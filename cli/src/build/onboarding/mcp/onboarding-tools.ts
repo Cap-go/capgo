@@ -8,10 +8,11 @@ import type { CapgoSDK } from '../../../sdk.js'
 import type { OnboardingNextStepInput } from '../../../schemas/onboarding.js'
 import { isAppAlreadyExistsError } from '../../../init/app-conflict.js'
 import { onboardingNextStepSchema } from '../../../schemas/onboarding.js'
-import { findSavedKeySilent, formatError, getAppId, getConfig } from '../../../utils.js'
+import { findSavedKeySilent, getAppId, getConfig } from '../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.js'
 import { getPlatformDirFromCapacitorConfig } from '../../platform-paths.js'
 import type { AndroidEffectDeps } from '../android/flow.js'
+import type { IosEffectDeps } from '../ios/flow.js'
 import { findAndroidApplicationIds } from '../android/gradle-parser.js'
 import { generateKeystore, listKeystoreAliases, sanitizeKeystoreAlias, tryUnlockPrivateKey } from '../android/keystore.js'
 import { fetchCapgoOAuthConfig } from '../android/oauth-config.js'
@@ -22,14 +23,17 @@ import { createProject, createServiceAccountKey, enableService, ensureServiceAcc
 import { inviteServiceAccount } from '../android/play-api.js'
 import { deleteAndroidProgress, loadAndroidProgress, saveAndroidProgress } from '../android/progress.js'
 import { validateServiceAccountJson } from '../android/service-account-validation.js'
-import { createCertificate, createProfile, ensureBundleId, generateJwt, verifyApiKey } from '../apple-api.js'
-import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
-import { loadProgress, saveProgress } from '../progress.js'
+import { createCertificate, createProfile, deleteProfile, ensureBundleId, generateJwt, listApps, listBundleIds, listDistributionCerts, revokeCertificate, verifyApiKey } from '../apple-api.js'
+import { createP12, generateCsr } from '../csr.js'
+import { detectIosBundleIds } from '../bundle-id-detector.js'
+import { writeReleaseBundleId } from '../../pbxproj-parser.js'
+import { deleteProgress, loadProgress, saveProgress } from '../progress.js'
 import { defaultBuildRecordPath, readBuildOutputRecord } from '../../output-record.js'
 import type { Platform } from './contract.js'
 import { renderResult } from './contract.js'
 import type { EngineDeps } from './engine.js'
 import { explainOnboarding, runAdvance, runStart } from './engine.js'
+import { getSession } from './session-state.js'
 import { canLaunchTerminal, launchBuildInTerminal } from './terminal-launch.js'
 
 /** Minimal shape of the MCP server's tool registrar (matches McpServer.tool). */
@@ -166,6 +170,119 @@ function buildAndroidEffectDeps(
   }
 }
 
+/**
+ * Build the iOS shared-engine effect deps the MCP driver injects into
+ * `decideIos` — headless (NO ink, NO native pickers, NO browser): the
+ * counterpart of the TUI's engine-driver wiring in ui/app.tsx, with the raw
+ * apple-api helpers adapted from their JWT-token call shape to the engine's
+ * abstracted dep shapes via a per-call `getFreshToken` (a fresh ASC JWT minted
+ * from the persisted keyId/issuerId + the .p8 bytes — session-carried when
+ * present, else re-read from the persisted p8Path so a server restart
+ * self-heals).
+ *
+ * Headless adaptations vs the TUI:
+ *  - openExternal is a NO-OP: the MCP server never opens the user's browser —
+ *    the verify-app create-app gate surfaces the App Store Connect URL in the
+ *    result instead.
+ *  - the native file pickers are omitted (p8-method-select never runs on the
+ *    MCP path; the single ios-api-key gate collects the path as text).
+ */
+function buildIosEffectDeps(cwd: string, getAppIdFn: () => Promise<string | undefined>): IosEffectDeps {
+  // The bundle-id detector needs the ios platform dir + capacitor appId
+  // SYNCHRONOUSLY (the dep mirrors the TUI's memo-bypassing detect call), but
+  // both come from the async capacitor-config read. Prime them once up front
+  // and make every Apple round-trip await the prime, so by the time verify-app
+  // calls detectBundleIds the real values are in place. Until primed the
+  // defaults match the overwhelmingly common layout ('ios' + no capacitor id).
+  let iosDirCache = 'ios'
+  let capacitorAppIdCache = ''
+  const primed = (async () => {
+    try {
+      const ext = await getConfig(true)
+      iosDirCache = getPlatformDirFromCapacitorConfig(ext?.config, 'ios') || 'ios'
+      capacitorAppIdCache = getAppId(undefined, ext?.config) ?? ''
+    }
+    catch {
+      // Not a Capacitor project / unreadable config — keep the defaults.
+    }
+  })()
+
+  /** Mint a fresh ASC JWT per call (mirrors the TUI's getFreshToken). */
+  async function getFreshToken(): Promise<string> {
+    await primed
+    const appId = await getAppIdFn()
+    if (!appId)
+      throw new Error('Cannot mint an App Store Connect token: no app id found in this project.')
+    const prog = await loadProgress(appId)
+    if (!prog?.keyId || !prog?.issuerId)
+      throw new Error('Missing App Store Connect API key details — provide the Key ID, Issuer ID, and .p8 path first.')
+    const carriedP8 = getSession(appId).iosCarried.p8Content
+    let content = carriedP8 ? carriedP8.toString('utf-8') : undefined
+    if (!content && prog.p8Path)
+      content = await readFile(prog.p8Path, 'utf-8')
+    if (!content)
+      throw new Error('The .p8 key file is unavailable — provide the p8Path again.')
+    return generateJwt(prog.keyId, prog.issuerId, content)
+  }
+
+  return {
+    // ── apple-api (token-adapted, mirrors ui/app.tsx's engine-driver wiring) ──
+    verifyApiKey: async () => {
+      const r = await verifyApiKey(await getFreshToken())
+      return { teamId: r.teamId }
+    },
+    createCertificate: async ({ csr }) => createCertificate(await getFreshToken(), csr),
+    createProfile: async ({ bundleId, certificateId }) => {
+      const token = await getFreshToken()
+      const { bundleIdResourceId } = await ensureBundleId(token, bundleId)
+      const p = await createProfile(token, bundleIdResourceId, certificateId, bundleId)
+      return { profileId: p.profileId, profileName: p.profileName, profileBase64: p.profileContent }
+    },
+    // Scoped to the DISTRIBUTION pool — same reasoning as the TUI's cert-limit
+    // recovery: only same-type revocations free a slot.
+    listCertificates: async () => listDistributionCerts(await getFreshToken(), { types: ['DISTRIBUTION'] }),
+    // ── cert-limit / duplicate-profile recovery (S6b, mirrors ui/app.tsx) ──
+    revokeCertificate: async (certificateId) => {
+      await revokeCertificate(await getFreshToken(), certificateId)
+    },
+    deleteProfile: async (profileId) => {
+      await deleteProfile(await getFreshToken(), profileId)
+    },
+
+    // ── verify-app (remote App Store verification, PR #2397) ──
+    listApps: async () => listApps(await getFreshToken()),
+    listBundleIds: async () => listBundleIds(await getFreshToken()),
+    detectBundleIds: () => detectIosBundleIds({ cwd, iosDir: iosDirCache, capacitorAppId: capacitorAppIdCache }),
+    writeReleaseBundleId: (fromId, toId) => writeReleaseBundleId(cwd, iosDirCache, fromId, toId),
+    ensureBundleId: async (bundleId) => {
+      await ensureBundleId(await getFreshToken(), bundleId)
+    },
+    // HEADLESS: never open the user's browser from the MCP server. The engine
+    // surfaces the create-app URL in the verify-app gate result instead.
+    openExternal: () => {},
+
+    // ── csr (shape-adapted) ──
+    generateCsr: () => {
+      const r = generateCsr()
+      return { csr: r.csrPem, privateKeyPem: r.privateKeyPem }
+    },
+    createP12: ({ certificatePem, privateKeyPem, password }) =>
+      createP12(certificatePem, privateKeyPem, password).p12Base64,
+
+    // ── file system ──
+    readFile: (path: string) => readFile(path) as Promise<Buffer>,
+    copyFile,
+    isMacOS: () => process.platform === 'darwin',
+
+    // ── persistence (the shared tail's saving-credentials needs all of these) ──
+    loadProgress,
+    saveProgress,
+    deleteProgress,
+    updateSavedCredentials,
+    loadSavedCredentials: (appId: string) => loadSavedCredentials(appId),
+  }
+}
+
 /** Build the real IO deps from the SDK + CLI utils. */
 function buildDeps(sdk: CapgoSDK): EngineDeps {
   const cwd = process.cwd()
@@ -217,47 +334,7 @@ function buildDeps(sdk: CapgoSDK): EngineDeps {
     buildRecordPath: defaultBuildRecordPath,
     canLaunchTerminal: () => canLaunchTerminal(),
     launchBuildInTerminal: (cmd: string) => launchBuildInTerminal(cmd),
-    setIosApiKey: async (appId: string, keyId: string, issuerId: string, p8Path: string) => {
-      const base = (await loadProgress(appId)) ?? { platform: 'ios' as const, appId, startedAt: new Date().toISOString(), completedSteps: {} }
-      await saveProgress(appId, { ...base, platform: 'ios', appId, setupMethod: 'create-new', keyId, issuerId, p8Path })
-    },
-    finalizeIosCredentials: async (appId: string) => {
-      const prog = await loadProgress(appId)
-      if (!prog?.keyId || !prog?.issuerId || !prog?.p8Path)
-        return { ok: false as const, error: 'Missing App Store Connect API key details.' }
-      try {
-        const p8Content = await readFile(prog.p8Path, 'utf-8')
-        const token = generateJwt(prog.keyId, prog.issuerId, p8Content)
-        await verifyApiKey(token)
-        const { csrPem, privateKeyPem } = generateCsr()
-        const cert = await createCertificate(token, csrPem)
-        const { p12Base64 } = createP12(cert.certificateContent, privateKeyPem)
-        const { bundleIdResourceId } = await ensureBundleId(token, appId)
-        const profile = await createProfile(token, bundleIdResourceId, cert.certificateId, appId)
-        await updateSavedCredentials(appId, 'ios', {
-          BUILD_CERTIFICATE_BASE64: p12Base64,
-          P12_PASSWORD: DEFAULT_P12_PASSWORD,
-          APPLE_KEY_ID: prog.keyId,
-          APPLE_ISSUER_ID: prog.issuerId,
-          APPLE_KEY_CONTENT: Buffer.from(p8Content).toString('base64'),
-          APP_STORE_CONNECT_TEAM_ID: cert.teamId,
-          CAPGO_IOS_PROVISIONING_MAP: JSON.stringify({ [appId]: profile.profileContent }),
-        })
-        await saveProgress(appId, {
-          ...prog,
-          completedSteps: {
-            ...prog.completedSteps,
-            apiKeyVerified: { keyId: prog.keyId, issuerId: prog.issuerId },
-            certificateCreated: { certificateId: cert.certificateId, expirationDate: cert.expirationDate, teamId: cert.teamId, p12Base64 },
-            profileCreated: { profileId: profile.profileId, profileName: profile.profileName, profileBase64: profile.profileContent },
-          },
-        })
-        return { ok: true as const }
-      }
-      catch (err) {
-        return { ok: false as const, error: formatError(err) }
-      }
-    },
+    iosEffectDeps: buildIosEffectDeps(cwd, getAppIdClosure),
     androidEffectDeps: buildAndroidEffectDeps(cwd, getAppIdClosure),
     writeKeystoreFile: async (appId: string, base64: string, alias: string): Promise<string> => {
       // Write the generated/loaded keystore to android/app/<alias>.p12, mirroring

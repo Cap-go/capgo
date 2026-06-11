@@ -583,6 +583,17 @@ export interface IosEffectDeps {
      */
     importedP12Password?: string
     /**
+     * The existing Apple Distribution certs surfaced when the per-team cert
+     * limit was hit (cert-limit recovery). Produced by `creating-certificate`
+     * into transient.existingCerts; the driver threads the list back here so a
+     * parked `cert-limit-prompt` re-renders (and resolves the user's pick by
+     * cert id) WITHOUT re-hitting Apple. EPHEMERAL — never persisted (the TUI's
+     * `existingCerts` React state); cleared together with `certToRevoke` after
+     * a successful revoke. A restart that loses it re-enters via a fresh
+     * creating-certificate attempt, which re-derives the list.
+     */
+    existingCerts?: AscDistributionCert[]
+    /**
      * The cert the user picked at `cert-limit-prompt` (cert-limit recovery). The
      * choice is EPHEMERAL — `applyIosInput` persists nothing; the driver records
      * the picked AscDistributionCert here and re-drives the prompt as a resolver
@@ -653,6 +664,15 @@ export interface IosEffectDeps {
      * variant. Mirrors the TUI leaving `noMatchReason` untouched on back-nav.
      */
     noMatchReason?: IosNoMatchReason
+    /**
+     * The failing step's human error message — the error screen's content
+     * (BATCH 8). EPHEMERAL — set by the failing effect into transient.error and
+     * threaded back here by the driver so a parked 'error' view re-renders the
+     * message (iosViewForStep('error') reads ctx.error). NEVER persisted —
+     * mirrors the TUI's setError React state; a crash-recovery resume re-enters
+     * the failing phase fresh.
+     */
+    error?: string
     /**
      * The step to re-run when the user picks "Try again" on the error screen
      * (BATCH 8). EPHEMERAL — set by the failing effect into transient.retryStep,

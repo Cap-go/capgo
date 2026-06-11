@@ -26,6 +26,11 @@ export const onboardingNextStepSchema = z.object({
   keystoreNewAlias: z.string().optional().describe('Alias for a newly generated keystore (default "release"), when generating'),
   keystorePasswordMethod: z.enum(['random', 'manual']).optional().describe('For a new keystore: generate a random password or set your own'),
   keystoreCommonName: z.string().optional().describe('Certificate Common Name for a new keystore (defaults to the app id)'),
+  verifyAction: z.enum(['pick', 'create-new', 'autofix', 'continue', 'recheck', 'open', 'reopen', 'back', 'cancel']).optional().describe('Answer to the iOS verify-app gate: "pick" an existing App Store app (with verifyAppId), "create-new" when the build id is correct and no app matches, "autofix" to rewrite the Xcode bundle id, "continue"/"recheck" to re-check after a manual fix, "open"/"reopen" to (re)surface the App Store Connect create-app page, "back" to return to the app picker, or "cancel" to stop'),
+  verifyAppId: z.string().optional().describe('The bundle id of the App Store app picked at the iOS verify-app step — only together with verifyAction "pick"'),
+  certToRevoke: z.string().optional().describe('Answer to the iOS cert-limit-prompt: the Apple resource id of the Distribution certificate to revoke (frees a slot so a new one can be created), or "__exit__" to stop'),
+  duplicateProfileAction: z.enum(['delete', 'exit']).optional().describe('Answer to the iOS duplicate-profile-prompt: "delete" removes the duplicate Capgo provisioning profile(s) and recreates a fresh one, "exit" stops onboarding'),
+  errorAction: z.enum(['retry', 'restart', 'exit', 'email-support']).optional().describe('Answer to the iOS error recovery screen: "retry" re-runs the failing step, "restart" wipes onboarding progress and starts over, "exit" stops here, "email-support" returns instructions for contacting Capgo support'),
 })
 
 export type OnboardingNextStepInput = z.infer<typeof onboardingNextStepSchema>

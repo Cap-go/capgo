@@ -1,18 +1,25 @@
 // src/build/onboarding/mcp/engine.ts
 import type { AndroidOnboardingProgress, AndroidOnboardingStep } from '../android/types.js'
 import type { AndroidEffectDeps, AndroidStepCtx } from '../android/flow.js'
-import type { OnboardingProgress } from '../types.js'
+import type { IosEffectDeps, IosStepCtx, IosStepView } from '../ios/flow.js'
+import type { OnboardingProgress, OnboardingStep } from '../types.js'
 import type { NextStepResult, Platform } from './contract.js'
+import type { IosCarried } from './session-state.js'
 import type { BuildOutputRecord } from '../../output-record.js'
 import { buildAppIdConflictSuggestions } from '../../../init/app-conflict.js'
 import { ONBOARDING_RULES } from './contract.js'
 import { explainForState } from './explanations.js'
 import { isSafeAppIdForCommand } from './app-id-validation.js'
 import { ANDROID_STEP_PROGRESS } from '../android/types.js'
+import { STEP_PROGRESS } from '../types.js'
 import { getAndroidResumeStep } from '../android/progress.js'
-import { validateStepInput, validateStorePassword } from './step-input.js'
+import { getIosResumeStep } from '../ios/progress.js'
+import { validateIosStepInput, validateStepInput, validateStorePassword } from './step-input.js'
 import { androidViewForStep, applyAndroidInput, applyGoogleSignIn, runAndroidEffect } from '../android/flow.js'
+import { applyIosInput, iosViewForStep, runIosEffect } from '../ios/flow.js'
+import { clearSession, dropIosCarried, getSession, mergeIosCarried } from './session-state.js'
 import { beginOAuthSession, clearOAuthSession, pollOAuthSession } from './oauth-session.js'
+import { SUPPORT_EMAIL } from '../../../support/contact-support.js'
 
 /** Facts gathered during preflight; the pure deciders branch only on these. */
 export interface PreflightFacts {
@@ -58,6 +65,25 @@ interface OnboardingInput {
   keystoreNewAlias?: string
   keystorePasswordMethod?: 'random' | 'manual'
   keystoreCommonName?: string
+  /** Answer to the parked iOS verify-app gate (the TUI Select vocabulary). */
+  verifyAction?: 'pick' | 'create-new' | 'autofix' | 'continue' | 'recheck' | 'open' | 'reopen' | 'back' | 'cancel'
+  /** The picked App Store app's bundle id — only with verifyAction 'pick'. */
+  verifyAppId?: string
+  /**
+   * Answer to the parked iOS cert-limit-prompt (S6b): the Apple resource id of
+   * the Distribution certificate to revoke, or '__exit__' (the engine's
+   * OPTION_CERT_LIMIT_EXIT sentinel) to stop.
+   */
+  certToRevoke?: string
+  /** Answer to the parked iOS duplicate-profile-prompt (S6b). */
+  duplicateProfileAction?: 'delete' | 'exit'
+  /**
+   * Answer to the parked iOS error recovery screen (S6b): 'retry' re-runs the
+   * failing step (carried.retryStep), 'restart' wipes progress + session and
+   * starts over, 'exit' stops, 'email-support' surfaces support instructions
+   * (MCP-only arm — no host-side opens).
+   */
+  errorAction?: 'retry' | 'restart' | 'exit' | 'email-support'
 }
 
 // decideStart
@@ -122,13 +148,13 @@ export async function decideStart(
   if (active === 'android')
     return decideAndroid(facts, deps)
   if (active === 'ios')
-    return decideIos(facts)
+    return decideIos(facts, deps)
 
   // Single android platform with no in-flight progress → auto-route to android.
   if (facts.platformsDetected.length === 1 && facts.platformsDetected[0] === 'android')
     return decideAndroid(facts, deps)
 
-  return decidePlatform(facts, progress)
+  return decidePlatform(facts, progress, deps)
 }
 
 /** Which platform's credential flow is already in progress (if any). */
@@ -142,7 +168,7 @@ function activePlatform(facts: PreflightFacts): Platform | null {
   return null
 }
 
-function decidePlatform(facts: PreflightFacts, _progress: OnboardingProgress | null): NextStepResult {
+async function decidePlatform(facts: PreflightFacts, _progress: OnboardingProgress | null, deps: EngineDeps): Promise<NextStepResult> {
   const platforms = facts.platformsDetected
 
   if (platforms.length === 0) {
@@ -168,7 +194,7 @@ function decidePlatform(facts: PreflightFacts, _progress: OnboardingProgress | n
   if (platforms.length === 1) {
     // Single-platform (ios only): auto-route to ios. Single android is handled
     // via decideAndroid in the async path (activePlatform or platform selection).
-    return decideIos(facts)
+    return decideIos(facts, deps)
   }
 
   return {
@@ -194,52 +220,664 @@ function decidePlatform(facts: PreflightFacts, _progress: OnboardingProgress | n
   }
 }
 
-export function decideIos(facts: PreflightFacts): NextStepResult {
-  const p = facts.iosProgress
-  const done = p?.completedSteps ?? {}
+// ─── iOS (granular shared-engine path, S6a) ───────────────────────────────────
+//
+// decideIos is a thin driver over the SHARED iOS flow engine (ios/flow.ts),
+// mirroring decideAndroid: state = getIosResumeStep(progress); auto steps run
+// via runIosEffect inside the bounded loop (the same non-progress guard);
+// choice/gate steps render via mapIosView. iOS engine step ids become the MCP
+// state names VERBATIM — with one exception: the TUI-only .p8 input chain
+// (api-key-instructions / p8-method-select / input-p8-path / input-key-id /
+// input-issuer-id, plus welcome and the setup-method fork) renders as the
+// SINGLE 'ios-api-key' human gate (the e2e tree pins that state name). The
+// gate collects all three fields in one call; on receipt drive() applies them
+// sequentially through applyIosInput so progress persists identically to the
+// TUI (see persistIosApiKeyInput).
+//
+// Carried transients (certData / profileData / teamId / p8Content / the
+// verify-app gate fields ...) live in the process-local session registry
+// (session-state.ts): threaded into every effect as deps.carried and merged
+// back from every IosEffectResult.transient — the headless mirror of the TUI's
+// iosCarriedRef. A server restart loses them; the flow engine self-heals from
+// persisted progress (resolveP8Content re-reads the .p8 from p8Path; the
+// cert/profile markers rebuild the credential map), so nothing here may crash
+// on a missing carried field. Secrets in carried (p8 bytes, p12 base64,
+// passwords) must NEVER serialize into a NextStepResult — mapIosView builds
+// results exclusively from view fields + whitelisted non-secret context.
 
-  if (!p?.keyId || !p?.issuerId || !p?.p8Path) {
+/** The TUI-only .p8 input chain steps the MCP collapses into one 'ios-api-key' gate. */
+const IOS_API_KEY_GATE_STEPS = new Set<OnboardingStep>([
+  'welcome',
+  'setup-method-select',
+  'api-key-instructions',
+  'p8-method-select',
+  'input-p8-path',
+  'input-key-id',
+  'input-issuer-id',
+])
+
+/** The single ios-api-key human gate (collects keyId + issuerId + p8Path in one call). */
+function iosApiKeyGateResult(facts: PreflightFacts): NextStepResult {
+  return {
+    onboarding: 'capgo-builder',
+    phase: 'credentials',
+    state: 'ios-api-key',
+    platform: 'ios',
+    progress: 25,
+    kind: 'human_gate',
+    summary: `Set up iOS signing for "${facts.appId}". I need an App Store Connect API key.`,
+    human: {
+      instruction: 'In App Store Connect go to Users and Access, Integrations, App Store Connect API, create a key with App Manager access and download the .p8 (you can only download it once). Then give me the Key ID, the Issuer ID, and the path to the .p8 file. The .p8 stays on your machine — do not paste its contents here.',
+    },
+    collect: [
+      { field: 'keyId', desc: 'the Key ID shown next to the key' },
+      { field: 'issuerId', desc: 'the Issuer ID at the top of the Keys page' },
+      { field: 'p8Path', desc: 'absolute path to the downloaded .p8 file' },
+    ],
+    next: {
+      tool: NEXT_STEP_TOOL,
+      with: { keyId: '<keyId>', issuerId: '<issuerId>', p8Path: '<path>' },
+      instruction: 'Collect all three from the user, then call next_step with keyId, issuerId, and p8Path.',
+      call: `${NEXT_STEP_TOOL}({ keyId: "ABC123", issuerId: "1a2b-...", p8Path: "/path/to/AuthKey.p8" })`,
+    },
+    rules: ONBOARDING_RULES,
+  }
+}
+
+/**
+ * The existing ios-credentials-failed re-collect gate. S6a maps EVERY iOS
+ * engine 'error' here (the message carries the failing step's human text);
+ * S6b replaces this with structured per-failure recovery.
+ */
+function iosCredentialsFailedResult(facts: PreflightFacts, message: string): NextStepResult {
+  return {
+    onboarding: 'capgo-builder',
+    phase: 'credentials',
+    state: 'ios-credentials-failed',
+    platform: 'ios',
+    progress: 25,
+    kind: 'human_gate',
+    summary: `iOS signing setup failed: ${message}`,
+    human: { instruction: 'This often means the API key lacks access, the .p8 moved, or Apple\'s certificate limit was hit. Provide corrected Key ID / Issuer ID / .p8 path, then continue.' },
+    collect: [
+      { field: 'keyId', desc: 'the Key ID' },
+      { field: 'issuerId', desc: 'the Issuer ID' },
+      { field: 'p8Path', desc: 'absolute path to the .p8 file' },
+    ],
+    next: {
+      tool: NEXT_STEP_TOOL,
+      with: { keyId: '<keyId>', issuerId: '<issuerId>', p8Path: '<path>' },
+      instruction: 'Collect corrected values from the user, then call next_step with keyId, issuerId, p8Path — or call next_step({}) to retry as-is.',
+      call: `${NEXT_STEP_TOOL}({ keyId: "ABC123", issuerId: "1a2b-...", p8Path: "/path/to/AuthKey.p8" })`,
+    },
+    rules: ONBOARDING_RULES,
+  }
+}
+
+/**
+ * The iOS data-safety gate (a TUI run parked `_credentialsExistGate: 'pending'`).
+ * Mirrors the android credentials-exist choice — answered via credentialsExistChoice.
+ */
+function iosCredentialsExistResult(facts: PreflightFacts): NextStepResult {
+  return {
+    onboarding: 'capgo-builder',
+    phase: 'credentials',
+    state: 'credentials-exist',
+    platform: 'ios',
+    progress: STEP_PROGRESS['credentials-exist'],
+    kind: 'choice',
+    summary: `iOS credentials already exist for "${facts.appId}". Continuing onboarding will create new credentials and replace the existing ones. Back them up first, or stop?`,
+    options: [
+      { value: 'backup', label: 'Start fresh (backup existing credentials first)' },
+      { value: 'cancel', label: 'Stop — keep my existing credentials' },
+    ],
+    next: {
+      tool: NEXT_STEP_TOOL,
+      with: { credentialsExistChoice: '<backup|cancel>' },
+      instruction: 'Tell the user their existing iOS credentials will be replaced. Ask whether to back them up first and continue, or stop. Then call next_step with credentialsExistChoice.',
+      call: `${NEXT_STEP_TOOL}({ credentialsExistChoice: "backup" })`,
+    },
+    rules: ONBOARDING_RULES,
+  }
+}
+
+/** A thrown (non-engine-routed) iOS effect failure → the same re-collect gate. */
+function iosEffectError(step: OnboardingStep, err: unknown, facts: PreflightFacts): NextStepResult {
+  const message = err instanceof Error ? err.message : String(err)
+  return iosCredentialsFailedResult(facts, `at step "${step}": ${message}`)
+}
+
+/**
+ * Map an interactive IosStepView into a NextStepResult — the iOS mirror of
+ * mapAndroidView. State names reuse the engine step ids; option values mirror
+ * the TUI Select values. Only NON-SECRET, view-derived data may appear here.
+ */
+export function mapIosView(
+  view: IosStepView,
+  facts: PreflightFacts,
+  ctx?: IosStepCtx,
+): NextStepResult {
+  const base = {
+    onboarding: 'capgo-builder' as const,
+    phase: 'credentials' as const,
+    platform: 'ios' as const,
+    state: view.step,
+    progress: STEP_PROGRESS[view.step] ?? 45,
+    rules: ONBOARDING_RULES,
+  }
+
+  switch (view.step) {
+    // ── verify-app (the parked App Store verification gate, PR #2397) ────────
+    // Three variants, mirroring iosViewForStep: the PICKER (option values are
+    // app bundle ids + the '__create_new__' escape — answered via
+    // verifyAction 'pick' + verifyAppId, or verifyAction 'create-new'), and
+    // the Path-A / Path-B gates (option values ARE verifyAction members).
+    case 'verify-app': {
+      const releaseId = ctx?.verifyReleaseBundleId ?? ''
+      const options = (view.options ?? []).map(o => ({ value: o.value, label: o.label, note: o.note }))
+      const isPicker = !ctx?.verifyPath
+      const isCreateApp = ctx?.verifyPath === 'create-app'
+      const createAppUrl = 'https://appstoreconnect.apple.com/apps'
+      const title = view.title ?? `Verifying the App Store app for ${releaseId}.`
+      return {
+        ...base,
+        kind: 'choice',
+        summary: isPicker
+          ? `${title} Pick the App Store app this project should build for, or create a new one.`
+          : title,
+        context: {
+          ...(releaseId ? { releaseBundleId: releaseId } : {}),
+          ...(isCreateApp ? { createAppUrl } : {}),
+          ...(ctx?.verifyAttempt ? { attempt: ctx.verifyAttempt } : {}),
+        },
+        options,
+        next: isPicker
+          ? {
+              tool: NEXT_STEP_TOOL,
+              with: { verifyAction: '<pick|create-new>', verifyAppId: '<bundle id when picking>' },
+              instruction: 'Present the App Store apps to the user. To build for one of them, call next_step with verifyAction "pick" AND verifyAppId set to that option\'s bundle id. If none match and the build id is correct, call next_step with verifyAction "create-new" (no verifyAppId).',
+              call: `${NEXT_STEP_TOOL}({ verifyAction: "pick", verifyAppId: "com.example.app" })`,
+            }
+          : {
+              tool: NEXT_STEP_TOOL,
+              with: { verifyAction: `<${options.map(o => o.value).join('|')}>` },
+              instruction: isCreateApp
+                ? `Tell the user to create the App Store app at ${createAppUrl} (I cannot open a browser for them). Then call next_step with verifyAction — "recheck" once they created it, or another listed action.`
+                : 'Present the options to the user, then call next_step with verifyAction set to their pick.',
+              call: `${NEXT_STEP_TOOL}({ verifyAction: "${options[0]?.value ?? 'recheck'}" })`,
+            },
+      }
+    }
+
+    // ── cert-limit-prompt (S6b — cert-limit recovery) ────────────────────────
+    // Apple's per-team Distribution-cert limit was hit. One option per existing
+    // cert (value = its Apple resource id; label carries name + expiry, with
+    // the Capgo-created cert flagged) plus the engine's '__exit__' sentinel —
+    // answered via certToRevoke. The list itself is the engine view's options
+    // (built from ctx.existingCerts), so the MCP never re-derives it.
+    case 'cert-limit-prompt': {
+      const options = (view.options ?? []).map(o => ({ value: o.value, label: o.label, note: o.note }))
+      return {
+        ...base,
+        kind: 'choice',
+        summary: `${view.title ?? 'Apple\'s Distribution-certificate limit was reached.'} Revoking one frees a slot so a new certificate can be created.`,
+        options,
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { certToRevoke: '<certificate id|__exit__>' },
+          instruction: 'Present the certificates to the user (the one created by Capgo is flagged). WARNING: revoking a certificate invalidates anything still signing with it, so let the USER choose. Then call next_step with certToRevoke set to the chosen option\'s value, or "__exit__" to stop.',
+          call: `${NEXT_STEP_TOOL}({ certToRevoke: "${options[0]?.value ?? '__exit__'}" })`,
+        },
+      }
+    }
+
+    // ── duplicate-profile-prompt (S6b — duplicate-profile recovery) ──────────
+    // Apple already has Capgo provisioning profiles for this bundle id. The
+    // options are the engine's static delete|exit pair — answered via
+    // duplicateProfileAction. Origin routing (creating-profile vs
+    // import-create-profile-only) is the engine's job, keyed off the persisted
+    // duplicateProfileOrigin marker.
+    case 'duplicate-profile-prompt': {
+      const options = (view.options ?? []).map(o => ({ value: o.value, label: o.label, note: o.note }))
+      return {
+        ...base,
+        kind: 'choice',
+        summary: `${view.title ?? 'Apple already has Capgo provisioning profile(s) for this app.'} Delete them and create a fresh one, or stop here.`,
+        options,
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { duplicateProfileAction: '<delete|exit>' },
+          instruction: 'Ask the user. To delete the duplicate Capgo profile(s) and recreate a fresh one, call next_step with duplicateProfileAction "delete"; to stop, "exit".',
+          call: `${NEXT_STEP_TOOL}({ duplicateProfileAction: "delete" })`,
+        },
+      }
+    }
+
+    // ── error (S6b — the structured recovery screen) ─────────────────────────
+    // The engine error view's choices verbatim ('retry' only when a retryStep
+    // is carried — exactly the TUI's showRetry gate), plus the MCP-only
+    // 'email-support' arm (no host-side opens; instructions only). Corrected
+    // ASC key details (keyId/issuerId/p8Path) are ALSO accepted while parked
+    // here — the S6a re-collect arm folded into the recovery menu.
+    case 'error': {
+      const engineOptions = (view.options ?? []).map(o => ({ value: o.value, label: o.label, note: o.note }))
+      const options = [
+        ...engineOptions,
+        { value: 'email-support', label: '📧  Email Capgo support', note: undefined },
+      ]
+      const hasRetry = engineOptions.some(o => o.value === 'retry')
+      return {
+        ...base,
+        kind: 'choice',
+        summary: `iOS setup hit an error: ${view.message ?? 'unknown error.'}`,
+        options,
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { errorAction: `<${options.map(o => o.value).join('|')}>` },
+          instruction: `Show the error to the user and present the recovery options.${hasRetry ? ' "retry" re-runs the failing step.' : ''} "restart" wipes the onboarding progress and starts over; "exit" stops here; "email-support" returns instructions for contacting Capgo support. If the error looks like a wrong API key, you can instead send corrected keyId/issuerId/p8Path directly.`,
+          call: `${NEXT_STEP_TOOL}({ errorAction: "${engineOptions[0]?.value ?? 'restart'}" })`,
+        },
+      }
+    }
+
+    default: {
+      // Generic mapping for views outside the S6a create-new scope (the
+      // cert-limit / duplicate-profile recoveries land in S6b as structured
+      // states). Mirrors mapAndroidView's default: surface the engine view
+      // verbatim and allow a plain re-check.
+      if (view.kind === 'choice') {
+        return {
+          ...base,
+          kind: 'choice',
+          summary: view.title ?? `iOS setup: ${view.step}`,
+          options: (view.options ?? []).map(o => ({ value: o.value, label: o.label, note: o.note })),
+          next: {
+            tool: NEXT_STEP_TOOL,
+            instruction: 'Present the options to the user. Structured answers for this step arrive in a later milestone — call next_step({}) to re-check, or finish this step in the interactive wizard (`npx @capgo/cli build init`).',
+            call: `${NEXT_STEP_TOOL}({})`,
+          },
+        }
+      }
+      return {
+        ...base,
+        kind: 'human_gate',
+        summary: view.title ?? `iOS setup: ${view.step}`,
+        human: { instruction: view.prompt ?? 'Continue when ready.' },
+        next: { tool: NEXT_STEP_TOOL, instruction: 'Call next_step to continue.', call: `${NEXT_STEP_TOOL}({})` },
+      }
+    }
+  }
+}
+
+/**
+ * The session-parked iOS recovery step, if any (S6b). The cert-limit /
+ * duplicate-profile prompts and the error screen are NOT resume targets
+ * (their state is the TUI's React state — here the per-app session): the
+ * presence of their carried markers is what parks them between tool calls.
+ * Precedence mirrors causality: an error parked AFTER a recovery prompt
+ * (e.g. a failed revoke) must win over the prompt's own marker. A server
+ * restart loses the markers and the flow self-heals via a fresh resume —
+ * re-deriving the inventory through the failing step, never crashing.
+ */
+function iosParkedStep(carried: IosCarried): OnboardingStep | null {
+  if (carried.error !== undefined)
+    return 'error'
+  if (carried.existingCerts !== undefined)
+    return 'cert-limit-prompt'
+  if (carried.duplicateProfiles !== undefined)
+    return 'duplicate-profile-prompt'
+  return null
+}
+
+/**
+ * The effective iOS step an incoming answer must address: the session-parked
+ * recovery step when one is parked, else the persisted resume step. This is
+ * what the strict iOS input gate validates against.
+ */
+function effectiveIosStep(appId: string, progress: OnboardingProgress | null): OnboardingStep {
+  return iosParkedStep(getSession(appId).iosCarried) ?? getIosResumeStep(progress)
+}
+
+/**
+ * Phase-0 data-safety gate seeding (S7, mirrors the android gate at
+ * decideAndroid): when saved iOS credentials already exist for this app AND
+ * the user is entering the credential phase fresh (the resume step is still in
+ * the .p8-chain entry set) AND the gate has not been evaluated, persist
+ * `_credentialsExistGate: 'pending'` so getIosResumeStep parks on
+ * 'credentials-exist' BEFORE any Apple traffic — matching the FROZEN TUI
+ * journey semantics (ios-resume.journeys.mjs: the gate intercepts before the
+ * verify-app/create pipeline). Only fires on a truly fresh entry, so an
+ * in-flight onboarding is unaffected. Returns the (possibly updated) progress.
+ */
+async function seedIosCredentialsExistGate(
+  appId: string,
+  ios: IosEffectDeps | undefined,
+  progress: OnboardingProgress | null,
+): Promise<OnboardingProgress | null> {
+  if (progress?._credentialsExistGate !== undefined)
+    return progress
+  if (!IOS_API_KEY_GATE_STEPS.has(getIosResumeStep(progress)))
+    return progress
+  let hasSavedIos = false
+  try {
+    const saved = await ios?.loadSavedCredentials?.(appId)
+    hasSavedIos = !!(saved && typeof saved === 'object' && (saved as { ios?: unknown }).ios)
+  }
+  catch {
+    // Treat a load failure as "no saved credentials" — never block onboarding
+    // on a read error; the worst case is the pre-existing (no-gate) behavior.
+    hasSavedIos = false
+  }
+  if (!hasSavedIos)
+    return progress
+  const seeded: OnboardingProgress = {
+    ...(progress ?? { platform: 'ios', appId, startedAt: new Date().toISOString(), completedSteps: {} }),
+    _credentialsExistGate: 'pending',
+  }
+  await ios?.saveProgress?.(appId, seeded)
+  return seeded
+}
+
+/**
+ * The 'email-support' arm of the parked error screen (S6b, MCP-only). NO
+ * host-side opens — the MCP server never launches a mail client or browser;
+ * it surfaces the support address + what to include and leaves the error
+ * parked so the user can still retry/restart/exit afterwards.
+ */
+function iosEmailSupportResult(facts: PreflightFacts, message?: string): NextStepResult {
+  return {
+    onboarding: 'capgo-builder',
+    phase: 'credentials',
+    state: 'error',
+    platform: 'ios',
+    progress: STEP_PROGRESS.error ?? 45,
+    kind: 'human_gate',
+    summary: `To get help from Capgo support, email ${SUPPORT_EMAIL}.${message ? ` Include the error: "${message}"` : ''}`,
+    human: {
+      instruction: `Email ${SUPPORT_EMAIL} describing what you were doing (iOS build onboarding for "${facts.appId}") and paste the error message shown above. I cannot open your mail app from here. Running \`npx @capgo/cli@latest doctor\` and attaching its output speeds up support.`,
+    },
+    context: { supportEmail: SUPPORT_EMAIL },
+    next: {
+      tool: NEXT_STEP_TOOL,
+      with: { errorAction: '<retry|restart|exit>' },
+      instruction: 'After the user has emailed support (or decided not to), call next_step with errorAction: "retry" to re-run the failing step, "restart" to start onboarding over, or "exit" to stop.',
+      call: `${NEXT_STEP_TOOL}({ errorAction: "retry" })`,
+    },
+    rules: ONBOARDING_RULES,
+  }
+}
+
+/** The 'exit' arm of the parked error screen — a clean stop, progress kept. */
+function iosErrorExitResult(facts: PreflightFacts, message?: string): NextStepResult {
+  return {
+    onboarding: 'capgo-builder',
+    phase: 'credentials',
+    state: 'error',
+    platform: 'ios',
+    progress: STEP_PROGRESS.error ?? 45,
+    kind: 'done',
+    summary: `Stopped iOS onboarding after an error${message ? ` ("${message}")` : ''}. Nothing else was changed — your saved progress is kept, so running onboarding again resumes from the failing step.`,
+    rules: ONBOARDING_RULES,
+  }
+}
+
+export async function decideIos(
+  facts: PreflightFacts,
+  deps: EngineDeps,
+  opts?: {
+    verifyAction?: OnboardingInput['verifyAction']
+    verifyAppId?: string
+    certToRevoke?: string
+    duplicateProfileAction?: 'delete' | 'exit'
+    errorAction?: 'retry' | 'restart' | 'exit' | 'email-support'
+  },
+): Promise<NextStepResult> {
+  const appId = facts.appId!
+  const ios: IosEffectDeps = deps.iosEffectDeps ?? {}
+
+  // Seed empty progress on first entry (mirrors decideAndroid's seeding): the
+  // resume resolver then lands on the .p8 chain entry, not the TUI-only
+  // 'welcome'. NOT persisted — the first persist happens when the gate's
+  // three fields arrive (persistIosApiKeyInput).
+  let progress: OnboardingProgress = facts.iosProgress ?? {
+    platform: 'ios',
+    appId,
+    startedAt: new Date().toISOString(),
+    completedSteps: {},
+  }
+
+  // ── Parked error screen actions (S6b) — validated by the strict gate ───────
+  // (errorAction only reaches here while the session is parked on 'error').
+  // 'retry' re-drives the engine's error RESOLVER (carried.retryStep routing);
+  // the other arms are DRIVER-owned, mirroring the TUI: restart =
+  // resetForFreshStart (wipe progress + session), exit = leave onboarding,
+  // email-support = surface instructions (no host-side opens, stays parked).
+  let errorRetry = false
+  if (opts?.errorAction) {
+    const carriedNow = getSession(appId).iosCarried
+    const errorMessage = carriedNow.error
+    if (opts.errorAction === 'email-support')
+      return iosEmailSupportResult(facts, errorMessage)
+    if (opts.errorAction === 'exit') {
+      dropIosCarried(appId, ['error', 'retryStep', 'errorAction'])
+      return iosErrorExitResult(facts, errorMessage)
+    }
+    if (opts.errorAction === 'retry') {
+      if (!carriedNow.retryStep) {
+        // No retry was offered (unrecoverable / user-initiated exit sink) —
+        // the engine resolver would self-loop; treat as the exit arm.
+        dropIosCarried(appId, ['error', 'retryStep', 'errorAction'])
+        return iosErrorExitResult(facts, errorMessage)
+      }
+      mergeIosCarried(appId, { errorAction: 'retry' })
+      errorRetry = true
+    }
+    if (opts.errorAction === 'restart') {
+      // Wipe progress + session, back to the very start (the TUI's
+      // resetForFreshStart + setStep('welcome')). The data-safety gate below
+      // re-evaluates against the fresh progress, so saved credentials are
+      // re-protected before any new Apple traffic.
+      try {
+        await ios.deleteProgress?.(appId)
+      }
+      catch {
+        // Best-effort: a failed delete leaves the old progress; the resume
+        // routing then simply continues from it instead of restarting.
+      }
+      clearSession(appId)
+      progress = { platform: 'ios', appId, startedAt: new Date().toISOString(), completedSteps: {} }
+    }
+  }
+
+  // ── Phase-0 data-safety gate (S7) ──────────────────────────────────────────
+  progress = (await seedIosCredentialsExistGate(appId, ios, progress)) ?? progress
+
+  // 'cancel' on the data-safety gate is a hard stop (mirrors the android gate):
+  // the user declined to back up their existing iOS credentials.
+  if (progress._credentialsExistGate === 'cancel') {
     return {
-      onboarding: 'capgo-builder',
-      phase: 'credentials',
-      state: 'ios-api-key',
-      platform: 'ios',
-      progress: 25,
-      kind: 'human_gate',
-      summary: `Set up iOS signing for "${facts.appId}". I need an App Store Connect API key.`,
-      human: {
-        instruction: 'In App Store Connect go to Users and Access, Integrations, App Store Connect API, create a key with App Manager access and download the .p8 (you can only download it once). Then give me the Key ID, the Issuer ID, and the path to the .p8 file. The .p8 stays on your machine — do not paste its contents here.',
-      },
-      collect: [
-        { field: 'keyId', desc: 'the Key ID shown next to the key' },
-        { field: 'issuerId', desc: 'the Issuer ID at the top of the Keys page' },
-        { field: 'p8Path', desc: 'absolute path to the downloaded .p8 file' },
-      ],
-      next: {
-        tool: NEXT_STEP_TOOL,
-        with: { keyId: '<keyId>', issuerId: '<issuerId>', p8Path: '<path>' },
-        instruction: 'Collect all three from the user, then call next_step with keyId, issuerId, and p8Path.',
-        call: `${NEXT_STEP_TOOL}({ keyId: "ABC123", issuerId: "1a2b-...", p8Path: "/path/to/AuthKey.p8" })`,
-      },
+      onboarding: 'capgo-builder', phase: 'credentials', state: 'credentials-exist', platform: 'ios',
+      progress: STEP_PROGRESS['credentials-exist'], kind: 'done',
+      summary: `Onboarding stopped to protect the existing iOS credentials for "${appId}". Nothing was changed. Re-run onboarding and choose "Start fresh (backup existing credentials first)" when you're ready to replace them.`,
       rules: ONBOARDING_RULES,
     }
   }
 
-  if (!done.profileCreated) {
-    return {
-      onboarding: 'capgo-builder',
-      phase: 'credentials',
-      state: 'ios-finalize',
-      platform: 'ios',
-      progress: 70,
-      kind: 'auto',
-      summary: 'Verifying your App Store Connect key, creating the distribution certificate + provisioning profile, and saving credentials...',
-      context: { appId: facts.appId },
-      rules: ONBOARDING_RULES,
+  // Record the user's verify-app gate pick into the session BEFORE driving, so
+  // the parked step re-runs as a RESOLVER effect (the same carried-driven
+  // mechanism the TUI uses). 'pick' also resolves verifyAppId → the chosen
+  // AscApp against the carried picker inventory; an unknown id resolves to
+  // null and the resolver simply re-parks the picker.
+  if (opts?.verifyAction) {
+    const carriedNow = getSession(appId).iosCarried
+    const chosen = opts.verifyAction === 'pick'
+      ? ((carriedNow.verifyApps ?? []).find(a => a.bundleId === opts.verifyAppId) ?? null)
+      : undefined
+    mergeIosCarried(appId, {
+      verifyAction: opts.verifyAction,
+      ...(chosen !== undefined ? { verifyChosenApp: chosen } : {}),
+    })
+  }
+
+  // ── Parked cert-limit-prompt answer (S6b) ──────────────────────────────────
+  // Resolve the picked option value (a cert's Apple resource id) against the
+  // carried inventory into carried.certToRevoke — the engine resolver then
+  // routes pick → revoking-certificate / no-pick ('__exit__') → the error
+  // sink, mirroring app.tsx:3917-3926. An unknown id re-renders the prompt
+  // with a correction and applies NOTHING.
+  let certLimitAnswered = false
+  if (opts?.certToRevoke !== undefined) {
+    const carriedNow = getSession(appId).iosCarried
+    if (opts.certToRevoke === '__exit__') {
+      // The engine resolver reads "no carried certToRevoke" as the exit pick.
+      dropIosCarried(appId, ['certToRevoke'])
+      certLimitAnswered = true
+    }
+    else {
+      const chosenCert = (carriedNow.existingCerts ?? []).find(c => c.id === opts.certToRevoke)
+      if (!chosenCert) {
+        const ctx: IosStepCtx = { appId, ...(carriedNow as Partial<IosStepCtx>) }
+        const rerender = mapIosView(iosViewForStep('cert-limit-prompt', progress, ctx), facts, ctx)
+        return { ...rerender, summary: `Unknown certificate id "${opts.certToRevoke}" — call next_step with certToRevoke set to one of the listed option values, or "__exit__".\n\n${rerender.summary}` }
+      }
+      mergeIosCarried(appId, { certToRevoke: chosenCert })
+      certLimitAnswered = true
     }
   }
 
-  return decideBuildPhase(facts, 'ios')
+  // ── Parked duplicate-profile-prompt answer (S6b) ───────────────────────────
+  // 'delete' → carried.confirmDeleteDuplicates=true → the resolver routes to
+  // deleting-duplicate-profiles (then back to the persisted
+  // duplicateProfileOrigin); 'exit' → no confirm → the error sink. Mirrors
+  // app.tsx:3941-3949.
+  let dupAnswered = false
+  if (opts?.duplicateProfileAction) {
+    if (opts.duplicateProfileAction === 'delete')
+      mergeIosCarried(appId, { confirmDeleteDuplicates: true })
+    else
+      dropIosCarried(appId, ['confirmDeleteDuplicates'])
+    dupAnswered = true
+  }
+
+  let forcedNextStep: OnboardingStep | undefined
+
+  for (let i = 0; i < MAX_AUTO_STEPS; i++) {
+    // Session-parked recovery steps (error / cert-limit / duplicate-profile)
+    // override the persisted resume step — they are the MCP's mirror of the
+    // TUI's React `step` state, which resume routing can never reproduce.
+    const step = forcedNextStep
+      ?? iosParkedStep(getSession(appId).iosCarried)
+      ?? getIosResumeStep(progress)
+    forcedNextStep = undefined
+
+    // The TUI-only .p8 input chain renders as the single 'ios-api-key' gate.
+    if (IOS_API_KEY_GATE_STEPS.has(step))
+      return iosApiKeyGateResult(facts)
+
+    // ask-build is the post-save entry point — map to the shared build-ready
+    // choice exactly like the android driver (the unchanged C2/D2 contract).
+    if (step === 'ask-build')
+      return decideBuildPhase(facts, 'ios')
+
+    // Data-safety gate (parked by a TUI run or seeded above) → the
+    // backup-or-cancel choice.
+    if (step === 'credentials-exist')
+      return iosCredentialsExistResult(facts)
+
+    const session = getSession(appId)
+    const ctx: IosStepCtx = { appId, ...(session.iosCarried as Partial<IosStepCtx>) }
+    const view = iosViewForStep(step, progress, ctx)
+
+    // A parked choice with a recorded answer re-drives as a RESOLVER effect
+    // instead of re-rendering (mirrors the TUI onChange → runIosEffect with
+    // the recorded carried state). Each is ONE-SHOT: consumed below so a
+    // re-park in the same call renders the prompt instead of looping.
+    const isVerifyResolver = step === 'verify-app' && Boolean(session.iosCarried.verifyAction)
+    const isCertLimitResolver = step === 'cert-limit-prompt' && certLimitAnswered
+    const isDupResolver = step === 'duplicate-profile-prompt' && dupAnswered
+    const isErrorResolver = step === 'error' && errorRetry
+    const isResolver = isVerifyResolver || isCertLimitResolver || isDupResolver || isErrorResolver
+
+    if (view.kind !== 'auto' && !isResolver) {
+      if (view.kind === 'done')
+        return decideBuildPhase(facts, 'ios')
+      // 'error' (and the recovery prompts) map to structured states in
+      // mapIosView — the S6a blanket ios-credentials-failed mapping is gone.
+      return mapIosView(view, facts, ctx)
+    }
+
+    try {
+      // saving-credentials needs the raw .p8 bytes for the APPLE_KEY_CONTENT
+      // credential. They ride the process-local session (never persisted);
+      // after a server restart re-read them from the persisted p8Path — the
+      // same self-heal resolveP8Content performs for verifying-key.
+      if (step === 'saving-credentials' && !session.iosCarried.p8Content && progress.p8Path && ios.readFile) {
+        try {
+          mergeIosCarried(appId, { p8Content: await ios.readFile(progress.p8Path) })
+        }
+        catch {
+          // Degrade: credentials save without the APPLE_KEY_* fields.
+        }
+      }
+
+      const carried = getSession(appId).iosCarried
+      const r = await runIosEffect(step, progress, { ...ios, appId, carried })
+      progress = r.progress
+      if (r.transient)
+        mergeIosCarried(appId, r.transient as Partial<IosCarried>)
+      // Each resolver consumed its recorded answer — drop/clear it so a later
+      // re-entry renders the prompt (or re-runs the initial fetch) instead of
+      // replaying a stale action.
+      if (isVerifyResolver)
+        dropIosCarried(appId, ['verifyAction'])
+      if (isCertLimitResolver)
+        certLimitAnswered = false
+      if (isDupResolver)
+        dupAnswered = false
+      if (isErrorResolver) {
+        errorRetry = false
+        dropIosCarried(appId, ['errorAction'])
+      }
+
+      // Recovery-park cleanup — the MCP mirror of the TUI clearing its React
+      // state once a recovery resolves:
+      //  - a successful revoke clears the cert-limit inventory + pick (the TUI
+      //    clears certToRevoke/existingCerts after the revoke);
+      //  - a completed duplicate deletion clears the duplicate list + confirm;
+      //  - leaving the error screen (retry routed) clears the error park so the
+      //    next call resumes the flow instead of re-rendering the stale error.
+      if (step === 'revoking-certificate' && r.next === 'creating-certificate')
+        dropIosCarried(appId, ['certToRevoke', 'existingCerts'])
+      if (step === 'deleting-duplicate-profiles' && r.next && r.next !== 'error')
+        dropIosCarried(appId, ['duplicateProfiles', 'confirmDeleteDuplicates'])
+      if (step === 'error' && r.next && r.next !== 'error')
+        dropIosCarried(appId, ['error', 'retryStep'])
+
+      if (r.next === 'ai-analysis-prompt') {
+        // TUI-only AI-debug entry — reroute to the existing build-failed handling.
+        return {
+          onboarding: 'capgo-builder', phase: 'build', state: 'build-failed', platform: 'ios',
+          progress: 92, kind: 'error',
+          summary: 'The build did not succeed. Check the build logs in your Capgo dashboard, fix the cause, and retry.',
+          rules: ONBOARDING_RULES,
+        }
+      }
+      // NOTE: r.next === 'error' is NOT special-cased — the loop parks on the
+      // 'error' step (transient.error/retryStep just merged into the session)
+      // and the next iteration renders the structured recovery screen.
+      if (r.next)
+        forcedNextStep = r.next
+    }
+    catch (err) {
+      return iosEffectError(step, err, facts)
+    }
+  }
+
+  return {
+    onboarding: 'capgo-builder', phase: 'credentials', state: 'ios-auto-loop-guard', platform: 'ios', progress: 0, kind: 'error',
+    summary: 'iOS onboarding stalled (too many automatic steps without progress). Please retry or run `capgo doctor`.',
+    rules: ONBOARDING_RULES,
+  }
 }
 
 export function mapAndroidView(
@@ -959,6 +1597,23 @@ export async function decideAdvance(
   input: OnboardingInput | undefined,
   deps: EngineDeps,
 ): Promise<NextStepResult> {
+  // Thread a verify-app gate answer (or an S6b recovery answer — cert-limit /
+  // duplicate-profile / error screen) into the iOS driver. All validated
+  // upstream by the strict iOS step gate in drive().
+  const iosOpts = (input && (
+    input.verifyAction !== undefined
+    || input.certToRevoke !== undefined
+    || input.duplicateProfileAction !== undefined
+    || input.errorAction !== undefined
+  ))
+    ? {
+        verifyAction: input.verifyAction,
+        verifyAppId: input.verifyAppId,
+        certToRevoke: input.certToRevoke,
+        duplicateProfileAction: input.duplicateProfileAction,
+        errorAction: input.errorAction,
+      }
+    : undefined
   if (input?.platform === 'ios' || input?.platform === 'android') {
     if (!facts.authenticated)
       return decideStart(facts, progress, deps)
@@ -968,7 +1623,7 @@ export async function decideAdvance(
       return decideStart(facts, progress, deps)
     if (input.platform === 'android')
       return decideAndroid(facts, deps)
-    return decideIos(facts)
+    return decideIos(facts, deps, iosOpts)
   }
   // No platform supplied → resume the active flow if one exists, so a mid-flow
   // next_step that omits `platform` does not bounce back to platform-select.
@@ -976,7 +1631,7 @@ export async function decideAdvance(
   if (active === 'android')
     return decideAndroid(facts, deps)
   if (active === 'ios')
-    return decideIos(facts)
+    return decideIos(facts, deps, iosOpts)
   return decideStart(facts, progress, deps)
 }
 
@@ -991,8 +1646,15 @@ export interface EngineDeps {
   loadAndroidProgress: (appId: string) => Promise<AndroidOnboardingProgress | null>
   readBuildRecord: (path: string) => Promise<BuildOutputRecord | null>
   buildRecordPath: (appId: string, platform: Platform) => string
-  setIosApiKey: (appId: string, keyId: string, issuerId: string, p8Path: string) => Promise<void>
-  finalizeIosCredentials: (appId: string) => Promise<{ ok: true } | { ok: false, error: string }>
+  /**
+   * The shared iOS flow engine's IO deps (Apple API / CSR / fs / persistence),
+   * pre-bound by the driver (buildIosEffectDeps in onboarding-tools.ts for
+   * production; canned fakes in tests). decideIos threads the per-app carried
+   * session state in on every effect run. Optional so legacy fixtures that
+   * never enter the iOS path keep working — a missing helper inside surfaces
+   * as a caught effect error, never a crash.
+   */
+  iosEffectDeps?: IosEffectDeps
   androidEffectDeps: AndroidEffectDeps
   /** Returns true when the current host can launch Terminal.app (macOS). Injectable for tests. */
   canLaunchTerminal: () => boolean
@@ -1218,6 +1880,56 @@ async function persistAndroidInput(deps: EngineDeps, appId: string, input: Onboa
   }
 }
 
+/**
+ * Apply the ASC API key trio from the single 'ios-api-key' MCP gate (or the
+ * ios-credentials-failed re-collect gate) to the persisted iOS progress.
+ *
+ * Routes each field through the SAME pure reducers the TUI input chain uses
+ * (applyIosInput 'input-p8-path' / 'input-key-id' / 'input-issuer-id') so the
+ * persisted progress is byte-identical to a TUI run — the resume routing
+ * (getIosResumeStep) then lands on verifying-key exactly as it does for the
+ * wizard. The create-new fork is persisted on first touch (the MCP only drives
+ * create-new in this slice; the import fork is a later slice).
+ *
+ * Also buffers the .p8 bytes into the per-app session (the headless mirror of
+ * the TUI's p8ContentRef) so verifying-key and the saving-credentials
+ * APPLE_KEY_CONTENT write get them without a re-read. Best-effort: a missing/
+ * unreadable file is NOT an error here — verifying-key's resolveP8Content
+ * retries from p8Path and surfaces the failure with a clear message.
+ */
+async function persistIosApiKeyInput(deps: EngineDeps, appId: string, input: OnboardingInput): Promise<void> {
+  const ios = deps.iosEffectDeps
+  const loadIosProgress = ios?.loadProgress ?? deps.loadProgress
+  const progressRaw: OnboardingProgress = (await loadIosProgress(appId)) ?? {
+    platform: 'ios',
+    appId,
+    startedAt: new Date().toISOString(),
+    completedSteps: {},
+  }
+
+  let updated = progressRaw
+  if (!updated.setupMethod)
+    updated = applyIosInput('setup-method-select', updated, { step: 'setup-method-select', value: 'create' })
+  if (input.p8Path)
+    updated = applyIosInput('input-p8-path', updated, { step: 'input-p8-path', value: input.p8Path })
+  if (input.keyId)
+    updated = applyIosInput('input-key-id', updated, { step: 'input-key-id', value: input.keyId })
+  if (input.issuerId)
+    updated = applyIosInput('input-issuer-id', updated, { step: 'input-issuer-id', value: input.issuerId })
+
+  if (updated !== progressRaw)
+    await ios?.saveProgress?.(appId, updated)
+
+  if (input.p8Path && ios?.readFile) {
+    try {
+      mergeIosCarried(appId, { p8Content: await ios.readFile(input.p8Path) })
+    }
+    catch {
+      // Unreadable .p8 — verifying-key re-reads from p8Path and reports.
+    }
+  }
+}
+
 async function executeAuto(result: NextStepResult, facts: PreflightFacts, deps: EngineDeps): Promise<NextStepResult | null> {
   if (result.state === 'registering-app' && facts.appId) {
     const reg = await deps.registerApp(facts.appId)
@@ -1228,28 +1940,6 @@ async function executeAuto(result: NextStepResult, facts: PreflightFacts, deps: 
     return {
       onboarding: 'capgo-builder', phase: 'app', state: 'register-app-failed', progress: 8, kind: 'error',
       summary: `Could not register "${facts.appId}" in Capgo: ${reg.error}`,
-      rules: ONBOARDING_RULES,
-    }
-  }
-  if (result.state === 'ios-finalize' && facts.appId) {
-    const fin = await deps.finalizeIosCredentials(facts.appId)
-    if (fin.ok)
-      return null
-    return {
-      onboarding: 'capgo-builder', phase: 'credentials', state: 'ios-credentials-failed', platform: 'ios', progress: 25, kind: 'human_gate',
-      summary: `iOS signing setup failed: ${fin.error}`,
-      human: { instruction: "This often means the API key lacks access, the .p8 moved, or Apple's certificate limit was hit. Provide corrected Key ID / Issuer ID / .p8 path, then continue." },
-      collect: [
-        { field: 'keyId', desc: 'the Key ID' },
-        { field: 'issuerId', desc: 'the Issuer ID' },
-        { field: 'p8Path', desc: 'absolute path to the .p8 file' },
-      ],
-      next: {
-        tool: NEXT_STEP_TOOL,
-        with: { keyId: '<keyId>', issuerId: '<issuerId>', p8Path: '<path>' },
-        instruction: 'Collect corrected values from the user, then call next_step with keyId, issuerId, p8Path.',
-        call: `${NEXT_STEP_TOOL}({ keyId: "ABC123", issuerId: "1a2b-...", p8Path: "/path/to/AuthKey.p8" })`,
-      },
       rules: ONBOARDING_RULES,
     }
   }
@@ -1385,6 +2075,29 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
     }
   }
 
+  // ── iOS data-safety gate routing ───────────────────────────────────────────
+  // credentialsExistChoice is shared between the android and iOS gates. When
+  // the IOS flow is the one parked on 'credentials-exist' (a TUI run set
+  // `_credentialsExistGate: 'pending'`), the answer belongs to the iOS
+  // progress — apply it there and keep it OUT of the android persist path
+  // (which would otherwise seed a stray android progress file).
+  let iosOwnsCredentialsGate = false
+  if (input?.credentialsExistChoice) {
+    const gAppId = await deps.getAppId()
+    if (gAppId) {
+      const iosProg = await deps.loadProgress(gAppId)
+      const androidProg = await deps.loadAndroidProgress(gAppId)
+      if (!androidProg && iosProg && getIosResumeStep(iosProg) === 'credentials-exist') {
+        iosOwnsCredentialsGate = true
+        const updated: OnboardingProgress = {
+          ...iosProg,
+          _credentialsExistGate: input.credentialsExistChoice === 'backup' ? 'backup' : 'cancel',
+        }
+        await deps.iosEffectDeps?.saveProgress?.(gAppId, updated)
+      }
+    }
+  }
+
   const androidInputPresent = input && (
     input.serviceAccountMethod !== undefined
     || input.playDeveloperId !== undefined
@@ -1393,7 +2106,7 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
     || input.androidPackage !== undefined
     || input.serviceAccountJsonPath !== undefined
     || input.saMethodChoice !== undefined
-    || input.credentialsExistChoice !== undefined
+    || (input.credentialsExistChoice !== undefined && !iosOwnsCredentialsGate)
     || input.keystoreMethod !== undefined
     || input.keystorePath !== undefined
     || input.keystoreStorePassword !== undefined
@@ -1407,8 +2120,8 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
   // field may be applied. Runs BEFORE persistAndroidInput so a mega-call
   // (multiple fields) / wrong-field / non-answer is rejected with a correction
   // and nothing is applied. Scoped to android-input steps only — the iOS
-  // three-field step and the bare-{} sign-in-proceed path never set
-  // androidInputPresent, so they are unaffected.
+  // fields are governed by their own gate below, and the bare-{}
+  // sign-in-proceed path never sets androidInputPresent, so both are unaffected.
   if (androidInputPresent) {
     const gateAppId = await deps.getAppId()
     if (gateAppId) {
@@ -1443,15 +2156,59 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
       await persistAndroidInput(deps, inputAppId, input!)
   }
 
-  if (input?.keyId && input?.issuerId && input?.p8Path) {
-    const inputAppId = await deps.getAppId()
-    if (inputAppId)
-      await deps.setIosApiKey(inputAppId, input.keyId, input.issuerId, input.p8Path)
+  // ── iOS granular input path (S6a/S6b) ──────────────────────────────────────
+  // The ASC API key trio (the single ios-api-key gate, all three in one call),
+  // the verify-app gate answer, and the S6b recovery answers (certToRevoke /
+  // duplicateProfileAction / errorAction). Validated by the strict iOS gate
+  // against the EFFECTIVE current step (the session-parked recovery step when
+  // one is parked, else the persisted resume step) BEFORE anything is applied
+  // — a stale/early answer or an off-step field is rejected with a correction.
+  const iosInputPresent = input && (
+    input.p8Path !== undefined
+    || input.keyId !== undefined
+    || input.issuerId !== undefined
+    || input.verifyAction !== undefined
+    || input.verifyAppId !== undefined
+    || input.certToRevoke !== undefined
+    || input.duplicateProfileAction !== undefined
+    || input.errorAction !== undefined
+  )
+  if (iosInputPresent) {
+    const gateAppId = await deps.getAppId()
+    if (gateAppId) {
+      // Seed the Phase-0 data-safety gate BEFORE validating, so an API-key
+      // trio sent as the very first call cannot slip past the
+      // credentials-exist gate (the FROZEN journey: the gate intercepts
+      // BEFORE any Apple traffic). With the gate pending, the effective step
+      // is 'credentials-exist', which takes none of the iOS keys — the trio
+      // is rejected with a correction and the gate renders.
+      const loaded = await deps.loadProgress(gateAppId)
+      const gateProgress = await seedIosCredentialsExistGate(gateAppId, deps.iosEffectDeps, loaded)
+      const currentStep = effectiveIosStep(gateAppId, gateProgress)
+      const check = validateIosStepInput(currentStep, input as unknown as Record<string, unknown>)
+      if (!check.ok) {
+        const facts = await gatherFacts(deps)
+        const corrective = await decideIos(facts, deps) // re-renders the current step; nothing applied
+        return { ...corrective, summary: `${check.message}\n\n${corrective.summary}` }
+      }
+      // Apply the ASC key trio through the SAME reducers the TUI uses
+      // (applyIosInput), so progress persists identically — the gate answers
+      // (verifyAction / certToRevoke / duplicateProfileAction / errorAction)
+      // ride through decideAdvance → decideIos instead (the resolver mechanism).
+      if (input!.p8Path !== undefined || input!.keyId !== undefined || input!.issuerId !== undefined) {
+        await persistIosApiKeyInput(deps, gateAppId, input!)
+        // Corrected key details while parked on the error screen clear the
+        // park (the re-collect arm): the flow resumes from the failing phase
+        // with the new values instead of re-rendering the stale error.
+        if (getSession(gateAppId).iosCarried.error !== undefined)
+          dropIosCarried(gateAppId, ['error', 'retryStep', 'errorAction'])
+      }
+    }
   }
 
-  // Detect sign-in proceed: plain continue (no android input, no platform choice) at google-sign-in.
+  // Detect sign-in proceed: plain continue (no android/ios input, no platform choice) at google-sign-in.
   let signInProceed = false
-  const isPlainContinue = !input || (!input.platform && !input.keyId && !input.runBuild && !input.checkBuild && !androidInputPresent)
+  const isPlainContinue = !input || (!input.platform && !input.runBuild && !input.checkBuild && !androidInputPresent && !iosInputPresent)
   if (isPlainContinue) {
     const spAppId = await deps.getAppId()
     if (spAppId) {
@@ -1491,9 +2248,19 @@ export async function runAdvance(deps: EngineDeps, input?: OnboardingInput): Pro
 }
 
 /**
+ * Map an iOS resume step to its MCP state name: the TUI-only .p8 chain (and
+ * the bootstrap 'welcome') collapses into the single 'ios-api-key' gate name;
+ * every other engine step id is the state name verbatim — mirroring decideIos.
+ */
+function resolveIosStateName(step: OnboardingStep): string {
+  return IOS_API_KEY_GATE_STEPS.has(step) ? 'ios-api-key' : step
+}
+
+/**
  * Read-only: determine the onboarding state the user is currently on, WITHOUT
- * running any side effect. Mirrors the branch selection of decideStart/decideAndroid
- * (preflight → platform → android resume step) but never calls effects.
+ * running any side effect. Mirrors the branch selection of decideStart/
+ * decideAndroid/decideIos (preflight → platform → resume step) but never
+ * calls effects.
  */
 export function resolveCurrentState(facts: PreflightFacts): string {
   if (!facts.capacitorProject || !facts.appId)
@@ -1511,7 +2278,7 @@ export function resolveCurrentState(facts: PreflightFacts): string {
   if (facts.androidProgress)
     return getAndroidResumeStep(facts.androidProgress)
   if (facts.iosProgress)
-    return 'ios-api-key'
+    return resolveIosStateName(getIosResumeStep(facts.iosProgress))
   if (facts.platformsDetected.length === 1 && facts.platformsDetected[0] === 'android')
     return getAndroidResumeStep(androidProgress)
   if (facts.platformsDetected.length === 1 && facts.platformsDetected[0] === 'ios')

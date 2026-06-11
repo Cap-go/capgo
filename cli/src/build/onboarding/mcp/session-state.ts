@@ -106,6 +106,23 @@ export function mergeTailCarried(appId: string, partial: Partial<TailCarried>): 
 }
 
 /**
+ * Drop `keys` from the iOS carried state for `appId` and return the new
+ * carried object. The complement of mergeIosCarried for one-shot consumable
+ * fields (e.g. the verify-app `verifyAction` pick, which the driver MUST clear
+ * after the resolver effect ran so a later re-entry runs the initial fetch —
+ * merge semantics skip `undefined`, so a merge can never clear). Immutable:
+ * builds a NEW carried object; prior snapshots are untouched.
+ */
+export function dropIosCarried(appId: string, keys: (keyof IosCarried)[]): IosCarried {
+  const session = getSession(appId)
+  const iosCarried: Record<string, unknown> = { ...(session.iosCarried as Record<string, unknown>) }
+  for (const key of keys)
+    delete iosCarried[key as string]
+  registry.set(appId, { ...session, iosCarried: iosCarried as IosCarried })
+  return iosCarried as IosCarried
+}
+
+/**
  * Drop the session entry for `appId`. Idempotent: safe on an absent appId and
  * safe to call twice. The next getSession() recreates a fresh empty session.
  */

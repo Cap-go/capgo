@@ -7,6 +7,7 @@
 // new keystore store password must be at least 6 characters and the existing
 // keystore store password must be non-empty — see validateStorePassword.
 import type { AndroidOnboardingStep } from '../android/types.js'
+import type { OnboardingStep } from '../types.js'
 
 /** state → the set of input fields that legitimately answer it (in order). */
 export const STEP_ALLOWED_FIELDS: Partial<Record<AndroidOnboardingStep, string[]>> = {
@@ -118,6 +119,161 @@ export function validateStorePassword(
     if (storePassword.length === 0)
       return { ok: false, message: 'Store password cannot be empty' }
     return { ok: true }
+  }
+  return { ok: true }
+}
+
+// ─── iOS strict step-input gate (S6a — the granular shared-engine path) ───────
+//
+// Mirrors the android gate above for the iOS input keys the MCP governs. Two
+// vocabularies exist:
+//
+//   - The ASC API key trio (p8Path / keyId / issuerId). Unlike android, the MCP
+//     deliberately collects ALL THREE in one 'ios-api-key' human gate (the
+//     current UX, pinned by the e2e tree), so the rule here is "at least one of
+//     the trio, and no other governed iOS key" — not exactly-one. The trio is
+//     accepted on every step the single gate (or the ios-credentials-failed
+//     re-collect gate) can park over: the TUI-only .p8 chain, verifying-key,
+//     and the create-new auto steps whose failure routes to the re-collect gate
+//     (verify-app / creating-certificate / creating-profile /
+//     saving-credentials).
+//
+//   - The verify-app gate pick (verifyAction, plus verifyAppId ONLY together
+//     with verifyAction='pick'). Accepted ONLY while the engine is parked on
+//     'verify-app' — anywhere else a stale/early verifyAction is rejected so it
+//     can never be silently merged into the session and replayed later.
+//
+// Unlike the android gate (which passes ungoverned steps), an iOS key sent at a
+// step with no entry is REJECTED — every interactive iOS state the MCP renders
+// has an entry here, so an off-step key is always an agent mistake.
+
+const IOS_TRIO_FIELDS = ['p8Path', 'keyId', 'issuerId']
+const IOS_VERIFY_FIELDS = ['verifyAction', 'verifyAppId']
+
+/**
+ * The S6b recovery vocabulary: each field answers EXACTLY ONE parked recovery
+ * step (the session-derived park, not a resume-derivable step — see
+ * engine.ts iosParkedStep). A recovery field anywhere else is always an agent
+ * mistake (stale/early answer) and is rejected so it can never be silently
+ * merged into the session and replayed later.
+ */
+const IOS_RECOVERY_FIELD_STEPS: Record<string, OnboardingStep> = {
+  certToRevoke: 'cert-limit-prompt',
+  duplicateProfileAction: 'duplicate-profile-prompt',
+  errorAction: 'error',
+}
+const IOS_RECOVERY_FIELDS = Object.keys(IOS_RECOVERY_FIELD_STEPS)
+
+/** The set of all iOS input keys the MCP governs (for the extras check). */
+export const IOS_INPUT_KEYS: string[] = [...IOS_TRIO_FIELDS, ...IOS_VERIFY_FIELDS, ...IOS_RECOVERY_FIELDS]
+
+/** Steps that accept the ASC API key trio (the single ios-api-key gate + the re-collect gate). */
+const IOS_TRIO_STEPS = new Set<OnboardingStep>([
+  'welcome',
+  'setup-method-select',
+  'api-key-instructions',
+  'p8-method-select',
+  'input-p8-path',
+  'input-key-id',
+  'input-issuer-id',
+  'verifying-key',
+  // Post-verify auto steps: a failure there parks the user on the structured
+  // 'error' recovery (or, for non-engine throws, the ios-credentials-failed
+  // re-collect gate), whose persisted resume step is the failing auto step —
+  // corrected key details must be accepted from it.
+  'verify-app',
+  'creating-certificate',
+  'creating-profile',
+  'saving-credentials',
+  // The parked structured error screen ALSO accepts corrected key details (the
+  // re-collect arm folded into the recovery menu): supplying the trio clears
+  // the error park and resumes the failing phase with the new values.
+  'error',
+])
+
+/**
+ * Validate incoming iOS next_step input against the step it answers.
+ *
+ * Returns { ok:true } when the input is a legitimate answer for `currentStep`
+ * (see the vocabulary rules above). Otherwise { ok:false, message } with a
+ * corrective instruction for the agent. Inputs with NO governed iOS key always
+ * pass — the android gate (and the rest of drive()) owns those.
+ *
+ * @param currentStep the iOS step the user is currently on (the session-parked
+ *   recovery step when one is parked, else the resume step — see
+ *   engine.ts effectiveIosStep)
+ * @param input the next_step input object
+ */
+export function validateIosStepInput(
+  currentStep: OnboardingStep,
+  input: Record<string, unknown>,
+): { ok: boolean, message?: string } {
+  const present = IOS_INPUT_KEYS.filter(k => input[k] !== undefined && input[k] !== null)
+  if (present.length === 0)
+    return { ok: true }
+
+  const trio = present.filter(k => IOS_TRIO_FIELDS.includes(k))
+  const verify = present.filter(k => IOS_VERIFY_FIELDS.includes(k))
+  const recovery = present.filter(k => IOS_RECOVERY_FIELDS.includes(k))
+
+  // ── Recovery vocabulary (S6b) ──────────────────────────────────────────────
+  if (recovery.length > 0) {
+    // Never mix a recovery answer with anything else (one answer per call).
+    if (recovery.length > 1 || trio.length > 0 || verify.length > 0) {
+      const keep = recovery[0]
+      const remove = present.filter(k => k !== keep)
+      return {
+        ok: false,
+        message: `Send ONE answer per call: either the App Store Connect key fields ({ ${IOS_TRIO_FIELDS.join(', ')} }), a verify-app action ({ verifyAction }), or a single recovery action ({ ${IOS_RECOVERY_FIELDS.join(' } / { ')} }) — never a mix. Remove: ${remove.join(', ')}.`,
+      }
+    }
+    const field = recovery[0]
+    const target = IOS_RECOVERY_FIELD_STEPS[field]
+    if (currentStep !== target) {
+      return {
+        ok: false,
+        message: `${field} answers only the ${target} step, which is not the current step. Answer the current step instead.`,
+      }
+    }
+    return { ok: true }
+  }
+
+  // Never mix the two vocabularies in one call (the one-answer-per-call rule).
+  if (trio.length > 0 && verify.length > 0) {
+    return {
+      ok: false,
+      message: `Send ONE answer per call: either the App Store Connect key fields ({ ${IOS_TRIO_FIELDS.join(', ')} }) or a verify-app action ({ verifyAction }), never both — remove: ${(currentStep === 'verify-app' && verify.length > 0 ? trio : verify).join(', ')}.`,
+    }
+  }
+
+  if (verify.length > 0) {
+    if (currentStep !== 'verify-app') {
+      return {
+        ok: false,
+        message: 'verifyAction answers only the verify-app step, which is not the current step. Answer the current step instead.',
+      }
+    }
+    if (input.verifyAction === undefined || input.verifyAction === null) {
+      return {
+        ok: false,
+        message: 'verifyAppId is only valid together with verifyAction: "pick". Call next_step with verifyAction (and verifyAppId only when picking an app).',
+      }
+    }
+    if (input.verifyAppId !== undefined && input.verifyAppId !== null && input.verifyAction !== 'pick') {
+      return {
+        ok: false,
+        message: 'verifyAppId is only valid together with verifyAction: "pick" — remove verifyAppId, or use verifyAction: "pick".',
+      }
+    }
+    return { ok: true }
+  }
+
+  // ASC API key trio.
+  if (!IOS_TRIO_STEPS.has(currentStep)) {
+    return {
+      ok: false,
+      message: `The current step (${currentStep}) does not take App Store Connect key fields. Answer the current step instead.`,
+    }
   }
   return { ok: true }
 }
