@@ -955,6 +955,8 @@
   "compat-fix-rebuild-cta": "Open Capgo Builder",
   "compat-fix-rebuild-detail": "Build for iOS and Android in the cloud, then submit to the stores — no local Xcode or Android Studio needed.",
   "compat-fix-rebuild-title": "Ship a new native build",
+  "compat-fix-rollback-confirm": "This will set {changes} and devices on the affected channel(s) will receive that bundle again. Continue?",
+  "compat-fix-rollback-cta": "Roll back for me",
   "compat-fix-rollback-detail": "Point the affected channel back to its last compatible bundle so users stay safe until the new build is live.",
   "compat-fix-rollback-title": "Roll back the channel",
   "compat-fix-title": "A new native build is needed",

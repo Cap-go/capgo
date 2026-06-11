@@ -12,6 +12,7 @@ import IconChevronRight from '~icons/lucide/chevron-right'
 import IconExternalLink from '~icons/lucide/external-link'
 import { dependencyDiffPath, groupCompatibilityEvents, platformLabel } from '~/services/compatibilityEvents'
 import { formatLocalDateTime } from '~/services/date'
+import { checkPermissions } from '~/services/permissions'
 import { pushEvent } from '~/services/posthog'
 import { createSignedImageUrl } from '~/services/storage'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
@@ -61,15 +62,105 @@ const visibleGroups = computed<CompatibilityEventGroup[]>(() => {
 const hasUnresolved = computed(() => groupedEvents.value.some(group => !group.resolved))
 
 const config = getLocalConfig()
-// Docs that explain why native changes can't ship over-the-air (the bundle
-// compatibility / disable-updates strategy section).
-const compatDocsUrl = 'https://capgo.app/docs/cli/commands/#disable-updates-strategy'
+// Docs that explain why native changes can't ship over-the-air.
+const compatDocsUrl = 'https://capgo.app/docs/live-updates/compatibility/'
 
 // Send the user to the in-app native build flow (Builds tab), tracking the click
 // so this Builder entry point can be compared with the banner / upload CTAs.
 function openBuilder() {
   pushEvent('builder_cta_compatibility_clicked', config.supaHost, { app_id: id.value })
   router.push(`/app/${encodeURIComponent(id.value)}/builds`)
+}
+
+interface RollbackTarget {
+  channelId: number
+  channelName: string
+  versionId: number
+  versionName: string
+}
+
+// One rollback per affected channel: the most recent unresolved event per channel
+// (events are loaded newest-first) tells us the last compatible bundle. Channels
+// or previous bundles that no longer exist (deleted) cannot be rolled back.
+const rollbackTargets = computed<RollbackTarget[]>(() => {
+  const seen = new Set<number>()
+  const targets: RollbackTarget[] = []
+  for (const group of groupedEvents.value) {
+    if (group.resolved)
+      continue
+    const event = group.representative
+    if (event.channel_id === null || seen.has(event.channel_id))
+      continue
+    seen.add(event.channel_id)
+    if (!existingChannelIds.value.has(event.channel_id))
+      continue
+    if (event.previous_version_id === null || !existingVersionIds.value.has(event.previous_version_id))
+      continue
+    targets.push({
+      channelId: event.channel_id,
+      channelName: event.channel_name ?? t('unknown'),
+      versionId: event.previous_version_id,
+      versionName: bundleLabel(event.previous_version_name),
+    })
+  }
+  return targets
+})
+
+async function rollbackChannels() {
+  const targets = rollbackTargets.value
+  if (targets.length === 0)
+    return
+  for (const target of targets) {
+    const allowed = await checkPermissions('channel.promote_bundle', { channelId: target.channelId })
+    if (!allowed) {
+      toast.error(t('no-permission'))
+      return
+    }
+  }
+  let failed = false
+  for (const target of targets) {
+    const { error } = await supabase
+      .from('channels')
+      .update({ version: target.versionId })
+      .eq('id', target.channelId)
+    if (error) {
+      console.error('[Compatibility] Error rolling back channel', target.channelName, error)
+      failed = true
+    }
+  }
+  if (failed) {
+    toast.error(t('error-update-channel'))
+  }
+  else {
+    toast.success(t('linked-bundle'))
+    toast.info(t('cloud-replication-delay'))
+  }
+  await refreshData()
+}
+
+// Rolling channels back to older bundles is outward-facing (devices start
+// receiving them again), so always confirm first.
+function openRollbackDialog() {
+  const changes = rollbackTargets.value
+    .map(target => `${target.channelName} → ${target.versionName}`)
+    .join(', ')
+  dialogStore.openDialog({
+    title: t('compat-fix-rollback-title'),
+    description: t('compat-fix-rollback-confirm', { changes }),
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('compat-fix-rollback-cta'),
+        role: 'primary',
+        handler: async () => {
+          await rollbackChannels()
+        },
+      },
+    ],
+  })
 }
 
 // The guidance panel is collapsible and remembers the user's choice across
@@ -434,14 +525,26 @@ watchEffect(async () => {
                     <p class="flex-1 mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
                       {{ t('compat-fix-rollback-detail') }}
                     </p>
-                    <button
-                      type="button"
-                      class="inline-flex items-center self-start gap-1.5 px-4 py-2 mt-4 text-sm font-semibold transition-colors border rounded-lg border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-                      @click="router.push(`/app/${encodeURIComponent(id)}/channels`)"
-                    >
-                      {{ t('compat-fix-manage-channels') }}
-                      <IconArrowRight class="w-4 h-4" />
-                    </button>
+                    <div class="flex flex-wrap items-center gap-2 mt-4">
+                      <button
+                        v-if="rollbackTargets.length > 0"
+                        type="button"
+                        data-test="compatibility-rollback-cta"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white transition-colors rounded-lg bg-blue-600 hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                        @click="openRollbackDialog"
+                      >
+                        {{ t('compat-fix-rollback-cta') }}
+                        <IconArrowRight class="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold transition-colors border rounded-lg border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                        @click="router.push(`/app/${encodeURIComponent(id)}/channels`)"
+                      >
+                        {{ t('compat-fix-manage-channels') }}
+                        <IconArrowRight class="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
