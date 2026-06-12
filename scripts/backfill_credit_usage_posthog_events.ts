@@ -9,6 +9,9 @@
  *
  * Send a specific range:
  *   bun run admin:backfill-credit-usage-posthog --apply --from=2026-03-01 --to=2026-06-01
+ *
+ * Reuse a run marker across retries:
+ *   bun run admin:backfill-credit-usage-posthog --apply --backfill-run-id=credits-2026-q2
  */
 import process from 'node:process'
 import type { UsageOverageEventRow } from '../supabase/functions/_backend/utils/credit_usage_posthog.ts'
@@ -33,6 +36,7 @@ Options:
   --org-id=UUID        Limit to one organization.
   --limit=N            Stop after N transactions.
   --batch-size=N       Supabase page size. Default: ${DEFAULT_BATCH_SIZE}.
+  --backfill-run-id=ID Mark all emitted events with this run id. Defaults to a generated id.
   --env-file=PATH      Env file to load. Default: ${DEFAULT_ENV_FILE}.
   --help               Show this help.
 
@@ -101,6 +105,9 @@ async function main() {
   const batchSize = parsePositiveInteger(getArgValue(args, '--batch-size'), '--batch-size', DEFAULT_BATCH_SIZE)
   const limit = getArgValue(args, '--limit') ? parsePositiveInteger(getArgValue(args, '--limit'), '--limit', 0) : null
   const orgId = getArgValue(args, '--org-id')
+  const backfillStartedAt = new Date().toISOString()
+  const backfillRunId = getArgValue(args, '--backfill-run-id')?.trim()
+    || `credit-usage-posthog-${backfillStartedAt.replace(/[:.]/g, '-')}`
   const to = getArgValue(args, '--to') ? parseDate(getArgValue(args, '--to')!, '--to') : new Date()
   const from = getArgValue(args, '--from')
     ? parseDate(getArgValue(args, '--from')!, '--from')
@@ -116,6 +123,7 @@ async function main() {
   const toIso = to.toISOString()
 
   console.log(`${apply ? 'Applying' : 'Dry-running'} usage credit PostHog backfill`)
+  console.log(`Backfill run id: ${backfillRunId}`)
   console.log(`Range: ${fromIso} <= occurred_at < ${toIso}`)
   if (orgId)
     console.log(`Org: ${orgId}`)
@@ -173,6 +181,10 @@ async function main() {
     for (const transaction of transactions) {
       const overageId = getCreditUsageSourceRefOverageEventId(transaction.source_ref)
       const input = buildCreditUsagePosthogEventInput(transaction, overageId ? overageById.get(overageId) ?? null : null, 'backfill')
+      input.tags.backfill_range_from = fromIso
+      input.tags.backfill_range_to = toIso
+      input.tags.backfill_run_id = backfillRunId
+      input.tags.backfill_started_at = backfillStartedAt
       seen += 1
       byType.set(String(input.tags.transaction_type), (byType.get(String(input.tags.transaction_type)) ?? 0) + 1)
       byMetric.set(String(input.tags.metric ?? 'none'), (byMetric.get(String(input.tags.metric ?? 'none')) ?? 0) + 1)
