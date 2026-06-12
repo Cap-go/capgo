@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { CompatibilityEventGroup, CompatibilityEventRow } from '~/services/compatibilityEvents'
 import type { Database } from '~/types/supabase.types'
-import { computed, ref, watchEffect } from 'vue'
+import { computed, onUnmounted, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -83,8 +83,10 @@ interface RollbackTarget {
 }
 
 // One rollback per affected channel: the most recent unresolved event per channel
-// (events are loaded newest-first) tells us the last compatible bundle. Channels
-// or previous bundles that no longer exist (deleted) cannot be rolled back.
+// (events are loaded newest-first) tells us the bundle the channel served before
+// the incompatible change. When several incompatible updates stacked up, each
+// rollback unwinds one step (the next step is offered after the events refresh).
+// Channels or previous bundles that no longer exist (deleted) cannot be rolled back.
 const rollbackTargets = computed<RollbackTarget[]>(() => {
   const seen = new Set<number>()
   const targets: RollbackTarget[] = []
@@ -109,8 +111,27 @@ const rollbackTargets = computed<RollbackTarget[]>(() => {
   return targets
 })
 
-async function rollbackChannels() {
-  const targets = rollbackTargets.value
+// The compatibility queue resolves events a few seconds after a channel write,
+// so a rollback refreshes again shortly after. Track the timers so they are
+// cleared on unmount (and on a subsequent rollback) instead of firing into a
+// dead component.
+const pendingRefreshTimers: ReturnType<typeof setTimeout>[] = []
+
+function clearDelayedRefreshes() {
+  for (const timer of pendingRefreshTimers)
+    clearTimeout(timer)
+  pendingRefreshTimers.length = 0
+}
+
+function scheduleDelayedRefreshes() {
+  clearDelayedRefreshes()
+  pendingRefreshTimers.push(setTimeout(() => refreshData(), 4000))
+  pendingRefreshTimers.push(setTimeout(() => refreshData(), 10000))
+}
+
+onUnmounted(clearDelayedRefreshes)
+
+async function rollbackChannels(targets: readonly RollbackTarget[]) {
   if (targets.length === 0)
     return
   for (const target of targets) {
@@ -120,7 +141,8 @@ async function rollbackChannels() {
       return
     }
   }
-  let failed = false
+  const failedChannels: string[] = []
+  const rolledBackChannels: string[] = []
   for (const target of targets) {
     const { error } = await supabase
       .from('channels')
@@ -128,31 +150,34 @@ async function rollbackChannels() {
       .eq('id', target.channelId)
     if (error) {
       console.error('[Compatibility] Error rolling back channel', target.channelName, error)
-      failed = true
+      failedChannels.push(target.channelName)
+    }
+    else {
+      rolledBackChannels.push(target.channelName)
     }
   }
-  if (failed) {
-    toast.error(t('error-update-channel'))
-  }
-  else {
+  if (failedChannels.length === 0)
     toast.success(t('compat-fix-rollback-done'))
-  }
-  // The compatibility queue resolves the event a few seconds after the channel
-  // write, so refresh now and again shortly after to catch the resolution.
+  else if (rolledBackChannels.length === 0)
+    toast.error(t('compat-fix-rollback-failed', { channels: failedChannels.join(', ') }))
+  else
+    toast.error(t('compat-fix-rollback-partial', { done: rolledBackChannels.join(', '), channels: failedChannels.join(', ') }))
   await refreshData()
-  setTimeout(() => refreshData(), 4000)
-  setTimeout(() => refreshData(), 10000)
+  scheduleDelayedRefreshes()
 }
 
 // Rolling channels back to older bundles is outward-facing (devices start
-// receiving them again), so always confirm first.
+// receiving them again), so always confirm first. The targets are snapshotted
+// here so the writes performed on confirm are exactly the changes the dialog
+// displayed, even if a background refresh mutates rollbackTargets meanwhile.
 function openRollbackDialog() {
-  const changes = rollbackTargets.value
+  const targets = [...rollbackTargets.value]
+  const changes = targets
     .map(target => `${target.channelName} → ${target.versionName}`)
     .join(', ')
   // Without the downgrade guard, devices that already installed a newer native
   // build could be served the rolled-back (older) bundle — warn about it.
-  const unguarded = rollbackTargets.value
+  const unguarded = targets
     .filter(target => guardOffChannelIds.value.has(target.channelId))
     .map(target => target.channelName)
   const description = unguarded.length > 0
@@ -170,7 +195,7 @@ function openRollbackDialog() {
         text: t('compat-fix-rollback-cta'),
         role: 'primary',
         handler: async () => {
-          await rollbackChannels()
+          await rollbackChannels(targets)
         },
       },
     ],
