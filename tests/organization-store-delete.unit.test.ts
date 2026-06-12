@@ -35,6 +35,10 @@ const mainStore = {
 vi.mock('~/services/supabase', () => ({
   isPlatformAdmin: mockIsPlatformAdmin,
   stripeEnabled: ref(true),
+  // The store's currentOrganization watch tags PostHog with the org group;
+  // isLocal=true makes setOrganization a no-op in tests.
+  getLocalConfig: () => ({ supaHost: 'http://localhost:54321' }),
+  isLocal: () => true,
   useSupabase: () => ({
     auth: {
       onAuthStateChange: vi.fn(() => ({
