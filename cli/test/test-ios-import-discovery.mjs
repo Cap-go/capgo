@@ -122,18 +122,18 @@ const PROFILE_FOR_A = {
 const SCANNED_IDENTITIES = [IDENTITY_DIST_A, IDENTITY_DIST_B, IDENTITY_DEV]
 const SCANNED_PROFILES = [PROFILE_FOR_A]
 
-// Apple profiles returned by the prefetch for identity A's cert.
+// Apple profiles returned by the prefetch for identity A's cert — the RAW
+// AscProfileSummary shape listProfilesForCert actually returns (the engine
+// synthesizes DiscoveredProfile from it; hostile-review 2026-06-12 — the old
+// fixture was pre-synthesized and skipped that mapping).
 const APPLE_PROFILES_FOR_A = [
   {
-    path: '',
-    uuid: 'apple-profile-A',
+    id: 'apple-profile-A',
     name: 'Capgo com.example.app AppStore',
-    applicationIdentifier: '',
-    bundleId: 'com.example.app',
-    teamId: 'TEAMAAAAAA',
+    profileType: 'IOS_APP_STORE',
+    profileContent: 'YXBwbGUtcHJvZmlsZS1B',
     expirationDate: '2027-02-01T00:00:00.000Z',
-    profileType: 'app_store',
-    certificateSha1s: [IDENTITY_DIST_A.sha1],
+    bundleIdentifier: 'com.example.app',
   },
 ]
 
@@ -398,6 +398,18 @@ await test('import-validating-all-certs → transient identityAvailability/profi
   assertEquals(prefetchCalls[0].args[0], 'APPLE_CERT_A', 'prefetch uses the resolved Apple cert id')
   assert(res.transient.profilePrefetch, 'transient.profilePrefetch present')
   assertEquals(res.transient.profilePrefetch[IDENTITY_DIST_A.sha1].length, 1, 'A has its Apple profiles prefetched')
+  // The prefetch returns RAW AscProfileSummary[] and the engine SYNTHESIZES each
+  // into a DiscoveredProfile (synthesizeProfileFromAscSummary) — pin the mapping
+  // (hostile-review 2026-06-12: the old fixture was pre-synthesized, so the
+  // id→uuid / bundleIdentifier→bundleId / IOS_APP_STORE→app_store /
+  // profileContent→profileBase64 mapping was never exercised).
+  const synthesized = res.transient.profilePrefetch[IDENTITY_DIST_A.sha1][0]
+  assertEquals(synthesized.uuid, 'apple-profile-A', 'uuid comes from the ASC summary id')
+  assertEquals(synthesized.bundleId, 'com.example.app', 'bundleId comes from the ASC bundleIdentifier')
+  assertEquals(synthesized.profileType, 'app_store', 'IOS_APP_STORE maps to app_store')
+  assertEquals(synthesized.teamId, IDENTITY_DIST_A.teamId, 'teamId comes from the picked identity')
+  assertEquals(synthesized.certificateSha1s[0], IDENTITY_DIST_A.sha1, 'certificateSha1s comes from the picked identity')
+  assertEquals(synthesized.profileBase64, 'YXBwbGUtcHJvZmlsZS1B', 'profileBase64 carries the ASC profileContent')
   assert(!(IDENTITY_DIST_B.sha1 in res.transient.profilePrefetch), 'unavailable B is NOT prefetched')
 
   // Ephemeral — persists nothing.

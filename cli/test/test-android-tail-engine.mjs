@@ -879,6 +879,103 @@ await test('imported-SA tail progress resumes through the tail, not the import f
 // drives; reference it so a regression that drops the export fails here too.
 assert(typeof applyAndroidInput === 'function', 'applyAndroidInput must be exported from the engine')
 
+// ─── HOSTILE-REVIEW MED: backing-up must not mislabel REAL copy failures ───────
+//
+// '(file may not exist yet)' is only true for ENOENT. A real failure (EACCES,
+// disk full, …) must surface its actual reason — the flow still proceeds (the
+// gate's promise was "backup attempted", not "backup must succeed") but the
+// message must not lie.
+
+await test('backing-up: a REAL copyFile failure (EACCES) logs a truthful warning, not "(file may not exist yet)" — flow still proceeds', async () => {
+  const logs = []
+  const internal = []
+  const deps = {
+    copyFile: async () => { throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' }) },
+    saveAndroidProgress: async () => {},
+    onLog: (msg, color) => logs.push({ msg, color }),
+    onInternalLog: line => internal.push(line),
+  }
+  const res = await runAndroidEffect('backing-up', tailProgress(), deps)
+  assertEquals(res.next, 'keystore-method-select', 'the flow still proceeds (gate contract unchanged)')
+  assertEquals(res.progress._credentialsExistGate, 'done', 'gate still flips to done')
+  const warn = logs.find(l => /Could not back up credentials/.test(l.msg))
+  assert(warn, `must log the truthful could-not-back-up warning (got: ${JSON.stringify(logs)})`)
+  assert(warn.msg.includes('EACCES'), 'the warning must carry the real reason')
+  assertEquals(warn.color, 'yellow', 'warning stays yellow')
+  assert(!logs.some(l => /file may not exist yet/.test(l.msg)), 'must NOT claim the file may not exist on a permission failure')
+  assert(internal.some(line => line.includes('EACCES')), 'the real reason still reaches onInternalLog')
+})
+
+await test('backing-up: a MISSING source file (ENOENT) keeps the benign message and proceeds', async () => {
+  const logs = []
+  const deps = {
+    copyFile: async () => { throw Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' }) },
+    saveAndroidProgress: async () => {},
+    onLog: (msg, color) => logs.push({ msg, color }),
+    onInternalLog: () => {},
+  }
+  const res = await runAndroidEffect('backing-up', tailProgress(), deps)
+  assertEquals(res.next, 'keystore-method-select', 'missing source stays non-fatal')
+  assert(logs.some(l => /file may not exist yet/.test(l.msg)), 'the benign message stays for the genuinely-missing-file case')
+})
+
+// ─── HOSTILE-REVIEW MED (CodeRabbit): revoked OAuth token must not linger ──────
+
+await test('gcp-setup-running strips _oauthRefreshToken from the persisted progress after a successful revoke', async () => {
+  const savedSnapshots = []
+  const deps = {
+    getAccessToken: async () => 'tok',
+    enableService: async () => {},
+    ensureServiceAccount: async () => ({ account: { email: 'sa@proj-1.iam.gserviceaccount.com', uniqueId: 'U1' }, created: true }),
+    createServiceAccountKey: async () => ({ privateKeyDataBase64: 'eyJ9' }),
+    inviteServiceAccount: async () => {},
+    revokeToken: async () => {},
+    saveAndroidProgress: async (appId, p) => { savedSnapshots.push(p) },
+    onStatus: () => {},
+    onLog: () => {},
+  }
+  const progress = tailProgress({
+    _oauthRefreshToken: 'rt-secret',
+    completedSteps: {
+      gcpProjectChosen: { projectId: 'proj-1', displayName: 'Proj', createdByOnboarding: false },
+      playAccountChosen: { developerId: 'dev-1' },
+      androidPackageChosen: { packageName: APP_ID, source: 'gradle' },
+    },
+  })
+  const res = await runAndroidEffect('gcp-setup-running', progress, deps)
+  assertEquals(res.next, 'saving-credentials', 'the happy provisioning chain finishes into saving-credentials')
+  assert(res.progress._oauthRefreshToken === undefined, 'the returned progress must not carry the revoked refresh token')
+  const last = savedSnapshots[savedSnapshots.length - 1]
+  assert(last, 'progress must be persisted after the revoke step')
+  assert(last._oauthRefreshToken === undefined, 'the PERSISTED progress must not carry the revoked refresh token')
+})
+
+await test('gcp-setup-running keeps the chain alive when revokeToken FAILS (token expires on its own)', async () => {
+  const statuses = []
+  const deps = {
+    getAccessToken: async () => 'tok',
+    enableService: async () => {},
+    ensureServiceAccount: async () => ({ account: { email: 'sa@proj-1.iam.gserviceaccount.com', uniqueId: 'U1' }, created: false }),
+    createServiceAccountKey: async () => ({ privateKeyDataBase64: 'eyJ9' }),
+    inviteServiceAccount: async () => {},
+    revokeToken: async () => { throw new Error('revoke endpoint down') },
+    saveAndroidProgress: async () => {},
+    onStatus: msg => statuses.push(msg),
+    onLog: () => {},
+  }
+  const progress = tailProgress({
+    _oauthRefreshToken: 'rt-secret',
+    completedSteps: {
+      gcpProjectChosen: { projectId: 'proj-1', displayName: 'Proj', createdByOnboarding: false },
+      playAccountChosen: { developerId: 'dev-1' },
+      androidPackageChosen: { packageName: APP_ID, source: 'gradle' },
+    },
+  })
+  const res = await runAndroidEffect('gcp-setup-running', progress, deps)
+  assertEquals(res.next, 'saving-credentials', 'a failed revoke stays non-fatal')
+  assert(statuses.some(s => /Revoke request failed/.test(s)), 'the failure is surfaced via onStatus')
+})
+
 // ─── Summary ─────────────────────────────────────────────────────────────────
 
 console.log(`\n${testsPassed} passed, ${testsFailed} failed`)

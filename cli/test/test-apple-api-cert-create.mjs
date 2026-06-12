@@ -21,6 +21,7 @@ import assert from 'node:assert/strict'
 import {
   CertificateLimitError,
   createCertificate,
+  createProfile,
   listDistributionCerts,
 } from '../src/build/onboarding/apple-api.ts'
 
@@ -150,6 +151,46 @@ try {
     await listDistributionCerts('tok', { types: ['DISTRIBUTION'] })
     assert.ok(calls[0].url.includes('filter[certificateType]=DISTRIBUTION'), 'filters the requested type')
     assert.ok(!calls[0].url.includes('IOS_DISTRIBUTION'), 'legacy type excluded when narrowed')
+  })
+
+  // ── HOSTILE-REVIEW LOW: the awaited follow-up list inside the catch must not
+  // REPLACE the original error when it fails itself. ──────────────────────────
+
+  await t('cert-limit rejection whose follow-up list ALSO fails rethrows the ORIGINAL Apple error', async () => {
+    stubFetch((call) => {
+      if (call.method === 'POST')
+        return jsonResponse(LIMIT_ERROR_BODY, { ok: false, status: 409 })
+      // The diagnostics list itself blows up — e.g. a transient ASC outage.
+      return jsonResponse({ errors: [{ title: 'Service Unavailable', detail: 'try later', code: 'SERVICE_UNAVAILABLE' }] }, { ok: false, status: 503 })
+    })
+    let thrown = null
+    try {
+      await createCertificate('tok', 'CSR_PEM')
+    }
+    catch (e) {
+      thrown = e
+    }
+    assert.ok(thrown, 'still throws')
+    assert.ok(!(thrown instanceof CertificateLimitError), 'no revoke prompt when the pool could not be listed')
+    assert.ok(thrown.message.includes('ENTITY_ERROR.ATTRIBUTE.INVALID'), `must surface the ORIGINAL create error, not the list failure (got: ${thrown.message})`)
+  })
+
+  await t('createProfile duplicate rejection whose findCapgoProfiles follow-up fails rethrows the ORIGINAL duplicate error', async () => {
+    stubFetch((call) => {
+      if (call.method === 'POST')
+        return jsonResponse({ errors: [{ title: 'Conflict', detail: 'Multiple profiles found with the name Capgo com.example.app AppStore', code: 'ENTITY_ERROR' }] }, { ok: false, status: 409 })
+      // findCapgoProfiles' GET blows up — must not replace the duplicate error.
+      return jsonResponse({ errors: [{ title: 'Service Unavailable', detail: 'try later', code: 'SERVICE_UNAVAILABLE' }] }, { ok: false, status: 503 })
+    })
+    let thrown = null
+    try {
+      await createProfile('tok', 'BUNDLE_RES_ID', 'CERT_ID', 'com.example.app')
+    }
+    catch (e) {
+      thrown = e
+    }
+    assert.ok(thrown, 'still throws')
+    assert.ok(thrown.message.includes('Multiple profiles found'), `must surface the ORIGINAL duplicate error, not the list failure (got: ${thrown.message})`)
   })
 
   console.log(`\n✅ ${passed} apple-api cert-create tests passed`)

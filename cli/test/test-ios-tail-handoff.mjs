@@ -98,6 +98,9 @@ function iosProgress(overrides = {}) {
     appId: APP_ID,
     startedAt: '2026-06-03T00:00:00.000Z',
     setupMethod: 'create-new',
+    // Real create-new progress ALWAYS carries p8Path (input-p8-path persists it
+    // before verifying-key) — required since the crash-recovery re-read fix.
+    p8Path: '/keys/AuthKey_KEY1.p8',
     ...rest,
     completedSteps: {
       apiKeyVerified: { keyId: 'KEY1', issuerId: 'ISS1' },
@@ -147,6 +150,9 @@ function makeDeps(overrides = {}) {
 
     onStatus: () => {},
     onLog: () => {},
+
+    // ── injected IO (the engine reads the .p8 ONLY through this dep) ──
+    readFile: async (...a) => { calls.push({ name: 'readFile', args: a }); return Buffer.from('p8-secret-bytes') },
 
     ...overrides,
   }
@@ -307,15 +313,55 @@ await test('saving-credentials (IMPORT app_store) uses importedP12Password AND e
   assertEquals(creds.APPLE_KEY_CONTENT, P8_BYTES.toString('base64'), 'import app_store must emit APPLE_KEY_CONTENT from carried.p8Content')
 })
 
-await test('saving-credentials (create-new) WITHOUT carried.p8Content omits the APPLE_KEY_* fields (IO-free: no raw fs read)', async () => {
-  // The engine never re-reads the .p8 from disk; when the driver did not thread
-  // the secret bytes, the ASC key fields are simply absent (the 5 base fields stay).
+await test('saving-credentials (create-new) WITHOUT carried.p8Content RE-READS the .p8 from progress.p8Path (crash recovery — hostile-review blocker)', async () => {
+  // CONTRACT CHANGE (3-engine hostile-review consensus, 2026-06-12): the old
+  // behavior silently OMITTED the APPLE_KEY_* fields when the carried bytes were
+  // lost (fresh mount after a crash), then deleted progress — saving credentials
+  // that can never upload to App Store Connect. Main's bespoke doSaveCredentials
+  // re-read the .p8 from p8PathRef and refused to save without it; the engine
+  // port dropped both. Now: re-read via the INJECTED deps.readFile (still no raw
+  // fs in the engine — same pattern as resolveP8Content) and emit the full key.
   const deps = makeDeps()
   await runIosEffect('saving-credentials', iosProgress(), deps)
+  const read = deps.__calls.find(c => c.name === 'readFile')
+  assert(read, 'must re-read the .p8 through the injected readFile dep')
+  assertEquals(read.args[0], '/keys/AuthKey_KEY1.p8', 'reads the persisted p8Path')
   const creds = deps.__calls.find(c => c.name === 'updateSavedCredentials').args[2]
-  assert(!('APPLE_KEY_CONTENT' in creds), 'no carried .p8 → no APPLE_KEY_CONTENT (engine does no fs read)')
-  assert(!('APPLE_KEY_ID' in creds), 'no carried .p8 → no APPLE_KEY_ID')
+  assertEquals(creds.APPLE_KEY_CONTENT, Buffer.from('p8-secret-bytes').toString('base64'), 'APPLE_KEY_CONTENT restored from the re-read')
+  assertEquals(creds.APPLE_KEY_ID, 'KEY1', 'key id from the apiKeyVerified mirror')
+  assertEquals(creds.APPLE_ISSUER_ID, 'ISS1', 'issuer id from the apiKeyVerified mirror')
   assertEquals(creds.BUILD_CERTIFICATE_BASE64, CERT_DATA.p12Base64, 'the 5 base fields are still emitted')
+})
+
+await test('saving-credentials REFUSES to save when the ASC key cannot be resolved (no carried bytes, no readable p8Path) — diverts instead', async () => {
+  // The restored main guard: never silently persist an app_store credential map
+  // missing the ASC key. The throw rides the tail build-first contract: the
+  // self-heal catch diverts to the persisted resume step; nothing is saved or
+  // deleted.
+  // The persisted resume still points at saving-credentials (cert+profile are
+  // set), so the build-first self-heal RETHROWS — the driver surfaces the error
+  // screen with retry instead of silently saving a key-less map.
+  const deps = makeDeps({ readFile: undefined, loadProgress: async () => iosProgress({ p8Path: undefined }) })
+  let threw = null
+  try {
+    await runIosEffect('saving-credentials', iosProgress({ p8Path: undefined }), deps)
+  }
+  catch (e) { threw = e }
+  assert(threw, 'must throw (surfaced to the error screen) with an unresolvable ASC key')
+  assert(/ASC API key|.p8/.test(threw.message), 'the error names the missing .p8 so the user knows what to fix')
+  assert(!deps.__calls.some(c => c.name === 'updateSavedCredentials'), 'must NOT save unusable credentials')
+  assert(!deps.__calls.some(c => c.name === 'deleteProgress'), 'must NOT delete progress on the refused save')
+})
+
+await test('saving-credentials (import ad_hoc) still saves WITHOUT any ASC key — needsAscKey is false', async () => {
+  const IMPORT_CERT = { certificateId: 'ICERT', expirationDate: '2027-02-02', teamId: 'ITEAM', p12Base64: 'import-p12' }
+  const IMPORT_PROFILE = { profileId: 'IPROF', profileName: 'Imported Profile', profileBase64: 'import-prof' }
+  const deps = makeDeps({ readFile: undefined, carried: { certData: IMPORT_CERT, profileData: IMPORT_PROFILE, teamId: 'ITEAM', importedP12Password: 'kc-pass' } })
+  const res = await runIosEffect('saving-credentials', iosProgress({ setupMethod: 'import-existing', importDistribution: 'ad_hoc', p8Path: undefined, completedSteps: { certificateCreated: undefined, profileCreated: undefined } }), deps)
+  assertEquals(res.next, 'ask-build', 'ad_hoc import saves without the ASC key')
+  const creds = deps.__calls.find(c => c.name === 'updateSavedCredentials').args[2]
+  assert(!('APPLE_KEY_CONTENT' in creds), 'ad_hoc map has no APPLE_KEY_CONTENT')
+  assertEquals(creds.CAPGO_IOS_DISTRIBUTION, 'ad_hoc', 'distribution carried through')
 })
 
 // ─── 2) DRIVER threading: resolve ONCE, reuse downstream, reach build-complete ──
@@ -567,6 +613,79 @@ await test('the tail front gates take priority: _credentialsExistGate "pending" 
   // The data-safety gate fires before the tail router — protecting existing creds.
   const p = savedTailProgress({ _credentialsExistGate: 'pending' })
   assertEquals(getIosResumeStep(p), 'credentials-exist')
+})
+
+// ─── HOSTILE-REVIEW P1: Apple bundle id ≠ Capgo appId ─────────────────────────
+//
+// progress.appId is the CAPGO app key. When plugins.CapacitorUpdater.appId is
+// configured, the Apple-side bundle id DIFFERS from it. With no verified
+// iosBundleIdOverride the engine must prefer the DETECTED Release bundle id
+// (deps.detectBundleIds → pbxproj Release — the same authoritative source
+// verify-app gates on) over progress.appId at every bundle-id-consuming engine
+// site. Here: the provisioning_map key (save path + lossy tail rebuild).
+
+const DETECTED_RELEASE_ID = 'com.real.releaseid'
+function detectedBundleIds() {
+  return {
+    pbxproj: { value: DETECTED_RELEASE_ID, source: 'pbxproj-release', label: 'project.pbxproj (Release config)' },
+    debug: null,
+    plist: null,
+    capacitor: { value: APP_ID, source: 'capacitor-config', label: 'capacitor.config.ts (appId)' },
+    recommended: { value: DETECTED_RELEASE_ID, source: 'pbxproj-release', label: 'project.pbxproj (Release config)' },
+    mismatch: true,
+    debugReleaseDiffer: false,
+    releaseResolved: true,
+    candidates: [],
+  }
+}
+
+await test('saving-credentials keys the provisioning map by the DETECTED Release bundle id when no override exists (appId is the Capgo key)', async () => {
+  const deps = makeDeps({ detectBundleIds: detectedBundleIds })
+  await runIosEffect('saving-credentials', iosProgress(), deps)
+  const creds = deps.__calls.find(c => c.name === 'updateSavedCredentials').args[2]
+  const map = JSON.parse(creds.CAPGO_IOS_PROVISIONING_MAP)
+  assert(map[DETECTED_RELEASE_ID], `provisioning map must be keyed by the detected Release bundle id (got keys: ${Object.keys(map)})`)
+  assert(!map[APP_ID], 'the Capgo app key must NOT key the provisioning map when a Release id was detected')
+})
+
+await test('saving-credentials provisioning-map key priority: a verified iosBundleIdOverride beats the detected Release id', async () => {
+  const deps = makeDeps({ detectBundleIds: detectedBundleIds })
+  await runIosEffect('saving-credentials', iosProgress({ iosBundleIdOverride: 'com.verified.override' }), deps)
+  const creds = deps.__calls.find(c => c.name === 'updateSavedCredentials').args[2]
+  const map = JSON.parse(creds.CAPGO_IOS_PROVISIONING_MAP)
+  assert(map['com.verified.override'], 'the verified override wins over detection')
+  assert(!map[DETECTED_RELEASE_ID], 'no detected-id key when an override exists')
+})
+
+await test('lossy tail rebuild (exporting-env, nothing carried) keys the provisioning map by the SAME detected Release id as the save path', async () => {
+  const deps = makeDeps({ detectBundleIds: detectedBundleIds })
+  await runIosEffect('exporting-env', iosProgress(), deps)
+  const ex = deps.__calls.find(c => c.name === 'exportCredentialsToEnv')
+  assert(ex, 'exporting-env must call exportCredentialsToEnv')
+  const map = JSON.parse(ex.args[0].credentials.CAPGO_IOS_PROVISIONING_MAP)
+  assert(map[DETECTED_RELEASE_ID], `the lossy rebuild must resolve the bundle id like the save path (got keys: ${Object.keys(map)})`)
+})
+
+// ─── HOSTILE-REVIEW LOW: lossy rebuild loses the non-secret ASC identifiers ────
+
+await test('lossy tail rebuild restores the non-secret APPLE_KEY_ID/APPLE_ISSUER_ID (APPLE_KEY_CONTENT cannot be rebuilt synchronously)', async () => {
+  const deps = makeDeps()
+  await runIosEffect('exporting-env', iosProgress(), deps)
+  const creds = deps.__calls.find(c => c.name === 'exportCredentialsToEnv').args[0].credentials
+  // The default fixture persists apiKeyVerified { keyId: 'KEY1', issuerId: 'ISS1' }.
+  assertEquals(creds.APPLE_KEY_ID, 'KEY1', 'APPLE_KEY_ID restored from the persisted apiKeyVerified mirror')
+  assertEquals(creds.APPLE_ISSUER_ID, 'ISS1', 'APPLE_ISSUER_ID restored from the persisted apiKeyVerified mirror')
+  // DOCUMENTED LIMITATION: the secret .p8 bytes are transient/async-only — a
+  // synchronous rebuild must NOT fabricate APPLE_KEY_CONTENT.
+  assert(!('APPLE_KEY_CONTENT' in creds), 'a sync lossy rebuild cannot restore the secret APPLE_KEY_CONTENT')
+})
+
+await test('lossy tail rebuild prefers top-level progress.keyId/issuerId over the apiKeyVerified mirror', async () => {
+  const deps = makeDeps()
+  await runIosEffect('exporting-env', iosProgress({ keyId: 'KEYTOP', issuerId: 'ISSTOP' }), deps)
+  const creds = deps.__calls.find(c => c.name === 'exportCredentialsToEnv').args[0].credentials
+  assertEquals(creds.APPLE_KEY_ID, 'KEYTOP', 'top-level keyId wins (same precedence as buildIosSavedCredentials)')
+  assertEquals(creds.APPLE_ISSUER_ID, 'ISSTOP', 'top-level issuerId wins')
 })
 
 // ─── Summary ─────────────────────────────────────────────────────────────────

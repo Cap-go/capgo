@@ -136,9 +136,37 @@ import {
 import type { IosEffectDeps, IosStepCtx } from '../ios/flow.js'
 import { applyIosInput, runIosEffect } from '../ios/flow.js'
 import { getIosResumeStep } from '../ios/progress.js'
+import { classifyP8SubmitError } from './p8-error.js'
 
 const OUTPUT_LINE_SPLIT_RE = /\r?\n/
 const CARRIAGE_RETURN_RE = /\r/g
+
+/**
+ * Special error to signal the UI should redirect to .p8 input.
+ */
+class NeedP8Error extends Error {
+  constructor() {
+    super('Need .p8 file')
+    this.name = 'NeedP8Error'
+  }
+}
+
+/**
+ * The tail engine's `carried.savedCredentials` is a `Record<string, string>`
+ * (tail/flow.ts), while the React mirror is `Partial<BuildCredentials>` whose
+ * values may be `undefined`. Convert explicitly — dropping undefined entries —
+ * instead of casting the Partial to a Record it doesn't satisfy.
+ */
+function toCarriedSavedCredentials(creds: Partial<BuildCredentials> | null): Record<string, string> | undefined {
+  if (!creds)
+    return undefined
+  const out: Record<string, string> = {}
+  for (const [key, value] of Object.entries(creds)) {
+    if (typeof value === 'string')
+      out[key] = value
+  }
+  return out
+}
 
 // The create-new credential PROVISIONING effect steps the iOS engine-driver
 // (below) routes through the shared engine's `runIosEffect`. The CHOICE / INPUT
@@ -1206,7 +1234,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
    * can phrase its breadcrumb differently.
    */
   const resetForFreshStart = useCallback(async () => {
-    await deleteProgress(appId).catch(() => { /* best-effort */ })
+    await deleteProgress(appId).catch((err) => {
+      // Best-effort: a failed wipe must not block the restart, but leave a
+      // trace in the internal log so support bundles can explain a "restart
+      // that still resumed" report.
+      appendInternalLog(`restart: deleteProgress failed: ${err instanceof Error ? err.message : String(err)}`)
+    })
     // Import-flow state
     setImportMode(false)
     setImportMatches([])
@@ -1312,17 +1345,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   /**
    * Get a fresh JWT token, re-reading the .p8 file if needed.
    * Uses refs to avoid stale closure issues.
+   * (NeedP8Error — the redirect-to-.p8-input signal — lives at module scope.)
    */
-  /**
-   * Special error to signal the UI should redirect to .p8 input.
-   */
-  class NeedP8Error extends Error {
-    constructor() {
-      super('Need .p8 file')
-      this.name = 'NeedP8Error'
-    }
-  }
-
   async function getFreshToken(): Promise<string> {
     let content = p8ContentRef.current
     if (!content && p8PathRef.current) {
@@ -1451,6 +1475,31 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     }
     setStep('error')
   }, [retryCount, addLog, appId, buildInitCommand, buildOutput, doctorCommand, log, pm.pm])
+
+  // The three [step]-keyed engine drivers (create-new / import / tail) run
+  // long async effects that must report failures through the LATEST
+  // handleError — but handleError is re-created on every retryCount/log/
+  // buildOutput tick, so the [step]-keyed closures would otherwise call a
+  // STALE copy (old retry counter, old log tail in the support bundle).
+  // Port the android driver's pattern (android/ui/app.tsx handleErrorRef):
+  // a ref updated every render; the drivers call ref.current at error time.
+  const handleErrorRef = useRef(handleError)
+  useEffect(() => {
+    handleErrorRef.current = handleError
+  }, [handleError])
+
+  // @inkjs/ui Select re-fires onChange on every re-render while it stays
+  // mounted after a selection (known upstream bug). The cert-limit-prompt and
+  // duplicate-profile-prompt resolvers are ASYNC — they await loadProgress +
+  // runIosEffect before setStep unmounts the Select — so a re-fire in that
+  // window would double-run the resolver. One-shot refs (set BEFORE the first
+  // await, reset on step change) make them idempotent.
+  const certLimitPickHandledRef = useRef(false)
+  const duplicateProfilePickHandledRef = useRef(false)
+  useEffect(() => {
+    certLimitPickHandledRef.current = false
+    duplicateProfilePickHandledRef.current = false
+  }, [step])
 
   // Show the contact-support confirmation gate as an Ink step and resolve once
   // the user picks Yes/Cancel. Returns a promise so contactSupport() can await
@@ -2024,7 +2073,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         // ── error route: surface through the TUI's handleError so the support
         // bundle + retryCount + telemetry UX is identical to the bespoke catch ──
         if (result.next === 'error') {
-          handleError(new Error(t?.error ?? 'Onboarding failed.'), (t?.retryStep as OnboardingStep) ?? step)
+          handleErrorRef.current(new Error(t?.error ?? 'Onboarding failed.'), (t?.retryStep as OnboardingStep) ?? step)
           return
         }
 
@@ -2157,7 +2206,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       }
       catch (err) {
         if (!cancelled)
-          handleError(err, step)
+          handleErrorRef.current(err, step)
       }
     })()
 
@@ -2314,7 +2363,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         // ── error route: surface through handleError so the support bundle +
         // retryCount + telemetry UX is identical to the bespoke catch ──
         if (result.next === 'error') {
-          handleError(new Error(t?.error ?? 'Onboarding failed.'), (t?.retryStep as OnboardingStep) ?? step)
+          handleErrorRef.current(new Error(t?.error ?? 'Onboarding failed.'), (t?.retryStep as OnboardingStep) ?? step)
           return
         }
 
@@ -2420,7 +2469,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       }
       catch (err) {
         if (!cancelled)
-          handleError(err, step)
+          handleErrorRef.current(err, step)
       }
     })()
 
@@ -2490,6 +2539,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         saveProgress,
         deleteProgress,
         updateSavedCredentials,
+        // Crash-recovery: buildIosSavedCredentials re-reads the .p8 from the
+        // persisted p8Path when the carried key content was lost (restart) —
+        // without this seam the resume's refuse guard fires even though the
+        // key file is perfectly readable (hostile-review 2026-06-12).
+        readFile: async path => Buffer.from(await readFile(path)),
 
         // ── tail helpers — pre-bind the resolved Capgo key into the entry builder
         // so CAPGO_TOKEN is included (mirrors createCiSecretEntries(creds, capgoKey)).
@@ -2581,7 +2635,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           teamId: iosCarriedRef.current.teamId ?? teamId ?? undefined,
           p8Content: iosCarriedRef.current.p8Content ?? (p8ContentRef.current ? Buffer.from(p8ContentRef.current) : undefined),
           importedP12Password: iosCarriedRef.current.importedP12Password ?? (importedP12Password || undefined),
-          savedCredentials: (savedCredentials ?? undefined) as Record<string, string> | undefined,
+          savedCredentials: toCarriedSavedCredentials(savedCredentials),
           ciSecretEntries,
           ciSecretExistingKeys,
           workflowIsNew: previewIsNew,
@@ -2699,7 +2753,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         // handleError.
         const message = err instanceof Error ? err.message : String(err)
         if (step === 'saving-credentials') {
-          handleError(err, 'saving-credentials')
+          handleErrorRef.current(err, 'saving-credentials')
         }
         else if (step === 'requesting-build') {
           // The engine catches build-request throws internally (→ build-complete),
@@ -4077,8 +4131,16 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               const reduced = applyIosInput('input-p8-path', base, { step: 'input-p8-path', value: filePath })
               setStep(getIosResumeStep(reduced))
             }
-            catch {
-              handleError(new Error(`File not found: ${filePath}`), 'api-key-instructions')
+            catch (err) {
+              // The try spans MORE than the readFile — savePartialProgress /
+              // loadProgress can fail AFTER the read succeeded. Only a missing
+              // file earns the friendly not-found copy; everything else
+              // surfaces the REAL error. The raw error is always logged.
+              appendInternalLog(`api-key-instructions .p8 submit failed: ${err instanceof Error ? err.message : String(err)}`)
+              if (classifyP8SubmitError(err) === 'not-found')
+                handleError(new Error(`File not found: ${filePath}`), 'api-key-instructions')
+              else
+                handleError(err, 'api-key-instructions')
             }
           }}
         />
@@ -4121,8 +4183,15 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               const reduced = applyIosInput('input-p8-path', base, { step: 'input-p8-path', value: filePath })
               setStep(getIosResumeStep(reduced))
             }
-            catch {
-              handleError(new Error(`File not found: ${value}`), 'input-p8-path')
+            catch (err) {
+              // Same classification as the api-key-instructions handler: the
+              // try also covers savePartialProgress / loadProgress, so only
+              // ENOENT becomes "File not found" — real errors surface as-is.
+              appendInternalLog(`input-p8-path submit failed: ${err instanceof Error ? err.message : String(err)}`)
+              if (classifyP8SubmitError(err) === 'not-found')
+                handleError(new Error(`File not found: ${value}`), 'input-p8-path')
+              else
+                handleError(err, 'input-p8-path')
             }
           }}
         />
@@ -4203,6 +4272,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             { label: '✖  Exit onboarding', value: '__exit__' },
           ]}
           onChange={async (value) => {
+            // Known @inkjs/ui bug: Select re-fires onChange while it stays
+            // mounted post-select — one-shot guard (reset on step change) so
+            // the async resolver below cannot double-run.
+            if (certLimitPickHandledRef.current)
+              return
+            certLimitPickHandledRef.current = true
             if (value === '__exit__') {
               // DIVERGE: the bespoke exit escape calls exitOnboarding directly
               // (the engine models this as the resolver's 'error' route, but the
@@ -4241,6 +4316,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           duplicateCount={duplicateProfiles.length}
           dense={dense}
           onChange={async (value) => {
+            // Known @inkjs/ui bug: Select re-fires onChange while it stays
+            // mounted post-select — one-shot guard (reset on step change) so
+            // the async resolver below cannot double-run.
+            if (duplicateProfilePickHandledRef.current)
+              return
+            duplicateProfilePickHandledRef.current = true
             if (value === 'delete') {
               // EPHEMERAL-branching: record the confirm into the carried ref +
               // thread the duplicate list (the delete effect reads it). Then run

@@ -656,6 +656,74 @@ await test('CHAIN: setup-method-select → api-key-instructions → input-p8-pat
   // The chain persisted ONLY the create-new fields — no secret rode into progress.
   assert(!p.completedSteps.apiKeyVerified, 'verifying-key has not run yet — no apiKeyVerified marker')
 })
+
+// ─── HOSTILE-REVIEW P1: Apple bundle id ≠ Capgo appId (create-new effects) ─────
+//
+// progress.appId is the CAPGO app key — when plugins.CapacitorUpdater.appId is
+// configured it is NOT the Apple bundle id. With no verified iosBundleIdOverride
+// the engine must resolve the bundle id from the DETECTED Release id
+// (deps.detectBundleIds, the same source verify-app gates on), falling back to
+// progress.appId only when nothing was detected.
+
+const DETECTED_RELEASE_ID = 'com.real.releaseid'
+function mismatchedDetect() {
+  return {
+    pbxproj: { value: DETECTED_RELEASE_ID, source: 'pbxproj-release', label: 'project.pbxproj (Release config)' },
+    debug: null,
+    plist: null,
+    capacitor: { value: APP_ID, source: 'capacitor-config', label: 'capacitor.config.ts (appId)' },
+    recommended: { value: DETECTED_RELEASE_ID, source: 'pbxproj-release', label: 'project.pbxproj (Release config)' },
+    mismatch: true,
+    debugReleaseDiffer: false,
+    releaseResolved: true,
+    candidates: [],
+  }
+}
+
+await test('creating-profile uses the DETECTED Release bundle id (not the Capgo appId) for createProfile + the duplicate probe when no override exists', async () => {
+  const deps = makeDeps({ detectBundleIds: mismatchedDetect })
+  const progress = iosProgress({ completedSteps: { certificateCreated: { ...RAW_CERT, p12Base64: 'P12_BASE64' } } })
+  const res = await runIosEffect('creating-profile', progress, deps)
+  assertEquals(res.next, 'saving-credentials', 'happy path still advances to the saving-credentials convergence point')
+  const create = deps.__calls.find(c => c.name === 'createProfile')
+  assert(create, 'createProfile must fire')
+  assertEquals(create.args[0].bundleId, DETECTED_RELEASE_ID, 'createProfile must receive the detected Release bundle id, not the Capgo app key')
+  const dup = deps.__calls.find(c => c.name === 'checkDuplicateProfiles')
+  assert(dup, 'duplicate probe fires on the happy path')
+  assertEquals(dup.args[0], DETECTED_RELEASE_ID, 'the duplicate probe must use the SAME resolved bundle id')
+})
+
+await test('creating-profile: a verified iosBundleIdOverride still beats the detected Release id', async () => {
+  const deps = makeDeps({ detectBundleIds: mismatchedDetect })
+  const progress = iosProgress({
+    iosBundleIdOverride: 'com.verified.override',
+    completedSteps: { certificateCreated: { ...RAW_CERT, p12Base64: 'P12_BASE64' } },
+  })
+  await runIosEffect('creating-profile', progress, deps)
+  const create = deps.__calls.find(c => c.name === 'createProfile')
+  assertEquals(create.args[0].bundleId, 'com.verified.override', 'the persisted override has top priority')
+})
+
+// ─── HOSTILE-REVIEW P2: stale p8Path must re-prompt, not leak raw fs errors ────
+
+await test('verifying-key with a STALE p8Path (readFile throws ENOENT) throws the NeedP8-style .p8 error, not the raw fs error', async () => {
+  // No carried.p8Content (crash-recovery resume) + an unreadable persisted path.
+  const deps = makeDeps({
+    readFile: async () => { throw Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' }) },
+  })
+  const progress = iosProgress({ p8Path: '/Users/me/AuthKey_GONE.p8', keyId: 'KEY1', issuerId: 'ISS1' })
+  let thrown = null
+  try {
+    await runIosEffect('verifying-key', progress, deps)
+  }
+  catch (e) {
+    thrown = e
+  }
+  assert(thrown, 'verifying-key must fail fast when the .p8 cannot be re-read')
+  assert(/\.p8/.test(thrown.message), `the error must carry the '.p8' marker so the driver's re-prompt matcher fires (got: ${thrown.message})`)
+  assert(!/ENOENT/.test(thrown.message), `the raw fs error must NOT bypass the re-prompt routing (got: ${thrown.message})`)
+  assert(!deps.__calls.some(c => c.name === 'verifyApiKey'), 'must not attempt the Apple verify without the .p8 bytes')
+})
 // ─── Summary ─────────────────────────────────────────────────────────────────────
 
 console.log(`\n${testsPassed} passed, ${testsFailed} failed`)

@@ -484,7 +484,15 @@ export async function createCertificate(
       // purpose: revoking a cert from another pool (legacy IOS_DISTRIBUTION)
       // would not free a slot here — offering it would send the user in a
       // circle (and tempt them to revoke a production cert for nothing).
-      const existing = await listDistributionCerts(token, { types: ['DISTRIBUTION'] })
+      // The list is diagnostics only — if it ALSO fails it must not REPLACE
+      // the original create error (hostile-review, 2026-06-12).
+      let existing: AscDistributionCert[]
+      try {
+        existing = await listDistributionCerts(token, { types: ['DISTRIBUTION'] })
+      }
+      catch {
+        throw err
+      }
       if (existing.length > 0) {
         throw new CertificateLimitError(existing)
       }
@@ -722,7 +730,16 @@ export async function createProfile(
     // Detect duplicate profile error
     if (err.message?.includes('Multiple profiles found')
       || err.message?.includes('duplicate')) {
-      const existing = await findCapgoProfiles(token, appId)
+      // The follow-up list is diagnostics for the delete-and-retry prompt — if
+      // it ALSO fails it must not REPLACE the original duplicate error
+      // (hostile-review, 2026-06-12): rethrow the ORIGINAL.
+      let existing: Array<{ id: string, name: string, profileType: string }>
+      try {
+        existing = await findCapgoProfiles(token, appId)
+      }
+      catch {
+        throw err
+      }
       if (existing.length > 0) {
         throw new DuplicateProfileError(existing)
       }

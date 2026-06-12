@@ -3509,7 +3509,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           dense={false}
           onChoose={async (choice) => {
             if (choice === 'support') {
-              await handleSupport('ai-analysis-prompt')
+              // Best-effort flow — surface unexpected failures but don't block.
+              await handleSupport('ai-analysis-prompt').catch((err) => { console.error('[support-flow]', err) })
               return
             }
             if (choice === 'debug') {
@@ -3556,7 +3557,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           maxRetries={MAX_AI_RETRIES}
           dense={false}
           onReread={() => setStep('ai-analysis-result-scroll')}
-          onSupport={() => { handleSupport('ai-analysis-result').catch(() => {}) }}
+          onSupport={() => { handleSupport('ai-analysis-result').catch((err) => { console.error('[support-flow]', err) }) }}
           onRetry={async () => {
             if (aiJobId) {
               await trackAiAnalysisChoice({
