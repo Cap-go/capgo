@@ -268,6 +268,9 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'import-export-warning': 70,
   'import-exporting': 75,
   // Create-new sub-flow
+  'p8-source-select': 4,
+  'p8-create-method-select': 4,
+  'asc-key-generating': 22,
   'api-key-instructions': 5,
   'p8-method-select': 8,
   'input-p8-path': 10,
@@ -354,6 +357,9 @@ export function getPhaseLabel(step: OnboardingStep): string {
     case 'import-export-warning':
     case 'import-exporting':
       return 'Step 4 of 4 · Export from Keychain'
+    case 'p8-source-select':
+    case 'p8-create-method-select':
+    case 'asc-key-generating':
     case 'api-key-instructions':
     case 'p8-method-select':
     case 'input-p8-path':
