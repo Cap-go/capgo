@@ -32,8 +32,8 @@ function activeTabColor(tab: string, isSecondary = false) {
 
 const ulPrimaryClass = 'flex text-xs md:text-sm font-medium text-center text-gray-500 dark:text-gray-300 gap-1 pt-1 px-1'
 const ulSecondaryClass = 'flex text-sm font-medium text-center text-gray-600 dark:text-gray-200 gap-2 py-2'
-const buttonPrimaryClass = 'inline-flex items-center gap-2 px-3 py-2 min-w-[42px] min-h-[38px] rounded-t-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:focus-visible:ring-offset-slate-900 transition-all group relative'
-const buttonSecondaryClass = 'inline-flex items-center gap-2 px-3 py-1.5 rounded-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:focus-visible:ring-offset-slate-900 transition-colors group'
+const buttonPrimaryClass = 'inline-flex items-center justify-center gap-2 px-3 py-2 min-w-11 min-h-11 rounded-t-md cursor-pointer touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:focus-visible:ring-offset-slate-900 transition-colors group relative'
+const buttonSecondaryClass = 'inline-flex items-center justify-center gap-2 px-3 py-2 min-h-11 min-w-11 rounded-md cursor-pointer touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:focus-visible:ring-offset-slate-900 transition-colors group'
 const iconClass = 'w-5 h-5 transition-colors'
 const labelClass = 'hidden md:block text-xs md:text-sm font-medium transition-colors first-letter:uppercase'
 </script>
@@ -41,9 +41,16 @@ const labelClass = 'hidden md:block text-xs md:text-sm font-medium transition-co
 <template>
   <div>
     <div class="pb-0">
-      <ul :class="[ulPrimaryClass, noWrap ? 'flex-nowrap overflow-x-scroll no-scrollbar px-1' : 'flex-wrap']">
+      <ul :class="[ulPrimaryClass, noWrap ? 'flex-nowrap overflow-x-auto overscroll-x-contain no-scrollbar px-1' : 'flex-wrap']">
         <li v-for="(tab, i) in tabs" :key="i" class="relative mr-2" :class="{ 'z-20': activeTab === tab.key }">
-          <button :class="[buttonPrimaryClass, activeTabColor(tab.key)]" @click="emit('update:activeTab', tab.key)">
+          <button
+            type="button"
+            :class="[buttonPrimaryClass, activeTabColor(tab.key)]"
+            :aria-current="activeTab === tab.key ? 'page' : undefined"
+            :aria-label="t(tab.label)"
+            :title="t(tab.label)"
+            @click="emit('update:activeTab', tab.key)"
+          >
             <component :is="tab.icon" :class="iconClass" />
             <span :class="labelClass">{{ t(tab.label) }}</span>
           </button>
@@ -51,9 +58,16 @@ const labelClass = 'hidden md:block text-xs md:text-sm font-medium transition-co
       </ul>
     </div>
     <div class="relative -mt-px border-t bg-blue-50 dark:bg-slate-800/40 border-blue-200/60 dark:border-blue-800/70" :class="secondaryTabs?.length ? 'z-10' : 'z-0'">
-      <ul v-if="secondaryTabs?.length" :class="[ulSecondaryClass, noWrap ? 'flex-nowrap overflow-x-scroll no-scrollbar px-1' : 'flex-wrap']">
+      <ul v-if="secondaryTabs?.length" :class="[ulSecondaryClass, noWrap ? 'flex-nowrap overflow-x-auto overscroll-x-contain no-scrollbar px-1' : 'flex-wrap']">
         <li v-for="(tab, i) in secondaryTabs" :key="i" class="mr-2">
-          <button :class="[buttonSecondaryClass, activeTabColor(tab.key, true)]" @click="emit('update:secondaryActiveTab', tab.key)">
+          <button
+            type="button"
+            :class="[buttonSecondaryClass, activeTabColor(tab.key, true)]"
+            :aria-current="secondaryActiveTab === tab.key ? 'page' : undefined"
+            :aria-label="t(tab.label)"
+            :title="t(tab.label)"
+            @click="emit('update:secondaryActiveTab', tab.key)"
+          >
             <component :is="tab.icon" :class="iconClass" />
             <span :class="labelClass">{{ t(tab.label) }}</span>
           </button>

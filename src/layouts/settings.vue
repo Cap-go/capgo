@@ -282,7 +282,7 @@ function handleSecondary(val: string) {
     />
     <main class="flex relative flex-1 w-full min-h-0 mt-0 overflow-hidden bg-blue-50 dark:bg-slate-800/40">
       <div
-        class="flex-1 w-full min-h-0 px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-16 lg:px-8 max-w-9xl"
+        class="flex-1 w-full min-h-0 px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-6 lg:px-8 max-w-9xl"
         :class="{ 'blur-sm pointer-events-none select-none': showAdminOnlyModal }"
       >
         <!-- Show FailedCard instead of normal content when security compliance is required -->

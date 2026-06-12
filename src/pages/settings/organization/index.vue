@@ -249,7 +249,7 @@ async function copyOrganizationId() {
                   </span>
                 </div>
               </div>
-              <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-black border rounded-lg cursor-pointer dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 border-slate-500 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden" @click="presentActionSheet">
+              <button id="change-org-pic" type="button" class="min-h-11 px-3 py-2 text-sm font-medium text-center text-black border rounded-lg cursor-pointer touch-manipulation dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 border-slate-500 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden" @click="presentActionSheet">
                 {{ t('change') }}
               </button>
             </div>
@@ -287,7 +287,7 @@ async function copyOrganizationId() {
                 {{ t('organization-id') }}
               </p>
               <div class="pt-2 md:pt-0 md:ml-6">
-                <button type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg cursor-pointer dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 border-slate-500 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden" @click.prevent="copyOrganizationId()">
+                <button type="button" class="min-h-11 px-3 py-2 text-sm font-medium text-center text-gray-700 border rounded-lg cursor-pointer touch-manipulation dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 border-slate-500 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden" @click.prevent="copyOrganizationId()">
                   {{ t('copy-organization-id') }}
                 </button>
               </div>
@@ -298,7 +298,7 @@ async function copyOrganizationId() {
             <div class="flex flex-col px-2 py-5 border-t md:px-6 border-slate-300">
               <div class="flex self-end">
                 <button
-                  class="p-2 text-red-600 border border-red-400 rounded-lg cursor-pointer hover:text-white hover:bg-red-600"
+                  class="min-h-11 px-3 py-2 text-red-600 border border-red-400 rounded-lg cursor-pointer touch-manipulation hover:text-white hover:bg-red-600"
                   color="secondary"
                   shape="round"
                   type="button"
@@ -314,7 +314,7 @@ async function copyOrganizationId() {
                 </button>
                 <button
                   id="save-changes"
-                  class="p-2 ml-3 text-white bg-blue-500 rounded-lg cursor-pointer hover:bg-blue-600 d-btn"
+                  class="ml-3 min-h-11 px-3 py-2 text-white bg-blue-500 rounded-lg cursor-pointer touch-manipulation hover:bg-blue-600 d-btn"
                   type="submit"
                   color="secondary"
                   shape="round"

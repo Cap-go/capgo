@@ -33,14 +33,14 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <header class="bg-slate-100 backdrop-blur-xl dark:bg-slate-900">
+  <header class="border-b border-slate-200/80 bg-slate-100/95 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/95">
     <div class="px-2 sm:px-4 lg:px-6">
       <div class="relative flex items-center justify-between h-16 -mb-px">
         <!-- Header: Left side -->
         <div class="flex items-center space-x-4">
           <div v-if="displayStore.NavTitle && isMobile" class="pr-2">
             <button
-              class="flex p-2 rounded-sm dark:text-white focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none text-slate-500 dark:hover:bg-slate-600 hover:bg-slate-300"
+              class="flex min-h-11 min-w-11 items-center justify-center rounded-md p-2 text-slate-500 touch-manipulation hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:text-white dark:hover:bg-slate-600"
               :aria-label="t('button-back')"
               @click="back()"
             >
@@ -50,7 +50,7 @@ const { t } = useI18n()
           </div>
           <!-- Hamburger button -->
           <button
-            class="p-1 rounded-md lg:hidden dark:text-white focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none text-slate-500 dark:hover:text-slate-50 hover:text-slate-600"
+            class="min-h-11 min-w-11 rounded-md p-2 text-slate-500 touch-manipulation hover:bg-slate-200 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:text-white dark:hover:bg-slate-800 dark:hover:text-slate-50 lg:hidden"
             aria-controls="sidebar"
             :aria-expanded="props.sidebarOpen"
             :aria-label="props.sidebarOpen ? t('close-sidebar') : t('open-sidebar')"

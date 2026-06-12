@@ -334,6 +334,19 @@ function tooltipIdFor(rowIndex: number, actionIndex: number): string {
   return `datatable-action-tooltip-${rowIndex}-${actionIndex}`
 }
 
+function cleanActionText(value: unknown): string {
+  return DOMPurify.sanitize(String(value ?? ''), { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function getActionAriaLabel(action: NonNullable<TableColumn['actions']>[number], elem: any, col: TableColumn): string {
+  const title = getActionTitle(action, elem)
+  const isDeleteAction = title.toLocaleLowerCase() === t('delete').toLocaleLowerCase()
+  const actionLabel = isDeleteAction ? t('remove') : title
+  return cleanActionText(actionLabel || col.label || t('actions'))
+}
+
 const displayElemRange = computed(() => {
   const begin = (props.currentPage - 1) * props.elementList.length
   const end = begin + props.elementList.length
@@ -459,37 +472,37 @@ const RenderCell = defineComponent<{
 const isReloading = computed(() => props.isLoading || pendingReset.value)
 const isAdding = computed(() => props.isLoading || pendingAdd.value)
 const paginationClass = computed(() => props.mobileFixedPagination
-  ? 'fixed bottom-0 left-0 z-40 flex items-center justify-between w-full p-4 bg-white md:relative md:pt-4 md:bg-transparent dark:bg-gray-900 dark:md:bg-transparent'
-  : 'flex items-center justify-between w-full p-4 bg-white md:relative md:pt-4 md:bg-transparent dark:bg-gray-900 dark:md:bg-transparent')
+  ? 'fixed bottom-0 left-0 z-40 flex items-center justify-between w-full gap-3 border-t border-gray-200 bg-white p-4 md:relative md:border-t-0 md:pt-4 md:bg-transparent dark:border-gray-700 dark:bg-gray-900 dark:md:bg-transparent'
+  : 'flex items-center justify-between w-full gap-3 p-4 bg-white md:relative md:pt-4 md:bg-transparent dark:bg-gray-900 dark:md:bg-transparent')
 </script>
 
 <template>
-  <div class="pb-4 overflow-x-auto md:pb-0">
-    <div class="flex items-start justify-between p-3 pb-4 md:items-center">
-      <div class="flex h-10 md:mb-0">
+  <div class="pb-4 md:pb-0">
+    <div class="flex flex-col gap-3 p-3 pb-4 md:flex-row md:items-center md:justify-between">
+      <div class="flex flex-wrap items-center gap-2 md:mb-0">
         <button
-          class="inline-flex items-center py-1.5 px-3 mr-2 text-sm font-medium text-gray-500 bg-white rounded-md border border-gray-300 cursor-pointer dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
+          class="inline-flex min-h-11 items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-500 touch-manipulation cursor-pointer hover:bg-gray-100 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700"
           type="button" @click="handleResetClick"
         >
-          <IconReload v-if="!isReloading" class="m-1 md:mr-2" />
-          <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
+          <IconReload v-if="!isReloading" class="size-5" />
+          <Spinner v-else size="w-[16.8px] h-[16.8px]" />
           <span class="hidden text-sm md:block">{{ t("reload") }}</span>
         </button>
-        <div v-if="showAdd" class="p-px mr-2 rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
+        <div v-if="showAdd" class="rounded-lg bg-linear-to-r from-cyan-500 to-purple-500 p-px">
           <button
             :data-test="addButtonTestId"
-            class="inline-flex items-center py-1.5 px-3 text-sm font-medium text-gray-500 bg-white rounded-md cursor-pointer dark:text-white dark:bg-gray-800 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
+            class="inline-flex min-h-11 items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-500 touch-manipulation cursor-pointer hover:bg-gray-100 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 dark:focus:ring-gray-700"
             type="button" @click="handleAddClick"
           >
-            <plusOutline v-if="!isAdding" class="m-1 md:mr-2" />
-            <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
+            <plusOutline v-if="!isAdding" class="size-5" />
+            <Spinner v-else size="w-[16.8px] h-[16.8px]" />
             <span class="hidden text-sm md:block">{{ t("add-one") }}</span>
           </button>
         </div>
-        <div v-if="filterText && filterList.length" class="h-10 d-dropdown">
+        <div v-if="filterText && filterList.length" class="d-dropdown">
           <button
             tabindex="0"
-            class="inline-flex items-center py-1.5 px-3 mr-2 h-full text-sm font-medium text-gray-500 bg-white rounded-md border border-gray-300 cursor-pointer dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
+            class="inline-flex min-h-11 items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-500 touch-manipulation cursor-pointer hover:bg-gray-100 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700"
           >
             <div
               v-if="filterActivated"
@@ -526,7 +539,7 @@ const paginationClass = computed(() => props.mobileFixedPagination
       </div>
       <button
         v-if="isSelectAllEnabled"
-        class="inline-flex items-center self-end px-3 py-2 ml-auto mr-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg cursor-pointer dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
+        class="inline-flex min-h-11 items-center self-start rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-500 touch-manipulation cursor-pointer hover:bg-gray-100 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 md:ml-auto md:self-end"
         type="button" @click="
           selectedRows = selectedRows.map(() => true);
           emit('selectRow', selectedRows);
@@ -536,21 +549,21 @@ const paginationClass = computed(() => props.mobileFixedPagination
       </button>
       <button
         v-if="isSelectAllEnabled"
-        class="inline-flex items-center self-end py-1.5 px-3 mr-2 text-sm font-medium text-gray-500 bg-white rounded-lg border border-gray-300 cursor-pointer dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
+        class="inline-flex min-h-11 items-center self-start rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-500 touch-manipulation cursor-pointer hover:bg-gray-100 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 md:self-end"
         type="button" @click="emit('massDelete')"
       >
         <IconTrash class="h-6 text-red-500" />
       </button>
-      <div class="flex overflow-hidden md:w-auto">
+      <div class="flex w-full min-w-0 overflow-hidden md:w-auto">
         <FormKit
           v-model="searchVal" :placeholder="searchPlaceholder" :prefix-icon="IconSearch"
           :disabled="isLoading" enterkeyhint="send" :classes="{
-            outer: 'mb-0! md:w-96',
+            outer: 'mb-0! w-full md:w-96',
           }"
         />
       </div>
     </div>
-    <div class="block">
+    <div class="block overflow-x-auto">
       <table id="custom_table" class="w-full text-sm text-left text-gray-500 pb-14 md:pb-0 dark:text-gray-400">
         <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:text-gray-400 dark:bg-gray-700">
           <tr>
@@ -615,7 +628,8 @@ const paginationClass = computed(() => props.mobileFixedPagination
                             :disabled="isActionDisabled(action, elem)"
                             :aria-describedby="getActionTitle(action, elem) ? tooltipIdFor(i, actionIndex) : undefined"
                             :data-test="action.testId ? (typeof action.testId === 'function' ? action.testId(elem) : action.testId) : undefined"
-                            class="p-2 text-gray-500 rounded-md cursor-pointer dark:text-gray-400 hover:text-gray-600 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed dark:hover:bg-gray-700 dark:hover:text-gray-300 dark:disabled:hover:text-gray-400 disabled:hover:bg-transparent disabled:hover:text-gray-500"
+                            class="min-h-11 min-w-11 rounded-md p-2.5 text-gray-500 touch-manipulation cursor-pointer hover:bg-gray-200 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-gray-500 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300 dark:disabled:hover:text-gray-400"
+                            :aria-label="getActionAriaLabel(action, elem, col)"
                             @click.stop="action.onClick(elem)"
                           >
                             <component :is="action.icon" />
@@ -633,7 +647,8 @@ const paginationClass = computed(() => props.mobileFixedPagination
                     </template>
                     <template v-else-if="col.icon">
                       <button
-                        class="p-2 text-gray-500 rounded-md cursor-pointer dark:text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+                        class="min-h-11 min-w-11 rounded-md p-2.5 text-gray-500 touch-manipulation cursor-pointer hover:bg-gray-200 hover:text-gray-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+                        :aria-label="col.label"
                         @click.stop="col.onClick ? col.onClick(elem) : () => { }"
                       >
                         <component :is="col.icon" />

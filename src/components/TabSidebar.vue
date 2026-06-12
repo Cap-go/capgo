@@ -58,7 +58,13 @@ onMounted(() => {
           <div class="w-full">
             <ul class="flex flex-nowrap mr-3 md:block md:mr-0">
               <li v-for="(m, i) in tabs" :key="i" class="mr-0.5 w-full cursor-pointer md:mr-0 md:mb-0.5" @click="openLink(m.key)">
-                <button :id="`tab-${m.label}`" class="flex items-center py-2 px-2.5 w-full whitespace-nowrap rounded-sm cursor-pointer hover:bg-gray-400 first-letter:uppercase" :class="{ 'text-blue-600 hover:text-blue-800': isActive(m.key), 'text-slate-400 hover:text-slate-100': !isActive(m.key) }">
+                <button
+                  :id="`tab-${m.label}`"
+                  type="button"
+                  class="flex min-h-11 w-full cursor-pointer items-center rounded-md px-2.5 py-2 text-left whitespace-nowrap touch-manipulation hover:bg-gray-400 first-letter:uppercase focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800"
+                  :class="{ 'text-blue-600 hover:text-blue-800': isActive(m.key), 'text-slate-400 hover:text-slate-100': !isActive(m.key) }"
+                  :aria-current="isActive(m.key) ? 'page' : undefined"
+                >
                   <component :is="m.icon" class="mr-2 w-4 h-4 fill-current shrink-0" />
                   <span class="hidden text-sm font-medium md:block first-letter:uppercase">{{ t(m.label) }}</span>
                 </button>
