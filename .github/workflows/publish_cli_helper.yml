@@ -130,11 +130,29 @@ jobs:
             x86_64) helper="./cli-helper/dist/x64/Capgo.app/Contents/MacOS/capgo" ;;
             *) echo "::error::unsupported runner arch: $arch"; exit 1 ;;
           esac
+          # No --invoked-by: the caller gate must reject before anything else
+          # (the wrap passphrase is read from stdin, not argv, so none is passed).
           set +e
-          out=$("$helper" keychain-export --sha1 "$(printf 'a%.0s' {1..40})" --output /tmp/x.p12 --passphrase p | cat)
+          out=$("$helper" keychain-export --sha1 "$(printf 'a%.0s' {1..40})" --output /tmp/x.p12 < /dev/null | cat)
           set -e
           echo "$out" | jq -e '.ok == false and .errorCode == "FORBIDDEN_CALLER"' > /dev/null \
             || { echo "::error::gate did not reject missing handshake: $out"; exit 1; }
+      - name: Gate test — valid handshake + stdin passphrase reaches keychain lookup
+        run: |
+          arch="$(uname -m)"
+          case "$arch" in
+            arm64) helper="./cli-helper/dist/arm64/Capgo.app/Contents/MacOS/capgo" ;;
+            x86_64) helper="./cli-helper/dist/x64/Capgo.app/Contents/MacOS/capgo" ;;
+            *) echo "::error::unsupported runner arch: $arch"; exit 1 ;;
+          esac
+          # WITH the handshake and a passphrase on stdin, the helper passes the gate,
+          # reads the passphrase, and fails only at the keychain lookup (the random
+          # SHA1 matches nothing). This guards the stdin passphrase interface.
+          set +e
+          out=$(printf 'wrap-pass\n' | "$helper" keychain-export --sha1 "$(printf 'a%.0s' {1..40})" --output /tmp/x.p12 --invoked-by capgo-cli | cat)
+          set -e
+          echo "$out" | jq -e '.ok == false and .errorCode == "NO_IDENTITY"' > /dev/null \
+            || { echo "::error::expected NO_IDENTITY with handshake + stdin passphrase: $out"; exit 1; }
       - name: Prepare packages
         run: node cli-helper/scripts/prepare-publish.mjs "${{ steps.version.outputs.version }}"
       # Publish under the `rc` dist-tag while the package is new/unproven, so it
