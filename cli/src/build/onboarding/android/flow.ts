@@ -1090,6 +1090,13 @@ export interface AndroidEffectDeps {
   defaultExportPath?: (appId: string, platform: 'ios' | 'android') => string
 
   /**
+   * Lockfile-based package-manager detection (pure, read-only). Drives the
+   * pick-package-manager 'recommended — matches your lockfile' note.
+   * Mirrors @capgo/find-package-manager: findPackageManagerType(cwd, 'npm').
+   */
+  detectPackageManager?: () => string
+
+  /**
    * Generate the GitHub Actions workflow YAML (pure).
    * Mirrors workflow-generator.ts: generateWorkflow(opts).
    */

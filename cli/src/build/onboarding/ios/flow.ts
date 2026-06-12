@@ -478,6 +478,8 @@ export interface IosEffectDeps {
   ) => Promise<void>
   exportCredentialsToEnv?: (opts: EnvExportOpts) => EnvExportResult
   defaultExportPath?: (appId: string, platform: 'ios' | 'android') => string
+  /** Lockfile-based package-manager detection (the pick-package-manager 'recommended' note). */
+  detectPackageManager?: () => string
   generateWorkflow?: (opts: WorkflowGeneratorOpts) => GeneratedWorkflow
   writeWorkflowFile?: (opts: WorkflowGeneratorOpts, writeOptions?: WorkflowWriteOptions) => WorkflowWriteResult
   requestBuildInternal?: (appId: string, options: BuildRequestOptions, silent?: boolean, logger?: BuildLogger) => Promise<BuildRequestResult>

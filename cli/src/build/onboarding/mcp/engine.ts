@@ -211,7 +211,15 @@ function activePlatform(facts: PreflightFacts): Platform | null {
   // setupMethod: the S12 import fork persists it as the FIRST iOS write (before
   // any .p8 field exists), so a fork-only progress must already count as an
   // in-flight iOS flow — a follow-up next_step({}) may not bounce to platform-select.
-  if (i && (Boolean(i.setupMethod) || Boolean(i.keyId) || Boolean(i.p8Path) || Boolean(i.completedSteps?.apiKeyVerified) || Boolean(i.completedSteps?.credentialsSaved)))
+  // _credentialsExistGate: the iOS data-safety gate seeds a progress whose
+  // ONLY field is the gate marker (no setupMethod / .p8 fields exist yet), so
+  // it must already count as an in-flight iOS flow too — pending/backup/done
+  // all mean the user is inside the iOS credential phase, and 'cancel' renders
+  // the durable hard stop. Without this, a dual-platform project bounced the
+  // gate (and every bare follow-up) to platform-select — unlike android,
+  // whose gate-seeded progress always carries activePlatform: 'android'.
+  // Found by the live MCP e2e (S14).
+  if (i && (Boolean(i.setupMethod) || Boolean(i.keyId) || Boolean(i.p8Path) || Boolean(i._credentialsExistGate) || Boolean(i.completedSteps?.apiKeyVerified) || Boolean(i.completedSteps?.credentialsSaved)))
     return 'ios'
   return null
 }
@@ -1246,6 +1254,7 @@ export async function decideIos(
       return renderTailStep('ios', appId, step, progress, ctx as unknown as Record<string, unknown>, {
         defaultExportPath: ios.defaultExportPath,
         generateWorkflow: ios.generateWorkflow,
+        detectPackageManager: ios.detectPackageManager,
       })
     }
 
@@ -2074,6 +2083,7 @@ export async function decideAndroid(
       return renderTailStep('android', appId, step, progress, ctx as unknown as Record<string, unknown>, {
         defaultExportPath: deps.androidEffectDeps.defaultExportPath,
         generateWorkflow: deps.androidEffectDeps.generateWorkflow,
+        detectPackageManager: deps.androidEffectDeps.detectPackageManager,
       })
     }
 
@@ -2506,6 +2516,8 @@ function applyMcpTailAnswer<P extends TailEffectProgress>(
 interface TailRenderDeps {
   defaultExportPath?: (appId: string, platform: 'ios' | 'android') => string
   generateWorkflow?: IosEffectDeps['generateWorkflow']
+  /** Lockfile-based package-manager detection (pick-package-manager's 'recommended' note). */
+  detectPackageManager?: () => string
 }
 
 /**
@@ -2673,6 +2685,10 @@ function mapTailView(
       return {
         ...base,
         summary: `${view.prompt ?? 'Which package manager does this project use?'} It drives the install + build steps in the generated workflow.`,
+        // Lockfile detection (when the driver wires the dep): the matching
+        // option's label already carries the 'recommended — matches your
+        // lockfile' note (tailViewForStep); surface the name in context too.
+        ...(viewCtx.detectedPackageManager ? { context: { detectedPackageManager: viewCtx.detectedPackageManager } } : {}),
         next: {
           tool: NEXT_STEP_TOOL,
           with: { packageManager: '<bun|npm|pnpm|yarn>' },
@@ -2791,6 +2807,9 @@ function renderTailStep(
     ciSecretEntries: carried.ciSecretEntries,
     ciSecretExistingKeys: (invocationCtx.ciSecretExistingKeys as string[] | undefined) ?? carried.ciSecretExistingKeys,
     defaultEnvExportPath: renderDeps.defaultExportPath?.(appId, platform),
+    // pick-package-manager only: lockfile detection runs per render (cheap,
+    // read-only) — the engine view marks the matching option 'recommended'.
+    detectedPackageManager: step === 'pick-package-manager' ? renderDeps.detectPackageManager?.() : undefined,
   }
   setTailParked(appId, {
     step,
@@ -3435,6 +3454,17 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
           _credentialsExistGate: input.credentialsExistChoice === 'backup' ? 'backup' : 'cancel',
         }
         await deps.iosEffectDeps?.saveProgress?.(gAppId, updated)
+        // Route the answered gate straight INTO the iOS driver, mirroring the
+        // android persist path (whose seeded progress carries
+        // activePlatform: 'android' and is picked up by the decide loop). The
+        // iOS gate-seeded progress carries ONLY `_credentialsExistGate`, so
+        // falling through to the decide loop on a DUAL-platform project
+        // bounced BOTH gate arms back to platform-select — the backup never
+        // ran and the cancel never halted (found by the live MCP e2e, S14).
+        // decideIos runs the 'backup' arm's backing-up effect itself and
+        // renders the 'cancel' arm's durable hard stop.
+        const gateFacts = await gatherFacts(deps)
+        return decideIos(gateFacts, deps)
       }
     }
   }
@@ -3668,16 +3698,31 @@ export async function runAdvance(deps: EngineDeps, input?: OnboardingInput): Pro
 /**
  * Map an iOS resume step to its MCP state name: the TUI-only .p8 chain (and
  * the bootstrap 'welcome') collapses into the single 'ios-api-key' gate name;
- * every other engine step id is the state name verbatim — mirroring decideIos.
+ * 'ask-build' maps to the shared 'build-ready' choice (the deciders route it
+ * through decideBuildPhase); every other engine step id is the state name
+ * verbatim — mirroring decideIos.
  */
 function resolveIosStateName(step: OnboardingStep): string {
-  return IOS_API_KEY_GATE_STEPS.has(step) ? 'ios-api-key' : step
+  if (IOS_API_KEY_GATE_STEPS.has(step))
+    return 'ios-api-key'
+  if (step === 'ask-build')
+    return 'build-ready'
+  return step
+}
+
+/**
+ * The android mirror: 'ask-build' renders as the shared 'build-ready' choice
+ * (decideAndroid → decideBuildPhase); every other step id is verbatim.
+ */
+function resolveAndroidStateName(step: AndroidOnboardingStep): string {
+  return step === 'ask-build' ? 'build-ready' : step
 }
 
 /**
  * Read-only: determine the onboarding state the user is currently on, WITHOUT
  * running any side effect. Mirrors the branch selection of decideStart/
- * decideAndroid/decideIos (preflight → platform → resume step) but never
+ * decideAndroid/decideIos (preflight → platform → resume step, with the same
+ * ask-build → build-ready / .p8-chain → ios-api-key name mapping) but never
  * calls effects.
  */
 export function resolveCurrentState(facts: PreflightFacts): string {
@@ -3694,15 +3739,95 @@ export function resolveCurrentState(facts: PreflightFacts): string {
     ?? { platform: 'android' as const, appId, startedAt: new Date().toISOString(), completedSteps: {} }
   // An in-flight android credential flow (or a fresh android-only project) → resume step.
   if (facts.androidProgress)
-    return getAndroidResumeStep(facts.androidProgress)
+    return resolveAndroidStateName(getAndroidResumeStep(facts.androidProgress))
   if (facts.iosProgress)
     return resolveIosStateName(getIosResumeStep(facts.iosProgress))
   if (facts.platformsDetected.length === 1 && facts.platformsDetected[0] === 'android')
-    return getAndroidResumeStep(androidProgress)
+    return resolveAndroidStateName(getAndroidResumeStep(androidProgress))
   if (facts.platformsDetected.length === 1 && facts.platformsDetected[0] === 'ios')
     return 'ios-api-key'
   return 'platform-select'
 }
+
+// ─── S15: EXPLAIN coverage inventory (spec §8 Phase 5) ─────────────────────────
+//
+// The hermetic explain-coverage gate (private test-mcp-explain-coverage.mjs)
+// derives "every state name the MCP can emit" mechanically:
+//
+//   inventory = (STEP_PROGRESS keys ∪ ANDROID_STEP_PROGRESS keys)
+//               − MCP_UNREACHABLE_STEPS
+//               ∪ MCP_ONLY_STATES
+//
+// MCP_ONLY_STATES must list every state literal this file constructs that is
+// NOT an engine step id (the gate scans this file's source for `state: '...'`
+// literals, so a new constructor with an unlisted name fails the gate).
+// MCP_UNREACHABLE_STEPS lists the engine step ids the MCP can NEVER emit as a
+// result/explain state. Typing it against the step unions makes a step-id
+// rename a compile error here — the rename-catch half of the gate.
+
+/** State names the MCP constructs directly that are NOT engine step ids. */
+export const MCP_ONLY_STATES: readonly string[] = [
+  // Preflight / app phase (decideStart + executeAuto).
+  'no-capacitor-project',
+  'login-required',
+  'registering-app',
+  'app-id-conflict',
+  'register-app-failed',
+  // iOS: the collapsed .p8 gate + the S6a re-collect gate.
+  'ios-api-key',
+  'ios-credentials-failed',
+  // Build phase (decideBuildPhase + the C2/D2 handoff/polling results).
+  'build-ready',
+  'build-launched',
+  'build-run-handoff',
+  'build-waiting',
+  'build-failed',
+  'build-skipped',
+  'build-appid-unsafe',
+  // Defensive stall guards (drive / decideIos / decideAndroid).
+  'auto-loop-guard',
+  'ios-auto-loop-guard',
+  'android-auto-loop-guard',
+]
+
+/**
+ * Engine step ids (present in the type tables) the MCP can NEVER emit as a
+ * state name:
+ *  - TUI bootstrap / TUI-only screens: welcome, resume-prompt, adding-platform,
+ *    the AI build-debug sub-flow (decideIos reroutes its entry to
+ *    'build-failed'), the contact-support sub-flow (the MCP's error screen has
+ *    the email-support arm instead), the native file pickers (the MCP collects
+ *    paths as text), the google-sign-in-running spinner (the MCP parks on
+ *    'google-sign-in' via its OAuth session), and view-workflow-diff (the MCP
+ *    folds the diff into preview-workflow-file's context — 'view' re-parks);
+ *  - the .p8 input chain, collapsed into the single 'ios-api-key' gate;
+ *  - 'ask-build', mapped to the shared 'build-ready' choice (decideBuildPhase);
+ *  - 'requesting-build', never run over MCP (the C2/D2 handoff + checkBuild
+ *    polling replace it).
+ */
+export const MCP_UNREACHABLE_STEPS: ReadonlySet<string> = new Set<OnboardingStep | AndroidOnboardingStep>([
+  'welcome',
+  'resume-prompt',
+  'adding-platform',
+  'api-key-instructions',
+  'p8-method-select',
+  'input-p8-path',
+  'input-key-id',
+  'input-issuer-id',
+  'ask-build',
+  'requesting-build',
+  'view-workflow-diff',
+  'ai-analysis-prompt',
+  'ai-analysis-running',
+  'ai-analysis-result',
+  'ai-analysis-result-scroll',
+  'support-confirm',
+  'support-log-view',
+  'support-uploading',
+  'keystore-existing-picker',
+  'sa-json-existing-picker',
+  'google-sign-in-running',
+])
 
 /**
  * Read-only "explain the current step" entry point backing the

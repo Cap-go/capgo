@@ -3,17 +3,22 @@
 // capgo_builder_onboarding_explain tool when the user is confused. No engine
 // dependencies — pure data + a lookup with a generic fallback.
 //
-// COVERAGE: every USER-FACING state (decision / input / gate) has an entry —
-// including the S6b iOS recovery states (cert-limit-prompt /
-// duplicate-profile-prompt / the 'error' recovery screen).
-// AUTO/TRANSIENT states (spinners + internal transitions: *-running, *-loading,
-// *-generating, *-validating, *-detecting-*, welcome, backing-up, *-guard,
-// revoking-certificate, deleting-duplicate-profiles,
-// build-complete, requesting-build, writing-workflow-file, exporting-env,
-// overwrite-and-export-env, uploading-ci-secrets, checking-ci-secrets,
-// google-sign-in-running, saving-credentials, credentials-exist) intentionally
-// have NO bespoke entry and resolve to FALLBACK — a user does not ask to
-// "explain" a spinner. Some wording may be refined later when tests expand.
+// COVERAGE (S15 — enforced by the hermetic gate in the private
+// test-mcp-explain-coverage.mjs, spec §8 Phase 5): every INTERACTIVE state the
+// MCP can emit (decision / input / gate / error — including the S6b iOS
+// recovery states, the credentials-exist data-safety gate and the stall
+// guards) has an AUTHORED entry, and every entry key must be an emittable
+// state (engine.ts MCP_ONLY_STATES / MCP_UNREACHABLE_STEPS define the
+// inventory — catches renames and dead entries).
+// AUTO/TRANSIENT states (spinners + terminals: *-running, *-loading,
+// *-generating, *-validating, registering-app, welcome, backing-up,
+// import-scanning and the other import-* spinners, revoking-certificate,
+// deleting-duplicate-profiles, build-complete, build-skipped, requesting-build,
+// writing-workflow-file, exporting-env, overwrite-and-export-env,
+// uploading-ci-secrets, checking-ci-secrets, detecting-ci-secrets,
+// saving-credentials) MAY resolve to FALLBACK — a user does not ask to
+// "explain" a spinner — though the high-anxiety Apple spinners (verifying-key,
+// creating-certificate, creating-profile) keep bespoke entries.
 
 const FALLBACK = [
   'This step is part of setting up Capgo Builder so your app can be built in the cloud.',
@@ -30,6 +35,8 @@ export const EXPLANATIONS: Record<string, string> = {
   'app-id-conflict': 'WHAT: The app id already exists and is not in your account.\nWHY: App ids are globally unique in Capgo.\nWHAT TO DO: Choose a different app id in your capacitor config, then continue.',
   // ── Platform ───────────────────────────────────────────────────────────────
   'platform-select': 'WHAT: We are choosing which app platform to set up first — iOS or Android.\nWHY: Each platform signs and ships builds differently, so Capgo configures them one at a time.\nOPTIONS: "ios" sets up Apple builds (you will create an App Store Connect API key). "android" sets up Google Play builds (mostly automatic; one Google sign-in).\nWHAT TO DO: Pick whichever you want to ship first. You can set up the other one later.',
+  // ── Data-safety gate (shared by both platforms) ──────────────────────────────
+  'credentials-exist': 'WHAT: Saved Capgo build credentials for this app already exist on this machine, and continuing will create new ones that replace them.\nWHY: Replacing credentials can break anything still using the old ones (an existing CI setup, another machine), so nothing is touched without your say-so.\nOPTIONS: "backup" — copy the existing credentials to a dated backup file first, then continue onboarding; "cancel" — stop here and change nothing.\nWHAT TO DO: Pick "backup" if you really want fresh credentials (the old ones stay recoverable from the backup file). Pick "cancel" if this is unexpected — your current setup keeps working.',
   // ── iOS ────────────────────────────────────────────────────────────────────
   'ios-api-key': 'WHAT: We need an App Store Connect API key so Capgo can build and sign your iOS app.\nWHY: Apple requires this key to create the signing certificate and provisioning profile.\nWHAT TO DO: In App Store Connect → Users and Access → Integrations, create a key with App Manager access, download the .p8 (you can only download it once), and give me the Key ID, Issuer ID, and the path to the .p8. The .p8 stays on your machine.',
   'ios-credentials-failed': 'WHAT: Setting up the iOS signing credentials failed.\nWHY: Usually the API key details are wrong or the key lacks App Manager access.\nWHAT TO DO: Re-check the Key ID / Issuer ID / .p8 path and that the key has the right access, then retry.',
@@ -62,7 +69,6 @@ export const EXPLANATIONS: Record<string, string> = {
   'keystore-new-cn': 'WHAT: The certificate "common name" identifies who the signing certificate belongs to.\nWHY: It is embedded in the certificate metadata; it does not affect functionality.\nWHAT TO DO: Your app id (or company/app name) is a fine value.',
   // ── Keystore (existing) ──────────────────────────────────────────────────────
   'keystore-existing-path': 'WHAT: We need the path to your existing keystore file.\nWHY: Capgo signs builds with the same keystore you already use, so we read it from disk.\nWHAT TO DO: Give the absolute path to your .jks/.keystore/.p12 file. The file stays on your machine.',
-  'keystore-existing-picker': 'WHAT: We found candidate keystore files and you can pick one.\nWHY: Choosing the right file avoids signing with the wrong key.\nWHAT TO DO: Select the keystore you use for releases, or provide a path manually.',
   'keystore-existing-store-password': 'WHAT: We need the password that unlocks your existing keystore.\nWHY: We must open the keystore to read and use the signing key.\nWHAT TO DO: Provide the store password for that keystore file.',
   'keystore-existing-alias-select': 'WHAT: Your keystore holds more than one key; pick which alias signs the app.\nWHY: The alias selects the exact signing key.\nWHAT TO DO: Choose the alias you normally release with (often "release" or your app name).',
   'keystore-existing-alias': 'WHAT: Enter the alias (key name) inside your keystore.\nWHY: It selects which key signs your app.\nWHAT TO DO: Provide the alias you use for release signing.',
@@ -70,7 +76,6 @@ export const EXPLANATIONS: Record<string, string> = {
   // ── Service account fork ─────────────────────────────────────────────────────
   'service-account-method-select': 'WHAT: A Google Play "service account" is a special Google credential (a JSON key file) that grants Capgo permission to upload and publish builds to YOUR Google Play account on your behalf.\nWHY: Capgo needs Play access to deliver your Android builds. Without it, Capgo can build the app but cannot push it to Google Play.\nOPTIONS: "generate" (recommended) — sign in with Google once and Capgo creates and wires up the service account for you automatically. "existing" — you already have a service-account JSON file and want to use it.\nWHAT TO DO: If you are not sure, choose "generate" — it is the guided, one-sign-in path. Choose "existing" only if you already manage your own Play service account.',
   'sa-json-existing-path': 'WHAT: We need the path to your Google Play service-account JSON key file.\nWHY: That file is the credential Capgo uses to upload to Play.\nWHAT TO DO: Provide the absolute path to the .json key you downloaded from Google Cloud.',
-  'sa-json-existing-picker': 'WHAT: We found candidate service-account JSON files; pick one.\nWHY: The right key must have Play upload permission for your app.\nWHAT TO DO: Choose the JSON that belongs to your Play service account, or provide a path.',
   'sa-json-validation-failed': 'WHAT: The service-account JSON you provided did not validate.\nWHY: It may be the wrong file, lack Play permissions, or be malformed.\nOPTIONS: try a different file, switch to the guided Google sign-in, or save anyway.\nWHAT TO DO: Use the guided "generate" path if you are unsure which JSON is correct.',
   // ── Google sign-in / Play / GCP ──────────────────────────────────────────────
   'google-sign-in': 'WHAT: We will open your browser for a Google sign-in.\nWHY: Capgo uses your one-time Google authorization to create and wire up the Play service account for you. Your tokens are used only during setup and revoked afterwards; they never reach Capgo servers.\nWHAT TO DO: Approve every requested permission in the browser, then tell me to continue.',
@@ -81,6 +86,8 @@ export const EXPLANATIONS: Record<string, string> = {
   // ── Build phase ──────────────────────────────────────────────────────────────
   'build-ready': 'WHAT: Credentials are set up; you can run your first cloud build now.\nWHY: This produces a real signed build in the cloud to confirm everything works.\nWHAT TO DO: Choose to build now, or skip — onboarding still completes either way.',
   'build-run-handoff': 'WHAT: We are handing off to run the build.\nWHY: The build runs in the cloud and you can watch its progress.\nWHAT TO DO: Follow the instructions to start/track the build.',
+  'build-launched': 'WHAT: Your first cloud build was started in a new terminal window on this machine.\nWHY: The build command streams its progress there while this conversation stays free; the result lands in a local build record we can poll.\nWHAT TO DO: Watch the terminal window. When the command finishes (or you want a status check), ask me to check the build — I will read the build record and continue from the result.',
+  'build-waiting': 'WHAT: The cloud build has not produced a result yet — we are waiting for it to finish.\nWHY: Cloud builds take a few minutes (upload, build, sign); the outcome is read from a local build record once the build command completes.\nWHAT TO DO: Let the build command finish in its terminal, then ask me to check again. If no build was actually started, run the build command shown earlier first.',
   'build-failed': 'WHAT: The cloud build failed.\nWHY: Could be a code/build-config issue or a credentials problem.\nWHAT TO DO: Check the build log shown, fix the cause, and retry.',
   'build-appid-unsafe': 'WHAT: The app id contains characters that are unsafe to put in a shell command.\nWHY: We refuse to build with an app id that could be misinterpreted by the shell.\nWHAT TO DO: Use a normal reverse-domain app id (letters, digits, dots).',
   // ── CI secrets / GitHub Actions / env export sub-flow ────────────────────────
@@ -93,11 +100,16 @@ export const EXPLANATIONS: Record<string, string> = {
   'confirm-secrets-push': 'WHAT: Confirm pushing the secrets needed by the workflow.\nWHY: The workflow needs these secrets to build.\nWHAT TO DO: Confirm to proceed.',
   'ask-export-env': 'WHAT: Optionally export your credentials to a local .env file.\nWHY: Handy for local builds and scripts.\nWHAT TO DO: Say yes to write a .env, or skip.',
   'confirm-env-export-overwrite': 'WHAT: A .env file already exists.\nWHY: We do not overwrite it without asking.\nWHAT TO DO: Confirm to overwrite or cancel to keep yours.',
-  'pick-package-manager': 'WHAT: Choose your package manager for the generated workflow.\nWHY: The workflow installs deps using it.\nWHAT TO DO: Pick npm/pnpm/yarn/bun to match your project.',
+  'pick-package-manager': 'WHAT: Choose the package manager the generated workflow should use.\nWHY: The workflow installs dependencies and runs your build with it, so it must match the project.\nWHAT TO DO: Pick npm/pnpm/yarn/bun to match your project — when an option is marked "recommended", it matches the lockfile detected in your project.',
   'pick-build-script': 'WHAT: Choose which build script the workflow should run.\nWHY: It needs to know how to build your web assets.\nWHAT TO DO: Pick the script from your package.json (or "custom").',
   'pick-build-script-custom': 'WHAT: Enter a custom build command for the workflow.\nWHY: Your build does not match a standard script.\nWHAT TO DO: Provide the exact command to build your web assets.',
   'preview-workflow-file': 'WHAT: Review the GitHub Actions workflow file before writing it.\nWHY: So you see exactly what will be added to your repo.\nWHAT TO DO: Read it, then approve or adjust.',
-  'view-workflow-diff': 'WHAT: Review the diff against your existing workflow file.\nWHY: So you do not lose existing CI configuration.\nWHAT TO DO: Review the changes, then approve.',
+  // NOTE: 'view-workflow-diff' has NO entry — the MCP never emits that state
+  // (preview-workflow-file folds the proposed file text into its context).
+  // ── Stall guards (defensive error states from the bounded decide loops) ──────
+  'auto-loop-guard': 'WHAT: Onboarding stopped itself because the automatic steps ran many times without reaching a question or a result.\nWHY: This safety guard prevents an endless loop when a step keeps re-running without making progress — usually a transient error or inconsistent saved state.\nWHAT TO DO: Try again (call next_step) — most stalls are transient. If it keeps happening, run `npx @capgo/cli@latest doctor` and contact Capgo support with the output.',
+  'ios-auto-loop-guard': 'WHAT: iOS onboarding stopped itself because the automatic setup steps ran many times without reaching a question or a result.\nWHY: This safety guard prevents an endless loop when a step keeps re-running without making progress — usually a transient Apple API error or inconsistent saved state.\nWHAT TO DO: Try again (call next_step) — most stalls are transient. If it keeps happening, run `npx @capgo/cli@latest doctor` and contact Capgo support with the output.',
+  'android-auto-loop-guard': 'WHAT: Android onboarding stopped itself because the automatic setup steps ran many times without reaching a question or a result.\nWHY: This safety guard prevents an endless loop when a step keeps re-running without making progress — usually a transient Google API error or inconsistent saved state.\nWHAT TO DO: Try again (call next_step) — most stalls are transient. If it keeps happening, run `npx @capgo/cli@latest doctor` and contact Capgo support with the output.',
 }
 
 /** Return the explanation for a state, or a generic fallback for unknown states. */

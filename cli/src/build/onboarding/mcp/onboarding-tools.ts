@@ -9,6 +9,7 @@ import type { OnboardingNextStepInput } from '../../../schemas/onboarding.js'
 import { isAppAlreadyExistsError } from '../../../init/app-conflict.js'
 import { onboardingNextStepSchema } from '../../../schemas/onboarding.js'
 import { findBuildCommandForProjectType, findProjectType, findSavedKeySilent, getAppId, getConfig, getPackageScripts } from '../../../utils.js'
+import { findPackageManagerType } from '@capgo/find-package-manager'
 import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.js'
 import { getPlatformDirFromCapacitorConfig } from '../../platform-paths.js'
 import type { AndroidEffectDeps } from '../android/flow.js'
@@ -179,6 +180,7 @@ function buildAndroidEffectDeps(
     uploadCiSecretsAsync,
     exportCredentialsToEnv,
     defaultExportPath,
+    detectPackageManager: () => findPackageManagerType(cwd, 'npm'),
     generateWorkflow,
     writeWorkflowFile,
     getPackageScripts,
@@ -398,6 +400,7 @@ function buildIosEffectDeps(cwd: string, getAppIdFn: () => Promise<string | unde
     uploadCiSecretsAsync,
     exportCredentialsToEnv,
     defaultExportPath,
+    detectPackageManager: () => findPackageManagerType(cwd, 'npm'),
     generateWorkflow,
     writeWorkflowFile,
     getPackageScripts,
