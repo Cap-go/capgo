@@ -310,8 +310,10 @@ const buildCLI = Bun.build({
   env: 'disable',
   define: {
     'process.env.SUPA_DB': '"production"',
+    // __CAPGO_DEV__ stays false forever — dev/spoof branches never ship.
     'globalThis.__CAPGO_DEV__': 'false',
-    'globalThis.__CAPGO_MCP_ONBOARDING__': 'false',
+    // MCP onboarding is release-ready as of PR 2: ship the onboarding tools.
+    'globalThis.__CAPGO_MCP_ONBOARDING__': 'true',
   },
   plugins: [
     fixCapacitorCliDirname,
@@ -340,8 +342,10 @@ const buildSDK = Bun.build({
   env: 'disable',
   define: {
     'process.env.SUPA_DB': '"production"',
+    // __CAPGO_DEV__ stays false forever — dev/spoof branches never ship.
     'globalThis.__CAPGO_DEV__': 'false',
-    'globalThis.__CAPGO_MCP_ONBOARDING__': 'false',
+    // MCP onboarding is release-ready as of PR 2: ship the onboarding tools.
+    'globalThis.__CAPGO_MCP_ONBOARDING__': 'true',
   },
   plugins: [
     fixCapacitorCliDirname,

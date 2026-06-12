@@ -154,6 +154,9 @@ t('resume allowlist only accepts the exact cli-managed test diff', () => {
     execSync('git init', { cwd: root, stdio: 'ignore' })
     execSync('git config user.email "test@example.com"', { cwd: root, stdio: 'ignore' })
     execSync('git config user.name "Test User"', { cwd: root, stdio: 'ignore' })
+    // Hermetic against host gitconfig: a global commit.gpgsign=true would make
+    // the temp-repo commit below fail (no pinentry in non-interactive runs).
+    execSync('git config commit.gpgsign false', { cwd: root, stdio: 'ignore' })
 
     mkdirSync(join(root, 'src'), { recursive: true })
     const filePath = join(root, 'src', 'main.css')

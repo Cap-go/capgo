@@ -605,9 +605,10 @@ export async function startMcpServer(): Promise<void> {
     },
   )
 
-  // MCP-conducted Builder onboarding (2-tool spine). Build-time gated OFF until the
-  // flow is finished (PR 2) — DCE strips it (and the MCP-only deciders) from the
-  // release bundle. The shared engine still ships (the ink TUI uses it).
+  // MCP-conducted Builder onboarding (2-tool spine + explain). Build-time gated:
+  // OFF in PR 1 while the flow was under construction, flipped ON in PR 2 now that
+  // the full journey (android + iOS + tail) ships through the shared engine.
+  // `bun run dev` keeps the flag undefined-safe; release builds define it to true.
   if (globalThis.__CAPGO_MCP_ONBOARDING__)
     registerOnboardingTools(server, sdk)
 
