@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Assert the dev-only CAPGO_KEYCHAIN_HELPER_PATH override is dead-code-eliminated
+# from the PRODUCTION CLI bundle.
+#
+# resolveHelperBinary() gates the override behind __CAPGO_ALLOW_HELPER_ENV_OVERRIDE__,
+# which cli/build.mjs defines as `false` for production builds; the minifier then
+# deletes the whole branch, including the env-var access. A regression (an
+# accidental NODE_ENV=development build, or refactoring the define away) would ship
+# the override to users — this fails the build instead.
+#
+# Notes:
+#  - We force a production build so the result does not depend on the ambient
+#    NODE_ENV of whoever runs `bun run test`.
+#  - We force a production build so the result does not depend on the ambient
+#    NODE_ENV of whoever runs `bun run test`.
+#  - We grep the bare variable name. That is safe because this check's npm script
+#    is `bash scripts/check-helper-dce.sh` (it does NOT mention the variable), so
+#    the bundle's inlined package.json no longer contains it — the only possible
+#    match is the override code itself (minified, e.g. `MN.env.CAPGO_KEYCHAIN_HELPER_PATH`).
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+NODE_ENV=production bun run build >/dev/null
+
+if grep -q 'CAPGO_KEYCHAIN_HELPER_PATH' dist/index.js; then
+  echo "FAIL: the dev-only keychain-helper override survived dead-code elimination" >&2
+  echo "      in the production bundle (cli/dist/index.js). It must be stripped." >&2
+  exit 1
+fi
+echo "helper-dce OK: dev keychain-helper override absent from the production bundle"
+echo "helper-dce OK: dev keychain-helper override absent from the production bundle"

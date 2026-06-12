@@ -38,10 +38,6 @@ describe('mapIosOnboardingError', () => {
     expect(mapIosOnboardingError(new Error('no identities'), 'import-scanning')).toBe('keychain_no_identities')
   })
 
-  it.concurrent('maps import-compiling-helper failures to keychain_helper_compile_failed', () => {
-    expect(mapIosOnboardingError(new Error('compile failed'), 'import-compiling-helper')).toBe('keychain_helper_compile_failed')
-  })
-
   it.concurrent('maps import-exporting failures to keychain_export_failed', () => {
     expect(mapIosOnboardingError(new Error('wrong password'), 'import-exporting')).toBe('keychain_export_failed')
   })

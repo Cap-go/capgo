@@ -1,6 +1,13 @@
 import { copyFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { env, exit } from 'node:process'
 
+// Precompiled keychain helper packages resolve from node_modules at runtime
+// (binary-only optional deps) — never bundle them.
+const HELPER_PACKAGES = [
+  '@capgo/cli-keychain-darwin-arm64',
+  '@capgo/cli-keychain-darwin-x64',
+]
+
 // Shared plugin definitions - Bun's plugin API is compatible with esbuild's
 const stubSemver = {
   name: 'stub-semver',
@@ -308,8 +315,13 @@ const buildCLI = Bun.build({
   minify: true,
   // Keep env access runtime-only unless explicitly defined below.
   env: 'disable',
+  external: HELPER_PACKAGES,
   define: {
     'process.env.SUPA_DB': '"production"',
+    // Gates the CAPGO_KEYCHAIN_HELPER_PATH dev override. `false` here makes
+    // the minifier delete the whole branch from release bundles —
+    // publish_cli.yml asserts the string is absent from dist/index.js.
+    '__CAPGO_ALLOW_HELPER_ENV_OVERRIDE__': env.NODE_ENV === 'development' ? 'true' : 'false',
   },
   plugins: [
     fixCapacitorCliDirname,
@@ -336,8 +348,13 @@ const buildSDK = Bun.build({
   format: 'esm',
   // Keep env access runtime-only unless explicitly defined below.
   env: 'disable',
+  external: HELPER_PACKAGES,
   define: {
     'process.env.SUPA_DB': '"production"',
+    // Gates the CAPGO_KEYCHAIN_HELPER_PATH dev override. `false` here makes
+    // the minifier delete the whole branch from release bundles —
+    // publish_cli.yml asserts the string is absent from dist/index.js.
+    '__CAPGO_ALLOW_HELPER_ENV_OVERRIDE__': env.NODE_ENV === 'development' ? 'true' : 'false',
   },
   plugins: [
     fixCapacitorCliDirname,
@@ -404,15 +421,6 @@ Promise.all([buildCLI, buildSDK]).then(async (results) => {
   writeFileSync('meta.json', JSON.stringify(metafile))
 
   copyFileSync('package.json', 'dist/package.json')
-
-  // Ship the macOS keychain-export Swift helper alongside the bundle. The
-  // CLI compiles it on first use into an OS temp folder via `swiftc`. Source
-  // is shipped (not a precompiled binary) to keep the npm tarball Linux/Win-
-  // safe and to skip code-signing infrastructure for now.
-  copyFileSync(
-    'src/build/onboarding/keychain-export.swift',
-    'dist/keychain-export.swift',
-  )
 
   console.warn('✅ Built CLI and SDK successfully')
 }).catch((err) => {
