@@ -150,6 +150,10 @@
     "react": "^19.2.6",
     "string-width": "^8.2.1"
   },
+  "optionalDependencies": {
+    "@capgo/cli-keychain-darwin-arm64": "^1.0.0",
+    "@capgo/cli-keychain-darwin-x64": "^1.0.0"
+  },
   "devDependencies": {
     "@antfu/eslint-config": "^9.0.0",
     "@bradenmacdonald/s3-lite-client": "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.6",
