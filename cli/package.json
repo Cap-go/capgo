@@ -72,6 +72,7 @@
     "test:upload": "bun test/test-upload-validation.mjs",
     "test:fail-on-incompatible": "bun test/test-fail-on-incompatible.mjs",
     "test:credentials": "bun test/test-credentials.mjs",
+    "test:asc-key-protocol": "bun test/test-asc-key-protocol.mjs",
     "test:credentials-validation": "bun test/test-credentials-validation.mjs",
     "test:android-service-account-validation": "bun test/test-android-service-account-validation.mjs",
     "test:build-zip-filter": "bun test/test-build-zip-filter.mjs",
