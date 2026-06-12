@@ -2,7 +2,10 @@ name: Build and publish CLI keychain helper
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel a publish mid-flight: cancelling between the arm64 and x64
+  # `npm publish` steps leaves the release half-published, and the retry then
+  # fails with "version already exists". Queue instead.
+  cancel-in-progress: false
 
 on:
   # Normal release: the deliberate button (choose the version).

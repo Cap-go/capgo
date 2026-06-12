@@ -25,18 +25,21 @@ cd "$(dirname "$0")/.."
 # would be rejected at runtime. Fail fast here instead. Keep in sync with
 # macos-signing.ts.
 EXPECTED_TEAM_ID="UVTJ336J2D"
+# Bundle identifier baked into Info.plist; pinned in the designated requirement
+# (must match HELPER_BUNDLE_IDENTIFIER in macos-signing.ts).
+HELPER_IDENTIFIER="app.capgo.cli.helper"
 if [ "$CAPGO_APPLE_TEAM_ID" != "$EXPECTED_TEAM_ID" ]; then
   echo "CAPGO_APPLE_TEAM_ID ($CAPGO_APPLE_TEAM_ID) != $EXPECTED_TEAM_ID expected by the CLI verifier." >&2
   echo "Fix the APPLE_TEAM_ID secret or update macos-signing.ts; refusing to sign a helper users can't run." >&2
   exit 1
 fi
 
-REQUIREMENT='=anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[subject.OU] = "'"$CAPGO_APPLE_TEAM_ID"'"'
+REQUIREMENT='=identifier "'"$HELPER_IDENTIFIER"'" and anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[subject.OU] = "'"$CAPGO_APPLE_TEAM_ID"'"'
 
 for arch in arm64 x64; do
   app="dist/$arch/Capgo.app"
   echo "── Signing $app"
-  codesign --force --options runtime --timestamp --sign "$DEVELOPER_ID_IDENTITY" "$app"
+  codesign --force --options runtime --timestamp --identifier "$HELPER_IDENTIFIER" --sign "$DEVELOPER_ID_IDENTITY" "$app"
 
   echo "── Notarizing $app"
   ditto -c -k --keepParent "$app" "dist/$arch/Capgo.zip"

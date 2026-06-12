@@ -1,7 +1,23 @@
 # Precompiled macOS Keychain-Export Helper — Design
 
 **Date:** 2026-06-06
-**Status:** Approved design, pending implementation plan
+**Status:** Implemented (PR #2458). This is the original design doc; some
+examples below predate the final implementation. **The code is the source of
+truth** — where this doc and the code disagree, the code wins. As-built deltas:
+
+- The helper ships inside a signed/notarized **`Capgo.app` bundle**, not a bare
+  binary. Runtime resolution is
+  `…/@capgo/cli-keychain-darwin-<arch>/Capgo.app/Contents/MacOS/capgo`, and the
+  npm package `files` list ships `Capgo.app` (not `helper`).
+- The designated requirement pins the **bundle identifier**
+  (`identifier "app.capgo.cli.helper"`) in addition to the Apple chain +
+  Developer ID OID + Team OU.
+- The Apple Team ID (`UVTJ336J2D`) is **hardcoded** in `macos-signing.ts` and
+  `sign-and-notarize.sh` (it is public, not a secret), so there is no
+  `APPLE_TEAM_ID` secret to wire.
+- The wrap passphrase is passed to the helper over **stdin**, never argv.
+- `optionalDependencies` for the helper packages are **deliberately not yet
+  declared** — gated until helper `1.0.0` is published (see the plan's Task 9).
 
 ## Problem
 

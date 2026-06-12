@@ -323,6 +323,14 @@ export function generateP12Passphrase(): string {
  */
 const CAPGO_APPLE_TEAM_ID = 'UVTJ336J2D'
 
+/**
+ * Bundle identifier (CFBundleIdentifier) the helper's Capgo.app is built with.
+ * Pinned in the designated requirement so the check accepts ONLY this binary,
+ * not merely any binary signed with Capgo's Developer ID cert. Must match
+ * cli-helper/assets/Info.plist.template and sign-and-notarize.sh.
+ */
+const HELPER_BUNDLE_IDENTIFIER = 'app.capgo.cli.helper'
+
 const HELPER_PACKAGE_PREFIX = '@capgo/cli-keychain-darwin-'
 
 /**
@@ -336,12 +344,15 @@ export function helperPackageName(arch: string): string | null {
 }
 
 /**
- * codesign designated requirement asserting: Apple-rooted chain, a
- * Developer ID Application leaf cert (OID 1.2.840.113635.100.6.1.13), and
- * the given Apple Team ID as the signing team.
+ * codesign designated requirement asserting: the exact helper bundle identifier
+ * (app.capgo.cli.helper), an Apple-rooted chain, a Developer ID Application leaf
+ * cert (OID 1.2.840.113635.100.6.1.13), and the given Apple Team ID as the
+ * signing team. The identifier clause is what scopes the requirement to THIS
+ * binary — without it, any other binary signed with Capgo's Developer ID cert
+ * (a future tool, a leaked artifact) would also satisfy the check.
  */
 export function helperSignatureRequirement(teamId: string = CAPGO_APPLE_TEAM_ID): string {
-  return `=anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[subject.OU] = "${teamId}"`
+  return `=identifier "${HELPER_BUNDLE_IDENTIFIER}" and anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[subject.OU] = "${teamId}"`
 }
 
 /**
@@ -398,6 +409,12 @@ export async function resolveHelperBinary(options: ResolveHelperBinaryOptions = 
       if (overridePath) {
         if (!existsSync(overridePath))
           throw new MacOSSigningError(`CAPGO_KEYCHAIN_HELPER_PATH points to a missing file: ${overridePath}`)
+        try {
+          accessSync(overridePath, constants.X_OK)
+        }
+        catch {
+          throw new MacOSSigningError(`CAPGO_KEYCHAIN_HELPER_PATH points to a non-executable file: ${overridePath}`)
+        }
         return overridePath
       }
     }
@@ -497,15 +514,21 @@ interface SpawnResult {
   code: number | null
 }
 
-function spawnCapture(command: string, args: readonly string[]): Promise<SpawnResult> {
+function spawnCapture(command: string, args: readonly string[], stdinInput?: string): Promise<SpawnResult> {
   return new Promise((resolveRun) => {
-    const child = spawn(command, [...args], { stdio: ['ignore', 'pipe', 'pipe'] })
+    // Pipe stdin only when we have something to feed it (the keychain helper's
+    // wrap passphrase) — that keeps it off the process argv where any same-user
+    // process could read it via `ps`. codesign and other callers pass no input.
+    const stdin: 'pipe' | 'ignore' = stdinInput !== undefined ? 'pipe' : 'ignore'
+    const child = spawn(command, [...args], { stdio: [stdin, 'pipe', 'pipe'] })
     let stdout = ''
     let stderr = ''
-    child.stdout.on('data', (chunk: Buffer) => {
+    // stdout/stderr are always 'pipe' above, so they are non-null at runtime;
+    // optional chaining only satisfies the widened type from the stdin variable.
+    child.stdout?.on('data', (chunk: Buffer) => {
       stdout += chunk.toString('utf-8')
     })
-    child.stderr.on('data', (chunk: Buffer) => {
+    child.stderr?.on('data', (chunk: Buffer) => {
       stderr += chunk.toString('utf-8')
     })
     child.once('error', (err) => {
@@ -514,6 +537,12 @@ function spawnCapture(command: string, args: readonly string[]): Promise<SpawnRe
     child.once('close', (code) => {
       resolveRun({ stdout, stderr, code })
     })
+    if (stdinInput !== undefined && child.stdin) {
+      // Swallow EPIPE if the child exits before reading stdin — the exit
+      // code/JSON is the real signal, not the write.
+      child.stdin.on('error', () => {})
+      child.stdin.end(stdinInput)
+    }
   })
 }
 
@@ -562,23 +591,25 @@ export async function exportP12FromKeychain(
   const p12Path = join(workDir, 'identity.p12')
 
   try {
+    // Passphrase goes over stdin (one line), NOT argv, so it never appears in
+    // `ps`/argv for the brief export window. The helper reads one line of stdin.
     const result = await spawnCapture(helperPath, [
       'keychain-export',
       '--sha1',
       sha1,
       '--output',
       p12Path,
-      '--passphrase',
-      passphrase,
       '--invoked-by',
       'capgo-cli',
-    ])
+    ], `${passphrase}\n`)
 
     // The helper ALWAYS emits one line of JSON on stdout — success or fail.
     // Parse it before checking exit code so we get the structured errorCode.
     const parsed = parseHelperJson(result.stdout, result.stderr, result.code)
 
-    if (!parsed.ok) {
+    // Strict `=== true`: the JSON comes from an external process, so a truthy
+    // non-boolean `ok` must NOT be read as success.
+    if (parsed.ok !== true) {
       const code = parsed.errorCode ?? 'INTERNAL'
       const msg = parsed.message ?? 'Unknown error from keychain-export helper'
       const osStatus = parsed.osStatus !== undefined ? ` [OSStatus ${parsed.osStatus}]` : ''
@@ -587,7 +618,20 @@ export async function exportP12FromKeychain(
       )
     }
 
+    // Independently validate the artifact before we treat it as a signing key:
+    // a truncated/empty export must fail loudly here, not be stored as a
+    // "successful" empty credential.
     const p12Buffer = await readFile(p12Path)
+    if (p12Buffer.length === 0) {
+      throw new MacOSSigningError(
+        'keychain-export reported success but the exported .p12 is empty.',
+      )
+    }
+    if (typeof parsed.p12SizeBytes === 'number' && parsed.p12SizeBytes !== p12Buffer.length) {
+      throw new MacOSSigningError(
+        `keychain-export size mismatch: helper reported ${parsed.p12SizeBytes} bytes, read ${p12Buffer.length}.`,
+      )
+    }
     return { base64: p12Buffer.toString('base64'), passphrase }
   }
   finally {

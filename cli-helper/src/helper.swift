@@ -8,8 +8,9 @@
 // Usage:
 //   helper keychain-export --sha1 <40-hex-char-cert-sha1>
 //                          --output <path-to-output.p12>
-//                          --passphrase <wrap-passphrase-for-p12>
 //                          --invoked-by capgo-cli
+//   The PKCS#12 wrap passphrase is read as ONE line from stdin (never argv, so
+//   it does not appear in `ps`). The caller writes "<passphrase>\n" then closes.
 //
 // JSON output (single line on stdout, ALWAYS emitted before exit):
 //
@@ -20,6 +21,7 @@
 //     {"ok":false,"errorCode":"USER_DENIED","message":"…","osStatus":-128}
 //     {"ok":false,"errorCode":"NO_IDENTITY","message":"…"}
 //     {"ok":false,"errorCode":"INVALID_ARGS","message":"…"}
+//     {"ok":false,"errorCode":"FORBIDDEN_CALLER","message":"…"}
 //     {"ok":false,"errorCode":"EXPORT_FAILED","message":"…","osStatus":-12345}
 //     {"ok":false,"errorCode":"WRITE_FAILED","message":"…"}
 //     {"ok":false,"errorCode":"INTERNAL","message":"…"}
@@ -30,7 +32,7 @@
 //   2 — argument parsing error (INVALID_ARGS)
 //   3 — no identity matching the given SHA1 (NO_IDENTITY)
 //   4 — user denied macOS Keychain access (USER_DENIED)
-//
+//   5 — caller not permitted (FORBIDDEN_CALLER)
 // Why we use SecItemExport(.formatPKCS12) and accept the 2 prompts:
 //   Xcode-imported signing keys are non-extractable (kSecKeyExtractable=false).
 //   `SecKeyCopyExternalRepresentation` rejects them with
@@ -177,8 +179,9 @@ func describeStatus(_ status: OSStatus) -> String {
 struct Args {
     var sha1Hex: String = ""
     var outputPath: String = ""
-    var passphrase: String = ""
     var invokedBy: String = ""
+    // The PKCS#12 wrap passphrase is NOT an argv flag — it is read from stdin
+    // (see readPassphraseFromStdin) so it never appears in `ps`/argv.
 }
 
 func parseArgs(_ cli: [String]) throws -> Args {
@@ -195,7 +198,6 @@ func parseArgs(_ cli: [String]) throws -> Args {
         switch flag {
         case "--sha1": args.sha1Hex = value.lowercased()
         case "--output": args.outputPath = value
-        case "--passphrase": args.passphrase = value
         case "--invoked-by": args.invokedBy = value
         default: throw KeychainExportError.invalidArgs("Unknown argument: \(flag)")
         }
@@ -206,13 +208,20 @@ func parseArgs(_ cli: [String]) throws -> Args {
     if args.outputPath.isEmpty {
         throw KeychainExportError.invalidArgs("Required: --output <path>")
     }
-    if args.passphrase.isEmpty {
-        throw KeychainExportError.invalidArgs("Required: --passphrase <wrap-passphrase>")
-    }
     if args.sha1Hex.count != 40 || args.sha1Hex.range(of: "^[0-9a-f]{40}$", options: .regularExpression) == nil {
         throw KeychainExportError.invalidArgs("--sha1 must be 40 lowercase hex chars (got \"\(args.sha1Hex)\")")
     }
     return args
+}
+
+/// Read the PKCS#12 wrap passphrase as a single line from stdin. Kept off argv
+/// so it never shows up in `ps`/argv. The Node caller writes "<passphrase>\n"
+/// then closes stdin.
+func readPassphraseFromStdin() throws -> String {
+    guard let line = readLine(strippingNewline: true), !line.isEmpty else {
+        throw KeychainExportError.invalidArgs("Required: PKCS#12 wrap passphrase on stdin (one line).")
+    }
+    return line
 }
 
 // MARK: - SHA1 of cert DER (matches `security find-identity` output)
@@ -269,22 +278,26 @@ func findIdentityBySha1(_ targetSha1: String) throws -> (SecIdentity, String) {
 // MARK: - Export to PKCS#12
 
 func exportIdentityAsPkcs12(_ identity: SecIdentity, passphrase: String) throws -> Data {
-    // CFString must outlive the SecItemExport call. Holding `cfPass` in a
-    // local keeps it alive for the duration of this function.
     let cfPass: CFString = passphrase as CFString
     var keyParams = SecItemImportExportKeyParameters()
     keyParams.version = UInt32(SEC_KEY_IMPORT_EXPORT_PARAMS_VERSION)
     keyParams.passphrase = Unmanaged.passUnretained(cfPass)
 
     var exportedData: CFData?
-    let status = withUnsafePointer(to: &keyParams) { paramsPtr in
-        SecItemExport(
-            identity,
-            .formatPKCS12,
-            SecItemImportExportFlags(rawValue: 0),
-            paramsPtr,
-            &exportedData
-        )
+    // Unmanaged.passUnretained does NOT bump cfPass's retain count — the Security
+    // framework borrows the string for the duration of the call. Hold it alive
+    // explicitly with withExtendedLifetime so the optimizer can't release it
+    // before SecItemExport returns (a use-after-free otherwise).
+    let status = withExtendedLifetime(cfPass) {
+        withUnsafePointer(to: &keyParams) { paramsPtr in
+            SecItemExport(
+                identity,
+                .formatPKCS12,
+                SecItemImportExportFlags(rawValue: 0),
+                paramsPtr,
+                &exportedData
+            )
+        }
     }
 
     // Treat user-denied / canceled distinctly so the caller can offer retry
@@ -307,9 +320,6 @@ func exportIdentityAsPkcs12(_ identity: SecIdentity, passphrase: String) throws 
         throw KeychainExportError.exportFailed(0, "SecItemExport returned nil data with success status")
     }
 
-    // Keep cfPass alive past the call — Unmanaged.passUnretained doesn't
-    // bump the retain count; the Security framework relies on us holding it.
-    _ = cfPass
     return data as Data
 }
 
@@ -323,15 +333,19 @@ func writeP12(_ data: Data, to path: String) throws {
             "Failed to write P12 to \(path): \(error.localizedDescription)"
         )
     }
-    // Best-effort 0600 chmod. Non-fatal if it fails.
+    // The file holds a signing private key. Restrict it to 0600; if that fails,
+    // delete it and fail loudly — never leave a world/group-readable key behind
+    // while reporting success (the Node caller only reads our JSON, not stderr).
     do {
         try FileManager.default.setAttributes(
             [.posixPermissions: NSNumber(value: Int16(0o600))],
             ofItemAtPath: path
         )
     } catch {
-        FileHandle.standardError.write(
-            Data("warning: could not chmod 0600 on \(path): \(error.localizedDescription)\n".utf8)
+        try? FileManager.default.removeItem(atPath: path)
+        throw KeychainExportError.writeFailed(
+            "Wrote P12 to \(path) but could not restrict it to 0600 "
+                + "(\(error.localizedDescription)); removed it to avoid leaving a readable private key."
         )
     }
 }
@@ -366,8 +380,9 @@ do {
     case "keychain-export":
         let args = try parseArgs(Array(argv.dropFirst(2)))
         try enforceCallerGate(args)
+        let passphrase = try readPassphraseFromStdin()
         let (identity, identityName) = try findIdentityBySha1(args.sha1Hex)
-        let p12 = try exportIdentityAsPkcs12(identity, passphrase: args.passphrase)
+        let p12 = try exportIdentityAsPkcs12(identity, passphrase: passphrase)
         try writeP12(p12, to: args.outputPath)
         emitSuccessAndExit(p12Path: args.outputPath, p12SizeBytes: p12.count, identityName: identityName)
     default:
