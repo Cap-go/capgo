@@ -8,6 +8,7 @@ import type { CapgoSDK } from '../../../sdk.js'
 import type { OnboardingNextStepInput } from '../../../schemas/onboarding.js'
 import { isAppAlreadyExistsError } from '../../../init/app-conflict.js'
 import { onboardingNextStepSchema } from '../../../schemas/onboarding.js'
+import { z } from 'zod'
 import { findBuildCommandForProjectType, findProjectType, findSavedKeySilent, getAppId, getConfig, getPackageScripts } from '../../../utils.js'
 import { findPackageManagerType } from '@capgo/find-package-manager'
 import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.js'
@@ -470,11 +471,21 @@ function buildDeps(sdk: CapgoSDK): EngineDeps {
     iosEffectDeps: buildIosEffectDeps(cwd, getAppIdClosure),
     androidEffectDeps: buildAndroidEffectDeps(cwd, getAppIdClosure),
     writeKeystoreFile: async (appId: string, base64: string, alias: string): Promise<string> => {
-      // Write the generated/loaded keystore to android/app/<alias>.p12, mirroring
-      // the Ink wizard which uses the same path (keystore-generating hardcodes it).
+      // Write the generated/loaded keystore to <androidDir>/app/<alias>.p12. The
+      // android dir is resolved from capacitor.config (custom `android.path`
+      // projects exist — CodeRabbit #2394) exactly like findAndroidApplicationIds
+      // above; falls back to 'android' when the config is unreadable.
       // `alias` comes from user input — sanitize it for the ON-DISK filename only
       // (the crypto alias / KEYSTORE_KEY_ALIAS keep the user's exact value).
-      const androidAppDir = join(cwd, 'android', 'app')
+      let androidDir = 'android'
+      try {
+        const ext = await getConfig()
+        androidDir = getPlatformDirFromCapacitorConfig(ext?.config, 'android') || 'android'
+      }
+      catch {
+        // Not a Capacitor project or config unreadable — fall back to 'android'.
+      }
+      const androidAppDir = join(cwd, androidDir, 'app')
       await mkdir(androidAppDir, { recursive: true })
       const safe = sanitizeKeystoreAlias(alias)
       const filePath = join(androidAppDir, `${safe}.p12`)
@@ -482,7 +493,7 @@ function buildDeps(sdk: CapgoSDK): EngineDeps {
       const resolvedDir = resolve(androidAppDir)
       const resolvedFile = resolve(filePath)
       if (resolvedFile !== resolvedDir && !resolvedFile.startsWith(resolvedDir + sep))
-        throw new Error('Refusing to write keystore outside the android/app directory.')
+        throw new Error('Refusing to write keystore outside the android app directory.')
       const bytes = Buffer.from(base64, 'base64')
       await writeFile(filePath, bytes)
       return filePath
@@ -519,10 +530,12 @@ export function registerOnboardingTools(server: McpLike, sdk: CapgoSDK, depsOver
 
   server.tool(
     'capgo_builder_onboarding_explain',
-    'Explain the CURRENT Capgo Builder onboarding step in plain language — call this whenever the user is confused, asks what a step means, or does not understand the options. Read-only; it never advances the flow.',
-    {},
-    async () => {
-      const text = await explainOnboarding(deps)
+    'Explain a Capgo Builder onboarding step in plain language — call this whenever the user is confused, asks what a step means, or does not understand the options. Defaults to the CURRENT step; pass { state } to explain a specific one (e.g. a build-phase state like "build-waiting" whose protocol context is not on disk). Read-only; it never advances the flow.',
+    {
+      state: z.string().optional().describe('Optional state name to explain (from a prior result state field). Omit to explain the current step.'),
+    },
+    async (args: { state?: string }) => {
+      const text = await explainOnboarding(deps, args)
       return { content: [{ type: 'text' as const, text }] }
     },
   )

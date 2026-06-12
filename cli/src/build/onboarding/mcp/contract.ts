@@ -62,6 +62,28 @@ export const ONBOARDING_RULES: string[] = [
   'If the user is confused, asks what a step means, or does not understand the options, call capgo_builder_onboarding_explain for a plain-language explanation — do not guess.',
 ]
 
+// ─── Secret redaction (defense-in-depth) ──────────────────────────────────────
+//
+// Call-site discipline keeps secrets OUT of `context` (pinned by the private
+// suite's assertNoCarriedSecrets); this pass catches future slips so a
+// secret-bearing context value can never serialize into the MCP transcript.
+// Matching is by KEY NAME, string values only — inventory keys like
+// `secretKeys` (arrays of secret NAMES, no values) are untouched.
+//
+// `keystorePassword` is the ONE sanctioned surfacing: renderResult prints it
+// as a human line above (the user must save it with the keystore), so the
+// JSON copy below is still redacted — the secret appears exactly once, on
+// purpose, in the human-facing line.
+const SECRET_CONTEXT_KEY = /password|passphrase|secret|token|p12|p8|keycontent|credential/i
+
+/** Return a copy of `context` with secret-keyed string values replaced by '[redacted]'. */
+function redactSecretContext(context: Record<string, unknown>): Record<string, unknown> {
+  const redacted: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(context))
+    redacted[key] = SECRET_CONTEXT_KEY.test(key) && typeof value === 'string' ? '[redacted]' : value
+  return redacted
+}
+
 /** Render a result into MCP text content: imperative directive first, structured data last. */
 export function renderResult(result: NextStepResult): string {
   const lines: string[] = []
@@ -77,7 +99,8 @@ export function renderResult(result: NextStepResult): string {
 
   // Surface a random-generated keystore password as a human line so the user can
   // save it (only set when the password was auto-generated — manual passwords the
-  // user already knows are never echoed here).
+  // user already knows are never echoed here). This is the sanctioned exception
+  // to the redaction pass below — the JSON copy is redacted.
   if (result.context && typeof result.context.keystorePassword === 'string') {
     lines.push(`Keystore password: ${result.context.keystorePassword} (save this with the keystore — you need both for every release)`)
   }
@@ -114,6 +137,7 @@ export function renderResult(result: NextStepResult): string {
   }
   lines.push('')
   lines.push('---')
-  lines.push(JSON.stringify(result, null, 2))
+  const safeResult = result.context ? { ...result, context: redactSecretContext(result.context) } : result
+  lines.push(JSON.stringify(safeResult, null, 2))
   return lines.join('\n')
 }

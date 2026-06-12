@@ -99,29 +99,57 @@ export function defaultBuildRecordPath(appId: string, platform: 'ios' | 'android
 }
 
 /**
- * Read a build output record from `path`. Returns the parsed `BuildOutputRecord`
- * if the file exists, is valid JSON, and the parsed object contains a string
- * `jobId` property. Returns `null` in all other cases (missing file, parse
- * error, missing/wrong-type jobId).
+ * Thrown by `readBuildOutputRecord` when the record file EXISTS but cannot be
+ * used: unreadable (permissions), not valid JSON (e.g. truncated write), or an
+ * unexpected shape. Distinct from the `null` return (no record yet) so callers
+ * polling for a build result can surface the failure instead of waiting forever.
+ */
+export class BuildRecordReadError extends Error {
+  readonly recordPath: string
+  constructor(message: string, recordPath: string) {
+    super(message)
+    this.name = 'BuildRecordReadError'
+    this.recordPath = recordPath
+  }
+}
+
+/**
+ * Read a build output record from `path`.
+ *
+ * Returns `null` ONLY when the file does not exist yet (ENOENT — the build has
+ * not finished). Every other failure mode (unreadable file, malformed JSON,
+ * missing/wrong-type jobId/status/outputUrl) throws `BuildRecordReadError`:
+ * a present-but-corrupt record is a surfaced failure, never "still waiting".
  */
 export async function readBuildOutputRecord(path: string): Promise<BuildOutputRecord | null> {
+  let raw: string
   try {
-    const raw = await readFile(path, 'utf-8')
-    const parsed: unknown = JSON.parse(raw)
-    if (
-      typeof parsed === 'object'
-      && parsed !== null
-      && typeof (parsed as Record<string, unknown>).jobId === 'string'
-      && typeof (parsed as Record<string, unknown>).status === 'string'
-      && ((parsed as Record<string, unknown>).outputUrl === null || typeof (parsed as Record<string, unknown>).outputUrl === 'string')
-    ) {
-      return parsed as BuildOutputRecord
-    }
-    return null
+    raw = await readFile(path, 'utf-8')
   }
-  catch {
-    return null
+  catch (error) {
+    if ((error as NodeJS.ErrnoException | null)?.code === 'ENOENT')
+      return null
+    throw new BuildRecordReadError(`Build record at ${path} could not be read: ${stringifyError(error)}`, path)
   }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  }
+  catch (error) {
+    throw new BuildRecordReadError(`Build record at ${path} is not valid JSON (possibly a truncated write): ${stringifyError(error)}`, path)
+  }
+
+  if (
+    typeof parsed === 'object'
+    && parsed !== null
+    && typeof (parsed as Record<string, unknown>).jobId === 'string'
+    && typeof (parsed as Record<string, unknown>).status === 'string'
+    && ((parsed as Record<string, unknown>).outputUrl === null || typeof (parsed as Record<string, unknown>).outputUrl === 'string')
+  ) {
+    return parsed as BuildOutputRecord
+  }
+  throw new BuildRecordReadError(`Build record at ${path} has an unexpected shape (jobId/status must be strings; outputUrl must be a string or null).`, path)
 }
 
 function stringifyError(error: unknown): string {

@@ -875,7 +875,10 @@ export function applyAndroidInput(
     // app.tsx:2694–2701 (gradle picker) / 2727–2734 (manual input)
     // The next step depends on serviceAccountMethod (passed in input since
     // progress.serviceAccountMethod is the canonical source but the caller
-    // also has it in local React state — both should be in sync).
+    // also has it in local React state — both should be in sync). Persist it
+    // back into progress so a legacy/partial progress file (no method yet)
+    // resumes onto the SAME route the caller decided on, instead of falling
+    // back to the OAuth default.
     case 'android-package-select': {
       const i = input as Extract<AndroidInput, { step: 'android-package-select' }>
       const choice = {
@@ -884,6 +887,7 @@ export function applyAndroidInput(
       }
       return {
         ...progress,
+        serviceAccountMethod: i.serviceAccountMethod,
         completedSteps: { ...progress.completedSteps, androidPackageChosen: choice },
       }
     }

@@ -3434,7 +3434,23 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
     }
     if (checkAppId) {
       const recordPath = deps.buildRecordPath(checkAppId, checkPlatform)
-      const rec = await deps.readBuildRecord(recordPath)
+      // A present-but-corrupt record THROWS (BuildRecordReadError) instead of
+      // returning null — surface it as a failure with the path instead of
+      // polling 'still waiting' forever over a file that will never parse
+      // (CodeRabbit #2394). null still means 'no record yet'.
+      let rec: Awaited<ReturnType<typeof deps.readBuildRecord>>
+      try {
+        rec = await deps.readBuildRecord(recordPath)
+      }
+      catch (err) {
+        return {
+          onboarding: 'capgo-builder', phase: 'build', state: 'build-failed', platform: checkPlatform,
+          progress: 90, kind: 'error',
+          summary: `The build output record at ${recordPath} exists but can't be read (${err instanceof Error ? err.message : String(err)}). The build process may have crashed mid-write. Delete the file and re-run the build command, then call ${NEXT_STEP_TOOL} with checkBuild: true again.`,
+          context: { recordPath },
+          rules: ONBOARDING_RULES,
+        }
+      }
       if (rec === null)
         return buildWaitingResult(checkPlatform)
       if (rec.status === 'success' || Boolean(rec.outputUrl)) {
@@ -3572,6 +3588,20 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
         const corrective = await decideAndroid(facts, deps) // re-returns the current step; no input applied
         return { ...corrective, summary: `${pwCheck.message}\n\n${corrective.summary}` }
       }
+    }
+  }
+
+  // The GCP picker's "Create a new project" row ('__new__') is navigation-only
+  // (mirrors main's app.tsx onChange, which routes to the create-name screen
+  // without persisting): render the gcp-project-create-name prompt so the agent
+  // collects gcpProjectName next — the unchanged gcp-projects-select resume
+  // step accepts it. Without this, a literal gcpProjectId: "__new__" pick
+  // (the option row's value) silently re-rendered the same picker forever.
+  if (androidInputPresent && input?.gcpProjectId === '__new__') {
+    const facts = await gatherFacts(deps)
+    if (facts.appId) {
+      const view = androidViewForStep('gcp-project-create-name', facts.androidProgress, { appId: facts.appId })
+      return mapAndroidView(view, facts)
     }
   }
 
