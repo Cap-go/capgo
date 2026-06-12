@@ -117,6 +117,73 @@ export const SetupMethodSelectStep: FC<SetupMethodSelectStepProps> = ({ dense = 
   </Box>
 )
 
+// ── p8-source-select ──────────────────────────────────────────────────────────
+// First fork of the ASC API-key step: does the user already have a .p8 file? If
+// not — and we can drive the guided macOS helper — offer to create one for them.
+export interface P8SourceSelectStepProps {
+  dense?: boolean
+  /** True when the guided macOS helper is available (macOS + binary present). */
+  canAutomate: boolean
+  onChange: (value: string) => void | Promise<void>
+}
+
+export const P8SourceSelectStep: FC<P8SourceSelectStepProps> = ({ dense = false, canAutomate, onChange }) => (
+  <Box flexDirection="column" marginTop={1}>
+    <Alert variant="info">
+      Do you already have an App Store Connect API key (.p8 file)?
+    </Alert>
+    {!dense && <Newline />}
+    <Select
+      options={[
+        { label: '✓  Yes — I have a .p8 file', value: 'have' },
+        {
+          label: canAutomate
+            ? '✨  No — create one for me (guided, opens a window)'
+            : '🆕  No — I will create one at App Store Connect',
+          value: 'create',
+        },
+      ]}
+      onChange={onChange}
+    />
+  </Box>
+)
+
+// ── p8-create-method-select ───────────────────────────────────────────────────
+// macOS only: hand-create the key at App Store Connect, or let the guided helper
+// drive the whole flow in an embedded browser and capture the key automatically.
+export interface P8CreateMethodSelectStepProps {
+  dense?: boolean
+  onChange: (value: string) => void | Promise<void>
+}
+
+export const P8CreateMethodSelectStep: FC<P8CreateMethodSelectStepProps> = ({ dense = false, onChange }) => (
+  <Box flexDirection="column" marginTop={1}>
+    <Alert variant="info">
+      How do you want to create the .p8 key?
+    </Alert>
+    {!dense && <Newline />}
+    <Select
+      options={[
+        { label: '✨  Automated — Capgo guides you and captures the key', value: 'automated' },
+        { label: '📝  Manual — I will create it myself at App Store Connect', value: 'manual' },
+      ]}
+      onChange={onChange}
+    />
+    {!dense && <Newline />}
+    <Text dimColor>
+      Automated opens a window, walks you through Apple's UI, and captures the key — no copy-paste.
+    </Text>
+  </Box>
+)
+
+// ── asc-key-generating ────────────────────────────────────────────────────────
+// Spinner shown while the guided macOS helper runs in its own window.
+export const AscKeyGeneratingStep: FC = () => (
+  <Box flexDirection="column" marginTop={1}>
+    <SpinnerLine text="Guiding you through App Store Connect — finish in the window that opened…" />
+  </Box>
+)
+
 // ── api-key-instructions ─────────────────────────────────────────────────────
 // `canUseFilePicker` decides which control to show: the picker/manual fork
 // (Select) or a direct path input (FilteredTextInput). The submit handler for

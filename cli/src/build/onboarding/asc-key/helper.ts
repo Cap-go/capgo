@@ -3,8 +3,9 @@ import type { AscCredentials, AscEventLine, AscProtocolLine, AscResultLine } fro
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { env, platform } from 'node:process'
+import { fileURLToPath } from 'node:url'
 import { trackEvent } from '../../../analytics/track'
 import { ascEventToTrack, AscProtocolParser } from './protocol'
 
@@ -23,10 +24,38 @@ export function isMacOS(): boolean {
   return platform === 'darwin'
 }
 
+/** SwiftPM product name of the vendored helper package (cli/native/asc-key-helper). */
+const HELPER_PRODUCT_NAME = 'P8Extract'
+
+/**
+ * Dev/CI fallback: a `swift build` output of the vendored package, resolved
+ * relative to this module. Empty in a bundled install (the package isn't
+ * shipped to npm), so this only ever resolves when running from the repo.
+ */
+function localBuildCandidates(): string[] {
+  let here: string
+  try {
+    here = dirname(fileURLToPath(import.meta.url))
+  }
+  catch {
+    return []
+  }
+  // From src/build/onboarding/asc-key → repo `cli/native/asc-key-helper`.
+  const pkg = join(here, '..', '..', '..', '..', 'native', 'asc-key-helper', '.build')
+  return [
+    join(pkg, 'apple', 'Products', 'Release', HELPER_PRODUCT_NAME), // universal
+    join(pkg, 'release', HELPER_PRODUCT_NAME),
+    join(pkg, 'arm64-apple-macosx', 'release', HELPER_PRODUCT_NAME),
+    join(pkg, 'debug', HELPER_PRODUCT_NAME),
+    join(pkg, 'arm64-apple-macosx', 'debug', HELPER_PRODUCT_NAME),
+  ]
+}
+
 /**
  * Locate the precompiled Swift helper binary, in priority order:
  *   1. `CAPGO_ASC_KEY_HELPER_PATH` — explicit override (dev / CI / tests).
  *   2. `~/.capgo/asc-key-helper/<binary>` — the cached download location.
+ *   3. A local `swift build` of the vendored package (dev, running from src).
  * Returns `null` when none exists, so the caller can show install guidance.
  */
 export function resolveHelperBinary(): string | null {
@@ -36,6 +65,10 @@ export function resolveHelperBinary(): string | null {
   const cached = join(homedir(), '.capgo', 'asc-key-helper', HELPER_BINARY_NAME)
   if (existsSync(cached))
     return cached
+  for (const candidate of localBuildCandidates()) {
+    if (existsSync(candidate))
+      return candidate
+  }
   return null
 }
 

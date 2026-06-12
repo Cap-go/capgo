@@ -54,6 +54,10 @@ export type OnboardingStep
     | 'import-export-warning'
     | 'import-exporting'
     // ── Existing create-new sub-flow (and ASC API key step reused by import for app_store) ──
+    // Do-you-have-a-.p8 fork: have one → existing import; none + macOS → create.
+    | 'p8-source-select'
+    | 'p8-create-method-select'
+    | 'asc-key-generating'
     | 'api-key-instructions'
     | 'p8-method-select'
     | 'input-p8-path'

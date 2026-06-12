@@ -1,105 +1,78 @@
+import type { DOMElement } from 'ink'
 import type { FC } from 'react'
+import type { BuildCredentials } from '../../../schemas/build.js'
 import type { BuildLogger } from '../../request.js'
+import type { BuildOnboardingWorkflowDecision, BuildOnboardingWorkflowEvent, WorkflowDiffTelemetry } from '../analytics.js'
+import type { AscAppLike, GatePath } from '../app-verification.js'
+import type { AscApp, AscProfileSummary } from '../apple-api.js'
+import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../ci-secrets.js'
+import type { DiffLine } from '../diff-utils.js'
 import type { DiscoveredProfile, IdentityProfileMatch, SigningIdentity } from '../macos-signing.js'
+import type { BuilderOnboardingAction } from '../telemetry.js'
 import type { ApiKeyData, CertificateData, EnrichedIdentityAvailability, OnboardingErrorCategory, OnboardingProgress, OnboardingResult, OnboardingStep, ProfileData } from '../types.js'
-import { handleCustomMsg } from '../../qr.js'
-import { spawn } from 'node:child_process'
+import type { BuildScriptChoice, PackageManager } from '../workflow-generator.js'
+import type { AiResultKind } from './components.js'
+import type { NoMatchReason } from './steps/ios-import.js'
 import { Buffer } from 'node:buffer'
+import { spawn } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { copyFile, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { Alert, ProgressBar, Select } from '@inkjs/ui'
-import type { DOMElement } from 'ink'
 import { Box, measureElement, Newline, Text, useApp, useInput, useStdout } from 'ink'
 import open from 'open'
 // src/build/onboarding/ui/app.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-
-// Braille spinner frames for the per-row "Profile" cell during prefetch.
-// Module-scoped so the array reference is stable and never triggers
-// re-renders by accident.
-const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'] as const
-import { detectIosBundleIds } from '../bundle-id-detector.js'
-import { writeReleaseBundleId } from '../../pbxproj-parser.js'
+import { releaseCapturedLogs, runCapgoAiAnalysis } from '../../../ai/analyze.js'
+import { renderMarkdown } from '../../../ai/render-markdown.js'
+import { createStreamingMarkdownRenderer } from '../../../ai/stream-markdown.js'
+import { aiAnalysisResultFromPostAnalyze, trackAiAnalysisChoice, trackAiAnalysisResult } from '../../../ai/telemetry.js'
+import { trackEvent } from '../../../analytics/track.js'
 import { writeOnboardingSupportBundle, writeSupportBundleFiles } from '../../../onboarding-support.js'
-import { contactSupport } from '../../../support/contact-support.js'
-import { uploadSupportLogs } from '../../../support/support-upload.js'
+import { formatRunnerCommand, splitRunnerCommand } from '../../../runner-command.js'
 import { copyToClipboard, revealInFinder } from '../../../support/clipboard.js'
+import { contactSupport } from '../../../support/contact-support.js'
 import { appendInternalLog, getInternalLogPath } from '../../../support/internal-log.js'
 import { redactSecrets } from '../../../support/redact.js'
-import { formatRunnerCommand, splitRunnerCommand } from '../../../runner-command.js'
+import { uploadSupportLogs } from '../../../support/support-upload.js'
 import { createSupabaseClient, findBuildCommandForProjectType, findProjectType, findSavedKeySilent, getOrganizationId, getPackageScripts, getPMAndCommand } from '../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.js'
-import { releaseCapturedLogs, runCapgoAiAnalysis } from '../../../ai/analyze.js'
-import { createStreamingMarkdownRenderer } from '../../../ai/stream-markdown.js'
-import { renderMarkdown } from '../../../ai/render-markdown.js'
-import { aiAnalysisResultFromPostAnalyze, trackAiAnalysisChoice, trackAiAnalysisResult } from '../../../ai/telemetry.js'
+import { parseMobileprovisionDetailed } from '../../mobileprovision-parser.js'
+import { writeReleaseBundleId } from '../../pbxproj-parser.js'
+import { handleCustomMsg } from '../../qr.js'
 import { requestBuildInternal } from '../../request.js'
 import { isAiAnalysisTooTall, resolveAiResultRoute } from '../ai-fit.js'
-
-// Upper bound on "I fixed it, retry build" attempts after an AI diagnosis.
-// Three total attempts (initial + two retries) caps the AI cost when a model
-// suggestion doesn't actually fix the failure mode while still giving the user
-// a couple of in-wizard chances to iterate.
-const MAX_AI_RETRIES = 2
-import type { AscApp, AscProfileSummary } from '../apple-api.js'
-import { CertificateLimitError, classifyCertAvailability, computeCertSha1, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listApps, listBundleIds, listDistributionCerts, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
-import type { AscAppLike, GatePath } from '../app-verification.js'
+import { getWorkflowDiffTelemetry, trackBuildOnboardingWorkflowEvent } from '../analytics.js'
 import { classifyAppVerification, evaluateGate } from '../app-verification.js'
-import { trackEvent } from '../../../analytics/track.js'
+import { CertificateLimitError, classifyCertAvailability, computeCertSha1, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listApps, listBundleIds, listDistributionCerts, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
+import { resolveHelperBinary, runAscKeyHelper } from '../asc-key/helper.js'
+import { sanitizeBuildLogLines } from '../build-log.js'
+import { detectIosBundleIds } from '../bundle-id-detector.js'
+import { createCiSecretEntries, detectCiSecretTargets, getCiSecretRepoLabelAsync, getCiSecretTargetLabel, listExistingCiSecretKeysAsync, uploadCiSecretsAsync } from '../ci-secrets.js'
 import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
+import { diffLines } from '../diff-utils.js'
+import { defaultExportPath, exportCredentialsToEnv } from '../env-export.js'
 import { mapIosOnboardingError } from '../error-categories.js'
 import { canUseFilePicker, openFilePicker, openMobileprovisionPicker } from '../file-picker.js'
-import { parseMobileprovisionDetailed } from '../../mobileprovision-parser.js'
 import { bundleIdMatches, exportP12FromKeychain, filterProfilesForApp, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, scanProvisioningProfiles } from '../macos-signing.js'
+import { IOS_MIN_ROWS, terminalFitsOnboarding } from '../min-terminal-size.js'
 import { deleteProgress, extractKeyIdFromP8Path, getImportEntryStep, getResumeStep, loadProgress, saveProgress } from '../progress.js'
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
-import { createCiSecretEntries, detectCiSecretTargets, getCiSecretRepoLabelAsync, getCiSecretTargetLabel, listExistingCiSecretKeysAsync, uploadCiSecretsAsync } from '../ci-secrets.js'
-import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../ci-secrets.js'
-import { defaultExportPath, exportCredentialsToEnv } from '../env-export.js'
-import type { BuilderOnboardingAction } from '../telemetry.js'
 import { trackBuilderOnboardingAction, trackBuilderOnboardingStep } from '../telemetry.js'
-import { writeWorkflowFile, WORKFLOW_PATH } from '../workflow-writer.js'
-import type { BuildScriptChoice, PackageManager } from '../workflow-generator.js'
-import type { BuildCredentials } from '../../../schemas/build.js'
 import {
   getPhaseLabel,
 
   STEP_PROGRESS,
 } from '../types.js'
-import { CompletedStepsLog } from './completed-steps-log.js'
-import { IOS_MIN_ROWS, terminalFitsOnboarding } from '../min-terminal-size.js'
-import { sanitizeBuildLogLines } from '../build-log.js'
-import { TerminalTooSmallPrompt } from './min-size-gate.js'
-import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, DiffSummary, Divider, FilteredTextInput, FullscreenAiViewer, FullscreenBuildOutput, FullscreenDiffViewer, Header, isBuildCompleteDismissKey, SecretsTable, SpinnerLine, SuccessLine, Table, WIZARD_PADDING_ROWS } from './components.js'
-import type { AiResultKind } from './components.js'
-import { logBudgetRows } from './frame-fit.js'
-import { diffLines } from '../diff-utils.js'
-import type { DiffLine } from '../diff-utils.js'
 import { generateWorkflow, WORKFLOW_PATH as WORKFLOW_GEN_PATH } from '../workflow-generator.js'
-import { getWorkflowDiffTelemetry, trackBuildOnboardingWorkflowEvent } from '../analytics.js'
-import type { BuildOnboardingWorkflowDecision, BuildOnboardingWorkflowEvent, WorkflowDiffTelemetry } from '../analytics.js'
 import { buildScriptPickerOptions, normalizePackageManager } from '../workflow-ui-helpers.js'
-import {
-  ApiKeyInstructionsStep,
-  BackingUpStep,
-  CertLimitPromptStep,
-  CreatingCertificateStep,
-  CreatingProfileStep,
-  CredentialsExistStep,
-  DeletingDuplicateProfilesStep,
-  DuplicateProfilePromptStep,
-  InputIssuerIdStep,
-  InputKeyIdStep,
-  InputP8PathStep,
-  P8MethodSelectStep,
-  RevokingCertificateStep,
-  SavingCredentialsStep,
-  SetupMethodSelectStep,
-  VerifyingKeyStep,
-} from './steps/ios-credentials.js'
+import { WORKFLOW_PATH, writeWorkflowFile } from '../workflow-writer.js'
+import { CompletedStepsLog } from './completed-steps-log.js'
+import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, DiffSummary, Divider, FilteredTextInput, FullscreenAiViewer, FullscreenBuildOutput, FullscreenDiffViewer, Header, isBuildCompleteDismissKey, SecretsTable, SpinnerLine, SuccessLine, Table, WIZARD_PADDING_ROWS } from './components.js'
+import { logBudgetRows } from './frame-fit.js'
+import { TerminalTooSmallPrompt } from './min-size-gate.js'
 import {
   AskBuildStep,
   AskCiSecretsStep,
@@ -110,6 +83,27 @@ import {
   DetectingCiSecretsStep,
 } from './steps/ios-ci.js'
 import {
+  ApiKeyInstructionsStep,
+  AscKeyGeneratingStep,
+  BackingUpStep,
+  CertLimitPromptStep,
+  CreatingCertificateStep,
+  CreatingProfileStep,
+  CredentialsExistStep,
+  DeletingDuplicateProfilesStep,
+  DuplicateProfilePromptStep,
+  InputIssuerIdStep,
+  InputKeyIdStep,
+  InputP8PathStep,
+  P8CreateMethodSelectStep,
+  P8MethodSelectStep,
+  P8SourceSelectStep,
+  RevokingCertificateStep,
+  SavingCredentialsStep,
+  SetupMethodSelectStep,
+  VerifyingKeyStep,
+} from './steps/ios-credentials.js'
+import {
   ImportCreateProfileOnlyStep,
   ImportDistributionModeStep,
   ImportExportingStep,
@@ -119,12 +113,11 @@ import {
   ImportPickProfileStep,
   ImportScanningStep,
 } from './steps/ios-import.js'
-import type { NoMatchReason } from './steps/ios-import.js'
 import {
   AddingPlatformStep,
   AiAnalysisPromptStep,
-  AiAnalysisRunningStep,
   AiAnalysisResultStep,
+  AiAnalysisRunningStep,
   BuildCompleteStep,
   ErrorStep,
   estimateErrorBodyRows,
@@ -133,6 +126,17 @@ import {
   PlatformSelectStep,
   WelcomeStep,
 } from './steps/ios-shared.js'
+
+// Braille spinner frames for the per-row "Profile" cell during prefetch.
+// Module-scoped so the array reference is stable and never triggers
+// re-renders by accident.
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'] as const
+
+// Upper bound on "I fixed it, retry build" attempts after an AI diagnosis.
+// Three total attempts (initial + two retries) caps the AI cost when a model
+// suggestion doesn't actually fix the failure mode while still giving the user
+// a couple of in-wizard chances to iterate.
+const MAX_AI_RETRIES = 2
 
 const OUTPUT_LINE_SPLIT_RE = /\r?\n/
 const CARRIAGE_RETURN_RE = /\r/g
@@ -167,9 +171,11 @@ interface AppProps {
   apikey?: string
   // Capgo API gateway override (--supa-host); prod when omitted.
   supaHost?: string
-  /** Reports the wizard outcome to the shell when it reaches build-complete, so
+  /**
+   * Reports the wizard outcome to the shell when it reaches build-complete, so
    *  the caller prints an accurate post-exit message + durable summary instead of
-   *  always claiming success. Never fires on cancel/missing-platform exits. */
+   *  always claiming success. Never fires on cancel/missing-platform exits.
+   */
   onResult?: (result: OnboardingResult) => void
 }
 
@@ -976,7 +982,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     exitRequestedRef.current = true
     if (message)
       addLog(message, 'yellow')
-    setTimeout(() => exit(), 50)
+    setTimeout(exit, 50)
   }, [addLog, exit])
 
   // Open browser on Ctrl+O (FilteredTextInput ignores ctrl keys, so no conflict)
@@ -1059,7 +1065,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     // a subsequent setStep on an alternate restart path) sees clean
     // values rather than stale.
     setP8Path('')
-    setP8Content('')  // wrapper updates p8ContentRef too
+    setP8Content('') // wrapper updates p8ContentRef too
     setKeyId('')
     setIssuerId('')
     setTeamId('')
@@ -1676,7 +1682,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                   try {
                     const raced = await Promise.race<AscProfileSummary[] | '__timeout__'>([
                       listProfilesForCert(token, certId),
-                      new Promise<'__timeout__'>(resolve => setTimeout(() => resolve('__timeout__'), 7000)),
+                      new Promise<'__timeout__'>(resolve => setTimeout(resolve, 7000, '__timeout__')),
                     ])
                     // Check generation, NOT the step-tied `cancelled` —
                     // setStep('import-pick-identity') below trips cancelled
@@ -1882,6 +1888,42 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         catch (err) {
           if (!cancelled)
             handleError(err, 'import-exporting')
+        }
+      })()
+    }
+
+    if (step === 'asc-key-generating') {
+      ;(async () => {
+        try {
+          // Launch the guided macOS helper; it streams stats to PostHog and
+          // returns the captured credentials on its terminal result line.
+          const outcome = await runAscKeyHelper({ apikey })
+          if (cancelled)
+            return
+          if (!outcome.ok) {
+            const reason = outcome.errorCode === 'USER_CANCELLED'
+              ? 'Guided key creation was cancelled.'
+              : `Guided key creation failed (${outcome.errorCode}): ${outcome.message}`
+            // Back to the fork so the user can retry, say "I have a .p8", or
+            // create it by hand.
+            handleError(new Error(reason), 'p8-source-select')
+            return
+          }
+          const { credentials } = outcome
+          setP8Content(credentials.privateKey) // wrapper also updates p8ContentRef
+          setKeyId(credentials.keyId)
+          setIssuerId(credentials.issuerId)
+          // The helper also saved the .p8 to the fastlane/ASC conventional path.
+          setP8Path(join(homedir(), '.appstoreconnect', 'private_keys', `AuthKey_${credentials.keyId}.p8`))
+          await savePartialProgress({ keyId: credentials.keyId, issuerId: credentials.issuerId })
+          if (cancelled)
+            return
+          addLog('✔ App Store Connect API key created via guided helper')
+          setStep('verifying-key')
+        }
+        catch (err) {
+          if (!cancelled)
+            handleError(err, 'p8-source-select')
         }
       })()
     }
@@ -2320,7 +2362,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           if (cancelled)
             return
           setVerifyAppLoading(false)
-          addLog("⚠ Couldn't reach App Store Connect to verify your app; continuing without remote verification.", 'yellow')
+          addLog('⚠ Couldn\'t reach App Store Connect to verify your app; continuing without remote verification.', 'yellow')
           if (!verifyShownRef.current) {
             verifyShownRef.current = true
             trackVerifyEvent('iOS App Verify Shown', '🔍', { app_count: 0, bundle_id_count: 0, debug_release_differ: debugReleaseDiffer })
@@ -3153,7 +3195,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // The fullscreen AI viewer is a takeover: render it as an EARLY RETURN so it
   // owns the whole terminal and bypasses the regular wizard frame above. It
   // fills the screen itself via minHeight.
-  if (isAiResultScroll && aiAnalysisText)
+  if (isAiResultScroll && aiAnalysisText) {
     return (
       <FullscreenAiViewer
         title="AI analysis"
@@ -3166,11 +3208,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         }}
       />
     )
+  }
 
   // "View logs first" from the support confirm — a scrollable takeover of the
   // exact bundle that will be sent (secrets already redacted). Exit returns to
   // the confirm so the user can then send or cancel.
-  if (step === 'support-log-view')
+  if (step === 'support-log-view') {
     return (
       <FullscreenAiViewer
         title="Logs that will be sent to Capgo support"
@@ -3181,13 +3224,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         onExit={() => setStep('support-confirm')}
       />
     )
+  }
 
   // The iOS error screen is a fullscreen scroll takeover when its recovery
   // advice is taller than the viewport — same treatment as the AI viewer above,
   // so the Try again / Restart / Exit actions (in the compact ErrorStep shown
   // after dismiss) are never pushed off-screen. Placed after the size gate like
   // the AI viewer: below the floor the resize prompt wins.
-  if (isErrorScroll && error)
+  if (isErrorScroll && error) {
     return (
       <FullscreenAiViewer
         title="Build error"
@@ -3197,12 +3241,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         onExit={() => setErrorViewedFull(true)}
       />
     )
+  }
 
   // The workflow-file diff is a fullscreen takeover too (same reasoning as the
   // AI/build viewers): rendered inside the wizard Box it inherited the header +
   // padding (a large top gap) and a too-short viewport. As an early return it
   // owns the whole terminal and fills it.
-  if (step === 'view-workflow-diff' && previewDiff.length > 0)
+  if (step === 'view-workflow-diff' && previewDiff.length > 0) {
     return (
       <FullscreenDiffViewer
         title={previewIsNew
@@ -3219,6 +3264,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         }}
       />
     )
+  }
 
   // `minHeight={terminalRows}` makes the root fill the whole viewport. Ink
   // only does a full clear-the-screen redraw when the frame height is ≥ the
@@ -3248,78 +3294,78 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           steps have completed. */}
       <Box flexDirection="column" ref={bodyRef}>
         {/* Progress bar */}
-      {showProgress && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold color="cyan">{phaseLabel}</Text>
-          <Box marginTop={1}>
-            <ProgressBar value={progress} />
-            <Text dimColor>
-              {' '}
-              {progress}
-              %
-            </Text>
+        {showProgress && (
+          <Box flexDirection="column" marginTop={1}>
+            <Text bold color="cyan">{phaseLabel}</Text>
+            <Box marginTop={1}>
+              <ProgressBar value={progress} />
+              <Text dimColor>
+                {' '}
+                {progress}
+                %
+              </Text>
+            </Box>
+            <Divider />
           </Box>
-          <Divider />
-        </Box>
-      )}
+        )}
 
-      {/* Resume-or-restart prompt — only reachable when initialProgress is
+        {/* Resume-or-restart prompt — only reachable when initialProgress is
           non-null AND getResumeStep didn't resolve to 'welcome'. The initial
           step useState above wires this branch. */}
-      {step === 'resume-prompt' && initialProgress && (() => {
-        const { startedAt, setupMethod, importDistribution: savedDist, completedSteps, iosBundleIdOverride } = initialProgress
-        // Defensive date parse: legacy / corrupted progress files can carry an
-        // unparseable startedAt — show the raw string with a dim suffix instead
-        // of crashing the wizard.
-        let whenLabel: string
-        try {
-          const d = new Date(startedAt)
-          if (Number.isNaN(d.getTime()))
-            throw new Error('NaN')
-          whenLabel = d.toLocaleString()
-        }
-        catch {
-          whenLabel = `${startedAt} (could not parse)`
-        }
-        const setupLabel = setupMethod === 'import-existing'
-          ? 'Import existing credentials'
-          : 'Create new via Apple'
-        const distLabel = savedDist === 'app_store'
-          ? 'App Store'
-          : savedDist === 'ad_hoc' ? 'Ad Hoc' : null
-        const keyVerified = Boolean(completedSteps.apiKeyVerified)
-        const certCreated = Boolean(completedSteps.certificateCreated)
-        const profileCreated = Boolean(completedSteps.profileCreated)
-        const showBundleOverride = Boolean(
-          iosBundleIdOverride && iosBundleIdOverride !== iosBundleIdInitial,
-        )
-        const resumeLabel = getPhaseLabel(startStep) || startStep
-        return (
-          <Box flexDirection="column" marginTop={1} gap={1}>
-            <Text bold color="cyan">{`↩️  Found in-progress onboarding for ${appId}`}</Text>
-            <Text>Pick up where you left off, or start over from the welcome step.</Text>
-            <Box flexDirection="column">
-              <Text>{`•  Started: ${whenLabel}`}</Text>
-              <Text>{`•  Setup method: ${setupLabel}`}</Text>
-              {distLabel && <Text>{`•  Distribution mode: ${distLabel}`}</Text>}
-              <Text>{`•  ASC API key verified: ${keyVerified ? `Yes (Key: ${completedSteps.apiKeyVerified!.keyId})` : 'No'}`}</Text>
-              <Text>{`•  Certificate created: ${certCreated ? `Yes (expires ${completedSteps.certificateCreated!.expirationDate})` : 'No'}`}</Text>
-              <Text>{`•  Profile created: ${profileCreated ? `Yes ("${completedSteps.profileCreated!.profileName}")` : 'No'}`}</Text>
-              {showBundleOverride && <Text>{`•  Confirmed iOS bundle id: ${iosBundleIdOverride}`}</Text>}
-              <Text dimColor>{`•  Resume target: ${resumeLabel}`}</Text>
-            </Box>
-            <Select
-              options={[
-                { label: '▶️  Continue from where I left off', value: 'continue' },
-                { label: '🔄  Restart onboarding (wipe saved progress)', value: 'restart' },
-              ]}
-              onChange={async (value) => {
+        {step === 'resume-prompt' && initialProgress && (() => {
+          const { startedAt, setupMethod, importDistribution: savedDist, completedSteps, iosBundleIdOverride } = initialProgress
+          // Defensive date parse: legacy / corrupted progress files can carry an
+          // unparseable startedAt — show the raw string with a dim suffix instead
+          // of crashing the wizard.
+          let whenLabel: string
+          try {
+            const d = new Date(startedAt)
+            if (Number.isNaN(d.getTime()))
+              throw new Error('NaN')
+            whenLabel = d.toLocaleString()
+          }
+          catch {
+            whenLabel = `${startedAt} (could not parse)`
+          }
+          const setupLabel = setupMethod === 'import-existing'
+            ? 'Import existing credentials'
+            : 'Create new via Apple'
+          const distLabel = savedDist === 'app_store'
+            ? 'App Store'
+            : savedDist === 'ad_hoc' ? 'Ad Hoc' : null
+          const keyVerified = Boolean(completedSteps.apiKeyVerified)
+          const certCreated = Boolean(completedSteps.certificateCreated)
+          const profileCreated = Boolean(completedSteps.profileCreated)
+          const showBundleOverride = Boolean(
+            iosBundleIdOverride && iosBundleIdOverride !== iosBundleIdInitial,
+          )
+          const resumeLabel = getPhaseLabel(startStep) || startStep
+          return (
+            <Box flexDirection="column" marginTop={1} gap={1}>
+              <Text bold color="cyan">{`↩️  Found in-progress onboarding for ${appId}`}</Text>
+              <Text>Pick up where you left off, or start over from the welcome step.</Text>
+              <Box flexDirection="column">
+                <Text>{`•  Started: ${whenLabel}`}</Text>
+                <Text>{`•  Setup method: ${setupLabel}`}</Text>
+                {distLabel && <Text>{`•  Distribution mode: ${distLabel}`}</Text>}
+                <Text>{`•  ASC API key verified: ${keyVerified ? `Yes (Key: ${completedSteps.apiKeyVerified!.keyId})` : 'No'}`}</Text>
+                <Text>{`•  Certificate created: ${certCreated ? `Yes (expires ${completedSteps.certificateCreated!.expirationDate})` : 'No'}`}</Text>
+                <Text>{`•  Profile created: ${profileCreated ? `Yes ("${completedSteps.profileCreated!.profileName}")` : 'No'}`}</Text>
+                {showBundleOverride && <Text>{`•  Confirmed iOS bundle id: ${iosBundleIdOverride}`}</Text>}
+                <Text dimColor>{`•  Resume target: ${resumeLabel}`}</Text>
+              </Box>
+              <Select
+                options={[
+                  { label: '▶️  Continue from where I left off', value: 'continue' },
+                  { label: '🔄  Restart onboarding (wipe saved progress)', value: 'restart' },
+                ]}
+                onChange={async (value) => {
                 // Record which branch the user took. The funnel already shows
                 // the resume-prompt step + the next step (welcome on restart,
                 // the resume target on continue), but the explicit choice tag
                 // gives a clean continue-vs-restart split without inferring it.
-                trackAction('resume_prompt_decision', { choice: value })
-                if (value === 'continue') {
+                  trackAction('resume_prompt_decision', { choice: value })
+                  if (value === 'continue') {
                   // Now that the user has committed to picking up where
                   // they left off, replay the breadcrumb log so they see
                   // the in-progress state they're resuming into. Held
@@ -3327,512 +3373,643 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                   // wasn't surrounded by stale "Distribution · ad_hoc",
                   // "Key file selected · …" entries while they were
                   // still deciding.
-                  hydrateCompletedLog()
-                  setStep(startStep)
-                  return
-                }
-                await resetForFreshStart()
-                addLog('↩️  Restarted — fresh start', 'yellow')
-                setStep('welcome')
-              }}
-            />
-          </Box>
-        )
-      })()}
+                    hydrateCompletedLog()
+                    setStep(startStep)
+                    return
+                  }
+                  await resetForFreshStart()
+                  addLog('↩️  Restarted — fresh start', 'yellow')
+                  setStep('welcome')
+                }}
+              />
+            </Box>
+          )
+        })()}
 
-      {/* Welcome */}
-      {step === 'welcome' && <WelcomeStep />}
+        {/* Welcome */}
+        {step === 'welcome' && <WelcomeStep />}
 
-      {/* Platform select */}
-      {step === 'platform-select' && (
-        <PlatformSelectStep
-          appId={appId}
-          dense={dense}
-          onChange={async (value) => {
-            if (value === 'android') {
+        {/* Platform select */}
+        {step === 'platform-select' && (
+          <PlatformSelectStep
+            appId={appId}
+            dense={dense}
+            onChange={async (value) => {
+              if (value === 'android') {
               // The Android flow lives in a separate Ink app — this iOS app
               // can't host it inline. Exit cleanly and tell the user to
               // re-run with --platform android.
-              addLog('Re-run with `npx @capgo/cli@latest build init --platform android` to set up Android.', 'cyan')
-              exitOnboarding()
-              return
-            }
-            // Check for existing credentials before proceeding
-            const existing = await loadSavedCredentials(appId)
-            if (existing?.ios) {
-              setStep('credentials-exist')
-            }
-            else if (isMacOS()) {
+                addLog('Re-run with `npx @capgo/cli@latest build init --platform android` to set up Android.', 'cyan')
+                exitOnboarding()
+                return
+              }
+              // Check for existing credentials before proceeding
+              const existing = await loadSavedCredentials(appId)
+              if (existing?.ios) {
+                setStep('credentials-exist')
+              }
+              else if (isMacOS()) {
               // macOS users see the fork: import existing or create new
-              setStep('setup-method-select')
-            }
-            else {
-              // Non-macOS hosts can only create new (importing requires Keychain)
-              setStep('api-key-instructions')
-            }
-          }}
-        />
-      )}
-
-      {/* No platform directory */}
-      {step === 'no-platform' && (
-        <NoPlatformStep
-          iosDir={iosDir}
-          addIosCommand={addIosCommand}
-          syncIosCommand={syncIosCommand}
-          dense={dense}
-          onChange={(value) => {
-            if (value === 'run') {
-              setStep('adding-platform')
-            }
-            else if (value === 'recheck') {
-              if (existsSync(join(process.cwd(), iosDir))) {
-                addLog(`✔ Found ${iosDir}/ — resuming onboarding.`)
-                ;(async () => {
-                  const existing = await loadSavedCredentials(appId)
-                  if (existing?.ios)
-                    setStep('credentials-exist')
-                  else
-                    setStep('api-key-instructions')
-                })()
+                setStep('setup-method-select')
               }
               else {
-                addLog(`⚠ ${iosDir}/ is still missing. Try ${addIosCommand} or ${doctorCommand}.`, 'yellow')
+              // Non-macOS hosts can only create new (importing requires Keychain)
+                setStep('api-key-instructions')
               }
-            }
-            else {
-              addLog(`Exiting. Run \`${buildInitCommand}\` after the native iOS folder exists.`, 'yellow')
-              exitOnboarding()
-            }
-          }}
-        />
-      )}
+            }}
+          />
+        )}
 
-      {step === 'adding-platform' && (
-        <AddingPlatformStep addIosCommand={addIosCommand} doctorCommand={doctorCommand} dense={dense} />
-      )}
+        {/* No platform directory */}
+        {step === 'no-platform' && (
+          <NoPlatformStep
+            iosDir={iosDir}
+            addIosCommand={addIosCommand}
+            syncIosCommand={syncIosCommand}
+            dense={dense}
+            onChange={(value) => {
+              if (value === 'run') {
+                setStep('adding-platform')
+              }
+              else if (value === 'recheck') {
+                if (existsSync(join(process.cwd(), iosDir))) {
+                  addLog(`✔ Found ${iosDir}/ — resuming onboarding.`)
+                  ;(async () => {
+                    const existing = await loadSavedCredentials(appId)
+                    if (existing?.ios)
+                      setStep('credentials-exist')
+                    else
+                      setStep('api-key-instructions')
+                  })()
+                }
+                else {
+                  addLog(`⚠ ${iosDir}/ is still missing. Try ${addIosCommand} or ${doctorCommand}.`, 'yellow')
+                }
+              }
+              else {
+                addLog(`Exiting. Run \`${buildInitCommand}\` after the native iOS folder exists.`, 'yellow')
+                exitOnboarding()
+              }
+            }}
+          />
+        )}
 
-      {/* Existing credentials warning */}
-      {step === 'credentials-exist' && (
-        <CredentialsExistStep
-          appId={appId}
-          dense={dense}
-          onChange={(value) => {
-            if (value === 'backup') {
-              setStep('backing-up')
-            }
-            else {
-              addLog('Exiting onboarding.', 'yellow')
-              exitOnboarding()
-            }
-          }}
-        />
-      )}
+        {step === 'adding-platform' && (
+          <AddingPlatformStep addIosCommand={addIosCommand} doctorCommand={doctorCommand} dense={dense} />
+        )}
 
-      {/* Backing up credentials */}
-      {step === 'backing-up' && <BackingUpStep />}
+        {/* Existing credentials warning */}
+        {step === 'credentials-exist' && (
+          <CredentialsExistStep
+            appId={appId}
+            dense={dense}
+            onChange={(value) => {
+              if (value === 'backup') {
+                setStep('backing-up')
+              }
+              else {
+                addLog('Exiting onboarding.', 'yellow')
+                exitOnboarding()
+              }
+            }}
+          />
+        )}
 
-      {/* Setup-method fork (macOS only) */}
-      {step === 'setup-method-select' && (
-        <SetupMethodSelectStep
-          dense={dense}
-          onChange={async (value) => {
+        {/* Backing up credentials */}
+        {step === 'backing-up' && <BackingUpStep />}
+
+        {/* Setup-method fork (macOS only) */}
+        {step === 'setup-method-select' && (
+          <SetupMethodSelectStep
+            dense={dense}
+            onChange={async (value) => {
             // Persist the fork choice to progress so resume after CLI close
             // routes to the right path. Without this, an interrupted import
             // run resumes into the create-new path's `creating-certificate`
             // step and triggers the cert-limit error.
-            const existing = await loadProgress(appId) || {
-              platform: 'ios' as const,
-              appId,
-              startedAt: new Date().toISOString(),
-              completedSteps: {},
-            }
-            existing.setupMethod = value === 'import' ? 'import-existing' : 'create-new'
-            await saveProgress(appId, existing)
+              const existing = await loadProgress(appId) || {
+                platform: 'ios' as const,
+                appId,
+                startedAt: new Date().toISOString(),
+                completedSteps: {},
+              }
+              existing.setupMethod = value === 'import' ? 'import-existing' : 'create-new'
+              await saveProgress(appId, existing)
 
-            if (value === 'import') {
-              setImportMode(true)
-              setStep('import-scanning')
-            }
-            else {
-              setImportMode(false)
-              setStep('api-key-instructions')
-            }
-          }}
-        />
-      )}
+              if (value === 'import') {
+                setImportMode(true)
+                setStep('import-scanning')
+              }
+              else {
+                setImportMode(false)
+                // Ask whether they already have a .p8 before the instructions.
+                setStep('p8-source-select')
+              }
+            }}
+          />
+        )}
 
-      {/* Import: scanning */}
-      {step === 'import-scanning' && <ImportScanningStep />}
+        {/* Do you already have a .p8 file? */}
+        {step === 'p8-source-select' && (
+          <P8SourceSelectStep
+            dense={dense}
+            canAutomate={isMacOS() && resolveHelperBinary() !== null}
+            onChange={(value) => {
+              if (value === 'have') {
+                setStep('api-key-instructions')
+              }
+              else if (isMacOS() && resolveHelperBinary() !== null) {
+              // No key yet, and we can drive the guided helper.
+                setStep('p8-create-method-select')
+              }
+              else {
+              // No automation available — fall back to the manual instructions.
+                setStep('api-key-instructions')
+              }
+            }}
+          />
+        )}
 
-      {/* Verify the App Store Connect app exists for the Release build id.
+        {/* How to create the .p8: guided helper vs by hand (macOS only) */}
+        {step === 'p8-create-method-select' && (
+          <P8CreateMethodSelectStep
+            dense={dense}
+            onChange={(value) => {
+              if (value === 'automated')
+                setStep('asc-key-generating')
+              else
+                setStep('api-key-instructions')
+            }}
+          />
+        )}
+
+        {/* Guided helper is running in its own window */}
+        {step === 'asc-key-generating' && <AscKeyGeneratingStep />}
+
+        {/* Import: scanning */}
+        {step === 'import-scanning' && <ImportScanningStep />}
+
+        {/* Verify the App Store Connect app exists for the Release build id.
           app_store mode only; reached after verifying-key. The single
           invariant: an ASC app exists whose bundleId
           == the Release PRODUCT_BUNDLE_IDENTIFIER. The exact-match and
           fetch-failure cases are handled in the effect above (they transition
           straight through); this render only drives the picker + the two
           resolution-path gates. */}
-      {step === 'verify-app' && (
-        <Box flexDirection="column">
-          {verifyDebugBundleId && verifyReleaseBundleId
-            ? (
-                <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1} marginTop={1}>
-                  <Text bold color="yellow">{'⚠  Debug and Release use different bundle IDs'}</Text>
-                  <Text>
-                    {'Debug builds '}
-                    <Text bold>{verifyDebugBundleId}</Text>
-                    {'   ·   Release builds '}
-                    <Text bold color="cyan">{verifyReleaseBundleId}</Text>
+        {step === 'verify-app' && (
+          <Box flexDirection="column">
+            {verifyDebugBundleId && verifyReleaseBundleId
+              ? (
+                  <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1} marginTop={1}>
+                    <Text bold color="yellow">⚠  Debug and Release use different bundle IDs</Text>
+                    <Text>
+                      {'Debug builds '}
+                      <Text bold>{verifyDebugBundleId}</Text>
+                      {'   ·   Release builds '}
+                      <Text bold color="cyan">{verifyReleaseBundleId}</Text>
+                    </Text>
+                    <Text>
+                      {'Capgo Builder signs the '}
+                      <Text bold color="cyan">Release</Text>
+                      {' ID → '}
+                      <Text bold color="cyan">{verifyReleaseBundleId}</Text>
+                    </Text>
+                  </Box>
+                )
+              : null}
+            {(() => {
+              if (verifyAppLoading) {
+                return (
+                  <Box flexDirection="column" marginTop={1}>
+                    <SpinnerLine text="Checking App Store Connect for your app..." />
+                    <Text dimColor>Fetching your apps and registered bundle IDs to verify the build matches a real App Store app.</Text>
+                  </Box>
+                )
+              }
+
+              const releaseId = verifyReleaseBundleId
+
+              // Final pass: persist the verified Release id as the override and
+              // continue to the pending target (creating-certificate).
+              const passGate = async (path: GatePath, resolvedId: string) => {
+                await persistVerifyOverride(resolvedId)
+                trackVerifyEvent('iOS App Verify Passed', '✅', { attempts: verifyAttempt, path })
+                setStep(pendingVerifyNext ?? 'creating-certificate')
+                setPendingVerifyNext(null)
+              }
+
+              // Path A Continue — re-read pbxproj FRESH from disk (never the memo)
+              // and re-check the Release build id against the chosen app.
+              const continueFixBuildId = async () => {
+                const fresh = detectIosBundleIds({ cwd: process.cwd(), iosDir, capacitorAppId: iosBundleIdInitial })
+                const newRelease = fresh.releaseResolved && fresh.pbxproj ? fresh.pbxproj.value : ''
+                setVerifyReleaseBundleId(newRelease)
+                const satisfied = Boolean(verifyChosenApp) && newRelease === verifyChosenApp!.bundleId
+                const attempt = verifyAttempt + 1
+                const gate = evaluateGate({ satisfied, attempt })
+                if (gate.proceed) {
+                  addLog(`✓ Building "${verifyChosenApp!.name}" (${newRelease}) — matches your App Store app.`)
+                  await passGate('fix-build-id', newRelease)
+                  return
+                }
+                setVerifyAttempt(attempt)
+                trackVerifyEvent('iOS App Verify Gate Blocked', '🚧', { attempt, path: 'fix-build-id' })
+              }
+
+              // Path A auto-fix — rewrite the Release PRODUCT_BUNDLE_IDENTIFIER in the
+              // Xcode project to the chosen App Store app's bundle id, then re-check
+              // (which now passes and advances the gate). Only PRODUCT_BUNDLE_IDENTIFIER
+              // assignments equal to the current build id are touched; capacitor.config
+              // is never modified.
+              const autoFixBuildId = async () => {
+                if (!verifyChosenApp)
+                  return
+                const target = verifyChosenApp.bundleId
+                try {
+                  const { changed } = writeReleaseBundleId(process.cwd(), iosDir, releaseId, target)
+                  if (changed > 0) {
+                    addLog(`🔧 Updated PRODUCT_BUNDLE_IDENTIFIER → "${target}" in your Xcode project.`)
+                    trackVerifyEvent('iOS App Verify Auto Fixed', '🔧', { attempt: verifyAttempt, path: 'fix-build-id' })
+                  }
+                  else {
+                    addLog(`⚠ Couldn't find PRODUCT_BUNDLE_IDENTIFIER "${releaseId}" to update — edit it in Xcode, then re-check.`, 'yellow')
+                  }
+                }
+                catch {
+                  addLog('⚠ Could not write to your Xcode project — edit PRODUCT_BUNDLE_IDENTIFIER manually, then re-check.', 'yellow')
+                }
+                // Re-check against disk; passes the gate when the write succeeded.
+                await continueFixBuildId()
+              }
+
+              // Path B Continue — re-poll /v1/apps and check for an app matching the
+              // Release build id. Never re-opens the browser automatically.
+              const continueCreateApp = async () => {
+                // Show the step's loader while we re-poll ASC (an async network call) —
+                // otherwise the re-check feels instant and the user can't tell it ran.
+                setVerifyAppLoading(true)
+                const attempt = verifyAttempt + 1
+                try {
+                  const token = await getFreshToken()
+                  const apps = await listApps(token)
+                  setVerifyApps(apps)
+                  const satisfied = apps.some(a => a.bundleId === releaseId)
+                  if (evaluateGate({ satisfied, attempt }).proceed) {
+                    const matched = apps.find(a => a.bundleId === releaseId)
+                    addLog(`✓ Building "${matched?.name ?? releaseId}" (${releaseId}) — matches your App Store app.`)
+                    await passGate('create-app', releaseId)
+                    return
+                  }
+                  // Still not found — count the attempt so the escalating box visibly
+                  // advances, then ask before re-opening the browser.
+                  setVerifyAttempt(attempt)
+                  setVerifyAskReopen(true)
+                  trackVerifyEvent('iOS App Verify Gate Blocked', '🚧', { attempt, path: 'create-app' })
+                }
+                catch {
+                  // Couldn't reach ASC — still count the attempt so the user sees the
+                  // re-check happened (not a silent no-op) and surface a connectivity
+                  // message distinct from "app still missing".
+                  setVerifyAttempt(attempt)
+                  setVerifyAskReopen(true)
+                  addLog('⚠ Couldn\'t reach App Store Connect to re-check — check your connection and try again.', 'yellow')
+                  trackVerifyEvent('iOS App Verify Gate Blocked', '🚧', { attempt, path: 'create-app' })
+                }
+                finally {
+                  setVerifyAppLoading(false)
+                }
+              }
+
+              // Open the ASC new-app page. Registers the identifier first (idempotent)
+              // so it is selectable in the form. Opens ONLY on explicit choice.
+              const openCreatePage = async () => {
+                try {
+                  const token = await getFreshToken()
+                  await ensureBundleId(token, releaseId)
+                }
+                catch {
+                  // Registration is best-effort — the user can still create the app
+                  // and pick/register the id in the web form.
+                }
+                trackVerifyEvent('iOS App Verify Create App Opened', '🌐', { attempt: verifyAttempt })
+                try {
+                  await open('https://appstoreconnect.apple.com/apps')
+                }
+                catch {
+                  addLog('⚠ Could not open your browser. Visit https://appstoreconnect.apple.com/apps to create the app.', 'yellow')
+                }
+                setVerifyAskReopen(false)
+              }
+
+              const cancelGate = (path: GatePath) => {
+                trackVerifyEvent('iOS App Verify Cancelled', '🚫', { attempt: verifyAttempt, path })
+                addLog('Exiting onboarding.', 'yellow')
+                exitOnboarding()
+              }
+
+              // Return to the app picker (verifyPath === null) to choose a different
+              // App Store app or switch to "create a new app". Resets the per-attempt
+              // gate state so the re-picked target starts fresh.
+              const backToPicker = () => {
+                setVerifyPath(null)
+                setVerifyChosenApp(null)
+                setVerifyAttempt(0)
+                setVerifyAskReopen(false)
+              }
+
+              // Escalating border colour ramp so a repeatedly-blocked gate never
+              // looks frozen (spec: each blocked Continue must look visibly
+              // different). Tops out at red.
+              const escalation = evaluateGate({ satisfied: false, attempt: verifyAttempt }).escalationLevel
+              const gateBorder = escalation >= 3 ? 'red' : escalation === 2 ? 'yellow' : 'cyan'
+              const attemptMarker = verifyAttempt > 0 ? ` (attempt ${verifyAttempt})` : ''
+
+              // ── Path A: fix the build id ──────────────────────────────────────
+              if (verifyPath === 'fix-build-id' && verifyChosenApp) {
+                const wrong = releaseId
+                const right = verifyChosenApp.bundleId
+                return (
+                  <Box flexDirection="column" marginTop={1}>
+                    <Box flexDirection="column" borderStyle="round" borderColor={gateBorder} paddingX={1}>
+                      <Text bold color={gateBorder}>{`Build ID doesn't match "${verifyChosenApp.name}"${attemptMarker}`}</Text>
+                      <Newline />
+                      <Text>
+                        {'Your project builds '}
+                        <Text bold color="red">{wrong || '(no Release build ID resolved)'}</Text>
+                        {', but the App Store app you picked is '}
+                        <Text bold color="green">{right}</Text>
+                        .
+                      </Text>
+                      <Newline />
+                      <Text>
+                        {'Set '}
+                        <Text bold>PRODUCT_BUNDLE_IDENTIFIER</Text>
+                        {' (Release) to '}
+                        <Text bold color="cyan">{right}</Text>
+                        {' — pick "Update … for me" below to do it automatically, or edit it in Xcode yourself and re-check.'}
+                      </Text>
+                      <Text dimColor>capacitor.config.appId can stay as-is — only the Release PRODUCT_BUNDLE_IDENTIFIER must match.</Text>
+                    </Box>
+                    <Newline />
+                    <Select
+                      key={`gate-a-${gateActionSeq}`}
+                      options={[
+                        { label: '🔧 Update PRODUCT_BUNDLE_IDENTIFIER for me', value: 'autofix' },
+                        { label: '✅ I\'ve edited it myself — re-check', value: 'continue' },
+                        { label: '↩  Back — pick a different app', value: 'back' },
+                        { label: '❌ Cancel onboarding', value: 'cancel' },
+                      ]}
+                      onChange={(value) => {
+                        setGateActionSeq(s => s + 1)
+                        if (value === 'autofix')
+                          void autoFixBuildId()
+                        else if (value === 'continue')
+                          void continueFixBuildId()
+                        else if (value === 'back')
+                          backToPicker()
+                        else
+                          cancelGate('fix-build-id')
+                      }}
+                    />
+                  </Box>
+                )
+              }
+
+              // ── Path B: create the app ────────────────────────────────────────
+              if (verifyPath === 'create-app') {
+                const alreadyRegistered = verifyRegisteredIds.includes(releaseId)
+                // After a blocked re-poll we ASK before re-opening the browser.
+                if (verifyAskReopen) {
+                  return (
+                    <Box flexDirection="column" marginTop={1}>
+                      <Box flexDirection="column" borderStyle="round" borderColor={gateBorder} paddingX={1}>
+                        <Text bold color={gateBorder}>{`Still no App Store app for ${releaseId}${attemptMarker}`}</Text>
+                        <Newline />
+                        <Text>
+                          {`We re-checked App Store Connect and didn't find an app whose bundle ID is `}
+                          <Text bold color="cyan">{releaseId}</Text>
+                          .
+                        </Text>
+                        <Text dimColor>Create the app on appstoreconnect.com (the API cannot create apps), then re-check.</Text>
+                      </Box>
+                      <Newline />
+                      <Select
+                        key={`gate-b-reopen-${gateActionSeq}`}
+                        options={[
+                          { label: '🔁 I\'ve created it — re-check', value: 'recheck' },
+                          { label: '🌐 Re-open the create-app page', value: 'reopen' },
+                          { label: '❌ Cancel onboarding', value: 'cancel' },
+                        ]}
+                        onChange={(value) => {
+                          setGateActionSeq(s => s + 1)
+                          if (value === 'recheck')
+                            void continueCreateApp()
+                          else if (value === 'reopen')
+                            void openCreatePage()
+                          else
+                            cancelGate('create-app')
+                        }}
+                      />
+                    </Box>
+                  )
+                }
+                return (
+                  <Box flexDirection="column" marginTop={1}>
+                    <Box flexDirection="column" borderStyle="round" borderColor={gateBorder} paddingX={1}>
+                      <Text bold color={gateBorder}>{`No App Store app exists for ${releaseId}${attemptMarker}`}</Text>
+                      <Newline />
+                      <Text>
+                        {'Your project builds '}
+                        <Text bold color="cyan">{releaseId}</Text>
+                        {`, but there's no App Store Connect app with that bundle ID yet. An app_store build needs one to upload to.`}
+                      </Text>
+                      <Newline />
+                      <Text dimColor>
+                        {alreadyRegistered
+                          ? `The identifier ${releaseId} is already registered in your Developer account — select it when creating the app.`
+                          : `We'll register the identifier ${releaseId} (so it's selectable) when you open the create-app page.`}
+                      </Text>
+                      <Text dimColor>The App Store Connect API cannot create apps — this is a one-time manual step on the web.</Text>
+                    </Box>
+                    <Newline />
+                    <Select
+                      key={`gate-b-${gateActionSeq}`}
+                      options={[
+                        { label: '🌐 Open App Store Connect to create the app', value: 'open' },
+                        { label: '🔁 I\'ve already created it — re-check', value: 'recheck' },
+                        ...(verifyApps.length > 0 ? [{ label: '↩  Back — pick an existing app', value: 'back' }] : []),
+                        { label: '❌ Cancel onboarding', value: 'cancel' },
+                      ]}
+                      onChange={(value) => {
+                        setGateActionSeq(s => s + 1)
+                        if (value === 'open')
+                          void openCreatePage()
+                        else if (value === 'recheck')
+                          void continueCreateApp()
+                        else if (value === 'back')
+                          backToPicker()
+                        else
+                          cancelGate('create-app')
+                      }}
+                    />
+                  </Box>
+                )
+              }
+
+              // ── Picker (wrong-build-id): account has apps, none match the build
+              //    id. Let the user pick the intended app (→ Path A) or declare the
+              //    build id correct and create a new app (→ Path B). ──────────────
+              return (
+                <Box flexDirection="column" marginTop={1}>
+                  <Alert variant="warning">
+                    {`No App Store app matches the bundle ID your project builds (${releaseId}).`}
+                  </Alert>
+                  <Newline />
+                  <Text dimColor>
+                    {`An app_store build signs the Release PRODUCT_BUNDLE_IDENTIFIER and uploads to the App Store app with the same bundle ID. None of your apps use ${releaseId}, so the upload would be rejected. Which app are you building?`}
                   </Text>
-                  <Text>
-                    {'Capgo Builder signs the '}
-                    <Text bold color="cyan">Release</Text>
-                    {' ID → '}
-                    <Text bold color="cyan">{verifyReleaseBundleId}</Text>
-                  </Text>
+                  <Newline />
+                  <Select
+                    options={[
+                      ...verifyApps.map(a => ({
+                        label: `${a.name} — ${a.bundleId}`,
+                        value: a.bundleId,
+                      })),
+                      { label: '➕ None of these — my build ID is correct, create a new app', value: '__create_new__' },
+                    ]}
+                    onChange={(value) => {
+                      if (value === '__create_new__') {
+                        trackVerifyEvent('iOS App Verify Picked', '👆', { matches_build_id: false, chose_create_new: true })
+                        setVerifyPath('create-app')
+                        return
+                      }
+                      const chosen = verifyApps.find(a => a.bundleId === value) ?? null
+                      trackVerifyEvent('iOS App Verify Picked', '👆', {
+                        matches_build_id: value === releaseId,
+                        chose_create_new: false,
+                      })
+                      if (chosen && chosen.bundleId === releaseId) {
+                        // Already matches — pass straight through (defensive; the
+                        // exact-match case is normally handled in the effect).
+                        addLog(`✓ Building "${chosen.name}" (${releaseId}) — matches your App Store app.`)
+                        void (async () => {
+                          try {
+                            await passGate('fix-build-id', releaseId)
+                          }
+                          catch {
+                            addLog('⚠ Could not save the verified bundle ID; you may be re-prompted next run.', 'yellow')
+                          }
+                        })()
+                        return
+                      }
+                      setVerifyChosenApp(chosen)
+                      setVerifyPath('fix-build-id')
+                    }}
+                  />
                 </Box>
               )
-            : null}
-          {(() => {
-        if (verifyAppLoading) {
-          return (
-            <Box flexDirection="column" marginTop={1}>
-              <SpinnerLine text="Checking App Store Connect for your app..." />
-              <Text dimColor>Fetching your apps and registered bundle IDs to verify the build matches a real App Store app.</Text>
-            </Box>
-          )
-        }
-
-        const releaseId = verifyReleaseBundleId
-
-        // Final pass: persist the verified Release id as the override and
-        // continue to the pending target (creating-certificate).
-        const passGate = async (path: GatePath, resolvedId: string) => {
-          await persistVerifyOverride(resolvedId)
-          trackVerifyEvent('iOS App Verify Passed', '✅', { attempts: verifyAttempt, path })
-          setStep(pendingVerifyNext ?? 'creating-certificate')
-          setPendingVerifyNext(null)
-        }
-
-        // Path A Continue — re-read pbxproj FRESH from disk (never the memo)
-        // and re-check the Release build id against the chosen app.
-        const continueFixBuildId = async () => {
-          const fresh = detectIosBundleIds({ cwd: process.cwd(), iosDir, capacitorAppId: iosBundleIdInitial })
-          const newRelease = fresh.releaseResolved && fresh.pbxproj ? fresh.pbxproj.value : ''
-          setVerifyReleaseBundleId(newRelease)
-          const satisfied = Boolean(verifyChosenApp) && newRelease === verifyChosenApp!.bundleId
-          const attempt = verifyAttempt + 1
-          const gate = evaluateGate({ satisfied, attempt })
-          if (gate.proceed) {
-            addLog(`✓ Building "${verifyChosenApp!.name}" (${newRelease}) — matches your App Store app.`)
-            await passGate('fix-build-id', newRelease)
-            return
-          }
-          setVerifyAttempt(attempt)
-          trackVerifyEvent('iOS App Verify Gate Blocked', '🚧', { attempt, path: 'fix-build-id' })
-        }
-
-        // Path A auto-fix — rewrite the Release PRODUCT_BUNDLE_IDENTIFIER in the
-        // Xcode project to the chosen App Store app's bundle id, then re-check
-        // (which now passes and advances the gate). Only PRODUCT_BUNDLE_IDENTIFIER
-        // assignments equal to the current build id are touched; capacitor.config
-        // is never modified.
-        const autoFixBuildId = async () => {
-          if (!verifyChosenApp)
-            return
-          const target = verifyChosenApp.bundleId
-          try {
-            const { changed } = writeReleaseBundleId(process.cwd(), iosDir, releaseId, target)
-            if (changed > 0) {
-              addLog(`🔧 Updated PRODUCT_BUNDLE_IDENTIFIER → "${target}" in your Xcode project.`)
-              trackVerifyEvent('iOS App Verify Auto Fixed', '🔧', { attempt: verifyAttempt, path: 'fix-build-id' })
-            }
-            else {
-              addLog(`⚠ Couldn't find PRODUCT_BUNDLE_IDENTIFIER "${releaseId}" to update — edit it in Xcode, then re-check.`, 'yellow')
-            }
-          }
-          catch {
-            addLog('⚠ Could not write to your Xcode project — edit PRODUCT_BUNDLE_IDENTIFIER manually, then re-check.', 'yellow')
-          }
-          // Re-check against disk; passes the gate when the write succeeded.
-          await continueFixBuildId()
-        }
-
-        // Path B Continue — re-poll /v1/apps and check for an app matching the
-        // Release build id. Never re-opens the browser automatically.
-        const continueCreateApp = async () => {
-          // Show the step's loader while we re-poll ASC (an async network call) —
-          // otherwise the re-check feels instant and the user can't tell it ran.
-          setVerifyAppLoading(true)
-          const attempt = verifyAttempt + 1
-          try {
-            const token = await getFreshToken()
-            const apps = await listApps(token)
-            setVerifyApps(apps)
-            const satisfied = apps.some(a => a.bundleId === releaseId)
-            if (evaluateGate({ satisfied, attempt }).proceed) {
-              const matched = apps.find(a => a.bundleId === releaseId)
-              addLog(`✓ Building "${matched?.name ?? releaseId}" (${releaseId}) — matches your App Store app.`)
-              await passGate('create-app', releaseId)
-              return
-            }
-            // Still not found — count the attempt so the escalating box visibly
-            // advances, then ask before re-opening the browser.
-            setVerifyAttempt(attempt)
-            setVerifyAskReopen(true)
-            trackVerifyEvent('iOS App Verify Gate Blocked', '🚧', { attempt, path: 'create-app' })
-          }
-          catch {
-            // Couldn't reach ASC — still count the attempt so the user sees the
-            // re-check happened (not a silent no-op) and surface a connectivity
-            // message distinct from "app still missing".
-            setVerifyAttempt(attempt)
-            setVerifyAskReopen(true)
-            addLog("⚠ Couldn't reach App Store Connect to re-check — check your connection and try again.", 'yellow')
-            trackVerifyEvent('iOS App Verify Gate Blocked', '🚧', { attempt, path: 'create-app' })
-          }
-          finally {
-            setVerifyAppLoading(false)
-          }
-        }
-
-        // Open the ASC new-app page. Registers the identifier first (idempotent)
-        // so it is selectable in the form. Opens ONLY on explicit choice.
-        const openCreatePage = async () => {
-          try {
-            const token = await getFreshToken()
-            await ensureBundleId(token, releaseId)
-          }
-          catch {
-            // Registration is best-effort — the user can still create the app
-            // and pick/register the id in the web form.
-          }
-          trackVerifyEvent('iOS App Verify Create App Opened', '🌐', { attempt: verifyAttempt })
-          try {
-            await open('https://appstoreconnect.apple.com/apps')
-          }
-          catch {
-            addLog('⚠ Could not open your browser. Visit https://appstoreconnect.apple.com/apps to create the app.', 'yellow')
-          }
-          setVerifyAskReopen(false)
-        }
-
-        const cancelGate = (path: GatePath) => {
-          trackVerifyEvent('iOS App Verify Cancelled', '🚫', { attempt: verifyAttempt, path })
-          addLog('Exiting onboarding.', 'yellow')
-          exitOnboarding()
-        }
-
-        // Return to the app picker (verifyPath === null) to choose a different
-        // App Store app or switch to "create a new app". Resets the per-attempt
-        // gate state so the re-picked target starts fresh.
-        const backToPicker = () => {
-          setVerifyPath(null)
-          setVerifyChosenApp(null)
-          setVerifyAttempt(0)
-          setVerifyAskReopen(false)
-        }
-
-        // Escalating border colour ramp so a repeatedly-blocked gate never
-        // looks frozen (spec: each blocked Continue must look visibly
-        // different). Tops out at red.
-        const escalation = evaluateGate({ satisfied: false, attempt: verifyAttempt }).escalationLevel
-        const gateBorder = escalation >= 3 ? 'red' : escalation === 2 ? 'yellow' : 'cyan'
-        const attemptMarker = verifyAttempt > 0 ? ` (attempt ${verifyAttempt})` : ''
-
-        // ── Path A: fix the build id ──────────────────────────────────────
-        if (verifyPath === 'fix-build-id' && verifyChosenApp) {
-          const wrong = releaseId
-          const right = verifyChosenApp.bundleId
-          return (
-            <Box flexDirection="column" marginTop={1}>
-              <Box flexDirection="column" borderStyle="round" borderColor={gateBorder} paddingX={1}>
-                <Text bold color={gateBorder}>{`Build ID doesn't match "${verifyChosenApp.name}"${attemptMarker}`}</Text>
-                <Newline />
-                <Text>
-                  {'Your project builds '}
-                  <Text bold color="red">{wrong || '(no Release build ID resolved)'}</Text>
-                  {', but the App Store app you picked is '}
-                  <Text bold color="green">{right}</Text>
-                  {'.'}
-                </Text>
-                <Newline />
-                <Text>
-                  {'Set '}
-                  <Text bold>PRODUCT_BUNDLE_IDENTIFIER</Text>
-                  {' (Release) to '}
-                  <Text bold color="cyan">{right}</Text>
-                  {' — pick "Update … for me" below to do it automatically, or edit it in Xcode yourself and re-check.'}
-                </Text>
-                <Text dimColor>{'capacitor.config.appId can stay as-is — only the Release PRODUCT_BUNDLE_IDENTIFIER must match.'}</Text>
-              </Box>
-              <Newline />
-              <Select
-                key={`gate-a-${gateActionSeq}`}
-                options={[
-                  { label: '🔧 Update PRODUCT_BUNDLE_IDENTIFIER for me', value: 'autofix' },
-                  { label: '✅ I\'ve edited it myself — re-check', value: 'continue' },
-                  { label: '↩  Back — pick a different app', value: 'back' },
-                  { label: '❌ Cancel onboarding', value: 'cancel' },
-                ]}
-                onChange={(value) => {
-                  setGateActionSeq(s => s + 1)
-                  if (value === 'autofix')
-                    void autoFixBuildId()
-                  else if (value === 'continue')
-                    void continueFixBuildId()
-                  else if (value === 'back')
-                    backToPicker()
-                  else
-                    cancelGate('fix-build-id')
-                }}
-              />
-            </Box>
-          )
-        }
-
-        // ── Path B: create the app ────────────────────────────────────────
-        if (verifyPath === 'create-app') {
-          const alreadyRegistered = verifyRegisteredIds.includes(releaseId)
-          // After a blocked re-poll we ASK before re-opening the browser.
-          if (verifyAskReopen) {
-            return (
-              <Box flexDirection="column" marginTop={1}>
-                <Box flexDirection="column" borderStyle="round" borderColor={gateBorder} paddingX={1}>
-                  <Text bold color={gateBorder}>{`Still no App Store app for ${releaseId}${attemptMarker}`}</Text>
-                  <Newline />
-                  <Text>{`We re-checked App Store Connect and didn't find an app whose bundle ID is `}<Text bold color="cyan">{releaseId}</Text>{'.'}</Text>
-                  <Text dimColor>{'Create the app on appstoreconnect.com (the API cannot create apps), then re-check.'}</Text>
-                </Box>
-                <Newline />
-                <Select
-                  key={`gate-b-reopen-${gateActionSeq}`}
-                  options={[
-                    { label: '🔁 I\'ve created it — re-check', value: 'recheck' },
-                    { label: '🌐 Re-open the create-app page', value: 'reopen' },
-                    { label: '❌ Cancel onboarding', value: 'cancel' },
-                  ]}
-                  onChange={(value) => {
-                    setGateActionSeq(s => s + 1)
-                    if (value === 'recheck')
-                      void continueCreateApp()
-                    else if (value === 'reopen')
-                      void openCreatePage()
-                    else
-                      cancelGate('create-app')
-                  }}
-                />
-              </Box>
-            )
-          }
-          return (
-            <Box flexDirection="column" marginTop={1}>
-              <Box flexDirection="column" borderStyle="round" borderColor={gateBorder} paddingX={1}>
-                <Text bold color={gateBorder}>{`No App Store app exists for ${releaseId}${attemptMarker}`}</Text>
-                <Newline />
-                <Text>
-                  {'Your project builds '}
-                  <Text bold color="cyan">{releaseId}</Text>
-                  {`, but there's no App Store Connect app with that bundle ID yet. An app_store build needs one to upload to.`}
-                </Text>
-                <Newline />
-                <Text dimColor>
-                  {alreadyRegistered
-                    ? `The identifier ${releaseId} is already registered in your Developer account — select it when creating the app.`
-                    : `We'll register the identifier ${releaseId} (so it's selectable) when you open the create-app page.`}
-                </Text>
-                <Text dimColor>{'The App Store Connect API cannot create apps — this is a one-time manual step on the web.'}</Text>
-              </Box>
-              <Newline />
-              <Select
-                key={`gate-b-${gateActionSeq}`}
-                options={[
-                  { label: '🌐 Open App Store Connect to create the app', value: 'open' },
-                  { label: '🔁 I\'ve already created it — re-check', value: 'recheck' },
-                  ...(verifyApps.length > 0 ? [{ label: '↩  Back — pick an existing app', value: 'back' }] : []),
-                  { label: '❌ Cancel onboarding', value: 'cancel' },
-                ]}
-                onChange={(value) => {
-                  setGateActionSeq(s => s + 1)
-                  if (value === 'open')
-                    void openCreatePage()
-                  else if (value === 'recheck')
-                    void continueCreateApp()
-                  else if (value === 'back')
-                    backToPicker()
-                  else
-                    cancelGate('create-app')
-                }}
-              />
-            </Box>
-          )
-        }
-
-        // ── Picker (wrong-build-id): account has apps, none match the build
-        //    id. Let the user pick the intended app (→ Path A) or declare the
-        //    build id correct and create a new app (→ Path B). ──────────────
-        return (
-          <Box flexDirection="column" marginTop={1}>
-            <Alert variant="warning">
-              {`No App Store app matches the bundle ID your project builds (${releaseId}).`}
-            </Alert>
-            <Newline />
-            <Text dimColor>
-              {`An app_store build signs the Release PRODUCT_BUNDLE_IDENTIFIER and uploads to the App Store app with the same bundle ID. None of your apps use ${releaseId}, so the upload would be rejected. Which app are you building?`}
-            </Text>
-            <Newline />
-            <Select
-              options={[
-                ...verifyApps.map(a => ({
-                  label: `${a.name} — ${a.bundleId}`,
-                  value: a.bundleId,
-                })),
-                { label: '➕ None of these — my build ID is correct, create a new app', value: '__create_new__' },
-              ]}
-              onChange={(value) => {
-                if (value === '__create_new__') {
-                  trackVerifyEvent('iOS App Verify Picked', '👆', { matches_build_id: false, chose_create_new: true })
-                  setVerifyPath('create-app')
-                  return
-                }
-                const chosen = verifyApps.find(a => a.bundleId === value) ?? null
-                trackVerifyEvent('iOS App Verify Picked', '👆', {
-                  matches_build_id: value === releaseId,
-                  chose_create_new: false,
-                })
-                if (chosen && chosen.bundleId === releaseId) {
-                  // Already matches — pass straight through (defensive; the
-                  // exact-match case is normally handled in the effect).
-                  addLog(`✓ Building "${chosen.name}" (${releaseId}) — matches your App Store app.`)
-                  void (async () => {
-                    try {
-                      await passGate('fix-build-id', releaseId)
-                    }
-                    catch {
-                      addLog('⚠ Could not save the verified bundle ID; you may be re-prompted next run.', 'yellow')
-                    }
-                  })()
-                  return
-                }
-                setVerifyChosenApp(chosen)
-                setVerifyPath('fix-build-id')
-              }}
-            />
+            })()}
           </Box>
-        )
-          })()}
-        </Box>
-      )}
+        )}
 
-      {/* Import: distribution mode (now FIRST visible step in import flow) */}
-      {step === 'import-distribution-mode' && (
-        <ImportDistributionModeStep
-          dense={dense}
-          onChange={async (value) => {
+        {/* Import: distribution mode (now FIRST visible step in import flow) */}
+        {step === 'import-distribution-mode' && (
+          <ImportDistributionModeStep
+            dense={dense}
+            onChange={async (value) => {
+              if (value === '__cancel__') {
+                setImportMode(false)
+                // Clear the persisted import-distribution and setupMethod since
+                // the user is bailing to the create-new path.
+                const existing = await loadProgress(appId)
+                if (existing) {
+                  existing.setupMethod = 'create-new'
+                  delete existing.importDistribution
+                  await saveProgress(appId, existing)
+                }
+                setStep('api-key-instructions')
+                return
+              }
+              const mode = value as 'app_store' | 'ad_hoc'
+              setImportDistribution(mode)
+              // Persist so a CLI restart at any later step (incl. verifying-key
+              // or saving-credentials) knows we're in app_store vs ad_hoc.
+              // Codex caught a bug where without this, resumed sessions
+              // re-entered the create-new path via the stale `importMode=false`
+              // default — fixed here by hydrating both fields on mount.
+              const existing = await loadProgress(appId) || {
+                platform: 'ios' as const,
+                appId,
+                startedAt: new Date().toISOString(),
+                completedSteps: {},
+              }
+              existing.setupMethod = 'import-existing'
+              existing.importDistribution = mode
+              await saveProgress(appId, existing)
+              upsertLog('✔ Distribution · ', `✔ Distribution · ${mode}`)
+              if (mode === 'app_store') {
+              // Need .p8 for TestFlight upload AND for any profile auto-recovery.
+              // After verifying-key the import-mode branch routes back to import-pick-identity.
+              // Skip the .p8 input chain entirely if the key was already
+              // verified on a previous attempt (resume) — otherwise we
+              // re-ask "How do you want to provide the .p8 file?" even
+              // though APPLE_KEY_CONTENT is already known. Use the same
+              // routing decision as the post-scan entry point.
+                setStep(getImportEntryStep(existing))
+              }
+              else {
+              // ad_hoc skips .p8; can opt into it later from no-match recovery.
+              // Surface the support hint up-front rather than waiting until
+              // the user is mid-recovery in the portal-explanation step —
+              // they've now committed to the harder path and deserve to
+              // know help is available before they hit a wall. The helper
+              // is idempotent across the session, so re-picking Ad Hoc
+              // after a back-navigation doesn't re-emit.
+                logAdHocSupportHint()
+                setStep('import-pick-identity')
+              }
+            }}
+          />
+        )}
+
+        {/* Import: validating all certs with Apple — eager batch */}
+        {step === 'import-validating-all-certs' && (
+          <Box flexDirection="column" marginTop={1}>
+            <SpinnerLine text={`Validating ${importMatches.length} certificate${importMatches.length === 1 ? '' : 's'} with Apple...`} />
+            <Text dimColor>Splitting into Available / Unavailable so we only offer options that can succeed.</Text>
+          </Box>
+        )}
+
+        {/* Import: per-identity Apple check + auto-fetch profile */}
+        {step === 'import-checking-apple-cert' && chosenIdentity && (
+          <Box flexDirection="column" marginTop={1}>
+            <SpinnerLine text={`Checking Apple for matching profiles for "${chosenIdentity.name}"...`} />
+            <Text dimColor>Looking up the cert + listing its profiles so we either auto-import or only show recovery options that can succeed.</Text>
+          </Box>
+        )}
+
+        {/* Import: pick identity — two-table picker (Available + Unavailable)
+          when we have classification data from import-validating-all-certs;
+          falls back to main's flat list when not. */}
+        {step === 'import-pick-identity' && (() => {
+          const haveClassification = Object.keys(identityAvailability).length > 0
+          // Partition identities. When the batch validation didn't run
+          // (no API key yet) every identity lands in "available" so the
+          // user gets the unfiltered list — they can still recover from
+          // each pick via the no-match menu / per-identity check.
+          const available: IdentityProfileMatch[] = []
+          const unavailable: IdentityProfileMatch[] = []
+          for (const m of importMatches) {
+            const a = identityAvailability[m.identity.sha1]
+            if (!haveClassification || a?.available)
+              available.push(m)
+            else
+              unavailable.push(m)
+          }
+
+          const onPick = async (value: string) => {
             if (value === '__cancel__') {
               setImportMode(false)
-              // Clear the persisted import-distribution and setupMethod since
-              // the user is bailing to the create-new path.
               const existing = await loadProgress(appId)
               if (existing) {
                 existing.setupMethod = 'create-new'
@@ -3842,360 +4019,271 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               setStep('api-key-instructions')
               return
             }
-            const mode = value as 'app_store' | 'ad_hoc'
-            setImportDistribution(mode)
-            // Persist so a CLI restart at any later step (incl. verifying-key
-            // or saving-credentials) knows we're in app_store vs ad_hoc.
-            // Codex caught a bug where without this, resumed sessions
-            // re-entered the create-new path via the stale `importMode=false`
-            // default — fixed here by hydrating both fields on mount.
-            const existing = await loadProgress(appId) || {
-              platform: 'ios' as const,
-              appId,
-              startedAt: new Date().toISOString(),
-              completedSteps: {},
+            const match = importMatches.find(m => m.identity.sha1 === value)
+            if (!match)
+              return
+            setChosenIdentity(match.identity)
+            // Clear stale per-identity cert id from a previous pick so the
+            // per-identity check doesn't trust an old result.
+            setAppleCertIdForChosen(undefined)
+            addLog(`✔ Identity · ${match.identity.name}`)
+            // Three-way routing:
+            //   - Local profile already matches → straight to picker
+            //   - No local match but ASC key available + cert is verified
+            //     by the batch validation → per-identity check (auto-fetch
+            //     from Apple before showing recovery menu)
+            //   - Otherwise → straight to recovery menu
+            const usable = filterProfilesForApp(match.profiles, iosBundleId, importDistribution)
+            if (usable.length > 0) {
+              setStep('import-pick-profile')
+              return
             }
-            existing.setupMethod = 'import-existing'
-            existing.importDistribution = mode
-            await saveProgress(appId, existing)
-            upsertLog('✔ Distribution · ', `✔ Distribution · ${mode}`)
-            if (mode === 'app_store') {
-              // Need .p8 for TestFlight upload AND for any profile auto-recovery.
-              // After verifying-key the import-mode branch routes back to import-pick-identity.
-              // Skip the .p8 input chain entirely if the key was already
-              // verified on a previous attempt (resume) — otherwise we
-              // re-ask "How do you want to provide the .p8 file?" even
-              // though APPLE_KEY_CONTENT is already known. Use the same
-              // routing decision as the post-scan entry point.
-              setStep(getImportEntryStep(existing))
-            }
-            else {
-              // ad_hoc skips .p8; can opt into it later from no-match recovery.
-              // Surface the support hint up-front rather than waiting until
-              // the user is mid-recovery in the portal-explanation step —
-              // they've now committed to the harder path and deserve to
-              // know help is available before they hit a wall. The helper
-              // is idempotent across the session, so re-picking Ad Hoc
-              // after a back-navigation doesn't re-emit.
-              logAdHocSupportHint()
-              setStep('import-pick-identity')
-            }
-          }}
-        />
-      )}
-
-      {/* Import: validating all certs with Apple — eager batch */}
-      {step === 'import-validating-all-certs' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text={`Validating ${importMatches.length} certificate${importMatches.length === 1 ? '' : 's'} with Apple...`} />
-          <Text dimColor>Splitting into Available / Unavailable so we only offer options that can succeed.</Text>
-        </Box>
-      )}
-
-      {/* Import: per-identity Apple check + auto-fetch profile */}
-      {step === 'import-checking-apple-cert' && chosenIdentity && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text={`Checking Apple for matching profiles for "${chosenIdentity.name}"...`} />
-          <Text dimColor>Looking up the cert + listing its profiles so we either auto-import or only show recovery options that can succeed.</Text>
-        </Box>
-      )}
-
-      {/* Import: pick identity — two-table picker (Available + Unavailable)
-          when we have classification data from import-validating-all-certs;
-          falls back to main's flat list when not. */}
-      {step === 'import-pick-identity' && (() => {
-        const haveClassification = Object.keys(identityAvailability).length > 0
-        // Partition identities. When the batch validation didn't run
-        // (no API key yet) every identity lands in "available" so the
-        // user gets the unfiltered list — they can still recover from
-        // each pick via the no-match menu / per-identity check.
-        const available: IdentityProfileMatch[] = []
-        const unavailable: IdentityProfileMatch[] = []
-        for (const m of importMatches) {
-          const a = identityAvailability[m.identity.sha1]
-          if (!haveClassification || a?.available)
-            available.push(m)
-          else
-            unavailable.push(m)
-        }
-
-        const onPick = async (value: string) => {
-          if (value === '__cancel__') {
-            setImportMode(false)
-            const existing = await loadProgress(appId)
-            if (existing) {
-              existing.setupMethod = 'create-new'
-              delete existing.importDistribution
-              await saveProgress(appId, existing)
-            }
-            setStep('api-key-instructions')
-            return
+            const apiKeyAvailable = !!(p8ContentRef.current || (await loadProgress(appId))?.completedSteps?.apiKeyVerified)
+            if (!apiKeyAvailable)
+              setNoMatchReason('no-profile-on-disk')
+            setStep(apiKeyAvailable ? 'import-checking-apple-cert' : 'import-no-match-recovery')
           }
-          const match = importMatches.find(m => m.identity.sha1 === value)
-          if (!match)
-            return
-          setChosenIdentity(match.identity)
-          // Clear stale per-identity cert id from a previous pick so the
-          // per-identity check doesn't trust an old result.
-          setAppleCertIdForChosen(undefined)
-          addLog(`✔ Identity · ${match.identity.name}`)
-          // Three-way routing:
-          //   - Local profile already matches → straight to picker
-          //   - No local match but ASC key available + cert is verified
-          //     by the batch validation → per-identity check (auto-fetch
-          //     from Apple before showing recovery menu)
-          //   - Otherwise → straight to recovery menu
-          const usable = filterProfilesForApp(match.profiles, iosBundleId, importDistribution)
-          if (usable.length > 0) {
-            setStep('import-pick-profile')
-            return
-          }
-          const apiKeyAvailable = !!(p8ContentRef.current || (await loadProgress(appId))?.completedSteps?.apiKeyVerified)
-          if (!apiKeyAvailable)
-            setNoMatchReason('no-profile-on-disk')
-          setStep(apiKeyAvailable ? 'import-checking-apple-cert' : 'import-no-match-recovery')
-        }
 
-        // When classification ran we render two tables + a Select with
-        // available rows only (unavailable certs can't be picked). Without
-        // classification we fall back to main's flat-list ImportPickIdentityStep
-        // so nothing regresses for the ad_hoc-without-.p8 entry path.
-        if (!haveClassification) {
+          // When classification ran we render two tables + a Select with
+          // available rows only (unavailable certs can't be picked). Without
+          // classification we fall back to main's flat-list ImportPickIdentityStep
+          // so nothing regresses for the ad_hoc-without-.p8 entry path.
+          if (!haveClassification) {
+            return (
+              <ImportPickIdentityStep
+                identityCount={importMatches.length}
+                dense={dense}
+                options={[
+                  ...importMatches.map((m) => {
+                    const matchCount = filterProfilesForApp(m.profiles, iosBundleId, importDistribution).length
+                    const label = matchCount > 0
+                      ? `🔑  ${m.identity.name} · ${matchCount} matching profile${matchCount === 1 ? '' : 's'}`
+                      : `🔑  ${m.identity.name} · ⚠ no matching profiles on this Mac (recovery available)`
+                    return { label, value: m.identity.sha1 }
+                  }),
+                  { label: '↩️   Cancel and use Create new instead', value: '__cancel__' },
+                ]}
+                onChange={onPick}
+              />
+            )
+          }
+
+          const availableRows = available.map((m, i) => {
+            const matchCount = filterProfilesForApp(m.profiles, iosBundleId, importDistribution).length
+            // Cell value is a three-way state:
+            //   1. matchCount > 0 → 'AVAILABLE' (green). Catches BOTH the
+            //      on-disk-match case AND the prefetch-injected case (the
+            //      prefetch synthesises profiles into m.profiles, so this
+            //      branch lights up automatically — no separate prefetch
+            //      branch needed for the success path).
+            //   2. matchCount === 0 + prefetch pending → animated spinner.
+            //      Yellow cellColor (see Table below) signals "in flight,
+            //      click is still allowed" — the onPick handler routes
+            //      pending clicks the same way unavailable clicks go,
+            //      through import-checking-apple-cert.
+            //   3. matchCount === 0 + timeout/error/unavailable/no entry →
+            //      'UNAVAILABLE' (red). Click re-routes through
+            //      import-checking-apple-cert so the user gets a fresh fetch.
+            const prefetchState = profilePrefetch[m.identity.sha1]
+            let profileCell: string
+            if (matchCount > 0)
+              profileCell = 'AVAILABLE'
+            else if (prefetchState?.kind === 'pending')
+              profileCell = `${SPINNER_FRAMES[spinnerFrame % SPINNER_FRAMES.length]} checking…`
+            else
+              profileCell = 'UNAVAILABLE'
+            return {
+              '#': `${i + 1}`,
+              'Name': `🔑 ${m.identity.name}`,
+              'Team': m.identity.teamId,
+              'Profile': profileCell,
+            }
+          })
+          const unavailableRows = unavailable.map(m => ({
+            Name: `🔒 ${m.identity.name}`,
+            Team: m.identity.teamId,
+            Reason: identityAvailability[m.identity.sha1]?.reasonText || 'Not classified',
+          }))
+
           return (
-            <ImportPickIdentityStep
-              identityCount={importMatches.length}
+            <Box flexDirection="column" marginTop={1}>
+              {available.length > 0 && (
+                <>
+                  <Text bold color="green">{`✅  CERTIFICATE${available.length === 1 ? '' : 'S'} AVAILABLE (${available.length})`}</Text>
+                  <Newline />
+                  <Table
+                    data={availableRows}
+                    cellColor={(col, val) => {
+                      if (col !== 'Profile')
+                        return undefined
+                      if (val === 'AVAILABLE')
+                        return 'green'
+                      if (val === 'UNAVAILABLE')
+                        return 'red'
+                      // Spinner cell — every pending render is one of
+                      // SPINNER_FRAMES followed by ` checking…`. Endswith is
+                      // cheaper than scanning frame chars and tolerates the
+                      // frame index rolling over between renders.
+                      if (typeof val === 'string' && val.endsWith(' checking…'))
+                        return 'yellow'
+                      return undefined
+                    }}
+                  />
+                  <Newline />
+                </>
+              )}
+              {available.length === 0 && (
+                <Box flexDirection="column">
+                  <Text bold color="red">✖  NO CERTIFICATES AVAILABLE</Text>
+                  <Text dimColor>
+                    All
+                    {' '}
+                    {unavailable.length}
+                    {' '}
+                    identit
+                    {unavailable.length === 1 ? 'y is' : 'ies are'}
+                    {' '}
+                    unavailable on Apple's side. See the table below for the reason, or use "Create new" to generate a fresh cert + profile.
+                  </Text>
+                  <Newline />
+                </Box>
+              )}
+              {unavailable.length > 0 && (
+                <>
+                  <Text bold color="red">{`✖  CERTIFICATE${unavailable.length === 1 ? '' : 'S'} UNAVAILABLE (${unavailable.length})`}</Text>
+                  <Newline />
+                  <Table
+                    data={unavailableRows}
+                    cellColor={col => (col === 'Reason' ? 'yellow' : undefined)}
+                    cellDim={col => col !== 'Reason'}
+                  />
+                  <Newline />
+                </>
+              )}
+              <Text bold>Pick an option:</Text>
+              <Select
+                options={[
+                  ...available.map((m, i) => ({
+                    label: `[${i + 1}] ${m.identity.name}`,
+                    value: m.identity.sha1,
+                  })),
+                  { label: '↩️   Cancel and use Create new instead', value: '__cancel__' },
+                ]}
+                onChange={onPick}
+              />
+            </Box>
+          )
+        })()}
+
+        {/* Import: pick profile */}
+        {step === 'import-pick-profile' && chosenIdentity && (() => {
+          const allMatchedProfiles = importMatches.find(m => m.identity.sha1 === chosenIdentity.sha1)?.profiles || []
+          // Filter to profiles that are actually usable for THIS app + THIS
+          // distribution mode. Without this filter, a user with a cert reused
+          // across multiple apps (or with both app_store and ad_hoc profiles
+          // linked to one cert) could pick a profile whose bundleId !== iosBundleId
+          // or whose profileType !== importDistribution. `doSaveCredentials`
+          // would then persist a mismatched provisioning_map / distribution
+          // pair, producing unusable signing credentials.
+          const matchedProfiles = filterProfilesForApp(allMatchedProfiles, iosBundleId, importDistribution)
+          const droppedCount = allMatchedProfiles.length - matchedProfiles.length
+          return (
+            <ImportPickProfileStep
+              matchedCount={matchedProfiles.length}
+              droppedCount={droppedCount}
+              distribution={importDistribution}
               dense={dense}
               options={[
-                ...importMatches.map((m) => {
-                  const matchCount = filterProfilesForApp(m.profiles, iosBundleId, importDistribution).length
-                  const label = matchCount > 0
-                    ? `🔑  ${m.identity.name} · ${matchCount} matching profile${matchCount === 1 ? '' : 's'}`
-                    : `🔑  ${m.identity.name} · ⚠ no matching profiles on this Mac (recovery available)`
-                  return { label, value: m.identity.sha1 }
-                }),
-                { label: '↩️   Cancel and use Create new instead', value: '__cancel__' },
+                ...matchedProfiles.map(p => ({
+                  label: `📜  ${p.name} · bundle ${p.bundleId} · ${p.profileType} · expires ${p.expirationDate.split('T')[0]}`,
+                  // Key by UUID, NOT path. Disk-discovered profiles have a
+                  // unique path, but Apple-fetched profiles (from the D
+                  // no-match-recovery path) are synthesized with path=''.
+                  // UUID is unique for both kinds: disk profiles use the
+                  // mobileprovision UUID, synthesized ones use Apple's
+                  // profile resource ID.
+                  value: p.uuid,
+                })),
+                { label: '↩️   Back to identity selection', value: '__back__' },
               ]}
-              onChange={onPick}
+              onChange={(value) => {
+                if (value === '__back__') {
+                  setStep('import-pick-identity')
+                  return
+                }
+                const profile = matchedProfiles.find(p => p.uuid === value)
+                if (!profile)
+                  return
+                // Defense in depth: verify bundleId + profileType match before
+                // committing. The filter above should make this unreachable,
+                // but if the filter regresses, we'd rather hard-fail than
+                // silently save bad creds. Wildcard bundle ids
+                // (`com.example.*`, bare `*`) are accepted via bundleIdMatches
+                // so this guard stays in sync with the picker's filter — a
+                // strict equality here would over-reject wildcards the filter
+                // intentionally accepted upstream.
+                if (!bundleIdMatches(profile.bundleId, iosBundleId)
+                  || (importDistribution && profile.profileType !== importDistribution)) {
+                  handleError(
+                    new Error(
+                      `Profile "${profile.name}" doesn't match this app: `
+                      + `bundle ${profile.bundleId} (expected ${iosBundleId}), `
+                      + `type ${profile.profileType} (expected ${importDistribution ?? 'any'}).`,
+                    ),
+                    'import-pick-profile',
+                  )
+                  return
+                }
+                // Belt-and-suspenders: the upstream matchIdentitiesToProfiles
+                // filter and Apple-fetched profile synthesizing should both
+                // guarantee `profile.certificateSha1s` contains
+                // `chosenIdentity.sha1`. But the file-picker recovery path
+                // imports a .mobileprovision the user might have hand-created
+                // in the portal — if they ticked the wrong cert in the cert
+                // list there, we'd otherwise save credentials that the build
+                // server can't actually sign with (private key from
+                // chosenIdentity but profile only trusts a different cert).
+                // Catch that here with a clear error rather than discovering
+                // it during a build hours later.
+                if (chosenIdentity && !profile.certificateSha1s.includes(chosenIdentity.sha1)) {
+                  const shownSha1s = profile.certificateSha1s.map(s => `${s.slice(0, 8)}…`).join(', ') || '(none listed)'
+                  handleError(
+                    new Error(
+                      `Profile "${profile.name}" doesn't trust your chosen certificate "${chosenIdentity.name}". `
+                      + `The profile's allowed-certs list contains ${profile.certificateSha1s.length} entr${profile.certificateSha1s.length === 1 ? 'y' : 'ies'} (SHA1: ${shownSha1s}); your cert's SHA1 starts with ${chosenIdentity.sha1.slice(0, 8)}…. `
+                      + `Either pick a different profile, or re-create this profile in the Apple Developer Portal and tick the right cert.`,
+                    ),
+                    'import-pick-profile',
+                  )
+                  return
+                }
+                setChosenProfile(profile)
+                addLog(`✔ Profile · ${profile.name}`)
+                setStep('import-export-warning')
+              }}
             />
           )
-        }
+        })()}
 
-        const availableRows = available.map((m, i) => {
-          const matchCount = filterProfilesForApp(m.profiles, iosBundleId, importDistribution).length
-          // Cell value is a three-way state:
-          //   1. matchCount > 0 → 'AVAILABLE' (green). Catches BOTH the
-          //      on-disk-match case AND the prefetch-injected case (the
-          //      prefetch synthesises profiles into m.profiles, so this
-          //      branch lights up automatically — no separate prefetch
-          //      branch needed for the success path).
-          //   2. matchCount === 0 + prefetch pending → animated spinner.
-          //      Yellow cellColor (see Table below) signals "in flight,
-          //      click is still allowed" — the onPick handler routes
-          //      pending clicks the same way unavailable clicks go,
-          //      through import-checking-apple-cert.
-          //   3. matchCount === 0 + timeout/error/unavailable/no entry →
-          //      'UNAVAILABLE' (red). Click re-routes through
-          //      import-checking-apple-cert so the user gets a fresh fetch.
-          const prefetchState = profilePrefetch[m.identity.sha1]
-          let profileCell: string
-          if (matchCount > 0)
-            profileCell = 'AVAILABLE'
-          else if (prefetchState?.kind === 'pending')
-            profileCell = `${SPINNER_FRAMES[spinnerFrame % SPINNER_FRAMES.length]} checking…`
-          else
-            profileCell = 'UNAVAILABLE'
-          return {
-            '#': `${i + 1}`,
-            'Name': `🔑 ${m.identity.name}`,
-            'Team': m.identity.teamId,
-            'Profile': profileCell,
-          }
-        })
-        const unavailableRows = unavailable.map(m => ({
-          'Name': `🔒 ${m.identity.name}`,
-          'Team': m.identity.teamId,
-          'Reason': identityAvailability[m.identity.sha1]?.reasonText || 'Not classified',
-        }))
-
-        return (
-          <Box flexDirection="column" marginTop={1}>
-            {available.length > 0 && (
-              <>
-                <Text bold color="green">{`✅  CERTIFICATE${available.length === 1 ? '' : 'S'} AVAILABLE (${available.length})`}</Text>
-                <Newline />
-                <Table
-                  data={availableRows}
-                  cellColor={(col, val) => {
-                    if (col !== 'Profile')
-                      return undefined
-                    if (val === 'AVAILABLE')
-                      return 'green'
-                    if (val === 'UNAVAILABLE')
-                      return 'red'
-                    // Spinner cell — every pending render is one of
-                    // SPINNER_FRAMES followed by ` checking…`. Endswith is
-                    // cheaper than scanning frame chars and tolerates the
-                    // frame index rolling over between renders.
-                    if (typeof val === 'string' && val.endsWith(' checking…'))
-                      return 'yellow'
-                    return undefined
-                  }}
-                />
-                <Newline />
-              </>
-            )}
-            {available.length === 0 && (
-              <Box flexDirection="column">
-                <Text bold color="red">{`✖  NO CERTIFICATES AVAILABLE`}</Text>
-                <Text dimColor>
-                  All
-                  {' '}
-                  {unavailable.length}
-                  {' '}
-                  identit
-                  {unavailable.length === 1 ? 'y is' : 'ies are'}
-                  {' '}
-                  unavailable on Apple's side. See the table below for the reason, or use "Create new" to generate a fresh cert + profile.
-                </Text>
-                <Newline />
-              </Box>
-            )}
-            {unavailable.length > 0 && (
-              <>
-                <Text bold color="red">{`✖  CERTIFICATE${unavailable.length === 1 ? '' : 'S'} UNAVAILABLE (${unavailable.length})`}</Text>
-                <Newline />
-                <Table
-                  data={unavailableRows}
-                  cellColor={col => (col === 'Reason' ? 'yellow' : undefined)}
-                  cellDim={col => col !== 'Reason'}
-                />
-                <Newline />
-              </>
-            )}
-            <Text bold>Pick an option:</Text>
-            <Select
+        {/* Import: no-match recovery menu */}
+        {step === 'import-no-match-recovery' && chosenIdentity && (() => {
+          const hasAscKey = !!(p8ContentRef.current || p8PathRef.current)
+          // D2 (create-profile-only) currently only knows how to create
+          // IOS_APP_STORE profiles via apple-api.ts createProfile, which
+          // hardcodes that profileType. For ad_hoc we'd need a separate
+          // create path that calls Apple with IOS_APP_ADHOC. Until that
+          // exists, hide the "Create" option for ad_hoc users so they
+          // can't end up with an app_store profile saved under
+          // CAPGO_IOS_DISTRIBUTION='ad_hoc'. Browser + Fetch still work.
+          const canCreateProfile = importDistribution !== 'ad_hoc'
+          return (
+            <ImportNoMatchRecoveryStep
+              reason={noMatchReason ?? undefined}
+              appId={iosBundleId}
+              importDistribution={importDistribution}
+              identityName={chosenIdentity.name}
+              dense={dense}
               options={[
-                ...available.map((m, i) => ({
-                  label: `[${i + 1}] ${m.identity.name}`,
-                  value: m.identity.sha1,
-                })),
-                { label: '↩️   Cancel and use Create new instead', value: '__cancel__' },
-              ]}
-              onChange={onPick}
-            />
-          </Box>
-        )
-      })()}
-
-      {/* Import: pick profile */}
-      {step === 'import-pick-profile' && chosenIdentity && (() => {
-        const allMatchedProfiles = importMatches.find(m => m.identity.sha1 === chosenIdentity.sha1)?.profiles || []
-        // Filter to profiles that are actually usable for THIS app + THIS
-        // distribution mode. Without this filter, a user with a cert reused
-        // across multiple apps (or with both app_store and ad_hoc profiles
-        // linked to one cert) could pick a profile whose bundleId !== iosBundleId
-        // or whose profileType !== importDistribution. `doSaveCredentials`
-        // would then persist a mismatched provisioning_map / distribution
-        // pair, producing unusable signing credentials.
-        const matchedProfiles = filterProfilesForApp(allMatchedProfiles, iosBundleId, importDistribution)
-        const droppedCount = allMatchedProfiles.length - matchedProfiles.length
-        return (
-          <ImportPickProfileStep
-            matchedCount={matchedProfiles.length}
-            droppedCount={droppedCount}
-            distribution={importDistribution}
-            dense={dense}
-            options={[
-              ...matchedProfiles.map(p => ({
-                label: `📜  ${p.name} · bundle ${p.bundleId} · ${p.profileType} · expires ${p.expirationDate.split('T')[0]}`,
-                // Key by UUID, NOT path. Disk-discovered profiles have a
-                // unique path, but Apple-fetched profiles (from the D
-                // no-match-recovery path) are synthesized with path=''.
-                // UUID is unique for both kinds: disk profiles use the
-                // mobileprovision UUID, synthesized ones use Apple's
-                // profile resource ID.
-                value: p.uuid,
-              })),
-              { label: '↩️   Back to identity selection', value: '__back__' },
-            ]}
-            onChange={(value) => {
-              if (value === '__back__') {
-                setStep('import-pick-identity')
-                return
-              }
-              const profile = matchedProfiles.find(p => p.uuid === value)
-              if (!profile)
-                return
-              // Defense in depth: verify bundleId + profileType match before
-              // committing. The filter above should make this unreachable,
-              // but if the filter regresses, we'd rather hard-fail than
-              // silently save bad creds. Wildcard bundle ids
-              // (`com.example.*`, bare `*`) are accepted via bundleIdMatches
-              // so this guard stays in sync with the picker's filter — a
-              // strict equality here would over-reject wildcards the filter
-              // intentionally accepted upstream.
-              if (!bundleIdMatches(profile.bundleId, iosBundleId)
-                || (importDistribution && profile.profileType !== importDistribution)) {
-                handleError(
-                  new Error(
-                    `Profile "${profile.name}" doesn't match this app: `
-                    + `bundle ${profile.bundleId} (expected ${iosBundleId}), `
-                    + `type ${profile.profileType} (expected ${importDistribution ?? 'any'}).`,
-                  ),
-                  'import-pick-profile',
-                )
-                return
-              }
-              // Belt-and-suspenders: the upstream matchIdentitiesToProfiles
-              // filter and Apple-fetched profile synthesizing should both
-              // guarantee `profile.certificateSha1s` contains
-              // `chosenIdentity.sha1`. But the file-picker recovery path
-              // imports a .mobileprovision the user might have hand-created
-              // in the portal — if they ticked the wrong cert in the cert
-              // list there, we'd otherwise save credentials that the build
-              // server can't actually sign with (private key from
-              // chosenIdentity but profile only trusts a different cert).
-              // Catch that here with a clear error rather than discovering
-              // it during a build hours later.
-              if (chosenIdentity && !profile.certificateSha1s.includes(chosenIdentity.sha1)) {
-                const shownSha1s = profile.certificateSha1s.map(s => `${s.slice(0, 8)}…`).join(', ') || '(none listed)'
-                handleError(
-                  new Error(
-                    `Profile "${profile.name}" doesn't trust your chosen certificate "${chosenIdentity.name}". `
-                    + `The profile's allowed-certs list contains ${profile.certificateSha1s.length} entr${profile.certificateSha1s.length === 1 ? 'y' : 'ies'} (SHA1: ${shownSha1s}); your cert's SHA1 starts with ${chosenIdentity.sha1.slice(0, 8)}…. `
-                    + `Either pick a different profile, or re-create this profile in the Apple Developer Portal and tick the right cert.`,
-                  ),
-                  'import-pick-profile',
-                )
-                return
-              }
-              setChosenProfile(profile)
-              addLog(`✔ Profile · ${profile.name}`)
-              setStep('import-export-warning')
-            }}
-          />
-        )
-      })()}
-
-      {/* Import: no-match recovery menu */}
-      {step === 'import-no-match-recovery' && chosenIdentity && (() => {
-        const hasAscKey = !!(p8ContentRef.current || p8PathRef.current)
-        // D2 (create-profile-only) currently only knows how to create
-        // IOS_APP_STORE profiles via apple-api.ts createProfile, which
-        // hardcodes that profileType. For ad_hoc we'd need a separate
-        // create path that calls Apple with IOS_APP_ADHOC. Until that
-        // exists, hide the "Create" option for ad_hoc users so they
-        // can't end up with an app_store profile saved under
-        // CAPGO_IOS_DISTRIBUTION='ad_hoc'. Browser + Fetch still work.
-        const canCreateProfile = importDistribution !== 'ad_hoc'
-        return (
-          <ImportNoMatchRecoveryStep
-            reason={noMatchReason ?? undefined}
-            appId={iosBundleId}
-            importDistribution={importDistribution}
-            identityName={chosenIdentity.name}
-            dense={dense}
-            options={[
               // Order optimized for most-likely-to-succeed first:
               //   1. Create a fresh profile via Apple API — automatic
               //   2. Use a local .mobileprovision file — fastest when you
@@ -4211,25 +4299,25 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               // routes the manual case through the file picker. Two
               // parallel rescan paths made the UX inconsistent with the
               // instructions we render in the walkthrough.
-              ...(canCreateProfile
-                ? [{
-                    label: hasAscKey
-                      ? `✨  Create a new App Store profile for this cert via Apple`
-                      : `✨  Provide ASC API key, then create a new App Store profile for this cert`,
-                    value: 'create',
-                  }]
-                : []),
-              ...(canUseFilePicker()
-                ? [{ label: `📁  Use a .mobileprovision file from disk`, value: 'provide-profile-path' }]
-                : []),
-              {
-                label: `🌐  Open Apple Developer Portal (browse / create profiles manually)`,
-                value: 'browser',
-              },
-              { label: '↩️   Back to identity selection', value: 'back' },
-            ]}
-            onChange={(value) => {
-              if (value === 'browser') {
+                ...(canCreateProfile
+                  ? [{
+                      label: hasAscKey
+                        ? `✨  Create a new App Store profile for this cert via Apple`
+                        : `✨  Provide ASC API key, then create a new App Store profile for this cert`,
+                      value: 'create',
+                    }]
+                  : []),
+                ...(canUseFilePicker()
+                  ? [{ label: `📁  Use a .mobileprovision file from disk`, value: 'provide-profile-path' }]
+                  : []),
+                {
+                  label: `🌐  Open Apple Developer Portal (browse / create profiles manually)`,
+                  value: 'browser',
+                },
+                { label: '↩️   Back to identity selection', value: 'back' },
+              ]}
+              onChange={(value) => {
+                if (value === 'browser') {
                 // Don't immediately open the portal — manual cert/profile
                 // creation on developer.apple.com is genuinely tricky
                 // (right cert type, allowed-certs list on the profile,
@@ -4238,964 +4326,969 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                 // manual steps + steers the user toward the automatic
                 // "Create a new App Store profile via Apple" option
                 // when it's available (almost always the better pick).
-                setStep('import-portal-explanation')
-                return
-              }
-              if (value === 'provide-profile-path') {
-                mobileprovisionPickerOpenedRef.current = false
-                setStep('import-provide-profile-path')
-                return
-              }
-              if (value === 'back') {
-                setStep('import-pick-identity')
-                return
-              }
-              if (value === 'create') {
-                if (hasAscKey)
-                  setStep('import-create-profile-only')
-                else {
-                  setPendingRecoveryAction('create-profile-only')
-                  setStep('api-key-instructions')
+                  setStep('import-portal-explanation')
+                  return
                 }
-              }
-            }}
-          />
-        )
-      })()}
+                if (value === 'provide-profile-path') {
+                  mobileprovisionPickerOpenedRef.current = false
+                  setStep('import-provide-profile-path')
+                  return
+                }
+                if (value === 'back') {
+                  setStep('import-pick-identity')
+                  return
+                }
+                if (value === 'create') {
+                  if (hasAscKey) {
+                    setStep('import-create-profile-only')
+                  }
+                  else {
+                    setPendingRecoveryAction('create-profile-only')
+                    setStep('api-key-instructions')
+                  }
+                }
+              }}
+            />
+          )
+        })()}
 
-      {/* Import: native picker for a .mobileprovision file on disk */}
-      {step === 'import-provide-profile-path' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Opening file picker for your .mobileprovision file..." />
-          <Text dimColor>{`If the dialog doesn't appear, check behind other windows or in the menu bar.`}</Text>
-        </Box>
-      )}
+        {/* Import: native picker for a .mobileprovision file on disk */}
+        {step === 'import-provide-profile-path' && (
+          <Box flexDirection="column" marginTop={1}>
+            <SpinnerLine text="Opening file picker for your .mobileprovision file..." />
+            <Text dimColor>{`If the dialog doesn't appear, check behind other windows or in the menu bar.`}</Text>
+          </Box>
+        )}
 
-      {/* Import: manual portal walkthrough — explains what to do on
+        {/* Import: manual portal walkthrough — explains what to do on
           developer.apple.com and steers toward the automatic "Create new"
           path or the file-picker path. Routed to from the recovery menu's
           "🌐 Open Apple Developer Portal" option. */}
-      {step === 'import-portal-explanation' && chosenIdentity && (() => {
-        const canAutoCreate = importDistribution !== 'ad_hoc'
-        // The walkthrough renders one of two flavours:
-        //  - app_store: the original "you CAN do this manually, but
-        //    here's an easier automatic option" framing, ending with a
-        //    Select that nudges toward the auto path.
-        //  - ad_hoc: an honest "this is complex, here's what's involved,
-        //    and you can email support if you want help" framing, with a
-        //    plain Open Portal option (no "anyway" — there's no
-        //    automatic alternative to contrast with), the file-picker
-        //    return path, and a Capgo-support breadcrumb. The manual
-        //    walkthrough below stops at step 7 (download + come back),
-        //    intentionally skipping the device-registration step that
-        //    ad_hoc profiles require — that step varies wildly by team
-        //    and is exactly the kind of thing support can help with.
-        return (
-          <Box flexDirection="column" marginTop={1}>
-            <Alert variant="info">
-              {canAutoCreate
-                ? 'You can do this manually in the Apple Developer Portal — but the automatic path is much easier.'
-                : `Ad-hoc distribution is genuinely fiddly (you also need to register every target device on Apple's side). Here's what's involved — and how to get help if you're stuck.`}
-            </Alert>
-            <Newline />
-            {/* The ad_hoc "want help?" breadcrumb fires at the moment the
+        {step === 'import-portal-explanation' && chosenIdentity && (() => {
+          const canAutoCreate = importDistribution !== 'ad_hoc'
+          // The walkthrough renders one of two flavours:
+          //  - app_store: the original "you CAN do this manually, but
+          //    here's an easier automatic option" framing, ending with a
+          //    Select that nudges toward the auto path.
+          //  - ad_hoc: an honest "this is complex, here's what's involved,
+          //    and you can email support if you want help" framing, with a
+          //    plain Open Portal option (no "anyway" — there's no
+          //    automatic alternative to contrast with), the file-picker
+          //    return path, and a Capgo-support breadcrumb. The manual
+          //    walkthrough below stops at step 7 (download + come back),
+          //    intentionally skipping the device-registration step that
+          //    ad_hoc profiles require — that step varies wildly by team
+          //    and is exactly the kind of thing support can help with.
+          return (
+            <Box flexDirection="column" marginTop={1}>
+              <Alert variant="info">
+                {canAutoCreate
+                  ? 'You can do this manually in the Apple Developer Portal — but the automatic path is much easier.'
+                  : `Ad-hoc distribution is genuinely fiddly (you also need to register every target device on Apple's side). Here's what's involved — and how to get help if you're stuck.`}
+              </Alert>
+              <Newline />
+              {/* The ad_hoc "want help?" breadcrumb fires at the moment the
                 user picks Ad Hoc on the distribution-mode step (yellow log
                 entries), not here. Surfacing it on the recovery walkthrough
                 meant the user only saw the offer AFTER they'd already
                 started fumbling — too late. The log lines stay visible in
                 the side log throughout the rest of the wizard. */}
-            <Text bold>{`What you'd need to do manually:`}</Text>
-            <Box flexDirection="column" marginLeft={2} marginTop={1}>
-              <Text>1. Sign in at developer.apple.com/account/resources/profiles/list.</Text>
-              <Text>
-                2. Select the correct team (top right) —
-                {' '}
-                <Text bold>{chosenIdentity.teamId}</Text>
-                {chosenIdentity.teamName ? ` (${chosenIdentity.teamName})` : ''}
-                .
-              </Text>
-              <Text>
-                3. Click
-                {' '}
-                <Text bold>+</Text>
-                {' '}
-                to create a new profile. Pick
-                {' '}
-                <Text bold>{importDistribution === 'ad_hoc' ? 'Ad Hoc' : 'App Store'}</Text>
-                {' '}
-                under
-                {' '}
-                <Text bold>Distribution</Text>
-                .
-              </Text>
-              <Text>
-                4. Pick the App ID matching
-                {' '}
-                <Text bold>{iosBundleId}</Text>
-                {`. Create it first if it doesn't exist.`}
-              </Text>
-              <Text>
-                5. In the "Certificates" step, tick the cert matching
-                {' '}
-                <Text bold>{chosenIdentity.name}</Text>
-                . If multiple are listed, pick carefully — we re-verify the cert SHA1 in the next step.
-              </Text>
-              {!canAutoCreate && (
+              <Text bold>{`What you'd need to do manually:`}</Text>
+              <Box flexDirection="column" marginLeft={2} marginTop={1}>
+                <Text>1. Sign in at developer.apple.com/account/resources/profiles/list.</Text>
                 <Text>
-                  6. In the "Devices" step, tick every device UDID that should be able to run this build. (This is the ad-hoc-specific step. Devices have to be registered under
+                  2. Select the correct team (top right) —
                   {' '}
-                  <Text color="cyan" underline>developer.apple.com/account/resources/devices/list</Text>
+                  <Text bold>{chosenIdentity.teamId}</Text>
+                  {chosenIdentity.teamName ? ` (${chosenIdentity.teamName})` : ''}
+                  .
+                </Text>
+                <Text>
+                  3. Click
                   {' '}
-                  first.)
+                  <Text bold>+</Text>
+                  {' '}
+                  to create a new profile. Pick
+                  {' '}
+                  <Text bold>{importDistribution === 'ad_hoc' ? 'Ad Hoc' : 'App Store'}</Text>
+                  {' '}
+                  under
+                  {' '}
+                  <Text bold>Distribution</Text>
+                  .
                 </Text>
-              )}
-              <Text>
-                {canAutoCreate ? '6. ' : '7. '}
-                Name + Generate + Download. The .mobileprovision file lands in your Downloads folder.
-              </Text>
-              <Text>
-                {canAutoCreate ? '7. ' : '8. '}
-                Come back here and pick
-                {' '}
-                <Text bold>📁  Use a .mobileprovision file from disk</Text>
-                .
-              </Text>
-            </Box>
-            <Newline />
-            {canAutoCreate && (
-              <Box flexDirection="column">
-                <Text bold color="green">💡 Recommended: let Capgo do this automatically.</Text>
-                <Text dimColor>
-                  "✨ Create a new App Store profile for this cert via Apple" runs the same steps via the Apple API — same cert, same bundle ID, no portal navigation, no manual download.
+                <Text>
+                  4. Pick the App ID matching
+                  {' '}
+                  <Text bold>{iosBundleId}</Text>
+                  {`. Create it first if it doesn't exist.`}
                 </Text>
-                <Newline />
+                <Text>
+                  5. In the "Certificates" step, tick the cert matching
+                  {' '}
+                  <Text bold>{chosenIdentity.name}</Text>
+                  . If multiple are listed, pick carefully — we re-verify the cert SHA1 in the next step.
+                </Text>
+                {!canAutoCreate && (
+                  <Text>
+                    6. In the "Devices" step, tick every device UDID that should be able to run this build. (This is the ad-hoc-specific step. Devices have to be registered under
+                    {' '}
+                    <Text color="cyan" underline>developer.apple.com/account/resources/devices/list</Text>
+                    {' '}
+                    first.)
+                  </Text>
+                )}
+                <Text>
+                  {canAutoCreate ? '6. ' : '7. '}
+                  Name + Generate + Download. The .mobileprovision file lands in your Downloads folder.
+                </Text>
+                <Text>
+                  {canAutoCreate ? '7. ' : '8. '}
+                  Come back here and pick
+                  {' '}
+                  <Text bold>📁  Use a .mobileprovision file from disk</Text>
+                  .
+                </Text>
               </Box>
-            )}
-            <Select
-              options={[
-                ...(canAutoCreate
-                  ? [{ label: '✨  Use "Create a new App Store profile" instead (recommended)', value: 'use-create' }]
-                  : []),
-                {
-                  label: canAutoCreate
-                    ? '🌐  Open the portal anyway (advanced)'
-                    : '🌐  Open Apple Developer Portal',
-                  value: 'open-anyway',
-                },
-                ...(canUseFilePicker()
-                  ? [{ label: '📁  I already have a .mobileprovision on disk — let me pick it', value: 'use-file' }]
-                  : []),
-                { label: '↩️   Back to recovery menu', value: 'back' },
-              ]}
-              onChange={(value) => {
-                if (value === 'use-create') {
-                  setStep('import-create-profile-only')
-                  return
-                }
-                if (value === 'use-file') {
-                  mobileprovisionPickerOpenedRef.current = false
-                  setStep('import-provide-profile-path')
-                  return
-                }
-                if (value === 'open-anyway') {
-                  open('https://developer.apple.com/account/resources/profiles/list')
-                  addLog('🌐 Opened Apple Developer Portal — once you have downloaded the .mobileprovision file, come back and pick "📁 Use a .mobileprovision file from disk".', 'yellow')
+              <Newline />
+              {canAutoCreate && (
+                <Box flexDirection="column">
+                  <Text bold color="green">💡 Recommended: let Capgo do this automatically.</Text>
+                  <Text dimColor>
+                    "✨ Create a new App Store profile for this cert via Apple" runs the same steps via the Apple API — same cert, same bundle ID, no portal navigation, no manual download.
+                  </Text>
+                  <Newline />
+                </Box>
+              )}
+              <Select
+                options={[
+                  ...(canAutoCreate
+                    ? [{ label: '✨  Use "Create a new App Store profile" instead (recommended)', value: 'use-create' }]
+                    : []),
+                  {
+                    label: canAutoCreate
+                      ? '🌐  Open the portal anyway (advanced)'
+                      : '🌐  Open Apple Developer Portal',
+                    value: 'open-anyway',
+                  },
+                  ...(canUseFilePicker()
+                    ? [{ label: '📁  I already have a .mobileprovision on disk — let me pick it', value: 'use-file' }]
+                    : []),
+                  { label: '↩️   Back to recovery menu', value: 'back' },
+                ]}
+                onChange={(value) => {
+                  if (value === 'use-create') {
+                    setStep('import-create-profile-only')
+                    return
+                  }
+                  if (value === 'use-file') {
+                    mobileprovisionPickerOpenedRef.current = false
+                    setStep('import-provide-profile-path')
+                    return
+                  }
+                  if (value === 'open-anyway') {
+                    open('https://developer.apple.com/account/resources/profiles/list')
+                    addLog('🌐 Opened Apple Developer Portal — once you have downloaded the .mobileprovision file, come back and pick "📁 Use a .mobileprovision file from disk".', 'yellow')
+                    setStep('import-no-match-recovery')
+                    return
+                  }
                   setStep('import-no-match-recovery')
-                  return
-                }
-                setStep('import-no-match-recovery')
-              }}
-            />
-          </Box>
-        )
-      })()}
+                }}
+              />
+            </Box>
+          )
+        })()}
 
-      {/* Import: D2 — creating a new profile via Apple for the existing cert */}
-      {step === 'import-create-profile-only' && <ImportCreateProfileOnlyStep />}
+        {/* Import: D2 — creating a new profile via Apple for the existing cert */}
+        {step === 'import-create-profile-only' && <ImportCreateProfileOnlyStep />}
 
-      {/* Import: export warning (heads-up before the one Keychain dialog) */}
-      {step === 'import-export-warning' && chosenIdentity && (
-        <ImportExportWarningStep
-          identityName={chosenIdentity.name}
-          dense={dense}
-          onChange={(value) => {
-            if (value === 'go') {
+        {/* Import: export warning (heads-up before the one Keychain dialog) */}
+        {step === 'import-export-warning' && chosenIdentity && (
+          <ImportExportWarningStep
+            identityName={chosenIdentity.name}
+            dense={dense}
+            onChange={(value) => {
+              if (value === 'go') {
               // Go straight to the export step; the precompiled helper is
               // resolved and signature-verified there.
-              setStep('import-exporting')
-            }
-            else if (value === 'back') {
+                setStep('import-exporting')
+              }
+              else if (value === 'back') {
               // Back goes to profile selection (distribution mode is now upstream of this step)
-              setStep('import-pick-profile')
-            }
-            else {
-              exitOnboarding('Exiting. Re-run `build init` whenever you\'re ready.')
-            }
-          }}
-        />
-      )}
+                setStep('import-pick-profile')
+              }
+              else {
+                exitOnboarding('Exiting. Re-run `build init` whenever you\'re ready.')
+              }
+            }}
+          />
+        )}
 
-      {/* Import: exporting (the one Keychain prompt happens here) */}
-      {step === 'import-exporting' && <ImportExportingStep />}
+        {/* Import: exporting (the one Keychain prompt happens here) */}
+        {step === 'import-exporting' && <ImportExportingStep />}
 
-      {/* API key instructions + .p8 input */}
-      {step === 'api-key-instructions' && (
-        <ApiKeyInstructionsStep
-          canUseFilePicker={canUseFilePicker()}
-          dense={dense}
-          onMethodChange={(value) => {
-            if (value === 'picker') {
-              setStep('p8-method-select')
-            }
-            else {
-              setStep('input-p8-path')
-            }
-          }}
-          onPathSubmit={async (value) => {
-            const filePath = value.replace(/^~/, process.env.HOME || '')
-            try {
-              const content = await readFile(filePath, 'utf-8')
-              setP8Path(filePath)
-              setP8Content(content)
-              const extracted = extractKeyIdFromPath(filePath)
-              if (extracted)
-                setKeyId(extracted)
-              addLog(`✔ Key file found · ${filePath}`)
-              // Persist the extracted keyId too, so a quit-before-confirm resume
-              // restores it instead of showing the empty placeholder.
-              void savePartialProgress({ p8Path: filePath, keyId: extracted || undefined })
-              setStep('input-key-id')
-            }
-            catch {
-              handleError(new Error(`File not found: ${filePath}`), 'api-key-instructions')
-            }
-          }}
-        />
-      )}
+        {/* API key instructions + .p8 input */}
+        {step === 'api-key-instructions' && (
+          <ApiKeyInstructionsStep
+            canUseFilePicker={canUseFilePicker()}
+            dense={dense}
+            onMethodChange={(value) => {
+              if (value === 'picker') {
+                setStep('p8-method-select')
+              }
+              else {
+                setStep('input-p8-path')
+              }
+            }}
+            onPathSubmit={async (value) => {
+              const filePath = value.replace(/^~/, process.env.HOME || '')
+              try {
+                const content = await readFile(filePath, 'utf-8')
+                setP8Path(filePath)
+                setP8Content(content)
+                const extracted = extractKeyIdFromPath(filePath)
+                if (extracted)
+                  setKeyId(extracted)
+                addLog(`✔ Key file found · ${filePath}`)
+                // Persist the extracted keyId too, so a quit-before-confirm resume
+                // restores it instead of showing the empty placeholder.
+                void savePartialProgress({ p8Path: filePath, keyId: extracted || undefined })
+                setStep('input-key-id')
+              }
+              catch {
+                handleError(new Error(`File not found: ${filePath}`), 'api-key-instructions')
+              }
+            }}
+          />
+        )}
 
-      {/* File picker opening */}
-      {step === 'p8-method-select' && <P8MethodSelectStep />}
+        {/* File picker opening */}
+        {step === 'p8-method-select' && <P8MethodSelectStep />}
 
-      {/* Manual .p8 path input */}
-      {step === 'input-p8-path' && (
-        <InputP8PathStep
-          onSubmit={async (value) => {
-            const filePath = value.replace(/^~/, process.env.HOME || '')
-            try {
-              const content = await readFile(filePath, 'utf-8')
-              setP8Path(filePath)
-              setP8Content(content)
-              const extracted = extractKeyIdFromPath(filePath)
-              if (extracted)
-                setKeyId(extracted)
-              addLog(`✔ Key file found · ${filePath}`)
-              // Persist the extracted keyId too, so a quit-before-confirm resume
-              // restores it instead of showing the empty placeholder.
-              void savePartialProgress({ p8Path: filePath, keyId: extracted || undefined })
-              setStep('input-key-id')
-            }
-            catch {
-              handleError(new Error(`File not found: ${value}`), 'input-p8-path')
-            }
-          }}
-        />
-      )}
+        {/* Manual .p8 path input */}
+        {step === 'input-p8-path' && (
+          <InputP8PathStep
+            onSubmit={async (value) => {
+              const filePath = value.replace(/^~/, process.env.HOME || '')
+              try {
+                const content = await readFile(filePath, 'utf-8')
+                setP8Path(filePath)
+                setP8Content(content)
+                const extracted = extractKeyIdFromPath(filePath)
+                if (extracted)
+                  setKeyId(extracted)
+                addLog(`✔ Key file found · ${filePath}`)
+                // Persist the extracted keyId too, so a quit-before-confirm resume
+                // restores it instead of showing the empty placeholder.
+                void savePartialProgress({ p8Path: filePath, keyId: extracted || undefined })
+                setStep('input-key-id')
+              }
+              catch {
+                handleError(new Error(`File not found: ${value}`), 'input-p8-path')
+              }
+            }}
+          />
+        )}
 
-      {/* Key ID */}
-      {step === 'input-key-id' && (
-        <InputKeyIdStep
-          keyId={keyId}
-          dense={dense}
-          onSubmit={(value) => {
+        {/* Key ID */}
+        {step === 'input-key-id' && (
+          <InputKeyIdStep
+            keyId={keyId}
+            dense={dense}
+            onSubmit={(value) => {
             // `value || keyId` reuses the detected key ID when the user just
             // presses Enter; the trim+guard rejects an empty submission in the
             // no-detection case (keyId='' makes the fallback a no-op).
-            const finalKeyId = (value || keyId).trim()
-            if (!finalKeyId)
-              return
-            setKeyId(finalKeyId)
-            upsertLog('✔ Key ID · ', `✔ Key ID · ${finalKeyId}`)
-            void savePartialProgress({ keyId: finalKeyId })
-            setStep('input-issuer-id')
-          }}
-        />
-      )}
+              const finalKeyId = (value || keyId).trim()
+              if (!finalKeyId)
+                return
+              setKeyId(finalKeyId)
+              upsertLog('✔ Key ID · ', `✔ Key ID · ${finalKeyId}`)
+              void savePartialProgress({ keyId: finalKeyId })
+              setStep('input-issuer-id')
+            }}
+          />
+        )}
 
-      {/* Issuer ID */}
-      {step === 'input-issuer-id' && (
-        <InputIssuerIdStep
-          dense={dense}
-          onSubmit={(value) => {
-            const cleaned = value.trim()
-            if (!cleaned)
-              return
-            setIssuerId(cleaned)
-            upsertLog('✔ Issuer ID · ', `✔ Issuer ID · ${cleaned}`)
-            void savePartialProgress({ issuerId: cleaned })
-            setStep('verifying-key')
-          }}
-        />
-      )}
+        {/* Issuer ID */}
+        {step === 'input-issuer-id' && (
+          <InputIssuerIdStep
+            dense={dense}
+            onSubmit={(value) => {
+              const cleaned = value.trim()
+              if (!cleaned)
+                return
+              setIssuerId(cleaned)
+              upsertLog('✔ Issuer ID · ', `✔ Issuer ID · ${cleaned}`)
+              void savePartialProgress({ issuerId: cleaned })
+              setStep('verifying-key')
+            }}
+          />
+        )}
 
-      {/* Verifying */}
-      {step === 'verifying-key' && <VerifyingKeyStep />}
+        {/* Verifying */}
+        {step === 'verifying-key' && <VerifyingKeyStep />}
 
-      {/* Creating certificate */}
-      {step === 'creating-certificate' && <CreatingCertificateStep />}
+        {/* Creating certificate */}
+        {step === 'creating-certificate' && <CreatingCertificateStep />}
 
-      {/* Certificate limit — ask which to revoke */}
-      {step === 'cert-limit-prompt' && (
-        <CertLimitPromptStep
-          existingCount={existingCerts.length}
-          dense={dense}
-          options={[
-            ...existingCerts.map((c) => {
-              const ourCertId = certData?.certificateId || initialProgress?.completedSteps.certificateCreated?.certificateId
-              const isOurs = ourCertId === c.id
-              const creator = isOurs ? ' · 🔧 Created by Capgo' : ''
-              return {
-                label: `🗑️   ${c.name} · expires ${c.expirationDate.split('T')[0]}${creator}`,
-                value: c.id,
-              }
-            }),
-            { label: '✖  Exit onboarding', value: '__exit__' },
-          ]}
-          onChange={(value) => {
-            if (value === '__exit__') {
-              addLog(`Exiting. Revoke a certificate manually in App Store Connect, then resume with ${buildInitCommand}.`, 'yellow')
-              exitOnboarding()
-            }
-            else {
-              setCertToRevoke(value)
-              setStep('revoking-certificate')
-            }
-          }}
-        />
-      )}
-
-      {/* Revoking certificate */}
-      {step === 'revoking-certificate' && <RevokingCertificateStep />}
-
-      {/* Creating profile */}
-      {step === 'creating-profile' && <CreatingProfileStep appId={appId} dense={dense} />}
-
-      {/* Duplicate profile prompt */}
-      {step === 'duplicate-profile-prompt' && (
-        <DuplicateProfilePromptStep
-          duplicateCount={duplicateProfiles.length}
-          dense={dense}
-          onChange={(value) => {
-            if (value === 'delete') {
-              setStep('deleting-duplicate-profiles')
-            }
-            else {
-              addLog(`Exiting. Delete the duplicate profiles in App Store Connect, then resume with ${buildInitCommand}.`, 'yellow')
-              exitOnboarding()
-            }
-          }}
-        />
-      )}
-
-      {/* Deleting duplicate profiles */}
-      {step === 'deleting-duplicate-profiles' && (
-        <DeletingDuplicateProfilesStep duplicateCount={duplicateProfiles.length} />
-      )}
-
-      {/* Saving credentials */}
-      {step === 'saving-credentials' && <SavingCredentialsStep />}
-
-      {step === 'detecting-ci-secrets' && <DetectingCiSecretsStep />}
-
-      {step === 'ci-secrets-setup' && (
-        <CiSecretsSetupStep
-          advice={ciSecretSetupAdvice}
-          dense={dense}
-          onChange={(value) => {
-            setStep(value === 'retry' ? 'detecting-ci-secrets' : 'build-complete')
-          }}
-        />
-      )}
-
-      {step === 'ci-secrets-target-select' && (
-        <CiSecretsTargetSelectStep
-          options={[
-            ...ciSecretTargets.map(target => ({
-              label: target.provider === 'github' ? 'GitHub Actions repository secrets' : 'GitLab CI/CD variables',
-              value: target.provider,
-            })),
-            { label: 'Skip', value: 'skip' },
-          ]}
-          dense={dense}
-          onChange={(value) => {
-            if (value === 'skip') {
-              setStep('build-complete')
-              return
-            }
-            const target = ciSecretTargets.find(candidate => candidate.provider === value) || null
-            setCiSecretTarget(target)
-            if (!target) {
-              setStep('build-complete')
-              return
-            }
-            // GitHub routes into the new 3-option GitHub Actions prompt
-            // (secrets + workflow / secrets-only / no); GitLab keeps the legacy
-            // 2-option ask-ci-secrets flow.
-            setStep(target.provider === 'github' ? 'ask-github-actions-setup' : 'ask-ci-secrets')
-          }}
-        />
-      )}
-
-      {step === 'ask-ci-secrets' && (
-        <AskCiSecretsStep
-          entryCount={ciSecretEntries.length}
-          target={ciSecretTarget}
-          targetLabel={getCiSecretTargetLabel(ciSecretTarget)}
-          dense={dense}
-          onChange={(value) => {
-            setStep(value === 'yes' ? 'checking-ci-secrets' : 'build-complete')
-          }}
-        />
-      )}
-
-      {step === 'ask-github-actions-setup' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SuccessLine text="Credentials saved · GitHub detected" />
-          <Newline />
-          <Text bold>Set up GitHub Actions for you?</Text>
-          <Text dimColor>
-            Capgo can push your
-            {' '}
-            {ciSecretEntries.length}
-            {' '}
-            build env var
-            {ciSecretEntries.length === 1 ? '' : 's'}
-            {' '}
-            as repository secrets and drop a
-            {' '}
-            .github/workflows/capgo-build.yml file you can dispatch manually.
-          </Text>
-          <Newline />
-          <Select
+        {/* Certificate limit — ask which to revoke */}
+        {step === 'cert-limit-prompt' && (
+          <CertLimitPromptStep
+            existingCount={existingCerts.length}
+            dense={dense}
             options={[
-              { label: '🚀  Yes — set the secrets AND create a workflow file', value: 'with-workflow' },
-              { label: '🔒  Yes — set ONLY the secrets', value: 'secrets-only' },
-              { label: '❌  No', value: 'no' },
+              ...existingCerts.map((c) => {
+                const ourCertId = certData?.certificateId || initialProgress?.completedSteps.certificateCreated?.certificateId
+                const isOurs = ourCertId === c.id
+                const creator = isOurs ? ' · 🔧 Created by Capgo' : ''
+                return {
+                  label: `🗑️   ${c.name} · expires ${c.expirationDate.split('T')[0]}${creator}`,
+                  value: c.id,
+                }
+              }),
+              { label: '✖  Exit onboarding', value: '__exit__' },
             ]}
             onChange={(value) => {
-              if (value === 'no') {
-                setSetupMode('declined')
-                setStep('ask-export-env')
+              if (value === '__exit__') {
+                addLog(`Exiting. Revoke a certificate manually in App Store Connect, then resume with ${buildInitCommand}.`, 'yellow')
+                exitOnboarding()
+              }
+              else {
+                setCertToRevoke(value)
+                setStep('revoking-certificate')
+              }
+            }}
+          />
+        )}
+
+        {/* Revoking certificate */}
+        {step === 'revoking-certificate' && <RevokingCertificateStep />}
+
+        {/* Creating profile */}
+        {step === 'creating-profile' && <CreatingProfileStep appId={appId} dense={dense} />}
+
+        {/* Duplicate profile prompt */}
+        {step === 'duplicate-profile-prompt' && (
+          <DuplicateProfilePromptStep
+            duplicateCount={duplicateProfiles.length}
+            dense={dense}
+            onChange={(value) => {
+              if (value === 'delete') {
+                setStep('deleting-duplicate-profiles')
+              }
+              else {
+                addLog(`Exiting. Delete the duplicate profiles in App Store Connect, then resume with ${buildInitCommand}.`, 'yellow')
+                exitOnboarding()
+              }
+            }}
+          />
+        )}
+
+        {/* Deleting duplicate profiles */}
+        {step === 'deleting-duplicate-profiles' && (
+          <DeletingDuplicateProfilesStep duplicateCount={duplicateProfiles.length} />
+        )}
+
+        {/* Saving credentials */}
+        {step === 'saving-credentials' && <SavingCredentialsStep />}
+
+        {step === 'detecting-ci-secrets' && <DetectingCiSecretsStep />}
+
+        {step === 'ci-secrets-setup' && (
+          <CiSecretsSetupStep
+            advice={ciSecretSetupAdvice}
+            dense={dense}
+            onChange={(value) => {
+              setStep(value === 'retry' ? 'detecting-ci-secrets' : 'build-complete')
+            }}
+          />
+        )}
+
+        {step === 'ci-secrets-target-select' && (
+          <CiSecretsTargetSelectStep
+            options={[
+              ...ciSecretTargets.map(target => ({
+                label: target.provider === 'github' ? 'GitHub Actions repository secrets' : 'GitLab CI/CD variables',
+                value: target.provider,
+              })),
+              { label: 'Skip', value: 'skip' },
+            ]}
+            dense={dense}
+            onChange={(value) => {
+              if (value === 'skip') {
+                setStep('build-complete')
                 return
               }
-              setSetupMode(value as 'with-workflow' | 'secrets-only')
-              setStep('checking-ci-secrets')
-            }}
-          />
-        </Box>
-      )}
-
-      {step === 'ask-export-env' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Export the credentials as a .env file instead?</Text>
-          <Text dimColor>
-            Writes
-            {' '}
-            {defaultExportPath(appId, 'ios').split('/').slice(-1)[0]}
-            {' '}
-            so you can wire up CI later via
-            {' '}
-            <Text>gh secret set -f</Text>
-            {' '}
-            or paste the values manually.
-          </Text>
-          <Newline />
-          <Select
-            options={[
-              { label: `📝  Yes — write .env.capgo.${appId}.ios`, value: 'yes' },
-              { label: '❌  No, exit without exporting', value: 'no' },
-            ]}
-            onChange={(value) => {
-              if (value === 'yes') {
-                setEnvExportTargetPath(defaultExportPath(appId, 'ios'))
-                setStep('exporting-env')
+              const target = ciSecretTargets.find(candidate => candidate.provider === value) || null
+              setCiSecretTarget(target)
+              if (!target) {
+                setStep('build-complete')
                 return
               }
-              setStep('build-complete')
+              // GitHub routes into the new 3-option GitHub Actions prompt
+              // (secrets + workflow / secrets-only / no); GitLab keeps the legacy
+              // 2-option ask-ci-secrets flow.
+              setStep(target.provider === 'github' ? 'ask-github-actions-setup' : 'ask-ci-secrets')
             }}
           />
-        </Box>
-      )}
+        )}
 
-      {step === 'exporting-env' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text={`Writing ${defaultExportPath(appId, 'ios').split('/').slice(-1)[0]}…`} />
-        </Box>
-      )}
-
-      {step === 'confirm-env-export-overwrite' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold color="yellow">
-            {envExportTargetPath}
-            {' '}
-            already exists.
-          </Text>
-          <Text dimColor>Replace it with a fresh export, or skip?</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '✏️   Replace it', value: 'replace' },
-              { label: '🛑  Skip — keep the existing file', value: 'skip' },
-            ]}
+        {step === 'ask-ci-secrets' && (
+          <AskCiSecretsStep
+            entryCount={ciSecretEntries.length}
+            target={ciSecretTarget}
+            targetLabel={getCiSecretTargetLabel(ciSecretTarget)}
+            dense={dense}
             onChange={(value) => {
-              setStep(value === 'replace' ? 'overwrite-and-export-env' : 'build-complete')
+              setStep(value === 'yes' ? 'checking-ci-secrets' : 'build-complete')
             }}
           />
-        </Box>
-      )}
+        )}
 
-      {step === 'pick-package-manager' && (() => {
-        const detected = normalizePackageManager(pm.pm)
-        const detectionNote = pm.pm === 'unknown'
-          ? '(no recognizable lockfile in this project — pick whichever you actually use)'
-          : `(detected from your lockfile — ${pm.pm})`
-        return (
+        {step === 'ask-github-actions-setup' && (
           <Box flexDirection="column" marginTop={1}>
-            <Text bold>Which package manager does this project use?</Text>
+            <SuccessLine text="Credentials saved · GitHub detected" />
+            <Newline />
+            <Text bold>Set up GitHub Actions for you?</Text>
             <Text dimColor>
-              Drives the install + build steps in the generated workflow. We
+              Capgo can push your
               {' '}
-              {detectionNote}
+              {ciSecretEntries.length}
+              {' '}
+              build env var
+              {ciSecretEntries.length === 1 ? '' : 's'}
+              {' '}
+              as repository secrets and drop a
+              {' '}
+              .github/workflows/capgo-build.yml file you can dispatch manually.
             </Text>
             <Newline />
             <Select
               options={[
-                { label: `📦  bun${detected === 'bun' ? '  (recommended — matches your lockfile)' : ''}`, value: 'bun' },
-                { label: `📦  npm${detected === 'npm' ? '  (recommended — matches your lockfile)' : ''}`, value: 'npm' },
-                { label: `📦  pnpm${detected === 'pnpm' ? '  (recommended — matches your lockfile)' : ''}`, value: 'pnpm' },
-                { label: `📦  yarn${detected === 'yarn' ? '  (recommended — matches your lockfile)' : ''}`, value: 'yarn' },
+                { label: '🚀  Yes — set the secrets AND create a workflow file', value: 'with-workflow' },
+                { label: '🔒  Yes — set ONLY the secrets', value: 'secrets-only' },
+                { label: '❌  No', value: 'no' },
               ]}
               onChange={(value) => {
-                setSelectedPackageManager(value as PackageManager)
-                setStep('pick-build-script')
-              }}
-            />
-          </Box>
-        )
-      })()}
-
-      {step === 'pick-build-script' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Which script builds your web assets?</Text>
-          <Text dimColor>
-            Capgo will run this before invoking
-            {' '}
-            <Text>capgo build request</Text>
-            {' '}
-            in the workflow. Pick the script you use locally to produce the web build (typically into capacitor.config webDir, e.g. dist/).
-          </Text>
-          <Newline />
-          <Select
-            options={buildScriptPickerOptions(availableScripts, recommendedScript)}
-            onChange={(value) => {
-              if (value === '__skip__') {
-                setBuildScriptChoice({ type: 'skip' })
-                setStep('preview-workflow-file')
-                return
-              }
-              if (value === '__custom__') {
-                setStep('pick-build-script-custom')
-                return
-              }
-              setBuildScriptChoice({ type: 'npm-script', name: value })
-              setStep('preview-workflow-file')
-            }}
-          />
-        </Box>
-      )}
-
-      {step === 'pick-build-script-custom' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Custom build command</Text>
-          <Text dimColor>
-            Type the exact command you want the workflow to run before
-            {' '}
-            <Text>capgo build request</Text>
-            {' '}
-            (e.g.
-            {' '}
-            <Text>make web</Text>
-            ,
-            {' '}
-            <Text>bash scripts/build.sh</Text>
-            ).
-          </Text>
-          <Box marginTop={1}>
-            <FilteredTextInput
-              placeholder="make web"
-              onSubmit={(value) => {
-                const cleaned = value.trim()
-                if (!cleaned)
+                if (value === 'no') {
+                  setSetupMode('declined')
+                  setStep('ask-export-env')
                   return
-                setBuildScriptChoice({ type: 'custom', command: cleaned })
-                setStep('preview-workflow-file')
+                }
+                setSetupMode(value as 'with-workflow' | 'secrets-only')
+                setStep('checking-ci-secrets')
               }}
             />
           </Box>
-        </Box>
-      )}
+        )}
 
-      {step === 'preview-workflow-file' && previewDiff.length > 0 && (() => {
-        const allEqual = previewDiff.every(l => l.kind === 'eq')
-        const writeLabel = allEqual
-          ? '✏️   Write file anyway (re-writes identical content)'
-          : (previewIsNew ? '✏️   Write file' : '✏️   Replace existing file')
-        const skipLabel = '❌  Do not write file'
-        const title = previewIsNew
-          ? `🆕  Proposed new file — ${previewExistingPath ?? WORKFLOW_PATH}`
-          : `✏️  Proposed changes — ${previewExistingPath ?? WORKFLOW_PATH}`
-        const subtitle = previewIsNew
-          ? 'Nothing exists on disk yet. Every line below is what would be written.'
-          : 'Proposed diff vs the file on disk. Lines marked - would be removed, lines marked + would be added.'
-        return (
+        {step === 'ask-export-env' && (
           <Box flexDirection="column" marginTop={1}>
-            <DiffSummary title={title} subtitle={subtitle} lines={previewDiff} />
-            <Box marginTop={1} flexDirection="column">
-              <Text bold>What should we do with {WORKFLOW_PATH}?</Text>
+            <Text bold>Export the credentials as a .env file instead?</Text>
+            <Text dimColor>
+              Writes
+              {' '}
+              {defaultExportPath(appId, 'ios').split('/').slice(-1)[0]}
+              {' '}
+              so you can wire up CI later via
+              {' '}
+              <Text>gh secret set -f</Text>
+              {' '}
+              or paste the values manually.
+            </Text>
+            <Newline />
+            <Select
+              options={[
+                { label: `📝  Yes — write .env.capgo.${appId}.ios`, value: 'yes' },
+                { label: '❌  No, exit without exporting', value: 'no' },
+              ]}
+              onChange={(value) => {
+                if (value === 'yes') {
+                  setEnvExportTargetPath(defaultExportPath(appId, 'ios'))
+                  setStep('exporting-env')
+                  return
+                }
+                setStep('build-complete')
+              }}
+            />
+          </Box>
+        )}
+
+        {step === 'exporting-env' && (
+          <Box flexDirection="column" marginTop={1}>
+            <SpinnerLine text={`Writing ${defaultExportPath(appId, 'ios').split('/').slice(-1)[0]}…`} />
+          </Box>
+        )}
+
+        {step === 'confirm-env-export-overwrite' && (
+          <Box flexDirection="column" marginTop={1}>
+            <Text bold color="yellow">
+              {envExportTargetPath}
+              {' '}
+              already exists.
+            </Text>
+            <Text dimColor>Replace it with a fresh export, or skip?</Text>
+            <Newline />
+            <Select
+              options={[
+                { label: '✏️   Replace it', value: 'replace' },
+                { label: '🛑  Skip — keep the existing file', value: 'skip' },
+              ]}
+              onChange={(value) => {
+                setStep(value === 'replace' ? 'overwrite-and-export-env' : 'build-complete')
+              }}
+            />
+          </Box>
+        )}
+
+        {step === 'pick-package-manager' && (() => {
+          const detected = normalizePackageManager(pm.pm)
+          const detectionNote = pm.pm === 'unknown'
+            ? '(no recognizable lockfile in this project — pick whichever you actually use)'
+            : `(detected from your lockfile — ${pm.pm})`
+          return (
+            <Box flexDirection="column" marginTop={1}>
+              <Text bold>Which package manager does this project use?</Text>
+              <Text dimColor>
+                Drives the install + build steps in the generated workflow. We
+                {' '}
+                {detectionNote}
+              </Text>
+              <Newline />
               <Select
                 options={[
-                  { label: writeLabel, value: 'write' },
-                  { label: '👀  Show proposed file diff', value: 'view' },
-                  { label: skipLabel, value: 'cancel' },
+                  { label: `📦  bun${detected === 'bun' ? '  (recommended — matches your lockfile)' : ''}`, value: 'bun' },
+                  { label: `📦  npm${detected === 'npm' ? '  (recommended — matches your lockfile)' : ''}`, value: 'npm' },
+                  { label: `📦  pnpm${detected === 'pnpm' ? '  (recommended — matches your lockfile)' : ''}`, value: 'pnpm' },
+                  { label: `📦  yarn${detected === 'yarn' ? '  (recommended — matches your lockfile)' : ''}`, value: 'yarn' },
                 ]}
                 onChange={(value) => {
-                  if (value === 'view') {
-                    trackWorkflowEvent('workflow-preview-action', { decision: 'view' })
-                    trackWorkflowEvent('workflow-diff-opened', { decision: 'view' })
-                    setStep('view-workflow-diff')
+                  setSelectedPackageManager(value as PackageManager)
+                  setStep('pick-build-script')
+                }}
+              />
+            </Box>
+          )
+        })()}
+
+        {step === 'pick-build-script' && (
+          <Box flexDirection="column" marginTop={1}>
+            <Text bold>Which script builds your web assets?</Text>
+            <Text dimColor>
+              Capgo will run this before invoking
+              {' '}
+              <Text>capgo build request</Text>
+              {' '}
+              in the workflow. Pick the script you use locally to produce the web build (typically into capacitor.config webDir, e.g. dist/).
+            </Text>
+            <Newline />
+            <Select
+              options={buildScriptPickerOptions(availableScripts, recommendedScript)}
+              onChange={(value) => {
+                if (value === '__skip__') {
+                  setBuildScriptChoice({ type: 'skip' })
+                  setStep('preview-workflow-file')
+                  return
+                }
+                if (value === '__custom__') {
+                  setStep('pick-build-script-custom')
+                  return
+                }
+                setBuildScriptChoice({ type: 'npm-script', name: value })
+                setStep('preview-workflow-file')
+              }}
+            />
+          </Box>
+        )}
+
+        {step === 'pick-build-script-custom' && (
+          <Box flexDirection="column" marginTop={1}>
+            <Text bold>Custom build command</Text>
+            <Text dimColor>
+              Type the exact command you want the workflow to run before
+              {' '}
+              <Text>capgo build request</Text>
+              {' '}
+              (e.g.
+              {' '}
+              <Text>make web</Text>
+              ,
+              {' '}
+              <Text>bash scripts/build.sh</Text>
+              ).
+            </Text>
+            <Box marginTop={1}>
+              <FilteredTextInput
+                placeholder="make web"
+                onSubmit={(value) => {
+                  const cleaned = value.trim()
+                  if (!cleaned)
                     return
-                  }
-                  trackWorkflowEvent('workflow-preview-action', { decision: value === 'write' ? 'write' : 'cancel' })
-                  setPreviewDiff([])
-                  setStep(value === 'write' ? 'writing-workflow-file' : 'build-complete')
+                  setBuildScriptChoice({ type: 'custom', command: cleaned })
+                  setStep('preview-workflow-file')
                 }}
               />
             </Box>
           </Box>
-        )
-      })()}
-      {step === 'preview-workflow-file' && previewDiff.length === 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text={`Preparing diff for ${WORKFLOW_PATH}…`} />
-        </Box>
-      )}
+        )}
 
-      {/* view-workflow-diff renders as a fullscreen early-return takeover above. */}
-
-      {step === 'writing-workflow-file' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text={`Writing ${WORKFLOW_PATH}…`} />
-        </Box>
-      )}
-
-      {step === 'checking-ci-secrets' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text={ciSecretCheckPhase} />
-        </Box>
-      )}
-
-      {step === 'confirm-secrets-push' && (
-        (() => {
-          const existingSet = new Set(ciSecretExistingKeys)
-          const newCount = ciSecretEntries.filter(entry => !existingSet.has(entry.key)).length
-          const replaceCount = ciSecretEntries.length - newCount
+        {step === 'preview-workflow-file' && previewDiff.length > 0 && (() => {
+          const allEqual = previewDiff.every(l => l.kind === 'eq')
+          const writeLabel = allEqual
+            ? '✏️   Write file anyway (re-writes identical content)'
+            : (previewIsNew ? '✏️   Write file' : '✏️   Replace existing file')
+          const skipLabel = '❌  Do not write file'
+          const title = previewIsNew
+            ? `🆕  Proposed new file — ${previewExistingPath ?? WORKFLOW_PATH}`
+            : `✏️  Proposed changes — ${previewExistingPath ?? WORKFLOW_PATH}`
+          const subtitle = previewIsNew
+            ? 'Nothing exists on disk yet. Every line below is what would be written.'
+            : 'Proposed diff vs the file on disk. Lines marked - would be removed, lines marked + would be added.'
           return (
             <Box flexDirection="column" marginTop={1}>
-              <Text bold color="yellow">⚠  Confirm before pushing secrets</Text>
-              <Text>
-                Repository:
-                {' '}
-                <Text bold color="cyan">{ciSecretRepoLabel}</Text>
-                {' '}
-                <Text dimColor>(resolved via `gh repo view`)</Text>
-              </Text>
-              <Text bold>
-                {`Will push ${ciSecretEntries.length} env var${ciSecretEntries.length === 1 ? '' : 's'}`}
-                {replaceCount > 0 ? ` — ${newCount} new, ${replaceCount} REPLACING existing:` : ' — all new:'}
-              </Text>
-              <Box marginTop={1}>
-                <SecretsTable
-                  rows={ciSecretEntries.map(entry => ({
-                    name: entry.key,
-                    status: existingSet.has(entry.key) ? 'REPLACE' : 'NEW',
-                  }))}
+              <DiffSummary title={title} subtitle={subtitle} lines={previewDiff} />
+              <Box marginTop={1} flexDirection="column">
+                <Text bold>
+                  What should we do with
+                  {WORKFLOW_PATH}
+                  ?
+                </Text>
+                <Select
+                  options={[
+                    { label: writeLabel, value: 'write' },
+                    { label: '👀  Show proposed file diff', value: 'view' },
+                    { label: skipLabel, value: 'cancel' },
+                  ]}
+                  onChange={(value) => {
+                    if (value === 'view') {
+                      trackWorkflowEvent('workflow-preview-action', { decision: 'view' })
+                      trackWorkflowEvent('workflow-diff-opened', { decision: 'view' })
+                      setStep('view-workflow-diff')
+                      return
+                    }
+                    trackWorkflowEvent('workflow-preview-action', { decision: value === 'write' ? 'write' : 'cancel' })
+                    setPreviewDiff([])
+                    setStep(value === 'write' ? 'writing-workflow-file' : 'build-complete')
+                  }}
                 />
               </Box>
-              {replaceCount > 0 && (
-                <Box marginTop={1}>
-                  <Text dimColor color="yellow">⚠  `gh secret set` overwrites silently — replaced values cannot be recovered.</Text>
-                </Box>
-              )}
             </Box>
           )
-        })()
-      )}
-      {step === 'confirm-secrets-push' && (
-        <>
-          <Box marginTop={1}>
-            <Select
-              options={[
-                {
-                  label: `✅  Yes, push to ${ciSecretRepoLabel}`,
-                  value: 'confirm',
-                },
-                { label: '❌  Cancel — don\'t push anything', value: 'cancel' },
-              ]}
-              onChange={(value) => {
-                setStep(value === 'confirm' ? 'uploading-ci-secrets' : 'build-complete')
-              }}
+        })()}
+        {step === 'preview-workflow-file' && previewDiff.length === 0 && (
+          <Box flexDirection="column" marginTop={1}>
+            <SpinnerLine text={`Preparing diff for ${WORKFLOW_PATH}…`} />
+          </Box>
+        )}
+
+        {/* view-workflow-diff renders as a fullscreen early-return takeover above. */}
+
+        {step === 'writing-workflow-file' && (
+          <Box flexDirection="column" marginTop={1}>
+            <SpinnerLine text={`Writing ${WORKFLOW_PATH}…`} />
+          </Box>
+        )}
+
+        {step === 'checking-ci-secrets' && (
+          <Box flexDirection="column" marginTop={1}>
+            <SpinnerLine text={ciSecretCheckPhase} />
+          </Box>
+        )}
+
+        {step === 'confirm-secrets-push' && (
+          (() => {
+            const existingSet = new Set(ciSecretExistingKeys)
+            const newCount = ciSecretEntries.filter(entry => !existingSet.has(entry.key)).length
+            const replaceCount = ciSecretEntries.length - newCount
+            return (
+              <Box flexDirection="column" marginTop={1}>
+                <Text bold color="yellow">⚠  Confirm before pushing secrets</Text>
+                <Text>
+                  Repository:
+                  {' '}
+                  <Text bold color="cyan">{ciSecretRepoLabel}</Text>
+                  {' '}
+                  <Text dimColor>(resolved via `gh repo view`)</Text>
+                </Text>
+                <Text bold>
+                  {`Will push ${ciSecretEntries.length} env var${ciSecretEntries.length === 1 ? '' : 's'}`}
+                  {replaceCount > 0 ? ` — ${newCount} new, ${replaceCount} REPLACING existing:` : ' — all new:'}
+                </Text>
+                <Box marginTop={1}>
+                  <SecretsTable
+                    rows={ciSecretEntries.map(entry => ({
+                      name: entry.key,
+                      status: existingSet.has(entry.key) ? 'REPLACE' : 'NEW',
+                    }))}
+                  />
+                </Box>
+                {replaceCount > 0 && (
+                  <Box marginTop={1}>
+                    <Text dimColor color="yellow">⚠  `gh secret set` overwrites silently — replaced values cannot be recovered.</Text>
+                  </Box>
+                )}
+              </Box>
+            )
+          })()
+        )}
+        {step === 'confirm-secrets-push' && (
+          <>
+            <Box marginTop={1}>
+              <Select
+                options={[
+                  {
+                    label: `✅  Yes, push to ${ciSecretRepoLabel}`,
+                    value: 'confirm',
+                  },
+                  { label: '❌  Cancel — don\'t push anything', value: 'cancel' },
+                ]}
+                onChange={(value) => {
+                  setStep(value === 'confirm' ? 'uploading-ci-secrets' : 'build-complete')
+                }}
+              />
+            </Box>
+          </>
+        )}
+
+        {step === 'confirm-ci-secret-overwrite' && (
+          <ConfirmCiSecretOverwriteStep
+            existingKeys={ciSecretExistingKeys}
+            dense={dense}
+            onChange={(value) => {
+              setStep(value === 'replace' ? 'uploading-ci-secrets' : 'build-complete')
+            }}
+          />
+        )}
+
+        {step === 'uploading-ci-secrets' && (
+          <Box flexDirection="column" marginTop={1}>
+            <SpinnerLine
+              text={ciSecretUploadProgress
+                ? `Pushing ${ciSecretUploadProgress.current} of ${ciSecretUploadProgress.total}: ${ciSecretUploadProgress.key}…`
+                : `Uploading env vars to ${ciSecretRepoLabel ?? getCiSecretTargetLabel(ciSecretTarget)}…`}
             />
           </Box>
-        </>
-      )}
+        )}
 
-      {step === 'confirm-ci-secret-overwrite' && (
-        <ConfirmCiSecretOverwriteStep
-          existingKeys={ciSecretExistingKeys}
-          dense={dense}
-          onChange={(value) => {
-            setStep(value === 'replace' ? 'uploading-ci-secrets' : 'build-complete')
-          }}
-        />
-      )}
-
-      {step === 'uploading-ci-secrets' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine
-            text={ciSecretUploadProgress
-              ? `Pushing ${ciSecretUploadProgress.current} of ${ciSecretUploadProgress.total}: ${ciSecretUploadProgress.key}…`
-              : `Uploading env vars to ${ciSecretRepoLabel ?? getCiSecretTargetLabel(ciSecretTarget)}…`}
+        {step === 'ci-secrets-failed' && (
+          <CiSecretsFailedStep
+            error={ciSecretError}
+            dense={dense}
+            onChange={(value) => {
+              setStep(value === 'retry' ? (ciSecretTarget ? 'checking-ci-secrets' : 'detecting-ci-secrets') : 'build-complete')
+            }}
           />
-        </Box>
-      )}
+        )}
 
-      {step === 'ci-secrets-failed' && (
-        <CiSecretsFailedStep
-          error={ciSecretError}
-          dense={dense}
-          onChange={(value) => {
-            setStep(value === 'retry' ? (ciSecretTarget ? 'checking-ci-secrets' : 'detecting-ci-secrets') : 'build-complete')
-          }}
-        />
-      )}
+        {/* Ask to build */}
+        {step === 'ask-build' && (
+          <AskBuildStep
+            dense={dense}
+            onChange={(value) => {
+              if (value === 'yes') {
+                setStep('requesting-build')
+              }
+              else {
+                setStep('build-complete')
+              }
+            }}
+          />
+        )}
 
-      {/* Ask to build */}
-      {step === 'ask-build' && (
-        <AskBuildStep
-          dense={dense}
-          onChange={(value) => {
-            if (value === 'yes') {
-              setStep('requesting-build')
-            }
-            else {
-              setStep('build-complete')
-            }
-          }}
-        />
-      )}
-
-      {/* Requesting build: handled by the FullscreenBuildOutput early return
+        {/* Requesting build: handled by the FullscreenBuildOutput early return
           above (fullscreen takeover, bypasses the too-small gate) — nothing
           renders here in the measured body. */}
 
-      {/* AI debug — ask the user whether to send the captured log */}
-      {step === 'ai-analysis-prompt' && (
-        <AiAnalysisPromptStep
-          dense={dense}
-          onChange={async (value) => {
-            if (value === 'support') {
-              await handleSupport('ai-analysis-prompt')
-              return
-            }
-            if (value === 'debug') {
-              setStep('ai-analysis-running')
-            }
-            else {
-              if (aiJobId) {
-                await trackAiAnalysisChoice({
-                  apikey: resolvedApiKeyRef.current ?? apikey ?? '',
-                  orgId: resolvedOrgId ?? '',
-                  appId,
-                  platform: 'ios',
-                  jobId: aiJobId,
-                  choice: 'skip',
-                  triggeredBy: 'onboarding',
-                }).catch(() => { /* telemetry never breaks the wizard */ })
+        {/* AI debug — ask the user whether to send the captured log */}
+        {step === 'ai-analysis-prompt' && (
+          <AiAnalysisPromptStep
+            dense={dense}
+            onChange={async (value) => {
+              if (value === 'support') {
+                await handleSupport('ai-analysis-prompt')
+                return
               }
-              setStep('build-complete')
-            }
-          }}
-        />
-      )}
+              if (value === 'debug') {
+                setStep('ai-analysis-running')
+              }
+              else {
+                if (aiJobId) {
+                  await trackAiAnalysisChoice({
+                    apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+                    orgId: resolvedOrgId ?? '',
+                    appId,
+                    platform: 'ios',
+                    jobId: aiJobId,
+                    choice: 'skip',
+                    triggeredBy: 'onboarding',
+                  }).catch(() => { /* telemetry never breaks the wizard */ })
+                }
+                setStep('build-complete')
+              }
+            }}
+          />
+        )}
 
-      {/* AI debug — spinner while the edge function is running */}
-      {step === 'ai-analysis-running' && <AiAnalysisRunningStep streamText={aiStreamPreview} terminalRows={terminalRows} terminalCols={terminalCols} />}
+        {/* AI debug — spinner while the edge function is running */}
+        {step === 'ai-analysis-running' && <AiAnalysisRunningStep streamText={aiStreamPreview} terminalRows={terminalRows} terminalCols={terminalCols} />}
 
-      {step === 'support-uploading' && (
-        <Box marginTop={1}>
-          <SpinnerLine text={supportBusyText} />
-        </Box>
-      )}
+        {step === 'support-uploading' && (
+          <Box marginTop={1}>
+            <SpinnerLine text={supportBusyText} />
+          </Box>
+        )}
 
-      {/* AI debug — render the diagnosis (or fallback message), then offer
+        {/* AI debug — render the diagnosis (or fallback message), then offer
           retry-or-skip. Retry transitions back to 'requesting-build' so the
           user can rebuild after applying the AI's fix in another terminal,
           without re-running the credential wizard. Capped at MAX_AI_RETRIES. */}
-      {step === 'ai-analysis-result' && (
-        <AiAnalysisResultStep
-          analysisText={aiAnalysisText}
-          // Collapse to the compact marker + "Re-read" option only when the
-          // user has dismissed the viewer AND the analysis is still too tall to
-          // show inline. If the terminal is now big enough, show the full text.
-          collapsed={aiViewedFull && !!aiAnalysisText && isAiAnalysisTooTall(aiAnalysisText, terminalRows, terminalCols)}
-          result={aiResult}
-          canRetry={MAX_AI_RETRIES - aiRetryCount > 0}
-          retriesLeft={MAX_AI_RETRIES - aiRetryCount}
-          maxRetries={MAX_AI_RETRIES}
-          dense={dense}
-          onChange={async (value) => {
-            if (value === 'support') {
-              await handleSupport('ai-analysis-result')
-              return
-            }
-            if (value === 'reread') {
-              // Re-open the fullscreen scroll viewer (alt buffer has no
-              // scrollback, so this is the only way to re-read).
-              setStep('ai-analysis-result-scroll')
-              return
-            }
-            if (value === 'retry') {
-              // Track the retry intent before we tear down the AI state so
-              // the choice event carries the per-attempt context.
-              if (aiJobId) {
-                await trackAiAnalysisChoice({
-                  apikey: resolvedApiKeyRef.current ?? apikey ?? '',
-                  orgId: resolvedOrgId ?? '',
-                  appId,
-                  platform: 'ios',
-                  jobId: aiJobId,
-                  choice: 'retry',
-                  triggeredBy: 'onboarding',
-                }).catch(() => { /* telemetry never breaks the wizard */ })
-                // Free the captured log for the previous attempt; the next
-                // attempt's `requestBuildInternal` will create a new file
-                // tied to a new builder_job_id.
-                void releaseCapturedLogs(aiJobId).catch(() => { /* best-effort */ })
-              }
-              // Reset AI state so the next failure starts clean. The fit
-              // check (and possible scroll-viewer route) will re-evaluate
-              // against the new analysis text.
-              setAiJobId(null)
-              setAiAnalysisText(null)
-              setAiResult(null)
-              setAiViewedFull(false)
-              setAiRetryCount(prev => prev + 1)
-              setStep('requesting-build')
-              return
-            }
-            // 'skip' (with retries available) or 'continue' (none left).
-            setStep('build-complete')
-          }}
-        />
-      )}
-
-      {/* (ai-analysis-result-scroll renders as a fullscreen early return above.) */}
-
-      {/* Contact-support confirmation gate — tells the user everything that's
-          about to happen (logs saved, revealed in Finder on macOS, email
-          opened) and waits for an explicit Yes before the mail client opens. */}
-      {step === 'support-confirm' && (
-        <Box flexDirection="column" marginTop={1} gap={1}>
-          <Text bold>Email Capgo support</Text>
-          <Text>{supportConfirmMessage}</Text>
-          <Select
-            options={[
-              { label: '📨  Yes, send to support', value: 'yes' },
-              { label: '👀  View logs first', value: 'view' },
-              { label: '✖  Cancel', value: 'no' },
-            ]}
-            onChange={(value) => {
-              if (value === 'view') {
-                let lines: string[] = []
-                try { lines = readFileSync(supportLogPathRef.current, 'utf8').split('\n') }
-                catch { lines = ['(could not read the logs file)'] }
-                setSupportLogLines(lines)
-                setStep('support-log-view')
+        {step === 'ai-analysis-result' && (
+          <AiAnalysisResultStep
+            analysisText={aiAnalysisText}
+            // Collapse to the compact marker + "Re-read" option only when the
+            // user has dismissed the viewer AND the analysis is still too tall to
+            // show inline. If the terminal is now big enough, show the full text.
+            collapsed={aiViewedFull && !!aiAnalysisText && isAiAnalysisTooTall(aiAnalysisText, terminalRows, terminalCols)}
+            result={aiResult}
+            canRetry={MAX_AI_RETRIES - aiRetryCount > 0}
+            retriesLeft={MAX_AI_RETRIES - aiRetryCount}
+            maxRetries={MAX_AI_RETRIES}
+            dense={dense}
+            onChange={async (value) => {
+              if (value === 'support') {
+                await handleSupport('ai-analysis-result')
                 return
               }
-              const resolve = supportConfirmResolveRef.current
-              supportConfirmResolveRef.current = null
-              resolve?.(value === 'yes')
+              if (value === 'reread') {
+              // Re-open the fullscreen scroll viewer (alt buffer has no
+              // scrollback, so this is the only way to re-read).
+                setStep('ai-analysis-result-scroll')
+                return
+              }
+              if (value === 'retry') {
+              // Track the retry intent before we tear down the AI state so
+              // the choice event carries the per-attempt context.
+                if (aiJobId) {
+                  await trackAiAnalysisChoice({
+                    apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+                    orgId: resolvedOrgId ?? '',
+                    appId,
+                    platform: 'ios',
+                    jobId: aiJobId,
+                    choice: 'retry',
+                    triggeredBy: 'onboarding',
+                  }).catch(() => { /* telemetry never breaks the wizard */ })
+                  // Free the captured log for the previous attempt; the next
+                  // attempt's `requestBuildInternal` will create a new file
+                  // tied to a new builder_job_id.
+                  void releaseCapturedLogs(aiJobId).catch(() => { /* best-effort */ })
+                }
+                // Reset AI state so the next failure starts clean. The fit
+                // check (and possible scroll-viewer route) will re-evaluate
+                // against the new analysis text.
+                setAiJobId(null)
+                setAiAnalysisText(null)
+                setAiResult(null)
+                setAiViewedFull(false)
+                setAiRetryCount(prev => prev + 1)
+                setStep('requesting-build')
+                return
+              }
+              // 'skip' (with retries available) or 'continue' (none left).
+              setStep('build-complete')
             }}
           />
-        </Box>
-      )}
+        )}
 
-      {/* Error with retry */}
-      {step === 'error' && error && (
-        <ErrorStep
-          error={error}
-          recoveryAdvice={recoveryAdvice}
-          supportBundlePath={supportBundlePath}
-          showRetry={!!retryStep}
-          dense={dense}
-          collapsed={errorTooTall && errorViewedFull}
-          hasBuildLog={!!aiJobId}
-          onChange={async (value) => {
-            if (value === 'support') {
-              await handleSupport()
-            }
-            else if (value === 'ai') {
+        {/* (ai-analysis-result-scroll renders as a fullscreen early return above.) */}
+
+        {/* Contact-support confirmation gate — tells the user everything that's
+          about to happen (logs saved, revealed in Finder on macOS, email
+          opened) and waits for an explicit Yes before the mail client opens. */}
+        {step === 'support-confirm' && (
+          <Box flexDirection="column" marginTop={1} gap={1}>
+            <Text bold>Email Capgo support</Text>
+            <Text>{supportConfirmMessage}</Text>
+            <Select
+              options={[
+                { label: '📨  Yes, send to support', value: 'yes' },
+                { label: '👀  View logs first', value: 'view' },
+                { label: '✖  Cancel', value: 'no' },
+              ]}
+              onChange={(value) => {
+                if (value === 'view') {
+                  let lines: string[] = []
+                  try { lines = readFileSync(supportLogPathRef.current, 'utf8').split('\n') }
+                  catch { lines = ['(could not read the logs file)'] }
+                  setSupportLogLines(lines)
+                  setStep('support-log-view')
+                  return
+                }
+                const resolve = supportConfirmResolveRef.current
+                supportConfirmResolveRef.current = null
+                resolve?.(value === 'yes')
+              }}
+            />
+          </Box>
+        )}
+
+        {/* Error with retry */}
+        {step === 'error' && error && (
+          <ErrorStep
+            error={error}
+            recoveryAdvice={recoveryAdvice}
+            supportBundlePath={supportBundlePath}
+            showRetry={!!retryStep}
+            dense={dense}
+            collapsed={errorTooTall && errorViewedFull}
+            hasBuildLog={!!aiJobId}
+            onChange={async (value) => {
+              if (value === 'support') {
+                await handleSupport()
+              }
+              else if (value === 'ai') {
               // A captured build-failure log is available — route into the
               // existing AI-analysis prompt (unchanged from today).
-              setStep('ai-analysis-prompt')
-            }
-            else if (value === 'retry') {
-              setError(null)
-              errorCategoryRef.current = undefined
-              pickerOpenedRef.current = false
-              mobileprovisionPickerOpenedRef.current = false
-              if (retryStep)
-                setStep(retryStep)
-            }
-            else if (value === 'restart') {
+                setStep('ai-analysis-prompt')
+              }
+              else if (value === 'retry') {
+                setError(null)
+                errorCategoryRef.current = undefined
+                pickerOpenedRef.current = false
+                mobileprovisionPickerOpenedRef.current = false
+                if (retryStep)
+                  setStep(retryStep)
+              }
+              else if (value === 'restart') {
               // Centralised reset (also clears the per-identity Apple-side
               // availability map + the iOS bundle id confirmation gate — both
               // missing from the previous inline version). The log message
               // stays error-recovery specific.
-              await resetForFreshStart()
-              addLog('↩️  Onboarding reset — starting fresh', 'yellow')
-              setStep('welcome')
-            }
-            else {
-              setError(`Run \`${buildInitCommand}\` to resume.`)
-              exitOnboarding()
-            }
-          }}
-        />
-      )}
+                await resetForFreshStart()
+                addLog('↩️  Onboarding reset — starting fresh', 'yellow')
+                setStep('welcome')
+              }
+              else {
+                setError(`Run \`${buildInitCommand}\` to resume.`)
+                exitOnboarding()
+              }
+            }}
+          />
+        )}
 
-      {/* Done */}
-      {step === 'build-complete' && (
-        <BuildCompleteStep
-          buildUrl={buildUrl}
-          ciSecretUploadSummary={ciSecretUploadSummary}
-          buildRequestCommand={buildRequestCommand}
-          workflowWrittenPath={workflowWrittenPath}
-          envExportPath={envExportPath}
-          envExportError={envExportError}
-          dense={dense}
-        />
-      )}
+        {/* Done */}
+        {step === 'build-complete' && (
+          <BuildCompleteStep
+            buildUrl={buildUrl}
+            ciSecretUploadSummary={ciSecretUploadSummary}
+            buildRequestCommand={buildRequestCommand}
+            workflowWrittenPath={workflowWrittenPath}
+            envExportPath={envExportPath}
+            envExportError={envExportError}
+            dense={dense}
+          />
+        )}
       </Box>
     </Box>
   )

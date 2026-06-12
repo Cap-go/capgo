@@ -11,10 +11,12 @@
 #   2. ~/.capgo/asc-key-helper/capgo-asc-key-helper  (cached download)
 #
 # Usage:
-#   scripts/build-asc-key-helper.sh <path-to-helper-swift-package> [out-dir]
+#   scripts/build-asc-key-helper.sh [path-to-helper-swift-package] [out-dir]
+#
+# Defaults to the in-repo package at cli/native/asc-key-helper.
 #
 # Example:
-#   scripts/build-asc-key-helper.sh ~/Developer/test-p8-extract dist-helper
+#   scripts/build-asc-key-helper.sh                 # builds the vendored package
 #   export CAPGO_ASC_KEY_HELPER_PATH="$PWD/dist-helper/capgo-asc-key-helper"
 #
 set -euo pipefail
@@ -24,14 +26,17 @@ if [[ "$(uname)" != "Darwin" ]]; then
   exit 1
 fi
 
-SRC_DIR="${1:-}"
+# Default to the vendored package next to this script (cli/native/asc-key-helper).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEFAULT_SRC="$SCRIPT_DIR/../native/asc-key-helper"
+SRC_DIR="${1:-$DEFAULT_SRC}"
 OUT_DIR="${2:-dist-helper}"
 PRODUCT_NAME="P8Extract"          # SwiftPM executable product name
 OUT_BINARY="capgo-asc-key-helper" # canonical name the CLI looks for
 
-if [[ -z "$SRC_DIR" || ! -f "$SRC_DIR/Package.swift" ]]; then
-  echo "error: pass the helper Swift package dir (the folder with Package.swift)." >&2
-  echo "usage: $0 <path-to-helper-swift-package> [out-dir]" >&2
+if [[ ! -f "$SRC_DIR/Package.swift" ]]; then
+  echo "error: no Package.swift at '$SRC_DIR'." >&2
+  echo "usage: $0 [path-to-helper-swift-package] [out-dir]" >&2
   exit 1
 fi
 
