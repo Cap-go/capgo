@@ -58,6 +58,13 @@ jobs:
             echo "::error::version '$v' is not semver (e.g. 1.0.0)"; exit 1
           fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
+          # Prereleases (e.g. 1.0.0-rc.4) publish under the `rc` dist-tag so they
+          # stay off the default install; stable versions go to `latest`.
+          if printf '%s' "$v" | grep -q '-'; then
+            echo "npm_tag=rc" >> "$GITHUB_OUTPUT"
+          else
+            echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
+          fi
       - name: Build helper bundles
         run: bash cli-helper/scripts/build.sh "${{ steps.version.outputs.version }}"
       - name: Import Developer ID certificate into throwaway keychain
@@ -164,12 +171,12 @@ jobs:
         working-directory: cli-helper/npm/darwin-arm64
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --provenance --access public --tag rc
+        run: npm publish --provenance --access public --tag ${{ steps.version.outputs.npm_tag }}
       - name: Publish darwin-x64
         working-directory: cli-helper/npm/darwin-x64
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --provenance --access public --tag rc
+        run: npm publish --provenance --access public --tag ${{ steps.version.outputs.npm_tag }}
       - name: Zip signed bundles for release assets
         run: |
           ditto -c -k --keepParent cli-helper/dist/arm64/Capgo.app cli-helper/dist/Capgo-arm64.zip
