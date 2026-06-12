@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { NavigationGuardNext, RouteLocationNormalized } from 'vue-router'
 import type { UserModule } from '~/types'
 import { hideLoader } from '~/services/loader'
+import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { setUser } from '~/services/posthog'
 import { isSsoUser, provisionSsoUser } from '~/services/ssoProvisioning'
 import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
@@ -215,6 +216,8 @@ async function guard(
 
   function shouldRedirectToPendingInviteOnboarding(organizationsLoaded: boolean) {
     if (!organizationsLoaded)
+      return false
+    if (isNativeAppStoreContext())
       return false
     if (to.path.startsWith('/onboarding/invitation'))
       return false

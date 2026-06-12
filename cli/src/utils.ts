@@ -2020,23 +2020,6 @@ export async function getRemoteDependencies(supabase: SupabaseClient<Database>, 
   return convertNativePackages(((remoteNativePackages.version as any)?.native_packages as any) ?? [])
 }
 
-export async function checkChecksum(supabase: SupabaseClient<Database>, appId: string, channel: string, currentChecksum: string) {
-  const s = spinnerC()
-  s.start(`Checking bundle checksum compatibility with channel ${channel}`)
-  const remoteChecksum = await getRemoteChecksums(supabase, appId, channel)
-
-  if (!remoteChecksum) {
-    s.stop(`No checksum found for channel ${channel}, the bundle will be uploaded`)
-    return
-  }
-  if (remoteChecksum && remoteChecksum === currentChecksum) {
-    // cannot upload the same bundle - stop spinner before throwing
-    s.stop(`Checksum check failed`)
-    log.error(`Cannot upload the same bundle content.\nCurrent bundle checksum matches remote bundle for channel ${channel}\nDid you build your app before uploading?\nPS: You can ignore this check with "--ignore-checksum-check"`)
-    throw new Error('Cannot upload the same bundle content')
-  }
-  s.stop(`Checksum compatible with ${channel} channel`)
-}
 
 export type { Compatibility, CompatibilityDetails, IncompatibilityReason } from './schemas/common'
 
