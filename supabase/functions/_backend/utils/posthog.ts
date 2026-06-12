@@ -14,6 +14,7 @@ interface PostHogCapturePayload extends Pick<TrackOptions, 'event'>, Pick<TrackO
   ip?: string
   setPersonProperties?: boolean
   tags?: Record<string, any>
+  timestamp?: string
   user_id?: string
 }
 
@@ -47,7 +48,7 @@ export async function trackPosthogEvent(c: Context, payload: PostHogCapturePaylo
     distinct_id: distinctId,
     properties,
     ip: payload.ip,
-    timestamp: new Date().toISOString(),
+    timestamp: payload.timestamp ?? new Date().toISOString(),
   }
 
   try {
