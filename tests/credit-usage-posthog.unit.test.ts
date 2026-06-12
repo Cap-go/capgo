@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { addBackfillRunTags, buildCheckpointResumeFilter, getBackfillProgressScopeKey, resolveCutoverIso } from '../scripts/backfill_credit_usage_posthog_events.ts'
 import { buildCreditUsagePosthogEventInput } from '../supabase/functions/_backend/utils/credit_usage_posthog.ts'
 
 const {
@@ -119,6 +120,63 @@ describe('credit usage PostHog event builder', () => {
       transaction_type: 'deduction',
       usage: 5400,
       limit: 1800,
+    })
+  })
+})
+
+describe('credit usage PostHog backfill helpers', () => {
+  it('builds stable checkpoint scope keys', () => {
+    expect(getBackfillProgressScopeKey(null)).toBe('all_orgs')
+    expect(getBackfillProgressScopeKey(undefined)).toBe('all_orgs')
+    expect(getBackfillProgressScopeKey(' org-1 ')).toBe('org:org-1')
+  })
+
+  it('builds a resume filter after the last processed occurred_at and id pair', () => {
+    expect(buildCheckpointResumeFilter('2026-03-01T10:00:00.000Z', 123))
+      .toBe('occurred_at.gt.2026-03-01T10:00:00.000Z,and(occurred_at.eq.2026-03-01T10:00:00.000Z,id.gt.123)')
+  })
+
+  it('normalizes explicit cutovers before they are used as query bounds', () => {
+    expect(resolveCutoverIso({
+      apply: true,
+      configuredCutover: '2026-06-01',
+      progress: null,
+      to: new Date('2026-06-12T00:00:00.000Z'),
+    })).toBe('2026-06-01T00:00:00.000Z')
+  })
+
+  it('requires a cutover before the first applying run', () => {
+    expect(() => resolveCutoverIso({
+      apply: true,
+      configuredCutover: null,
+      progress: null,
+      to: new Date('2026-06-12T00:00:00.000Z'),
+    })).toThrow('Missing cutover timestamp')
+  })
+
+  it('marks backfilled events with a run id without changing event identity', () => {
+    const input = buildCreditUsagePosthogEventInput(transaction as any, overageEvent as any, 'backfill')
+
+    const tagged = addBackfillRunTags(input, {
+      backfillRangeFrom: '2026-03-01T00:00:00.000Z',
+      backfillRangeTo: '2026-06-01T00:00:00.000Z',
+      backfillRunId: 'credits-q2',
+      backfillStartedAt: '2026-06-12T09:30:00.000Z',
+    })
+
+    expect(tagged).toBe(input)
+    expect(tagged).toMatchObject({
+      distinctId: 'org-1',
+      event: 'Credit Usage Ledger Entry',
+      timestamp: '2026-03-01T10:00:00.000Z',
+    })
+    expect(tagged.tags).toMatchObject({
+      $insert_id: 'usage_credit_transaction:123',
+      backfill_range_from: '2026-03-01T00:00:00.000Z',
+      backfill_range_to: '2026-06-01T00:00:00.000Z',
+      backfill_run_id: 'credits-q2',
+      backfill_started_at: '2026-06-12T09:30:00.000Z',
+      capture_source: 'backfill',
     })
   })
 })
