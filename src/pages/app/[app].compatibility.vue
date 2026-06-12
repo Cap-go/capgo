@@ -585,7 +585,7 @@ watchEffect(async () => {
                     <button
                       type="button"
                       data-test="compatibility-rebuild-cta"
-                      class="inline-flex items-center self-start gap-1.5 px-4 py-2 mt-4 text-sm font-semibold text-white transition-colors rounded-lg bg-blue-600 hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                      class="self-start mt-4 text-white d-btn d-btn-primary d-btn-sm"
                       @click="openBuilder"
                     >
                       {{ t('compat-fix-rebuild-cta') }}
@@ -604,7 +604,7 @@ watchEffect(async () => {
                         v-if="permittedRollbackTargets.length > 0"
                         type="button"
                         data-test="compatibility-rollback-cta"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white transition-colors rounded-lg bg-blue-600 hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                        class="text-white d-btn d-btn-primary d-btn-sm"
                         @click="openRollbackDialog"
                       >
                         {{ t('compat-fix-rollback-cta') }}
@@ -612,7 +612,7 @@ watchEffect(async () => {
                       </button>
                       <button
                         type="button"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold transition-colors border rounded-lg border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                        class="d-btn d-btn-outline d-btn-sm"
                         @click="router.push(`/app/${encodeURIComponent(id)}/channels`)"
                       >
                         {{ t('compat-fix-manage-channels') }}
