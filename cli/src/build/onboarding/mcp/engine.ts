@@ -14,6 +14,7 @@ import { isSafeAppIdForCommand } from './app-id-validation.js'
 import { ANDROID_STEP_PROGRESS } from '../android/types.js'
 import { STEP_PROGRESS } from '../types.js'
 import { getAndroidResumeStep } from '../android/progress.js'
+import { extractDeveloperId } from '../android/play-api.js'
 import { getIosResumeStep } from '../ios/progress.js'
 import { TAIL_INPUT_KEYS, validateIosStepInput, validateStepInput, validateStorePassword, validateTailStepInput } from './step-input.js'
 import { androidViewForStep, applyAndroidInput, applyGoogleSignIn, runAndroidEffect } from '../android/flow.js'
@@ -2015,7 +2016,25 @@ export async function decideAndroid(
       if (poll.status === 'absent') {
         // startOAuthFlow is always provided by the MCP driver (buildAndroidEffectDeps);
         // the Ink driver never reaches this code path.
-        await session.begin(appId, () => deps.androidEffectDeps.startOAuthFlow!())
+        try {
+          await session.begin(appId, () => deps.androidEffectDeps.startOAuthFlow!())
+        }
+        catch (err) {
+          // begin() rethrows when the flow could not even start (e.g. the
+          // loopback port is busy). Surface a structured retry gate instead of
+          // letting the raw error escape the MCP tool handler
+          // (hostile-review 2026-06-12).
+          const reason = err instanceof Error ? err.message : String(err)
+          session.clear(appId)
+          return {
+            onboarding: 'capgo-builder', phase: 'credentials', state: 'google-sign-in', platform: 'android',
+            progress: ANDROID_STEP_PROGRESS['google-sign-in'], kind: 'human_gate',
+            summary: `Google sign-in could not start (${reason}). Tell me to continue to try again.`,
+            human: { instruction: `The Google sign-in could not start (${reason}). Tell me to continue and I will try opening the browser again.` },
+            next: { tool: NEXT_STEP_TOOL, instruction: 'Tell the user what went wrong, then call next_step({}) to retry.', call: `${NEXT_STEP_TOOL}({})` },
+            rules: ONBOARDING_RULES,
+          }
+        }
         return {
           onboarding: 'capgo-builder', phase: 'credentials', state: 'google-sign-in', platform: 'android',
           progress: ANDROID_STEP_PROGRESS['google-sign-in'], kind: 'human_gate',
@@ -2051,7 +2070,26 @@ export async function decideAndroid(
       }
 
       const tokens = poll.tokens!
-      const info = await deps.androidEffectDeps.fetchUserInfo(tokens.accessToken)
+      let info: Awaited<ReturnType<typeof deps.androidEffectDeps.fetchUserInfo>>
+      try {
+        info = await deps.androidEffectDeps.fetchUserInfo(tokens.accessToken)
+      }
+      catch (err) {
+        // The sign-in itself SUCCEEDED; only the user-info fetch failed (e.g. a
+        // transient network error). KEEP the settled session so the next
+        // continue retries fetchUserInfo with the same tokens instead of making
+        // the user sign in again — and never let the raw error escape the MCP
+        // tool handler (hostile-review 2026-06-12).
+        const reason = err instanceof Error ? err.message : String(err)
+        return {
+          onboarding: 'capgo-builder', phase: 'credentials', state: 'google-sign-in', platform: 'android',
+          progress: ANDROID_STEP_PROGRESS['google-sign-in'], kind: 'human_gate',
+          summary: `You're signed in, but I couldn't fetch your Google account info (${reason}). Tell me to continue to retry.`,
+          human: { instruction: `The Google sign-in succeeded, but fetching your account info failed (${reason}). Tell me to continue and I will retry without a new sign-in.` },
+          next: { tool: NEXT_STEP_TOOL, instruction: 'Tell the user what went wrong, then call next_step({}) to retry.', call: `${NEXT_STEP_TOOL}({})` },
+          rules: ONBOARDING_RULES,
+        }
+      }
       progress = applyGoogleSignIn(progress, tokens, info)
       await deps.androidEffectDeps.saveAndroidProgress(appId, progress)
       session.clear(appId)
@@ -2944,6 +2982,14 @@ export interface EngineDeps {
   readBuildRecord: (path: string) => Promise<BuildOutputRecord | null>
   buildRecordPath: (appId: string, platform: Platform) => string
   /**
+   * Remove a build record (and its QR png) left behind by an earlier build.
+   * Called by runBuild BEFORE the hand-off so checkBuild can never read a
+   * stale record as the new build's result (hostile-review 2026-06-12).
+   * Optional so legacy fixtures keep working; production wires
+   * removeBuildOutputRecord.
+   */
+  clearBuildRecord?: (recordPath: string) => Promise<void>
+  /**
    * The shared iOS flow engine's IO deps (Apple API / CSR / fs / persistence),
    * pre-bound by the driver (buildIosEffectDeps in onboarding-tools.ts for
    * production; canned fakes in tests). decideIos threads the per-app carried
@@ -3453,6 +3499,23 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
       }
       if (rec === null)
         return buildWaitingResult(checkPlatform)
+      // Stale-record correlation (hostile-review 2026-06-12): a record left
+      // behind by an earlier build of ANOTHER app/platform must never complete
+      // (or fail) THIS onboarding. schemaVersion:1 records always carry
+      // appId/platform (strict read shape); future schemas may not — correlate
+      // only on present string fields.
+      const recAppId: unknown = rec.appId
+      const recPlatform: unknown = rec.platform
+      if ((typeof recAppId === 'string' && recAppId !== checkAppId)
+        || (typeof recPlatform === 'string' && recPlatform !== checkPlatform)) {
+        return {
+          onboarding: 'capgo-builder', phase: 'build', state: 'build-stale-record', platform: checkPlatform,
+          progress: 92, kind: 'error',
+          summary: `The build record at ${recordPath} is for "${String(recAppId)}" (${String(recPlatform)}), not "${checkAppId}" (${checkPlatform}) — it's stale. Delete the file, re-run the build command, then call ${NEXT_STEP_TOOL} with checkBuild: true.`,
+          context: { recordPath },
+          rules: ONBOARDING_RULES,
+        }
+      }
       if (rec.status === 'success' || Boolean(rec.outputUrl)) {
         // S8: a CONFIRMED first build enters the shared post-save tail
         // (CI-secrets → env/workflow) instead of ending the conversation —
@@ -3479,7 +3542,41 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
           rules: ONBOARDING_RULES,
         }
       }
+      // Precondition (hostile-review 2026-06-12): the build offer
+      // (decideBuildPhase) only renders AFTER the save wrote
+      // completedSteps.credentialsSaved. Honor the same contract here so a
+      // premature runBuild can never launch a build for an app whose
+      // credentials were never saved.
+      const buildProgress = buildPlatform === 'android'
+        ? await deps.loadAndroidProgress(buildAppId)
+        : await deps.loadProgress(buildAppId)
+      if (!buildProgress?.completedSteps?.credentialsSaved) {
+        return {
+          onboarding: 'capgo-builder', phase: 'build', state: 'build-not-ready', platform: buildPlatform,
+          progress: 90, kind: 'error',
+          summary: `Can't start the first build for "${buildAppId}" (${buildPlatform}): credentials haven't been saved yet. Finish the onboarding steps first — call ${NEXT_STEP_TOOL}({}) to continue from the current step.`,
+          rules: ONBOARDING_RULES,
+        }
+      }
       const recordPath = deps.buildRecordPath(buildAppId, buildPlatform)
+      // Clear any record left behind by an earlier build BEFORE the hand-off so
+      // checkBuild can never read last run's result as this build's
+      // (hostile-review 2026-06-12). Optional dep: legacy fixtures without it
+      // keep the previous behavior.
+      if (deps.clearBuildRecord) {
+        try {
+          await deps.clearBuildRecord(recordPath)
+        }
+        catch (err) {
+          return {
+            onboarding: 'capgo-builder', phase: 'build', state: 'build-stale-record', platform: buildPlatform,
+            progress: 90, kind: 'error',
+            summary: `A record from an earlier build at ${recordPath} could not be removed (${err instanceof Error ? err.message : String(err)}). Delete the file manually, then ask me to run the build again.`,
+            context: { recordPath },
+            rules: ONBOARDING_RULES,
+          }
+        }
+      }
       const command = `npx @capgo/cli@latest build request ${buildAppId} --platform ${buildPlatform} --output-upload --output-record "${recordPath}"`
       if (deps.canLaunchTerminal()) {
         const launched = await deps.launchBuildInTerminal(command)
@@ -3575,7 +3672,7 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
         const allowed = check.allowedFields
         const correction = allowed && allowed.length > 0
           ? `This step accepts only one of: ${allowed.map(f => `{ ${f}: ... }`).join(' or ')}. Call ${NEXT_STEP_TOOL} with EXACTLY ONE of those fields and no others${check.extras.length ? ` — remove: ${check.extras.join(', ')}` : ''}. Do not batch multiple answers.`
-          : `Call ${NEXT_STEP_TOOL} with only the field this step asks for.`
+          : `The current step (${currentStep}) takes none of the supplied fields${check.extras.length ? ` (${check.extras.join(', ')})` : ''}. Answer the current step instead — or call ${NEXT_STEP_TOOL}({}) to continue from it.`
         return { ...corrective, summary: `${correction}\n\n${corrective.summary}` }
       }
       // Content gate: enforce the store-password rules the ink TUI applies inline
@@ -3602,6 +3699,34 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
     if (facts.appId) {
       const view = androidViewForStep('gcp-project-create-name', facts.androidProgress, { appId: facts.appId })
       return mapAndroidView(view, facts)
+    }
+  }
+
+  // The package picker's "Type a different package name" row ('__manual__') is
+  // navigation-only too (mirrors main's app.tsx onChange, which switches to the
+  // manual text input without persisting): render the manual-entry prompt so
+  // the agent collects a REAL package name next. Without this, the literal
+  // sentinel was persisted as the applicationId and service-account
+  // provisioning ran against "__manual__" (hostile-review 2026-06-12).
+  if (androidInputPresent && input?.androidPackage === '__manual__') {
+    const facts = await gatherFacts(deps)
+    if (facts.appId) {
+      const view = androidViewForStep('android-package-select', facts.androidProgress, { appId: facts.appId })
+      return mapAndroidView(view, facts)
+    }
+  }
+
+  // Mirror the TUI's Play developer id submit guard (android/ui/app.tsx:2900):
+  // an unparseable id/URL re-renders the prompt with the exact TUI corrective
+  // and persists nothing — the shared reducer silently no-ops on invalid input
+  // ("caller should surface error"), which over MCP looped the same prompt with
+  // no explanation (hostile-review 2026-06-12).
+  if (androidInputPresent && input?.playDeveloperId !== undefined && input.playDeveloperId !== null
+    && !extractDeveloperId(String(input.playDeveloperId))) {
+    const facts = await gatherFacts(deps)
+    if (facts.appId) {
+      const corrective = await decideAndroid(facts, deps) // re-renders the current step; nothing applied
+      return { ...corrective, summary: `Could not extract a developer ID. Paste the full Play Console URL or just the numeric ID.\n\n${corrective.summary}` }
     }
   }
 
@@ -3865,6 +3990,8 @@ export const MCP_ONLY_STATES: readonly string[] = [
   'build-failed',
   'build-skipped',
   'build-appid-unsafe',
+  'build-not-ready',
+  'build-stale-record',
   // Defensive stall guards (drive / decideIos / decideAndroid).
   'auto-loop-guard',
   'ios-auto-loop-guard',

@@ -21,6 +21,12 @@ export const STEP_ALLOWED_FIELDS: Partial<Record<AndroidOnboardingStep, string[]
   // — the store-password step never stays to collect a key password, so
   // keystoreKeyPassword is not a legitimate answer at this step (vestigial).
   'keystore-existing-store-password': ['keystoreStorePassword'],
+  // Resume-step ALIASES (fail-closed gate, hostile-review 2026-06-12): these
+  // auto steps are what getAndroidResumeStep derives while the user is parked
+  // on the question the auto step's effect rendered — the answer legitimately
+  // arrives "at" the auto step. Each lists exactly the rendered question's
+  // fields.
+  'keystore-existing-detecting-alias': ['keystoreAlias'], // renders the alias select/input
   'keystore-existing-alias-select': ['keystoreAlias'],
   'keystore-existing-alias': ['keystoreAlias'],
   'keystore-existing-key-password': ['keystoreKeyPassword'],
@@ -35,6 +41,9 @@ export const STEP_ALLOWED_FIELDS: Partial<Record<AndroidOnboardingStep, string[]
   'service-account-method-select': ['serviceAccountMethod'],
   'sa-json-existing-path': ['serviceAccountJsonPath'],
   'sa-json-validation-failed': ['saMethodChoice'],
+  // Resume alias: validation runs as the sa-json-validating effect; on failure
+  // the validation-failed choice renders while resume stays sa-json-validating.
+  'sa-json-validating': ['saMethodChoice'],
   'play-developer-id-input': ['playDeveloperId'],
   // The GCP project picker accepts EITHER an existing project id OR a new
   // project name — mirroring main's app.tsx onChange, where selecting the
@@ -46,6 +55,9 @@ export const STEP_ALLOWED_FIELDS: Partial<Record<AndroidOnboardingStep, string[]
   // gcpProjectChosen{createdByOnboarding:true} is written and gcp-setup-running
   // creates the project.
   'gcp-projects-select': ['gcpProjectId', 'gcpProjectName'],
+  // Resume alias: the project list loads as the gcp-projects-loading effect and
+  // renders the picker; resume stays gcp-projects-loading until a pick persists.
+  'gcp-projects-loading': ['gcpProjectId', 'gcpProjectName'],
   'gcp-project-create-name': ['gcpProjectName'],
   'android-package-select': ['androidPackage'],
   // ── Post-build tail steps (S9-S11) ─────────────────────────────────────────
@@ -82,8 +94,14 @@ export const ANDROID_INPUT_KEYS: string[] = [
  * fields and no other governed android key. Otherwise { ok:false } with the
  * allowed fields + the offending extra keys for a corrective message.
  *
- * Steps with no allowed-field entry (auto/sign-in/no-field) are not governed and
- * always pass — the strict gate only constrains interactive input steps.
+ * Inputs with NO governed android key always pass (plain continue / other
+ * vocabularies). Steps with no allowed-field entry FAIL CLOSED for governed
+ * keys (hostile-review 2026-06-12): an android field sent at an auto step, at
+ * the google-sign-in park, or before the android flow has rendered its first
+ * step ('welcome', i.e. null progress) is never a legitimate answer — letting
+ * it through allowed jumping the keystore phase past the credentials-exist
+ * data-safety gate (which is seeded only when the flow renders
+ * keystore-method-select).
  *
  * @param currentStep the resume step the user is currently on
  * @param input the next_step input object
@@ -94,8 +112,10 @@ export function validateStepInput(
 ): { ok: boolean, allowedFields?: string[], extras: string[] } {
   const allowed = STEP_ALLOWED_FIELDS[currentStep]
   const presentAndroidKeys = ANDROID_INPUT_KEYS.filter(k => input[k] !== undefined && input[k] !== null)
+  if (presentAndroidKeys.length === 0)
+    return { ok: true, extras: [] } // no governed key — nothing to gate
   if (!allowed)
-    return { ok: true, extras: [] } // auto / no-field step — not governed
+    return { ok: false, extras: presentAndroidKeys } // fail closed — see doc above
   const presentAllowed = presentAndroidKeys.filter(k => allowed.includes(k))
   const extras = presentAndroidKeys.filter(k => !allowed.includes(k))
   // Exactly one allowed field, and no other governed key. (One field per call.)

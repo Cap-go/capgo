@@ -37,7 +37,7 @@ import { createP12, generateCsr } from '../csr.js'
 import { detectIosBundleIds } from '../bundle-id-detector.js'
 import { writeReleaseBundleId } from '../../pbxproj-parser.js'
 import { deleteProgress, loadProgress, saveProgress } from '../progress.js'
-import { defaultBuildRecordPath, readBuildOutputRecord } from '../../output-record.js'
+import { defaultBuildRecordPath, readBuildOutputRecord, removeBuildOutputRecord } from '../../output-record.js'
 import type { Platform } from './contract.js'
 import { renderResult } from './contract.js'
 import type { EngineDeps } from './engine.js'
@@ -416,8 +416,11 @@ function buildIosEffectDeps(cwd: string, getAppIdFn: () => Promise<string | unde
   }
 }
 
-/** Build the real IO deps from the SDK + CLI utils. */
-function buildDeps(sdk: CapgoSDK): EngineDeps {
+/**
+ * Production EngineDeps wiring. Exported for tests that pin production-only
+ * behavior (clearBuildRecord wiring, keystore file modes).
+ */
+export function buildDeps(sdk: CapgoSDK): EngineDeps {
   const cwd = process.cwd()
   const getAppIdClosure = async (): Promise<string | undefined> => {
     try {
@@ -465,6 +468,7 @@ function buildDeps(sdk: CapgoSDK): EngineDeps {
     loadAndroidProgress: (appId: string) => loadAndroidProgress(appId),
     readBuildRecord: readBuildOutputRecord,
     buildRecordPath: defaultBuildRecordPath,
+    clearBuildRecord: removeBuildOutputRecord,
     canLaunchTerminal: () => canLaunchTerminal(),
     launchBuildInTerminal: (cmd: string) => launchBuildInTerminal(cmd),
     iosEffectDeps: buildIosEffectDeps(cwd, getAppIdClosure),
@@ -494,7 +498,8 @@ function buildDeps(sdk: CapgoSDK): EngineDeps {
       if (resolvedFile !== resolvedDir && !resolvedFile.startsWith(resolvedDir + sep))
         throw new Error('Refusing to write keystore outside the android app directory.')
       const bytes = Buffer.from(base64, 'base64')
-      await writeFile(filePath, bytes)
+      // Owner-only: the .p12 holds the signing private key (hostile-review 2026-06-12).
+      await writeFile(filePath, bytes, { mode: 0o600 })
       return filePath
     },
   }
