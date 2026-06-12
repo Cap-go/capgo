@@ -1226,6 +1226,8 @@ export async function decideIos(
     // credentials-exist gate re-protects the saved credentials. NEVER
     // decideBuildPhase here: the build already happened (buildRequested).
     if (step === 'build-complete') {
+      // Harvest the outcome facts BEFORE the cleanup wipes the session.
+      const outcomes = harvestTailOutcomes(appId, Boolean(progress?.completedSteps?.ciSecretsUploaded))
       try {
         await ios.deleteProgress?.(appId)
       }
@@ -1233,7 +1235,7 @@ export async function decideIos(
         // Best-effort cleanup — a stale slim file only re-renders this terminal.
       }
       clearSession(appId)
-      return tailCompleteResult(appId, 'ios')
+      return tailCompleteResult(appId, 'ios', outcomes)
     }
 
     // Data-safety gate (parked by a TUI run or seeded above) → the
@@ -1357,6 +1359,11 @@ export async function decideIos(
           savedCredentials: r.transient?.savedCredentials,
           ciSecretEntries: r.transient?.ciSecretEntries,
           ciSecretExistingKeys: r.transient?.ciSecretExistingKeys,
+          // NON-SECRET outcome facts (counts/labels/paths only) — parked so
+          // harvestTailOutcomes can surface them on the terminal build-complete.
+          ciSecretUploadSummary: r.transient?.ciSecretUploadSummary,
+          workflowFilePath: r.transient?.workflowFilePath,
+          envExportPath: r.transient?.envExportPath,
         })
         if (step === 'saving-credentials' && r.next === 'ask-build') {
           // The save succeeded (the self-heal path returns a different next):
@@ -2063,6 +2070,8 @@ export async function decideAndroid(
     // gate re-protects the saved credentials. NEVER decideBuildPhase here: the
     // build already happened (buildRequested).
     if (step === 'build-complete') {
+      // Harvest the outcome facts BEFORE the cleanup wipes the session.
+      const outcomes = harvestTailOutcomes(appId, Boolean(progress?.completedSteps?.ciSecretsUploaded))
       try {
         await deps.androidEffectDeps.deleteAndroidProgress(appId)
       }
@@ -2070,7 +2079,7 @@ export async function decideAndroid(
         // Best-effort cleanup — a stale slim file only re-renders this terminal.
       }
       clearSession(appId)
-      return tailCompleteResult(appId, 'android')
+      return tailCompleteResult(appId, 'android', outcomes)
     }
 
     // ── S9-S11: interactive tail steps render structurally (and park) ────────
@@ -2176,6 +2185,11 @@ export async function decideAndroid(
           savedCredentials: transient.savedCredentials,
           ciSecretEntries: transient.ciSecretEntries,
           ciSecretExistingKeys: transient.ciSecretExistingKeys,
+          // NON-SECRET outcome facts (counts/labels/paths only) — parked so
+          // harvestTailOutcomes can surface them on the terminal build-complete.
+          ciSecretUploadSummary: transient.ciSecretUploadSummary,
+          workflowFilePath: transient.workflowFilePath,
+          envExportPath: transient.envExportPath,
         })
         if (step === 'saving-credentials' && r.next === 'ask-build') {
           progress = slimAndroidTailProgress({
@@ -2306,12 +2320,49 @@ const MCP_TAIL_EFFECT_STEPS = new Set<string>([
   'requesting-build',
 ])
 
-/** The tail's terminal screen — onboarding is fully complete (post-build). */
-function tailCompleteResult(appId: string, platform: Platform): NextStepResult {
+/**
+ * The tail's terminal screen — onboarding is fully complete (post-build).
+ * Mirrors the TUI's build-complete screen, which SURFACES what the tail did
+ * (CI upload summary, workflow path, .env path) — without it the conducting
+ * agent has no tool-result evidence for claims like "secrets uploaded" (the
+ * live Codex judge correctly failed exactly that). Outcome strings carry
+ * counts/labels/paths only — never secret values.
+ */
+function tailCompleteResult(
+  appId: string,
+  platform: Platform,
+  outcomes: { uploadSummary?: string, workflowPath?: string, envExportPath?: string } = {},
+): NextStepResult {
+  const done: string[] = []
+  if (outcomes.uploadSummary)
+    done.push(outcomes.uploadSummary)
+  if (outcomes.workflowPath)
+    done.push(`GitHub Actions workflow written: ${outcomes.workflowPath}`)
+  if (outcomes.envExportPath)
+    done.push(`Build env vars exported to ${outcomes.envExportPath} (file mode 0600 — do not commit it).`)
+  const outcomeText = done.length > 0 ? ` ${done.join(' ')}` : ''
   return {
     onboarding: 'capgo-builder', phase: 'done', state: 'build-complete', platform, progress: 100, kind: 'done',
-    summary: `Capgo Builder onboarding for "${appId}" (${platform}) is complete — credentials are saved and your first cloud build went through. Run \`npx @capgo/cli@latest build request --platform ${platform}\` anytime for new builds.`,
+    summary: `Capgo Builder onboarding for "${appId}" (${platform}) is complete — credentials are saved and your first cloud build went through.${outcomeText} Run \`npx @capgo/cli@latest build request --platform ${platform}\` anytime for new builds.`,
     rules: ONBOARDING_RULES,
+  }
+}
+
+/**
+ * Harvest the tail outcome facts for the terminal summary BEFORE the session
+ * is cleared. Session transients (exact upload summary / written paths) win;
+ * the durable ciSecretsUploaded marker provides a generic line when a server
+ * restart lost the session.
+ */
+function harvestTailOutcomes(appId: string, ciSecretsUploaded: boolean): { uploadSummary?: string, workflowPath?: string, envExportPath?: string } {
+  const tail = getSession(appId).tailCarried as Record<string, unknown>
+  const uploadSummary = typeof tail.ciSecretUploadSummary === 'string'
+    ? tail.ciSecretUploadSummary
+    : (ciSecretsUploaded ? 'The build env vars were uploaded to your CI secrets.' : undefined)
+  return {
+    ...(uploadSummary ? { uploadSummary } : {}),
+    ...(typeof tail.workflowFilePath === 'string' ? { workflowPath: tail.workflowFilePath } : {}),
+    ...(typeof tail.envExportPath === 'string' ? { envExportPath: tail.envExportPath } : {}),
   }
 }
 

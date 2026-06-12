@@ -64,8 +64,21 @@ export type IosCarried = NonNullable<IosEffectDeps['carried']> & {
    */
   _appleCertIdForChosen?: string
 }
-/** The tail driver-held transient state — the exact `TailEffectDeps['carried']` shape. */
-export type TailCarried = NonNullable<TailEffectDeps['carried']>
+/**
+ * The tail driver-held transient state — the exact `TailEffectDeps['carried']`
+ * shape, plus the NON-SECRET tail OUTCOME facts the outcome-aware terminal
+ * summary harvests (engine.ts harvestTailOutcomes → tailCompleteResult): the
+ * exact upload summary line (counts/labels only), the written workflow path
+ * and the exported .env path. These three are non-secret BY CONSTRUCTION and
+ * are the one carried subset allowed to surface verbatim in a tool result —
+ * secret VALUES (savedCredentials / ciSecretEntries) must still never leave
+ * this registry.
+ */
+export type TailCarried = NonNullable<TailEffectDeps['carried']> & {
+  ciSecretUploadSummary?: string
+  workflowFilePath?: string
+  envExportPath?: string
+}
 
 /**
  * S9-S11: the MCP's parked interactive TAIL step + the NON-SECRET view context
