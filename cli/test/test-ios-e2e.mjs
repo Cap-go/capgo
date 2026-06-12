@@ -15,7 +15,7 @@
  *   (b) IMPORT (ad_hoc, on-disk profile) — setup-method-select(import) →
  *       import-distribution-mode(ad_hoc) → import-scanning →
  *       import-validating-all-certs → import-pick-identity → import-pick-profile →
- *       import-export-warning → import-compiling-helper → import-exporting →
+ *       import-export-warning → import-exporting →
  *       saving-credentials → [tail] → build-complete.
  *   (c) IMPORT (app_store, create-profile via ASC key) — import-no-match-recovery
  *       (create, no ASC key) → api-key-instructions → … → verifying-key (which
@@ -178,8 +178,6 @@ function makeDeps(overrides = {}) {
     findCertIdBySha1: async (sha1) => { calls.push({ name: 'findCertIdBySha1', args: [sha1] }); return 'APPLE-CERT-ID' },
     ensureBundleId: async (b) => { calls.push({ name: 'ensureBundleId', args: [b] }) },
     exportP12FromKeychain: async (sha1) => { calls.push({ name: 'exportP12FromKeychain', args: [sha1] }); return { ...EXPORTED_P12 } },
-    precompileSwiftHelper: async () => { calls.push({ name: 'precompileSwiftHelper', args: [] }) },
-    isHelperCached: () => { calls.push({ name: 'isHelperCached', args: [] }); return true },
 
     // fs
     readFile: async (...a) => { calls.push({ name: 'readFile', args: a }); return P8_BYTES },
@@ -385,14 +383,12 @@ await test('(a) CREATE-NEW: a saved (credentialsSaved) progress resumes onto ask
 // (b) IMPORT (ad_hoc, on-disk profile) happy path → build-complete
 // ════════════════════════════════════════════════════════════════════════════════
 
-await test('(b) IMPORT ad_hoc: distribution(ad_hoc) → scan → validate → pick identity → pick profile → compile → export → tail → build-complete', async () => {
+await test('(b) IMPORT ad_hoc: distribution(ad_hoc) → scan → validate → pick identity → pick profile → export → tail → build-complete', async () => {
   const persisted = []
   const result = await drive({
     startProgress: iosProgress({ setupMethod: undefined }),
     startStep: 'setup-method-select',
     onPersist: p => persisted.push(p),
-    // helper NOT cached so the compile step is exercised.
-    depsOverrides: { isHelperCached: () => false },
     // After the silent scan, the TUI runs the eager batch availability pass before
     // rendering the picker; model that with an effect route. validation → picker.
     effectRoutes: {
@@ -407,7 +403,9 @@ await test('(b) IMPORT ad_hoc: distribution(ad_hoc) → scan → validate → pi
       'import-pick-identity': { carried: { chosenIdentity: IDENTITY_A }, resolveEffect: true },
       // import-pick-profile: pick the on-disk profile → import-export-warning.
       'import-pick-profile': { carried: { chosenProfile: PROFILE_ON_DISK }, resolveEffect: true },
-      // import-export-warning: 'go' + helper NOT cached → import-compiling-helper.
+      // import-export-warning: 'go' → import-exporting (PR #2458 removed the
+      // swiftc compile detour; the precompiled signed helper is resolved inside
+      // the export step).
       'import-export-warning': { carried: { exportWarningAction: 'go' }, resolveEffect: true },
       // ask-build is a tail CHOICE (yes/no) with no persisted reducer — picking
       // 'no' (Not now) finishes the wizard. It's an ephemeral driver route, so
@@ -417,7 +415,7 @@ await test('(b) IMPORT ad_hoc: distribution(ad_hoc) → scan → validate → pi
     },
   })
   assertEquals(result.step, 'build-complete', `import ad_hoc must reach build-complete (visited: ${result.visited.join(' → ')})`)
-  for (const s of ['import-scanning', 'import-validating-all-certs', 'import-pick-identity', 'import-pick-profile', 'import-export-warning', 'import-compiling-helper', 'import-exporting', 'saving-credentials'])
+  for (const s of ['import-scanning', 'import-validating-all-certs', 'import-pick-identity', 'import-pick-profile', 'import-export-warning', 'import-exporting', 'saving-credentials'])
     assert(result.visited.includes(s), `passed through ${s} (visited: ${result.visited.join(' → ')})`)
   // The imported export payload rode transient only; nothing of it was persisted.
   assert(result.carried.certData && result.carried.profileData && result.carried.importedP12Password, 'the export payload rode transient into saving-credentials')
@@ -441,7 +439,6 @@ await test('(c) IMPORT app_store recovery: no-match-recovery(create, no ASC key)
     onPersist: p => persisted.push(p),
     depsOverrides: {
       scanProvisioningProfiles: async () => [], // no on-disk profile → recovery is the path
-      isHelperCached: () => true, // skip the compile step on this path
     },
     script: {
       // 'create' + NO ASC key → api-key-instructions, persisting pendingRecoveryAction.
@@ -578,7 +575,6 @@ await test('(e) every failing effect that routes to error provides a non-empty t
     { step: 'import-scanning', deps: { listSigningIdentities: async () => [] }, progress: iosProgress({ setupMethod: 'import-existing', importDistribution: 'ad_hoc' }) },
     { step: 'import-validating-all-certs', deps: { carried: { importMatches: [{ identity: IDENTITY_A, profiles: [] }] }, classifyCertAvailability: async () => { throw new Error('classify boom') } }, progress: iosProgress({ setupMethod: 'import-existing', importDistribution: 'app_store' }) },
     { step: 'import-checking-apple-cert', deps: { carried: { chosenIdentity: IDENTITY_A, importMatches: [] }, findCertIdBySha1: async () => { throw new Error('apple boom') } }, progress: iosProgress({ setupMethod: 'import-existing', importDistribution: 'app_store' }) },
-    { step: 'import-compiling-helper', deps: { carried: {}, precompileSwiftHelper: async () => { throw new Error('swiftc boom') } }, progress: iosProgress({ setupMethod: 'import-existing', importDistribution: 'app_store' }) },
     { step: 'import-exporting', deps: { carried: {} }, progress: iosProgress({ setupMethod: 'import-existing', importDistribution: 'app_store' }) }, // missing selection guard
     { step: 'import-create-profile-only', deps: { carried: { chosenIdentity: IDENTITY_A }, createProfile: async () => { throw new Error('create boom') } }, progress: iosProgress({ setupMethod: 'import-existing', importDistribution: 'app_store' }) },
     { step: 'cert-limit-prompt', deps: { carried: {} }, progress: iosProgress({}) }, // exit sink (no certToRevoke)

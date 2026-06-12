@@ -1,18 +1,21 @@
 <script setup lang="ts">
 import type { CompatibilityEventGroup, CompatibilityEventRow } from '~/services/compatibilityEvents'
 import type { Database } from '~/types/supabase.types'
-import { computed, ref, watchEffect } from 'vue'
+import { computed, onUnmounted, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconArrowRight from '~icons/lucide/arrow-right'
 import IconCheckCircle from '~icons/lucide/check-circle'
+import IconChevronRight from '~icons/lucide/chevron-right'
 import IconExternalLink from '~icons/lucide/external-link'
 import { dependencyDiffPath, groupCompatibilityEvents, platformLabel } from '~/services/compatibilityEvents'
 import { formatLocalDateTime } from '~/services/date'
+import { checkPermissions } from '~/services/permissions'
+import { pushEvent } from '~/services/posthog'
 import { createSignedImageUrl } from '~/services/storage'
-import { useSupabase } from '~/services/supabase'
+import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 
@@ -32,6 +35,9 @@ const app = ref<Database['public']['Tables']['apps']['Row']>()
 const events = ref<CompatibilityEventRow[]>([])
 const existingChannelIds = ref<Set<number>>(new Set())
 const existingVersionIds = ref<Set<number>>(new Set())
+// Channels whose disable_auto_update_under_native guard is OFF: a rollback can
+// reach devices already on a newer native build, so the confirm dialog warns.
+const guardOffChannelIds = ref<Set<number>>(new Set())
 interface MemberInfo {
   email: string
   image_url: string | null
@@ -53,6 +59,188 @@ const visibleGroups = computed<CompatibilityEventGroup[]>(() => {
     return groupedEvents.value.filter(group => !group.resolved)
   return groupedEvents.value
 })
+
+// Whether the app currently has any live incompatibility, which is when the
+// "what this means / how to fix it" guidance + Capgo Builder CTA are relevant.
+const hasUnresolved = computed(() => groupedEvents.value.some(group => !group.resolved))
+
+const config = getLocalConfig()
+// Docs that explain why native changes can't ship over-the-air.
+const compatDocsUrl = 'https://capgo.app/docs/live-updates/compatibility/'
+
+// Send the user to the in-app native build flow (Builds tab), tracking the click
+// so this Builder entry point can be compared with the banner / upload CTAs.
+function openBuilder() {
+  pushEvent('builder_cta_compatibility_clicked', config.supaHost, { app_id: id.value })
+  router.push(`/app/${encodeURIComponent(id.value)}/builds`)
+}
+
+interface RollbackTarget {
+  channelId: number
+  channelName: string
+  versionId: number
+  versionName: string
+}
+
+// One rollback per affected channel: the most recent unresolved event per channel
+// (events are loaded newest-first) tells us the bundle the channel served before
+// the incompatible change. When several incompatible updates stacked up, each
+// rollback unwinds one step (the next step is offered after the events refresh).
+// Channels or previous bundles that no longer exist (deleted) cannot be rolled back.
+const rollbackTargets = computed<RollbackTarget[]>(() => {
+  const seen = new Set<number>()
+  const targets: RollbackTarget[] = []
+  for (const group of groupedEvents.value) {
+    if (group.resolved)
+      continue
+    const event = group.representative
+    if (event.channel_id === null || seen.has(event.channel_id))
+      continue
+    seen.add(event.channel_id)
+    if (!existingChannelIds.value.has(event.channel_id))
+      continue
+    if (event.previous_version_id === null || !existingVersionIds.value.has(event.previous_version_id))
+      continue
+    targets.push({
+      channelId: event.channel_id,
+      channelName: event.channel_name ?? t('unknown'),
+      versionId: event.previous_version_id,
+      versionName: bundleLabel(event.previous_version_name),
+    })
+  }
+  return targets
+})
+
+// Channels the user may actually roll back (channel.promote_bundle — the
+// permission the DB trigger enforces on every channels.version write). The CTA
+// and the confirm dialog only ever cover permitted channels, so a user without
+// permission is never offered an action that would fail.
+const permittedChannelIds = ref<Set<number>>(new Set())
+let permissionsRequestId = 0
+
+watch(rollbackTargets, async (targets) => {
+  const requestId = ++permissionsRequestId
+  if (targets.length === 0) {
+    permittedChannelIds.value = new Set()
+    return
+  }
+  const permitted = new Set<number>()
+  for (const target of targets) {
+    const allowed = await checkPermissions('channel.promote_bundle', { channelId: target.channelId })
+    if (requestId !== permissionsRequestId)
+      return
+    if (allowed)
+      permitted.add(target.channelId)
+  }
+  permittedChannelIds.value = permitted
+}, { immediate: true })
+
+const permittedRollbackTargets = computed(() =>
+  rollbackTargets.value.filter(target => permittedChannelIds.value.has(target.channelId)))
+
+// The compatibility queue resolves events a few seconds after a channel write,
+// so a rollback refreshes again shortly after. Track the timers so they are
+// cleared on unmount (and on a subsequent rollback) instead of firing into a
+// dead component.
+const pendingRefreshTimers: ReturnType<typeof setTimeout>[] = []
+
+function clearDelayedRefreshes() {
+  for (const timer of pendingRefreshTimers)
+    clearTimeout(timer)
+  pendingRefreshTimers.length = 0
+}
+
+function scheduleDelayedRefreshes() {
+  clearDelayedRefreshes()
+  pendingRefreshTimers.push(setTimeout(() => refreshData(), 4000))
+  pendingRefreshTimers.push(setTimeout(() => refreshData(), 10000))
+}
+
+onUnmounted(clearDelayedRefreshes)
+
+async function rollbackChannels(targets: readonly RollbackTarget[]) {
+  if (targets.length === 0)
+    return
+  const failedChannels: string[] = []
+  const rolledBackChannels: string[] = []
+  for (const target of targets) {
+    // Targets are permission-filtered before the dialog opens; this re-check
+    // only catches a revocation in between. Skip just that channel (it is
+    // named in the outcome toast) instead of aborting the whole batch.
+    const allowed = await checkPermissions('channel.promote_bundle', { channelId: target.channelId })
+    if (!allowed) {
+      console.error('[Compatibility] No permission to roll back channel', target.channelName)
+      failedChannels.push(target.channelName)
+      continue
+    }
+    const { error } = await supabase
+      .from('channels')
+      .update({ version: target.versionId })
+      .eq('id', target.channelId)
+    if (error) {
+      console.error('[Compatibility] Error rolling back channel', target.channelName, error)
+      failedChannels.push(target.channelName)
+    }
+    else {
+      rolledBackChannels.push(target.channelName)
+    }
+  }
+  if (failedChannels.length === 0)
+    toast.success(t('compat-fix-rollback-done'))
+  else if (rolledBackChannels.length === 0)
+    toast.error(t('compat-fix-rollback-failed', { channels: failedChannels.join(', ') }))
+  else
+    toast.error(t('compat-fix-rollback-partial', { done: rolledBackChannels.join(', '), channels: failedChannels.join(', ') }))
+  await refreshData()
+  scheduleDelayedRefreshes()
+}
+
+// Rolling channels back to older bundles is outward-facing (devices start
+// receiving them again), so always confirm first. The targets are snapshotted
+// here so the writes performed on confirm are exactly the changes the dialog
+// displayed, even if a background refresh mutates rollbackTargets meanwhile.
+function openRollbackDialog() {
+  const targets = [...permittedRollbackTargets.value]
+  const changes = targets
+    .map(target => `${target.channelName} → ${target.versionName}`)
+    .join(', ')
+  // Without the downgrade guard, devices that already installed a newer native
+  // build could be served the rolled-back (older) bundle — warn about it.
+  const unguarded = targets
+    .filter(target => guardOffChannelIds.value.has(target.channelId))
+    .map(target => target.channelName)
+  const description = unguarded.length > 0
+    ? `${t('compat-fix-rollback-confirm', { changes })} ${t('compat-fix-rollback-warn-no-guard', { channels: unguarded.join(', ') })}`
+    : t('compat-fix-rollback-confirm', { changes })
+  dialogStore.openDialog({
+    title: t('compat-fix-rollback-title'),
+    description,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('compat-fix-rollback-cta'),
+        role: 'primary',
+        handler: async () => {
+          await rollbackChannels(targets)
+        },
+      },
+    ],
+  })
+}
+
+// The guidance panel is collapsible and remembers the user's choice across
+// visits (default expanded; only collapsed if they hid it before).
+const guidanceCollapseKey = 'capgo-compat-guidance-collapsed'
+const guidanceOpen = ref(typeof localStorage === 'undefined' || localStorage.getItem(guidanceCollapseKey) !== '1')
+
+function toggleGuidance() {
+  guidanceOpen.value = !guidanceOpen.value
+  if (typeof localStorage !== 'undefined')
+    localStorage.setItem(guidanceCollapseKey, guidanceOpen.value ? '0' : '1')
+}
 
 async function loadAppInfo() {
   try {
@@ -91,26 +279,32 @@ async function loadEvents() {
 }
 
 // Channel names are snapshots that outlive deleted channels; only link the
-// ones that still exist.
+// ones that still exist. Also remember which channels have the downgrade guard
+// (disable_auto_update_under_native) off, so the rollback confirm can warn.
 async function loadExistingChannels() {
   const channelIds = [...new Set(events.value
     .map(event => event.channel_id)
     .filter((channelId): channelId is number => channelId !== null))]
   if (channelIds.length === 0) {
     existingChannelIds.value = new Set()
+    guardOffChannelIds.value = new Set()
     return
   }
   const { data, error } = await supabase
     .from('channels')
-    .select('id')
+    .select('id, disable_auto_update_under_native')
     .eq('app_id', id.value)
     .in('id', channelIds)
   if (error) {
     console.error('[Compatibility] Error checking channels:', error)
     existingChannelIds.value = new Set()
+    guardOffChannelIds.value = new Set()
     return
   }
   existingChannelIds.value = new Set((data ?? []).map(channel => channel.id))
+  guardOffChannelIds.value = new Set((data ?? [])
+    .filter(channel => !channel.disable_auto_update_under_native)
+    .map(channel => channel.id))
 }
 
 function openChannel(event: CompatibilityEventRow) {
@@ -348,6 +542,109 @@ watchEffect(async () => {
                 {{ t('compatibility-filter-unresolved') }}
               </label>
             </div>
+
+            <!-- Fix guidance + Capgo Builder CTA, shown while the app has live incompatibilities -->
+            <section
+              v-if="hasUnresolved"
+              data-test="compatibility-fix-guidance"
+              class="overflow-hidden border rounded-xl border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
+            >
+              <button
+                type="button"
+                data-test="compatibility-fix-guidance-toggle"
+                class="flex items-center w-full gap-3 px-5 py-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                :aria-expanded="guidanceOpen"
+                @click="toggleGuidance"
+              >
+                <IconAlertCircle class="w-5 h-5 shrink-0 text-amber-500 dark:text-amber-400" />
+                <span class="flex-1 text-base font-semibold text-slate-900 dark:text-white">
+                  {{ t('compat-fix-title') }}
+                </span>
+                <IconChevronRight
+                  class="w-4 h-4 transition-transform shrink-0 text-slate-400"
+                  :class="guidanceOpen ? 'rotate-90' : ''"
+                />
+              </button>
+
+              <div v-show="guidanceOpen" class="px-5 pb-5 border-t border-slate-100 dark:border-slate-800">
+                <p class="pt-4 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                  {{ t('compat-fix-explanation') }}
+                </p>
+
+                <h3 class="mt-4 text-xs font-semibold tracking-wide uppercase text-slate-400 dark:text-slate-500">
+                  {{ t('compat-fix-how-title') }}
+                </h3>
+                <div class="grid gap-3 mt-3 sm:grid-cols-2">
+                  <div class="flex flex-col p-4 border rounded-lg border-slate-200 dark:border-slate-700">
+                    <h4 class="text-sm font-semibold text-slate-900 dark:text-white">
+                      {{ t('compat-fix-rebuild-title') }}
+                    </h4>
+                    <p class="flex-1 mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                      {{ t('compat-fix-rebuild-detail') }}
+                    </p>
+                    <button
+                      type="button"
+                      data-test="compatibility-rebuild-cta"
+                      class="self-start mt-4 text-white d-btn d-btn-primary d-btn-sm"
+                      @click="openBuilder"
+                    >
+                      {{ t('compat-fix-rebuild-cta') }}
+                      <IconArrowRight class="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div class="flex flex-col p-4 border rounded-lg border-slate-200 dark:border-slate-700">
+                    <h4 class="text-sm font-semibold text-slate-900 dark:text-white">
+                      {{ t('compat-fix-rollback-title') }}
+                    </h4>
+                    <p class="flex-1 mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                      {{ t('compat-fix-rollback-detail') }}
+                    </p>
+                    <div class="flex flex-wrap items-center gap-2 mt-4">
+                      <button
+                        v-if="permittedRollbackTargets.length > 0"
+                        type="button"
+                        data-test="compatibility-rollback-cta"
+                        class="text-white d-btn d-btn-primary d-btn-sm"
+                        @click="openRollbackDialog"
+                      >
+                        {{ t('compat-fix-rollback-cta') }}
+                        <IconArrowRight class="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        class="d-btn d-btn-outline d-btn-sm"
+                        @click="router.push(`/app/${encodeURIComponent(id)}/channels`)"
+                      >
+                        {{ t('compat-fix-manage-channels') }}
+                        <IconArrowRight class="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
+                  <details class="group">
+                    <summary class="inline-flex items-center gap-1 text-sm font-medium cursor-pointer list-none text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+                      <IconChevronRight class="w-4 h-4 transition-transform group-open:rotate-90" />
+                      {{ t('compat-fix-why-title') }}
+                    </summary>
+                    <p class="mt-2 pl-5 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                      {{ t('compat-fix-why-detail') }}
+                    </p>
+                  </details>
+                  <a
+                    :href="compatDocsUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-test="compatibility-docs-link"
+                    class="inline-flex items-center gap-1 mt-3 text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    {{ t('compat-fix-learn-more') }}
+                    <IconExternalLink class="h-3.5 w-3.5" />
+                  </a>
+                </div>
+              </div>
+            </section>
 
             <!-- Empty state -->
             <div

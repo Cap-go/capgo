@@ -1,17 +1,21 @@
 import assert from 'node:assert/strict'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   bundleIdMatches,
+  exportP12FromKeychain,
   filterProfilesForApp,
   generateP12Passphrase,
+  helperPackageName,
+  helperSignatureRequirement,
   isMacOS,
   matchIdentitiesToProfiles,
   parseFindIdentityOutput,
   parseHelperJson,
+  resolveHelperBinary,
   scanProvisioningProfiles,
 } from '../src/build/onboarding/macos-signing.ts'
 
@@ -421,5 +425,220 @@ t('filterProfilesForApp accepts the bare "*" wildcard against any concrete appId
   const filtered = filterProfilesForApp(profiles, 'com.anything.here', 'ad_hoc')
   assert.equal(filtered.length, 1)
 })
+
+// ─── helperPackageName ────────────────────────────────────────────────
+
+t('helperPackageName maps arm64 and x64 to scoped packages', () => {
+  assert.equal(helperPackageName('arm64'), '@capgo/cli-keychain-darwin-arm64')
+  assert.equal(helperPackageName('x64'), '@capgo/cli-keychain-darwin-x64')
+})
+
+t('helperPackageName returns null for unsupported architectures', () => {
+  assert.equal(helperPackageName('ia32'), null)
+  assert.equal(helperPackageName('ppc64'), null)
+  assert.equal(helperPackageName(''), null)
+})
+
+// ─── helperSignatureRequirement ───────────────────────────────────────
+
+t('helperSignatureRequirement pins identifier + Developer ID + team', () => {
+  const req = helperSignatureRequirement('ABCDE12345')
+  assert.ok(req.startsWith('=identifier "app.capgo.cli.helper" and anchor apple generic'), `got: ${req}`)
+  assert.ok(req.includes('certificate leaf[field.1.2.840.113635.100.6.1.13]'))
+  assert.ok(req.includes('certificate leaf[subject.OU] = "ABCDE12345"'))
+})
+
+// ─── resolveHelperBinary ──────────────────────────────────────────────
+
+// Builds a fake package dir containing a Capgo.app/Contents/MacOS/capgo bundle.
+// `bin` is the inner executable path resolveHelperBinary returns.
+function makeFakeHelper() {
+  const dir = mkdtempSync(join(tmpdir(), 'capgo-helper-test-'))
+  const macosDir = join(dir, 'Capgo.app', 'Contents', 'MacOS')
+  mkdirSync(macosDir, { recursive: true })
+  const bin = join(macosDir, 'capgo')
+  writeFileSync(bin, '#!/bin/sh\nexit 0\n')
+  chmodSync(bin, 0o755)
+  return { dir, bin }
+}
+
+const okCodesign = async () => ({ stdout: '', stderr: '', code: 0 })
+const failCodesign = async () => ({ stdout: '', stderr: 'test requirement failed', code: 3 })
+
+await tAsync('resolveHelperBinary rejects unsupported architectures', async () => {
+  await assert.rejects(
+    resolveHelperBinary({ arch: 'ia32', resolve: () => { throw new Error('unreachable') } }),
+    /No precompiled Capgo keychain helper exists for .*ia32/,
+  )
+})
+
+await tAsync('resolveHelperBinary names the missing package in its error', async () => {
+  await assert.rejects(
+    resolveHelperBinary({ arch: 'arm64', resolve: () => { throw new Error('not found') } }),
+    /@capgo\/cli-keychain-darwin-arm64.*not installed/s,
+  )
+})
+
+await tAsync('resolveHelperBinary returns the binary when signature verifies', async () => {
+  const { dir, bin } = makeFakeHelper()
+  try {
+    const resolved = await resolveHelperBinary({
+      arch: 'arm64',
+      resolve: () => join(dir, 'package.json'),
+      codesignRunner: okCodesign,
+    })
+    assert.equal(resolved, bin)
+  }
+  finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+await tAsync('resolveHelperBinary hard-errors when signature verification fails', async () => {
+  const { dir } = makeFakeHelper()
+  try {
+    await assert.rejects(
+      resolveHelperBinary({
+        arch: 'arm64',
+        resolve: () => join(dir, 'package.json'),
+        codesignRunner: failCodesign,
+      }),
+      /Refusing to run the keychain helper.*did not verify/s,
+    )
+  }
+  finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+await tAsync('resolveHelperBinary errors when resolved binary file is missing', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'capgo-helper-test-'))
+  try {
+    await assert.rejects(
+      resolveHelperBinary({
+        arch: 'arm64',
+        resolve: () => join(dir, 'package.json'),
+        codesignRunner: okCodesign,
+      }),
+      /not installed|bundle is missing or not executable/s,
+    )
+  }
+  finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+await tAsync('env override wins when explicitly allowed (dev builds)', async () => {
+  const { dir, bin } = makeFakeHelper()
+  process.env.CAPGO_KEYCHAIN_HELPER_PATH = bin
+  try {
+    const resolved = await resolveHelperBinary({
+      allowEnvOverride: true,
+      arch: 'arm64',
+      resolve: () => { throw new Error('should not be consulted') },
+      codesignRunner: failCodesign, // override path skips signature check too
+    })
+    assert.equal(resolved, bin)
+  }
+  finally {
+    delete process.env.CAPGO_KEYCHAIN_HELPER_PATH
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+// NOTE: this runs against UNBUNDLED source, where __CAPGO_ALLOW_HELPER_ENV_OVERRIDE__
+// is `undefined`, so `allowEnvOverride` defaults to false and the override is
+// fail-closed. It does NOT prove the release BUNDLE drops the override branch via
+// dead-code elimination — that is a separate property asserted on the built
+// dist/index.js by the `test:helper-dce` script (run in CI), not here.
+await tAsync('env override is fail-closed by default in unbundled source', async () => {
+  const { dir, bin } = makeFakeHelper()
+  process.env.CAPGO_KEYCHAIN_HELPER_PATH = '/nonexistent/evil-binary'
+  try {
+    const resolved = await resolveHelperBinary({
+      arch: 'arm64',
+      resolve: () => join(dir, 'package.json'),
+      codesignRunner: okCodesign,
+    })
+    assert.equal(resolved, bin)
+  }
+  finally {
+    delete process.env.CAPGO_KEYCHAIN_HELPER_PATH
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+// ─── exportP12FromKeychain: stdin passphrase + artifact validation ────
+// exportP12FromKeychain gates on isMacOS(), so these only run on darwin (the
+// cli unit suite also runs on Linux CI, where the export path is unreachable).
+// They drive a fake helper that reads the passphrase from STDIN — proving it is
+// not passed on argv — and exercise the post-export artifact validation.
+if (isMacOS()) {
+  // Fake helper: read one line of stdin (the passphrase) -> write it to passFile,
+  // write `bodyBytes` bytes to --output, emit success JSON reporting `reportSize`.
+  function makeExportHelper({ bodyBytes, reportSize, passFile }) {
+    const dir = mkdtempSync(join(tmpdir(), 'capgo-export-helper-'))
+    const bin = join(dir, 'fake-export.sh')
+    const body = 'x'.repeat(bodyBytes)
+    const script = [
+      '#!/bin/sh',
+      'read PASS',
+      'OUT=""',
+      'while [ $# -gt 0 ]; do',
+      '  case "$1" in --output) OUT="$2"; shift 2 ;; --sha1|--invoked-by) shift 2 ;; *) shift ;; esac',
+      'done',
+      `printf '%s' "$PASS" > "${passFile}"`,
+      `printf '%s' '${body}' > "$OUT"`,
+      `echo '{"ok":true,"p12Path":"'"$OUT"'","p12SizeBytes":${reportSize},"identityName":"Fake Dist"}'`,
+      '',
+    ].join('\n')
+    writeFileSync(bin, script)
+    chmodSync(bin, 0o755)
+    return { dir, bin }
+  }
+
+  const exportSha1 = 'a'.repeat(40)
+  const readFileSyncFn = require('node:fs').readFileSync
+
+  await tAsync('exportP12FromKeychain feeds the passphrase via stdin (not argv) and returns base64', async () => {
+    const passDir = mkdtempSync(join(tmpdir(), 'capgo-pass-'))
+    const passFile = join(passDir, 'pass.txt')
+    const { dir, bin } = makeExportHelper({ bodyBytes: 16, reportSize: 16, passFile })
+    try {
+      const result = await exportP12FromKeychain(exportSha1, { helperPathOverride: bin })
+      assert.equal(result.base64, Buffer.from('x'.repeat(16)).toString('base64'))
+      assert.match(result.passphrase, /^[0-9a-f]{64}$/)
+      assert.equal(readFileSyncFn(passFile, 'utf8'), result.passphrase, 'helper received the passphrase over stdin')
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+      rmSync(passDir, { recursive: true, force: true })
+    }
+  })
+
+  await tAsync('exportP12FromKeychain rejects an empty exported p12', async () => {
+    const passDir = mkdtempSync(join(tmpdir(), 'capgo-pass-'))
+    const { dir, bin } = makeExportHelper({ bodyBytes: 0, reportSize: 0, passFile: join(passDir, 'pass.txt') })
+    try {
+      await assert.rejects(exportP12FromKeychain(exportSha1, { helperPathOverride: bin }), /exported \.p12 is empty/)
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+      rmSync(passDir, { recursive: true, force: true })
+    }
+  })
+
+  await tAsync('exportP12FromKeychain rejects a reported/actual size mismatch', async () => {
+    const passDir = mkdtempSync(join(tmpdir(), 'capgo-pass-'))
+    const { dir, bin } = makeExportHelper({ bodyBytes: 8, reportSize: 9999, passFile: join(passDir, 'pass.txt') })
+    try {
+      await assert.rejects(exportP12FromKeychain(exportSha1, { helperPathOverride: bin }), /size mismatch/)
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+      rmSync(passDir, { recursive: true, force: true })
+    }
+  })
+}
 
 process.stdout.write('OK\n')

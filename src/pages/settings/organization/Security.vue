@@ -14,6 +14,7 @@ import IconLock from '~icons/heroicons/lock-closed'
 import IconShield from '~icons/heroicons/shield-check'
 import IconUser from '~icons/heroicons/user'
 import SsoConfiguration from '~/components/organizations/SsoConfiguration.vue'
+import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { checkPermissions } from '~/services/permissions'
 import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
 import { getCurrentPlanNameOrg, useSupabase } from '~/services/supabase'
@@ -49,6 +50,7 @@ const router = useRouter()
 const supabase = useSupabase()
 const isLoading = ref(true)
 const isSaving = ref(false)
+const hideExternalPurchaseFlows = isNativeAppStoreContext()
 
 displayStore.NavTitle = t('security')
 
@@ -1520,7 +1522,7 @@ onMounted(async () => {
           </section>
 
           <!-- SSO Configuration Section -->
-          <section v-if="hasOrgPerm" class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
+          <section v-if="hasOrgPerm && (isEnterprisePlan || !hideExternalPurchaseFlows)" class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
             <!-- Enterprise Plan: Show SSO Configuration -->
             <template v-if="isEnterprisePlan">
               <div class="flex items-start gap-4 mb-6">

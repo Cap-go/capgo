@@ -39,7 +39,7 @@
 //   import steps (import-scanning, import-distribution-mode, import-pick-identity
 //   flat-list, import-pick-profile, import-no-match-recovery for every
 //   NoMatchReason, import-create-profile-only, import-export-warning,
-//   import-compiling-helper, import-exporting), and the CI steps
+//   import-exporting), and the CI steps
 //   (detecting-ci-secrets, ci-secrets-setup, ci-secrets-target-select,
 //   ask-ci-secrets, confirm-ci-secret-overwrite, ci-secrets-failed, ask-build).
 //
@@ -87,7 +87,6 @@ import {
   VerifyingKeyStep,
 } from '../src/build/onboarding/ui/steps/ios-credentials.tsx'
 import {
-  ImportCompilingHelperStep,
   ImportCreateProfileOnlyStep,
   ImportDistributionModeStep,
   ImportExportingStep,
@@ -660,24 +659,6 @@ test('import-export-warning shows the permission warning, the three numbered ste
       'Exit onboarding',
     ],
     'import-export-warning',
-  )
-})
-
-// import-compiling-helper (spinner + comfortable two-paragraph explanation)
-test('import-compiling-helper shows the compile spinner and the swiftc/caching explanation', () => {
-  assertContains(
-    h(ImportCompilingHelperStep),
-    [
-      'Compiling keychain-export helper (one-time, ~2-3s)...',
-      // The explanation paragraph wraps at 80 cols ("…wraps Apple's Security" /
-      // "framework. It compiles via swiftc…"); assert wrap-safe sub-phrases.
-      'We ship a small Swift program (~350 lines) that wraps Apple\'s Security',
-      'framework. It compiles via',
-      'swiftc',
-      'The result is cached for this CLI version',
-      'build init',
-    ],
-    'import-compiling-helper',
   )
 })
 

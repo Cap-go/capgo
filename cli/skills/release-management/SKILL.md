@@ -36,7 +36,7 @@ Use this skill for OTA update workflows in Capgo Cloud.
 ### `bundle upload [appId]`
 
 - Alias: `u`
-- Example: `npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production`
+- Example: `npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production,beta`
 - Key behavior:
   - Bundle version must be greater than `0.0.0` and unique.
   - Deleted versions cannot be reused.
@@ -44,10 +44,12 @@ Use this skill for OTA update workflows in Capgo Cloud.
   - Encryption is recommended for trustless distribution.
   - Interactive prompts are disabled automatically in CI and other non-interactive sessions so uploads do not block automation.
   - Optional upload prompts can remember the user's answer on the current machine so future uploads can skip the same question.
+  - `--channel` accepts a single channel or a comma-separated list such as `production,beta`.
+  - When multiple channels are provided, channels that already have the uploaded checksum are skipped and the remaining channels are assigned.
   - Use `--qr-preview` to print a terminal QR code for the uploaded bundle after a successful upload. App preview must be enabled first.
 - Important options:
   - `-p, --path <path>`
-  - `-c, --channel <channel>`
+  - `-c, --channel <channel[,channel...]>`
   - `-e, --external <url>`
   - `--iv-session-key <key>`
   - `-b, --bundle <bundle>`
@@ -56,7 +58,7 @@ Use this skill for OTA update workflows in Capgo Cloud.
   - `--min-update-version <minUpdateVersion>`
   - `--auto-min-update-version`
   - `--ignore-metadata-check`
-  - `--fail-on-incompatible` (fail the upload instead of uploading when the bundle is incompatible with the channel's current native packages; cannot be combined with `--ignore-metadata-check`)
+  - `--fail-on-incompatible` (fail the upload instead of uploading when the bundle is incompatible with a target channel's current native packages; cannot be combined with `--ignore-metadata-check`)
   - `--ignore-checksum-check`
   - `--force-crc32-checksum`
   - `--timeout <timeout>`
