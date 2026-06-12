@@ -151,7 +151,7 @@ export interface TailEffectDeps<P extends TailEffectProgress = TailEffectProgres
    * ANDROID_KEYSTORE_FILE… on android). Throws on missing inputs — same guards
    * the android engine used inline.
    */
-  buildSavedCredentials: (progress: P) => Record<string, string>
+  buildSavedCredentials: (progress: P) => Record<string, string> | Promise<Record<string, string>>
 
   /**
    * Lossy fallback used when the driver did not thread the saved-credential map
@@ -706,9 +706,19 @@ async function preloadWorkflowScripts<P extends TailEffectProgress>(
     const availableScripts = deps.getPackageScripts() ?? {}
     let recommendedScript: string | null = null
     if (deps.findProjectType) {
-      const projectType = await deps.findProjectType({ quiet: true }).catch(() => null)
+      // Both lookups stay best-effort (null = no recommendation), but the
+      // swallowed reasons are routed through onInternalLog like the outer
+      // catch — silent `.catch(() => null)` hid real failures from the
+      // support bundle (hostile-review, 2026-06-12).
+      const projectType = await deps.findProjectType({ quiet: true }).catch((err) => {
+        deps.onInternalLog?.(`project-type detection failed, no recommended script: ${err instanceof Error ? err.message : String(err)}`)
+        return null
+      })
       if (projectType && deps.findBuildCommandForProjectType) {
-        const recommended = await deps.findBuildCommandForProjectType(projectType).catch(() => null)
+        const recommended = await deps.findBuildCommandForProjectType(projectType).catch((err) => {
+          deps.onInternalLog?.(`build-command lookup failed for "${projectType}", no recommended script: ${err instanceof Error ? err.message : String(err)}`)
+          return null
+        })
         if (recommended && Object.hasOwn(availableScripts, recommended))
           recommendedScript = recommended
       }
@@ -751,16 +761,21 @@ export async function runTailEffect<P extends TailEffectProgress>(
       // the resolver to route the user back to re-collect the missing input.
       let credentials: Record<string, string>
       try {
-        credentials = deps.buildSavedCredentials(progress)
+        credentials = await deps.buildSavedCredentials(progress)
       }
       catch (buildError) {
         // Self-heal: the save genuinely cannot proceed. Emit the same guidance
-        // the bespoke android tail logs before routing back (app.tsx ~L1331).
+        // the bespoke android tail logs before routing back (app.tsx ~L1331) —
+        // WITH the real builder error appended: the generic line alone made
+        // live failures undiagnosable (hostile-review, 2026-06-12). The full
+        // reason also goes to the internal log for the support bundle.
+        const reason = buildError instanceof Error ? buildError.message : String(buildError)
         const fresh = await deps.loadProgress(progress.appId)
         if (fresh) {
           const expectedStep = deps.resumeStep(fresh)
           if (expectedStep !== 'saving-credentials') {
-            deps.onLog?.('ℹ Some required input was missing — sending you back to fill it in.', 'yellow')
+            deps.onInternalLog?.(`saving-credentials build failed (diverting to ${expectedStep}): ${reason}`)
+            deps.onLog?.(`ℹ Some required input was missing — sending you back to fill it in. (${reason})`, 'yellow')
             return { progress, next: expectedStep }
           }
         }
@@ -1029,6 +1044,15 @@ export async function runTailEffect<P extends TailEffectProgress>(
 
     // ── requesting-build ──────────────────────────────────────────────────
     case 'requesting-build': {
+      // ABORT CONTRACT (deps.signal): BuildRequestOptions/requestBuildInternal
+      // expose no AbortSignal seam (request.ts owns its internal polling /
+      // WebSocket AbortControllers), so an abort can NOT cancel in-flight work
+      // — DOCUMENTED LIMITATION. The signal is honoured at this effect's own
+      // await boundaries instead: when the driver has already torn down, bail
+      // quietly (no viewer output, no build request, no onward routing).
+      if (deps.signal?.aborted)
+        return { progress }
+
       // CLI-flag key takes precedence over the saved one — the driver resolves it
       // (apikey ?? findSavedKeySilent()) and hands it back via deps.resolveApikey.
       // When that dep is wired and yields nothing, mirror the android no-key UX:
@@ -1065,6 +1089,12 @@ export async function runTailEffect<P extends TailEffectProgress>(
           deps.logger,
         )
 
+        // Aborted while the request was in flight: the work is done (the limit
+        // above — it cannot be cancelled mid-flight), but the driver is gone —
+        // do not route onward or write to the torn-down viewer.
+        if (deps.signal?.aborted)
+          return { progress }
+
         if (result.success) {
           const url = `https://capgo.app/app/${progress.appId}/builds`
           // Blank line + queued line — parity with setBuildOutput([..., '', queued]).
@@ -1087,6 +1117,11 @@ export async function runTailEffect<P extends TailEffectProgress>(
         return { progress, next: 'build-complete' }
       }
       catch (err) {
+        // Aborted while the request was in flight — the driver is tearing
+        // down; drop the outcome quietly (same await-boundary contract as the
+        // pre-flight check above).
+        if (deps.signal?.aborted)
+          return { progress }
         // The bespoke try/catch (app.tsx ~L1733-1738): a thrown build request writes
         // 2 lines to the build VIEWER and routes to build-complete — credentials are
         // already saved, so it NEVER throws (no handleError). The reason rides in

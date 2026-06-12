@@ -551,6 +551,45 @@ await test('DRIVER: D2 duplicate -> prompt -> delete -> import-create-profile-on
   assertEquals(deletes[1].args[0], 'DUP2', 'second duplicate deleted')
 })
 
+// ─── HOSTILE-REVIEW MED: 'open-anyway' must not fabricate success ──────────────
+//
+// The old breadcrumb logged '🌐 Opened Apple Developer Portal — …' UNCONDITIONALLY
+// (even when openExternal threw) and never told the user the URL. Contract now
+// mirrors the verify-app sibling (ios/flow.ts verify-app 'open' branch): on
+// success the line INCLUDES the url; on failure log the could-not-open fallback
+// with the url instead of claiming success. Routing is unchanged either way.
+
+const PORTAL_PROFILES_URL = 'https://developer.apple.com/account/resources/profiles/list'
+
+await test("portal resolver 'open-anyway' SUCCESS log includes the opened portal URL", async () => {
+  const logs = []
+  const deps = makeDeps({
+    carried: { portalAction: 'open-anyway', noMatchReason: 'apple-other' },
+    onLog: (msg, color) => logs.push({ msg, color }),
+  })
+  const res = await runIosEffect('import-portal-explanation', iosProgress(), deps)
+  assertEquals(res.next, 'import-no-match-recovery', 'still bounces back to the recovery menu')
+  const opened = logs.find(l => /Opened Apple Developer Portal/.test(l.msg))
+  assert(opened, 'the success breadcrumb still fires when openExternal succeeded')
+  assert(opened.msg.includes(PORTAL_PROFILES_URL), `the success line must include the URL that was opened (got: ${opened.msg})`)
+})
+
+await test("portal resolver 'open-anyway' FAILURE logs the could-not-open fallback with the URL — never fabricates success", async () => {
+  const logs = []
+  const deps = makeDeps({
+    carried: { portalAction: 'open-anyway', noMatchReason: 'apple-other' },
+    openExternal: async () => { throw new Error('no browser') },
+    onLog: (msg, color) => logs.push({ msg, color }),
+  })
+  const res = await runIosEffect('import-portal-explanation', iosProgress(), deps)
+  assertEquals(res.next, 'import-no-match-recovery', 'a failed portal-open still bounces back (recovery contract unchanged)')
+  assert(!logs.some(l => /Opened Apple Developer Portal/.test(l.msg)), 'must NOT claim the portal was opened when openExternal failed')
+  const warn = logs.find(l => /Could not open your browser/.test(l.msg))
+  assert(warn, 'must log the could-not-open warning (verify-app sibling pattern)')
+  assert(warn.msg.includes(PORTAL_PROFILES_URL), `the warning must tell the user WHERE to go (got: ${warn.msg})`)
+  assertEquals(warn.color, 'yellow', 'the warning is yellow')
+})
+
 // ─── Summary ─────────────────────────────────────────────────────────────────────
 
 console.log(`\n${testsPassed} passed, ${testsFailed} failed`)

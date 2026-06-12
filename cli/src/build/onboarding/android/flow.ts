@@ -1429,8 +1429,17 @@ export async function runAndroidEffect(
         deps.onLog?.(`✔ Backup saved · ${backupPath}`)
       }
       catch (err) {
-        deps.onInternalLog?.(`credentials backup failed: ${err instanceof Error ? err.message : String(err)}`)
-        deps.onLog?.('⚠ Could not backup credentials (file may not exist yet)', 'yellow')
+        const reason = err instanceof Error ? err.message : String(err)
+        deps.onInternalLog?.(`credentials backup failed: ${reason}`)
+        // Only ENOENT means "nothing to back up yet" — that stays benign. Any
+        // OTHER failure (EACCES, disk full, …) keeps the proceed-anyway gate
+        // contract but must report the REAL reason instead of pretending the
+        // file may not exist (hostile-review, 2026-06-12).
+        const missingSource = (err as { code?: string } | null)?.code === 'ENOENT' || /ENOENT/.test(reason)
+        if (missingSource)
+          deps.onLog?.('⚠ Could not backup credentials (file may not exist yet)', 'yellow')
+        else
+          deps.onLog?.(`⚠ Could not back up credentials: ${reason}`, 'yellow')
       }
       const nextProgress: AndroidOnboardingProgress = { ...progress, _credentialsExistGate: 'done' }
       await deps.saveAndroidProgress(progress.appId, nextProgress)
@@ -1840,13 +1849,24 @@ export async function runAndroidEffect(
       // Failure is non-fatal: the token expires within ~1 hour regardless.
       if (currentProgress._oauthRefreshToken) {
         deps.onStatus?.('Revoking OAuth token (we don\'t need it anymore)...')
+        let revoked = false
         try {
           await deps.revokeToken(currentProgress._oauthRefreshToken)
+          revoked = true
           deps.onStatus?.('✔ OAuth token revoked')
         }
         catch (err) {
           const msg = err instanceof Error ? err.message : String(err)
           deps.onStatus?.(`⚠ Revoke request failed (${msg}) — token will expire on its own`)
+        }
+        if (revoked) {
+          // The token is now dead — strip it from progress and persist, so a
+          // revoked credential doesn't linger in progress.json (CodeRabbit,
+          // 2026-06-12). On a failed revoke it is KEPT: it still expires on
+          // its own and a crash-resume re-enters this step to retry.
+          const { _oauthRefreshToken: _revoked, ...withoutToken } = currentProgress
+          currentProgress = withoutToken
+          await deps.saveAndroidProgress(currentProgress.appId, currentProgress)
         }
       }
 

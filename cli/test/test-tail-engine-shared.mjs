@@ -1096,6 +1096,84 @@ await test('applyTailInput navigation-only tail values fall through unchanged', 
   }
 })
 
+// ─── HOSTILE-REVIEW MED: self-heal divert must surface the REAL builder error ──
+
+await test('saving-credentials self-heal divert SURFACES the underlying builder error (onLog detail + onInternalLog)', async () => {
+  const logs = []
+  const internal = []
+  const deps = makeDeps({
+    onLog: (msg, color) => logs.push({ msg, color }),
+    onInternalLog: line => internal.push(line),
+    loadProgress: async () => tailProgress(),
+    buildSavedCredentials: () => { throw new Error('service-account key not provisioned (detail-xyz)') },
+    resumeStep: () => 'gcp-projects-loading',
+  })
+  const res = await runTailEffect('saving-credentials', tailProgress(), deps)
+  assertEquals(res.next, 'gcp-projects-loading', 'still diverts to the resolved resume step')
+  const hit = logs.find(l => /Some required input was missing/.test(l.msg))
+  assert(hit, 'the guidance line still fires on the divert')
+  assert(hit.msg.includes('service-account key not provisioned (detail-xyz)'), `the guidance line must carry the REAL builder error, not only the generic text (got: ${hit.msg})`)
+  assert(internal.some(line => line.includes('service-account key not provisioned (detail-xyz)')), 'the builder error must reach onInternalLog for the support bundle')
+})
+
+// ─── HOSTILE-REVIEW MED: deps.signal must actually be consumed ─────────────────
+//
+// ABORT CONTRACT: BuildRequestOptions/requestBuildInternal expose no AbortSignal
+// seam (request.ts owns its internal poll/WebSocket AbortControllers), so an
+// abort cannot cancel in-flight work — the engine honours the signal at its own
+// await boundaries instead: a pre-aborted signal must bail quietly WITHOUT
+// firing a build request.
+
+await test('requesting-build with a PRE-ABORTED deps.signal does NOT call requestBuildInternal (quiet bail)', async () => {
+  const controller = new AbortController()
+  controller.abort()
+  const outputs = []
+  const deps = makeDeps({ signal: controller.signal, onBuildOutput: line => outputs.push(line) })
+  const res = await runTailEffect('requesting-build', tailProgress(), deps)
+  assert(!deps.__calls.some(c => c.name === 'requestBuildInternal'), 'an aborted driver must not fire a build request')
+  assertEquals(res.next, undefined, 'aborted: bail quietly without routing onward')
+  assertEquals(outputs.length, 0, 'aborted: no viewer output either')
+})
+
+await test('requesting-build with a NON-aborted signal still requests the build normally', async () => {
+  const controller = new AbortController()
+  const deps = makeDeps({ signal: controller.signal })
+  const res = await runTailEffect('requesting-build', tailProgress(), deps)
+  assert(deps.__calls.some(c => c.name === 'requestBuildInternal'), 'a live signal must not block the request')
+  assertEquals(res.next, 'detecting-ci-secrets', 'normal success routing (entries rebuilt from progress)')
+})
+
+// ─── HOSTILE-REVIEW LOW: preload .catch(() => null) dropped the reasons ────────
+
+await test('preloadWorkflowScripts routes a findProjectType failure through onInternalLog (still best-effort)', async () => {
+  const internal = []
+  const deps = makeDeps({
+    onInternalLog: line => internal.push(line),
+    getPackageScripts: () => ({ build: 'vite build' }),
+    findProjectType: async () => { throw new Error('detect-blew-up-xyz') },
+  })
+  const progress = tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'with-workflow' })
+  const res = await runTailEffect('uploading-ci-secrets', progress, deps)
+  assertEquals(res.next, 'pick-package-manager', 'preload stays best-effort — routing unchanged')
+  assert(res.transient && res.transient.availableScripts, 'scripts still surfaced')
+  assert(!res.transient.recommendedScript, 'no recommendation without a project type')
+  assert(internal.some(line => line.includes('detect-blew-up-xyz')), 'the swallowed findProjectType error must reach onInternalLog')
+})
+
+await test('preloadWorkflowScripts routes a findBuildCommandForProjectType failure through onInternalLog', async () => {
+  const internal = []
+  const deps = makeDeps({
+    onInternalLog: line => internal.push(line),
+    getPackageScripts: () => ({ build: 'vite build' }),
+    findProjectType: async () => 'vue',
+    findBuildCommandForProjectType: async () => { throw new Error('cmd-blew-up-xyz') },
+  })
+  const progress = tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'with-workflow' })
+  const res = await runTailEffect('uploading-ci-secrets', progress, deps)
+  assertEquals(res.next, 'pick-package-manager', 'routing unchanged')
+  assert(internal.some(line => line.includes('cmd-blew-up-xyz')), 'the swallowed findBuildCommandForProjectType error must reach onInternalLog')
+})
+
 // ─── Summary ─────────────────────────────────────────────────────────────────
 
 console.log(`\n${testsPassed} passed, ${testsFailed} failed`)

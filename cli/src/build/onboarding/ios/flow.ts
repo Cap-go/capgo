@@ -828,7 +828,7 @@ const TAIL_INPUT_STEPS = new Set<OnboardingStep>([
  * secret .p8 bytes come from the transient `carried.p8Content` (NEVER persisted);
  * the non-secret key/issuer ids come from persisted progress.keyId/issuerId.
  */
-function buildIosSavedCredentials(progress: OnboardingProgress, deps: IosEffectDeps): Record<string, string> {
+async function buildIosSavedCredentials(progress: OnboardingProgress, deps: IosEffectDeps): Promise<Record<string, string>> {
   const carried = deps.carried
   const certData = carried?.certData ?? progress.completedSteps.certificateCreated
   const profileData = carried?.profileData ?? progress.completedSteps.profileCreated
@@ -846,10 +846,12 @@ function buildIosSavedCredentials(progress: OnboardingProgress, deps: IosEffectD
   const isImport = progress.setupMethod === 'import-existing'
   const p12Password = isImport && carried?.importedP12Password ? carried.importedP12Password : DEFAULT_P12_PASSWORD
 
-  // The provisioning_map key is the resolved iOS bundle id (override when the
-  // user confirmed a different one), matching what the build system looks up by
-  // PRODUCT_BUNDLE_IDENTIFIER at sign time.
-  const provisioningBundleId = progress.iosBundleIdOverride || progress.appId
+  // The provisioning_map key is the resolved iOS bundle id (the verified
+  // override, else the detected Release id, else appId — resolveIosBundleId),
+  // matching what the build system looks up by PRODUCT_BUNDLE_IDENTIFIER at
+  // sign time. progress.appId alone is WRONG when plugins.CapacitorUpdater.appId
+  // splits the Capgo key from the Apple bundle id (hostile-review P1).
+  const provisioningBundleId = resolveIosBundleId(progress, deps)
   const provisioningMap: Record<string, { profile: string, name: string }> = {
     [provisioningBundleId]: {
       profile: profileData.profileBase64,
@@ -877,7 +879,28 @@ function buildIosSavedCredentials(progress: OnboardingProgress, deps: IosEffectD
   // read from persisted progress.keyId / progress.issuerId (with the
   // apiKeyVerified mirror as the resume-hydrated fallback, matching the TUI refs).
   const needsAscKey = !isImport || progress.importDistribution === 'app_store'
-  const keyContent = carried?.p8Content
+  let keyContent = carried?.p8Content
+  // Crash recovery (hostile-review blocker, 2026-06-12): a resume that lost the
+  // carried bytes (fresh mount) re-reads the .p8 from the persisted p8Path via
+  // the INJECTED readFile — the same fallback resolveP8Content implements for
+  // verifying-key, and what main's bespoke doSaveCredentials did. The engine
+  // still performs no raw fs IO of its own.
+  if (needsAscKey && !keyContent && progress.p8Path && deps.readFile) {
+    try {
+      keyContent = await deps.readFile(progress.p8Path)
+    }
+    catch {
+      // Unreadable .p8 (moved/deleted) — fall through to the refuse guard below.
+    }
+  }
+  if (needsAscKey && !keyContent) {
+    // Restored main guard (the engine port had dropped it): NEVER silently save
+    // an app_store credential map missing the ASC key — it cannot upload to
+    // App Store Connect and the user would only find out at the first cloud
+    // build. The throw rides the tail's build-first contract: the self-heal
+    // catch diverts to the persisted resume step so the user re-provides the key.
+    throw new Error('iOS ASC API key (.p8) unavailable — refusing to save credentials that cannot upload to App Store Connect. Re-provide the .p8 key file to continue.')
+  }
   if (needsAscKey && keyContent) {
     const apiKeyVerified = progress.completedSteps.apiKeyVerified
     const keyId = progress.keyId ?? apiKeyVerified?.keyId
@@ -900,14 +923,22 @@ function buildIosSavedCredentials(progress: OnboardingProgress, deps: IosEffectD
  * persisted), so an imported export cannot be rebuilt here — those resumes
  * restart the import export sub-flow from import-scanning. Returns {} when not
  * rebuildable (matching the android lossy-rebuild contract).
+ *
+ * The non-secret ASC identifiers (APPLE_KEY_ID / APPLE_ISSUER_ID) ARE restored
+ * from persisted progress (keyId/issuerId with the apiKeyVerified mirror — the
+ * same precedence buildIosSavedCredentials uses). DOCUMENTED LIMITATION:
+ * APPLE_KEY_CONTENT (the secret .p8 bytes) can NOT be rebuilt here — this
+ * rebuild is synchronous and the bytes only exist behind the async injected
+ * readFile / the transient carried.p8Content channel; a resume that needs the
+ * full key re-enters the .p8 chain instead.
  */
-function rebuildIosTailCredentials(progress: OnboardingProgress): Record<string, string> {
+function rebuildIosTailCredentials(progress: OnboardingProgress, deps?: Pick<IosEffectDeps, 'detectBundleIds'>): Record<string, string> {
   const certData = progress.completedSteps.certificateCreated
   const profileData = progress.completedSteps.profileCreated
   if (!certData || !profileData || !certData.teamId)
     return {}
 
-  const provisioningBundleId = progress.iosBundleIdOverride || progress.appId
+  const provisioningBundleId = resolveIosBundleId(progress, deps)
   const provisioningMap: Record<string, { profile: string, name: string }> = {
     [provisioningBundleId]: {
       profile: profileData.profileBase64,
@@ -916,12 +947,18 @@ function rebuildIosTailCredentials(progress: OnboardingProgress): Record<string,
   }
   const distribution = progress.setupMethod === 'import-existing' ? (progress.importDistribution || 'app_store') : 'app_store'
 
+  const apiKeyVerified = progress.completedSteps.apiKeyVerified
+  const keyId = progress.keyId ?? apiKeyVerified?.keyId
+  const issuerId = progress.issuerId ?? apiKeyVerified?.issuerId
+
   return {
     BUILD_CERTIFICATE_BASE64: certData.p12Base64,
     P12_PASSWORD: DEFAULT_P12_PASSWORD,
     CAPGO_IOS_PROVISIONING_MAP: JSON.stringify(provisioningMap),
     APP_STORE_CONNECT_TEAM_ID: certData.teamId,
     CAPGO_IOS_DISTRIBUTION: distribution,
+    ...(keyId ? { APPLE_KEY_ID: keyId } : {}),
+    ...(issuerId ? { APPLE_ISSUER_ID: issuerId } : {}),
   }
 }
 
@@ -937,7 +974,9 @@ function toTailDeps(deps: IosEffectDeps): TailEffectDeps<OnboardingProgress> {
   return {
     platform: 'ios',
     buildSavedCredentials: progress => buildIosSavedCredentials(progress, deps),
-    rebuildTailCredentials: rebuildIosTailCredentials,
+    // Closure-bound over deps so the lossy rebuild resolves the bundle id the
+    // SAME way the save path does (override → detected Release id → appId).
+    rebuildTailCredentials: progress => rebuildIosTailCredentials(progress, deps),
     resumeStep: getIosResumeStep,
     updateSavedCredentials: deps.updateSavedCredentials!,
     loadProgress: deps.loadProgress!,
@@ -2402,7 +2441,7 @@ export async function runIosEffect(
     // surface the duplicates in transient, and route to duplicate-profile-prompt
     // (its view lands in BATCH 3). Other failures route to 'error'.
     case 'creating-profile': {
-      const bundleId = resolveIosBundleId(progress)
+      const bundleId = resolveIosBundleId(progress, deps)
       const certificateId = deps.carried?.certData?.certificateId
         ?? progress.completedSteps.certificateCreated?.certificateId
       if (!certificateId)
@@ -2690,7 +2729,7 @@ export async function runIosEffect(
 
       const matches = deps.carried?.importMatches ?? []
       const match = matches.find(m => m.identity.sha1 === chosenIdentity.sha1)
-      const appId = resolveIosBundleId(progress)
+      const appId = resolveIosBundleId(progress, deps)
       const dist = progress.importDistribution
       const usable = filterProfilesForApp(match?.profiles ?? [], appId, dist)
       if (usable.length > 0)
@@ -2727,7 +2766,7 @@ export async function runIosEffect(
       if (!chosenIdentity)
         return iosError(progress, 'Internal error: no identity chosen for the Apple cert check.', 'import-scanning')
 
-      const appId = resolveIosBundleId(progress)
+      const appId = resolveIosBundleId(progress, deps)
       const dist = progress.importDistribution
       const matches = deps.carried?.importMatches ?? []
 
@@ -2817,7 +2856,7 @@ export async function runIosEffect(
       if (!chosenProfile)
         return { progress, next: 'import-pick-identity' }
 
-      const appId = resolveIosBundleId(progress)
+      const appId = resolveIosBundleId(progress, deps)
       const dist = progress.importDistribution
       const chosenIdentity = deps.carried?.chosenIdentity
       // Defense-in-depth validation mirroring the TUI's onChange guards
@@ -2916,13 +2955,18 @@ export async function runIosEffect(
       if (action === 'use-file')
         return { progress, next: 'import-provide-profile-path', transient: stickyTransient }
       if (action === 'open-anyway') {
+        const portalUrl = 'https://developer.apple.com/account/resources/profiles/list'
+        const followUp = 'once you have downloaded the .mobileprovision file, come back and pick "📁 Use a .mobileprovision file from disk".'
         try {
-          await deps.openExternal?.('https://developer.apple.com/account/resources/profiles/list')
+          await deps.openExternal?.(portalUrl)
+          deps.onLog?.(`🌐 Opened Apple Developer Portal (${portalUrl}) — ${followUp}`, 'yellow')
         }
         catch {
-          // Opening the portal is best-effort — a failure must not abort recovery.
+          // Opening the portal is best-effort — a failure must not abort
+          // recovery, but it must not be reported as success either: tell the
+          // user WHERE to go instead (the verify-app 'open' sibling pattern).
+          deps.onLog?.(`⚠ Could not open your browser. Visit ${portalUrl} — ${followUp}`, 'yellow')
         }
-        deps.onLog?.('🌐 Opened Apple Developer Portal — once you have downloaded the .mobileprovision file, come back and pick "📁 Use a .mobileprovision file from disk".', 'yellow')
         return { progress, next: 'import-no-match-recovery', transient: stickyTransient }
       }
       // 'back' or an unrecognized value bounces to the recovery menu.
@@ -2961,7 +3005,7 @@ export async function runIosEffect(
       if (deps.carried?.profilePickerOpened)
         return { progress, next: 'import-no-match-recovery', transient: { ...stickyTransient, profilePickerOpened: true } }
 
-      const appId = resolveIosBundleId(progress)
+      const appId = resolveIosBundleId(progress, deps)
       const dist = progress.importDistribution
 
       try {
@@ -3074,7 +3118,7 @@ export async function runIosEffect(
         return iosError(progress, msg)
       }
 
-      const appId = resolveIosBundleId(progress)
+      const appId = resolveIosBundleId(progress, deps)
       try {
         const certId = await deps.findCertIdBySha1!(chosenIdentity.sha1)
         if (!certId) {
@@ -3282,13 +3326,30 @@ function credentialsBackupDestPath(date: string): string {
 }
 
 /**
- * Resolve the Apple-side iOS bundle id used for ensureBundleId / createProfile
- * and as the provisioning_map key. Mirrors the TUI's `iosBundleId` = the
- * verified/adopted override (persisted as iosBundleIdOverride by verify-app /
- * redirectIfMismatch) else config.appId (== progress.appId here).
+ * Resolve the Apple-side iOS bundle id used for ensureBundleId / createProfile,
+ * profile filtering and as the provisioning_map key. progress.appId is the
+ * CAPGO app key — when plugins.CapacitorUpdater.appId is configured it is NOT
+ * the Apple bundle id (hostile-review P1, 2026-06-12). Priority:
+ *   1. progress.iosBundleIdOverride — the verified/adopted override persisted
+ *      by verify-app / redirectIfMismatch (the TUI's `iosBundleId`).
+ *   2. The FRESH-detected Release PRODUCT_BUNDLE_IDENTIFIER via the injected
+ *      deps.detectBundleIds — the same authoritative source verify-app gates on.
+ *   3. progress.appId — last resort for drivers that wire no detector (the
+ *      pre-fix behaviour; correct whenever the Capgo key == the bundle id).
  */
-function resolveIosBundleId(progress: OnboardingProgress): string {
-  return progress.iosBundleIdOverride || progress.appId
+function resolveIosBundleId(progress: OnboardingProgress, deps?: Pick<IosEffectDeps, 'detectBundleIds'>): string {
+  if (progress.iosBundleIdOverride)
+    return progress.iosBundleIdOverride
+  try {
+    const detected = deps?.detectBundleIds?.()
+    if (detected?.releaseResolved && detected.pbxproj)
+      return detected.pbxproj.value
+  }
+  catch {
+    // The detector reads the Xcode project from disk (driver-bound IO) — a
+    // read failure must not break credential building; fall back to appId.
+  }
+  return progress.appId
 }
 
 /**
@@ -3298,11 +3359,25 @@ function resolveIosBundleId(progress: OnboardingProgress): string {
  * re-reading the file at progress.p8Path via the injected readFile. Throws a
  * NeedP8-style error when neither is available — the same fail-fast the TUI's
  * getFreshToken does so the driver can re-prompt for the .p8.
+ *
+ * A STALE p8Path (file moved/deleted/unreadable since the last run) must throw
+ * the SAME NeedP8-style error, not the raw fs error: the driver's re-prompt
+ * matcher keys on the '.p8' message, and a raw ENOENT would bypass it and land
+ * on the support-bundle error screen (the TUI converts the identical failure to
+ * NeedP8Error in getFreshToken, app.tsx:1333–1340). The real fs reason goes to
+ * the internal log only.
  */
 async function resolveP8Content(progress: OnboardingProgress, deps: IosEffectDeps): Promise<Buffer> {
   if (deps.carried?.p8Content)
     return deps.carried.p8Content
-  if (progress.p8Path && deps.readFile)
-    return deps.readFile(progress.p8Path)
+  if (progress.p8Path && deps.readFile) {
+    try {
+      return await deps.readFile(progress.p8Path)
+    }
+    catch (err) {
+      deps.onInternalLog?.(`saved .p8 no longer readable, re-prompting: ${err instanceof Error ? err.message : String(err)}`)
+      throw new Error('verifying-key: .p8 content unavailable (the saved .p8 path is no longer readable — re-provide the .p8 key file)')
+    }
+  }
   throw new Error('verifying-key: .p8 content unavailable (no carried bytes and no readable p8Path)')
 }
