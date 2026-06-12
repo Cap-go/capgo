@@ -9,6 +9,7 @@ import { toast } from 'vue-sonner'
 import CreditsCta from '~/components/CreditsCta.vue'
 import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { formatIncludedThenPrice } from '~/services/creditPricing'
+import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { checkPermissions } from '~/services/permissions'
 import { getDatafastAttribution, openCheckout } from '~/services/stripe'
 import { getCreditUnitPricing, getCurrentPlanNameOrg, useSupabase } from '~/services/supabase'
@@ -34,7 +35,7 @@ const router = useRouter()
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const dialogStore = useDialogV2Store()
-const isMobile = Capacitor.isNativePlatform()
+const isMobile = isNativeAppStoreContext()
 
 // Modal state for non-admin access
 const showAdminModal = ref(false)
@@ -326,6 +327,11 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
 
 watchEffect(async () => {
   if (route.path === '/settings/organization/plans') {
+    if (isMobile) {
+      router.replace('/settings/organization/usage')
+      return
+    }
+
     // if success is in url params show modal success plan setup
     if (route.query.success) {
       // toast.success(t('usage-success'))
@@ -422,6 +428,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
             </h1>
             <!-- Custom Plan Trigger -->
             <button
+              v-if="!isMobile"
               class="items-center hidden px-3 py-1 text-xs font-medium text-blue-700 transition-colors rounded-full bg-blue-50 lg:inline-flex dark:text-blue-300 hover:bg-blue-100 dark:bg-blue-900/30"
               @click="openSupport()"
             >
@@ -431,7 +438,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {{ t('plan-desc') }}
           </p>
-          <p class="mt-2 text-sm">
+          <p v-if="!isMobile" class="mt-2 text-sm">
             <a class="font-medium text-blue-600 hover:underline dark:text-blue-300" href="https://capgo.app/pricing/#compare-plans">
               {{ t('plan-full-comparison-link') }}
             </a>
@@ -464,10 +471,10 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
       </div>
 
       <!-- Credits CTA: shows info banner for credits-only orgs, upsell CTA for others -->
-      <CreditsCta class="mb-6 shrink-0" :credits-only="isCreditsOnly" />
+      <CreditsCta v-if="!isMobile" class="mb-6 shrink-0" :credits-only="isCreditsOnly" />
 
       <!-- Expert as a Service CTA -->
-      <div class="mb-6 shrink-0">
+      <div v-if="!isMobile" class="mb-6 shrink-0">
         <div class="flex flex-col gap-3 p-4 border border-amber-200 bg-amber-50 rounded-2xl text-amber-900 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p class="text-sm font-semibold">

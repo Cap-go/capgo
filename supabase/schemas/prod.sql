@@ -3346,31 +3346,33 @@ CREATE OR REPLACE FUNCTION "public"."count_all_plans_v2"() RETURNS TABLE("plan_n
     SET "search_path" TO ''
     AS $$
 BEGIN
-  RETURN QUERY 
+  RETURN QUERY
   WITH ActiveSubscriptions AS (
     SELECT DISTINCT ON (si.customer_id)
       p.name AS product_name,
       si.customer_id
     FROM public.stripe_info si
-    INNER JOIN public.plans p ON si.product_id = p.stripe_id 
+    INNER JOIN public.plans p ON si.product_id = p.stripe_id
     WHERE si.status = 'succeeded'
     ORDER BY si.customer_id, si.created_at DESC
   ),
   TrialUsers AS (
     SELECT DISTINCT ON (si.customer_id)
-      'Trial' AS product_name,
+      'Trial'::character varying AS product_name,
       si.customer_id
     FROM public.stripe_info si
-    WHERE si.trial_at > NOW() 
-    AND si.status IS NULL
-    AND NOT EXISTS (
-      SELECT 1 FROM ActiveSubscriptions a 
-      WHERE a.customer_id = si.customer_id
-    )
+    WHERE si.trial_at > NOW()
+      AND si.status IS DISTINCT FROM 'succeeded'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM ActiveSubscriptions a
+        WHERE a.customer_id = si.customer_id
+      )
+    ORDER BY si.customer_id, si.created_at DESC
   )
-  SELECT 
-    product_name as plan_name,
-    COUNT(*) as count
+  SELECT
+    product_name AS plan_name,
+    COUNT(*) AS count
   FROM (
     SELECT product_name, customer_id FROM ActiveSubscriptions
     UNION ALL

@@ -3,12 +3,14 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const organizationStore = useOrganizationStore()
+const hideExternalPurchaseFlows = isNativeAppStoreContext()
 
 // Password policy takes priority over subscription
 const needsPasswordUpdate = computed(() => {
@@ -137,9 +139,9 @@ async function copyOrgId() {
           {{ t('subscription-required') }}
         </h3>
         <div class="mt-3 text-base text-red-700">
-          <p>{{ t('plan-failed-description') }}</p>
+          <p>{{ t(hideExternalPurchaseFlows ? 'plan-failed-native-description' : 'plan-failed-description') }}</p>
         </div>
-        <div class="mt-6">
+        <div v-if="!hideExternalPurchaseFlows" class="mt-6">
           <button
             class="py-3 px-8 text-base font-semibold text-white bg-red-600 rounded-lg shadow-md transition-colors duration-200 hover:bg-red-700 hover:shadow-lg focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none"
             @click="goToPlans"

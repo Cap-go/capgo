@@ -1653,6 +1653,7 @@
   "plan-distribution-trend": "Plan Distribution Trend",
   "plan-failed": "Plan failed, please verify your card details",
   "plan-failed-description": "Your Capgo subscription is inactive or has expired. To resume updates and dashboard access, please upgrade your plan.",
+  "plan-failed-native-description": "Your Capgo subscription is inactive or has expired. Some dashboard features are unavailable until billing is resolved.",
   "plan-feature-community-support-discord": "Community support (Discord)",
   "plan-feature-custom-domain": "Custom domain",
   "plan-feature-direct-chat-support": "Direct chat support",

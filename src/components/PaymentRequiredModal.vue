@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 
 const { t } = useI18n()
 const router = useRouter()
+const hideExternalPurchaseFlows = isNativeAppStoreContext()
 
 function goToPlans() {
   router.push('/settings/organization/plans')
@@ -28,9 +30,10 @@ function goToPlans() {
         {{ t('subscription-required') }}
       </h2>
       <p class="mb-6 max-w-sm text-gray-600 dark:text-gray-400">
-        {{ t('plan-failed-description') }}
+        {{ t(hideExternalPurchaseFlows ? 'plan-failed-native-description' : 'plan-failed-description') }}
       </p>
       <button
+        v-if="!hideExternalPurchaseFlows"
         class="inline-flex gap-2 items-center px-6 py-3 text-white bg-amber-500 rounded-lg transition-colors cursor-pointer hover:bg-amber-600 focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:outline-none"
         @click="goToPlans"
       >
