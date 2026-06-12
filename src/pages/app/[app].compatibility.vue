@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { CompatibilityEventGroup, CompatibilityEventRow } from '~/services/compatibilityEvents'
 import type { Database } from '~/types/supabase.types'
-import { computed, onUnmounted, ref, watchEffect } from 'vue'
+import { computed, onUnmounted, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -111,6 +111,33 @@ const rollbackTargets = computed<RollbackTarget[]>(() => {
   return targets
 })
 
+// Channels the user may actually roll back (channel.promote_bundle — the
+// permission the DB trigger enforces on every channels.version write). The CTA
+// and the confirm dialog only ever cover permitted channels, so a user without
+// permission is never offered an action that would fail.
+const permittedChannelIds = ref<Set<number>>(new Set())
+let permissionsRequestId = 0
+
+watch(rollbackTargets, async (targets) => {
+  const requestId = ++permissionsRequestId
+  if (targets.length === 0) {
+    permittedChannelIds.value = new Set()
+    return
+  }
+  const permitted = new Set<number>()
+  for (const target of targets) {
+    const allowed = await checkPermissions('channel.promote_bundle', { channelId: target.channelId })
+    if (requestId !== permissionsRequestId)
+      return
+    if (allowed)
+      permitted.add(target.channelId)
+  }
+  permittedChannelIds.value = permitted
+}, { immediate: true })
+
+const permittedRollbackTargets = computed(() =>
+  rollbackTargets.value.filter(target => permittedChannelIds.value.has(target.channelId)))
+
 // The compatibility queue resolves events a few seconds after a channel write,
 // so a rollback refreshes again shortly after. Track the timers so they are
 // cleared on unmount (and on a subsequent rollback) instead of firing into a
@@ -134,16 +161,18 @@ onUnmounted(clearDelayedRefreshes)
 async function rollbackChannels(targets: readonly RollbackTarget[]) {
   if (targets.length === 0)
     return
-  for (const target of targets) {
-    const allowed = await checkPermissions('channel.promote_bundle', { channelId: target.channelId })
-    if (!allowed) {
-      toast.error(t('no-permission'))
-      return
-    }
-  }
   const failedChannels: string[] = []
   const rolledBackChannels: string[] = []
   for (const target of targets) {
+    // Targets are permission-filtered before the dialog opens; this re-check
+    // only catches a revocation in between. Skip just that channel (it is
+    // named in the outcome toast) instead of aborting the whole batch.
+    const allowed = await checkPermissions('channel.promote_bundle', { channelId: target.channelId })
+    if (!allowed) {
+      console.error('[Compatibility] No permission to roll back channel', target.channelName)
+      failedChannels.push(target.channelName)
+      continue
+    }
     const { error } = await supabase
       .from('channels')
       .update({ version: target.versionId })
@@ -171,7 +200,7 @@ async function rollbackChannels(targets: readonly RollbackTarget[]) {
 // here so the writes performed on confirm are exactly the changes the dialog
 // displayed, even if a background refresh mutates rollbackTargets meanwhile.
 function openRollbackDialog() {
-  const targets = [...rollbackTargets.value]
+  const targets = [...permittedRollbackTargets.value]
   const changes = targets
     .map(target => `${target.channelName} → ${target.versionName}`)
     .join(', ')
@@ -572,7 +601,7 @@ watchEffect(async () => {
                     </p>
                     <div class="flex flex-wrap items-center gap-2 mt-4">
                       <button
-                        v-if="rollbackTargets.length > 0"
+                        v-if="permittedRollbackTargets.length > 0"
                         type="button"
                         data-test="compatibility-rollback-cta"
                         class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white transition-colors rounded-lg bg-blue-600 hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
