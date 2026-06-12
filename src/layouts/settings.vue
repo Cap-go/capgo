@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
 import type { Tab } from '~/components/comp_def'
-import { Capacitor } from '@capacitor/core'
 import { computedAsync } from '@vueuse/core'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -13,6 +12,7 @@ import Tabs from '~/components/Tabs.vue'
 import { accountTabs } from '~/constants/accountTabs'
 import { organizationTabs as baseOrgTabs } from '~/constants/organizationTabs'
 import { settingsTabs } from '~/constants/settingsTabs'
+import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { checkPermissions } from '~/services/permissions'
 import { openPortal } from '~/services/stripe'
 import { stripeEnabled } from '~/services/supabase'
@@ -22,6 +22,7 @@ const { t } = useI18n()
 const organizationStore = useOrganizationStore()
 const router = useRouter()
 const route = useRoute()
+const hideExternalPurchaseFlows = isNativeAppStoreContext()
 
 // Modal state for non-admin billing access (triggered by billing tab click)
 const showBillingModal = ref(false)
@@ -40,7 +41,19 @@ const shouldBlockContent = computed(() => {
 })
 
 // keep Tab icon typing (including ShallowRef) instead of Vue's UnwrapRef narrowing
-const organizationTabs = ref<Tab[]>([...baseOrgTabs]) as Ref<Tab[]>
+function withoutExternalPurchaseTabs(tabs: Tab[]) {
+  if (!hideExternalPurchaseFlows)
+    return tabs
+
+  const restrictedKeys = new Set([
+    '/billing',
+    '/settings/organization/credits',
+    '/settings/organization/plans',
+  ])
+  return tabs.filter(tab => !restrictedKeys.has(tab.key))
+}
+
+const organizationTabs = ref<Tab[]>(withoutExternalPurchaseTabs([...baseOrgTabs])) as Ref<Tab[]>
 
 const canReadBilling = computedAsync(async () => {
   const orgId = organizationStore.currentOrganization?.gid
@@ -93,16 +106,16 @@ const showAdminOnlyModal = computed(() => {
 })
 
 watchEffect(() => {
-  if (!stripeEnabled.value) {
+  if (!stripeEnabled.value || hideExternalPurchaseFlows) {
     const path = route.path.replace(/\/$/, '')
     const billingPaths = [
-      '/settings/organization/usage',
+      ...(hideExternalPurchaseFlows ? [] : ['/settings/organization/usage']),
       '/settings/organization/credits',
       '/settings/organization/plans',
       '/billing',
     ]
     if (billingPaths.some(p => path === p || path.startsWith(`${p}/`)))
-      router.replace('/settings/organization')
+      router.replace(hideExternalPurchaseFlows ? '/settings/organization/usage' : '/settings/organization')
   }
 })
 
@@ -132,7 +145,7 @@ watchEffect(() => {
   if (!needsUsage && hasUsage)
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/usage')
 
-  const needsCredits = billingEnabled && canUpdateBilling.value
+  const needsCredits = billingEnabled && canUpdateBilling.value && !hideExternalPurchaseFlows
   const hasCredits = organizationTabs.value.find(tab => tab.key === '/settings/organization/credits')
 
   if (needsCredits && !hasCredits) {
@@ -144,7 +157,7 @@ watchEffect(() => {
   if (!needsCredits && hasCredits)
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/credits')
 
-  const needsPlans = billingEnabled && canUpdateBilling.value
+  const needsPlans = billingEnabled && canUpdateBilling.value && !hideExternalPurchaseFlows
   const hasPlans = organizationTabs.value.find(tab => tab.key === '/settings/organization/plans')
   if (needsPlans && !hasPlans) {
     const base = baseOrgTabs.find(t => t.key === '/settings/organization/plans')
@@ -190,7 +203,7 @@ watchEffect(() => {
   })
 
   // Check billing access - users with org.read_billing permission can access billing
-  if (!Capacitor.isNativePlatform()
+  if (!hideExternalPurchaseFlows
     && billingEnabled
     && canReadBilling.value
     && !organizationTabs.value.find(tab => tab.key === '/billing')) {
@@ -209,7 +222,7 @@ watchEffect(() => {
       },
     })
   }
-  else if (!canReadBilling.value || !billingEnabled) {
+  else if (hideExternalPurchaseFlows || !canReadBilling.value || !billingEnabled) {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/billing')
   }
 })

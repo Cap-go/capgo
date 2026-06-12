@@ -68,7 +68,6 @@ const EPHEMERAL_PICKER_STEPS = new Set([
   'import-provide-profile-path',
   'import-create-profile-only',
   'import-export-warning',
-  'import-compiling-helper',
   'import-exporting',
   'cert-limit-prompt',
   'revoking-certificate',

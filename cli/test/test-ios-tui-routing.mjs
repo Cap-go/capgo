@@ -674,29 +674,18 @@ await testAsync("import-portal-explanation · back → bespoke 'import-no-match-
 // ════════════════════════════════════════════════════════════════════════════
 // EPHEMERAL navigation. The pick rides carried.exportWarningAction; the resolver
 // mirrors the TUI onChange:
-//   - 'go' + helper cached    → import-exporting (MATCH).
-//   - 'go' + helper NOT cached → import-compiling-helper (MATCH).
+//   - 'go'                    → import-exporting (MATCH; PR #2458 removed the
+//     swiftc compile detour — the precompiled signed helper is resolved inside
+//     the export step, so 'go' routes straight to import-exporting).
 //   - 'back'                  → import-pick-profile (MATCH).
 //   - 'exit' / no pick        → exitOnboarding → resolver 'error' (DIVERGE).
-await testAsync("import-export-warning · go (helper cached) → bespoke 'import-exporting' [MATCH]", async () => {
+await testAsync("import-export-warning · go → bespoke 'import-exporting' [MATCH]", async () => {
   await parityEffect({
     step: 'import-export-warning',
     progress: adHocImport(),
     carried: { exportWarningAction: 'go', chosenIdentity: IDENTITY_A, chosenProfile: PROFILE_ON_DISK },
-    deps: { isHelperCached: () => true },
     bespoke: 'import-exporting',
     engine: 'import-exporting',
-    klass: 'MATCH',
-  })
-})
-await testAsync("import-export-warning · go (helper NOT cached) → bespoke 'import-compiling-helper' [MATCH]", async () => {
-  await parityEffect({
-    step: 'import-export-warning',
-    progress: adHocImport(),
-    carried: { exportWarningAction: 'go', chosenIdentity: IDENTITY_A, chosenProfile: PROFILE_ON_DISK },
-    deps: { isHelperCached: () => false },
-    bespoke: 'import-compiling-helper',
-    engine: 'import-compiling-helper',
     klass: 'MATCH',
   })
 })

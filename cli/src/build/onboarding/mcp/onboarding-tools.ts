@@ -31,7 +31,7 @@ import { deleteAndroidProgress, loadAndroidProgress, saveAndroidProgress } from 
 import { validateServiceAccountJson } from '../android/service-account-validation.js'
 import type { AscDistributionCert } from '../apple-api.js'
 import { classifyCertAvailability, computeCertSha1, createCertificate, createProfile, deleteProfile, ensureBundleId, findCertIdBySha1, generateJwt, listApps, listBundleIds, listDistributionCerts, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
-import { exportP12FromKeychain, isHelperCached, listSigningIdentities, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
+import { exportP12FromKeychain, listSigningIdentities, scanProvisioningProfiles } from '../macos-signing.js'
 import { parseMobileprovisionBufferDetailed } from '../../mobileprovision-parser.js'
 import { createP12, generateCsr } from '../csr.js'
 import { detectIosBundleIds } from '../bundle-id-detector.js'
@@ -348,11 +348,10 @@ function buildIosEffectDeps(cwd: string, getAppIdFn: () => Promise<string | unde
     // context instead of a browser open).
     listSigningIdentities,
     scanProvisioningProfiles,
+    // exportP12FromKeychain resolves + signature-verifies the precompiled
+    // signed helper internally (PR #2458 dropped the swiftc compile path, so
+    // there are no precompile/cache deps to wire — same as the TUI driver).
     exportP12FromKeychain,
-    precompileSwiftHelper: async () => {
-      await precompileSwiftHelper()
-    },
-    isHelperCached,
     // classifyCertAvailability resolves the identity's cert from the memoized
     // SHA-1 index, then enriches via the apple-api classifier — byte-for-byte
     // the TUI driver's wiring (ui/app.tsx ~L2229-2249).

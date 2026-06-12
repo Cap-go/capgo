@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * iOS BATCH 7b — import export sub-flow spec (warning / compile / exporting) +
+ * iOS BATCH 7b — import export sub-flow spec (warning / exporting) +
  * pendingRecoveryAction wiring.
  *
  * Drives `iosViewForStep` / `applyIosInput` / `runIosEffect` for the three
@@ -9,17 +9,12 @@
  *
  *   import-export-warning (choice + resolver, EPHEMERAL):
  *     view: a choice whose 'go' row names the chosen identity, plus back + exit.
- *     'go'  + helper cached      -> import-exporting   (skip the compile step)
- *     'go'  + helper NOT cached  -> import-compiling-helper
- *     'go'  + isHelperCached dep omitted -> import-exporting (defaults to cached)
+ *     'go'                       -> import-exporting (PR #2458 removed the swiftc
+ *                                   compile detour — the precompiled signed helper
+ *                                   is resolved + verified in the export step)
  *     'back'                     -> import-pick-profile
  *     'exit' / no pick           -> error (the engine has no 'exit' step)
  *     reducer persists NOTHING.
- *
- *   import-compiling-helper (effect, IDEMPOTENT):
- *     already compiled (guard)   -> import-exporting WITHOUT re-invoking swiftc
- *     precompileSwiftHelper ok   -> import-exporting (+ transient helperCompiled)
- *     precompileSwiftHelper throws -> error
  *
  *   import-exporting (effect, EPHEMERAL-dep):
  *     missing chosenIdentity OR chosenProfile -> error (the guard)
@@ -39,16 +34,16 @@
  *       -> creating-certificate (the normal create-new path is unchanged)
  *
  *   FULL import happy path:
- *     import-export-warning('go') -> (import-compiling-helper?) -> import-exporting
- *       -> saving-credentials, threading the export transient forward, and NEVER
- *       persisting the export payload anywhere.
+ *     import-export-warning('go') -> import-exporting -> saving-credentials,
+ *       threading the export transient forward, and NEVER persisting the export
+ *       payload anywhere.
  *
  * Like test-ios-import-recovery.mjs, this file is the headless DRIVER: the
  * export-warning choice is EPHEMERAL-branching, so the driver records the user's
- * pick into deps.carried.exportWarningAction (+ the compile idempotency guard
- * helperCompiled, + chosenIdentity / chosenProfile) and re-drives each step
+ * pick into deps.carried.exportWarningAction (+ chosenIdentity / chosenProfile)
+ * and re-drives each step
  * through runIosEffect — the SAME mechanism the Ink TUI uses to mirror its React
- * state/refs. The engine is IO-FREE: every keychain / swiftc / file touch is an
+ * state/refs. The engine is IO-FREE: every keychain / file touch is an
  * injected dep, and the exported cert/profile/passphrase NEVER hit progress.json.
  */
 import { Buffer } from 'node:buffer'
@@ -60,7 +55,7 @@ const {
   applyIosInput,
 } = await import('../src/build/onboarding/ios/flow.ts')
 
-console.log('🧪 iOS BATCH 7b — import export (warning / compile / exporting) + pendingRecoveryAction\n')
+console.log('🧪 iOS BATCH 7b — import export (warning / exporting) + pendingRecoveryAction\n')
 
 let testsPassed = 0
 let testsFailed = 0
@@ -138,10 +133,10 @@ function iosProgress(overrides = {}) {
 }
 
 /**
- * Mocked IosEffectDeps. Keychain / swiftc / file / verify touches are injected and
+ * Mocked IosEffectDeps. Keychain / file / verify touches are injected and
  * record their calls so the spec can assert which helper fired and with what
  * argument. `carried` is the driver-held transient — the spec threads the ephemeral
- * export-warning pick / compile guard / chosen identity / chosen profile / .p8
+ * export-warning pick / chosen identity / chosen profile / .p8
  * bytes through it. `saveProgress` records every persist so the spec can prove the
  * export payload is NEVER written.
  */
@@ -152,8 +147,6 @@ function makeDeps(overrides = {}) {
     appId: APP_ID,
 
     exportP12FromKeychain: async (sha1) => { calls.push({ name: 'exportP12FromKeychain', args: [sha1] }); return { ...EXPORTED } },
-    precompileSwiftHelper: async () => { calls.push({ name: 'precompileSwiftHelper', args: [] }) },
-    isHelperCached: () => { calls.push({ name: 'isHelperCached', args: [] }); return true },
 
     verifyApiKey: async (...a) => { calls.push({ name: 'verifyApiKey', args: a }); return { teamId: 'TEAMAAA' } },
 
@@ -203,27 +196,18 @@ await test('import-export-warning reducer persists NOTHING (the pick is ephemera
 })
 
 // ════════════════════════════════════════════════════════════════════════════════
-// import-export-warning — RESOLVER (helper-cached branch + back + exit)
+// import-export-warning — RESOLVER (go + back + exit)
 // ════════════════════════════════════════════════════════════════════════════════
 
-console.log('\n🧪 import-export-warning RESOLVER (go keyed off isHelperCached, back, exit)\n')
+console.log('\n🧪 import-export-warning RESOLVER (go, back, exit)\n')
 
-await test("export-warning resolver 'go' + helper CACHED -> import-exporting (skip the compile step)", async () => {
-  const deps = makeDeps({ carried: { exportWarningAction: 'go' }, isHelperCached: () => true })
+// PR #2458 replaced the runtime swiftc compile with precompiled signed helper
+// packages, removing the import-compiling-helper step: 'go' now routes straight
+// to import-exporting unconditionally.
+await test("export-warning resolver 'go' -> import-exporting", async () => {
+  const deps = makeDeps({ carried: { exportWarningAction: 'go' } })
   const res = await runIosEffect('import-export-warning', iosProgress(), deps)
-  assertEquals(res.next, 'import-exporting', 'a cached helper goes straight to export')
-})
-
-await test("export-warning resolver 'go' + helper NOT cached -> import-compiling-helper", async () => {
-  const deps = makeDeps({ carried: { exportWarningAction: 'go' }, isHelperCached: () => false })
-  const res = await runIosEffect('import-export-warning', iosProgress(), deps)
-  assertEquals(res.next, 'import-compiling-helper', 'an uncompiled helper detours through the compile step')
-})
-
-await test("export-warning resolver 'go' + isHelperCached dep OMITTED -> import-exporting (defaults to cached)", async () => {
-  const deps = makeDeps({ carried: { exportWarningAction: 'go' }, isHelperCached: undefined })
-  const res = await runIosEffect('import-export-warning', iosProgress(), deps)
-  assertEquals(res.next, 'import-exporting', 'the macOS-first default treats the helper as present')
+  assertEquals(res.next, 'import-exporting', "'go' goes straight to export (no compile detour)")
 })
 
 await test("export-warning resolver 'back' -> import-pick-profile", async () => {
@@ -242,39 +226,6 @@ await test('export-warning resolver persists NOTHING', async () => {
   const deps = makeDeps({ carried: { exportWarningAction: 'go' } })
   await runIosEffect('import-export-warning', iosProgress(), deps)
   assert(!deps.__calls.some(c => c.name === 'saveProgress'), 'pure routing — nothing persisted')
-})
-
-// ════════════════════════════════════════════════════════════════════════════════
-// import-compiling-helper — EFFECT (idempotent)
-// ════════════════════════════════════════════════════════════════════════════════
-
-console.log('\n🧪 import-compiling-helper (effect, idempotent)\n')
-
-await test('import-compiling-helper (precompileSwiftHelper succeeds) -> import-exporting; transient helperCompiled', async () => {
-  const deps = makeDeps({ carried: {} })
-  const res = await runIosEffect('import-compiling-helper', iosProgress(), deps)
-  assertEquals(res.next, 'import-exporting', 'a successful compile advances to export')
-  assert(res.transient?.helperCompiled === true, 'marks the helper as compiled (idempotency guard)')
-  assert(deps.__calls.some(c => c.name === 'precompileSwiftHelper'), 'invoked swiftc')
-})
-
-await test('import-compiling-helper IDEMPOTENT: already-compiled guard -> import-exporting WITHOUT re-invoking swiftc', async () => {
-  const deps = makeDeps({ carried: { helperCompiled: true } })
-  const res = await runIosEffect('import-compiling-helper', iosProgress(), deps)
-  assertEquals(res.next, 'import-exporting', 'a re-drive after compiling skips straight to export')
-  assert(!deps.__calls.some(c => c.name === 'precompileSwiftHelper'), 'swiftc is NOT re-invoked')
-})
-
-await test('import-compiling-helper (precompileSwiftHelper throws) -> error', async () => {
-  const deps = makeDeps({ carried: {}, precompileSwiftHelper: async () => { throw new Error('swiftc failed') } })
-  const res = await runIosEffect('import-compiling-helper', iosProgress(), deps)
-  assertEquals(res.next, 'error', 'a compile failure routes to error')
-})
-
-await test('import-compiling-helper persists NOTHING', async () => {
-  const deps = makeDeps({ carried: {} })
-  await runIosEffect('import-compiling-helper', iosProgress(), deps)
-  assert(!deps.__calls.some(c => c.name === 'saveProgress'), 'the compile step persists nothing')
 })
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -385,18 +336,19 @@ await test("verifying-key ignores an UNKNOWN pendingRecoveryAction value -> veri
 })
 
 // ════════════════════════════════════════════════════════════════════════════════
-// FULL import happy path — warning -> (compile?) -> exporting -> saving-credentials
+// FULL import happy path — warning -> exporting -> saving-credentials
 // ════════════════════════════════════════════════════════════════════════════════
 
-console.log('\n🧪 FULL import happy path (warning -> compile? -> exporting -> saving-credentials)\n')
+console.log('\n🧪 FULL import happy path (warning -> exporting -> saving-credentials)\n')
 
-await test('DRIVER: warning(go, cached) -> import-exporting -> saving-credentials; export rides transient, NOTHING persisted', async () => {
+await test('DRIVER: warning(go) -> import-exporting -> saving-credentials; export rides transient, NOTHING persisted', async () => {
   const progress = iosProgress()
 
-  // 1) export warning: user picks 'go'; helper is already cached -> straight to export.
-  const warnDeps = makeDeps({ carried: { exportWarningAction: 'go' }, isHelperCached: () => true })
+  // 1) export warning: user picks 'go' -> straight to export (PR #2458 removed
+  //    the swiftc compile detour).
+  const warnDeps = makeDeps({ carried: { exportWarningAction: 'go' } })
   const warn = await runIosEffect('import-export-warning', progress, warnDeps)
-  assertEquals(warn.next, 'import-exporting', 'cached helper skips the compile step')
+  assertEquals(warn.next, 'import-exporting', "'go' goes straight to export")
 
   // 2) import-exporting: exports + synthesizes the cert/profile records (transient only).
   const expDeps = makeDeps({ carried: { chosenIdentity: IDENTITY_A, chosenProfile: PROFILE_ON_DISK } })
@@ -407,27 +359,6 @@ await test('DRIVER: warning(go, cached) -> import-exporting -> saving-credential
   // No persistence happened anywhere in the export sub-flow.
   assert(!warnDeps.__calls.some(c => c.name === 'saveProgress'), 'the warning step persists nothing')
   assert(!expDeps.__calls.some(c => c.name === 'saveProgress'), 'the export step persists nothing')
-})
-
-await test('DRIVER: warning(go, NOT cached) -> import-compiling-helper -> import-exporting -> saving-credentials', async () => {
-  const progress = iosProgress()
-
-  // 1) export warning: helper NOT cached -> detour through the compile step.
-  const warnDeps = makeDeps({ carried: { exportWarningAction: 'go' }, isHelperCached: () => false })
-  const warn = await runIosEffect('import-export-warning', progress, warnDeps)
-  assertEquals(warn.next, 'import-compiling-helper', 'an uncompiled helper detours through compilation')
-
-  // 2) import-compiling-helper: compiles -> import-exporting (+ helperCompiled guard).
-  const compDeps = makeDeps({ carried: {} })
-  const comp = await runIosEffect('import-compiling-helper', progress, compDeps)
-  assertEquals(comp.next, 'import-exporting', 'a successful compile advances to export')
-  assert(comp.transient.helperCompiled === true, 'the compile guard is threaded forward')
-
-  // 3) import-exporting: exports -> saving-credentials.
-  const expDeps = makeDeps({ carried: { chosenIdentity: IDENTITY_A, chosenProfile: PROFILE_ON_DISK, helperCompiled: comp.transient.helperCompiled } })
-  const exp = await runIosEffect('import-exporting', progress, expDeps)
-  assertEquals(exp.next, 'saving-credentials', 'the full compile->export->save chain reaches the shared tail')
-  assertEquals(exp.transient.importedP12Password, EXPORTED.passphrase, 'the keychain passphrase rides transient through to saving-credentials')
 })
 
 // ─── Summary ─────────────────────────────────────────────────────────────────────

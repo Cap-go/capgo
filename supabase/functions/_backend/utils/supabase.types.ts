@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       apikey_global_permissions: {
@@ -4885,6 +4910,8 @@ export type Database = {
         | "webview_unclean_restart"
         | "webview_render_process_gone"
         | "webview_content_process_terminated"
+        | "os_version_changed"
+        | "native_app_version_changed"
       stripe_status:
         | "created"
         | "succeeded"
@@ -5059,6 +5086,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth", "build_time"],
@@ -5154,6 +5184,8 @@ export const Constants = {
         "webview_unclean_restart",
         "webview_render_process_gone",
         "webview_content_process_terminated",
+        "os_version_changed",
+        "native_app_version_changed",
       ],
       stripe_status: [
         "created",

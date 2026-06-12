@@ -267,7 +267,7 @@ Capgo never inspects external content. Add encryption for trustless security.
 **Example:**
 
 ```bash
-npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production
+npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production,beta
 ```
 
 **Options:**
@@ -276,7 +276,7 @@ npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel prod
 | -------------- | ------------- | -------------------- |
 | **-a** | <code>string</code> | API key to link to your account |
 | **-p** | <code>string</code> | Path of the folder to upload, if not provided it will use the webDir set in capacitor.config |
-| **-c** | <code>string</code> | Channel to link to |
+| **-c** | <code>string</code> | Channel to link to. Use commas for multiple channels, for example production,beta |
 | **-e** | <code>string</code> | Link to external URL instead of upload to Capgo Cloud |
 | **--iv-session-key** | <code>string</code> | Set the IV and session key for bundle URL external |
 | **--s3-region** | <code>string</code> | Region for your S3 bucket |

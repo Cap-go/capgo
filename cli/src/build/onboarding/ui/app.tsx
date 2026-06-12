@@ -53,7 +53,7 @@ import { createP12, generateCsr } from '../csr.js'
 import { mapIosOnboardingError } from '../error-categories.js'
 import { canUseFilePicker, openFilePicker, openMobileprovisionPicker } from '../file-picker.js'
 import { parseMobileprovisionBufferDetailed } from '../../mobileprovision-parser.js'
-import { bundleIdMatches, exportP12FromKeychain, filterProfilesForApp, isHelperCached, isMacOS, listSigningIdentities, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
+import { bundleIdMatches, exportP12FromKeychain, filterProfilesForApp, isMacOS, listSigningIdentities, scanProvisioningProfiles } from '../macos-signing.js'
 import { deleteProgress, extractKeyIdFromP8Path, getImportEntryStep, loadProgress, saveProgress } from '../progress.js'
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
 import { createCiSecretEntries, detectCiSecretTargets, getCiSecretRepoLabelAsync, getCiSecretTargetLabel, listExistingCiSecretKeysAsync, uploadCiSecretsAsync } from '../ci-secrets.js'
@@ -110,7 +110,6 @@ import {
   DetectingCiSecretsStep,
 } from './steps/ios-ci.js'
 import {
-  ImportCompilingHelperStep,
   ImportCreateProfileOnlyStep,
   ImportDistributionModeStep,
   ImportExportingStep,
@@ -176,7 +175,6 @@ const IOS_ENGINE_IMPORT_EFFECT_STEPS = new Set<OnboardingStep>([
   'import-checking-apple-cert',
   'import-provide-profile-path',
   'import-create-profile-only',
-  'import-compiling-helper',
   'import-exporting',
 ])
 
@@ -1619,7 +1617,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     //
     // The import EFFECT steps (import-scanning, import-validating-all-certs,
     // import-checking-apple-cert, import-provide-profile-path,
-    // import-create-profile-only, import-compiling-helper, import-exporting) are
+    // import-create-profile-only, import-exporting) are
     // now engine-driven (IOS_ENGINE_IMPORT_EFFECT_STEPS) — see the import effect
     // driver below. The engine runs the Mac scans / Apple-side cert+profile
     // lookups / .mobileprovision parse / Keychain export the bespoke bodies used
@@ -1895,7 +1893,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   //
   // The IMPORT effects (import-scanning, import-validating-all-certs,
   // import-checking-apple-cert, import-provide-profile-path,
-  // import-create-profile-only, import-compiling-helper, import-exporting) and
+  // import-create-profile-only, import-exporting) and
   // the import-mode verifying-key routing keep their bespoke bodies for now.
   useEffect(() => {
     // verifying-key is now FULLY engine-routed: the engine's `next` expresses
@@ -2219,8 +2217,6 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         listSigningIdentities,
         scanProvisioningProfiles,
         exportP12FromKeychain,
-        precompileSwiftHelper: async () => { await precompileSwiftHelper() },
-        isHelperCached,
 
         // ── apple-api (token-adapted, mirroring the bespoke import effects) ──
         // classifyCertAvailability resolves the identity's cert from the pre-built
@@ -2279,7 +2275,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
 
         // ── carried transient (driver-held) — the choice handlers stash the
         // ephemeral picks (chosenIdentity / chosenProfile / noMatchReason /
-        // profilePickerOpened / helperCompiled) here so the import effects find
+        // profilePickerOpened) here so the import effects find
         // their inputs, exactly as the engine resolver contract expects.
         carried: {
           ...iosCarriedRef.current,
@@ -4024,20 +4020,17 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               return
             }
             // EPHEMERAL-branching: record 'go' / 'back' into the carried ref and run
-            // the resolver effect. 'go' → isHelperCached() ? import-exporting :
-            // import-compiling-helper (so the first run shows the swiftc compile
-            // instead of a silent pause); 'back' → import-pick-profile.
+            // the resolver effect. 'go' → import-exporting (the precompiled helper
+            // is resolved + signature-verified in the export step itself — PR #2458
+            // removed the swiftc compile step); 'back' → import-pick-profile.
             const current = (await loadProgress(appId)) ?? { platform: 'ios' as const, appId, startedAt: new Date().toISOString(), completedSteps: {} }
             iosCarriedRef.current = { ...iosCarriedRef.current, exportWarningAction: value as 'go' | 'back' | 'exit' }
-            const res = await runIosEffect('import-export-warning', current, { appId, carried: iosCarriedRef.current, isHelperCached })
+            const res = await runIosEffect('import-export-warning', current, { appId, carried: iosCarriedRef.current })
             if (res.next && res.next !== 'import-export-warning')
               setStep(res.next)
           }}
         />
       )}
-
-      {/* Import: compiling helper (one-time per CLI version) */}
-      {step === 'import-compiling-helper' && <ImportCompilingHelperStep dense={dense} />}
 
       {/* Import: exporting (the one Keychain prompt happens here) */}
       {step === 'import-exporting' && <ImportExportingStep />}

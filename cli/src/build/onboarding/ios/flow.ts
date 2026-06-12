@@ -217,14 +217,6 @@ export interface IosStepCtx {
    * `mobileprovisionPickerOpenedRef` guard (app.tsx:1689).
    */
   profilePickerOpened?: boolean
-  /**
-   * True once the import-compiling-helper effect has compiled the Swift keychain-
-   * export helper this drive — returned in transient and threaded back as
-   * `deps.carried.helperCompiled` so a re-drive does NOT re-invoke swiftc (it
-   * skips straight to import-exporting). Mirrors the TUI's single-run compile
-   * effect (app.tsx:1611–1627).
-   */
-  helperCompiled?: boolean
 
   // ── ASC API key data surfaced after verifying-key (ephemeral mirror) ─────
   /** Verified key id + issuer id (mirror of completedSteps.apiKeyVerified). */
@@ -401,10 +393,6 @@ export interface IosEffectDeps {
    * saving-credentials handoff reads — NEVER persisted, risk #2 / D-iOS-3).
    */
   exportP12FromKeychain?: (targetSha1: string) => Promise<ExportedP12>
-  /** Pre-compile the Swift keychain-export helper (import-compiling-helper). */
-  precompileSwiftHelper?: () => Promise<void>
-  /** Whether the Swift keychain-export helper is already compiled + cached. */
-  isHelperCached?: () => boolean
 
   // ── mobileprovision-parser ───────────────────────────────────────────────
   /** Parse a `.mobileprovision` file in detail (import-provide-profile-path). */
@@ -643,20 +631,13 @@ export interface IosEffectDeps {
     /**
      * The user's pick at `import-export-warning` (the heads-up before the one
      * Keychain dialog). EPHEMERAL — `applyIosInput` persists nothing; the driver
-     * records the choice here and re-drives the step as a resolver. 'go' → compile
-     * the helper if needed then export (import-compiling-helper / import-exporting,
-     * keyed off isHelperCached); 'back' → import-pick-profile; 'exit'/absent →
-     * exit onboarding. Mirrors app.tsx:3769 onChange.
+     * records the choice here and re-drives the step as a resolver. 'go' →
+     * import-exporting (the precompiled signed helper is resolved + verified in
+     * the export step itself — PR #2458 removed the swiftc compile step);
+     * 'back' → import-pick-profile; 'exit'/absent → exit onboarding. Mirrors
+     * app.tsx:3769 onChange.
      */
     exportWarningAction?: 'go' | 'back' | 'exit'
-    /**
-     * Idempotency guard for `import-compiling-helper` (mirrors the TUI's
-     * single-run effect). Once the Swift keychain-export helper has been compiled
-     * this attempt, the driver threads the returned `helperCompiled: true`
-     * transient back here so a re-drive does NOT re-invoke swiftc — it skips
-     * straight to import-exporting. EPHEMERAL — never persisted.
-     */
-    helperCompiled?: boolean
     /**
      * The STICKY no-match reason set by the step that ROUTED into recovery
      * (import-pick-identity / import-checking-apple-cert). The recovery resolver
@@ -1286,8 +1267,8 @@ export type IosInput =
   // import-export-warning — the heads-up before the single Keychain dialog
   // (BATCH 7b). EPHEMERAL navigation choice: the driver records the pick in
   // carried.exportWarningAction and re-drives the step as a resolver (mirrors
-  // app.tsx:3769 onChange — 'go' → import-compiling-helper / import-exporting
-  // keyed off isHelperCached; 'back' → import-pick-profile; 'exit' → exit).
+  // app.tsx:3769 onChange — 'go' → import-exporting; 'back' →
+  // import-pick-profile; 'exit' → exit).
   // Persists nothing.
   | { step: 'import-export-warning', value: 'go' | 'back' | 'exit' }
 // ─── Engine surface (tail-wired; non-tail steps remain stubs) ───────────────────
@@ -1600,7 +1581,7 @@ export function iosViewForStep(
     // 'go' row names the chosen identity so the user recognises the cert they're
     // exporting (app.tsx:3767 passes chosenIdentity.name). The pick is EPHEMERAL —
     // the driver records it into carried.exportWarningAction and re-drives this
-    // step as a resolver (which keys 'go' off isHelperCached). The TUI only renders
+    // step as a resolver ('go' → import-exporting). The TUI only renders
     // this step when chosenIdentity is present (app.tsx:3765 `&& chosenIdentity`);
     // mirror that by falling back to a neutral identity label when ctx omits it.
     case 'import-export-warning': {
@@ -1902,8 +1883,8 @@ export function applyIosInput(
     // navigation; the TUI routes via setStep / exitOnboarding, never persisting the
     // choice. The pure reducer records nothing — the driver records the pick into
     // deps.carried.exportWarningAction and re-drives the step through runIosEffect
-    // ('go' → import-compiling-helper / import-exporting keyed off isHelperCached;
-    // 'back' → import-pick-profile; 'exit' → exit). Ephemeral, so resume re-renders.
+    // ('go' → import-exporting; 'back' → import-pick-profile; 'exit' → exit).
+    // Ephemeral, so resume re-renders.
     case 'import-export-warning':
       return progress
 
@@ -3181,12 +3162,10 @@ export async function runIosEffect(
     // EPHEMERAL-branching choice: the pick rides deps.carried.exportWarningAction
     // and the driver re-drives this step as a resolver. The routing mirrors the
     // TUI onChange exactly:
-    //   - 'go'   → start the export. The TUI compiles the Swift helper FIRST when
-    //     it isn't cached, so the user sees a concrete progress step instead of a
-    //     silent swiftc pause behind the "look for the macOS dialog" spinner
-    //     (app.tsx:3776 setStep(isHelperCached() ? 'import-exporting' :
-    //     'import-compiling-helper')). isHelperCached defaults to true (helper
-    //     present on the macOS-first target) when the dep is omitted.
+    //   - 'go'   → import-exporting. The precompiled signed helper is resolved
+    //     and signature-verified inside the export step itself (PR #2458 replaced
+    //     the runtime swiftc compile with prebuilt notarized helper packages, so
+    //     the old import-compiling-helper step no longer exists).
     //   - 'back' → import-pick-profile (distribution mode is upstream now;
     //     app.tsx:3780).
     //   - 'exit' / absent → exit onboarding (app.tsx:3783).
@@ -3195,40 +3174,12 @@ export async function runIosEffect(
       const action = deps.carried?.exportWarningAction
       if (action === 'back')
         return { progress, next: 'import-pick-profile' }
-      if (action === 'go') {
-        const helperCached = deps.isHelperCached ? deps.isHelperCached() : true
-        return { progress, next: helperCached ? 'import-exporting' : 'import-compiling-helper' }
-      }
+      if (action === 'go')
+        return { progress, next: 'import-exporting' }
       // 'exit' or no pick → leave onboarding. The engine has no 'exit' step, so
       // (like cert-limit-prompt / duplicate-profile-prompt's exit branches) this
       // routes to 'error', the driver's exitOnboarding equivalent (app.tsx:3783).
       return iosError(progress, `Onboarding cancelled. Re-run \`build init\` to resume.`)
-    }
-
-    // ── import-compiling-helper (effect, IDEMPOTENT) ──────────────────────────
-    // app.tsx:1611–1627. One-time-per-CLI-version compile of the Swift keychain-
-    // export helper, surfaced as its own step so the user sees the ~2-3s swiftc
-    // invocation rather than a silent pause. IDEMPOTENT (mirrors the TUI's single-
-    // run effect): if the driver already compiled this attempt it threads
-    // carried.helperCompiled=true back, so a re-drive skips straight to
-    // import-exporting WITHOUT re-invoking swiftc. Outcomes:
-    //   - already compiled (guard)     → import-exporting (no re-compile).
-    //   - precompileSwiftHelper succeeds → import-exporting (+ helperCompiled flag).
-    //   - precompileSwiftHelper throws  → error (app.tsx:1624 handleError).
-    case 'import-compiling-helper': {
-      if (deps.carried?.helperCompiled)
-        return { progress, next: 'import-exporting' }
-      try {
-        const startedAt = Date.now()
-        await deps.precompileSwiftHelper!()
-        deps.onLog?.(`✔ Compiled keychain-export helper in ${Date.now() - startedAt}ms`)
-        return { progress, next: 'import-exporting', transient: { helperCompiled: true } }
-      }
-      catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        deps.onLog?.(`✖ ${msg}`, 'red')
-        return iosError(progress, msg, 'import-compiling-helper')
-      }
     }
 
     // ── import-exporting (effect, EPHEMERAL-dep) ──────────────────────────────
