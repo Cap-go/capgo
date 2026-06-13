@@ -5,6 +5,17 @@ struct ContentView: View {
     @Bindable var model: GuidedFlowModel
 
     var body: some View {
+        // Gate the embedded browser behind the intro/consent screen — the
+        // WKWebView (and any contact with Apple) isn't created until the user
+        // accepts the guided flow.
+        if model.hasConsented {
+            guidedView
+        } else {
+            ConsentView(model: model)
+        }
+    }
+
+    private var guidedView: some View {
         HSplitView {
             StepsPanel(model: model)
                 .frame(minWidth: 300, idealWidth: 340, maxWidth: 440)

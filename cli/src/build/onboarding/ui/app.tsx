@@ -95,7 +95,6 @@ import {
   InputIssuerIdStep,
   InputKeyIdStep,
   InputP8PathStep,
-  P8CreateMethodSelectStep,
   P8MethodSelectStep,
   P8SourceSelectStep,
   RevokingCertificateStep,
@@ -1932,6 +1931,16 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           if (cancelled)
             return
           if (!outcome.ok) {
+            // The user picked "I'll create it manually" on the helper's intro
+            // screen — not an error. Persist the choice (so resume doesn't
+            // re-launch the helper) and route straight to the manual .p8
+            // instructions.
+            if (outcome.errorCode === 'USER_CHOSE_MANUAL') {
+              await persistP8CreateMethod('manual')
+              addLog('You chose to create the .p8 key manually.')
+              setStep('api-key-instructions')
+              return
+            }
             const reason = outcome.errorCode === 'USER_CANCELLED'
               ? 'Guided key creation was cancelled.'
               : `Guided key creation failed (${outcome.errorCode}): ${outcome.message}`
@@ -3596,31 +3605,18 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                 setStep('api-key-instructions')
               }
               else if (isMacOS() && resolveHelperBinary() !== null) {
-              // No key yet, and we can drive the guided helper. The method
-              // (automated vs manual) is persisted at p8-create-method-select.
-                setStep('p8-create-method-select')
-              }
-              else {
-              // No automation available — fall back to the manual instructions.
-                await persistP8CreateMethod('manual')
-                setStep('api-key-instructions')
-              }
-            }}
-          />
-        )}
-
-        {/* How to create the .p8: guided helper vs by hand (macOS only) */}
-        {step === 'p8-create-method-select' && (
-          <P8CreateMethodSelectStep
-            dense={dense}
-            onChange={async (value) => {
-              if (value === 'automated') {
-                // Remember the guided path so a quit-and-resume re-launches the
-                // helper instead of dropping the user on the manual .p8 picker.
+              // No key yet, and we can drive the guided helper — launch it right
+              // away. Its own intro/consent screen explains the safety model and
+              // offers manual creation, so there's no separate TUI question. We
+              // persist 'automated' so a quit-and-resume re-launches the helper;
+              // if the user picks "manual" inside it, the helper returns
+              // USER_CHOSE_MANUAL and the asc-key-generating effect re-routes to
+              // the manual instructions (and re-persists 'manual').
                 await persistP8CreateMethod('automated')
                 setStep('asc-key-generating')
               }
               else {
+              // No automation available — fall back to the manual instructions.
                 await persistP8CreateMethod('manual')
                 setStep('api-key-instructions')
               }

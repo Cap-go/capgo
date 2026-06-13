@@ -148,34 +148,6 @@ export const P8SourceSelectStep: FC<P8SourceSelectStepProps> = ({ dense = false,
   </Box>
 )
 
-// ── p8-create-method-select ───────────────────────────────────────────────────
-// macOS only: hand-create the key at App Store Connect, or let the guided helper
-// drive the whole flow in an embedded browser and capture the key automatically.
-export interface P8CreateMethodSelectStepProps {
-  dense?: boolean
-  onChange: (value: string) => void | Promise<void>
-}
-
-export const P8CreateMethodSelectStep: FC<P8CreateMethodSelectStepProps> = ({ dense = false, onChange }) => (
-  <Box flexDirection="column" marginTop={1}>
-    <Alert variant="info">
-      How do you want to create the .p8 key?
-    </Alert>
-    {!dense && <Newline />}
-    <Select
-      options={[
-        { label: '✨  Automated — Capgo guides you and captures the key', value: 'automated' },
-        { label: '📝  Manual — I will create it myself at App Store Connect', value: 'manual' },
-      ]}
-      onChange={onChange}
-    />
-    {!dense && <Newline />}
-    <Text dimColor>
-      Automated opens a window, walks you through Apple's UI, and captures the key — no copy-paste.
-    </Text>
-  </Box>
-)
-
 // ── asc-key-generating ────────────────────────────────────────────────────────
 // Spinner shown while the guided macOS helper runs in its own window.
 export const AscKeyGeneratingStep: FC = () => (

@@ -51,6 +51,10 @@ final class GuidedFlowModel {
     weak var webView: WKWebView?
 
     // Flow state.
+    /// Gates the embedded browser behind the intro/consent screen. The WKWebView
+    /// is not even created (so Apple is never contacted) until the user accepts
+    /// the guided flow here — see ContentView.
+    private(set) var hasConsented = false
     private(set) var currentStep: FlowStep = .login
     private(set) var mode: FlowMode = .createNew
     var issuerId: String = ""
@@ -129,6 +133,23 @@ final class GuidedFlowModel {
 
     var currentStepNumber: Int {
         (steps.firstIndex(of: currentStep) ?? 0) + 1
+    }
+
+    // MARK: - Intro / consent
+
+    /// The user accepted the guided flow on the intro screen. Mounting the web
+    /// view (ContentView) now loads App Store Connect.
+    func giveConsent() {
+        guard !hasConsented else { return }
+        hasConsented = true
+        StatsProtocol.event("consent_accepted", ["choice": "guided"])
+    }
+
+    /// The user chose to create the .p8 by hand from the intro screen. Tell the
+    /// CLI (USER_CHOSE_MANUAL) so it shows the manual instructions, then exit.
+    func chooseManualCreation() {
+        StatsProtocol.event("consent_manual_chosen")
+        CredentialsEmitter.exitManual()
     }
 
     /// Multi-team accounts must explicitly confirm which team gets the key —

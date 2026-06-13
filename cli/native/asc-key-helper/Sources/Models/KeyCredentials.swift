@@ -36,6 +36,22 @@ enum CredentialsEmitter {
         exit(1)
     }
 
+    /// The user chose, on the intro/consent screen, to create the .p8 by hand
+    /// instead of using the guided flow. A deliberate, non-error outcome: the CLI
+    /// reads `USER_CHOSE_MANUAL` off the result line and shows the manual key
+    /// instructions. Mark `didEmit` so the window-close handler doesn't also fire
+    /// a contradictory USER_CANCELLED line on the way out.
+    static func exitManual() {
+        didEmit = true
+        StatsProtocol.resultFailure(code: "USER_CHOSE_MANUAL", message: "User chose to create the .p8 manually.")
+        StatsProtocol.event("helper_finished", [
+            "ok": false,
+            "outcome": "manual",
+            "total_ms": StatsProtocol.elapsedMs(),
+        ])
+        exit(0)
+    }
+
     /// Keep a copy in the fastlane/ASC conventional location, since Apple never
     /// allows the key to be downloaded again. The key is ALSO delivered on stdout
     /// (the result line) — so a copy failure doesn't lose the key for a one-shot

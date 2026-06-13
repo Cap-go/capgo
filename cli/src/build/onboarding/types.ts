@@ -56,7 +56,6 @@ export type OnboardingStep
     // ── Existing create-new sub-flow (and ASC API key step reused by import for app_store) ──
     // Do-you-have-a-.p8 fork: have one → existing import; none + macOS → create.
     | 'p8-source-select'
-    | 'p8-create-method-select'
     | 'asc-key-generating'
     | 'api-key-instructions'
     | 'p8-method-select'
@@ -203,10 +202,13 @@ export interface OnboardingProgress {
   setupMethod?: 'create-new' | 'import-existing'
   /**
    * Records how the user chose to obtain the .p8 in the create-new flow's
-   * source fork (`p8-source-select` → `p8-create-method-select`):
-   *   - `automated` — the guided macOS helper creates + captures the key.
-   *   - `manual`    — the user has a .p8, or creates one by hand at App Store
-   *                   Connect, and enters it via `api-key-instructions`.
+   * source fork (`p8-source-select`):
+   *   - `automated` — picked "No — create one for me": the guided macOS helper
+   *                   creates + captures the key. (Its in-window intro screen
+   *                   still lets the user switch to manual, which re-persists
+   *                   `manual` from the asc-key-generating effect.)
+   *   - `manual`    — the user has a .p8, or chose to create one by hand at App
+   *                   Store Connect, and enters it via `api-key-instructions`.
    *
    * Persisted so a quit-and-resume lands the user back where they chose to be:
    * an `automated` user resumes on the helper (`asc-key-generating`), NOT the
@@ -284,7 +286,6 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   // doesn't move backwards entering the fork, and the two steps differ so it
   // advances between them.
   'p8-source-select': 6,
-  'p8-create-method-select': 7,
   'asc-key-generating': 22,
   'api-key-instructions': 5,
   'p8-method-select': 8,
@@ -373,7 +374,6 @@ export function getPhaseLabel(step: OnboardingStep): string {
     case 'import-exporting':
       return 'Step 4 of 4 · Export from Keychain'
     case 'p8-source-select':
-    case 'p8-create-method-select':
     case 'asc-key-generating':
     case 'api-key-instructions':
     case 'p8-method-select':

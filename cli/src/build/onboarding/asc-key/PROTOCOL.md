@@ -59,6 +59,11 @@ part of this protocol — prefer a `log` line so the diagnostic reaches the bund
   `privateKey` appears **only** here and is **never** forwarded to analytics.
   As defence-in-depth, the CLI also strips any prop key matching
   `private_key|secret|p8|pem|password|token` before sending event tags.
+- On a `false` result, `errorCode` is one of: `USER_CANCELLED` (window closed
+  before a key), `USER_CHOSE_MANUAL` (user picked "create manually" on the intro
+  screen — the CLI routes to the manual .p8 instructions, not an error path),
+  `HELPER_CRASHED` (died on a signal), `NO_RESULT`, or an internal validation
+  code. New codes can be added without a version bump.
 - The reader tolerates non-protocol stdout lines (it skips anything without a
   matching `capgoAscKey`), partial lines split across chunks, and a final
   newline-less line.
@@ -68,6 +73,8 @@ part of this protocol — prefer a `log` line so the diagnostic reaches the bund
 | `name`                | `props`                                              | Emitted when                              |
 | --------------------- | ---------------------------------------------------- | ----------------------------------------- |
 | `helper_started`      | `protocol_version`, `os_version`                     | The helper window appears.                |
+| `consent_accepted`    | `choice` (`guided`)                                  | User accepts the intro/consent screen.    |
+| `consent_manual_chosen`| —                                                   | User picks "create manually" on the intro.|
 | `signed_in`           | `team_count`                                         | First authenticated session read.         |
 | `team_confirmed`      | `is_switch`, `team_count`                            | User confirms a team in the dialog.       |
 | `api_access_checked`  | `enabled`, `role_ok`                                 | Team API-access capability is determined. |
@@ -76,7 +83,7 @@ part of this protocol — prefer a `log` line so the diagnostic reaches the bund
 | `validation_started`  | —                                                    | The new key is validated against Apple.   |
 | `validation_succeeded`| `duration_ms`                                        | Validation passed.                        |
 | `validation_failed`   | `duration_ms`                                        | Validation failed.                        |
-| `helper_finished`     | `ok`, `outcome` (`created`\|`cancelled`), `total_ms` | Just before the helper exits.             |
+| `helper_finished`     | `ok`, `outcome` (`created`\|`cancelled`\|`manual`), `total_ms` | Just before the helper exits.    |
 
 New events can be added without bumping the protocol version — the CLI forwards
 any `event` line generically (humanized name + `prop_*` tags). Bump
