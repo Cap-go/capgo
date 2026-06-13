@@ -330,16 +330,20 @@ enum FlowScripts {
         if (window.__p8hlClear) window.__p8hlClear();
         (function () {
             const find = () => { \(finder) };
-            // A round, generous halo that FOLLOWS the button's border-radius (so a
-            // circular "+" gets a circular ring, not a tight square). Pure
-            // box-shadow — no rectangular outline — and large enough to read as a
-            // deliberate highlight around a small ~32px button.
-            const RING = '0 0 0 7px #ff3b30, 0 0 0 15px rgba(255,59,48,0.45), 0 0 36px 16px rgba(255,59,48,0.65)';
+            // A crisp ring set OFF the button via outline-offset — a GAP between the
+            // button and the ring, so it reads as a frame around the "+" rather than
+            // a thick solid band hugging it (which looked like a filled red square).
+            // outline follows the element's own border-radius on modern WebKit; a
+            // soft box-shadow glow gives it presence without filling the area.
             let el = null, scrolled = false;
             const paint = (n) => {
-                n.style.setProperty('box-shadow', RING, 'important');
+                n.style.setProperty('outline', '3px solid #ff3b30', 'important');
+                n.style.setProperty('outline-offset', '6px', 'important');
+                n.style.setProperty('box-shadow', '0 0 0 4px rgba(255,59,48,0.18), 0 0 20px 7px rgba(255,59,48,0.5)', 'important');
             };
             const clear = (n) => {
+                n.style.removeProperty('outline');
+                n.style.removeProperty('outline-offset');
                 n.style.removeProperty('box-shadow');
             };
             const tick = () => {
