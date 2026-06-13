@@ -31,9 +31,10 @@ enum FlowScripts {
     """
 
     /// Find the VISIBLE "+" generate button on the "Active (N)" heading's row.
-    /// The h3's immediate `following-sibling::button[1]` can be a tiny non-visible
-    /// control (seen as a 5×13 sliver), so instead pick the nearest SIZABLE button
-    /// (≥18px) on the same row, to the heading's right. Sets `generatePlus`.
+    /// Per the live DOM: the row has a 5×13 sliver (skip — too small), the "+"
+    /// (~16×18 button with an SVG icon), and a wider "Edit" text button (no SVG).
+    /// So pick the leftmost button on the heading's row that has an SVG and isn't
+    /// a sliver (≥10px). Sets `generatePlus`.
     static let findGeneratePlusButton = """
     const __h3 = document.evaluate('.//h3[starts-with(normalize-space(), "Active")]', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
     let generatePlus = null;
@@ -41,9 +42,10 @@ enum FlowScripts {
         const hr = __h3.getBoundingClientRect();
         generatePlus = [...document.querySelectorAll('button')].filter(b => {
             const r = b.getBoundingClientRect();
-            return r.width >= 18 && r.height >= 18
+            return r.width >= 10 && r.height >= 10
+                && b.querySelector('svg')
                 && Math.abs((r.top + r.height / 2) - (hr.top + hr.height / 2)) < 30
-                && r.left >= hr.left && r.left < hr.right + 200;
+                && r.left >= hr.left;
         }).sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left)[0] || null;
     }
     """
@@ -361,7 +363,7 @@ enum FlowScripts {
                 // an oblong element makes a distorting ellipse/teardrop.
                 if (r.width > 0 && Math.abs(r.width - r.height) <= Math.max(r.width, r.height) * 0.35)
                     n.style.setProperty('border-radius', '50%', 'important');
-                n.style.setProperty('box-shadow', '0 0 0 3px #ff3b30, 0 0 0 6px rgba(255,59,48,0.25), 0 0 18px 6px rgba(255,59,48,0.55)', 'important');
+                n.style.setProperty('box-shadow', '0 0 0 3px #ff3b30, 0 0 0 8px rgba(255,59,48,0.30), 0 0 22px 8px rgba(255,59,48,0.60)', 'important');
             };
             const clear = (n) => {
                 n.style.removeProperty('border-radius');
