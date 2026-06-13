@@ -297,7 +297,10 @@ export class CapgoSDK {
         supaAnon: this.supaAnon,
       }
 
-      const apps = await listAppInternal(internalOptions, false)
+      // silent=true: the SDK is a programmatic API and (via the MCP server) runs over
+      // a stdio JSON-RPC channel — clack `intro`/`log` output on stdout corrupts the
+      // protocol framing and drops the transport. Every other SDK method is silent too.
+      const apps = await listAppInternal(internalOptions, true)
 
       const appInfos: AppInfo[] = apps.map(app => ({
         appId: app.app_id,

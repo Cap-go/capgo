@@ -1,4 +1,5 @@
 import type { SDKResult } from '../schemas/sdk'
+import process from 'node:process'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
@@ -9,6 +10,7 @@ import { CapgoSDK } from '../sdk'
 import { findSavedKey } from '../utils'
 import { registerOnboardingTools } from '../build/onboarding/mcp/onboarding-tools'
 import { buildServerInstructions } from './instructions'
+import { installMcpStdoutGuard } from './stdout-guard'
 
 /**
  * Format an SDK result error for MCP response.
@@ -617,8 +619,11 @@ export async function startMcpServer(): Promise<void> {
   if (onboardingEnabled)
     registerOnboardingTools(server, sdk)
 
-  // Start the server with stdio transport
-  const transport = new StdioServerTransport()
+  // Start the server with stdio transport. Route ambient stdout (stray clack/console
+  // output from any tool or dependency) to stderr so it can't corrupt the JSON-RPC
+  // frames a strict client reads — otherwise the transport drops ("Transport closed").
+  const transportStdout = installMcpStdoutGuard()
+  const transport = new StdioServerTransport(process.stdin, transportStdout)
   await server.connect(transport)
   trackMcpServerStarted(Boolean(savedApiKey))
 }
