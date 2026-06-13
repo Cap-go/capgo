@@ -3609,7 +3609,16 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
     if (gAppId) {
       const iosProg = await deps.loadProgress(gAppId)
       const androidProg = await deps.loadAndroidProgress(gAppId)
-      if (!androidProg && iosProg && getIosResumeStep(iosProg) === 'credentials-exist') {
+      // Disambiguate the SHARED credentials-exist gate by the SESSION platform, not
+      // disk: if this session is setting up iOS, the answer belongs to the iOS gate
+      // even when a leftover ANDROID progress file exists on disk (otherwise the
+      // answer misrouted into the android flow). Fall back to the disk shape only
+      // when no platform is committed yet (e.g. a fresh process after a restart).
+      const credGatePlatform = getSessionPlatform(gAppId)
+      if (
+        (credGatePlatform === 'ios' || (!credGatePlatform && !androidProg))
+        && iosProg && getIosResumeStep(iosProg) === 'credentials-exist'
+      ) {
         iosOwnsCredentialsGate = true
         const updated: OnboardingProgress = {
           ...iosProg,
@@ -3891,15 +3900,16 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
   }
 }
 
-export async function runStart(deps: EngineDeps): Promise<NextStepResult> {
-  // A fresh "start onboarding" must re-offer the platform picker (matching the TUI's
-  // `build init`), so clear the session's committed platform first. Without this, a
-  // re-entry mid-session would silently resume the prior platform. Disk progress is
-  // untouched — it still resumes the STEP once a platform is (re-)picked.
+export async function runStart(deps: EngineDeps, platform?: Platform): Promise<NextStepResult> {
+  // A fresh "start onboarding" re-evaluates the platform. An explicit `platform` (the
+  // user already said which — "set up Capgo Builder for iOS" — or is switching after a
+  // wrong pick) COMMITS to it and skips the picker; otherwise clear any committed
+  // platform so the picker is re-offered (matching the TUI's `build init`). Either way
+  // disk progress is untouched — it still resumes the STEP within the chosen platform.
   const appId = await deps.getAppId()
   if (appId)
-    setSessionPlatform(appId, undefined)
-  return drive(deps, undefined)
+    setSessionPlatform(appId, platform)
+  return drive(deps, platform ? { platform } : undefined)
 }
 
 export async function runAdvance(deps: EngineDeps, input?: OnboardingInput): Promise<NextStepResult> {

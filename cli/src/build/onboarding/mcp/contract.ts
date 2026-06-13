@@ -60,6 +60,7 @@ export const ONBOARDING_RULES: string[] = [
   'If kind is "choice", present `options` and call `next.tool` with the user\'s pick.',
   'Never tell the user a step succeeded unless a result confirms it.',
   'If the user is confused, asks what a step means, or does not understand the options, call capgo_builder_onboarding_explain for a plain-language explanation — do not guess.',
+  'If the user changes which platform to set up (named the wrong one, or wants to switch), call start_capgo_builder_onboarding({ platform: "ios" | "android" }) to switch cleanly — do NOT try to cancel the current step or answer it with the other platform in mind.',
 ]
 
 // ─── Secret redaction (defense-in-depth) ──────────────────────────────────────

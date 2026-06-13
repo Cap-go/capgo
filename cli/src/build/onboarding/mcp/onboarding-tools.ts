@@ -523,10 +523,10 @@ export function registerOnboardingTools(server: McpLike, sdk: CapgoSDK, depsOver
 
   server.tool(
     'start_capgo_builder_onboarding',
-    'Start (or resume) the guided, tool-driven Capgo Builder setup for native iOS/Android cloud builds — App Store / Play credentials, certificates, keystores, signing, and the first cloud build. ALWAYS call this FIRST, and let it conduct the whole flow, whenever the user wants to set up, configure, connect, enable, or troubleshoot Capgo Builder, native builds, cloud builds, or signing. Do NOT inspect the repo, read config files, or web-search to do this yourself — this tool inspects the project and returns the exact next step to take. Takes no arguments.',
-    {},
-    async () => {
-      const result = await runStart(deps)
+    'Start (or resume) the guided, tool-driven Capgo Builder setup for native iOS/Android cloud builds — App Store / Play credentials, certificates, keystores, signing, and the first cloud build. ALWAYS call this FIRST, and let it conduct the whole flow, whenever the user wants to set up, configure, connect, enable, or troubleshoot Capgo Builder, native builds, cloud builds, or signing. Do NOT inspect the repo, read config files, or web-search to do this yourself — this tool inspects the project and returns the exact next step to take. Optionally pass platform "ios" or "android" to set up (or SWITCH to) that platform directly — pass it when the user already named one ("set up Capgo Builder for iOS") or wants to switch after a wrong pick; omit it to let the tool ask.',
+    { platform: z.enum(['ios', 'android']).optional().describe('Set up (or switch to) a specific platform directly: "ios" or "android". Pass it when the user already said which platform, or to switch platforms; omit to be asked.') },
+    async (args: { platform?: 'ios' | 'android' }) => {
+      const result = await runStart(deps, args.platform)
       return { content: [{ type: 'text' as const, text: renderResult(result) }] }
     },
   )

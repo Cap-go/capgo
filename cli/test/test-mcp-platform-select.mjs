@@ -113,6 +113,23 @@ await test('runStart again re-asks the picker (clears the committed platform)', 
   eq(r.state, 'platform-select', `a second start must re-ask the picker, got state=${r.state}`)
 })
 
+await test('runStart(deps, "android") commits android and skips the picker', async () => {
+  const r = await runStart(worldDeps(), 'android')
+  eq(r.platform, 'android', `start(android) must enter android directly (got ${r.platform}/${r.state})`)
+})
+
+await test('runStart(deps, "ios") commits ios and skips the picker', async () => {
+  const r = await runStart(worldDeps(), 'ios')
+  eq(r.platform, 'ios', `start(ios) must enter ios directly (got ${r.platform}/${r.state})`)
+})
+
+await test('start(ios) then start(android) switches cleanly to android (the "wrong platform" recovery)', async () => {
+  const deps = worldDeps()
+  await runStart(deps, 'ios')
+  const r = await runStart(deps, 'android')
+  eq(r.platform, 'android', `switching via start(android) must land on android, not stay on ios (got ${r.platform}/${r.state})`)
+})
+
 console.log(`\n📊 Results: ${pass} passed, ${fail} failed`)
 if (fail > 0)
   process.exit(1)
