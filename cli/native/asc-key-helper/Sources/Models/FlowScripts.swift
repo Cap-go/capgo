@@ -30,6 +30,24 @@ enum FlowScripts {
     ).singleNodeValue;
     """
 
+    /// Find the VISIBLE "+" generate button on the "Active (N)" heading's row.
+    /// The h3's immediate `following-sibling::button[1]` can be a tiny non-visible
+    /// control (seen as a 5×13 sliver), so instead pick the nearest SIZABLE button
+    /// (≥18px) on the same row, to the heading's right. Sets `generatePlus`.
+    static let findGeneratePlusButton = """
+    const __h3 = document.evaluate('.//h3[starts-with(normalize-space(), "Active")]', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+    let generatePlus = null;
+    if (__h3) {
+        const hr = __h3.getBoundingClientRect();
+        generatePlus = [...document.querySelectorAll('button')].filter(b => {
+            const r = b.getBoundingClientRect();
+            return r.width >= 18 && r.height >= 18
+                && Math.abs((r.top + r.height / 2) - (hr.top + hr.height / 2)) < 30
+                && r.left >= hr.left && r.left < hr.right + 200;
+        }).sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left)[0] || null;
+    }
+    """
+
     static let findNewKeyRow = """
     const downloadButton = document.evaluate(
         './/button[normalize-space()="Download"]',
@@ -338,7 +356,11 @@ enum FlowScripts {
             // child mutation, so React's reconciler is untouched.)
             let el = null, scrolled = false;
             const paint = (n) => {
-                n.style.setProperty('border-radius', '50%', 'important');
+                const r = n.getBoundingClientRect();
+                // Round it only when roughly square (a circular "+"); forcing 50% on
+                // an oblong element makes a distorting ellipse/teardrop.
+                if (r.width > 0 && Math.abs(r.width - r.height) <= Math.max(r.width, r.height) * 0.35)
+                    n.style.setProperty('border-radius', '50%', 'important');
                 n.style.setProperty('box-shadow', '0 0 0 3px #ff3b30, 0 0 0 6px rgba(255,59,48,0.25), 0 0 18px 6px rgba(255,59,48,0.55)', 'important');
             };
             const clear = (n) => {
@@ -380,30 +402,22 @@ enum FlowScripts {
     static let createKeyHighlightProbe = """
     const out = {};
     try {
-        const xp = (e) => document.evaluate(e, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-        out.hasActiveH3 = !!xp('.//h3[starts-with(normalize-space(), "Active")]');
-        const btn = xp('.//h3[starts-with(normalize-space(), "Active")]/following-sibling::button[1]');
-        out.matched = !!btn;
-        if (btn) {
-            const r = btn.getBoundingClientRect();
-            out.tag = btn.tagName;
-            out.text = (btn.textContent || '').trim().slice(0, 30);
-            out.aria = btn.getAttribute('aria-label') || '';
-            out.visible = btn.getClientRects().length > 0;
-            out.rect = Math.round(r.left) + ',' + Math.round(r.top) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height);
+        const rectStr = (el) => { const r = el.getBoundingClientRect(); return Math.round(r.left) + ',' + Math.round(r.top) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height); };
+        const h3 = document.evaluate('.//h3[starts-with(normalize-space(), "Active")]', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+        out.hasActiveH3 = !!h3;
+        \(findGeneratePlusButton)
+        out.picked = generatePlus ? rectStr(generatePlus) : null;
+        out.pickedHasSvg = generatePlus ? !!generatePlus.querySelector('svg') : false;
+        out.pickedAria = generatePlus ? (generatePlus.getAttribute('aria-label') || '') : '';
+        // Every button on the heading's row, for diagnosis if `picked` is wrong.
+        if (h3) {
+            const hr = h3.getBoundingClientRect();
+            out.rowButtons = [...document.querySelectorAll('button')].filter(b => {
+                const r = b.getBoundingClientRect();
+                return Math.abs((r.top + r.height / 2) - (hr.top + hr.height / 2)) < 30 && r.left >= hr.left - 20;
+            }).slice(0, 10).map(b => rectStr(b) + (b.querySelector('svg') ? ' svg' : '') + (b.getAttribute('aria-label') ? ' aria=' + b.getAttribute('aria-label') : ''));
         }
-        out.candidates = [...document.querySelectorAll('button')].filter(b => {
-            const t = (b.textContent || '').trim();
-            const a = (b.getAttribute('aria-label') || '').toLowerCase();
-            return t === '+' || a.includes('generate') || a.includes('add') || a.includes('create new');
-        }).slice(0, 6).map(b => {
-            const r = b.getBoundingClientRect();
-            return (b.getAttribute('aria-label') || (b.textContent || '').trim().slice(0, 16) || '?')
-                + '@' + Math.round(r.left) + ',' + Math.round(r.top) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height);
-        });
         out.bodyTransform = getComputedStyle(document.body).transform;
-        out.htmlTransform = getComputedStyle(document.documentElement).transform;
-        out.scrollY = Math.round(window.scrollY);
     } catch (e) { out.error = String(e); }
     return JSON.stringify(out);
     """
@@ -416,7 +430,7 @@ enum FlowScripts {
             """
             \(awaitNoProgressBar)
             \(removeOverlay)
-            \(attachHighlightDirect(finder: "\(findGenerateButton) return generateButton;", scroll: true))
+            \(attachHighlightDirect(finder: "\(findGeneratePlusButton) return generatePlus;", scroll: true))
             """
         case .nameKey:
             overlayHighlight(finder: "return document.querySelector('#name, input[name=\"name\"]');")
