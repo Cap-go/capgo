@@ -8,6 +8,7 @@ import { addAppOptionsSchema, cleanupOptionsSchema, getStatsOptionsSchema, reque
 import { CapgoSDK } from '../sdk'
 import { findSavedKey } from '../utils'
 import { registerOnboardingTools } from '../build/onboarding/mcp/onboarding-tools'
+import { buildServerInstructions } from './instructions'
 
 /**
  * Format an SDK result error for MCP response.
@@ -32,10 +33,14 @@ function formatMcpError<T>(result: SDKResult<T>): { content: Array<{ type: 'text
  * This allows AI agents to interact with Capgo Cloud programmatically.
  */
 export async function startMcpServer(): Promise<void> {
-  const server = new McpServer({
-    name: 'capgo',
-    version: pack.version,
-  })
+  // Computed once: gates BOTH the onboarding-tool registration (below) and the
+  // onboarding steer appended to the server instructions, so we never advertise a
+  // start_capgo_builder_onboarding tool we didn't actually register.
+  const onboardingEnabled = Boolean(globalThis.__CAPGO_MCP_ONBOARDING__)
+  const server = new McpServer(
+    { name: 'capgo', version: pack.version },
+    { instructions: buildServerInstructions(onboardingEnabled) },
+  )
 
   setInvocationSource('mcp')
   enableSupabaseInstrumentation()
@@ -609,7 +614,7 @@ export async function startMcpServer(): Promise<void> {
   // OFF in PR 1 while the flow was under construction, flipped ON in PR 2 now that
   // the full journey (android + iOS + tail) ships through the shared engine.
   // `bun run dev` keeps the flag undefined-safe; release builds define it to true.
-  if (globalThis.__CAPGO_MCP_ONBOARDING__)
+  if (onboardingEnabled)
     registerOnboardingTools(server, sdk)
 
   // Start the server with stdio transport
