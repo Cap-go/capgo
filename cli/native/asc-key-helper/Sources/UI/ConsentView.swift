@@ -26,7 +26,7 @@ struct ConsentView: View {
             }
             Spacer(minLength: 16)
             actions
-                .frame(maxWidth: 640, alignment: .leading)
+                .frame(maxWidth: .infinity)
                 .padding(.horizontal, 40)
             Spacer(minLength: 28)
         }
@@ -104,8 +104,6 @@ struct ConsentView: View {
                 Text("I'll create it manually")
             }
             .controlSize(.large)
-
-            Spacer()
         }
     }
 }
