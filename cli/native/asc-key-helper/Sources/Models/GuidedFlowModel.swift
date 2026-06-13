@@ -91,6 +91,9 @@ final class GuidedFlowModel {
     private var isResolving = false
     private var pageSettled = false
     private var steeredToKeys = false
+    /// Total auto-steers to the keys page from an off-flow ASC page — capped so a
+    /// keys→/apps redirect can never loop.
+    private var keysSteerCount = 0
     private var issuerScrapeFailures = 0
     private let validator = ASCKeyValidator()
     // Stats-protocol bookkeeping (see StatsProtocol). One-shot guards keep the
@@ -478,16 +481,28 @@ final class GuidedFlowModel {
         }
         if urlString.hasPrefix(Self.apiKeysURLString) {
             await resolveOnApiPage()
-        } else if !didAutoNavigate {
-            // A non-keys ASC page (e.g. /apps). Only steer to the keys page once
-            // a real session exists — navigating mid-login would break auth.
+        } else {
+            // A non-keys ASC page (e.g. /apps): a restored/persisted session lands
+            // here, or Apple bounced us off the keys page. If a real session
+            // exists we ARE signed in — mark the sign-in step complete (so the
+            // flow advances even though we're not on the keys page yet) and steer
+            // back to the keys page. Steer once per page load, capped, so a keys↔
+            // /apps redirect can never loop; after the cap the user keeps the
+            // "Take me back" control. Navigating only with a session in hand
+            // avoids breaking Apple's mid-login redirects.
             if let json = (try? await callJavaScript(FlowScripts.readSession)) as? String,
                ASCSession.parse(jsonText: json) != nil {
-                didAutoNavigate = true
-                StatsProtocol.debug("steering to the API keys page from an off-flow ASC page", [
-                    "from": urlString,
-                ])
-                webView?.load(URLRequest(url: Self.apiKeysURL))
+                everLoggedIn = true
+                if !steeredToKeys, keysSteerCount < 3 {
+                    steeredToKeys = true
+                    didAutoNavigate = true
+                    keysSteerCount += 1
+                    StatsProtocol.debug("signed in on an off-flow ASC page — steering to the keys page", [
+                        "from": urlString,
+                        "attempt": keysSteerCount,
+                    ])
+                    webView?.load(URLRequest(url: Self.apiKeysURL))
+                }
             }
         }
     }
