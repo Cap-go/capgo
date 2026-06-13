@@ -97,6 +97,11 @@ extension WebViewContainer.Coordinator: WKNavigationDelegate {
         if let url = navigationAction.request.url, url.scheme == "data" {
             if let pem = Self.decodePEM(fromDataURL: url) {
                 model.privateKeyCaptured(pem)
+            } else {
+                // The "Download" produced a data: URL we couldn't decode into a
+                // private key. Don't fail silently — the flow would otherwise stall
+                // forever on downloadKey with no diagnostic.
+                StatsProtocol.error("intercepted a data: download but could not decode a .p8 private key from it")
             }
             decisionHandler(.cancel)
             return
@@ -149,17 +154,26 @@ extension WebViewContainer.Coordinator: WKDownloadDelegate {
     }
 
     func downloadDidFinish(_ download: WKDownload) {
-        guard let destination = downloadDestination,
-              destination.pathExtension == "p8",
+        guard let destination = downloadDestination else { return }
+        // Always remove the temp file — it holds a private key; never leave it on
+        // disk, even on the failure path.
+        defer { try? FileManager.default.removeItem(at: destination) }
+        guard destination.pathExtension == "p8",
               let pem = try? String(contentsOf: destination, encoding: .utf8),
               pem.contains("PRIVATE KEY") else {
+            StatsProtocol.warn("downloaded key file was not a readable .p8", [
+                "ext": destination.pathExtension,
+            ])
             return
         }
         model.privateKeyCaptured(pem)
-        try? FileManager.default.removeItem(at: destination)
     }
 
     func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
+        StatsProtocol.warn("key download failed", ["detail": error.localizedDescription])
+        if let destination = downloadDestination {
+            try? FileManager.default.removeItem(at: destination)
+        }
         downloadDestination = nil
     }
 }

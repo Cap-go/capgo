@@ -14,7 +14,7 @@ const PATTERNS: Array<{ re: RegExp, replace: string }> = [
   // `p8`/`pem` cover a stray private-key-bearing prop the patterns above miss; the
   // closing quote anchors the key, so `"p8Path"` (a useful, non-secret path) is
   // left intact.
-  { re: /("(?:access_token|refresh_token|id_token|client_secret|private_key|apple_key_content|api[_-]?key|token|secret|password|p8|pem)"\s*:\s*")[^"]+(")/gi, replace: '$1[REDACTED]$2' },
+  { re: /("(?:access_token|refresh_token|id_token|client_secret|private[_-]?key|apple_key_content|api[_-]?key|token|secret|password|p8|pem)"\s*:\s*")[^"]+(")/gi, replace: '$1[REDACTED]$2' },
 ]
 
 export function redactSecrets(text: string): string {

@@ -280,9 +280,11 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'import-create-profile-only': 60,
   'import-export-warning': 70,
   'import-exporting': 75,
-  // Create-new sub-flow
-  'p8-source-select': 4,
-  'p8-create-method-select': 4,
+  // Create-new sub-flow — must sit above setup-method-select (5) so the bar
+  // doesn't move backwards entering the fork, and the two steps differ so it
+  // advances between them.
+  'p8-source-select': 6,
+  'p8-create-method-select': 7,
   'asc-key-generating': 22,
   'api-key-instructions': 5,
   'p8-method-select': 8,

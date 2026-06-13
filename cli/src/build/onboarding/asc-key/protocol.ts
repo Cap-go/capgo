@@ -124,7 +124,7 @@ export function parseAscProtocolLine(line: string): AscProtocolLine | null {
       ts: typeof obj.ts === 'number' ? obj.ts : 0,
       runId: typeof obj.runId === 'string' ? obj.runId : '',
       name: obj.name,
-      props: (obj.props && typeof obj.props === 'object') ? obj.props as Record<string, unknown> : {},
+      props: (obj.props && typeof obj.props === 'object' && !Array.isArray(obj.props)) ? obj.props as Record<string, unknown> : {},
     }
   }
   if (obj.kind === 'log') {
@@ -137,7 +137,7 @@ export function parseAscProtocolLine(line: string): AscProtocolLine | null {
       runId: typeof obj.runId === 'string' ? obj.runId : '',
       level: normalizeLogLevel(obj.level),
       message: obj.message,
-      props: (obj.props && typeof obj.props === 'object') ? obj.props as Record<string, unknown> : {},
+      props: (obj.props && typeof obj.props === 'object' && !Array.isArray(obj.props)) ? obj.props as Record<string, unknown> : {},
     }
   }
   if (obj.kind === 'result') {

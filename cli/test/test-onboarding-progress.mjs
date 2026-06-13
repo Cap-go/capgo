@@ -210,6 +210,13 @@ t('getResumeStep returns asc-key-generating for create-new automated with no inp
   assert.equal(getResumeStep(progress), 'asc-key-generating')
 })
 
+// ...but only when the helper is actually available — else the manual path, so
+// resume doesn't land on a step that immediately fails with HELPER_NOT_FOUND.
+t('getResumeStep returns api-key-instructions for automated when helper unavailable', () => {
+  const progress = makeProgress({ setupMethod: 'create-new', p8CreateMethod: 'automated' })
+  assert.equal(getResumeStep(progress, false), 'api-key-instructions')
+})
+
 // Manual choosers (and legacy/undefined) still resume on the .p8 instructions.
 t('getResumeStep returns api-key-instructions for create-new manual with no inputs', () => {
   const progress = makeProgress({ setupMethod: 'create-new', p8CreateMethod: 'manual' })

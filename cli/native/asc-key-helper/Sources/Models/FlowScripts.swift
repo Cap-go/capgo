@@ -119,9 +119,14 @@ enum FlowScripts {
     /// code do the switch + navigation. Matched by team name, not CSS classes.
     /// Returns a JSON diagnostics string.
     static func switchTeamViaMenuScript(teamName: String) -> String {
-        let safe = teamName
-            .replacingOccurrences(of: "\\", with: "")
-            .replacingOccurrences(of: "'", with: "\\'")
+        // JSON-encode the team name so ANY character (quotes, backslashes,
+        // newlines, control chars) is safely embedded as a JS string literal —
+        // string concatenation could otherwise break the script or be injected.
+        let jsTeamName: String = {
+            guard let data = try? JSONSerialization.data(withJSONObject: [teamName]),
+                  let json = String(data: data, encoding: .utf8) else { return "\"\"" }
+            return String(json.dropFirst().dropLast()) // `["x"]` -> `"x"`
+        }()
         return """
         const out = {};
         try {
@@ -138,7 +143,7 @@ enum FlowScripts {
             let target = null;
             for (let i = 0; i < 40; i++) {
                 const lis = [...root.querySelectorAll('li')];
-                target = lis.find(li => li.textContent.trim() === '\(safe)');
+                target = lis.find(li => li.textContent.trim() === \(jsTeamName));
                 if (target) break;
                 await sleep(50);
             }

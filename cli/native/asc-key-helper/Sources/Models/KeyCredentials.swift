@@ -36,18 +36,39 @@ enum CredentialsEmitter {
         exit(1)
     }
 
-    /// Keep a copy in the fastlane/ASC conventional location, since Apple
-    /// never allows the key to be downloaded again.
+    /// Keep a copy in the fastlane/ASC conventional location, since Apple never
+    /// allows the key to be downloaded again. The key is ALSO delivered on stdout
+    /// (the result line) — so a copy failure doesn't lose the key for a one-shot
+    /// run — but it is recorded (not silently swallowed) so a missing .p8 on
+    /// resume is diagnosable.
     private static func savePrivateKeyCopy(_ credentials: KeyCredentials) {
+        // Apple key IDs are alphanumeric; strip anything else so a crafted keyId
+        // can't escape the directory (path traversal) via the filename.
+        let safeKeyId = credentials.keyId.filter { $0.isLetter || $0.isNumber }
+        guard !safeKeyId.isEmpty else {
+            StatsProtocol.error("refusing to save .p8 — empty/invalid keyId after sanitization")
+            return
+        }
         let directory = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".appstoreconnect/private_keys", isDirectory: true)
-        let file = directory.appendingPathComponent("AuthKey_\(credentials.keyId).p8")
+        let file = directory.appendingPathComponent("AuthKey_\(safeKeyId).p8")
+        if FileManager.default.fileExists(atPath: file.path) { return }
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            guard !FileManager.default.fileExists(atPath: file.path) else { return }
-            try Data(credentials.privateKey.utf8).write(to: file)
-            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+            // Create with 0600 from the start — no group/world-readable window
+            // between writing the private key and chmod'ing it.
+            let created = FileManager.default.createFile(
+                atPath: file.path,
+                contents: Data(credentials.privateKey.utf8),
+                attributes: [.posixPermissions: 0o600]
+            )
+            if !created {
+                throw CocoaError(.fileWriteUnknown)
+            }
         } catch {
+            StatsProtocol.error("could not save .p8 copy to ~/.appstoreconnect/private_keys", [
+                "detail": String(describing: error),
+            ])
             FileHandle.standardError.write(Data("warning: could not save key copy: \(error)\n".utf8))
         }
     }

@@ -16,9 +16,9 @@ import type { NoMatchReason } from './steps/ios-import.js'
 import { Buffer } from 'node:buffer'
 import { spawn } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
-import { copyFile, readFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { Alert, ProgressBar, Select } from '@inkjs/ui'
 import { Box, measureElement, Newline, Text, useApp, useInput, useStdout } from 'ink'
@@ -218,7 +218,9 @@ async function runRunnerCommand(runner: string, args: string[]): Promise<{ succe
 
 const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgress, iosDir, apikey, supaHost, onResult }) => {
   const { exit } = useApp()
-  const startStep = getResumeStep(initialProgress)
+  // Pass helper availability so an automated-path resume only targets
+  // asc-key-generating when the helper can actually run (else manual instructions).
+  const startStep = getResumeStep(initialProgress, isMacOS() && resolveHelperBinary() !== null)
 
   // When there's saved progress AND the resume target isn't trivially 'welcome',
   // land on the resume-prompt fork so the user can see what's saved and decide
@@ -1024,13 +1026,15 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       startedAt: new Date().toISOString(),
       completedSteps: {},
     }
+    // Build a new object rather than mutating the loaded one (immutability).
+    const next = { ...existing }
     if (updates.p8Path !== undefined)
-      existing.p8Path = updates.p8Path
+      next.p8Path = updates.p8Path
     if (updates.keyId !== undefined)
-      existing.keyId = updates.keyId
+      next.keyId = updates.keyId
     if (updates.issuerId !== undefined)
-      existing.issuerId = updates.issuerId
-    await saveProgress(appId, existing)
+      next.issuerId = updates.issuerId
+    await saveProgress(appId, next)
   }, [appId])
 
   // Persist which .p8 source the user picked in the create-new fork so a
@@ -1041,8 +1045,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     const existing = await loadProgress(appId)
     if (!existing)
       return
-    existing.p8CreateMethod = method
-    await saveProgress(appId, existing)
+    await saveProgress(appId, { ...existing, p8CreateMethod: method })
   }, [appId])
 
   /**
@@ -1475,6 +1478,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             return
           if (existing?.ios)
             setStep('credentials-exist')
+          else if (isMacOS())
+            // Fresh iOS, no creds: offer the import-vs-create fork (create-new →
+            // the guided .p8 helper). Only macOS can drive the helper; other
+            // hosts go straight to the manual .p8 instructions.
+            setStep('setup-method-select')
           else
             setStep('api-key-instructions')
         })()
@@ -1539,6 +1547,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               return
             if (existing?.ios)
               setStep('credentials-exist')
+            else if (isMacOS())
+              // Fresh iOS, no creds: route through the import-vs-create fork
+              // (create-new → the guided .p8 helper) on macOS.
+              setStep('setup-method-select')
             else
               setStep('api-key-instructions')
           })()
@@ -1931,6 +1943,19 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           const { credentials } = outcome
           // The helper also saved the .p8 to the fastlane/ASC conventional path.
           const helperP8Path = join(homedir(), '.appstoreconnect', 'private_keys', `AuthKey_${credentials.keyId}.p8`)
+          // Apple never re-issues the key, so don't rely solely on the helper's
+          // best-effort copy: write the captured key to disk ourselves (0600) if
+          // it isn't already there. This makes quit-and-resume safe — verifying-key
+          // reads p8Path and always finds the file.
+          try {
+            if (!existsSync(helperP8Path)) {
+              await mkdir(dirname(helperP8Path), { recursive: true })
+              await writeFile(helperP8Path, credentials.privateKey, { mode: 0o600 })
+            }
+          }
+          catch (err) {
+            appendInternalLog(`could not write captured .p8 to ${helperP8Path}: ${err instanceof Error ? err.message : String(err)}`)
+          }
           setP8Content(credentials.privateKey) // wrapper also updates p8ContentRef
           setKeyId(credentials.keyId)
           setIssuerId(credentials.issuerId)
@@ -1946,6 +1971,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         catch (err) {
           if (!cancelled)
             handleError(err, 'p8-source-select')
+        }
+        finally {
+          // The run settled — drop our controller so the unmount-only cleanup
+          // can't abort a stale, already-resolved controller.
+          ascHelperAbortRef.current = null
         }
       })()
     }
@@ -3525,13 +3555,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                 startedAt: new Date().toISOString(),
                 completedSteps: {},
               }
-              existing.setupMethod = value === 'import' ? 'import-existing' : 'create-new'
-              // Re-entering the create fork: clear any prior .p8 source choice so
-              // quitting before re-choosing doesn't resume onto a path the user
-              // has since left (it gets re-set when they pick in the fork).
-              if (value !== 'import')
-                existing.p8CreateMethod = undefined
-              await saveProgress(appId, existing)
+              // New object, not in-place mutation (immutability). Re-entering the
+              // create fork clears any prior .p8 source choice so quitting before
+              // re-choosing doesn't resume onto a path the user has since left.
+              await saveProgress(appId, {
+                ...existing,
+                setupMethod: value === 'import' ? 'import-existing' : 'create-new',
+                p8CreateMethod: value === 'import' ? existing.p8CreateMethod : undefined,
+              })
 
               if (value === 'import') {
                 setImportMode(true)

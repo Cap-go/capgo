@@ -155,6 +155,9 @@ export async function runAscKeyHelper(options: RunAscKeyHelperOptions = {}): Pro
     let eventCount = 0
     let logCount = 0
     let runId = ''
+    // Node fires 'error' then 'close' on a spawn failure; settle once so we don't
+    // resolve twice or write a second, contradictory breadcrumb to the support log.
+    let settled = false
 
     // Tear the helper down when the caller aborts (the onboarding TUI unmounts
     // on quit) or the CLI process exits. The child's stdio pipes otherwise keep
@@ -225,8 +228,13 @@ export async function runAscKeyHelper(options: RunAscKeyHelperOptions = {}): Pro
       for (const line of parser.push(chunk))
         handleLine(line)
     })
+    // Cap captured stderr — a crashing/verbose helper could grow this unbounded.
+    // Keep the most recent ~64 KB (the tail carries the actual error).
+    const STDERR_CAP = 64 * 1024
     child.stderr?.on('data', (chunk: Buffer) => {
       stderr += chunk.toString('utf-8')
+      if (stderr.length > STDERR_CAP)
+        stderr = stderr.slice(-STDERR_CAP)
     })
     // Breadcrumb the run's outcome into the support log so a bundle always shows
     // the helper ran (and how it ended), even when it emitted no diagnostics.
@@ -236,12 +244,18 @@ export async function runAscKeyHelper(options: RunAscKeyHelperOptions = {}): Pro
     }
 
     child.once('error', (err) => {
+      if (settled)
+        return
+      settled = true
       detach()
       const message = err instanceof Error ? err.message : String(err)
       breadcrumb(`[asc-helper] run ${runId || '(no id)'} failed to spawn (SPAWN_FAILED): ${message}`)
       resolve({ ok: false, errorCode: 'SPAWN_FAILED', message, runId, logCount })
     })
     child.once('close', (code, signal) => {
+      if (settled)
+        return
+      settled = true
       detach()
       for (const line of parser.flush())
         handleLine(line)

@@ -86,7 +86,7 @@ export async function deleteProgress(
  * into the create-new path's `creating-certificate` step (which would trigger
  * the Apple 3-cert-limit error for users at the limit).
  */
-export function getResumeStep(progress: OnboardingProgress | null): OnboardingStep {
+export function getResumeStep(progress: OnboardingProgress | null, canAutomate = true): OnboardingStep {
   if (!progress)
     return 'welcome'
 
@@ -142,8 +142,10 @@ export function getResumeStep(progress: OnboardingProgress | null): OnboardingSt
     // .p8 picker — resume them back on the helper (`asc-key-generating`
     // re-launches the guided window), not the manual instructions. Manual
     // choosers (and legacy/undefined) fall through to the .p8 instructions.
-    if (progress.p8CreateMethod === 'automated')
+    if (progress.p8CreateMethod === 'automated' && canAutomate)
       return 'asc-key-generating'
+    // Automated chosen but the helper isn't available here (non-macOS, or the
+    // binary moved) — don't resume into a HELPER_NOT_FOUND; use the manual path.
     return 'api-key-instructions'
   }
   if (!completedSteps.certificateCreated) {

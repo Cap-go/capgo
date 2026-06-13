@@ -318,6 +318,12 @@ final class GuidedFlowModel {
         eligibleContacts = []
         dialogNameFilled = false
         selectedRoles = []
+        // Per-team one-shot guards: the new team has its own capability/access and
+        // its own keys-page steering, so re-evaluate them instead of carrying the
+        // previous team's verdicts (wrong-team analytics / a consumed steer cap).
+        didEmitCapability = false
+        didEmitAccessDenied = false
+        keysSteerCount = 0
         if case .useExisting = mode {
             mode = .createNew
         }
@@ -449,9 +455,10 @@ final class GuidedFlowModel {
         // touch these — running JS or navigating mid-flow breaks Apple's
         // multi-step auth and produces authResult=FAILED. Just reflect the
         // sign-in step (until we've ever been in) and otherwise stand back.
-        let isAppleAuth = host.contains("idmsa.apple.com")
-            || host.contains("appleid.apple.com")
-            || host.contains("account.apple.com")
+        // Exact host or a real subdomain — not a substring (which would also match
+        // a crafted host like `idmsa.apple.com.evil.example`). Mirrors isOffCourse.
+        let authHosts = ["idmsa.apple.com", "appleid.apple.com", "account.apple.com"]
+        let isAppleAuth = authHosts.contains { host == $0 || host.hasSuffix(".\($0)") }
         let isAscLogin = urlString.hasPrefix("https://appstoreconnect.apple.com/login")
         if isAppleAuth || isAscLogin {
             if !everLoggedIn {
@@ -826,6 +833,12 @@ final class GuidedFlowModel {
            pem.contains("PRIVATE KEY") {
             autoLocateMessage = "Found \(fileURL.path) — validating…"
             privateKeyCaptured(pem)
+        } else {
+            // No readable .p8 auto-located — the user picks it on the locateP8File
+            // step. Record why (missing vs unreadable) so it's diagnosable.
+            StatsProtocol.debug("could not auto-locate a readable .p8 for the existing key — awaiting manual pick", [
+                "key_id": key.keyId,
+            ])
         }
     }
 
