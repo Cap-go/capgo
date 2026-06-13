@@ -656,6 +656,13 @@ final class GuidedFlowModel {
         if let script = FlowScripts.highlightScript(for: currentStep) {
             _ = try? await callJavaScript(script)
         }
+        // Diagnostic: record what the generate-button highlight actually matched
+        // (and the page's transform context) into the support log, so a misplaced
+        // or drifting highlight can be diagnosed from a bundle without a live DOM.
+        if currentStep == .createKey,
+           let probe = (try? await callJavaScript(FlowScripts.createKeyHighlightProbe)) as? String {
+            StatsProtocol.debug("createKey highlight probe", ["probe": probe])
+        }
     }
 
     // MARK: - Scraping

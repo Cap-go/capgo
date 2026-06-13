@@ -273,25 +273,30 @@ enum FlowScripts {
         const __p8style = 'position:fixed;border:5px solid #ff3b30;border-radius:14px;pointer-events:none;z-index:2147483647;box-shadow:0 0 0 6px rgba(255,59,48,0.35), 0 0 18px 4px rgba(255,59,48,0.45);display:none';
         const __p8tick = () => {
             window.__p8specs.forEach((spec, i) => {
-                let ov = document.getElementById('__p8overlay' + i);
-                if (!ov) {
-                    ov = document.createElement('div');
-                    ov.id = '__p8overlay' + i;
-                    ov.className = '__p8ov';
-                    ov.style.cssText = __p8style;
-                    document.body.appendChild(ov);
-                }
-                const t = spec.find();
-                if (t && t.getClientRects().length) {
-                    const r = t.getBoundingClientRect();
-                    ov.style.display = 'block';
-                    ov.style.left = (r.left - spec.pad) + 'px';
-                    ov.style.top = (r.top - spec.pad) + 'px';
-                    ov.style.width = (r.width + spec.pad * 2) + 'px';
-                    ov.style.height = (r.height + spec.pad * 2) + 'px';
-                } else {
-                    ov.style.display = 'none';
-                }
+                // A throwing finder must never kill the loop — a dead loop freezes
+                // every overlay at its last viewport spot, which then visibly drifts
+                // away from its target as the page scrolls.
+                try {
+                    let ov = document.getElementById('__p8overlay' + i);
+                    if (!ov) {
+                        ov = document.createElement('div');
+                        ov.id = '__p8overlay' + i;
+                        ov.className = '__p8ov';
+                        ov.style.cssText = __p8style;
+                        document.body.appendChild(ov);
+                    }
+                    const t = spec.find();
+                    if (t && t.getClientRects().length) {
+                        const r = t.getBoundingClientRect();
+                        ov.style.display = 'block';
+                        ov.style.left = (r.left - spec.pad) + 'px';
+                        ov.style.top = (r.top - spec.pad) + 'px';
+                        ov.style.width = (r.width + spec.pad * 2) + 'px';
+                        ov.style.height = (r.height + spec.pad * 2) + 'px';
+                    } else {
+                        ov.style.display = 'none';
+                    }
+                } catch (e) { /* keep ticking — one bad finder must not freeze the rest */ }
             });
             window.__p8raf = requestAnimationFrame(__p8tick);
         };
@@ -309,6 +314,43 @@ enum FlowScripts {
     if (window.__p8raf) { cancelAnimationFrame(window.__p8raf); window.__p8raf = null; }
     document.querySelectorAll('.__p8ov').forEach(e => e.remove());
     window.__p8specs = [];
+    """
+
+    /// One-shot diagnostic for the "Open the Generate dialog" highlight, routed to
+    /// the CLI support log. Reports what the generate-button finder matches (tag,
+    /// text, aria, on-screen rect, visibility), nearby candidate "+"/Generate
+    /// buttons with their positions, and whether <body>/<html> carry a CSS
+    /// `transform` — a transform on an ancestor silently re-bases our `position:
+    /// fixed` overlay, which makes it drift on scroll. Returns a JSON string.
+    static let createKeyHighlightProbe = """
+    const out = {};
+    try {
+        const xp = (e) => document.evaluate(e, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+        out.hasActiveH3 = !!xp('.//h3[starts-with(normalize-space(), "Active")]');
+        const btn = xp('.//h3[starts-with(normalize-space(), "Active")]/following-sibling::button[1]');
+        out.matched = !!btn;
+        if (btn) {
+            const r = btn.getBoundingClientRect();
+            out.tag = btn.tagName;
+            out.text = (btn.textContent || '').trim().slice(0, 30);
+            out.aria = btn.getAttribute('aria-label') || '';
+            out.visible = btn.getClientRects().length > 0;
+            out.rect = Math.round(r.left) + ',' + Math.round(r.top) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height);
+        }
+        out.candidates = [...document.querySelectorAll('button')].filter(b => {
+            const t = (b.textContent || '').trim();
+            const a = (b.getAttribute('aria-label') || '').toLowerCase();
+            return t === '+' || a.includes('generate') || a.includes('add') || a.includes('create new');
+        }).slice(0, 6).map(b => {
+            const r = b.getBoundingClientRect();
+            return (b.getAttribute('aria-label') || (b.textContent || '').trim().slice(0, 16) || '?')
+                + '@' + Math.round(r.left) + ',' + Math.round(r.top) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height);
+        });
+        out.bodyTransform = getComputedStyle(document.body).transform;
+        out.htmlTransform = getComputedStyle(document.documentElement).transform;
+        out.scrollY = Math.round(window.scrollY);
+    } catch (e) { out.error = String(e); }
+    return JSON.stringify(out);
     """
 
     static func highlightScript(for step: FlowStep) -> String? {
