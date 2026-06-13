@@ -349,7 +349,7 @@ export type TailInput =
   | { step: 'ask-ci-secrets'; value: 'yes' | 'no' }
   | { step: 'confirm-ci-secret-overwrite'; value: 'replace' | 'skip' }
   | { step: 'ci-secrets-failed'; value: 'retry' | 'continue' }
-  | { step: 'ask-github-actions-setup'; value: 'with-workflow' | 'secrets-only' | 'declined' }
+  | { step: 'ask-github-actions-setup'; value: 'with-workflow' | 'secrets-only' | 'no' }
   | { step: 'confirm-secrets-push'; value: 'confirm' | 'cancel' }
   | { step: 'ask-export-env'; value: 'no' }
   | { step: 'ask-export-env'; value: 'yes'; envExportTargetPath: string }
@@ -607,7 +607,10 @@ export function applyTailInput<P extends TailEffectProgress>(
     // ── ask-github-actions-setup ──────────────────────────────────────────────
     case 'ask-github-actions-setup': {
       const i = input as Extract<TailInput, { step: 'ask-github-actions-setup' }>
-      return { ...progress, setupMode: i.value }
+      // Map the user-facing 'no' option to the canonical persisted 'declined' (mirrors the
+      // bespoke android/iOS drivers) so resume routing (setupMode === 'declined') matches.
+      const mode = i.value === 'no' ? 'declined' as const : i.value
+      return { ...progress, setupMode: mode }
     }
 
     // ── ask-export-env ────────────────────────────────────────────────────────
