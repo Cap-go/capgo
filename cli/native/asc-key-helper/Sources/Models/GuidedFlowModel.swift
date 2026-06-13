@@ -465,7 +465,7 @@ final class GuidedFlowModel {
                 // wall so the user can sign in fresh (and we re-persist that).
                 StatsProtocol.warn("auth failed — clearing persisted web session, retrying clean login")
                 Task {
-                    await WebSessionStore.clear(from: webView)
+                    await WebSessionStore.clear()
                     webView?.load(URLRequest(url: Self.apiKeysURL))
                 }
             }

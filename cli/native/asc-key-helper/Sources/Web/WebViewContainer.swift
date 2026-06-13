@@ -17,12 +17,12 @@ struct WebViewContainer: NSViewRepresentable {
 
     func makeNSView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
-        // The store itself is non-persistent — WE persist the Apple sign-in by
-        // saving/restoring the session cookies ourselves (see WebSessionStore).
-        // A WKWebsiteDataStore(forIdentifier:) needs app entitlements this
-        // non-bundled binary lacks (macOS SIGKILLs it), so we capture cookies via
-        // the native cookie store instead and re-inject them next launch.
-        configuration.websiteDataStore = WebSessionStore.makeDataStore()
+        // Persist the Apple sign-in across launches via WKWebsiteDataStore(
+        // forIdentifier:) (see WebSessionStore) — WebKit saves the full session.
+        // OFF by default because it SIGKILLs on an unsigned binary; enabled with
+        // CAPGO_ASC_KEY_PERSIST_SESSION on signed builds. Otherwise a throwaway
+        // non-persistent store, so an unsigned dev build still runs.
+        configuration.websiteDataStore = WebSessionStore.dataStore
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         if #available(macOS 13.3, *) {
@@ -31,13 +31,10 @@ struct WebViewContainer: NSViewRepresentable {
             #endif
         }
         context.coordinator.attach(webView: webView)
-        // Restore any saved Apple session cookies BEFORE the first load, then load
-        // the keys page: a returning user lands already signed in; a new user gets
-        // Apple's login wall with this page as the post-login redirect target.
-        Task { @MainActor in
-            await WebSessionStore.restore(into: webView)
-            webView.load(URLRequest(url: GuidedFlowModel.apiKeysURL))
-        }
+        // Start at the keys page: a persisted session lands the user already
+        // signed in; otherwise Apple's login wall uses this page as the post-login
+        // redirect target.
+        webView.load(URLRequest(url: GuidedFlowModel.apiKeysURL))
         return webView
     }
 
@@ -48,8 +45,6 @@ struct WebViewContainer: NSViewRepresentable {
         private let model: GuidedFlowModel
         private var urlObservation: NSKeyValueObservation?
         private var downloadDestination: URL?
-        /// Throttles cookie persistence so we don't write on every sub-frame load.
-        private var lastCookieSave = Date.distantPast
 
         init(model: GuidedFlowModel) {
             self.model = model
@@ -135,12 +130,6 @@ extension WebViewContainer.Coordinator: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         model.pageDidFinishLoading()
-        // Capture the session cookies as the user progresses (throttled) so a
-        // successful sign-in is persisted to disk before the helper ever exits.
-        if Date().timeIntervalSince(lastCookieSave) > 2 {
-            lastCookieSave = Date()
-            Task { await WebSessionStore.persist(from: webView) }
-        }
     }
 }
 
