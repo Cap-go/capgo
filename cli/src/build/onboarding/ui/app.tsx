@@ -3083,11 +3083,18 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
 
     return () => {
       cancelled = true
-      // Quitting the TUI while the guided helper is running must kill its window
-      // — otherwise the child's pipes keep the CLI process alive and it hangs.
-      ascHelperAbortRef.current?.abort()
     }
   }, [step])
+
+  // Kill the guided helper child ONLY when the whole onboarding unmounts (the
+  // user quit / Ctrl+C) — NOT on every step transition. Aborting per-step could
+  // tear down a still-running helper if the step ever churned; an unmount-scoped
+  // cleanup fires once, at real exit, and otherwise leaves a live run alone.
+  useEffect(() => {
+    return () => {
+      ascHelperAbortRef.current?.abort()
+    }
+  }, [])
 
   // Spinner-frame ticker for the in-flight profile prefetch cells. Runs only
   // while at least one entry in profilePrefetch is `pending`; the cleanup

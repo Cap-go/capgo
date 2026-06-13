@@ -160,6 +160,7 @@ export async function runAscKeyHelper(options: RunAscKeyHelperOptions = {}): Pro
     // on quit) or the CLI process exits. The child's stdio pipes otherwise keep
     // Node's event loop alive, so the CLI hangs after printing its exit message.
     let killTimer: ReturnType<typeof setTimeout> | undefined
+    let wasAborted = false
     const killChild = (sig: NodeJS.Signals): void => {
       try {
         child.kill(sig)
@@ -169,6 +170,7 @@ export async function runAscKeyHelper(options: RunAscKeyHelperOptions = {}): Pro
       }
     }
     const onAbort = (): void => {
+      wasAborted = true
       killChild('SIGTERM')
       // Escalate if the GUI helper doesn't exit promptly on SIGTERM.
       killTimer = setTimeout(() => killChild('SIGKILL'), 2000)
@@ -239,7 +241,7 @@ export async function runAscKeyHelper(options: RunAscKeyHelperOptions = {}): Pro
       breadcrumb(`[asc-helper] run ${runId || '(no id)'} failed to spawn (SPAWN_FAILED): ${message}`)
       resolve({ ok: false, errorCode: 'SPAWN_FAILED', message, runId, logCount })
     })
-    child.once('close', (code) => {
+    child.once('close', (code, signal) => {
       detach()
       for (const line of parser.flush())
         handleLine(line)
@@ -256,12 +258,21 @@ export async function runAscKeyHelper(options: RunAscKeyHelperOptions = {}): Pro
         return
       }
 
-      const errorCode = result?.errorCode ?? (code === 1 ? 'USER_CANCELLED' : 'NO_RESULT')
+      // Distinguish OUR intentional teardown (abort on quit → SIGTERM/SIGKILL)
+      // from the helper dying on its own. A `signal` we DIDN'T send means the
+      // helper crashed (e.g. SIGSEGV/SIGABRT/SIGILL) — surface the signal name
+      // so a support bundle shows it instead of a bare "code null".
+      const errorCode = result?.errorCode
+        ?? (wasAborted ? 'USER_CANCELLED' : code === 1 ? 'USER_CANCELLED' : signal ? 'HELPER_CRASHED' : 'NO_RESULT')
       const message = result?.message
-        ?? (code === 1
-          ? 'Helper was cancelled before delivering a key.'
-          : `Helper exited (code ${code}) without a result line.${stderr.trim() ? ` Stderr: ${stderr.trim()}` : ''}`)
-      breadcrumb(`[asc-helper] run ${runId || '(no id)'} ended without a key (${errorCode}): ${message} — ${eventCount} events, ${logCount} logs`)
+        ?? (wasAborted
+          ? 'Helper was stopped because the CLI exited or was cancelled.'
+          : code === 1
+            ? 'Helper was cancelled before delivering a key.'
+            : signal
+              ? `Helper crashed (killed by ${signal}) without a result line.${stderr.trim() ? ` Stderr: ${stderr.trim()}` : ''}`
+              : `Helper exited (code ${code}) without a result line.${stderr.trim() ? ` Stderr: ${stderr.trim()}` : ''}`)
+      breadcrumb(`[asc-helper] run ${runId || '(no id)'} ended without a key (${errorCode}, code=${code}, signal=${signal ?? 'none'}): ${message} — ${eventCount} events, ${logCount} logs`)
       resolve({ ok: false, errorCode, message, runId, logCount })
     })
   })
