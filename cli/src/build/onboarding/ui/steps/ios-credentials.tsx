@@ -348,12 +348,15 @@ export const VerifyingKeyStep: FC = () => (
 export const CreatingCertificateStep: FC = () => (
   <Box flexDirection="column" marginTop={1}>
     <SpinnerLine text="Generating signing key and CSR..." />
-    <SpinnerLine text="Creating iOS distribution certificate..." />
+    <SpinnerLine text="Creating Apple Distribution certificate..." />
   </Box>
 )
 
 // ── cert-limit-prompt ─────────────────────────────────────────────────────────
-// Apple caps distribution certs at 3; the user must revoke one to continue.
+// Apple caps Apple Distribution certs per team; the user must revoke one to
+// continue. The list is scoped to the DISTRIBUTION pool (the type the wizard
+// creates) — legacy iOS Distribution certs are excluded because revoking one
+// would not free a slot here.
 // `options` is built by the parent (one row per existing cert + an exit row)
 // so this component stays presentational. `existingCount` drives the header.
 //
@@ -370,7 +373,7 @@ export interface CertLimitPromptStepProps {
 
 export const CertLimitPromptStep: FC<CertLimitPromptStepProps> = ({ existingCount, options, dense = false, onChange }) => (
   <Box flexDirection="column" marginTop={1}>
-    <ErrorLine text={`iOS distribution certificate limit reached (${existingCount} existing).`} />
+    <ErrorLine text={`Apple Distribution certificate limit reached (${existingCount} existing).`} />
     {!dense && <Newline />}
     <Text bold>Select a certificate to revoke:</Text>
     {!dense && <Newline />}
