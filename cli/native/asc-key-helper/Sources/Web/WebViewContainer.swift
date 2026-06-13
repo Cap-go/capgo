@@ -19,9 +19,9 @@ struct WebViewContainer: NSViewRepresentable {
         let configuration = WKWebViewConfiguration()
         // Persist the Apple sign-in across launches via WKWebsiteDataStore(
         // forIdentifier:) (see WebSessionStore) — WebKit saves the full session.
-        // OFF by default because it SIGKILLs on an unsigned binary; enabled with
-        // CAPGO_ASC_KEY_PERSIST_SESSION on signed builds. Otherwise a throwaway
-        // non-persistent store, so an unsigned dev build still runs.
+        // Automatic when the helper runs as an .app (has a bundle id); a
+        // bundle-less raw binary falls back to a throwaway non-persistent store
+        // (forIdentifier would SIGKILL it).
         configuration.websiteDataStore = WebSessionStore.dataStore
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator

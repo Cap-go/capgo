@@ -9,7 +9,8 @@
 # create a persistent store at ~/Library/WebKit/<bundle-id>/. The signature is
 # valid only on this machine — for distribution, sign + notarize the .app in CI.
 #
-# Persistence is opt-in: run with CAPGO_ASC_KEY_PERSIST_SESSION=1 (see below).
+# Persistence is automatic once running as an .app (no env flag) — the helper
+# detects its bundle id and persists the session.
 #
 # Usage:
 #   scripts/sign-asc-key-helper-dev.sh [path-to-helper-binary]
@@ -67,7 +68,6 @@ echo "   WebKit persists the session at ~/Library/WebKit/$BUNDLE_ID/"
 echo ""
 echo "Test persistence (sign in once, quit, run again — you should stay logged in):"
 echo ""
-echo "  CAPGO_ASC_KEY_PERSIST_SESSION=1 \\"
 echo "  CAPGO_ASC_KEY_HELPER_PATH=\"$INNER\" \\"
 echo "    node dist/index.js build init"
 echo ""

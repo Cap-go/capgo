@@ -9,21 +9,24 @@ import WebKit
 /// localStorage — keyed by a UUID we keep on disk. WebKit owns the save/load; we
 /// never touch cookies by hand.
 ///
-/// IMPORTANT — opt-in. `forIdentifier` requires a properly code-signed app; on an
-/// unsigned / ad-hoc dev binary macOS force-terminates the process (SIGKILL) the
-/// moment the store is created. So persistence is OFF unless
-/// `CAPGO_ASC_KEY_PERSIST_SESSION` is set, and the persistent store is created
-/// LAZILY (only when opted in) — the default path never calls `forIdentifier`, so
-/// an unsigned build runs fine with a throwaway session. Enable it on a signed
-/// build (the distributed CLI sets the env when it spawns its signed helper).
+/// `forIdentifier` needs a real app container: when the helper runs as an `.app`
+/// (it has a bundle identifier) WebKit persists to `~/Library/WebKit/<bundle-id>/`
+/// and everything works. A bundle-LESS raw executable has no container, so macOS
+/// force-terminates the process (SIGKILL) the moment the store is created — so we
+/// persist ONLY when a bundle identifier is present, and create the persistent
+/// store LAZILY (a raw dev binary never calls `forIdentifier`, falling back to a
+/// throwaway session). No flags needed: ship/sign the helper as an `.app` and
+/// persistence is automatic (see scripts/sign-asc-key-helper-dev.sh for local
+/// dev). To start fresh, delete `~/Library/WebKit/<bundle-id>/`.
 @MainActor
 enum WebSessionStore {
     private static let dir = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".capgo/asc-key-helper", isDirectory: true)
     private static let identifierFile = dir.appendingPathComponent("webstore.uuid")
 
-    /// True when session persistence is requested for this run (signed builds).
-    static let isPersistent: Bool = ProcessInfo.processInfo.environment["CAPGO_ASC_KEY_PERSIST_SESSION"] != nil
+    /// We persist only when running as a real `.app` (a bundle id is present);
+    /// `forIdentifier` would SIGKILL a bundle-less raw binary.
+    static let isPersistent: Bool = Bundle.main.bundleIdentifier != nil
 
     /// A UUID stable across launches — read from disk, or created + saved once.
     private static func stableIdentifier() -> UUID {
@@ -38,11 +41,11 @@ enum WebSessionStore {
     }
 
     /// The persistent store — created LAZILY so `forIdentifier` is only ever
-    /// invoked when persistence is opted in (an unsigned build would SIGKILL here).
+    /// invoked when we have a bundle id (a raw binary would SIGKILL here).
     private static let persistent: WKWebsiteDataStore = WKWebsiteDataStore(forIdentifier: stableIdentifier())
 
-    /// The store to hand the web view: the persistent one when opted in, else a
-    /// throwaway non-persistent store (never touches `forIdentifier`).
+    /// The store to hand the web view: the persistent one when running as an
+    /// `.app`, else a throwaway non-persistent store (never touches `forIdentifier`).
     static var dataStore: WKWebsiteDataStore {
         isPersistent ? persistent : .nonPersistent()
     }
