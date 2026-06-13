@@ -43,6 +43,7 @@ import type { CiSecretSetupAdvice, CiSecretTarget } from '../ci-secrets.js'
 import type { IosEffectDeps } from '../ios/flow.js'
 import type { TailEffectDeps } from '../tail/flow.js'
 import type { OnboardingStep } from '../types.js'
+import type { Platform } from './contract.js'
 
 /**
  * The iOS driver-held transient state — the exact `IosEffectDeps['carried']`
@@ -106,6 +107,15 @@ export interface OnboardingSessionState {
   iosCarried: IosCarried
   tailCarried: TailCarried
   tailParked?: TailParkedState
+  /**
+   * The platform this session is setting up, as CHOSEN by the user (platform
+   * picker answer / single-platform auto-route / explicit `{ platform }`), NOT
+   * inferred from on-disk progress. This is what lets a bare `next_step({})`
+   * resume the right platform AND lets two concurrent server processes onboard
+   * the same app for different platforms without reading each other's progress
+   * files. Process-local: a restart loses it and the flow re-asks the picker.
+   */
+  activePlatform?: Platform
 }
 
 const registry = new Map<string, OnboardingSessionState>()
@@ -137,6 +147,27 @@ export function getSession(appId: string): OnboardingSessionState {
   const created: OnboardingSessionState = { iosCarried: {}, tailCarried: {} }
   registry.set(appId, created)
   return created
+}
+
+/**
+ * Read the platform this session committed to (via setSessionPlatform), or
+ * undefined when none has been chosen yet (fresh session, or after a restart).
+ * Deliberately does NOT consult disk progress — the platform is a session
+ * decision, not a property of what happens to be saved on disk.
+ */
+export function getSessionPlatform(appId: string): Platform | undefined {
+  return registry.get(appId)?.activePlatform
+}
+
+/**
+ * Record (or, with `undefined`, clear) the platform this session is setting up.
+ * Called when the user picks at the platform gate, when a single-platform
+ * project auto-routes, or on any explicit `{ platform }`. Cleared by runStart so
+ * a fresh "start onboarding" always re-asks instead of silently resuming.
+ */
+export function setSessionPlatform(appId: string, platform: Platform | undefined): void {
+  const session = getSession(appId)
+  registry.set(appId, { ...session, activePlatform: platform })
 }
 
 /**

@@ -20,7 +20,7 @@ import { TAIL_INPUT_KEYS, validateIosStepInput, validateStepInput, validateStore
 import { androidViewForStep, applyAndroidInput, applyGoogleSignIn, runAndroidEffect } from '../android/flow.js'
 import { applyIosInput, iosViewForStep, runIosEffect } from '../ios/flow.js'
 import { applyTailInput, tailViewForStep } from '../tail/flow.js'
-import { clearSession, dropIosCarried, getSession, mergeIosCarried, mergeTailCarried, setTailParked } from './session-state.js'
+import { clearSession, dropIosCarried, getSession, getSessionPlatform, mergeIosCarried, mergeTailCarried, setSessionPlatform, setTailParked } from './session-state.js'
 import { slimAndroidTailProgress, slimIosTailProgress } from './tail-progress.js'
 import { beginOAuthSession, clearOAuthSession, pollOAuthSession } from './oauth-session.js'
 import { SUPPORT_EMAIL } from '../../../support/contact-support.js'
@@ -184,45 +184,24 @@ export async function decideStart(
     }
   }
 
-  // Resume an in-flight platform credential flow so credential-submission calls
-  // that omit `platform` are not bounced back to platform selection.
-  const active = activePlatform(facts)
+  // Resume the platform this session is already setting up. Comes from PROCESS-LOCAL
+  // session memory (set when the user picked / a single-platform project auto-routed /
+  // an explicit `{ platform }` arrived), NEVER from disk — so two concurrent sessions
+  // for the same app don't read each other's progress files, and a FRESH start (empty
+  // session) falls through to the picker instead of silently resuming what's on disk.
+  const active = facts.appId ? getSessionPlatform(facts.appId) : undefined
   if (active === 'android')
     return decideAndroid(facts, deps)
   if (active === 'ios')
     return decideIos(facts, deps)
 
-  // Single android platform with no in-flight progress → auto-route to android.
-  if (facts.platformsDetected.length === 1 && facts.platformsDetected[0] === 'android')
+  // Single android platform → commit to android (mirrors single-ios in decidePlatform).
+  if (facts.appId && facts.platformsDetected.length === 1 && facts.platformsDetected[0] === 'android') {
+    setSessionPlatform(facts.appId, 'android')
     return decideAndroid(facts, deps)
+  }
 
   return decidePlatform(facts, progress, deps)
-}
-
-/** Which platform's credential flow is already in progress (if any). */
-function activePlatform(facts: PreflightFacts): Platform | null {
-  // completedSteps.credentialsSaved: the S8 SLIM tail progress (markers +
-  // non-secret prefs only) carries none of the credential-phase fields, so the
-  // marker itself is what keeps the post-save tail resumable — a plain
-  // next_step({}) after the save must NOT bounce to platform-select.
-  const a = facts.androidProgress
-  if (a && (a.activePlatform === 'android' || Boolean(a.completedSteps?.keystoreReady) || Boolean(a.serviceAccountForkSeen) || Boolean(a.completedSteps?.credentialsSaved)))
-    return 'android'
-  const i = facts.iosProgress
-  // setupMethod: the S12 import fork persists it as the FIRST iOS write (before
-  // any .p8 field exists), so a fork-only progress must already count as an
-  // in-flight iOS flow — a follow-up next_step({}) may not bounce to platform-select.
-  // _credentialsExistGate: the iOS data-safety gate seeds a progress whose
-  // ONLY field is the gate marker (no setupMethod / .p8 fields exist yet), so
-  // it must already count as an in-flight iOS flow too — pending/backup/done
-  // all mean the user is inside the iOS credential phase, and 'cancel' renders
-  // the durable hard stop. Without this, a dual-platform project bounced the
-  // gate (and every bare follow-up) to platform-select — unlike android,
-  // whose gate-seeded progress always carries activePlatform: 'android'.
-  // Found by the live MCP e2e (S14).
-  if (i && (Boolean(i.setupMethod) || Boolean(i.keyId) || Boolean(i.p8Path) || Boolean(i._credentialsExistGate) || Boolean(i.completedSteps?.apiKeyVerified) || Boolean(i.completedSteps?.credentialsSaved)))
-    return 'ios'
-  return null
 }
 
 async function decidePlatform(facts: PreflightFacts, _progress: OnboardingProgress | null, deps: EngineDeps): Promise<NextStepResult> {
@@ -249,8 +228,10 @@ async function decidePlatform(facts: PreflightFacts, _progress: OnboardingProgre
   }
 
   if (platforms.length === 1) {
-    // Single-platform (ios only): auto-route to ios. Single android is handled
-    // via decideAndroid in the async path (activePlatform or platform selection).
+    // Single-platform (ios only): commit to ios and auto-route. Single android is
+    // handled in decideStart (single-android commit + decideAndroid).
+    if (facts.appId)
+      setSessionPlatform(facts.appId, 'ios')
     return decideIos(facts, deps)
   }
 
@@ -2956,13 +2937,20 @@ export async function decideAdvance(
       return decideStart(facts, progress, deps)
     if (!facts.appRegistered)
       return decideStart(facts, progress, deps)
+    // Commit this session to the chosen platform (the picker answer / explicit
+    // pick). Subsequent bare next_step({}) calls resume THIS platform from session
+    // memory — never from whichever platform happens to have progress on disk.
+    if (facts.appId)
+      setSessionPlatform(facts.appId, input.platform)
     if (input.platform === 'android')
       return decideAndroid(facts, deps)
     return decideIos(facts, deps, iosOpts)
   }
-  // No platform supplied → resume the active flow if one exists, so a mid-flow
-  // next_step that omits `platform` does not bounce back to platform-select.
-  const active = activePlatform(facts)
+  // No platform supplied → resume the platform this session committed to (from
+  // session memory, not disk), so a mid-flow next_step({}) continues the right flow.
+  // With no committed platform (fresh start / post-restart) this falls to decideStart,
+  // which offers the picker rather than guessing from disk.
+  const active = facts.appId ? getSessionPlatform(facts.appId) : undefined
   if (active === 'android')
     return decideAndroid(facts, deps)
   if (active === 'ios')
@@ -3469,7 +3457,7 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
     const checkAppId = await deps.getAppId()
     const checkPlatform: Platform = (input.platform === 'ios' || input.platform === 'android')
       ? input.platform
-      : (activePlatform(await gatherFacts(deps)) ?? 'android')
+      : ((checkAppId ? getSessionPlatform(checkAppId) : undefined) ?? 'android')
     if (checkAppId && !isSafeAppIdForCommand(checkAppId)) {
       return {
         onboarding: 'capgo-builder', phase: 'build', state: 'build-appid-unsafe', platform: checkPlatform,
@@ -3894,6 +3882,13 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
 }
 
 export async function runStart(deps: EngineDeps): Promise<NextStepResult> {
+  // A fresh "start onboarding" must re-offer the platform picker (matching the TUI's
+  // `build init`), so clear the session's committed platform first. Without this, a
+  // re-entry mid-session would silently resume the prior platform. Disk progress is
+  // untouched — it still resumes the STEP once a platform is (re-)picked.
+  const appId = await deps.getAppId()
+  if (appId)
+    setSessionPlatform(appId, undefined)
   return drive(deps, undefined)
 }
 
