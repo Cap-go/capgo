@@ -427,12 +427,15 @@ enum FlowScripts {
     static func highlightScript(for step: FlowStep) -> String? {
         switch step {
         case .createKey:
-            // The "+" is a static button, so we attach the ring DIRECTLY to it
-            // (no overlay, no scroll drift). Tear down any leftover overlay first.
+            // The "+" is a small icon button whose box-shadow/outline gets clipped
+            // by an ancestor's overflow — so a directly-attached ring is invisible.
+            // Use the floating overlay (appended to <body>, never clipped, z-index
+            // max), positioned over the REAL "+" via findGeneratePlusButton. The
+            // rAF loop tracks it through scroll; body/html carry no transform
+            // (probe-confirmed) so position:fixed doesn't drift.
             """
             \(awaitNoProgressBar)
-            \(removeOverlay)
-            \(attachHighlightDirect(finder: "\(findGeneratePlusButton) return generatePlus;", scroll: true))
+            \(overlayHighlight(finder: "\(findGeneratePlusButton) return generatePlus;", scroll: true, pad: 10))
             """
         case .nameKey:
             overlayHighlight(finder: "return document.querySelector('#name, input[name=\"name\"]');")
@@ -463,14 +466,7 @@ enum FlowScripts {
 
     static func unhighlightScript(for step: FlowStep) -> String? {
         switch step {
-        case .createKey:
-            // createKey attaches its ring directly to the button — clear that,
-            // and any overlay too (defensive against a mixed transition).
-            """
-            if (window.__p8hlClear) window.__p8hlClear();
-            \(removeOverlay)
-            """
-        case .nameKey, .selectRole, .generateKey, .downloadKey:
+        case .createKey, .nameKey, .selectRole, .generateKey, .downloadKey:
             removeOverlay
         default:
             nil
