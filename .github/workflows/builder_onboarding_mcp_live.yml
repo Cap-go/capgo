@@ -1,0 +1,115 @@
+name: Builder onboarding MCP live (opencode + Workers AI)
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/builder_onboarding_mcp_live.yml"
+      - ".gitmodules"
+      - "private/cli-mcp-tests"
+      - "cli/src/build/onboarding/**"
+      - "cli/src/mcp/**"
+      - "cli/test/**onboarding**"
+      - "cli/test/e2e-mcp/**"
+
+permissions: {}
+
+env:
+  PRIVATE_SUITE_DIR: private/cli-mcp-tests
+  # Reuse the TUI R2 uploader, but point it at the MCP suite's results dir/report
+  # so it publishes cli/test/e2e-mcp/results/tree-report.html instead of the TUI
+  # report (the script reads RESULTS_DIR/REPORT_PATH from env).
+  RESULTS_DIR: private/cli-mcp-tests/cli/test/e2e-mcp/results
+  REPORT_PATH: private/cli-mcp-tests/cli/test/e2e-mcp/results/tree-report.html
+
+jobs:
+  mcp-live:
+    name: Run live MCP suite (opencode + Workers AI)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout PR with private suite submodule
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.CLI_MCP_TESTS_TOKEN || secrets.PERSONAL_ACCESS_TOKEN || github.token }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+
+      - name: Setup bun
+        run: bash scripts/setup-bun.sh
+
+      # The opencode SDK shells out to `opencode serve`, so the opencode CLI must
+      # be on PATH at runtime — it is an environmental dependency of the live
+      # actor/judge, not an npm dependency of the suite.
+      - name: Install opencode CLI
+        run: |
+          set -euo pipefail
+          curl -fsSL https://opencode.ai/install | bash
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+
+      - name: Verify opencode CLI on PATH
+        run: opencode --version
+
+      - name: Install Capgo dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build local CLI dist
+        run: bun run cli:build
+
+      - name: Install private suite dependencies
+        working-directory: ${{ env.PRIVATE_SUITE_DIR }}
+        run: bun install --frozen-lockfile
+
+      - name: Hermetic MCP suites (hard fail)
+        working-directory: ${{ env.PRIVATE_SUITE_DIR }}
+        env:
+          CAPGO_CLI_ROOT: ${{ github.workspace }}/cli
+        run: bun run test:mcp:hermetic
+
+      - name: Live MCP tree — opencode + Workers AI (hard fail)
+        working-directory: ${{ env.PRIVATE_SUITE_DIR }}
+        env:
+          CAPGO_CLI_ROOT: ${{ github.workspace }}/cli
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CAPGO_E2E_MAX_ATTEMPTS: "2"
+          CAPGO_E2E_TOKEN_BUDGET: "8000000"
+        run: bun run test:mcp:live
+
+      - name: Cost + report to step summary
+        if: always()
+        working-directory: ${{ env.PRIVATE_SUITE_DIR }}
+        run: |
+          if [ -f cli/test/e2e-mcp/results/cost.json ]; then
+            node -e "const c=require('./cli/test/e2e-mcp/results/cost.json'); console.log(c.line)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Publish tree report to R2
+        if: always()
+        id: r2
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          R2_RESULTS_UPLOAD_ACCESS_KEY_ID: ${{ secrets.BUILDER_ONBOARDING_TUI_RESULTS_R2_UPLOAD_ACCESS_KEY_ID }}
+          R2_RESULTS_UPLOAD_SECRET_ACCESS_KEY: ${{ secrets.TUI_RESULTS_R2_UPLOAD_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ vars.BUILDER_ONBOARDING_TUI_R2_BUCKET }}
+          REPORTS_BASE_URL: ${{ vars.BUILDER_ONBOARDING_TUI_REPORTS_URL }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node .github/scripts/upload-r2-results.mjs
+        continue-on-error: true
