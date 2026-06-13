@@ -369,7 +369,9 @@ enum FlowScripts {
                 // an oblong element makes a distorting ellipse/teardrop.
                 if (r.width > 0 && Math.abs(r.width - r.height) <= Math.max(r.width, r.height) * 0.35)
                     n.style.setProperty('border-radius', '50%', 'important');
-                n.style.setProperty('box-shadow', '0 0 0 3px #ff3b30, 0 0 0 8px rgba(255,59,48,0.30), 0 0 22px 8px rgba(255,59,48,0.60)', 'important');
+                // Tight ring that hugs the "+": a crisp 2px solid ring + a small
+                // soft halo. NO big blur/spread — that ballooned into a ~80px blob.
+                n.style.setProperty('box-shadow', '0 0 0 2px #ff3b30, 0 0 5px 1px rgba(255,59,48,0.55)', 'important');
             };
             const clear = (n) => {
                 n.style.removeProperty('border-radius');
