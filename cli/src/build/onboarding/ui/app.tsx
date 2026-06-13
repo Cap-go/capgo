@@ -1,5 +1,4 @@
 import type { FC } from 'react'
-import type { BuildLogger } from '../../request.js'
 import type { DiscoveredProfile, IdentityProfileMatch, SigningIdentity } from '../macos-signing.js'
 import type { CertificateData, EnrichedIdentityAvailability, OnboardingErrorCategory, OnboardingProgress, OnboardingResult, OnboardingStep, ProfileData } from '../types.js'
 import { handleCustomMsg } from '../../qr.js'
@@ -7,7 +6,6 @@ import { spawn } from 'node:child_process'
 import { Buffer } from 'node:buffer'
 import { existsSync, readFileSync } from 'node:fs'
 import { copyFile, readFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { Alert, ProgressBar, Select } from '@inkjs/ui'
@@ -45,7 +43,7 @@ import { isAiAnalysisTooTall, resolveAiResultRoute } from '../ai-fit.js'
 // a couple of in-wizard chances to iterate.
 const MAX_AI_RETRIES = 2
 import type { AscApp, AscDistributionCert } from '../apple-api.js'
-import { CertificateLimitError, classifyCertAvailability, computeCertSha1, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listApps, listBundleIds, listDistributionCerts, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
+import { classifyCertAvailability, computeCertSha1, createCertificate, createProfile, deleteProfile, ensureBundleId, findCertIdBySha1, generateJwt, listApps, listBundleIds, listDistributionCerts, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
 import type { AscAppLike, GatePath } from '../app-verification.js'
 import { evaluateGate } from '../app-verification.js'
 import { trackEvent } from '../../../analytics/track.js'
@@ -53,7 +51,7 @@ import { createP12, generateCsr } from '../csr.js'
 import { mapIosOnboardingError } from '../error-categories.js'
 import { canUseFilePicker, openFilePicker, openMobileprovisionPicker } from '../file-picker.js'
 import { parseMobileprovisionBufferDetailed } from '../../mobileprovision-parser.js'
-import { bundleIdMatches, exportP12FromKeychain, filterProfilesForApp, isMacOS, listSigningIdentities, scanProvisioningProfiles } from '../macos-signing.js'
+import { exportP12FromKeychain, filterProfilesForApp, isMacOS, listSigningIdentities, scanProvisioningProfiles } from '../macos-signing.js'
 import { deleteProgress, extractKeyIdFromP8Path, getImportEntryStep, loadProgress, saveProgress } from '../progress.js'
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
 import { createCiSecretEntries, detectCiSecretTargets, getCiSecretRepoLabelAsync, getCiSecretTargetLabel, listExistingCiSecretKeysAsync, uploadCiSecretsAsync } from '../ci-secrets.js'
@@ -881,7 +879,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
    */
   // The 'fetching-profile' variant was removed alongside the Rescan
   // recovery option (commit 36a7c282) — the file picker covers that path.
-  const [pendingRecoveryAction, setPendingRecoveryAction] = useState<'create-profile-only' | null>(null)
+  const [_pendingRecoveryAction, setPendingRecoveryAction] = useState<'create-profile-only' | null>(null)
   // Why the wizard ended up at `import-no-match-recovery`. Set right before
   // each setStep call that routes there so the step can render an Alert
   // sentence that names the actual cause (Apple-no-cert, bundle mismatch,
@@ -947,7 +945,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
    * would retry `creating-profile` — the create-new path — which can't
    * succeed in import mode because `certData.certificateId` is never set.
    */
-  const [duplicateProfileOrigin, setDuplicateProfileOrigin] = useState<'creating-profile' | 'import-create-profile-only'>('creating-profile')
+  const [_duplicateProfileOrigin, setDuplicateProfileOrigin] = useState<'creating-profile' | 'import-create-profile-only'>('creating-profile')
 
   // ─── Engine-driven create-new effect carried transient (ink-thin-wrapper) ───
   // Driver-held transient threaded between the create-new provisioning effects
@@ -4118,7 +4116,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               // Engine-derived routing (same as the input-p8-path onSubmit): the
               // direct path-submit on the api-key-instructions screen is an
               // input-p8-path action. Route off a base WITHOUT keyId so it lands
-              // on input-key-id, MATCHing the bespoke setStep('input-key-id').
+              // on input-key-id, matching the bespoke setStep('input-key-id').
               // We load the FULL persisted progress first (the sibling input-key-id
               // / input-issuer-id handlers do the same) so routing-critical fields
               // — esp. iosBundleIdOverride + iosBundleIdContextAppId (the verified bundle-id override) —
@@ -4169,7 +4167,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               // read + keyId extraction are the effect boundary, done above), then
               // getIosResumeStep routes on the .p8 chain. We route off a base WITHOUT
               // keyId so it lands on input-key-id (the user still confirms/overrides
-              // the auto-detected Key ID), MATCHing the bespoke setStep('input-key-id')
+              // the auto-detected Key ID), matching the bespoke setStep('input-key-id')
               // — even though keyId is persisted to disk for resume restoration.
               // We load the FULL persisted progress first (the sibling input-key-id
               // / input-issuer-id handlers do the same) so routing-critical fields
@@ -4216,7 +4214,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             // already-resolved finalKeyId so the engine's `value || detected`
             // matches the bespoke `value || keyId`), then getIosResumeStep
             // re-derives the next step from the persisted .p8 chain (p8Path +
-            // keyId set, no issuerId → input-issuer-id). MATCHes the bespoke
+            // keyId set, no issuerId → input-issuer-id). matches the bespoke
             // setStep('input-issuer-id').
             const loaded = await loadProgress(appId)
             const reduced = applyIosInput('input-key-id', loaded ?? { platform: 'ios', appId, startedAt: new Date().toISOString(), completedSteps: {} }, { step: 'input-key-id', value: finalKeyId })
@@ -4238,7 +4236,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             await savePartialProgress({ issuerId: cleaned })
             // Engine-derived routing: applyIosInput records issuerId, then
             // getIosResumeStep re-derives the next step from the persisted .p8
-            // chain (p8Path + keyId + issuerId all set → verifying-key). MATCHes
+            // chain (p8Path + keyId + issuerId all set → verifying-key). matches
             // the bespoke setStep('verifying-key'). Works for both create-new and
             // import app_store (getResumeStep routes the same on a full .p8 chain).
             const loaded = await loadProgress(appId)

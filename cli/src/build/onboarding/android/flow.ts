@@ -494,27 +494,6 @@ export function androidViewForStep(
   }
 }
 
-// ─── androidStepView ──────────────────────────────────────────────────────────
-
-/**
- * Pure function: given persisted progress (or null for a fresh run) and the
- * current runtime context, return a UI-framework-neutral description of the
- * step the user is on.
- *
- * Thin wrapper around `androidViewForStep` that resolves the step from
- * progress first. Drivers that already know the step should call
- * `androidViewForStep` directly.
- *
- * No I/O; no mutation of progress.
- */
-export function androidStepView(
-  progress: AndroidOnboardingProgress | null,
-  ctx: AndroidStepCtx,
-): AndroidStepView {
-  const step = progress ? getAndroidResumeStep(progress) : 'keystore-method-select'
-  return androidViewForStep(step, progress, ctx)
-}
-
 // ─── RELEASE_ALIAS_DEFAULT ────────────────────────────────────────────────────
 // Mirrors the constant in app.tsx so both use the same default.
 const RELEASE_ALIAS_DEFAULT = 'release'

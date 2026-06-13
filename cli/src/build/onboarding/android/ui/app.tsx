@@ -1,5 +1,4 @@
 import type { FC } from 'react'
-import type { BuildLogger } from '../../../request.js'
 import type { GcpProject } from '../gcp-api.js'
 import type {
   AndroidOnboardingErrorCategory,

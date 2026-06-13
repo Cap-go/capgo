@@ -306,7 +306,7 @@ test("input-p8-path · empty → bespoke stays 'input-p8-path' [DIVERGE: no-op i
 // (MATCH). The empty-submission-with-detected-default case ALSO matches: the
 // AuthKey_<id>.p8 filename re-derives the default, so keyId is recorded and resume
 // advances. An empty submission with NO detectable default is a no-op → resume
-// re-lands on input-key-id (the p8Path-only resume target), MATCHing the bespoke's
+// re-lands on input-key-id (the p8Path-only resume target), matching the bespoke's
 // `if (!finalKeyId) return` re-show.
 const p8PathOnly = () => iosProgress({ setupMethod: 'create-new', p8Path: '/Users/me/AuthKey_ABC123.p8' })
 const p8PathNoKeyHint = () => iosProgress({ setupMethod: 'create-new', p8Path: '/Users/me/key.p8' })
@@ -346,7 +346,7 @@ test("input-key-id · empty (no default) → bespoke stays 'input-key-id' [MATCH
 // ════════════════════════════════════════════════════════════════════════════
 // Persists issuerId. With p8Path + keyId + issuerId all set, getResumeStep lands on
 // verifying-key (MATCH). An empty submission is a no-op → resume re-lands on
-// input-issuer-id (the p8Path+keyId resume target), MATCHing the bespoke re-show.
+// input-issuer-id (the p8Path+keyId resume target), matching the bespoke re-show.
 const p8AndKey = () => iosProgress({ setupMethod: 'create-new', p8Path: '/Users/me/key.p8', keyId: 'KEYID123' })
 test("input-issuer-id · value → bespoke 'verifying-key' [MATCH]", () => {
   parity({

@@ -837,7 +837,6 @@ export async function decideAndroid(
         && progress._keystoreBase64
         && deps.writeKeystoreFile
       ) {
-        keystoreFileWritten = true
         const alias = progress.keystoreAlias ?? progress.completedSteps.keystoreReady.alias ?? 'release'
         try {
           const writtenPath = await deps.writeKeystoreFile(appId, progress._keystoreBase64, alias)
