@@ -31,22 +31,28 @@ enum FlowScripts {
     """
 
     /// Find the VISIBLE "+" generate button on the "Active (N)" heading's row.
-    /// Per the live DOM: the row has a 5×13 sliver (skip — too small), the "+"
-    /// (~16×18 button with an SVG icon), and a wider "Edit" text button (no SVG).
-    /// So pick the leftmost button on the heading's row that has an SVG and isn't
-    /// a sliver (≥10px). Sets `generatePlus`.
+    /// Per the live DOM (Safari inspect): the row has the real "+" (a button whose
+    /// BOX is tiny — e.g. 5×13 — but whose SVG icon overflows it as the visible
+    /// ~24px circle), a HIDDEN duplicate "+" (visibility:hidden, further right),
+    /// and a text-only "Edit" button (no SVG). So: among VISIBLE svg buttons on the
+    /// heading's row, pick the leftmost, and target its SVG (the on-screen circle)
+    /// rather than the tiny button box. Sets `generatePlus`.
     static let findGeneratePlusButton = """
     const __h3 = document.evaluate('.//h3[starts-with(normalize-space(), "Active")]', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
     let generatePlus = null;
     if (__h3) {
         const hr = __h3.getBoundingClientRect();
-        generatePlus = [...document.querySelectorAll('button')].filter(b => {
+        const shown = (b) => { const s = getComputedStyle(b); return s.visibility !== 'hidden' && s.display !== 'none' && parseFloat(s.opacity || '1') > 0.01; };
+        const btn = [...document.querySelectorAll('button')].filter(b => {
+            if (!b.querySelector('svg') || !shown(b)) return false;
             const r = b.getBoundingClientRect();
-            return r.width >= 10 && r.height >= 10
-                && b.querySelector('svg')
-                && Math.abs((r.top + r.height / 2) - (hr.top + hr.height / 2)) < 30
-                && r.left >= hr.left;
+            return Math.abs((r.top + r.height / 2) - (hr.top + hr.height / 2)) < 30 && r.left >= hr.left;
         }).sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left)[0] || null;
+        if (btn) {
+            const svg = btn.querySelector('svg');
+            const area = (el) => { const r = el.getBoundingClientRect(); return r.width * r.height; };
+            generatePlus = (svg && area(svg) > area(btn)) ? svg : btn;
+        }
     }
     """
 
