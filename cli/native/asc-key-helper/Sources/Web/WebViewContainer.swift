@@ -17,12 +17,15 @@ struct WebViewContainer: NSViewRepresentable {
 
     func makeNSView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
-        // Start with a clean session each launch. Persisting the Apple ID login
-        // proved unreliable: only part of the session survived, so ASC rejected
-        // it (authResult=FAILED) and the flow oscillated between advanced and
-        // signed-out. A non-persistent store guarantees a clean sign-in. Proper
-        // cookie persistence can be revisited for the real CLI later.
-        configuration.websiteDataStore = .nonPersistent()
+        // Persist the Apple sign-in across launches via a stable, app-independent
+        // WKWebsiteDataStore(forIdentifier:) (see WebSessionStore). WebKit saves
+        // the FULL session — all cookies (incl. HttpOnly) + localStorage — so a
+        // previously signed-in user skips the login wall. An earlier cookie-only
+        // attempt only kept part of the session (→ authResult=FAILED oscillation);
+        // a real persistent store keeps all of it. A stale session is recovered
+        // by clearing it on auth failure (GuidedFlowModel). Set
+        // CAPGO_ASC_KEY_FRESH_SESSION to force a clean, throwaway session.
+        configuration.websiteDataStore = WebSessionStore.dataStore
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         if #available(macOS 13.3, *) {

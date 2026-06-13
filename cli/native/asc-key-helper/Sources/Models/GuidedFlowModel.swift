@@ -460,7 +460,14 @@ final class GuidedFlowModel {
             if isAscLogin, !everLoggedIn, !recoverAttempted,
                urlString.contains("authResult=FAILED") || urlString.contains("authResult=ERROR") {
                 recoverAttempted = true
-                webView?.load(URLRequest(url: Self.apiKeysURL))
+                // A stale PERSISTED session can make Apple's silent re-auth fail
+                // and loop. Wipe the saved session, then reload onto a clean login
+                // wall so the user can sign in fresh (and we re-persist that).
+                StatsProtocol.warn("auth failed — clearing persisted web session, retrying clean login")
+                Task {
+                    await WebSessionStore.clear()
+                    webView?.load(URLRequest(url: Self.apiKeysURL))
+                }
             }
             return
         }
