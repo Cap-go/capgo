@@ -7,8 +7,11 @@ struct ContentView: View {
     var body: some View {
         // Gate the embedded browser behind the intro/consent screen — the
         // WKWebView (and any contact with Apple) isn't created until the user
-        // accepts the guided flow.
-        if model.hasConsented {
+        // accepts the guided flow. Once the key is created + validated, replace
+        // it with the success screen that sends the user back to the terminal.
+        if model.flowSucceeded {
+            SuccessView(model: model)
+        } else if model.hasConsented {
             guidedView
         } else {
             ConsentView(model: model)

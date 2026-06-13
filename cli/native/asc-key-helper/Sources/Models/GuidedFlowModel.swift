@@ -55,6 +55,9 @@ final class GuidedFlowModel {
     /// is not even created (so Apple is never contacted) until the user accepts
     /// the guided flow here — see ContentView.
     private(set) var hasConsented = false
+    /// The key was created + validated. Shows the success screen (ContentView)
+    /// before the window auto-closes and hands back to the terminal.
+    private(set) var flowSucceeded = false
     private(set) var currentStep: FlowStep = .login
     private(set) var mode: FlowMode = .createNew
     var issuerId: String = ""
@@ -150,6 +153,14 @@ final class GuidedFlowModel {
     func chooseManualCreation() {
         StatsProtocol.event("consent_manual_chosen")
         CredentialsEmitter.exitManual()
+    }
+
+    /// Close the helper and hand control back to the terminal. The credentials
+    /// were already delivered (see validateAndFinish); the CLI advances as soon
+    /// as this process exits. Invoked by the success screen's button and its
+    /// auto-close timer.
+    func finishToTerminal() {
+        exit(0)
     }
 
     /// Multi-team accounts must explicitly confirm which team gets the key —
@@ -918,11 +929,21 @@ final class GuidedFlowModel {
                 StatsProtocol.event("validation_succeeded", [
                     "duration_ms": Int(Date().timeIntervalSince(validationStart) * 1000),
                 ])
-                CredentialsEmitter.emit(KeyCredentials(
+                // Deliver the credentials to the CLI now, but DON'T exit yet —
+                // show a success screen first so the user knows to return to the
+                // terminal. The CLI only advances once we exit, so auto-close
+                // after a short beat (the success button closes sooner) to
+                // guarantee the terminal never waits forever.
+                CredentialsEmitter.deliver(KeyCredentials(
                     keyId: keyId.trimmingCharacters(in: .whitespacesAndNewlines),
                     issuerId: issuerId.trimmingCharacters(in: .whitespacesAndNewlines),
                     privateKey: privateKey
                 ))
+                flowSucceeded = true
+                Task {
+                    try? await Task.sleep(for: .seconds(6))
+                    finishToTerminal()
+                }
             } catch {
                 validationError = error.localizedDescription
                 StatsProtocol.event("validation_failed", [

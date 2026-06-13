@@ -13,17 +13,27 @@ enum CredentialsEmitter {
     private(set) static var didEmit = false
 
     static func emit(_ credentials: KeyCredentials) {
+        deliver(credentials)
+        exit(0)
+    }
+
+    /// Deliver the captured credentials to the CLI WITHOUT exiting, so the helper
+    /// can show a success screen before the window closes. The terminal `result`
+    /// line of the stdout stats protocol IS the credential delivery — the CLI
+    /// reads keyId/issuerId/privateKey from it. NOTE: the CLI only acts on the
+    /// result once the helper process exits (it resolves on `close`), so a caller
+    /// that uses `deliver` MUST arrange to exit shortly after (see
+    /// GuidedFlowModel's success screen + auto-close).
+    static func deliver(_ credentials: KeyCredentials) {
+        guard !didEmit else { return }
         savePrivateKeyCopy(credentials)
         didEmit = true
-        // The terminal `result` line of the stdout stats protocol IS the
-        // credential delivery — the CLI reads keyId/issuerId/privateKey from it.
         StatsProtocol.result(credentials)
         StatsProtocol.event("helper_finished", [
             "ok": true,
             "outcome": "created",
             "total_ms": StatsProtocol.elapsedMs(),
         ])
-        exit(0)
     }
 
     static func exitCancelled() {
