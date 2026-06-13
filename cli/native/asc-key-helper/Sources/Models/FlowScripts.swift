@@ -325,17 +325,17 @@ enum FlowScripts {
         if (window.__p8hlClear) window.__p8hlClear();
         (function () {
             const find = () => { \(finder) };
-            const RING = '0 0 0 4px #ff3b30, 0 0 0 9px rgba(255,59,48,0.40), 0 0 16px 6px rgba(255,59,48,0.55)';
+            // A round, generous halo that FOLLOWS the button's border-radius (so a
+            // circular "+" gets a circular ring, not a tight square). Pure
+            // box-shadow — no rectangular outline — and large enough to read as a
+            // deliberate highlight around a small ~32px button.
+            const RING = '0 0 0 7px #ff3b30, 0 0 0 15px rgba(255,59,48,0.45), 0 0 36px 16px rgba(255,59,48,0.65)';
             let el = null, scrolled = false;
             const paint = (n) => {
                 n.style.setProperty('box-shadow', RING, 'important');
-                n.style.setProperty('outline', '3px solid #ff3b30', 'important');
-                n.style.setProperty('outline-offset', '3px', 'important');
             };
             const clear = (n) => {
                 n.style.removeProperty('box-shadow');
-                n.style.removeProperty('outline');
-                n.style.removeProperty('outline-offset');
             };
             const tick = () => {
                 let next = null;
