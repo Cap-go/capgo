@@ -433,15 +433,17 @@ enum FlowScripts {
     static func highlightScript(for step: FlowStep) -> String? {
         switch step {
         case .createKey:
-            // The "+" is a small icon button whose box-shadow/outline gets clipped
-            // by an ancestor's overflow — so a directly-attached ring is invisible.
-            // Use the floating overlay (appended to <body>, never clipped, z-index
-            // max), positioned over the REAL "+" via findGeneratePlusButton. The
-            // rAF loop tracks it through scroll; body/html carry no transform
-            // (probe-confirmed) so position:fixed doesn't drift.
+            // The "+" lives in the keys-table header row. A floating position:fixed
+            // overlay DRIFTS to the top of the page when that row scrolls above the
+            // viewport — its rect.top goes negative, so the fixed div gets pinned up
+            // near "Users and Access". Attach the ring DIRECTLY to the element
+            // instead: inline box-shadow on the existing node (no child mutation, so
+            // React's reconciler is untouched) tracks the element through scroll
+            // natively and vanishes with it — no drift. Targets the visible "+" SVG
+            // via findGeneratePlusButton.
             """
             \(awaitNoProgressBar)
-            \(overlayHighlight(finder: "\(findGeneratePlusButton) return generatePlus;", scroll: true, pad: 10))
+            \(attachHighlightDirect(finder: "\(findGeneratePlusButton) return generatePlus;", scroll: true))
             """
         case .nameKey:
             overlayHighlight(finder: "return document.querySelector('#name, input[name=\"name\"]');")
@@ -472,7 +474,14 @@ enum FlowScripts {
 
     static func unhighlightScript(for step: FlowStep) -> String? {
         switch step {
-        case .createKey, .nameKey, .selectRole, .generateKey, .downloadKey:
+        case .createKey:
+            // createKey now uses the directly-attached ring; also remove any overlay
+            // left over from an earlier build/run so nothing lingers.
+            """
+            if (window.__p8hlClear) window.__p8hlClear();
+            \(removeOverlay)
+            """
+        case .nameKey, .selectRole, .generateKey, .downloadKey:
             removeOverlay
         default:
             nil
