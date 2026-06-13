@@ -330,20 +330,19 @@ enum FlowScripts {
         if (window.__p8hlClear) window.__p8hlClear();
         (function () {
             const find = () => { \(finder) };
-            // A crisp ring set OFF the button via outline-offset — a GAP between the
-            // button and the ring, so it reads as a frame around the "+" rather than
-            // a thick solid band hugging it (which looked like a filled red square).
-            // outline follows the element's own border-radius on modern WebKit; a
-            // soft box-shadow glow gives it presence without filling the area.
+            // The "+" button's BOX is square (its round look is a fill/inner
+            // element), so a ring traces a square unless we force a radius. Round
+            // the element itself (border-radius:50%) and a thin box-shadow ring then
+            // follows that circle: a 3px solid ring + a soft glow — clean, round, not
+            // a filled blob. (Pure inline style on an existing node; no reflow, no
+            // child mutation, so React's reconciler is untouched.)
             let el = null, scrolled = false;
             const paint = (n) => {
-                n.style.setProperty('outline', '3px solid #ff3b30', 'important');
-                n.style.setProperty('outline-offset', '6px', 'important');
-                n.style.setProperty('box-shadow', '0 0 0 4px rgba(255,59,48,0.18), 0 0 20px 7px rgba(255,59,48,0.5)', 'important');
+                n.style.setProperty('border-radius', '50%', 'important');
+                n.style.setProperty('box-shadow', '0 0 0 3px #ff3b30, 0 0 0 6px rgba(255,59,48,0.25), 0 0 18px 6px rgba(255,59,48,0.55)', 'important');
             };
             const clear = (n) => {
-                n.style.removeProperty('outline');
-                n.style.removeProperty('outline-offset');
+                n.style.removeProperty('border-radius');
                 n.style.removeProperty('box-shadow');
             };
             const tick = () => {
