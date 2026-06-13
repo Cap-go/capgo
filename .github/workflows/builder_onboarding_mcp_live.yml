@@ -1,11 +1,16 @@
 name: Builder onboarding MCP live (opencode + Workers AI)
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref_name }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || inputs.pr_number || github.ref_name }}
   cancel-in-progress: true
 
 on:
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to run. Leave empty when dispatching from the PR branch."
+        required: false
+        type: string
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
@@ -15,7 +20,6 @@ on:
       - "cli/src/build/onboarding/**"
       - "cli/src/mcp/**"
       - "cli/test/**onboarding**"
-      - "cli/test/e2e-mcp/**"
 
 permissions: {}
 
@@ -26,6 +30,9 @@ env:
   # report (the script reads RESULTS_DIR/REPORT_PATH from env).
   RESULTS_DIR: private/cli-mcp-tests/cli/test/e2e-mcp/results
   REPORT_PATH: private/cli-mcp-tests/cli/test/e2e-mcp/results/tree-report.html
+  # opencode-ai npm package version pinned for a reproducible CLI install (see
+  # "Install opencode CLI" below). Bump deliberately, not via a floating tag.
+  OPENCODE_VERSION: "1.17.4"
 
 jobs:
   mcp-live:
@@ -35,19 +42,70 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
     permissions:
       contents: read
-      pull-requests: write
+      pull-requests: write # post/refresh the report-URL comment on the PR
     steps:
+      - name: Resolve PR context
+        id: pr
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          INPUT_PR_NUMBER: ${{ inputs.pr_number }}
+          REF_NAME: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            if [ "$EVENT_HEAD_REPO" != "$REPOSITORY" ]; then
+              echo "::error::Live MCP previews only run for PR branches inside $REPOSITORY."
+              exit 1
+            fi
+
+            echo "number=$EVENT_PR_NUMBER" >> "$GITHUB_OUTPUT"
+            echo "sha=$EVENT_HEAD_SHA" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # workflow_dispatch: resolve a PR from the input, else the current branch.
+          # If none can be resolved, fall back to the branch ref and skip the
+          # R2/comment steps rather than hard-failing the manual run.
+          pr_number="$INPUT_PR_NUMBER"
+          if [ -z "$pr_number" ]; then
+            pr_number="$(gh pr list --repo "$REPOSITORY" --head "$REF_NAME" --state open --json number --jq '.[0].number // empty')"
+          fi
+
+          if [ -z "$pr_number" ]; then
+            echo "::warning::No open PR resolved for this dispatch; running on ref $REF_NAME and skipping the R2 publish + PR comment."
+            echo "number=" >> "$GITHUB_OUTPUT"
+            echo "sha=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          pr_data="$(gh pr view "$pr_number" --repo "$REPOSITORY" --json number,headRefOid,headRepository,headRepositoryOwner --jq '(.number|tostring) + "\t" + .headRefOid + "\t" + .headRepositoryOwner.login + "/" + .headRepository.name')"
+          IFS="$(printf '\t')" read -r resolved_number head_sha head_repo <<< "$pr_data"
+
+          if [ "$head_repo" != "$REPOSITORY" ]; then
+            echo "::error::Live MCP previews only run for PR branches inside $REPOSITORY."
+            exit 1
+          fi
+
+          echo "number=$resolved_number" >> "$GITHUB_OUTPUT"
+          echo "sha=$head_sha" >> "$GITHUB_OUTPUT"
+
       - name: Checkout PR with private suite submodule
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          ref: ${{ steps.pr.outputs.sha || github.ref }}
           fetch-depth: 0
           submodules: recursive
           token: ${{ secrets.CLI_MCP_TESTS_TOKEN || secrets.PERSONAL_ACCESS_TOKEN || github.token }}
           persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 24.x
 
@@ -56,12 +114,15 @@ jobs:
 
       # The opencode SDK shells out to `opencode serve`, so the opencode CLI must
       # be on PATH at runtime — it is an environmental dependency of the live
-      # actor/judge, not an npm dependency of the suite.
+      # actor/judge, not an npm dependency of the suite. Install a PINNED version
+      # from the npm registry (the opencode-ai package ships the `opencode`
+      # binary via platform optionalDependencies) instead of piping an
+      # unversioned curl|bash installer.
       - name: Install opencode CLI
         run: |
           set -euo pipefail
-          curl -fsSL https://opencode.ai/install | bash
-          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+          bun install -g "opencode-ai@${OPENCODE_VERSION}"
+          echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
 
       - name: Verify opencode CLI on PATH
         run: opencode --version
@@ -96,12 +157,22 @@ jobs:
         if: always()
         working-directory: ${{ env.PRIVATE_SUITE_DIR }}
         run: |
+          set -euo pipefail
           if [ -f cli/test/e2e-mcp/results/cost.json ]; then
-            node -e "const c=require('./cli/test/e2e-mcp/results/cost.json'); console.log(c.line)" >> "$GITHUB_STEP_SUMMARY"
+            # Emit the cost line inside a fenced code block so its contents can't
+            # inject markdown/HTML into the job summary. node strips any backticks
+            # (char 96) from the value so it can't break out of the fence; the
+            # shell command itself contains no literal backticks.
+            {
+              echo '### Live MCP cost'
+              echo '```'
+              node -e 'const c=require("./cli/test/e2e-mcp/results/cost.json"); const bt=String.fromCharCode(96); process.stdout.write(String(c.line).split(bt).join("") + "\n")'
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Publish tree report to R2
-        if: always()
+        if: ${{ always() && steps.pr.outputs.number != '' }}
         id: r2
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -109,7 +180,41 @@ jobs:
           R2_RESULTS_UPLOAD_SECRET_ACCESS_KEY: ${{ secrets.TUI_RESULTS_R2_UPLOAD_SECRET_ACCESS_KEY }}
           R2_BUCKET: ${{ vars.BUILDER_ONBOARDING_TUI_R2_BUCKET }}
           REPORTS_BASE_URL: ${{ vars.BUILDER_ONBOARDING_TUI_REPORTS_URL }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          # Distinct prefix + report title so the MCP report does not collide
+          # with / overwrite the TUI report in the shared R2 bucket.
+          R2_PREFIX: builder-onboarding-mcp
+          REPORT_TITLE: Builder onboarding MCP live report
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.sha || github.sha }}
         run: node .github/scripts/upload-r2-results.mjs
         continue-on-error: true
+
+      # Surface the hosted report ON the PR (the job summary already links it, but
+      # a sticky PR comment is what reviewers actually see). Updated in place per
+      # PR via the marker; skipped on workflow_dispatch runs without a PR.
+      - name: Comment report URL on PR
+        if: ${{ always() && steps.r2.outputs.url != '' && steps.pr.outputs.number != '' }}
+        uses: actions/github-script@v8
+        env:
+          REPORT_URL: ${{ steps.r2.outputs.url }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.sha }}
+          JOB_STATUS: ${{ job.status }}
+        with:
+          script: |
+            const marker = '<!-- builder-onboarding-mcp-live -->'
+            const issue_number = Number(process.env.PR_NUMBER)
+            const ok = process.env.JOB_STATUS === 'success'
+            const body = [
+              marker,
+              `## 🤖 Builder onboarding MCP live — ${ok ? '✅ passed' : '❌ failed'}`,
+              '',
+              `**[▶ Open the interactive HTML report](${process.env.REPORT_URL})** (opencode + Workers AI journey tree)`,
+              '',
+              `Commit: ${process.env.HEAD_SHA} · [Job summary with the cost line](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+            ].join('\n')
+            const { owner, repo } = context.repo
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 })
+            const mine = comments.find(c => c.body && c.body.includes(marker))
+            if (mine) await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body })
+            else await github.rest.issues.createComment({ owner, repo, issue_number, body })
