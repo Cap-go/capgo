@@ -2541,10 +2541,11 @@ function applyMcpTailAnswer<P extends TailEffectProgress>(
     }
 
     case 'ask-github-actions-setup': {
-      // Option value 'no' maps to the persisted setupMode 'declined'.
-      const mode = input.githubActionsSetup === 'no' ? 'declined' : input.githubActionsSetup!
-      const next = applyTailInput('ask-github-actions-setup', progress, { step: 'ask-github-actions-setup', value: mode })
-      return { progress: next, next: mode === 'declined' ? 'ask-export-env' : 'checking-ci-secrets' }
+      // applyTailInput maps the user-facing 'no' to the persisted setupMode 'declined';
+      // pass the raw answer and route on whether the user declined.
+      const declined = input.githubActionsSetup === 'no'
+      const next = applyTailInput('ask-github-actions-setup', progress, { step: 'ask-github-actions-setup', value: input.githubActionsSetup! })
+      return { progress: next, next: declined ? 'ask-export-env' : 'checking-ci-secrets' }
     }
 
     case 'ask-export-env': {
