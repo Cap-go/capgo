@@ -27,7 +27,14 @@ if (missing.length > 0) {
 const resultsDir = process.env.RESULTS_DIR;
 const reportPath = process.env.REPORT_PATH;
 const shortSha = process.env.HEAD_SHA.slice(0, 12);
-const prefix = `builder-onboarding-tui/pr-${process.env.PR_NUMBER}/${shortSha}`;
+// R2_PREFIX lets a second workflow (e.g. the MCP live suite) publish under a
+// distinct prefix so its report does not collide with / overwrite the TUI
+// report. Defaults to the historical TUI prefix to keep existing behavior.
+const prefixBase = trimSlashes(process.env.R2_PREFIX ?? "builder-onboarding-tui");
+const prefix = `${prefixBase}/pr-${process.env.PR_NUMBER}/${shortSha}`;
+// REPORT_TITLE overrides the step-summary heading. The default preserves the
+// TUI wording so the existing TUI workflow renders identically.
+const reportTitle = process.env.REPORT_TITLE ?? "Builder onboarding TUI report";
 const concurrency = parseConcurrency(process.env.R2_UPLOAD_CONCURRENCY ?? "16");
 
 const client = new S3Client({
@@ -77,7 +84,7 @@ await append(process.env.GITHUB_OUTPUT, `url=${reportUrl}\n`);
 await append(
   process.env.GITHUB_STEP_SUMMARY,
   [
-    "### Builder onboarding TUI report",
+    `### ${reportTitle}`,
     "",
     `[Open protected HTML report](${reportUrl})`,
     "",
@@ -209,6 +216,12 @@ function toObjectPath(file) {
 
 function trimTrailingSlash(value) {
   return value.replace(/\/+$/, "");
+}
+
+// Normalize a configurable prefix: strip leading/trailing slashes so
+// `R2_PREFIX=/foo/` and `foo` produce the same object keys.
+function trimSlashes(value) {
+  return value.replace(/^\/+/, "").replace(/\/+$/, "");
 }
 
 function formatError(error) {
