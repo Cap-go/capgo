@@ -459,10 +459,12 @@ export function buildDeps(sdk: CapgoSDK): EngineDeps {
       return out
     },
     isAppRegistered: async (appId: string) => {
-      const res = await sdk.listApps()
-      if (!res.success || !res.data)
-        return false
-      return res.data.some((a: { app_id?: string, appId?: string }) => a.app_id === appId || a.appId === appId)
+      // Targeted existence+access check — NOT listApps. The broad apps list times out
+      // on large databases (a full-table RBAC RLS scan) and would falsely report an
+      // app you OWN as unregistered, which then re-registers it and surfaces a bogus
+      // "already exists and is not in your account" conflict.
+      const res = await sdk.appHasAccess(appId)
+      return res.success && res.data === true
     },
     loadProgress: (appId: string) => loadProgress(appId),
     registerApp: async (appId: string) => {
