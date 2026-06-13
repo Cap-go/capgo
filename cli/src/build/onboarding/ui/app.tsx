@@ -3502,8 +3502,16 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               }
               else {
                 setImportMode(false)
-                // Ask whether they already have a .p8 before the instructions.
-                setStep('p8-source-select')
+                // Only ask "do you already have a .p8?" when answering it
+                // actually changes the path — i.e. when the guided macOS helper
+                // is available to offer. Otherwise both answers funnel to the
+                // same manual instructions, so skip straight there (the pre-fork
+                // behaviour on every non-automatable host: non-macOS, or macOS
+                // without the helper binary).
+                if (isMacOS() && resolveHelperBinary() !== null)
+                  setStep('p8-source-select')
+                else
+                  setStep('api-key-instructions')
               }
             }}
           />
