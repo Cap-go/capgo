@@ -534,6 +534,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   const p8PathRef = useRef(p8Path)
   const keyIdRef = useRef(keyId)
   const issuerIdRef = useRef(issuerId)
+  // Lets the asc-key-generating effect's cleanup kill the guided helper child
+  // when the user quits the TUI (otherwise the helper's pipes hang the CLI).
+  const ascHelperAbortRef = useRef<AbortController | null>(null)
 
   // Wrapper that keeps both state and ref in sync
   const setP8Content = useCallback((val: string) => {
@@ -1908,8 +1911,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       ;(async () => {
         try {
           // Launch the guided macOS helper; it streams stats to PostHog and
-          // returns the captured credentials on its terminal result line.
-          const outcome = await runAscKeyHelper({ apikey })
+          // returns the captured credentials on its terminal result line. The
+          // abort controller (aborted in this effect's cleanup) terminates the
+          // helper window if the user quits the TUI, so the CLI doesn't hang.
+          const abort = new AbortController()
+          ascHelperAbortRef.current = abort
+          const outcome = await runAscKeyHelper({ apikey, signal: abort.signal })
           if (cancelled)
             return
           if (!outcome.ok) {
@@ -3076,6 +3083,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
 
     return () => {
       cancelled = true
+      // Quitting the TUI while the guided helper is running must kill its window
+      // — otherwise the child's pipes keep the CLI process alive and it hangs.
+      ascHelperAbortRef.current?.abort()
     }
   }, [step])
 

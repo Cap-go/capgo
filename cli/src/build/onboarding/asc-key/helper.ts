@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { env, platform } from 'node:process'
+import process, { env, platform } from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { trackEvent } from '../../../analytics/track'
 import { appendInternalLog } from '../../../support/internal-log'
@@ -111,6 +111,13 @@ export interface RunAscKeyHelperOptions {
    * best-effort and no-ops when no internal log has been started for this run.
    */
   forwardToInternalLog?: boolean
+  /**
+   * Abort signal. When it fires — e.g. the onboarding TUI unmounts because the
+   * user quit — the helper child is terminated (SIGTERM, then SIGKILL) so its
+   * stdio pipes stop keeping the CLI process alive. Without this the CLI hangs
+   * after exit while the helper window is still open.
+   */
+  signal?: AbortSignal
 }
 
 /**
@@ -148,6 +155,37 @@ export async function runAscKeyHelper(options: RunAscKeyHelperOptions = {}): Pro
     let eventCount = 0
     let logCount = 0
     let runId = ''
+
+    // Tear the helper down when the caller aborts (the onboarding TUI unmounts
+    // on quit) or the CLI process exits. The child's stdio pipes otherwise keep
+    // Node's event loop alive, so the CLI hangs after printing its exit message.
+    let killTimer: ReturnType<typeof setTimeout> | undefined
+    const killChild = (sig: NodeJS.Signals): void => {
+      try {
+        child.kill(sig)
+      }
+      catch {
+        // Already exited — nothing to kill.
+      }
+    }
+    const onAbort = (): void => {
+      killChild('SIGTERM')
+      // Escalate if the GUI helper doesn't exit promptly on SIGTERM.
+      killTimer = setTimeout(() => killChild('SIGKILL'), 2000)
+      killTimer.unref?.()
+    }
+    const onProcExit = (): void => killChild('SIGKILL')
+    const detach = (): void => {
+      if (killTimer)
+        clearTimeout(killTimer)
+      options.signal?.removeEventListener('abort', onAbort)
+      process.removeListener('exit', onProcExit)
+    }
+    if (options.signal?.aborted)
+      onAbort()
+    else
+      options.signal?.addEventListener('abort', onAbort, { once: true })
+    process.once('exit', onProcExit)
 
     const handleLine = (line: AscProtocolLine): void => {
       if (line.runId)
@@ -196,11 +234,13 @@ export async function runAscKeyHelper(options: RunAscKeyHelperOptions = {}): Pro
     }
 
     child.once('error', (err) => {
+      detach()
       const message = err instanceof Error ? err.message : String(err)
       breadcrumb(`[asc-helper] run ${runId || '(no id)'} failed to spawn (SPAWN_FAILED): ${message}`)
       resolve({ ok: false, errorCode: 'SPAWN_FAILED', message, runId, logCount })
     })
     child.once('close', (code) => {
+      detach()
       for (const line of parser.flush())
         handleLine(line)
 
