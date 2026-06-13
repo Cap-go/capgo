@@ -67,7 +67,7 @@ const APPLE_DIST_CERT = {
   id: 'CERT_AD_1',
   attributes: {
     name: 'Apple Distribution',
-    serialNumber: 'SER1',
+    serialNumber: 'SERIAL1',
     expirationDate: '2026-12-17T00:00:00Z',
   },
 }
