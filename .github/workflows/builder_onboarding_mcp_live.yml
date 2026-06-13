@@ -194,7 +194,7 @@ jobs:
       # PR via the marker; skipped on workflow_dispatch runs without a PR.
       - name: Comment report URL on PR
         if: ${{ always() && steps.r2.outputs.url != '' && steps.pr.outputs.number != '' }}
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           REPORT_URL: ${{ steps.r2.outputs.url }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
