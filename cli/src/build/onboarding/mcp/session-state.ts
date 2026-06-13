@@ -173,18 +173,6 @@ export function setTailParked(appId: string, parked: TailParkedState): void {
 }
 
 /**
- * Drop the tail park for `appId` (one-shot consume: the driver clears it when
- * the parked step's answer is applied, before re-driving). Idempotent.
- */
-export function clearTailParked(appId: string): void {
-  const session = registry.get(appId)
-  if (!session || session.tailParked === undefined)
-    return
-  const { tailParked: _dropped, ...rest } = session
-  registry.set(appId, rest)
-}
-
-/**
  * Drop `keys` from the iOS carried state for `appId` and return the new
  * carried object. The complement of mergeIosCarried for one-shot consumable
  * fields (e.g. the verify-app `verifyAction` pick, which the driver MUST clear
