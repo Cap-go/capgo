@@ -53,6 +53,13 @@ interface McpLike {
     schema: Record<string, unknown>,
     handler: (args: any) => Promise<{ content: Array<{ type: 'text', text: string }> }>,
   ) => unknown
+  // Optional: clients that support MCP prompts get a discoverable slash-command
+  // entry point. Optional so the 2-tool test mock (tool only) stays valid.
+  prompt?: (
+    name: string,
+    description: string,
+    handler: () => { messages: Array<{ role: 'user' | 'assistant', content: { type: 'text', text: string } }> },
+  ) => unknown
 }
 
 /**
@@ -514,7 +521,7 @@ export function registerOnboardingTools(server: McpLike, sdk: CapgoSDK, depsOver
 
   server.tool(
     'start_capgo_builder_onboarding',
-    'Start or resume guided Capgo Builder onboarding — set up native iOS/Android cloud builds, signing, and a first cloud build. Call this whenever the user wants to set up, configure, or troubleshoot native builds. Takes no arguments; it inspects the project and returns the first step.',
+    'Start (or resume) the guided, tool-driven Capgo Builder setup for native iOS/Android cloud builds — App Store / Play credentials, certificates, keystores, signing, and the first cloud build. ALWAYS call this FIRST, and let it conduct the whole flow, whenever the user wants to set up, configure, connect, enable, or troubleshoot Capgo Builder, native builds, cloud builds, or signing. Do NOT inspect the repo, read config files, or web-search to do this yourself — this tool inspects the project and returns the exact next step to take. Takes no arguments.',
     {},
     async () => {
       const result = await runStart(deps)
@@ -542,5 +549,25 @@ export function registerOnboardingTools(server: McpLike, sdk: CapgoSDK, depsOver
       const text = await explainOnboarding(deps, args)
       return { content: [{ type: 'text' as const, text }] }
     },
+  )
+
+  // ── Discoverable, client-agnostic entry point (MCP prompt) ──────────────────
+  // Clients that support MCP prompts surface this as a slash command (e.g.
+  // /capgo-builder-setup). Invoking it injects the message below, which kicks
+  // off the tool-driven flow — so the user never has to name the tool, and the
+  // agent is told NOT to improvise the setup itself. Optional-chained so the
+  // 2-tool test mock (no .prompt) is unaffected.
+  server.prompt?.(
+    'capgo-builder-setup',
+    'Set up Capgo Builder native cloud builds (iOS/Android signing + first build) — starts the guided, tool-driven onboarding.',
+    () => ({
+      messages: [{
+        role: 'user' as const,
+        content: {
+          type: 'text' as const,
+          text: 'Set up Capgo Builder for native cloud builds in this project. Do it by calling the start_capgo_builder_onboarding tool now, then follow the `next` instruction in each result — calling capgo_builder_onboarding_next_step / capgo_builder_onboarding_explain exactly as directed — until setup is complete. Do NOT configure Capgo manually, read config files, or search the web: the onboarding tools conduct the entire flow.',
+        },
+      }],
+    }),
   )
 }
