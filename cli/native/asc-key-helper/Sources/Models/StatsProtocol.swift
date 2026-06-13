@@ -10,13 +10,19 @@ import Foundation
 ///   {"capgoAscKey":1,"kind":"result","ts":<ms>,"runId":"…","ok":true,"keyId":"…","issuerId":"…","privateKey":"…"}
 ///   {"capgoAscKey":1,"kind":"result","ts":<ms>,"runId":"…","ok":false,"errorCode":"USER_CANCELLED","message":"…"}
 ///
+///   {"capgoAscKey":1,"kind":"log","ts":<ms>,"runId":"…","level":"warn","message":"…","props":{…}}
+///
 /// Contract:
-///  - `event` lines carry only non-sensitive `props` — NEVER the private key.
+///  - `event` lines carry only non-sensitive `props` — NEVER the private key —
+///    and are forwarded to PostHog analytics.
+///  - `log` lines are verbose diagnostics routed to the CLI's internal support
+///    log (the bundle a user emails to support), NOT analytics. They also never
+///    carry the private key.
 ///  - the terminal `result` line carries the credentials on success; it is the
 ///    only place the private key ever appears, and the CLI must not forward it
 ///    to analytics.
-///  - human-readable diagnostics stay on **stderr** and are not part of this
-///    protocol.
+///  - free-form stderr is still tolerated but is not part of this protocol;
+///    prefer a structured `log` line so it reaches the support bundle.
 enum StatsProtocol {
     static let version = 1
     /// Correlates every line emitted by a single helper run.
@@ -65,6 +71,21 @@ enum StatsProtocol {
     static func event(_ name: String, _ props: [String: Any] = [:]) {
         writeLine(["kind": "event", "name": name, "props": props])
     }
+
+    /// Emit a verbose diagnostic line routed to the CLI's **internal support
+    /// log** (NOT analytics). Use it generously for anything that helps a human
+    /// diagnose a stuck/failed run after the fact — a finder that matched
+    /// nothing, an unexpected navigation, the detail of a validation error.
+    /// `props` must never contain the private key. `level` is one of
+    /// `debug`/`info`/`warn`/`error` (the CLI defaults anything else to `info`).
+    static func log(_ level: String, _ message: String, _ props: [String: Any] = [:]) {
+        writeLine(["kind": "log", "level": level, "message": message, "props": props])
+    }
+
+    static func debug(_ message: String, _ props: [String: Any] = [:]) { log("debug", message, props) }
+    static func info(_ message: String, _ props: [String: Any] = [:]) { log("info", message, props) }
+    static func warn(_ message: String, _ props: [String: Any] = [:]) { log("warn", message, props) }
+    static func error(_ message: String, _ props: [String: Any] = [:]) { log("error", message, props) }
 
     /// Terminal success line carrying the captured credentials.
     static func result(_ credentials: KeyCredentials) {

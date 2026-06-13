@@ -2,10 +2,12 @@
 import assert from 'node:assert/strict'
 import {
   ASC_KEY_CHANNEL,
+  ASC_LOG_LEVELS,
   ASC_PROTOCOL_VERSION,
   AscProtocolParser,
   ascEventToTrack,
   buildEventTags,
+  formatInternalLogLine,
   parseAscProtocolLine,
 } from '../src/build/onboarding/asc-key/protocol.ts'
 
@@ -103,6 +105,51 @@ console.log('🧪 Testing asc-key stdout stats protocol...\n')
 {
   assert.equal(ASC_PROTOCOL_VERSION, 1)
   console.log('✅ protocol version constant')
+}
+
+// 10. parse a valid log line (diagnostics → internal support log)
+{
+  const line = parseAscProtocolLine('{"capgoAscKey":1,"kind":"log","ts":420,"runId":"r2","level":"warn","message":"issuer_id scrape returned no value","props":{"attempt":3,"url":"https://appstoreconnect.apple.com/access/integrations/api"}}')
+  assert.ok(line, 'log line should parse')
+  assert.equal(line.kind, 'log')
+  assert.equal(line.level, 'warn')
+  assert.equal(line.message, 'issuer_id scrape returned no value')
+  assert.equal(line.props.attempt, 3)
+  console.log('✅ parses a valid log line')
+}
+
+// 11. log line: missing message is dropped; unknown/absent level defaults to info
+{
+  assert.equal(parseAscProtocolLine('{"capgoAscKey":1,"kind":"log","props":{}}'), null, 'no message => not a log line')
+  const noLevel = parseAscProtocolLine('{"capgoAscKey":1,"kind":"log","message":"hi"}')
+  assert.equal(noLevel.level, 'info', 'absent level defaults to info')
+  const oddLevel = parseAscProtocolLine('{"capgoAscKey":1,"kind":"log","level":"verbose","message":"hi"}')
+  assert.equal(oddLevel.level, 'info', 'unknown level falls back to info')
+  assert.deepEqual([...ASC_LOG_LEVELS], ['debug', 'info', 'warn', 'error'])
+  console.log('✅ log line tolerates missing message / odd level')
+}
+
+// 12. formatInternalLogLine renders a readable, prop-bearing support line
+{
+  const line = parseAscProtocolLine('{"capgoAscKey":1,"kind":"log","ts":1234,"runId":"r","level":"error","message":"Apple key validation failed","props":{"detail":"Unauthorized"}}')
+  const rendered = formatInternalLogLine(line)
+  assert.ok(rendered.includes('+1234ms'), 'includes the run-clock timestamp')
+  assert.ok(rendered.includes('ERROR'), 'includes the upper-cased level')
+  assert.ok(rendered.includes('Apple key validation failed'), 'includes the message')
+  assert.ok(rendered.includes('"detail":"Unauthorized"'), 'includes structured props')
+  // A log line with no props renders without a trailing props blob.
+  const bare = formatInternalLogLine(parseAscProtocolLine('{"capgoAscKey":1,"kind":"log","ts":5,"level":"info","message":"hello"}'))
+  assert.equal(bare, '[asc-helper +5ms] INFO hello')
+  console.log('✅ formatInternalLogLine renders a readable support line')
+}
+
+// 13. SECRET GUARD: a stray secret in log props must never reach the support log
+{
+  const line = parseAscProtocolLine('{"capgoAscKey":1,"kind":"log","ts":1,"level":"debug","message":"oops","props":{"privateKey":"SECRET","p8":"SECRET","token":"SECRET","attempt":2}}')
+  const rendered = formatInternalLogLine(line)
+  assert.ok(!rendered.includes('SECRET'), 'no secret-looking value should appear in the rendered log line')
+  assert.ok(rendered.includes('"attempt":2'), 'non-secret props still pass through')
+  console.log('✅ secret-looking props are stripped from log lines')
 }
 
 console.log('\n🎉 All asc-key protocol tests passed')

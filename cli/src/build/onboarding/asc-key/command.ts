@@ -6,6 +6,7 @@ import { intro, log, outro } from '@clack/prompts'
 import { flushAnalytics, trackEvent } from '../../../analytics/track'
 import { checkAlerts } from '../../../api/update'
 import { updateSavedCredentials } from '../../credentials'
+import { appendInternalLog, getInternalLogPath, startInternalLog } from '../../../support/internal-log'
 import { isMacOS, NotMacOSError, resolveHelperBinary, runAscKeyHelper } from './helper'
 import { ASC_KEY_CHANNEL } from './protocol'
 
@@ -45,6 +46,15 @@ export async function createAppleKeyCommand(options: CreateAppleKeyOptions = {})
     void trackEvent({ channel: ASC_KEY_CHANNEL, event: 'ASC Key: Helper Missing', icon: '🔑', apikey: options.apikey })
     await flushAnalytics()
     exit(1)
+  }
+
+  // Start a support log for this run (no-op if it can't be created). The helper
+  // streams diagnostic `log` lines into it, so a user who hits trouble can send
+  // the bundle to support. The onboarding (`build init`) path starts its own.
+  if (!getInternalLogPath()) {
+    const logPath = startInternalLog(options.appId)
+    if (logPath)
+      appendInternalLog(`apple-key: guided helper starting for app ${options.appId ?? '(none)'}`)
   }
 
   log.step('Opening the guided helper… complete the steps in the window that appears.')

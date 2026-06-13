@@ -255,6 +255,10 @@ final class GuidedFlowModel {
             let script = FlowScripts.switchTeamViaMenuScript(teamName: team.name)
             let diagnostics = (try? await callJavaScript(script)) as? String
             FileHandle.standardError.write(Data("[switch] \(team.name) -> \(diagnostics ?? "<no result>")\n".utf8))
+            StatsProtocol.debug("team switch attempt", [
+                "team": team.name,
+                "diagnostics": diagnostics ?? "<no result>",
+            ])
             guard parseClicked(diagnostics) else {
                 switchFailed(team)
                 return
@@ -287,6 +291,9 @@ final class GuidedFlowModel {
         session = nil
         didAutoNavigate = false // re-detect a manual switch's navigation
         statusMessage = "Couldn’t switch to \(team.name) automatically — open the account menu (top-right) and pick the team yourself; we’ll continue once you do."
+        StatsProtocol.warn("automatic team switch did not land — asking the user to switch manually", [
+            "team": team.name,
+        ])
     }
 
     /// Everything scraped so far belongs to the previous team.
@@ -470,6 +477,9 @@ final class GuidedFlowModel {
             if let json = (try? await callJavaScript(FlowScripts.readSession)) as? String,
                ASCSession.parse(jsonText: json) != nil {
                 didAutoNavigate = true
+                StatsProtocol.debug("steering to the API keys page from an off-flow ASC page", [
+                    "from": urlString,
+                ])
                 webView?.load(URLRequest(url: Self.apiKeysURL))
             }
         }
@@ -522,6 +532,13 @@ final class GuidedFlowModel {
                 didEmitAccessDenied = true
                 StatsProtocol.event("api_access_denied", [
                     "reason": (!isEnabled) ? "not_enabled" : "insufficient_role",
+                ])
+                // Support needs the team + raw roles to advise the user on who to
+                // ask (Account Holder for enablement, an Admin for a key).
+                StatsProtocol.warn("API access denied for this team", [
+                    "reason": (!isEnabled) ? "not_enabled" : "insufficient_role",
+                    "team": session.currentTeam.name,
+                    "roles": session.roles.joined(separator: ", "),
                 ])
             }
             setStep(.verifyAccess)
@@ -592,6 +609,14 @@ final class GuidedFlowModel {
            let roles = try? JSONDecoder().decode([String].self, from: data) {
             selectedRoles = roles
         }
+        if wrongRoleSelected {
+            // The user picked a role other than the recommended one — Capgo
+            // Builder keys want Admin. Surface exactly what they chose.
+            StatsProtocol.warn("non-recommended role selected for the key", [
+                "selected": selectedRoles.joined(separator: ", "),
+                "recommended": FlowScripts.recommendedRole,
+            ])
+        }
         // Wrong role → keep them on the role step (the panel shows a warning).
         setStep(wrongRoleSelected ? .selectRole : .generateKey)
     }
@@ -609,6 +634,15 @@ final class GuidedFlowModel {
             "from": String(describing: previous),
             "to": String(describing: step),
             "elapsed_ms_on_prev": elapsedOnPrev,
+        ])
+        // Richer breadcrumb for the support log: the analytics event omits the
+        // page/team context that's decisive when reconstructing a stuck run.
+        StatsProtocol.debug("step \(previous) → \(step)", [
+            "from": String(describing: previous),
+            "to": String(describing: step),
+            "url": currentURL,
+            "team": session?.currentTeam.name ?? "nil",
+            "ever_logged_in": everLoggedIn,
         ])
         Task {
             if let unhighlight = FlowScripts.unhighlightScript(for: previous) {
@@ -639,8 +673,17 @@ final class GuidedFlowModel {
             // failure here means an accessible team's page didn't yield the
             // Issuer ID (slow load or an Apple DOM change) — let the user paste.
             issuerScrapeFailures += 1
+            StatsProtocol.warn("issuer_id scrape returned no value (DOM element not found yet)", [
+                "attempt": issuerScrapeFailures,
+                "url": currentURL,
+            ])
             if issuerScrapeFailures >= 8, !apiAccessWarningDismissed {
                 scrapeTroubleWarning = true
+                // Persistent miss → almost always an Apple DOM change; this is
+                // the single most useful line for support to see in the bundle.
+                StatsProtocol.error("issuer_id scrape persistently failing — Apple DOM may have changed", [
+                    "attempts": issuerScrapeFailures,
+                ])
             }
         }
     }
@@ -774,6 +817,12 @@ final class GuidedFlowModel {
                 guard let pem = try? String(contentsOf: fileURL, encoding: .utf8),
                       pem.contains("PRIVATE KEY") else {
                     self.validationError = "That file doesn’t look like a .p8 private key."
+                    // Common user mistake (picked the .cer/.mobileprovision, or a
+                    // truncated file). Log the path — not the contents — so support
+                    // can see what they chose. redactSecrets backstops the line.
+                    StatsProtocol.warn("selected file is not a .p8 private key", [
+                        "path": fileURL.path,
+                    ])
                     return
                 }
                 self.validationError = nil
@@ -814,6 +863,13 @@ final class GuidedFlowModel {
             } catch {
                 validationError = error.localizedDescription
                 StatsProtocol.event("validation_failed", [
+                    "duration_ms": Int(Date().timeIntervalSince(validationStart) * 1000),
+                ])
+                // The analytics event omits the reason; the support log needs
+                // Apple's actual error text to tell a bad key from a transient
+                // network/clock-skew failure. This is never secret-bearing.
+                StatsProtocol.error("Apple key validation failed", [
+                    "detail": error.localizedDescription,
                     "duration_ms": Int(Date().timeIntervalSince(validationStart) * 1000),
                 ])
             }

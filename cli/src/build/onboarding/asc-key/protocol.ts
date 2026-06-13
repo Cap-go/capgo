@@ -33,6 +33,33 @@ export interface AscEventLine {
   props: Record<string, unknown>
 }
 
+/** Severity levels a helper diagnostic `log` line may carry. */
+export const ASC_LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const
+export type AscLogLevel = (typeof ASC_LOG_LEVELS)[number]
+
+/**
+ * A verbose diagnostic line. Unlike an `event` (which feeds PostHog analytics),
+ * a `log` line is routed into the CLI's **internal support log** — the bundle a
+ * user emails to support when a run goes wrong. Use it generously for anything
+ * that helps a human diagnose a stuck/failed run after the fact: a finder that
+ * matched nothing, an unexpected navigation, the detail of a validation error.
+ * It is NOT analytics and, like an event, NEVER carries the private key.
+ */
+export interface AscLogLine {
+  capgoAscKey: number
+  kind: 'log'
+  /** Milliseconds since the helper started. */
+  ts: number
+  /** Correlates every line of a single helper run. */
+  runId: string
+  /** Severity, defaulting to `info` when the helper omits/garbles it. */
+  level: AscLogLevel
+  /** Human-readable diagnostic message. */
+  message: string
+  /** Optional structured context. NEVER contains the private key. */
+  props: Record<string, unknown>
+}
+
 /** The captured credentials, delivered on the terminal success line. */
 export interface AscCredentials {
   keyId: string
@@ -56,7 +83,14 @@ export interface AscResultLine {
   message?: string
 }
 
-export type AscProtocolLine = AscEventLine | AscResultLine
+export type AscProtocolLine = AscEventLine | AscLogLine | AscResultLine
+
+/** Coerce an arbitrary `level` value to a known {@link AscLogLevel}. */
+function normalizeLogLevel(value: unknown): AscLogLevel {
+  return (typeof value === 'string' && (ASC_LOG_LEVELS as readonly string[]).includes(value))
+    ? value as AscLogLevel
+    : 'info'
+}
 
 /**
  * Parse a single raw stdout line into a protocol envelope, or `null` when the
@@ -90,6 +124,19 @@ export function parseAscProtocolLine(line: string): AscProtocolLine | null {
       ts: typeof obj.ts === 'number' ? obj.ts : 0,
       runId: typeof obj.runId === 'string' ? obj.runId : '',
       name: obj.name,
+      props: (obj.props && typeof obj.props === 'object') ? obj.props as Record<string, unknown> : {},
+    }
+  }
+  if (obj.kind === 'log') {
+    if (typeof obj.message !== 'string')
+      return null
+    return {
+      capgoAscKey: ASC_PROTOCOL_VERSION,
+      kind: 'log',
+      ts: typeof obj.ts === 'number' ? obj.ts : 0,
+      runId: typeof obj.runId === 'string' ? obj.runId : '',
+      level: normalizeLogLevel(obj.level),
+      message: obj.message,
       props: (obj.props && typeof obj.props === 'object') ? obj.props as Record<string, unknown> : {},
     }
   }
@@ -204,4 +251,33 @@ export function ascEventToTrack(event: AscEventLine): {
     icon: '🔑',
     tags: buildEventTags(event),
   }
+}
+
+/** JSON.stringify that never throws (returns '' on a circular/odd value). */
+function safeStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value)
+  }
+  catch {
+    return ''
+  }
+}
+
+/**
+ * Render a helper `log` line as a single internal-support-log string. Secret-
+ * looking prop keys are dropped defensively here, and the CLI's `redactSecrets`
+ * still runs as a backstop when the line is appended. Shape:
+ *
+ *   `[asc-helper +1234ms] WARN issuer_id scrape returned no value {"attempt":3}`
+ */
+export function formatInternalLogLine(line: AscLogLine): string {
+  const safeProps: Record<string, unknown> = {}
+  for (const [key, raw] of Object.entries(line.props)) {
+    if (SECRET_KEY_PATTERN.test(key))
+      continue
+    safeProps[key] = raw
+  }
+  const keys = Object.keys(safeProps)
+  const propsText = keys.length ? ` ${safeStringify(safeProps)}` : ''
+  return `[asc-helper +${line.ts}ms] ${line.level.toUpperCase()} ${line.message}${propsText}`
 }
