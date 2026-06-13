@@ -16,6 +16,7 @@ export const onboardingNextStepSchema = z.object({
   gcpProjectName: z.string().optional().describe('Display name for a new Google Cloud project, when creating one'),
   androidPackage: z.string().optional().describe('The Android applicationId / package name to grant release access to, when asked'),
   saMethodChoice: z.enum(['retry', 'save-anyway', 'oauth']).optional().describe('Recovery choice at service-account validation failure'),
+  reopenSignIn: z.boolean().optional().describe('Set true at the Google sign-in step to (re)open the browser for a fresh Google authorization — use this when the browser did not open, was closed, or the sign-in stalled on "still waiting", so the user is never stuck'),
   checkBuild: z.boolean().optional().describe('Set true after running the build command, to read the build output record and confirm the result'),
   credentialsExistChoice: z.enum(['backup', 'cancel']).optional().describe('Data-safety choice when saved Android credentials already exist: "backup" (back them up, then continue) or "cancel" (stop onboarding), when the step asks'),
   keystoreMethod: z.enum(['existing', 'generate']).optional().describe('Whether you already have an Android keystore ("existing") or want one created ("generate")'),

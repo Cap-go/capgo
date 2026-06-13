@@ -60,6 +60,8 @@ interface OnboardingInput {
   gcpProjectName?: string
   androidPackage?: string
   saMethodChoice?: 'retry' | 'save-anyway' | 'oauth'
+  /** Set true at google-sign-in to (re)open the browser for a fresh OAuth — recovery when the browser didn't open, was closed, or the sign-in stalled. */
+  reopenSignIn?: boolean
   credentialsExistChoice?: 'backup' | 'cancel'
   keystoreMethod?: 'existing' | 'generate'
   keystorePath?: string
@@ -1895,6 +1897,9 @@ export async function decideAndroid(
   deps: EngineDeps,
   opts?: {
     signInProceed?: boolean
+    /** Drop any in-flight Google OAuth session and (re)open the browser for a fresh
+     *  sign-in — recovery for "still waiting" when the browser never opened / was closed. */
+    reopenSignIn?: boolean
     /**
      * S9-S11: the explicit tail step a validated tail answer routed to
      * (drive() → applyMcpTailAnswer). Honored only while the slim tail
@@ -1992,6 +1997,11 @@ export async function decideAndroid(
 
       // Use injected session registry when available (for tests), else module-level.
       const session = deps.oauthSession ?? { begin: beginOAuthSession, poll: pollOAuthSession, clear: clearOAuthSession }
+      // Reopen recovery: the user asked to (re)open the browser because it never opened,
+      // they closed it, or the flow stalled on 'pending'. Drop the in-flight session so
+      // the poll below reports 'absent' and we begin a fresh flow (a new browser window).
+      if (opts?.reopenSignIn)
+        session.clear(appId)
       const poll = session.poll(appId)
 
       if (poll.status === 'absent') {
@@ -2020,8 +2030,8 @@ export async function decideAndroid(
           onboarding: 'capgo-builder', phase: 'credentials', state: 'google-sign-in', platform: 'android',
           progress: ANDROID_STEP_PROGRESS['google-sign-in'], kind: 'human_gate',
           summary: `I have opened your browser for Google sign-in. Approve the permissions, then tell me to continue.`,
-          human: { instruction: `Your browser has been opened for Google sign-in. Approve every requested permission — your tokens never reach Capgo servers and are revoked when setup finishes. Once you have approved in the browser, tell me to continue.` },
-          next: { tool: NEXT_STEP_TOOL, instruction: 'After the user approves in the browser, call next_step with no arguments to continue.', call: `${NEXT_STEP_TOOL}({})` },
+          human: { instruction: `Your browser has been opened for Google sign-in. Approve every requested permission — your tokens never reach Capgo servers and are revoked when setup finishes. Once you have approved, tell me to continue. If the browser did not actually open, tell me to reopen it.` },
+          next: { tool: NEXT_STEP_TOOL, instruction: 'After the user approves in the browser, call next_step({}) to continue. If the browser did not open, call next_step({ reopenSignIn: true }) to reopen it.', call: `${NEXT_STEP_TOOL}({})` },
           rules: ONBOARDING_RULES,
         }
       }
@@ -2030,9 +2040,9 @@ export async function decideAndroid(
         return {
           onboarding: 'capgo-builder', phase: 'credentials', state: 'google-sign-in', platform: 'android',
           progress: ANDROID_STEP_PROGRESS['google-sign-in'], kind: 'human_gate',
-          summary: `Still waiting on the browser sign-in — finish in the browser, then tell me to continue.`,
-          human: { instruction: `The browser sign-in is still in progress. Complete the sign-in in your browser, then tell me to continue.` },
-          next: { tool: NEXT_STEP_TOOL, instruction: 'After finishing the browser sign-in, call next_step with no arguments to continue.', call: `${NEXT_STEP_TOOL}({})` },
+          summary: `Still waiting on the browser sign-in. Finish it in the browser then tell me to continue — or, if the browser did not open or you closed it, ask me to reopen it.`,
+          human: { instruction: `The browser sign-in is still in progress. Complete it in your browser, then tell me to continue. If the browser never opened, you closed it, or you are stuck on this screen, tell me to reopen it and I will open a fresh sign-in window.` },
+          next: { tool: NEXT_STEP_TOOL, instruction: 'When the user has signed in, call next_step({}) to continue. If the browser did not open, was closed, or they are stuck here, call next_step({ reopenSignIn: true }) to reopen the sign-in.', call: `${NEXT_STEP_TOOL}({})` },
           rules: ONBOARDING_RULES,
         }
       }
@@ -3866,7 +3876,7 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
     const result = await decideAdvance(facts, progress, input, deps)
 
     if (signInProceed && result.platform === 'android' && result.state === 'google-sign-in')
-      return decideAndroid(facts, deps, { signInProceed: true })
+      return decideAndroid(facts, deps, { signInProceed: true, reopenSignIn: Boolean(input?.reopenSignIn) })
 
     if (result.kind !== 'auto')
       return result
