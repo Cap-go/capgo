@@ -7,7 +7,7 @@
 - Large corpus: 1810 files · ~3,702,572 words. Semantic extraction will be expensive (many Claude tokens). Consider running on a subfolder.
 
 ## Summary
-- 9205 nodes · 19656 edges · 590 communities (490 shown, 100 thin omitted)
+- 9205 nodes · 19656 edges · 590 communities (489 shown, 101 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 202 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
@@ -447,7 +447,7 @@
 ## Import Cycles
 - 3-file cycle: `cli/src/init/runtime.tsx -> cli/src/init/ui/app.tsx -> cli/src/init/ui/components.tsx -> cli/src/init/runtime.tsx`
 
-## Communities (590 total, 100 thin omitted)
+## Communities (590 total, 101 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.00
@@ -674,12 +674,12 @@ Cohesion: 0.09
 Nodes (29): getAccountDisabledRedirect(), getPostRestorePath(), guard(), isDisabledAccount(), maybeProvisionSsoMembership(), hideLoader(), showLoader(), isNativeAppStoreContext() (+21 more)
 
 ### Community 56 - "Community 56"
-Cohesion: 0.11
-Nodes (37): assertRawAttachmentRouteIdHasValidEncoding(), assertValidPercentEncodedAttachmentKey(), ATTACHMENT_PLAN_LIMIT, ATTACHMENT_ROUTE_PREFIXES, buildDurableObjectRequest(), buildNormalizedUploadMetadataHeader(), calculateBytesTransferred(), canReplayUploadRequest() (+29 more)
-
-### Community 57 - "Community 57"
 Cohesion: 0.06
 Nodes (36): ApplyBackfillTransactionOptions, ApplyBackfillTransactionResult, BackfillRevenueMovementEvent, BackfillSummary, BuildRevenueMovementEventsOptions, BuildRevenueMovementEventsResult, calculateChurnRevenue(), calculateNrr() (+28 more)
+
+### Community 57 - "Community 57"
+Cohesion: 0.11
+Nodes (37): assertRawAttachmentRouteIdHasValidEncoding(), assertValidPercentEncodedAttachmentKey(), ATTACHMENT_PLAN_LIMIT, ATTACHMENT_ROUTE_PREFIXES, buildDurableObjectRequest(), buildNormalizedUploadMetadataHeader(), calculateBytesTransferred(), canReplayUploadRequest() (+29 more)
 
 ### Community 58 - "Community 58"
 Cohesion: 0.10
@@ -838,8 +838,8 @@ Cohesion: 0.12
 Nodes (13): AnalyzeBehavior, decideAnalyzeBehavior(), DecideInput, isLogTooBig(), PostAnalyzeInput, PostAnalyzeStreamInput, postAnalyzeStreamRequest(), releaseCapturedLogs() (+5 more)
 
 ### Community 97 - "Community 97"
-Cohesion: 0.12
-Nodes (9): DEFAULT_RETRY_PARAMS, isR2ChecksumError(), isR2Error(), isR2MultipartDoesNotExistError(), retry(), RetryBucket, RetryMultipartUpload, RetryOptions (+1 more)
+Cohesion: 0.13
+Nodes (18): Digester, noopDigester(), sha256Digester(), setKeyFromMetadata(), parseChecksum(), parseUploadMetadata(), UploadMetadata, Env (+10 more)
 
 ### Community 98 - "Community 98"
 Cohesion: 0.15
@@ -879,37 +879,33 @@ Nodes (20): {
   sendNotifOrgOnceMock,
 }, apikeys, app_versions, apps, channel_devices, channels, disableUpdatePgEnum, group_members (+12 more)
 
-### Community 105 - "Community 105"
-Cohesion: 0.17
-Nodes (5): Digester, noopDigester(), sha256Digester(), UploadHandler, Part
-
 ### Community 106 - "Community 106"
-Cohesion: 0.13
-Nodes (21): AiBinding, app, buildBatches(), extractAiText(), extractContentText(), getTargetLanguageName(), getTranslationModel(), keepTranslation() (+13 more)
+Cohesion: 0.12
+Nodes (18): AppScopedAttachmentPath, AsyncLock, AttachmentHeadReader, encodeR2KeyForUploadLocation(), ErrorPart, FinalPart, getAttachmentReadCandidateKeys(), getErrorMessage() (+10 more)
 
 ### Community 107 - "Community 107"
 Cohesion: 0.13
-Nodes (19): allTargets(), backendDependencyMatchers, backendUtilityMatchers, deployMatchers, DeployScope, DeployScopeResult, DeployTarget, getChangedFiles() (+11 more)
+Nodes (21): AiBinding, app, buildBatches(), extractAiText(), extractContentText(), getTargetLanguageName(), getTranslationModel(), keepTranslation() (+13 more)
 
 ### Community 108 - "Community 108"
 Cohesion: 0.13
-Nodes (19): child, ensureSupabaseStarted(), functionsReadyTimeoutMs, generatedEnvPath, getSupabaseStatus(), hasHealthySupabaseApi(), overriddenEnv, parseSupabaseStatus() (+11 more)
+Nodes (19): allTargets(), backendDependencyMatchers, backendUtilityMatchers, deployMatchers, DeployScope, DeployScopeResult, DeployTarget, getChangedFiles() (+11 more)
 
 ### Community 109 - "Community 109"
 Cohesion: 0.13
-Nodes (19): getInvocationSource(), checkAppExists(), addApp(), addAppInternal(), AppCreateSource, ensureAppDoesNotExist(), ensureOptions(), resolveAppCreateSource() (+11 more)
+Nodes (19): child, ensureSupabaseStarted(), functionsReadyTimeoutMs, generatedEnvPath, getSupabaseStatus(), hasHealthySupabaseApi(), overriddenEnv, parseSupabaseStatus() (+11 more)
 
 ### Community 110 - "Community 110"
+Cohesion: 0.13
+Nodes (19): getInvocationSource(), checkAppExists(), addApp(), addAppInternal(), AppCreateSource, ensureAppDoesNotExist(), ensureOptions(), resolveAppCreateSource() (+11 more)
+
+### Community 111 - "Community 111"
 Cohesion: 0.09
 Nodes (21): compilerOptions, baseUrl, declaration, emitDeclarationOnly, esModuleInterop, forceConsistentCasingInFileNames, ignoreDeprecations, jsx (+13 more)
 
-### Community 111 - "Community 111"
-Cohesion: 0.13
-Nodes (16): setKeyFromMetadata(), parseChecksum(), parseUploadMetadata(), UploadMetadata, AttachmentUploadHandler, Env, normalizeContentType(), optionsHandler() (+8 more)
-
 ### Community 112 - "Community 112"
 Cohesion: 0.13
-Nodes (17): AppScopedAttachmentPath, AsyncLock, AttachmentHeadReader, encodeR2KeyForUploadLocation(), ErrorPart, FinalPart, getAttachmentReadCandidateKeys(), getErrorMessage() (+9 more)
+Nodes (9): DEFAULT_RETRY_PARAMS, isR2ChecksumError(), isR2Error(), isR2MultipartDoesNotExistError(), retry(), RetryBucket, RetryMultipartUpload, RetryOptions (+1 more)
 
 ### Community 113 - "Community 113"
 Cohesion: 0.14
@@ -1698,12 +1694,12 @@ Nodes (3): bumpFiles, scripts, postbump
 ## Knowledge Gaps
 - **3227 isolated node(s):** `@upstash/context7-mcp`, `@agentdeskai/browser-tools-mcp`, `claude`, `@modelcontextprotocol/server-postgres`, `priorityPaths` (+3222 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **100 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **101 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Database` connect `Community 14` to `Community 3`, `Community 11`, `Community 12`, `Community 13`, `Community 17`, `Community 21`, `Community 22`, `Community 279`, `Community 23`, `Community 25`, `Community 26`, `Community 156`, `Community 288`, `Community 35`, `Community 38`, `Community 43`, `Community 172`, `Community 173`, `Community 308`, `Community 55`, `Community 323`, `Community 70`, `Community 71`, `Community 74`, `Community 78`, `Community 88`, `Community 231`, `Community 109`?**
+- **Why does `Database` connect `Community 14` to `Community 3`, `Community 11`, `Community 12`, `Community 13`, `Community 17`, `Community 21`, `Community 22`, `Community 279`, `Community 23`, `Community 25`, `Community 26`, `Community 156`, `Community 288`, `Community 35`, `Community 38`, `Community 43`, `Community 172`, `Community 173`, `Community 308`, `Community 55`, `Community 323`, `Community 70`, `Community 71`, `Community 74`, `Community 78`, `Community 88`, `Community 231`, `Community 110`?**
   _High betweenness centrality (0.151) - this node is a cross-community bridge._
 - **Why does `getCreditTopUpProductId()` connect `Community 64` to `Community 1`, `Community 10`, `Community 143`?**
   _High betweenness centrality (0.042) - this node is a cross-community bridge._
