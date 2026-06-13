@@ -1030,6 +1030,18 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     await saveProgress(appId, existing)
   }, [appId])
 
+  // Persist which .p8 source the user picked in the create-new fork so a
+  // quit-and-resume routes back to the same path (see getResumeStep): an
+  // `automated` user resumes on the guided helper, a `manual` user on the .p8
+  // instructions. Best-effort — a missing progress file just means a fresh run.
+  const persistP8CreateMethod = useCallback(async (method: 'automated' | 'manual') => {
+    const existing = await loadProgress(appId)
+    if (!existing)
+      return
+    existing.p8CreateMethod = method
+    await saveProgress(appId, existing)
+  }, [appId])
+
   /**
    * Reset everything for a fresh-start onboarding pass. Called from:
    *   • the ErrorStep restart handler (existing user-facing "Restart" option),
@@ -1910,12 +1922,15 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             return
           }
           const { credentials } = outcome
+          // The helper also saved the .p8 to the fastlane/ASC conventional path.
+          const helperP8Path = join(homedir(), '.appstoreconnect', 'private_keys', `AuthKey_${credentials.keyId}.p8`)
           setP8Content(credentials.privateKey) // wrapper also updates p8ContentRef
           setKeyId(credentials.keyId)
           setIssuerId(credentials.issuerId)
-          // The helper also saved the .p8 to the fastlane/ASC conventional path.
-          setP8Path(join(homedir(), '.appstoreconnect', 'private_keys', `AuthKey_${credentials.keyId}.p8`))
-          await savePartialProgress({ keyId: credentials.keyId, issuerId: credentials.issuerId })
+          setP8Path(helperP8Path)
+          // Persist all three (incl. p8Path) so a resume AFTER the key was
+          // captured lands on verifying-key — not back on the helper re-run.
+          await savePartialProgress({ keyId: credentials.keyId, issuerId: credentials.issuerId, p8Path: helperP8Path })
           if (cancelled)
             return
           addLog('✔ App Store Connect API key created via guided helper')
@@ -3494,6 +3509,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                 completedSteps: {},
               }
               existing.setupMethod = value === 'import' ? 'import-existing' : 'create-new'
+              // Re-entering the create fork: clear any prior .p8 source choice so
+              // quitting before re-choosing doesn't resume onto a path the user
+              // has since left (it gets re-set when they pick in the fork).
+              if (value !== 'import')
+                existing.p8CreateMethod = undefined
               await saveProgress(appId, existing)
 
               if (value === 'import') {
@@ -3522,16 +3542,19 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           <P8SourceSelectStep
             dense={dense}
             canAutomate={isMacOS() && resolveHelperBinary() !== null}
-            onChange={(value) => {
+            onChange={async (value) => {
               if (value === 'have') {
+                await persistP8CreateMethod('manual')
                 setStep('api-key-instructions')
               }
               else if (isMacOS() && resolveHelperBinary() !== null) {
-              // No key yet, and we can drive the guided helper.
+              // No key yet, and we can drive the guided helper. The method
+              // (automated vs manual) is persisted at p8-create-method-select.
                 setStep('p8-create-method-select')
               }
               else {
               // No automation available — fall back to the manual instructions.
+                await persistP8CreateMethod('manual')
                 setStep('api-key-instructions')
               }
             }}
@@ -3542,11 +3565,17 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         {step === 'p8-create-method-select' && (
           <P8CreateMethodSelectStep
             dense={dense}
-            onChange={(value) => {
-              if (value === 'automated')
+            onChange={async (value) => {
+              if (value === 'automated') {
+                // Remember the guided path so a quit-and-resume re-launches the
+                // helper instead of dropping the user on the manual .p8 picker.
+                await persistP8CreateMethod('automated')
                 setStep('asc-key-generating')
-              else
+              }
+              else {
+                await persistP8CreateMethod('manual')
                 setStep('api-key-instructions')
+              }
             }}
           />
         )}

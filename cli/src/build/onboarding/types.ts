@@ -202,6 +202,19 @@ export interface OnboardingProgress {
    */
   setupMethod?: 'create-new' | 'import-existing'
   /**
+   * Records how the user chose to obtain the .p8 in the create-new flow's
+   * source fork (`p8-source-select` → `p8-create-method-select`):
+   *   - `automated` — the guided macOS helper creates + captures the key.
+   *   - `manual`    — the user has a .p8, or creates one by hand at App Store
+   *                   Connect, and enters it via `api-key-instructions`.
+   *
+   * Persisted so a quit-and-resume lands the user back where they chose to be:
+   * an `automated` user resumes on the helper (`asc-key-generating`), NOT the
+   * manual .p8 picker. Absent on legacy files and on the import flow.
+   * Only meaningful when `setupMethod === 'create-new'`.
+   */
+  p8CreateMethod?: 'automated' | 'manual'
+  /**
    * Records the distribution mode picked at `import-distribution-mode`.
    *
    * Persisted (not derived from .p8 presence) because ad_hoc users can

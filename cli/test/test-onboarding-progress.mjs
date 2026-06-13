@@ -203,6 +203,37 @@ t('getResumeStep returns creating-profile for create-new with cert, no profile',
   assert.equal(getResumeStep(progress), 'creating-profile')
 })
 
+// A user who chose the guided macOS helper (p8CreateMethod=automated) and quit
+// before it captured a key must resume ON the helper, not the manual .p8 picker.
+t('getResumeStep returns asc-key-generating for create-new automated with no inputs', () => {
+  const progress = makeProgress({ setupMethod: 'create-new', p8CreateMethod: 'automated' })
+  assert.equal(getResumeStep(progress), 'asc-key-generating')
+})
+
+// Manual choosers (and legacy/undefined) still resume on the .p8 instructions.
+t('getResumeStep returns api-key-instructions for create-new manual with no inputs', () => {
+  const progress = makeProgress({ setupMethod: 'create-new', p8CreateMethod: 'manual' })
+  assert.equal(getResumeStep(progress), 'api-key-instructions')
+})
+t('getResumeStep returns api-key-instructions for create-new with no p8CreateMethod', () => {
+  const progress = makeProgress({ setupMethod: 'create-new' })
+  assert.equal(getResumeStep(progress), 'api-key-instructions')
+})
+
+// Once the helper captured the key (all three inputs persisted), resume goes to
+// verifying-key — the partial-input branch wins over the automated re-launch, so
+// the helper is NOT re-run for work already done.
+t('getResumeStep returns verifying-key for create-new automated once inputs are saved', () => {
+  const progress = makeProgress({
+    setupMethod: 'create-new',
+    p8CreateMethod: 'automated',
+    keyId: 'K',
+    issuerId: 'I',
+    p8Path: '/Users/x/.appstoreconnect/private_keys/AuthKey_K.p8',
+  })
+  assert.equal(getResumeStep(progress), 'verifying-key')
+})
+
 // Partial .p8 inputs (the original branches) keep working — these resume
 // at the furthest input step, regardless of distribution mode.
 t('getResumeStep resumes at verifying-key when import has full .p8 inputs', () => {
