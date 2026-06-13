@@ -253,31 +253,8 @@ export function ascEventToTrack(event: AscEventLine): {
   }
 }
 
-/** JSON.stringify that never throws (returns '' on a circular/odd value). */
-function safeStringify(value: unknown): string {
-  try {
-    return JSON.stringify(value)
-  }
-  catch {
-    return ''
-  }
-}
-
-/**
- * Render a helper `log` line as a single internal-support-log string. Secret-
- * looking prop keys are dropped defensively here, and the CLI's `redactSecrets`
- * still runs as a backstop when the line is appended. Shape:
- *
- *   `[asc-helper +1234ms] WARN issuer_id scrape returned no value {"attempt":3}`
- */
-export function formatInternalLogLine(line: AscLogLine): string {
-  const safeProps: Record<string, unknown> = {}
-  for (const [key, raw] of Object.entries(line.props)) {
-    if (SECRET_KEY_PATTERN.test(key))
-      continue
-    safeProps[key] = raw
-  }
-  const keys = Object.keys(safeProps)
-  const propsText = keys.length ? ` ${safeStringify(safeProps)}` : ''
-  return `[asc-helper +${line.ts}ms] ${line.level.toUpperCase()} ${line.message}${propsText}`
-}
+// NOTE: `log` lines are routed to the internal support log by the CLI consumer
+// (helper.ts) with minimal shaping — the helper's own level/message/props pass
+// through, and `appendInternalLog` supplies the timestamp and runs
+// `redactSecrets`. The CLI deliberately does NOT render a bespoke display format
+// here; secret coverage lives in one place (redactSecrets), not a second guard.

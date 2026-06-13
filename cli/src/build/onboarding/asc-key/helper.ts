@@ -8,7 +8,7 @@ import { env, platform } from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { trackEvent } from '../../../analytics/track'
 import { appendInternalLog } from '../../../support/internal-log'
-import { ascEventToTrack, AscProtocolParser, formatInternalLogLine } from './protocol'
+import { ascEventToTrack, AscProtocolParser } from './protocol'
 
 /** Name of the precompiled helper binary as bundled / cached on disk. */
 const HELPER_BINARY_NAME = 'capgo-asc-key-helper'
@@ -162,13 +162,17 @@ export async function runAscKeyHelper(options: RunAscKeyHelperOptions = {}): Pro
         }
       }
       else if (line.kind === 'log') {
-        // Verbose diagnostics → the internal support log, NOT analytics. This is
-        // what a user emails to support when a run goes wrong; it never carries
-        // the private key (appendInternalLog also redacts as a backstop).
+        // Verbose diagnostics → the internal support log, NOT analytics. We pass
+        // the helper's own line through with minimal shaping (source tag + level
+        // + message + structured context). appendInternalLog supplies the
+        // timestamp and runs redactSecrets as the secret backstop — the CLI does
+        // not render a bespoke format of its own.
         logCount += 1
         options.onLog?.(line)
-        if (toInternalLog)
-          appendInternalLog(formatInternalLogLine(line))
+        if (toInternalLog) {
+          const ctx = Object.keys(line.props).length ? ` ${JSON.stringify(line.props)}` : ''
+          appendInternalLog(`asc-helper ${line.level}: ${line.message}${ctx}`)
+        }
       }
       else {
         // Keep the last result line as authoritative.

@@ -49,11 +49,12 @@ part of this protocol — prefer a `log` line so the diagnostic reaches the bund
 
 - **`event` lines are forwarded to PostHog** (channel `app-store-connect-key`).
 - **`log` lines are appended to the CLI's internal support log**, never to
-  analytics. The CLI renders each as
-  `[asc-helper +<ts>ms] <LEVEL> <message> <props-json>`, drops any secret-looking
-  prop key, and `redactSecrets` runs over the line as a final backstop. The CLI
-  also writes a one-line per-run summary (outcome + event/log counts) so a bundle
-  always shows the helper ran.
+  analytics. The CLI passes the helper's own line through with minimal shaping —
+  `asc-helper <level>: <message> <props-json>` — and `appendInternalLog` supplies
+  the timestamp and runs `redactSecrets` over it (the single redaction authority;
+  the CLI does not add a bespoke format or a second secret guard). It also writes
+  a one-line per-run summary (outcome + event/log counts) so a bundle always
+  shows the helper ran.
 - The **terminal `result` line** carries the credentials on success. The
   `privateKey` appears **only** here and is **never** forwarded to analytics.
   As defence-in-depth, the CLI also strips any prop key matching
@@ -101,7 +102,7 @@ Current emit points (see `GuidedFlowModel.swift`):
 | `error` | `issuer_id scrape persistently failing…`              | The Issuer ID finder missed ≥8 times.         |
 | `error` | `Apple key validation failed` (+ detail)              | Apple rejected the new key.                   |
 
-New `log` lines can be added freely — the CLI renders any `log` line generically.
+New `log` lines can be added freely — the CLI appends any `log` line generically.
 Adding emit points never requires a version bump.
 
 ## Distribution of the precompiled helper
