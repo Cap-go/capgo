@@ -34,5 +34,5 @@ const SAFE_APP_ID = /^[a-z0-9][\w-]*(?:\.[a-z0-9][\w-]*)+$/i
  * Invalid examples: com.x; rm -rf ~   com.x$(cmd)   nodots   com-example   foo_bar   ""
  */
 export function isSafeAppIdForCommand(appId: string): boolean {
-  return SAFE_APP_ID.test(appId)
+  return SAFE_APP_ID.test(appId) && appId.includes('.')
 }

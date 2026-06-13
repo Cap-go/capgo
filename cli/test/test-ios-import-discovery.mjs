@@ -12,7 +12,7 @@
  *       'ad_hoc'    → import-pick-identity  (no .p8 chain)
  *       'app_store' → api-key-instructions  (fresh) | the furthest partial .p8
  *                     step | verifying-key  (.p8 chain already partial/complete)
- *       '__cancel__'→ api-key-instructions  (bail to create-new; importDistribution
+ *       '__cancel__'→ import-distribution-mode (re-enter the setup fork; importDistribution
  *                     cleared, setupMethod='create-new')
  *
  *   import-scanning (effect ★):
@@ -270,7 +270,7 @@ await test('app_store with a previously-verified .p8 chain → routes to verifyi
 
 // ─── REDUCER + ROUTING: __cancel__ ───────────────────────────────────────────────
 
-await test("__cancel__ → switches to create-new (setupMethod='create-new'), CLEARS importDistribution; routes to api-key-instructions", async () => {
+await test("__cancel__ → switches to create-new (setupMethod='create-new'), CLEARS importDistribution; getImportEntryStep falls back to the distribution fork", async () => {
   // A user who had previously picked ad_hoc now bails to the create-new path —
   // the stale ad_hoc must be cleared so it can't leak into create-new routing.
   const before = iosProgress({ importDistribution: 'ad_hoc' })

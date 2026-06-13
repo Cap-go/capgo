@@ -8,7 +8,7 @@
  * stays identical between the two paths.
  *
  * IMPORTANT (v1 contract): this writes a LOCAL `.env.capgo.<appId>.<platform>`
- * file (mode 0o600) that the USER commits manually. It performs NO git
+ * file (mode 0o600). The file holds credentials, so it should stay local (add it to `.gitignore`). It performs NO git
  * operation — no `git add`, no `git commit`, nothing touches the repo index.
  * v1 must NOT add an auto-commit here; the user owns whether/when the file
  * lands in version control.
@@ -29,7 +29,7 @@ export interface EnvExportOpts {
   /**
    * If absent, defaults to `<cwd>/.env.capgo.<appId>.<platform>`.
    *
-   * This is the path of a LOCAL 0o600 .env file that the USER commits manually.
+   * This is the path of a LOCAL 0o600 .env file holding credentials — keep it out of version control.
    * Writing it performs NO git operation; v1 must not add an auto-commit.
    */
   targetPath?: string

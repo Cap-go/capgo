@@ -559,7 +559,6 @@ await test('DRIVER: D2 duplicate -> prompt -> delete -> import-create-profile-on
 // success the line INCLUDES the url; on failure log the could-not-open fallback
 // with the url instead of claiming success. Routing is unchanged either way.
 
-const PORTAL_PROFILES_URL = 'https://developer.apple.com/account/resources/profiles/list'
 // Match via RegExp (not String.includes with a URL literal) so CodeQL's URL-substring
 // sanitization rule does not flag these log-message assertions as URL-validation sinks.
 const PORTAL_PROFILES_URL_RE = /https:\/\/developer\.apple\.com\/account\/resources\/profiles\/list/
