@@ -309,6 +309,53 @@ enum FlowScripts {
         overlayHighlight([(finder: finder, pad: pad)], scroll: scroll)
     }
 
+    /// Attach the highlight DIRECTLY to the real target element — a ring drawn on
+    /// the button itself, not a floating overlay. We only ever set INLINE STYLE on
+    /// an existing node (box-shadow + outline; both paint outside the box, so no
+    /// reflow) and never insert or remove child nodes — so React's reconciler is
+    /// untouched. (The "removeChild must be an instance of Node" crash came from
+    /// inserting nodes into a React-owned parent, not from styling an existing
+    /// one.) Because the style lives ON the element, it tracks the element through
+    /// scroll and layout natively — no rAF, no drift. A light interval re-applies
+    /// in case a re-render clears it, and restores the element's style on teardown.
+    /// Use ONLY for static targets (the "+" generate button); re-rendering
+    /// dropdowns still use the overlay, which never touches their nodes.
+    private static func attachHighlightDirect(finder: String, scroll: Bool = false) -> String {
+        """
+        if (window.__p8hlClear) window.__p8hlClear();
+        (function () {
+            const find = () => { \(finder) };
+            const RING = '0 0 0 4px #ff3b30, 0 0 0 9px rgba(255,59,48,0.40), 0 0 16px 6px rgba(255,59,48,0.55)';
+            let el = null, scrolled = false;
+            const paint = (n) => {
+                n.style.setProperty('box-shadow', RING, 'important');
+                n.style.setProperty('outline', '3px solid #ff3b30', 'important');
+                n.style.setProperty('outline-offset', '3px', 'important');
+            };
+            const clear = (n) => {
+                n.style.removeProperty('box-shadow');
+                n.style.removeProperty('outline');
+                n.style.removeProperty('outline-offset');
+            };
+            const tick = () => {
+                let next = null;
+                try { next = find(); } catch (e) {}
+                if (next !== el) { if (el) clear(el); el = next; scrolled = false; }
+                if (el) {
+                    paint(el);
+                    if (\(scroll ? "true" : "false") && !scrolled && el.scrollIntoView) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        scrolled = true;
+                    }
+                }
+            };
+            const id = setInterval(tick, 200);
+            tick();
+            window.__p8hlClear = () => { clearInterval(id); if (el) clear(el); window.__p8hlClear = null; };
+        })();
+        """
+    }
+
     /// Tear down all overlays and the tracking loop.
     static let removeOverlay = """
     if (window.__p8raf) { cancelAnimationFrame(window.__p8raf); window.__p8raf = null; }
@@ -356,9 +403,12 @@ enum FlowScripts {
     static func highlightScript(for step: FlowStep) -> String? {
         switch step {
         case .createKey:
+            // The "+" is a static button, so we attach the ring DIRECTLY to it
+            // (no overlay, no scroll drift). Tear down any leftover overlay first.
             """
             \(awaitNoProgressBar)
-            \(overlayHighlight(finder: "\(findGenerateButton) return generateButton;", scroll: true, pad: 16))
+            \(removeOverlay)
+            \(attachHighlightDirect(finder: "\(findGenerateButton) return generateButton;", scroll: true))
             """
         case .nameKey:
             overlayHighlight(finder: "return document.querySelector('#name, input[name=\"name\"]');")
@@ -389,7 +439,14 @@ enum FlowScripts {
 
     static func unhighlightScript(for step: FlowStep) -> String? {
         switch step {
-        case .createKey, .nameKey, .selectRole, .generateKey, .downloadKey:
+        case .createKey:
+            // createKey attaches its ring directly to the button — clear that,
+            // and any overlay too (defensive against a mixed transition).
+            """
+            if (window.__p8hlClear) window.__p8hlClear();
+            \(removeOverlay)
+            """
+        case .nameKey, .selectRole, .generateKey, .downloadKey:
             removeOverlay
         default:
             nil
