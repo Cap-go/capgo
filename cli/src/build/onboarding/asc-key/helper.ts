@@ -227,7 +227,7 @@ export interface ProbeGuidedHelperOptions {
  * this machine, so the onboarding flow never offers the guided path it would
  * then have to reject. Unlike the sync {@link resolveHelperBinary} existence
  * check, this also verifies the Developer-ID signature + Capgo team of a
- * packaged bundle, so a helper that is installed but mis-signed / wrong-team /
+ * packaged bundle, so a helper that is installed but wrongly signed / wrong-team /
  * tampered is reported `untrusted` (treated exactly like not-installed: the
  * guided option is withheld and the user goes straight to manual instructions,
  * the same as on Linux).
