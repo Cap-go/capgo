@@ -143,6 +143,12 @@ jobs:
           CAPGO_CLI_ROOT: ${{ github.workspace }}/cli
         run: bun run test:signing
 
+      - name: Run ASC key helper journeys (CLI side)
+        working-directory: ${{ env.PRIVATE_SUITE_DIR }}
+        env:
+          CAPGO_CLI_ROOT: ${{ github.workspace }}/cli
+        run: bun run test:asc-key
+
       - name: Run private TUI E2E suite
         working-directory: ${{ env.PRIVATE_SUITE_DIR }}
         env:
