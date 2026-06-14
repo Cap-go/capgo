@@ -4309,6 +4309,41 @@ $$;
 ALTER FUNCTION "public"."enqueue_credit_usage_alert"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."enqueue_credit_usage_posthog_event"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  IF TG_OP <> 'INSERT' THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+
+  BEGIN
+    PERFORM pgmq.send(
+      'credit_usage_posthog',
+      jsonb_build_object(
+        'function_name', 'credit_usage_posthog',
+        'function_type', NULL,
+        'payload', jsonb_build_object(
+          'transaction_id', NEW.id,
+          'org_id', NEW.org_id,
+          'transaction_type', NEW.transaction_type,
+          'occurred_at', NEW.occurred_at
+        )
+      )
+    );
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'Failed to enqueue credit usage PostHog event for transaction %: %', NEW.id, SQLERRM;
+  END;
+
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."enqueue_credit_usage_posthog_event"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."exist_app_v2"("appid" character varying) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -16173,6 +16208,20 @@ ALTER SEQUENCE "public"."audit_logs_id_seq" OWNED BY "public"."audit_logs"."id";
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."backfill_progress" (
+    "job_name" "text" NOT NULL,
+    "scope_key" "text" NOT NULL,
+    "cutover_at" timestamp with time zone NOT NULL,
+    "last_processed_occurred_at" timestamp with time zone,
+    "last_processed_id" bigint,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."backfill_progress" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."bandwidth_usage" (
     "id" integer NOT NULL,
     "device_id" character varying(255) NOT NULL,
@@ -18224,6 +18273,11 @@ ALTER TABLE ONLY "public"."audit_logs"
 
 
 
+ALTER TABLE ONLY "public"."backfill_progress"
+    ADD CONSTRAINT "backfill_progress_pkey" PRIMARY KEY ("job_name", "scope_key");
+
+
+
 ALTER TABLE ONLY "public"."bandwidth_usage"
     ADD CONSTRAINT "bandwidth_usage_pkey" PRIMARY KEY ("id");
 
@@ -19201,6 +19255,10 @@ CREATE OR REPLACE TRIGGER "cleanup_onboarding_app_data_on_complete" AFTER UPDATE
 
 
 CREATE OR REPLACE TRIGGER "credit_usage_alert_on_transactions" AFTER INSERT ON "public"."usage_credit_transactions" FOR EACH ROW EXECUTE FUNCTION "public"."enqueue_credit_usage_alert"();
+
+
+
+CREATE OR REPLACE TRIGGER "credit_usage_posthog_on_transactions" AFTER INSERT ON "public"."usage_credit_transactions" FOR EACH ROW EXECUTE FUNCTION "public"."enqueue_credit_usage_posthog_event"();
 
 
 
@@ -20246,6 +20304,10 @@ CREATE POLICY "Deny all" ON "public"."org_metrics_cache" USING (false) WITH CHEC
 
 
 
+CREATE POLICY "Deny all access" ON "public"."backfill_progress" USING (false) WITH CHECK (false);
+
+
+
 CREATE POLICY "Deny all access" ON "public"."cron_tasks" USING (false) WITH CHECK (false);
 
 
@@ -20473,6 +20535,9 @@ ALTER TABLE "public"."apps" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."audit_logs" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."backfill_progress" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."bandwidth_usage" ENABLE ROW LEVEL SECURITY;
@@ -21736,6 +21801,10 @@ REVOKE ALL ON FUNCTION "public"."enqueue_channel_device_counts"() FROM PUBLIC;
 
 
 REVOKE ALL ON FUNCTION "public"."enqueue_credit_usage_alert"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."enqueue_credit_usage_posthog_event"() FROM PUBLIC;
 
 
 
@@ -23597,6 +23666,10 @@ GRANT SELECT ON TABLE "public"."audit_logs" TO "anon";
 
 GRANT ALL ON SEQUENCE "public"."audit_logs_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."audit_logs_id_seq" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."backfill_progress" TO "service_role";
 
 
 

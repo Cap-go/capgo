@@ -318,6 +318,8 @@ const buildCLI = Bun.build({
   external: HELPER_PACKAGES,
   define: {
     'process.env.SUPA_DB': '"production"',
+    'globalThis.__CAPGO_DEV__': 'false',
+    'globalThis.__CAPGO_MCP_ONBOARDING__': 'false',
     // Gates the CAPGO_KEYCHAIN_HELPER_PATH dev override. `false` here makes
     // the minifier delete the whole branch from release bundles —
     // publish_cli.yml asserts the string is absent from dist/index.js.
@@ -351,6 +353,8 @@ const buildSDK = Bun.build({
   external: HELPER_PACKAGES,
   define: {
     'process.env.SUPA_DB': '"production"',
+    'globalThis.__CAPGO_DEV__': 'false',
+    'globalThis.__CAPGO_MCP_ONBOARDING__': 'false',
     // Gates the CAPGO_KEYCHAIN_HELPER_PATH dev override. `false` here makes
     // the minifier delete the whole branch from release bundles —
     // publish_cli.yml asserts the string is absent from dist/index.js.

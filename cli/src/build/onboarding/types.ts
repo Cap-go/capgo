@@ -1,5 +1,7 @@
 // src/build/onboarding/types.ts
 
+import type { TailProgress } from './tail-types.js'
+
 export type Platform = 'ios' | 'android'
 
 // The outcome a wizard app reports to the shell/command when Ink exits, so the
@@ -182,7 +184,35 @@ export interface ProfileData {
   profileBase64: string
 }
 
-export interface OnboardingProgress {
+// ─── Post-save "tail" milestones (shared with android) ───────────────────────
+//
+// Mirror the android `CredentialsSaved` / `BuildRequested` / `CiSecretsUploaded`
+// markers so `getIosResumeStep` can route a saved progress THROUGH the shared
+// post-save tail (CI-secrets → env-export → workflow-file → build-request)
+// without re-running a side-effecting step. Each is a marker in the same
+// self-healing style as the cert/profile markers: presence means "this
+// irreversible step already happened — do NOT do it again". Absent on every
+// legacy/in-flight progress file → `tailResumeStep` returns null and resume is
+// unchanged (terminal stays `saving-credentials`).
+
+export interface IosCredentialsSaved {
+  /** ISO timestamp credentials.json was written — purely informational. */
+  savedAt: string
+}
+
+export interface IosBuildRequested {
+  /** The build dashboard URL surfaced after the queue request succeeded. */
+  buildUrl: string
+}
+
+export interface IosCiSecretsUploaded {
+  /** Provider the secrets were pushed to (matches the chosen ciSecretTarget). */
+  provider: 'github' | 'gitlab'
+  /** How many env vars were pushed — informational. */
+  count: number
+}
+
+export interface OnboardingProgress extends TailProgress {
   platform: Platform
   appId: string
   startedAt: string
@@ -252,10 +282,81 @@ export interface OnboardingProgress {
    * user already moved on from.
    */
   iosBundleIdContextAppId?: string
+  /**
+   * LEGACY (engine-era confirm-app-id gate, removed by PR #2397). Older CLI
+   * versions persisted this when the user confirmed the bundle id at the
+   * now-removed `confirm-app-id` step. No code reads it anymore — the driver
+   * silently adopts the authoritative Release bundle id and the remote
+   * `verify-app` step owns the bundle-id invariant (see `iosBundleIdOverride`).
+   * Kept in the type only so older progress files keep parsing; resume IGNORES
+   * it (see test-ios-confirm-app-id.mjs).
+   */
+  appIdConfirmed?: boolean
+  /**
+   * LEGACY (engine-era confirm-app-id gate, removed by PR #2397). The router
+   * target the removed `confirm-app-id` step would have returned to. No code
+   * reads it anymore; resume IGNORES it so a stale value can never park the
+   * wizard on a step that no longer renders (see test-ios-confirm-app-id.mjs).
+   */
+  pendingAppIdNext?: OnboardingStep
+  /**
+   * Lifecycle of the iOS data-safety gate that runs BEFORE the setup-method
+   * fork when saved iOS credentials already exist for this appId. Mirrors the
+   * android `_credentialsExistGate` marker so the gate is resume-derivable
+   * instead of living only in the TUI's `setStep` calls:
+   *   - 'pending' → saved iOS credentials exist; awaiting the user's
+   *                 backup-or-cancel choice (the `credentials-exist` step)
+   *   - 'backup'  → user chose backup; the `backing-up` effect must still run
+   *   - 'done'    → backup performed (or source absent); proceed to setup
+   *   - 'cancel'  → user chose to stop; onboarding halts to protect the
+   *                 existing credentials
+   *
+   * Absent on legacy/in-flight progress files → treated as "no gate", so the
+   * resume routing is unchanged for every existing progress file.
+   *
+   * ADDITIVE (BATCH 0): only consumed by `getIosResumeStep`'s Phase-0 gate.
+   */
+  _credentialsExistGate?: 'pending' | 'backup' | 'done' | 'cancel'
+  /**
+   * Which step triggered the `duplicate-profile-prompt`, so the post-deletion
+   * effect (`deleting-duplicate-profiles`) can route back to the right place on
+   * resume. The prompt is dual-origin: `creating-profile` reaches it on the
+   * create-new path, and `import-create-profile-only` reaches it on the import
+   * path. Persisting the origin prevents an import user from being routed back
+   * into the create-new `creating-profile` step (the exact class of resume bug
+   * the `setupMethod` branch was added to prevent).
+   *
+   * ADDITIVE (BATCH 0): persisted now so the engine surface is total; the
+   * effect that reads it is wired in a later batch.
+   */
+  duplicateProfileOrigin?: 'creating-profile' | 'import-create-profile-only'
+  /**
+   * Deferred recovery branch after the import `.p8` input chain. When the user
+   * picks "create" in `import-no-match-recovery` but has no ASC API key yet, the
+   * flow detours through `api-key-instructions` → `verifying-key` and must
+   * return to `import-create-profile-only` afterwards. Persisting the pending
+   * action (e.g. `'create-profile-only'`) lets resume restore that deferred
+   * target instead of dropping the user at the picker.
+   *
+   * ADDITIVE (BATCH 0): persisted now so the engine surface is total; the
+   * routing that reads it is wired in a later batch.
+   */
+  pendingRecoveryAction?: string
   completedSteps: {
     apiKeyVerified?: ApiKeyData
     certificateCreated?: CertificateData
     profileCreated?: ProfileData
+    // ── Post-save "tail" milestones (shared with android) ──
+    // Present only once the matching side-effecting tail step has finished, so
+    // `getIosResumeStep` can route a saved progress THROUGH the tail without
+    // re-running an irreversible step. Absent on every legacy/in-flight file →
+    // resume falls through to `saving-credentials` exactly as before.
+    /** Set once `saving-credentials` wrote credentials.json. Gates tail entry. */
+    credentialsSaved?: IosCredentialsSaved
+    /** Set once `requesting-build` queued a build. Guards a double build-request. */
+    buildRequested?: IosBuildRequested
+    /** Set once `uploading-ci-secrets` pushed the secrets. Guards a re-upload. */
+    ciSecretsUploaded?: IosCiSecretsUploaded
   }
   /** Temporary — wiped after .p12 creation */
   _privateKeyPem?: string
