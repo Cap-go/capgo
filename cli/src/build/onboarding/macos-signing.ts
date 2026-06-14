@@ -378,7 +378,7 @@ export function helperSignatureRequirement(
  */
 declare const __CAPGO_ALLOW_HELPER_ENV_OVERRIDE__: boolean | undefined
 
-interface CodesignRunner {
+export interface CodesignRunner {
   (args: readonly string[]): Promise<SpawnResult>
 }
 

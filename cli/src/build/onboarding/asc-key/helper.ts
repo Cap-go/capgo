@@ -9,6 +9,7 @@ import process, { env, platform } from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { trackEvent } from '../../../analytics/track'
 import { appendInternalLog } from '../../../support/internal-log'
+import type { CodesignRunner } from '../macos-signing'
 import { ASC_KEY_HELPER_BUNDLE_IDENTIFIER, helperPackageName, verifyAppBundleSignature } from '../macos-signing'
 import { ascEventToTrack, AscProtocolParser } from './protocol'
 
@@ -155,6 +156,20 @@ export function resolveAscHelper(): ResolvedAscHelper | null {
     const override = env.CAPGO_ASC_KEY_HELPER_PATH
     if (override && existsSync(override))
       return { binary: override, source: 'override' }
+
+    // Test seam: treat a given `.app` as the signed npm-package bundle so the
+    // real Developer-ID signature verification runs against it (source
+    // 'package' → verified at probe/spawn). Lets the E2E suite exercise the
+    // untrusted path end-to-end — pointing at an ad-hoc-signed bundle that
+    // fails codesign — without a published, notarized package. Gated by the
+    // same build-time flag as the override above, so it (and this string) are
+    // DCE'd out of release bundles; CI asserts the literal is absent from dist.
+    const packageBundle = env.CAPGO_ASC_KEY_HELPER_PACKAGE_BUNDLE
+    if (packageBundle) {
+      const binary = join(packageBundle, 'Contents', 'MacOS', HELPER_APP_EXECUTABLE)
+      if (existsSync(binary))
+        return { binary, source: 'package', bundlePath: packageBundle }
+    }
   }
 
   // The packaged app + the local swift-build are macOS 14 apps; never offer them
@@ -184,6 +199,72 @@ export function resolveAscHelper(): ResolvedAscHelper | null {
  */
 export function resolveHelperBinary(): string | null {
   return resolveAscHelper()?.binary ?? null
+}
+
+/** Why the guided helper can't be offered. See {@link probeGuidedHelper}. */
+export type GuidedHelperUnusableReason
+  = | 'not-macos' /** Not a Mac — the helper is a macOS app (Linux/Windows). */
+    | 'unsupported-os' /** macOS < 14 — the SwiftUI/WKWebView app can't launch. */
+    | 'not-installed' /** No helper resolved (optional package absent, no cache/build). */
+    | 'untrusted' /** Helper present but its Developer-ID signature/team didn't verify. */
+
+export type GuidedHelperProbe
+  = | { usable: true, source: AscHelperSource }
+    | { usable: false, reason: GuidedHelperUnusableReason, detail?: string }
+
+export interface ProbeGuidedHelperOptions {
+  /**
+   * Inject a pre-resolved helper instead of calling {@link resolveAscHelper}
+   * (tests). `null` models "nothing resolved". Omit in production.
+   */
+  resolved?: ResolvedAscHelper | null
+  /** Forward an injected codesign runner to signature verification (tests). */
+  codesignRunner?: CodesignRunner
+}
+
+/**
+ * Decide — once, up front — whether guided ASC-key creation can ACTUALLY run on
+ * this machine, so the onboarding flow never offers the guided path it would
+ * then have to reject. Unlike the sync {@link resolveHelperBinary} existence
+ * check, this also verifies the Developer-ID signature + Capgo team of a
+ * packaged bundle, so a helper that is installed but mis-signed / wrong-team /
+ * tampered is reported `untrusted` (treated exactly like not-installed: the
+ * guided option is withheld and the user goes straight to manual instructions,
+ * the same as on Linux).
+ *
+ * Async because the signature check spawns `codesign`. Mirrors the spawn-time
+ * verification in {@link runAscKeyHelper} (same bundle id, same verifier), so a
+ * `usable` verdict here means the later spawn won't be refused for trust.
+ */
+export async function probeGuidedHelper(options: ProbeGuidedHelperOptions = {}): Promise<GuidedHelperProbe> {
+  if (!isMacOS())
+    return { usable: false, reason: 'not-macos' }
+
+  const resolved = options.resolved !== undefined ? options.resolved : resolveAscHelper()
+  if (!resolved) {
+    // resolveAscHelper() returns null both on macOS < 14 and when nothing is
+    // installed; distinguish so callers can log/track the real reason.
+    return { usable: false, reason: isMacOS14OrLater() ? 'not-installed' : 'unsupported-os' }
+  }
+
+  // Only the signed npm-package bundle is signature-checked; override/cache/local
+  // are ad-hoc dev/CI builds that can't satisfy a Developer-ID requirement and
+  // are trusted by virtue of being explicitly opted into (same as the spawn path).
+  if (resolved.source === 'package' && resolved.bundlePath) {
+    try {
+      await verifyAppBundleSignature(resolved.bundlePath, {
+        bundleIdentifier: ASC_KEY_HELPER_BUNDLE_IDENTIFIER,
+        label: 'App Store Connect key helper',
+        reinstallHint: `Reinstall ${helperPackageName(process.arch) ?? '@capgo/cli-helper-darwin-*'} and try again.`,
+        codesignRunner: options.codesignRunner,
+      })
+    }
+    catch (err) {
+      return { usable: false, reason: 'untrusted', detail: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  return { usable: true, source: resolved.source }
 }
 
 /**

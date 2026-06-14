@@ -45,7 +45,7 @@ import { isAiAnalysisTooTall, resolveAiResultRoute } from '../ai-fit.js'
 import { getWorkflowDiffTelemetry, trackBuildOnboardingWorkflowEvent } from '../analytics.js'
 import { evaluateGate } from '../app-verification.js'
 import { classifyCertAvailability, computeCertSha1, createCertificate, createProfile, deleteProfile, ensureBundleId, findCertIdBySha1, generateJwt, listApps, listBundleIds, listDistributionCerts, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
-import { resolveHelperBinary, runAscKeyHelper } from '../asc-key/helper.js'
+import { runAscKeyHelper } from '../asc-key/helper.js'
 import { sanitizeBuildLogLines } from '../build-log.js'
 import { detectIosBundleIds } from '../bundle-id-detector.js'
 import { createCiSecretEntries, detectCiSecretTargets, getCiSecretRepoLabelAsync, getCiSecretTargetLabel, listExistingCiSecretKeysAsync, uploadCiSecretsAsync } from '../ci-secrets.js'
@@ -263,6 +263,15 @@ interface AppProps {
   initialProgress: OnboardingProgress | null
   /** Resolved iOS directory from capacitor.config (defaults to 'ios') */
   iosDir: string
+  /**
+   * Whether guided ASC-key creation may be offered: macOS + the signed helper
+   * installed + its Developer-ID signature/team verified (computed once in
+   * command.ts via probeGuidedHelper). Gates every "create one for me" / "do
+   * you already have a .p8?" branch — when false (not installed, wrong
+   * signature, wrong team, or non-macOS) the user goes straight to the manual
+   * .p8 instructions, exactly as before the helper existed and as on Linux.
+   */
+  guidedHelperUsable: boolean
   /** Optional Capgo API key passed via -a/--apikey flag; takes precedence over saved key */
   apikey?: string
   // Capgo API gateway override (--supa-host); prod when omitted.
@@ -312,11 +321,14 @@ async function runRunnerCommand(runner: string, args: string[]): Promise<{ succe
   })
 }
 
-const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgress, iosDir, apikey, supaHost, onResult }) => {
+const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgress, iosDir, guidedHelperUsable, apikey, supaHost, onResult }) => {
   const { exit } = useApp()
   // Pass helper availability so an automated-path resume only targets
   // asc-key-generating when the helper can actually run (else manual instructions).
-  const startStep = getIosResumeStep(initialProgress, isMacOS() && resolveHelperBinary() !== null)
+  // guidedHelperUsable already folds in macOS + signed-helper-installed +
+  // signature/team verification (see command.ts), so an installed-but-untrusted
+  // helper resumes to the manual path just like no helper at all.
+  const startStep = getIosResumeStep(initialProgress, guidedHelperUsable)
 
   // When there's saved progress AND the resume target isn't trivially 'welcome',
   // land on the resume-prompt fork so the user can see what's saved and decide
@@ -1504,7 +1516,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     setRetryStep(failedStep)
     // A key that won't validate on macOS-with-helper → offer the guided creation
     // as the lead recovery option (e.g. the user pasted a stale/wrong .p8).
-    setOfferGuidedKeyFallback(failedStep === 'verifying-key' && isMacOS() && resolveHelperBinary() !== null)
+    setOfferGuidedKeyFallback(failedStep === 'verifying-key' && guidedHelperUsable)
     setRetryCount(nextRetryCount)
     if (nextRetryCount > 1) {
       addLog(`⚠ Attempt ${nextRetryCount} failed. Recovery steps and a support bundle are available below.`, 'yellow')
@@ -3418,7 +3430,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               // to offer. Otherwise both answers funnel to the same manual
               // instructions, so skip straight there (the pre-fork behaviour on
               // every non-automatable host: non-macOS, or macOS without the binary).
-              if (isMacOS() && resolveHelperBinary() !== null)
+              if (guidedHelperUsable)
                 setStep('p8-source-select')
               else
                 setStep('api-key-instructions')
@@ -3431,13 +3443,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         {step === 'p8-source-select' && (
           <P8SourceSelectStep
             dense={dense}
-            canAutomate={isMacOS() && resolveHelperBinary() !== null}
+            canAutomate={guidedHelperUsable}
             onChange={async (value) => {
               if (value === 'have') {
                 await persistP8CreateMethod('manual')
                 setStep('api-key-instructions')
               }
-              else if (isMacOS() && resolveHelperBinary() !== null) {
+              else if (guidedHelperUsable) {
               // No key yet, and we can drive the guided helper — launch it right
               // away. Its own intro/consent screen explains the safety model and
               // offers manual creation, so there's no separate TUI question. We
@@ -4315,7 +4327,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         {step === 'api-key-instructions' && (
           <ApiKeyInstructionsStep
             canUseFilePicker={canUseFilePicker()}
-            canCreateGuided={isMacOS() && resolveHelperBinary() !== null}
+            canCreateGuided={guidedHelperUsable}
             dense={dense}
             onMethodChange={async (value) => {
               if (value === 'guided') {
