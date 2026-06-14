@@ -4659,9 +4659,15 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         {step === 'api-key-instructions' && (
           <ApiKeyInstructionsStep
             canUseFilePicker={canUseFilePicker()}
+            canCreateGuided={isMacOS() && resolveHelperBinary() !== null}
             dense={dense}
-            onMethodChange={(value) => {
-              if (value === 'picker') {
+            onMethodChange={async (value) => {
+              if (value === 'guided') {
+                // Switch from the manual .p8 path to the guided helper.
+                await persistP8CreateMethod('automated')
+                setStep('asc-key-generating')
+              }
+              else if (value === 'picker') {
                 setStep('p8-method-select')
               }
               else {

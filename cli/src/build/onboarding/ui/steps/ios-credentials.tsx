@@ -205,13 +205,17 @@ export const AscKeyCreatedStep: FC<AscKeyCreatedStepProps> = ({ keyId, onContinu
 // single <Newline/> spacer between the picker prompt and its Select.
 export interface ApiKeyInstructionsStepProps {
   canUseFilePicker: boolean
+  /** macOS + helper available: also offer "✨ Create one for me (guided)" as an
+   *  alternative to providing the .p8 by hand. Defaults to false. */
+  canCreateGuided?: boolean
   dense?: boolean
-  onMethodChange: (value: string) => void
+  onMethodChange: (value: string) => void | Promise<void>
   onPathSubmit: (value: string) => void | Promise<void>
 }
 
 export const ApiKeyInstructionsStep: FC<ApiKeyInstructionsStepProps> = ({
   canUseFilePicker,
+  canCreateGuided = false,
   dense = false,
   onMethodChange,
   onPathSubmit,
@@ -225,6 +229,9 @@ export const ApiKeyInstructionsStep: FC<ApiKeyInstructionsStepProps> = ({
             options={[
               { label: '📂  Open file picker', value: 'picker' },
               { label: '📝  Type the path', value: 'manual' },
+              // Escape hatch: let the user switch to the guided creation instead
+              // of hunting for / generating the .p8 by hand (macOS only).
+              ...(canCreateGuided ? [{ label: '✨  Create one for me instead (guided)', value: 'guided' }] : []),
             ]}
             onChange={onMethodChange}
           />
