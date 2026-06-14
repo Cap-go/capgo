@@ -31,7 +31,7 @@ import type { FC } from 'react'
 // single SpinnerLine and render identically in both forms, so they take no
 // `dense` prop.
 import { Alert, Select } from '@inkjs/ui'
-import { Box, Newline, Text } from 'ink'
+import { Box, Newline, Text, useInput } from 'ink'
 import React from 'react'
 import { Divider, ErrorLine, FilteredTextInput, SpinnerLine, SuccessLine } from '../components.js'
 
@@ -155,6 +155,41 @@ export const AscKeyGeneratingStep: FC = () => (
     <SpinnerLine text="Guiding you through App Store Connect — finish in the window that opened…" />
   </Box>
 )
+
+// ── asc-key-created ───────────────────────────────────────────────────────────
+// Large success screen shown once the guided helper has created + validated the
+// key. This is the gate that hands control back: the helper window stays open
+// until the user presses Enter here, which closes it and continues. Styled like
+// the platform picker (centered, fills the frame).
+export interface AscKeyCreatedStepProps {
+  keyId: string
+  onContinue: () => void
+}
+
+export const AscKeyCreatedStep: FC<AscKeyCreatedStepProps> = ({ keyId, onContinue }) => {
+  useInput((_input, key) => {
+    if (key.return)
+      onContinue()
+  })
+  return (
+    <Box flexDirection="column" alignItems="center" flexGrow={1} marginTop={1}>
+      <Box flexGrow={1} />
+      <Text>🎉</Text>
+      <Box marginTop={1}>
+        <Text bold color="green">App Store Connect API key created</Text>
+      </Box>
+      <Box marginTop={1} flexDirection="column" alignItems="center">
+        <Text>Your key was created and validated with Apple.</Text>
+        {keyId
+          ? <Text dimColor>{`Key ID: ${keyId}`}</Text>
+          : null}
+      </Box>
+      <Box flexGrow={1} />
+      <Text color="cyan">Press Enter to continue</Text>
+      <Text dimColor>This closes the helper window and finishes your setup here.</Text>
+    </Box>
+  )
+}
 
 // ── api-key-instructions ─────────────────────────────────────────────────────
 // `canUseFilePicker` decides which control to show: the picker/manual fork

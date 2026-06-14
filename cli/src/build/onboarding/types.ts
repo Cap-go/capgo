@@ -57,6 +57,7 @@ export type OnboardingStep
     // Do-you-have-a-.p8 fork: have one → existing import; none + macOS → create.
     | 'p8-source-select'
     | 'asc-key-generating'
+    | 'asc-key-created'
     | 'api-key-instructions'
     | 'p8-method-select'
     | 'input-p8-path'
@@ -287,6 +288,7 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   // advances between them.
   'p8-source-select': 6,
   'asc-key-generating': 22,
+  'asc-key-created': 24,
   'api-key-instructions': 5,
   'p8-method-select': 8,
   'input-p8-path': 10,
@@ -375,6 +377,7 @@ export function getPhaseLabel(step: OnboardingStep): string {
       return 'Step 4 of 4 · Export from Keychain'
     case 'p8-source-select':
     case 'asc-key-generating':
+    case 'asc-key-created':
     case 'api-key-instructions':
     case 'p8-method-select':
     case 'input-p8-path':

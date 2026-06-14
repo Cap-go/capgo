@@ -31,8 +31,9 @@ struct SuccessView: View {
                     .textSelection(.enabled)
             }
 
-            // The point of this screen: send the user back to the terminal.
-            Text("Switch back to the terminal — Capgo is finishing your setup there.")
+            // The point of this screen: send the user back to the terminal, where
+            // the success screen waits for Enter to continue (which closes this).
+            Text("Switch back to the terminal and press Enter to continue.")
                 .font(.headline)
                 .multilineTextAlignment(.center)
                 .padding(.top, 4)
@@ -48,7 +49,7 @@ struct SuccessView: View {
             .buttonStyle(.borderedProminent)
             .padding(.top, 4)
 
-            Text("This window closes on its own once setup continues.")
+            Text("This window closes automatically when you continue in the terminal.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
 

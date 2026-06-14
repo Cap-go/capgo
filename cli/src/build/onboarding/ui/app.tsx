@@ -84,6 +84,7 @@ import {
 } from './steps/ios-ci.js'
 import {
   ApiKeyInstructionsStep,
+  AscKeyCreatedStep,
   AscKeyGeneratingStep,
   BackingUpStep,
   CertLimitPromptStep,
@@ -1985,7 +1986,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           if (cancelled)
             return
           addLog('✔ App Store Connect API key created via guided helper')
-          setStep('verifying-key')
+          // Show the big CLI success screen and WAIT there. The helper window
+          // stays open (we hold its close handle); pressing Enter on the success
+          // screen closes it and continues to verifying-key. We deliberately do
+          // NOT auto-advance — the user controls the handoff.
+          setStep('asc-key-created')
         }
         catch (err) {
           if (!cancelled)
@@ -3646,6 +3651,20 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
 
         {/* Guided helper is running in its own window */}
         {step === 'asc-key-generating' && <AscKeyGeneratingStep />}
+
+        {/* Big success screen — the handoff gate. Enter closes the helper window
+            and continues to verifying-key. */}
+        {step === 'asc-key-created' && (
+          <AscKeyCreatedStep
+            keyId={keyId}
+            onContinue={() => {
+              // Close the still-open helper window, then continue.
+              ascHelperCloseRef.current?.()
+              ascHelperCloseRef.current = null
+              setStep('verifying-key')
+            }}
+          />
+        )}
 
         {/* Import: scanning */}
         {step === 'import-scanning' && <ImportScanningStep />}
