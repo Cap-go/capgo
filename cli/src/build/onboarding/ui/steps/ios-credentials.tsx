@@ -171,22 +171,34 @@ export const AscKeyCreatedStep: FC<AscKeyCreatedStepProps> = ({ keyId, onContinu
     if (key.return)
       onContinue()
   })
+  // A single centered "card" (bordered box) so the whole celebration reads as one
+  // intentional unit, vertically + horizontally centered in the frame — instead
+  // of the emoji floating mid-screen with the prompt stranded at the bottom.
   return (
-    <Box flexDirection="column" alignItems="center" flexGrow={1} marginTop={1}>
-      <Box flexGrow={1} />
-      <Text>🎉</Text>
-      <Box marginTop={1}>
-        <Text bold color="green">App Store Connect API key created</Text>
+    <Box flexGrow={1} alignItems="center" justifyContent="center">
+      <Box
+        flexDirection="column"
+        alignItems="center"
+        borderStyle="round"
+        borderColor="green"
+        paddingX={6}
+        paddingY={1}
+      >
+        <Text>🎉</Text>
+        <Box marginTop={1}>
+          <Text bold color="green">App Store Connect API key created</Text>
+        </Box>
+        <Box marginTop={1} flexDirection="column" alignItems="center">
+          <Text>Your key was created and validated with Apple.</Text>
+          {keyId
+            ? <Text dimColor>{`Key ID: ${keyId}`}</Text>
+            : null}
+        </Box>
+        <Box marginTop={1}>
+          <Text bold color="cyan">Press Enter to continue  →</Text>
+        </Box>
+        <Text dimColor>This closes the helper window and finishes your setup here.</Text>
       </Box>
-      <Box marginTop={1} flexDirection="column" alignItems="center">
-        <Text>Your key was created and validated with Apple.</Text>
-        {keyId
-          ? <Text dimColor>{`Key ID: ${keyId}`}</Text>
-          : null}
-      </Box>
-      <Box flexGrow={1} />
-      <Text color="cyan">Press Enter to continue</Text>
-      <Text dimColor>This closes the helper window and finishes your setup here.</Text>
     </Box>
   )
 }
