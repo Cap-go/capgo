@@ -410,6 +410,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   const [error, setError] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
   const [retryStep, setRetryStep] = useState<OnboardingStep | null>(null)
+  // True when the error screen should offer "✨ Create a new key for me (guided)"
+  // — set when an ASC key fails to validate on macOS where the helper is available
+  // (e.g. the user pasted a stale/wrong .p8). Lets them fall back to the guided
+  // flow instead of only retrying the manual entry.
+  const [offerGuidedKeyFallback, setOfferGuidedKeyFallback] = useState(false)
   // askOverwrite removed — credential check happens at start now
   const [duplicateProfiles, setDuplicateProfiles] = useState<Array<{ id: string, name: string, profileType: string }>>([])
   const [existingCerts, setExistingCerts] = useState<Array<{ id: string, name: string, serialNumber: string, expirationDate: string }>>([])
@@ -1294,6 +1299,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     setSupportBundlePath(bundlePath)
     setError(message)
     setRetryStep(failedStep)
+    // A key that won't validate on macOS-with-helper → offer the guided creation
+    // as the lead recovery option (e.g. the user pasted a stale/wrong .p8).
+    setOfferGuidedKeyFallback(failedStep === 'verifying-key' && isMacOS() && resolveHelperBinary() !== null)
     setRetryCount(nextRetryCount)
     if (nextRetryCount > 1) {
       addLog(`⚠ Attempt ${nextRetryCount} failed. Recovery steps and a support bundle are available below.`, 'yellow')
@@ -3262,7 +3270,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   const ERROR_FRAME_CHROME_ROWS = 15
   const errorViewerLines = error ? formatErrorViewerLines(error, recoveryAdvice, supportBundlePath) : []
   const errorTooTall = step === 'error' && !!error
-    && estimateErrorBodyRows(error, recoveryAdvice, supportBundlePath, terminalCols, !!retryStep, !!aiJobId) + ERROR_FRAME_CHROME_ROWS > terminalRows
+    && estimateErrorBodyRows(error, recoveryAdvice, supportBundlePath, terminalCols, !!retryStep, !!aiJobId, offerGuidedKeyFallback) + ERROR_FRAME_CHROME_ROWS > terminalRows
   const isErrorScroll = errorTooTall && !errorViewedFull
 
   // The streaming build output is a fullscreen takeover too — same reasoning as
@@ -5363,8 +5371,19 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             dense={dense}
             collapsed={errorTooTall && errorViewedFull}
             hasBuildLog={!!aiJobId}
+            showGuidedKey={offerGuidedKeyFallback}
             onChange={async (value) => {
-              if (value === 'support') {
+              if (value === 'guided-key') {
+                // Fall back to the guided macOS helper after a manual key failed
+                // to validate. Clear the error, remember the guided choice, and
+                // launch the helper (its intro/consent screen leads).
+                setError(null)
+                errorCategoryRef.current = undefined
+                setOfferGuidedKeyFallback(false)
+                await persistP8CreateMethod('automated')
+                setStep('asc-key-generating')
+              }
+              else if (value === 'support') {
                 await handleSupport()
               }
               else if (value === 'ai') {

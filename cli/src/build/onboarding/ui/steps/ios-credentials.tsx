@@ -135,13 +135,13 @@ export const P8SourceSelectStep: FC<P8SourceSelectStepProps> = ({ dense = false,
     {!dense && <Newline />}
     <Select
       options={[
-        { label: '✓  Yes — I have a .p8 file', value: 'have' },
         {
           label: canAutomate
             ? '✨  No — create one for me (guided, opens a window)'
             : '🆕  No — I will create one at App Store Connect',
           value: 'create',
         },
+        { label: '✓  Yes — I have a .p8 file', value: 'have' },
       ]}
       onChange={onChange}
     />
