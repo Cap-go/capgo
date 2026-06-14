@@ -52,7 +52,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <plist version="1.0"><dict>
   <key>CFBundleExecutable</key><string>$APP_NAME</string>
   <key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
-  <key>CFBundleName</key><string>Capgo App Store Connect Key Helper</string>
+  <key>CFBundleName</key><string>Capgo</string>
+  <key>CFBundleDisplayName</key><string>Capgo</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>$VERSION</string>

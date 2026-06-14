@@ -2,16 +2,66 @@ import type { Buffer } from 'node:buffer'
 import type { AscCredentials, AscEventLine, AscLogLine, AscProtocolLine, AscResultLine } from './protocol'
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { createRequire } from 'node:module'
+import { homedir, release } from 'node:os'
 import { dirname, join } from 'node:path'
 import process, { env, platform } from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { trackEvent } from '../../../analytics/track'
 import { appendInternalLog } from '../../../support/internal-log'
+import { ASC_KEY_HELPER_BUNDLE_IDENTIFIER, helperPackageName, verifyAppBundleSignature } from '../macos-signing'
 import { ascEventToTrack, AscProtocolParser } from './protocol'
 
 /** Name of the precompiled helper binary as bundled / cached on disk. */
 const HELPER_BINARY_NAME = 'capgo-asc-key-helper'
+
+/** Bundle name + inner executable of the signed, packaged ASC key helper .app. */
+const HELPER_APP_NAME = 'CapgoAscKeyHelper.app'
+const HELPER_APP_EXECUTABLE = 'CapgoAscKeyHelper'
+
+/**
+ * Darwin kernel major version for macOS 14 (Sonoma). The packaged ASC key helper
+ * is a SwiftUI/WKWebView app that requires macOS 14, so the guided path must not
+ * be offered on older systems (the app can't launch there).
+ */
+const MACOS_14_DARWIN_MAJOR = 23
+
+/**
+ * Build-time flag controlling whether CAPGO_ASC_KEY_HELPER_PATH is honored.
+ * Mirrors the keychain helper's gate in macos-signing.ts: cli/build.mjs `define`s
+ * it `false` for npm release builds so the minifier deletes the whole env-override
+ * branch (including the string literal); CI asserts the string is absent from
+ * dist/index.js. Dev builds (NODE_ENV=development) define it `true`. Running
+ * unbundled source (tests, `bun src/index.ts`) leaves it undefined → the gate is
+ * open there (matching the keychain helper's behavior, so the harness tests that
+ * set CAPGO_ASC_KEY_HELPER_PATH still work).
+ */
+declare const __CAPGO_ALLOW_HELPER_ENV_OVERRIDE__: boolean | undefined
+
+/** macOS 14+ check via the Darwin kernel major (macOS 14 = Darwin 23). */
+function isMacOS14OrLater(): boolean {
+  const major = Number.parseInt(release().split('.')[0] ?? '', 10)
+  return Number.isFinite(major) && major >= MACOS_14_DARWIN_MAJOR
+}
+
+/**
+ * Where a resolved helper binary came from. `package` is the signed npm bundle —
+ * the ONLY source we spawn-time signature-verify. `override`/`cache`/`local` are
+ * dev/CI paths (unsigned or ad-hoc) that skip verification.
+ */
+export type AscHelperSource = 'override' | 'package' | 'cache' | 'local'
+
+export interface ResolvedAscHelper {
+  /** Inner executable to spawn. */
+  binary: string
+  /** Where it came from (drives whether we verify the signature at spawn). */
+  source: AscHelperSource
+  /**
+   * The enclosing `.app` bundle path — present only for the signed `package`
+   * source, where it is the target of the designated-requirement check.
+   */
+  bundlePath?: string
+}
 
 /** Thrown when the helper is requested on a non-macOS host. */
 export class NotMacOSError extends Error {
@@ -53,24 +103,87 @@ function localBuildCandidates(): string[] {
 }
 
 /**
- * Locate the precompiled Swift helper binary, in priority order:
- *   1. `CAPGO_ASC_KEY_HELPER_PATH` — explicit override (dev / CI / tests).
- *   2. `~/.capgo/asc-key-helper/<binary>` — the cached download location.
- *   3. A local `swift build` of the vendored package (dev, running from src).
- * Returns `null` when none exists, so the caller can show install guidance.
+ * Locate the signed `CapgoAscKeyHelper.app` inside the arch-matching
+ * `@capgo/cli-helper-darwin-<arch>` optional dependency. Returns the inner
+ * executable + its enclosing bundle (the signature-check target), or `null`
+ * when the package isn't installed / doesn't contain the bundle (dev checkouts).
  */
-export function resolveHelperBinary(): string | null {
-  const override = env.CAPGO_ASC_KEY_HELPER_PATH
-  if (override && existsSync(override))
-    return override
+function packageHelper(): ResolvedAscHelper | null {
+  const packageName = helperPackageName(process.arch)
+  if (!packageName)
+    return null
+  let packageJsonPath: string
+  try {
+    packageJsonPath = createRequire(import.meta.url).resolve(`${packageName}/package.json`)
+  }
+  catch {
+    return null
+  }
+  const bundlePath = join(dirname(packageJsonPath), HELPER_APP_NAME)
+  const binary = join(bundlePath, 'Contents', 'MacOS', HELPER_APP_EXECUTABLE)
+  if (!existsSync(binary))
+    return null
+  return { binary, source: 'package', bundlePath }
+}
+
+/**
+ * Locate the precompiled Swift helper, in priority order:
+ *   1. `CAPGO_ASC_KEY_HELPER_PATH` — explicit override (dev / CI / tests). Only
+ *      honored in dev builds (DCE'd from release bundles, like the keychain
+ *      helper's CAPGO_KEYCHAIN_HELPER_PATH); skips signature verification.
+ *   2. The signed `CapgoAscKeyHelper.app` in the arch-matching
+ *      `@capgo/cli-helper-darwin-*` package — verified at spawn time.
+ *   3. `~/.capgo/asc-key-helper/<binary>` — the legacy cached download location.
+ *   4. A local `swift build` of the vendored package (dev, running from src).
+ * Returns `null` (caller shows install / manual guidance) when none exists OR on
+ * macOS < 14 — the packaged SwiftUI/WKWebView app requires macOS 14, so the
+ * guided path must never be offered where it can't launch.
+ *
+ * Synchronous on purpose: it gates the guided path in several call sites that
+ * cannot await. Signature verification of the package source is deferred to
+ * {@link runAscKeyHelper} (just before spawn), which can await.
+ */
+export function resolveAscHelper(): ResolvedAscHelper | null {
+  // Env override first, BEFORE the macOS-14 gate: a developer pointing at their
+  // own build is explicitly opting in regardless of OS. The outer condition folds
+  // to a literal `false` in npm release bundles (build.mjs defines
+  // __CAPGO_ALLOW_HELPER_ENV_OVERRIDE__ = false), so the minifier deletes this
+  // whole block — including the CAPGO_ASC_KEY_HELPER_PATH string literal. CI
+  // asserts that string is absent from dist/index.js. The gate is open when the
+  // flag is undefined (unbundled source: tests, `bun src/index.ts`) or true (dev).
+  if (typeof __CAPGO_ALLOW_HELPER_ENV_OVERRIDE__ === 'undefined' || __CAPGO_ALLOW_HELPER_ENV_OVERRIDE__) {
+    const override = env.CAPGO_ASC_KEY_HELPER_PATH
+    if (override && existsSync(override))
+      return { binary: override, source: 'override' }
+  }
+
+  // The packaged app + the local swift-build are macOS 14 apps; never offer them
+  // on older systems where the WKWebView host can't launch.
+  if (!isMacOS14OrLater())
+    return null
+
+  const pkg = packageHelper()
+  if (pkg)
+    return pkg
+
   const cached = join(homedir(), '.capgo', 'asc-key-helper', HELPER_BINARY_NAME)
   if (existsSync(cached))
-    return cached
+    return { binary: cached, source: 'cache' }
+
   for (const candidate of localBuildCandidates()) {
     if (existsSync(candidate))
-      return candidate
+      return { binary: candidate, source: 'local' }
   }
   return null
+}
+
+/**
+ * Path-only resolver kept for the many synchronous gating call sites. Returns
+ * the inner executable to spawn, or `null`. See {@link resolveAscHelper} for the
+ * source metadata that drives spawn-time signature verification.
+ */
+export function resolveHelperBinary(): string | null {
+  return resolveAscHelper()?.binary ?? null
 }
 
 /**
@@ -145,18 +258,49 @@ export async function runAscKeyHelper(options: RunAscKeyHelperOptions = {}): Pro
   if (!isMacOS())
     throw new NotMacOSError()
 
-  const binary = options.helperPathOverride ?? resolveHelperBinary()
-  if (!binary) {
+  // Test injection bypasses resolution + verification (the harness feeds an
+  // unsigned fake binary). Production resolves with source metadata so we can
+  // verify ONLY the signed package bundle before spawning it.
+  const resolved: ResolvedAscHelper | null = options.helperPathOverride !== undefined
+    ? { binary: options.helperPathOverride, source: 'override' }
+    : resolveAscHelper()
+  if (!resolved) {
     return {
       ok: false,
       errorCode: 'HELPER_NOT_FOUND',
-      message: 'Could not locate the App Store Connect key helper binary. '
-        + 'Set CAPGO_ASC_KEY_HELPER_PATH to a compiled helper binary, or update '
-        + '@capgo/cli so it downloads the helper automatically.',
+      message: 'Could not locate the App Store Connect key helper. '
+        + 'Update @capgo/cli (and reinstall its optional dependencies) so the '
+        + 'signed helper is installed, then try again.',
       runId: '',
       logCount: 0,
       // No child was spawned — nothing to close.
       close: () => {},
+    }
+  }
+  const binary = resolved.binary
+
+  // Verify the Developer-ID signature of the packaged bundle BEFORE spawning it,
+  // pinned to the ASC key helper's bundle id (same team + Developer ID as the
+  // keychain helper). The override/cache/local dev paths are ad-hoc builds that
+  // can't pass a Developer-ID requirement, so they skip the check by design.
+  if (resolved.source === 'package' && resolved.bundlePath) {
+    try {
+      await verifyAppBundleSignature(resolved.bundlePath, {
+        bundleIdentifier: ASC_KEY_HELPER_BUNDLE_IDENTIFIER,
+        label: 'App Store Connect key helper',
+        reinstallHint: `Reinstall ${helperPackageName(process.arch) ?? '@capgo/cli-helper-darwin-*'} and try again.`,
+      })
+    }
+    catch (err) {
+      return {
+        ok: false,
+        errorCode: 'HELPER_UNTRUSTED',
+        message: err instanceof Error ? err.message : String(err),
+        runId: '',
+        logCount: 0,
+        // Nothing was spawned — nothing to close.
+        close: () => {},
+      }
     }
   }
 

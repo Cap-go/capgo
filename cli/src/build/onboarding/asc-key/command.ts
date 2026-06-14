@@ -43,7 +43,7 @@ export async function createAppleKeyCommand(options: CreateAppleKeyOptions = {})
 
   if (!resolveHelperBinary()) {
     log.error('Could not find the App Store Connect key helper binary.')
-    log.info('Set CAPGO_ASC_KEY_HELPER_PATH to a compiled helper binary, or update @capgo/cli so it downloads the helper automatically.')
+    log.info('Update @capgo/cli (and reinstall its optional dependencies) so the signed helper is installed, then try again.')
     void trackEvent({ channel: ASC_KEY_CHANNEL, event: 'ASC Key: Helper Missing', icon: '🔑', apikey: options.apikey })
     await flushAnalytics()
     exit(1)

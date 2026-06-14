@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sign (Developer ID + hardened runtime), notarize, and STAPLE each Capgo.app
+# Sign (Developer ID + hardened runtime), notarize, and STAPLE each CapgoKeychainHelper.app
 # bundle, then verify against the same designated requirement the CLI enforces
 # at runtime — a cert/team mismatch fails the release, not the user.
 #
@@ -37,7 +37,7 @@ fi
 REQUIREMENT='=identifier "'"$HELPER_IDENTIFIER"'" and anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[subject.OU] = "'"$CAPGO_APPLE_TEAM_ID"'"'
 
 for arch in arm64 x64; do
-  app="dist/$arch/Capgo.app"
+  app="dist/$arch/CapgoKeychainHelper.app"
   echo "── Signing $app"
   codesign --force --options runtime --timestamp --identifier "$HELPER_IDENTIFIER" --sign "$DEVELOPER_ID_IDENTITY" "$app"
 

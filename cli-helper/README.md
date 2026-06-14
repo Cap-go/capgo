@@ -1,10 +1,10 @@
 # Capgo CLI keychain helper
 
 Small Swift program (Security framework only), shipped inside a hidden macOS
-app bundle, **`Capgo.app`**. The single binary uses subcommand dispatch — today
+app bundle, **`CapgoKeychainHelper.app`**. The single binary uses subcommand dispatch — today
 just `keychain-export`:
 
-    Capgo.app/Contents/MacOS/capgo keychain-export \
+    CapgoKeychainHelper.app/Contents/MacOS/capgo keychain-export \
       --sha1 <40-hex> --output <path.p12> --passphrase <wrap-pass> --invoked-by capgo-cli
 
 It exports one code-signing identity from the macOS Keychain as a
@@ -14,12 +14,12 @@ subcommands of the same signed binary.
 
 ## Why a bundle (not a bare binary)
 
-`Capgo.app` is an **`LSUIElement` agent** — no Dock icon, no Cmd-Tab entry, no
+`CapgoKeychainHelper.app` is an **`LSUIElement` agent** — no Dock icon, no Cmd-Tab entry, no
 window; it runs headlessly and exits. The bundle gives two things a bare binary
 can't:
 
 - **Branded Keychain prompts.** Because the export runs from inside a signed
-  `Capgo.app`, the macOS Keychain "Allow / Always Allow" prompts show the
+  `CapgoKeychainHelper.app`, the macOS Keychain "Allow / Always Allow" prompts show the
   **Capgo name + icon** instead of a generic process name. (This requires the
   bundle to be signed — see the dev note below.)
 - **Stable ACL identity.** `CFBundleIdentifier = app.capgo.cli.helper` keys the
@@ -27,19 +27,22 @@ can't:
   grant persists across CLI upgrades. The CLI also verifies the bundle's
   Developer ID + Capgo Team ID code signature before running it.
 
-The CLI execs `Capgo.app/Contents/MacOS/capgo` **directly** (never `open
-Capgo.app`), so there is no Dock flash and no Gatekeeper "downloaded from the
+The CLI execs `CapgoKeychainHelper.app/Contents/MacOS/capgo` **directly** (never `open
+CapgoKeychainHelper.app`), so there is no Dock flash and no Gatekeeper "downloaded from the
 internet" prompt (npm doesn't set the quarantine xattr; direct exec isn't a
 LaunchServices launch).
 
 Shipped as two precompiled, Developer-ID-signed, notarized, **stapled** npm
 packages:
 
-- `@capgo/cli-keychain-darwin-arm64` (Apple Silicon, macOS 11+)
-- `@capgo/cli-keychain-darwin-x64` (Intel, macOS 10.15+)
+- `@capgo/cli-helper-darwin-arm64` (Apple Silicon, macOS 11+)
+- `@capgo/cli-helper-darwin-x64` (Intel, macOS 10.15+)
 
 Both are `optionalDependencies` of `@capgo/cli`; npm installs at most one. Each
-ships its own `Capgo.app`. See SECURITY.md for the threat model.
+ships TWO signed bundles: `CapgoKeychainHelper.app` (the keychain helper
+described here, per-arch) and `CapgoAscKeyHelper.app` (the App Store Connect API
+key helper, a universal bundle — see `cli/native/asc-key-helper`). See
+SECURITY.md for the threat model.
 
 ## Dev bootstrap (working on the Swift source)
 
@@ -54,7 +57,7 @@ eliminated from npm release builds (asserted in CI). The env-override path skips
 both the signature check and the bundle, so point it at a binary you built and
 trust. Note: a bare dev binary is **not** signed, so the Keychain prompt shows
 the process name, not "Capgo" — to see the branded prompt, build + sign the
-bundle (`bash cli-helper/scripts/build.sh` then `codesign … Capgo.app`).
+bundle (`bash cli-helper/scripts/build.sh` then `codesign … CapgoKeychainHelper.app`).
 
 ## Release
 

@@ -27,5 +27,12 @@ if grep -q 'CAPGO_KEYCHAIN_HELPER_PATH' dist/index.js; then
   echo "      in the production bundle (cli/dist/index.js). It must be stripped." >&2
   exit 1
 fi
-echo "helper-dce OK: dev keychain-helper override absent from the production bundle"
-echo "helper-dce OK: dev keychain-helper override absent from the production bundle"
+
+# The ASC key helper gates CAPGO_ASC_KEY_HELPER_PATH behind the SAME build flag.
+# It must likewise be dead-code-eliminated from the production bundle.
+if grep -q 'CAPGO_ASC_KEY_HELPER_PATH' dist/index.js; then
+  echo "FAIL: the dev-only asc-key-helper override survived dead-code elimination" >&2
+  echo "      in the production bundle (cli/dist/index.js). It must be stripped." >&2
+  exit 1
+fi
+echo "helper-dce OK: dev keychain + asc-key helper overrides absent from the production bundle"
