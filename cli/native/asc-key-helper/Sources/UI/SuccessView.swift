@@ -32,7 +32,7 @@ struct SuccessView: View {
             }
 
             // The point of this screen: send the user back to the terminal.
-            Text("Return to the terminal — Capgo is finishing your setup there.")
+            Text("Switch back to the terminal — Capgo is finishing your setup there.")
                 .font(.headline)
                 .multilineTextAlignment(.center)
                 .padding(.top, 4)
@@ -40,7 +40,7 @@ struct SuccessView: View {
             Button {
                 model.finishToTerminal()
             } label: {
-                Text("Return to the terminal  →")
+                Text("Close this window  →")
                     .frame(minWidth: 220)
             }
             .keyboardShortcut(.defaultAction)
@@ -48,7 +48,7 @@ struct SuccessView: View {
             .buttonStyle(.borderedProminent)
             .padding(.top, 4)
 
-            Text("This window closes automatically.")
+            Text("This window closes on its own once setup continues.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
 

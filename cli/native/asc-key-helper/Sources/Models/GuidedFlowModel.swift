@@ -929,21 +929,18 @@ final class GuidedFlowModel {
                 StatsProtocol.event("validation_succeeded", [
                     "duration_ms": Int(Date().timeIntervalSince(validationStart) * 1000),
                 ])
-                // Deliver the credentials to the CLI now, but DON'T exit yet —
-                // show a success screen first so the user knows to return to the
-                // terminal. The CLI only advances once we exit, so auto-close
-                // after a short beat (the success button closes sooner) to
-                // guarantee the terminal never waits forever.
+                // Deliver the credentials to the CLI now, but DON'T exit — show a
+                // success screen instead. The CLI resolves on this result line
+                // (so the terminal advances) while this window stays open, then
+                // closes it (SIGTERM) once the key is verified. No auto-close
+                // timer: the window persists until the terminal moves on, or the
+                // user clicks "Return to the terminal".
                 CredentialsEmitter.deliver(KeyCredentials(
                     keyId: keyId.trimmingCharacters(in: .whitespacesAndNewlines),
                     issuerId: issuerId.trimmingCharacters(in: .whitespacesAndNewlines),
                     privateKey: privateKey
                 ))
                 flowSucceeded = true
-                Task {
-                    try? await Task.sleep(for: .seconds(6))
-                    finishToTerminal()
-                }
             } catch {
                 validationError = error.localizedDescription
                 StatsProtocol.event("validation_failed", [

@@ -538,6 +538,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // Lets the asc-key-generating effect's cleanup kill the guided helper child
   // when the user quits the TUI (otherwise the helper's pipes hang the CLI).
   const ascHelperAbortRef = useRef<AbortController | null>(null)
+  // Dismisses the guided helper window once the flow has advanced past the key
+  // step. The helper resolves on its result line (so the terminal proceeds) but
+  // keeps its window open on a success screen; we close it when verifying-key
+  // succeeds — otherwise it stays open (e.g. if verification fails).
+  const ascHelperCloseRef = useRef<(() => void) | null>(null)
 
   // Wrapper that keeps both state and ref in sync
   const setP8Content = useCallback((val: string) => {
@@ -1950,6 +1955,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             return
           }
           const { credentials } = outcome
+          // The helper window is still open on its success screen — hold its
+          // close handle and dismiss it once verifying-key confirms the key (or
+          // on unmount). Until then the user sees the "you're done, return to the
+          // terminal" screen while the terminal advances here.
+          ascHelperCloseRef.current = outcome.close
           // The helper also saved the .p8 to the fastlane/ASC conventional path.
           const helperP8Path = join(homedir(), '.appstoreconnect', 'private_keys', `AuthKey_${credentials.keyId}.p8`)
           // Apple never re-issues the key, so don't rely solely on the helper's
@@ -2251,6 +2261,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           }
           await saveProgress(appId, progress)
           addLog(`✔ API Key verified — Key: ${keyId}`)
+          // The key is confirmed and the flow is moving on — NOW dismiss the
+          // guided helper window (if it's still open on its success screen).
+          // No-op when the key didn't come from the helper (manual / resume).
+          ascHelperCloseRef.current?.()
+          ascHelperCloseRef.current = null
           setRetryCount(0)
           // Branch on flow mode:
           //  - import + pending recovery action → resume the action
@@ -3131,7 +3146,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // cleanup fires once, at real exit, and otherwise leaves a live run alone.
   useEffect(() => {
     return () => {
+      // Abort an in-flight run, AND close a helper window still open on its
+      // success screen (resolved on the result line but not yet dismissed by
+      // verifying-key). Either way the helper's pipes are released so the CLI
+      // can exit instead of hanging.
       ascHelperAbortRef.current?.abort()
+      ascHelperCloseRef.current?.()
     }
   }, [])
 

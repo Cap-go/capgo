@@ -73,6 +73,16 @@ export function resolveHelperBinary(): string | null {
   return null
 }
 
+/**
+ * Dismiss the helper window. The outcome resolves as soon as the helper delivers
+ * its terminal `result` line — BEFORE the process exits — so the helper can keep
+ * its window open (showing a success screen) while the CLI advances. The caller
+ * invokes `close()` once the flow has moved on (e.g. the key verified) to close
+ * the window; until then it stays open. Safe to call more than once / after the
+ * window already closed.
+ */
+export type CloseHelper = () => void
+
 export interface AscHelperSuccess {
   ok: true
   credentials: AscCredentials
@@ -81,6 +91,8 @@ export interface AscHelperSuccess {
   eventCount: number
   /** Number of diagnostic `log` lines routed to the internal support log. */
   logCount: number
+  /** Dismiss the still-open helper window. See {@link CloseHelper}. */
+  close: CloseHelper
 }
 
 export interface AscHelperFailure {
@@ -90,6 +102,8 @@ export interface AscHelperFailure {
   runId: string
   /** Number of diagnostic `log` lines routed to the internal support log. */
   logCount: number
+  /** Dismiss the helper window (no-op once it has exited). See {@link CloseHelper}. */
+  close: CloseHelper
 }
 
 export type AscHelperOutcome = AscHelperSuccess | AscHelperFailure
@@ -141,6 +155,8 @@ export async function runAscKeyHelper(options: RunAscKeyHelperOptions = {}): Pro
         + 'release that bundles it.',
       runId: '',
       logCount: 0,
+      // No child was spawned — nothing to close.
+      close: () => {},
     }
   }
 
@@ -155,8 +171,10 @@ export async function runAscKeyHelper(options: RunAscKeyHelperOptions = {}): Pro
     let eventCount = 0
     let logCount = 0
     let runId = ''
-    // Node fires 'error' then 'close' on a spawn failure; settle once so we don't
-    // resolve twice or write a second, contradictory breadcrumb to the support log.
+    // The outcome resolves once (on the result line, or on a spawn-failure /
+    // result-less exit). `settled` guards against resolving twice; the abort/exit
+    // teardown stays armed AFTER we settle, because we resolve while the helper
+    // window is still open (see below).
     let settled = false
 
     // Tear the helper down when the caller aborts (the onboarding TUI unmounts
@@ -172,12 +190,19 @@ export async function runAscKeyHelper(options: RunAscKeyHelperOptions = {}): Pro
         // Already exited — nothing to kill.
       }
     }
+    // Dismiss the helper window: SIGTERM (clean SwiftUI termination), escalating
+    // to SIGKILL if the GUI lingers. Used both by the caller's `close()` (once
+    // the flow advanced) and by abort-on-quit.
+    const closeHelper = (): void => {
+      killChild('SIGTERM')
+      if (!killTimer) {
+        killTimer = setTimeout(() => killChild('SIGKILL'), 2000)
+        killTimer.unref?.()
+      }
+    }
     const onAbort = (): void => {
       wasAborted = true
-      killChild('SIGTERM')
-      // Escalate if the GUI helper doesn't exit promptly on SIGTERM.
-      killTimer = setTimeout(() => killChild('SIGKILL'), 2000)
-      killTimer.unref?.()
+      closeHelper()
     }
     const onProcExit = (): void => killChild('SIGKILL')
     const detach = (): void => {
@@ -191,6 +216,34 @@ export async function runAscKeyHelper(options: RunAscKeyHelperOptions = {}): Pro
     else
       options.signal?.addEventListener('abort', onAbort, { once: true })
     process.once('exit', onProcExit)
+
+    // Breadcrumb the run's outcome into the support log so a bundle always shows
+    // the helper ran (and how it ended), even when it emitted no diagnostics.
+    const breadcrumb = (text: string): void => {
+      if (toInternalLog)
+        appendInternalLog(text)
+    }
+
+    // Resolve as soon as the helper delivers its terminal `result` line — WITHOUT
+    // waiting for the process to exit — so the CLI can advance while the helper
+    // window stays open (showing its success screen). The abort/exit teardown
+    // stays armed so the still-open child can never outlive or hang the CLI; the
+    // caller calls `outcome.close()` to dismiss the window once the flow moves on.
+    // We deliberately do NOT detach() here (that happens on the real `close`).
+    const settleSuccess = (credentials: AscCredentials): void => {
+      if (settled)
+        return
+      settled = true
+      breadcrumb(`[asc-helper] run ${runId || '(no id)'} succeeded — ${eventCount} events, ${logCount} logs`)
+      resolve({ ok: true, credentials, runId, eventCount, logCount, close: closeHelper })
+    }
+    const settleFailure = (errorCode: string, message: string): void => {
+      if (settled)
+        return
+      settled = true
+      breadcrumb(`[asc-helper] run ${runId || '(no id)'} ended without a key (${errorCode}): ${message} — ${eventCount} events, ${logCount} logs`)
+      resolve({ ok: false, errorCode, message, runId, logCount, close: closeHelper })
+    }
 
     const handleLine = (line: AscProtocolLine): void => {
       if (line.runId)
@@ -218,8 +271,14 @@ export async function runAscKeyHelper(options: RunAscKeyHelperOptions = {}): Pro
         }
       }
       else {
-        // Keep the last result line as authoritative.
+        // Terminal result line. Keep it as authoritative and settle now so the
+        // CLI proceeds while the helper window remains open. A malformed/partial
+        // result falls through to the close-handler fallback.
         result = line
+        if (line.ok && line.keyId && line.issuerId && line.privateKey)
+          settleSuccess({ keyId: line.keyId, issuerId: line.issuerId, privateKey: line.privateKey })
+        else if (!line.ok && line.errorCode)
+          settleFailure(line.errorCode, line.message ?? 'Helper reported a failure.')
       }
     }
 
@@ -236,42 +295,27 @@ export async function runAscKeyHelper(options: RunAscKeyHelperOptions = {}): Pro
       if (stderr.length > STDERR_CAP)
         stderr = stderr.slice(-STDERR_CAP)
     })
-    // Breadcrumb the run's outcome into the support log so a bundle always shows
-    // the helper ran (and how it ended), even when it emitted no diagnostics.
-    const breadcrumb = (text: string): void => {
-      if (toInternalLog)
-        appendInternalLog(text)
-    }
 
     child.once('error', (err) => {
+      detach()
       if (settled)
         return
       settled = true
-      detach()
       const message = err instanceof Error ? err.message : String(err)
       breadcrumb(`[asc-helper] run ${runId || '(no id)'} failed to spawn (SPAWN_FAILED): ${message}`)
-      resolve({ ok: false, errorCode: 'SPAWN_FAILED', message, runId, logCount })
+      resolve({ ok: false, errorCode: 'SPAWN_FAILED', message, runId, logCount, close: closeHelper })
     })
     child.once('close', (code, signal) => {
+      for (const line of parser.flush())
+        handleLine(line)
+      // Already settled on a result line — this is just the window finally
+      // closing (via outcome.close(), abort, or the user). Clean up and stop.
+      detach()
       if (settled)
         return
       settled = true
-      detach()
-      for (const line of parser.flush())
-        handleLine(line)
 
-      if (result?.ok && result.keyId && result.issuerId && result.privateKey) {
-        breadcrumb(`[asc-helper] run ${runId || '(no id)'} succeeded — ${eventCount} events, ${logCount} logs`)
-        resolve({
-          ok: true,
-          credentials: { keyId: result.keyId, issuerId: result.issuerId, privateKey: result.privateKey },
-          runId,
-          eventCount,
-          logCount,
-        })
-        return
-      }
-
+      // No result line arrived before exit — apply the crash/cancel fallback.
       // Distinguish OUR intentional teardown (abort on quit → SIGTERM/SIGKILL)
       // from the helper dying on its own. A `signal` we DIDN'T send means the
       // helper crashed (e.g. SIGSEGV/SIGABRT/SIGILL) — surface the signal name
@@ -287,7 +331,7 @@ export async function runAscKeyHelper(options: RunAscKeyHelperOptions = {}): Pro
               ? `Helper crashed (killed by ${signal}) without a result line.${stderr.trim() ? ` Stderr: ${stderr.trim()}` : ''}`
               : `Helper exited (code ${code}) without a result line.${stderr.trim() ? ` Stderr: ${stderr.trim()}` : ''}`)
       breadcrumb(`[asc-helper] run ${runId || '(no id)'} ended without a key (${errorCode}, code=${code}, signal=${signal ?? 'none'}): ${message} — ${eventCount} events, ${logCount} logs`)
-      resolve({ ok: false, errorCode, message, runId, logCount })
+      resolve({ ok: false, errorCode, message, runId, logCount, close: closeHelper })
     })
   })
 }
