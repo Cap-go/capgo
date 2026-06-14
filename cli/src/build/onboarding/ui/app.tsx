@@ -4836,11 +4836,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             <Box flexDirection="column" marginTop={1}>
               <DiffSummary title={title} subtitle={subtitle} lines={previewDiff} />
               <Box marginTop={1} flexDirection="column">
-                <Text bold>
-                  What should we do with
-                  {WORKFLOW_PATH}
-                  ?
-                </Text>
+                <Text bold>What should we do with {WORKFLOW_PATH}?</Text>
                 <Select
                   options={[
                     { label: writeLabel, value: 'write' },
