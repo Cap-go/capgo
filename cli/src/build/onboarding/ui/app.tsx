@@ -3250,8 +3250,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     || step === 'ci-secrets-failed'
     || step === 'confirm-ci-secret-overwrite'
   const showHeader = step !== 'requesting-build' && step !== 'view-workflow-diff' && !isAiResultScroll
-  const showProgress = step !== 'welcome' && step !== 'platform-select' && step !== 'adding-platform' && step !== 'no-platform' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build' && step !== 'ai-analysis-result' && step !== 'support-confirm' && step !== 'support-log-view' && step !== 'support-uploading' && !isAiResultScroll && !tallStep
-  const showLog = step !== 'requesting-build' && step !== 'build-complete' && !isAiStep && !tallStep
+  const showProgress = step !== 'welcome' && step !== 'platform-select' && step !== 'adding-platform' && step !== 'no-platform' && step !== 'error' && step !== 'build-complete' && step !== 'asc-key-created' && step !== 'requesting-build' && step !== 'ai-analysis-result' && step !== 'support-confirm' && step !== 'support-log-view' && step !== 'support-uploading' && !isAiResultScroll && !tallStep
+  const showLog = step !== 'requesting-build' && step !== 'build-complete' && step !== 'asc-key-created' && !isAiStep && !tallStep
   const recoveryAdvice = error
     ? getBuildOnboardingRecoveryAdvice(error, retryStep, pm.runner, appId)
     : null
@@ -3367,6 +3367,26 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           setStep('preview-workflow-file')
         }}
       />
+    )
+  }
+
+  // Full-screen celebration takeover: the guided helper created + validated the
+  // key. Render ONLY the header + the centered success screen — no progress bar,
+  // no completed-steps log, no chrome — so it reads as a clean "done!" moment
+  // (like the platform picker). Enter closes the helper and continues.
+  if (step === 'asc-key-created') {
+    return (
+      <Box flexDirection="column" minHeight={terminalRows} padding={1}>
+        {showHeader && <Header compact={headerCompact} />}
+        <AscKeyCreatedStep
+          keyId={keyId}
+          onContinue={() => {
+            ascHelperCloseRef.current?.()
+            ascHelperCloseRef.current = null
+            setStep('verifying-key')
+          }}
+        />
+      </Box>
     )
   }
 
@@ -3659,20 +3679,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
 
         {/* Guided helper is running in its own window */}
         {step === 'asc-key-generating' && <AscKeyGeneratingStep />}
-
-        {/* Big success screen — the handoff gate. Enter closes the helper window
-            and continues to verifying-key. */}
-        {step === 'asc-key-created' && (
-          <AscKeyCreatedStep
-            keyId={keyId}
-            onContinue={() => {
-              // Close the still-open helper window, then continue.
-              ascHelperCloseRef.current?.()
-              ascHelperCloseRef.current = null
-              setStep('verifying-key')
-            }}
-          />
-        )}
+        {/* asc-key-created renders as a full-screen takeover above (early return). */}
 
         {/* Import: scanning */}
         {step === 'import-scanning' && <ImportScanningStep />}

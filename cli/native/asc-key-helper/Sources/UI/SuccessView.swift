@@ -8,7 +8,9 @@ struct SuccessView: View {
     @Bindable var model: GuidedFlowModel
 
     var body: some View {
-        VStack(spacing: 22) {
+        ZStack {
+            Color(nsColor: .windowBackgroundColor)
+            VStack(spacing: 22) {
             Spacer()
 
             Image(systemName: "checkmark.circle.fill")
@@ -54,10 +56,13 @@ struct SuccessView: View {
                 .foregroundStyle(.tertiary)
 
             Spacer()
+            }
+            .frame(maxWidth: 520)
+            .padding(40)
+
+            // Confetti rains on top — non-interactive so the button still works.
+            ConfettiView()
         }
-        .frame(maxWidth: 520)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(40)
-        .background(Color(nsColor: .windowBackgroundColor))
     }
 }
