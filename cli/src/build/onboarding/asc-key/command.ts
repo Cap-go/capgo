@@ -7,6 +7,7 @@ import { flushAnalytics, trackEvent } from '../../../analytics/track'
 import { checkAlerts } from '../../../api/update'
 import { updateSavedCredentials } from '../../credentials'
 import { appendInternalLog, getInternalLogPath, startInternalLog } from '../../../support/internal-log'
+import { formatError } from '../../../utils'
 import { isMacOS, NotMacOSError, resolveHelperBinary, runAscKeyHelper } from './helper'
 import { ASC_KEY_CHANNEL } from './protocol'
 
@@ -42,7 +43,7 @@ export async function createAppleKeyCommand(options: CreateAppleKeyOptions = {})
 
   if (!resolveHelperBinary()) {
     log.error('Could not find the App Store Connect key helper binary.')
-    log.info('Set CAPGO_ASC_KEY_HELPER_PATH to a compiled helper, or upgrade to a CLI release that bundles it.')
+    log.info('Set CAPGO_ASC_KEY_HELPER_PATH to a compiled helper binary, or update @capgo/cli so it downloads the helper automatically.')
     void trackEvent({ channel: ASC_KEY_CHANNEL, event: 'ASC Key: Helper Missing', icon: '🔑', apikey: options.apikey })
     await flushAnalytics()
     exit(1)
@@ -118,7 +119,7 @@ export async function createAppleKeyCommand(options: CreateAppleKeyOptions = {})
     if (error instanceof NotMacOSError)
       log.error(error.message)
     else
-      log.error(`Unexpected error: ${error instanceof Error ? error.message : String(error)}`)
+      log.error(`Unexpected error: ${formatError(error)}`)
     await flushAnalytics()
     exit(1)
   }

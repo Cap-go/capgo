@@ -151,8 +151,8 @@ export async function runAscKeyHelper(options: RunAscKeyHelperOptions = {}): Pro
       ok: false,
       errorCode: 'HELPER_NOT_FOUND',
       message: 'Could not locate the App Store Connect key helper binary. '
-        + 'Set CAPGO_ASC_KEY_HELPER_PATH to a compiled helper, or use a CLI '
-        + 'release that bundles it.',
+        + 'Set CAPGO_ASC_KEY_HELPER_PATH to a compiled helper binary, or update '
+        + '@capgo/cli so it downloads the helper automatically.',
       runId: '',
       logCount: 0,
       // No child was spawned — nothing to close.

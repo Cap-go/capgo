@@ -201,7 +201,11 @@ function coerceTagValue(value: unknown): string | number | boolean | undefined {
     return undefined
   // Flatten small structured values so they're still queryable.
   try {
-    return JSON.stringify(value)
+    const json = JSON.stringify(value)
+    // Defense-in-depth: the top-level key filter (buildEventTags) can't see a
+    // secret nested INSIDE a structured prop. If the serialized value mentions a
+    // secret-like key/token, drop the whole value rather than forward it.
+    return SECRET_KEY_PATTERN.test(json) ? undefined : json
   }
   catch {
     return undefined

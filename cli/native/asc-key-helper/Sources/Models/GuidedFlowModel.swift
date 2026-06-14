@@ -92,7 +92,10 @@ final class GuidedFlowModel {
     private var expectedTeamId: String?
     private var awaitingSwitchApply = false
     private var currentURLValue: URL?
-    private var pollTask: Task<Void, Never>?
+    // nonisolated(unsafe) so `deinit` (a nonisolated context) can cancel it.
+    // Safe: it's only mutated on the MainActor, and deinit runs after the last
+    // reference is gone, so there's no concurrent access to race with.
+    nonisolated(unsafe) private var pollTask: Task<Void, Never>?
     private var didAttemptValidation = false
     private var didAutoNavigate = false
     private var isResolving = false
@@ -441,6 +444,12 @@ final class GuidedFlowModel {
         isResolving = true
         await resolve(url: url)
         isResolving = false
+    }
+
+    /// Stop the background poll loop if the model is ever torn down (e.g. the
+    /// window closes without delivering a key) so it can't outlive the model.
+    deinit {
+        pollTask?.cancel()
     }
 
     func privateKeyCaptured(_ pem: String, replace: Bool = false) {

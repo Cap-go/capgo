@@ -49,8 +49,10 @@ swift build \
 
 BUILT="$SRC_DIR/.build/apple/Products/Release/$PRODUCT_NAME"
 if [[ ! -f "$BUILT" ]]; then
-  # Fall back to the single-arch path if a universal build wasn't produced.
-  BUILT="$(find "$SRC_DIR/.build" -maxdepth 3 -name "$PRODUCT_NAME" -type f -perm -111 | head -1)"
+  # Fall back to a single-arch RELEASE build if a universal one wasn't produced.
+  # Restrict to */release/* so a stale debug artifact from a prior build can
+  # never be picked up and shipped.
+  BUILT="$(find "$SRC_DIR/.build" -maxdepth 3 -path "*/release/*" -name "$PRODUCT_NAME" -type f -perm -111 | head -1)"
 fi
 if [[ -z "${BUILT:-}" || ! -f "$BUILT" ]]; then
   echo "error: could not find built product '$PRODUCT_NAME' under $SRC_DIR/.build" >&2

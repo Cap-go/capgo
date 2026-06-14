@@ -1,6 +1,6 @@
 # App Store Connect key helper — stdout stats protocol
 
-The `build credentials apple-key` command launches a native macOS helper (a
+The `npx @capgo/cli@latest build credentials apple-key` command launches a native macOS helper (a
 precompiled Swift app) that walks the user through creating an App Store Connect
 **team** API key in an embedded browser, then captures the resulting credentials.
 
