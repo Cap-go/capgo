@@ -207,7 +207,7 @@
     },
     "cli": {
       "name": "@capgo/cli",
-      "version": "8.3.0",
+      "version": "8.4.1",
       "bin": {
         "capgo": "dist/index.js",
       },
@@ -263,8 +263,8 @@
         "zod": "^4.4.3",
       },
       "optionalDependencies": {
-        "@capgo/cli-keychain-darwin-arm64": "^1.0.0",
-        "@capgo/cli-keychain-darwin-x64": "^1.0.0",
+        "@capgo/cli-helper-darwin-arm64": "^1.1.0",
+        "@capgo/cli-helper-darwin-x64": "^1.1.0",
       },
     },
   },
@@ -616,9 +616,9 @@
 
     "@capgo/cli": ["@capgo/cli@workspace:cli"],
 
-    "@capgo/cli-keychain-darwin-arm64": ["@capgo/cli-keychain-darwin-arm64@1.0.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-1Qh506oVrMNwErFLHXUvdQMadoxptA+XjNozWz9+2Z9iEi7omgzSWzAN0nDUI+uLNzhAHqxsVkpc/oD9q6NALA=="],
+    "@capgo/cli-helper-darwin-arm64": ["@capgo/cli-helper-darwin-arm64@1.1.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-3KxpDm4CQ1Z3VUlgZ2NwRdG73PE/A5C2ujhYlP+Q+nh1NLaVBeYwc+F2asyhr4Vb4oPqvJYIaqhCx9SootZYoQ=="],
 
-    "@capgo/cli-keychain-darwin-x64": ["@capgo/cli-keychain-darwin-x64@1.0.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-BxMx8QI1IsRVVpSqmCYxe4EShUpdBHgmxYF0AdWVn56lroRVkC7QZ7CXOEM2+YrnYFA4SUVdkBtRuHRhMbmauA=="],
+    "@capgo/cli-helper-darwin-x64": ["@capgo/cli-helper-darwin-x64@1.1.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-pL8Vvp+La2DNpL6nIEv5OpsvLWFJycZ4n7wjJ/WJBB7gOWUwtR8j/YVMjUDyz5Z7GiX5j4q8kApuDU/ntqQXsg=="],
 
     "@capgo/find-package-manager": ["@capgo/find-package-manager@0.0.18", "", {}, "sha512-YTajLnUJYYOqHWH59l6Umlqq1PmdUReWY5HLgfHfVHJk/xyWzfQ8Kzo5dLd1vxqNWZV8zvGHLk9mCxMAxt/q1A=="],
 

@@ -87,6 +87,12 @@ export interface OnboardingShellProps {
   iosBundleIdInitial: string
   iosDir: string
   androidDir: string
+  /**
+   * Whether guided ASC-key creation may be offered (macOS + signed helper
+   * installed + signature/team verified — see the probe in command.ts).
+   * Threaded into the iOS OnboardingApp; the Android app ignores it.
+   */
+  guidedHelperUsable: boolean
   apikey?: string
   supaHost?: string
   /** Pre-resolved platform (--platform flag or the single existing native dir); skips the picker. */
@@ -106,7 +112,7 @@ export interface OnboardingShellProps {
   onResult?: (result: OnboardingResult) => void
 }
 
-const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, iosDir, androidDir, apikey, supaHost, initialPlatform, updateInfo, onResolvePlatform, onResult }) => {
+const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, iosDir, androidDir, guidedHelperUsable, apikey, supaHost, initialPlatform, updateInfo, onResolvePlatform, onResult }) => {
   const { exit } = useApp()
   const { cols, rows } = useTerminalSize()
   const [ready, setReady] = useState<ReadyApp | null>(null)
@@ -165,7 +171,7 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
   // exiting the wizard. The app owns the size decision so a shrink→regrow keeps
   // the user exactly where they were.
   if (ready?.kind === 'ios')
-    return <OnboardingApp appId={appId} iosBundleIdInitial={iosBundleIdInitial} initialProgress={ready.progress} iosDir={iosDir} apikey={apikey} supaHost={supaHost} onResult={onResult} />
+    return <OnboardingApp appId={appId} iosBundleIdInitial={iosBundleIdInitial} initialProgress={ready.progress} iosDir={iosDir} guidedHelperUsable={guidedHelperUsable} apikey={apikey} supaHost={supaHost} onResult={onResult} />
   if (ready?.kind === 'android')
     return <AndroidOnboardingApp appId={appId} initialProgress={ready.progress} androidDir={androidDir} apikey={apikey} supaHost={supaHost} onResult={onResult} />
 

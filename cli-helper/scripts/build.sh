@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build Capgo.app bundles (one per macOS arch) wrapping the keychain helper.
+# Build CapgoKeychainHelper.app bundles (one per macOS arch) wrapping the keychain helper.
 #
 # Hidden agent app (LSUIElement = no Dock icon, not in Cmd-Tab) branded "Capgo",
 # so the macOS Keychain prompts shown during export display the Capgo name +
@@ -23,7 +23,7 @@ mkdir -p dist
 
 build_arch() {
   local arch="$1" target="$2" minos="$3"
-  local app="dist/$arch/Capgo.app"
+  local app="dist/$arch/CapgoKeychainHelper.app"
   mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
   swiftc src/helper.swift -framework Security -O -target "$target" \
     -o "$app/Contents/MacOS/capgo"

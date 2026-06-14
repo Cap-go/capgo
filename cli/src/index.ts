@@ -18,6 +18,8 @@ import { lastOutputCommand } from './build/last-output-command'
 import { checkBuildNeeded } from './build/needed'
 import type { OnboardingBuilderOptions } from './build/onboarding/command'
 import { onboardingBuilderCommand } from './build/onboarding/command'
+import type { CreateAppleKeyOptions } from './build/onboarding/asc-key/command'
+import { createAppleKeyCommand } from './build/onboarding/asc-key/command'
 import { requestBuildCommand } from './build/request'
 import { cleanupBundle } from './bundle/cleanup'
 import { checkCompatibility } from './bundle/compatibility'
@@ -910,6 +912,24 @@ const buildCredentials = build
 📚 DOCUMENTATION:
    iOS setup: https://capgo.app/docs/cli/cloud-build/ios/
    Android setup: https://capgo.app/docs/cli/cloud-build/android/`)
+
+buildCredentials
+  .command('apple-key')
+  .alias('asc-key')
+  .description(`Create an App Store Connect team API key with a guided macOS helper (macOS only).
+
+Opens a native window that walks you through Apple's App Store Connect UI in an
+embedded browser, auto-captures the Issuer ID + Key ID, intercepts the one-time
+.p8, validates it against Apple, and saves it to ~/.appstoreconnect/private_keys.
+Progress statistics are forwarded to Capgo analytics (disable with CAPGO_DISABLE_TELEMETRY).
+
+Example:
+  npx @capgo/cli build credentials apple-key --appId com.example.app`)
+  .action((options: CreateAppleKeyOptions) => createAppleKeyCommand(options))
+  .option('-a, --apikey <apikey>', optionDescriptions.apikey)
+  .option('--appId <appId>', 'Save the captured key into this app iOS build credentials')
+  .option('--local', 'Save into the per-project .capgo-credentials.json instead of the global file')
+  .option('--json', 'Print the captured Key ID / Issuer ID / .p8 path as JSON')
 
 buildCredentials
   .command('save')

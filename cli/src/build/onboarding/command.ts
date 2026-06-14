@@ -5,8 +5,11 @@ import { log } from '@clack/prompts'
 // src/build/onboarding/command.ts
 import { render } from 'ink'
 import React from 'react'
+import { trackEvent } from '../../analytics/track.js'
 import { getAppId, getConfig } from '../../utils.js'
 import { appendInternalLog, startInternalLog } from '../../support/internal-log.js'
+import { isMacOS, probeGuidedHelper } from './asc-key/helper.js'
+import { ASC_KEY_CHANNEL } from './asc-key/protocol.js'
 import { getPlatformDirFromCapacitorConfig } from '../platform-paths.js'
 import OnboardingShell from './ui/shell.js'
 import { checkForCliUpdate, manualUpdateHint, runUpdateAndReexec } from './self-update.js'
@@ -146,6 +149,34 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
   // CAPGO_SKIP_UPDATE_PROMPT), so this never stalls startup.
   const updateInfo = options.enableSelfUpdate ? await checkForCliUpdate() : null
 
+  // Decide BEFORE rendering whether guided App Store Connect key creation can
+  // actually run here: macOS + the signed helper installed + its Developer-ID
+  // signature/team verified. The iOS flow uses this to gate the "create one for
+  // me" offer, so a user is NEVER asked "do you have a .p8?" / offered guided
+  // creation only to be rejected when the helper can't launch (not installed,
+  // wrong signature, wrong team). When it can't run the flow goes straight to
+  // the manual .p8 instructions — exactly as it did before the helper existed,
+  // and as it always does on Linux. The probe spawns codesign, so do it once,
+  // up front (off-macOS it returns immediately without spawning anything).
+  const guidedProbe = await probeGuidedHelper()
+  const guidedHelperUsable = guidedProbe.usable
+  if (!guidedProbe.usable && isMacOS()) {
+    appendInternalLog(`build init: guided ASC key creation unavailable (${guidedProbe.reason})${guidedProbe.detail ? `: ${guidedProbe.detail}` : ''}`)
+    // Only the integrity failure is worth a telemetry event: the helper IS
+    // installed on this Mac but its signature/team didn't verify (tampered,
+    // wrong build, or wrong team) — a security-relevant signal worth surfacing.
+    // not-installed / unsupported-os are expected, benign config states.
+    if (guidedProbe.reason === 'untrusted') {
+      void trackEvent({
+        channel: ASC_KEY_CHANNEL,
+        event: 'ASC Key: Helper Untrusted',
+        icon: '🔑',
+        apikey: options.apikey,
+        tags: { reason: guidedProbe.reason },
+      })
+    }
+  }
+
   // The shell resolves the platform (immediately if initialPlatform is set,
   // else once the user picks). Capture it so the breadcrumb below — printed
   // after Ink restores the primary buffer — names the right platform.
@@ -168,6 +199,9 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
       apikey: options.apikey,
       supaHost: options.supaHost,
       initialPlatform,
+      // Whether the iOS flow may offer guided ASC-key creation (see the probe
+      // above). The shell threads it into the iOS OnboardingApp only.
+      guidedHelperUsable,
       updateInfo: updateInfo ?? undefined,
       onResolvePlatform: (platform: Platform) => {
         resolvedPlatform = platform

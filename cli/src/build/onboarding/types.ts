@@ -56,6 +56,10 @@ export type OnboardingStep
     | 'import-export-warning'
     | 'import-exporting'
     // ── Existing create-new sub-flow (and ASC API key step reused by import for app_store) ──
+    // Do-you-have-a-.p8 fork: have one → existing import; none + macOS → create.
+    | 'p8-source-select'
+    | 'asc-key-generating'
+    | 'asc-key-created'
     | 'api-key-instructions'
     | 'p8-method-select'
     | 'input-p8-path'
@@ -228,6 +232,22 @@ export interface OnboardingProgress extends TailProgress {
    */
   setupMethod?: 'create-new' | 'import-existing'
   /**
+   * Records how the user chose to obtain the .p8 in the create-new flow's
+   * source fork (`p8-source-select`):
+   *   - `automated` — picked "No — create one for me": the guided macOS helper
+   *                   creates + captures the key. (Its in-window intro screen
+   *                   still lets the user switch to manual, which re-persists
+   *                   `manual` from the asc-key-generating effect.)
+   *   - `manual`    — the user has a .p8, or chose to create one by hand at App
+   *                   Store Connect, and enters it via `api-key-instructions`.
+   *
+   * Persisted so a quit-and-resume lands the user back where they chose to be:
+   * an `automated` user resumes on the helper (`asc-key-generating`), NOT the
+   * manual .p8 picker. Absent on legacy files and on the import flow.
+   * Only meaningful when `setupMethod === 'create-new'`.
+   */
+  p8CreateMethod?: 'automated' | 'manual'
+  /**
    * Records the distribution mode picked at `import-distribution-mode`.
    *
    * Persisted (not derived from .p8 presence) because ad_hoc users can
@@ -364,7 +384,12 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'import-create-profile-only': 60,
   'import-export-warning': 70,
   'import-exporting': 75,
-  // Create-new sub-flow
+  // Create-new sub-flow — must sit above setup-method-select (5) so the bar
+  // doesn't move backwards entering the fork, and the two steps differ so it
+  // advances between them.
+  'p8-source-select': 6,
+  'asc-key-generating': 22,
+  'asc-key-created': 24,
   'api-key-instructions': 5,
   'p8-method-select': 8,
   'input-p8-path': 10,
@@ -451,6 +476,9 @@ export function getPhaseLabel(step: OnboardingStep): string {
     case 'import-export-warning':
     case 'import-exporting':
       return 'Step 4 of 4 · Export from Keychain'
+    case 'p8-source-select':
+    case 'asc-key-generating':
+    case 'asc-key-created':
     case 'api-key-instructions':
     case 'p8-method-select':
     case 'input-p8-path':

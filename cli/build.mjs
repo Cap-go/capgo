@@ -1,11 +1,11 @@
 import { copyFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { env, exit } from 'node:process'
 
-// Precompiled keychain helper packages resolve from node_modules at runtime
-// (binary-only optional deps) — never bundle them.
+// Precompiled helper packages (keychain + ASC key helper .apps) resolve from
+// node_modules at runtime (binary-only optional deps) — never bundle them.
 const HELPER_PACKAGES = [
-  '@capgo/cli-keychain-darwin-arm64',
-  '@capgo/cli-keychain-darwin-x64',
+  '@capgo/cli-helper-darwin-arm64',
+  '@capgo/cli-helper-darwin-x64',
 ]
 
 // Shared plugin definitions - Bun's plugin API is compatible with esbuild's

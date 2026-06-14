@@ -127,6 +127,31 @@ jobs:
       - name: Build local CLI dist
         run: bun run cli:build
 
+      - name: Strip the auto-installed helper so the suite controls availability
+        # @capgo/cli-helper-darwin-* now auto-installs via optionalDependencies
+        # (1.1.0 is published), so the production dist would resolve the REAL
+        # signed app and verify it — making guided ASC-key creation available
+        # everywhere. That breaks the suite's WORLD-CONTROLLED availability: the
+        # "guided helper unavailable" journey + the fresh-ios create journeys
+        # assume no helper, and the "available" journey spoofs a fake at the
+        # resolver cache path (which the real package shadows, and the real Swift
+        # GUI can't be pty-driven). Remove the installed helper so resolution
+        # falls through to the per-world cache spoof (available) or nothing
+        # (unavailable) — the baseline that existed before the helper became
+        # installable. The real package's resolution + Developer-ID verification
+        # is covered by test:signing (same package/signing) and the test:asc-key
+        # probe cases (injected runners + the package-bundle seam), which are
+        # unaffected by its absence here.
+        run: |
+          # Remove both bun layouts: the package dir / top-level symlink
+          # (node_modules/@capgo/cli-helper-darwin-*) and the isolated store
+          # (node_modules/.bun/@capgo+cli-helper-darwin-*). No -type filter so the
+          # symlinks are caught too.
+          find . -path '*/node_modules/@capgo/cli-helper-darwin-*' -prune -exec rm -rf {} + 2>/dev/null || true
+          find . -path '*/node_modules/.bun/@capgo+cli-helper-darwin-*' -prune -exec rm -rf {} + 2>/dev/null || true
+          # Fail fast if the dist can still resolve the helper (strip missed it).
+          node -e "const {createRequire}=require('module');const r=createRequire(process.cwd()+'/cli/dist/index.js');try{r.resolve('@capgo/cli-helper-darwin-arm64/package.json');console.error('::error::helper still resolvable after strip — the suite would not control availability');process.exit(1)}catch(e){console.log('OK: guided helper not resolvable ('+e.code+') — worlds now control availability')}"
+
       - name: Install private suite dependencies
         working-directory: ${{ env.PRIVATE_SUITE_DIR }}
         run: bun install --frozen-lockfile
@@ -142,6 +167,12 @@ jobs:
         env:
           CAPGO_CLI_ROOT: ${{ github.workspace }}/cli
         run: bun run test:signing
+
+      - name: Run ASC key helper journeys (CLI side)
+        working-directory: ${{ env.PRIVATE_SUITE_DIR }}
+        env:
+          CAPGO_CLI_ROOT: ${{ github.workspace }}/cli
+        run: bun run test:asc-key
 
       - name: Run private TUI E2E suite
         working-directory: ${{ env.PRIVATE_SUITE_DIR }}
