@@ -377,15 +377,43 @@ enum FlowScripts {
                 n.style.removeProperty('border-radius');
                 n.style.removeProperty('box-shadow');
             };
+            // Find the nearest actually-scrollable ancestor — App Store Connect
+            // scrolls inside a container, not the window — else fall back to the
+            // page scroller.
+            const scrollerFor = (node) => {
+                let p = node.parentElement;
+                while (p) {
+                    const s = getComputedStyle(p);
+                    if (/(auto|scroll)/.test(s.overflowY + ' ' + s.overflow) && p.scrollHeight - p.clientHeight > 4) return p;
+                    p = p.parentElement;
+                }
+                return document.scrollingElement || document.documentElement;
+            };
+            // Bring the "+" to ~22% from the top of the viewport — comfortably in
+            // view with the keys table below it. We scroll the STABLE button (the
+            // visible "+" SVG can overflow a tiny box, which throws off centering
+            // and overshoots), and only when it's meaningfully out of place — never
+            // past it. `block:'center'` put a high-on-the-page "+" too far down.
+            const scrollToTarget = (node) => {
+                const target = node.closest('button') || node;
+                const r = target.getBoundingClientRect();
+                const vh = window.innerHeight || document.documentElement.clientHeight;
+                const delta = r.top - vh * 0.22;
+                if (Math.abs(delta) < 40) return; // already well placed — don't nudge
+                scrollerFor(target).scrollBy({ top: delta, behavior: 'smooth' });
+            };
             const tick = () => {
                 let next = null;
                 try { next = find(); } catch (e) {}
-                if (next !== el) { if (el) clear(el); el = next; scrolled = false; }
+                // Do NOT reset `scrolled` when the node identity changes (React
+                // re-renders the "+" into a fresh node): re-scrolling on every
+                // re-render stacked smooth-scroll animations and overshot.
+                if (next !== el) { if (el) clear(el); el = next; }
                 if (el) {
                     paint(el);
-                    if (\(scroll ? "true" : "false") && !scrolled && el.scrollIntoView) {
-                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        scrolled = true;
+                    if (\(scroll ? "true" : "false") && !scrolled) {
+                        scrolled = true; // one-shot per highlight session
+                        try { scrollToTarget(el); } catch (e) {}
                     }
                 }
             };
