@@ -1277,4 +1277,137 @@ describe('private role bindings helpers', () => {
       .rejects
       .toThrow('CANNOT_DEMOTE_LAST_SUPER_ADMIN_BINDING')
   })
+
+  it('blocks deleting the last active org_super_admin when only an expired invite binding remains', async () => {
+    const id = randomUUID()
+    const orgId = randomUUID()
+
+    await query(`
+      INSERT INTO public.orgs (id, name, management_email, created_by)
+      VALUES ($1::uuid, $2, $3, $4::uuid)
+    `, [orgId, `Last Super Admin Expired Delete Org ${id}`, `last-super-admin-expired-delete-${id}@capgo.app`, USER_ID])
+
+    const roleResult = await query(`
+      SELECT id, name
+      FROM public.roles
+      WHERE name IN ('org_super_admin', 'org_member')
+        AND scope_type = public.rbac_scope_org()
+    `)
+    const roleIds = new Map(roleResult.rows.map(row => [row.name, row.id]))
+    const superAdminRoleId = roleIds.get('org_super_admin')
+    expect(superAdminRoleId).toBeTruthy()
+
+    await query(`
+      INSERT INTO public.role_bindings (
+        principal_type,
+        principal_id,
+        role_id,
+        scope_type,
+        org_id,
+        granted_by,
+        granted_at,
+        expires_at,
+        reason,
+        is_direct
+      ) VALUES (
+        public.rbac_principal_user(),
+        $1::uuid,
+        $2::uuid,
+        public.rbac_scope_org(),
+        $3::uuid,
+        $4::uuid,
+        now(),
+        now() - INTERVAL '1 second',
+        'expired invite placeholder regression',
+        true
+      )
+    `, [USER_ID_2, superAdminRoleId, orgId, USER_ID])
+
+    const activeBindingResult = await query(`
+      SELECT rb.id
+      FROM public.role_bindings rb
+      WHERE rb.org_id = $1::uuid
+        AND rb.principal_type = public.rbac_principal_user()
+        AND rb.principal_id = $2::uuid
+        AND rb.scope_type = public.rbac_scope_org()
+        AND rb.role_id = $3::uuid
+      LIMIT 1
+    `, [orgId, USER_ID, superAdminRoleId])
+    expect(activeBindingResult.rowCount).toBe(1)
+
+    await expect(query(`
+      DELETE FROM public.role_bindings
+      WHERE id = $1::uuid
+    `, [activeBindingResult.rows[0].id]))
+      .rejects
+      .toThrow('CANNOT_DELETE_LAST_SUPER_ADMIN_BINDING')
+  })
+
+  it('blocks demoting the last active org_super_admin when only an expired invite binding remains', async () => {
+    const id = randomUUID()
+    const orgId = randomUUID()
+
+    await query(`
+      INSERT INTO public.orgs (id, name, management_email, created_by)
+      VALUES ($1::uuid, $2, $3, $4::uuid)
+    `, [orgId, `Last Super Admin Expired Demotion Org ${id}`, `last-super-admin-expired-demotion-${id}@capgo.app`, USER_ID])
+
+    const roleResult = await query(`
+      SELECT id, name
+      FROM public.roles
+      WHERE name IN ('org_super_admin', 'org_member')
+        AND scope_type = public.rbac_scope_org()
+    `)
+    const roleIds = new Map(roleResult.rows.map(row => [row.name, row.id]))
+    const superAdminRoleId = roleIds.get('org_super_admin')
+    const memberRoleId = roleIds.get('org_member')
+    expect(superAdminRoleId).toBeTruthy()
+    expect(memberRoleId).toBeTruthy()
+
+    await query(`
+      INSERT INTO public.role_bindings (
+        principal_type,
+        principal_id,
+        role_id,
+        scope_type,
+        org_id,
+        granted_by,
+        granted_at,
+        expires_at,
+        reason,
+        is_direct
+      ) VALUES (
+        public.rbac_principal_user(),
+        $1::uuid,
+        $2::uuid,
+        public.rbac_scope_org(),
+        $3::uuid,
+        $4::uuid,
+        now(),
+        now() - INTERVAL '1 second',
+        'expired invite placeholder regression',
+        true
+      )
+    `, [USER_ID_2, superAdminRoleId, orgId, USER_ID])
+
+    const activeBindingResult = await query(`
+      SELECT rb.id
+      FROM public.role_bindings rb
+      WHERE rb.org_id = $1::uuid
+        AND rb.principal_type = public.rbac_principal_user()
+        AND rb.principal_id = $2::uuid
+        AND rb.scope_type = public.rbac_scope_org()
+        AND rb.role_id = $3::uuid
+      LIMIT 1
+    `, [orgId, USER_ID, superAdminRoleId])
+    expect(activeBindingResult.rowCount).toBe(1)
+
+    await expect(query(`
+      UPDATE public.role_bindings
+      SET role_id = $2::uuid
+      WHERE id = $1::uuid
+    `, [activeBindingResult.rows[0].id, memberRoleId]))
+      .rejects
+      .toThrow('CANNOT_DEMOTE_LAST_SUPER_ADMIN_BINDING')
+  })
 })

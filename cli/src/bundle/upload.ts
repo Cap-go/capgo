@@ -834,6 +834,7 @@ async function setVersionInChannel(
   appid: string,
   localConfig: localConfigType,
   targetChannel: UploadTargetChannel | null,
+  requireChannelAssignment = false,
   selfAssign?: boolean,
 ): Promise<boolean> {
   const { data: versionId } = await supabase
@@ -849,7 +850,11 @@ async function setVersionInChannel(
     && await hasCliPermission(supabase, apikey, 'app.create_channel', { appId: appid })
 
   if (targetChannel && !canPromoteTargetChannel) {
-    uploadFail('Cannot set channel because this API key lacks channel.promote_bundle for the target channel')
+    const message = 'Cannot set channel because this API key lacks channel.promote_bundle for the target channel'
+    if (requireChannelAssignment)
+      uploadFail(message)
+    log.warn(message)
+    return false
   }
 
   if (targetChannel && canPromoteTargetChannel && selfAssign) {
@@ -885,7 +890,11 @@ async function setVersionInChannel(
     return true
   }
 
-  uploadFail('Cannot create target channel because this API key lacks app.create_channel')
+  const message = 'Cannot create target channel because this API key lacks app.create_channel'
+  if (requireChannelAssignment)
+    uploadFail(message)
+  log.warn(message)
+  return false
 }
 export async function getDefaultUploadChannel(appId: string, supabase: SupabaseType, hostWeb: string) {
   const { error, data } = await supabase.from('apps')
@@ -1017,6 +1026,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   if (options.channel !== undefined && requestedChannels.length === 0)
     uploadFail('Missing channel name, pass one channel or a comma-separated list with --channel')
 
+  const channelAssignmentRequired = requestedChannels.length > 0
   const defaultUploadChannel = requestedChannels.length > 0 ? null : await getDefaultUploadChannel(appid, supabase, localConfig.hostWeb)
   const channels = requestedChannels.length > 0 ? requestedChannels : parseUploadChannels(defaultUploadChannel || 'production')
   if (channels.length === 0)
@@ -1504,7 +1514,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
       log.info(`[Verbose] Setting bundle ${bundle} to channel ${targetChannel}...`)
 
     const uploadTargetChannel = await findUploadTargetChannel(supabase, appid, targetChannel)
-    const targetChannelVersionSet = await setVersionInChannel(supabase, apikey, !!options.bundleUrl, bundle, targetChannel, userId, orgId, appid, localConfig, uploadTargetChannel, options.selfAssign)
+    const targetChannelVersionSet = await setVersionInChannel(supabase, apikey, !!options.bundleUrl, bundle, targetChannel, userId, orgId, appid, localConfig, uploadTargetChannel, channelAssignmentRequired, options.selfAssign)
     if (targetChannelVersionSet)
       channelVersionSet.add(targetChannel)
     if (options.verbose)
@@ -1527,7 +1537,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
 
   if (channelVersionSet.size === 0)
     log.warn('Cannot set channel because this API key lacks the required RBAC permission')
-  if (channelVersionSet.size !== expectedChannelAssignments)
+  if (channelAssignmentRequired && channelVersionSet.size !== expectedChannelAssignments)
     uploadFail('Cannot complete upload because one or more target channels were not updated')
   if (options.verbose)
     log.info(`[Verbose] Sending upload event...`)
