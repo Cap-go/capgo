@@ -71,6 +71,13 @@ describe('logsnag revenue metric helpers', () => {
     expect(dayDateId).toBe('2026-03-24')
   })
 
+  it.concurrent('detects dated global stats replays', () => {
+    const replayWindow = logsnagInsightsTestUtils.getCompletedDayWindowForDateId('2026-03-24')
+
+    expect(logsnagInsightsTestUtils.isLatestCompletedGlobalStatsWindow(replayWindow, new Date('2026-03-25T01:01:00.000Z'))).toBe(true)
+    expect(logsnagInsightsTestUtils.isLatestCompletedGlobalStatsWindow(replayWindow, new Date('2026-03-26T01:01:00.000Z'))).toBe(false)
+  })
+
   it.concurrent('detects missing global stats shards before notifications', () => {
     expect(logsnagInsightsTestUtils.getMissingGlobalStatsRequiredShards(new Set())).toEqual([
       'core',

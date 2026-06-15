@@ -376,6 +376,10 @@ function getDailyWindow(referenceDate = new Date()): DailyWindow {
     prevDayDateId: getDateId(prevDayStart),
   }
 }
+function isLatestCompletedGlobalStatsWindow(window: DailyWindow, referenceDate = new Date()): boolean {
+  return window.prevDayDateId === getDailyWindow(referenceDate).prevDayDateId
+}
+
 
 function getCurrentDayWindow(referenceDate = new Date()): CurrentDayWindow {
   const dayStartMillis = Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), referenceDate.getUTCDate())
@@ -1554,40 +1558,51 @@ async function runUsageGlobalStatsShard(c: Context, window: DailyWindow): Promis
   const metricWindow = getMetricWindowFromDailyWindow(window)
   const dayStartIso = metricWindow.dayStart.toISOString()
   const nextDayStartIso = metricWindow.nextDayStart.toISOString()
-  const successRatePromise = (async () => {
-    const res = await getUpdateStats(c)
-    cloudlog({ requestId: c.get('requestId'), message: 'success_rate', successRate: res.total.success_rate })
-    return res.total.success_rate
-  })()
+  const shouldWriteCurrentUsageMetrics = isLatestCompletedGlobalStatsWindow(window)
+  const currentUsageMetricsPromise: Promise<{ bundleStorageGb: number, successRate: number } | null> = shouldWriteCurrentUsageMetrics
+    ? (async () => {
+        const [bundleStorageGb, successRate] = await Promise.all([
+          getBundleStorageGb(c),
+          (async () => {
+            const res = await getUpdateStats(c)
+            cloudlog({ requestId: c.get('requestId'), message: 'success_rate', successRate: res.total.success_rate })
+            return res.total.success_rate
+          })(),
+        ])
+        return { bundleStorageGb, successRate }
+      })()
+    : Promise.resolve(null)
   const [
     updatesLastMonth,
     devicesLastMonth,
     devicesByPlatform,
     registersToday,
-    bundleStorageGb,
-    successRate,
+    currentUsageMetrics,
     demoAppsCreated,
   ] = await Promise.all([
     readLastMonthUpdatesCF(c, window.prevDayEnd),
     readLastMonthDevicesCF(c, window.prevDayEnd),
     readLastMonthDevicesByPlatformCF(c, window.prevDayEnd),
     getRegistersToday(c, dayStartIso, nextDayStartIso),
-    getBundleStorageGb(c),
-    successRatePromise,
+    currentUsageMetricsPromise,
     countDemoSeededApps(c, dayStartIso, nextDayStartIso),
   ])
 
-  await updateGlobalStatsSnapshot(c, window.prevDayDateId, {
-    bundle_storage_gb: bundleStorageGb,
+  const snapshotPatch: GlobalStatsSnapshotPatch = {
     demo_apps_created: demoAppsCreated,
     devices_last_month: devicesLastMonth,
     devices_last_month_android: devicesByPlatform.android,
     devices_last_month_ios: devicesByPlatform.ios,
     registers_today: registersToday,
-    success_rate: successRate,
     updates_last_month: updatesLastMonth,
-  })
+  }
 
+  if (currentUsageMetrics) {
+    snapshotPatch.bundle_storage_gb = currentUsageMetrics.bundleStorageGb
+    snapshotPatch.success_rate = currentUsageMetrics.successRate
+  }
+
+  await updateGlobalStatsSnapshot(c, window.prevDayDateId, snapshotPatch)
   cloudlog({ requestId: c.get('requestId'), message: 'Updated global stats usage shard', dateId: window.prevDayDateId, updatesLastMonth, devicesLastMonth, registersToday })
 }
 
@@ -1995,6 +2010,7 @@ export const logsnagInsightsTestUtils = {
   getMissingGlobalStatsShards,
   hasCompletedGlobalStatsNotifications,
   normalizeCompletedGlobalStatsShards,
+  isLatestCompletedGlobalStatsWindow,
   getLogsnagInsightsShardFunctionName,
   getCompletedDayWindow,
   getCurrentDayWindow,
