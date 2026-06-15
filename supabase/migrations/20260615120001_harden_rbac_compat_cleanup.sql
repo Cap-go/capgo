@@ -21,6 +21,21 @@ WHERE role_permissions.role_id = roles.id
   AND roles.name = public.rbac_role_app_developer()
   AND permissions.key = public.rbac_perm_channel_update_settings();
 
+-- App-level read access must satisfy channel table RLS for every current and
+-- future channel under the app. This adds only read-only channel permissions.
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT roles.id, permissions.id
+FROM public.roles
+INNER JOIN public.permissions
+  ON permissions.key IN (
+    public.rbac_perm_channel_read(),
+    public.rbac_perm_channel_read_history(),
+    public.rbac_perm_channel_read_forced_devices(),
+    public.rbac_perm_channel_read_audit()
+  )
+WHERE roles.name = public.rbac_role_app_reader()
+ON CONFLICT DO NOTHING;
+
 DROP POLICY IF EXISTS "Allow update for auth (admin+)" ON public.orgs;
 DROP POLICY IF EXISTS "Allow org settings update via RBAC" ON public.orgs;
 CREATE POLICY "Allow org settings update via RBAC"

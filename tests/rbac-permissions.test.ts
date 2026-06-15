@@ -92,7 +92,7 @@ describe('rbac permission system', () => {
   })
 
   describe('rbac_check_permission_direct SQL function', () => {
-    describe('RBAC permission inputs', () => {
+    describe('rbac permission inputs', () => {
       it('should allow app read permission for an authorized user', async () => {
         const result = await query(`
           SELECT public.rbac_check_permission_direct(
@@ -699,6 +699,253 @@ describe('rbac permission system', () => {
         ])
 
         expect(result.rows[0].allowed).toBe(false)
+      })
+
+      it('should let app readers see every channel in the app without channel write permissions', async () => {
+        const testId = randomUUID()
+        const readerUserId = randomUUID()
+        const orgId = randomUUID()
+        const appUuid = randomUUID()
+        const appId = `com.rbac.app-reader-channel.${testId}`
+        const otherOrgId = randomUUID()
+        const otherAppUuid = randomUUID()
+        const otherAppId = `com.rbac.app-reader-other.${testId}`
+
+        await query(`
+          INSERT INTO public.orgs (id, name, management_email, created_by)
+          VALUES
+            ($1::uuid, $2, $3, $4::uuid),
+            ($5::uuid, $6, $7, $4::uuid)
+        `, [
+          orgId,
+          `RBAC App Reader Channel ${testId}`,
+          `rbac-app-reader-channel-${testId}@capgo.app`,
+          USER_ID,
+          otherOrgId,
+          `RBAC App Reader Other ${testId}`,
+          `rbac-app-reader-other-${testId}@capgo.app`,
+        ])
+
+        await query(`
+          INSERT INTO public.apps (id, app_id, name, icon_url, owner_org)
+          VALUES
+            ($1::uuid, $2, $3, $4, $5::uuid),
+            ($6::uuid, $7, $8, $4, $9::uuid)
+        `, [
+          appUuid,
+          appId,
+          `RBAC App Reader Channel App ${testId}`,
+          'rbac-app-reader-channel-icon',
+          orgId,
+          otherAppUuid,
+          otherAppId,
+          `RBAC App Reader Other App ${testId}`,
+          otherOrgId,
+        ])
+
+        const version = await query(`
+          INSERT INTO public.app_versions (app_id, name, owner_org, user_id, storage_provider)
+          VALUES ($1, $2, $3::uuid, $4::uuid, 'r2-direct')
+          RETURNING id
+        `, [appId, `1.0.0-app-reader-${testId}`, orgId, USER_ID])
+
+        const otherVersion = await query(`
+          INSERT INTO public.app_versions (app_id, name, owner_org, user_id, storage_provider)
+          VALUES ($1, $2, $3::uuid, $4::uuid, 'r2-direct')
+          RETURNING id
+        `, [otherAppId, `1.0.0-app-reader-other-${testId}`, otherOrgId, USER_ID])
+
+        const existingChannel = await query(`
+          INSERT INTO public.channels (name, app_id, version, created_by, owner_org)
+          VALUES ($1, $2, $3::bigint, $4::uuid, $5::uuid)
+          RETURNING id
+        `, [`existing-${testId}`, appId, version.rows[0].id, USER_ID, orgId])
+
+        await query(`
+          INSERT INTO public.role_bindings (
+            principal_type,
+            principal_id,
+            role_id,
+            scope_type,
+            org_id,
+            app_id,
+            granted_by,
+            is_direct
+          )
+          SELECT
+            public.rbac_principal_user(),
+            $1::uuid,
+            r.id,
+            public.rbac_scope_app(),
+            $2::uuid,
+            $3::uuid,
+            $4::uuid,
+            true
+          FROM public.roles r
+          WHERE r.name = public.rbac_role_app_reader()
+        `, [readerUserId, orgId, appUuid, USER_ID])
+
+        const futureChannel = await query(`
+          INSERT INTO public.channels (name, app_id, version, created_by, owner_org)
+          VALUES ($1, $2, $3::bigint, $4::uuid, $5::uuid)
+          RETURNING id
+        `, [`future-${testId}`, appId, version.rows[0].id, USER_ID, orgId])
+
+        const otherChannel = await query(`
+          INSERT INTO public.channels (name, app_id, version, created_by, owner_org)
+          VALUES ($1, $2, $3::bigint, $4::uuid, $5::uuid)
+          RETURNING id
+        `, [`other-${testId}`, otherAppId, otherVersion.rows[0].id, USER_ID, otherOrgId])
+
+        await withAuthClaim(readerUserId)
+        await query('SET LOCAL ROLE authenticated')
+
+        const appRows = await query(`
+          SELECT app_id
+          FROM public.apps
+          WHERE app_id = $1
+        `, [appId])
+        expect(appRows.rowCount).toBe(1)
+
+        const visibleChannels = await query(`
+          SELECT name
+          FROM public.channels
+          WHERE app_id = $1
+          ORDER BY name
+        `, [appId])
+        expect(visibleChannels.rows.map(row => row.name)).toEqual([
+          `existing-${testId}`,
+          `future-${testId}`,
+        ])
+
+        const otherChannelRows = await query(`
+          SELECT id
+          FROM public.channels
+          WHERE id = $1::bigint
+        `, [otherChannel.rows[0].id])
+        expect(otherChannelRows.rowCount).toBe(0)
+
+        const permissionResult = await query(`
+          SELECT
+            public.rbac_check_permission_request(public.rbac_perm_channel_read(), $1::uuid, $2, $3::bigint) AS can_read_existing,
+            public.rbac_check_permission_request(public.rbac_perm_channel_read_history(), $1::uuid, $2, $4::bigint) AS can_read_future_history,
+            public.rbac_check_permission_request(public.rbac_perm_channel_read_forced_devices(), $1::uuid, $2, $4::bigint) AS can_read_future_forced_devices,
+            public.rbac_check_permission_request(public.rbac_perm_channel_read_audit(), $1::uuid, $2, $4::bigint) AS can_read_future_audit,
+            public.rbac_check_permission_request(public.rbac_perm_channel_update_settings(), $1::uuid, $2, $3::bigint) AS can_update_channel,
+            public.rbac_check_permission_request(public.rbac_perm_channel_promote_bundle(), $1::uuid, $2, $3::bigint) AS can_promote_bundle,
+            public.rbac_check_permission_request(public.rbac_perm_channel_rollback_bundle(), $1::uuid, $2, $3::bigint) AS can_rollback_bundle,
+            public.rbac_check_permission_request(public.rbac_perm_channel_manage_forced_devices(), $1::uuid, $2, $3::bigint) AS can_manage_forced_devices,
+            public.rbac_check_permission_request(public.rbac_perm_channel_delete(), $1::uuid, $2, $3::bigint) AS can_delete_channel
+        `, [orgId, appId, existingChannel.rows[0].id, futureChannel.rows[0].id])
+
+        expect(permissionResult.rows[0]).toMatchObject({
+          can_read_existing: true,
+          can_read_future_history: true,
+          can_read_future_forced_devices: true,
+          can_read_future_audit: true,
+          can_update_channel: false,
+          can_promote_bundle: false,
+          can_rollback_bundle: false,
+          can_manage_forced_devices: false,
+          can_delete_channel: false,
+        })
+      })
+
+      it('should keep channel readers from seeing the parent app or sibling channels', async () => {
+        const testId = randomUUID()
+        const channelUserId = randomUUID()
+        const orgId = randomUUID()
+        const appUuid = randomUUID()
+        const appId = `com.rbac.channel-reader-only.${testId}`
+
+        await query(`
+          INSERT INTO public.orgs (id, name, management_email, created_by)
+          VALUES ($1::uuid, $2, $3, $4::uuid)
+        `, [orgId, `RBAC Channel Reader Only ${testId}`, `rbac-channel-reader-only-${testId}@capgo.app`, USER_ID])
+
+        await query(`
+          INSERT INTO public.apps (id, app_id, name, icon_url, owner_org)
+          VALUES ($1::uuid, $2, $3, $4, $5::uuid)
+        `, [appUuid, appId, `RBAC Channel Reader Only App ${testId}`, 'rbac-channel-reader-only-icon', orgId])
+
+        const version = await query(`
+          INSERT INTO public.app_versions (app_id, name, owner_org, user_id, storage_provider)
+          VALUES ($1, $2, $3::uuid, $4::uuid, 'r2-direct')
+          RETURNING id
+        `, [appId, `1.0.0-channel-reader-only-${testId}`, orgId, USER_ID])
+
+        const allowedChannel = await query(`
+          INSERT INTO public.channels (name, app_id, version, created_by, owner_org)
+          VALUES ($1, $2, $3::bigint, $4::uuid, $5::uuid)
+          RETURNING id, rbac_id
+        `, [`allowed-${testId}`, appId, version.rows[0].id, USER_ID, orgId])
+
+        const siblingChannel = await query(`
+          INSERT INTO public.channels (name, app_id, version, created_by, owner_org)
+          VALUES ($1, $2, $3::bigint, $4::uuid, $5::uuid)
+          RETURNING id
+        `, [`sibling-${testId}`, appId, version.rows[0].id, USER_ID, orgId])
+
+        await query(`
+          INSERT INTO public.role_bindings (
+            principal_type,
+            principal_id,
+            role_id,
+            scope_type,
+            org_id,
+            app_id,
+            channel_id,
+            granted_by,
+            is_direct
+          )
+          SELECT
+            public.rbac_principal_user(),
+            $1::uuid,
+            r.id,
+            public.rbac_scope_channel(),
+            $2::uuid,
+            $3::uuid,
+            $4::uuid,
+            $5::uuid,
+            true
+          FROM public.roles r
+          WHERE r.name = public.rbac_role_channel_reader()
+        `, [channelUserId, orgId, appUuid, allowedChannel.rows[0].rbac_id, USER_ID])
+
+        await withAuthClaim(channelUserId)
+        await query('SET LOCAL ROLE authenticated')
+
+        const appRows = await query(`
+          SELECT app_id
+          FROM public.apps
+          WHERE app_id = $1
+        `, [appId])
+        expect(appRows.rowCount).toBe(0)
+
+        const allowedChannelRows = await query(`
+          SELECT id
+          FROM public.channels
+          WHERE id = $1::bigint
+        `, [allowedChannel.rows[0].id])
+        expect(allowedChannelRows.rowCount).toBe(1)
+
+        const siblingChannelRows = await query(`
+          SELECT id
+          FROM public.channels
+          WHERE id = $1::bigint
+        `, [siblingChannel.rows[0].id])
+        expect(siblingChannelRows.rowCount).toBe(0)
+
+        const permissionResult = await query(`
+          SELECT
+            public.rbac_check_permission_request(public.rbac_perm_channel_read(), $1::uuid, $2, $3::bigint) AS can_read_channel,
+            public.rbac_check_permission_request(public.rbac_perm_app_read(), $1::uuid, $2, NULL::bigint) AS can_read_app
+        `, [orgId, appId, allowedChannel.rows[0].id])
+
+        expect(permissionResult.rows[0]).toMatchObject({
+          can_read_channel: true,
+          can_read_app: false,
+        })
       })
 
       it('should deny org permissions outside bound org for api keys', async () => {
