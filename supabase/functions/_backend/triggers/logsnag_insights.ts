@@ -748,6 +748,7 @@ async function getPaidProductActivityStats(c: Context, window: CurrentDayWindow)
   const drizzleClient = getDrizzleClient(pgClient)
   const dayStart = window.dayStart
   const nextDayStart = window.nextDayStart
+  const snapshotEndIso = nextDayStart.toISOString()
   const lookbackStart = new Date(dayStart.getTime() - 59 * 24 * 60 * 60 * 1000)
   const dayDateId = getDateId(dayStart)
   const lookbackDateId = getDateId(lookbackStart)
@@ -761,10 +762,15 @@ async function getPaidProductActivityStats(c: Context, window: CurrentDayWindow)
         FROM public.orgs o
         INNER JOIN public.stripe_info si ON si.customer_id = o.customer_id
         WHERE o.customer_id IS NOT NULL
-          AND si.status = 'succeeded'
           AND si.is_good_plan = true
-          AND COALESCE(si.paid_at, si.subscription_anchor_start, si.created_at, o.created_at) < ${nextDayStart.toISOString()}::timestamptz
-          AND (si.canceled_at IS NULL OR si.canceled_at >= ${dayStart.toISOString()}::timestamptz)
+          AND COALESCE(si.paid_at, si.subscription_anchor_start, si.created_at, o.created_at) < ${snapshotEndIso}::timestamptz
+          AND si.status IN (
+            'succeeded'::public.stripe_status,
+            'canceled'::public.stripe_status,
+            'deleted'::public.stripe_status
+          )
+          AND (si.canceled_at IS NULL OR si.canceled_at >= ${snapshotEndIso}::timestamptz)
+          AND si.subscription_anchor_end > ${snapshotEndIso}::timestamptz
       ),
       builder_clients AS (
         SELECT DISTINCT po.customer_id
@@ -1416,6 +1422,7 @@ async function getBillingSnapshotCounts(c: Context, snapshotExclusiveEnd: Date):
 
 async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
   const supabase = supabaseAdmin(c)
+  const snapshotEndIso = window.prevDayEnd.toISOString()
   const [
     apps,
     updates,
@@ -1428,16 +1435,18 @@ async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise
     need_upgrade,
     actives,
   ] = await Promise.all([
-    countAllApps(c),
-    countAllUpdates(c),
-    countAllUpdatesExternal(c),
+    countAllApps(c, window.prevDayEnd),
+    countAllUpdates(c, window.prevDayEnd),
+    countAllUpdatesExternal(c, window.prevDayEnd),
     supabase
       .from('users')
       .select('id', { count: 'exact', head: true })
+      .lt('created_at', snapshotEndIso)
       .then(res => res.count ?? 0),
     supabase
       .from('orgs')
       .select('id', { count: 'exact', head: true })
+      .lt('created_at', snapshotEndIso)
       .then(res => res.count ?? 0),
     getGithubStars(),
     getBillingSnapshotCounts(c, window.prevDayEnd),

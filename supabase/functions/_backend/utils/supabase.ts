@@ -140,16 +140,22 @@ export function supabaseApikey(c: Context, apikey: string | null | undefined) {
   })
 }
 
-export async function getAppsFromSB(c: Context): Promise<string[]> {
+export async function getAppsFromSB(c: Context, referenceDate?: Date): Promise<string[]> {
   const limit = 1000
+  const createdBeforeIso = referenceDate?.toISOString()
   let page = 0
   let apps: string[] = []
 
   while (true) {
-    const { data, error } = await supabaseAdmin(c)
+    let query = supabaseAdmin(c)
       .from('apps')
       .select('app_id')
       .range(page * limit, (page + 1) * limit - 1)
+
+    if (createdBeforeIso)
+      query = query.lt('created_at', createdBeforeIso)
+
+    const { data, error } = await query
 
     if (error) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting apps from Supabase', error })

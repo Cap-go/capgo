@@ -916,11 +916,12 @@ LIMIT ${limit}`
   return [] as StatRowCF[]
 }
 
-export async function getAppsFromCF(c: Context): Promise<{ app_id: string }[]> {
+export async function getAppsFromCF(c: Context, referenceDate?: Date): Promise<{ app_id: string }[]> {
   if (!c.env.DB_STOREAPPS)
     return Promise.resolve([])
 
-  const query = `SELECT app_id FROM store_apps WHERE (onprem = 1 OR capgo = 1) AND url != ''`
+  const createdBeforeFilter = referenceDate ? ` AND created_at < '${formatDateCF(referenceDate)}'` : ''
+  const query = `SELECT app_id FROM store_apps WHERE (onprem = 1 OR capgo = 1) AND url != ''${createdBeforeFilter}`
   cloudlog({ requestId: c.get('requestId'), message: 'getAppsFromCF query', query })
   // use c.env.DB_STORE_APPS and table store_apps
   try {
@@ -958,8 +959,9 @@ export async function countUpdatesFromStoreAppsCF(c: Context): Promise<number> {
   return 0
 }
 
-export async function countUpdatesFromLogsCF(c: Context): Promise<number> {
-  const query = `SELECT SUM(_sample_interval) AS count FROM app_log WHERE blob2 = 'get'`
+export async function countUpdatesFromLogsCF(c: Context, referenceDate?: Date): Promise<number> {
+  const endFilter = referenceDate ? ` AND timestamp < toDateTime('${formatDateCF(referenceDate)}')` : ''
+  const query = `SELECT SUM(_sample_interval) AS count FROM app_log WHERE blob2 = 'get'${endFilter}`
 
   cloudlog({ requestId: c.get('requestId'), message: 'countUpdatesFromLogsCF query', query })
   try {
@@ -972,8 +974,9 @@ export async function countUpdatesFromLogsCF(c: Context): Promise<number> {
   return 0
 }
 
-export async function countUpdatesFromLogsExternalCF(c: Context): Promise<number> {
-  const query = `SELECT SUM(_sample_interval) AS count FROM app_log_external WHERE blob2 = 'get'`
+export async function countUpdatesFromLogsExternalCF(c: Context, referenceDate?: Date): Promise<number> {
+  const endFilter = referenceDate ? ` AND timestamp < toDateTime('${formatDateCF(referenceDate)}')` : ''
+  const query = `SELECT SUM(_sample_interval) AS count FROM app_log_external WHERE blob2 = 'get'${endFilter}`
 
   cloudlog({ requestId: c.get('requestId'), message: 'countUpdatesFromLogsExternalCF query', query })
   try {
