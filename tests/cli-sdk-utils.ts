@@ -251,6 +251,33 @@ async function apiKeyHasAnyAppPermission(
   return false
 }
 
+async function apiKeyHasAnyChannelPermission(
+  apikey: string,
+  apiKey: ApiKeyRow,
+  app: { app_id: string, owner_org: string | null },
+  channelId: number,
+  requiredPermissions: RbacPermissionKey[],
+) {
+  if (!app.owner_org)
+    return false
+
+  for (const permissionKey of Array.from(new Set(requiredPermissions))) {
+    const { data, error } = await getSupabaseClient().rpc('rbac_check_permission_direct' as any, {
+      p_permission_key: permissionKey,
+      p_user_id: apiKey.user_id,
+      p_org_id: app.owner_org,
+      p_app_id: app.app_id,
+      p_channel_id: channelId,
+      p_apikey: apikey,
+    })
+
+    if (!error && data === true)
+      return true
+  }
+
+  return false
+}
+
 async function getAuthorizedApp(
   apikey: string,
   appId: string,
@@ -746,9 +773,20 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ORG_SUPER_ADMIN) {
   }
 
   ;(sdk as any).getCurrentBundle = async (appId: string, channelId: string) => {
-    const access = await getAuthorizedApp(apikey, appId, ['app.read_bundles'])
-    if ('error' in access)
-      return { success: false, error: access.error }
+    const apiKey = await getApiKeyRecord(apikey)
+    if (!apiKey)
+      return { success: false, error: 'Invalid API key or insufficient permissions.' }
+
+    const app = await getAppRecord(appId)
+    if (!app)
+      return { success: false, error: `App ${appId} does not exist` }
+
+    const channel = await getChannelRecord(appId, channelId)
+    if (!channel)
+      return { success: false, error: `Channel ${channelId} not found for app ${appId}` }
+
+    if (!(await apiKeyHasAnyChannelPermission(apikey, apiKey, app, channel.id, ['channel.read'])))
+      return { success: false, error: 'Invalid API key or insufficient permissions.' }
 
     const version = await getChannelVersionRecord(appId, channelId)
     if (!version)

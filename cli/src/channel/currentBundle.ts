@@ -1,16 +1,18 @@
 import type { ChannelCurrentBundleOptions } from '../schemas/channel'
 import { intro, log } from '@clack/prompts'
 import { trackEvent, withSupabaseSource } from '../analytics/track'
-import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
+import { check2FAComplianceForApp } from '../api/app'
 import {
   createSupabaseClient,
   findSavedKey,
   getAppId,
   getConfig,
+  hasCliPermission,
   resolveUserIdFromApiKey,
 } from '../utils'
 
 interface Channel {
+  id: number
   version: {
     name: string
   }
@@ -41,7 +43,6 @@ export async function currentBundleInternal(channel: string, appId: string, opti
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
   await check2FAComplianceForApp(supabase, appId, silent)
   await resolveUserIdFromApiKey(supabase, options.apikey)
-  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'app.read_bundles', silent, true)
 
   if (!channel) {
     if (!silent)
@@ -51,7 +52,7 @@ export async function currentBundleInternal(channel: string, appId: string, opti
 
   const { data: supabaseChannel, error } = await withSupabaseSource('channels.currentBundle', () => supabase
     .from('channels')
-    .select('version ( name )')
+    .select('id, version ( name )')
     .eq('name', channel)
     .eq('app_id', appId)
     .limit(1))
@@ -62,7 +63,13 @@ export async function currentBundleInternal(channel: string, appId: string, opti
     throw new Error(`Channel ${channel} not found for app ${appId}`)
   }
 
-  const { version } = supabaseChannel[0] as Channel
+  const { id: channelId, version } = supabaseChannel[0] as Channel
+  if (!(await hasCliPermission(supabase, options.apikey, 'channel.read', { appId, channelId }))) {
+    const msg = `Insufficient permissions for channel ${channel}. Required RBAC permission for this action: channel.read.`
+    if (!silent)
+      log.error(msg)
+    throw new Error(msg)
+  }
 
   void trackEvent({ channel: 'channel', event: 'Channel Current Bundle Viewed', icon: '📦', tags: { has_bundle: Boolean(version) } })
 
