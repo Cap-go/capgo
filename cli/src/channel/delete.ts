@@ -1,7 +1,7 @@
 import type { ChannelDeleteOptions } from '../schemas/channel'
 import { intro, log, outro } from '@clack/prompts'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
-import { delChannel, delChannelDevices, findBundleIdByChannelName, findChannel } from '../api/channels'
+import { delChannel, findBundleIdByChannelName, findChannel } from '../api/channels'
 import { deleteAppVersion } from '../api/versions'
 import {
   createSupabaseClient,
@@ -9,7 +9,6 @@ import {
   formatError,
   getAppId,
   getConfig,
-  getOrganizationId,
   sendEvent,
 } from '../utils'
 
@@ -52,6 +51,13 @@ export async function deleteChannelInternal(channelId: string, appId: string, op
 
   await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'channel.delete', silent, true, channel.id)
 
+  const orgId = channel.owner_org
+  if (!orgId) {
+    if (!silent)
+      log.error(`Channel ${channelId} has no owner organization`)
+    throw new Error(`Channel ${channelId} has no owner organization`)
+  }
+
   if (options.deleteBundle && !silent)
     log.info(`Deleting bundle ${appId}#${channelId} from Capgo`)
 
@@ -63,13 +69,6 @@ export async function deleteChannelInternal(channelId: string, appId: string, op
       await deleteAppVersion(supabase, appId, bundle.name)
   }
 
-  const { error: delDevicesError } = await delChannelDevices(supabase, appId, channel.id)
-  if (delDevicesError) {
-    if (!silent)
-      log.error(`Cannot delete channel devices: ${formatError(delDevicesError)}`)
-    throw new Error(`Cannot delete channel devices: ${formatError(delDevicesError)}`)
-  }
-
   if (!silent)
     log.info(`Deleting channel ${appId}#${channelId} from Capgo`)
 
@@ -79,8 +78,6 @@ export async function deleteChannelInternal(channelId: string, appId: string, op
       log.error(`Cannot delete Channel 🙀 ${formatError(deleteStatus.error)}`)
     throw new Error(`Cannot delete channel: ${formatError(deleteStatus.error)}`)
   }
-
-  const orgId = await getOrganizationId(supabase, appId)
 
   await sendEvent(options.apikey, {
     channel: 'channel',

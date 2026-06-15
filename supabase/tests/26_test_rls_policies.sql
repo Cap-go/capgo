@@ -1,8 +1,7 @@
 -- Test RLS Policies
 -- This file tests all Row Level Security policies in the database
 BEGIN;
-
-SELECT plan(64);
+SELECT plan(65);
 
 -- Test app_versions policies
 SELECT
@@ -68,6 +67,18 @@ SELECT
         ],
         'channel_devices should have correct policies'
     );
+SELECT
+    is(
+        (
+            SELECT confdeltype::text
+            FROM pg_constraint
+            WHERE conrelid = 'public.channel_devices'::regclass
+              AND conname = 'channel_devices_channel_id_fkey'
+        ),
+        'c',
+        'channel_devices should cascade when a channel is deleted'
+    );
+
 
 -- Test channel_permission_overrides policies
 SELECT

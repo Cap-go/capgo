@@ -808,6 +808,15 @@ USING (
     NULL::bigint
   )
 );
+ALTER TABLE public.channel_devices
+  DROP CONSTRAINT IF EXISTS channel_devices_channel_id_fkey;
+
+ALTER TABLE public.channel_devices
+  ADD CONSTRAINT channel_devices_channel_id_fkey
+  FOREIGN KEY (channel_id)
+  REFERENCES public.channels(id)
+  ON DELETE CASCADE;
+
 
 DROP POLICY IF EXISTS "Allow delete for auth, api keys (write+)" ON public.channel_devices;
 CREATE POLICY "Allow RBAC channel_devices delete"

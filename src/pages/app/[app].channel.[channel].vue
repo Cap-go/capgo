@@ -59,9 +59,9 @@ const loading = ref(true)
 const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
 
 const canUpdateChannelSettings = computedAsync(async () => {
-  if (!packageId.value)
+  if (!packageId.value || !id.value)
     return false
-  return await checkPermissions('channel.update_settings', { appId: packageId.value })
+  return await checkPermissions('channel.update_settings', { appId: packageId.value, channelId: id.value })
 }, false)
 
 const canPromoteBundle = computedAsync(async () => {

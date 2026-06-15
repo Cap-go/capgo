@@ -699,6 +699,108 @@ describe('tests CLI channel commands', () => {
       expect(devicesAfter).toHaveLength(0)
     })
 
+    it.concurrent('should delete channel with a channel-scoped admin key', async () => {
+      const channelName = generateChannelName()
+      await createChannel(channelName, APPNAME)
+
+      const supabase = getSupabaseClient()
+      const { data: app, error: appError } = await supabase
+        .from('apps')
+        .select('id')
+        .eq('app_id', APPNAME)
+        .single()
+      expect(appError).toBeNull()
+      expect(app?.id).toBeTruthy()
+
+      const { data: channel, error: channelError } = await supabase
+        .from('channels')
+        .select('id, rbac_id')
+        .eq('name', channelName)
+        .eq('app_id', APPNAME)
+        .single()
+      expect(channelError).toBeNull()
+      expect(channel?.rbac_id).toBeTruthy()
+
+      const deviceId = randomUUID()
+      await supabase
+        .from('channel_devices')
+        .insert({
+          channel_id: channel!.id,
+          device_id: deviceId,
+          app_id: APPNAME,
+          owner_org: ORG_ID,
+        })
+        .throwOnError()
+
+      const { data: channelAdminRole, error: roleError } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('name', 'channel_admin')
+        .eq('scope_type', 'channel')
+        .single()
+      expect(roleError).toBeNull()
+      expect(channelAdminRole?.id).toBeTruthy()
+
+      const key = `channel-delete-${randomUUID()}`
+      const apiKey = await createDirectApiKeyWithBindings({
+        key,
+        name: `Channel delete admin ${channelName}`,
+        orgId: ORG_ID,
+        roleName: 'org_member',
+      })
+      const resolvedKey = apiKey.key ?? key
+
+      try {
+        const { error: bindingError } = await supabase
+          .from('role_bindings')
+          .insert({
+            principal_type: 'apikey',
+            principal_id: apiKey.rbac_id,
+            role_id: channelAdminRole!.id,
+            scope_type: 'channel',
+            org_id: ORG_ID,
+            app_id: app!.id,
+            channel_id: channel!.rbac_id,
+            granted_by: apiKey.user_id,
+            reason: 'CLI channel delete channel-admin regression test',
+            is_direct: true,
+          })
+        expect(bindingError).toBeNull()
+
+        const { data: directAllowed, error: directError } = await supabase.rpc('rbac_check_permission_direct' as any, {
+          p_permission_key: 'channel.delete',
+          p_user_id: apiKey.user_id,
+          p_org_id: ORG_ID,
+          p_app_id: APPNAME,
+          p_channel_id: channel!.id,
+          p_apikey: resolvedKey,
+        })
+        expect(directError).toBeNull()
+        expect(directAllowed).toBe(true)
+
+        const result = await createTestSDK(resolvedKey).deleteChannel(channelName, APPNAME, false)
+        expect(result.success, result.error).toBe(true)
+
+        const { data: channelAfter, error: deletedChannelError } = await supabase
+          .from('channels')
+          .select('id')
+          .eq('id', channel!.id)
+          .single()
+        expect(deletedChannelError).toBeDefined()
+        expect(channelAfter).toBeNull()
+
+        const { data: devicesAfter } = await supabase
+          .from('channel_devices')
+          .select('id')
+          .eq('channel_id', channel!.id)
+        expect(devicesAfter).toHaveLength(0)
+      }
+      finally {
+        await supabase.from('role_bindings').delete().eq('principal_id', apiKey.rbac_id)
+        await supabase.from('apikeys').delete().eq('id', apiKey.id)
+      }
+    })
+
     it.concurrent('should fail to delete non-existent channel', async () => {
       const testInvalidChannel = generateChannelName()
       const result = await createTestSDK().deleteChannel(testInvalidChannel, APPNAME, false)
