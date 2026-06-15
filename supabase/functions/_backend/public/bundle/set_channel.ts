@@ -99,7 +99,6 @@ export async function setChannel(c: Context<MiddlewareKeyVariables>, body: SetCh
     }
 
     await dbClient.query('COMMIT')
-    transactionStarted = false
   }
   catch (error) {
     if (dbClient && transactionStarted) {
