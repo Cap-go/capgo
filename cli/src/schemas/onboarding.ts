@@ -6,7 +6,7 @@ import { z } from 'zod'
 export const onboardingNextStepSchema = z.object({
   platform: z.enum(['ios', 'android']).optional().describe('Platform choice, when the previous step asked for it'),
   serviceAccountJsonPath: z.string().optional().describe('Path to your Google Play service-account JSON file, when the previous step asked for it'),
-  runBuild: z.boolean().optional().describe('Set true (with platform) to trigger the first cloud build; set false to skip it and finish onboarding'),
+  runBuild: z.boolean().optional().describe('Set false (with platform) to SKIP the first cloud build and finish onboarding. The build itself is run with the start_capgo_build tool, not here — passing true is rejected with a pointer to start_capgo_build.'),
   keyId: z.string().optional().describe('App Store Connect Key ID (iOS), when asked'),
   issuerId: z.string().optional().describe('App Store Connect Issuer ID (iOS), when asked'),
   p8Path: z.string().optional().describe('Path to your App Store Connect .p8 key file (iOS), when asked'),
@@ -17,7 +17,8 @@ export const onboardingNextStepSchema = z.object({
   androidPackage: z.string().optional().describe('The Android applicationId / package name to grant release access to, when asked'),
   saMethodChoice: z.enum(['retry', 'save-anyway', 'oauth']).optional().describe('Recovery choice at service-account validation failure'),
   reopenSignIn: z.boolean().optional().describe('Set true at the Google sign-in step to (re)open the browser for a fresh Google authorization — use this when the browser did not open, was closed, or the sign-in stalled on "still waiting", so the user is never stuck'),
-  checkBuild: z.boolean().optional().describe('Set true after running the build command, to read the build output record and confirm the result'),
+  checkBuild: z.boolean().optional().describe('Set true to record a finished cloud build and continue setup — call it only after start_capgo_build / capgo_build_wait reports the build completed.'),
+  resumeChoice: z.enum(['continue', 'restart']).optional().describe('Answer to the resume prompt shown when an in-progress onboarding for the chosen platform already exists: "continue" picks up from the saved step, "restart" wipes the saved onboarding progress for that platform and begins again'),
   credentialsExistChoice: z.enum(['backup', 'cancel']).optional().describe('Data-safety choice when saved Android credentials already exist: "backup" (back them up, then continue) or "cancel" (stop onboarding), when the step asks'),
   keystoreMethod: z.enum(['existing', 'generate']).optional().describe('Whether you already have an Android keystore ("existing") or want one created ("generate")'),
   keystorePath: z.string().optional().describe('Absolute path to your existing Android keystore file (.jks/.keystore/.p12), when asked'),

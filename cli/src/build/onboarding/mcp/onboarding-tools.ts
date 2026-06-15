@@ -43,7 +43,8 @@ import { renderResult } from './contract.js'
 import type { EngineDeps } from './engine.js'
 import { explainOnboarding, runAdvance, runStart } from './engine.js'
 import { getSession } from './session-state.js'
-import { canLaunchTerminal, launchBuildInTerminal } from './terminal-launch.js'
+import type { BuildJobDeps } from './build-job.js'
+import { buildJobDeps, registerBuildTools } from './build-tools.js'
 
 /** Minimal shape of the MCP server's tool registrar (matches McpServer.tool). */
 interface McpLike {
@@ -478,8 +479,6 @@ export function buildDeps(sdk: CapgoSDK): EngineDeps {
     readBuildRecord: readBuildOutputRecord,
     buildRecordPath: defaultBuildRecordPath,
     clearBuildRecord: removeBuildOutputRecord,
-    canLaunchTerminal: () => canLaunchTerminal(),
-    launchBuildInTerminal: (cmd: string) => launchBuildInTerminal(cmd),
     iosEffectDeps: buildIosEffectDeps(cwd, getAppIdClosure),
     androidEffectDeps: buildAndroidEffectDeps(cwd, getAppIdClosure),
     writeKeystoreFile: async (appId: string, base64: string, alias: string): Promise<string> => {
@@ -518,7 +517,7 @@ export function buildDeps(sdk: CapgoSDK): EngineDeps {
  * Register the 2-tool onboarding spine onto an MCP server.
  * `depsOverride` is for tests; production passes only `server` + `sdk`.
  */
-export function registerOnboardingTools(server: McpLike, sdk: CapgoSDK, depsOverride?: EngineDeps): void {
+export function registerOnboardingTools(server: McpLike, sdk: CapgoSDK, depsOverride?: EngineDeps, buildJobDepsOverride?: BuildJobDeps): void {
   const deps = depsOverride ?? buildDeps(sdk)
 
   server.tool(
@@ -552,6 +551,13 @@ export function registerOnboardingTools(server: McpLike, sdk: CapgoSDK, depsOver
       return { content: [{ type: 'text' as const, text }] }
     },
   )
+
+  // ── Cloud-build tools (start / wait / logs / cancel) ─────────────────────────
+  // The build phase runs the first cloud build via a tracked background child
+  // (no Terminal.app/AppleScript) + bounded-wait polling. The onboarding
+  // build-ready step points the agent at start_capgo_build; a COMPLETED build
+  // hands back to capgo_builder_onboarding_next_step({ checkBuild }) for the tail.
+  registerBuildTools(server, deps.getAppId, buildJobDepsOverride ?? buildJobDeps(deps.cwd))
 
   // ── Discoverable, client-agnostic entry point (MCP prompt) ──────────────────
   // Clients that support MCP prompts surface this as a slash command (e.g.

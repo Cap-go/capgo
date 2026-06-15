@@ -116,6 +116,16 @@ export interface OnboardingSessionState {
    * files. Process-local: a restart loses it and the flow re-asks the picker.
    */
   activePlatform?: Platform
+  /**
+   * The platform whose continue-vs-restart resume prompt has already been
+   * resolved THIS session — shown and answered, or skipped as unnecessary (no
+   * resumable on-disk progress). While it differs from the committed platform, a
+   * fresh platform entry first shows the resume prompt (mirroring the TUI's
+   * `resume-prompt` fork) instead of silently resuming. Process-local: a restart
+   * loses it and the prompt is re-offered. Reset by runStart so a fresh "start
+   * onboarding" always re-asks.
+   */
+  resumeResolvedFor?: Platform
 }
 
 const registry = new Map<string, OnboardingSessionState>()
@@ -168,6 +178,46 @@ export function getSessionPlatform(appId: string): Platform | undefined {
 export function setSessionPlatform(appId: string, platform: Platform | undefined): void {
   const session = getSession(appId)
   registry.set(appId, { ...session, activePlatform: platform })
+}
+
+/**
+ * Read which platform's resume prompt has already been resolved this session
+ * (shown+answered, or determined unnecessary), or undefined when none has.
+ * Process-local; deliberately ignores disk — the resume decision is a session
+ * decision, exactly like the platform itself.
+ */
+export function getResumeResolvedFor(appId: string): Platform | undefined {
+  return registry.get(appId)?.resumeResolvedFor
+}
+
+/**
+ * Record (or, with `undefined`, clear) which platform's continue-vs-restart
+ * resume prompt has been resolved this session. Set once the prompt is answered
+ * or skipped as unnecessary; cleared by runStart so a fresh start re-asks.
+ */
+export function setResumeResolvedFor(appId: string, platform: Platform | undefined): void {
+  const session = getSession(appId)
+  registry.set(appId, { ...session, resumeResolvedFor: platform })
+}
+
+/**
+ * Drop the per-flow carried transients (iOS carried, tail carried, tail park)
+ * for `appId` while PRESERVING the session-level decisions (activePlatform,
+ * resumeResolvedFor). Used by the resume prompt's "restart" arm: the on-disk
+ * progress is wiped, so the in-memory carried state from the old run must go
+ * too — but the session stays committed to the same platform and must not
+ * re-ask the resume prompt it just answered. Immutable: builds a NEW entry.
+ */
+export function clearSessionCarried(appId: string): void {
+  const existing = registry.get(appId)
+  if (!existing)
+    return
+  registry.set(appId, {
+    iosCarried: {},
+    tailCarried: {},
+    activePlatform: existing.activePlatform,
+    resumeResolvedFor: existing.resumeResolvedFor,
+  })
 }
 
 /**

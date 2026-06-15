@@ -20,7 +20,7 @@ import { TAIL_INPUT_KEYS, validateIosStepInput, validateStepInput, validateStore
 import { androidViewForStep, applyAndroidInput, applyGoogleSignIn, runAndroidEffect } from '../android/flow.js'
 import { applyIosInput, iosViewForStep, runIosEffect } from '../ios/flow.js'
 import { applyTailInput, tailViewForStep } from '../tail/flow.js'
-import { clearSession, dropIosCarried, getSession, getSessionPlatform, mergeIosCarried, mergeTailCarried, setSessionPlatform, setTailParked } from './session-state.js'
+import { clearSession, clearSessionCarried, dropIosCarried, getResumeResolvedFor, getSession, getSessionPlatform, mergeIosCarried, mergeTailCarried, setResumeResolvedFor, setSessionPlatform, setTailParked } from './session-state.js'
 import { slimAndroidTailProgress, slimIosTailProgress } from './tail-progress.js'
 import { beginOAuthSession, clearOAuthSession, pollOAuthSession } from './oauth-session.js'
 import { SUPPORT_EMAIL } from '../../../support/contact-support.js'
@@ -62,6 +62,8 @@ interface OnboardingInput {
   saMethodChoice?: 'retry' | 'save-anyway' | 'oauth'
   /** Set true at google-sign-in to (re)open the browser for a fresh OAuth — recovery when the browser didn't open, was closed, or the sign-in stalled. */
   reopenSignIn?: boolean
+  /** Answer to the resume prompt: 'continue' resumes the saved step, 'restart' wipes this platform's saved progress and begins again. */
+  resumeChoice?: 'continue' | 'restart'
   credentialsExistChoice?: 'backup' | 'cancel'
   keystoreMethod?: 'existing' | 'generate'
   keystorePath?: string
@@ -2319,10 +2321,10 @@ function decideBuildPhase(facts: PreflightFacts, platform: Platform): NextStepRe
       { value: 'skip', label: 'Skip — I will build later' },
     ],
     next: {
-      tool: NEXT_STEP_TOOL,
-      with: { runBuild: true, platform },
-      instruction: `Ask the user. To build now: next_step({ runBuild: true, platform: "${platform}" }). To skip (onboarding still completes): next_step({ runBuild: false, platform: "${platform}" }).`,
-      call: `${NEXT_STEP_TOOL}({ runBuild: true, platform: "${platform}" })`,
+      tool: 'start_capgo_build',
+      with: { platform },
+      instruction: `Ask the user. To build now: start_capgo_build({ platform: "${platform}" }). To skip (onboarding still completes): next_step({ runBuild: false, platform: "${platform}" }).`,
+      call: `start_capgo_build({ platform: "${platform}" })`,
     },
     rules: ONBOARDING_RULES,
   }
@@ -2997,10 +2999,6 @@ export interface EngineDeps {
    */
   iosEffectDeps?: IosEffectDeps
   androidEffectDeps: AndroidEffectDeps
-  /** Returns true when the current host can launch Terminal.app (macOS). Injectable for tests. */
-  canLaunchTerminal: () => boolean
-  /** Launch `command` in a new macOS Terminal.app window. Injectable for tests. */
-  launchBuildInTerminal: (command: string) => Promise<{ ok: true } | { ok: false, error: string }>
   /**
    * Optional injectable OAuth session registry for testing. When provided, the
    * engine uses these instead of the module-level functions in oauth-session.ts.
@@ -3325,42 +3323,6 @@ async function executeAuto(result: NextStepResult, facts: PreflightFacts, deps: 
   return result
 }
 
-function buildLaunchedResult(platform: Platform, command: string, recordPath: string): NextStepResult {
-  return {
-    onboarding: 'capgo-builder', phase: 'build', state: 'build-launched', platform, progress: 92, kind: 'human_gate',
-    summary: 'I started your first cloud build in a new Terminal window — it takes a few minutes and won\'t block me.',
-    context: { command, recordPath },
-    human: {
-      instruction: 'A Terminal window is now running your build. When it finishes, tell me to continue and I\'ll fetch the result.',
-    },
-    next: {
-      tool: NEXT_STEP_TOOL,
-      with: { checkBuild: true, platform },
-      instruction: `When the Terminal build finishes, call next_step({ checkBuild: true, platform: "${platform}" }).`,
-      call: `${NEXT_STEP_TOOL}({ checkBuild: true, platform: "${platform}" })`,
-    },
-    rules: ONBOARDING_RULES,
-  }
-}
-
-function buildHandoffResult(platform: Platform, command: string, recordPath: string): NextStepResult {
-  return {
-    onboarding: 'capgo-builder', phase: 'build', state: 'build-run-handoff', platform, progress: 92, kind: 'human_gate',
-    summary: 'Time to run your first cloud build — it takes a few minutes and runs in your terminal, so it won\'t block me.',
-    context: { command, recordPath },
-    human: {
-      instruction: `Run this in your terminal:\n\n${command}\n\nIt builds in the cloud and writes the result to a file. When it finishes, tell me to continue.`,
-    },
-    next: {
-      tool: NEXT_STEP_TOOL,
-      with: { checkBuild: true, platform },
-      instruction: `After the build command finishes, call next_step({ checkBuild: true, platform: "${platform}" }) so I can read the result.`,
-      call: `${NEXT_STEP_TOOL}({ checkBuild: true, platform: "${platform}" })`,
-    },
-    rules: ONBOARDING_RULES,
-  }
-}
-
 function buildWaitingResult(platform: Platform): NextStepResult {
   return {
     onboarding: 'capgo-builder', phase: 'build', state: 'build-waiting', platform, progress: 95, kind: 'human_gate',
@@ -3390,7 +3352,14 @@ function buildDoneResult(appId: string, platform: Platform, rec: BuildOutputReco
 function buildFailedResult(appId: string, platform: Platform, rec: BuildOutputRecord, recordPath: string): NextStepResult {
   return {
     onboarding: 'capgo-builder', phase: 'build', state: 'build-failed', platform, progress: 92, kind: 'error',
-    summary: `The build did not succeed (status: ${rec.status}). The full record is at ${recordPath}.`,
+    summary: `The build did not succeed (status: ${rec.status}). The full record is at ${recordPath}. The build is a required step — onboarding can't finish until a build succeeds.`,
+    context: { appId, platform, jobId: rec.jobId, status: rec.status, recordPath },
+    next: {
+      tool: 'capgo_build_logs',
+      with: { platform },
+      instruction: 'Read the build logs with capgo_build_logs, tell the user what failed, and PROPOSE a fix. Do NOT act on your own behalf: do not edit files or retry automatically. Ask the user to confirm before retrying, and retry ONLY via start_capgo_build once they agree. Never call start_capgo_builder_onboarding or next_step to move past or restart onboarding — the build is a required gate.',
+      call: `capgo_build_logs({ platform: "${platform}" })`,
+    },
     rules: ONBOARDING_RULES,
   }
 }
@@ -3460,6 +3429,244 @@ async function enterTailAfterBuild(
   catch {
     return null
   }
+}
+
+// ── Resume prompt (continue vs restart) ──────────────────────────────────────
+//
+// Mirrors the Ink TUI's `resume-prompt` fork (ui/app.tsx, android/ui/app.tsx):
+// when a platform is committed for this session AND that platform has
+// non-trivial saved progress on disk, the FIRST fresh entry asks the user
+// whether to pick up where they left off or wipe and restart — instead of
+// silently teleporting them into the middle of the wizard. The decision is
+// SESSION-local (session-state's resumeResolvedFor), so a server restart
+// re-asks and two concurrent sessions never read each other's choice.
+
+/**
+ * True when `input` is a "fresh entry" into a platform flow — a bare
+ * next_step({}) or a lone { platform } pick — as opposed to a step answer
+ * (keystoreMethod, p8Path, a tail/gate answer, runBuild/checkBuild, ...). Only
+ * fresh entries are eligible for the resume prompt; a step answer must never be
+ * intercepted by it (that would silently drop the answer). `resumeChoice` is the
+ * answer to the prompt itself, handled separately, so it is NOT fresh here.
+ */
+function isFreshEntryInput(input: OnboardingInput | undefined): boolean {
+  if (!input)
+    return true
+  const present = Object.keys(input).filter((k) => {
+    const v = (input as Record<string, unknown>)[k]
+    return v !== undefined && v !== null
+  })
+  return present.length === 0 || (present.length === 1 && present[0] === 'platform')
+}
+
+/**
+ * Determine (and COMMIT) the platform a fresh-entry call will resume, mirroring
+ * the branch selection of decideStart/decideAdvance/decidePlatform WITHOUT
+ * running any effect: an explicit valid { platform } pick, else the
+ * session-committed platform, else a single-platform auto-route. Returns null
+ * when preflight isn't satisfied yet, or the project is multi-platform with no
+ * pick — there the resume prompt stays out of the way and the normal decide loop
+ * renders the login/registration/picker gate. Returns the gathered facts too so
+ * the caller reuses the freshly loaded progress.
+ */
+async function resolveFreshEntryPlatform(
+  deps: EngineDeps,
+  input: OnboardingInput | undefined,
+  appId: string,
+): Promise<{ platform: Platform, facts: PreflightFacts } | null> {
+  const facts = await gatherFacts(deps)
+  if (!facts.capacitorProject || !facts.appId || !facts.authenticated || !facts.appRegistered)
+    return null
+  if (input?.platform === 'ios' || input?.platform === 'android') {
+    if (!facts.platformsDetected.includes(input.platform))
+      return null
+    setSessionPlatform(appId, input.platform)
+    return { platform: input.platform, facts }
+  }
+  const active = getSessionPlatform(appId)
+  if (active)
+    return { platform: active, facts }
+  if (facts.platformsDetected.length === 1) {
+    const only = facts.platformsDetected[0]
+    setSessionPlatform(appId, only)
+    return { platform: only, facts }
+  }
+  return null
+}
+
+/** Non-secret saved-progress breadcrumbs for the android resume prompt. */
+function androidResumeMilestones(prog: AndroidOnboardingProgress): string[] {
+  const c = prog.completedSteps ?? {}
+  const out: string[] = []
+  if (prog.keystoreMethod)
+    out.push(`Keystore method: ${prog.keystoreMethod === 'existing' ? 'import existing' : 'generate new'}`)
+  if (prog.serviceAccountMethod)
+    out.push(`Play service account: ${prog.serviceAccountMethod === 'existing' ? 'import existing JSON' : 'create via Google'}`)
+  if (c.keystoreReady)
+    out.push('Keystore ready')
+  const signIn = c.googleSignInComplete as { email?: string } | undefined
+  if (signIn)
+    out.push(`Signed in with Google${signIn.email ? ` (${signIn.email})` : ''}`)
+  if (c.playAccountChosen)
+    out.push('Play developer account set')
+  if (c.gcpProjectChosen)
+    out.push('Google Cloud project chosen')
+  if (c.androidPackageChosen)
+    out.push('Android package chosen')
+  if (c.serviceAccountProvisioned)
+    out.push('Service account provisioned')
+  if (c.credentialsSaved)
+    out.push('Credentials saved')
+  return out
+}
+
+/** Non-secret saved-progress breadcrumbs for the iOS resume prompt. */
+function iosResumeMilestones(prog: OnboardingProgress): string[] {
+  const c = prog.completedSteps ?? {}
+  const out: string[] = []
+  if (prog.setupMethod)
+    out.push(`Setup method: ${prog.setupMethod === 'import-existing' ? 'import existing credentials' : 'create new via Apple'}`)
+  if (c.apiKeyVerified)
+    out.push('App Store Connect API key verified')
+  if (c.certificateCreated)
+    out.push('Distribution certificate created')
+  if (c.profileCreated)
+    out.push('Provisioning profile created')
+  if (c.credentialsSaved)
+    out.push('Credentials saved')
+  return out
+}
+
+/** Build the continue-vs-restart resume-prompt result for a platform with saved progress. */
+function buildResumePromptResult(
+  appId: string,
+  platform: Platform,
+  prog: AndroidOnboardingProgress | OnboardingProgress,
+  resumeStep: string,
+): NextStepResult {
+  const progressPct = platform === 'android' ? ANDROID_STEP_PROGRESS['resume-prompt'] : STEP_PROGRESS['resume-prompt']
+  const startedRaw = (prog as { startedAt?: string }).startedAt
+  let startedLabel: string | undefined
+  if (startedRaw) {
+    const d = new Date(startedRaw)
+    startedLabel = Number.isNaN(d.getTime()) ? startedRaw : d.toLocaleString()
+  }
+  const platformLabel = platform === 'android' ? 'Android' : 'iOS'
+  const done = platform === 'android'
+    ? androidResumeMilestones(prog as AndroidOnboardingProgress)
+    : iosResumeMilestones(prog as OnboardingProgress)
+  const summaryLines = [
+    `You already have an in-progress ${platformLabel} setup for "${appId}". Do you want to continue where you left off, or start over from scratch (which wipes the saved ${platformLabel} onboarding progress)?`,
+  ]
+  if (startedLabel)
+    summaryLines.push(`Started: ${startedLabel}`)
+  if (done.length) {
+    summaryLines.push('Already done:')
+    for (const item of done)
+      summaryLines.push(`  • ${item}`)
+  }
+  return {
+    onboarding: 'capgo-builder',
+    phase: 'credentials',
+    state: 'resume-prompt',
+    platform,
+    progress: progressPct,
+    kind: 'choice',
+    summary: summaryLines.join('\n'),
+    context: { appId, resumeTarget: resumeStep, startedAt: startedRaw },
+    options: [
+      { value: 'continue', label: 'Continue where I left off', note: `resumes at: ${resumeStep}` },
+      { value: 'restart', label: 'Start over from scratch', note: `wipes the saved ${platformLabel} onboarding progress and begins again` },
+    ],
+    next: {
+      tool: NEXT_STEP_TOOL,
+      with: { resumeChoice: '<continue|restart>' },
+      instruction: `Ask the user whether to continue the existing ${platformLabel} onboarding or restart it, then call ${NEXT_STEP_TOOL} with their choice.`,
+      call: `${NEXT_STEP_TOOL}({ resumeChoice: "continue" })`,
+    },
+    rules: ONBOARDING_RULES,
+  }
+}
+
+/**
+ * The resume-prompt gate. The ANSWER path (a continue/restart pick) runs in
+ * either mode, so next_step can deliver it. The SHOW path (rendering the prompt)
+ * runs only in 'start' mode — runStart, the start tool / "mount" analog — so
+ * mid-flow next_step advances resume silently, exactly like advancing inside an
+ * already-running TUI. Returns a result to RETURN, or null to fall through to
+ * the normal flow.
+ */
+async function maybeResumePrompt(deps: EngineDeps, input: OnboardingInput | undefined, mode: 'start' | 'advance'): Promise<NextStepResult | null> {
+  const appId = await deps.getAppId()
+  if (!appId)
+    return null
+
+  // ── Answer path: the user picked continue or restart ──────────────────────
+  if (input?.resumeChoice) {
+    const platform = getSessionPlatform(appId)
+    if (!platform)
+      return null // stray answer with no committed platform — let the picker take over
+    setResumeResolvedFor(appId, platform)
+    if (input.resumeChoice === 'restart') {
+      // Wipe THIS platform's saved progress and drop the old run's carried
+      // transients, but keep the session committed to the platform (and the
+      // just-recorded resolution, so the prompt isn't re-asked). The data-safety
+      // gate inside decideAndroid/decideIos re-protects any saved credentials.
+      try {
+        if (platform === 'android')
+          await deps.androidEffectDeps.deleteAndroidProgress?.(appId)
+        else
+          await deps.iosEffectDeps?.deleteProgress?.(appId)
+      }
+      catch {
+        // Best-effort: a failed delete leaves the old progress; the flow then
+        // simply resumes from it instead of restarting — never a crash.
+      }
+      try {
+        (deps.oauthSession ?? { clear: clearOAuthSession }).clear(appId)
+      }
+      catch { /* best-effort: drop any in-flight OAuth session for the old run */ }
+      clearSessionCarried(appId)
+    }
+    const facts = await gatherFacts(deps)
+    return platform === 'android' ? decideAndroid(facts, deps) : decideIos(facts, deps)
+  }
+
+  // The PROMPT is shown only at a fresh START (the start tool / "mount" analog);
+  // a mid-flow next_step advance resumes silently. The answer path above runs in
+  // either mode so next_step can still deliver the continue/restart pick.
+  if (mode !== 'start')
+    return null
+
+  // ── Show path: a fresh entry into a platform with resumable progress ────────
+  if (!isFreshEntryInput(input))
+    return null
+  const resolved = await resolveFreshEntryPlatform(deps, input, appId)
+  if (!resolved)
+    return null
+  const { platform, facts } = resolved
+  if (getResumeResolvedFor(appId) === platform)
+    return null
+  if (platform === 'android') {
+    const prog = facts.androidProgress
+    if (prog !== null) {
+      const step = getAndroidResumeStep(prog)
+      if (step !== 'welcome')
+        return buildResumePromptResult(appId, 'android', prog, step)
+    }
+  }
+  else {
+    const prog = facts.iosProgress
+    if (prog !== null) {
+      const step = getIosResumeStep(prog)
+      if (step !== 'welcome')
+        return buildResumePromptResult(appId, 'ios', prog, step)
+    }
+  }
+  // Nothing resumable for this platform — mark resolved so the prompt is never
+  // re-checked this session (e.g. once decideAndroid/decideIos persist a seed).
+  setResumeResolvedFor(appId, platform)
+  return null
 }
 
 async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextStepResult> {
@@ -3540,10 +3747,9 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
           rules: ONBOARDING_RULES,
         }
       }
-      // Precondition (hostile-review 2026-06-12): the build offer
-      // (decideBuildPhase) only renders AFTER the save wrote
-      // completedSteps.credentialsSaved. Honor the same contract here so a
-      // premature runBuild can never launch a build for an app whose
+      // Precondition (hostile-review 2026-06-12): the build offer (decideBuildPhase)
+      // only renders AFTER the save wrote completedSteps.credentialsSaved. Honor the
+      // same contract here so a premature build can never run for an app whose
       // credentials were never saved.
       const buildProgress = buildPlatform === 'android'
         ? await deps.loadAndroidProgress(buildAppId)
@@ -3556,33 +3762,21 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
           rules: ONBOARDING_RULES,
         }
       }
-      const recordPath = deps.buildRecordPath(buildAppId, buildPlatform)
-      // Clear any record left behind by an earlier build BEFORE the hand-off so
-      // checkBuild can never read last run's result as this build's
-      // (hostile-review 2026-06-12). Optional dep: legacy fixtures without it
-      // keep the previous behavior.
-      if (deps.clearBuildRecord) {
-        try {
-          await deps.clearBuildRecord(recordPath)
-        }
-        catch (err) {
-          return {
-            onboarding: 'capgo-builder', phase: 'build', state: 'build-stale-record', platform: buildPlatform,
-            progress: 90, kind: 'error',
-            summary: `A record from an earlier build at ${recordPath} could not be removed (${err instanceof Error ? err.message : String(err)}). Delete the file manually, then ask me to run the build again.`,
-            context: { recordPath },
-            rules: ONBOARDING_RULES,
-          }
-        }
+      // The first cloud build is RUN by the start_capgo_build tool, not next_step.
+      // A runBuild:true is a wrong-tool call — reject it and point the AI at
+      // start_capgo_build. (next_step({ runBuild: false }) still SKIPS the build below.)
+      return {
+        onboarding: 'capgo-builder', phase: 'build', state: 'build-use-start-tool', platform: buildPlatform,
+        progress: 90, kind: 'error',
+        summary: 'The first cloud build is run with the start_capgo_build tool, not next_step. Call start_capgo_build to run it.',
+        next: {
+          tool: 'start_capgo_build',
+          with: { platform: buildPlatform },
+          instruction: `Call start_capgo_build({ platform: "${buildPlatform}" }) to run the build, then keep calling capgo_build_wait until it finishes. (next_step({ runBuild: false }) only SKIPS the build.)`,
+          call: `start_capgo_build({ platform: "${buildPlatform}" })`,
+        },
+        rules: ONBOARDING_RULES,
       }
-      const command = `npx @capgo/cli@latest build request ${buildAppId} --platform ${buildPlatform} --output-upload --output-record "${recordPath}"`
-      if (deps.canLaunchTerminal()) {
-        const launched = await deps.launchBuildInTerminal(command)
-        if (launched.ok)
-          return buildLaunchedResult(buildPlatform, command, recordPath)
-        // launch failed → fall through to the portable agent hand-off
-      }
-      return buildHandoffResult(buildPlatform, command, recordPath)
     }
   }
   if (input?.runBuild === false) {
@@ -3596,6 +3790,15 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
       }
     }
   }
+
+  // ── Resume prompt ANSWER (continue/restart pick, via next_step) ──────────────
+  // The PROMPT itself is shown by runStart (the start tool / "mount" analog), so
+  // a mid-flow next_step advance never re-asks. 'advance' mode runs only the
+  // answer path (applying the user's pick when it arrives) and skips the show
+  // path. Returns the resumed/restarted view; null falls through to the flow.
+  const resumeResult = await maybeResumePrompt(deps, input, 'advance')
+  if (resumeResult)
+    return resumeResult
 
   // ── iOS data-safety gate routing ───────────────────────────────────────────
   // credentialsExistChoice is shared between the android and iOS gates. When
@@ -3907,9 +4110,20 @@ export async function runStart(deps: EngineDeps, platform?: Platform): Promise<N
   // platform so the picker is re-offered (matching the TUI's `build init`). Either way
   // disk progress is untouched — it still resumes the STEP within the chosen platform.
   const appId = await deps.getAppId()
-  if (appId)
+  if (appId) {
     setSessionPlatform(appId, platform)
-  return drive(deps, platform ? { platform } : undefined)
+    // A fresh start re-evaluates the resume prompt (mirrors a TUI re-launch):
+    // clear the prior session's resolution so an in-progress platform re-asks
+    // continue-vs-restart instead of silently resuming.
+    setResumeResolvedFor(appId, undefined)
+  }
+  // Show the continue-vs-restart prompt when this start lands on a platform that
+  // already has resumable on-disk progress (the TUI's mount-time resume-prompt).
+  const startInput = platform ? { platform } : undefined
+  const startResume = await maybeResumePrompt(deps, startInput, 'start')
+  if (startResume)
+    return startResume
+  return drive(deps, startInput)
 }
 
 export async function runAdvance(deps: EngineDeps, input?: OnboardingInput): Promise<NextStepResult> {
@@ -3997,10 +4211,10 @@ export const MCP_ONLY_STATES: readonly string[] = [
   // iOS: the collapsed .p8 gate + the S6a re-collect gate.
   'ios-api-key',
   'ios-credentials-failed',
-  // Build phase (decideBuildPhase + the C2/D2 handoff/polling results).
+  // Build phase (decideBuildPhase + start_capgo_build launch/polling + the runBuild corrective).
   'build-ready',
   'build-launched',
-  'build-run-handoff',
+  'build-use-start-tool',
   'build-waiting',
   'build-failed',
   'build-skipped',
@@ -4016,7 +4230,7 @@ export const MCP_ONLY_STATES: readonly string[] = [
 /**
  * Engine step ids (present in the type tables) the MCP can NEVER emit as a
  * state name:
- *  - TUI bootstrap / TUI-only screens: welcome, resume-prompt, adding-platform,
+ *  - TUI bootstrap / TUI-only screens: welcome, adding-platform,
  *    the AI build-debug sub-flow (decideIos reroutes its entry to
  *    'build-failed'), the contact-support sub-flow (the MCP's error screen has
  *    the email-support arm instead), the native file pickers (the MCP collects
@@ -4030,7 +4244,6 @@ export const MCP_ONLY_STATES: readonly string[] = [
  */
 export const MCP_UNREACHABLE_STEPS: ReadonlySet<string> = new Set<OnboardingStep | AndroidOnboardingStep>([
   'welcome',
-  'resume-prompt',
   'adding-platform',
   'api-key-instructions',
   'p8-method-select',

@@ -61,6 +61,15 @@ export const ONBOARDING_RULES: string[] = [
   'Never tell the user a step succeeded unless a result confirms it.',
   'If the user is confused, asks what a step means, or does not understand the options, call capgo_builder_onboarding_explain for a plain-language explanation — do not guess.',
   'If the user changes which platform to set up (named the wrong one, or wants to switch), call start_capgo_builder_onboarding({ platform: "ios" | "android" }) to switch cleanly — do NOT try to cancel the current step or answer it with the other platform in mind.',
+  // ── Cloud build tools ──
+  'When a cloud build is running, keep calling capgo_build_wait until it returns a terminal status (completed, failed, or cancelled). Never tell the user you will "check back later" and stop — call capgo_build_wait again.',
+  'Never tell the user a build succeeded or failed until a result confirms it.',
+  'Do not read the build log file on disk — it is for the user. Read build logs only via capgo_build_logs, treat them as possibly sensitive, and summarize rather than pasting them.',
+  'Tell the user they can watch the live build logs at the path shown in the result.',
+  'Only one build runs per app and platform at a time. If a build is already running, use its job_id — do not start another with start_capgo_build.',
+  'Only call cancel_capgo_build if the user explicitly asks to stop the build.',
+  'A failed build is a REQUIRED gate, not a dead end: onboarding cannot complete until a build succeeds (then GitHub Actions / CI setup follows). Never call start_capgo_builder_onboarding or capgo_builder_onboarding_next_step to skip, restart, or "continue past" a failed build.',
+  'When a build fails, diagnose it with capgo_build_logs, explain the likely cause, and PROPOSE a fix to the user. Do not act on your own behalf — do not edit files or retry on your own. Ask the user to confirm, and retry only via start_capgo_build once they agree.',
 ]
 
 // ─── Secret redaction (defense-in-depth) ──────────────────────────────────────
