@@ -836,7 +836,7 @@ DROP POLICY IF EXISTS "Allow insert for auth (write+)" ON public.channel_devices
 CREATE POLICY "Allow RBAC channel_devices insert"
 ON public.channel_devices
 FOR INSERT
-TO authenticated
+TO anon, authenticated
 WITH CHECK (
   public.rbac_check_permission_request(
     public.rbac_perm_channel_manage_forced_devices(),

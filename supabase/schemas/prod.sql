@@ -18103,7 +18103,7 @@ CREATE POLICY "Allow RBAC channel_devices delete" ON "public"."channel_devices" 
 
 
 
-CREATE POLICY "Allow RBAC channel_devices insert" ON "public"."channel_devices" FOR INSERT TO "authenticated" WITH CHECK ("public"."rbac_check_permission_request"("public"."rbac_perm_channel_manage_forced_devices"(), "owner_org", "app_id", "channel_id"));
+CREATE POLICY "Allow RBAC channel_devices insert" ON "public"."channel_devices" FOR INSERT TO "authenticated", "anon" WITH CHECK ("public"."rbac_check_permission_request"("public"."rbac_perm_channel_manage_forced_devices"(), "owner_org", "app_id", "channel_id"));
 
 
 

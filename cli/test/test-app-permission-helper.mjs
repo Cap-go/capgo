@@ -48,15 +48,14 @@ await checkAppExistsAndHasPermissionOrgErr(
   42,
 )
 
-assert.deepEqual(calls.map(call => call.name), ['exist_app_v2', 'cli_check_permission'])
-assert.deepEqual(calls[1].args, {
+assert.deepEqual(calls.map(call => call.name), ['cli_check_permission'])
+assert.deepEqual(calls[0].args, {
   apikey: 'ck_channel_cli_key',
   permission_key: 'channel.delete',
   org_id: null,
   app_id: 'com.example.app',
   channel_id: 42,
 })
-
 calls.length = 0
 
 await checkAppExistsAndHasPermissionOrgErr(
@@ -69,8 +68,8 @@ await checkAppExistsAndHasPermissionOrgErr(
   77,
 )
 
-assert.deepEqual(calls.map(call => call.name), ['exist_app_v2', 'cli_check_permission'])
-assert.deepEqual(calls[1].args, {
+assert.deepEqual(calls.map(call => call.name), ['cli_check_permission'])
+assert.deepEqual(calls[0].args, {
   apikey: 'ck_channel_update_key',
   permission_key: 'channel.update_settings',
   org_id: null,

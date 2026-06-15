@@ -1,7 +1,7 @@
 -- Test RLS Policies
 -- This file tests all Row Level Security policies in the database
 BEGIN;
-SELECT plan(65);
+SELECT plan(66);
 
 -- Test app_versions policies
 SELECT
@@ -77,6 +77,20 @@ SELECT
         ),
         'c',
         'channel_devices should cascade when a channel is deleted'
+    );
+
+SELECT
+    is(
+        (
+            SELECT array_agg(policy_role::text ORDER BY policy_role::text)
+            FROM pg_policies
+            CROSS JOIN unnest(roles) AS policy_role
+            WHERE schemaname = 'public'
+              AND tablename = 'channel_devices'
+              AND policyname = 'Allow RBAC channel_devices insert'
+        ),
+        ARRAY['anon', 'authenticated']::text[],
+        'channel_devices insert should allow anon API-key and authenticated JWT traffic'
     );
 
 

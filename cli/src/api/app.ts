@@ -168,12 +168,13 @@ export async function checkAppExistsAndHasPermissionOrgErr(
   channelId?: number | null,
 ) {
   const pm = getPMAndCommand()
+  const isChannelScopedPermission = channelId != null && requiredPermissionKey.startsWith('channel.')
 
   // Check 2FA compliance first (unless already checked earlier)
   if (!skip2FACheck)
     await check2FAComplianceForApp(supabase, appid, silent)
 
-  if (!(await checkAppExists(supabase, appid))) {
+  if (!isChannelScopedPermission && !(await checkAppExists(supabase, appid))) {
     const msg = `App ${appid} does not exist, run first \`${pm.runner} @capgo/cli app add ${appid}\` to create it`
     if (!silent)
       log.error(msg)
