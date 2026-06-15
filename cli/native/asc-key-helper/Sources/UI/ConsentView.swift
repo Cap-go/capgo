@@ -64,7 +64,7 @@ struct ConsentView: View {
             )
             point(
                 icon: "doc.badge.gearshape.fill",
-                title: "We only read the key you generate",
+                title: "We only receive the key you generate",
                 detail: "Capgo captures just the new API key (Key ID, Issuer ID, and the .p8) so Capgo Builder can upload your app."
             )
         }

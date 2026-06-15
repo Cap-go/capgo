@@ -1,7 +1,7 @@
 {
   "name": "@capgo/cli",
   "type": "module",
-  "version": "8.5.2",
+  "version": "8.5.3",
   "description": "A CLI to upload to capgo servers",
   "author": "Martin martin@capgo.app",
   "license": "Apache 2.0",
@@ -178,8 +178,8 @@
     "string-width": "^8.2.1"
   },
   "optionalDependencies": {
-    "@capgo/cli-helper-darwin-arm64": "^1.1.0",
-    "@capgo/cli-helper-darwin-x64": "^1.1.0"
+    "@capgo/cli-helper-darwin-arm64": "^1.1.1",
+    "@capgo/cli-helper-darwin-x64": "^1.1.1"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^9.0.0",
