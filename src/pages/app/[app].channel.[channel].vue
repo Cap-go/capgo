@@ -229,7 +229,7 @@ async function handleVersionLink(appVersion: Database['public']['Tables']['app_v
   } = await checkCompatibilityNativePackages(appVersion.app_id, channel.value.name, (appVersion.native_packages as any) ?? [])
 
   // Check if any package is incompatible
-  if (localDependencies.length > 0 && finalCompatibility.find(x => !isCompatible(x))) {
+  if (localDependencies.length > 0 && finalCompatibility.some(x => !isCompatible(x))) {
     toast.error(t('bundle-not-compatible-with-channel', { channel: channel.value.name }))
 
     dialogStore.openDialog({

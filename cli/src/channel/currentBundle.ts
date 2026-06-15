@@ -13,9 +13,11 @@ import {
 
 interface Channel {
   id: number
-  version: {
-    name: string
-  }
+  version: number | null
+}
+
+interface CurrentBundleRow {
+  bundle_name: string | null
 }
 
 export async function currentBundleInternal(channel: string, appId: string, options: ChannelCurrentBundleOptions, silent = false) {
@@ -52,7 +54,7 @@ export async function currentBundleInternal(channel: string, appId: string, opti
 
   const { data: supabaseChannel, error } = await withSupabaseSource('channels.currentBundle', () => supabase
     .from('channels')
-    .select('id, version ( name )')
+    .select('id, version')
     .eq('name', channel)
     .eq('app_id', appId)
     .limit(1))
@@ -79,14 +81,27 @@ export async function currentBundleInternal(channel: string, appId: string, opti
     throw new Error(`Channel ${channel} does not have a bundle linked`)
   }
 
-  if (!silent) {
-    if (!quiet)
-      log.info(`Current bundle for channel ${channel} is ${version.name}`)
-    else
-      log.info(version.name)
+  const { data: bundleRows, error: bundleError } = await withSupabaseSource('channels.currentBundleName', () => supabase
+    .rpc('get_channel_current_bundle_rbac' as any, {
+      p_app_id: appId,
+      p_channel_id: channelId,
+    }))
+
+  const bundleName = (bundleRows as CurrentBundleRow[] | null)?.[0]?.bundle_name
+  if (bundleError || !bundleName) {
+    if (!silent)
+      log.error(`Error retrieving current bundle for channel ${channel}.`)
+    throw new Error(`Channel ${channel} does not have a readable current bundle`)
   }
 
-  return version.name
+  if (!silent) {
+    if (!quiet)
+      log.info(`Current bundle for channel ${channel} is ${bundleName}`)
+    else
+      log.info(bundleName)
+  }
+
+  return bundleName
 }
 
 export async function currentBundle(channel: string, appId: string, options: ChannelCurrentBundleOptions) {

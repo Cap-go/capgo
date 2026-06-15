@@ -15,7 +15,7 @@ PG_DUMP_BIN="${PG_DUMP_BIN:-$(command -v pg_dump-17 || command -v pg_dump || tru
 PG_RESTORE_BIN="${PG_RESTORE_BIN:-$(command -v pg_restore-17 || command -v pg_restore || true)}"
 
 if [[ -z "$PSQL_BIN" || -z "$PG_DUMP_BIN" || -z "$PG_RESTORE_BIN" ]]; then
-  echo "Error: psql, pg_dump, and pg_restore are required to prepare read-replica schema."
+  echo "Error: psql, pg_dump, and pg_restore are required to prepare read-replica schema." >&2
   exit 1
 fi
 
@@ -38,7 +38,7 @@ for table in "${REPLICA_TABLES[@]}"; do
 done
 
 if [[ ${#TABLE_ARGS[@]} -eq 0 ]]; then
-  echo "Error: no configured replica tables were found in the source database."
+  echo "Error: no configured replica tables were found in the source database." >&2
   exit 1
 fi
 

@@ -2693,6 +2693,11 @@ DECLARE
   v_owner_org uuid;
   v_user_id uuid;
   v_org_enforcing_2fa boolean;
+  v_has_app_or_channel_access boolean;
+  v_apikey text;
+  v_api_key public.apikeys%ROWTYPE;
+  v_principal_type text;
+  v_principal_id uuid;
 BEGIN
   SELECT owner_org INTO v_owner_org
   FROM public.apps
@@ -2702,17 +2707,55 @@ BEGIN
     RETURN false;
   END IF;
 
-  IF NOT public.rbac_check_permission_request(
-    public.rbac_perm_app_read(),
-    v_owner_org,
-    reject_access_due_to_2fa_for_app.app_id,
-    NULL::bigint
-  ) THEN
-    RETURN false;
+  v_apikey := public.get_apikey_header();
+  IF v_apikey IS NOT NULL AND v_apikey <> '' THEN
+    SELECT * INTO v_api_key
+    FROM public.find_apikey_by_value(v_apikey)
+    LIMIT 1;
+
+    IF v_api_key.id IS NULL OR public.is_apikey_expired(v_api_key.expires_at) THEN
+      RETURN false;
+    END IF;
+
+    v_user_id := v_api_key.user_id;
+    v_principal_type := public.rbac_principal_apikey();
+    v_principal_id := v_api_key.rbac_id;
+  ELSE
+    v_user_id := auth.uid();
+    IF v_user_id IS NULL THEN
+      RETURN false;
+    END IF;
+
+    v_principal_type := public.rbac_principal_user();
+    v_principal_id := v_user_id;
   END IF;
 
-  v_user_id := public.request_actor_user_id();
-  IF v_user_id IS NULL THEN
+  SELECT
+    public.rbac_has_permission(
+      v_principal_type,
+      v_principal_id,
+      public.rbac_perm_app_read(),
+      v_owner_org,
+      reject_access_due_to_2fa_for_app.app_id,
+      NULL::bigint
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM public.channels c
+      WHERE c.owner_org = v_owner_org
+        AND c.app_id = reject_access_due_to_2fa_for_app.app_id
+        AND public.rbac_has_permission(
+          v_principal_type,
+          v_principal_id,
+          public.rbac_perm_channel_read(),
+          c.owner_org,
+          c.app_id,
+          c.id
+        )
+    )
+  INTO v_has_app_or_channel_access;
+
+  IF NOT COALESCE(v_has_app_or_channel_access, false) THEN
     RETURN false;
   END IF;
 
@@ -6226,3 +6269,35 @@ BEGIN
   END IF;
 END;
 $$;
+
+CREATE OR REPLACE FUNCTION public.get_channel_current_bundle_rbac(p_app_id character varying, p_channel_id bigint)
+RETURNS TABLE(bundle_name character varying)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT av.name
+  FROM public.channels ch
+  JOIN public.app_versions av
+    ON av.id = ch.version
+    AND av.app_id = ch.app_id
+  WHERE ch.id = p_channel_id
+    AND ch.app_id = p_app_id
+    AND public.rbac_check_permission_request(
+      public.rbac_perm_channel_read(),
+      ch.owner_org,
+      ch.app_id,
+      ch.id
+    )
+  LIMIT 1;
+END;
+$$;
+
+ALTER FUNCTION public.get_channel_current_bundle_rbac(character varying, bigint) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.get_channel_current_bundle_rbac(character varying, bigint) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_channel_current_bundle_rbac(character varying, bigint) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_channel_current_bundle_rbac(character varying, bigint) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_channel_current_bundle_rbac(character varying, bigint) TO service_role;
+COMMENT ON FUNCTION public.get_channel_current_bundle_rbac(character varying, bigint) IS 'Returns only the current bundle name for a channel the caller can read, allowing channel-scoped CLI access without granting app.read_bundles.';

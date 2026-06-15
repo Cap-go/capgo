@@ -948,6 +948,97 @@ describe('rbac permission system', () => {
         })
       })
 
+      it('should enforce app 2FA checks for channel-scoped api keys without app read', async () => {
+        const testId = randomUUID()
+        const channelKeyOwnerId = randomUUID()
+        const orgId = randomUUID()
+        const appUuid = randomUUID()
+        const appId = `com.rbac.channel-key-2fa.${testId}`
+        const channelKey = `rbac-channel-key-2fa-${testId}`
+
+        await query(`
+          INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_user_meta_data)
+          VALUES ($1::uuid, $2, $3, NOW(), NOW(), NOW(), '{}'::jsonb)
+        `, [channelKeyOwnerId, `channel-key-2fa-${testId}@capgo.app`, USER_PASSWORD_HASH])
+
+        await query(`
+          INSERT INTO public.users (id, email, first_name, last_name)
+          VALUES ($1::uuid, $2, 'Channel', 'Key')
+        `, [channelKeyOwnerId, `channel-key-2fa-${testId}@capgo.app`])
+
+        await query(`
+          INSERT INTO public.orgs (id, name, management_email, created_by, enforcing_2fa)
+          VALUES ($1::uuid, $2, $3, $4::uuid, true)
+        `, [orgId, `RBAC Channel Key 2FA ${testId}`, `rbac-channel-key-2fa-${testId}@capgo.app`, USER_ID])
+
+        await query(`
+          INSERT INTO public.apps (id, app_id, name, icon_url, owner_org)
+          VALUES ($1::uuid, $2, $3, $4, $5::uuid)
+        `, [appUuid, appId, `RBAC Channel Key 2FA App ${testId}`, 'rbac-channel-key-2fa-icon', orgId])
+
+        const channel = await query(`
+          INSERT INTO public.channels (name, app_id, created_by, owner_org)
+          VALUES ($1, $2, $3::uuid, $4::uuid)
+          RETURNING id, rbac_id
+        `, [`allowed-${testId}`, appId, USER_ID, orgId])
+
+        const apiKeyResult = await query(`
+          INSERT INTO public.apikeys (user_id, key, name)
+          VALUES ($1::uuid, $2, $3)
+          RETURNING rbac_id
+        `, [channelKeyOwnerId, channelKey, `RBAC channel key 2FA ${testId}`])
+
+        await query(`
+          INSERT INTO public.role_bindings (
+            principal_type,
+            principal_id,
+            role_id,
+            scope_type,
+            org_id,
+            app_id,
+            channel_id,
+            granted_by,
+            is_direct
+          )
+          SELECT
+            public.rbac_principal_apikey(),
+            $1::uuid,
+            r.id,
+            public.rbac_scope_channel(),
+            $2::uuid,
+            $3::uuid,
+            $4::uuid,
+            $5::uuid,
+            true
+          FROM public.roles r
+          WHERE r.name = public.rbac_role_channel_reader()
+        `, [apiKeyResult.rows[0].rbac_id, orgId, appUuid, channel.rows[0].rbac_id, USER_ID])
+
+        const rawAccess = await query(`
+          SELECT
+            public.rbac_has_permission(public.rbac_principal_apikey(), $4::uuid, public.rbac_perm_channel_read(), $1::uuid, $2, $3::bigint) AS has_channel_read_binding,
+            public.rbac_has_permission(public.rbac_principal_apikey(), $4::uuid, public.rbac_perm_app_read(), $1::uuid, $2, NULL::bigint) AS has_app_read_binding
+        `, [orgId, appId, channel.rows[0].id, apiKeyResult.rows[0].rbac_id])
+        expect(rawAccess.rows[0]).toMatchObject({
+          has_channel_read_binding: true,
+          has_app_read_binding: false,
+        })
+
+        await query(`SELECT set_config('request.headers', $1, true)`, [JSON.stringify({ capgkey: channelKey })])
+        await query('SET LOCAL ROLE anon')
+
+        const guardedAccess = await query(`
+          SELECT
+            public.rbac_check_permission_request(public.rbac_perm_channel_read(), $1::uuid, $2, $3::bigint) AS can_read_channel_after_2fa_gate,
+            public.reject_access_due_to_2fa_for_app($2) AS rejects_for_2fa
+        `, [orgId, appId, channel.rows[0].id])
+
+        expect(guardedAccess.rows[0]).toMatchObject({
+          can_read_channel_after_2fa_gate: false,
+          rejects_for_2fa: true,
+        })
+      })
+
       it('should deny org permissions outside bound org for api keys', async () => {
         const allowedOrgId = randomUUID()
         const targetOrgId = randomUUID()

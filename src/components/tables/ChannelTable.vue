@@ -308,9 +308,9 @@ columns.value = [
       {
         icon: IconSettings,
         disabled: (elem: Element) => !canReadChannel.value[elem.id],
-        title: (elem: Element) => (!canReadChannel.value[elem.id]
-          ? t('channel-permission-read-required')
-          : ''),
+        title: (elem: Element) => (canReadChannel.value[elem.id]
+          ? ''
+          : t('channel-permission-read-required')),
         onClick: (elem: Element) => openOne(elem),
       },
       {

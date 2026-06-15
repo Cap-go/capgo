@@ -59,6 +59,7 @@ const ANON_ALLOWED_PROCS = [
   'public.check_org_members_password_policy(uuid)',
   'public.get_org_members(uuid)',
   'public.get_org_members_rbac(uuid)',
+  'public.get_channel_current_bundle_rbac(character varying, bigint)',
   'public.get_total_app_storage_size_orgs(uuid, character varying)',
   'public.get_total_storage_size_org(uuid)',
   'public.get_user_main_org_id_by_app_id(text)',

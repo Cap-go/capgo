@@ -250,7 +250,7 @@ function toTitleCaseSegment(segment: string) {
 }
 
 function deriveOrgNameFromWebsite(hostname: string) {
-  const primarySegment = hostname.split('.').filter(Boolean)[0] ?? ''
+  const primarySegment = hostname.split('.').find(Boolean) ?? ''
   return toTitleCaseSegment(primarySegment)
 }
 
@@ -264,7 +264,7 @@ function isStepActive(stepId: OnboardingStep) {
 }
 
 async function goBack() {
-  if (window.history.length > 1) {
+  if (globalThis.history.length > 1) {
     await router.back()
     return
   }
@@ -369,49 +369,107 @@ function deriveNameFromWebsitePreview(hostname: string) {
   return deriveOrgNameFromWebsite(hostname || websiteHostname.value)
 }
 
-async function createOrganization() {
+function getValidatedOrganizationName() {
   if (isSubmitting.value || !main.auth)
-    return
+    return null
 
   if (!mode.value) {
     toast.error(t('organization-onboarding-mode-required'))
-    return
+    return null
   }
 
   const orgName = orgNameInput.value.trim()
   if (!orgName) {
     toast.error(t('org-name-required'))
-    return
+    return null
   }
 
   if (!selectedUserCountStop.value) {
     toast.error(t('organization-onboarding-user-scale-required'))
-    return
+    return null
   }
 
   if (!selectedIntent.value) {
     toast.error(t('organization-onboarding-intent-required'))
-    return
+    return null
   }
+
+  return orgName
+}
+
+async function createOrganizationRequest(orgName: string) {
+  const normalizedWebsite = mode.value === 'website'
+    ? websitePreview.value?.website
+    : undefined
+
+  return await supabase.functions.invoke('organization', {
+    method: 'POST',
+    body: {
+      name: orgName,
+      email: main.auth?.email ?? '',
+      estimatedMau: selectedUserCountStop.value!.value,
+      website: normalizedWebsite,
+      intent: selectedIntent.value,
+    },
+  })
+}
+
+function trackOrganizationCreated(orgId: string) {
+  try {
+    pushEvent('onboarding_intent_selected', config.supaHost, {
+      intent: selectedIntent.value,
+      estimated_mau: selectedUserCountStop.value?.value ?? null,
+      org_id: orgId,
+    })
+  }
+  catch (error) {
+    console.error('Failed to track onboarding intent', error)
+  }
+}
+
+async function refreshCreatedOrganization(orgId: string) {
+  try {
+    await organizationStore.fetchOrganizations()
+    organizationStore.setCurrentOrganization(orgId)
+  }
+  catch (error) {
+    console.error('Failed to refresh organizations after onboarding create', error)
+    toast.error(t('organization-onboarding-refresh-failed'))
+  }
+}
+
+async function maybeUseImportedLogoAfterCreate() {
+  if (mode.value !== 'website' || !importedLogoUrl.value)
+    return false
+
+  try {
+    return await useImportedLogo()
+  }
+  catch (error) {
+    console.error('Failed to import logo after organization create', error)
+    return false
+  }
+}
+
+async function advanceToLogoStep(orgId: string) {
+  step.value = 'logo'
+  try {
+    await syncRouteQuery('logo', orgId)
+  }
+  catch (error) {
+    console.error('Failed to sync onboarding route after create', error)
+  }
+}
+
+async function createOrganization() {
+  const orgName = getValidatedOrganizationName()
+  if (!orgName)
+    return
 
   isSubmitting.value = true
 
   try {
-    const normalizedWebsite = mode.value === 'website'
-      ? websitePreview.value?.website
-      : undefined
-
-    const { data, error } = await supabase.functions.invoke('organization', {
-      method: 'POST',
-      body: {
-        name: orgName,
-        email: main.auth.email ?? '',
-        estimatedMau: selectedUserCountStop.value.value,
-        website: normalizedWebsite,
-        intent: selectedIntent.value,
-      },
-    })
-
+    const { data, error } = await createOrganizationRequest(orgName)
     if (error || !data?.id) {
       console.error('Error creating organization during onboarding', error)
       toast.error(error?.code === '23505'
@@ -422,45 +480,13 @@ async function createOrganization() {
 
     createdOrgId.value = data.id
     toast.success(t('org-created-successfully'))
+    trackOrganizationCreated(data.id)
+    await refreshCreatedOrganization(data.id)
 
-    try {
-      pushEvent('onboarding_intent_selected', config.supaHost, {
-        intent: selectedIntent.value,
-        estimated_mau: selectedUserCountStop.value?.value ?? null,
-        org_id: data.id,
-      })
-    }
-    catch (error) {
-      console.error('Failed to track onboarding intent', error)
-    }
+    if (await maybeUseImportedLogoAfterCreate())
+      return
 
-    try {
-      await organizationStore.fetchOrganizations()
-      organizationStore.setCurrentOrganization(data.id)
-    }
-    catch (error) {
-      console.error('Failed to refresh organizations after onboarding create', error)
-      toast.error(t('organization-onboarding-refresh-failed'))
-    }
-
-    if (mode.value === 'website' && importedLogoUrl.value) {
-      try {
-        const imported = await useImportedLogo()
-        if (imported)
-          return
-      }
-      catch (error) {
-        console.error('Failed to import logo after organization create', error)
-      }
-    }
-
-    step.value = 'logo'
-    try {
-      await syncRouteQuery('logo', data.id)
-    }
-    catch (error) {
-      console.error('Failed to sync onboarding route after create', error)
-    }
+    await advanceToLogoStep(data.id)
   }
   finally {
     isSubmitting.value = false
@@ -506,7 +532,7 @@ async function useImportedLogo() {
       }
 
       const binary = atob(payload)
-      const bytes = Uint8Array.from(binary, char => char.charCodeAt(0))
+      const bytes = Uint8Array.from(binary, char => char.codePointAt(0) ?? 0)
       const blob = new Blob([bytes], { type: contentType })
       await uploadLogoBlob(blob, `${websiteHostname.value || 'website-logo'}.png`)
       return true
@@ -623,7 +649,11 @@ onUnmounted(() => {
   <section class="h-full min-h-0 overflow-y-auto bg-slate-50 px-4 py-4 text-slate-950 sm:px-5 sm:py-6 lg:px-6 dark:bg-slate-950 dark:text-slate-50">
     <div class="relative mx-auto flex w-full max-w-5xl flex-col gap-4">
       <InviteTeammateModal ref="inviteModalRef" @success="onInviteSuccess" />
+      <label for="organization-logo-input" class="sr-only">
+        {{ t('organization-onboarding-logo-title') }}
+      </label>
       <input
+        id="organization-logo-input"
         ref="logoInput"
         type="file"
         accept="image/*"

@@ -1666,7 +1666,11 @@ getKeys()
             </button>
           </div>
           <div v-if="scopePicker.items.length > 8" class="border-b border-slate-200 p-2 dark:border-slate-700">
+            <label for="api-key-scope-search" class="sr-only">
+              {{ t('search-scope-items') }}
+            </label>
             <input
+              id="api-key-scope-search"
               v-model="scopePickerQuery"
               type="search"
               class="min-h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
@@ -1908,7 +1912,11 @@ getKeys()
                     {{ getAppOrgNameById(appId) }}
                   </span>
                 </span>
+                <label :for="`create-key-app-role-${appId}`" class="sr-only">
+                  {{ getAppNameById(appId) }} {{ t('select-role') }}
+                </label>
                 <select
+                  :id="`create-key-app-role-${appId}`"
                   data-test="create-key-app-role-select"
                   class="d-select d-select-sm d-select-bordered"
                   :value="pendingAppBindings[appId] || ''"
@@ -1990,10 +1998,11 @@ getKeys()
           </div>
           <template v-else-if="selectedApiKeyForChannelPermissions?.rbac_id && selectedChannelPermissionApp">
             <div>
-              <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+              <label for="apikey-channel-permissions-app-select" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
                 {{ t('app') }}
               </label>
               <select
+                id="apikey-channel-permissions-app-select"
                 v-model="selectedChannelPermissionAppUuid"
                 class="w-full d-select d-select-bordered"
                 data-test="apikey-channel-permissions-app-select"

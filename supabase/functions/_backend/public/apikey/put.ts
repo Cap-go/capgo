@@ -8,8 +8,8 @@ import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hon
 import { middlewareAuth } from '../../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
-import { checkPermission } from '../../utils/rbac.ts'
 import { schema } from '../../utils/postgres_schema.ts'
+import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseAdmin, supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { apiKeyBindingsAllowOrgCreate, assertApiKeyCanKeepOrgCreateGrant, parseApiKeyGlobalPermissions, replaceApiKeyGlobalPermissions, validateApiKeyGlobalPermissionsForBindings } from './global_permissions.ts'
 import { ensureApiKeyCanManageTargetOrgIds, ensureApiKeyManagementAllowed, getApiKeyBindingOrgIds, isValidApiKeyIdFormat, requireApiKeyManagementAuth, selectOwnedApiKeyByIdentifier } from './scope.ts'
@@ -376,7 +376,8 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
     const orgsToValidate = hasBindingUpdates
       ? [...new Set(bindings.map(binding => binding.org_id))]
       : currentBindingOrgIds
-    await validateExpirationAgainstOrgPolicies(orgsToValidate, expires_at !== undefined ? expires_at : existingApikey.expires_at, dataSupabase)
+    const expiresAtForValidation = expires_at === undefined ? existingApikey.expires_at : expires_at
+    await validateExpirationAgainstOrgPolicies(orgsToValidate, expiresAtForValidation, dataSupabase)
   }
 
   const isHashedKey = existingApikey.key_hash !== null

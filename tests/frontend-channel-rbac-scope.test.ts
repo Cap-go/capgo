@@ -29,4 +29,10 @@ describe('frontend channel RBAC scope regressions', () => {
     expect(source).not.toContain(`checkPermissions('${permission}', { appId: props.appId })`)
     expect(source).not.toContain(oldSettingsGuard)
   })
+
+  it.concurrent('keeps app reader channel defaults aligned with RBAC role permissions', async () => {
+    const source = await readRepoFile('src/components/permissions/ChannelPermissionOverridesPanel.vue')
+
+    expect(source).toContain(`  app_reader: {\n    'channel.read': true,\n    'channel.read_history': true,\n    'channel.promote_bundle': false,\n  },`)
+  })
 })

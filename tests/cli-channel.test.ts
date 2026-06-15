@@ -180,13 +180,13 @@ describe('tests CLI channel commands', () => {
 
       const { data: channel, error: channelError } = await supabase
         .from('channels')
-        .select('id, rbac_id')
+        .select('id, rbac_id, version ( name )')
         .eq('name', channelName)
         .eq('app_id', APPNAME)
         .single()
       expect(channelError).toBeNull()
       expect(channel?.rbac_id).toBeTruthy()
-
+      expect(channel?.version?.name).toBeTruthy()
       const { data: channelReaderRole, error: roleError } = await supabase
         .from('roles')
         .select('id')
@@ -235,7 +235,7 @@ describe('tests CLI channel commands', () => {
 
         const result = await createTestSDK(resolvedKey).getCurrentBundle(APPNAME, channelName)
         expect(result.success, result.error).toBe(true)
-        expect(result.data).toBeDefined()
+        expect(result.data).toBe(channel?.version?.name)
       }
       finally {
         await supabase.from('role_bindings').delete().eq('principal_id', apiKey.rbac_id)

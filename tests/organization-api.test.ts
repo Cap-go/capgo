@@ -19,9 +19,11 @@ import {
   TEST_EMAIL,
   USER_ADMIN_EMAIL,
   USER_EMAIL,
+  USER_EMAIL_NONMEMBER,
   USER_ID,
   USER_ID_2,
   USER_PASSWORD,
+  USER_PASSWORD_NONMEMBER,
 } from './test-utils.ts'
 
 const normalizedSupabaseBaseUrl = normalizeLocalhostUrl(SUPABASE_BASE_URL) ?? SUPABASE_BASE_URL
@@ -2248,6 +2250,65 @@ describe('rbac mode - organization member operations', () => {
     // role_bindings also cleaned up
     const { data: bindingsAfter } = await getSupabaseClient().from('role_bindings').select().eq('principal_type', 'user').eq('principal_id', userData!.id).eq('org_id', ORG_ID_RBAC)
     expect(bindingsAfter).toHaveLength(0)
+  })
+
+  it('[DELETE] /organization/members - org member can leave self and cleans role_bindings', async () => {
+    const { data: userData } = await getSupabaseClient().from('users').select('id').eq('email', USER_EMAIL_NONMEMBER).single()
+    expect(userData).toBeTruthy()
+
+    await getSupabaseClient().from('role_bindings').delete().eq('principal_type', 'user').eq('principal_id', userData!.id).eq('org_id', ORG_ID_RBAC)
+    await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID_RBAC).eq('user_id', userData!.id)
+    await getSupabaseClient().from('org_users').insert({
+      org_id: ORG_ID_RBAC,
+      user_id: userData!.id,
+      rbac_role_name: 'org_member',
+    })
+    await createUserOrgBinding(ORG_ID_RBAC, userData!.id, 'org_member')
+
+    const memberHeaders = await getAuthHeadersForCredentials(USER_EMAIL_NONMEMBER, USER_PASSWORD_NONMEMBER)
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID_RBAC}&email=${encodeURIComponent(USER_EMAIL_NONMEMBER)}`, {
+      headers: memberHeaders,
+      method: 'DELETE',
+    })
+    expect(response.status).toBe(200)
+
+    const { data: orgUserAfter } = await getSupabaseClient().from('org_users').select().eq('org_id', ORG_ID_RBAC).eq('user_id', userData!.id)
+    expect(orgUserAfter).toHaveLength(0)
+
+    const { data: bindingsAfter } = await getSupabaseClient().from('role_bindings').select().eq('principal_type', 'user').eq('principal_id', userData!.id).eq('org_id', ORG_ID_RBAC)
+    expect(bindingsAfter).toHaveLength(0)
+  })
+
+  it('[DELETE] /organization/members - org member cannot delete another member', async () => {
+    const { data: userData } = await getSupabaseClient().from('users').select('id').eq('email', USER_EMAIL_NONMEMBER).single()
+    expect(userData).toBeTruthy()
+
+    await getSupabaseClient().from('role_bindings').delete().eq('principal_type', 'user').eq('principal_id', userData!.id).eq('org_id', ORG_ID_RBAC)
+    await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID_RBAC).eq('user_id', userData!.id)
+    await getSupabaseClient().from('org_users').insert({
+      org_id: ORG_ID_RBAC,
+      user_id: userData!.id,
+      rbac_role_name: 'org_member',
+    })
+    await createUserOrgBinding(ORG_ID_RBAC, userData!.id, 'org_member')
+
+    const memberHeaders = await getAuthHeadersForCredentials(USER_EMAIL_NONMEMBER, USER_PASSWORD_NONMEMBER)
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID_RBAC}&email=${USER_ADMIN_EMAIL}`, {
+      headers: memberHeaders,
+      method: 'DELETE',
+    })
+    expect(response.status).toBe(400)
+    const payload = await response.json() as { error: string }
+    expect(payload.error).toBe('cannot_access_organization')
+
+    const { data: orgUserAfter } = await getSupabaseClient().from('org_users').select().eq('org_id', ORG_ID_RBAC).eq('user_id', userData!.id)
+    expect(orgUserAfter).toHaveLength(1)
+
+    const { data: bindingsAfter } = await getSupabaseClient().from('role_bindings').select().eq('principal_type', 'user').eq('principal_id', userData!.id).eq('org_id', ORG_ID_RBAC)
+    expect(bindingsAfter!.length).toBeGreaterThan(0)
+
+    await getSupabaseClient().from('role_bindings').delete().eq('principal_type', 'user').eq('principal_id', userData!.id).eq('org_id', ORG_ID_RBAC)
+    await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID_RBAC).eq('user_id', userData!.id)
   })
 })
 
