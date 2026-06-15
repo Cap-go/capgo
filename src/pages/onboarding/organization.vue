@@ -15,6 +15,7 @@ import IconPencil from '~icons/lucide/pencil-line'
 import IconRefresh from '~icons/lucide/refresh-cw'
 import IconSmartphone from '~icons/lucide/smartphone'
 import IconSparkles from '~icons/lucide/sparkles'
+import IconStore from '~icons/lucide/store'
 import IconUpload from '~icons/lucide/upload-cloud'
 import IconUserPlus from '~icons/lucide/user-plus'
 import IconUsers from '~icons/lucide/users-round'
@@ -28,7 +29,7 @@ import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 type OnboardingStep = 'details' | 'logo' | 'invite'
-type OnboardingMode = 'website' | 'name' | null
+type OnboardingMode = 'store' | 'website' | 'name' | null
 
 interface InviteTeammateModalRef {
   openDialog: () => void
@@ -46,11 +47,26 @@ interface WebsitePreview {
   icon: string | null
   website: string
 }
+interface StoreMetadata {
+  name?: string
+  icon_url?: string | null
+  icon_data_url?: string | null
+  developer_name?: string | null
+  developer_url?: string | null
+  app_id?: string | null
+  url?: string
+}
 
 interface UserCountStop {
   value: number
   label: string
   planName: string
+}
+
+interface OrganizationFormValues {
+  orgName: string
+  userCountStop: UserCountStop
+  intent: string
 }
 
 const route = useRoute()
@@ -65,20 +81,24 @@ const { currentOrganization } = storeToRefs(organizationStore)
 const step = ref<OnboardingStep>('details')
 const mode = ref<OnboardingMode>(null)
 const websiteInput = ref('')
+const storeUrlInput = ref('')
 const orgNameInput = ref('')
 const createdOrgId = ref('')
 const isSubmitting = ref(false)
 const isUploadingLogo = ref(false)
 const isLoadingWebsitePreview = ref(false)
+const isLoadingStoreMetadata = ref(false)
 const isLoggingOut = ref(false)
 const selectedLogoPreview = ref('')
 const sentInvites = ref<SentInvite[]>([])
 const websitePreview = ref<WebsitePreview | null>(null)
+const storeMetadata = ref<StoreMetadata | null>(null)
 const inviteModalRef = ref<InviteTeammateModalRef | null>(null)
 const logoInputRef = useTemplateRef<HTMLInputElement>('logoInput')
 const isAdditionalOrgFlow = ref(false)
 const estimatedUsersIndex = ref<number | null>(null)
 const config = getLocalConfig()
+let storeMetadataRun = 0
 
 // Org-level onboarding intent: what the user wants to do with Capgo first.
 // Persisted on the new org (orgs.onboarding jsonb, keyed by `intent`) by the
@@ -109,7 +129,7 @@ const activeOrgId = computed(() => createdOrgId.value || '')
 const activeOrgName = computed(() => {
   if (currentOrganization.value?.gid === activeOrgId.value)
     return currentOrganization.value.name
-  return orgNameInput.value.trim() || websitePreview.value?.name || ''
+  return orgNameInput.value.trim() || storeMetadata.value?.developer_name?.trim() || websitePreview.value?.name || ''
 })
 const hasSavedLogo = computed(() => currentOrganization.value?.gid === activeOrgId.value && !!currentOrganization.value.logo)
 const userCountStops = computed<UserCountStop[]>(() => {
@@ -159,10 +179,35 @@ const websiteHostname = computed(() => {
   }
 })
 
-const importedLogoUrl = computed(() => websitePreview.value?.icon ?? '')
+const storeHostname = computed(() => {
+  const value = storeMetadata.value?.url || storeUrlInput.value.trim()
+  if (!value)
+    return ''
+
+  try {
+    const normalized = /^https?:\/\//.test(value) ? value : `https://${value}`
+    return new URL(normalized).hostname.replace(/^www\./, '')
+  }
+  catch {
+    return ''
+  }
+})
+
+const importedLogoUrl = computed(() => {
+  const storeIcon = storeMetadata.value?.icon_data_url || storeMetadata.value?.icon_url || ''
+  return websitePreview.value?.icon || storeIcon
+})
+const importedLogoFilenameBase = computed(() => websiteHostname.value || storeMetadata.value?.app_id || storeHostname.value || 'imported-logo')
+const sourceSummaryLabel = computed(() => {
+  if (mode.value === 'store')
+    return storeMetadata.value?.app_id || storeHostname.value || t('organization-onboarding-mode-store')
+  if (mode.value === 'website')
+    return websiteHostname.value || t('organization-onboarding-mode-website')
+  return t('organization-onboarding-mode-name')
+})
 const canShowOrgDetails = computed(() => mode.value !== null)
 const canCreateOrganization = computed(() => {
-  if (!main.auth || isSubmitting.value || isLoadingWebsitePreview.value || !mode.value)
+  if (!main.auth || isSubmitting.value || isLoadingWebsitePreview.value || isLoadingStoreMetadata.value || !mode.value)
     return false
 
   return !!orgNameInput.value.trim() && !!selectedUserCountStop.value
@@ -250,7 +295,7 @@ function toTitleCaseSegment(segment: string) {
 }
 
 function deriveOrgNameFromWebsite(hostname: string) {
-  const primarySegment = hostname.split('.').filter(Boolean)[0] ?? ''
+  const primarySegment = hostname.split('.').find(Boolean) ?? ''
   return toTitleCaseSegment(primarySegment)
 }
 
@@ -264,7 +309,7 @@ function isStepActive(stepId: OnboardingStep) {
 }
 
 async function goBack() {
-  if (window.history.length > 1) {
+  if (globalThis.history.length > 1) {
     await router.back()
     return
   }
@@ -294,11 +339,20 @@ async function logoutFromOnboarding() {
   }
 }
 
+function getCurrentStoreUrl() {
+  if (mode.value !== 'store')
+    return ''
+
+  return storeMetadata.value?.url?.trim() || storeUrlInput.value.trim()
+}
+
 async function syncRouteQuery(nextStep: OnboardingStep, orgId = createdOrgId.value) {
+  const storeUrl = getCurrentStoreUrl()
   await router.replace({
     path: '/onboarding/organization',
     query: {
       ...(orgId ? { org: orgId } : {}),
+      ...(storeUrl ? { store_url: storeUrl } : {}),
       ...(typeof route.query.source === 'string' ? { source: route.query.source } : {}),
       ...(typeof route.query.to === 'string' ? { to: route.query.to } : {}),
       step: nextStep,
@@ -314,6 +368,12 @@ async function hydrateOnboardingFromQuery() {
 
   const queryOrgId = typeof route.query.org === 'string' ? route.query.org : ''
   const queryStep = typeof route.query.step === 'string' ? route.query.step as OnboardingStep : 'details'
+  const queryStoreUrl = typeof route.query.store_url === 'string' ? route.query.store_url.trim() : ''
+
+  if (queryStoreUrl) {
+    mode.value = 'store'
+    storeUrlInput.value = queryStoreUrl
+  }
 
   const validatedOrg = queryOrgId
     ? organizationStore.organizations.find(org => org.gid === queryOrgId && !org.role.includes('invite'))
@@ -365,102 +425,183 @@ async function fetchWebsitePreview() {
   }
 }
 
+async function fetchStoreMetadata() {
+  if (mode.value !== 'store')
+    return null
+
+  const storeUrl = storeUrlInput.value.trim()
+  if (!storeUrl) {
+    toast.error(t('organization-onboarding-store-invalid'))
+    return null
+  }
+
+  const requestedRun = ++storeMetadataRun
+  isLoadingStoreMetadata.value = true
+  try {
+    const { data, error } = await supabase.functions.invoke('private/store_metadata', {
+      body: {
+        url: storeUrl,
+      },
+    })
+
+    if (requestedRun !== storeMetadataRun || mode.value !== 'store' || storeUrlInput.value.trim() !== storeUrl)
+      return null
+
+    if (error || !data) {
+      console.error('Failed to fetch store metadata', error)
+      toast.error(t('organization-onboarding-store-fetch-failed'))
+      return null
+    }
+
+    const metadata = data as StoreMetadata
+    storeMetadata.value = metadata
+
+    const developerName = metadata.developer_name?.trim()
+    const appName = metadata.name?.trim()
+    orgNameInput.value = developerName || orgNameInput.value.trim() || appName || ''
+    return storeMetadata.value
+  }
+  finally {
+    if (requestedRun === storeMetadataRun)
+      isLoadingStoreMetadata.value = false
+  }
+}
+
 function deriveNameFromWebsitePreview(hostname: string) {
   return deriveOrgNameFromWebsite(hostname || websiteHostname.value)
+}
+
+function getOrganizationFormValues(): OrganizationFormValues | null {
+  if (!mode.value) {
+    toast.error(t('organization-onboarding-mode-required'))
+    return null
+  }
+
+  const orgName = orgNameInput.value.trim()
+  if (!orgName) {
+    toast.error(t('org-name-required'))
+    return null
+  }
+
+  const userCountStop = selectedUserCountStop.value
+  if (!userCountStop) {
+    toast.error(t('organization-onboarding-user-scale-required'))
+    return null
+  }
+
+  const intent = selectedIntent.value
+  if (!intent) {
+    toast.error(t('organization-onboarding-intent-required'))
+    return null
+  }
+
+  return { orgName, userCountStop, intent }
+}
+
+function getNormalizedOrganizationWebsite() {
+  if (mode.value === 'website')
+    return websitePreview.value?.website
+
+  if (mode.value === 'store')
+    return storeMetadata.value?.developer_url ?? undefined
+
+  return undefined
+}
+
+async function createOrganizationRecord(form: OrganizationFormValues) {
+  const { data, error } = await supabase.functions.invoke('organization', {
+    method: 'POST',
+    body: {
+      name: form.orgName,
+      email: main.auth?.email ?? '',
+      estimatedMau: form.userCountStop.value,
+      website: getNormalizedOrganizationWebsite(),
+      intent: form.intent,
+    },
+  })
+
+  if (error || !data?.id) {
+    console.error('Error creating organization during onboarding', error)
+    toast.error(error?.code === '23505'
+      ? t('org-with-this-name-exists')
+      : t('cannot-create-org'))
+    return ''
+  }
+
+  return data.id as string
+}
+
+function trackCreatedOrganization(orgId: string, form: OrganizationFormValues) {
+  try {
+    pushEvent('onboarding_intent_selected', config.supaHost, {
+      intent: form.intent,
+      estimated_mau: form.userCountStop.value,
+      org_id: orgId,
+    })
+  }
+  catch (error) {
+    console.error('Failed to track onboarding intent', error)
+  }
+}
+
+async function refreshCreatedOrganization(orgId: string) {
+  try {
+    await organizationStore.fetchOrganizations()
+    organizationStore.setCurrentOrganization(orgId)
+  }
+  catch (error) {
+    console.error('Failed to refresh organizations after onboarding create', error)
+    toast.error(t('organization-onboarding-refresh-failed'))
+  }
+}
+
+async function tryUseImportedLogoAfterCreate() {
+  if (!importedLogoUrl.value)
+    return false
+
+  try {
+    return await useImportedLogo()
+  }
+  catch (error) {
+    console.error('Failed to import logo after organization create', error)
+    return false
+  }
+}
+
+async function continueToLogoStep(orgId: string) {
+  step.value = 'logo'
+  try {
+    await syncRouteQuery('logo', orgId)
+  }
+  catch (error) {
+    console.error('Failed to sync onboarding route after create', error)
+  }
 }
 
 async function createOrganization() {
   if (isSubmitting.value || !main.auth)
     return
 
-  if (!mode.value) {
-    toast.error(t('organization-onboarding-mode-required'))
+  const form = getOrganizationFormValues()
+  if (!form)
     return
-  }
-
-  const orgName = orgNameInput.value.trim()
-  if (!orgName) {
-    toast.error(t('org-name-required'))
-    return
-  }
-
-  if (!selectedUserCountStop.value) {
-    toast.error(t('organization-onboarding-user-scale-required'))
-    return
-  }
-
-  if (!selectedIntent.value) {
-    toast.error(t('organization-onboarding-intent-required'))
-    return
-  }
 
   isSubmitting.value = true
 
   try {
-    const normalizedWebsite = mode.value === 'website'
-      ? websitePreview.value?.website
-      : undefined
-
-    const { data, error } = await supabase.functions.invoke('organization', {
-      method: 'POST',
-      body: {
-        name: orgName,
-        email: main.auth.email ?? '',
-        estimatedMau: selectedUserCountStop.value.value,
-        website: normalizedWebsite,
-        intent: selectedIntent.value,
-      },
-    })
-
-    if (error || !data?.id) {
-      console.error('Error creating organization during onboarding', error)
-      toast.error(error?.code === '23505'
-        ? t('org-with-this-name-exists')
-        : t('cannot-create-org'))
+    const orgId = await createOrganizationRecord(form)
+    if (!orgId)
       return
-    }
 
-    createdOrgId.value = data.id
+    createdOrgId.value = orgId
     toast.success(t('org-created-successfully'))
+    trackCreatedOrganization(orgId, form)
+    await refreshCreatedOrganization(orgId)
 
-    try {
-      pushEvent('onboarding_intent_selected', config.supaHost, {
-        intent: selectedIntent.value,
-        estimated_mau: selectedUserCountStop.value?.value ?? null,
-        org_id: data.id,
-      })
-    }
-    catch (error) {
-      console.error('Failed to track onboarding intent', error)
-    }
+    if (await tryUseImportedLogoAfterCreate())
+      return
 
-    try {
-      await organizationStore.fetchOrganizations()
-      organizationStore.setCurrentOrganization(data.id)
-    }
-    catch (error) {
-      console.error('Failed to refresh organizations after onboarding create', error)
-      toast.error(t('organization-onboarding-refresh-failed'))
-    }
-
-    if (mode.value === 'website' && importedLogoUrl.value) {
-      try {
-        const imported = await useImportedLogo()
-        if (imported)
-          return
-      }
-      catch (error) {
-        console.error('Failed to import logo after organization create', error)
-      }
-    }
-
-    step.value = 'logo'
-    try {
-      await syncRouteQuery('logo', data.id)
-    }
-    catch (error) {
-      console.error('Failed to sync onboarding route after create', error)
-    }
+    await continueToLogoStep(orgId)
   }
   finally {
     isSubmitting.value = false
@@ -471,7 +612,7 @@ async function uploadLogoBlob(blob: Blob, filename?: string) {
   const orgId = activeOrgId.value
   if (!orgId) {
     toast.error(t('organization-not-found'))
-    return
+    return false
   }
 
   isUploadingLogo.value = true
@@ -480,10 +621,12 @@ async function uploadLogoBlob(blob: Blob, filename?: string) {
     step.value = 'invite'
     toast.success(t('organization-onboarding-logo-saved'))
     await syncRouteQuery('invite', orgId)
+    return true
   }
   catch (error) {
     console.error('Failed to upload organization logo during onboarding', error)
     toast.error(t('something-went-wrong-try-again-later'))
+    return false
   }
   finally {
     isUploadingLogo.value = false
@@ -506,10 +649,9 @@ async function useImportedLogo() {
       }
 
       const binary = atob(payload)
-      const bytes = Uint8Array.from(binary, char => char.charCodeAt(0))
+      const bytes = Uint8Array.from(binary, char => char.codePointAt(0) ?? 0)
       const blob = new Blob([bytes], { type: contentType })
-      await uploadLogoBlob(blob, `${websiteHostname.value || 'website-logo'}.png`)
-      return true
+      return await uploadLogoBlob(blob, `${importedLogoFilenameBase.value}.png`)
     }
 
     const response = await fetch(importedLogoUrl.value)
@@ -519,8 +661,7 @@ async function useImportedLogo() {
       return false
     }
     const blob = await response.blob()
-    await uploadLogoBlob(blob, `${websiteHostname.value || 'website-logo'}.png`)
-    return true
+    return await uploadLogoBlob(blob, `${importedLogoFilenameBase.value}.png`)
   }
   catch (error) {
     console.error('Failed to fetch imported logo', error)
@@ -572,7 +713,17 @@ async function finishOnboarding() {
     console.error('Failed to refresh organizations before finishing onboarding', error)
   }
 
-  await router.push('/app/new')
+  const storeUrl = getCurrentStoreUrl()
+
+  await router.push({
+    path: '/app/new',
+    query: storeUrl
+      ? {
+          existing_app: '1',
+          store_url: storeUrl,
+        }
+      : {},
+  })
 }
 
 watch(() => route.query.step, (nextValue) => {
@@ -603,6 +754,12 @@ watch([websiteInput, mode], () => {
   websitePreview.value = null
 })
 
+watch([storeUrlInput, mode], () => {
+  storeMetadataRun += 1
+  storeMetadata.value = null
+  isLoadingStoreMetadata.value = false
+})
+
 onMounted(async () => {
   if (!main.auth) {
     await router.replace('/login?to=/onboarding/organization')
@@ -623,7 +780,9 @@ onUnmounted(() => {
   <section class="h-full min-h-0 overflow-y-auto bg-slate-50 px-4 py-4 text-slate-950 sm:px-5 sm:py-6 lg:px-6 dark:bg-slate-950 dark:text-slate-50">
     <div class="relative mx-auto flex w-full max-w-5xl flex-col gap-4">
       <InviteTeammateModal ref="inviteModalRef" @success="onInviteSuccess" />
+      <label for="onboarding-logo-input" class="sr-only">{{ t('organization-onboarding-upload-logo') }}</label>
       <input
+        id="onboarding-logo-input"
         ref="logoInput"
         type="file"
         accept="image/*"
@@ -755,7 +914,25 @@ onUnmounted(() => {
                 </h2>
               </div>
 
-              <div class="grid gap-3 sm:grid-cols-2">
+              <div class="grid gap-3 sm:grid-cols-3">
+                <button
+                  type="button"
+                  class="group flex min-h-24 items-start gap-3 rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
+                  :class="whiteCardToggleButtonClass(mode === 'store')"
+                  data-test="onboarding-mode-store"
+                  @click="mode = 'store'"
+                >
+                  <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-500 text-white">
+                    <IconStore class="h-5 w-5" />
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block text-base font-semibold">{{ t('organization-onboarding-mode-store') }}</span>
+                    <span class="mt-1 block text-sm leading-6 text-slate-500 dark:text-slate-400">
+                      {{ t('organization-onboarding-mode-store-helper') }}
+                    </span>
+                  </span>
+                  <IconCheck v-if="mode === 'store'" class="h-5 w-5 shrink-0 text-primary-500" />
+                </button>
                 <button
                   type="button"
                   class="group flex min-h-24 items-start gap-3 rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
@@ -794,7 +971,42 @@ onUnmounted(() => {
                 </button>
               </div>
 
-              <div v-if="mode === 'website'" class="space-y-3 border-t border-slate-200 pt-4 dark:border-white/15">
+              <div v-if="mode === 'store'" class="space-y-3 border-t border-slate-200 pt-4 dark:border-white/15">
+                <div>
+                  <label for="onboarding-store-input" class="text-sm font-medium text-slate-800 dark:text-slate-200">
+                    {{ t('organization-onboarding-store-label') }}
+                  </label>
+                  <div class="mt-2 flex flex-col gap-3 sm:flex-row">
+                    <input
+                      id="onboarding-store-input"
+                      v-model="storeUrlInput"
+                      type="url"
+                      :placeholder="t('organization-onboarding-store-placeholder')"
+                      data-test="onboarding-store-url"
+                      class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 sm:text-sm dark:border-white/20 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/30"
+                    >
+                    <button
+                      type="button"
+                      class="d-btn min-h-11 shrink-0"
+                      :class="whiteCardSecondaryButtonClass()"
+                      data-test="onboarding-import-store"
+                      :disabled="isLoadingStoreMetadata || !storeUrlInput.trim()"
+                      @click="fetchStoreMetadata"
+                    >
+                      <IconLoader v-if="isLoadingStoreMetadata" class="h-4 w-4 animate-spin" />
+                      <IconSparkles v-else class="h-4 w-4" />
+                      <span>{{ t('organization-onboarding-import-store') }}</span>
+                    </button>
+                  </div>
+                  <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400" aria-live="polite">
+                    {{ storeMetadata
+                      ? t('organization-onboarding-store-imported')
+                      : t('organization-onboarding-store-help') }}
+                  </p>
+                </div>
+              </div>
+
+              <div v-else-if="mode === 'website'" class="space-y-3 border-t border-slate-200 pt-4 dark:border-white/15">
                 <div>
                   <label for="onboarding-website-input" class="text-sm font-medium text-slate-800 dark:text-slate-200">
                     {{ t('organization-onboarding-website-label') }}
@@ -846,10 +1058,14 @@ onUnmounted(() => {
                     data-test="onboarding-org-name"
                     class="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 sm:text-sm dark:border-white/20 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/30"
                   >
-                  <p v-if="mode === 'website'" class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                    {{ importedLogoUrl
-                      ? t('organization-onboarding-website-name-helper')
-                      : t('organization-onboarding-website-name-helper-empty') }}
+                  <p v-if="mode === 'website' || mode === 'store'" class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                    {{ mode === 'store'
+                      ? storeMetadata
+                        ? t('organization-onboarding-store-name-helper')
+                        : t('organization-onboarding-store-name-helper-empty')
+                      : importedLogoUrl
+                        ? t('organization-onboarding-website-name-helper')
+                        : t('organization-onboarding-website-name-helper-empty') }}
                   </p>
                 </div>
 
@@ -943,7 +1159,7 @@ onUnmounted(() => {
                     <span v-if="!isSubmitting">
                       {{ isCompactCreateOrgFlow
                         ? t('organization-create-submit')
-                        : mode === 'website' && importedLogoUrl
+                        : importedLogoUrl
                           ? t('organization-onboarding-continue-invite')
                           : t('organization-onboarding-continue-logo') }}
                     </span>
@@ -1122,7 +1338,7 @@ onUnmounted(() => {
                 {{ activeOrgName || t('organization-onboarding-org-placeholder') }}
               </p>
               <p class="mt-1 truncate text-xs text-slate-400">
-                {{ websiteHostname || t('organization-onboarding-mode-name') }}
+                {{ sourceSummaryLabel }}
               </p>
             </div>
           </div>
@@ -1133,11 +1349,13 @@ onUnmounted(() => {
                 {{ t('organization-onboarding-selected-path') }}
               </div>
               <div class="mt-1 font-semibold text-white">
-                {{ mode === 'website'
-                  ? t('organization-onboarding-mode-website')
-                  : mode === 'name'
-                    ? t('organization-onboarding-mode-name')
-                    : t('organization-onboarding-no-choice') }}
+                {{ mode === 'store'
+                  ? t('organization-onboarding-mode-store')
+                  : mode === 'website'
+                    ? t('organization-onboarding-mode-website')
+                    : mode === 'name'
+                      ? t('organization-onboarding-mode-name')
+                      : t('organization-onboarding-no-choice') }}
               </div>
             </div>
             <div class="rounded-xl border border-white/10 bg-white/5 p-3">
@@ -1159,19 +1377,19 @@ onUnmounted(() => {
             <ul class="mt-3 space-y-2 text-sm leading-6 text-slate-300">
               <li class="flex gap-3">
                 <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-400" />
-                {{ mode === 'website' && importedLogoUrl
+                {{ importedLogoUrl
                   ? t('organization-onboarding-next-invite-direct')
                   : t('organization-onboarding-next-logo') }}
               </li>
               <li class="flex gap-3">
                 <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-400" />
-                {{ mode === 'website' && importedLogoUrl
+                {{ importedLogoUrl
                   ? t('organization-onboarding-next-create-app-direct')
                   : t('organization-onboarding-next-invite') }}
               </li>
               <li class="flex gap-3">
                 <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-400" />
-                {{ mode === 'website' && importedLogoUrl
+                {{ importedLogoUrl
                   ? t('organization-onboarding-next-assets-direct')
                   : t('organization-onboarding-next-create-app') }}
               </li>
@@ -1197,7 +1415,7 @@ onUnmounted(() => {
                   {{ activeOrgName || t('organization-onboarding-org-placeholder') }}
                 </p>
                 <p class="mt-1 truncate text-xs text-slate-400">
-                  {{ websiteHostname || t('organization-onboarding-mode-name') }}
+                  {{ sourceSummaryLabel }}
                 </p>
               </div>
             </div>

@@ -31,6 +31,7 @@ import { app as sso_provision_user } from '../_backend/private/sso/provision-use
 import { app as sso_sp_metadata } from '../_backend/private/sso/sp-metadata.ts'
 import { app as sso_verify_dns } from '../_backend/private/sso/verify-dns.ts'
 import { app as stats_priv } from '../_backend/private/stats.ts'
+import { app as store_metadata } from '../_backend/private/store_metadata.ts'
 import { app as storeTop } from '../_backend/private/store_top.ts'
 import { app as stripe_checkout } from '../_backend/private/stripe_checkout.ts'
 import { app as stripe_portal } from '../_backend/private/stripe_portal.ts'
@@ -76,6 +77,7 @@ appGlobal.route('/invite_existing_user_to_org', invite_existing_user_to_org)
 appGlobal.route('/accept_invitation', accept_invitation)
 appGlobal.route('/validate_password_compliance', validate_password_compliance)
 appGlobal.route('/verify_email_otp', verify_email_otp)
+appGlobal.route('/store_metadata', store_metadata)
 appGlobal.route('/website_preview', website_preview)
 appGlobal.route('/sso/check-domain', sso_check_domain)
 appGlobal.route('/sso/check-enforcement', sso_check_enforcement)
