@@ -989,6 +989,51 @@ describe('rls policies with hashed api keys (via supabase sdk)', () => {
     expect(data.length).toBeGreaterThan(0)
   })
 
+  it('can regenerate a hashed API key through the public RPC despite direct apikey update denial', async () => {
+    const keyToRotate = await createHashedApiKey('test-rls-sdk-public-regenerate')
+
+    try {
+      const supabase = createClient(
+        process.env.SUPABASE_URL!,
+        process.env.SUPABASE_ANON_KEY!,
+        {
+          global: {
+            headers: { capgkey: keyToRotate.key },
+          },
+        },
+      )
+
+      const { data, error } = await supabase.rpc('regenerate_hashed_apikey' as any, {
+        p_apikey_id: keyToRotate.id,
+      })
+
+      expect(error).toBeNull()
+      const regenerated = data as { id: number, key: string, key_hash: string } | null
+      expect(regenerated?.id).toBe(keyToRotate.id)
+      expect(regenerated?.key).toBeTruthy()
+      expect(regenerated?.key).not.toBe(keyToRotate.key)
+      expect(regenerated?.key_hash).not.toBe(keyToRotate.key_hash)
+
+      const rotatedSupabase = createClient(
+        process.env.SUPABASE_URL!,
+        process.env.SUPABASE_ANON_KEY!,
+        {
+          global: {
+            headers: { capgkey: regenerated!.key },
+          },
+        },
+      )
+
+      const { data: orgs, error: orgError } = await rotatedSupabase.rpc('get_orgs_v7')
+      expect(orgError).toBeNull()
+      expect(Array.isArray(orgs)).toBe(true)
+      expect(orgs.length).toBeGreaterThan(0)
+    }
+    finally {
+      await deleteApiKey(keyToRotate.id)
+    }
+  })
+
   it('cannot access data with invalid API key', async () => {
     const supabase = createClient(
       process.env.SUPABASE_URL!,

@@ -10856,6 +10856,7 @@ ALTER FUNCTION "public"."refresh_orgs_has_usage_credits"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."regenerate_hashed_apikey"("p_apikey_id" bigint) RETURNS "public"."apikeys"
     LANGUAGE "plpgsql"
+    SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
 DECLARE
@@ -10872,10 +10873,12 @@ $$;
 
 
 ALTER FUNCTION "public"."regenerate_hashed_apikey"("p_apikey_id" bigint) OWNER TO "postgres";
+COMMENT ON FUNCTION "public"."regenerate_hashed_apikey"("p_apikey_id" bigint) IS 'Public compatibility RPC for hashed API key rotation. It resolves the caller from JWT or capgkey, then delegates to the service-owned helper so direct apikey UPDATE remains denied by RLS.';
 
 
 CREATE OR REPLACE FUNCTION "public"."regenerate_hashed_apikey_for_user"("p_apikey_id" bigint, "p_user_id" "uuid") RETURNS "public"."apikeys"
     LANGUAGE "plpgsql"
+    SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
 DECLARE
@@ -10905,6 +10908,7 @@ END;
 $$;
 
 
+COMMENT ON FUNCTION "public"."regenerate_hashed_apikey_for_user"("p_apikey_id" bigint, "p_user_id" "uuid") IS 'Service-owned hashed API key rotation helper. The caller must supply the already-authenticated user id; public callers must use regenerate_hashed_apikey(bigint).';
 ALTER FUNCTION "public"."regenerate_hashed_apikey_for_user"("p_apikey_id" bigint, "p_user_id" "uuid") OWNER TO "postgres";
 
 
@@ -20693,6 +20697,9 @@ GRANT ALL ON FUNCTION "public"."regenerate_hashed_apikey"("p_apikey_id" bigint) 
 
 
 
+REVOKE ALL ON FUNCTION "public"."regenerate_hashed_apikey_for_user"("p_apikey_id" bigint, "p_user_id" "uuid") FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."regenerate_hashed_apikey_for_user"("p_apikey_id" bigint, "p_user_id" "uuid") FROM "anon";
+REVOKE ALL ON FUNCTION "public"."regenerate_hashed_apikey_for_user"("p_apikey_id" bigint, "p_user_id" "uuid") FROM "authenticated";
 GRANT ALL ON FUNCTION "public"."regenerate_hashed_apikey_for_user"("p_apikey_id" bigint, "p_user_id" "uuid") TO "service_role";
 
 

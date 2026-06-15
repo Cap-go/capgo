@@ -5396,9 +5396,52 @@ GRANT EXECUTE ON FUNCTION public.get_user_id(text, text) TO service_role;
 COMMENT ON FUNCTION public.get_user_id(text) IS 'Compatibility RPC for old CLIs. It resolves valid non-expired API keys, including hashed keys, and does not authorize any write by itself.';
 COMMENT ON FUNCTION public.get_user_id(text, text) IS 'Compatibility RPC for old CLIs. The app_id argument is ignored; write authorization must be checked through RBAC.';
 
+CREATE OR REPLACE FUNCTION public.regenerate_hashed_apikey_for_user(
+  p_apikey_id bigint,
+  p_user_id uuid
+)
+RETURNS public.apikeys
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_plain_key text;
+  v_apikey public.apikeys;
+BEGIN
+  v_plain_key := gen_random_uuid()::text;
+
+  PERFORM set_config('capgo.skip_apikey_trigger', 'true', true);
+
+  UPDATE public.apikeys
+    SET key = NULL,
+        key_hash = encode(extensions.digest(v_plain_key, 'sha256'), 'hex')
+    WHERE id = p_apikey_id
+      AND user_id = p_user_id
+    RETURNING * INTO v_apikey;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'apikey_not_found'
+      USING ERRCODE = 'P0002';
+  END IF;
+
+  v_apikey.key := v_plain_key;
+
+  RETURN v_apikey;
+END;
+$$;
+
+ALTER FUNCTION public.regenerate_hashed_apikey_for_user(bigint, uuid) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.regenerate_hashed_apikey_for_user(bigint, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.regenerate_hashed_apikey_for_user(bigint, uuid) FROM anon;
+REVOKE ALL ON FUNCTION public.regenerate_hashed_apikey_for_user(bigint, uuid) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.regenerate_hashed_apikey_for_user(bigint, uuid) TO service_role;
+COMMENT ON FUNCTION public.regenerate_hashed_apikey_for_user(bigint, uuid) IS 'Service-owned hashed API key rotation helper. The caller must supply the already-authenticated user id; public callers must use regenerate_hashed_apikey(bigint).';
+
 CREATE OR REPLACE FUNCTION public.regenerate_hashed_apikey(p_apikey_id bigint)
 RETURNS public.apikeys
 LANGUAGE plpgsql
+SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
@@ -5417,6 +5460,7 @@ ALTER FUNCTION public.regenerate_hashed_apikey(bigint) OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.regenerate_hashed_apikey(bigint) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.regenerate_hashed_apikey(bigint) TO anon;
 GRANT EXECUTE ON FUNCTION public.regenerate_hashed_apikey(bigint) TO authenticated;
+COMMENT ON FUNCTION public.regenerate_hashed_apikey(bigint) IS 'Public compatibility RPC for hashed API key rotation. It resolves the caller from JWT or capgkey, then delegates to the service-owned helper so direct apikey UPDATE remains denied by RLS.';
 GRANT EXECUTE ON FUNCTION public.regenerate_hashed_apikey(bigint) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.set_webhook_created_by()
