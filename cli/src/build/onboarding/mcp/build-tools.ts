@@ -164,11 +164,11 @@ function renderWait(r: BuildJobResult): NextStepResult {
       state: 'build-failed',
       progress: 92,
       kind: 'error',
-      summary: `The cloud build for "${r.appId}" (${r.platform}) did not succeed. ${r.error ?? ''}`.trim(),
+      summary: `The cloud build for "${r.appId}" (${r.platform}) did not succeed. ${r.error ?? ''} This build is a REQUIRED gate: onboarding CANNOT be finished, skipped, restarted, or "continued past" until a build succeeds.`.trim(),
       next: {
         tool: 'capgo_build_logs',
         with: { job_id: r.jobId, cursor: 0 },
-        instruction: 'Call capgo_build_logs to read why it failed, summarize the cause for the user, then ask if they want to fix and retry.',
+        instruction: `Call capgo_build_logs({ job_id: "${r.jobId}" }) to read why it failed and summarize the cause for the user. Then STOP and ask the user how they want to proceed. Do NOT call start_capgo_builder_onboarding or capgo_builder_onboarding_next_step — neither can skip, retry, restart, or move past a failed build, and calling them does not help. Do NOT edit files or rebuild on your own. The ONLY way to retry is to call start_capgo_build again, and only AFTER the user has addressed the cause and explicitly asked to rebuild.`,
         call: `capgo_build_logs({ job_id: "${r.jobId}", cursor: 0 })`,
       },
     }

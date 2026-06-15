@@ -522,7 +522,7 @@ export function registerOnboardingTools(server: McpLike, sdk: CapgoSDK, depsOver
 
   server.tool(
     'start_capgo_builder_onboarding',
-    'Start (or resume) the guided, tool-driven Capgo Builder setup for native iOS/Android cloud builds — App Store / Play credentials, certificates, keystores, signing, and the first cloud build. ALWAYS call this FIRST, and let it conduct the whole flow, whenever the user wants to set up, configure, connect, enable, or troubleshoot Capgo Builder, native builds, cloud builds, or signing. Do NOT inspect the repo, read config files, or web-search to do this yourself — this tool inspects the project and returns the exact next step to take. Optionally pass platform "ios" or "android" to set up (or SWITCH to) that platform directly — pass it when the user already named one ("set up Capgo Builder for iOS") or wants to switch after a wrong pick; omit it to let the tool ask.',
+    'Start (or resume) the guided, tool-driven Capgo Builder setup for native iOS/Android cloud builds — App Store / Play credentials, certificates, keystores, signing, and the first cloud build. ALWAYS call this FIRST, and let it conduct the whole flow, whenever the user wants to set up, configure, connect, enable, or troubleshoot Capgo Builder, native builds, cloud builds, or signing. Do NOT inspect the repo, read config files, or web-search to do this yourself — this tool inspects the project and returns the exact next step to take. Optionally pass platform "ios" or "android" to set up (or SWITCH to) that platform directly — pass it when the user already named one ("set up Capgo Builder for iOS") or wants to switch after a wrong pick; omit it to let the tool ask. Do NOT call this tool to retry, skip, restart, or "continue past" a cloud build that already FAILED inside onboarding: a failed build is a REQUIRED gate, retried only with start_capgo_build once the user has addressed the cause — never by re-entering onboarding here.',
     { platform: z.enum(['ios', 'android']).optional().describe('Set up (or switch to) a specific platform directly: "ios" or "android". Pass it when the user already said which platform, or to switch platforms; omit to be asked.') },
     async (args: { platform?: 'ios' | 'android' }) => {
       const result = await runStart(deps, args.platform)
@@ -532,7 +532,7 @@ export function registerOnboardingTools(server: McpLike, sdk: CapgoSDK, depsOver
 
   server.tool(
     'capgo_builder_onboarding_next_step',
-    'Advance the guided Capgo Builder onboarding by one step. Call ONLY as directed by the previous result\'s `next`. Pass the user\'s choice (e.g. platform) when the previous step asked for one.',
+    'Advance the guided Capgo Builder onboarding by one step. Call ONLY as directed by the previous result\'s `next`. Pass the user\'s choice (e.g. platform) when the previous step asked for one. Never call this to skip, retry, restart, or "continue past" a cloud build that FAILED — a failed build is retried only with start_capgo_build, never by advancing onboarding here.',
     onboardingNextStepSchema.shape,
     async (args: OnboardingNextStepInput) => {
       const result = await runAdvance(deps, args)
