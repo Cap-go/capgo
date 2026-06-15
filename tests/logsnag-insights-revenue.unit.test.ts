@@ -179,6 +179,51 @@ describe('logsnag revenue metric helpers', () => {
     })
   })
 
+  it.concurrent('normalizes snapshot billing counts from SQL rows', () => {
+    expect(logsnagInsightsTestUtils.normalizeBillingSnapshotCounts([
+      {
+        yearly: '2',
+        monthly: '3',
+        total: '5',
+        paying_orgs_for_conversion: '4',
+        plan_name: 'Solo',
+        plan_count: '2',
+      },
+      {
+        yearly: '2',
+        monthly: '3',
+        total: '5',
+        paying_orgs_for_conversion: '4',
+        plan_name: 'Trial',
+        plan_count: '1',
+      },
+    ])).toEqual({
+      customers: { yearly: 2, monthly: 3, total: 5 },
+      payingOrgsForConversion: 4,
+      plans: {
+        Enterprise: 0,
+        Maker: 0,
+        Solo: 2,
+        Team: 0,
+        Trial: 1,
+      },
+    })
+  })
+
+  it.concurrent('defaults empty snapshot billing rows to zero counts', () => {
+    expect(logsnagInsightsTestUtils.normalizeBillingSnapshotCounts([])).toEqual({
+      customers: { yearly: 0, monthly: 0, total: 0 },
+      payingOrgsForConversion: 0,
+      plans: {
+        Enterprise: 0,
+        Maker: 0,
+        Solo: 0,
+        Team: 0,
+        Trial: 0,
+      },
+    })
+  })
+
   it.concurrent('normalizes logsnag insights retry payload counts', () => {
     expect(logsnagInsightsTestUtils.normalizeLogsnagInsightsRetryCount('2')).toBe(2)
     expect(logsnagInsightsTestUtils.normalizeLogsnagInsightsRetryCount(2.8)).toBe(2)

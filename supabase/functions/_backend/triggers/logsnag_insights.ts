@@ -89,6 +89,25 @@ interface LtvStats {
   shortest_ltv: number
   longest_ltv: number
 }
+interface BillingSnapshotCustomerCounts {
+  yearly: number
+  monthly: number
+  total: number
+}
+interface BillingSnapshotCounts {
+  customers: BillingSnapshotCustomerCounts
+  plans: PlanTotal
+  payingOrgsForConversion: number
+}
+interface BillingSnapshotRow {
+  [key: string]: unknown
+  yearly: number | string | null
+  monthly: number | string | null
+  total: number | string | null
+  paying_orgs_for_conversion: number | string | null
+  plan_name: string | null
+  plan_count: number | string | null
+}
 interface CustomerIdRow {
   customer_id: string
 }
@@ -115,6 +134,37 @@ function normalizePlanTotals(plans: PlanTotal): PlanTotal {
     normalized[key] = Number(normalized[key]) || 0
 
   return normalized
+}
+
+function getEmptyBillingSnapshotCounts(): BillingSnapshotCounts {
+  return {
+    customers: { yearly: 0, monthly: 0, total: 0 },
+    payingOrgsForConversion: 0,
+    plans: normalizePlanTotals({}),
+  }
+}
+
+function normalizeBillingSnapshotCounts(rows: BillingSnapshotRow[]): BillingSnapshotCounts {
+  const firstRow = rows[0]
+  if (!firstRow)
+    return getEmptyBillingSnapshotCounts()
+
+  const plans: PlanTotal = {}
+  for (const row of rows) {
+    if (!row.plan_name)
+      continue
+    plans[row.plan_name] = Number(row.plan_count) || 0
+  }
+
+  return {
+    customers: {
+      yearly: Number(firstRow.yearly) || 0,
+      monthly: Number(firstRow.monthly) || 0,
+      total: Number(firstRow.total) || 0,
+    },
+    payingOrgsForConversion: Number(firstRow.paying_orgs_for_conversion) || 0,
+    plans: normalizePlanTotals(plans),
+  }
 }
 
 const LOGSNAG_INSIGHTS_BACKGROUND_MAX_RETRIES = 4
@@ -1278,6 +1328,91 @@ async function dispatchLogsnagInsightsShards(c: Context, dateId: string): Promis
 
   cloudlog({ requestId: c.get('requestId'), message: 'Queued logsnag insights global stats shards', dateId, queued })
 }
+async function getBillingSnapshotCounts(c: Context, snapshotExclusiveEnd: Date): Promise<BillingSnapshotCounts> {
+  const pgClient = getPgClient(c, true)
+  const drizzleClient = getDrizzleClient(pgClient)
+  const snapshotExclusiveEndIso = snapshotExclusiveEnd.toISOString()
+
+  try {
+    // stripe_info stores current rows, so historical replays derive snapshot state from lifecycle timestamps.
+    const result = await drizzleClient.execute<BillingSnapshotRow>(sql`
+      WITH active_subscriptions AS (
+        SELECT DISTINCT ON (si.customer_id)
+          si.customer_id,
+          si.price_id,
+          p.name::character varying AS plan_name
+        FROM public.stripe_info si
+        INNER JOIN public.plans p ON p.stripe_id = si.product_id
+        WHERE si.is_good_plan = true
+          AND si.created_at < ${snapshotExclusiveEndIso}::timestamptz
+          AND (si.paid_at < ${snapshotExclusiveEndIso}::timestamptz OR si.paid_at IS NULL)
+          AND si.status IN (
+            'succeeded'::public.stripe_status,
+            'canceled'::public.stripe_status,
+            'deleted'::public.stripe_status
+          )
+          AND (si.canceled_at IS NULL OR si.canceled_at >= ${snapshotExclusiveEndIso}::timestamptz)
+          AND si.subscription_anchor_end > ${snapshotExclusiveEndIso}::timestamptz
+        ORDER BY si.customer_id, si.created_at DESC
+      ),
+      trial_users AS (
+        SELECT DISTINCT ON (si.customer_id)
+          'Trial'::character varying AS plan_name,
+          si.customer_id
+        FROM public.stripe_info si
+        WHERE si.created_at < ${snapshotExclusiveEndIso}::timestamptz
+          AND si.trial_at > ${snapshotExclusiveEndIso}::timestamptz
+          AND si.status IS DISTINCT FROM 'succeeded'::public.stripe_status
+          AND (si.canceled_at IS NULL OR si.canceled_at >= ${snapshotExclusiveEndIso}::timestamptz)
+          AND NOT EXISTS (
+            SELECT 1
+            FROM active_subscriptions a
+            WHERE a.customer_id = si.customer_id
+          )
+        ORDER BY si.customer_id, si.created_at DESC
+      ),
+      plan_counts AS (
+        SELECT plan_name, COUNT(*)::int AS plan_count
+        FROM active_subscriptions
+        GROUP BY plan_name
+        UNION ALL
+        SELECT 'Trial'::character varying AS plan_name, COUNT(*)::int AS plan_count
+        FROM trial_users
+      ),
+      customer_counts AS (
+        SELECT
+          COUNT(CASE WHEN price_id IN (SELECT price_y_id FROM public.plans WHERE price_y_id IS NOT NULL) THEN 1 END)::int AS yearly,
+          COUNT(CASE WHEN price_id IN (SELECT price_m_id FROM public.plans WHERE price_m_id IS NOT NULL) THEN 1 END)::int AS monthly,
+          COUNT(*)::int AS total
+        FROM active_subscriptions
+      ),
+      paying_org_counts AS (
+        SELECT COUNT(DISTINCT o.id)::int AS paying_orgs_for_conversion
+        FROM public.orgs o
+        INNER JOIN active_subscriptions a ON a.customer_id = o.customer_id
+      )
+      SELECT
+        cc.yearly,
+        cc.monthly,
+        cc.total,
+        poc.paying_orgs_for_conversion,
+        pc.plan_name,
+        pc.plan_count
+      FROM customer_counts cc
+      CROSS JOIN paying_org_counts poc
+      LEFT JOIN plan_counts pc ON true
+    `)
+
+    return normalizeBillingSnapshotCounts(result.rows)
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'billing snapshot counts error', error })
+    return getEmptyBillingSnapshotCounts()
+  }
+  finally {
+    await closeClient(c, pgClient)
+  }
+}
 
 async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
   const supabase = supabaseAdmin(c)
@@ -1288,11 +1423,9 @@ async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise
     users,
     orgs,
     stars,
-    customers,
-    paying_orgs_for_conversion,
+    billingSnapshot,
     onboarded,
     need_upgrade,
-    plans,
     actives,
   ] = await Promise.all([
     countAllApps(c),
@@ -1307,23 +1440,7 @@ async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise
       .select('id', { count: 'exact', head: true })
       .then(res => res.count ?? 0),
     getGithubStars(),
-    supabase.rpc('get_customer_counts').single().then((res) => {
-      if (res.error || !res.data)
-        cloudlog({ requestId: c.get('requestId'), message: 'get_customer_counts', error: res.error })
-      return res.data ?? { total: 0, yearly: 0, monthly: 0 }
-    }),
-    supabase
-      .from('orgs')
-      .select('id, stripe_info!inner(customer_id)', { count: 'exact', head: true })
-      .eq('stripe_info.status', 'succeeded')
-      .eq('stripe_info.is_good_plan', true)
-      .then((res) => {
-        if (res.error) {
-          cloudlog({ requestId: c.get('requestId'), message: 'paying_orgs_for_conversion error', error: res.error })
-          return 0
-        }
-        return res.count ?? 0
-      }),
+    getBillingSnapshotCounts(c, window.prevDayEnd),
     supabase.rpc('count_all_onboarded').single().then((res) => {
       if (res.error || !res.data)
         cloudlog({ requestId: c.get('requestId'), message: 'count_all_onboarded', error: res.error })
@@ -1333,17 +1450,6 @@ async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise
       if (res.error || !res.data)
         cloudlog({ requestId: c.get('requestId'), message: 'count_all_need_upgrade', error: res.error })
       return res.data ?? 0
-    }),
-    supabase.rpc('count_all_plans_v2').then((res) => {
-      if (res.error || !res.data)
-        cloudlog({ requestId: c.get('requestId'), message: 'count_all_plans_v2', error: res.error })
-      return res.data ?? []
-    }).then((data: any) => {
-      const total: PlanTotal = {}
-      for (const plan of Array.isArray(data) ? data : [])
-        total[plan.plan_name] = plan.count
-
-      return normalizePlanTotals(total)
     }),
     readActiveAppsCF(c, window.prevDayEnd).then(async (app_ids) => {
       try {
@@ -1357,8 +1463,9 @@ async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise
     }),
   ])
 
+  const { customers, payingOrgsForConversion, plans } = billingSnapshot
   const not_paying = users - customers.total - plans.Trial
-  const org_conversion_rate = calculateConversionRate(paying_orgs_for_conversion, orgs)
+  const org_conversion_rate = calculateConversionRate(payingOrgsForConversion, orgs)
   const planConversionRates = getPlanConversionRates(plans, orgs)
 
   await updateGlobalStatsSnapshot(c, window.prevDayDateId, {
@@ -1887,6 +1994,7 @@ export const logsnagInsightsTestUtils = {
   normalizeLogsnagInsightsShard,
   normalizeLogsnagInsightsRetryCount,
   normalizePlanTotals,
+  normalizeBillingSnapshotCounts,
   reserveLogsnagInsightsRetry,
   scheduleLogsnagInsightsUpdate,
 }
