@@ -1543,6 +1543,185 @@ USING (
   )
 );
 
+CREATE OR REPLACE FUNCTION public.prevent_role_binding_priority_escalation()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_actor_id uuid;
+  v_api_key_text text;
+  v_api_key public.apikeys%ROWTYPE;
+  v_principal_type text;
+  v_principal_id uuid;
+  v_target_role_priority integer;
+  v_caller_max_priority integer := 0;
+BEGIN
+  IF public.is_internal_request_role(public.current_request_role()) THEN
+    RETURN NEW;
+  END IF;
+
+  IF pg_trigger_depth() > 1
+    AND current_setting('capgo.org_creation_bootstrap_org_id', true) = NEW.org_id::text
+    AND NEW.principal_type = public.rbac_principal_user()
+    AND NEW.scope_type = public.rbac_scope_org()
+    AND NEW.principal_id = NEW.granted_by
+    AND NEW.app_id IS NULL
+    AND NEW.bundle_id IS NULL
+    AND NEW.channel_id IS NULL
+    AND EXISTS (
+      SELECT 1
+      FROM public.orgs
+      WHERE orgs.id = NEW.org_id
+        AND orgs.created_by = NEW.principal_id
+    )
+    AND EXISTS (
+      SELECT 1
+      FROM public.roles
+      WHERE roles.id = NEW.role_id
+        AND roles.scope_type = public.rbac_scope_org()
+        AND roles.name = public.rbac_role_org_super_admin()
+    )
+  THEN
+    RETURN NEW;
+  END IF;
+
+  v_actor_id := public.request_actor_user_id();
+
+  SELECT roles.priority_rank
+  INTO v_target_role_priority
+  FROM public.roles
+  WHERE roles.id = NEW.role_id
+    AND roles.scope_type = NEW.scope_type
+    AND roles.is_assignable IS TRUE
+  LIMIT 1;
+
+  IF v_target_role_priority IS NULL THEN
+    PERFORM public.pg_log(
+      'deny: ROLE_BINDING_ROLE_UNKNOWN',
+      pg_catalog.jsonb_build_object('org_id', NEW.org_id, 'uid', v_actor_id, 'role_id', NEW.role_id)
+    );
+    RAISE EXCEPTION 'Admins cannot assign this role!';
+  END IF;
+
+  v_api_key_text := public.get_apikey_header();
+  IF v_api_key_text IS NOT NULL THEN
+    SELECT *
+    INTO v_api_key
+    FROM public.find_apikey_by_value(v_api_key_text)
+    LIMIT 1;
+
+    IF v_api_key.id IS NULL OR public.is_apikey_expired(v_api_key.expires_at) THEN
+      PERFORM public.pg_log(
+        'deny: ROLE_BINDING_INVALID_API_KEY',
+        pg_catalog.jsonb_build_object('org_id', NEW.org_id, 'uid', v_actor_id)
+      );
+      RAISE EXCEPTION 'Admins cannot elevate privileges!';
+    END IF;
+
+    v_principal_type := public.rbac_principal_apikey();
+    v_principal_id := v_api_key.rbac_id;
+  ELSE
+    v_principal_type := public.rbac_principal_user();
+    v_principal_id := v_actor_id;
+  END IF;
+
+  IF v_principal_id IS NULL THEN
+    PERFORM public.pg_log(
+      'deny: ROLE_BINDING_MISSING_PRINCIPAL',
+      pg_catalog.jsonb_build_object('org_id', NEW.org_id, 'uid', v_actor_id)
+    );
+    RAISE EXCEPTION 'Admins cannot elevate privileges!';
+  END IF;
+
+  IF v_principal_type = public.rbac_principal_apikey() THEN
+    SELECT COALESCE(pg_catalog.MAX(roles.priority_rank), 0)
+    INTO v_caller_max_priority
+    FROM public.role_bindings
+    JOIN public.roles
+      ON roles.id = role_bindings.role_id
+      AND roles.scope_type = role_bindings.scope_type
+    WHERE role_bindings.principal_type = public.rbac_principal_apikey()
+      AND role_bindings.principal_id = v_principal_id
+      AND role_bindings.org_id = NEW.org_id
+      AND (
+        role_bindings.expires_at IS NULL
+        OR role_bindings.expires_at > pg_catalog.now()
+      );
+  ELSE
+    SELECT COALESCE(pg_catalog.MAX(roles.priority_rank), 0)
+    INTO v_caller_max_priority
+    FROM (
+      SELECT role_bindings.role_id, role_bindings.scope_type
+      FROM public.role_bindings
+      WHERE role_bindings.principal_type = public.rbac_principal_user()
+        AND role_bindings.principal_id = v_principal_id
+        AND role_bindings.org_id = NEW.org_id
+        AND (
+          role_bindings.expires_at IS NULL
+          OR role_bindings.expires_at > pg_catalog.now()
+        )
+
+      UNION ALL
+
+      SELECT role_bindings.role_id, role_bindings.scope_type
+      FROM public.group_members
+      JOIN public.groups
+        ON groups.id = group_members.group_id
+        AND groups.org_id = NEW.org_id
+      JOIN public.role_bindings
+        ON role_bindings.principal_type = public.rbac_principal_group()
+        AND role_bindings.principal_id = group_members.group_id
+        AND role_bindings.org_id = groups.org_id
+      WHERE group_members.user_id = v_principal_id
+        AND (
+          role_bindings.expires_at IS NULL
+          OR role_bindings.expires_at > pg_catalog.now()
+        )
+    ) active_caller_bindings
+    JOIN public.roles
+      ON roles.id = active_caller_bindings.role_id
+      AND roles.scope_type = active_caller_bindings.scope_type;
+  END IF;
+
+  IF v_caller_max_priority < v_target_role_priority THEN
+    PERFORM public.pg_log(
+      'deny: ROLE_BINDING_PRIORITY_ESCALATION',
+      pg_catalog.jsonb_build_object(
+        'org_id',
+        NEW.org_id,
+        'uid',
+        v_actor_id,
+        'role_id',
+        NEW.role_id,
+        'caller_max_priority',
+        v_caller_max_priority,
+        'target_role_priority',
+        v_target_role_priority
+      )
+    );
+    RAISE EXCEPTION 'Admins cannot elevate privileges!';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION public.prevent_role_binding_priority_escalation() IS
+  'Prevents direct role_bindings writes from assigning a role above the caller principal rank.';
+
+ALTER FUNCTION public.prevent_role_binding_priority_escalation() OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.prevent_role_binding_priority_escalation() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.prevent_role_binding_priority_escalation() TO service_role;
+
+DROP TRIGGER IF EXISTS prevent_role_binding_priority_escalation ON public.role_bindings;
+CREATE TRIGGER prevent_role_binding_priority_escalation
+BEFORE INSERT OR UPDATE OF role_id, principal_type, principal_id, scope_type, org_id, app_id, bundle_id, channel_id
+ON public.role_bindings
+FOR EACH ROW
+EXECUTE FUNCTION public.prevent_role_binding_priority_escalation();
+
 DROP POLICY IF EXISTS "allow_org_admins_insert_sso_providers" ON public.sso_providers;
 CREATE POLICY "allow_org_admins_insert_sso_providers"
 ON public.sso_providers
@@ -4027,17 +4206,25 @@ SET rbac_role_name = COALESCE(
   CASE
     WHEN app_id IS NOT NULL AND channel_id IS NOT NULL THEN
       CASE user_right::text
+        WHEN 'invite_super_admin' THEN 'channel_admin'
         WHEN 'super_admin' THEN 'channel_admin'
+        WHEN 'invite_admin' THEN 'channel_admin'
         WHEN 'admin' THEN 'channel_admin'
+        WHEN 'invite_write' THEN 'channel_developer'
         WHEN 'write' THEN 'channel_developer'
+        WHEN 'invite_upload' THEN 'channel_uploader'
         WHEN 'upload' THEN 'channel_uploader'
         ELSE 'channel_reader'
       END
     WHEN app_id IS NOT NULL THEN
       CASE user_right::text
+        WHEN 'invite_super_admin' THEN 'app_admin'
         WHEN 'super_admin' THEN 'app_admin'
+        WHEN 'invite_admin' THEN 'app_admin'
         WHEN 'admin' THEN 'app_admin'
+        WHEN 'invite_write' THEN 'app_developer'
         WHEN 'write' THEN 'app_developer'
+        WHEN 'invite_upload' THEN 'app_uploader'
         WHEN 'upload' THEN 'app_uploader'
         ELSE 'app_reader'
       END
@@ -5426,8 +5613,6 @@ BEGIN
   INSERT INTO public.org_users (user_id, org_id, rbac_role_name, is_invite)
   VALUES (NEW.created_by, NEW.id, public.rbac_role_org_super_admin(), false);
 
-  PERFORM set_config('capgo.org_creation_bootstrap_org_id', '', true);
-
   SELECT id INTO org_super_admin_role_id
   FROM public.roles
   WHERE name = public.rbac_role_org_super_admin()
@@ -5443,6 +5628,8 @@ BEGIN
       NEW.created_by, now(), 'Organization creator', true
     ) ON CONFLICT DO NOTHING;
   END IF;
+
+  PERFORM set_config('capgo.org_creation_bootstrap_org_id', '', true);
 
   IF NEW.customer_id IS NOT NULL THEN
     RETURN NEW;

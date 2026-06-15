@@ -456,6 +456,36 @@ export type Database = {
           },
         ]
       }
+      backfill_progress: {
+        Row: {
+          created_at: string
+          cutover_at: string
+          job_name: string
+          last_processed_id: number | null
+          last_processed_occurred_at: string | null
+          scope_key: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cutover_at: string
+          job_name: string
+          last_processed_id?: number | null
+          last_processed_occurred_at?: string | null
+          scope_key: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cutover_at?: string
+          job_name?: string
+          last_processed_id?: number | null
+          last_processed_occurred_at?: string | null
+          scope_key?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       bandwidth_usage: {
         Row: {
           app_id: string

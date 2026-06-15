@@ -26,7 +26,8 @@ export function requireApiKeyManagementAuth(
 export function isValidApiKeyIdFormat(id: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   const numericRegex = /^\d+$/
-  return uuidRegex.test(id) || numericRegex.test(id)
+  const legacyKeyRegex = /^[A-Za-z0-9._:-]{8,256}$/
+  return uuidRegex.test(id) || numericRegex.test(id) || legacyKeyRegex.test(id)
 }
 
 function isNumericApiKeyId(id: string): boolean {
@@ -140,8 +141,7 @@ export async function ensureApiKeyCanManageTargetOrgIds(
     throw quickError(401, errorCode, 'API key cannot manage this API key', { ...moreInfo, apikeyId: authApikey?.id ?? auth.apikey?.id })
   }
 }
-
-export async function filterApiKeysManageableByAuth<T extends ApiKeyRow>(
+export async function filterApiKeysManageableByAuth<T extends Pick<ApiKeyRow, 'rbac_id'>>(
   c: Context<MiddlewareKeyVariables>,
   auth: AuthInfo,
   authApikey: ApiKeyRow | undefined,

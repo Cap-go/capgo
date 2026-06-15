@@ -7,6 +7,7 @@ import { enableSupabaseInstrumentation, setInvocationSource, trackMcpServerStart
 import { addAppOptionsSchema, cleanupOptionsSchema, getStatsOptionsSchema, requestBuildOptionsSchema, starAllRepositoriesOptionsSchema, starRepoOptionsSchema, updateAppOptionsSchema, updateChannelOptionsSchema, uploadOptionsSchema } from '../schemas/sdk'
 import { CapgoSDK } from '../sdk'
 import { findSavedKey } from '../utils'
+import { registerOnboardingTools } from '../build/onboarding/mcp/onboarding-tools'
 
 /**
  * Format an SDK result error for MCP response.
@@ -603,6 +604,12 @@ export async function startMcpServer(): Promise<void> {
       }
     },
   )
+
+  // MCP-conducted Builder onboarding (2-tool spine). Build-time gated OFF until the
+  // flow is finished (PR 2) — DCE strips it (and the MCP-only deciders) from the
+  // release bundle. The shared engine still ships (the ink TUI uses it).
+  if (globalThis.__CAPGO_MCP_ONBOARDING__)
+    registerOnboardingTools(server, sdk)
 
   // Start the server with stdio transport
   const transport = new StdioServerTransport()

@@ -230,7 +230,7 @@ export function classifyCertAvailability(args: {
  */
 export async function listDistributionCerts(
   token: string,
-  options: { includeContent?: boolean } = {},
+  options: { includeContent?: boolean, types?: ('DISTRIBUTION' | 'IOS_DISTRIBUTION')[] } = {},
 ): Promise<AscDistributionCert[]> {
   // Query BOTH cert types — the legacy iOS-specific and the newer cross-
   // platform "Apple Distribution" — because Apple deprecated
@@ -251,8 +251,12 @@ export async function listDistributionCerts(
   // Capgo. Including them would surface unusable identities in the
   // picker. They'll still appear in the Available/Unavailable table view
   // (Phase 2) marked "Apple-managed — can't sign locally".
+  // `types` narrows the filter for callers that care about ONE pool — e.g.
+  // createCertificate's limit recovery, where only same-type revocations free
+  // a slot. Default stays both types for the import-matching reasons above.
+  const typeFilter = (options.types ?? ['DISTRIBUTION', 'IOS_DISTRIBUTION']).join(',')
   const body = await ascFetch(
-    '/certificates?filter[certificateType]=DISTRIBUTION,IOS_DISTRIBUTION&limit=200',
+    `/certificates?filter[certificateType]=${typeFilter}&limit=200`,
     token,
   )
   return (body.data || []).map((c: any): AscDistributionCert => ({
@@ -422,13 +426,16 @@ export class CertificateLimitError extends Error {
   constructor(
     public readonly certificates: AscDistributionCert[],
   ) {
-    super(`Certificate limit reached. Found ${certificates.length} existing iOS distribution certificate(s).`)
+    super(`Certificate limit reached. Found ${certificates.length} existing Apple Distribution certificate(s).`)
     this.name = 'CertificateLimitError'
   }
 }
 
 /**
- * Create a distribution certificate using a CSR.
+ * Create an Apple Distribution certificate (type DISTRIBUTION — the modern
+ * cross-platform type Xcode 11+ uses; the legacy IOS_DISTRIBUTION type is
+ * deprecated and its separate per-team pool tends to be full of old certs)
+ * using a CSR.
  * Returns the certificate ID, base64 DER content, expiration date, and team ID.
  *
  * Throws CertificateLimitError if the limit is reached, so the UI can ask
@@ -450,7 +457,7 @@ export async function createCertificate(
         data: {
           type: 'certificates',
           attributes: {
-            certificateType: 'IOS_DISTRIBUTION',
+            certificateType: 'DISTRIBUTION',
             csrContent: csrPem,
           },
         },
@@ -472,8 +479,20 @@ export async function createCertificate(
     if (err.message?.includes('ENTITY_ERROR.ATTRIBUTE.INVALID')
       || err.message?.includes('There is a problem with the request entity')
       || err.message?.includes('maximum number of certificates')) {
-      // Fetch existing certs so the UI can let the user choose which to revoke
-      const existing = await listDistributionCerts(token)
+      // Fetch the existing certs of the SAME type we tried to create so the
+      // UI can let the user choose which to revoke. Scoped to DISTRIBUTION on
+      // purpose: revoking a cert from another pool (legacy IOS_DISTRIBUTION)
+      // would not free a slot here — offering it would send the user in a
+      // circle (and tempt them to revoke a production cert for nothing).
+      // The list is diagnostics only — if it ALSO fails it must not REPLACE
+      // the original create error (hostile-review, 2026-06-12).
+      let existing: AscDistributionCert[]
+      try {
+        existing = await listDistributionCerts(token, { types: ['DISTRIBUTION'] })
+      }
+      catch {
+        throw err
+      }
       if (existing.length > 0) {
         throw new CertificateLimitError(existing)
       }
@@ -711,7 +730,16 @@ export async function createProfile(
     // Detect duplicate profile error
     if (err.message?.includes('Multiple profiles found')
       || err.message?.includes('duplicate')) {
-      const existing = await findCapgoProfiles(token, appId)
+      // The follow-up list is diagnostics for the delete-and-retry prompt — if
+      // it ALSO fails it must not REPLACE the original duplicate error
+      // (hostile-review, 2026-06-12): rethrow the ORIGINAL.
+      let existing: Array<{ id: string, name: string, profileType: string }>
+      try {
+        existing = await findCapgoProfiles(token, appId)
+      }
+      catch {
+        throw err
+      }
       if (existing.length > 0) {
         throw new DuplicateProfileError(existing)
       }

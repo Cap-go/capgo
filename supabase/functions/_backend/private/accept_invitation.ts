@@ -318,7 +318,9 @@ app.post('/', async (c) => {
     }
 
     const userId = session.user?.id ?? existingUser.id
-    await ensureOrgMembership(supabaseAdmin, userId, invitation)
+    const membershipError = await ensureOrgMembership(supabaseAdmin, userId, invitation)
+    if (membershipError)
+      return membershipError
 
     // Remove the invite only after the org membership is created successfully.
     const { error: tmpUserDeleteError } = await supabaseAdmin.from('tmp_users').delete().eq('invite_magic_string', baseBody.magic_invite_string)
@@ -380,10 +382,14 @@ app.post('/', async (c) => {
           ? { captchaToken: body.captchaToken }
           : undefined,
       })
-
       if (!sessionError && session.user?.id) {
-        await ensurePublicUserRowExists(c, supabaseAdmin, session.user.id, invitation, body.opt_for_newsletters)
-        await ensureOrgMembership(supabaseAdmin, session.user.id, invitation)
+        const publicUserError = await ensurePublicUserRowExists(c, supabaseAdmin, session.user.id, invitation, body.opt_for_newsletters)
+        if (publicUserError)
+          return publicUserError
+
+        const membershipError = await ensureOrgMembership(supabaseAdmin, session.user.id, invitation)
+        if (membershipError)
+          return membershipError
 
         const { error: tmpUserDeleteError } = await supabaseAdmin.from('tmp_users').delete().eq('invite_magic_string', body.magic_invite_string)
         if (tmpUserDeleteError) {
@@ -466,8 +472,12 @@ app.post('/', async (c) => {
       return quickError(400, 'sign_in_failed', 'Sign in failed, please retry', { error: sessionError.message })
     }
 
-    await ensureOrgMembership(supabaseAdmin, user.user.id, invitation)
-
+    const membershipError = await ensureOrgMembership(supabaseAdmin, user.user.id, invitation)
+    if (membershipError) {
+      didRollback = true
+      await rollbackCreatedUser(c, user.user.id)
+      return membershipError
+    }
     // Remove the invite only after the account + org membership are created successfully.
     const { error: tmpUserDeleteError } = await supabaseAdmin.from('tmp_users').delete().eq('invite_magic_string', body.magic_invite_string)
     if (tmpUserDeleteError) {

@@ -38,13 +38,9 @@ export async function setChannel(c: Context<MiddlewareKeyVariables>, body: SetCh
     query: <TRow = Record<string, unknown>>(text: string, params?: unknown[]) => Promise<{ rowCount?: number | null, rows: TRow[] }>
     release: () => void
   } | null = null
+  let transactionStarted = false
   try {
     dbClient = await pgClient.connect()
-    await dbClient.query('BEGIN')
-    await dbClient.query(
-      'SELECT set_config(\'request.headers\', $1, true)',
-      [JSON.stringify({ capgkey: effectiveApikey })],
-    )
 
     const channelResult = await dbClient.query<{ name: string, owner_org: string }>(
       `SELECT name, owner_org
@@ -81,6 +77,13 @@ export async function setChannel(c: Context<MiddlewareKeyVariables>, body: SetCh
     channelName = channel.name
     channelOwnerOrg = channel.owner_org
 
+    await dbClient.query('BEGIN')
+    transactionStarted = true
+    await dbClient.query(
+      'SELECT set_config(\'request.headers\', $1, true)',
+      [JSON.stringify({ capgkey: effectiveApikey })],
+    )
+
     const updateResult = await dbClient.query(
       `UPDATE public.channels
        SET version = $1
@@ -96,9 +99,10 @@ export async function setChannel(c: Context<MiddlewareKeyVariables>, body: SetCh
     }
 
     await dbClient.query('COMMIT')
+    transactionStarted = false
   }
   catch (error) {
-    if (dbClient) {
+    if (dbClient && transactionStarted) {
       try {
         await dbClient.query('ROLLBACK')
       }

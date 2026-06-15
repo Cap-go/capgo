@@ -58,9 +58,8 @@ export async function getAuditLogs(c: Context, bodyRaw: any): Promise<Response> 
 
   }
 
-  // Audit logs previously required legacy super_admin. org.delete is the
-  // RBAC super-admin-equivalent org permission, so keep that contract here.
-  if (!(await checkPermission(c, 'org.delete', { orgId: body.orgId }))) {
+  // Audit logs are readable through the dedicated RBAC audit permission.
+  if (!(await checkPermission(c, 'org.read_audit', { orgId: body.orgId }))) {
     throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
   }
 

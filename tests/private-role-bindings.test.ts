@@ -1038,6 +1038,92 @@ describe('private role bindings helpers', () => {
     await pool.end()
   })
 
+  it('blocks direct role_bindings escalation above the caller org rank', async () => {
+    const id = randomUUID()
+    const orgId = randomUUID()
+
+    const roleResult = await query(`
+      SELECT id, name
+      FROM public.roles
+      WHERE name IN ('org_super_admin', 'org_admin', 'org_member')
+        AND scope_type = public.rbac_scope_org()
+    `)
+    const roleIds = new Map(roleResult.rows.map(row => [row.name, row.id]))
+    const superAdminRoleId = roleIds.get('org_super_admin')
+    const adminRoleId = roleIds.get('org_admin')
+    const memberRoleId = roleIds.get('org_member')
+    expect(superAdminRoleId).toBeTruthy()
+    expect(adminRoleId).toBeTruthy()
+    expect(memberRoleId).toBeTruthy()
+
+    await query(`
+      INSERT INTO public.orgs (id, name, management_email, created_by)
+      VALUES ($1::uuid, $2, $3, $4::uuid)
+    `, [orgId, `Role Binding Direct Escalation Org ${id}`, `role-binding-direct-escalation-${id}@capgo.app`, USER_ID])
+
+    await query(`
+      INSERT INTO public.org_users (org_id, user_id, rbac_role_name, is_invite)
+      VALUES ($1::uuid, $2::uuid, 'org_admin', false)
+    `, [orgId, USER_ID_2])
+
+    await query(`
+      INSERT INTO public.role_bindings (
+        principal_type,
+        principal_id,
+        role_id,
+        scope_type,
+        org_id,
+        granted_by,
+        reason,
+        is_direct
+      )
+      VALUES (
+        public.rbac_principal_user(),
+        $1::uuid,
+        $2::uuid,
+        public.rbac_scope_org(),
+        $3::uuid,
+        $4::uuid,
+        'direct escalation regression setup',
+        true
+      )
+      ON CONFLICT (principal_type, principal_id, org_id, scope_type)
+      WHERE scope_type = public.rbac_scope_org()
+      DO UPDATE SET role_id = EXCLUDED.role_id
+    `, [USER_ID_2, adminRoleId, orgId, USER_ID])
+
+    await query('SET LOCAL ROLE authenticated')
+    await query(`
+      SELECT
+        set_config('request.jwt.claim.sub', $1, true),
+        set_config('request.jwt.claim.role', 'authenticated', true)
+    `, [USER_ID_2])
+
+    await query('SAVEPOINT blocked_role_escalation')
+    await expect(query(`
+      UPDATE public.role_bindings
+      SET role_id = $1::uuid
+      WHERE principal_type = public.rbac_principal_user()
+        AND principal_id = $2::uuid
+        AND scope_type = public.rbac_scope_org()
+        AND org_id = $3::uuid
+    `, [superAdminRoleId, USER_ID_2, orgId])).rejects.toThrow(/Admins cannot elevate privileges/)
+    await query('ROLLBACK TO SAVEPOINT blocked_role_escalation')
+
+    const allowedUpdate = await query(`
+      UPDATE public.role_bindings
+      SET role_id = $1::uuid
+      WHERE principal_type = public.rbac_principal_user()
+        AND principal_id = $2::uuid
+        AND scope_type = public.rbac_scope_org()
+        AND org_id = $3::uuid
+      RETURNING role_id
+    `, [memberRoleId, USER_ID_2, orgId])
+
+    expect(allowedUpdate.rowCount).toBe(1)
+    expect(allowedUpdate.rows[0]?.role_id).toBe(memberRoleId)
+  })
+
   it('accepts active org members as assignment targets', async () => {
     const fixture = await createFixture('org_admin')
     const drizzle = getDrizzleClient(client as any)

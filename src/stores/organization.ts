@@ -389,7 +389,6 @@ export const useOrganizationStore = defineStore('organization', () => {
       })
 
     if (error || data === null) {
-      console.log('Cannot get org members!', error)
       return []
     }
 
@@ -617,7 +616,6 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     // Verify user has org_super_admin or owner role for this organization
     const currentOrg = _organizations.value.get(orgId)
-    console.log('Delete org check:', { orgId, currentOrg, role: currentOrg?.role, userId: currentUserId })
     if (!currentOrg || !canDeleteOrganization(orgId)) {
       console.error('Permission denied:', { role: currentOrg?.role, required: ['owner', 'org_super_admin'] })
       return { data: null, error: new Error('Insufficient permissions') }

@@ -8,9 +8,13 @@ import { supabaseAdmin, supabaseWithAuth } from '../../utils/supabase.ts'
 import { attachApiKeyGlobalPermissions } from './global_permissions.ts'
 import { ensureApiKeyCanManageTargetOrgIds, ensureApiKeyManagementAllowed, filterApiKeysManageableByAuth, getApiKeyBindingOrgIds, isValidApiKeyIdFormat, requireApiKeyManagementAuth, selectOwnedApiKeyByIdentifier } from './scope.ts'
 
-const app = honoFactory.createApp()
+type ApiKeyRow = Database['public']['Tables']['apikeys']['Row']
+type ApiKeyPublicRow = Pick<ApiKeyRow, 'created_at' | 'expires_at' | 'id' | 'name' | 'rbac_id' | 'updated_at' | 'user_id'>
 
-async function withGlobalPermissions<T extends Database['public']['Tables']['apikeys']['Row']>(
+const app = honoFactory.createApp()
+const APIKEY_PUBLIC_COLUMNS = 'created_at, expires_at, id, name, rbac_id, updated_at, user_id'
+
+async function withGlobalPermissions<T extends { rbac_id: string | null }>(
   c: Context<MiddlewareKeyVariables>,
   apikeys: T[],
 ) {
@@ -39,26 +43,26 @@ async function withGlobalPermissions<T extends Database['public']['Tables']['api
 
 app.get('/', middlewareAuth(), async (c) => {
   const auth = requireApiKeyManagementAuth(c, 'not_authorized', 'API key management requires authentication')
-  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
+  const apikey = c.get('apikey') as ApiKeyRow | undefined
 
   await ensureApiKeyManagementAllowed(c, auth, apikey, 'cannot_list_apikeys')
 
   const { data: apikeys, error } = await (auth.authType === 'apikey' ? supabaseAdmin(c) : supabaseWithAuth(c, auth))
     .from('apikeys')
-    .select('*')
+    .select(APIKEY_PUBLIC_COLUMNS)
     .eq('user_id', auth.userId)
 
   if (error) {
     throw quickError(500, 'failed_to_list_apikeys', 'Failed to list API keys', { supabaseError: error })
   }
 
-  const manageableApiKeys = await filterApiKeysManageableByAuth(c, auth, apikey, apikeys ?? [])
+  const manageableApiKeys = await filterApiKeysManageableByAuth(c, auth, apikey, (apikeys ?? []) as ApiKeyPublicRow[])
   return c.json(await withGlobalPermissions(c, manageableApiKeys))
 })
 
 app.get('/:id', middlewareAuth(), async (c) => {
   const auth = requireApiKeyManagementAuth(c, 'not_authorized', 'API key management requires authentication')
-  const authApikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
+  const authApikey = c.get('apikey') as ApiKeyRow | undefined
 
   await ensureApiKeyManagementAllowed(c, auth, authApikey, 'cannot_get_apikey')
 
@@ -67,17 +71,17 @@ app.get('/:id', middlewareAuth(), async (c) => {
     throw simpleError('api_key_id_required', 'API key ID is required')
   }
 
-  // Validate id format to prevent PostgREST filter injection
+  // Validate id format to prevent PostgREST filter injection while keeping legacy plain-key lookup working.
   if (!isValidApiKeyIdFormat(id)) {
-    throw simpleError('invalid_id_format', 'API key ID must be a valid UUID or number')
+    throw simpleError('invalid_id_format', 'API key ID must be a numeric ID, UUID key, or legacy key token')
   }
 
-  const { data: fetchedApikey, error } = await selectOwnedApiKeyByIdentifier(c, auth, id)
+  const { data: fetchedApikey, error } = await selectOwnedApiKeyByIdentifier<ApiKeyPublicRow>(c, auth, id, APIKEY_PUBLIC_COLUMNS)
   if (error || !fetchedApikey) {
     throw quickError(404, 'failed_to_get_apikey', 'Failed to get API key', { supabaseError: error })
   }
   await ensureApiKeyCanManageTargetOrgIds(c, auth, authApikey, fetchedApikey.rbac_id ? await getApiKeyBindingOrgIds(c, fetchedApikey.rbac_id) : [], 'cannot_get_apikey')
-  const [apikeyWithPermissions] = await withGlobalPermissions(c, fetchedApikey ? [fetchedApikey] : [])
+  const [apikeyWithPermissions] = await withGlobalPermissions(c, [fetchedApikey])
   return c.json(apikeyWithPermissions)
 })
 

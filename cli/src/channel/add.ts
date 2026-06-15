@@ -36,6 +36,8 @@ export async function addChannelInternal(channelId: string, appId: string, optio
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon, silent)
   await check2FAComplianceForApp(supabase, appId, silent)
   await resolveUserIdFromApiKey(supabase, options.apikey)
+  // Creating a channel needs the exact RBAC permission. The backend and channels
+  // INSERT RLS remain authoritative, so a key without app.create_channel is denied.
   await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'app.create_channel', silent, true)
 
   if (!silent)

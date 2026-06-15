@@ -849,8 +849,7 @@ async function setVersionInChannel(
     && await hasCliPermission(supabase, apikey, 'app.create_channel', { appId: appid })
 
   if (targetChannel && !canPromoteTargetChannel) {
-    log.warn('This API key is not allowed to promote bundles in this channel')
-    return false
+    uploadFail('Cannot set channel because this API key lacks channel.promote_bundle for the target channel')
   }
 
   if (targetChannel && canPromoteTargetChannel && selfAssign) {
@@ -886,10 +885,8 @@ async function setVersionInChannel(
     return true
   }
 
-  log.warn('This API key is not allowed to create the target channel')
-  return false
+  uploadFail('Cannot create target channel because this API key lacks app.create_channel')
 }
-
 export async function getDefaultUploadChannel(appId: string, supabase: SupabaseType, hostWeb: string) {
   const { error, data } = await supabase.from('apps')
     .select('default_upload_channel')
@@ -1500,6 +1497,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     log.warn('Cannot delete linked bundle on upload because this API key lacks bundle.delete')
   }
 
+  const expectedChannelAssignments = new Set(channelsToAssign).size
   const channelVersionSet = new Set<string>()
   for (const targetChannel of channelsToAssign) {
     if (options.verbose)
@@ -1529,7 +1527,8 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
 
   if (channelVersionSet.size === 0)
     log.warn('Cannot set channel because this API key lacks the required RBAC permission')
-
+  if (channelVersionSet.size !== expectedChannelAssignments)
+    uploadFail('Cannot complete upload because one or more target channels were not updated')
   if (options.verbose)
     log.info(`[Verbose] Sending upload event...`)
 

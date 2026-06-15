@@ -293,7 +293,7 @@ async function ensureOrgMembershipInTransaction(
   orgId: string,
   fallbackRole: OrgRoleName = 'org_member',
 ): Promise<EnsureOrgMembershipResult> {
-  const ensureOrgRoleBinding = async (roleName: string) => {
+  const ensureOrgRoleBinding = async (roleName: string, mode: 'replace' | 'repair' = 'replace') => {
     const roleResult = await pgClient.query<{ id: string }>(
       `
         select id
@@ -310,16 +310,35 @@ async function ensureOrgMembershipInTransaction(
       throw new Error('missing_org_role')
     }
 
-    await pgClient.query(
-      `
-        delete from public.role_bindings
-        where principal_type = public.rbac_principal_user()
-          and principal_id = $1
-          and scope_type = public.rbac_scope_org()
-          and org_id = $2
-      `,
-      [userId, orgId],
-    )
+    if (mode === 'repair') {
+      const existingBinding = await pgClient.query<{ id: string }>(
+        `
+          select id
+          from public.role_bindings
+          where principal_type = public.rbac_principal_user()
+            and principal_id = $1
+            and scope_type = public.rbac_scope_org()
+            and org_id = $2
+          limit 1
+        `,
+        [userId, orgId],
+      )
+
+      if (existingBinding.rows[0])
+        return
+    }
+    else {
+      await pgClient.query(
+        `
+          delete from public.role_bindings
+          where principal_type = public.rbac_principal_user()
+            and principal_id = $1
+            and scope_type = public.rbac_scope_org()
+            and org_id = $2
+        `,
+        [userId, orgId],
+      )
+    }
 
     await pgClient.query(
       `
@@ -352,7 +371,7 @@ async function ensureOrgMembershipInTransaction(
   const promoteExistingInvite = async (membershipId: string, isInvite: boolean, roleName: string | null): Promise<EnsureOrgMembershipResult> => {
     const effectiveRole = roleName ?? fallbackRole
     if (!isInvite) {
-      await ensureOrgRoleBinding(effectiveRole)
+      await ensureOrgRoleBinding(effectiveRole, 'repair')
       return { alreadyMember: true }
     }
 

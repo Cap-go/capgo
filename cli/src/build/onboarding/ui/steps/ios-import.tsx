@@ -408,53 +408,6 @@ export const ImportExportWarningStep: FC<ImportExportWarningStepProps> = ({ iden
   )
 }
 
-// ── import-compiling-helper ───────────────────────────────────────────────────
-// One-time-per-CLI-version compile of the Swift keychain-export helper.
-//
-// Comfortable: the original spinner, a <Newline/>, then the two full wrapping
-// paragraphs (the "~350 lines / wraps Apple's Security framework / compiles via
-// swiftc into your OS temp folder" explanation + the "cached for this CLI
-// version" note). Dense: the blank line drops and both paragraphs collapse to
-// terse single-line notes (the original wrapping paragraphs blew the budget at
-// 60 cols).
-export interface ImportCompilingHelperStepProps {
-  dense?: boolean
-}
-
-export const ImportCompilingHelperStep: FC<ImportCompilingHelperStepProps> = ({ dense = false }) => {
-  return (
-    <Box flexDirection="column" marginTop={1}>
-      <SpinnerLine text="Compiling keychain-export helper (one-time, ~2-3s)..." />
-      {!dense && <Newline />}
-      {dense
-        ? (
-            <Box marginLeft={2}>
-              <Text dimColor>Compiling a ~350-line Swift helper via swiftc; cached per CLI version.</Text>
-            </Box>
-          )
-        : (
-            <Box flexDirection="column" marginLeft={2}>
-              <Text dimColor>
-                We ship a small Swift program (~350 lines) that wraps Apple's
-                Security framework. It compiles via
-                {' '}
-                <Text bold>swiftc</Text>
-                {' '}
-                into your OS temp folder.
-              </Text>
-              <Text dimColor>
-                The result is cached for this CLI version — future runs of
-                {' '}
-                <Text bold>build init</Text>
-                {' '}
-                skip this step.
-              </Text>
-            </Box>
-          )}
-    </Box>
-  )
-}
-
 // ── import-exporting ──────────────────────────────────────────────────────────
 // Spinner + a single short note. Identical in both forms (the note fits the
 // budget at 60 cols on its own), so no `dense` branch is needed. Restores the

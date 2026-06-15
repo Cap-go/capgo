@@ -33,3 +33,11 @@ t('redacts JSON-style secrets from raw API error bodies', () => {
   assert.ok(out.includes('[REDACTED]'))
   assert.ok(out.includes('"detail":"x"')) // non-secret fields preserved
 })
+
+t('redacts p8/pem-keyed values (ASC helper log props) but keeps p8Path', () => {
+  const out = redactSecrets('asc-helper error: bad key {"p8":"PRIVKEYBASE64SECRET","pem":"PEMSECRET","p8Path":"/Users/x/AuthKey_ABC.p8","attempt":2}')
+  assert.ok(!out.includes('PRIVKEYBASE64SECRET'))
+  assert.ok(!out.includes('PEMSECRET'))
+  assert.ok(out.includes('/Users/x/AuthKey_ABC.p8'), 'the .p8 file PATH is useful for support, not a secret — kept')
+  assert.ok(out.includes('"attempt":2'), 'non-secret context preserved')
+})

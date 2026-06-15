@@ -5,6 +5,7 @@ import {
   APIKEY_MANAGEMENT_ORG_SUPER_ADMIN,
   appApiKeyBindings,
   BASE_URL,
+  executeSQL,
   getAuthHeaders,
   getAuthHeadersForCredentials,
   getSupabaseClient,
@@ -13,6 +14,7 @@ import {
   resetAndSeedAppData,
   resetAppData,
   USER_EMAIL_APIKEY_MANAGEMENT,
+  USER_ID,
   USER_PASSWORD,
 } from './test-utils.ts'
 
@@ -46,27 +48,64 @@ afterAll(async () => {
 })
 
 describe('[GET] /apikey operations', () => {
-  it('get api keys for the user', async () => {
+  it('get api keys for the user without key material', async () => {
     const response = await fetch(`${BASE_URL}/apikey`, {
       method: 'GET',
       headers: authHeaders,
     })
 
-    const data = await response.json()
+    const data = await response.json() as Array<Record<string, unknown>>
     expect(response.status).toBe(200)
     expect(Array.isArray(data)).toBe(true)
+    expect(data.every(apikey => !('key' in apikey) && !('key_hash' in apikey))).toBe(true)
   })
 
-  it('get specific api key by id', async () => {
+  it('get specific api key by id without key material', async () => {
     // Using seeded API key ID 10 (dedicated test key)
     const response = await fetch(`${BASE_URL}/apikey/10`, {
       method: 'GET',
       headers: authHeaders,
     })
 
-    const data = await response.json()
+    const data = await response.json() as Record<string, unknown>
     expect(response.status).toBe(200)
     expect(data).toHaveProperty('id', 10)
+    expect(data).not.toHaveProperty('key')
+    expect(data).not.toHaveProperty('key_hash')
+  })
+
+  it('get legacy plain api key token without key material', async () => {
+    const legacyKey = `legacy-key-${randomUUID()}`
+    const [insertedKey] = await executeSQL(
+      `
+      WITH skip_apikey_trigger AS (
+        SELECT set_config('capgo.skip_apikey_trigger', 'true', true)
+      )
+      INSERT INTO public.apikeys (user_id, key, key_hash, name)
+      SELECT $1, $2, NULL, 'legacy-key-lookup-test'
+      FROM skip_apikey_trigger
+      RETURNING id
+      `,
+      [USER_ID, legacyKey],
+    )
+    expect(insertedKey).toHaveProperty('id')
+
+    try {
+      const response = await fetch(`${BASE_URL}/apikey/${legacyKey}`, {
+        method: 'GET',
+        headers: authHeaders,
+      })
+
+      const data = await response.json() as Record<string, unknown>
+      expect(response.status).toBe(200)
+      expect(data).toHaveProperty('id', Number(insertedKey?.id))
+      expect(data).not.toHaveProperty('key')
+      expect(data).not.toHaveProperty('key_hash')
+    }
+    finally {
+      if (insertedKey?.id)
+        await getSupabaseClient().from('apikeys').delete().eq('id', Number(insertedKey.id))
+    }
   })
 
   it('get api key with invalid id', async () => {
@@ -708,11 +747,14 @@ describe('[PUT] /apikey/:id operations', () => {
     expect(regenerateData.key).not.toBe(oldKey)
     expect(regenerateData.key_hash).not.toBe(oldHash)
 
-    // DB must keep the hashed key non-copyable (key column null).
-    const verifyResponse = await fetch(`${BASE_URL}/apikey/${createData.id}`, { headers: authHeaders })
-    const verifyData = await verifyResponse.json() as { key: string | null, key_hash: string }
-    expect(verifyData.key).toBeNull()
-    expect(verifyData.key_hash).toBe(regenerateData.key_hash)
+    const { data: verifyData, error: verifyError } = await getSupabaseClient()
+      .from('apikeys')
+      .select('key, key_hash')
+      .eq('id', createData.id)
+      .single()
+    expect(verifyError).toBeNull()
+    expect(verifyData?.key).toBeNull()
+    expect(verifyData?.key_hash).toBe(regenerateData.key_hash)
 
     // Old key must no longer authenticate.
     const oldAuthHeaders = { 'Content-Type': 'application/json', 'Authorization': oldKey }
@@ -846,12 +888,23 @@ describe('[POST] /apikey hashed key operations', () => {
     expect(data.key_hash).toMatch(/^[\da-f]{64}$/i)
 
     // Verify the created key exists but key column in DB should be null
-    const verifyResponse = await fetch(`${BASE_URL}/apikey/${data.id}`, { headers: authHeaders })
-    const verifyData = await verifyResponse.json() as { name: string, key: string | null, key_hash: string }
-    expect(verifyData.name).toBe(keyName)
+    const { data: verifyData, error: verifyError } = await getSupabaseClient()
+      .from('apikeys')
+      .select('name, key, key_hash')
+      .eq('id', data.id)
+      .single()
+    expect(verifyError).toBeNull()
+    expect(verifyData?.name).toBe(keyName)
     // In the database, the key should be null for hashed keys
-    expect(verifyData.key).toBeNull()
-    expect(verifyData.key_hash).toBe(data.key_hash)
+    expect(verifyData?.key).toBeNull()
+    expect(verifyData?.key_hash).toBe(data.key_hash)
+
+    // Public GET must not expose key material.
+    const publicResponse = await fetch(`${BASE_URL}/apikey/${data.id}`, { headers: authHeaders })
+    const publicData = await publicResponse.json() as Record<string, unknown>
+    expect(publicResponse.status).toBe(200)
+    expect(publicData).not.toHaveProperty('key')
+    expect(publicData).not.toHaveProperty('key_hash')
 
     // Cleanup
     await fetch(`${BASE_URL}/apikey/${data.id}`, {
@@ -879,10 +932,21 @@ describe('[POST] /apikey hashed key operations', () => {
     expect(data.key_hash).toBeNull()
 
     // Verify the key is stored in plain
-    const verifyResponse = await fetch(`${BASE_URL}/apikey/${data.id}`, { headers: authHeaders })
-    const verifyData = await verifyResponse.json() as { key: string, key_hash: string | null }
-    expect(verifyData.key).toBe(data.key)
-    expect(verifyData.key_hash).toBeNull()
+    const { data: verifyData, error: verifyError } = await getSupabaseClient()
+      .from('apikeys')
+      .select('key, key_hash')
+      .eq('id', data.id)
+      .single()
+    expect(verifyError).toBeNull()
+    expect(verifyData?.key).toBe(data.key)
+    expect(verifyData?.key_hash).toBeNull()
+
+    // Public GET must not expose key material.
+    const publicResponse = await fetch(`${BASE_URL}/apikey/${data.id}`, { headers: authHeaders })
+    const publicData = await publicResponse.json() as Record<string, unknown>
+    expect(publicResponse.status).toBe(200)
+    expect(publicData).not.toHaveProperty('key')
+    expect(publicData).not.toHaveProperty('key_hash')
 
     // Cleanup
     await fetch(`${BASE_URL}/apikey/${data.id}`, {
@@ -975,11 +1039,15 @@ describe('[POST] /apikey hashed key with expiration', () => {
     expect(new Date(data.expires_at).getTime()).toBeCloseTo(new Date(futureDate).getTime(), -3)
 
     // Verify in DB: key should be null, key_hash and expires_at should be set
-    const verifyResponse = await fetch(`${BASE_URL}/apikey/${data.id}`, { headers: authHeaders })
-    const verifyData = await verifyResponse.json() as { key: string | null, key_hash: string, expires_at: string }
-    expect(verifyData.key).toBeNull()
-    expect(verifyData.key_hash).toBe(data.key_hash)
-    expect(verifyData.expires_at).not.toBeNull()
+    const { data: verifyData, error: verifyError } = await getSupabaseClient()
+      .from('apikeys')
+      .select('key, key_hash, expires_at')
+      .eq('id', data.id)
+      .single()
+    expect(verifyError).toBeNull()
+    expect(verifyData?.key).toBeNull()
+    expect(verifyData?.key_hash).toBe(data.key_hash)
+    expect(verifyData?.expires_at).not.toBeNull()
 
     // Cleanup
     await fetch(`${BASE_URL}/apikey/${data.id}`, {

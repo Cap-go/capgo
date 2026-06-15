@@ -606,8 +606,6 @@ async function showInviteModal() {
 }
 
 async function sendInvitation(email: string, type: string): Promise<boolean> {
-  console.log(`Invite ${email} with perm ${type}`)
-
   const orgId = currentOrganization.value?.gid
   if (!orgId) {
     toast.error('Organization ID not found.')
@@ -645,10 +643,8 @@ async function sendInvitation(email: string, type: string): Promise<boolean> {
 }
 
 async function handleSendInvitationOutput(output: string, email: string, type: string): Promise<boolean> {
-  console.log('Output: ', output)
   if (!output)
     return false
-
   const orgId = currentOrganization.value?.gid
   const existingMember = members.value.find(member => member.email.toLowerCase() === email.toLowerCase())
   const hasPendingInvite = existingMember ? isInviteMember(existingMember) : false
@@ -878,7 +874,6 @@ async function _deleteMember(member: OrganizationMemberRow) {
       toast.success(t('member-deleted'))
 
       if (member.uid === main.user?.id) {
-        console.log('Current user deleted themselves from the org.')
         await organizationStore.fetchOrganizations()
         try {
           organizationStore.setCurrentOrganizationToMain()
@@ -909,7 +904,6 @@ async function deleteMember(member: OrganizationMemberRow) {
   }
 
   else if (await didCancel()) {
-    console.log('Member deletion cancelled.')
     return
   }
 
@@ -1041,15 +1035,12 @@ async function _changeMemberPermission(member: OrganizationMemberRow, perm: stri
     isLoading.value = false
   }
 }
-
 async function changeMemberPermission(member: OrganizationMemberRow) {
   const isInvite = isInviteMember(member)
   const perm = await showPermModal(isInvite, undefined, member.role)
 
-  if (!perm) {
-    console.log('Permission change cancelled.')
+  if (!perm)
     return
-  }
 
   _changeMemberPermission(member, perm)
 }
