@@ -1,5 +1,5 @@
 import type { ExtConfigPairs } from '../schemas/config'
-import { loadConfig as loadConfigCap, writeConfig as writeConfigCap } from '@capacitor/cli/dist/config'
+import { loadConfig as loadConfigCap, writeConfig as writeConfigCap } from '../capacitor-cli'
 
 export type { CapacitorConfig, ExtConfigPairs } from '../schemas/config'
 

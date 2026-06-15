@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { cwd } from 'node:process'
 import { intro, log, outro } from '@clack/prompts'
 import { parse } from '@std/semver'
+import { trackEvent } from '../analytics/track'
 import { encryptChecksum, encryptChecksumV3, encryptSource, generateSessionKey } from '../api/crypto'
 import { checkAlerts } from '../api/update'
 import { baseKeyV2, findRoot, formatError, getConfig, getInstalledVersion, isDeprecatedPluginVersion } from '../utils'
@@ -123,6 +124,8 @@ export async function encryptZipInternal(
     const filenameEncrypted = `${zipPath}_encrypted.zip`
 
     writeFileSync(filenameEncrypted, encryptedData)
+
+    void trackEvent({ channel: 'bundle', event: 'Bundle Encrypted', icon: '🔒', tags: {} })
 
     if (!silent) {
       if (json) {

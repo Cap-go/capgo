@@ -14,6 +14,7 @@ import {
   getAllNotificationBuckets,
   getNotificationBucket,
   normalizeNotificationTag,
+  readNotificationBadgeStateCF,
   readNotificationRegistrationsCF,
   readNotificationStatsCF,
   shouldTrackNotificationPermissionChanged,
@@ -43,6 +44,8 @@ const NOTIFICATION_EVENTS = new Set<NativeNotificationEvent>([
   'permission_changed',
   'background_started',
   'background_finished',
+  'badge_set',
+  'badge_applied',
 ])
 const CLIENT_NOTIFICATION_DELIVERY_EVENTS = new Set<NativeNotificationEvent>([
   'received',
@@ -52,6 +55,7 @@ const CLIENT_NOTIFICATION_DELIVERY_EVENTS = new Set<NativeNotificationEvent>([
 ])
 const CLIENT_NOTIFICATION_DEVICE_EVENTS = new Set<NativeNotificationEvent>([
   'permission_changed',
+  'badge_applied',
 ])
 const NOTIFICATION_PLATFORMS = new Set<NativeNotificationPlatform>(['ios', 'android'])
 const NOTIFICATION_PROVIDERS = new Set<NativeNotificationProvider>(['fcm', 'apns'])
@@ -73,6 +77,7 @@ interface RegisterBody {
   attributes?: Record<string, unknown>
   permission?: NativeNotificationRegisterInput['permission']
   badge?: number
+  badgeRevision?: number
   active?: boolean
   consent?: boolean
   identityProof: string
@@ -87,6 +92,8 @@ interface EventBody {
   event: NativeNotificationEvent
   campaignId?: string
   notificationId?: string
+  eventId?: string
+  occurredAt?: string
   externalId?: string
   nativeInstallId?: string
   recipientKey?: string
@@ -95,6 +102,18 @@ interface EventBody {
   platform?: NativeNotificationPlatform
   error?: string
   badge?: number
+  badgeRevision?: number
+  eventProof: string
+}
+
+interface SyncBody {
+  appId: string
+  nativeInstallId?: string
+  recipientKey: string
+  deviceKey: string
+  platform?: NativeNotificationPlatform
+  badge?: number
+  badgeRevision?: number
   eventProof: string
 }
 
@@ -372,6 +391,7 @@ function publicDevice(row: NativeNotificationRegistryRow) {
     tags: row.tags,
     attributes: row.attributes,
     badge: row.badge,
+    badgeRevision: row.badge_revision ?? 0,
     permission: row.permission,
     updatedAt: row.updated_at,
   }
@@ -557,12 +577,13 @@ app.post('/register', async (c) => {
       provider,
       platform: body.platform,
       badge: body.badge,
+      badgeRevision: body.badgeRevision,
     })
   }
 
   const eventProof = await createNotificationEventProof(c, appId, identity.recipientKey, identity.deviceKey)
 
-  return c.json({ ...BRES, recipientKey: identity.recipientKey, deviceKey: identity.deviceKey, bucket: identity.bucket, eventProof })
+  return c.json({ ...BRES, recipientKey: identity.recipientKey, deviceKey: identity.deviceKey, bucket: identity.bucket, eventProof, badgeRevision: Math.max(0, Math.trunc(body.badgeRevision ?? 0)) })
 })
 
 app.post('/events', async (c) => {
@@ -583,6 +604,8 @@ app.post('/events', async (c) => {
   const eventProof = assertString(body.eventProof, 'eventProof', 256)
   const campaignId = typeof body.campaignId === 'string' ? body.campaignId.trim() : ''
   const notificationId = typeof body.notificationId === 'string' ? body.notificationId.trim() : ''
+  const eventId = typeof body.eventId === 'string' ? body.eventId.trim().slice(0, 256) : ''
+  const occurredAt = typeof body.occurredAt === 'string' ? body.occurredAt.trim().slice(0, 64) : ''
   const validProof = CLIENT_NOTIFICATION_DELIVERY_EVENTS.has(body.event)
     ? campaignId && notificationId && await verifyNotificationDeliveryEventProof(c, {
         appId,
@@ -605,8 +628,37 @@ app.post('/events', async (c) => {
     provider,
     platform: body.platform,
     badge: body.badge,
+    badgeRevision: body.badgeRevision,
+    eventId,
+    occurredAt,
   })
   return c.json(BRES)
+})
+
+app.post('/sync', async (c) => {
+  const body = await parseBody<SyncBody>(c)
+  const appId = assertString(body.appId, 'appId', 128)
+  const limitedResponse = assertPublicPluginApp(c, appId)
+  if (limitedResponse)
+    return limitedResponse
+  const recipientKey = assertString(body.recipientKey, 'recipientKey', 128)
+  const deviceKey = assertString(body.deviceKey, 'deviceKey', 128)
+  const eventProof = assertString(body.eventProof, 'eventProof', 256)
+  if (!(await verifyNotificationEventProof(c, appId, recipientKey, deviceKey, eventProof)))
+    throw quickError(401, 'invalid_notification_event_proof', 'Invalid notification event proof', { appId })
+  if (body.platform && !NOTIFICATION_PLATFORMS.has(body.platform))
+    throw simpleError('invalid_platform', 'Invalid notification platform')
+
+  const badgeState = await readNotificationBadgeStateCF(c, { appId, recipientKey, deviceKey })
+  const desiredRevision = Math.max(0, Math.trunc(badgeState?.badge_revision ?? 0))
+  const currentRevision = Math.max(0, Math.trunc(body.badgeRevision ?? 0))
+  const desiredBadge = Math.max(0, Math.trunc(badgeState?.badge ?? body.badge ?? 0))
+  return c.json({
+    ...BRES,
+    badge: desiredBadge,
+    badgeRevision: desiredRevision,
+    shouldApplyBadge: desiredRevision > currentRevision,
+  })
 })
 
 app.post('/recipients/proof', middlewareV2(['write', 'all']), async (c) => {
@@ -651,6 +703,7 @@ app.post('/badge', middlewareV2(['write', 'all']), async (c) => {
   if (!providerConfigs.length)
     throw simpleError('missing_notification_provider', 'Missing configured notification platform credentials')
   const campaignId = body.campaignId || crypto.randomUUID()
+  const badgeRevision = Date.now()
   const queued = await enqueueNativeNotificationFanout(c, {
     kind: 'badge',
     appId,
@@ -660,9 +713,10 @@ app.post('/badge', middlewareV2(['write', 'all']), async (c) => {
     buckets: plan.buckets,
     limit: plan.limit,
     badge,
+    badgeRevision,
     providerConfigs,
   }, plan.buckets)
-  return c.json({ ...BRES, campaignId, queued, queuedBuckets: plan.buckets.length, targeted: null })
+  return c.json({ ...BRES, campaignId, queued, queuedBuckets: plan.buckets.length, targeted: null, badgeRevision })
 })
 
 app.post('/update-check', middlewareV2(['write', 'all']), async (c) => {

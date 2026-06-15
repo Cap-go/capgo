@@ -31,6 +31,8 @@ export type NativeNotificationEvent
     | 'permission_changed'
     | 'background_started'
     | 'background_finished'
+    | 'badge_set'
+    | 'badge_applied'
 
 export interface NativeNotificationTarget {
   externalId?: string
@@ -62,6 +64,7 @@ export interface NativeNotificationRegisterInput {
   attributes?: Record<string, unknown>
   permission?: NativeNotificationPermission
   badge?: number
+  badgeRevision?: number
   active?: boolean
   consent?: boolean
 }
@@ -89,6 +92,7 @@ export interface NativeNotificationRegistryRow {
   attributes: string
   active: number
   badge: number
+  badge_revision?: number
   permission: number
   consent: number
   updated_at: string
@@ -107,6 +111,9 @@ export interface NativeNotificationEventInput {
   platform?: NativeNotificationPlatform
   error?: string
   badge?: number
+  badgeRevision?: number
+  eventId?: string
+  occurredAt?: string
 }
 
 export interface NativeNotificationQueueMessage {
@@ -116,16 +123,27 @@ export interface NativeNotificationQueueMessage {
   payload: Record<string, unknown>
   target?: NativeNotificationTarget
   buckets?: string[]
+  registryCursorDeviceKey?: string
   devices?: NativeNotificationRegistryRow[]
   limit?: number
   badge?: number
+  badgeRevision?: number
   providerConfigs?: NativeNotificationProviderConfig[]
   attempt?: number
+  sendBatchSize?: number
+  skipQueuedEvents?: boolean
 }
 
 export interface NativeNotificationStatsRow {
   event: string
   count: number
+}
+
+export interface NativeNotificationBadgeStateRow {
+  badge: number
+  badge_revision: number
+  event_id: string
+  updated_at: string
 }
 
 function toHex(buffer: ArrayBuffer): string {
@@ -386,6 +404,7 @@ export async function trackNotificationRegistrationCF(c: Context<MiddlewareKeyVa
       Math.max(0, Math.trunc(input.badge ?? 0)),
       permissionToNumber(input.permission),
       input.consent === false ? 0 : 1,
+      Math.max(0, Math.trunc(input.badgeRevision ?? 0)),
     ],
     indexes: [identity.index],
   })
@@ -425,6 +444,7 @@ export function tombstoneNotificationRegistrationCF(c: Context<MiddlewareKeyVari
       Math.max(0, Math.trunc(params.badge ?? 0)),
       permissionToNumber(params.permission),
       0,
+      0,
     ],
     indexes: [getNotificationIndex(params.appId, getNotificationBucket(params.recipientKey))],
   })
@@ -436,8 +456,10 @@ export function buildNotificationRegistryLookupQuery(params: {
   buckets?: string[]
   recipientKey?: string
   deviceKey?: string
+  deviceKeyAfter?: string
   tag?: string
   limit?: number
+  orderByDeviceKey?: boolean
   now?: Date
 }) {
   const since = new Date((params.now?.getTime() ?? Date.now()) - NOTIFICATION_REGISTRY_RETENTION_DAYS * 24 * 60 * 60 * 1000)
@@ -448,10 +470,14 @@ export function buildNotificationRegistryLookupQuery(params: {
   ]
   const outerConditions = ['active = 1', 'consent = 1']
 
+  if (params.deviceKeyAfter)
+    innerConditions.push(`blob1 > '${escapeSqlString(params.deviceKeyAfter)}'`)
   if (params.recipientKey)
     outerConditions.push(`recipient_key = '${escapeSqlString(params.recipientKey)}'`)
   if (params.deviceKey)
     outerConditions.push(`device_key = '${escapeSqlString(params.deviceKey)}'`)
+  if (params.deviceKeyAfter)
+    outerConditions.push(`device_key > '${escapeSqlString(params.deviceKeyAfter)}'`)
   const tag = normalizeNotificationTag(params.tag)
   if (tag)
     outerConditions.push(`position('|${escapeSqlString(tag)}|' IN tags) > 0`)
@@ -476,13 +502,14 @@ FROM (
     argMax(double2, timestamp) AS badge,
     argMax(double3, timestamp) AS permission,
     argMax(double4, timestamp) AS consent,
+    argMax(double5, timestamp) AS badge_revision,
     max(timestamp) AS updated_at
   FROM ${params.dataset}
   WHERE ${innerConditions.join(' AND ')}
   GROUP BY blob1
 )
 WHERE ${outerConditions.join(' AND ')}
-ORDER BY updated_at DESC
+ORDER BY ${params.orderByDeviceKey ? 'device_key ASC' : 'updated_at DESC'}
 LIMIT ${limit}`
 }
 
@@ -502,9 +529,11 @@ export async function readNotificationRegistrationsCF(c: Context<MiddlewareKeyVa
   appId: string
   recipientKey?: string
   deviceKey?: string
+  deviceKeyAfter?: string
   tag?: string
   buckets?: string[]
   limit?: number
+  orderByDeviceKey?: boolean
 }) {
   if (!getEnv(c, 'CF_ANALYTICS_TOKEN') || !getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID'))
     return [] as NativeNotificationRegistryRow[]
@@ -515,8 +544,10 @@ export async function readNotificationRegistrationsCF(c: Context<MiddlewareKeyVa
     buckets: resolveNotificationBuckets(params),
     recipientKey: params.recipientKey,
     deviceKey: params.deviceKey,
+    deviceKeyAfter: params.deviceKeyAfter,
     tag: params.tag,
     limit: params.limit,
+    orderByDeviceKey: params.orderByDeviceKey,
   })
 
   cloudlog({ requestId: c.get('requestId'), message: 'readNotificationRegistrationsCF query', query })
@@ -543,7 +574,7 @@ export function buildNotificationStatsQuery(params: {
     ? `index1 = '${escapeSqlString(getNotificationEventIndex(params.appId, params.campaignId))}' AND blob2 = '${escapeSqlString(params.campaignId)}'`
     : `(index1 = '${appIndex}' OR startsWith(index1, '${appIndex}:'))`
 
-  return `SELECT blob1 AS event, count() AS count\n`
+  return `SELECT blob1 AS event, COUNT(DISTINCT if(blob9 = '', concat(toString(timestamp), ':', blob1, ':', blob3, ':', blob4), blob9)) AS count\n`
     + `FROM ${params.dataset}\n`
     + `WHERE timestamp >= toDateTime('${formatDateCF(since)}')\n`
     + `  AND ${indexCondition}\n`
@@ -573,6 +604,56 @@ export async function readNotificationStatsCF(c: Context<MiddlewareKeyVariables>
   }
 }
 
+export function buildNotificationBadgeStateQuery(params: {
+  dataset: string
+  appId: string
+  recipientKey: string
+  deviceKey: string
+  days?: number
+  now?: Date
+}) {
+  const days = Math.min(Math.max(Math.trunc(params.days ?? 92), 1), 92)
+  const since = new Date((params.now?.getTime() ?? Date.now()) - days * 24 * 60 * 60 * 1000)
+  const appIndex = escapeSqlString(getNotificationEventIndex(params.appId))
+  return `SELECT
+  argMax(double1, timestamp) AS badge,
+  argMax(double2, timestamp) AS badge_revision,
+  argMax(blob9, timestamp) AS event_id,
+  max(timestamp) AS updated_at
+FROM ${params.dataset}
+WHERE timestamp >= toDateTime('${formatDateCF(since)}')
+  AND (index1 = '${appIndex}' OR startsWith(index1, '${appIndex}:'))
+  AND blob1 = 'badge_set'
+  AND blob4 = '${escapeSqlString(params.deviceKey)}'
+  AND blob5 = '${escapeSqlString(params.recipientKey)}'
+GROUP BY blob4
+ORDER BY updated_at DESC
+LIMIT 1`
+}
+
+export async function readNotificationBadgeStateCF(c: Context<MiddlewareKeyVariables>, params: {
+  appId: string
+  recipientKey: string
+  deviceKey: string
+}) {
+  if (!getEnv(c, 'CF_ANALYTICS_TOKEN') || !getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID'))
+    return null
+  const query = buildNotificationBadgeStateQuery({
+    dataset: getEventsDataset(c),
+    appId: params.appId,
+    recipientKey: params.recipientKey,
+    deviceKey: params.deviceKey,
+  })
+  try {
+    const rows = await runQueryToCFA<NativeNotificationBadgeStateRow>(c, query)
+    return rows[0] ?? null
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'readNotificationBadgeStateCF error', error: serializeError(error) })
+    return null
+  }
+}
+
 export async function trackNotificationEventCF(c: Context<MiddlewareKeyVariables>, input: NativeNotificationEventInput) {
   if (!c.env.NOTIFICATION_EVENTS)
     return
@@ -595,8 +676,13 @@ export async function trackNotificationEventCF(c: Context<MiddlewareKeyVariables
       input.provider ?? '',
       input.error ?? '',
       input.platform ?? '',
+      input.eventId ?? '',
+      input.occurredAt ?? '',
     ],
-    doubles: [Math.max(0, Math.trunc(input.badge ?? 0))],
+    doubles: [
+      Math.max(0, Math.trunc(input.badge ?? 0)),
+      Math.max(0, Math.trunc(input.badgeRevision ?? 0)),
+    ],
     indexes: [index],
   })
 }

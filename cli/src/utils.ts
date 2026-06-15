@@ -12,7 +12,6 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { homedir, platform as osPlatform } from 'node:os'
 import path, { dirname, join, relative, resolve, sep } from 'node:path'
 import { cwd, env, stdin, stdout } from 'node:process'
-import { findMonorepoRoot, findNXMonorepoRoot, isMonorepo, isNXMonorepo } from '@capacitor/cli/dist/util/monorepotools'
 import { findInstallCommand, findPackageManagerRunner, findPackageManagerType } from '@capgo/find-package-manager'
 import { confirm as confirmC, isCancel, log, select, spinner as spinnerC } from '@clack/prompts'
 import { canParse, format, lessThan, parse, parseRange, rangeIntersects } from '@std/semver'
@@ -23,10 +22,12 @@ import { isCI } from 'ci-info'
 import prettyjson from 'prettyjson'
 import * as tus from 'tus-js-client'
 import { markSnag } from './app/debug'
+import { findMonorepoRoot, findNXMonorepoRoot, isMonorepo, isNXMonorepo } from './capacitor-cli'
 import { getChecksum } from './checksum'
 import { loadConfig, writeConfig } from './config'
 import { nativePackageSchema } from './schemas/common'
 import { formatApiErrorForCli, parseSecurityPolicyError } from './utils/security_policy_errors'
+import { createTimedFetch, isSupabaseInstrumentationEnabled } from './analytics/supabase-perf'
 
 export const baseKey = '.capgo_key'
 export const baseKeyV2 = '.capgo_key_v2'
@@ -40,6 +41,7 @@ export const UPLOAD_TIMEOUT = 120000
 export const ALERT_UPLOAD_SIZE_BYTES = 1024 * 1024 * 20 // 20MB
 export const MAX_UPLOAD_LENGTH_BYTES = 1024 * 1024 * 1024 // 1GB
 export const MAX_CHUNK_SIZE_BYTES = 1024 * 1024 * 99 // 99MB
+export const TUS_UPLOAD_RETRY_DELAYS = [0, 1000, 3000, 5000, 10000]
 
 export const PACKNAME = 'package.json'
 
@@ -158,6 +160,14 @@ interface TrackOptions {
    * example: "user-123"
    */
   user_id?: string
+  /**
+   * Organization ID for actor-scoped tracking.
+   */
+  org_id?: string
+  /**
+   * Tracking payload contract version.
+   */
+  tracking_version?: number
   /**
    * Event icon (emoji)
    * must be a single emoji
@@ -567,11 +577,11 @@ interface CapgoConfig {
   hostFilesApi: string
   hostApi: string
 }
-export async function getRemoteConfig(silent = false) {
+export async function getRemoteConfig(silent = false, signal?: AbortSignal) {
   // call host + /api/get_config and parse the result as json using fetch
   const localConfig = await getLocalConfig(silent)
   try {
-    const response = await fetch(`${localConfig.hostApi}/private/config`)
+    const response = await fetch(`${localConfig.hostApi}/private/config`, signal ? { signal } : {})
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
@@ -631,7 +641,7 @@ function normalizeSupabaseHost(host: string): string {
   return `${parsed.origin}${normalizedPath}`
 }
 
-export async function createSupabaseClient(apikey: string, supaHost?: string, supaKey?: string, silent = false) {
+export async function createSupabaseClient(apikey: string, supaHost?: string, supaKey?: string, silent = false, instrument = true) {
   const config = await getRemoteConfig(silent)
   if (supaHost && supaKey) {
     if (!silent)
@@ -654,6 +664,7 @@ export async function createSupabaseClient(apikey: string, supaHost?: string, su
       headers: {
         capgkey: apikey,
       },
+      ...(isSupabaseInstrumentationEnabled() && instrument ? { fetch: createTimedFetch() } : {}),
     },
   })
 }
@@ -1296,7 +1307,8 @@ export async function uploadTUS(apikey: string, data: Buffer, orgId: string, app
       channel: 'app',
       event: 'App TUS upload',
       icon: '⏫',
-      user_id: orgId,
+      org_id: orgId,
+      tracking_version: 2,
       tags: {
         'app-id': appId,
       },
@@ -1306,6 +1318,7 @@ export async function uploadTUS(apikey: string, data: Buffer, orgId: string, app
       endpoint: `${localConfig.hostFilesApi}/files/upload/attachments/`,
       // parallelUploads: multipart,
       chunkSize,
+      retryDelays: [...TUS_UPLOAD_RETRY_DELAYS],
       metadataForPartialUploads: {
         filename: `orgs/${orgId}/apps/${appId}/${name}.zip`,
         filetype: 'application/gzip',
@@ -1340,7 +1353,8 @@ export async function uploadTUS(apikey: string, data: Buffer, orgId: string, app
           channel: 'app',
           event: 'App TUS done',
           icon: '⏫',
-          user_id: orgId,
+          org_id: orgId,
+          tracking_version: 2,
           tags: {
             'app-id': appId,
           },
@@ -1418,19 +1432,24 @@ export async function updateOrCreateChannel(supabase: SupabaseClient<Database>, 
     .single()
 }
 
-export async function sendEvent(capgkey: string, payload: TrackOptions & { notifyConsole?: boolean }, verbose?: boolean): Promise<void> {
+export async function sendEvent(capgkey: string, payload: TrackOptions & { notifyConsole?: boolean }, verbose?: boolean, signal?: AbortSignal): Promise<void> {
   try {
     if (verbose) {
       log.info(`Get remove config: for ${payload.event}`)
     }
     // Always fetch remote config silently — sendEvent is telemetry and must
     // not bypass an Ink-controlled stdout (e.g. during `capgo init`).
-    const config = await getRemoteConfig(true)
+    const config = await getRemoteConfig(true, signal)
     if (verbose) {
       log.info(`Sending LogSnag event: ${JSON.stringify(payload)}`)
     }
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 seconds timeout
+    // Combine the internal timeout with any caller-supplied signal (e.g. the
+    // analytics flush) so in-flight telemetry can be released promptly.
+    const eventSignal = signal
+      ? (typeof AbortSignal.any === 'function' ? AbortSignal.any([controller.signal, signal]) : signal)
+      : controller.signal
 
     try {
       const fetchResponse = await fetch(`${config.hostApi}/private/events`, {
@@ -1440,7 +1459,7 @@ export async function sendEvent(capgkey: string, payload: TrackOptions & { notif
           'Content-Type': 'application/json',
           'capgkey': capgkey,
         },
-        signal: controller.signal,
+        signal: eventSignal,
       })
 
       clearTimeout(timeoutId)
@@ -2001,23 +2020,6 @@ export async function getRemoteDependencies(supabase: SupabaseClient<Database>, 
   return convertNativePackages(((remoteNativePackages.version as any)?.native_packages as any) ?? [])
 }
 
-export async function checkChecksum(supabase: SupabaseClient<Database>, appId: string, channel: string, currentChecksum: string) {
-  const s = spinnerC()
-  s.start(`Checking bundle checksum compatibility with channel ${channel}`)
-  const remoteChecksum = await getRemoteChecksums(supabase, appId, channel)
-
-  if (!remoteChecksum) {
-    s.stop(`No checksum found for channel ${channel}, the bundle will be uploaded`)
-    return
-  }
-  if (remoteChecksum && remoteChecksum === currentChecksum) {
-    // cannot upload the same bundle - stop spinner before throwing
-    s.stop(`Checksum check failed`)
-    log.error(`Cannot upload the same bundle content.\nCurrent bundle checksum matches remote bundle for channel ${channel}\nDid you build your app before uploading?\nPS: You can ignore this check with "--ignore-checksum-check"`)
-    throw new Error('Cannot upload the same bundle content')
-  }
-  s.stop(`Checksum compatible with ${channel} channel`)
-}
 
 export type { Compatibility, CompatibilityDetails, IncompatibilityReason } from './schemas/common'
 

@@ -166,10 +166,10 @@ const columns = ref<TableColumn[]>([
   },
   {
     label: t('last-upload'),
-    key: 'updated_at',
+    key: 'last_upload_at',
     mobile: false,
     sortable: 'desc',
-    displayFunction: item => formatDate(item.updated_at ?? ''),
+    displayFunction: item => formatDate(item.last_upload_at ?? ''),
   },
   {
     label: t('mau'),
@@ -263,14 +263,11 @@ const filteredApps = computed(() => {
   if (sortColumn) {
     const sorted = [...apps].sort((a, b) => {
       const key = sortColumn.key
+      // Sort by the raw underlying value rather than the formatted display string,
+      // so date columns (e.g. last_upload_at) order by their ISO timestamp
+      // chronologically instead of by localized label text.
       let aVal: any = a[key]
       let bVal: any = b[key]
-
-      // Handle displayFunction if present
-      if (sortColumn.displayFunction) {
-        aVal = sortColumn.displayFunction(a)
-        bVal = sortColumn.displayFunction(b)
-      }
 
       // Handle null/undefined values for MAU (should be 0 for numbers)
       if (key === 'mau') {

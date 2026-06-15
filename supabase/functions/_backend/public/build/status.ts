@@ -97,7 +97,7 @@ export async function getBuildStatus(
   // This prevents cross-app access by mixing an allowed app_id with another app's job_id.
   const { data: buildRequest, error: buildRequestError } = await supabase
     .from('build_requests')
-    .select('app_id, owner_org, platform, status, build_mode')
+    .select('app_id, owner_org, requested_by, platform, status, build_mode')
     .eq('builder_job_id', job_id)
     .maybeSingle()
 
@@ -250,6 +250,7 @@ export async function getBuildStatus(
         platform: buildRequest.platform,
         build_mode: buildRequest.build_mode,
         owner_org: buildRequest.owner_org,
+        requested_by: buildRequest.requested_by,
       },
     })
   }

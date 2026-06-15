@@ -91,14 +91,14 @@ async function markBuildAsFailed(
   // status write uses service role because API-key RLS must stay read-only here.
   //
   // Fetch the row first to capture the fields we need for the lifecycle event
-  // (previousStatus for the CAS guard + platform/build_mode/owner_org for the
+  // (previousStatus for the CAS guard + platform/build_mode/owner_org/requested_by for the
   // payload). Without this, marking a build failed here would silently miss
   // the `Build Failed` transition event, leaving the lifecycle funnel
   // incomplete for the builder-rejection and outer-catch paths.
   const adminClient = supabaseAdmin(c)
   const { data: row, error: selectError } = await adminClient
     .from('build_requests')
-    .select('status, platform, build_mode, owner_org')
+    .select('status, platform, build_mode, owner_org, requested_by')
     .eq('builder_job_id', jobId)
     .eq('app_id', appId)
     .maybeSingle()
@@ -168,6 +168,7 @@ async function markBuildAsFailed(
         platform: row.platform,
         build_mode: row.build_mode,
         owner_org: row.owner_org,
+        requested_by: row.requested_by,
       },
     })
   }
@@ -214,7 +215,7 @@ export async function startBuild(
 
     const { data: buildRequest, error: buildRequestError } = await supabase
       .from('build_requests')
-      .select('id, app_id, owner_org, status, platform, build_mode')
+      .select('id, app_id, owner_org, requested_by, status, platform, build_mode')
       .eq('builder_job_id', jobId)
       .eq('app_id', appId)
       .maybeSingle()
@@ -333,6 +334,7 @@ export async function startBuild(
           platform: buildRequest.platform,
           build_mode: buildRequest.build_mode,
           owner_org: buildRequest.owner_org,
+          requested_by: buildRequest.requested_by,
         },
       })
     }

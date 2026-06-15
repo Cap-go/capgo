@@ -9,7 +9,7 @@ import { addTagBento, trackBentoEvent } from '../utils/bento.ts'
 import { getFallbackCreditProductId } from '../utils/credits.ts'
 import { BRES, quickError, simpleError } from '../utils/hono.ts'
 import { middlewareStripeWebhook } from '../utils/hono_middleware_stripe.ts'
-import { cloudlog } from '../utils/logging.ts'
+import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import * as schema from '../utils/postgres_schema.ts'
 import { groupIdentifyPosthog } from '../utils/posthog.ts'
@@ -22,6 +22,7 @@ export const app = new Hono<MiddlewareKeyVariablesStripe>()
 
 interface Org {
   id: string
+  name: string
   management_email: string
   created_by: string
   customer_id?: string | null
@@ -713,6 +714,7 @@ async function customerSourceCreated(c: Context, org: Org, stripeEvent: Stripe.C
       event: 'org:card_added',
       preferenceKey: 'credit_usage',
       uniqId: 'org:card_added',
+      audience: 'billing',
     },
     channel: 'usage',
     event: 'Credit Card Added',
@@ -733,6 +735,7 @@ async function customerSourceExpiring(c: Context, org: Org) {
       event: 'org:card_expiring',
       preferenceKey: 'credit_usage',
       uniqId: 'org:card_expiring',
+      audience: 'billing',
     },
     channel: 'usage',
     event: 'Credit Card Expiring',
@@ -767,10 +770,11 @@ async function invoiceUpcoming(c: Context, org: Org, stripeEvent: Stripe.Invoice
   await sendEventToTracking(c, {
     bento: {
       cron: '* * * * *',
-      data: { plan_name: planName, price, plan_type: planType },
+      data: { plan_name: planName, price, plan_type: planType, org_name: org.name },
       event: 'org:invoice_upcoming',
       preferenceKey: 'credit_usage',
       uniqId: 'org:invoice_upcoming',
+      audience: 'billing',
     },
     channel: 'usage',
     event: 'Invoice Upcoming',
@@ -869,6 +873,7 @@ async function createdOrUpdated(
           event: 'user:plan_change',
           preferenceKey: 'credit_usage',
           uniqId: 'user:plan_change',
+          audience: 'billing',
         },
         channel: 'usage',
         event: planChangeEventName,
@@ -898,6 +903,7 @@ async function createdOrUpdated(
         event: eventName,
         preferenceKey: 'credit_usage',
         uniqId: `subscription:${eventName}:${plan.name}`,
+        audience: 'billing',
       },
       channel: 'usage',
       event: isNewSubscription ? 'User subscribe' : 'User update subscribe',
@@ -948,6 +954,7 @@ async function didCancel(c: Context, org: Org) {
       event: 'user:cancel',
       preferenceKey: 'credit_usage',
       uniqId: 'user:cancel',
+      audience: 'billing',
     },
     channel: 'usage',
     event: 'User cancel',
@@ -971,7 +978,7 @@ async function didCancel(c: Context, org: Org) {
 async function getOrg(c: Context, stripeData: StripeData) {
   const { error: dbError, data: org } = await supabaseAdmin(c)
     .from('orgs')
-    .select('id, management_email, created_by')
+    .select('id, management_email, created_by, name')
     .eq('customer_id', stripeData.data.customer_id)
     .single()
   if (dbError) {
@@ -981,6 +988,21 @@ async function getOrg(c: Context, stripeData: StripeData) {
     throw simpleError('webhook_error_no_org_found', 'Webhook Error: no org found')
   }
   return org
+}
+
+async function orgHasActiveUsageCredits(c: Context, orgId: string): Promise<boolean> {
+  const { data, error } = await supabaseAdmin(c)
+    .from('orgs')
+    .select('has_usage_credits')
+    .eq('id', orgId)
+    .maybeSingle()
+
+  if (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'orgHasActiveUsageCredits error', orgId, error })
+    return false
+  }
+
+  return data?.has_usage_credits === true
 }
 
 async function cancelingOrFinished(
@@ -1076,7 +1098,12 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
       return createdOrUpdatedResponse
   }
   else if (stripeData.data.status === 'failed') {
-    await trackBentoEvent(c, org.management_email, {}, 'org:failed_payment')
+    if (await orgHasActiveUsageCredits(c, org.id)) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Skipping failed payment email because org has active usage credits', orgId: org.id })
+    }
+    else {
+      await trackBentoEvent(c, org.management_email, {}, 'org:failed_payment')
+    }
     // Update the database with failed status
     await updateStripeInfo(c, stripeData)
   }

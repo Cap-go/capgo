@@ -54,11 +54,9 @@ export function mapIosOnboardingError(
   // failure occurred.
   if (failedStep === 'import-scanning')
     return 'keychain_no_identities'
-  if (failedStep === 'import-compiling-helper')
-    return 'keychain_helper_compile_failed'
   if (failedStep === 'import-exporting')
     return 'keychain_export_failed'
-  if (failedStep === 'import-fetching-profile')
+  if (failedStep === 'import-provide-profile-path')
     return 'profile_read_failed'
   if (failedStep === 'import-pick-profile' || failedStep === 'import-no-match-recovery')
     return 'profile_no_match'

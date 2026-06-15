@@ -154,6 +154,39 @@ describe('attachment upload plan gating regression', () => {
     const data = await response.json() as { error?: string }
     expect(data.error).toBe('on_premise_app')
   })
+
+  it('allows attachment uploads when only build time is over plan', async () => {
+    await executeSQL(
+      `
+        UPDATE public.stripe_info
+        SET
+          status = $1,
+          is_good_plan = $2,
+          trial_at = $3,
+          mau_exceeded = false,
+          storage_exceeded = false,
+          bandwidth_exceeded = false,
+          build_time_exceeded = true
+        WHERE customer_id = $4
+      `,
+      ['succeeded', false, '1970-01-01T00:00:00+00:00', stripeCustomerId],
+    )
+
+    const { uploadMetadata } = buildAttachmentPath(orgId, appId, `build-time-only-${randomUUID()}.txt`)
+
+    const response = await fetch(getEndpointUrl('/files/upload/attachments'), {
+      method: 'POST',
+      headers: {
+        'Authorization': uploadKey!,
+        'Content-Type': 'application/offset+octet-stream',
+        'Tus-Resumable': TUS_VERSION,
+        'Upload-Length': '4',
+        'Upload-Metadata': uploadMetadata,
+      },
+    })
+
+    expect(response.status).toBe(201)
+  })
 })
 
 describe('ready bundle upload immutability regression', () => {

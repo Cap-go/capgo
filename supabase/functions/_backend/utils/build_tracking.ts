@@ -65,6 +65,7 @@ interface BuildRowForTracking {
   platform: string
   build_mode: string
   owner_org: string
+  requested_by: string
 }
 
 export interface EmitBuildTransitionInput {
@@ -112,6 +113,7 @@ export async function emitBuildTransitionEvent(c: Context, input: EmitBuildTrans
 
   const tags: Record<string, string> = {
     app_id: input.build.app_id,
+    org_id: input.build.owner_org,
     platform: input.build.platform,
     build_mode: input.build.build_mode,
   }
@@ -138,7 +140,7 @@ export async function emitBuildTransitionEvent(c: Context, input: EmitBuildTrans
       channel: 'build-lifecycle',
       icon: ICON_BY_TRANSITION[transition],
       notify: false,
-      user_id: input.build.owner_org,
+      user_id: input.build.requested_by,
       groups: { organization: input.build.owner_org },
       tags,
     })

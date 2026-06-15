@@ -46,6 +46,22 @@ interface BillingCycleInfo {
   subscription_anchor_end: string | null
 }
 
+interface StripeInfoForPlanCheck {
+  subscription_id: string | null
+  subscription_anchor_start?: string | null
+  subscription_anchor_end?: string | null
+  status?: Database['public']['Enums']['stripe_status'] | null
+  trial_at?: string | null
+}
+
+interface OrgWithCustomerInfo {
+  customer_id: string | null
+  has_usage_credits?: boolean | null
+  name?: string | null
+  website?: string | null
+  stripe_info: StripeInfoForPlanCheck | null
+}
+
 interface BillingCycleRange {
   subscription_anchor_start: string
   subscription_anchor_end: string
@@ -108,6 +124,39 @@ function getDefaultBillingCycleRange(referenceDate = new Date()): BillingCycleRa
     subscription_anchor_start: start.toISOString(),
     subscription_anchor_end: end.toISOString(),
   }
+}
+
+function isFutureTimestamp(value: string | null | undefined): boolean {
+  if (!value)
+    return false
+
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) && timestamp > Date.now()
+}
+
+function hasActivePlanEntitlement(org: Pick<OrgWithCustomerInfo, 'stripe_info'>): boolean {
+  const stripeInfo = org.stripe_info
+  if (!stripeInfo)
+    return false
+
+  if (isFutureTimestamp(stripeInfo.trial_at))
+    return true
+
+  if (stripeInfo.status !== 'succeeded')
+    return false
+
+  if (!stripeInfo.subscription_anchor_end)
+    return true
+
+  const subscriptionEnd = Date.parse(stripeInfo.subscription_anchor_end)
+  if (!Number.isFinite(subscriptionEnd))
+    return true
+
+  return subscriptionEnd > Date.now()
+}
+
+function isCreditOnlyBillingOrg(org: Pick<OrgWithCustomerInfo, 'has_usage_credits' | 'stripe_info'>): boolean {
+  return org.has_usage_credits === true && !hasActivePlanEntitlement(org)
 }
 
 async function getBillingCycleRange(c: Context, orgId: string): Promise<BillingCycleRange> {
@@ -257,13 +306,17 @@ export async function findBestPlan(c: Context, stats: Database['public']['Functi
 
 async function userAbovePlan(c: Context, org: {
   customer_id: string | null
+  has_usage_credits?: boolean | null
   stripe_info: {
     subscription_id: string | null
-    status?: string | null
+    status?: Database['public']['Enums']['stripe_status'] | null
+    trial_at?: string | null
+    subscription_anchor_end?: string | null
   } | null
-}, orgId: string, is_good_plan: boolean, drizzleClient: ReturnType<typeof getDrizzleClient>): Promise<boolean> {
-  cloudlog({ requestId: c.get('requestId'), message: 'userAbovePlan', orgId, is_good_plan })
-  const hasActivePlan = org?.stripe_info?.status === 'succeeded'
+}, orgId: string, is_good_plan: boolean, drizzleClient: ReturnType<typeof getDrizzleClient>, forceCreditMode = false): Promise<boolean> {
+  const creditOnlyMode = forceCreditMode || isCreditOnlyBillingOrg(org)
+  cloudlog({ requestId: c.get('requestId'), message: 'userAbovePlan', orgId, is_good_plan, creditOnlyMode })
+  const hasActivePlan = hasActivePlanEntitlement(org)
   const totalStats = await getTotalStats(c, orgId)
   if (!totalStats) {
     return false
@@ -285,10 +338,10 @@ async function userAbovePlan(c: Context, org: {
   const planId = currentPlan?.id
 
   const metrics: Array<{ key: CreditMetric, usage: number, limit: number | null | undefined }> = [
-    { key: 'mau', usage: Number(totalStats.mau ?? 0), limit: currentPlan?.mau },
-    { key: 'storage', usage: Number(totalStats.storage ?? 0), limit: currentPlan?.storage },
-    { key: 'bandwidth', usage: Number(totalStats.bandwidth ?? 0), limit: currentPlan?.bandwidth },
-    { key: 'build_time', usage: Number(totalStats.build_time_unit ?? 0), limit: currentPlan?.build_time_unit },
+    { key: 'mau', usage: Number(totalStats.mau ?? 0), limit: creditOnlyMode ? 0 : currentPlan?.mau },
+    { key: 'storage', usage: Number(totalStats.storage ?? 0), limit: creditOnlyMode ? 0 : currentPlan?.storage },
+    { key: 'bandwidth', usage: Number(totalStats.bandwidth ?? 0), limit: creditOnlyMode ? 0 : currentPlan?.bandwidth },
+    { key: 'build_time', usage: Number(totalStats.build_time_unit ?? 0), limit: creditOnlyMode ? 0 : currentPlan?.build_time_unit },
   ]
 
   const creditResults: Record<CreditMetric, CreditApplicationResult | null> = {
@@ -420,7 +473,7 @@ async function userIsAtPlanUsage(c: Context, orgId: string, customerId: string |
 export async function getOrgWithCustomerInfo(c: Context, orgId: string) {
   const { data: org, error: userError } = await supabaseAdmin(c)
     .from('orgs')
-    .select('customer_id, name, website, stripe_info(status, subscription_id, subscription_anchor_start, subscription_anchor_end)')
+    .select('customer_id, has_usage_credits, name, website, stripe_info(status, subscription_id, subscription_anchor_start, subscription_anchor_end, trial_at)')
     .eq('id', orgId)
     .maybeSingle()
   if (userError)
@@ -482,7 +535,11 @@ export async function handleOrgNotificationsAndEvents(c: Context, org: any, orgI
 
   let finalIsGoodPlan = is_good_plan
 
-  if (!is_good_plan && is_onboarded) {
+  if (is_onboarded && isCreditOnlyBillingOrg(org)) {
+    const needsUpgrade = await userAbovePlan(c, org, orgId, is_good_plan, drizzleClient, true)
+    finalIsGoodPlan = !needsUpgrade
+  }
+  else if (!is_good_plan && is_onboarded) {
     const needsUpgrade = await userAbovePlan(c, org, orgId, is_good_plan, drizzleClient)
     finalIsGoodPlan = !needsUpgrade
   }

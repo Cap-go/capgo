@@ -2,6 +2,9 @@ import { exit } from 'node:process'
 import { log } from '@clack/prompts'
 import { Option, program } from 'commander'
 import pack from '../package.json'
+import { categorizeCliError } from './analytics/error-category'
+import { enableSupabaseInstrumentation } from './analytics/supabase-perf'
+import { extractCommandContext, flushAnalytics, trackCommandFailed, trackCommandInvoked, trackCommandSucceeded } from './analytics/track'
 import { addApp } from './app/add'
 import { debugApp } from './app/debug'
 import { deleteApp } from './app/delete'
@@ -13,7 +16,10 @@ import { clearCredentialsCommand, listCredentialsCommand, migrateCredentialsComm
 import { manageCredentialsCommand } from './build/credentials-manage'
 import { lastOutputCommand } from './build/last-output-command'
 import { checkBuildNeeded } from './build/needed'
+import type { OnboardingBuilderOptions } from './build/onboarding/command'
 import { onboardingBuilderCommand } from './build/onboarding/command'
+import type { CreateAppleKeyOptions } from './build/onboarding/asc-key/command'
+import { createAppleKeyCommand } from './build/onboarding/asc-key/command'
 import { requestBuildCommand } from './build/request'
 import { cleanupBundle } from './bundle/cleanup'
 import { checkCompatibility } from './bundle/compatibility'
@@ -22,7 +28,7 @@ import { deleteBundle } from './bundle/delete'
 import { encryptZip } from './bundle/encrypt'
 import { listBundle } from './bundle/list'
 import { printReleaseType } from './bundle/releaseType'
-import { uploadBundle } from './bundle/upload'
+import { handleBundleUploadCommand } from './bundle/upload-command'
 import { zipBundle } from './bundle/zip'
 import { addChannel } from './channel/add'
 import { currentBundle } from './channel/currentBundle'
@@ -39,6 +45,7 @@ import { startMcpServer } from './mcp/server'
 import { setupNotifications } from './notifications/setup'
 import { addOrganization, deleteOrganization, listMembers, listOrganizations, setOrganization } from './organization'
 import { capturePosthogException, getCommandPath, shouldCapturePosthogException } from './posthog'
+import { getPreviewQr } from './preview/qr'
 import { probe } from './probe'
 import { testRunDeviceCommand } from './run/device'
 import { getUserId } from './user/account'
@@ -64,10 +71,19 @@ program
   .description(`📦 Manage packages and bundle versions in Capgo Cloud`)
   .version(pack.version, '-v, --version', `output the current version`)
 
+// Turn on client-side Supabase perf tracking for the CLI. (Off by default so
+// the SDK bundle, which transitively imports createSupabaseClient, stays clean.)
+enableSupabaseInstrumentation()
+
 let currentCommandPath = 'unknown'
 
 program.hook('preAction', (_thisCommand, actionCommand) => {
   currentCommandPath = getCommandPath(actionCommand)
+  trackCommandInvoked(currentCommandPath, extractCommandContext(actionCommand))
+})
+
+program.hook('postAction', (_thisCommand, actionCommand) => {
+  trackCommandSucceeded(getCommandPath(actionCommand))
 })
 
 program
@@ -146,6 +162,25 @@ Example: npx @capgo/cli@latest login YOUR_API_KEY`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
+program
+  .command('get-qr [appId] [target]')
+  .description(`🔳 Print a terminal QR code for a bundle or channel preview.
+
+Preview must be enabled for the app.
+
+Examples:
+  npx @capgo/cli@latest get-qr com.example.app --bundle 1.2.3
+  npx @capgo/cli@latest get-qr com.example.app --bundle 123
+  npx @capgo/cli@latest get-qr com.example.app --channel production
+  npx @capgo/cli@latest get-qr com.example.app production --type channel`)
+  .action(getPreviewQr)
+  .option('-a, --apikey <apikey>', optionDescriptions.apikey)
+  .option('--bundle <bundle>', `Bundle name or id to preview`)
+  .option('--channel <channel>', `Channel name or id to preview`)
+  .addOption(new Option('--type <type>', `Type for positional target`).choices(['bundle', 'channel']))
+  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+
 const bundle = program
   .command('bundle')
   .description(`📦 Manage app bundles for deployment in Capgo Cloud, including upload, compatibility checks, and encryption.`)
@@ -160,13 +195,11 @@ Version must be > 0.0.0 and unique. Deleted versions cannot be reused for securi
 External option: Store only a URL link (useful for apps >200MB or privacy requirements).
 Capgo never inspects external content. Add encryption for trustless security.
 
-Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production`)
-  .action(async (...args: Parameters<typeof uploadBundle>): Promise<void> => {
-    await uploadBundle(...args)
-  })
+Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production,beta`)
+  .action(handleBundleUploadCommand)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('-p, --path <path>', `Path of the folder to upload, if not provided it will use the webDir set in capacitor.config`)
-  .option('-c, --channel <channel>', `Channel to link to`)
+  .option('-c, --channel <channel>', `Channel to link to. Use commas for multiple channels, for example production,beta`)
   .option('-e, --external <url>', `Link to external URL instead of upload to Capgo Cloud`)
   .option('--iv-session-key <key>', `Set the IV and session key for bundle URL external`)
   .option('--s3-region <region>', `Region for your S3 bucket`)
@@ -191,6 +224,7 @@ Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --cha
   )
   .option('--auto-min-update-version', `Set the min update version based on native packages`)
   .option('--ignore-metadata-check', `Ignores the metadata (node_modules) check when uploading`)
+  .option('--fail-on-incompatible', `Fail the upload (exit non-zero) instead of uploading when the bundle is incompatible with the channel's current native packages. In an interactive terminal you can still choose a native build; declining fails. Cannot be combined with --ignore-metadata-check.`)
   .option('--ignore-checksum-check', `Ignores the checksum check when uploading`)
   .option('--force-crc32-checksum', `Force CRC32 checksum for upload (override auto-detection)`)
   .option('--timeout <timeout>', `Timeout for the upload process in seconds`)
@@ -214,6 +248,7 @@ Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --cha
   .option('--disable-brotli', `Completely disable brotli compression even if updater version supports it`)
   .option('--version-exists-ok', `Exit successfully if bundle version already exists, useful for CI/CD workflows with monorepos`)
   .option('--self-assign', `Allow devices to auto-join this channel (updates channel setting)`)
+  .option('--qr-preview', `Print a terminal QR code for this bundle preview after upload`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
   .option('--verbose', optionDescriptions.verbose)
@@ -416,6 +451,8 @@ Example: npx @capgo/cli@latest app set com.example.app --name "Updated App" --re
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('-r, --retention <retention>', `Days to keep old bundles (0 = infinite, default: 0)`)
   .option('--expose-metadata <exposeMetadata>', `Expose bundle metadata (link and comment) to the plugin (true/false, default: false)`)
+  .option('--preview', `Enable bundle and channel preview QR codes for this app`)
+  .option('--no-preview', `Disable bundle and channel preview QR codes for this app`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
@@ -424,7 +461,7 @@ const channel = program
   .description(`📢 Manage distribution channels for app updates in Capgo Cloud, controlling how updates are delivered to devices.`)
 
 channel
-  .command('add [channelId] [appId]')
+  .command('add [channelName] [appId]')
   .alias('a')
   .description(`➕ Create a new channel for app distribution in Capgo Cloud to manage update delivery.
 
@@ -437,7 +474,7 @@ Example: npx @capgo/cli@latest channel add production com.example.app --default`
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
 channel
-  .command('delete [channelId] [appId]')
+  .command('delete [channelName] [appId]')
   .alias('d')
   .description(`🗑️ Delete a channel from Capgo Cloud, optionally removing associated bundles to free up resources.
 
@@ -479,7 +516,7 @@ Example: npx @capgo/cli@latest channel currentBundle production com.example.app`
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
 channel
-  .command('set [channelId] [appId]')
+  .command('set [channelName] [appId]')
   .alias('s')
   .description(`⚙️ Configure settings for a channel, such as linking a bundle, setting update strategies (major, minor, metadata, patch, none), or device targeting (iOS, Android, dev, prod, emulator, device).
 
@@ -511,6 +548,7 @@ Example: npx @capgo/cli@latest channel set production com.example.app --bundle 1
   .option('--no-emulator', `Disable sending update to emulator devices`)
   .option('--device', `Allow sending update to physical devices`)
   .option('--no-device', `Disable sending update to physical devices`)
+  .option('--qr-preview', `Print a terminal QR code for this channel preview after updating it`)
   .option('--package-json <packageJson>', optionDescriptions.packageJson)
   .option('--ignore-metadata-check', `Ignore checking node_modules compatibility if present in the bundle`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
@@ -786,7 +824,11 @@ build
   .description('Set up build credentials interactively (iOS: certificates + profiles automated; Android: keystore + Google OAuth provisions GCP service account and Play Console invite)')
   .option('-a, --apikey <apikey>', 'API key to link to your account')
   .option('-p, --platform <platform>', 'Platform to onboard (ios or android). If omitted, auto-detects when only one native folder exists; prompts otherwise.')
-  .action(onboardingBuilderCommand)
+  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  // enableSelfUpdate is set ONLY here (the genuine `build init` entrypoint) so
+  // the self-update prompt's re-exec replays `build init`, never a wrapper
+  // command that reached onboarding as a sub-step (bundle upload / credentials).
+  .action((options: OnboardingBuilderOptions) => onboardingBuilderCommand({ ...options, enableSelfUpdate: true }))
 
 build
   .command('request [appId]')
@@ -871,6 +913,24 @@ const buildCredentials = build
 📚 DOCUMENTATION:
    iOS setup: https://capgo.app/docs/cli/cloud-build/ios/
    Android setup: https://capgo.app/docs/cli/cloud-build/android/`)
+
+buildCredentials
+  .command('apple-key')
+  .alias('asc-key')
+  .description(`Create an App Store Connect team API key with a guided macOS helper (macOS only).
+
+Opens a native window that walks you through Apple's App Store Connect UI in an
+embedded browser, auto-captures the Issuer ID + Key ID, intercepts the one-time
+.p8, validates it against Apple, and saves it to ~/.appstoreconnect/private_keys.
+Progress statistics are forwarded to Capgo analytics (disable with CAPGO_DISABLE_TELEMETRY).
+
+Example:
+  npx @capgo/cli build credentials apple-key --appId com.example.app`)
+  .action((options: CreateAppleKeyOptions) => createAppleKeyCommand(options))
+  .option('-a, --apikey <apikey>', optionDescriptions.apikey)
+  .option('--appId <appId>', 'Save the captured key into this app iOS build credentials')
+  .option('--local', 'Save into the per-project .capgo-credentials.json instead of the global file')
+  .option('--json', 'Print the captured Key ID / Issuer ID / .p8 path as JSON')
 
 buildCredentials
   .command('save')
@@ -1114,37 +1174,48 @@ program.configureOutput({
   },
 })
 
-program.parseAsync().catch(async (error: unknown) => {
-  if (typeof error === 'object' && error !== null && 'code' in error) {
-    const commanderError = error as { code: string, exitCode?: number, message?: string }
-    // These are normal Commander.js exits (help, version, etc.) - exit silently
-    if (commanderError.code === 'commander.version' || commanderError.code === 'commander.helpDisplayed') {
-      exit(0)
-    }
-    const capturePromise = shouldCapturePosthogException(error)
-      ? capturePosthogException({
+void (async () => {
+  try {
+    await program.parseAsync()
+    await flushAnalytics()
+  }
+  catch (error: unknown) {
+    if (typeof error === 'object' && error !== null && 'code' in error) {
+      const commanderError = error as { code: string, exitCode?: number, message?: string }
+      // These are normal Commander.js exits (help, version, etc.) - exit silently
+      if (commanderError.code === 'commander.version' || commanderError.code === 'commander.helpDisplayed') {
+        await flushAnalytics()
+        exit(0)
+      }
+      const capturePromise = shouldCapturePosthogException(error)
+        ? capturePosthogException({
           error,
           functionName: currentCommandPath,
           kind: 'unhandled_error',
           status: commanderError.exitCode ?? 1,
         })
-      : Promise.resolve(false)
-    // For actual errors, show just the message without the full stack trace
-    if (commanderError.message) {
-      log.error(commanderError.message)
+        : Promise.resolve(false)
+      // For actual errors, show just the message without the full stack trace
+      if (commanderError.message) {
+        log.error(commanderError.message)
+      }
+      const exitCode = commanderError.exitCode ?? 1
+      // Track the failure for usage analytics regardless of exception-capture
+      // policy (commander usage errors are real failures, categorized 'commander').
+      trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode })
+      await Promise.all([capturePromise, flushAnalytics()])
+      exit(exitCode)
     }
-    await capturePromise
-    const exitCode = commanderError.exitCode ?? 1
-    exit(exitCode)
+    const capturePromise = capturePosthogException({
+      error,
+      functionName: currentCommandPath,
+      kind: 'unhandled_error',
+      status: 1,
+    })
+    // For non-Commander errors, show full error details
+    log.error(`Error: ${formatError(error)}`)
+    trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode: 1 })
+    await Promise.all([capturePromise, flushAnalytics()])
+    exit(1)
   }
-  const capturePromise = capturePosthogException({
-    error,
-    functionName: currentCommandPath,
-    kind: 'unhandled_error',
-    status: 1,
-  })
-  // For non-Commander errors, show full error details
-  log.error(`Error: ${formatError(error)}`)
-  await capturePromise
-  exit(1)
-})
+})()

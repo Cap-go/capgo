@@ -14,7 +14,7 @@ import { parse } from '@std/semver'
 import * as micromatch from 'micromatch'
 import * as tus from 'tus-js-client'
 import { encryptChecksum, encryptChecksumV3, encryptSource } from '../api/crypto'
-import { BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, findRoot, generateManifest, getContentType, getInstalledVersion, getLocalConfig, isDeprecatedPluginVersion, sendEvent } from '../utils'
+import { BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, findRoot, generateManifest, getContentType, getInstalledVersion, getLocalConfig, isDeprecatedPluginVersion, sendEvent, TUS_UPLOAD_RETRY_DELAYS } from '../utils'
 
 // Check if file already exists on server (bypass cache and force storage lookup)
 async function fileExists(localConfig: any, filename: string): Promise<boolean> {
@@ -147,7 +147,8 @@ export async function prepareBundlePartialFiles(
     channel: 'partial-update',
     event: 'Generate manifest',
     icon: '📂',
-    user_id: orgId,
+    org_id: orgId,
+    tracking_version: 2,
     tags: {
       'app-id': appid,
     },
@@ -292,7 +293,7 @@ export async function uploadPartial(
         const upload = new tus.Upload(finalBuffer as any, {
           endpoint: `${localConfig.hostFilesApi}/files/upload/attachments/`,
           chunkSize: options.tusChunkSize,
-          retryDelays: [0, 1000, 3000, 5000, 10000],
+          retryDelays: [...TUS_UPLOAD_RETRY_DELAYS],
           removeFingerprintOnSuccess: true,
           metadata: {
             filename,
@@ -369,7 +370,8 @@ export async function uploadPartial(
       channel: 'app',
       event: `App Partial TUS done${brFilesCount > 0 ? ' with .br extension' : ''}`,
       icon: '⏫',
-      user_id: orgId,
+      org_id: orgId,
+      tracking_version: 2,
       tags: {
         'app-id': appId,
       },
@@ -379,7 +381,8 @@ export async function uploadPartial(
       channel: 'performance',
       event: 'Partial upload performance',
       icon: '🚄',
-      user_id: orgId,
+      org_id: orgId,
+      tracking_version: 2,
       tags: {
         'app-id': appId,
         'time': uploadTime,

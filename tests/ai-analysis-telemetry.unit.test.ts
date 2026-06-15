@@ -37,7 +37,8 @@ describe('trackAiAnalysisChoice', () => {
       channel: 'build-lifecycle',
       icon: '🤖',
       notify: false,
-      user_id: 'org-uuid-1',
+      org_id: 'org-uuid-1',
+      tracking_version: 2,
       tags: {
         app_id: 'com.example.app',
         platform: 'ios',
@@ -88,7 +89,8 @@ describe('trackAiAnalysisResult', () => {
       channel: 'build-lifecycle',
       icon: '🤖',
       notify: false,
-      user_id: 'org-uuid-1',
+      org_id: 'org-uuid-1',
+      tracking_version: 2,
       tags: {
         app_id: 'com.example.app',
         platform: 'ios',

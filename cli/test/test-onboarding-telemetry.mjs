@@ -47,7 +47,8 @@ try {
   assert.equal(body.event, 'Builder Onboarding Action')
   assert.equal(body.channel, 'builder-onboarding')
   assert.equal(body.notify, false)
-  assert.equal(body.user_id, 'org-id')
+  assert.equal(body.org_id, 'org-id')
+  assert.equal(body.tracking_version, 2)
   assert.deepEqual(body.tags, {
     accepted: 'true',
     action: 'android_sa_method_selected',

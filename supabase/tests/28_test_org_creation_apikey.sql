@@ -7,7 +7,7 @@ BEGIN;
 -- Use existing seed identities from supabase/seed.sql and tests/test-utils.ts
 -- API key: ae6e7458-c46d-4c00-aa3b-153b0b8520ea (belongs to USER_ID below)
 -- USER_ID: 6aa76066-55ef-4238-ade6-0b32334a4097
-SELECT plan(3);
+SELECT plan(4);
 
 -- Test 1: API key identity compatibility remains, but org creation is JWT-only.
 -- Set up the API key context first
@@ -22,6 +22,24 @@ SELECT
         public.get_identity('{write,all}'),
         '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
         'get_identity function works with API key - prerequisite check'
+    );
+
+DO $$
+BEGIN
+  SET LOCAL role TO anon;
+  PERFORM set_config('request.headers', '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520ea"}', true);
+  PERFORM set_config(
+    'tests.apikey_creation_identity',
+    COALESCE(public.get_identity_for_apikey_creation()::text, 'null'),
+    true
+  );
+END $$;
+
+SELECT
+    is(
+        current_setting('tests.apikey_creation_identity', true),
+        'null',
+        'get_identity_for_apikey_creation stays JWT-only for API key callers'
     );
 
 DO $$

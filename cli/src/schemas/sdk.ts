@@ -167,7 +167,7 @@ export type DeleteOldKeyOptions = z.infer<typeof deleteOldKeyOptionsSchema>
 // ============================================================================
 
 export const addChannelOptionsSchema = z.object({
-  channelId: z.string(),
+  channelId: z.string().describe('Channel name'),
   appId: z.string(),
   default: z.boolean().optional(),
   selfAssign: z.boolean().optional(),
@@ -179,7 +179,7 @@ export const addChannelOptionsSchema = z.object({
 export type AddChannelOptions = z.infer<typeof addChannelOptionsSchema>
 
 export const updateChannelOptionsSchema = z.object({
-  channelId: z.string(),
+  channelId: z.string().describe('Channel name'),
   appId: z.string(),
   bundle: z.string().optional(),
   state: z.string().optional(),

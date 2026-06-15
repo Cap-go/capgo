@@ -7,8 +7,8 @@ android {
         applicationId "ee.forgr.capacitor_go"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-		versionCode 1234460001 
-        versionName "12.34.46"
+		versionCode 1216060999
+        versionName "12.160.6"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -20,6 +20,23 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    packaging {
+        jniLibs {
+            // NDK 27 llvm-strip can hang on these current prebuilt native libraries locally.
+            keepDebugSymbols += [
+                '**/libandroidx.graphics.path.so',
+                '**/libc++_shared.so',
+                '**/libdatastore_shared_counter.so',
+                '**/libexecutorch.so',
+                '**/libfbjni.so',
+                '**/libimage_processing_util_jni.so',
+                '**/libllm_inference_engine_jni.so',
+                '**/libsqlcipher.so',
+                '**/libsurface_util_jni.so',
+                '**/libtoolChecker.so',
+            ]
         }
     }
 }

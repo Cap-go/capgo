@@ -9,6 +9,7 @@ import type {
   CapgoNotificationPlatform,
   CapgoNotificationRegisterOptions,
   CapgoNotificationRegistration,
+  CapgoNotificationSyncResult,
   CapgoNotificationToken,
   CapgoNotificationsConfig,
   CapgoNotificationsNativePlugin,
@@ -23,6 +24,9 @@ export * from './definitions'
 
 const NativeCapgoNotifications = registerPlugin<CapgoNotificationsNativePlugin>('CapgoNotifications')
 const DEFAULT_SERVER_URL = 'https://api.capgo.app'
+const MAX_EVENT_QUEUE_SIZE = 512
+const MAX_EVENT_FLUSH_ATTEMPTS = 12
+const EVENT_QUEUE_FLUSH_LIMIT = 50
 
 interface UpdaterTriggerResult {
   status?: string
@@ -47,6 +51,21 @@ interface StoredNotificationRegistration extends CapgoNotificationRegistration {
   externalId: string
 }
 
+interface StoredBadgeState {
+  appId: string
+  badge: number
+  badgeRevision: number
+}
+
+type QueuedNotificationEventName = 'received' | 'opened' | 'background_started' | 'background_finished' | 'badge_applied'
+
+interface QueuedNotificationEvent extends CapgoNotificationEvent {
+  event: QueuedNotificationEventName
+  eventId: string
+  occurredAt: string
+  attempts: number
+}
+
 interface ListenerState {
   notificationReceived: Set<(notification: CapgoPushNotificationSchema) => void>
   notificationOpened: Set<(event: CapgoNotificationOpenedEvent) => void>
@@ -62,10 +81,12 @@ interface RuntimeState {
   attributes: Record<string, unknown>
   consent: boolean
   badge: number
+  badgeRevision: number
   token?: CapgoNotificationToken
   installId?: string
   bridgeListenersReady: boolean
   bridgeListenersPromise?: Promise<void>
+  eventFlushPromise?: Promise<void>
   lastRegistration?: StoredNotificationRegistration
   handledUpdateNotifications: Set<string>
   listeners: ListenerState
@@ -80,6 +101,7 @@ const state: RuntimeState = {
   attributes: {},
   consent: true,
   badge: 0,
+  badgeRevision: 0,
   bridgeListenersReady: false,
   handledUpdateNotifications: new Set(),
   listeners: {
@@ -114,6 +136,14 @@ function getAppId(options?: { appId?: string }) {
 
 function registrationStorageKey(appId: string) {
   return `capgo.notifications.registration.v1.${appId}`
+}
+
+function badgeStorageKey(appId: string) {
+  return `capgo.notifications.badge.v1.${appId}`
+}
+
+function eventQueueStorageKey(appId: string) {
+  return `capgo.notifications.events.v1.${appId}`
 }
 
 function getLocalStorage(): Storage | undefined {
@@ -152,6 +182,41 @@ function writeStoredRegistration(registration: StoredNotificationRegistration) {
   }
 }
 
+function readStoredBadgeState(appId: string): StoredBadgeState | undefined {
+  const storage = getLocalStorage()
+  if (!storage)
+    return undefined
+  try {
+    const parsed = JSON.parse(storage.getItem(badgeStorageKey(appId)) || 'null') as Partial<StoredBadgeState> | null
+    if (parsed?.appId !== appId || !Number.isFinite(parsed.badge) || !Number.isFinite(parsed.badgeRevision))
+      return undefined
+    return {
+      appId,
+      badge: Math.max(0, Math.trunc(parsed.badge ?? 0)),
+      badgeRevision: Math.max(0, Math.trunc(parsed.badgeRevision ?? 0)),
+    }
+  }
+  catch {
+    return undefined
+  }
+}
+
+function writeStoredBadgeState(appId: string) {
+  const storage = getLocalStorage()
+  if (!storage)
+    return
+  try {
+    storage.setItem(badgeStorageKey(appId), JSON.stringify({
+      appId,
+      badge: state.badge,
+      badgeRevision: state.badgeRevision,
+    }))
+  }
+  catch {
+    // Local cache only; the next register/sync still reports the native badge.
+  }
+}
+
 function hydrateStoredRegistration(appId?: string): StoredNotificationRegistration | undefined {
   if (!appId)
     return state.lastRegistration
@@ -161,6 +226,55 @@ function hydrateStoredRegistration(appId?: string): StoredNotificationRegistrati
   if (storedRegistration)
     state.lastRegistration = storedRegistration
   return storedRegistration
+}
+
+function hydrateStoredBadgeState(appId?: string) {
+  if (!appId)
+    return
+  const storedBadge = readStoredBadgeState(appId)
+  if (!storedBadge)
+    return
+  state.badge = storedBadge.badge
+  state.badgeRevision = storedBadge.badgeRevision
+}
+
+function readQueuedEvents(appId: string): QueuedNotificationEvent[] {
+  const storage = getLocalStorage()
+  if (!storage)
+    return []
+  try {
+    const parsed = JSON.parse(storage.getItem(eventQueueStorageKey(appId)) || '[]') as Partial<QueuedNotificationEvent>[]
+    if (!Array.isArray(parsed))
+      return []
+    return parsed
+      .filter((event): event is QueuedNotificationEvent => Boolean(event?.event && event.eventId && event.occurredAt))
+      .slice(-MAX_EVENT_QUEUE_SIZE)
+      .map(event => ({
+        ...event,
+        attempts: Math.max(0, Math.trunc(event.attempts ?? 0)),
+      }))
+  }
+  catch {
+    return []
+  }
+}
+
+function writeQueuedEvents(appId: string, events: QueuedNotificationEvent[]) {
+  const storage = getLocalStorage()
+  if (!storage)
+    return
+  try {
+    storage.setItem(eventQueueStorageKey(appId), JSON.stringify(events.slice(-MAX_EVENT_QUEUE_SIZE)))
+  }
+  catch {
+    // If storage is full, keep only the newest events.
+    try {
+      storage.setItem(eventQueueStorageKey(appId), JSON.stringify(events.slice(-Math.floor(MAX_EVENT_QUEUE_SIZE / 2))))
+    }
+    catch {
+      // Event replay is best effort when the host app storage is unavailable.
+    }
+  }
 }
 
 async function getInstallId() {
@@ -329,6 +443,16 @@ function updateOptionsFromNotification(notification?: CapgoPushNotificationSchem
   }
 }
 
+class CapgoNotificationRequestError extends Error {
+  status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'CapgoNotificationRequestError'
+    this.status = status
+  }
+}
+
 async function postJson(serverUrl: string, route: string, body: Record<string, unknown>) {
   const url = new URL(route, serverUrl)
   const response = await fetch(url.href, {
@@ -338,9 +462,18 @@ async function postJson(serverUrl: string, route: string, body: Record<string, u
   })
   if (!response.ok) {
     const error = await response.text().catch(() => '')
-    throw new Error(error || 'Capgo notification request failed')
+    throw new CapgoNotificationRequestError(response.status, error || 'Capgo notification request failed')
   }
   return response.json() as Promise<Record<string, unknown>>
+}
+
+async function hydrateNativeBadge(appId?: string) {
+  const nativeBadge = await NativeCapgoNotifications.getBadge().catch(() => undefined)
+  if (!nativeBadge || !Number.isFinite(nativeBadge.count))
+    return
+  state.badge = Math.max(0, Math.trunc(nativeBadge.count))
+  if (appId)
+    writeStoredBadgeState(appId)
 }
 
 async function registerToken(options: CapgoNotificationRegisterOptions, token: CapgoNotificationToken): Promise<CapgoNotificationRegistration> {
@@ -353,6 +486,8 @@ async function registerToken(options: CapgoNotificationRegisterOptions, token: C
   const identityProof = options.identityProof || state.identityProof
   if (!identityProof)
     throw new Error('Capgo notification identityProof is required')
+  hydrateStoredBadgeState(appId)
+  await hydrateNativeBadge(appId)
   const previousRegistration = hydrateStoredRegistration(appId)
   const previousIdentity = previousRegistration && previousRegistration.externalId !== options.externalId
     ? {
@@ -377,6 +512,7 @@ async function registerToken(options: CapgoNotificationRegisterOptions, token: C
     attributes: options.attributes ?? state.attributes,
     permission,
     badge: state.badge,
+    badgeRevision: state.badgeRevision,
     active: true,
     consent: options.consent ?? state.consent,
     previousPermission: previousRegistration?.permission,
@@ -391,26 +527,138 @@ async function registerToken(options: CapgoNotificationRegisterOptions, token: C
     platform,
     permission,
     eventProof: String(response.eventProof),
+    badgeRevision: typeof response.badgeRevision === 'number' ? response.badgeRevision : state.badgeRevision,
   }
+  if (typeof registration.badgeRevision === 'number')
+    state.badgeRevision = Math.max(state.badgeRevision, Math.trunc(registration.badgeRevision))
   state.lastRegistration = { ...registration, appId, externalId: options.externalId }
   writeStoredRegistration(state.lastRegistration)
+  writeStoredBadgeState(appId)
+  await flushEventQueue(appId)
+  await syncBadgeWithServer(appId).catch(() => undefined)
   return registration
 }
 
-async function trackEvent(event: 'received' | 'opened' | 'background_started' | 'background_finished', input?: CapgoNotificationEvent) {
+function getNumberData(data: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = data[key]
+    if (typeof value === 'number' && Number.isFinite(value))
+      return value
+    if (typeof value === 'string' && value.trim()) {
+      const parsed = Number(value)
+      if (Number.isFinite(parsed))
+        return parsed
+    }
+  }
+  return undefined
+}
+
+function badgeFromNotification(notification?: CapgoPushNotificationSchema): { badge?: number, badgeRevision?: number } {
+  const data = notificationData(notification)
+  const badge = getNumberData(data, 'capgoBadge', 'capgo_badge') ?? notification?.badge
+  const badgeRevision = getNumberData(data, 'capgoBadgeRevision', 'capgo_badge_revision')
+  return {
+    badge: Number.isFinite(badge) ? Math.max(0, Math.trunc(badge ?? 0)) : undefined,
+    badgeRevision: Number.isFinite(badgeRevision) ? Math.max(0, Math.trunc(badgeRevision ?? 0)) : undefined,
+  }
+}
+
+function createEventId(event: QueuedNotificationEventName, input: CapgoNotificationEvent, appId: string, deviceKey: string) {
+  if (input.eventId)
+    return input.eventId
+  if (input.campaignId && input.notificationId)
+    return `notification:${event}:${appId}:${input.campaignId}:${input.notificationId}:${deviceKey}`
+  if (event === 'badge_applied' && Number.isFinite(input.badgeRevision))
+    return `badge:${event}:${appId}:${deviceKey}:${Math.trunc(input.badgeRevision ?? 0)}:${Math.trunc(input.badge ?? 0)}`
+  return `manual:${event}:${appId}:${deviceKey}:${Date.now()}:${Math.random().toString(36).slice(2)}`
+}
+
+function queueEvent(appId: string, event: QueuedNotificationEvent) {
+  const events = readQueuedEvents(appId)
+  const existingIndex = events.findIndex(queuedEvent => queuedEvent.eventId === event.eventId)
+  if (existingIndex >= 0)
+    events[existingIndex] = { ...events[existingIndex], ...event, attempts: events[existingIndex].attempts }
+  else
+    events.push(event)
+  writeQueuedEvents(appId, events)
+}
+
+async function postQueuedEvent(event: QueuedNotificationEvent) {
+  await postJson(getServerUrl(), '/notifications/events', {
+    appId: event.appId,
+    event: event.event,
+    eventId: event.eventId,
+    occurredAt: event.occurredAt,
+    nativeInstallId: event.nativeInstallId || await getInstallId(),
+    externalId: event.externalId || state.externalId,
+    recipientKey: event.recipientKey,
+    deviceKey: event.deviceKey,
+    eventProof: event.eventProof,
+    platform: event.platform || assertNativePlatform(),
+    campaignId: event.campaignId,
+    notificationId: event.notificationId,
+    badge: event.badge ?? state.badge,
+    badgeRevision: event.badgeRevision ?? state.badgeRevision,
+    error: event.error,
+  })
+}
+
+async function flushEventQueue(appId?: string) {
+  const resolvedAppId = appId || state.config?.appId || state.lastRegistration?.appId
+  if (!resolvedAppId)
+    return
+  if (state.eventFlushPromise)
+    return state.eventFlushPromise
+
+  state.eventFlushPromise = (async () => {
+    const queuedEvents = readQueuedEvents(resolvedAppId)
+    if (!queuedEvents.length)
+      return
+
+    const remainingEvents: QueuedNotificationEvent[] = []
+    const eventsToFlush = queuedEvents.slice(0, EVENT_QUEUE_FLUSH_LIMIT)
+    const deferredEvents = queuedEvents.slice(EVENT_QUEUE_FLUSH_LIMIT)
+
+    for (const queuedEvent of eventsToFlush) {
+      try {
+        await postQueuedEvent(queuedEvent)
+      }
+      catch (error) {
+        const nextAttempts = queuedEvent.attempts + 1
+        if (error instanceof CapgoNotificationRequestError && error.status >= 400 && error.status < 500)
+          continue
+        if (nextAttempts < MAX_EVENT_FLUSH_ATTEMPTS)
+          remainingEvents.push({ ...queuedEvent, attempts: nextAttempts })
+      }
+    }
+
+    writeQueuedEvents(resolvedAppId, [...remainingEvents, ...deferredEvents])
+  })().finally(() => {
+    state.eventFlushPromise = undefined
+  })
+
+  return state.eventFlushPromise
+}
+
+async function trackEvent(event: QueuedNotificationEventName, input?: CapgoNotificationEvent) {
   const appId = input?.appId || state.config?.appId || state.lastRegistration?.appId
   if (!appId)
     return
   const registration = hydrateStoredRegistration(appId)
   const recipientKey = input?.recipientKey || registration?.recipientKey
   const deviceKey = input?.deviceKey || registration?.deviceKey
-  const eventProof = input?.eventProof
-  if (!recipientKey || !deviceKey || !eventProof || !input?.campaignId || !input.notificationId)
+  const eventProof = input?.eventProof || (event === 'badge_applied' ? registration?.eventProof : undefined)
+  if ((!recipientKey || !deviceKey || !eventProof || !input?.campaignId || !input.notificationId) && event !== 'badge_applied')
+    return
+  if (!recipientKey || !deviceKey || !eventProof)
     return
   const platform = assertNativePlatform()
-  await postJson(getServerUrl(), '/notifications/events', {
+  const queuedEvent: QueuedNotificationEvent = {
     appId,
     event,
+    eventId: createEventId(event, input ?? {}, appId, deviceKey),
+    occurredAt: input?.occurredAt || new Date().toISOString(),
+    attempts: 0,
     nativeInstallId: input?.nativeInstallId || await getInstallId(),
     externalId: input?.externalId || state.externalId,
     recipientKey,
@@ -420,7 +668,80 @@ async function trackEvent(event: 'received' | 'opened' | 'background_started' | 
     campaignId: input?.campaignId,
     notificationId: input?.notificationId,
     badge: input?.badge ?? state.badge,
+    badgeRevision: input?.badgeRevision ?? state.badgeRevision,
+    error: input?.error,
+  }
+  queueEvent(appId, queuedEvent)
+  await flushEventQueue(appId)
+}
+
+async function applyBadge(count: number, badgeRevision = Date.now(), appId = state.config?.appId || state.lastRegistration?.appId) {
+  state.badge = Math.max(0, Math.trunc(count))
+  state.badgeRevision = Math.max(state.badgeRevision, Math.trunc(badgeRevision || 0))
+  await NativeCapgoNotifications.setBadge({ count: state.badge })
+  if (appId)
+    writeStoredBadgeState(appId)
+}
+
+async function applyBadgeFromNotification(notification?: CapgoPushNotificationSchema) {
+  const { badge, badgeRevision } = badgeFromNotification(notification)
+  if (!Number.isFinite(badge) || !Number.isFinite(badgeRevision))
+    return
+  if ((badgeRevision ?? 0) < state.badgeRevision)
+    return
+  await applyBadge(badge ?? 0, badgeRevision)
+  const event = eventFromNotification(notification)
+  await trackEvent('badge_applied', {
+    ...event,
+    badge,
+    badgeRevision,
+    eventProof: state.lastRegistration?.eventProof || event.eventProof,
+  }).catch(() => undefined)
+}
+
+async function syncBadgeWithServer(appId?: string): Promise<CapgoNotificationSyncResult> {
+  const registration = hydrateStoredRegistration(appId || state.config?.appId)
+  const resolvedAppId = appId || registration?.appId || state.config?.appId
+  if (!resolvedAppId || !registration)
+    return { pendingEvents: 0 }
+
+  await hydrateNativeBadge(resolvedAppId)
+  await flushEventQueue(resolvedAppId)
+
+  const response = await postJson(getServerUrl(), '/notifications/sync', {
+    appId: resolvedAppId,
+    nativeInstallId: await getInstallId(),
+    recipientKey: registration.recipientKey,
+    deviceKey: registration.deviceKey,
+    eventProof: registration.eventProof,
+    platform: registration.platform,
+    badge: state.badge,
+    badgeRevision: state.badgeRevision,
   })
+
+  const badge = typeof response.badge === 'number' ? Math.max(0, Math.trunc(response.badge)) : undefined
+  const badgeRevision = typeof response.badgeRevision === 'number' ? Math.max(0, Math.trunc(response.badgeRevision)) : undefined
+  let appliedBadge = false
+  if (Number.isFinite(badge) && Number.isFinite(badgeRevision) && (badgeRevision ?? 0) > state.badgeRevision) {
+    await applyBadge(badge ?? 0, badgeRevision ?? 0, resolvedAppId)
+    await trackEvent('badge_applied', {
+      appId: resolvedAppId,
+      recipientKey: registration.recipientKey,
+      deviceKey: registration.deviceKey,
+      eventProof: registration.eventProof,
+      platform: registration.platform,
+      badge,
+      badgeRevision,
+    }).catch(() => undefined)
+    appliedBadge = true
+  }
+  await flushEventQueue(resolvedAppId)
+  return {
+    badge: badge ?? state.badge,
+    badgeRevision: appliedBadge ? badgeRevision : state.badgeRevision,
+    appliedBadge,
+    pendingEvents: readQueuedEvents(resolvedAppId).length,
+  }
 }
 
 async function maybeRunUpdateCheck(notification?: CapgoPushNotificationSchema) {
@@ -477,16 +798,21 @@ async function ensureBridgeListeners() {
       }))
       await addBridgeHandle(handles, NativeCapgoNotifications.addListener('notificationReceived', (notification) => {
         void Promise.allSettled([
+          applyBadgeFromNotification(notification),
           trackEvent('received', eventFromNotification(notification)),
           maybeRunUpdateCheck(notification),
         ])
         notifyListeners(state.listeners.notificationReceived, notification)
       }))
       await addBridgeHandle(handles, NativeCapgoNotifications.addListener('notificationOpened', (event) => {
-        void trackEvent('opened', eventFromNotification(event.notification)).catch(() => undefined)
+        void Promise.allSettled([
+          applyBadgeFromNotification(event.notification),
+          trackEvent('opened', eventFromNotification(event.notification)),
+        ])
         notifyListeners(state.listeners.notificationOpened, event)
       }))
       await addBridgeHandle(handles, NativeCapgoNotifications.addListener('backgroundNotification', (notification) => {
+        void applyBadgeFromNotification(notification).catch(() => undefined)
         if (!isUpdateCheckNotification(notification))
           void trackEvent('background_started', eventFromNotification(notification)).catch(() => undefined)
         void maybeRunUpdateCheck(notification).catch(() => undefined)
@@ -526,9 +852,13 @@ export const CapgoNotifications: CapgoNotificationsPlugin = {
     state.updater.installMode = config.updateInstallMode || 'next'
     state.updater.channel = config.updateChannel
     hydrateStoredRegistration(config.appId)
+    hydrateStoredBadgeState(config.appId)
+    await hydrateNativeBadge(config.appId)
     await ensureBridgeListeners()
     if (Capacitor.getPlatform() === 'android')
       await NativeCapgoNotifications.createDefaultChannel().catch(() => undefined)
+    await flushEventQueue(config.appId)
+    await syncBadgeWithServer(config.appId).catch(() => undefined)
   },
 
   async register(options) {
@@ -565,22 +895,30 @@ export const CapgoNotifications: CapgoNotificationsPlugin = {
   },
 
   async setBadge(count) {
-    state.badge = Math.max(0, Math.trunc(count))
-    await NativeCapgoNotifications.setBadge({ count: state.badge })
+    await applyBadge(count)
     if (state.token && state.externalId)
       await registerToken({ externalId: state.externalId, identityProof: state.identityProof || '', tags: state.tags, attributes: state.attributes, consent: state.consent }, state.token)
+    await trackEvent('badge_applied', { badge: state.badge, badgeRevision: state.badgeRevision }).catch(() => undefined)
   },
 
   async clearBadge() {
+    state.badgeRevision = Math.max(state.badgeRevision, Date.now())
     state.badge = 0
     await NativeCapgoNotifications.clearBadge()
+    if (state.config?.appId)
+      writeStoredBadgeState(state.config.appId)
     if (state.token && state.externalId)
       await registerToken({ externalId: state.externalId, identityProof: state.identityProof || '', tags: state.tags, attributes: state.attributes, consent: state.consent }, state.token)
+    await trackEvent('badge_applied', { badge: state.badge, badgeRevision: state.badgeRevision }).catch(() => undefined)
   },
 
   async incrementBadge(by = 1) {
     const current = await NativeCapgoNotifications.getBadge().catch(() => ({ count: state.badge }))
     await this.setBadge(Math.max(0, Math.trunc(current.count + by)))
+  },
+
+  async sync() {
+    return syncBadgeWithServer()
   },
 
   async enableUpdaterIntegration(options) {

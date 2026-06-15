@@ -11,6 +11,7 @@ interface DataToGet {
   appId?: string
   orgId?: string
   todayOnly?: boolean
+  currentHour?: string
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -44,6 +45,200 @@ interface AppOwnerOrgRow {
 interface VersionNameRow {
   id: number
   name: string
+}
+
+interface VersionMetaStorageRow {
+  timestamp: string | Date
+  version_id: number
+  size: number
+}
+
+interface StorageVersionLifetime {
+  addedAt?: number
+  removedAt?: number
+  size?: number
+}
+
+interface StorageHourlyRow {
+  app_id: string
+  owner_org: string
+  date: string
+  storage_byte_hours: number
+  updated_at: string
+}
+
+interface StorageHourlyCalculationOptions {
+  appId: string
+  ownerOrg: string
+  cycleStart: string
+  cycleEnd: string
+  currentHour?: string
+}
+
+interface StorageHourlyCalculationResult {
+  rows: StorageHourlyRow[]
+  skippedMissingAddition: number
+  skippedInvalidInterval: number
+  error?: string
+}
+
+type StorageIntervalSkipReason = 'missingAddition' | 'invalidInterval' | 'outsideCycle'
+
+interface StorageInterval {
+  start: number
+  end: number
+  size: number
+}
+
+const HOUR_MS = 60 * 60 * 1000
+const DAY_MS = 24 * HOUR_MS
+const MAX_STORAGE_CYCLE_HOURS = 34 * 24
+
+function parseTimestampMs(value: string | Date): number {
+  const date = value instanceof Date ? value : new Date(value)
+  const timestamp = date.getTime()
+  if (!Number.isFinite(timestamp))
+    throw new Error(`Invalid timestamp: ${String(value)}`)
+  return timestamp
+}
+
+function floorToDay(timestampMs: number): number {
+  return Math.floor(timestampMs / DAY_MS) * DAY_MS
+}
+
+function formatUtcDay(timestampMs: number): string {
+  return new Date(timestampMs).toISOString().slice(0, 10)
+}
+
+function getStorageDailyDeleteRange(cycleStart: string, cycleEnd: string) {
+  const cycleStartMs = parseTimestampMs(cycleStart)
+  const cycleEndMs = parseTimestampMs(cycleEnd)
+  const lastOverlappingDayMs = floorToDay(Math.max(cycleStartMs, cycleEndMs - 1))
+
+  return {
+    startDay: formatUtcDay(floorToDay(cycleStartMs)),
+    endExclusiveDay: formatUtcDay(lastOverlappingDayMs + DAY_MS),
+  }
+}
+
+function emptyStorageHourlyCalculationResult(): StorageHourlyCalculationResult {
+  return {
+    rows: [],
+    skippedMissingAddition: 0,
+    skippedInvalidInterval: 0,
+  }
+}
+
+function assertStorageCycleWithinLimit(cycleStartMs: number, cycleEndMs: number) {
+  const cycleHours = Math.ceil((cycleEndMs - cycleStartMs) / HOUR_MS)
+  if (cycleHours > MAX_STORAGE_CYCLE_HOURS)
+    throw new Error(`Billing cycle is too large for hourly storage calculation: ${cycleHours} hours`)
+}
+
+function applyStorageEvent(current: StorageVersionLifetime, event: VersionMetaStorageRow, timestamp: number) {
+  if (event.size > 0) {
+    if (current.addedAt === undefined || timestamp < current.addedAt) {
+      current.addedAt = timestamp
+      current.size = event.size
+    }
+    return
+  }
+
+  if (event.size < 0 && (current.removedAt === undefined || timestamp < current.removedAt))
+    current.removedAt = timestamp
+}
+
+function collectStorageVersionLifetimes(events: VersionMetaStorageRow[]) {
+  const versions = new Map<number, StorageVersionLifetime>()
+  for (const event of events) {
+    const timestamp = parseTimestampMs(event.timestamp)
+    const current = versions.get(event.version_id) ?? {}
+    applyStorageEvent(current, event, timestamp)
+    versions.set(event.version_id, current)
+  }
+  return versions
+}
+
+function getStorageInterval(
+  version: StorageVersionLifetime,
+  cycleStartMs: number,
+  calculationEndMs: number,
+  cycleEndMs: number,
+): StorageInterval | { skipReason: StorageIntervalSkipReason } {
+  if (version.addedAt === undefined || version.size === undefined || version.size <= 0)
+    return { skipReason: 'missingAddition' }
+
+  const start = Math.max(version.addedAt, cycleStartMs)
+  const end = Math.min(version.removedAt ?? calculationEndMs, calculationEndMs, cycleEndMs)
+  if (end <= cycleStartMs || start >= calculationEndMs)
+    return { skipReason: 'outsideCycle' }
+  if (end <= start)
+    return { skipReason: 'invalidInterval' }
+
+  return { start, end, size: version.size }
+}
+
+function addStorageIntervalToDailyBuckets(dailyBuckets: Map<number, number>, interval: StorageInterval) {
+  for (let bucketStart = floorToDay(interval.start); bucketStart < interval.end; bucketStart += DAY_MS) {
+    const overlapStart = Math.max(bucketStart, interval.start)
+    const overlapEnd = Math.min(bucketStart + DAY_MS, interval.end)
+    if (overlapEnd <= overlapStart)
+      continue
+
+    const byteHours = interval.size * ((overlapEnd - overlapStart) / HOUR_MS)
+    dailyBuckets.set(bucketStart, (dailyBuckets.get(bucketStart) ?? 0) + byteHours)
+  }
+}
+
+function buildStorageHourlyRows(dailyBuckets: Map<number, number>, options: StorageHourlyCalculationOptions) {
+  const now = new Date().toISOString()
+  return Array.from(dailyBuckets.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([dateMs, storageByteHours]) => ({
+      app_id: options.appId,
+      owner_org: options.ownerOrg,
+      date: formatUtcDay(dateMs),
+      storage_byte_hours: storageByteHours,
+      updated_at: now,
+    }))
+}
+
+export function calculateStorageHourlyRows(
+  events: VersionMetaStorageRow[],
+  options: StorageHourlyCalculationOptions,
+): StorageHourlyCalculationResult {
+  const cycleStartMs = parseTimestampMs(options.cycleStart)
+  const cycleEndMs = parseTimestampMs(options.cycleEnd)
+  const currentHourMs = options.currentHour ? parseTimestampMs(options.currentHour) : Date.now()
+  const calculationEndMs = Math.min(cycleEndMs, currentHourMs)
+
+  if (calculationEndMs <= cycleStartMs)
+    return emptyStorageHourlyCalculationResult()
+
+  assertStorageCycleWithinLimit(cycleStartMs, cycleEndMs)
+  const versions = collectStorageVersionLifetimes(events)
+  const dailyBuckets = new Map<number, number>()
+  let skippedMissingAddition = 0
+  let skippedInvalidInterval = 0
+
+  for (const version of versions.values()) {
+    const interval = getStorageInterval(version, cycleStartMs, calculationEndMs, cycleEndMs)
+    if ('skipReason' in interval) {
+      if (interval.skipReason === 'missingAddition')
+        skippedMissingAddition++
+      else if (interval.skipReason === 'invalidInterval')
+        skippedInvalidInterval++
+      continue
+    }
+
+    addStorageIntervalToDailyBuckets(dailyBuckets, interval)
+  }
+
+  return {
+    rows: buildStorageHourlyRows(dailyBuckets, options),
+    skippedMissingAddition,
+    skippedInvalidInterval,
+  }
 }
 
 async function runSupabaseResultWithRetry<T>(
@@ -90,6 +285,76 @@ async function runSupabaseResultWithRetry<T>(
   }
 
   return result
+}
+
+async function readVersionMetaStorageRows(c: Parameters<typeof supabaseAdmin>[0], appId: string, calculationEnd: string) {
+  const pgClient = getPgClient(c, false)
+  try {
+    const { rows } = await pgClient.query<VersionMetaStorageRow>(
+      `
+        SELECT timestamp, version_id, size
+        FROM public.version_meta
+        WHERE app_id = $1
+          AND timestamp < $2::timestamp
+        ORDER BY version_id, timestamp
+      `,
+      [appId, calculationEnd],
+    )
+    return rows
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
+}
+
+async function refreshStorageHourly(
+  c: Parameters<typeof supabaseAdmin>[0],
+  supabase: ReturnType<typeof supabaseAdmin>,
+  appId: string,
+  ownerOrg: string,
+  cycleInfo: CycleInfo,
+  currentHour?: string,
+) {
+  if (!cycleInfo.subscription_anchor_start || !cycleInfo.subscription_anchor_end)
+    throw simpleError('cannot_get_cycle_info', 'Cannot get cycle info', { cycleInfo })
+
+  const calculationEnd = currentHour ?? new Date().toISOString()
+  const events = await readVersionMetaStorageRows(c, appId, calculationEnd)
+  const calculation = calculateStorageHourlyRows(events, {
+    appId,
+    ownerOrg,
+    cycleStart: cycleInfo.subscription_anchor_start,
+    cycleEnd: cycleInfo.subscription_anchor_end,
+    currentHour: calculationEnd,
+  })
+
+  if (calculation.skippedMissingAddition > 0 || calculation.skippedInvalidInterval > 0) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'storage hourly skipped invalid version metadata',
+      appId,
+      skippedMissingAddition: calculation.skippedMissingAddition,
+      skippedInvalidInterval: calculation.skippedInvalidInterval,
+    })
+  }
+
+  const deleteRange = getStorageDailyDeleteRange(cycleInfo.subscription_anchor_start, cycleInfo.subscription_anchor_end)
+  await runSupabaseResultWithRetry(c, 'delete_daily_storage_hourly', async () => await (supabase as any)
+    .from('daily_storage_hourly')
+    .delete()
+    .eq('app_id', appId)
+    .gte('date', deleteRange.startDay)
+    .lt('date', deleteRange.endExclusiveDay))
+
+  if (calculation.rows.length === 0)
+    return calculation
+
+  await runSupabaseResultWithRetry(c, 'upsert_daily_storage_hourly', async () => await (supabase as any)
+    .from('daily_storage_hourly')
+    .upsert(calculation.rows, { onConflict: 'app_id,date' })
+    .eq('app_id', appId))
+
+  return calculation
 }
 
 async function getOrgStatsRefreshTarget(
@@ -362,6 +627,20 @@ app.post('/', middlewareAPISecret, async (c) => {
       .eq('app_id', appId)),
   ])
 
+  let storageHourly: StorageHourlyCalculationResult
+  try {
+    storageHourly = await refreshStorageHourly(c, supabase, appId, orgId, cycleInfo, body.currentHour)
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to refresh shadow hourly storage', appId, orgId, error })
+    storageHourly = {
+      rows: [],
+      skippedMissingAddition: 0,
+      skippedInvalidInterval: 0,
+      error: 'storage_hourly_refresh_failed',
+    }
+  }
+
   cloudlog({ requestId: c.get('requestId'), message: 'stats saved', mauLength: mau.length, bandwidthLength: bandwidth.length, storageLength: storage.length, versionUsageLength: versionUsage.length })
   const refreshCompletedAt = await syncAppStatsRefresh(c, supabase, body.appId)
 
@@ -395,7 +674,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     await queueOrgPlanRefreshWithRetry(c, supabase, orgId, orgStatsRefreshTarget.customerId)
   }
 
-  return c.json({ status: 'Stats saved', mau, bandwidth, storage, versionUsage })
+  return c.json({ status: 'Stats saved', mau, bandwidth, storage, storageHourly, versionUsage })
 })
 
 export const cronStatAppTestUtils = {

@@ -2,6 +2,7 @@ import { platform, version } from 'node:os'
 import { version as nodeVersion } from 'node:process'
 import { log, spinner } from '@clack/prompts'
 import pack from '../../package.json'
+import { trackEvent } from '../analytics/track'
 import { getAllPackagesDependencies, getAppId, getBundleVersion, getConfig } from '../utils'
 import { getLatestVersion } from '../utils/latest-version'
 
@@ -34,6 +35,25 @@ async function getInstalledDependencies() {
 
 interface DoctorInfoOptions {
   packageJson?: string
+}
+
+export function computeDoctorAnalyticsTags(
+  installed: Record<string, string>,
+  latest: Record<string, string>,
+): { is_outdated: boolean, dependency_count: number, outdated_count: number } {
+  const keys = Object.keys(installed)
+  let outdatedCount = 0
+  for (const key of keys) {
+    const have = installed[key]
+    const want = latest[key]
+    if (have && want && have !== want)
+      outdatedCount += 1
+  }
+  return {
+    is_outdated: outdatedCount > 0,
+    dependency_count: keys.length,
+    outdated_count: outdatedCount,
+  }
 }
 
 export async function getInfoInternal(options: DoctorInfoOptions, silent = false) {
@@ -84,6 +104,13 @@ export async function getInfoInternal(options: DoctorInfoOptions, silent = false
   else {
     latestDependencies = await getLatestDependencies(installedDependencies)
   }
+
+  void trackEvent({
+    channel: 'cli-usage',
+    event: 'Doctor Ran',
+    icon: '👨‍⚕️',
+    tags: computeDoctorAnalyticsTags(installedDependencies, latestDependencies),
+  })
 
   if (JSON.stringify(installedDependencies) !== JSON.stringify(latestDependencies)) {
     if (!silent)

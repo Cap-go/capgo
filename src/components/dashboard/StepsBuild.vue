@@ -141,14 +141,18 @@ function stepToName(stepNumber: number): string {
 
 function setLog() {
   if (initialOnboarding && main.user?.id) {
-    sendEvent({
-      channel: 'onboarding-build',
-      event: `onboarding-build-step-${stepToName(step.value)}`,
-      icon: 'build',
-      user_id: organizationStore.currentOrganization?.gid,
-      notify: false,
-    }).catch()
-    pushEvent(`user:onboarding-build-${stepToName(step.value)}`, config.supaHost)
+    const orgId = organizationStore.currentOrganization?.gid
+    if (orgId) {
+      sendEvent({
+        channel: 'onboarding-build',
+        event: `onboarding-build-step-${stepToName(step.value)}`,
+        icon: 'build',
+        org_id: orgId,
+        tracking_version: 2,
+        notify: false,
+      }).catch()
+      pushEvent(`user:onboarding-build-${stepToName(step.value)}`, config.supaHost, { org_id: orgId })
+    }
   }
   if (step.value === completedStepIndex.value) {
     emit('done')
@@ -351,9 +355,6 @@ onUnmounted(() => {
                 <h2 class="text-2xl font-semibold text-slate-950 dark:text-white sm:text-3xl">
                   {{ t('build-setup-command-title') }}
                 </h2>
-                <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-200">
-                  BETA
-                </span>
               </div>
               <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
                 {{ t('build-setup-command-subtitle') }}

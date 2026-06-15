@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { env } from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { getAuthHeaders, getEndpointUrl, getSupabaseClient, USER_ID } from './test-utils.ts'
+import { executeSQL, getAuthHeaders, getEndpointUrl, getSupabaseClient, USER_ID } from './test-utils.ts'
 
 const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
 
@@ -119,6 +119,169 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /apikey with atomic bindings', () => {
     expect(bindings).toHaveLength(1)
     expect(bindings![0].scope_type).toBe('org')
     expect(bindings![0].reason).toBe('atomic creation test')
+  })
+
+  it.concurrent('creates an org.create API key permission for org admin keys', async () => {
+    const response = await fetch(getEndpointUrl('/apikey'), {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: `org-create-permission-key-${TEST_ID.slice(0, 8)}`,
+        bindings: [
+          {
+            role_name: 'org_admin',
+            scope_type: 'org',
+            org_id: TEST_ORG_ID,
+          },
+        ],
+        global_permissions: ['org.create'],
+      }),
+    })
+
+    const data = await response.json() as { id: number, rbac_id: string, global_permissions: string[] }
+    expect(response.status).toBe(200)
+    expect(data.global_permissions).toContain('org.create')
+    createdKeyIds.push(data.id)
+
+    const permissionRows = await executeSQL(
+      `SELECT permission_key
+       FROM public.apikey_global_permissions
+       WHERE apikey_rbac_id = $1::uuid`,
+      [data.rbac_id],
+    )
+    expect(permissionRows).toEqual([{ permission_key: 'org.create' }])
+  })
+
+  it.concurrent('rejects org.create API key permission without an org admin binding', async () => {
+    const response = await fetch(getEndpointUrl('/apikey'), {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: `invalid-org-create-permission-key-${TEST_ID.slice(0, 8)}`,
+        bindings: [
+          {
+            role_name: 'org_member',
+            scope_type: 'org',
+            org_id: TEST_ORG_ID,
+          },
+        ],
+        global_permissions: ['org.create'],
+      }),
+    })
+
+    const data = await response.json() as { error: string }
+    expect(response.status).toBe(400)
+    expect(data.error).toBe('invalid_global_permissions')
+  })
+
+  it.concurrent('updates org.create API key permission from the API key editor payload', async () => {
+    const createResponse = await fetch(getEndpointUrl('/apikey'), {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: `update-org-create-permission-key-${TEST_ID.slice(0, 8)}`,
+        bindings: [
+          {
+            role_name: 'org_admin',
+            scope_type: 'org',
+            org_id: TEST_ORG_ID,
+          },
+        ],
+      }),
+    })
+
+    const createData = await createResponse.json() as { id: number, rbac_id: string }
+    expect(createResponse.status).toBe(200)
+    createdKeyIds.push(createData.id)
+
+    const grantResponse = await fetch(getEndpointUrl('/apikey'), {
+      method: 'PUT',
+      headers: authHeaders,
+      body: JSON.stringify({
+        id: createData.id,
+        bindings: [
+          {
+            role_name: 'org_admin',
+            scope_type: 'org',
+            org_id: TEST_ORG_ID,
+          },
+        ],
+        global_permissions: ['org.create'],
+      }),
+    })
+
+    const grantData = await grantResponse.json() as { global_permissions: string[] }
+    expect(grantResponse.status).toBe(200)
+    expect(grantData.global_permissions).toContain('org.create')
+
+    const revokeResponse = await fetch(getEndpointUrl('/apikey'), {
+      method: 'PUT',
+      headers: authHeaders,
+      body: JSON.stringify({
+        id: createData.id,
+        bindings: [
+          {
+            role_name: 'org_admin',
+            scope_type: 'org',
+            org_id: TEST_ORG_ID,
+          },
+        ],
+        global_permissions: [],
+      }),
+    })
+
+    const revokeData = await revokeResponse.json() as { global_permissions: string[] }
+    expect(revokeResponse.status).toBe(200)
+    expect(revokeData.global_permissions).toEqual([])
+
+    const permissionRows = await executeSQL(
+      `SELECT permission_key
+       FROM public.apikey_global_permissions
+       WHERE apikey_rbac_id = $1::uuid`,
+      [createData.rbac_id],
+    )
+    expect(permissionRows).toEqual([])
+
+    const regrantResponse = await fetch(getEndpointUrl('/apikey'), {
+      method: 'PUT',
+      headers: authHeaders,
+      body: JSON.stringify({
+        id: createData.id,
+        bindings: [
+          {
+            role_name: 'org_admin',
+            scope_type: 'org',
+            org_id: TEST_ORG_ID,
+          },
+        ],
+        global_permissions: ['org.create'],
+      }),
+    })
+    expect(regrantResponse.status).toBe(200)
+
+    const downgradeResponse = await fetch(getEndpointUrl('/apikey'), {
+      method: 'PUT',
+      headers: authHeaders,
+      body: JSON.stringify({
+        id: createData.id,
+        bindings: [
+          {
+            role_name: 'org_member',
+            scope_type: 'org',
+            org_id: TEST_ORG_ID,
+          },
+        ],
+      }),
+    })
+    expect(downgradeResponse.status).toBe(200)
+
+    const downgradedPermissionRows = await executeSQL(
+      `SELECT permission_key
+       FROM public.apikey_global_permissions
+       WHERE apikey_rbac_id = $1::uuid`,
+      [createData.rbac_id],
+    )
+    expect(downgradedPermissionRows).toEqual([])
   })
 
   it('requires explicit V2 bindings', async () => {
@@ -247,7 +410,7 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /apikey with atomic bindings', () => {
     expect(data.error).toBe('invalid_bindings')
   })
 
-  it('V2 key can authenticate', async () => {
+  it('v2 key can authenticate', async () => {
     // First create a V2 key with role bindings.
     const createResponse = await fetch(getEndpointUrl('/apikey'), {
       method: 'POST',

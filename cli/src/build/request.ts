@@ -43,7 +43,7 @@ import pack from '../../package.json'
 import {
   decideAnalyzeBehavior,
   isLogTooBig,
-  postAnalyzeRequest,
+  postAnalyzeStreamRequest,
   writeLocalAiFile,
 } from '../ai/analyze'
 import {
@@ -53,8 +53,14 @@ import {
   startCaptureForJob,
 } from '../ai/log-capture'
 import { renderMarkdown } from '../ai/render-markdown'
-import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../ai/telemetry'
-import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent } from '../utils'
+import { createStreamingMarkdownRenderer } from '../ai/stream-markdown'
+import { aiAnalysisResultFromPostAnalyze, trackAiAnalysisChoice, trackAiAnalysisResult } from '../ai/telemetry'
+import { writeSupportBundleFiles } from '../onboarding-support.js'
+import { copyToClipboard, revealInFinder } from '../support/clipboard.js'
+import { contactSupport } from '../support/contact-support.js'
+import { appendInternalLog, getInternalLogPath, startInternalLog } from '../support/internal-log.js'
+import { uploadSupportLogs } from '../support/support-upload.js'
+import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent, TUS_UPLOAD_RETRY_DELAYS } from '../utils'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
 import { writeBuildOutputRecord } from './output-record'
@@ -213,7 +219,8 @@ async function withCwd<T>(dir: string, fn: () => Promise<T>): Promise<T> {
       try {
         chdir(previous)
       }
-      catch {
+      catch (err) {
+        appendInternalLog(`cwd restore failed (ignored): ${err instanceof Error ? err.message : String(err)}`)
         // Best-effort restore; ignore to avoid masking original errors.
       }
     }
@@ -473,7 +480,8 @@ async function streamBuildLogs(
         try {
           ws.close()
         }
-        catch {
+        catch (err) {
+          appendInternalLog(`ws.close failed during cleanup (ignored): ${err instanceof Error ? err.message : String(err)}`)
           // ignore
         }
         resolve(status)
@@ -1119,11 +1127,14 @@ export async function zipDirectory(projectDir: string, outputPath: string, platf
   addDirectoryToZip(zip, projectDir, '', platform, nativeDeps, platformDir)
   addNativePackagesFromNodeModules(zip, parseNodeModulesPaths(options.nodeModules), platform, nativeDeps, platformDir)
 
-  // Rewrite pnpm store paths (node_modules/.pnpm/…/node_modules/@scope/pkg)
-  // to standard flat paths (node_modules/@scope/pkg).
-  // Scan all text-based entries because pnpm paths leak into Podfile, Podfile.lock,
-  // Pods.xcodeproj/project.pbxproj, .xcconfig files, Manifest.lock, settings.gradle, etc.
+  // Rewrite isolated-linker store paths to standard flat paths (node_modules/@scope/pkg).
+  // Both pnpm (node_modules/.pnpm/…/node_modules/@scope/pkg) and bun's isolated linker
+  // (node_modules/.bun/@scope+pkg@ver+hash/node_modules/@scope/pkg) leak store paths into
+  // Package.swift, Podfile, Podfile.lock, Pods.xcodeproj/project.pbxproj, .xcconfig files,
+  // Manifest.lock, settings.gradle, etc. The cloud builder only ships the flat plugin dirs,
+  // so these store paths must be collapsed back to node_modules/@scope/pkg.
   const pnpmPathPattern = /node_modules\/\.pnpm\/[^/\n\r]+(?:\/[^/\n\r]+)*\/node_modules\//g
+  const bunPathPattern = /node_modules\/\.bun\/[^/\n\r]+(?:\/[^/\n\r]+)*\/node_modules\//g
   const textExtensions = new Set([
     '',
     '.gradle',
@@ -1148,7 +1159,7 @@ export async function zipDirectory(projectDir: string, outputPath: string, platf
     if (!textExtensions.has(ext) && basename !== 'Podfile')
       continue
     const original = entry.getData().toString('utf-8')
-    let rewritten = original.replace(pnpmPathPattern, 'node_modules/')
+    let rewritten = original.replace(pnpmPathPattern, 'node_modules/').replace(bunPathPattern, 'node_modules/')
 
     // pnpm can leave deep relative paths in iOS files like Package.swift and Pods output.
     // Collapse any excessive ../ before project-root ios/ or node_modules/ paths back to
@@ -1258,6 +1269,11 @@ export function splitPayload(
 }
 
 export async function requestBuildInternal(appId: string, options: BuildRequestOptions, silent = false, logger?: BuildLogger): Promise<BuildRequestResult> {
+  // Start the verbose internal log so API errors + the support flow's bundle have
+  // content (no-op if already started by a wrapping onboarding run).
+  if (!getInternalLogPath())
+    startInternalLog(appId)
+  appendInternalLog(`build request: started for ${appId} (platform ${options.platform ?? 'auto'})`)
   // Track build time
   const buildStartTime = Date.now()
   const verbose = options.verbose ?? false
@@ -1631,9 +1647,17 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     // --ai-analytics is set in CI (so auto-upload has logs to send). Without the
     // flag-OR, the CI auto_upload branch from decideAnalyzeBehavior would never
     // have a log file to read.
-    const captureEnabled = shouldCaptureLogs() || options.aiAnalytics === true
+    const aiAnalysisMode: 'auto-prompt' | 'caller-handled' | 'skip' = options.aiAnalysisMode ?? 'auto-prompt'
+    // Capture when interactive, when the CI flag is set, OR when the caller asked
+    // to drive the AI flow themselves (e.g. Ink onboarding) so the captured log
+    // is available for runCapgoAiAnalysis.
+    const captureEnabled = (shouldCaptureLogs() || options.aiAnalytics === true || aiAnalysisMode === 'caller-handled')
+      && aiAnalysisMode !== 'skip'
     let capturedJobId: string | null = null
     let keepPromptFile = false // mutable so local-AI flow can set it true
+    // Populated only in caller-handled mode on a failed build. Returned to the
+    // caller so it can render its own AI prompt UI and later release the log.
+    let aiAnalysisInfo: BuildRequestResult['aiAnalysis']
 
     if (captureEnabled && buildRequest.job_id) {
       capturedJobId = buildRequest.job_id
@@ -1658,7 +1682,8 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       channel: 'native-builder',
       event: 'Build requested',
       icon: '🏗️',
-      user_id: orgId,
+      org_id: orgId,
+      tracking_version: 2,
       tags: {
         'app-id': appId,
         'platform': platform,
@@ -1715,6 +1740,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         const upload = new tus.Upload(zipBuffer as any, {
           endpoint: buildRequest.upload_url,
           chunkSize: 5 * 1024 * 1024, // 5MB chunks
+          retryDelays: [...TUS_UPLOAD_RETRY_DELAYS],
           metadata: {
             filename: basename(zipPath),
             filetype: 'application/zip',
@@ -1853,7 +1879,8 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
             signal: cancelAbort.signal,
           })
         }
-        catch {
+        catch (err) {
+          appendInternalLog(`build cancel request errored (ignored): ${err instanceof Error ? err.message : String(err)}`)
           // ignore cancellation errors
         }
         finally {
@@ -1977,8 +2004,30 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         }
       }
 
-      // On failure, offer the AI analysis flow (interactive menu or auto-upload).
-      if (finalStatus === 'failed' && captureEnabled && capturedJobId) {
+      // On failure, offer the AI analysis flow.
+      //
+      // - 'skip'           → no-op (caller wants nothing to do with AI here).
+      // - 'caller-handled' → leave the captured log on disk and surface it via
+      //                      `result.aiAnalysis` so the caller (e.g. the Ink
+      //                      onboarding wizard) can run `runCapgoAiAnalysis`
+      //                      and render its own UI without clack corrupting
+      //                      its terminal renderer.
+      // - 'auto-prompt'    → existing interactive / CI matrix via
+      //                      decideAnalyzeBehavior + clack prompts.
+      if (finalStatus === 'failed' && captureEnabled && capturedJobId && aiAnalysisMode === 'caller-handled') {
+        // Preserve the captured log until the caller calls
+        // releaseCapturedLogs(jobId) explicitly. Without this, the cleanup
+        // handlers registered above would remove it on process exit before
+        // the caller had a chance to read it.
+        keepPromptFile = true
+        const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
+        aiAnalysisInfo = {
+          jobId: capturedJobId,
+          capturedLogPath: logsPath,
+          ready: true,
+        }
+      }
+      else if (finalStatus === 'failed' && captureEnabled && capturedJobId && aiAnalysisMode === 'auto-prompt') {
         const behavior = decideAnalyzeBehavior({
           isTTY: process.stdout.isTTY === true,
           aiAnalyticsFlag: options.aiAnalytics === true,
@@ -1986,17 +2035,6 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
         const AI_WARNING = '⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.'
 
-        // Closed-enum mapper for PostAnalyzeResult.kind → telemetry result tag.
-        // Never include the analysis text itself in telemetry.
-        const mapPostAnalyzeResultKind = (kind: PostAnalyzeResult['kind']): 'success' | 'already_analyzed' | 'too_big' | 'error' => {
-          if (kind === 'ok')
-            return 'success'
-          if (kind === 'already_analyzed')
-            return 'already_analyzed'
-          if (kind === 'too_big')
-            return 'too_big'
-          return 'error'
-        }
 
         const runCapgoAi = async (choice: 'capgo_ai' | 'auto_upload', triggeredBy: 'menu' | 'ci_flag'): Promise<void> => {
           await trackAiAnalysisChoice({
@@ -2031,24 +2069,43 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           // @clack/prompts spinner appends its own animated dots — don't add an
           // ellipsis here or the user sees "…..." (6 dots: our 1-char ellipsis
           // plus the spinner's cycling 3-dot animation).
-          aiSpinner?.start('Analyzing build log with Capgo AI (Kimi K2.5)')
+          aiSpinner?.start('Analyzing build log with Capgo AI')
+
+          let printedHeader = false
+          // Progressive TTY rendering goes through the streaming markdown
+          // renderer so headers/lists/code bars appear styled as lines
+          // complete — output is byte-identical to the buffered
+          // renderMarkdown of the full text (see stream-markdown.ts).
+          const mdStream = isInteractive ? createStreamingMarkdownRenderer(t => stream.write(t), true) : null
+          const onChunk = isInteractive
+            ? (text: string) => {
+                if (!printedHeader) {
+                  aiSpinner?.stop('Capgo AI streaming')
+                  stream.write('\n--- AI analysis ---\n')
+                  printedHeader = true
+                }
+                mdStream!.feed(text)
+              }
+            : undefined
 
           let result: PostAnalyzeResult
           try {
-            result = await postAnalyzeRequest({
+            result = await postAnalyzeStreamRequest({
               apiHost: host,
               apikey: options.apikey,
               jobId: capturedJobId!,
               appId,
               logs,
+              onChunk,
             })
           }
           finally {
-            aiSpinner?.stop('Capgo AI finished')
+            if (!printedHeader)
+              aiSpinner?.stop('Capgo AI finished')
           }
 
           // Telemetry — closed-enum result only, never the analysis text.
-          const resultTag = mapPostAnalyzeResultKind(result.kind)
+          const resultTag = aiAnalysisResultFromPostAnalyze(result)
           await trackAiAnalysisResult({
             apikey: options.apikey,
             orgId,
@@ -2060,7 +2117,16 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           })
 
           if (result.kind === 'ok') {
-            stream.write(`\n--- AI analysis ---\n${renderMarkdown(result.analysis, isInteractive)}\n\n${AI_WARNING}\n`)
+            if (printedHeader) {
+              // TTY already rendered the text progressively — render the
+              // trailing line, then close out.
+              mdStream?.flush()
+              stream.write(`\n\n${AI_WARNING}\n`)
+            }
+            else {
+              // CI: buffered output, identical format to the pre-streaming CLI.
+              stream.write(`\n--- AI analysis ---\n${renderMarkdown(result.analysis, isInteractive)}\n\n${AI_WARNING}\n`)
+            }
           }
           else if (result.kind === 'already_analyzed') {
             stream.write('\nAI analysis already requested for this job (only one per job).\n')
@@ -2068,8 +2134,15 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           else if (result.kind === 'too_big') {
             stream.write('\nLog too big for AI analysis.\n')
           }
+          else if (result.kind === 'upgrade_required') {
+            stream.write(`\n${result.message ?? 'AI build analysis requires a newer CLI. Please upgrade: npx @capgo/cli@latest'}\n`)
+          }
           else {
-            stream.write(`\nAI analysis failed${result.status ? ` (${result.status})` : ''}${result.message ? `: ${result.message}` : ''}.\n`)
+            if (printedHeader)
+              mdStream?.flush() // show whatever partial lines completed before the interruption
+            else if (result.partial)
+              stream.write(`\n--- AI analysis (partial) ---\n${renderMarkdown(result.partial, isInteractive)}\n`)
+            stream.write(`\nAI analysis was interrupted${result.message ? ` (${result.message})` : ''}; this job's analysis slot is used. The full log is saved at ${logsPath} for local AI.\n`)
           }
         }
 
@@ -2100,6 +2173,81 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           })
         }
 
+        // Spec: at a build failure, "Email Capgo support" comes first — the same
+        // contact-support flow as the onboarding wizard, with clack-flavored deps.
+        const runEmailSupport = async (): Promise<void> => {
+          const internalLogPath = getInternalLogPath()
+          let internalLines: string[] = []
+          if (internalLogPath) {
+            try {
+              internalLines = readFileSync(internalLogPath, 'utf8').split('\n')
+            }
+            catch { /* best-effort */ }
+          }
+          let buildLogLines: string[] = []
+          try {
+            const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
+            // Full persisted build log — support needs all of it, not a tail. The
+            // bundle is gzipped + uploaded/attached, so size isn't a concern.
+            buildLogLines = readFileSync(logsPath, 'utf8').split('\n')
+          }
+          catch { /* best-effort */ }
+          await contactSupport({
+            subject: `Capgo Builder support — ${appId} (${platform})`,
+            body: `Hi Capgo team,\n\nMy cloud build failed and I'd like help.\n\nApp: ${appId}\nPlatform: ${platform}\nJob: ${capturedJobId}`,
+            confirm: async (msg, logPath) => {
+              for (;;) {
+                const choice = await select({
+                  message: msg,
+                  options: [
+                    { value: 'yes', label: '📨  Yes, send to support' },
+                    { value: 'view', label: '👀  View logs first (opens the file)' },
+                    { value: 'no', label: '✖  Cancel' },
+                  ],
+                })
+                if (clackIsCancel(choice) || choice === 'no')
+                  return false
+                if (choice === 'view') {
+                  clackLog.info(`Logs to be sent: ${logPath}`)
+                  try { (await import('open')).default(logPath) }
+                  catch { /* best-effort: just the path above */ }
+                  continue
+                }
+                return true
+              }
+            },
+            buildFiles: () => {
+              // The build log can be large; show a spinner while we render + gzip
+              // (and trim to fit the 10 MB cap) so it doesn't look frozen.
+              const s = spinnerC()
+              s.start('Preparing your logs to send…')
+              try {
+                return writeSupportBundleFiles({
+                  kind: 'build-request',
+                  appId,
+                  error: `Cloud build ${capturedJobId} failed`,
+                  logs: buildLogLines,
+                  sections: internalLines.length > 0 ? [{ title: 'Internal log', lines: internalLines }] : [],
+                })
+              }
+              finally {
+                s.stop('Logs ready.')
+              }
+            },
+            copyPath: p => copyToClipboard(p).ok,
+            reveal: p => revealInFinder(p),
+            openUrl: async u => (await import('open')).default(u),
+            print: msg => clackLog.info(msg),
+            upload: async (gzPath) => {
+              const s = spinnerC()
+              s.start('Uploading your logs to Capgo support…')
+              const r = await uploadSupportLogs({ apiHost: host, apikey: options.apikey, appId, jobId: capturedJobId ?? undefined, gzPath })
+              s.stop(r ? 'Logs uploaded.' : 'Logs upload unavailable — falling back to attaching the file.')
+              return r
+            },
+          })
+        }
+
         async function showMenu(): Promise<void> {
           if (await isLogTooBig(capturedJobId!)) {
             process.stdout.write('Log too big for AI analysis (>10 MB). Offering local AI instead.\n')
@@ -2107,14 +2255,17 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
             return
           }
           const choice = await select({
-            message: 'Choose AI analysis',
+            message: 'Build failed — get help or analyze the log',
             options: [
-              { value: 'capgo', label: 'Capgo AI (Kimi K2.5)' },
+              { value: 'support', label: '📨  Email Capgo support' },
+              { value: 'capgo', label: '🤖  Capgo AI' },
               { value: 'local', label: 'Local AI (write prompt to file)' },
               { value: 'skip', label: 'Skip' },
             ],
           })
-          if (choice === 'capgo')
+          if (choice === 'support')
+            await runEmailSupport()
+          else if (choice === 'capgo')
             await runCapgoAi('capgo_ai', 'menu')
           else if (choice === 'local')
             await runLocalAi()
@@ -2138,7 +2289,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           else {
             // interactive: show_menu or ask_then_menu
             if (behavior === 'ask_then_menu') {
-              const wants = await confirm({ message: 'Build failed. Run AI analysis?' })
+              const wants = await confirm({ message: 'Build failed. See help options (email Capgo support / AI analysis)?' })
               if (!wants || typeof wants === 'symbol') {
                 // user cancelled or declined — skip
                 await emitSkipChoice()
@@ -2153,7 +2304,9 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           }
         }
         catch (err) {
-          process.stderr.write(`AI analysis flow errored: ${err instanceof Error ? err.message : String(err)}\n`)
+          const msg = err instanceof Error ? err.message : String(err)
+          appendInternalLog(`AI analysis flow errored: ${msg}`)
+          process.stderr.write(`AI analysis flow errored: ${msg}\n`)
         }
       }
 
@@ -2165,7 +2318,8 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         channel: 'native-builder',
         event: finalStatus === 'succeeded' ? 'Build succeeded' : 'Build failed',
         icon: finalStatus === 'succeeded' ? '✅' : '❌',
-        user_id: orgId,
+        org_id: orgId,
+        tracking_version: 2,
         tags: {
           'app-id': appId,
           'platform': platform,
@@ -2180,6 +2334,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         jobId: buildRequest.job_id,
         uploadUrl: buildRequest.upload_url,
         status: finalStatus || startResult.status || buildRequest.status,
+        aiAnalysis: aiAnalysisInfo,
       }
     }
     finally {

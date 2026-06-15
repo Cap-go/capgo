@@ -6,17 +6,18 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import AdminOnlyModal from '~/components/AdminOnlyModal.vue'
 import CreditsCta from '~/components/CreditsCta.vue'
+import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { formatIncludedThenPrice } from '~/services/creditPricing'
+import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { checkPermissions } from '~/services/permissions'
-import { openCheckout } from '~/services/stripe'
+import { getDatafastAttribution, openCheckout } from '~/services/stripe'
 import { getCreditUnitPricing, getCurrentPlanNameOrg, useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
-import { isSuperAdminRole, useOrganizationStore } from '~/stores/organization'
+import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
 const mainStore = useMainStore()
@@ -34,13 +35,7 @@ const router = useRouter()
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const dialogStore = useDialogV2Store()
-const isMobile = Capacitor.isNativePlatform()
-
-// Check if user is super_admin
-const isSuperAdmin = computed(() => {
-  const orgId = organizationStore.currentOrganization?.gid
-  return organizationStore.hasPermissionsInRole('super_admin', ['org_super_admin'], orgId)
-})
+const isMobile = isNativeAppStoreContext()
 
 // Modal state for non-admin access
 const showAdminModal = ref(false)
@@ -152,10 +147,6 @@ function isSafariBrowser() {
   return /Version\/[\d.]+/.test(ua) && /Safari\//.test(ua) && !/Chrome|CriOS|FxiOS|OPiOS|Edg|Chromium/.test(ua)
 }
 
-async function getStripeAttributionId() {
-  return (await cookieStore.get('datafast_visitor_id'))?.value
-}
-
 async function prefetchStripeCheckoutUrl(plan: Database['public']['Tables']['plans']['Row'], isYear: boolean) {
   if (!plan.stripe_id)
     return
@@ -166,7 +157,7 @@ async function prefetchStripeCheckoutUrl(plan: Database['public']['Tables']['pla
 
   const successUrl = `${window.location.href}?success=1`
   const cancelUrl = `${window.location.href}?cancel=1`
-  const attributionId = await getStripeAttributionId()
+  const datafastAttribution = await getDatafastAttribution()
   try {
     const resp = await supabase.functions.invoke('private/stripe_checkout', {
       body: JSON.stringify({
@@ -175,7 +166,9 @@ async function prefetchStripeCheckoutUrl(plan: Database['public']['Tables']['pla
         cancelUrl,
         recurrence: isYear ? 'year' : 'month',
         orgId: currentOrganization.value?.gid ?? '',
-        attributionId,
+        attributionId: datafastAttribution.visitorId,
+        datafastVisitorId: datafastAttribution.visitorId,
+        datafastSessionId: datafastAttribution.sessionId,
       }),
     })
 
@@ -219,8 +212,9 @@ async function openSafariStripeCheckout(plan: Database['public']['Tables']['plan
 }
 
 async function openChangePlan(plan: Database['public']['Tables']['plans']['Row'], index: number) {
-  // Show admin modal for non-admins instead of blocking
-  if (!isSuperAdmin.value) {
+  // Show the permission modal instead of blocking when the user can't manage billing.
+  const orgId = currentOrganization.value?.gid
+  if (!orgId || !(await checkPermissions('org.update_billing', { orgId }))) {
     showAdminModal.value = true
     return
   }
@@ -281,6 +275,18 @@ async function loadData(initial: boolean) {
   initialLoad.value = true
 }
 
+// Pick the org with the most apps where the user can actually manage billing.
+// Used as a fallback when the current org's billing is not accessible.
+async function findBillableFallbackOrg() {
+  const candidates = [...organizationStore.getAllOrgs()]
+    .map(([_, org]) => org)
+    .sort((a, b) => b.app_count - a.app_count)
+  for (const org of candidates) {
+    if (await checkPermissions('org.update_billing', { orgId: org.gid }))
+      return org
+  }
+  return undefined
+}
 watch(currentOrganization, async (newOrg, prevOrg) => {
   if (newOrg) {
     // Check permission directly instead of relying on computedAsync default
@@ -288,14 +294,9 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
 
     if (!hasUpdateBillingPermission) {
       if (!initialLoad.value) {
-        const orgsMap = organizationStore.getAllOrgs()
-        const newOrg = [...orgsMap]
-          .map(([_, a]) => a)
-          .filter(org => isSuperAdminRole(org.role))
-          .sort((a, b) => b.app_count - a.app_count)[0]
-
-        if (newOrg) {
-          organizationStore.setCurrentOrganization(newOrg.gid)
+        const fallbackOrg = await findBillableFallbackOrg()
+        if (fallbackOrg) {
+          organizationStore.setCurrentOrganization(fallbackOrg.gid)
           return
         }
       }
@@ -326,6 +327,11 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
 
 watchEffect(async () => {
   if (route.path === '/settings/organization/plans') {
+    if (isMobile) {
+      router.replace('/settings/organization/usage')
+      return
+    }
+
     // if success is in url params show modal success plan setup
     if (route.query.success) {
       // toast.success(t('usage-success'))
@@ -342,14 +348,9 @@ watchEffect(async () => {
         const hasUpdateBillingPermission = await checkPermissions('org.update_billing', { orgId: currentOrganization.value.gid })
 
         if (!hasUpdateBillingPermission) {
-          const orgsMap = organizationStore.getAllOrgs()
-          const newOrg = [...orgsMap]
-            .map(([_, a]) => a)
-            .filter(org => isSuperAdminRole(org.role))
-            .sort((a, b) => b.app_count - a.app_count)[0]
-
-          if (newOrg) {
-            organizationStore.setCurrentOrganization(newOrg.gid)
+          const fallbackOrg = await findBillableFallbackOrg()
+          if (fallbackOrg) {
+            organizationStore.setCurrentOrganization(fallbackOrg.gid)
             return
           }
 
@@ -369,13 +370,17 @@ watchEffect(async () => {
       }
 
       loadData(true)
-      sendEvent({
-        channel: 'usage',
-        event: 'User visit',
-        icon: '💳',
-        user_id: currentOrganization.value?.gid,
-        notify: false,
-      }).catch()
+      const orgId = currentOrganization.value?.gid
+      if (orgId) {
+        sendEvent({
+          channel: 'usage',
+          event: 'User visit',
+          icon: '💳',
+          org_id: orgId,
+          tracking_version: 2,
+          notify: false,
+        }).catch()
+      }
     }
   }
 })
@@ -423,6 +428,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
             </h1>
             <!-- Custom Plan Trigger -->
             <button
+              v-if="!isMobile"
               class="items-center hidden px-3 py-1 text-xs font-medium text-blue-700 transition-colors rounded-full bg-blue-50 lg:inline-flex dark:text-blue-300 hover:bg-blue-100 dark:bg-blue-900/30"
               @click="openSupport()"
             >
@@ -432,7 +438,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {{ t('plan-desc') }}
           </p>
-          <p class="mt-2 text-sm">
+          <p v-if="!isMobile" class="mt-2 text-sm">
             <a class="font-medium text-blue-600 hover:underline dark:text-blue-300" href="https://capgo.app/pricing/#compare-plans">
               {{ t('plan-full-comparison-link') }}
             </a>
@@ -465,10 +471,10 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
       </div>
 
       <!-- Credits CTA: shows info banner for credits-only orgs, upsell CTA for others -->
-      <CreditsCta class="mb-6 shrink-0" :credits-only="isCreditsOnly" />
+      <CreditsCta v-if="!isMobile" class="mb-6 shrink-0" :credits-only="isCreditsOnly" />
 
       <!-- Expert as a Service CTA -->
-      <div class="mb-6 shrink-0">
+      <div v-if="!isMobile" class="mb-6 shrink-0">
         <div class="flex flex-col gap-3 p-4 border border-amber-200 bg-amber-50 rounded-2xl text-amber-900 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p class="text-sm font-semibold">
@@ -599,8 +605,13 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
       </div>
     </div>
 
-    <!-- Admin-only modal for non-admin users -->
-    <AdminOnlyModal v-if="showAdminModal" @click="showAdminModal = false" />
+    <!-- Permission modal shown when the user can't manage billing -->
+    <RbacPermissionOnlyModal
+      v-if="showAdminModal"
+      :title="t('billing-access-required')"
+      permission="org.update_billing"
+      @click="showAdminModal = false"
+    />
   </div>
 </template>
 

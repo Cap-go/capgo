@@ -582,13 +582,17 @@ const trialPlanBreakdownPlanNames = computed(() => {
   return totals.map(plan => plan.plan_name)
 })
 
-function getTrialPlanChartColor(planName: string) {
-  const colors = ['#119eff', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#ef4444']
-  let hash = 0
-  for (let index = 0; index < planName.length; index++)
-    hash = (hash * 31 + planName.charCodeAt(index)) >>> 0
+const trialPlanChartColors: Record<string, string> = {
+  Solo: '#119eff',
+  Maker: '#d97706',
+  Team: '#8b5cf6',
+  Enterprise: '#059669',
+}
 
-  return colors[hash % colors.length]
+const fallbackTrialPlanChartColors = ['#119eff', '#d97706', '#8b5cf6', '#059669', '#db2777', '#0f766e', '#dc2626']
+
+function getTrialPlanChartColor(planName: string, index: number) {
+  return trialPlanChartColors[planName] ?? fallbackTrialPlanChartColors[index % fallbackTrialPlanChartColors.length]
 }
 
 const trialPlanBreakdownTrendSeries = computed(() => {
@@ -597,13 +601,13 @@ const trialPlanBreakdownTrendSeries = computed(() => {
     return []
 
   return trialPlanBreakdownPlanNames.value
-    .map(planName => ({
+    .map((planName, index) => ({
       label: planName,
       data: trend.map(item => ({
         date: item.date,
         value: item.plans[planName] ?? 0,
       })),
-      color: getTrialPlanChartColor(planName),
+      color: getTrialPlanChartColor(planName, index),
     }))
     .filter(series => series.data.some(item => item.value > 0))
 })

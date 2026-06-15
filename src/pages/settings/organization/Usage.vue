@@ -10,7 +10,8 @@ import { toast } from 'vue-sonner'
 import CreditsCta from '~/components/CreditsCta.vue'
 import Spinner from '~/components/Spinner.vue'
 import { bytesToGb } from '~/services/conversion'
-import { formatUtcDateTimeAsLocal } from '~/services/date'
+import { formatLocalDate, formatLocalDateTime, formatUtcDateTimeAsLocal } from '~/services/date'
+import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { calculateCreditCost, getCurrentPlanNameOrg, getPlans, getPlanUsagePercent, getTotalStorage, getUsageCreditDeductions } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -29,6 +30,7 @@ const router = useRouter()
 const dialogStore = useDialogV2Store()
 const displayStore = useDisplayStore()
 displayStore.NavTitle = t('usage')
+const hideExternalPurchaseFlows = isNativeAppStoreContext()
 
 const { currentOrganization } = storeToRefs(organizationStore)
 
@@ -39,13 +41,17 @@ watchEffect(async () => {
       toast.success(t('usage-success'))
     }
     else if (main.user?.id) {
-      sendEvent({
-        channel: 'usage',
-        event: 'User visit',
-        icon: '💳',
-        user_id: currentOrganization.value?.gid,
-        notify: false,
-      }).catch()
+      const orgId = currentOrganization.value?.gid
+      if (orgId) {
+        sendEvent({
+          channel: 'usage',
+          event: 'User visit',
+          icon: '💳',
+          org_id: orgId,
+          tracking_version: 2,
+          notify: false,
+        }).catch()
+      }
     }
   }
 })
@@ -173,8 +179,8 @@ async function getUsage(orgId: string) {
     totalBuildTime,
     detailPlanUsage,
     cycle: {
-      subscription_anchor_start: dayjs(organizationStore.currentOrganization?.subscription_start).format('YYYY/MM/D'),
-      subscription_anchor_end: dayjs(organizationStore.currentOrganization?.subscription_end).format('YYYY/MM/D'),
+      subscription_anchor_start: formatLocalDate(organizationStore.currentOrganization?.subscription_start) || t('unknown'),
+      subscription_anchor_end: formatLocalDate(organizationStore.currentOrganization?.subscription_end) || t('unknown'),
     },
   }
 }
@@ -281,6 +287,9 @@ function formatBuildTime(seconds: number): string {
 }
 
 const shouldShowUpgrade = computed(() => {
+  if (hideExternalPurchaseFlows)
+    return false
+
   if (!currentPlanSuggest.value || !currentPlan.value) {
     return false
   }
@@ -333,7 +342,7 @@ function nextRunDate() {
   if (!source)
     return `${t('next-run')}: ${t('unknown')}`
 
-  const nextRun = dayjs(source).format('MMMM D, YYYY HH:mm')
+  const nextRun = formatLocalDateTime(source) || t('unknown')
   return `${t('next-run')}: ${nextRun}`
 }
 </script>
@@ -381,7 +390,7 @@ function nextRunDate() {
                 {{ currentPlan?.name || t('loading') }}
               </div>
             </div>
-            <div class="flex flex-col">
+            <div v-if="!hideExternalPurchaseFlows" class="flex flex-col">
               <div class="mb-1 text-sm text-gray-500 dark:text-gray-400">
                 {{ t('base') }}
               </div>
@@ -389,7 +398,7 @@ function nextRunDate() {
                 {{ formatMonthlyPrice(currentPlan?.price_m) }}
               </div>
             </div>
-            <div class="flex flex-col">
+            <div v-if="!hideExternalPurchaseFlows" class="flex flex-col">
               <div class="mb-1 text-sm text-gray-500 dark:text-gray-400">
                 {{ t('credits-used-in-period') }}
               </div>
@@ -398,7 +407,7 @@ function nextRunDate() {
               </div>
             </div>
           </div>
-          <div class="flex items-end justify-between pt-4 mt-4 border-t border-gray-100 dark:border-gray-700">
+          <div v-if="!hideExternalPurchaseFlows" class="flex items-end justify-between pt-4 mt-4 border-t border-gray-100 dark:border-gray-700">
             <div class="text-sm text-gray-500 dark:text-gray-400">
               {{ t('total') }}
             </div>
@@ -436,7 +445,7 @@ function nextRunDate() {
       </div>
 
       <!-- Credits CTA -->
-      <CreditsCta class="mb-8 shrink-0" />
+      <CreditsCta v-if="!hideExternalPurchaseFlows" class="mb-8 shrink-0" />
 
       <!-- Usage Metrics Grid -->
       <h2 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white shrink-0">

@@ -9,7 +9,13 @@ import { buildNotificationRegistryLookupQuery, createNotificationDeliveryEventPr
 
 type NotificationEnv = Record<string, unknown>
 const MAX_NOTIFICATION_RETRY_ATTEMPTS = 3
+const DEFAULT_NOTIFICATION_SEND_BATCH_SIZE = 50
+const DEFAULT_NOTIFICATION_RETRY_DELAY_SECONDS = 30
 const DEFAULT_NOTIFICATION_REGISTRY_DATASET = 'notification_registry'
+
+type NotificationQueueBinding = {
+  send?: (body: NativeNotificationQueueMessage, options?: { delaySeconds?: number }) => Promise<unknown>
+}
 
 interface SendOutcome {
   ok: boolean
@@ -29,6 +35,18 @@ interface AnalyticsApiResponse {
   meta?: Array<{ name: string, type: string }>
 }
 
+interface NativeNotificationProcessResult {
+  retryDevices: NativeNotificationRegistryRow[]
+  remainingDevices: NativeNotificationRegistryRow[]
+  continuationMessage?: NativeNotificationQueueMessage
+}
+
+interface ResolvedDevicePage {
+  devices: NativeNotificationRegistryRow[]
+  remainingDevices: NativeNotificationRegistryRow[]
+  continuationMessage?: NativeNotificationQueueMessage
+}
+
 const textEncoder = new TextEncoder()
 
 function readEnv(env: NotificationEnv, name: string): string {
@@ -38,6 +56,20 @@ function readEnv(env: NotificationEnv, name: string): string {
   if (value && typeof value === 'object' && 'value' in value && typeof (value as { value?: unknown }).value === 'string')
     return (value as { value: string }).value
   return ''
+}
+
+function readEnvInt(env: NotificationEnv, name: string, fallback: number, max: number): number {
+  const raw = Number(readEnv(env, name))
+  if (!Number.isFinite(raw) || raw <= 0)
+    return fallback
+  return Math.min(Math.max(1, Math.trunc(raw)), max)
+}
+
+function resolveSendBatchSize(env: NotificationEnv, message: NativeNotificationQueueMessage): number {
+  return Math.min(
+    Math.max(1, Math.trunc(message.sendBatchSize ?? readEnvInt(env, 'NOTIFICATION_SEND_BATCH_SIZE', DEFAULT_NOTIFICATION_SEND_BATCH_SIZE, 500))),
+    500,
+  )
 }
 
 function toBase64Url(bytes: Uint8Array): string {
@@ -175,12 +207,36 @@ async function runAnalyticsQuery<T>(env: NotificationEnv, query: string): Promis
   return convertAnalyticsRows<T>(await response.json() as AnalyticsApiResponse)
 }
 
-async function resolveMessageDevices(env: NotificationEnv, message: NativeNotificationQueueMessage): Promise<NativeNotificationRegistryRow[]> {
-  if (Array.isArray(message.devices))
-    return message.devices
+function chunkDeviceRows(devices: NativeNotificationRegistryRow[], size: number) {
+  const chunks: NativeNotificationRegistryRow[][] = []
+  for (let index = 0; index < devices.length; index += size)
+    chunks.push(devices.slice(index, index + size))
+  return chunks
+}
+
+function normalizeMessageLimit(limit: unknown): number | undefined {
+  if (typeof limit !== 'number' || !Number.isFinite(limit))
+    return undefined
+  const normalized = Math.trunc(limit)
+  return normalized > 0 ? normalized : undefined
+}
+
+async function resolveMessageDevicesPage(env: NotificationEnv, message: NativeNotificationQueueMessage, batchSize: number): Promise<ResolvedDevicePage> {
+  if (Array.isArray(message.devices)) {
+    return {
+      devices: message.devices.slice(0, batchSize),
+      remainingDevices: message.devices.slice(batchSize),
+    }
+  }
+
   const target = message.target
   if (!target)
-    return []
+    return { devices: [], remainingDevices: [] }
+
+  const remainingLimit = normalizeMessageLimit(message.limit)
+  const queryLimit = remainingLimit
+    ? Math.min(batchSize + 1, remainingLimit)
+    : batchSize + 1
 
   const query = buildNotificationRegistryLookupQuery({
     dataset: getRegistryDataset(env),
@@ -188,10 +244,28 @@ async function resolveMessageDevices(env: NotificationEnv, message: NativeNotifi
     buckets: message.buckets?.length ? message.buckets : getAllNotificationBuckets(),
     recipientKey: target.recipientKey,
     deviceKey: target.deviceKey,
+    deviceKeyAfter: message.registryCursorDeviceKey,
     tag: target.tag,
-    limit: message.limit,
+    limit: queryLimit,
+    orderByDeviceKey: true,
   })
-  return runAnalyticsQuery<NativeNotificationRegistryRow>(env, query)
+  const rows = await runAnalyticsQuery<NativeNotificationRegistryRow>(env, query)
+  const devices = rows.slice(0, batchSize)
+  const nextCursor = devices.at(-1)?.device_key
+  const nextLimit = remainingLimit ? remainingLimit - devices.length : undefined
+  const hasMore = rows.length > batchSize && Boolean(nextCursor) && (nextLimit === undefined || nextLimit > 0)
+  return {
+    devices,
+    remainingDevices: [],
+    continuationMessage: hasMore
+      ? {
+          ...message,
+          devices: undefined,
+          registryCursorDeviceKey: nextCursor,
+          limit: nextLimit,
+        }
+      : undefined,
+  }
 }
 
 function normalizeData(value: unknown): Record<string, string> {
@@ -227,6 +301,8 @@ async function withDeliveryMetadata(env: NotificationEnv, message: NativeNotific
         capgoRecipientKey: device.recipient_key,
         capgoDeviceKey: device.device_key,
         capgoEventProof: eventProof,
+        ...(Number.isFinite(message.badge) ? { capgoBadge: String(Math.max(0, Math.trunc(message.badge ?? 0))) } : {}),
+        ...(Number.isFinite(message.badgeRevision) ? { capgoBadgeRevision: String(Math.max(0, Math.trunc(message.badgeRevision ?? 0))) } : {}),
       },
     },
   }
@@ -516,6 +592,8 @@ function writeNotificationEvent(env: NotificationEnv, input: {
   device: NativeNotificationRegistryRow
   error?: string
   badge?: number
+  badgeRevision?: number
+  eventId?: string
 }) {
   const binding = env.NOTIFICATION_EVENTS as { writeDataPoint?: (point: { blobs: string[], doubles: number[], indexes: string[] }) => void } | undefined
   if (!binding?.writeDataPoint)
@@ -530,9 +608,30 @@ function writeNotificationEvent(env: NotificationEnv, input: {
       input.device.provider,
       input.error ?? '',
       input.device.platform,
+      input.eventId ?? `${input.event}:${input.appId}:${input.campaignId}:${input.notificationId ?? ''}:${input.device.device_key}`,
+      new Date().toISOString(),
     ],
-    doubles: [Math.max(0, Math.trunc(input.badge ?? 0))],
+    doubles: [
+      Math.max(0, Math.trunc(input.badge ?? 0)),
+      Math.max(0, Math.trunc(input.badgeRevision ?? 0)),
+    ],
     indexes: [getNotificationEventIndex(input.appId, input.campaignId)],
+  })
+}
+
+function writeBadgeDesiredState(env: NotificationEnv, message: NativeNotificationQueueMessage, device: NativeNotificationRegistryRow, notificationId: string) {
+  if (message.kind !== 'badge')
+    return
+  const badgeRevision = Math.max(0, Math.trunc(message.badgeRevision ?? Date.now()))
+  writeNotificationEvent(env, {
+    appId: message.appId,
+    campaignId: message.campaignId,
+    event: 'badge_set',
+    notificationId,
+    device,
+    badge: message.badge,
+    badgeRevision,
+    eventId: `badge-set:${message.appId}:${message.campaignId}:${device.device_key}:${badgeRevision}`,
   })
 }
 
@@ -583,6 +682,11 @@ function canRetry(message: NativeNotificationQueueMessage): boolean {
   return retryAttempt(message) < MAX_NOTIFICATION_RETRY_ATTEMPTS
 }
 
+function retryDelaySeconds(env: NotificationEnv, message: NativeNotificationQueueMessage): number {
+  const baseDelay = readEnvInt(env, 'NOTIFICATION_RETRY_DELAY_SECONDS', DEFAULT_NOTIFICATION_RETRY_DELAY_SECONDS, 900)
+  return Math.min(baseDelay * 2 ** retryAttempt(message), 900)
+}
+
 function shouldRetryThrownError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error)
   return ![
@@ -594,12 +698,12 @@ function shouldRetryThrownError(error: unknown): boolean {
 }
 
 function writeSuccessfulSend(env: NotificationEnv, message: NativeNotificationQueueMessage, device: NativeNotificationRegistryRow, outcome: SendOutcome) {
-  writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'sent', notificationId: outcome.notificationId, device, badge: message.badge })
-  writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'provider_accepted', notificationId: outcome.notificationId, device, badge: message.badge })
+  writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'sent', notificationId: outcome.notificationId, device, badge: message.badge, badgeRevision: message.badgeRevision })
+  writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'provider_accepted', notificationId: outcome.notificationId, device, badge: message.badge, badgeRevision: message.badgeRevision })
 }
 
 function writeFailedSend(env: NotificationEnv, message: NativeNotificationQueueMessage, device: NativeNotificationRegistryRow, error?: string, notificationId?: string) {
-  writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'failed', notificationId, device, error, badge: message.badge })
+  writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'failed', notificationId, device, error, badge: message.badge, badgeRevision: message.badgeRevision })
 }
 
 function shouldRetryOutcome(env: NotificationEnv, message: NativeNotificationQueueMessage, device: NativeNotificationRegistryRow, outcome: SendOutcome, shouldRetry: boolean): boolean {
@@ -614,17 +718,19 @@ function shouldRetryOutcome(env: NotificationEnv, message: NativeNotificationQue
   return shouldRetry && outcome.transient
 }
 
-export async function processNativeNotificationQueueMessage(message: NativeNotificationQueueMessage, env: NotificationEnv): Promise<NativeNotificationRegistryRow[]> {
+export async function processNativeNotificationQueueMessage(message: NativeNotificationQueueMessage, env: NotificationEnv): Promise<NativeNotificationProcessResult> {
   const retryDevices: NativeNotificationRegistryRow[] = []
   const shouldRetry = canRetry(message)
-  const devices = await resolveMessageDevices(env, message)
-  const shouldWriteQueuedEvents = !Array.isArray(message.devices)
+  const batchSize = resolveSendBatchSize(env, message)
+  const { devices, remainingDevices, continuationMessage } = await resolveMessageDevicesPage(env, message, batchSize)
+  const shouldWriteQueuedEvents = !message.skipQueuedEvents
   const credentialCache = createSendCredentialCache()
 
   for (const device of devices) {
     const notificationId = crypto.randomUUID()
     if (shouldWriteQueuedEvents)
-      writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'queued', notificationId, device, badge: message.badge })
+      writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'queued', notificationId, device, badge: message.badge, badgeRevision: message.badgeRevision })
+    writeBadgeDesiredState(env, message, device, notificationId)
     try {
       const outcome = await sendToDevice(env, message, device, notificationId, credentialCache)
       outcome.notificationId = notificationId
@@ -638,23 +744,40 @@ export async function processNativeNotificationQueueMessage(message: NativeNotif
     }
   }
 
-  return retryDevices
+  return { retryDevices, remainingDevices, continuationMessage }
 }
 
 export async function processNativeNotificationQueueBatch(batch: MessageBatch<NativeNotificationQueueMessage>, env: NotificationEnv) {
   await Promise.all(batch.messages.map(async (queueMessage) => {
     try {
-      const retryDevices = await processNativeNotificationQueueMessage(queueMessage.body, env)
+      const { retryDevices, remainingDevices, continuationMessage } = await processNativeNotificationQueueMessage(queueMessage.body, env)
+      if (continuationMessage || remainingDevices.length) {
+        const queue = env.NOTIFICATION_QUEUE as NotificationQueueBinding | undefined
+        if (!queue?.send)
+          throw new Error('Notification continuation queue is not configured')
+        const send = queue.send.bind(queue)
+        if (continuationMessage) {
+          await send(continuationMessage)
+        }
+        else {
+          await Promise.all(chunkDeviceRows(remainingDevices, resolveSendBatchSize(env, queueMessage.body)).map(devices =>
+            send({ ...queueMessage.body, devices }),
+          ))
+        }
+      }
       if (retryDevices.length) {
-        const queue = env.NOTIFICATION_QUEUE as { send?: (body: NativeNotificationQueueMessage) => Promise<void> } | undefined
+        const queue = env.NOTIFICATION_QUEUE as NotificationQueueBinding | undefined
         if (!queue?.send)
           throw new Error('Notification retry queue is not configured')
-        await queue.send({ ...queueMessage.body, attempt: retryAttempt(queueMessage.body) + 1, devices: retryDevices })
+        await queue.send(
+          { ...queueMessage.body, attempt: retryAttempt(queueMessage.body) + 1, devices: retryDevices, skipQueuedEvents: true },
+          { delaySeconds: retryDelaySeconds(env, queueMessage.body) },
+        )
       }
       queueMessage.ack()
     }
     catch {
-      queueMessage.retry()
+      queueMessage.retry({ delaySeconds: retryDelaySeconds(env, queueMessage.body) })
     }
   }))
 }

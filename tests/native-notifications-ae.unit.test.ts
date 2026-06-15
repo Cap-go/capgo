@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  buildNotificationBadgeStateQuery,
   buildNotificationRegistryLookupQuery,
   buildNotificationStatsQuery,
   createNotificationDeliveryEventProof,
@@ -146,6 +147,23 @@ describe('native notification AE registry', () => {
     expect(query).toContain("device_key = 'device-key'")
   })
 
+  it.concurrent('builds deterministic cursor pages for queue fanout lookups', () => {
+    const query = buildNotificationRegistryLookupQuery({
+      dataset: 'notification_registry',
+      appId: 'com.demo.app',
+      buckets: ['0a'],
+      deviceKeyAfter: 'device-1',
+      orderByDeviceKey: true,
+      limit: 51,
+      now: new Date('2026-05-06T00:00:00Z'),
+    })
+
+    expect(query).toContain("blob1 > 'device-1'")
+    expect(query).toContain("device_key > 'device-1'")
+    expect(query).toContain('ORDER BY device_key ASC')
+    expect(query).toContain('LIMIT 51')
+  })
+
   it.concurrent('uses registration tag normalization for registry lookup filters', () => {
     const query = buildNotificationRegistryLookupQuery({
       dataset: 'notification_registry',
@@ -170,7 +188,25 @@ describe('native notification AE registry', () => {
     expect(query).toContain('FROM notification_events')
     expect(query).toContain("index1 = 'com.demo.app:campaign-1'")
     expect(query).toContain("blob2 = 'campaign-1'")
+    expect(query).toContain('COUNT(DISTINCT')
     expect(query).toContain('GROUP BY blob1')
+  })
+
+  it.concurrent('builds latest desired badge lookup from AE event rows', () => {
+    const query = buildNotificationBadgeStateQuery({
+      dataset: 'notification_events',
+      appId: 'com.demo.app',
+      recipientKey: 'recipient-key',
+      deviceKey: 'device-key',
+      now: new Date('2026-05-06T00:00:00Z'),
+    })
+
+    expect(query).toContain('FROM notification_events')
+    expect(query).toContain("blob1 = 'badge_set'")
+    expect(query).toContain("blob4 = 'device-key'")
+    expect(query).toContain("blob5 = 'recipient-key'")
+    expect(query).toContain('argMax(double1, timestamp) AS badge')
+    expect(query).toContain('argMax(double2, timestamp) AS badge_revision')
   })
 
   it.concurrent('tracks permission_changed only when permission state changes or old plugins omit previous state', () => {
@@ -198,7 +234,8 @@ describe('native notification AE registry', () => {
   })
 
   it.concurrent('verifies server-minted identity and event proofs', async () => {
-    vi.stubEnv('NOTIFICATIONS_HMAC_SECRET', 'secret')
+    const previousSecret = process.env.NOTIFICATIONS_HMAC_SECRET
+    process.env.NOTIFICATIONS_HMAC_SECRET = 'secret'
     try {
       const context = {} as any
       const identityProof = await createNotificationIdentityProof(context, 'com.demo.app', 'user-1')
@@ -233,7 +270,10 @@ describe('native notification AE registry', () => {
       })).toBe(false)
     }
     finally {
-      vi.unstubAllEnvs()
+      if (previousSecret === undefined)
+        delete process.env.NOTIFICATIONS_HMAC_SECRET
+      else
+        process.env.NOTIFICATIONS_HMAC_SECRET = previousSecret
     }
   })
 
@@ -286,7 +326,7 @@ describe('native notification queue sender', () => {
     analyticsRowsByApp.set('com.demo.ae', [device])
     const events: any[] = []
 
-    const retryDevices = await processNativeNotificationQueueMessage({
+    const result = await processNativeNotificationQueueMessage({
       kind: 'send',
       appId: 'com.demo.ae',
       campaignId: 'campaign-ae',
@@ -307,16 +347,59 @@ describe('native notification queue sender', () => {
       NOTIFICATION_EVENTS: { writeDataPoint: (point: any) => events.push(point) },
     })
 
-    expect(retryDevices).toHaveLength(0)
+    expect(result.retryDevices).toHaveLength(0)
+    expect(result.remainingDevices).toHaveLength(0)
     expect(requestsFor(token)).toHaveLength(1)
     expect(events.some(point => point.blobs[0] === 'queued')).toBe(true)
     expect(events.some(point => point.blobs[0] === 'sent')).toBe(true)
   })
 
+  it('returns a small AE cursor continuation instead of queueing remaining device rows', async () => {
+    const firstToken = 'push-token-ae-page-1'
+    const secondToken = 'push-token-ae-page-2'
+    const firstDevice = {
+      ...fcmDevice(await encryptToken('secret', firstToken)),
+      device_key: 'device-1',
+    }
+    const secondDevice = {
+      ...fcmDevice(await encryptToken('secret', secondToken)),
+      device_key: 'device-2',
+    }
+    analyticsRowsByApp.set('com.demo.page', [firstDevice, secondDevice])
+
+    const result = await processNativeNotificationQueueMessage({
+      kind: 'send',
+      appId: 'com.demo.page',
+      campaignId: 'campaign-page',
+      payload: { title: 'Hello' },
+      target: { broadcast: true },
+      buckets: ['aa'],
+      sendBatchSize: 1,
+      providerConfigs: [{
+        provider: 'fcm',
+        status: 'configured',
+        secretRef: 'FCM_SECRET',
+        config: { projectId: 'demo-project' },
+      }],
+    }, {
+      API_SECRET: 'secret',
+      CF_ANALYTICS_TOKEN: 'cf-token',
+      CF_ACCOUNT_ANALYTICS_ID: 'cf-account',
+      FCM_SECRET: JSON.stringify({ access_token: 'token', project_id: 'demo-project' }),
+      NOTIFICATION_EVENTS: { writeDataPoint: () => undefined },
+    })
+
+    expect(requestsFor(firstToken)).toHaveLength(1)
+    expect(requestsFor(secondToken)).toHaveLength(0)
+    expect(result.remainingDevices).toHaveLength(0)
+    expect(result.continuationMessage?.registryCursorDeviceKey).toBe('device-1')
+    expect(result.continuationMessage?.devices).toBeUndefined()
+  })
+
   it('builds silent update-check payloads for Capgo updater', async () => {
     const token = 'push-token-update'
     const encryptedToken = await encryptToken('secret', token)
-    const retryDevices = await processNativeNotificationQueueMessage({
+    const result = await processNativeNotificationQueueMessage({
       kind: 'update_check',
       appId: 'com.demo.app',
       campaignId: 'campaign-update',
@@ -334,7 +417,8 @@ describe('native notification queue sender', () => {
       NOTIFICATION_EVENTS: { writeDataPoint: () => undefined },
     })
 
-    expect(retryDevices).toHaveLength(0)
+    expect(result.retryDevices).toHaveLength(0)
+    expect(result.remainingDevices).toHaveLength(0)
     const requests = requestsFor(token)
     expect(requests[0].message.notification).toBeUndefined()
     expect(requests[0].message.data.capgoAction).toBe('update_check')
@@ -351,7 +435,7 @@ describe('native notification queue sender', () => {
     const registry: any[] = []
 
     const encryptedToken = await encryptToken('secret', 'push-token-invalid')
-    const retryDevices = await processNativeNotificationQueueMessage({
+    const result = await processNativeNotificationQueueMessage({
       kind: 'send',
       appId: 'com.demo.app',
       campaignId: 'campaign-1',
@@ -370,7 +454,8 @@ describe('native notification queue sender', () => {
       NOTIFICATION_REGISTRY: { writeDataPoint: (point: any) => registry.push(point) },
     })
 
-    expect(retryDevices).toHaveLength(0)
+    expect(result.retryDevices).toHaveLength(0)
+    expect(result.remainingDevices).toHaveLength(0)
     expect(events.some(point => point.blobs[0] === 'failed')).toBe(true)
     expect(registry).toHaveLength(1)
     expect(registry[0].doubles[0]).toBe(0)
@@ -381,7 +466,7 @@ describe('native notification queue sender', () => {
     const registry: any[] = []
 
     const encryptedToken = await encryptToken('secret', 'push-token-invalid-payload')
-    const retryDevices = await processNativeNotificationQueueMessage({
+    const result = await processNativeNotificationQueueMessage({
       kind: 'send',
       appId: 'com.demo.app',
       campaignId: 'campaign-1',
@@ -400,13 +485,14 @@ describe('native notification queue sender', () => {
       NOTIFICATION_REGISTRY: { writeDataPoint: (point: any) => registry.push(point) },
     })
 
-    expect(retryDevices).toHaveLength(0)
+    expect(result.retryDevices).toHaveLength(0)
+    expect(result.remainingDevices).toHaveLength(0)
     expect(registry).toHaveLength(0)
   })
 
   it('does not retry permanent or exhausted notification send failures', async () => {
     const encryptedToken = await encryptToken('wrong-secret', 'push-token-permanent')
-    const permanentRetryDevices = await processNativeNotificationQueueMessage({
+    const permanentResult = await processNativeNotificationQueueMessage({
       kind: 'send',
       appId: 'com.demo.app',
       campaignId: 'campaign-1',
@@ -424,7 +510,7 @@ describe('native notification queue sender', () => {
       NOTIFICATION_EVENTS: { writeDataPoint: () => undefined },
     })
 
-    const exhaustedRetryDevices = await processNativeNotificationQueueMessage({
+    const exhaustedResult = await processNativeNotificationQueueMessage({
       kind: 'send',
       appId: 'com.demo.app',
       campaignId: 'campaign-1',
@@ -443,7 +529,70 @@ describe('native notification queue sender', () => {
       NOTIFICATION_EVENTS: { writeDataPoint: () => undefined },
     })
 
-    expect(permanentRetryDevices).toHaveLength(0)
-    expect(exhaustedRetryDevices).toHaveLength(0)
+    expect(permanentResult.retryDevices).toHaveLength(0)
+    expect(permanentResult.remainingDevices).toHaveLength(0)
+    expect(exhaustedResult.retryDevices).toHaveLength(0)
+    expect(exhaustedResult.remainingDevices).toHaveLength(0)
+  })
+
+  it('writes desired badge state before sending badge notifications', async () => {
+    const events: any[] = []
+    const encryptedToken = await encryptToken('secret', 'push-token-badge')
+    const result = await processNativeNotificationQueueMessage({
+      kind: 'badge',
+      appId: 'com.demo.app',
+      campaignId: 'campaign-badge',
+      payload: {},
+      badge: 7,
+      badgeRevision: 12345,
+      providerConfigs: [{
+        provider: 'fcm',
+        status: 'configured',
+        secretRef: 'FCM_SECRET',
+        config: { projectId: 'demo-project' },
+      }],
+      devices: [fcmDevice(encryptedToken)],
+    }, {
+      API_SECRET: 'secret',
+      FCM_SECRET: JSON.stringify({ access_token: 'token', project_id: 'demo-project' }),
+      NOTIFICATION_EVENTS: { writeDataPoint: (point: any) => events.push(point) },
+    })
+
+    expect(result.retryDevices).toHaveLength(0)
+    expect(events.some(point => point.blobs[0] === 'badge_set' && point.doubles[0] === 7 && point.doubles[1] === 12345)).toBe(true)
+    const request = requestsFor('push-token-badge')[0]
+    expect(request.message.data.capgoBadge).toBe('7')
+    expect(request.message.data.capgoBadgeRevision).toBe('12345')
+  })
+
+  it('processes notification sends in bounded chunks and exposes remaining devices', async () => {
+    const firstToken = 'push-token-batch-1'
+    const secondToken = 'push-token-batch-2'
+    const result = await processNativeNotificationQueueMessage({
+      kind: 'send',
+      appId: 'com.demo.app',
+      campaignId: 'campaign-batch',
+      payload: { title: 'Batch' },
+      sendBatchSize: 1,
+      providerConfigs: [{
+        provider: 'fcm',
+        status: 'configured',
+        secretRef: 'FCM_SECRET',
+        config: { projectId: 'demo-project' },
+      }],
+      devices: [
+        fcmDevice(await encryptToken('secret', firstToken)),
+        fcmDevice(await encryptToken('secret', secondToken)),
+      ],
+    }, {
+      API_SECRET: 'secret',
+      FCM_SECRET: JSON.stringify({ access_token: 'token', project_id: 'demo-project' }),
+      NOTIFICATION_EVENTS: { writeDataPoint: () => undefined },
+    })
+
+    expect(requestsFor(firstToken)).toHaveLength(1)
+    expect(requestsFor(secondToken)).toHaveLength(0)
+    expect(result.retryDevices).toHaveLength(0)
+    expect(result.remainingDevices).toHaveLength(1)
   })
 })

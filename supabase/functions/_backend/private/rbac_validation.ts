@@ -129,6 +129,10 @@ export const orgIdParamSchema = type({
   org_id: 'string.uuid',
 })
 
+export const appIdParamSchema = type({
+  app_id: 'string.uuid',
+})
+
 export const groupIdParamSchema = type({
   group_id: 'string.uuid',
 })
@@ -172,6 +176,8 @@ export const updateRoleBindingBodySchema = type({
 })
 
 export const invalidOrgIdHook = createErrorHook(() => 'Invalid org_id')
+
+export const invalidAppIdHook = createErrorHook(() => 'Invalid app_id')
 
 export const invalidGroupIdHook = createErrorHook(() => 'Invalid group_id')
 

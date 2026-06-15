@@ -92,3 +92,23 @@ internal/AuthKey_8P7Y3V99PJ.p8
 internal/CICD.mobileprovision
 internal/Certificates.p12
 .opencode
+.superpowers/
+.playwright-mcp/
+
+# Graphify local cache and optional exports. Keep graph.json, cost.json, and
+# GRAPH_REPORT.md committed.
+graphify-out/.*
+graphify-out/cache/
+graphify-out/manifest.json
+graphify-out/obsidian/
+graphify-out/wiki/
+graphify-out/memory/
+graphify-out/*.html
+graphify-out/*.svg
+graphify-out/*.graphml
+graphify-out/cypher.txt
+
+# Capgo CLI keychain helper — locally built bundles
+cli-helper/dist/
+cli-helper/npm/*/CapgoKeychainHelper.app
+cli-helper/npm/*/CapgoAscKeyHelper.app

@@ -1,8 +1,25 @@
+import type { PostAnalyzeResult } from './analyze.js'
 import { sendEvent } from '../utils.js'
 
-export type AiAnalysisChoice = 'capgo_ai' | 'local_ai' | 'skip' | 'auto_upload'
-export type AiAnalysisTriggeredBy = 'menu' | 'ci_flag'
-export type AiAnalysisResult = 'success' | 'already_analyzed' | 'too_big' | 'error'
+export type AiAnalysisChoice = 'capgo_ai' | 'local_ai' | 'skip' | 'auto_upload' | 'retry'
+export type AiAnalysisTriggeredBy = 'menu' | 'ci_flag' | 'onboarding'
+export type AiAnalysisResult = 'success' | 'already_analyzed' | 'too_big' | 'error' | 'mid_stream_error' | 'upgrade_required'
+
+// Closed-enum mapper for PostAnalyzeResult → telemetry result tag. Shared by
+// the build-failure flow and both onboarding TUIs so a new PostAnalyzeResult
+// variant cannot update one path and silently skew telemetry in the other.
+// Never include the analysis text itself in telemetry.
+export function aiAnalysisResultFromPostAnalyze(result: PostAnalyzeResult): AiAnalysisResult {
+  if (result.kind === 'ok')
+    return 'success'
+  if (result.kind === 'already_analyzed')
+    return 'already_analyzed'
+  if (result.kind === 'too_big')
+    return 'too_big'
+  if (result.kind === 'upgrade_required')
+    return 'upgrade_required'
+  return result.partial !== undefined ? 'mid_stream_error' : 'error'
+}
 
 export interface TrackAiAnalysisChoiceInput {
   apikey: string
@@ -37,7 +54,8 @@ export async function trackAiAnalysisChoice(input: TrackAiAnalysisChoiceInput): 
       channel: 'build-lifecycle',
       icon: '🤖',
       notify: false,
-      user_id: input.orgId,
+      org_id: input.orgId,
+      tracking_version: 2,
       tags: {
         app_id: input.appId,
         platform: input.platform,
@@ -76,7 +94,8 @@ export async function trackAiAnalysisResult(input: TrackAiAnalysisResultInput): 
       channel: 'build-lifecycle',
       icon: '🤖',
       notify: false,
-      user_id: input.orgId,
+      org_id: input.orgId,
+      tracking_version: 2,
       tags,
     })
   }

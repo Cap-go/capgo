@@ -361,7 +361,9 @@ CREATE TABLE public.orgs (
     has_usage_credits boolean DEFAULT false NOT NULL,
     website text,
     stats_refresh_requested_at timestamp without time zone,
+    onboarding jsonb DEFAULT '{"intent": "unknown"}'::jsonb NOT NULL,
     CONSTRAINT orgs_max_apikey_expiration_days_valid CHECK (((max_apikey_expiration_days IS NULL) OR ((max_apikey_expiration_days >= 1) AND (max_apikey_expiration_days <= 365)))),
+    CONSTRAINT orgs_onboarding_valid CHECK (((jsonb_typeof(onboarding) = 'object'::text) AND ((NOT (onboarding ? 'intent'::text)) OR ((onboarding ->> 'intent'::text) = ANY (ARRAY['unknown'::text, 'ota'::text, 'builder'::text, 'both'::text, 'exploring'::text]))))),
     CONSTRAINT orgs_password_policy_config_min_length_check CHECK (((password_policy_config IS NULL) OR ((jsonb_typeof(password_policy_config) = 'object'::text) AND ((NOT (password_policy_config ? 'min_length'::text)) OR ((jsonb_typeof((password_policy_config -> 'min_length'::text)) = 'number'::text) AND (((password_policy_config ->> 'min_length'::text))::numeric = trunc(((password_policy_config ->> 'min_length'::text))::numeric)) AND ((((password_policy_config ->> 'min_length'::text))::numeric >= (6)::numeric) AND (((password_policy_config ->> 'min_length'::text))::numeric <= (72)::numeric))))))),
     CONSTRAINT orgs_required_encryption_key_valid CHECK (((required_encryption_key IS NULL) OR (length((required_encryption_key)::text) = ANY (ARRAY[20, 21]))))
 );
@@ -785,10 +787,10 @@ CREATE INDEX idx_app_versions_retention_cleanup ON public.app_versions USING btr
 
 
 --
--- Name: idx_apps_owner_org_app_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_apps_default_upload_channel; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_apps_owner_org_app_id ON public.apps USING btree (owner_org, app_id);
+CREATE INDEX idx_apps_default_upload_channel ON public.apps USING btree (default_upload_channel);
 
 
 --
@@ -834,6 +836,13 @@ CREATE INDEX idx_manifest_file_hash ON public.manifest USING btree (file_hash);
 
 
 --
+-- Name: idx_manifest_file_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_manifest_file_name ON public.manifest USING btree (file_name);
+
+
+--
 -- Name: idx_orgs_customer_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -866,20 +875,6 @@ CREATE INDEX idx_stripe_info_status_plan ON public.stripe_info USING btree (stat
 --
 
 CREATE INDEX idx_stripe_info_trial ON public.stripe_info USING btree (trial_at) WHERE (trial_at IS NOT NULL);
-
-
---
--- Name: manifest_file_hash_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX manifest_file_hash_idx ON public.manifest USING btree (file_hash);
-
-
---
--- Name: manifest_file_name_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX manifest_file_name_idx ON public.manifest USING btree (file_name);
 
 
 --

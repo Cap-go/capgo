@@ -18,7 +18,7 @@ describe('release scope matching', () => {
   })
 
   it.concurrent('treats capgo deploy workflow changes as capgo-only releases', () => {
-    const files = ['.github/workflows/build_and_deploy.yml']
+    const files = ['.github/workflows/build_and_deploy.yml', 'scripts/deploy-scope.ts']
 
     expect(matchesComponent('capgo', files)).toBe(true)
     expect(matchesComponent('cli', files)).toBe(false)

@@ -1,4 +1,4 @@
-import type { AnalyticsEngineDataset, D1Database, Hyperdrive, Queue } from '@cloudflare/workers-types'
+import type { AnalyticsEngineDataset, D1Database, Hyperdrive, KVNamespace, Queue } from '@cloudflare/workers-types'
 import type { Context } from 'hono'
 import type { DeviceComparable } from './deviceComparison.ts'
 import type { Database } from './supabase.types.ts'
@@ -46,6 +46,7 @@ export type Bindings = {
   NOTIFICATION_EVENTS?: AnalyticsEngineDataset
   NOTIFICATION_QUEUE?: Queue
   DB_STOREAPPS: D1Database
+  CHANNEL_SELF_STORE?: KVNamespace
   HYPERDRIVE_CAPGO_DIRECT_EU: Hyperdrive // Add Hyperdrive binding
   HYPERDRIVE_CAPGO_READ_NA: Hyperdrive
   HYPERDRIVE_CAPGO_READ_EU: Hyperdrive

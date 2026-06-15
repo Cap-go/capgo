@@ -313,7 +313,9 @@ CREATE TYPE "public"."stats_action" AS ENUM (
     'webview_security_policy_violation',
     'webview_unclean_restart',
     'webview_render_process_gone',
-    'webview_content_process_terminated'
+    'webview_content_process_terminated',
+    'os_version_changed',
+    'native_app_version_changed'
 );
 
 
@@ -553,6 +555,34 @@ COMMENT ON FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") IS 'Acc
 
 
 
+CREATE OR REPLACE FUNCTION "public"."acknowledge_compatibility_event"("event_id" bigint, "note" "text") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE v_org uuid; v_app text;
+BEGIN
+  IF note IS NULL OR length(btrim(note)) = 0 THEN
+    RAISE EXCEPTION 'reason_required';
+  END IF;
+  SELECT org_id, app_id INTO v_org, v_app
+    FROM public.compatibility_events WHERE id = event_id;
+  IF v_org IS NULL THEN RETURN; END IF;            -- unknown id: no-op
+  -- RBAC: app upload-bundle permission (release managers); NOT legacy min_rights.
+  -- Adjust the perm key in review if a different role should be allowed to accept.
+  IF NOT public.rbac_check_permission_direct(
+        public.rbac_perm_app_upload_bundle(), auth.uid(), v_org, v_app, NULL::bigint) THEN
+    RETURN;                                         -- unauthorized: no-op (no oracle)
+  END IF;
+  UPDATE public.compatibility_events
+    SET resolved_at = now(), resolved_by = auth.uid(),
+        resolution_kind = 'accepted', resolution_note = note
+    WHERE id = event_id AND resolved_at IS NULL;
+END; $$;
+
+
+ALTER FUNCTION "public"."acknowledge_compatibility_event"("event_id" bigint, "note" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."aggregate_build_log_to_daily"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -596,6 +626,82 @@ $$;
 
 
 ALTER FUNCTION "public"."aggregate_build_log_to_daily"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."apikey_has_current_org_create_capability"("p_apikey_rbac_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.role_bindings AS rb
+    JOIN public.roles AS r ON r.id = rb.role_id
+    WHERE rb.principal_type = public.rbac_principal_apikey()
+      AND rb.principal_id = p_apikey_rbac_id
+      AND rb.scope_type = public.rbac_scope_org()
+      AND r.scope_type = public.rbac_scope_org()
+      AND (
+        rb.expires_at IS NULL
+        OR rb.expires_at > pg_catalog.now()
+      )
+      AND r.name IN (
+        public.rbac_role_org_super_admin(),
+        public.rbac_role_org_admin()
+      )
+  )
+$$;
+
+
+ALTER FUNCTION "public"."apikey_has_current_org_create_capability"("p_apikey_rbac_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."apikey_has_current_org_create_capability"("p_apikey_rbac_id" "uuid") IS 'Private helper ensuring org.create grants only remain effective while the API key still has a current org-scoped write-capable RBAC binding.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."apikey_has_global_permission"("p_apikey" "text", "p_permission_key" "text") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_api_key public.apikeys%ROWTYPE;
+BEGIN
+  IF p_apikey IS NULL OR p_apikey = '' OR p_permission_key IS NULL OR p_permission_key = '' THEN
+    RETURN false;
+  END IF;
+
+  SELECT *
+  INTO v_api_key
+  FROM public.find_apikey_by_value(p_apikey)
+  LIMIT 1;
+
+  IF v_api_key.id IS NULL OR public.is_apikey_expired(v_api_key.expires_at) THEN
+    RETURN false;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.apikey_global_permissions AS agp
+    WHERE agp.apikey_rbac_id = v_api_key.rbac_id
+      AND agp.permission_key = p_permission_key
+  ) THEN
+    RETURN false;
+  END IF;
+
+  IF p_permission_key = public.rbac_perm_org_create() THEN
+    RETURN public.apikey_has_current_org_create_capability(v_api_key.rbac_id);
+  END IF;
+
+  RETURN true;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."apikey_has_global_permission"("p_apikey" "text", "p_permission_key" "text") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."apikey_has_global_permission"("p_apikey" "text", "p_permission_key" "text") IS 'Service-role helper that checks global API-key permissions such as org.create using the supplied key value, including hashed-key lookup.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."apikey_permission_for_keymode"("keymode" "public"."key_mode"[], "scope_type" "text") RETURNS "text"
@@ -1315,6 +1421,7 @@ DECLARE
   v_user_id UUID;
   v_key TEXT;
   v_org_exists BOOLEAN;
+  v_stats_refresh_fields CONSTANT TEXT[] := ARRAY['stats_refresh_requested_at', 'stats_updated_at', 'updated_at'];
 BEGIN
   -- Skip audit logging for org DELETE operations
   -- When an org is deleted, we can't insert into audit_logs because the org_id
@@ -1325,7 +1432,6 @@ BEGIN
 
   -- Get current user from auth context or API key
   -- Uses get_identity() WITH key_mode parameter to support both JWT auth and API key authentication
-  -- This is the fix: previously called get_identity() without parameters which only checked auth.uid()
   v_user_id := public.get_identity('{read,upload,write,all}'::public.key_mode[]);
 
   -- Skip audit logging if no user is identified
@@ -1336,22 +1442,34 @@ BEGIN
 
   -- Convert records to JSONB based on operation type
   IF TG_OP = 'DELETE' THEN
-    v_old_record := to_jsonb(OLD);
+    v_old_record := pg_catalog.to_jsonb(OLD);
     v_new_record := NULL;
   ELSIF TG_OP = 'INSERT' THEN
     v_old_record := NULL;
-    v_new_record := to_jsonb(NEW);
+    v_new_record := pg_catalog.to_jsonb(NEW);
   ELSE -- UPDATE
-    v_old_record := to_jsonb(OLD);
-    v_new_record := to_jsonb(NEW);
+    v_old_record := pg_catalog.to_jsonb(OLD);
+    v_new_record := pg_catalog.to_jsonb(NEW);
 
     -- Calculate changed fields by comparing old and new values
-    FOR v_key IN SELECT jsonb_object_keys(v_new_record)
+    FOR v_key IN SELECT pg_catalog.jsonb_object_keys(v_new_record)
     LOOP
       IF v_old_record->v_key IS DISTINCT FROM v_new_record->v_key THEN
-        v_changed_fields := array_append(v_changed_fields, v_key);
+        v_changed_fields := pg_catalog.array_append(v_changed_fields, v_key);
       END IF;
     END LOOP;
+
+    -- Dashboard chart refreshes only touch stats refresh state. The apps table
+    -- also receives updated_at from its update trigger, so keep that out too.
+    IF TG_TABLE_NAME = ANY(ARRAY['apps', 'orgs'])
+      AND v_changed_fields && ARRAY['stats_refresh_requested_at', 'stats_updated_at']
+      AND NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.unnest(v_changed_fields) AS changed_field(field_name)
+        WHERE changed_field.field_name <> ALL(v_stats_refresh_fields)
+      ) THEN
+      RETURN NEW;
+    END IF;
   END IF;
 
   -- Get org_id and record_id based on table being modified
@@ -1479,6 +1597,85 @@ $$;
 
 
 ALTER FUNCTION "public"."auto_owner_org_by_app_id"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."bind_creating_apikey_to_org_on_create"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  api_key_text text;
+  api_key public.apikeys%ROWTYPE;
+  org_super_admin_role_id uuid;
+BEGIN
+  SELECT public.get_apikey_header() INTO api_key_text;
+  IF api_key_text IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT *
+  INTO api_key
+  FROM public.find_apikey_by_value(api_key_text)
+  LIMIT 1;
+
+  IF api_key.id IS NULL
+    OR public.is_apikey_expired(api_key.expires_at)
+    OR api_key.user_id IS DISTINCT FROM NEW.created_by
+  THEN
+    RETURN NEW;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.apikey_global_permissions AS agp
+    WHERE agp.apikey_rbac_id = api_key.rbac_id
+      AND agp.permission_key = public.rbac_perm_org_create()
+  )
+  OR NOT public.apikey_has_current_org_create_capability(api_key.rbac_id) THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT roles.id
+  INTO org_super_admin_role_id
+  FROM public.roles
+  WHERE roles.name = public.rbac_role_org_super_admin()
+    AND roles.scope_type = public.rbac_scope_org()
+  LIMIT 1;
+
+  IF org_super_admin_role_id IS NULL THEN
+    RAISE EXCEPTION 'org_super_admin role not found';
+  END IF;
+
+  INSERT INTO public.role_bindings (
+    principal_type,
+    principal_id,
+    role_id,
+    scope_type,
+    org_id,
+    granted_by,
+    granted_at,
+    reason,
+    is_direct
+  )
+  VALUES (
+    public.rbac_principal_apikey(),
+    api_key.rbac_id,
+    org_super_admin_role_id,
+    public.rbac_scope_org(),
+    NEW.id,
+    NEW.created_by,
+    pg_catalog.now(),
+    'Auto-granted to API key on org creation',
+    true
+  )
+  ON CONFLICT DO NOTHING;
+
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."bind_creating_apikey_to_org_on_create"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."calculate_credit_cost"("p_metric" "public"."credit_metric_type", "p_overage_amount" numeric) RETURNS TABLE("credit_step_id" bigint, "credit_cost_per_unit" numeric, "credits_required" numeric)
@@ -3149,31 +3346,33 @@ CREATE OR REPLACE FUNCTION "public"."count_all_plans_v2"() RETURNS TABLE("plan_n
     SET "search_path" TO ''
     AS $$
 BEGIN
-  RETURN QUERY 
+  RETURN QUERY
   WITH ActiveSubscriptions AS (
     SELECT DISTINCT ON (si.customer_id)
       p.name AS product_name,
       si.customer_id
     FROM public.stripe_info si
-    INNER JOIN public.plans p ON si.product_id = p.stripe_id 
+    INNER JOIN public.plans p ON si.product_id = p.stripe_id
     WHERE si.status = 'succeeded'
     ORDER BY si.customer_id, si.created_at DESC
   ),
   TrialUsers AS (
     SELECT DISTINCT ON (si.customer_id)
-      'Trial' AS product_name,
+      'Trial'::character varying AS product_name,
       si.customer_id
     FROM public.stripe_info si
-    WHERE si.trial_at > NOW() 
-    AND si.status IS NULL
-    AND NOT EXISTS (
-      SELECT 1 FROM ActiveSubscriptions a 
-      WHERE a.customer_id = si.customer_id
-    )
+    WHERE si.trial_at > NOW()
+      AND si.status IS DISTINCT FROM 'succeeded'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM ActiveSubscriptions a
+        WHERE a.customer_id = si.customer_id
+      )
+    ORDER BY si.customer_id, si.created_at DESC
   )
-  SELECT 
-    product_name as plan_name,
-    COUNT(*) as count
+  SELECT
+    product_name AS plan_name,
+    COUNT(*) AS count
   FROM (
     SELECT product_name, customer_id FROM ActiveSubscriptions
     UNION ALL
@@ -4108,6 +4307,41 @@ $$;
 
 
 ALTER FUNCTION "public"."enqueue_credit_usage_alert"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."enqueue_credit_usage_posthog_event"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  IF TG_OP <> 'INSERT' THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+
+  BEGIN
+    PERFORM pgmq.send(
+      'credit_usage_posthog',
+      jsonb_build_object(
+        'function_name', 'credit_usage_posthog',
+        'function_type', NULL,
+        'payload', jsonb_build_object(
+          'transaction_id', NEW.id,
+          'org_id', NEW.org_id,
+          'transaction_type', NEW.transaction_type,
+          'occurred_at', NEW.occurred_at
+        )
+      )
+    );
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'Failed to enqueue credit usage PostHog event for transaction %: %', NEW.id, SQLERRM;
+  END;
+
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."enqueue_credit_usage_posthog_event"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."exist_app_v2"("appid" character varying) RETURNS boolean
@@ -5567,6 +5801,10 @@ $$;
 ALTER FUNCTION "public"."get_identity_for_apikey_creation"() OWNER TO "postgres";
 
 
+COMMENT ON FUNCTION "public"."get_identity_for_apikey_creation"() IS 'Returns auth.uid() for JWT callers; API-key creation of API keys stays disabled even when org.create is granted.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."get_identity_org_allowed"("keymode" "public"."key_mode"[], "org_id" "uuid") RETURNS "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -5865,6 +6103,75 @@ $$;
 
 
 ALTER FUNCTION "public"."get_org_apikeys"("p_org_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."get_org_apps_with_last_upload"("p_org_id" "uuid", "p_search" "text" DEFAULT NULL::"text", "p_sort_by" "text" DEFAULT 'last_upload_at'::"text", "p_sort_desc" boolean DEFAULT true, "p_limit" integer DEFAULT 10, "p_offset" integer DEFAULT 0) RETURNS TABLE("created_at" timestamp with time zone, "app_id" character varying, "icon_url" character varying, "user_id" "uuid", "name" character varying, "last_version" character varying, "updated_at" timestamp with time zone, "id" "uuid", "retention" bigint, "owner_org" "uuid", "default_upload_channel" character varying, "transfer_history" "jsonb"[], "channel_device_count" bigint, "manifest_bundle_count" bigint, "expose_metadata" boolean, "allow_preview" boolean, "allow_device_custom_id" boolean, "need_onboarding" boolean, "existing_app" boolean, "ios_store_url" "text", "android_store_url" "text", "stats_updated_at" timestamp without time zone, "stats_refresh_requested_at" timestamp without time zone, "build_timeout_seconds" bigint, "build_timeout_updated_at" timestamp with time zone, "last_upload_at" timestamp with time zone, "total_count" bigint)
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+    v_limit integer := LEAST(GREATEST(COALESCE(p_limit, 10), 1), 100);
+    v_offset integer := GREATEST(COALESCE(p_offset, 0), 0);
+    v_search text := NULLIF(btrim(COALESCE(p_search, '')), '');
+    -- Whitelist sort keys to avoid dynamic-SQL injection via p_sort_by.
+    v_sort text := CASE
+        WHEN p_sort_by IN ('name', 'last_version', 'updated_at', 'created_at', 'last_upload_at')
+            THEN p_sort_by
+        ELSE 'last_upload_at'
+    END;
+    v_desc boolean := COALESCE(p_sort_desc, true);
+BEGIN
+    RETURN QUERY
+    WITH scoped AS (
+        SELECT
+            a.*,
+            lv.created_at AS last_upload_at
+        FROM public.apps a
+        LEFT JOIN LATERAL (
+            SELECT av.created_at
+            FROM public.app_versions av
+            WHERE av.app_id = a.app_id
+              AND av.name = a.last_version
+              AND av.deleted = false
+            ORDER BY av.created_at DESC
+            LIMIT 1
+        ) lv ON a.last_version IS NOT NULL
+        WHERE a.owner_org = p_org_id
+          AND (
+            v_search IS NULL
+            OR a.name ILIKE '%' || v_search || '%'
+            OR a.app_id ILIKE '%' || v_search || '%'
+          )
+    )
+    SELECT
+        s.*,
+        COUNT(*) OVER () AS total_count
+    FROM scoped s
+    ORDER BY
+        -- NULLS LAST in both directions so apps without uploads sort to the bottom.
+        CASE WHEN v_sort = 'last_upload_at' AND v_desc THEN s.last_upload_at END DESC NULLS LAST,
+        CASE WHEN v_sort = 'last_upload_at' AND NOT v_desc THEN s.last_upload_at END ASC NULLS LAST,
+        CASE WHEN v_sort = 'updated_at' AND v_desc THEN s.updated_at END DESC NULLS LAST,
+        CASE WHEN v_sort = 'updated_at' AND NOT v_desc THEN s.updated_at END ASC NULLS LAST,
+        CASE WHEN v_sort = 'created_at' AND v_desc THEN s.created_at END DESC NULLS LAST,
+        CASE WHEN v_sort = 'created_at' AND NOT v_desc THEN s.created_at END ASC NULLS LAST,
+        CASE WHEN v_sort = 'name' AND v_desc THEN s.name END DESC NULLS LAST,
+        CASE WHEN v_sort = 'name' AND NOT v_desc THEN s.name END ASC NULLS LAST,
+        CASE WHEN v_sort = 'last_version' AND v_desc THEN s.last_version END DESC NULLS LAST,
+        CASE WHEN v_sort = 'last_version' AND NOT v_desc THEN s.last_version END ASC NULLS LAST,
+        -- Stable tiebreaker so pagination is deterministic across pages.
+        s.app_id ASC
+    LIMIT v_limit
+    OFFSET v_offset;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_org_apps_with_last_upload"("p_org_id" "uuid", "p_search" "text", "p_sort_by" "text", "p_sort_desc" boolean, "p_limit" integer, "p_offset" integer) OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."get_org_apps_with_last_upload"("p_org_id" "uuid", "p_search" "text", "p_sort_by" "text", "p_sort_desc" boolean, "p_limit" integer, "p_offset" integer) IS 'Paginated apps for one org with a derived last_upload_at (created_at of the bundle matching apps.last_version). Returns the full apps row plus last_upload_at and total_count. SECURITY INVOKER so RLS on apps/app_versions enforces visibility; p_org_id is an indexed narrowing filter on top of RLS. Search/sort/pagination/total_count are computed in SQL so page order matches the displayed last-upload sort.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."get_org_build_time_unit"("p_org_id" "uuid", "p_start_date" "date", "p_end_date" "date") RETURNS TABLE("total_build_time_unit" bigint, "total_builds" bigint)
@@ -11724,6 +12031,21 @@ CREATE OR REPLACE FUNCTION "public"."rbac_perm_channel_update_settings"() RETURN
 ALTER FUNCTION "public"."rbac_perm_channel_update_settings"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."rbac_perm_org_create"() RETURNS "text"
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  SELECT 'org.create'::text
+$$;
+
+
+ALTER FUNCTION "public"."rbac_perm_org_create"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."rbac_perm_org_create"() IS 'Global API-key permission for creating a new organization before an org-scoped RBAC binding can exist.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."rbac_perm_org_create_app"() RETURNS "text"
     LANGUAGE "sql" IMMUTABLE
     SET "search_path" TO ''
@@ -15731,6 +16053,35 @@ $$;
 ALTER FUNCTION "public"."verify_mfa"() OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."apikey_global_permissions" (
+    "id" bigint NOT NULL,
+    "apikey_rbac_id" "uuid" NOT NULL,
+    "permission_key" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "granted_by" "uuid",
+    "reason" "text",
+    CONSTRAINT "apikey_global_permissions_permission_key_not_empty" CHECK (("permission_key" <> ''::"text"))
+);
+
+
+ALTER TABLE "public"."apikey_global_permissions" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."apikey_global_permissions" IS 'Global permissions for API keys where no org/app/channel target exists yet. Currently used to grandfather org creation for existing write-capable keys without granting it to future keys by default.';
+
+
+
+ALTER TABLE "public"."apikey_global_permissions" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "public"."apikey_global_permissions_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
 ALTER TABLE "public"."apikeys" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME "public"."apikeys_id_seq"
     START WITH 1
@@ -15855,6 +16206,20 @@ ALTER SEQUENCE "public"."audit_logs_id_seq" OWNER TO "postgres";
 
 ALTER SEQUENCE "public"."audit_logs_id_seq" OWNED BY "public"."audit_logs"."id";
 
+
+
+CREATE TABLE IF NOT EXISTS "public"."backfill_progress" (
+    "job_name" "text" NOT NULL,
+    "scope_key" "text" NOT NULL,
+    "cutover_at" timestamp with time zone NOT NULL,
+    "last_processed_occurred_at" timestamp with time zone,
+    "last_processed_id" bigint,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."backfill_progress" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."bandwidth_usage" (
@@ -16112,6 +16477,42 @@ COMMENT ON COLUMN "public"."channel_permission_overrides"."permission_key" IS 'R
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."compatibility_events" (
+    "id" bigint NOT NULL,
+    "org_id" "uuid" NOT NULL,
+    "app_id" "text" NOT NULL,
+    "source" "text" NOT NULL,
+    "platform" "text" NOT NULL,
+    "channel_id" bigint,
+    "channel_name" "text" NOT NULL,
+    "current_version_id" bigint,
+    "current_version_name" "text" NOT NULL,
+    "previous_version_id" bigint,
+    "previous_version_name" "text" NOT NULL,
+    "offenders" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "resolved_at" timestamp with time zone,
+    "resolved_by" "uuid",
+    "resolution_kind" "text",
+    "resolution_note" "text",
+    "change_occurred_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."compatibility_events" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."compatibility_events" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."compatibility_events_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."cron_tasks" (
     "id" integer NOT NULL,
     "name" "text" NOT NULL,
@@ -16313,6 +16714,27 @@ WITH ("autovacuum_vacuum_scale_factor"='0.05', "autovacuum_analyze_scale_factor"
 
 
 ALTER TABLE "public"."daily_storage" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."daily_storage_hourly" (
+    "app_id" character varying(255) NOT NULL,
+    "owner_org" "uuid" NOT NULL,
+    "date" "date" NOT NULL,
+    "storage_byte_hours" double precision DEFAULT 0 NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."daily_storage_hourly" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."daily_storage_hourly" IS 'Shadow daily storage-hour usage, recorded as byte-hours. This is intentionally not used for billing until storage-hour billing is explicitly enabled.';
+
+
+
+COMMENT ON COLUMN "public"."daily_storage_hourly"."storage_byte_hours" IS 'Byte-hour contribution for this UTC day.';
+
 
 
 CREATE SEQUENCE IF NOT EXISTS "public"."daily_storage_id_seq"
@@ -16928,7 +17350,9 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
     "has_usage_credits" boolean DEFAULT false NOT NULL,
     "website" "text",
     "stats_refresh_requested_at" timestamp without time zone,
+    "onboarding" "jsonb" DEFAULT '{"intent": "unknown"}'::"jsonb" NOT NULL,
     CONSTRAINT "orgs_max_apikey_expiration_days_valid" CHECK ((("max_apikey_expiration_days" IS NULL) OR (("max_apikey_expiration_days" >= 1) AND ("max_apikey_expiration_days" <= 365)))),
+    CONSTRAINT "orgs_onboarding_valid" CHECK ((("jsonb_typeof"("onboarding") = 'object'::"text") AND ((NOT ("onboarding" ? 'intent'::"text")) OR (("onboarding" ->> 'intent'::"text") = ANY (ARRAY['unknown'::"text", 'ota'::"text", 'builder'::"text", 'both'::"text", 'exploring'::"text"]))))),
     CONSTRAINT "orgs_password_policy_config_min_length_check" CHECK ((("password_policy_config" IS NULL) OR (("jsonb_typeof"("password_policy_config") = 'object'::"text") AND ((NOT ("password_policy_config" ? 'min_length'::"text")) OR (("jsonb_typeof"(("password_policy_config" -> 'min_length'::"text")) = 'number'::"text") AND ((("password_policy_config" ->> 'min_length'::"text"))::numeric = "trunc"((("password_policy_config" ->> 'min_length'::"text"))::numeric)) AND (((("password_policy_config" ->> 'min_length'::"text"))::numeric >= (6)::numeric) AND ((("password_policy_config" ->> 'min_length'::"text"))::numeric <= (72)::numeric))))))),
     CONSTRAINT "orgs_required_encryption_key_valid" CHECK ((("required_encryption_key" IS NULL) OR ("length"(("required_encryption_key")::"text") = ANY (ARRAY[20, 21]))))
 );
@@ -16976,6 +17400,10 @@ COMMENT ON COLUMN "public"."orgs"."use_new_rbac" IS 'Feature flag: when true, or
 
 
 COMMENT ON COLUMN "public"."orgs"."has_usage_credits" IS 'True only with positive, unexpired usage credits.';
+
+
+
+COMMENT ON COLUMN "public"."orgs"."onboarding" IS 'Onboarding answers (extensible JSONB). Currently: {"intent": unknown|ota|builder|both|exploring}. Used for segmentation and to tailor the org experience.';
 
 
 
@@ -17635,7 +18063,7 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
     "enable_notifications" boolean DEFAULT true NOT NULL,
     "opt_for_newsletters" boolean DEFAULT true NOT NULL,
     "ban_time" timestamp with time zone,
-    "email_preferences" "jsonb" DEFAULT '{"onboarding": true, "usage_limit": true, "credit_usage": true, "device_error": true, "weekly_stats": true, "monthly_stats": true, "bundle_created": true, "bundle_deployed": true, "deploy_stats_24h": true, "cli_realtime_feed": true, "billing_period_stats": true, "channel_self_rejected": true}'::"jsonb" NOT NULL,
+    "email_preferences" "jsonb" DEFAULT '{"onboarding": true, "usage_limit": true, "credit_usage": true, "device_error": true, "weekly_stats": true, "monthly_stats": true, "bundle_created": true, "bundle_deployed": true, "deploy_stats_24h": true, "cli_realtime_feed": true, "builder_onboarding": true, "bundle_incompatible": true, "billing_period_stats": true, "channel_self_rejected": true}'::"jsonb" NOT NULL,
     "created_via_invite" boolean DEFAULT false NOT NULL
 );
 
@@ -17643,7 +18071,7 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
 ALTER TABLE "public"."users" OWNER TO "postgres";
 
 
-COMMENT ON COLUMN "public"."users"."email_preferences" IS 'Per-user email notification preferences. Keys: usage_limit, credit_usage, onboarding, weekly_stats, monthly_stats, billing_period_stats, deploy_stats_24h, bundle_created, bundle_deployed, device_error, channel_self_rejected, cli_realtime_feed. Values are booleans.';
+COMMENT ON COLUMN "public"."users"."email_preferences" IS 'Per-user email notification preferences. Keys: usage_limit, credit_usage, onboarding, builder_onboarding, weekly_stats, monthly_stats, billing_period_stats, deploy_stats_24h, bundle_created, bundle_deployed, device_error, channel_self_rejected, cli_realtime_feed, bundle_incompatible. Values are booleans.';
 
 
 
@@ -17790,6 +18218,16 @@ ALTER TABLE ONLY "public"."usage_credit_transactions" ALTER COLUMN "id" SET DEFA
 
 
 
+ALTER TABLE ONLY "public"."apikey_global_permissions"
+    ADD CONSTRAINT "apikey_global_permissions_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."apikey_global_permissions"
+    ADD CONSTRAINT "apikey_global_permissions_rbac_permission_unique" UNIQUE ("apikey_rbac_id", "permission_key");
+
+
+
 ALTER TABLE ONLY "public"."apikeys"
     ADD CONSTRAINT "apikeys_pkey" PRIMARY KEY ("id");
 
@@ -17832,6 +18270,11 @@ ALTER TABLE ONLY "public"."apps"
 
 ALTER TABLE ONLY "public"."audit_logs"
     ADD CONSTRAINT "audit_logs_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."backfill_progress"
+    ADD CONSTRAINT "backfill_progress_pkey" PRIMARY KEY ("job_name", "scope_key");
 
 
 
@@ -17885,6 +18328,11 @@ ALTER TABLE ONLY "public"."channels"
 
 
 
+ALTER TABLE ONLY "public"."compatibility_events"
+    ADD CONSTRAINT "compatibility_events_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."cron_tasks"
     ADD CONSTRAINT "cron_tasks_name_key" UNIQUE ("name");
 
@@ -17912,6 +18360,11 @@ ALTER TABLE ONLY "public"."daily_mau"
 
 ALTER TABLE ONLY "public"."daily_revenue_metrics"
     ADD CONSTRAINT "daily_revenue_metrics_pkey" PRIMARY KEY ("date_id", "customer_id");
+
+
+
+ALTER TABLE ONLY "public"."daily_storage_hourly"
+    ADD CONSTRAINT "daily_storage_hourly_pkey" PRIMARY KEY ("app_id", "date");
 
 
 
@@ -18353,6 +18806,10 @@ CREATE INDEX "idx_app_versions_retention_cleanup" ON "public"."app_versions" USI
 
 
 
+CREATE INDEX "idx_apps_default_upload_channel" ON "public"."apps" USING "btree" ("default_upload_channel");
+
+
+
 CREATE INDEX "idx_audit_logs_created_at" ON "public"."audit_logs" USING "btree" ("created_at" DESC);
 
 
@@ -18366,6 +18823,10 @@ CREATE INDEX "idx_audit_logs_org_created" ON "public"."audit_logs" USING "btree"
 
 
 CREATE INDEX "idx_audit_logs_org_id" ON "public"."audit_logs" USING "btree" ("org_id");
+
+
+
+CREATE INDEX "idx_audit_logs_record_id" ON "public"."audit_logs" USING "btree" ("record_id");
 
 
 
@@ -18429,6 +18890,14 @@ CREATE INDEX "idx_channels_public_app_id_ios" ON "public"."channels" USING "btre
 
 
 
+CREATE INDEX "idx_compatibility_events_app_created" ON "public"."compatibility_events" USING "btree" ("app_id", "created_at" DESC);
+
+
+
+CREATE INDEX "idx_compatibility_events_unresolved" ON "public"."compatibility_events" USING "btree" ("app_id") WHERE ("resolved_at" IS NULL);
+
+
+
 CREATE INDEX "idx_cron_tasks_enabled" ON "public"."cron_tasks" USING "btree" ("enabled") WHERE ("enabled" = true);
 
 
@@ -18438,6 +18907,14 @@ CREATE INDEX "idx_daily_build_time_app_date" ON "public"."daily_build_time" USIN
 
 
 CREATE INDEX "idx_daily_mau_app_id_date" ON "public"."daily_mau" USING "btree" ("app_id", "date");
+
+
+
+CREATE INDEX "idx_daily_storage_hourly_date" ON "public"."daily_storage_hourly" USING "btree" ("date");
+
+
+
+CREATE INDEX "idx_daily_storage_hourly_owner_org_date" ON "public"."daily_storage_hourly" USING "btree" ("owner_org", "date");
 
 
 
@@ -18482,6 +18959,14 @@ CREATE INDEX "idx_id_app_id_app_versions_meta" ON "public"."app_versions_meta" U
 
 
 CREATE INDEX "idx_manifest_app_version_id" ON "public"."manifest" USING "btree" ("app_version_id");
+
+
+
+CREATE INDEX "idx_manifest_file_hash" ON "public"."manifest" USING "btree" ("file_hash");
+
+
+
+CREATE INDEX "idx_manifest_file_name" ON "public"."manifest" USING "btree" ("file_name");
 
 
 
@@ -18545,6 +19030,10 @@ CREATE INDEX "idx_usage_credit_transactions_grant" ON "public"."usage_credit_tra
 
 
 
+CREATE INDEX "idx_usage_credit_transactions_org_id" ON "public"."usage_credit_transactions" USING "btree" ("org_id");
+
+
+
 CREATE INDEX "idx_usage_credit_transactions_org_time" ON "public"."usage_credit_transactions" USING "btree" ("org_id", "occurred_at" DESC);
 
 
@@ -18557,6 +19046,10 @@ CREATE INDEX "idx_usage_overage_events_metric" ON "public"."usage_overage_events
 
 
 
+CREATE INDEX "idx_usage_overage_events_org_id" ON "public"."usage_overage_events" USING "btree" ("org_id");
+
+
+
 CREATE INDEX "idx_usage_overage_events_org_time" ON "public"."usage_overage_events" USING "btree" ("org_id", "created_at" DESC);
 
 
@@ -18566,6 +19059,10 @@ CREATE INDEX "idx_user_password_compliance_user_org" ON "public"."user_password_
 
 
 CREATE INDEX "idx_users_email_preferences" ON "public"."users" USING "gin" ("email_preferences");
+
+
+
+CREATE INDEX "idx_version_meta_app_id_timestamp" ON "public"."version_meta" USING "btree" ("app_id", "timestamp");
 
 
 
@@ -18665,6 +19162,10 @@ CREATE UNIQUE INDEX "unique_app_version_positive" ON "public"."version_meta" USI
 
 
 
+CREATE UNIQUE INDEX "uq_compatibility_events_dedup" ON "public"."compatibility_events" USING "btree" ("app_id", "channel_id", "platform", "current_version_id", "previous_version_id", "change_occurred_at") NULLS NOT DISTINCT;
+
+
+
 CREATE UNIQUE INDEX "usage_credit_transactions_purchase_payment_intent_id_idx" ON "public"."usage_credit_transactions" USING "btree" ((("source_ref" ->> 'paymentIntentId'::"text"))) WHERE (("transaction_type" = 'purchase'::"public"."credit_transaction_type") AND (("source_ref" ->> 'paymentIntentId'::"text") IS NOT NULL));
 
 
@@ -18729,6 +19230,10 @@ CREATE OR REPLACE TRIGGER "audit_orgs_trigger" AFTER INSERT OR DELETE OR UPDATE 
 
 
 
+CREATE OR REPLACE TRIGGER "bind_creating_apikey_to_org_on_create" AFTER INSERT ON "public"."orgs" FOR EACH ROW EXECUTE FUNCTION "public"."bind_creating_apikey_to_org_on_create"();
+
+
+
 CREATE OR REPLACE TRIGGER "channel_device_count_enqueue" AFTER INSERT OR DELETE ON "public"."channel_devices" FOR EACH ROW EXECUTE FUNCTION "public"."enqueue_channel_device_counts"();
 
 
@@ -18750,6 +19255,10 @@ CREATE OR REPLACE TRIGGER "cleanup_onboarding_app_data_on_complete" AFTER UPDATE
 
 
 CREATE OR REPLACE TRIGGER "credit_usage_alert_on_transactions" AFTER INSERT ON "public"."usage_credit_transactions" FOR EACH ROW EXECUTE FUNCTION "public"."enqueue_credit_usage_alert"();
+
+
+
+CREATE OR REPLACE TRIGGER "credit_usage_posthog_on_transactions" AFTER INSERT ON "public"."usage_credit_transactions" FOR EACH ROW EXECUTE FUNCTION "public"."enqueue_credit_usage_posthog_event"();
 
 
 
@@ -18957,10 +19466,6 @@ CREATE OR REPLACE TRIGGER "record_deployment_history_trigger" AFTER UPDATE OF "v
 
 
 
-CREATE OR REPLACE TRIGGER "replicate_devices" AFTER INSERT OR DELETE OR UPDATE ON "public"."devices" FOR EACH ROW EXECUTE FUNCTION "public"."trigger_http_queue_post_to_function"('replicate_data', 'cloudflare');
-
-
-
 CREATE OR REPLACE TRIGGER "role_bindings_enforce_apikey_expiration_policy" BEFORE INSERT OR UPDATE OF "principal_type", "principal_id", "org_id", "expires_at" ON "public"."role_bindings" FOR EACH ROW EXECUTE FUNCTION "public"."enforce_apikey_role_binding_expiration_policy"();
 
 
@@ -19006,6 +19511,16 @@ CREATE OR REPLACE TRIGGER "update_apps_build_timeout_updated_at" BEFORE INSERT O
 
 
 CREATE OR REPLACE TRIGGER "update_webhooks_updated_at" BEFORE UPDATE ON "public"."webhooks" FOR EACH ROW EXECUTE FUNCTION "public"."update_webhook_updated_at"();
+
+
+
+ALTER TABLE ONLY "public"."apikey_global_permissions"
+    ADD CONSTRAINT "apikey_global_permissions_apikey_rbac_id_fkey" FOREIGN KEY ("apikey_rbac_id") REFERENCES "public"."apikeys"("rbac_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."apikey_global_permissions"
+    ADD CONSTRAINT "apikey_global_permissions_granted_by_fkey" FOREIGN KEY ("granted_by") REFERENCES "public"."users"("id") ON DELETE SET NULL;
 
 
 
@@ -19114,8 +19629,28 @@ ALTER TABLE ONLY "public"."channels"
 
 
 
+ALTER TABLE ONLY "public"."compatibility_events"
+    ADD CONSTRAINT "compatibility_events_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."compatibility_events"
+    ADD CONSTRAINT "compatibility_events_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."daily_build_time"
     ADD CONSTRAINT "daily_build_time_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."daily_storage_hourly"
+    ADD CONSTRAINT "daily_storage_hourly_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."daily_storage_hourly"
+    ADD CONSTRAINT "daily_storage_hourly_owner_org_fkey" FOREIGN KEY ("owner_org") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
 
 
 
@@ -19497,7 +20032,7 @@ CREATE POLICY "Allow insert for auth, api keys (write, all) (admin+)" ON "public
 
 
 
-CREATE POLICY "Allow insert org for user" ON "public"."orgs" FOR INSERT TO "authenticated" WITH CHECK (("created_by" = ( SELECT "auth"."uid"() AS "uid")));
+CREATE POLICY "Allow insert org for user" ON "public"."orgs" FOR INSERT TO "authenticated" WITH CHECK (("created_by" = ( SELECT "public"."get_identity_for_apikey_creation"() AS "get_identity_for_apikey_creation")));
 
 
 
@@ -19651,6 +20186,10 @@ CREATE POLICY "Allow read for auth (read+)" ON "public"."daily_storage" FOR SELE
 
 
 
+CREATE POLICY "Allow read for auth (read+)" ON "public"."daily_storage_hourly" FOR SELECT TO "anon", "authenticated" USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity_org_appid"('{read,upload,write,all}'::"public"."key_mode"[], "owner_org", "app_id"), "owner_org", "app_id", NULL::bigint));
+
+
+
 CREATE POLICY "Allow read for auth (read+)" ON "public"."daily_version" FOR SELECT TO "anon", "authenticated" USING ((EXISTS ( SELECT 1
    FROM "public"."apps"
   WHERE ((("apps"."app_id")::"text" = ("daily_version"."app_id")::"text") AND "public"."check_min_rights"('read'::"public"."user_min_right",
@@ -19765,6 +20304,10 @@ CREATE POLICY "Deny all" ON "public"."org_metrics_cache" USING (false) WITH CHEC
 
 
 
+CREATE POLICY "Deny all access" ON "public"."backfill_progress" USING (false) WITH CHECK (false);
+
+
+
 CREATE POLICY "Deny all access" ON "public"."cron_tasks" USING (false) WITH CHECK (false);
 
 
@@ -19801,6 +20344,14 @@ CREATE POLICY "Deny delete for org members" ON "public"."usage_overage_events" A
 
 
 
+CREATE POLICY "Deny delete on apikey_global_permissions" ON "public"."apikey_global_permissions" AS RESTRICTIVE FOR DELETE TO "anon", "authenticated" USING (false);
+
+
+
+CREATE POLICY "Deny delete on daily_storage_hourly" ON "public"."daily_storage_hourly" AS RESTRICTIVE FOR DELETE TO "anon", "authenticated" USING (false);
+
+
+
 CREATE POLICY "Deny delete on deploy history" ON "public"."deploy_history" FOR DELETE USING (false);
 
 
@@ -19821,6 +20372,18 @@ CREATE POLICY "Deny insert for org members" ON "public"."usage_overage_events" A
 
 
 
+CREATE POLICY "Deny insert on apikey_global_permissions" ON "public"."apikey_global_permissions" AS RESTRICTIVE FOR INSERT TO "anon", "authenticated" WITH CHECK (false);
+
+
+
+CREATE POLICY "Deny insert on daily_storage_hourly" ON "public"."daily_storage_hourly" AS RESTRICTIVE FOR INSERT TO "anon", "authenticated" WITH CHECK (false);
+
+
+
+CREATE POLICY "Deny select on apikey_global_permissions" ON "public"."apikey_global_permissions" AS RESTRICTIVE FOR SELECT TO "anon", "authenticated" USING (false);
+
+
+
 CREATE POLICY "Deny update for org members" ON "public"."usage_credit_consumptions" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
 
 
@@ -19834,6 +20397,14 @@ CREATE POLICY "Deny update for org members" ON "public"."usage_credit_transactio
 
 
 CREATE POLICY "Deny update for org members" ON "public"."usage_overage_events" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
+
+
+
+CREATE POLICY "Deny update on apikey_global_permissions" ON "public"."apikey_global_permissions" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
+
+
+
+CREATE POLICY "Deny update on daily_storage_hourly" ON "public"."daily_storage_hourly" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
 
 
 
@@ -19921,7 +20492,7 @@ CREATE POLICY "Prevent users from inserting manifest entries" ON "public"."manif
 
 
 
-CREATE POLICY "Prevent users from updating manifest entries" ON "public"."manifest" FOR UPDATE TO "authenticated" USING (false);
+CREATE POLICY "Prevent users from updating manifest entries" ON "public"."manifest" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
 
 
 
@@ -19945,6 +20516,9 @@ CREATE POLICY "Users can read own security status" ON "public"."user_security" F
 
 
 
+ALTER TABLE "public"."apikey_global_permissions" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."apikeys" ENABLE ROW LEVEL SECURITY;
 
 
@@ -19961,6 +20535,9 @@ ALTER TABLE "public"."apps" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."audit_logs" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."backfill_progress" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."bandwidth_usage" ENABLE ROW LEVEL SECURITY;
@@ -20031,6 +20608,25 @@ COMMENT ON POLICY "channel_permission_overrides_admin_update" ON "public"."chann
 ALTER TABLE "public"."channels" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."compatibility_events" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "compatibility_events_deny_delete" ON "public"."compatibility_events" AS RESTRICTIVE FOR DELETE TO "anon", "authenticated" USING (false);
+
+
+
+CREATE POLICY "compatibility_events_deny_insert" ON "public"."compatibility_events" AS RESTRICTIVE FOR INSERT TO "anon", "authenticated" WITH CHECK (false);
+
+
+
+CREATE POLICY "compatibility_events_deny_update" ON "public"."compatibility_events" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
+
+
+
+CREATE POLICY "compatibility_events_select" ON "public"."compatibility_events" FOR SELECT TO "authenticated" USING ("public"."rbac_check_permission"("public"."rbac_perm_app_read"(), "org_id", ("app_id")::character varying, NULL::bigint));
+
+
+
 ALTER TABLE "public"."cron_tasks" ENABLE ROW LEVEL SECURITY;
 
 
@@ -20047,6 +20643,9 @@ ALTER TABLE "public"."daily_revenue_metrics" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."daily_storage" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."daily_storage_hourly" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."daily_version" ENABLE ROW LEVEL SECURITY;
@@ -20818,7 +21417,23 @@ GRANT ALL ON FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") TO "s
 
 
 
+REVOKE ALL ON FUNCTION "public"."acknowledge_compatibility_event"("event_id" bigint, "note" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."acknowledge_compatibility_event"("event_id" bigint, "note" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."acknowledge_compatibility_event"("event_id" bigint, "note" "text") TO "authenticated";
+
+
+
 GRANT ALL ON FUNCTION "public"."aggregate_build_log_to_daily"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."apikey_has_current_org_create_capability"("p_apikey_rbac_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."apikey_has_current_org_create_capability"("p_apikey_rbac_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."apikey_has_global_permission"("p_apikey" "text", "p_permission_key" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."apikey_has_global_permission"("p_apikey" "text", "p_permission_key" "text") TO "service_role";
 
 
 
@@ -20873,6 +21488,11 @@ REVOKE ALL ON FUNCTION "public"."auto_apikey_name_by_id"() FROM PUBLIC;
 
 
 REVOKE ALL ON FUNCTION "public"."auto_owner_org_by_app_id"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."bind_creating_apikey_to_org_on_create"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."bind_creating_apikey_to_org_on_create"() TO "service_role";
 
 
 
@@ -21184,6 +21804,10 @@ REVOKE ALL ON FUNCTION "public"."enqueue_credit_usage_alert"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "public"."enqueue_credit_usage_posthog_event"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."exist_app_v2"("appid" character varying) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."exist_app_v2"("appid" character varying) TO "anon";
 GRANT ALL ON FUNCTION "public"."exist_app_v2"("appid" character varying) TO "authenticated";
@@ -21415,6 +22039,13 @@ GRANT ALL ON FUNCTION "public"."get_next_stats_update_date"("org" "uuid") TO "se
 REVOKE ALL ON FUNCTION "public"."get_org_apikeys"("p_org_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."get_org_apikeys"("p_org_id" "uuid") TO "service_role";
 GRANT ALL ON FUNCTION "public"."get_org_apikeys"("p_org_id" "uuid") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."get_org_apps_with_last_upload"("p_org_id" "uuid", "p_search" "text", "p_sort_by" "text", "p_sort_desc" boolean, "p_limit" integer, "p_offset" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."get_org_apps_with_last_upload"("p_org_id" "uuid", "p_search" "text", "p_sort_by" "text", "p_sort_desc" boolean, "p_limit" integer, "p_offset" integer) TO "service_role";
+GRANT ALL ON FUNCTION "public"."get_org_apps_with_last_upload"("p_org_id" "uuid", "p_search" "text", "p_sort_by" "text", "p_sort_desc" boolean, "p_limit" integer, "p_offset" integer) TO "anon";
+GRANT ALL ON FUNCTION "public"."get_org_apps_with_last_upload"("p_org_id" "uuid", "p_search" "text", "p_sort_by" "text", "p_sort_desc" boolean, "p_limit" integer, "p_offset" integer) TO "authenticated";
 
 
 
@@ -21861,6 +22492,7 @@ GRANT ALL ON FUNCTION "public"."is_paying_and_good_plan_org_action"("orgid" "uui
 REVOKE ALL ON FUNCTION "public"."is_paying_org"("orgid" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."is_paying_org"("orgid" "uuid") TO "service_role";
 GRANT ALL ON FUNCTION "public"."is_paying_org"("orgid" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."is_paying_org"("orgid" "uuid") TO "anon";
 
 
 
@@ -21892,6 +22524,7 @@ GRANT ALL ON FUNCTION "public"."is_storage_exceeded_by_org"("org_id" "uuid") TO 
 REVOKE ALL ON FUNCTION "public"."is_trial_org"("orgid" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."is_trial_org"("orgid" "uuid") TO "service_role";
 GRANT ALL ON FUNCTION "public"."is_trial_org"("orgid" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."is_trial_org"("orgid" "uuid") TO "anon";
 
 
 
@@ -22279,6 +22912,13 @@ GRANT ALL ON FUNCTION "public"."rbac_perm_channel_rollback_bundle"() TO "service
 GRANT ALL ON FUNCTION "public"."rbac_perm_channel_update_settings"() TO "anon";
 GRANT ALL ON FUNCTION "public"."rbac_perm_channel_update_settings"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."rbac_perm_channel_update_settings"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."rbac_perm_org_create"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."rbac_perm_org_create"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."rbac_perm_org_create"() TO "anon";
+GRANT ALL ON FUNCTION "public"."rbac_perm_org_create"() TO "authenticated";
 
 
 
@@ -22978,6 +23618,16 @@ GRANT ALL ON FUNCTION "public"."verify_mfa"() TO "service_role";
 
 
 
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."apikey_global_permissions" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."apikey_global_permissions_id_seq" TO "anon";
+GRANT ALL ON SEQUENCE "public"."apikey_global_permissions_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."apikey_global_permissions_id_seq" TO "service_role";
+
+
+
 GRANT ALL ON SEQUENCE "public"."apikeys_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."apikeys_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."apikeys_id_seq" TO "service_role";
@@ -23016,6 +23666,10 @@ GRANT SELECT ON TABLE "public"."audit_logs" TO "anon";
 
 GRANT ALL ON SEQUENCE "public"."audit_logs_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."audit_logs_id_seq" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."backfill_progress" TO "service_role";
 
 
 
@@ -23085,6 +23739,18 @@ GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public".
 
 
 
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."compatibility_events" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."compatibility_events" TO "authenticated";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."compatibility_events" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."compatibility_events_id_seq" TO "anon";
+GRANT ALL ON SEQUENCE "public"."compatibility_events_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."compatibility_events_id_seq" TO "service_role";
+
+
+
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."cron_tasks" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."cron_tasks" TO "authenticated";
 GRANT ALL ON TABLE "public"."cron_tasks" TO "service_role";
@@ -23134,6 +23800,12 @@ GRANT ALL ON TABLE "public"."daily_revenue_metrics" TO "service_role";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_storage" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_storage" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_storage" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_storage_hourly" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_storage_hourly" TO "authenticated";
+GRANT ALL ON TABLE "public"."daily_storage_hourly" TO "service_role";
 
 
 

@@ -32,7 +32,11 @@ extend-exclude = [
   # Database and Supabase
   "supabase/.branches/",
   "supabase/.temp/",
+  "supabase/migrations/20260528113224_missing_indexs.sql",
   "supabase/schemas/prod.sql",
+  # Keep this committed migration filename stable even though it contains
+  # "indexs"; the migration timestamp is already part of history.
+  "supabase/migrations/20260528113224_missing_indexs.sql",
 
   # Assets and data files
   "*.json",
@@ -67,4 +71,8 @@ extend-exclude = [
 capgo = "capgo"
 forgr = "forgr"
 supabase = "supabase"
+ALS = "ALS" # AsyncLocalStorage abbreviation (used in CLI perf-tracking spec)
+UDID = "UDID" # Apple's "Unique Device IDentifier" — distinct from UUID, used in Developer Portal walkthroughs.
+unparseable = "unparseable" # Valid English synonym of "unparsable".
+CIPS = "CIPS" # real App Store Connect session role value (ASC key helper)
 # Add more project-specific terms as needed

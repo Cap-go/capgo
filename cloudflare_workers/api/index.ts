@@ -1,6 +1,7 @@
 import { app as accept_invitation } from '../../supabase/functions/_backend/private/accept_invitation.ts'
 import { app as admin_credits } from '../../supabase/functions/_backend/private/admin_credits.ts'
 import { app as admin_stats } from '../../supabase/functions/_backend/private/admin_stats.ts'
+import { app as channel_device } from '../../supabase/functions/_backend/private/channel_device.ts'
 import { app as channel_stats } from '../../supabase/functions/_backend/private/channel_stats.ts'
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
 import { app as configBuilder } from '../../supabase/functions/_backend/private/config_builder.ts'
@@ -108,6 +109,7 @@ appPrivate.route('/config', config)
 appPrivate.route('/config/builder', configBuilder)
 appPrivate.route('/accept_invitation', accept_invitation)
 appPrivate.route('/devices', devices_priv)
+appPrivate.route('/channel_device', channel_device)
 appPrivate.route('/log_as', log_as)
 appPrivate.route('/invite_new_user_to_org', invite_new_user_to_org)
 appPrivate.route('/invite_existing_user_to_org', invite_existing_user_to_org)

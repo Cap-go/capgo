@@ -12,8 +12,38 @@ on:
 permissions: {}
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    name: Resolve deploy scope
+    permissions:
+      contents: read
+    outputs:
+      api: ${{ steps.scope.outputs.api }}
+      files: ${{ steps.scope.outputs.files }}
+      plugins: ${{ steps.scope.outputs.plugins }}
+      supabase: ${{ steps.scope.outputs.supabase }}
+      translation: ${{ steps.scope.outputs.translation }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Resolve deploy scope
+        id: scope
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: bun scripts/deploy-scope.ts "$REF_NAME" >> "$GITHUB_OUTPUT"
+
   # Tests already passed before tag was created, so just build and deploy
   supabase_deploy:
+    needs: changes
+    if: ${{ needs.changes.outputs.supabase == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     name: Build code and deploy to Supabase
@@ -74,7 +104,8 @@ jobs:
         run: supabase functions deploy
 
   deploy_webapp:
-    needs: supabase_deploy
+    needs: [changes, supabase_deploy]
+    if: ${{ always() && needs.changes.result == 'success' && (needs.supabase_deploy.result == 'success' || needs.supabase_deploy.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -144,7 +175,8 @@ jobs:
           prerelease: ${{ contains(github.ref, '-alpha.') }}
 
   deploy_api:
-    needs: supabase_deploy
+    needs: [changes, supabase_deploy]
+    if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.api == 'true' && (needs.supabase_deploy.result == 'success' || needs.supabase_deploy.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -173,7 +205,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   deploy_translation_worker:
-    needs: deploy_api
+    needs: [changes, supabase_deploy]
+    if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.translation == 'true' && (needs.supabase_deploy.result == 'success' || (needs.supabase_deploy.result == 'skipped' && needs.changes.outputs.supabase != 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -202,7 +235,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   deploy_files:
-    needs: supabase_deploy
+    needs: [changes, supabase_deploy]
+    if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.files == 'true' && (needs.supabase_deploy.result == 'success' || needs.supabase_deploy.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -231,7 +265,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   deploy_plugin_regions:
-    needs: supabase_deploy
+    needs: [changes, supabase_deploy]
+    if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.plugins == 'true' && (needs.supabase_deploy.result == 'success' || needs.supabase_deploy.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:

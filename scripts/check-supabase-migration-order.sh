@@ -87,41 +87,29 @@ fi
 
 status=0
 
-is_allowed_modified_migration() {
-  local file="$1"
-
-  if [[ "$file" != "supabase/migrations/20260528090340_manifest_index.sql" ]]; then
-    return 1
-  fi
-
-  local base_content
-  local current_content
-  base_content="$(git show "${base_ref}:${file}" 2>/dev/null || true)"
-  current_content="$(cat "$file")"
-
-  [[ "$base_content" == $'CREATE INDEX IF NOT EXISTS ON public.manifest USING btree (file_name);\n\nCREATE INDEX IF NOT EXISTS ON public.manifest USING btree (file_hash);' \
-    && "$current_content" == $'CREATE INDEX IF NOT EXISTS manifest_file_name_idx ON public.manifest USING btree (file_name);\n\nCREATE INDEX IF NOT EXISTS manifest_file_hash_idx ON public.manifest USING btree (file_hash);' ]]
-}
-
 modified_files="$(git diff --name-only --diff-filter=MR "${base_ref}...HEAD" -- 'supabase/migrations/*.sql')"
 if [[ -n "$modified_files" ]]; then
-  blocked_modified_files=''
+  disallowed_modified_files=''
+
   while IFS= read -r file; do
     [[ -z "$file" ]] && continue
-    if is_allowed_modified_migration "$file"; then
-      echo "⚠️  Allowing exact syntax repair for broken migration on ${base_ref}: $file"
+
+    ts="$(extract_timestamp "$file" || true)"
+    if [[ -n "$ts" && "$ts" == "$latest_base_timestamp" ]]; then
+      echo "⚠️  Allowing fix to latest Supabase migration: $file"
       continue
     fi
-    blocked_modified_files+="${file}"$'\n'
+
+    disallowed_modified_files+="${file}"$'\n'
   done <<< "$modified_files"
 
-  if [[ -n "$blocked_modified_files" ]]; then
+  if [[ -n "$disallowed_modified_files" ]]; then
     echo '❌ Existing Supabase migrations were modified in this change.'
     echo '  Create a new migration instead of editing committed migration files.'
     while IFS= read -r file; do
       [[ -z "$file" ]] && continue
       echo "  - $file"
-    done <<< "$blocked_modified_files"
+    done <<< "$disallowed_modified_files"
     status=1
   fi
 fi

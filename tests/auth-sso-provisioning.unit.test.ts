@@ -90,6 +90,7 @@ function createTestContext() {
   const mockCreateSignedImageUrl = vi.fn(async (value: string) => value)
   const mockGetPlans = vi.fn(async () => [])
   const mockIsPlatformAdmin = vi.fn(async () => false)
+  const mockSetWebsitePaidUserCookie = vi.fn()
   const mockFetch = vi.fn<(...args: unknown[]) => Promise<MockFetchResponse>>(async () => ({
     ok: true,
     json: async () => ({ success: true }),
@@ -109,6 +110,7 @@ function createTestContext() {
     mockRpc,
     mockSendEvent,
     mockSetUser,
+    mockSetWebsitePaidUserCookie,
     mockGetSession,
     mockSignOut,
     organizationStore,
@@ -150,6 +152,11 @@ vi.mock('~/services/storage', () => ({
 
 vi.mock('~/services/tracking', () => ({
   sendEvent: (...args: unknown[]) => getContext().mockSendEvent(...args),
+}))
+
+vi.mock('~/services/websiteAuthCookie', () => ({
+  clearWebsitePaidUserCookie: vi.fn(),
+  setWebsitePaidUserCookie: (isPaidUser: boolean) => getContext().mockSetWebsitePaidUserCookie(isPaidUser),
 }))
 
 vi.mock('~/services/supabase', () => ({
@@ -346,6 +353,25 @@ describe('auth guard SSO provisioning', () => {
       expect(next).not.toHaveBeenCalledWith(expect.objectContaining({
         path: '/accountDisabled',
       }))
+    })
+  })
+
+  it.concurrent('sets the website paid user cookie for platform admins after login', async () => {
+    await withTestContext(async (context) => {
+      context.mockIsPlatformAdmin.mockResolvedValue(true)
+
+      const guard = await getGuard()
+      const next = vi.fn()
+
+      await guard(
+        { path: '/dashboard', fullPath: '/dashboard', meta: { middleware: 'auth' }, query: {} },
+        { path: '/login', fullPath: '/login', meta: {}, query: {} },
+        next,
+      )
+
+      expect(context.mockSetWebsitePaidUserCookie).toHaveBeenCalledWith(true)
+      expect(context.mainStore.isAdmin).toBe(true)
+      expect(next).toHaveBeenCalledWith()
     })
   })
 

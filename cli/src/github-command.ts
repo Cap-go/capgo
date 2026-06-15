@@ -1,5 +1,6 @@
 import process, { exit, stdout } from 'node:process'
 import { intro, log, outro, spinner as spinnerC } from '@clack/prompts'
+import { trackEvent } from './analytics/track'
 import { defaultStarRepo, starAllRepositories, StarAllRepositoriesAbortedError, starRepository } from './github'
 import { formatError } from './utils'
 
@@ -10,6 +11,7 @@ export function starRepositoryCommand(repository?: string) {
   }
   else {
     log.success(`🙏 Thanks for starring ${fullRepo} 🎉`)
+    void trackEvent({ channel: 'cli-usage', event: 'Repo Starred', icon: '⭐', tags: { repo_count: 1 } })
   }
 }
 
@@ -121,6 +123,8 @@ export async function starAllRepositoriesCommand(repositories: string[], options
     const starredCount = result.filter(entry => entry.status === 'starred').length
     const alreadyStarredCount = result.filter(entry => entry.status === 'already_starred').length
     const failedCount = result.filter(entry => entry.status === 'failed').length
+    if (starredCount > 0)
+      void trackEvent({ channel: 'cli-usage', event: 'Repo Starred', icon: '⭐', tags: { repo_count: starredCount } })
     const completionMessage = !hasResult
       ? 'No repositories were processed.'
       : `Completed ${result.length} repository(s): ${starredCount} starred, ${alreadyStarredCount} already starred, ${failedCount} failed.`

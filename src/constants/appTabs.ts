@@ -1,6 +1,7 @@
 import type { Tab } from '~/components/comp_def'
 import IconBell from '~icons/heroicons/bell-alert'
 import IconChart from '~icons/heroicons/chart-bar'
+import IconCompatibility from '~icons/heroicons/check-circle'
 import IconHistory from '~icons/heroicons/clock'
 import IconCog from '~icons/heroicons/cog-6-tooth'
 import IconCube from '~icons/heroicons/cube'
@@ -17,6 +18,7 @@ export const appTabs: Tab[] = [
   { label: 'devices', icon: IconDevice, key: '/devices' },
   { label: 'notifications', icon: IconBell, key: '/notifications' },
   { label: 'logs', icon: IconHistory, key: '/logs' },
+  { label: 'compatibility', icon: IconCompatibility, key: '/compatibility' },
   { label: 'builds', icon: IconBuild, key: '/builds' },
   { label: 'access', icon: IconShield, key: '/access' },
 ]

@@ -3,7 +3,7 @@ title: 📱 app
 description: "📱 Manage your Capgo app settings and configurations in Capgo Cloud."
 sidebar_label: app
 sidebar:
-  order: 8
+  order: 9
 ---
 
 📱 Manage your Capgo app settings and configurations in Capgo Cloud.
@@ -154,6 +154,8 @@ npx @capgo/cli@latest app set com.example.app --name "Updated App" --retention 3
 | **-a** | <code>string</code> | API key to link to your account |
 | **-r** | <code>string</code> | Days to keep old bundles (0 = infinite, default: 0) |
 | **--expose-metadata** | <code>string</code> | Expose bundle metadata (link and comment) to the plugin (true/false, default: false) |
+| **--preview** | <code>boolean</code> | Enable bundle and channel preview QR codes for this app |
+| **--no-preview** | <code>boolean</code> | Disable bundle and channel preview QR codes for this app |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 

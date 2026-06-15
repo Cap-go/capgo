@@ -13,6 +13,7 @@ const baseBuild = {
   platform: 'ios',
   build_mode: 'release',
   owner_org: 'org-uuid-1',
+  requested_by: 'user-uuid-1',
 }
 
 function fakeContext() {
@@ -40,10 +41,11 @@ describe('emitBuildTransitionEvent', () => {
       channel: 'build-lifecycle',
       icon: '⏳',
       notify: false,
-      user_id: 'org-uuid-1',
+      user_id: 'user-uuid-1',
       groups: { organization: 'org-uuid-1' },
       tags: {
         app_id: 'com.example.app',
+        org_id: 'org-uuid-1',
         platform: 'ios',
         build_mode: 'release',
       },

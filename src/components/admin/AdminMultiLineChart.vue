@@ -12,11 +12,10 @@ import {
   PointElement,
   Tooltip,
 } from 'chart.js'
-import dayjs from 'dayjs'
 import { computed } from 'vue'
 import { Line } from 'vue-chartjs'
 import { createChartColorWithOpacity, resolveAccessibleChartColor } from '~/services/chartConfig'
-import { formatLocalDate } from '~/services/date'
+import { formatLocalDate, formatLocalMonthYear } from '~/services/date'
 
 interface DataSeries {
   label: string
@@ -63,9 +62,9 @@ const isDark = useDark()
 
 function formatChartDate(date: string) {
   if (props.dateGranularity === 'month') {
-    const parsed = dayjs(date)
-    if (parsed.isValid())
-      return parsed.format('MMM YYYY')
+    const formattedMonth = formatLocalMonthYear(date)
+    if (formattedMonth)
+      return formattedMonth
   }
   return formatLocalDate(date) || date
 }
@@ -141,8 +140,14 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
       position: 'bottom',
       labels: {
         color: isDark.value ? '#d1d5db' : '#4b5563',
+        boxHeight: 10,
+        boxWidth: 10,
+        font: {
+          size: 12,
+          weight: 500,
+        },
+        padding: 18,
         usePointStyle: true,
-        padding: 15,
       },
     },
     tooltip: {

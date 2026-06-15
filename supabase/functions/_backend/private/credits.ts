@@ -64,6 +64,8 @@ interface CostCalculationResponse {
 interface StartTopUpRequest {
   orgId: string
   quantity?: number
+  datafastVisitorId?: string
+  datafastSessionId?: string
 }
 
 interface CompleteTopUpRequest {
@@ -565,6 +567,10 @@ app.post('/start-top-up', middlewareAuth, async (c) => {
     successUrl,
     cancelUrl,
     body.orgId,
+    {
+      visitorId: body.datafastVisitorId,
+      sessionId: body.datafastSessionId,
+    },
   )
 
   return c.json({ url: checkout.url })

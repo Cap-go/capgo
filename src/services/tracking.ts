@@ -29,6 +29,14 @@ interface TrackOptions {
    */
   user_id?: string
   /**
+   * Organization ID for actor-scoped tracking.
+   */
+  org_id?: string
+  /**
+   * Tracking payload contract version.
+   */
+  tracking_version?: number
+  /**
    * Event icon (emoji)
    * must be a single emoji
    * example: "🎉"

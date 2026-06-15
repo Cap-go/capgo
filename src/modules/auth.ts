@@ -2,11 +2,13 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { NavigationGuardNext, RouteLocationNormalized } from 'vue-router'
 import type { UserModule } from '~/types'
 import { hideLoader } from '~/services/loader'
+import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { setUser } from '~/services/posthog'
 import { isSsoUser, provisionSsoUser } from '~/services/ssoProvisioning'
 import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
+import { clearWebsitePaidUserCookie, setWebsitePaidUserCookie } from '~/services/websiteAuthCookie'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 import { hasPendingInviteSkip } from '~/utils/pendingInviteSkip'
@@ -215,6 +217,8 @@ async function guard(
   function shouldRedirectToPendingInviteOnboarding(organizationsLoaded: boolean) {
     if (!organizationsLoaded)
       return false
+    if (isNativeAppStoreContext())
+      return false
     if (to.path.startsWith('/onboarding/invitation'))
       return false
     if (hasPendingInviteSkip(sessionUser?.id ?? main.auth?.id))
@@ -291,6 +295,8 @@ async function guard(
     if (organizationsLoaded && isAdminRoute) {
       try {
         main.isAdmin = await isPlatformAdmin()
+        if (main.isAdmin)
+          setWebsitePaidUserCookie(true)
       }
       catch (error) {
         console.error('Failed to resolve platform admin status:', error)
@@ -316,6 +322,8 @@ async function guard(
     try {
       // isPlatformAdmin() is the only frontend admin-rights source.
       main.isAdmin = await isPlatformAdmin()
+      if (main.isAdmin)
+        setWebsitePaidUserCookie(true)
     }
     catch (error) {
       console.error('Failed to resolve platform admin status:', error)
@@ -385,6 +393,8 @@ async function guard(
       try {
         // Re-check via the single approved frontend path for admin-rights.
         main.isAdmin = await isPlatformAdmin()
+        if (main.isAdmin)
+          setWebsitePaidUserCookie(true)
       }
       catch (error) {
         console.error('Failed to resolve platform admin status:', error)
@@ -408,6 +418,21 @@ async function guard(
 }
 
 export const install: UserModule = ({ router }) => {
+  const supabase = useSupabase()
+  supabase.auth.getSession()
+    .then(({ data }) => {
+      if (!data.session)
+        clearWebsitePaidUserCookie()
+    })
+    .catch(error => console.error('Failed to clear website paid user cookie', error))
+
+  if (typeof supabase.auth.onAuthStateChange === 'function') {
+    supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session)
+        clearWebsitePaidUserCookie()
+    })
+  }
+
   router.beforeEach(async (to, from, next) => {
     if (to.meta.middleware) {
       await guard(next, to, from)

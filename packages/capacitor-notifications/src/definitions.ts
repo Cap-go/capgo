@@ -33,12 +33,15 @@ export interface CapgoNotificationRegistration {
   platform: CapgoNotificationPlatform
   permission: CapgoNotificationPermission
   eventProof: string
+  badgeRevision?: number
 }
 
 export interface CapgoNotificationEvent {
   appId?: string
   campaignId?: string
   notificationId?: string
+  eventId?: string
+  occurredAt?: string
   externalId?: string
   nativeInstallId?: string
   recipientKey?: string
@@ -47,6 +50,7 @@ export interface CapgoNotificationEvent {
   platform?: CapgoNotificationPlatform
   error?: string
   badge?: number
+  badgeRevision?: number
 }
 
 export interface CapgoPushNotificationSchema {
@@ -135,6 +139,13 @@ export interface CapgoUpdateCheckResult {
   error?: string
 }
 
+export interface CapgoNotificationSyncResult {
+  badge?: number
+  badgeRevision?: number
+  appliedBadge?: boolean
+  pendingEvents?: number
+}
+
 export interface CapgoNotificationsNativePlugin {
   checkPermissions: () => Promise<CapgoNotificationPermissionStatus>
   requestPermissions: () => Promise<CapgoNotificationPermissionStatus>
@@ -170,6 +181,7 @@ export interface CapgoNotificationsPlugin {
   setBadge: (count: number) => Promise<void>
   clearBadge: () => Promise<void>
   incrementBadge: (by?: number) => Promise<void>
+  sync: () => Promise<CapgoNotificationSyncResult>
   enableUpdaterIntegration: (options?: CapgoUpdaterIntegrationOptions) => Promise<void>
   runUpdateCheck: (options?: CapgoUpdaterIntegrationOptions) => Promise<CapgoUpdateCheckResult>
   trackReceived: (event?: CapgoNotificationEvent) => Promise<void>

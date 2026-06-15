@@ -2,4 +2,6 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <external-path name="my_images" path="." />
     <cache-path name="my_cache_images" path="." />
+    <!-- Covers @capgo/capacitor-pdf-generator (merged into this single FileProvider). -->
+    <cache-path name="pdf" path="." />
 </paths>

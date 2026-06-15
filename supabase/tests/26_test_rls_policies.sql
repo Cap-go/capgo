@@ -3,7 +3,7 @@
 BEGIN;
 
 -- Plan the number of tests
-SELECT plan(44);
+SELECT plan(46);
 
 -- Test app_versions policies
 SELECT
@@ -137,6 +137,20 @@ SELECT
             'Prevent non 2FA access'
         ],
         'orgs should have correct policies'
+    );
+
+-- Test apikey_global_permissions policies
+SELECT
+    policies_are(
+        'public',
+        'apikey_global_permissions',
+        ARRAY[
+            'Deny delete on apikey_global_permissions',
+            'Deny insert on apikey_global_permissions',
+            'Deny select on apikey_global_permissions',
+            'Deny update on apikey_global_permissions'
+        ],
+        'apikey_global_permissions should have correct restrictive policies'
     );
 
 -- Test devices policies
@@ -304,6 +318,26 @@ SELECT
             'Prevent users from updating manifest entries'
         ],
         'manifest should have correct policies'
+    );
+
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM pg_policies
+            WHERE
+                schemaname = 'public'
+                AND tablename = 'manifest'
+                AND policyname = 'Prevent users from updating manifest entries'
+                AND permissive = 'RESTRICTIVE'
+                AND cmd = 'UPDATE'
+                AND roles @> ARRAY['anon', 'authenticated']::name []
+                AND array_length(roles, 1) = 2
+                AND qual = 'false'
+                AND with_check = 'false'
+        ),
+        1::bigint,
+        'manifest update deny policy should match restrictive role shape'
     );
 
 -- Test deploy_history policies

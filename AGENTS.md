@@ -869,3 +869,24 @@ The deployment happens automatically after GitHub CI/CD on main branch.
 You are not allowed to deploy on your own, unless if asked. Same for git you
 never git push on main branch, add or commit unless asked.
 You can do it in others branches
+
+## Graphify
+
+The project-scoped Graphify skill lives at `.agents/skills/graphify/SKILL.md`.
+Use it for questions about architecture, file relationships, dead code, used
+code, and where code is used.
+
+Rules:
+- When the user types `/graphify`, follow the project skill before doing
+  anything else.
+- `graphify-out/graph.json` is committed and refreshed during release version
+  bumps. Prefer `graphify query "<question>"`, `graphify affected "<node>"`,
+  `graphify path "<A>" "<B>"`, or `graphify explain "<concept>"` before broad
+  source searches.
+- Use `bun run graphify:generate` to refresh the committed code graph. The
+  generator is deterministic AST/code extraction and does not require LLM API
+  keys.
+- For deterministic unused export checks, keep using `bun run lint:deadcode`
+  alongside Graphify's graph queries.
+- After code changes that should update the repository graph, run
+  `bun run graphify:generate` and commit the resulting `graphify-out/` changes.

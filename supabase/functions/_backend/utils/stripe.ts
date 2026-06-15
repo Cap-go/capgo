@@ -7,7 +7,7 @@ import { supabaseAdmin } from './supabase.ts'
 import { getEnv, isStripeConfigured } from './utils.ts'
 
 const ISO_COUNTRY_CODE_REGEX = /^[A-Z]{2}$/
-const TRAILING_SLASHES_REGEX = /\/+$/
+const TRAILING_SLASHES_REGEX = /\/+$/g
 
 // Checks if SUPABASE_URL points to a local instance
 function isLocalSupabase(c: Context): boolean {
@@ -471,6 +471,11 @@ export interface CreditCheckoutDetails {
   itemsSummary: CreditCheckoutItemSummary[]
 }
 
+export interface DatafastAttribution {
+  visitorId?: string | null
+  sessionId?: string | null
+}
+
 export interface StripeData {
   data: Database['public']['Tables']['stripe_info']['Insert']
   isUpgrade: boolean
@@ -498,14 +503,24 @@ export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { 
   return { priceId, productId }
 }
 
-export async function createCheckout(c: Context, customerId: string, recurrence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string, attributionId?: string) {
+function getDatafastAttributionMetadata(attribution?: DatafastAttribution): Record<string, string> {
+  return {
+    ...(attribution?.visitorId ? { datafast_visitor_id: attribution.visitorId } : {}),
+    ...(attribution?.sessionId ? { datafast_session_id: attribution.sessionId } : {}),
+  }
+}
+
+export async function createCheckout(c: Context, customerId: string, recurrence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string, attributionId?: string, datafastAttribution?: DatafastAttribution) {
   if (!isStripeConfigured(c))
     return { url: '' }
   const prices = await getPriceIds(c, planId, recurrence)
   cloudlog({ requestId: c.get('requestId'), message: 'prices', prices })
   if (!prices.priceId)
     return Promise.reject(new Error('Cannot find price'))
-  const metadata = attributionId ? { attribution_id: attributionId } : undefined
+  const metadata = {
+    ...(attributionId ? { attribution_id: attributionId } : {}),
+    ...getDatafastAttributionMetadata(datafastAttribution),
+  }
   const allowedSuccessUrl = getAllowedRedirectUrl(c, successUrl, 'success_url')
   const allowedCancelUrl = getAllowedRedirectUrl(c, cancelUrl, 'cancel_url')
   const session = await getStripe(c).checkout.sessions.create({
@@ -517,7 +532,7 @@ export async function createCheckout(c: Context, customerId: string, recurrence:
     cancel_url: allowedCancelUrl,
     automatic_tax: { enabled: true },
     client_reference_id: clientReferenceId,
-    metadata,
+    metadata: Object.keys(metadata).length ? metadata : undefined,
     customer_update: {
       address: 'auto',
       name: 'auto',
@@ -566,6 +581,7 @@ export async function createOneTimeCheckout(
   successUrl: string,
   cancelUrl: string,
   clientReferenceId?: string,
+  datafastAttribution?: DatafastAttribution,
 ) {
   if (!isStripeConfigured(c))
     return { url: '' }
@@ -611,6 +627,7 @@ export async function createOneTimeCheckout(
       productId,
       orgId: clientReferenceId ?? '',
       intendedQuantity: String(quantity),
+      ...getDatafastAttributionMetadata(datafastAttribution),
     },
   })
   return { url: session.url }
@@ -730,7 +747,7 @@ export async function createCustomer(c: Context, email: string, userId: string, 
   if (!isStripeConfigured(c)) {
     cloudlog({ requestId: c.get('requestId'), message: 'createCustomer no stripe key', email, userId, name })
     // create a fake customer id like stripe one and random id
-    const randomId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+    const randomId = crypto.randomUUID().replaceAll('-', '').slice(0, 24)
     return { id: `cus_${randomId}`, email, name, metadata }
   }
   const customer = await getStripe(c).customers.create({

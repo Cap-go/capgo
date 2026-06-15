@@ -12,8 +12,75 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
+      apikey_global_permissions: {
+        Row: {
+          apikey_rbac_id: string
+          created_at: string
+          granted_by: string | null
+          id: number
+          permission_key: string
+          reason: string | null
+        }
+        Insert: {
+          apikey_rbac_id: string
+          created_at?: string
+          granted_by?: string | null
+          id?: number
+          permission_key: string
+          reason?: string | null
+        }
+        Update: {
+          apikey_rbac_id?: string
+          created_at?: string
+          granted_by?: string | null
+          id?: number
+          permission_key?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apikey_global_permissions_apikey_rbac_id_fkey"
+            columns: ["apikey_rbac_id"]
+            isOneToOne: false
+            referencedRelation: "apikeys"
+            referencedColumns: ["rbac_id"]
+          },
+          {
+            foreignKeyName: "apikey_global_permissions_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apikeys: {
         Row: {
           created_at: string | null
@@ -393,6 +460,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      backfill_progress: {
+        Row: {
+          created_at: string
+          cutover_at: string
+          job_name: string
+          last_processed_id: number | null
+          last_processed_occurred_at: string | null
+          scope_key: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cutover_at: string
+          job_name: string
+          last_processed_id?: number | null
+          last_processed_occurred_at?: string | null
+          scope_key: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cutover_at?: string
+          job_name?: string
+          last_processed_id?: number | null
+          last_processed_occurred_at?: string | null
+          scope_key?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       bandwidth_usage: {
         Row: {
@@ -779,6 +876,84 @@ export type Database = {
           },
         ]
       }
+      compatibility_events: {
+        Row: {
+          app_id: string
+          change_occurred_at: string
+          channel_id: number | null
+          channel_name: string
+          created_at: string
+          current_version_id: number | null
+          current_version_name: string
+          id: number
+          offenders: Json
+          org_id: string
+          platform: string
+          previous_version_id: number | null
+          previous_version_name: string
+          resolution_kind: string | null
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          source: string
+        }
+        Insert: {
+          app_id: string
+          change_occurred_at?: string
+          channel_id?: number | null
+          channel_name: string
+          created_at?: string
+          current_version_id?: number | null
+          current_version_name: string
+          id?: never
+          offenders?: Json
+          org_id: string
+          platform: string
+          previous_version_id?: number | null
+          previous_version_name: string
+          resolution_kind?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          source: string
+        }
+        Update: {
+          app_id?: string
+          change_occurred_at?: string
+          channel_id?: number | null
+          channel_name?: string
+          created_at?: string
+          current_version_id?: number | null
+          current_version_name?: string
+          id?: never
+          offenders?: Json
+          org_id?: string
+          platform?: string
+          previous_version_id?: number | null
+          previous_version_name?: string
+          resolution_kind?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compatibility_events_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "compatibility_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cron_tasks: {
         Row: {
           batch_size: number | null
@@ -996,6 +1171,48 @@ export type Database = {
           storage?: number
         }
         Relationships: []
+      }
+      daily_storage_hourly: {
+        Row: {
+          app_id: string
+          created_at: string
+          date: string
+          owner_org: string
+          storage_byte_hours: number
+          updated_at: string
+        }
+        Insert: {
+          app_id: string
+          created_at?: string
+          date: string
+          owner_org: string
+          storage_byte_hours?: number
+          updated_at?: string
+        }
+        Update: {
+          app_id?: string
+          created_at?: string
+          date?: string
+          owner_org?: string
+          storage_byte_hours?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_storage_hourly_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "daily_storage_hourly_owner_org_fkey"
+            columns: ["owner_org"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       daily_version: {
         Row: {
@@ -1805,6 +2022,7 @@ export type Database = {
           management_email: string
           max_apikey_expiration_days: number | null
           name: string
+          onboarding: Json
           password_policy_config: Json | null
           require_apikey_expiration: boolean
           required_encryption_key: string | null
@@ -1829,6 +2047,7 @@ export type Database = {
           management_email: string
           max_apikey_expiration_days?: number | null
           name: string
+          onboarding?: Json
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
@@ -1853,6 +2072,7 @@ export type Database = {
           management_email?: string
           max_apikey_expiration_days?: number | null
           name?: string
+          onboarding?: Json
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
@@ -2985,6 +3205,18 @@ export type Database = {
     }
     Functions: {
       accept_invitation_to_org: { Args: { org_id: string }; Returns: string }
+      acknowledge_compatibility_event: {
+        Args: { event_id: number; note: string }
+        Returns: undefined
+      }
+      apikey_has_current_org_create_capability: {
+        Args: { p_apikey_rbac_id: string }
+        Returns: boolean
+      }
+      apikey_has_global_permission: {
+        Args: { p_apikey: string; p_permission_key: string }
+        Returns: boolean
+      }
       apikey_permission_for_keymode: {
         Args: {
           keymode: Database["public"]["Enums"]["key_mode"][]
@@ -3494,6 +3726,45 @@ export type Database = {
           name: string
           owner_email: string
           rbac_id: string
+          user_id: string
+        }[]
+      }
+      get_org_apps_with_last_upload: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_org_id: string
+          p_search?: string
+          p_sort_by?: string
+          p_sort_desc?: boolean
+        }
+        Returns: {
+          allow_device_custom_id: boolean
+          allow_preview: boolean
+          android_store_url: string
+          app_id: string
+          build_timeout_seconds: number
+          build_timeout_updated_at: string
+          channel_device_count: number
+          created_at: string
+          default_upload_channel: string
+          existing_app: boolean
+          expose_metadata: boolean
+          icon_url: string
+          id: string
+          ios_store_url: string
+          last_upload_at: string
+          last_version: string
+          manifest_bundle_count: number
+          name: string
+          need_onboarding: boolean
+          owner_org: string
+          retention: number
+          stats_refresh_requested_at: string
+          stats_updated_at: string
+          total_count: number
+          transfer_history: Json[]
+          updated_at: string
           user_id: string
         }[]
       }
@@ -4192,6 +4463,7 @@ export type Database = {
       rbac_perm_channel_read_history: { Args: never; Returns: string }
       rbac_perm_channel_rollback_bundle: { Args: never; Returns: string }
       rbac_perm_channel_update_settings: { Args: never; Returns: string }
+      rbac_perm_org_create: { Args: never; Returns: string }
       rbac_perm_org_create_app: { Args: never; Returns: string }
       rbac_perm_org_delete: { Args: never; Returns: string }
       rbac_perm_org_invite_user: { Args: never; Returns: string }
@@ -4668,6 +4940,8 @@ export type Database = {
         | "webview_unclean_restart"
         | "webview_render_process_gone"
         | "webview_content_process_terminated"
+        | "os_version_changed"
+        | "native_app_version_changed"
       stripe_status:
         | "created"
         | "succeeded"
@@ -4842,6 +5116,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth", "build_time"],
@@ -4937,6 +5214,8 @@ export const Constants = {
         "webview_unclean_restart",
         "webview_render_process_gone",
         "webview_content_process_terminated",
+        "os_version_changed",
+        "native_app_version_changed",
       ],
       stripe_status: [
         "created",

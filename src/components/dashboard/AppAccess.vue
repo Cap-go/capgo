@@ -13,6 +13,7 @@ import DataTable from '~/components/DataTable.vue'
 import RoleSelect from '~/components/forms/RoleSelect.vue'
 import SearchInput from '~/components/forms/SearchInput.vue'
 import RoleSelectionModal from '~/components/modals/RoleSelectionModal.vue'
+import { formatLocalDate } from '~/services/date'
 import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -524,7 +525,7 @@ onMounted(async () => {
 
       <template #granted_at="{ row }">
         <span class="text-sm text-gray-600">
-          {{ new Date(row.granted_at).toLocaleDateString() }}
+          {{ formatLocalDate(row.granted_at) }}
         </span>
       </template>
 

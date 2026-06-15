@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
-import { ref, watchEffect } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconAlertCircle from '~icons/lucide/alert-circle'
-import IconLock from '~icons/lucide/lock'
 import IconSettings from '~icons/lucide/settings'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
@@ -20,9 +19,22 @@ const loading = ref(true)
 const version = ref<Database['public']['Tables']['app_versions']['Row']>()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
 
-// Preview states
-type PreviewState = 'loading' | 'no-manifest' | 'preview-disabled' | 'encrypted' | 'ready'
+type PreviewState = 'loading' | 'preview-disabled' | 'ready'
 const previewState = ref<PreviewState>('loading')
+const browserPreviewUnavailableReason = computed<'missing-manifest' | 'encrypted' | null>(() => {
+  const currentVersion = version.value
+  if (!currentVersion)
+    return null
+  if (!currentVersion.manifest_count)
+    return 'missing-manifest'
+  if (currentVersion.session_key)
+    return 'encrypted'
+  return null
+})
+const browserPreviewAvailable = computed(() => {
+  const currentVersion = version.value
+  return !browserPreviewUnavailableReason.value && !!currentVersion
+})
 
 async function getVersion() {
   if (!id.value)
@@ -84,18 +96,6 @@ function determinePreviewState() {
     return
   }
 
-  // Check if bundle has manifest
-  if (!version.value.manifest_count || version.value.manifest_count === 0) {
-    previewState.value = 'no-manifest'
-    return
-  }
-
-  // Check if bundle is encrypted
-  if (version.value.session_key) {
-    previewState.value = 'encrypted'
-    return
-  }
-
   previewState.value = 'ready'
 }
 
@@ -153,33 +153,13 @@ watchEffect(async () => {
       </button>
     </div>
 
-    <!-- No Manifest State -->
-    <div v-else-if="previewState === 'no-manifest'" class="flex flex-col justify-center items-center min-h-[50vh]">
-      <IconAlertCircle class="w-16 h-16 mb-4 text-amber-500" />
-      <h2 class="text-xl font-semibold text-foreground">
-        {{ t('preview-not-available') }}
-      </h2>
-      <p class="mt-2 text-center text-muted-foreground max-w-md">
-        {{ t('preview-no-manifest') }}
-      </p>
-    </div>
-
-    <!-- Encrypted State -->
-    <div v-else-if="previewState === 'encrypted'" class="flex flex-col justify-center items-center min-h-[50vh]">
-      <IconLock class="w-16 h-16 mb-4 text-amber-500" />
-      <h2 class="text-xl font-semibold text-foreground">
-        {{ t('preview-encrypted') }}
-      </h2>
-      <p class="mt-2 text-center text-muted-foreground max-w-md">
-        {{ t('preview-encrypted-description') }}
-      </p>
-    </div>
-
     <!-- Ready State - Show Preview -->
-    <div v-else-if="previewState === 'ready'" class="w-full h-full">
+    <div v-else-if="previewState === 'ready'" class="h-full min-h-0 w-full overflow-y-auto">
       <BundlePreviewFrame
         :app-id="packageId"
         :version-id="id"
+        :browser-preview="browserPreviewAvailable"
+        :browser-preview-unavailable-reason="browserPreviewUnavailableReason"
       />
     </div>
   </div>

@@ -1,5 +1,6 @@
 import type { ChannelCurrentBundleOptions } from '../schemas/channel'
 import { intro, log } from '@clack/prompts'
+import { trackEvent, withSupabaseSource } from '../analytics/track'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
 import {
   createSupabaseClient,
@@ -49,12 +50,12 @@ export async function currentBundleInternal(channel: string, appId: string, opti
     throw new Error('Channel name missing')
   }
 
-  const { data: supabaseChannel, error } = await supabase
+  const { data: supabaseChannel, error } = await withSupabaseSource('channels.currentBundle', () => supabase
     .from('channels')
     .select('version ( name )')
     .eq('name', channel)
     .eq('app_id', appId)
-    .limit(1)
+    .limit(1))
 
   if (error || !supabaseChannel?.length) {
     if (!silent)
@@ -63,6 +64,9 @@ export async function currentBundleInternal(channel: string, appId: string, opti
   }
 
   const { version } = supabaseChannel[0] as Channel
+
+  void trackEvent({ channel: 'channel', event: 'Channel Current Bundle Viewed', icon: '📦', tags: { has_bundle: Boolean(version) } })
+
   if (!version) {
     if (!silent)
       log.error(`Error retrieving channel ${channel} for app ${appId}. Perhaps the channel does not exist?`)

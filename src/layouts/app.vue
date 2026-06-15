@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Tab } from '~/components/comp_def'
-import { computed, watchEffect } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PaymentRequiredModal from '~/components/PaymentRequiredModal.vue'
 import Tabs from '~/components/Tabs.vue'
@@ -13,17 +13,50 @@ import { useOrganizationStore } from '~/stores/organization'
 const router = useRouter()
 const route = useRoute()
 const organizationStore = useOrganizationStore()
+const isResolvingAppOrganization = ref(false)
 
-// Get the app ID from the route
+// Decoded app ID from the route. Use this for data lookups.
 const appId = computed(() => {
-  const match = route.path.match(/^\/app\/([^/]+)/)
-  return match ? match[1] : ''
+  if (!('app' in route.params))
+    return ''
+
+  const appParam = route.params.app
+  if (Array.isArray(appParam))
+    return appParam[0] ?? ''
+
+  return typeof appParam === 'string' ? appParam : ''
 })
 
-watchEffect(async () => {
-  if (appId.value)
-    await organizationStore.awaitInitialLoad()
+// Original encoded app route segment. Use this for URLs so tabs preserve
+// app IDs that contain reserved characters such as `/`.
+const appRouteSegment = computed(() => {
+  const match = route.path.match(/^\/app\/([^/]+)/)
+  return match ? match[1] : (appId.value ? encodeURIComponent(appId.value) : '')
 })
+
+watch(appId, async (targetAppId) => {
+  if (!targetAppId) {
+    isResolvingAppOrganization.value = false
+    return
+  }
+
+  isResolvingAppOrganization.value = true
+  try {
+    await organizationStore.awaitInitialLoad()
+    if (appId.value !== targetAppId)
+      return
+
+    const appOrganization = organizationStore.getOrgByAppId(targetAppId)
+    if (!appOrganization || organizationStore.currentOrganization?.gid === appOrganization.gid)
+      return
+
+    organizationStore.setCurrentOrganization(appOrganization.gid)
+  }
+  finally {
+    if (appId.value === targetAppId)
+      isResolvingAppOrganization.value = false
+  }
+}, { immediate: true })
 
 const appTabs = computed<Tab[]>(() => baseAppTabs)
 
@@ -39,7 +72,7 @@ const isOnInfoPage = computed(() => {
 
 // Show payment overlay only when org is unpaid AND not on info page
 const showPaymentOverlay = computed(() => {
-  return isOrgUnpaid.value && !isOnInfoPage.value
+  return !isResolvingAppOrganization.value && isOrgUnpaid.value && !isOnInfoPage.value
 })
 
 // Detect resource type from route (channel, device, or bundle)
@@ -62,7 +95,7 @@ const resourceId = computed(() => {
 
 // Generate tabs with full paths for the current app
 const tabs = computed<Tab[]>(() => {
-  if (!appId.value)
+  if (!appRouteSegment.value)
     return appTabs.value
 
   // Filter tabs when org is unpaid - only show info tab
@@ -72,7 +105,7 @@ const tabs = computed<Tab[]>(() => {
 
   return availableTabs.map(tab => ({
     ...tab,
-    key: tab.key ? `/app/${appId.value}${tab.key}` : `/app/${appId.value}`,
+    key: tab.key ? `/app/${appRouteSegment.value}${tab.key}` : `/app/${appRouteSegment.value}`,
   }))
 })
 
@@ -85,7 +118,7 @@ const tabsConfig: Record<string, Tab[]> = {
 
 // Generate secondary tabs with full paths for the current resource
 const secondaryTabs = computed<Tab[]>(() => {
-  if (!appId.value || !resourceId.value || !resourceType.value)
+  if (!appRouteSegment.value || !resourceId.value || !resourceType.value)
     return []
 
   const baseTabs = tabsConfig[resourceType.value] || []
@@ -93,8 +126,8 @@ const secondaryTabs = computed<Tab[]>(() => {
   return baseTabs.map(tab => ({
     ...tab,
     key: tab.key
-      ? `/app/${appId.value}/${resourceType.value}/${resourceId.value}${tab.key}`
-      : `/app/${appId.value}/${resourceType.value}/${resourceId.value}`,
+      ? `/app/${appRouteSegment.value}/${resourceType.value}/${resourceId.value}${tab.key}`
+      : `/app/${appRouteSegment.value}/${resourceType.value}/${resourceId.value}`,
   }))
 })
 
@@ -108,13 +141,13 @@ const parentTabMap: Record<string, string> = {
 const activeTab = computed(() => {
   const path = route.path.replace(/\/$/, '')
 
-  if (!appId.value)
+  if (!appRouteSegment.value)
     return tabs.value[0]?.key ?? ''
 
   // If on a resource detail page (bundle/channel/device), keep parent tab active
   if (resourceType.value) {
     const parentTab = parentTabMap[resourceType.value]
-    return `/app/${appId.value}/${parentTab}`
+    return `/app/${appRouteSegment.value}/${parentTab}`
   }
 
   // Prefer exact match.
@@ -133,7 +166,7 @@ const activeTab = computed(() => {
     .filter(({ tabKey }) => path.startsWith(`${tabKey}/`))
     .sort((a, b) => b.tabKey.length - a.tabKey.length)[0]
 
-  return prefixMatch?.t.key ?? `/app/${appId.value}`
+  return prefixMatch?.t.key ?? `/app/${appRouteSegment.value}`
 })
 
 const activeSecondaryTab = computed(() => {
@@ -145,7 +178,7 @@ const activeSecondaryTab = computed(() => {
     return path === tabKey
   })
 
-  return tab?.key ?? `/app/${appId.value}/${resourceType.value}/${resourceId.value}`
+  return tab?.key ?? `/app/${appRouteSegment.value}/${resourceType.value}/${resourceId.value}`
 })
 
 function handleTab(key: string) {
@@ -170,8 +203,8 @@ function handleSecondaryTab(key: string) {
     />
     <main class="relative flex flex-1 w-full min-h-0 mt-0 overflow-hidden bg-blue-50 dark:bg-slate-800/40">
       <div
-        class="flex-1 w-full min-h-0 mx-auto overflow-y-auto"
-        :class="{ 'blur-sm pointer-events-none select-none': showPaymentOverlay }"
+        class="flex-1 w-full min-h-0 mx-auto"
+        :class="showPaymentOverlay ? 'overflow-hidden blur-sm pointer-events-none select-none' : 'overflow-y-auto'"
       >
         <RouterView class="w-full" />
       </div>

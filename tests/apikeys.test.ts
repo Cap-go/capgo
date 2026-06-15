@@ -293,6 +293,56 @@ describe('[PUT] /apikey/:id operations', () => {
     expect(verifyData.name).toBe(newName)
   })
 
+  it.concurrent('updates api key role bindings', async () => {
+    let createData: { id: number, rbac_id: string } | undefined
+
+    try {
+      const createResponse = await fetch(`${BASE_URL}/apikey`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify(orgKeyBody('temp-key-update-bindings')),
+      })
+      expect(createResponse.status).toBe(200)
+      createData = await createResponse.json<{ id: number, rbac_id: string }>()
+
+      const appBindings = await appApiKeyBindings(APPNAME, 'app_reader')
+      const updateResponse = await fetch(`${BASE_URL}/apikey/${createData.id}`, {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify({
+          bindings: appBindings,
+        }),
+      })
+      expect(updateResponse.status).toBe(200)
+
+      const { data: bindings, error } = await getSupabaseClient()
+        .from('role_bindings')
+        .select('scope_type, app_id, roles(name)')
+        .eq('principal_type', 'apikey')
+        .eq('principal_id', createData.rbac_id)
+
+      expect(error).toBeNull()
+      const bindingRows = (bindings || []) as any[]
+      expect(bindingRows).toHaveLength(2)
+      expect(bindingRows).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          scope_type: 'app',
+          app_id: appBindings[0].app_id,
+          roles: expect.objectContaining({ name: 'app_reader' }),
+        }),
+        expect.objectContaining({
+          scope_type: 'org',
+          roles: expect.objectContaining({ name: 'apikey_org_reader' }),
+        }),
+      ]))
+    }
+    finally {
+      if (createData) {
+        await fetch(`${BASE_URL}/apikey/${createData.id}`, { method: 'DELETE', headers: authHeaders })
+      }
+    }
+  })
+
   it('update api key with invalid id', async () => {
     const response = await fetch(`${BASE_URL}/apikey/424242`, {
       method: 'PUT',

@@ -51,7 +51,8 @@ export async function loginInternal(apikey: string, options: Options, silent = f
   }
 
   const supabase = await createSupabaseClient(apikey, options.supaHost, options.supaAnon)
-  const userId = await resolveUserIdFromApiKey(supabase, apikey)
+  // Validates the key; under v2 the backend derives the actor user_id from it.
+  await resolveUserIdFromApiKey(supabase, apikey)
 
   if (local) {
     await writeFileAtomic('.capgo', `${apikey}\n`, { mode: 0o600 })
@@ -66,7 +67,7 @@ export async function loginInternal(apikey: string, options: Options, silent = f
     channel: 'user-login',
     event: 'User CLI login',
     icon: '✅',
-    user_id: userId,
+    tracking_version: 2,
     notify: false,
   }).catch()
 

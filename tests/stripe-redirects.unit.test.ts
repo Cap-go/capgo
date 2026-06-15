@@ -132,6 +132,12 @@ describe('stripe redirect URL allowlist', () => {
       'plan_test',
       '/app/success',
       '/app/cancel',
+      'org_123',
+      'legacy_visitor_123',
+      {
+        visitorId: 'visitor_123',
+        sessionId: 'session_123',
+      },
     )
 
     expect(result.url).toBe('https://pay.capgo.test/p/pay')
@@ -139,6 +145,12 @@ describe('stripe redirect URL allowlist', () => {
       allow_promotion_codes: true,
       success_url: 'https://capgo.test/app/success?success=true',
       cancel_url: 'https://capgo.test/app/cancel',
+      client_reference_id: 'org_123',
+      metadata: {
+        attribution_id: 'legacy_visitor_123',
+        datafast_visitor_id: 'visitor_123',
+        datafast_session_id: 'session_123',
+      },
     }))
   })
 
@@ -304,6 +316,10 @@ describe('stripe redirect URL allowlist', () => {
       '/app/success',
       '/app/cancel',
       'org_123',
+      {
+        visitorId: 'visitor_456',
+        sessionId: 'session_456',
+      },
     )
 
     expect(createSession).toHaveBeenCalledWith(expect.objectContaining({
@@ -313,6 +329,8 @@ describe('stripe redirect URL allowlist', () => {
         }),
       ],
       metadata: expect.objectContaining({
+        datafast_visitor_id: 'visitor_456',
+        datafast_session_id: 'session_456',
         intendedQuantity: '5',
         orgId: 'org_123',
       }),

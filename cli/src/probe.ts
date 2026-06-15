@@ -1,6 +1,7 @@
 import type { UpdateProbeResult } from './app/updateProbe'
 import { exit, stdin, stdout } from 'node:process'
 import { intro, isCancel, log, select } from '@clack/prompts'
+import { trackEvent } from './analytics/track'
 import { explainCommonUpdateError, prepareUpdateProbe, singleProbeRequest } from './app/updateProbe'
 import { getConfig } from './utils'
 
@@ -65,6 +66,8 @@ export async function probeInternal(options: ProbeOptions): Promise<ProbeInterna
 
   const ctx = prepared.context
   const result = await singleProbeRequest(ctx.endpoint, ctx.payload)
+
+  void trackEvent({ channel: 'cli-usage', event: 'Update Probed', icon: '🔎', tags: { update_available: result.success } })
 
   const probeInternalResult: ProbeInternalResult = {
     success: result.success,

@@ -15,6 +15,7 @@
 import type { ComponentPublicInstance } from 'vue'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { pushEvent } from '~/services/posthog'
 import { getLocalConfig } from '~/services/supabase'
 import { useOrganizationStore } from '~/stores/organization'
@@ -32,10 +33,12 @@ const rightPupil = ref({ x: 0, y: 0 })
 
 const currentOrg = computed(() => organizationStore.currentOrganization)
 const config = getLocalConfig()
+const hideExternalPurchaseFlows = isNativeAppStoreContext()
 
 function trackBannerEvent(eventName: string) {
   const org = currentOrg.value
   pushEvent(eventName, config.supaHost, {
+    ...(org?.gid ? { org_id: org.gid } : {}),
     trial_days_left: org?.trial_left ?? 0,
     org_gid: org?.gid ?? '',
   })
@@ -72,7 +75,7 @@ const hasApps = computed(() => {
 })
 
 const showBanner = computed(() => {
-  return isTrial.value && isAccountOldEnough.value && hasApps.value
+  return !hideExternalPurchaseFlows && isTrial.value && isAccountOldEnough.value && hasApps.value
 })
 
 // Whether we need the time tick running — true when the account-age check

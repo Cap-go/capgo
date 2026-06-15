@@ -13,7 +13,7 @@ import IconAlertTriangle from '~icons/lucide/alert-triangle'
 import IconCheckCircle from '~icons/lucide/check-circle'
 import IconTrendingUp from '~icons/lucide/trending-up'
 import { createTooltipConfig } from '~/services/chartTooltip'
-import { formatDistanceToNow } from '~/services/date'
+import { formatDistanceToNow, formatLocalDate, formatLocalDateShort } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useAppDetailStore } from '~/stores/appDetail'
 import { useDisplayStore } from '~/stores/display'
@@ -208,7 +208,7 @@ const currentVersionDeployLabel = computed(() => {
   const diffMs = Date.now() - date.getTime()
   if (diffMs < 24 * 60 * 60 * 1000)
     return formatDistanceToNow(date)
-  return date.toLocaleDateString()
+  return formatLocalDate(date) || '-'
 })
 
 function formatPercent(value: number) {
@@ -230,7 +230,7 @@ function formatShortDate(value: string | null | undefined) {
   if (Number.isNaN(date.getTime()))
     return '-'
 
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  return formatLocalDateShort(date) || '-'
 }
 
 const currentVersionDataset = computed(() => {
@@ -331,8 +331,7 @@ const chartData = computed<ChartData<'line'>>(() => {
 
   return {
     labels: stats.value.labels.map((d) => {
-      const date = new Date(d)
-      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+      return formatLocalDateShort(d) || d
     }),
     datasets: stats.value.datasets.map((dataset, index) => {
       const color = chartPalette[index % chartPalette.length]

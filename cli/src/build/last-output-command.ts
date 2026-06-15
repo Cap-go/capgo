@@ -2,6 +2,7 @@ import type { BuildOutputRecord } from './output-record'
 import { readFile } from 'node:fs/promises'
 import { exit, stdout } from 'node:process'
 import { log as clackLog } from '@clack/prompts'
+import { trackEvent } from '../analytics/track'
 
 export interface LastOutputOptions {
   path: string
@@ -52,6 +53,8 @@ export async function lastOutputCommand(options: LastOutputOptions): Promise<voi
     clackLog.error(`Unsupported record schemaVersion=${String(record?.schemaVersion)} (expected 1). Re-run the build with a matching CLI to refresh the file.`)
     exit(1)
   }
+
+  void trackEvent({ channel: 'cli-usage', event: 'Build Last Output Viewed', icon: '📄', tags: {} })
 
   if (options.qr) {
     stdout.write(`${record.qrCodeAscii ?? ''}\n`)

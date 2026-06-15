@@ -159,6 +159,16 @@ const hasChartData = computed(() => {
     :is-loading="isLoading"
     :is-demo-data="isDemoMode"
   >
+    <template #header>
+      <slot name="header">
+        <div class="min-w-0">
+          <h2 class="text-xl font-semibold leading-tight text-slate-900 dark:text-white sm:text-2xl">
+            {{ title }}
+          </h2>
+        </div>
+      </slot>
+    </template>
+
     <LineChartStats
       :key="`${useBillingPeriod}-${accumulated}-${isDemoMode}`"
       :title="title"

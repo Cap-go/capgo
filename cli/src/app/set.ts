@@ -39,7 +39,7 @@ export async function setAppInternal(appId: string, options: Options, silent = f
   await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.admin, silent)
   const organizationUid = await getOrganizationId(supabase, appId)
 
-  const { name, icon, retention, exposeMetadata } = options
+  const { name, icon, retention, exposeMetadata, preview } = options
 
   if (retention && Number.isNaN(Number(retention))) {
     if (!silent)
@@ -104,6 +104,7 @@ export async function setAppInternal(appId: string, options: Options, silent = f
       name,
       retention: !retention ? undefined : retention * 24 * 60 * 60,
       expose_metadata: exposeMetadata,
+      allow_preview: preview,
     })
     .eq('app_id', appId)
 
@@ -117,7 +118,8 @@ export async function setAppInternal(appId: string, options: Options, silent = f
     channel: 'app',
     event: 'App Updated',
     icon: '📝',
-    user_id: organizationUid,
+    org_id: organizationUid,
+    tracking_version: 2,
     tags: { 'app-id': appId },
     notify: false,
     notifyConsole: true,

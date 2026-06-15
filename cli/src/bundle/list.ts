@@ -1,5 +1,6 @@
 import type { OptionsBase } from '../schemas/base'
 import { intro, log, outro } from '@clack/prompts'
+import { trackEvent } from '../analytics/track'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
 import { checkAlerts } from '../api/update'
 import { displayBundles, getActiveAppVersions } from '../api/versions'
@@ -35,6 +36,8 @@ export async function listBundle(appId: string, options: OptionsBase, silent = f
     log.info(`Querying available versions of: ${appId} in Capgo`)
 
   const allVersions = await getActiveAppVersions(supabase, appId)
+
+  void trackEvent({ channel: 'bundle', event: 'Bundles Listed', icon: '📋', tags: { bundle_count: allVersions?.length ?? 0 } })
 
   if (!silent) {
     log.info(`Active versions in Capgo: ${allVersions?.length ?? 0}`)

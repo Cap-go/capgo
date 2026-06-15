@@ -91,11 +91,13 @@
             "queue": "capgo-native-notifications-prod",
             "max_batch_size": 10,
             "max_batch_timeout": 5,
+            "max_concurrency": 2,
             "max_retries": 5,
             "dead_letter_queue": "capgo-native-notifications-prod-dlq"
           }
         ]
-      }
+      },
+      "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }]
     },
     "preprod": {
       "name": "capgo_api-preprod",
@@ -171,11 +173,13 @@
             "queue": "capgo-native-notifications-preprod",
             "max_batch_size": 10,
             "max_batch_timeout": 5,
+            "max_concurrency": 2,
             "max_retries": 5,
             "dead_letter_queue": "capgo-native-notifications-preprod-dlq"
           }
         ]
-      }
+      },
+      "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "9c405a5248604951a2a12125799bc21b" }]
     },
     "alpha": {
       "name": "capgo_api-alpha",
@@ -251,11 +255,13 @@
             "queue": "capgo-native-notifications-alpha",
             "max_batch_size": 10,
             "max_batch_timeout": 5,
+            "max_concurrency": 2,
             "max_retries": 5,
             "dead_letter_queue": "capgo-native-notifications-alpha-dlq"
           }
         ]
-      }
+      },
+      "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "16a85350d8a246ff857a645c8f51d6ae" }]
     },
     "local": {
       "name": "capgo_api-local",
@@ -264,7 +270,8 @@
       },
       "vars": {
         "ENV_NAME": "capgo_api-local"
-      }
+      },
+      "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "00000000000000000000000000000001" }]
     }
   }
 }

@@ -3,9 +3,11 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import pack from '../../package.json'
+import { enableSupabaseInstrumentation, setInvocationSource, trackMcpServerStarted, withMcpToolTracking } from '../analytics/track'
 import { addAppOptionsSchema, cleanupOptionsSchema, getStatsOptionsSchema, requestBuildOptionsSchema, starAllRepositoriesOptionsSchema, starRepoOptionsSchema, updateAppOptionsSchema, updateChannelOptionsSchema, uploadOptionsSchema } from '../schemas/sdk'
 import { CapgoSDK } from '../sdk'
 import { findSavedKey } from '../utils'
+import { registerOnboardingTools } from '../build/onboarding/mcp/onboarding-tools'
 
 /**
  * Format an SDK result error for MCP response.
@@ -34,6 +36,18 @@ export async function startMcpServer(): Promise<void> {
     name: 'capgo',
     version: pack.version,
   })
+
+  setInvocationSource('mcp')
+  enableSupabaseInstrumentation()
+
+  // Auto-track every tool invocation without touching each registration.
+  const originalTool = server.tool.bind(server)
+  ;(server as unknown as { tool: (...args: any[]) => unknown }).tool = (...args: any[]) => {
+    const handlerIndex = args.length - 1
+    if (typeof args[handlerIndex] === 'function')
+      args[handlerIndex] = withMcpToolTracking(String(args[0]), args[handlerIndex])
+    return (originalTool as (...a: any[]) => unknown)(...args)
+  }
 
   // Initialize SDK - will use saved API key or require it per-call
   let savedApiKey: string | undefined
@@ -311,7 +325,7 @@ export async function startMcpServer(): Promise<void> {
     'Create a new distribution channel for an app',
     {
       appId: z.string().describe('App ID'),
-      channelId: z.string().describe('Channel name/ID to create'),
+      channelId: z.string().describe('Channel name to create'),
       default: z.boolean().optional().describe('Set as default channel'),
       selfAssign: z.boolean().optional().describe('Allow devices to self-assign to this channel'),
     },
@@ -365,7 +379,7 @@ export async function startMcpServer(): Promise<void> {
     'Delete a channel from an app',
     {
       appId: z.string().describe('App ID'),
-      channelId: z.string().describe('Channel name/ID to delete'),
+      channelId: z.string().describe('Channel name to delete'),
       deleteBundle: z.boolean().optional().describe('Also delete the bundle linked to this channel'),
     },
     async ({ appId, channelId, deleteBundle }) => {
@@ -384,7 +398,7 @@ export async function startMcpServer(): Promise<void> {
     'Get the current bundle linked to a specific channel',
     {
       appId: z.string().describe('App ID'),
-      channelId: z.string().describe('Channel name/ID'),
+      channelId: z.string().describe('Channel name'),
     },
     async ({ appId, channelId }) => {
       const result = await sdk.getCurrentBundle(appId, channelId)
@@ -591,7 +605,14 @@ export async function startMcpServer(): Promise<void> {
     },
   )
 
+  // MCP-conducted Builder onboarding (2-tool spine). Build-time gated OFF until the
+  // flow is finished (PR 2) — DCE strips it (and the MCP-only deciders) from the
+  // release bundle. The shared engine still ships (the ink TUI uses it).
+  if (globalThis.__CAPGO_MCP_ONBOARDING__)
+    registerOnboardingTools(server, sdk)
+
   // Start the server with stdio transport
   const transport = new StdioServerTransport()
   await server.connect(transport)
+  trackMcpServerStarted(Boolean(savedApiKey))
 }

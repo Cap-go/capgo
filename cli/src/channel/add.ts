@@ -37,7 +37,11 @@ export async function addChannelInternal(channelId: string, appId: string, optio
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon, silent)
   await check2FAComplianceForApp(supabase, appId, silent)
   await resolveUserIdFromApiKey(supabase, options.apikey)
-  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.admin, silent, true)
+  // Creating a channel needs app_admin tier (app.create_channel / the INSERT RLS's app.update_settings),
+  // which get_org_perm_for_apikey reports as perm_write; org_super_admin's app.delete is NOT required.
+  // Gating on admin here was a false-negative that blocked org_admin/app_admin keys. The channels
+  // INSERT RLS remains authoritative, so a non-admin key is still rejected at the DB.
+  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.write, silent, true)
 
   if (!silent)
     log.info(`Creating channel ${appId}#${channelId} to Capgo`)
@@ -65,7 +69,8 @@ export async function addChannelInternal(channelId: string, appId: string, optio
     channel: 'channel',
     event: 'Create channel',
     icon: '✅',
-    user_id: orgId,
+    org_id: orgId,
+    tracking_version: 2,
     tags: {
       'app-id': appId,
       'channel': channelId,

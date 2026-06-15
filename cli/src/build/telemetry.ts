@@ -79,7 +79,8 @@ export async function trackBuilderUpload(input: TrackBuilderUploadInput): Promis
       channel: 'build-lifecycle',
       icon: ICON_BY_PHASE[input.phase],
       notify: false,
-      user_id: input.orgId,
+      org_id: input.orgId,
+      tracking_version: 2,
       tags,
     })
   }

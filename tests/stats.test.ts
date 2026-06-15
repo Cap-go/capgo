@@ -429,7 +429,7 @@ describe('[POST] /stats', () => {
     }
   })
 
-  it.concurrent('filters legacy download_fail before saved stats and logs', async () => {
+  testIt('filters legacy download_fail before saved stats and logs', async () => {
     const cases = [
       { pluginVersion: '7.16.9', shouldRecord: false, createVersion: true },
       { pluginVersion: '7.16.9', shouldRecord: false, createVersion: false },
@@ -439,13 +439,14 @@ describe('[POST] /stats', () => {
       { pluginVersion: 'not-a-version', shouldRecord: false, createVersion: true },
     ]
 
-    for (const testCase of cases) {
+    for (const [caseIndex, testCase] of cases.entries()) {
       const uuid = randomUUID().toLowerCase()
+      const caseId = randomUUID().slice(0, 8)
       const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
       baseData.device_id = uuid
       baseData.action = 'download_fail'
       baseData.plugin_version = testCase.pluginVersion
-      baseData.version_build = `1.0.0-download-fail-${testCase.pluginVersion.replace(/\./g, '-')}-${testCase.createVersion ? 'existing' : 'missing'}`
+      baseData.version_build = `1.0.0-download-fail-${caseIndex}-${caseId}-${testCase.pluginVersion.replace(/\./g, '-')}-${testCase.createVersion ? 'existing' : 'missing'}`
       const versionName = testCase.createVersion
         ? (await createAppVersions(baseData.version_build, APP_NAME_STATS)).name
         : baseData.version_build
