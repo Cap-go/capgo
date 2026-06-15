@@ -16,8 +16,11 @@ import { ensureApiKeyCanManageTargetOrgIds, ensureApiKeyManagementAllowed, getAp
 
 const app = honoFactory.createApp()
 const APIKEY_ORG_READER_ROLE = 'apikey_org_reader'
+type ApiKeyRow = Database['public']['Tables']['apikeys']['Row']
 type ApiKeyUpdateData = Partial<Pick<Database['public']['Tables']['apikeys']['Update'], 'name' | 'expires_at'>>
-type ApiKeyLookupRow = Pick<Database['public']['Tables']['apikeys']['Row'], 'id' | 'rbac_id' | 'expires_at' | 'key' | 'key_hash'>
+type ApiKeyLookupRow = Pick<ApiKeyRow, 'id' | 'rbac_id' | 'expires_at' | 'key' | 'key_hash'>
+type ApiKeyPublicRow = Pick<ApiKeyRow, 'created_at' | 'expires_at' | 'id' | 'name' | 'rbac_id' | 'updated_at' | 'user_id'>
+const APIKEY_PUBLIC_COLUMNS = 'created_at, expires_at, id, name, rbac_id, updated_at, user_id'
 
 interface ApiKeyPut {
   id?: string | number
@@ -380,7 +383,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
 
   const writeSupabase = supabaseAdmin(c)
 
-  let updatedApikey: Database['public']['Tables']['apikeys']['Row'] | typeof existingApikey = existingApikey
+  let updatedApikey: ApiKeyPublicRow | null = null
   if (hasBindingUpdates) {
     await replaceApiKeyBindings(c, auth, {
       id: existingApikey.id,
@@ -389,7 +392,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
 
     const { data: updatedData, error: fetchUpdatedError } = await supabase
       .from('apikeys')
-      .select()
+      .select(APIKEY_PUBLIC_COLUMNS)
       .eq('id', existingApikey.id)
       .eq('user_id', auth.userId)
       .single()
@@ -407,7 +410,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
 
     const { data: updatedData, error: fetchUpdatedError } = await dataSupabase
       .from('apikeys')
-      .select()
+      .select(APIKEY_PUBLIC_COLUMNS)
       .eq('id', existingApikey.id)
       .eq('user_id', auth.userId)
       .single()
@@ -423,7 +426,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
       .update(updateData)
       .eq('id', existingApikey.id) // Use the fetched ID to ensure we update the correct record
       .eq('user_id', auth.userId)
-      .select()
+      .select(APIKEY_PUBLIC_COLUMNS)
       .single()
 
     if (updateError || !updatedData) {
@@ -460,6 +463,10 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
       throw quickError(500, 'failed_to_update_apikey', 'Failed to regenerate API key', { requestId, supabaseError: updateError })
     }
     return c.json(updatedData)
+  }
+
+  if (!updatedApikey) {
+    throw quickError(500, 'failed_to_update_apikey', 'Failed to load updated API key', { requestId, apikeyId: existingApikey.id })
   }
 
   if (globalPermissions !== undefined) {

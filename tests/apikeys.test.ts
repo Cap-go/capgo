@@ -558,6 +558,46 @@ describe('[PUT] /apikey/:id operations', () => {
     expect(verifyData.name).toBe(newName)
   })
 
+  it.concurrent('metadata updates do not return plain or hashed key material', async () => {
+    const createdKeyIds: number[] = []
+
+    try {
+      for (const hashed of [false, true]) {
+        const suffix = hashed ? 'hashed' : 'plain'
+        const createResponse = await fetch(`${BASE_URL}/apikey`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify(orgKeyBody(`temp-metadata-no-leak-${suffix}-${randomUUID()}`, { hashed })),
+        })
+        expect(createResponse.status).toBe(200)
+        const createData = await createResponse.json<{ id: number }>()
+        createdKeyIds.push(createData.id)
+
+        const newName = `temp-metadata-updated-${suffix}-${randomUUID()}`
+        const updateResponse = await fetch(`${BASE_URL}/apikey/${createData.id}`, {
+          method: 'PUT',
+          headers: authHeaders,
+          body: JSON.stringify({ name: newName }),
+        })
+        const updateData = await updateResponse.json() as Record<string, unknown>
+
+        expect(updateResponse.status).toBe(200)
+        expect(updateData).toHaveProperty('id', createData.id)
+        expect(updateData).toHaveProperty('name', newName)
+        expect(updateData).not.toHaveProperty('key')
+        expect(updateData).not.toHaveProperty('key_hash')
+      }
+    }
+    finally {
+      for (const keyId of createdKeyIds.reverse()) {
+        await fetch(`${BASE_URL}/apikey/${keyId}`, {
+          method: 'DELETE',
+          headers: authHeaders,
+        })
+      }
+    }
+  })
+
   it.concurrent('updates api key role bindings', async () => {
     let createData: { id: number, rbac_id: string } | undefined
 

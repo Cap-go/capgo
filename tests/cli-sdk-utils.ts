@@ -704,13 +704,20 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ORG_SUPER_ADMIN) {
     device?: boolean
     prod?: boolean
   }) => {
-    const access = await getAuthorizedApp(apikey, appId, ['channel.update_settings'])
-    if ('error' in access)
-      return { success: false, error: access.error }
+    const apiKey = await getApiKeyRecord(apikey)
+    if (!apiKey)
+      return { success: false, error: 'Invalid API key or insufficient permissions.' }
+
+    const app = await getAppRecord(appId)
+    if (!app)
+      return { success: false, error: `App ${appId} does not exist` }
 
     const existingChannel = await getChannelRecord(appId, channelId)
     if (!existingChannel)
       return { success: false, error: 'Cannot find channel' }
+
+    if (!(await apiKeyHasAnyChannelPermission(apikey, apiKey, app, existingChannel.id, ['channel.update_settings'])))
+      return { success: false, error: 'Invalid API key or insufficient permissions.' }
 
     if (state && !['default', 'normal'].includes(state))
       return { success: false, error: 'Unknown state' }

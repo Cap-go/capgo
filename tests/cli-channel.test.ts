@@ -243,6 +243,95 @@ describe('tests CLI channel commands', () => {
       }
     })
 
+    it.concurrent('should set channel bundle with a channel-scoped admin key', async () => {
+      const channelName = generateChannelName()
+      await createChannel(channelName, APPNAME)
+
+      const bundle = `1.0.${Math.floor(Math.random() * 10000)}`
+      await getSupabaseClient()
+        .from('app_versions')
+        .insert({
+          app_id: APPNAME,
+          name: bundle,
+          owner_org: ORG_ID,
+          user_id: USER_ID,
+          storage_provider: 'r2-direct',
+        })
+        .throwOnError()
+
+      const supabase = getSupabaseClient()
+      const { data: app, error: appError } = await supabase
+        .from('apps')
+        .select('id')
+        .eq('app_id', APPNAME)
+        .single()
+      expect(appError).toBeNull()
+      expect(app?.id).toBeTruthy()
+
+      const { data: channel, error: channelError } = await supabase
+        .from('channels')
+        .select('id, rbac_id')
+        .eq('name', channelName)
+        .eq('app_id', APPNAME)
+        .single()
+      expect(channelError).toBeNull()
+      expect(channel?.rbac_id).toBeTruthy()
+
+      const { data: channelAdminRole, error: roleError } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('name', 'channel_admin')
+        .eq('scope_type', 'channel')
+        .single()
+      expect(roleError).toBeNull()
+      expect(channelAdminRole?.id).toBeTruthy()
+
+      const key = `channel-update-${randomUUID()}`
+      const apiKey = await createDirectApiKeyWithBindings({
+        key,
+        name: `Channel update admin ${channelName}`,
+        orgId: ORG_ID,
+        roleName: 'org_member',
+      })
+      const resolvedKey = apiKey.key ?? key
+
+      try {
+        const { error: bindingError } = await supabase
+          .from('role_bindings')
+          .insert({
+            principal_type: 'apikey',
+            principal_id: apiKey.rbac_id,
+            role_id: channelAdminRole!.id,
+            scope_type: 'channel',
+            org_id: ORG_ID,
+            app_id: app!.id,
+            channel_id: channel!.rbac_id,
+            granted_by: apiKey.user_id,
+            reason: 'CLI channel set channel-admin regression test',
+            is_direct: true,
+          })
+        expect(bindingError).toBeNull()
+
+        const { data: directAllowed, error: directError } = await supabase.rpc('rbac_check_permission_direct' as any, {
+          p_permission_key: 'channel.update_settings',
+          p_user_id: apiKey.user_id,
+          p_org_id: ORG_ID,
+          p_app_id: APPNAME,
+          p_channel_id: channel!.id,
+          p_apikey: resolvedKey,
+        })
+        expect(directError).toBeNull()
+        expect(directAllowed).toBe(true)
+
+        const result = await createTestSDK(resolvedKey).updateChannel({ channelId: channelName, appId: APPNAME, bundle })
+        expect(result.success, result.error).toBe(true)
+      }
+      finally {
+        await supabase.from('role_bindings').delete().eq('principal_id', apiKey.rbac_id)
+        await supabase.from('apikeys').delete().eq('id', apiKey.id)
+      }
+    })
+
     it.concurrent('should fail to set bundle for invalid channel name', async () => {
       const bundle = '1.0.0'
       const testInvalidChannel = generateChannelName()

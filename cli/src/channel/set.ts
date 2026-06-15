@@ -15,7 +15,6 @@ import {
   getBundleVersion,
   getCompatibilityDetails,
   getConfig,
-  getOrganizationId,
   isCompatible,
   resolveUserIdFromApiKey,
   sendEvent,
@@ -139,7 +138,12 @@ export async function setChannelInternal(channel: string, appId: string, options
   }
 
   await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'channel.update_settings', silent, true, existingChannel.id)
-  const orgId = await getOrganizationId(supabase, appId)
+  const orgId = existingChannel.owner_org
+  if (!orgId) {
+    if (!silent)
+      log.error(`Cannot get organization id for channel ${channel}`)
+    throw new Error(`Cannot get organization id for channel ${channel}`)
+  }
 
   await checkPlanValid(supabase, orgId, options.apikey, appId)
 

@@ -34,6 +34,7 @@ interface DeleteChannelDeviceBody {
 }
 
 type ChannelRow = Pick<Database['public']['Tables']['channels']['Row'], 'id' | 'app_id' | 'owner_org' | 'public'>
+type ChannelDeviceRow = Pick<Database['public']['Tables']['channel_devices']['Row'], 'app_id' | 'channel_id' | 'owner_org'>
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
@@ -47,17 +48,31 @@ function requireAuth(c: Context<MiddlewareKeyVariables>): AuthInfo {
   return auth
 }
 
-async function requireManageDevices(c: Context<MiddlewareKeyVariables>, appId: string) {
+function assertValidAppId(appId: string) {
   if (!isValidAppId(appId)) {
     throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: appId })
   }
+}
+
+async function requireManageDevices(c: Context<MiddlewareKeyVariables>, appId: string) {
+  assertValidAppId(appId)
 
   if (!(await checkPermission(c, 'app.manage_devices', { appId }))) {
     quickError(403, 'permission_denied', 'Permission denied: app.manage_devices', { appId })
   }
 }
 
+async function requireManageForcedDevices(c: Context<MiddlewareKeyVariables>, appId: string, channelId: number) {
+  assertValidAppId(appId)
+
+  if (!(await checkPermission(c, 'channel.manage_forced_devices', { appId, channelId }))) {
+    quickError(403, 'permission_denied', 'Permission denied: channel.manage_forced_devices', { appId, channelId })
+  }
+}
+
 async function getWritableChannel(c: Context<MiddlewareKeyVariables>, body: SetChannelDeviceBody): Promise<ChannelRow> {
+  assertValidAppId(body.app_id)
+
   const supabase = supabaseWithAuth(c, requireAuth(c))
   const { data: channel, error } = await supabase
     .from('channels')
@@ -77,10 +92,28 @@ async function getWritableChannel(c: Context<MiddlewareKeyVariables>, body: SetC
   return channel
 }
 
-export async function setChannelDeviceOverride(c: Context<MiddlewareKeyVariables>, body: SetChannelDeviceBody) {
-  await requireManageDevices(c, body.app_id)
+async function getExistingChannelDeviceOverride(c: Context<MiddlewareKeyVariables>, body: DeleteChannelDeviceBody): Promise<ChannelDeviceRow | null> {
+  assertValidAppId(body.app_id)
 
+  const supabase = supabaseWithAuth(c, requireAuth(c))
+  const { data: override, error } = await supabase
+    .from('channel_devices')
+    .select('app_id, channel_id, owner_org')
+    .eq('device_id', body.device_id.toLowerCase())
+    .eq('app_id', body.app_id)
+    .maybeSingle()
+
+  if (error) {
+    quickError(500, 'channel_device_error', 'Error loading channel override', { error })
+  }
+
+  return override
+}
+
+export async function setChannelDeviceOverride(c: Context<MiddlewareKeyVariables>, body: SetChannelDeviceBody) {
   const channel = await getWritableChannel(c, body)
+  await requireManageForcedDevices(c, channel.app_id, channel.id)
+
   const supabase = supabaseWithAuth(c, requireAuth(c))
   const override = {
     app_id: body.app_id,
@@ -105,7 +138,11 @@ export async function setChannelDeviceOverride(c: Context<MiddlewareKeyVariables
 }
 
 export async function deleteChannelDeviceOverride(c: Context<MiddlewareKeyVariables>, body: DeleteChannelDeviceBody) {
-  await requireManageDevices(c, body.app_id)
+  const existingOverride = await getExistingChannelDeviceOverride(c, body)
+  if (existingOverride)
+    await requireManageForcedDevices(c, existingOverride.app_id, existingOverride.channel_id)
+  else
+    await requireManageDevices(c, body.app_id)
 
   const supabase = supabaseWithAuth(c, requireAuth(c))
   const { error } = await supabase
