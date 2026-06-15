@@ -108,6 +108,15 @@ interface BillingSnapshotRow {
   plan_name: string | null
   plan_count: number | string | null
 }
+interface CoreSnapshotCounts {
+  onboarded: number
+  needUpgrade: number
+}
+interface CoreSnapshotRow {
+  [key: string]: unknown
+  onboarded: number | string | null
+  need_upgrade: number | string | null
+}
 interface CustomerIdRow {
   customer_id: string
 }
@@ -164,6 +173,12 @@ function normalizeBillingSnapshotCounts(rows: BillingSnapshotRow[]): BillingSnap
     },
     payingOrgsForConversion: Number(firstRow.paying_orgs_for_conversion) || 0,
     plans: normalizePlanTotals(plans),
+  }
+}
+function normalizeCoreSnapshotCounts(row: Partial<CoreSnapshotRow> | null | undefined): CoreSnapshotCounts {
+  return {
+    onboarded: Number(row?.onboarded) || 0,
+    needUpgrade: Number(row?.need_upgrade) || 0,
   }
 }
 
@@ -1423,6 +1438,53 @@ async function getBillingSnapshotCounts(c: Context, snapshotExclusiveEnd: Date):
     await closeClient(c, pgClient)
   }
 }
+async function getCoreSnapshotCounts(c: Context, snapshotExclusiveEnd: Date): Promise<CoreSnapshotCounts> {
+  const pgClient = getPgClient(c, true)
+  const drizzleClient = getDrizzleClient(pgClient)
+  const snapshotExclusiveEndIso = snapshotExclusiveEnd.toISOString()
+
+    // stripe_info stores current plan-state flags; plan_calculated_at bounds dated replays against later recalculations.
+  try {
+    const result = await drizzleClient.execute<CoreSnapshotRow>(sql`
+      WITH active_need_upgrade AS (
+        SELECT DISTINCT ON (si.customer_id)
+          si.customer_id
+        FROM public.stripe_info si
+        WHERE si.is_good_plan = false
+          AND si.created_at < ${snapshotExclusiveEndIso}::timestamptz
+          AND (si.plan_calculated_at IS NULL OR si.plan_calculated_at < ${snapshotExclusiveEndIso}::timestamptz)
+          AND (si.paid_at < ${snapshotExclusiveEndIso}::timestamptz OR si.paid_at IS NULL)
+          AND si.status IN (
+            'succeeded'::public.stripe_status,
+            'canceled'::public.stripe_status,
+            'deleted'::public.stripe_status
+          )
+          AND (si.canceled_at IS NULL OR si.canceled_at >= ${snapshotExclusiveEndIso}::timestamptz)
+          AND si.subscription_anchor_end > ${snapshotExclusiveEndIso}::timestamptz
+        ORDER BY si.customer_id, si.created_at DESC
+      )
+      SELECT
+        (
+          SELECT COUNT(DISTINCT apps.owner_org)::int
+          FROM public.apps apps
+          WHERE apps.created_at < ${snapshotExclusiveEndIso}::timestamptz
+        ) AS onboarded,
+        (
+          SELECT COUNT(*)::int
+          FROM active_need_upgrade
+        ) AS need_upgrade
+    `)
+
+    return normalizeCoreSnapshotCounts(result.rows[0])
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'core snapshot counts error', error })
+    return normalizeCoreSnapshotCounts(null)
+  }
+  finally {
+    await closeClient(c, pgClient)
+  }
+}
 
 async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
   const supabase = supabaseAdmin(c)
@@ -1435,8 +1497,7 @@ async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise
     orgs,
     stars,
     billingSnapshot,
-    onboarded,
-    need_upgrade,
+    coreSnapshot,
     actives,
   ] = await Promise.all([
     countAllApps(c, window.prevDayEnd),
@@ -1454,16 +1515,7 @@ async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise
       .then(res => res.count ?? 0),
     getGithubStars(),
     getBillingSnapshotCounts(c, window.prevDayEnd),
-    supabase.rpc('count_all_onboarded').single().then((res) => {
-      if (res.error || !res.data)
-        cloudlog({ requestId: c.get('requestId'), message: 'count_all_onboarded', error: res.error })
-      return res.data ?? 0
-    }),
-    supabase.rpc('count_all_need_upgrade').single().then((res) => {
-      if (res.error || !res.data)
-        cloudlog({ requestId: c.get('requestId'), message: 'count_all_need_upgrade', error: res.error })
-      return res.data ?? 0
-    }),
+    getCoreSnapshotCounts(c, window.prevDayEnd),
     readActiveAppsCF(c, window.prevDayEnd).then(async (app_ids) => {
       try {
         const res2 = await supabase.rpc('count_active_users', { app_ids }).single()
@@ -1477,6 +1529,7 @@ async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise
   ])
 
   const { customers, payingOrgsForConversion, plans } = billingSnapshot
+  const { onboarded, needUpgrade: need_upgrade } = coreSnapshot
   const not_paying = users - customers.total - plans.Trial
   const org_conversion_rate = calculateConversionRate(payingOrgsForConversion, orgs)
   const planConversionRates = getPlanConversionRates(plans, orgs)
@@ -2020,6 +2073,7 @@ export const logsnagInsightsTestUtils = {
   normalizeLogsnagInsightsRetryCount,
   normalizePlanTotals,
   normalizeBillingSnapshotCounts,
+  normalizeCoreSnapshotCounts,
   reserveLogsnagInsightsRetry,
   scheduleLogsnagInsightsUpdate,
 }

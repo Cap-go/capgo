@@ -231,6 +231,15 @@ describe('logsnag revenue metric helpers', () => {
     })
   })
 
+  it.concurrent('normalizes core snapshot counts from SQL rows', () => {
+    expect(logsnagInsightsTestUtils.normalizeCoreSnapshotCounts({
+      onboarded: '7',
+      need_upgrade: null,
+    })).toEqual({ onboarded: 7, needUpgrade: 0 })
+
+    expect(logsnagInsightsTestUtils.normalizeCoreSnapshotCounts(null)).toEqual({ onboarded: 0, needUpgrade: 0 })
+  })
+
   it.concurrent('normalizes logsnag insights retry payload counts', () => {
     expect(logsnagInsightsTestUtils.normalizeLogsnagInsightsRetryCount('2')).toBe(2)
     expect(logsnagInsightsTestUtils.normalizeLogsnagInsightsRetryCount(2.8)).toBe(2)
