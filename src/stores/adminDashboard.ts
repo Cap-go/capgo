@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 
 export type MetricCategory = 'uploads' | 'distribution' | 'failures' | 'success_rate' | 'platform_overview' | 'org_metrics' | 'mau_trend' | 'success_rate_trend' | 'apps_trend' | 'bundles_trend' | 'deployments_trend' | 'storage_trend' | 'bandwidth_trend' | 'global_stats_trend' | 'plugin_breakdown' | 'trial_organizations' | 'trial_plan_breakdown' | 'onboarding_funnel' | 'cancelled_users' | 'email_type_breakdown' | 'customer_country_breakdown' | 'organization_insights' | 'builder_analytics'
-export type DateRangeMode = '30day' | '90day' | 'quarter' | '6month' | '12month' | 'custom'
+export type DateRangeMode = '3day' | '7day' | '14day' | '30day' | '90day' | 'quarter' | '6month' | '12month' | 'custom'
 
 interface DateRange {
   start: Date
@@ -50,6 +50,21 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
   const activeDateRange = computed<DateRange>(() => {
     const now = new Date()
     switch (dateRangeMode.value) {
+      case '3day':
+        return {
+          start: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
+          end: now,
+        }
+      case '7day':
+        return {
+          start: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+          end: now,
+        }
+      case '14day':
+        return {
+          start: new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000),
+          end: now,
+        }
       case '30day':
         return {
           start: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000),
