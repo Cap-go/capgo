@@ -390,6 +390,27 @@ export async function getAdminBuilderAnalytics(c: Context, startDate: string, en
       last_seen: a.lastSeen,
     })).sort((x, y) => y.last_seen - x.last_seen).slice(0, 200)
 
+    // Individual onboarding journeys (most recent first) — the "who gave up and where" list.
+    const journey_list = journeys
+      .slice()
+      .sort((a, b) => b.startedAt - a.startedAt)
+      .slice(0, 300)
+      .map(j => ({
+        org_id: j.orgId || `app:${j.appId}`,
+        org_name: names[j.orgId] || j.orgId || j.appId,
+        app_id: j.appId,
+        platform: j.platform,
+        outcome: j.completed ? 'completed' : 'quit',
+        milestone: j.milestone,
+        milestone_label: MILESTONES[j.milestone]?.label ?? '',
+        last_step: j.lastStep,
+        used_ai: j.usedAi,
+        started_at: j.startedAt,
+        ended_at: j.endedAt,
+        duration_ms: Math.max(0, j.endedAt - j.startedAt),
+        steps: j.steps,
+      }))
+
     cloudlog({ requestId: c.get('requestId'), message: 'builder_analytics computed', journeys: starts, builds: builds.length })
 
     return {
@@ -417,6 +438,7 @@ export async function getAdminBuilderAnalytics(c: Context, startDate: string, en
         onboarding_error_categories,
       },
       orgs,
+      journeys: journey_list,
       posthog_configured: posthogConfigured,
       posthog_connected: events.length > 0 || starts > 0,
     }

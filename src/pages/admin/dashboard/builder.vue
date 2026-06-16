@@ -31,6 +31,21 @@ interface OrgRow {
   builds_failed: number
   last_seen: number
 }
+interface JourneyRow {
+  org_id: string
+  org_name: string
+  app_id: string
+  platform: string
+  outcome: 'completed' | 'quit'
+  milestone: number
+  milestone_label: string
+  last_step: string
+  used_ai: boolean
+  started_at: number
+  ended_at: number
+  duration_ms: number
+  steps: string[]
+}
 interface BuilderAnalytics {
   kpis: {
     onboarding_starts: number
@@ -50,6 +65,7 @@ interface BuilderAnalytics {
   status_breakdown: Tally[]
   errors: { failed_builds: number, groups: ErrorGroup[], new_count: number, novelty_meaningful: boolean, onboarding_error_categories: Tally[] }
   orgs: OrgRow[]
+  journeys: JourneyRow[]
   posthog_configured: boolean
   posthog_connected: boolean
 }
@@ -102,6 +118,19 @@ const errorGroups = computed(() => data.value?.errors?.groups ?? [])
 const newErrorGroups = computed(() => errorGroups.value.filter(g => g.is_new))
 const onbErrorCategories = computed(() => data.value?.errors?.onboarding_error_categories ?? [])
 const orgs = computed(() => data.value?.orgs ?? [])
+const journeyQuitOnly = ref(false)
+const journeys = computed(() => data.value?.journeys ?? [])
+const journeysShown = computed(() =>
+  journeyQuitOnly.value ? journeys.value.filter(j => j.outcome === 'quit') : journeys.value,
+)
+function fmtDuration(ms: number): string {
+  const s = Math.round(ms / 1000)
+  if (s < 60)
+    return `${s}s`
+  if (s < 3600)
+    return `${Math.floor(s / 60)}m ${s % 60}s`
+  return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`
+}
 
 // PostHog half can be unconfigured or unreachable; surface that instead of silently showing
 // empty onboarding/AI numbers.
@@ -404,6 +433,68 @@ displayStore.defaultBack = '/dashboard'
                         {{ o.succeeded ? 'Succeeded' : 'In progress / quit' }}
                       </span>
                     </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </ChartCard>
+
+          <!-- Onboarding journeys -->
+          <ChartCard
+            title="Onboarding journeys"
+            :is-loading="isLoadingData"
+            :has-data="journeys.length > 0"
+            no-data-message="No onboarding journeys in this period (or PostHog not configured)"
+          >
+            <template #header>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex flex-col gap-1">
+                  <h2 class="text-2xl font-semibold leading-tight dark:text-white text-slate-600">
+                    Onboarding journeys
+                  </h2>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ journeysShown.length }} of {{ journeys.length }} journeys — who started, how far they got, and where they dropped
+                  </p>
+                </div>
+                <label class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                  <input v-model="journeyQuitOnly" type="checkbox" class="rounded"> Quit only
+                </label>
+              </div>
+            </template>
+            <div class="h-full overflow-auto">
+              <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+                <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                  <tr>
+                    <th class="px-3 py-3">Org</th>
+                    <th class="px-3 py-3">App</th>
+                    <th class="px-3 py-3">Platform</th>
+                    <th class="px-3 py-3">Furthest</th>
+                    <th class="px-3 py-3">Last step (where)</th>
+                    <th class="px-3 py-3">Outcome</th>
+                    <th class="px-3 py-3 text-right">Duration</th>
+                    <th class="px-3 py-3 text-right">Started</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+                  <tr v-for="(j, i) in journeysShown" :key="`${j.org_id}-${j.app_id}-${j.started_at}-${i}`">
+                    <td class="px-3 py-3">
+                      <span class="font-medium text-slate-900 dark:text-white">{{ j.org_name }}</span>
+                      <span v-if="j.used_ai" class="ml-1.5 text-[10px] text-purple-500">AI</span>
+                    </td>
+                    <td class="px-3 py-3 text-slate-500 dark:text-slate-400">{{ j.app_id }}</td>
+                    <td class="px-3 py-3 capitalize text-slate-500 dark:text-slate-400">{{ j.platform }}</td>
+                    <td class="px-3 py-3 text-slate-700 dark:text-slate-200">{{ j.milestone_label }}</td>
+                    <td class="px-3 py-3 text-slate-700 dark:text-slate-200">{{ humanStep(j.last_step) }}</td>
+                    <td class="px-3 py-3">
+                      <span
+                        class="rounded px-2 py-0.5 text-xs font-medium"
+                        :class="j.outcome === 'completed' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'"
+                      >
+                        {{ j.outcome === 'completed' ? 'Completed' : 'Quit' }}
+                      </span>
+                    </td>
+                    <td class="px-3 py-3 text-right text-slate-500 dark:text-slate-400">{{ fmtDuration(j.duration_ms) }}</td>
+                    <td class="px-3 py-3 text-right text-slate-500 dark:text-slate-400">{{ ago(j.started_at) }}</td>
                   </tr>
                 </tbody>
               </table>
