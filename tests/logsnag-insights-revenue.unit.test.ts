@@ -487,6 +487,38 @@ describe('logsnag revenue metric helpers', () => {
     }
   })
 
+  it('returns failure when the retry budget is exhausted and the snapshot update fails', async () => {
+    const globalWithEdgeRuntime = globalThis as typeof globalThis & {
+      EdgeRuntime?: { waitUntil: (promise: Promise<unknown>) => void }
+    }
+    const previousEdgeRuntime = globalWithEdgeRuntime.EdgeRuntime
+    const waitUntil = vi.fn()
+
+    globalWithEdgeRuntime.EdgeRuntime = { waitUntil }
+
+    try {
+      const app = new Hono()
+      const runUpdate = vi.fn(async () => {
+        throw new Error('snapshot failed after retry budget')
+      })
+      app.post('/', async (c) => {
+        await logsnagInsightsTestUtils.scheduleLogsnagInsightsUpdate(c, runUpdate, {
+          retryCount: logsnagInsightsTestUtils.LOGSNAG_INSIGHTS_BACKGROUND_MAX_RETRIES,
+          retryMsgId: null,
+        })
+        return c.json({ status: 'ok' })
+      })
+
+      const response = await Promise.resolve(app.request('http://localhost/', { method: 'POST' }))
+      expect(response.status).toBe(500)
+      expect(waitUntil).not.toHaveBeenCalled()
+      expect(runUpdate).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      globalWithEdgeRuntime.EdgeRuntime = previousEdgeRuntime
+    }
+  })
+
   it('propagates strict tracking provider failures', async () => {
     const restoreEnv = withTestEnv({
       LOGSNAG_TOKEN: '',

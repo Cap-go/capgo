@@ -1417,7 +1417,7 @@ async function dispatchLogsnagInsightsShards(c: Context, dateId: string): Promis
   cloudlog({ requestId: c.get('requestId'), message: 'Queued logsnag insights global stats shards', dateId, queued })
 }
 async function getBillingSnapshotCounts(c: Context, snapshotExclusiveEnd: Date): Promise<BillingSnapshotCounts> {
-  const pgClient = getPgClient(c, true)
+  const pgClient = getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
   const snapshotExclusiveEndIso = snapshotExclusiveEnd.toISOString()
 
@@ -1502,7 +1502,7 @@ async function getBillingSnapshotCounts(c: Context, snapshotExclusiveEnd: Date):
   }
 }
 async function getCoreSnapshotCounts(c: Context, snapshotExclusiveEnd: Date): Promise<CoreSnapshotCounts> {
-  const pgClient = getPgClient(c, true)
+  const pgClient = getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
   const snapshotExclusiveEndIso = snapshotExclusiveEnd.toISOString()
 
@@ -2110,9 +2110,14 @@ function scheduleLogsnagInsightsUpdate(
         return
       if (retryMsgId !== null)
         throw error
-      if (retryCount >= LOGSNAG_INSIGHTS_BACKGROUND_MAX_RETRIES)
+      if (retryCount >= LOGSNAG_INSIGHTS_BACKGROUND_MAX_RETRIES) {
         cloudlogErr({ requestId: c.get('requestId'), message: 'logsnag insights background retry budget exhausted', retryCount, error })
+        throw error
+      }
     })
+
+  if (retryMsgId === null && retryCount >= LOGSNAG_INSIGHTS_BACKGROUND_MAX_RETRIES)
+    return task
 
   return backgroundTask(c, task)
 }
@@ -2121,6 +2126,7 @@ export const logsnagInsightsTestUtils = {
   buildLogsnagInsightsRetryMessage,
   buildLogsnagInsightsShardMessage,
   readLogsnagInsightsPayload,
+  LOGSNAG_INSIGHTS_BACKGROUND_MAX_RETRIES,
   calculateChurnRevenue,
   calculateNrr,
   countUniqueCustomers,
