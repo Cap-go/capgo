@@ -13,6 +13,7 @@ import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
 import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
 import Spinner from '~/components/Spinner.vue'
+import { logAsUser } from '~/services/logAs'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -157,6 +158,12 @@ function ago(ms: number): string {
   if (sec < 86400)
     return `${Math.floor(sec / 3600)}h ago`
   return `${Math.floor(sec / 86400)}d ago`
+}
+function spoof(orgId: string) {
+  // Reuse the platform-admin impersonation flow (private/log_as accepts a user id,
+  // email, or org id — here we pass the org id to log in as its owner).
+  if (orgId && !orgId.startsWith('app:'))
+    logAsUser(orgId, router)
 }
 
 watch(() => adminStore.activeDateRange, () => loadData(), { deep: true })
@@ -412,6 +419,7 @@ displayStore.defaultBack = '/dashboard'
                     <td class="px-4 py-3">
                       <span class="font-medium text-slate-900 dark:text-white">{{ o.org_name }}</span>
                       <span v-if="o.used_ai" class="ml-1.5 text-[10px] text-purple-500">AI</span>
+                      <button v-if="o.org_id && !o.org_id.startsWith('app:')" type="button" class="ml-2 text-[11px] font-medium text-blue-500 hover:underline" @click="spoof(o.org_id)">Spoof</button>
                     </td>
                     <td class="px-4 py-3 text-right text-slate-700 dark:text-slate-200">
                       {{ o.completed }}/{{ o.attempts }}
@@ -480,6 +488,7 @@ displayStore.defaultBack = '/dashboard'
                     <td class="px-3 py-3">
                       <span class="font-medium text-slate-900 dark:text-white">{{ j.org_name }}</span>
                       <span v-if="j.used_ai" class="ml-1.5 text-[10px] text-purple-500">AI</span>
+                      <button v-if="j.org_id && !j.org_id.startsWith('app:')" type="button" class="ml-2 text-[11px] font-medium text-blue-500 hover:underline" @click="spoof(j.org_id)">Spoof</button>
                     </td>
                     <td class="px-3 py-3 text-slate-500 dark:text-slate-400">{{ j.app_id }}</td>
                     <td class="px-3 py-3 capitalize text-slate-500 dark:text-slate-400">{{ j.platform }}</td>
