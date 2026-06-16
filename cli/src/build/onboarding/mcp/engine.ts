@@ -17,12 +17,13 @@ import { getAndroidResumeStep } from '../android/progress.js'
 import { extractDeveloperId } from '../android/play-api.js'
 import { getIosResumeStep } from '../ios/progress.js'
 import { TAIL_INPUT_KEYS, validateIosStepInput, validateStepInput, validateStorePassword, validateTailStepInput } from './step-input.js'
-import { androidViewForStep, applyAndroidInput, applyGoogleSignIn, runAndroidEffect } from '../android/flow.js'
+import { androidViewForStep, applyAndroidInput, applyGoogleSignInBroker, runAndroidEffect } from '../android/flow.js'
 import { applyIosInput, iosViewForStep, runIosEffect } from '../ios/flow.js'
 import { applyTailInput, tailViewForStep } from '../tail/flow.js'
 import { clearSession, clearSessionCarried, dropIosCarried, getResumeResolvedFor, getSession, getSessionPlatform, mergeIosCarried, mergeTailCarried, setResumeResolvedFor, setSessionPlatform, setTailParked } from './session-state.js'
 import { slimAndroidTailProgress, slimIosTailProgress } from './tail-progress.js'
-import { beginOAuthSession, clearOAuthSession, pollOAuthSession } from './oauth-session.js'
+import { brokerBegin, brokerClear, brokerPoll } from './broker-session.js'
+import type { GoogleUserInfo } from '../android/oauth-google.js'
 import { SUPPORT_EMAIL } from '../../../support/contact-support.js'
 
 /** Facts gathered during preflight; the pure deciders branch only on these. */
@@ -62,6 +63,10 @@ interface OnboardingInput {
   saMethodChoice?: 'retry' | 'save-anyway' | 'oauth'
   /** Set true at google-sign-in to (re)open the browser for a fresh OAuth — recovery when the browser didn't open, was closed, or the sign-in stalled. */
   reopenSignIn?: boolean
+  /** At google-sign-in: open the broker sign-in link in the user's browser (true) or let them open it (false/omit). */
+  openSignInBrowser?: boolean
+  /** The confirmation code the user reads off the broker success page — releases the token on poll. */
+  confirmCode?: string
   /** Answer to the resume prompt: 'continue' resumes the saved step, 'restart' wipes this platform's saved progress and begins again. */
   resumeChoice?: 'continue' | 'restart'
   credentialsExistChoice?: 'backup' | 'cancel'
@@ -1913,6 +1918,10 @@ export async function decideAndroid(
     /** Drop any in-flight Google OAuth session and (re)open the browser for a fresh
      *  sign-in — recovery for "still waiting" when the browser never opened / was closed. */
     reopenSignIn?: boolean
+    /** At google-sign-in: open the broker sign-in link in the user's browser (vs. letting them open it). */
+    openSignInBrowser?: boolean
+    /** The confirmation code the user reads off the broker success page — released the token on the next poll. */
+    confirmCode?: string
     /**
      * S9-S11: the explicit tail step a validated tail answer routed to
      * (drive() → applyMcpTailAnswer). Honored only while the slim tail
@@ -2003,100 +2012,126 @@ export async function decideAndroid(
     forcedNextStep = undefined
 
     if (step === 'google-sign-in') {
-      if (!opts?.signInProceed) {
-        const view = androidViewForStep(step, progress, ctx)
-        return mapAndroidView(view, facts)
+      // ── Broker-backed Google sign-in (MCP-only) ─────────────────────────────
+      // The MCP process dies between tool calls, so an in-flight loopback consent can't survive. The Capgo
+      // OAuth broker holds the sign-in server-side: we create a session, show the user the sign-in link (and
+      // can open it for them), then poll — the user reads back a confirmation code from the success page —
+      // until a short-lived Google access token is handed off. The handle lives on disk, so polling resumes
+      // across a restart. The interactive TUI keeps its own loopback flow (untouched).
+      const session = deps.oauthSession ?? { begin: brokerBegin, poll: brokerPoll, clear: brokerClear }
+      const baseGate = {
+        onboarding: 'capgo-builder' as const, phase: 'credentials' as const, state: 'google-sign-in' as const,
+        platform: 'android' as const, progress: ANDROID_STEP_PROGRESS['google-sign-in'], kind: 'human_gate' as const,
+        rules: ONBOARDING_RULES,
       }
 
-      // Use injected session registry when available (for tests), else module-level.
-      const session = deps.oauthSession ?? { begin: beginOAuthSession, poll: pollOAuthSession, clear: clearOAuthSession }
-      // Reopen recovery: the user asked to (re)open the browser because it never opened,
-      // they closed it, or the flow stalled on 'pending'. Drop the in-flight session so
-      // the poll below reports 'absent' and we begin a fresh flow (a new browser window).
-      if (opts?.reopenSignIn)
-        session.clear(appId)
-      const poll = session.poll(appId)
+      // First gate — not yet proceeding: offer to start. No broker session/link exists until the user continues.
+      if (!opts?.signInProceed) {
+        return {
+          ...baseGate,
+          summary: `Next: connect your Google account so Capgo can set up Play Console publishing (Google Play + Google Cloud access). Tell me to continue and I'll create your sign-in link.`,
+          human: { instruction: `We'll connect your Google account to provision Play Console access. When you tell me to continue I'll create a sign-in link — I can open it in your browser for you, or give you the link to open yourself.` },
+          next: { tool: NEXT_STEP_TOOL, instruction: `Call ${NEXT_STEP_TOOL}({}) to start the Google sign-in and get the link.`, call: `${NEXT_STEP_TOOL}({})` },
+        }
+      }
 
+      if (opts?.reopenSignIn)
+        await session.clear(appId)
+
+      let poll = await session.poll(appId, opts?.confirmCode)
+      let justBegan = false
       if (poll.status === 'absent') {
-        // startOAuthFlow is always provided by the MCP driver (buildAndroidEffectDeps);
-        // the Ink driver never reaches this code path.
         try {
-          await session.begin(appId, () => deps.androidEffectDeps.startOAuthFlow!())
+          const begun = await session.begin(appId)
+          poll = { status: 'pending', signInUrl: begun.signInUrl }
+          justBegan = true
         }
         catch (err) {
-          // begin() rethrows when the flow could not even start (e.g. the
-          // loopback port is busy). Surface a structured retry gate instead of
-          // letting the raw error escape the MCP tool handler
-          // (hostile-review 2026-06-12).
           const reason = err instanceof Error ? err.message : String(err)
-          session.clear(appId)
+          await session.clear(appId)
           return {
-            onboarding: 'capgo-builder', phase: 'credentials', state: 'google-sign-in', platform: 'android',
-            progress: ANDROID_STEP_PROGRESS['google-sign-in'], kind: 'human_gate',
+            ...baseGate,
             summary: `Google sign-in could not start (${reason}). Tell me to continue to try again.`,
-            human: { instruction: `The Google sign-in could not start (${reason}). Tell me to continue and I will try opening the browser again.` },
-            next: { tool: NEXT_STEP_TOOL, instruction: 'Tell the user what went wrong, then call next_step({}) to retry.', call: `${NEXT_STEP_TOOL}({})` },
-            rules: ONBOARDING_RULES,
+            human: { instruction: `The Google sign-in could not start (${reason}). Tell me to continue and I'll try again.` },
+            next: { tool: NEXT_STEP_TOOL, instruction: `Tell the user what went wrong, then call ${NEXT_STEP_TOOL}({}) to retry.`, call: `${NEXT_STEP_TOOL}({})` },
           }
         }
-        return {
-          onboarding: 'capgo-builder', phase: 'credentials', state: 'google-sign-in', platform: 'android',
-          progress: ANDROID_STEP_PROGRESS['google-sign-in'], kind: 'human_gate',
-          summary: `I have opened your browser for Google sign-in. Approve the permissions, then tell me to continue.`,
-          human: { instruction: `Your browser has been opened for Google sign-in. Approve every requested permission — your tokens never reach Capgo servers and are revoked when setup finishes. Once you have approved, tell me to continue. If the browser did not actually open, tell me to reopen it.` },
-          next: { tool: NEXT_STEP_TOOL, instruction: 'After the user approves in the browser, call next_step({}) to continue. If the browser did not open, call next_step({ reopenSignIn: true }) to reopen it.', call: `${NEXT_STEP_TOOL}({})` },
-          rules: ONBOARDING_RULES,
+      }
+
+      const signInUrl = poll.signInUrl ?? ''
+
+      // Open the link in the user's browser when asked (best effort — fall back to showing the link).
+      let openedNow = false
+      if (opts?.openSignInBrowser && signInUrl && deps.androidEffectDeps.openBrowser) {
+        try {
+          await deps.androidEffectDeps.openBrowser(signInUrl)
+          openedNow = true
+        }
+        catch {
+          openedNow = false
         }
       }
 
       if (poll.status === 'pending') {
+        if (openedNow) {
+          return {
+            ...baseGate,
+            summary: `I opened the Google sign-in page in your browser. Approve the permissions; you'll then see a confirmation code — read it back to me.`,
+            human: { instruction: `Your browser should now show the Google sign-in. Approve every requested permission. When it finishes you'll see a confirmation code (like "ABCD-2345") — tell me that code. If the browser didn't open, the link is: ${signInUrl}` },
+            next: { tool: NEXT_STEP_TOOL, instruction: `When the user gives you the code shown in their browser, call ${NEXT_STEP_TOOL}({ confirmCode: "<code>" }). If they aren't signed in yet, call ${NEXT_STEP_TOOL}({}) to check again.`, call: `${NEXT_STEP_TOOL}({ confirmCode: "ABCD-2345" })` },
+          }
+        }
+        if (justBegan) {
+          return {
+            ...baseGate,
+            summary: `Open this link to sign in with Google: ${signInUrl} — or tell me to open it in your browser for you.`,
+            human: { instruction: `Give the user this Google sign-in link so they can open it: ${signInUrl}\nYou can also open it for them. After they sign in they'll see a confirmation code (like "ABCD-2345") to read back to you.` },
+            next: { tool: NEXT_STEP_TOOL, instruction: `Show the user the link above. EITHER call ${NEXT_STEP_TOOL}({ openSignInBrowser: true }) to open it in their browser for them, OR have them open it themselves. Once they've signed in and have the confirmation code, call ${NEXT_STEP_TOOL}({ confirmCode: "<code>" }).`, call: `${NEXT_STEP_TOOL}({ openSignInBrowser: true })` },
+          }
+        }
         return {
-          onboarding: 'capgo-builder', phase: 'credentials', state: 'google-sign-in', platform: 'android',
-          progress: ANDROID_STEP_PROGRESS['google-sign-in'], kind: 'human_gate',
-          summary: `Still waiting on the browser sign-in. Finish it in the browser then tell me to continue — or, if the browser did not open or you closed it, ask me to reopen it.`,
-          human: { instruction: `The browser sign-in is still in progress. Complete it in your browser, then tell me to continue. If the browser never opened, you closed it, or you are stuck on this screen, tell me to reopen it and I will open a fresh sign-in window.` },
-          next: { tool: NEXT_STEP_TOOL, instruction: 'When the user has signed in, call next_step({}) to continue. If the browser did not open, was closed, or they are stuck here, call next_step({ reopenSignIn: true }) to reopen the sign-in.', call: `${NEXT_STEP_TOOL}({})` },
-          rules: ONBOARDING_RULES,
+          ...baseGate,
+          summary: `Still waiting on your Google sign-in. Finish it in the browser, then tell me the confirmation code shown. Sign-in link: ${signInUrl}`,
+          human: { instruction: `The Google sign-in isn't complete yet. Open the link if you haven't (${signInUrl}), approve the permissions, and tell me the confirmation code you see. If you're stuck, tell me to reopen the sign-in.` },
+          next: { tool: NEXT_STEP_TOOL, instruction: `When the user has the confirmation code, call ${NEXT_STEP_TOOL}({ confirmCode: "<code>" }). To re-check, call ${NEXT_STEP_TOOL}({}). To start over, call ${NEXT_STEP_TOOL}({ reopenSignIn: true }).`, call: `${NEXT_STEP_TOOL}({})` },
+        }
+      }
+
+      if (poll.status === 'awaiting_code') {
+        const wrong = poll.error ? ` That code didn't match (${poll.error}) — double-check it and try again.` : ''
+        return {
+          ...baseGate,
+          summary: `You're signed in — now enter the confirmation code shown on the sign-in page.${wrong}`,
+          human: { instruction: `Your browser shows a confirmation code (like "ABCD-2345"). Read it back to me to finish connecting your Google account.${wrong}` },
+          next: { tool: NEXT_STEP_TOOL, instruction: `Ask the user for the code shown in their browser, then call ${NEXT_STEP_TOOL}({ confirmCode: "<the code>" }).`, call: `${NEXT_STEP_TOOL}({ confirmCode: "ABCD-2345" })` },
         }
       }
 
       if (poll.status === 'error') {
-        const reason = poll.error?.message ?? 'unknown error'
-        session.clear(appId)
+        const reason = poll.error ?? 'unknown error'
+        await session.clear(appId)
         return {
-          onboarding: 'capgo-builder', phase: 'credentials', state: 'google-sign-in', platform: 'android',
-          progress: ANDROID_STEP_PROGRESS['google-sign-in'], kind: 'human_gate',
+          ...baseGate,
           summary: `Google sign-in did not complete (${reason}). Tell me to continue to try again.`,
-          human: { instruction: `The Google sign-in did not complete successfully (${reason}). Tell me to continue and I will open the browser again for a fresh sign-in.` },
-          next: { tool: NEXT_STEP_TOOL, instruction: 'Tell the user what went wrong, then call next_step({}) to retry.', call: `${NEXT_STEP_TOOL}({})` },
-          rules: ONBOARDING_RULES,
+          human: { instruction: `The Google sign-in did not complete (${reason}). Tell me to continue and I'll start a fresh sign-in.` },
+          next: { tool: NEXT_STEP_TOOL, instruction: `Tell the user what went wrong, then call ${NEXT_STEP_TOOL}({}) to retry.`, call: `${NEXT_STEP_TOOL}({})` },
         }
       }
 
-      const tokens = poll.tokens!
-      let info: Awaited<ReturnType<typeof deps.androidEffectDeps.fetchUserInfo>>
+      // done — a short-lived access token + its expiry. Persist it immediately: the broker hard-deletes the
+      // session on handoff, so we can't re-poll. The account-info fetch is cosmetic (the token, not the email,
+      // drives provisioning), so a transient failure there must NOT force a re-sign-in.
+      const accessToken = poll.accessToken!
+      let info: GoogleUserInfo = { sub: '', email: '', emailVerified: false }
       try {
-        info = await deps.androidEffectDeps.fetchUserInfo(tokens.accessToken)
+        info = await deps.androidEffectDeps.fetchUserInfo(accessToken)
       }
-      catch (err) {
-        // The sign-in itself SUCCEEDED; only the user-info fetch failed (e.g. a
-        // transient network error). KEEP the settled session so the next
-        // continue retries fetchUserInfo with the same tokens instead of making
-        // the user sign in again — and never let the raw error escape the MCP
-        // tool handler (hostile-review 2026-06-12).
-        const reason = err instanceof Error ? err.message : String(err)
-        return {
-          onboarding: 'capgo-builder', phase: 'credentials', state: 'google-sign-in', platform: 'android',
-          progress: ANDROID_STEP_PROGRESS['google-sign-in'], kind: 'human_gate',
-          summary: `You're signed in, but I couldn't fetch your Google account info (${reason}). Tell me to continue to retry.`,
-          human: { instruction: `The Google sign-in succeeded, but fetching your account info failed (${reason}). Tell me to continue and I will retry without a new sign-in.` },
-          next: { tool: NEXT_STEP_TOOL, instruction: 'Tell the user what went wrong, then call next_step({}) to retry.', call: `${NEXT_STEP_TOOL}({})` },
-          rules: ONBOARDING_RULES,
-        }
+      catch {
+        // Non-fatal — keep the empty info; provisioning uses the access token, not the email.
       }
-      progress = applyGoogleSignIn(progress, tokens, info)
+      progress = applyGoogleSignInBroker(progress, accessToken, poll.expiresAt ?? null, info)
       await deps.androidEffectDeps.saveAndroidProgress(appId, progress)
-      session.clear(appId)
+      await session.clear(appId)
       continue
     }
 
@@ -3011,14 +3046,13 @@ export interface EngineDeps {
   iosEffectDeps?: IosEffectDeps
   androidEffectDeps: AndroidEffectDeps
   /**
-   * Optional injectable OAuth session registry for testing. When provided, the
-   * engine uses these instead of the module-level functions in oauth-session.ts.
-   * Production builds omit this and rely on the module-level registry.
+   * Optional injectable broker OAuth session for testing. When provided, the engine uses these instead of the
+   * disk-persisted broker-session.ts functions. Production omits this and relies on the broker session.
    */
   oauthSession?: {
-    begin: typeof beginOAuthSession
-    poll: typeof pollOAuthSession
-    clear: typeof clearOAuthSession
+    begin: typeof brokerBegin
+    poll: typeof brokerPoll
+    clear: typeof brokerClear
   }
   /**
    * Write the generated/loaded Android keystore (.p12) to a file on disk so the
@@ -3634,7 +3668,7 @@ async function maybeResumePrompt(deps: EngineDeps, input: OnboardingInput | unde
         // simply resumes from it instead of restarting — never a crash.
       }
       try {
-        (deps.oauthSession ?? { clear: clearOAuthSession }).clear(appId)
+        await (deps.oauthSession ?? { clear: brokerClear }).clear(appId)
       }
       catch { /* best-effort: drop any in-flight OAuth session for the old run */ }
       clearSessionCarried(appId)
@@ -4099,7 +4133,7 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
     const result = await decideAdvance(facts, progress, input, deps)
 
     if (signInProceed && result.platform === 'android' && result.state === 'google-sign-in')
-      return decideAndroid(facts, deps, { signInProceed: true, reopenSignIn: Boolean(input?.reopenSignIn) })
+      return decideAndroid(facts, deps, { signInProceed: true, reopenSignIn: Boolean(input?.reopenSignIn), openSignInBrowser: input?.openSignInBrowser, confirmCode: input?.confirmCode })
 
     if (result.kind !== 'auto')
       return result

@@ -63,6 +63,33 @@ export function applyGoogleSignIn(
     },
   }
 }
+
+/**
+ * Apply a BROKER (access-token) Google sign-in. The MCP path receives a short-lived access token from the
+ * Capgo OAuth broker and CANNOT refresh it (the token is issued to the broker's confidential Web client), so
+ * it stores the access token + its expiry and re-signs-in on expiry — no `_oauthRefreshToken`. Mirrors
+ * applyGoogleSignIn for the refresh-token (TUI loopback) path.
+ */
+export function applyGoogleSignInBroker(
+  progress: AndroidOnboardingProgress,
+  accessToken: string,
+  expiresAt: number | null,
+  info: GoogleUserInfo,
+): AndroidOnboardingProgress {
+  return {
+    ...progress,
+    _oauthAccessToken: accessToken,
+    _oauthAccessTokenExpiresAt: expiresAt ?? undefined,
+    completedSteps: {
+      ...progress.completedSteps,
+      googleSignInComplete: {
+        email: info.email,
+        googleSubject: info.sub,
+        scope: '',
+      },
+    },
+  }
+}
 import { getAndroidResumeStep, hasAnyOAuthProgress } from './progress.js'
 import { extractDeveloperId } from './play-api.js'
 import { generateProjectId, sanitizeGcpProjectDisplayName, ANDROIDPUBLISHER_API, DEFAULT_SERVICE_ACCOUNT_ID, DEFAULT_SERVICE_ACCOUNT_DISPLAY_NAME, DEFAULT_SERVICE_ACCOUNT_DESCRIPTION } from './gcp-api.js'
@@ -932,6 +959,13 @@ export interface AndroidEffectDeps {
    * The driver pre-binds OAuth client config (clientId, clientSecret, scopes).
    */
   startOAuthFlow?: (callbacks?: Pick<RunOAuthFlowOptions, 'onAuthUrl' | 'onStatus'>) => Promise<PendingOAuthSession>
+
+  /**
+   * Open a URL in the user's default browser — used by the MCP broker sign-in to (optionally) open the
+   * sign-in link for the user. Best-effort: the engine falls back to showing the link if this throws or is
+   * absent. Optional (the Ink driver never uses it).
+   */
+  openBrowser?: (url: string) => Promise<void>
 
   /** Fetch the signed-in user's profile (email, sub). */
   fetchUserInfo: (accessToken: string) => Promise<GoogleUserInfo>
@@ -1834,14 +1868,16 @@ export async function runAndroidEffect(
       await deps.saveAndroidProgress(currentProgress.appId, currentProgress)
       deps.onStatus?.('✔ Play Console invite confirmed')
 
-      // Step F: revoke the OAuth refresh token now that provisioning succeeded.
-      // From this point forward Capgo uses the service account JSON key.
-      // Failure is non-fatal: the token expires within ~1 hour regardless.
-      if (currentProgress._oauthRefreshToken) {
+      // Step F: revoke the OAuth token now that provisioning succeeded — from here Capgo uses the service
+      // account JSON key. The TUI loopback stores a refresh token; the MCP broker stores a short-lived access
+      // token. Revoke whichever is present (Google's revoke endpoint accepts either). Failure is non-fatal:
+      // the token expires within ~1 hour regardless.
+      const oauthTokenToRevoke = currentProgress._oauthRefreshToken ?? currentProgress._oauthAccessToken
+      if (oauthTokenToRevoke) {
         deps.onStatus?.('Revoking OAuth token (we don\'t need it anymore)...')
         let revoked = false
         try {
-          await deps.revokeToken(currentProgress._oauthRefreshToken)
+          await deps.revokeToken(oauthTokenToRevoke)
           revoked = true
           deps.onStatus?.('✔ OAuth token revoked')
         }
@@ -1850,11 +1886,10 @@ export async function runAndroidEffect(
           deps.onStatus?.(`⚠ Revoke request failed (${msg}) — token will expire on its own`)
         }
         if (revoked) {
-          // The token is now dead — strip it from progress and persist, so a
-          // revoked credential doesn't linger in progress.json (CodeRabbit,
-          // 2026-06-12). On a failed revoke it is KEPT: it still expires on
-          // its own and a crash-resume re-enters this step to retry.
-          const { _oauthRefreshToken: _revoked, ...withoutToken } = currentProgress
+          // The token is now dead — strip both token fields from progress so a revoked credential doesn't
+          // linger in progress.json (CodeRabbit, 2026-06-12). On a failed revoke they are KEPT: they expire
+          // on their own and a crash-resume re-enters this step to retry.
+          const { _oauthRefreshToken: _r, _oauthAccessToken: _a, _oauthAccessTokenExpiresAt: _e, ...withoutToken } = currentProgress
           currentProgress = withoutToken
           await deps.saveAndroidProgress(currentProgress.appId, currentProgress)
         }

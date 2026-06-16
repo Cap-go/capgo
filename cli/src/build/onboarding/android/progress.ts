@@ -129,6 +129,7 @@ export function hasAnyOAuthProgress(progress: AndroidOnboardingProgress): boolea
     || progress.completedSteps.gcpProjectChosen
     || progress.completedSteps.androidPackageChosen
     || progress._oauthRefreshToken
+    || progress._oauthAccessToken
   )
 }
 
@@ -326,10 +327,11 @@ export function getAndroidResumeStep(progress: AndroidOnboardingProgress | null)
     return 'service-account-method-select'
   }
 
-  // Phase 2b — Google sign-in: marker + refresh token. We need the refresh
-  // token to mint access tokens for the rest of the flow on subsequent
-  // resumes; if it's missing we must re-auth.
-  if (!completedSteps.googleSignInComplete || !progress._oauthRefreshToken)
+  // Phase 2b — Google sign-in: marker + a USABLE token. The MCP broker stores a short-lived access token
+  // (re-sign-in on expiry); the TUI loopback stores a refresh token. A missing or expired token re-auths.
+  const oauthTokenUsable = !!progress._oauthRefreshToken
+    || (!!progress._oauthAccessToken && (!progress._oauthAccessTokenExpiresAt || progress._oauthAccessTokenExpiresAt > Date.now()))
+  if (!completedSteps.googleSignInComplete || !oauthTokenUsable)
     return 'google-sign-in'
 
   // Phase 3 — Play developer account ID (paste).

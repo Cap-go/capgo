@@ -35,7 +35,10 @@ await test('explains what the access is for and the local/revocable trust model'
   ok(/google cloud/i.test(text), 'must name Google Cloud')
   ok(/google play/i.test(text), 'must name Google Play')
   ok(/revoke/i.test(text), 'must tell the user they can revoke')
-  ok(/never reach capgo|do not (?:go to|reach) capgo|never.*capgo server/i.test(text), 'must say tokens never reach Capgo servers')
+  // The broker (Capgo backend) DOES briefly hold the token — so disclose the honest model: short-lived,
+  // handed off once, deleted, no long-lived refresh token retained.
+  ok(/short-lived/i.test(text), 'must disclose the token is short-lived')
+  ok(/delete|handed.*once|no long-lived refresh/i.test(text), 'must disclose the token is handed off once and not retained long-term')
 })
 
 console.log(`\n📊 Results: ${pass} passed, ${fail} failed`)

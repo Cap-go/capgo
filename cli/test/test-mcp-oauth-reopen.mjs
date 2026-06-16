@@ -26,17 +26,16 @@ function eq(a, b, msg) { if (a !== b) throw new Error(msg || `Expected ${JSON.st
 function ok(c, msg) { if (!c) throw new Error(msg || 'expected truthy') }
 
 // Fake OAuth session registry mirroring oauth-session.ts, with begin/clear counters.
+// Fake broker-backed session mirroring broker-session.ts (begin/poll/clear), with begin/clear counters.
 function makeOAuthSessionFake() {
   let entry = null
+  const signInUrl = 'https://api.capgo.app/builder_auth_direct/google/start?s=PUB'
   return {
     beginCount: 0,
     clearCount: 0,
-    begin(_appId, startFn) {
-      this.beginCount++
-      return Promise.resolve(startFn()).then((session) => { entry = { session, status: 'pending' } })
-    },
-    poll() { return entry ? { status: entry.status, tokens: entry.tokens, error: entry.error } : { status: 'absent' } },
-    clear() { this.clearCount++; entry?.session?.close?.(); entry = null },
+    begin(_appId) { this.beginCount++; entry = { status: 'pending', signInUrl }; return { signInUrl } },
+    poll(_appId, _confirmCode) { return entry ? { status: entry.status, signInUrl: entry.signInUrl, accessToken: entry.accessToken, expiresAt: entry.expiresAt, error: entry.error } : { status: 'absent' } },
+    clear(_appId) { this.clearCount++; entry = null },
   }
 }
 

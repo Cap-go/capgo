@@ -22,7 +22,8 @@ import { createCiSecretEntries, detectCiSecretTargets, getCiSecretRepoLabelAsync
 import { defaultExportPath, exportCredentialsToEnv } from '../env-export.js'
 import { generateWorkflow } from '../workflow-generator.js'
 import { writeWorkflowFile } from '../workflow-writer.js'
-import { fetchUserInfo, refreshAccessToken, revokeToken, runOAuthFlow, startOAuthFlow } from '../android/oauth-google.js'
+import { fetchUserInfo, revokeToken, runOAuthFlow, startOAuthFlow } from '../android/oauth-google.js'
+import open from 'open'
 
 import { OAUTH_SCOPES_FOR_ONBOARDING } from '../android/oauth-scopes.js'
 import { createProject, createServiceAccountKey, enableService, ensureServiceAccount, listProjects } from '../android/gcp-api.js'
@@ -89,31 +90,18 @@ function buildAndroidEffectDeps(
     return configCache
   }
 
-  // Local access-token cache — cleared when the refresh token is revoked.
-  // Stores the token alongside its expiry so we can detect and refresh stale tokens.
-  let cachedAccessToken: { token: string, expiresAt: number } | null = null
-
   async function getAccessToken(): Promise<string> {
-    // Return cached token only if it is still valid with a 60s safety margin.
-    if (cachedAccessToken && Date.now() < cachedAccessToken.expiresAt - 60_000) {
-      return cachedAccessToken.token
-    }
+    // Broker model: the MCP cannot refresh a token issued to the broker's confidential Web client, so it uses
+    // the short-lived access token persisted at sign-in and re-signs-in once it expires (60s safety margin).
     const appId = await getAppIdFn()
-    if (!appId) {
+    if (!appId)
       throw new Error('Not signed in — re-run onboarding to re-authenticate with Google.')
-    }
     const progress = await loadAndroidProgress(appId)
-    const refreshToken = progress?._oauthRefreshToken
-    if (!refreshToken) {
-      throw new Error('Not signed in — re-run onboarding to re-authenticate with Google.')
-    }
-    const cfg = await getConfig_()
-    const tokens = await refreshAccessToken(
-      { clientId: cfg.clientId, clientSecret: cfg.clientSecret, scopes: OAUTH_SCOPES_FOR_ONBOARDING },
-      refreshToken,
-    )
-    cachedAccessToken = { token: tokens.accessToken, expiresAt: tokens.expiresAt }
-    return tokens.accessToken
+    const token = progress?._oauthAccessToken
+    const expiresAt = progress?._oauthAccessTokenExpiresAt
+    if (!token || !expiresAt || Date.now() >= expiresAt - 60_000)
+      throw new Error('Your Google sign-in has expired — re-run the Capgo Builder onboarding to sign in again with Google.')
+    return token
   }
 
   return {
@@ -153,12 +141,12 @@ function buildAndroidEffectDeps(
         callbacks,
       )
     },
+    // Open the broker sign-in link in the user's browser when the engine asks (best-effort; the engine shows
+    // the link as a fallback). `open` resolves once the OS hands off to the browser — never blocks the tool.
+    openBrowser: async (url: string) => { await open(url) },
     fetchUserInfo,
     getAccessToken,
-    revokeToken: async (refreshToken: string) => {
-      cachedAccessToken = null
-      return revokeToken(refreshToken)
-    },
+    revokeToken: async (token: string) => revokeToken(token),
 
     // ── GCP ───────────────────────────────────────────────────────────────────
     listProjects,
