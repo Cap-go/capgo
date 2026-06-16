@@ -1549,6 +1549,59 @@ async function getCoreSnapshotCounts(c: Context, snapshotExclusiveEnd: Date): Pr
   }
 }
 
+async function countActiveUsersForSnapshot(c: Context, appIds: string[], window: DailyWindow): Promise<number> {
+  if (appIds.length === 0)
+    return 0
+
+  const db = getPgClient(c, false)
+
+  try {
+    const result = await db.query<{ count: number | string | null }>(`
+      WITH active_app_ids AS (
+        SELECT DISTINCT unnest($1::varchar[]) AS app_id
+      ),
+      current_active_owner_orgs AS (
+        SELECT COALESCE(
+          (
+            SELECT (transfer_entry.entry->>'transferred_from')::uuid
+            FROM unnest(COALESCE(apps.transfer_history, '{}'::jsonb[])) AS transfer_entry(entry)
+            WHERE (transfer_entry.entry->>'transferred_at')::timestamptz >= $2::timestamptz
+            ORDER BY (transfer_entry.entry->>'transferred_at')::timestamptz ASC
+            LIMIT 1
+          ),
+          apps.owner_org
+        ) AS owner_org
+        FROM public.apps apps
+        INNER JOIN active_app_ids active ON active.app_id = apps.app_id
+        WHERE apps.created_at < $2::timestamptz
+      ),
+      deleted_active_owner_orgs AS (
+        SELECT deleted_apps.owner_org
+        FROM public.deleted_apps deleted_apps
+        INNER JOIN active_app_ids active ON active.app_id = deleted_apps.app_id
+        WHERE deleted_apps.deleted_at >= $3::timestamptz
+      )
+      SELECT COUNT(DISTINCT orgs.created_by)::int AS count
+      FROM (
+        SELECT owner_org FROM current_active_owner_orgs
+        UNION
+        SELECT owner_org FROM deleted_active_owner_orgs
+      ) active_owner_orgs
+      INNER JOIN public.orgs orgs ON orgs.id = active_owner_orgs.owner_org
+      WHERE orgs.created_at < $2::timestamptz
+    `, [appIds, window.prevDayEnd.toISOString(), window.prevDayStart.toISOString()])
+
+    return Number(result.rows[0]?.count) || 0
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'count active users for snapshot error', error })
+    return 0
+  }
+  finally {
+    await closeClient(c, db)
+  }
+}
+
 async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
   const supabase = supabaseAdmin(c)
   const snapshotEndIso = window.prevDayEnd.toISOString()
@@ -1579,16 +1632,10 @@ async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise
     getGithubStars(),
     getBillingSnapshotCounts(c, window.prevDayEnd),
     getCoreSnapshotCounts(c, window.prevDayEnd),
-    readActiveAppsCF(c, window.prevDayEnd).then(async (app_ids) => {
-      try {
-        const res2 = await supabase.rpc('count_active_users', { app_ids }).single()
-        return { apps: app_ids.length, users: res2.data ?? 0 }
-      }
-      catch (e) {
-        cloudlogErr({ requestId: c.get('requestId'), message: 'count_active_users error', error: e })
-      }
-      return { apps: app_ids.length, users: 0 }
-    }),
+    readActiveAppsCF(c, window.prevDayEnd).then(async appIds => ({
+      apps: appIds.length,
+      users: await countActiveUsersForSnapshot(c, appIds, window),
+    })),
   ])
 
   const { customers, payingOrgsForConversion, plans } = billingSnapshot
