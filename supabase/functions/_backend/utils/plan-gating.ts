@@ -3,6 +3,10 @@ import { quickError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { getCurrentPlanNameOrg, supabaseAdmin } from './supabase.ts'
 
+function isActivePlanStatus(status: string | null | undefined): boolean {
+  return status === 'succeeded'
+}
+
 async function getActivePlanNameOrg(c: Context, orgId: string): Promise<string | null> {
   const { data: org, error: orgError } = await supabaseAdmin(c)
     .from('orgs')
@@ -35,7 +39,7 @@ async function getActivePlanNameOrg(c: Context, orgId: string): Promise<string |
     return null
   }
 
-  if (stripeInfo.status !== 'succeeded' || stripeInfo.is_good_plan !== true)
+  if (!isActivePlanStatus(stripeInfo.status) || stripeInfo.is_good_plan !== true)
     return null
 
   const { data: plan, error: planError } = await supabaseAdmin(c)

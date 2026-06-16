@@ -122,10 +122,25 @@ const cancellationReasonLabels: Record<string, string> = {
   payment_failed: 'Payment failed',
 }
 
+const churnReasonLabels: Record<string, string> = {
+  past_due_unresolved: 'Failed to resolve past due',
+}
+
+function formatStoredChurnReason(churnReason: string | null): string | null {
+  if (!churnReason)
+    return null
+
+  return churnReasonLabels[churnReason] ?? churnReason
+}
+
 /**
- * Formats Stripe cancellation details into a short, human-readable label.
+ * Formats stored churn reasons or Stripe cancellation details into a short label.
  */
-function formatCancellationReason(details: CancellationDetails | null): string | null {
+function formatCancellationReason(details: CancellationDetails | null, churnReason: string | null): string | null {
+  const storedReason = formatStoredChurnReason(churnReason)
+  if (storedReason)
+    return storedReason
+
   if (!details)
     return null
 
@@ -277,7 +292,7 @@ app.post('/', middlewareAuth, async (c) => {
               plan_name: org.plan_name,
               billing_type: org.billing_type,
               subscription_or_signup_date: org.subscription_or_signup_date,
-              cancellation_reason: formatCancellationReason(details),
+              cancellation_reason: formatCancellationReason(details, org.churn_reason),
             }
           }),
         )
