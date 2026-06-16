@@ -184,30 +184,6 @@ const githubStarsTrendSeries = computed(() => {
   ]
 })
 
-const devicePlatformTrendSeries = computed(() => {
-  if (globalStatsTrendData.value.length === 0)
-    return []
-
-  return [
-    {
-      label: 'iOS Devices',
-      data: globalStatsTrendData.value.map(item => ({
-        date: item.date,
-        value: item.devices_last_month_ios || 0,
-      })),
-      color: '#000000', // black (Apple)
-    },
-    {
-      label: 'Android Devices',
-      data: globalStatsTrendData.value.map(item => ({
-        date: item.date,
-        value: item.devices_last_month_android || 0,
-      })),
-      color: '#3ddc84', // Android green
-    },
-  ]
-})
-
 // Latest metrics from global stats
 const latestGlobalStats = computed(() => {
   if (globalStatsTrendData.value.length === 0)
@@ -476,20 +452,6 @@ displayStore.defaultBack = '/dashboard'
                 </p>
               </div>
             </div>
-          </div>
-
-          <!-- Device Platform Trend Chart -->
-          <div class="grid grid-cols-1 gap-6">
-            <ChartCard
-              :title="t('device-platform-trend')"
-              :is-loading="isLoadingGlobalStatsTrend"
-              :has-data="devicePlatformTrendSeries.length > 0"
-            >
-              <AdminMultiLineChart
-                :series="devicePlatformTrendSeries"
-                :is-loading="isLoadingGlobalStatsTrend"
-              />
-            </ChartCard>
           </div>
 
           <!-- GitHub Stars Trend -->
