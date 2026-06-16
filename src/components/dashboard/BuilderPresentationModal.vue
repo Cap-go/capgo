@@ -26,6 +26,15 @@ const router = useRouter()
 const config = getLocalConfig()
 const reduce = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
+// Guided App Store Connect key creation is a macOS-only desktop helper, so the
+// explicit "we create your Apple key for you" copy on slide 2 is gated to macOS
+// visitors. iPadOS reports a "Macintosh" UA but exposes touch points — exclude it.
+const isMacOS = typeof navigator !== 'undefined'
+  && /Macintosh|Mac OS X/.test(navigator.userAgent || '')
+  && (navigator.maxTouchPoints ?? 0) <= 1
+const s2Lead = computed(() => (isMacOS ? t('builder-promo-s2-lead-macos') : t('builder-promo-s2-lead')))
+const s2Item4 = computed(() => (isMacOS ? t('builder-promo-s2-item4-macos') : t('builder-promo-s2-item4')))
+
 const SLIDE_COUNT = 5
 const cur = ref(0)
 const launched = ref(false)
@@ -475,7 +484,7 @@ onUnmounted(() => {
               <div class="bp-right">
                 <h2>{{ t('builder-promo-s2-title') }}</h2>
                 <p class="bp-lead">
-                  {{ t('builder-promo-s2-lead') }}
+                  {{ s2Lead }}
                 </p>
                 <div class="bp-list">
                   <div class="bp-item g">
@@ -488,7 +497,7 @@ onUnmounted(() => {
                     <span class="bp-c">✓</span> {{ t('builder-promo-s2-item3') }}
                   </div>
                   <div class="bp-item g">
-                    <span class="bp-c">✓</span> {{ t('builder-promo-s2-item4') }}
+                    <span class="bp-c">✓</span> {{ s2Item4 }}
                   </div>
                 </div>
               </div>

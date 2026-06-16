@@ -492,6 +492,8 @@
   "build-step-wait-subtitle": "This page will self-refresh when the build is detected",
   "build-time": "Build Time",
   "build-timeout-help": "Native cloud builds are stopped after this many minutes. The default is 15 minutes.",
+  "builder-promo-s2-lead-macos": "A guided setup configures signing for iOS & Android — and if you don't have an App Store Connect key yet, it opens a guided window and creates one for you, step by step. The rest — build machines, Xcode, Fastlane, CI — is already running, nothing to manage.",
+  "builder-promo-s2-item4-macos": "No Apple key yet? A guided window creates it for you",
   "build-timeout-invalid": "Build timeout must be between 5 and 360 minutes",
   "build-timeout-label": "Build timeout (minutes)",
   "build-time-usage": "Build time usage: ",
