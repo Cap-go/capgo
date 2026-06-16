@@ -180,6 +180,13 @@ function normalizeBillingSnapshotCounts(rows: BillingSnapshotRow[]): BillingSnap
     plans: normalizePlanTotals(plans),
   }
 }
+
+function isUnpaidAtBillingSnapshot(paidAt: Date | string | null | undefined, snapshotExclusiveEnd: Date): boolean {
+  if (!paidAt)
+    return true
+  return new Date(paidAt).getTime() >= snapshotExclusiveEnd.getTime()
+}
+
 function normalizeCoreSnapshotCounts(row: Partial<CoreSnapshotRow> | null | undefined): CoreSnapshotCounts {
   return {
     onboarded: Number(row?.onboarded) || 0,
@@ -1443,7 +1450,7 @@ async function getBillingSnapshotCounts(c: Context, snapshotExclusiveEnd: Date):
         FROM public.stripe_info si
         WHERE si.created_at < ${snapshotExclusiveEndIso}::timestamptz
           AND si.trial_at > ${snapshotExclusiveEndIso}::timestamptz
-          AND si.status IS DISTINCT FROM 'succeeded'::public.stripe_status
+          AND (si.paid_at IS NULL OR si.paid_at >= ${snapshotExclusiveEndIso}::timestamptz)
           AND (si.canceled_at IS NULL OR si.canceled_at >= ${snapshotExclusiveEndIso}::timestamptz)
           AND NOT EXISTS (
             SELECT 1
@@ -2133,6 +2140,7 @@ export const logsnagInsightsTestUtils = {
   normalizeLogsnagInsightsRetryCount,
   normalizePlanTotals,
   normalizeBillingSnapshotCounts,
+  isUnpaidAtBillingSnapshot,
   normalizeCoreSnapshotCounts,
   reserveLogsnagInsightsRetry,
   scheduleLogsnagInsightsUpdate,
