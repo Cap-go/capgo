@@ -9,10 +9,19 @@ import { attachApiKeyGlobalPermissions } from './global_permissions.ts'
 import { ensureApiKeyCanManageTargetOrgIds, ensureApiKeyManagementAllowed, filterApiKeysManageableByAuth, getApiKeyBindingOrgIds, isValidApiKeyIdFormat, requireApiKeyManagementAuth, selectOwnedApiKeyByIdentifier } from './scope.ts'
 
 type ApiKeyRow = Database['public']['Tables']['apikeys']['Row']
-type ApiKeyPublicRow = Pick<ApiKeyRow, 'created_at' | 'expires_at' | 'id' | 'name' | 'rbac_id' | 'updated_at' | 'user_id'>
+type ApiKeyPublicSelectRow = Pick<ApiKeyRow, 'created_at' | 'expires_at' | 'id' | 'key_hash' | 'name' | 'rbac_id' | 'updated_at' | 'user_id'>
+type ApiKeyPublicRow = Omit<ApiKeyPublicSelectRow, 'key_hash'> & { is_hashed_key: boolean }
 
 const app = honoFactory.createApp()
-const APIKEY_PUBLIC_COLUMNS = 'created_at, expires_at, id, name, rbac_id, updated_at, user_id'
+const APIKEY_PUBLIC_COLUMNS = 'created_at, expires_at, id, key_hash, name, rbac_id, updated_at, user_id'
+
+function toApiKeyPublicRow(apikey: ApiKeyPublicSelectRow): ApiKeyPublicRow {
+  const { key_hash, ...publicApiKey } = apikey
+  return {
+    ...publicApiKey,
+    is_hashed_key: key_hash !== null,
+  }
+}
 
 async function withGlobalPermissions<T extends { rbac_id: string | null }>(
   c: Context<MiddlewareKeyVariables>,
@@ -56,7 +65,8 @@ app.get('/', middlewareAuth(), async (c) => {
     throw quickError(500, 'failed_to_list_apikeys', 'Failed to list API keys', { supabaseError: error })
   }
 
-  const manageableApiKeys = await filterApiKeysManageableByAuth(c, auth, apikey, (apikeys ?? []) as ApiKeyPublicRow[])
+  const publicApiKeys = ((apikeys ?? []) as ApiKeyPublicSelectRow[]).map(toApiKeyPublicRow)
+  const manageableApiKeys = await filterApiKeysManageableByAuth(c, auth, apikey, publicApiKeys)
   return c.json(await withGlobalPermissions(c, manageableApiKeys))
 })
 
@@ -76,12 +86,12 @@ app.get('/:id', middlewareAuth(), async (c) => {
     throw simpleError('invalid_id_format', 'API key ID must be a numeric ID, UUID key, or legacy key token')
   }
 
-  const { data: fetchedApikey, error } = await selectOwnedApiKeyByIdentifier<ApiKeyPublicRow>(c, auth, id, APIKEY_PUBLIC_COLUMNS)
+  const { data: fetchedApikey, error } = await selectOwnedApiKeyByIdentifier<ApiKeyPublicSelectRow>(c, auth, id, APIKEY_PUBLIC_COLUMNS)
   if (error || !fetchedApikey) {
     throw quickError(404, 'failed_to_get_apikey', 'Failed to get API key', { supabaseError: error })
   }
   await ensureApiKeyCanManageTargetOrgIds(c, auth, authApikey, fetchedApikey.rbac_id ? await getApiKeyBindingOrgIds(c, fetchedApikey.rbac_id) : [], 'cannot_get_apikey')
-  const [apikeyWithPermissions] = await withGlobalPermissions(c, [fetchedApikey])
+  const [apikeyWithPermissions] = await withGlobalPermissions(c, [toApiKeyPublicRow(fetchedApikey)])
   return c.json(apikeyWithPermissions)
 })
 

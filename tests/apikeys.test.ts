@@ -58,6 +58,7 @@ describe('[GET] /apikey operations', () => {
     expect(response.status).toBe(200)
     expect(Array.isArray(data)).toBe(true)
     expect(data.every(apikey => !('key' in apikey) && !('key_hash' in apikey))).toBe(true)
+    expect(data.every(apikey => typeof apikey.is_hashed_key === 'boolean')).toBe(true)
   })
 
   it('get specific api key by id without key material', async () => {
@@ -71,6 +72,7 @@ describe('[GET] /apikey operations', () => {
     expect(response.status).toBe(200)
     expect(data).toHaveProperty('id', 10)
     expect(data).not.toHaveProperty('key')
+    expect(typeof data.is_hashed_key).toBe('boolean')
     expect(data).not.toHaveProperty('key_hash')
   })
 
@@ -99,6 +101,7 @@ describe('[GET] /apikey operations', () => {
       const data = await response.json() as Record<string, unknown>
       expect(response.status).toBe(200)
       expect(data).toHaveProperty('id', Number(insertedKey?.id))
+      expect(data).toHaveProperty('is_hashed_key', false)
       expect(data).not.toHaveProperty('key')
       expect(data).not.toHaveProperty('key_hash')
     }
@@ -942,6 +945,7 @@ describe('[POST] /apikey hashed key operations', () => {
     // Public GET must not expose key material.
     const publicResponse = await fetch(`${BASE_URL}/apikey/${data.id}`, { headers: authHeaders })
     const publicData = await publicResponse.json() as Record<string, unknown>
+    expect(publicData).toHaveProperty('is_hashed_key', true)
     expect(publicResponse.status).toBe(200)
     expect(publicData).not.toHaveProperty('key')
     expect(publicData).not.toHaveProperty('key_hash')
@@ -985,6 +989,7 @@ describe('[POST] /apikey hashed key operations', () => {
     const publicResponse = await fetch(`${BASE_URL}/apikey/${data.id}`, { headers: authHeaders })
     const publicData = await publicResponse.json() as Record<string, unknown>
     expect(publicResponse.status).toBe(200)
+    expect(publicData).toHaveProperty('is_hashed_key', false)
     expect(publicData).not.toHaveProperty('key')
     expect(publicData).not.toHaveProperty('key_hash')
 

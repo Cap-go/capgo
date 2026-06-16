@@ -19,8 +19,9 @@ const APIKEY_ORG_READER_ROLE = 'apikey_org_reader'
 type ApiKeyRow = Database['public']['Tables']['apikeys']['Row']
 type ApiKeyUpdateData = Partial<Pick<Database['public']['Tables']['apikeys']['Update'], 'name' | 'expires_at'>>
 type ApiKeyLookupRow = Pick<ApiKeyRow, 'id' | 'rbac_id' | 'expires_at' | 'key' | 'key_hash'>
-type ApiKeyPublicRow = Pick<ApiKeyRow, 'created_at' | 'expires_at' | 'id' | 'name' | 'rbac_id' | 'updated_at' | 'user_id'>
-const APIKEY_PUBLIC_COLUMNS = 'created_at, expires_at, id, name, rbac_id, updated_at, user_id'
+type ApiKeyPublicSelectRow = Pick<ApiKeyRow, 'created_at' | 'expires_at' | 'id' | 'key_hash' | 'name' | 'rbac_id' | 'updated_at' | 'user_id'>
+type ApiKeyPublicRow = Omit<ApiKeyPublicSelectRow, 'key_hash'> & { is_hashed_key: boolean }
+const APIKEY_PUBLIC_COLUMNS = 'created_at, expires_at, id, key_hash, name, rbac_id, updated_at, user_id'
 
 interface ApiKeyPut {
   id?: string | number
@@ -38,6 +39,14 @@ interface BindingInput {
   app_id?: string | null
   channel_id?: string | number | null
   reason?: string
+}
+
+function toApiKeyPublicRow(apikey: ApiKeyPublicSelectRow): ApiKeyPublicRow {
+  const { key_hash, ...publicApiKey } = apikey
+  return {
+    ...publicApiKey,
+    is_hashed_key: key_hash !== null,
+  }
 }
 
 function parseBindingsForUpdate(body: ApiKeyPut, requestId: string): BindingInput[] | undefined {
@@ -401,7 +410,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
     if (fetchUpdatedError || !updatedData) {
       throw quickError(500, 'failed_to_update_apikey', 'Failed to load updated API key', { requestId, supabaseError: fetchUpdatedError })
     }
-    updatedApikey = updatedData
+    updatedApikey = toApiKeyPublicRow(updatedData as ApiKeyPublicSelectRow)
   }
   else if (hasGlobalPermissionUpdates) {
     await replaceApiKeyGlobalPermissionsForExistingBindings(c, auth, {
@@ -419,7 +428,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
     if (fetchUpdatedError || !updatedData) {
       throw quickError(500, 'failed_to_update_apikey', 'Failed to load updated API key', { requestId, supabaseError: fetchUpdatedError })
     }
-    updatedApikey = updatedData
+    updatedApikey = toApiKeyPublicRow(updatedData as ApiKeyPublicSelectRow)
   }
   else if (hasUpdates) {
     const { data: updatedData, error: updateError } = await writeSupabase
@@ -433,7 +442,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
     if (updateError || !updatedData) {
       throw quickError(500, 'failed_to_update_apikey', 'Failed to update API key', { requestId, supabaseError: updateError })
     }
-    updatedApikey = updatedData
+    updatedApikey = toApiKeyPublicRow(updatedData as ApiKeyPublicSelectRow)
   }
 
   if (regenerate) {
@@ -445,7 +454,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
       if (regenerateError || !regeneratedApikey) {
         throw quickError(500, 'failed_to_update_apikey', 'Failed to regenerate API key', { requestId, supabaseError: regenerateError })
       }
-      return c.json(regeneratedApikey)
+      return c.json({ ...regeneratedApikey, is_hashed_key: true })
     }
 
     const { data: updatedData, error: updateError } = await writeSupabase
@@ -463,7 +472,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
     if (updateError || !updatedData) {
       throw quickError(500, 'failed_to_update_apikey', 'Failed to regenerate API key', { requestId, supabaseError: updateError })
     }
-    return c.json(updatedData)
+    return c.json({ ...updatedData, is_hashed_key: updatedData.key_hash !== null })
   }
 
   if (!updatedApikey) {
