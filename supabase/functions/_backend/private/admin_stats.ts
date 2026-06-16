@@ -7,6 +7,7 @@ import { getAdminAppsTrend, getAdminBandwidthTrend, getAdminBundlesTrend, getAdm
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { getAdminCancelledOrganizations, getAdminCustomerCountryBreakdown, getAdminDeploymentsTrend, getAdminEmailTypeBreakdown, getAdminGlobalStatsTrend, getAdminOnboardingFunnel, getAdminOrganizationInsights, getAdminPluginBreakdown, getAdminTrialOrganizations, getAdminTrialPlanBreakdown } from '../utils/pg.ts'
+import { getAdminBuilderAnalytics } from '../utils/builder_analytics.ts'
 import { getCancellationDetails } from '../utils/stripe.ts'
 import { supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
@@ -38,6 +39,7 @@ const metricCategories = [
   'email_type_breakdown',
   'customer_country_breakdown',
   'organization_insights',
+  'builder_analytics',
 ] as const
 
 const isoUtcDatetimeSchema = type('string').narrow((value, ctx) => {
@@ -307,6 +309,10 @@ app.post('/', middlewareAuth, async (c) => {
           paid_only,
           search,
         })
+        break
+
+      case 'builder_analytics':
+        result = await getAdminBuilderAnalytics(c, start_date, end_date)
         break
 
       default:

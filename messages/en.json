@@ -1715,6 +1715,7 @@
   "plugin-sandbox-native-bridge-tests": "Native bridge tests",
   "plugin-sandbox-skipped-native-setup": "Skipped plugins needing native setup",
   "plugins": "Plugins",
+  "builder": "Builder",
   "prediction": "Prediction",
   "preview": "Preview bundle",
   "preview-disabled": "Preview is disabled",
