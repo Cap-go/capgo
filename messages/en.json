@@ -530,6 +530,7 @@
   "builder-promo-s5-title": "Everything's in place.",
   "builder-promo-s5-lead1": "Builds, signing, and delivery are handled for you.",
   "builder-promo-s5-lead2": "All that's left is your first build.",
+  "builder": "Builder",
   "builder-promo-s5-cta": "Start my first build",
   "builds": "Builds",
   "builds-last-month-trend": "Native Builds Last 30 Days (Total, iOS, Android)",
