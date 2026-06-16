@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { platform } from 'node:os'
+import { platform, release } from 'node:os'
 import { arch, env, version as nodeVersion } from 'node:process'
 import { isCI, name as ciName } from 'ci-info'
 import pack from '../../package.json'
@@ -31,6 +31,7 @@ export interface GlobalAnalyticsProps {
   node_version: string
   os_platform: string
   os_arch: string
+  os_release: string
   is_ci: boolean
   is_tty: boolean
   invocation_source: InvocationSource
@@ -43,6 +44,7 @@ export function getGlobalAnalyticsProps(): GlobalAnalyticsProps {
     node_version: nodeVersion,
     os_platform: platform(),
     os_arch: arch,
+    os_release: release(),
     is_ci: isCI,
     is_tty: Boolean(process.stdout.isTTY),
     invocation_source: invocationSource,
