@@ -283,19 +283,45 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
     // whatever auth + org we can and emit one event. Awaited so the request
     // flushes before the process exits; trackBuilderOnboardingCancelled
     // swallows every error, so this never blocks or breaks the exit.
+    //
+    // Time-boxed: the whole resolve+send path is raced against a single
+    // deadline so a stalled network can never keep the CLI alive after the
+    // user has already quit. On timeout we abort the org lookup and skip the
+    // event — losing one best-effort quit beacon is preferable to a hang.
     if (result.outcome === 'cancelled') {
       const apikey = options.apikey?.trim() || findSavedKeySilent()
       if (apikey) {
-        const orgId = await resolveOwnerOrgId(apikey, appId)
-        await trackBuilderOnboardingCancelled({
-          apikey,
-          appId,
-          orgId,
-          journeyId,
-          platform: resolvedPlatform,
-          lastStep,
-          durationMs: Date.now() - journeyStartedAt,
+        const timeoutMs = 1500
+        const controller = new AbortController()
+        let timer: ReturnType<typeof setTimeout> | undefined
+        const deadline = new Promise<void>((resolve) => {
+          timer = setTimeout(() => {
+            controller.abort()
+            resolve()
+          }, timeoutMs)
         })
+        try {
+          await Promise.race([
+            (async () => {
+              const orgId = await resolveOwnerOrgId(apikey, appId, undefined, controller.signal)
+              await trackBuilderOnboardingCancelled({
+                apikey,
+                appId,
+                orgId,
+                journeyId,
+                platform: resolvedPlatform,
+                lastStep,
+                durationMs: Date.now() - journeyStartedAt,
+                signal: controller.signal,
+              })
+            })(),
+            deadline,
+          ])
+        }
+        finally {
+          if (timer)
+            clearTimeout(timer)
+        }
       }
     }
   }

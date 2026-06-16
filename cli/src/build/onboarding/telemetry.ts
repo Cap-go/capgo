@@ -126,6 +126,11 @@ export interface TrackBuilderOnboardingCancelledInput {
   lastStep?: string
   /** Total wall-clock duration of the journey, from launch to quit. */
   durationMs?: number
+  /**
+   * Abort signal used to time-box the post-quit flush so a stalled network
+   * can't keep the CLI alive after the user has already exited the wizard.
+   */
+  signal?: AbortSignal
 }
 
 /**
@@ -159,7 +164,7 @@ export async function trackBuilderOnboardingCancelled(input: TrackBuilderOnboard
       org_id: input.orgId,
       tracking_version: 2,
       tags,
-    })
+    }, undefined, input.signal)
   }
   catch {
     // Telemetry must never break the exit path.
