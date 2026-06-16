@@ -36,6 +36,7 @@ interface TrackEventBody extends TrackOptions {
   notifyConsole?: boolean
   org_id?: string
   tracking_version?: number | string
+  nonPersonTags?: Record<string, string | number | boolean>
 }
 
 function isTrackingV2(version: unknown) {
