@@ -142,6 +142,30 @@ describe('stripe subscription event classification', () => {
     expect(stripeData.data.price_id).toBe('price_licensed')
   })
 
+  it.concurrent('maps subscription trial end to the stored trial date', () => {
+    const stripeData = extractDataEvent(mockContext, {
+      data: {
+        object: {
+          customer: 'cus_trial_extended',
+          id: 'sub_trial_extended',
+          items: {
+            data: [
+              makeSubscriptionItem({
+                interval: 'month',
+                priceId: 'price_monthly_trial',
+                productId: 'prod_trial',
+              }),
+            ],
+          },
+          trial_end: 1_722_470_400,
+        },
+      },
+      type: 'customer.subscription.updated',
+    } as any)
+
+    expect(stripeData.data.trial_at).toBe('2024-08-01T00:00:00.000Z')
+  })
+
   it.concurrent('keeps same-cadence plan switches as plan changes instead of upgrades', () => {
     const stripeData = extractDataEvent(mockContext, {
       data: {

@@ -276,6 +276,11 @@ interface AppProps {
   apikey?: string
   // Capgo API gateway override (--supa-host); prod when omitted.
   supaHost?: string
+  /** Correlation id for this onboarding run; emitted as `journey_id` on every analytics event. */
+  journeyId: string
+  /** Reports the current step to the shell on every transition, so the caller can
+   *  record where the user dropped off for the quit event. */
+  onStep?: (step: string) => void
   /**
    * Reports the wizard outcome to the shell when it reaches build-complete, so
    *  the caller prints an accurate post-exit message + durable summary instead of
@@ -321,7 +326,7 @@ async function runRunnerCommand(runner: string, args: string[]): Promise<{ succe
   })
 }
 
-const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgress, iosDir, guidedHelperUsable, apikey, supaHost, onResult }) => {
+const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgress, iosDir, guidedHelperUsable, apikey, supaHost, journeyId, onStep, onResult }) => {
   const { exit } = useApp()
   // Pass helper availability so an automated-path resume only targets
   // asc-key-generating when the helper can actually run (else manual instructions).
@@ -699,6 +704,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         void trackBuilderOnboardingStep({
           apikey: resolvedApiKeyRef.current,
           appId,
+          journeyId,
           orgId: resolvedOrgId,
           platform: 'ios',
           ...queued,
@@ -711,6 +717,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         void trackBuilderOnboardingAction({
           apikey: resolvedApiKeyRef.current,
           appId,
+          journeyId,
           orgId: resolvedOrgId,
           platform: 'ios',
           ...queued,
@@ -747,6 +754,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       void trackBuilderOnboardingStep({
         apikey: resolvedApiKeyRef.current,
         appId,
+        journeyId,
         orgId: resolvedOrgId,
         platform: 'ios',
         ...eventPayload,
@@ -755,7 +763,15 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     else {
       pendingTelemetryRef.current.push(eventPayload)
     }
-  }, [step, appId, resolvedOrgId, error])
+  }, [step, appId, resolvedOrgId, error, journeyId])
+
+  // Report each step up to the shell/command so the quit event can name where
+  // the user dropped off. Deliberately separate from the analytics effect above
+  // (which is gated on a resolved api key) — drop-off location must be captured
+  // for the quit event even when no telemetry key is present.
+  useEffect(() => {
+    onStep?.(step)
+  }, [step, onStep])
 
   // Emit a named "Builder Onboarding Action" event (distinct from the per-step
   // funnel). Mirrors the Android helper: fires immediately once the org id is
@@ -775,6 +791,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         void trackBuilderOnboardingAction({
           apikey: resolvedApiKeyRef.current,
           appId,
+          journeyId,
           orgId: resolvedOrgId,
           platform: 'ios',
           ...payload,
@@ -784,7 +801,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         pendingActionTelemetryRef.current.push(payload)
       }
     },
-    [appId, resolvedOrgId, step],
+    [appId, resolvedOrgId, step, journeyId],
   )
   const [teamId, setTeamId] = useState(initialProgress?.completedSteps.certificateCreated?.teamId || '')
   const [certData, setCertData] = useState<CertificateData | null>(initialProgress?.completedSteps.certificateCreated || null)
@@ -1191,6 +1208,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       appId,
       platform: 'ios',
       apikey,
+      journeyId,
       packageManager: selectedPackageManager ?? normalizePackageManager(pm.pm),
       buildScriptType: buildScriptChoice?.type,
       decision: options.decision,
@@ -2725,7 +2743,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         // so the driver injects the gateway override here (parity with main's
         // bespoke requesting-build body).
         requestBuildInternal: (id, options, silent, logger) =>
-          requestBuildInternal(id, { ...options, supaHost }, silent, logger),
+          requestBuildInternal(id, { ...options, supaHost, builderJourneyId: journeyId }, silent, logger),
 
         // ── streaming / telemetry / preload sinks (forwarded into the shared tail) ──
         // The rich streaming BuildLogger requesting-build forwards into

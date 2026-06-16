@@ -117,6 +117,8 @@ const globalStatsTrendData = ref<Array<{
   registers_today: number
   demo_apps_created: number
   devices_last_month: number
+  trial_extended_orgs: number
+  trial_extended_subscribed_orgs: number
 }>>([])
 
 const isLoadingGlobalStatsTrend = ref(false)
@@ -624,6 +626,30 @@ const registrationsTrendSeries = computed(() => {
         value: item.registers_today,
       })),
       color: '#3b82f6', // blue
+    },
+  ]
+})
+
+const trialExtensionTrendSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: t('trial-extensions'),
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.trial_extended_orgs ?? 0,
+      })),
+      color: '#119eff',
+    },
+    {
+      label: t('extended-trial-subscriptions'),
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.trial_extended_subscribed_orgs ?? 0,
+      })),
+      color: '#10b981',
     },
   ]
 })
@@ -1295,6 +1321,18 @@ displayStore.defaultBack = '/dashboard'
             >
               <AdminMultiLineChart
                 :series="usersTrendSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+
+            <!-- Trial Extension Conversions -->
+            <ChartCard
+              :title="t('trial-extension-conversion-trend')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="trialExtensionTrendSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="trialExtensionTrendSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
               />
             </ChartCard>

@@ -38,7 +38,7 @@ try {
   assert.equal(body.channel, 'mcp')
   assert.equal(body.tags.tool_name, 'capgo_list_apps')
   assert.equal(body.tags.success, true)
-  assert.equal(body.tags.invocation_source, 'mcp')
+  assert.equal(body.nonPersonTags.invocation_source, 'mcp')
   assert.equal(typeof body.tags.duration_ms, 'number')
 
   // isError result path

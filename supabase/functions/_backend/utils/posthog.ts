@@ -14,6 +14,7 @@ interface PostHogCapturePayload extends Pick<TrackOptions, 'event'>, Pick<TrackO
   ip?: string
   setPersonProperties?: boolean
   tags?: Record<string, any>
+  nonPersonTags?: Record<string, any>
   timestamp?: string
   user_id?: string
 }
@@ -34,7 +35,12 @@ export async function trackPosthogEvent(c: Context, payload: PostHogCapturePaylo
 
   const hasGroups = payload.groups && Object.keys(payload.groups).length > 0
 
+  // `tags` become BOTH event properties and PostHog person properties ($set).
+  // `nonPersonTags` are event properties ONLY — never $set — for volatile
+  // per-event context (e.g. the CLI's global runtime props) that must not
+  // become last-write-wins identity traits on the actor.
   const properties = {
+    ...(payload.nonPersonTags || {}),
     ...(payload.tags || {}),
     channel: payload.channel,
     description: payload.description,

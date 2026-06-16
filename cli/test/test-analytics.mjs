@@ -29,6 +29,8 @@ try {
   assert.equal(typeof props.node_version, 'string')
   assert.equal(typeof props.os_platform, 'string')
   assert.equal(typeof props.os_arch, 'string')
+  assert.equal(typeof props.os_release, 'string')
+  assert.equal(typeof props.timezone, 'string')
   assert.equal(typeof props.is_ci, 'boolean')
   assert.equal(typeof props.is_tty, 'boolean')
   assert.equal(props.invocation_source, 'cli')
@@ -54,8 +56,8 @@ try {
   assert.equal(body.tags.foo, 'bar')
   assert.equal(body.tags.count, 3)
   assert.equal(body.tags.flag, true)
-  assert.equal(body.tags.invocation_source, 'cli')
-  assert.equal(typeof body.tags.cli_version, 'string')
+  assert.equal(body.nonPersonTags.invocation_source, 'cli')
+  assert.equal(typeof body.nonPersonTags.cli_version, 'string')
 
   // 3. opt-out suppresses the send
   process.env.CAPGO_DISABLE_TELEMETRY = '1'
