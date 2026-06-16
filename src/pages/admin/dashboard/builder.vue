@@ -298,26 +298,28 @@ function buildPeriodSubtitle(stats: { builds: number, days: number, totalSeconds
   return `${stats.builds.toLocaleString()} builds across ${stats.days.toLocaleString()} active days, ${formatTotalSeconds(stats.totalSeconds)} total in selected period`
 }
 
-watch(() => adminStore.activeDateRange, () => {
-  loadGlobalStatsTrend()
-}, { deep: true })
-
-watch(() => adminStore.refreshTrigger, () => {
-  loadGlobalStatsTrend()
-})
-
-onMounted(async () => {
-  if (!mainStore.isAdmin) {
-    console.error('Non-admin user attempted to access admin dashboard builder')
-    router.push('/dashboard')
-    return
-  }
-
+async function refreshBuilderDashboard() {
   isLoading.value = true
   await loadGlobalStatsTrend()
   isLoading.value = false
+}
 
-  displayStore.NavTitle = t('builder')
+function sendNonAdminBack() {
+  console.error('Non-admin user attempted to access admin dashboard builder')
+  return router.push('/dashboard')
+}
+
+watch(
+  [() => adminStore.activeDateRange, () => adminStore.refreshTrigger],
+  () => loadGlobalStatsTrend(),
+  { deep: true },
+)
+
+onMounted(async () => {
+  if (!mainStore.isAdmin)
+    return sendNonAdminBack()
+
+  await refreshBuilderDashboard()
 })
 
 displayStore.NavTitle = t('builder')
