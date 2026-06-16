@@ -1641,14 +1641,14 @@ export function mapAndroidView(
       return {
         ...base,
         kind: 'choice',
-        summary: `Let's set up your Android signing keystore for "${facts.appId}". Do you already have one?`,
+        summary: `Let's set up your Android signing keystore for "${facts.appId}". Do you already have one?\n\nThis choice matters: if you have EVER published this app to Google Play, you must reuse the SAME keystore you signed those releases with. Creating a new keystore changes the signing key, so Google Play will REJECT new uploads — unless you reset the upload key in the Google Play Console (App integrity → App signing → request an upload key reset). Creating a new keystore is only safe if this app has never been uploaded to Google Play (a first build).`,
         options: (view.options ?? [])
           .filter(o => o.value !== 'learn')
           .map(o => ({ value: o.value, label: o.label, note: o.note })),
         next: {
           tool: NEXT_STEP_TOOL,
           with: { keystoreMethod: '<existing|generate>' },
-          instruction: 'Ask the user whether they already have a keystore, then call next_step with keystoreMethod.',
+          instruction: 'First ask the user whether this app has ALREADY been published to Google Play. If yes (or they are unsure), steer them to "existing" and use the keystore they signed previous releases with — generating a new one will make Google Play reject their uploads unless they reset the upload key in the Play Console. Creating a new keystore is only safe if the app has NEVER been uploaded to Google Play. Then call next_step with keystoreMethod.',
           call: `${NEXT_STEP_TOOL}({ keystoreMethod: "generate" })`,
         },
       }
@@ -1657,12 +1657,12 @@ export function mapAndroidView(
       return {
         ...base,
         kind: 'human_gate',
-        summary: 'A keystore signs your Android app. You need one to publish to Google Play.',
-        human: { instruction: 'Let the user know about keystores, then ask them to choose: do they already have one or should we create one?' },
+        summary: 'A keystore signs your Android app — you need one to publish to Google Play. If you have ALREADY published this app, you must reuse the SAME keystore: a new one changes the signing key and Google Play will reject your uploads unless you reset the upload key in the Play Console.',
+        human: { instruction: 'Explain what a keystore is, then warn: if the app has already been published to Google Play they MUST reuse the existing keystore — a new key is rejected by Google Play unless they reset the upload key in the Google Play Console (App integrity → App signing). Ask whether the app has ever been uploaded to Google Play: if yes, use the existing keystore; if never, creating a new one is fine.' },
         next: {
           tool: NEXT_STEP_TOOL,
           with: { keystoreMethod: '<existing|generate>' },
-          instruction: 'Ask the user whether they already have a keystore, then call next_step with keystoreMethod.',
+          instruction: 'Ask whether they already have a keystore (and whether the app has been published to Google Play), then call next_step with keystoreMethod.',
           call: `${NEXT_STEP_TOOL}({ keystoreMethod: "generate" })`,
         },
       }
