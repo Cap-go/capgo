@@ -15,20 +15,21 @@
 -- therefore does NOT touch clear_onboarding_app_data -- it relies on that
 -- existing safe cleanup and only flips the flag.
 --
--- To stay robust if the provenance reset raises for one app (e.g. real data is
--- attached to demo-tracked rows), the flip is done per-app inside an exception
--- block: a failing app is skipped, never blocking the others, and no data is
--- lost.
+-- To stay robust if the provenance reset raises for one app (real data attached
+-- to demo-tracked rows), the flip is done per-app inside an exception block that
+-- catches ONLY the provenance RAISE (SQLSTATE P0001): a refusing app is skipped,
+-- never blocking the others, and no data is lost.
 
 -- Real-bundle detector: true when an app has at least one UPLOAD-READY, real
 -- bundle. "Upload-ready" reuses the predicate the (reverted)
 -- complete_onboarding_after_first_upload trigger used -- an external bundle with
--- a non-blank external_url, or a stored bundle with a non-blank r2_path -- so
--- metadata-only version rows (e.g. `--dry-upload`, or a created-but-not-finished
--- upload) do NOT qualify. Demo-seeded versions are excluded via the
--- onboarding_demo_data provenance table (the authoritative demo marker), and
--- 'builtin'/'unknown' placeholders are never counted. Used only to SELECT apps
--- that have genuinely shipped a real upload.
+-- a non-blank external_url, or a stored bundle with a non-blank r2_path (and not
+-- the 'r2-direct' in-progress provider) -- so metadata-only version rows (e.g.
+-- `--dry-upload`, or a created-but-not-finished upload) do NOT qualify.
+-- Demo-seeded versions are excluded via the onboarding_demo_data provenance
+-- table (the authoritative demo marker), and 'builtin'/'unknown' placeholders
+-- are never counted. Used only to SELECT apps that have genuinely shipped a
+-- real upload.
 CREATE OR REPLACE FUNCTION public.app_has_real_bundle(p_app_id text)
 RETURNS boolean
 LANGUAGE sql
@@ -73,7 +74,10 @@ DECLARE
 BEGIN
   -- Target apps that clearly finished real onboarding: an upload-ready real
   -- bundle, created more than 15 days ago, and not still carrying seeded demo
-  -- data.
+  -- data. The 15-day gate is deliberately on the app's age (not the upload's
+  -- age): once an app is well past the onboarding window AND has a real upload,
+  -- clearing the banner is correct -- there is no value in keeping a "demo data"
+  -- banner on an app that already shipped a real bundle.
   FOR v_app IN
     SELECT id, app_id
     FROM public.apps
@@ -84,16 +88,19 @@ BEGIN
   LOOP
     BEGIN
       -- Flipping the flag fires cleanup_onboarding_app_data_on_complete, whose
-      -- provenance-based reset only removes tracked demo rows. The per-app
-      -- exception block means that if that reset refuses (it would touch real
-      -- data), this app is left pending and the batch continues -- never a
-      -- partial delete, never a lost batch.
+      -- provenance-based reset only removes tracked demo rows.
       UPDATE public.apps
       SET need_onboarding = false
       WHERE id = v_app.id;
 
       v_completed := v_completed + 1;
-    EXCEPTION WHEN OTHERS THEN
+    EXCEPTION WHEN raise_exception THEN
+      -- SQLSTATE P0001 only: the provenance reset refused (it would have
+      -- cascaded into real data). Leave this app pending and continue with the
+      -- rest of the batch. Any OTHER error class (programming errors in the
+      -- cleanup chain, deadlocks, infra failures) is intentionally NOT caught
+      -- here, so a genuine defect surfaces loudly instead of being silently
+      -- downgraded to a benign-looking "left pending".
       v_skipped := v_skipped + 1;
       RAISE WARNING 'cleanup_completed_onboarding_apps: left app % (%) pending: %',
         v_app.app_id, v_app.id, SQLERRM;
@@ -111,6 +118,9 @@ GRANT EXECUTE ON FUNCTION public.cleanup_completed_onboarding_apps() TO service_
 -- Register a DAILY cron task (consolidated cron_tasks system). The transition is
 -- gated by created_at < now() - 15 days, so an app becomes eligible at most
 -- once -- a daily pass is plenty; runs at 04:00 UTC, after cleanup_expired_demo_apps (03:00).
+-- The ON CONFLICT clause resets EVERY scheduling column (including run_on_dow,
+-- run_on_day, and enabled) so re-running the migration always restores the
+-- intended daily, enabled schedule even if the row was previously patched.
 INSERT INTO public.cron_tasks (
   name,
   description,
@@ -123,7 +133,8 @@ INSERT INTO public.cron_tasks (
   run_at_minute,
   run_at_second,
   run_on_dow,
-  run_on_day
+  run_on_day,
+  enabled
 ) VALUES (
   'cleanup_completed_onboarding_apps',
   'Daily: clear apps.need_onboarding for apps that finished real onboarding (upload-ready bundle, created >15 days ago, no seeded demo data)',
@@ -136,7 +147,8 @@ INSERT INTO public.cron_tasks (
   0,
   0,
   null,
-  null
+  null,
+  true
 )
 ON CONFLICT (name) DO UPDATE SET
   description = excluded.description,
@@ -148,4 +160,7 @@ ON CONFLICT (name) DO UPDATE SET
   run_at_hour = excluded.run_at_hour,
   run_at_minute = excluded.run_at_minute,
   run_at_second = excluded.run_at_second,
+  run_on_dow = excluded.run_on_dow,
+  run_on_day = excluded.run_on_day,
+  enabled = excluded.enabled,
   updated_at = NOW();

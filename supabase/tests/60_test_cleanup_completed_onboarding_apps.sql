@@ -1,118 +1,100 @@
 BEGIN;
 
-SELECT plan(12);
+SELECT plan(19);
 
 SELECT tests.authenticate_as_service_role();
 
--- Fixtures: onboarding apps in different states.
---   real.old     -> upload-ready real bundle, 20 days old   => should auto-complete
---   real.recent  -> upload-ready real bundle, 2 days old     => too young, stays pending
---   noreal.old   -> only a builtin placeholder               => no real upload, stays pending
---   demo.old     -> upload-ready but demo-tracked + demo/    => seeded demo, stays pending
---   noupload.old -> non-placeholder version, NO artifact     => not upload-ready, stays pending
-INSERT INTO public.apps (
-  id, owner_org, app_id, icon_url, name, user_id, need_onboarding, created_at
-)
+-- Fixtures (all need_onboarding=true). Org/user come from the seed.
+--   real.old     -> upload-ready r2 bundle, 20d            => auto-complete
+--   real.recent  -> upload-ready r2 bundle, 2d             => too young, pending
+--   noreal.old   -> live 'builtin' placeholder, upload-ready => excluded by NAME, pending
+--   demo.old     -> upload-ready but demo-tracked + demo/   => seeded demo, pending
+--   noupload.old -> non-placeholder version, NO artifact    => not upload-ready, pending
+--   external.old -> external bundle w/ external_url, 20d    => auto-complete (external branch)
+--   r2direct.old -> 'r2-direct' provider w/ r2_path, 20d    => NOT upload-ready, pending
+--   raises.old   -> real bundle (eligible) + a demo-tracked
+--                   version with an UNTRACKED manifest      => provenance reset RAISEs,
+--                                                              app is skipped, data preserved
+INSERT INTO public.apps (id, owner_org, app_id, icon_url, name, user_id, need_onboarding, created_at)
 VALUES
-  ('60000000-0000-0000-0000-000000000001', '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
-   'com.test.onb.real.old', '', 'Real Old', '6aa76066-55ef-4238-ade6-0b32334a4097', true, now() - interval '20 days'),
-  ('60000000-0000-0000-0000-000000000002', '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
-   'com.test.onb.real.recent', '', 'Real Recent', '6aa76066-55ef-4238-ade6-0b32334a4097', true, now() - interval '2 days'),
-  ('60000000-0000-0000-0000-000000000003', '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
-   'com.test.onb.noreal.old', '', 'No Real Old', '6aa76066-55ef-4238-ade6-0b32334a4097', true, now() - interval '20 days'),
-  ('60000000-0000-0000-0000-000000000004', '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
-   'com.test.onb.demo.old', '', 'Demo Old', '6aa76066-55ef-4238-ade6-0b32334a4097', true, now() - interval '20 days'),
-  ('60000000-0000-0000-0000-000000000005', '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
-   'com.test.onb.noupload.old', '', 'No Upload Old', '6aa76066-55ef-4238-ade6-0b32334a4097', true, now() - interval '20 days');
+  ('60000000-0000-0000-0000-000000000001', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'com.test.onb.real.old', '', 'Real Old', '6aa76066-55ef-4238-ade6-0b32334a4097', true, now() - interval '20 days'),
+  ('60000000-0000-0000-0000-000000000002', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'com.test.onb.real.recent', '', 'Real Recent', '6aa76066-55ef-4238-ade6-0b32334a4097', true, now() - interval '2 days'),
+  ('60000000-0000-0000-0000-000000000003', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'com.test.onb.noreal.old', '', 'No Real Old', '6aa76066-55ef-4238-ade6-0b32334a4097', true, now() - interval '20 days'),
+  ('60000000-0000-0000-0000-000000000004', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'com.test.onb.demo.old', '', 'Demo Old', '6aa76066-55ef-4238-ade6-0b32334a4097', true, now() - interval '20 days'),
+  ('60000000-0000-0000-0000-000000000005', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'com.test.onb.noupload.old', '', 'No Upload Old', '6aa76066-55ef-4238-ade6-0b32334a4097', true, now() - interval '20 days'),
+  ('60000000-0000-0000-0000-000000000006', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'com.test.onb.external.old', '', 'External Old', '6aa76066-55ef-4238-ade6-0b32334a4097', true, now() - interval '20 days'),
+  ('60000000-0000-0000-0000-000000000007', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'com.test.onb.r2direct.old', '', 'R2 Direct Old', '6aa76066-55ef-4238-ade6-0b32334a4097', true, now() - interval '20 days'),
+  ('60000000-0000-0000-0000-000000000008', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'com.test.onb.raises.old', '', 'Raises Old', '6aa76066-55ef-4238-ade6-0b32334a4097', true, now() - interval '20 days');
 
--- real.old / real.recent: stored bundle with a real r2_path (upload-ready).
--- demo.old: also upload-ready, but it is demo-tracked (see onboarding_demo_data).
--- noupload.old: non-placeholder version with NO r2_path/external_url (metadata-only).
+-- storage_provider is NOT NULL; every row supplies a value.
+-- noreal.old (960003): a LIVE builtin placeholder that is otherwise upload-ready,
+--   so it is rejected ONLY by the name filter (exercises that branch).
+-- raises.old has two versions: 960008 (real, makes it eligible) and 960009
+--   (demo-tracked, with a non-demo manifest that is left untracked).
 INSERT INTO public.app_versions (id, owner_org, created_at, app_id, name, user_id, deleted, storage_provider, r2_path, external_url)
 VALUES
-  (960001, '046a36ac-e03c-4590-9257-bd6c9dba9ee8', now() - interval '20 days', 'com.test.onb.real.old', '1.0.0', '6aa76066-55ef-4238-ade6-0b32334a4097', false, 'r2', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.test.onb.real.old/1.0.0.zip', NULL),
-  (960002, '046a36ac-e03c-4590-9257-bd6c9dba9ee8', now() - interval '2 days', 'com.test.onb.real.recent', '1.0.0', '6aa76066-55ef-4238-ade6-0b32334a4097', false, 'r2', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.test.onb.real.recent/1.0.0.zip', NULL),
-  (960003, '046a36ac-e03c-4590-9257-bd6c9dba9ee8', now() - interval '20 days', 'com.test.onb.noreal.old', 'builtin', '6aa76066-55ef-4238-ade6-0b32334a4097', true, NULL, NULL, NULL),
+  (960001, '046a36ac-e03c-4590-9257-bd6c9dba9ee8', now() - interval '20 days', 'com.test.onb.real.old', '1.0.0', '6aa76066-55ef-4238-ade6-0b32334a4097', false, 'r2', 'orgs/046a36ac/apps/com.test.onb.real.old/1.0.0.zip', NULL),
+  (960002, '046a36ac-e03c-4590-9257-bd6c9dba9ee8', now() - interval '2 days', 'com.test.onb.real.recent', '1.0.0', '6aa76066-55ef-4238-ade6-0b32334a4097', false, 'r2', 'orgs/046a36ac/apps/com.test.onb.real.recent/1.0.0.zip', NULL),
+  (960003, '046a36ac-e03c-4590-9257-bd6c9dba9ee8', now() - interval '20 days', 'com.test.onb.noreal.old', 'builtin', '6aa76066-55ef-4238-ade6-0b32334a4097', false, 'r2', 'orgs/046a36ac/apps/com.test.onb.noreal.old/builtin.zip', NULL),
   (960004, '046a36ac-e03c-4590-9257-bd6c9dba9ee8', now() - interval '20 days', 'com.test.onb.demo.old', '1.0.0', '6aa76066-55ef-4238-ade6-0b32334a4097', false, 'r2', 'demo/com.test.onb.demo.old/1.0.0.zip', NULL),
-  (960005, '046a36ac-e03c-4590-9257-bd6c9dba9ee8', now() - interval '20 days', 'com.test.onb.noupload.old', '1.0.0', '6aa76066-55ef-4238-ade6-0b32334a4097', false, 'r2', NULL, NULL);
+  (960005, '046a36ac-e03c-4590-9257-bd6c9dba9ee8', now() - interval '20 days', 'com.test.onb.noupload.old', '1.0.0', '6aa76066-55ef-4238-ade6-0b32334a4097', false, 'r2', NULL, NULL),
+  (960006, '046a36ac-e03c-4590-9257-bd6c9dba9ee8', now() - interval '20 days', 'com.test.onb.external.old', '1.0.0', '6aa76066-55ef-4238-ade6-0b32334a4097', false, 'external', NULL, 'https://cdn.example.com/external/1.0.0.zip'),
+  (960007, '046a36ac-e03c-4590-9257-bd6c9dba9ee8', now() - interval '20 days', 'com.test.onb.r2direct.old', '1.0.0', '6aa76066-55ef-4238-ade6-0b32334a4097', false, 'r2-direct', 'orgs/046a36ac/apps/com.test.onb.r2direct.old/1.0.0.zip', NULL),
+  (960008, '046a36ac-e03c-4590-9257-bd6c9dba9ee8', now() - interval '20 days', 'com.test.onb.raises.old', '2.0.0', '6aa76066-55ef-4238-ade6-0b32334a4097', false, 'r2', 'orgs/046a36ac/apps/com.test.onb.raises.old/2.0.0.zip', NULL),
+  (960009, '046a36ac-e03c-4590-9257-bd6c9dba9ee8', now() - interval '20 days', 'com.test.onb.raises.old', '1.0.0', '6aa76066-55ef-4238-ade6-0b32334a4097', false, 'r2', 'orgs/046a36ac/apps/com.test.onb.raises.old/1.0.0.zip', NULL);
 
--- demo.old carries a demo/ manifest (so has_seeded_demo_data is true) ...
+-- demo.old carries a demo/ manifest (so has_seeded_demo_data is true).
+-- raises.old's demo-tracked version 960009 carries a NON-demo manifest that is
+-- deliberately NOT tracked in onboarding_demo_data, so the provenance reset's
+-- "untracked manifest on a demo version" guard fires (RAISE) on flip.
 INSERT INTO public.manifest (app_version_id, file_name, s3_path, file_hash, file_size)
 VALUES
-  (960004, 'main.js', 'demo/com.test.onb.demo.old/1.0.0/main.js', repeat('c', 64), 123);
+  (960004, 'main.js', 'demo/com.test.onb.demo.old/1.0.0/main.js', repeat('c', 64), 123),
+  (960009, 'main.js', 'orgs/046a36ac/apps/com.test.onb.raises.old/1.0.0/main.js', repeat('d', 64), 123);
 
--- ... and is recorded as demo-seeded in the provenance table.
+-- Provenance: demo.old version and raises.old's 960009 are demo-seeded.
 INSERT INTO public.onboarding_demo_data (app_id, owner_org, relation_name, row_key, seed_id)
 VALUES
-  ('com.test.onb.demo.old', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'app_versions', '960004', '70000000-0000-0000-0000-000000000001');
+  ('com.test.onb.demo.old', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'app_versions', '960004', '70000000-0000-0000-0000-000000000001'),
+  ('com.test.onb.raises.old', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'app_versions', '960009', '70000000-0000-0000-0000-000000000002');
 
--- app_has_real_bundle distinguishes upload-ready real uploads from placeholders,
--- demo-tracked versions, and metadata-only (non-upload-ready) version rows.
-SELECT ok(
-  public.app_has_real_bundle('com.test.onb.real.old'),
-  'app_has_real_bundle is true for an upload-ready real bundle'
-);
+-- app_has_real_bundle: true only for upload-ready, non-placeholder, non-demo bundles.
+SELECT ok(public.app_has_real_bundle('com.test.onb.real.old'), 'true for an upload-ready stored (r2) bundle');
+SELECT ok(public.app_has_real_bundle('com.test.onb.external.old'), 'true for an upload-ready external bundle');
+SELECT ok(public.app_has_real_bundle('com.test.onb.raises.old'), 'true when a real bundle coexists with a demo-tracked version');
+SELECT ok(NOT public.app_has_real_bundle('com.test.onb.noreal.old'), 'false for a live builtin placeholder (name filter)');
+SELECT ok(NOT public.app_has_real_bundle('com.test.onb.noupload.old'), 'false for a non-upload-ready (metadata-only) version');
+SELECT ok(NOT public.app_has_real_bundle('com.test.onb.r2direct.old'), 'false for an r2-direct (in-progress) version');
+SELECT ok(NOT public.app_has_real_bundle('com.test.onb.demo.old'), 'false for a demo-tracked version (provenance)');
 
-SELECT ok(
-  NOT public.app_has_real_bundle('com.test.onb.demo.old'),
-  'app_has_real_bundle is false for a demo-tracked version (provenance)'
-);
-
-SELECT ok(
-  NOT public.app_has_real_bundle('com.test.onb.noreal.old'),
-  'app_has_real_bundle is false when only a builtin placeholder exists'
-);
-
-SELECT ok(
-  NOT public.app_has_real_bundle('com.test.onb.noupload.old'),
-  'app_has_real_bundle is false for a non-upload-ready (metadata-only) version'
-);
-
-SELECT ok(
-  public.has_seeded_demo_data('com.test.onb.demo.old'),
-  'has_seeded_demo_data is true for the seeded demo app'
-);
+SELECT ok(public.has_seeded_demo_data('com.test.onb.demo.old'), 'has_seeded_demo_data true for the seeded demo app');
 
 -- Run the job.
 SELECT public.cleanup_completed_onboarding_apps();
 
+SELECT is((SELECT need_onboarding FROM public.apps WHERE app_id = 'com.test.onb.real.old'), false, 'real (r2) app is auto-completed');
+SELECT is((SELECT need_onboarding FROM public.apps WHERE app_id = 'com.test.onb.external.old'), false, 'real (external) app is auto-completed');
+SELECT is((SELECT need_onboarding FROM public.apps WHERE app_id = 'com.test.onb.real.recent'), true, 'recent app stays pending');
+SELECT is((SELECT need_onboarding FROM public.apps WHERE app_id = 'com.test.onb.noreal.old'), true, 'builtin-placeholder app stays pending');
+SELECT is((SELECT need_onboarding FROM public.apps WHERE app_id = 'com.test.onb.demo.old'), true, 'seeded demo app stays pending');
+SELECT is((SELECT need_onboarding FROM public.apps WHERE app_id = 'com.test.onb.noupload.old'), true, 'metadata-only app stays pending');
+SELECT is((SELECT need_onboarding FROM public.apps WHERE app_id = 'com.test.onb.r2direct.old'), true, 'r2-direct app stays pending');
+
+-- The provenance reset RAISEs for raises.old; the per-app exception block leaves
+-- it pending WITHOUT aborting the batch (real.old/external.old completed above)
+-- and WITHOUT deleting any of its data (the flip is rolled back).
+SELECT is((SELECT need_onboarding FROM public.apps WHERE app_id = 'com.test.onb.raises.old'), true, 'app whose cleanup raises is skipped, left pending');
 SELECT is(
-  (SELECT need_onboarding FROM public.apps WHERE app_id = 'com.test.onb.real.old'),
-  false,
-  'real app older than 15 days is auto-completed'
+  (SELECT count(*)::integer FROM public.app_versions WHERE app_id = 'com.test.onb.raises.old' AND deleted = false),
+  2,
+  'a raising apps data is fully preserved (flip rolled back, nothing deleted)'
 );
 
-SELECT is(
-  (SELECT need_onboarding FROM public.apps WHERE app_id = 'com.test.onb.real.recent'),
-  true,
-  'real app younger than 15 days stays pending'
-);
-
-SELECT is(
-  (SELECT need_onboarding FROM public.apps WHERE app_id = 'com.test.onb.noreal.old'),
-  true,
-  'app with no real upload stays pending'
-);
-
-SELECT is(
-  (SELECT need_onboarding FROM public.apps WHERE app_id = 'com.test.onb.demo.old'),
-  true,
-  'seeded demo app stays pending'
-);
-
-SELECT is(
-  (SELECT need_onboarding FROM public.apps WHERE app_id = 'com.test.onb.noupload.old'),
-  true,
-  'app with a metadata-only (non-upload-ready) version stays pending'
-);
-
--- Flipping the flag fires the existing provenance-based cleanup, which has no
--- demo rows tracked for this app, so the real bundle must survive untouched.
 SELECT is(
   (SELECT count(*)::integer FROM public.app_versions
    WHERE app_id = 'com.test.onb.real.old' AND name = '1.0.0' AND deleted = false),
   1,
-  'auto-completion preserves the real bundle (provenance cleanup deletes nothing)'
+  'completed app keeps its real bundle (no demo provenance to clear)'
 );
 
 SELECT ok(
