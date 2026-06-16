@@ -56,8 +56,8 @@ try {
   assert.equal(body.tags.foo, 'bar')
   assert.equal(body.tags.count, 3)
   assert.equal(body.tags.flag, true)
-  assert.equal(body.tags.invocation_source, 'cli')
-  assert.equal(typeof body.tags.cli_version, 'string')
+  assert.equal(body.nonPersonTags.invocation_source, 'cli')
+  assert.equal(typeof body.nonPersonTags.cli_version, 'string')
 
   // 3. opt-out suppresses the send
   process.env.CAPGO_DISABLE_TELEMETRY = '1'

@@ -1433,13 +1433,14 @@ export async function updateOrCreateChannel(supabase: SupabaseClient<Database>, 
     .single()
 }
 
-export async function sendEvent(capgkey: string, payload: TrackOptions & { notifyConsole?: boolean }, verbose?: boolean, signal?: AbortSignal): Promise<void> {
+export async function sendEvent(capgkey: string, payload: TrackOptions & { notifyConsole?: boolean, nonPersonTags?: Record<string, string | number | boolean> }, verbose?: boolean, signal?: AbortSignal): Promise<void> {
   try {
-    // Build the enriched payload first and DEFENSIVELY: a fault while reading
-    // the global analytics props must degrade to the caller's own tags and must
-    // never drop the event. sendEvent is the single send path that trackEvent()
-    // and every direct caller funnel through, so OS/version segmentation stays
-    // complete. Caller-supplied tags win on key conflict.
+    // Attach the global analytics props as nonPersonTags — event properties the
+    // backend never writes as PostHog person properties ($set) — built
+    // DEFENSIVELY: a fault while reading them degrades to the caller's tags and
+    // must never drop the event. sendEvent is the single send path that
+    // trackEvent() and every direct caller funnel through, so OS/version
+    // segmentation stays complete. Caller-supplied nonPersonTags win on conflict.
     let globalProps = {}
     try {
       globalProps = getGlobalAnalyticsProps()
@@ -1450,7 +1451,7 @@ export async function sendEvent(capgkey: string, payload: TrackOptions & { notif
     }
     const enrichedPayload = {
       ...payload,
-      tags: { ...globalProps, ...(payload.tags ?? {}) },
+      nonPersonTags: { ...globalProps, ...(payload.nonPersonTags ?? {}) },
     }
     if (verbose) {
       log.info(`Get remove config: for ${payload.event}`)
