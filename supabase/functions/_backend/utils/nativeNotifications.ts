@@ -274,6 +274,10 @@ export function getNotificationEventIndex(appId: string, campaignId?: string): s
   return (campaignId ? `${appId}:${campaignId}` : appId).slice(0, 96)
 }
 
+function isCampaignScopedNotificationEvent(event: NativeNotificationEvent) {
+  return event !== 'permission_changed' && event !== 'badge_applied'
+}
+
 export async function deriveNativeNotificationIdentity(
   c: Context,
   appId: string,
@@ -658,6 +662,8 @@ export async function trackNotificationEventCF(c: Context<MiddlewareKeyVariables
   if (!c.env.NOTIFICATION_EVENTS)
     return
 
+  const campaignId = isCampaignScopedNotificationEvent(input.event) ? input.campaignId : undefined
+  const notificationId = isCampaignScopedNotificationEvent(input.event) ? input.notificationId : undefined
   let recipientKey = input.recipientKey ?? ''
   let deviceKey = input.deviceKey ?? ''
   if (!recipientKey && input.externalId)
@@ -665,12 +671,12 @@ export async function trackNotificationEventCF(c: Context<MiddlewareKeyVariables
   if (!deviceKey && input.nativeInstallId)
     deviceKey = await deriveDeviceKey(c, input.appId, input.nativeInstallId)
 
-  const index = getNotificationEventIndex(input.appId, input.campaignId)
+  const index = getNotificationEventIndex(input.appId, campaignId)
   c.env.NOTIFICATION_EVENTS.writeDataPoint({
     blobs: [
       input.event,
-      input.campaignId ?? '',
-      input.notificationId ?? '',
+      campaignId ?? '',
+      notificationId ?? '',
       deviceKey,
       recipientKey,
       input.provider ?? '',

@@ -13,6 +13,7 @@ import {
   getNotificationIndex,
   normalizeNotificationTag,
   shouldTrackNotificationPermissionChanged,
+  trackNotificationEventCF,
   verifyNotificationDeliveryEventProof,
   verifyNotificationEventProof,
   verifyNotificationIdentityProof,
@@ -231,6 +232,32 @@ describe('native notification AE registry', () => {
     expect(getNotificationEventIndex(appId, campaignId)).toBe(expectedIndex)
     expect(query).toContain(`index1 = '${expectedIndex}'`)
     expect(query).toContain(`blob2 = '${campaignId}'`)
+  })
+
+  it.concurrent('keeps device events out of campaign-scoped stats', async () => {
+    const rows: any[] = []
+    const context = {
+      env: {
+        NOTIFICATION_EVENTS: {
+          writeDataPoint: (row: any) => rows.push(row),
+        },
+      },
+    } as any
+
+    await trackNotificationEventCF(context, {
+      appId: 'com.demo.app',
+      event: 'permission_changed',
+      campaignId: 'campaign-spoof',
+      notificationId: 'notification-spoof',
+      recipientKey: 'recipient-key',
+      deviceKey: 'device-key',
+      platform: 'android',
+    })
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0].indexes).toEqual(['com.demo.app'])
+    expect(rows[0].blobs[1]).toBe('')
+    expect(rows[0].blobs[2]).toBe('')
   })
 
   it.concurrent('verifies server-minted identity and event proofs', async () => {
