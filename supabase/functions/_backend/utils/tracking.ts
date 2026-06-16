@@ -30,6 +30,7 @@ export interface SendEventToTrackingPayload extends TrackOptions {
   bento?: BentoTrackingPayload
   groups?: PostHogGroups
   sentToBento?: boolean
+  nonPersonTags?: Record<string, string | number | boolean>
 }
 
 export interface SendEventToTrackingOptions {
@@ -70,6 +71,7 @@ async function executeTracking(c: Context, payload: SendEventToTrackingPayload, 
       event: payload.event,
       user_id: payload.user_id,
       tags: payload.tags,
+      nonPersonTags: payload.nonPersonTags,
       channel: payload.channel,
       description: payload.description,
       groups: payload.groups,

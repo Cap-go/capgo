@@ -273,12 +273,45 @@ function serializeStorageError(error: unknown) {
   }
 }
 
+interface SizeRangeDiagnostic {
+  contentLength?: string | null
+  contentRange?: string | null
+  error?: ReturnType<typeof serializeStorageError>
+  reason: 'head_error' | 'missing_head_size'
+  size: number
+  status?: number
+  statusText?: string
+}
+
+interface SizeKeyDiagnostic {
+  fileId: string
+  finalSize: number
+  head: {
+    error?: ReturnType<typeof serializeStorageError>
+    rawSize?: unknown
+    size: number
+    success: boolean
+  }
+  range?: SizeRangeDiagnostic
+  usedFallback: boolean
+}
+
+export interface StorageSizeDiagnostics {
+  bucket: string
+  candidateKeys: string[]
+  candidates: SizeKeyDiagnostic[]
+  endpoint: string
+  fileId: string
+  selectedCandidateKey: string | null
+  size: number
+}
+
 async function getSizeFromRangeFallback(
   c: Context,
   client: ReturnType<typeof initS3>,
   fileId: string,
   reason: 'head_error' | 'missing_head_size',
-): Promise<number> {
+): Promise<SizeRangeDiagnostic> {
   try {
     const url = await client.getPresignedUrl('GET', fileId, {
       parameters: { 'x-id': 'GetObject' },
@@ -295,18 +328,14 @@ async function getSizeFromRangeFallback(
     const contentLength = res.headers.get('content-length') || res.headers.get('Content-Length')
     if (!res.ok) {
       await res.body?.cancel()
+      const diagnostic = { contentLength, contentRange, reason, size: 0, status: res.status, statusText: res.statusText }
       cloudlog({
         requestId: c.get('requestId'),
         message: 'getSize range fallback returned non-success response',
         fileId,
-        reason,
-        status: res.status,
-        statusText: res.statusText,
-        contentRange,
-        contentLength,
-        size: 0,
+        ...diagnostic,
       })
-      return 0
+      return diagnostic
     }
 
     const size = res.status === 206 && contentRange
@@ -316,43 +345,46 @@ async function getSizeFromRangeFallback(
         : 0
     await res.body?.cancel()
 
+    const diagnostic = { contentLength, contentRange, reason, size, status: res.status, statusText: res.statusText }
     cloudlog({
       requestId: c.get('requestId'),
       message: 'getSize range fallback result',
       fileId,
-      reason,
-      status: res.status,
-      statusText: res.statusText,
-      contentRange,
-      contentLength,
-      size,
+      ...diagnostic,
     })
-    return size
+    return diagnostic
   }
   catch (fallbackError) {
+    const diagnostic = { error: serializeStorageError(fallbackError), reason, size: 0 }
     cloudlogErr({
       requestId: c.get('requestId'),
       message: 'getSize range fallback failed',
       fileId,
-      reason,
-      error: serializeStorageError(fallbackError),
+      ...diagnostic,
       bucket: getEnv(c, 'S3_BUCKET'),
       endpoint: getEnv(c, 'S3_ENDPOINT'),
     })
-    return 0
+    return diagnostic
   }
 }
 
-async function getSizeForKey(c: Context, client: ReturnType<typeof initS3>, fileId: string) {
+async function getSizeForKey(c: Context, client: ReturnType<typeof initS3>, fileId: string): Promise<SizeKeyDiagnostic> {
   let size = 0
   let headError: unknown
-  let usedFallback = false
+  const diagnostic: SizeKeyDiagnostic = {
+    fileId,
+    finalSize: 0,
+    head: { size: 0, success: false },
+    usedFallback: false,
+  }
+
   try {
     // Ask Cloudflare/R2 for the raw object (no brotli/gzip) so Content-Length is preserved.
     const file = await client.statObject(fileId, {
       headers: { 'Accept-Encoding': 'identity' },
     })
     size = Number.isFinite(file.size) ? file.size : 0
+    diagnostic.head = { rawSize: file.size, size, success: true }
     cloudlog({
       requestId: c.get('requestId'),
       message: 'getSize head result',
@@ -365,21 +397,24 @@ async function getSizeForKey(c: Context, client: ReturnType<typeof initS3>, file
   }
   catch (error) {
     headError = error
+    diagnostic.head = { error: serializeStorageError(error), size: 0, success: false }
     cloudlogErr({
       requestId: c.get('requestId'),
       message: 'getSize head failed',
       fileId,
-      error: serializeStorageError(error),
+      error: diagnostic.head.error,
       bucket: getEnv(c, 'S3_BUCKET'),
       endpoint: getEnv(c, 'S3_ENDPOINT'),
     })
   }
 
   if (!size) {
-    usedFallback = true
-    size = await getSizeFromRangeFallback(c, client, fileId, headError ? 'head_error' : 'missing_head_size')
+    diagnostic.usedFallback = true
+    diagnostic.range = await getSizeFromRangeFallback(c, client, fileId, headError ? 'head_error' : 'missing_head_size')
+    size = diagnostic.range.size
   }
 
+  diagnostic.finalSize = size
   cloudlog({
     requestId: c.get('requestId'),
     message: 'getSize final',
@@ -387,18 +422,32 @@ async function getSizeForKey(c: Context, client: ReturnType<typeof initS3>, file
     bucket: getEnv(c, 'S3_BUCKET'),
     endpoint: getEnv(c, 'S3_ENDPOINT'),
     finalSize: size,
-    usedFallback,
+    usedFallback: diagnostic.usedFallback,
+    head: diagnostic.head,
+    range: diagnostic.range,
   })
-  return size
+  return diagnostic
 }
 
-async function getSize(c: Context, fileId: string) {
+async function getSizeDiagnostics(c: Context, fileId: string): Promise<StorageSizeDiagnostics> {
   const client = initS3(c)
   const candidateKeys = getManifestStorageCandidateKeys(fileId)
+  const diagnostics: StorageSizeDiagnostics = {
+    bucket: getEnv(c, 'S3_BUCKET'),
+    candidateKeys,
+    candidates: [],
+    endpoint: getEnv(c, 'S3_ENDPOINT'),
+    fileId,
+    selectedCandidateKey: null,
+    size: 0,
+  }
 
   for (const candidateKey of candidateKeys) {
-    const size = await getSizeForKey(c, client, candidateKey)
-    if (size > 0) {
+    const candidate = await getSizeForKey(c, client, candidateKey)
+    diagnostics.candidates.push(candidate)
+    if (candidate.finalSize > 0) {
+      diagnostics.selectedCandidateKey = candidateKey
+      diagnostics.size = candidate.finalSize
       if (candidateKey !== fileId) {
         cloudlog({
           requestId: c.get('requestId'),
@@ -406,25 +455,25 @@ async function getSize(c: Context, fileId: string) {
           fileId,
           candidateKey,
           candidateKeys,
-          size,
+          size: candidate.finalSize,
         })
       }
-      return size
+      return diagnostics
     }
   }
 
-  if (candidateKeys.length > 1) {
-    cloudlogErr({
-      requestId: c.get('requestId'),
-      message: 'getSize failed all manifest storage candidates',
-      fileId,
-      candidateKeys,
-      bucket: getEnv(c, 'S3_BUCKET'),
-      endpoint: getEnv(c, 'S3_ENDPOINT'),
-    })
-  }
+  cloudlogErr({
+    requestId: c.get('requestId'),
+    message: 'getSize exhausted storage candidates',
+    ...diagnostics,
+  })
 
-  return 0
+  return diagnostics
+}
+
+async function getSize(c: Context, fileId: string) {
+  const diagnostics = await getSizeDiagnostics(c, fileId)
+  return diagnostics.size
 }
 
 async function getObject(c: Context, fileId: string): Promise<Response | null> {
@@ -449,6 +498,7 @@ async function getObject(c: Context, fileId: string): Promise<Response | null> {
 export const s3 = {
   getSize,
   deleteObject,
+  getSizeDiagnostics,
   moveObjectToTrash,
   deleteObjectsWithPrefix,
   checkIfExist,

@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       apikey_global_permissions: {
@@ -435,6 +460,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      backfill_progress: {
+        Row: {
+          created_at: string
+          cutover_at: string
+          job_name: string
+          last_processed_id: number | null
+          last_processed_occurred_at: string | null
+          scope_key: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cutover_at: string
+          job_name: string
+          last_processed_id?: number | null
+          last_processed_occurred_at?: string | null
+          scope_key: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cutover_at?: string
+          job_name?: string
+          last_processed_id?: number | null
+          last_processed_occurred_at?: string | null
+          scope_key?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       bandwidth_usage: {
         Row: {
@@ -1468,6 +1523,8 @@ export type Database = {
           updates_external: number | null
           updates_last_month: number | null
           upgraded_orgs: number
+          trial_extended_orgs: number
+          trial_extended_subscribed_orgs: number
           users: number | null
           users_active: number | null
         }
@@ -1552,6 +1609,8 @@ export type Database = {
           updates_external?: number | null
           updates_last_month?: number | null
           upgraded_orgs?: number
+          trial_extended_orgs?: number
+          trial_extended_subscribed_orgs?: number
           users?: number | null
           users_active?: number | null
         }
@@ -1636,6 +1695,8 @@ export type Database = {
           updates_external?: number | null
           updates_last_month?: number | null
           upgraded_orgs?: number
+          trial_extended_orgs?: number
+          trial_extended_subscribed_orgs?: number
           users?: number | null
           users_active?: number | null
         }
@@ -2530,6 +2591,51 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "plans"
             referencedColumns: ["stripe_id"]
+          },
+        ]
+      }
+      trial_extension_events: {
+        Row: {
+          created_at: string
+          customer_id: string
+          extension_days: number
+          id: number
+          new_trial_at: string
+          org_id: string
+          previous_trial_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          extension_days: number
+          id?: number
+          new_trial_at: string
+          org_id: string
+          previous_trial_at: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          extension_days?: number
+          id?: number
+          new_trial_at?: string
+          org_id?: string
+          previous_trial_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trial_extension_events_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "stripe_info"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "trial_extension_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4885,6 +4991,8 @@ export type Database = {
         | "webview_unclean_restart"
         | "webview_render_process_gone"
         | "webview_content_process_terminated"
+        | "os_version_changed"
+        | "native_app_version_changed"
       stripe_status:
         | "created"
         | "succeeded"
@@ -5059,6 +5167,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth", "build_time"],
@@ -5154,6 +5265,8 @@ export const Constants = {
         "webview_unclean_restart",
         "webview_render_process_gone",
         "webview_content_process_terminated",
+        "os_version_changed",
+        "native_app_version_changed",
       ],
       stripe_status: [
         "created",

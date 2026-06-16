@@ -31,6 +31,15 @@ function handleDateRangeChange(event: Event) {
           class="py-2 pr-10 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-lg appearance-none cursor-pointer pl-9 dark:text-white dark:bg-gray-700 dark:border-gray-600 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:hover:bg-gray-600 dark:focus:ring-blue-400"
           @change="handleDateRangeChange"
         >
+          <option value="3day">
+            {{ t('3-days') }}
+          </option>
+          <option value="7day">
+            {{ t('7-days') }}
+          </option>
+          <option value="14day">
+            {{ t('14-days') }}
+          </option>
           <option value="30day">
             {{ t('30-days') }}
           </option>

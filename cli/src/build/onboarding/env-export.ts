@@ -6,6 +6,12 @@
  * Reuses the renderer from `build credentials manage` so the file format
  * (section comments, .gitignore reminder, provisioning-map base64 fallback)
  * stays identical between the two paths.
+ *
+ * IMPORTANT (v1 contract): this writes a LOCAL `.env.capgo.<appId>.<platform>`
+ * file (mode 0o600). The file holds credentials, so it should stay local (add it to `.gitignore`). It performs NO git
+ * operation — no `git add`, no `git commit`, nothing touches the repo index.
+ * v1 must NOT add an auto-commit here; the user owns whether/when the file
+ * lands in version control.
  */
 
 import type { BuildCredentials } from '../../schemas/build.js'
@@ -20,7 +26,12 @@ export interface EnvExportOpts {
   credentials: Partial<BuildCredentials>
   /** Default false — onboarding writes into the global store, not local. */
   local?: boolean
-  /** If absent, defaults to `<cwd>/.env.capgo.<appId>.<platform>`. */
+  /**
+   * If absent, defaults to `<cwd>/.env.capgo.<appId>.<platform>`.
+   *
+   * This is the path of a LOCAL 0o600 .env file holding credentials — keep it out of version control.
+   * Writing it performs NO git operation; v1 must not add an auto-commit.
+   */
   targetPath?: string
   /** When true, write even if the file already exists. */
   overwrite?: boolean

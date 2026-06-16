@@ -81,7 +81,6 @@
     "npm:@capgo/capacitor-pdf-generator@^8.0.30": "8.0.30_@capacitor+core@8.3.4",
     "npm:@capgo/capacitor-pedometer@^8.0.32": "8.0.32_@capacitor+core@8.3.4",
     "npm:@capgo/capacitor-persistent-account@^8.0.29": "8.0.29_@capacitor+core@8.3.4",
-    "npm:@capgo/capacitor-photo-library@^8.0.13": "8.0.13_@capacitor+core@8.3.4",
     "npm:@capgo/capacitor-pretty-toast@^8.1.7": "8.1.11_@capacitor+core@8.3.4",
     "npm:@capgo/capacitor-printer@^8.0.14": "8.0.14_@capacitor+core@8.3.4",
     "npm:@capgo/capacitor-privacy-screen@^8.3.3": "8.3.3_@capacitor+core@8.3.4",
@@ -98,7 +97,7 @@
     "npm:@capgo/capacitor-speech-synthesis@^8.0.15": "8.0.15_@capacitor+core@8.3.4",
     "npm:@capgo/capacitor-textinteraction@^8.0.25": "8.0.25_@capacitor+core@8.3.4",
     "npm:@capgo/capacitor-transitions@^8.1.8": "8.1.8_react@19.2.6_vue@3.5.35__typescript@6.0.3_typescript@6.0.3",
-    "npm:@capgo/capacitor-updater@^8.48.0": "8.48.0_@capacitor+core@8.3.4",
+    "npm:@capgo/capacitor-updater@8.49.1": "8.49.1_@capacitor+core@8.3.4",
     "npm:@capgo/capacitor-uploader@^8.2.1": "8.2.1_@capacitor+core@8.3.4",
     "npm:@capgo/capacitor-video-player@^8.1.13": "8.1.13_@capacitor+core@8.3.4_hls.js@1.6.16",
     "npm:@capgo/capacitor-video-thumbnails@^8.1.12": "8.1.13_@capacitor+core@8.3.4",
@@ -1354,12 +1353,6 @@
         "@capacitor/core"
       ]
     },
-    "@capgo/capacitor-photo-library@8.0.13_@capacitor+core@8.3.4": {
-      "integrity": "sha512-s/HyNatiAId+veLH5Jt1vTr49/fj8QXW6CM877LxrJO1E3FGj8e+Si4jPHLcPn9zrR9HmZmrHieDKixb8MQCNA==",
-      "dependencies": [
-        "@capacitor/core"
-      ]
-    },
     "@capgo/capacitor-pretty-toast@8.1.11_@capacitor+core@8.3.4": {
       "integrity": "sha512-7QhxXmnQWQgJi/MnWuZ04QBcuiW3JaQd+R8XZfcO+0kluR4WxOpbPFFpdXvdlm/dwfEsC3c/Gt5XHk2Yf95T1Q==",
       "dependencies": [
@@ -1469,8 +1462,8 @@
         "vue"
       ]
     },
-    "@capgo/capacitor-updater@8.48.0_@capacitor+core@8.3.4": {
-      "integrity": "sha512-S1Vi1KyH8tfqXerl4vtMMUDlq8r72r0HF5HXgeTitqVvp9uihOEbVSqcHCdVTVopoYByYjg6c8kAHIJ4Mdz1oQ==",
+    "@capgo/capacitor-updater@8.49.1_@capacitor+core@8.3.4": {
+      "integrity": "sha512-cFAfOAeySj7hoQ3NsxZ5Tn5O6CRNYgJiqghTmG7XoVtatzU8WhhGO9vWe/qEaHTOL4sgXHkHB8joaOt9V0barw==",
       "dependencies": [
         "@capacitor/core"
       ]
@@ -4159,11 +4152,7 @@
       "dependencies": [
         "@vitest/spy",
         "estree-walker@3.0.3",
-        "magic-string",
-        "vite@8.0.14_@types+node@25.9.1_sass@1.100.0"
-      ],
-      "optionalPeers": [
-        "vite@8.0.14_@types+node@25.9.1_sass@1.100.0"
+        "magic-string"
       ]
     },
     "@vitest/mocker@4.1.7_vite@8.0.16__@types+node@25.9.1__sass@1.100.0_@types+node@25.9.1_sass@1.100.0": {
@@ -9127,7 +9116,6 @@
         "tinyexec",
         "tinyglobby",
         "tinyrainbow",
-        "vite@8.0.14_@types+node@25.9.1_sass@1.100.0",
         "why-is-node-running"
       ],
       "optionalPeers": [
@@ -9141,7 +9129,7 @@
       "integrity": "sha512-flYyaFd2CgoCoU+0UKt3pxksgC+S02iTDN0n3LtqaMeXsI9SBcdNujc2k0DeFLzUn/0k538yNjOSdwgCqcrwJA==",
       "dependencies": [
         "@types/node",
-        "@vitest/coverage-v8@4.1.7_vitest@4.1.7_sass@1.100.0",
+        "@vitest/coverage-v8@4.1.7_vitest@4.1.7_@types+node@25.9.1_@vitest+ui@4.1.7_vite@8.0.16__@types+node@25.9.1__sass@1.100.0",
         "@vitest/expect",
         "@vitest/mocker@4.1.7_vite@8.0.16__@types+node@25.9.1__sass@1.100.0_@types+node@25.9.1_sass@1.100.0",
         "@vitest/pretty-format",
@@ -9166,7 +9154,7 @@
       ],
       "optionalPeers": [
         "@types/node",
-        "@vitest/coverage-v8@4.1.7_vitest@4.1.7_sass@1.100.0",
+        "@vitest/coverage-v8@4.1.7_vitest@4.1.7_@types+node@25.9.1_@vitest+ui@4.1.7_vite@8.0.16__@types+node@25.9.1__sass@1.100.0",
         "@vitest/ui@4.1.7_vitest@4.1.7_@types+node@25.9.1_@vitest+coverage-v8@4.1.7_vite@8.0.16__@types+node@25.9.1__sass@1.100.0"
       ],
       "bin": true
@@ -9597,7 +9585,6 @@
         "npm:@capgo/capacitor-pdf-generator@^8.0.30",
         "npm:@capgo/capacitor-pedometer@^8.0.32",
         "npm:@capgo/capacitor-persistent-account@^8.0.29",
-        "npm:@capgo/capacitor-photo-library@^8.0.13",
         "npm:@capgo/capacitor-pretty-toast@^8.1.7",
         "npm:@capgo/capacitor-printer@^8.0.14",
         "npm:@capgo/capacitor-privacy-screen@^8.3.3",
@@ -9614,7 +9601,7 @@
         "npm:@capgo/capacitor-speech-synthesis@^8.0.15",
         "npm:@capgo/capacitor-textinteraction@^8.0.25",
         "npm:@capgo/capacitor-transitions@^8.1.8",
-        "npm:@capgo/capacitor-updater@^8.48.0",
+        "npm:@capgo/capacitor-updater@8.49.1",
         "npm:@capgo/capacitor-uploader@^8.2.1",
         "npm:@capgo/capacitor-video-player@^8.1.13",
         "npm:@capgo/capacitor-video-thumbnails@^8.1.12",

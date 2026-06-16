@@ -89,6 +89,11 @@ interface LtvStats {
   shortest_ltv: number
   longest_ltv: number
 }
+interface TrialExtensionStats {
+  [key: string]: unknown
+  trial_extended_orgs: number
+  trial_extended_subscribed_orgs: number
+}
 interface BillingSnapshotCustomerCounts {
   yearly: number
   monthly: number
@@ -1095,6 +1100,57 @@ async function countDemoSeededApps(c: Context, createdAfterIso: string, createdB
   }
 }
 
+async function getTrialExtensionStats(c: Context, window: CurrentDayWindow): Promise<TrialExtensionStats> {
+  const pgClient = getPgClient(c, false)
+  const drizzleClient = getDrizzleClient(pgClient)
+  const dayStartIso = window.dayStart.toISOString()
+  const nextDayStartIso = window.nextDayStart.toISOString()
+
+  try {
+    const result = await drizzleClient.execute<TrialExtensionStats>(sql`
+      WITH extension_events AS (
+        SELECT DISTINCT tee.org_id
+        FROM public.trial_extension_events tee
+        WHERE tee.created_at >= ${dayStartIso}::timestamptz
+          AND tee.created_at < ${nextDayStartIso}::timestamptz
+      ),
+      subscribed_extended AS (
+        SELECT DISTINCT o.id AS org_id
+        FROM public.orgs o
+        INNER JOIN public.stripe_info si ON si.customer_id = o.customer_id
+        WHERE si.paid_at IS NOT NULL
+          AND si.paid_at >= ${dayStartIso}::timestamptz
+          AND si.paid_at < ${nextDayStartIso}::timestamptz
+          AND EXISTS (
+            SELECT 1
+            FROM public.trial_extension_events tee
+            WHERE tee.org_id = o.id
+              AND tee.created_at <= si.paid_at
+          )
+      )
+      SELECT
+        (SELECT COUNT(*) FROM extension_events)::int AS trial_extended_orgs,
+        (SELECT COUNT(*) FROM subscribed_extended)::int AS trial_extended_subscribed_orgs
+    `)
+
+    const row = result.rows[0]
+    return {
+      trial_extended_orgs: Number(row?.trial_extended_orgs) || 0,
+      trial_extended_subscribed_orgs: Number(row?.trial_extended_subscribed_orgs) || 0,
+    }
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'trial extension stats unavailable', error })
+    return {
+      trial_extended_orgs: 0,
+      trial_extended_subscribed_orgs: 0,
+    }
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
+}
+
 async function ensureGlobalStatsSnapshotRow(c: Context, dateId: string): Promise<void> {
   const db = getPgClient(c)
 
@@ -1670,6 +1726,7 @@ async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Prom
     new_paying_orgs,
     canceled_orgs,
     upgraded_orgs,
+    trialExtensionStats,
     credits_bought,
     credits_consumed,
   ] = await Promise.all([
@@ -1726,6 +1783,7 @@ async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Prom
         }
         return new Set((res.data || []).map(row => row.customer_id)).size
       }),
+    getTrialExtensionStats(c, metricWindow),
     supabase
       .from('usage_credit_grants')
       .select('credits_total')
@@ -1770,6 +1828,8 @@ async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Prom
     revenue_maker: revenue.revenue_maker,
     revenue_solo: revenue.revenue_solo,
     revenue_team: revenue.revenue_team,
+    trial_extended_orgs: trialExtensionStats.trial_extended_orgs,
+    trial_extended_subscribed_orgs: trialExtensionStats.trial_extended_subscribed_orgs,
     total_revenue: revenue.total_revenue,
     upgraded_orgs,
   })

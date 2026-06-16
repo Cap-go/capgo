@@ -6,6 +6,7 @@ import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import { routes } from 'vue-router/auto-routes'
 import { installDeepLinkHandler } from '~/services/deepLinks'
+import { getNativeExternalPurchaseRedirect, isNativeAppStoreContext, isNativeExternalPurchaseRestrictedPath } from '~/services/nativeCompliance'
 import { posthogLoader } from '~/services/posthog'
 import { getErrorMessage, isKnownCrawlerNoiseErrorMessage, isStaleAssetErrorMessage } from '~/services/staleAssetErrors'
 import { getLocalConfig } from '~/services/supabase'
@@ -176,6 +177,10 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
 })
 router.beforeEach((to, from, next) => {
+  if (isNativeAppStoreContext() && isNativeExternalPurchaseRestrictedPath(to.path)) {
+    return next(getNativeExternalPurchaseRedirect(to.path))
+  }
+
   if (to.path.startsWith('/app/') && to.query.tab) {
     const tab = to.query.tab as string
     const newPath = to.path.endsWith('/') ? `${to.path}${tab}` : `${to.path}/${tab}`

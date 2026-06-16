@@ -28,6 +28,7 @@ const SERVICE_ONLY_PROCS = [
   'public.check_org_hashed_key_enforcement(uuid, public.apikeys)',
   'public.cleanup_onboarding_app_data_on_complete()',
   'public.delete_old_deleted_versions()',
+  'public.enqueue_credit_usage_posthog_event()',
   'public.generate_org_user_stripe_info_on_org_create()',
   'public.get_apikey()',
   'public.noupdate()',

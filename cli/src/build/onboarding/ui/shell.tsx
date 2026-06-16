@@ -87,8 +87,16 @@ export interface OnboardingShellProps {
   iosBundleIdInitial: string
   iosDir: string
   androidDir: string
+  /**
+   * Whether guided ASC-key creation may be offered (macOS + signed helper
+   * installed + signature/team verified — see the probe in command.ts).
+   * Threaded into the iOS OnboardingApp; the Android app ignores it.
+   */
+  guidedHelperUsable: boolean
   apikey?: string
   supaHost?: string
+  /** Correlation id for this onboarding run; threaded into every analytics event the apps emit. */
+  journeyId: string
   /** Pre-resolved platform (--platform flag or the single existing native dir); skips the picker. */
   initialPlatform?: Platform
   /**
@@ -99,6 +107,9 @@ export interface OnboardingShellProps {
   updateInfo?: { currentVersion: string, latestVersion: string }
   /** Called once a platform is chosen so the caller can print the completion breadcrumb. */
   onResolvePlatform?: (platform: Platform) => void
+  /** Called by the mounted app on every step transition, so the caller can record
+   *  where the user dropped off for the quit event. */
+  onStep?: (step: string) => void
   /** Called by the mounted app when it reaches the build-complete screen, so the
    *  caller prints the accurate post-exit message + durable summary. If the wizard
    *  exits any other way (cancel / missing platform), this never fires and the
@@ -106,7 +117,7 @@ export interface OnboardingShellProps {
   onResult?: (result: OnboardingResult) => void
 }
 
-const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, iosDir, androidDir, apikey, supaHost, initialPlatform, updateInfo, onResolvePlatform, onResult }) => {
+const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, iosDir, androidDir, guidedHelperUsable, apikey, supaHost, journeyId, initialPlatform, updateInfo, onResolvePlatform, onStep, onResult }) => {
   const { exit } = useApp()
   const { cols, rows } = useTerminalSize()
   const [ready, setReady] = useState<ReadyApp | null>(null)
@@ -165,9 +176,9 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
   // exiting the wizard. The app owns the size decision so a shrink→regrow keeps
   // the user exactly where they were.
   if (ready?.kind === 'ios')
-    return <OnboardingApp appId={appId} iosBundleIdInitial={iosBundleIdInitial} initialProgress={ready.progress} iosDir={iosDir} apikey={apikey} supaHost={supaHost} onResult={onResult} />
+    return <OnboardingApp appId={appId} iosBundleIdInitial={iosBundleIdInitial} initialProgress={ready.progress} iosDir={iosDir} guidedHelperUsable={guidedHelperUsable} apikey={apikey} supaHost={supaHost} journeyId={journeyId} onStep={onStep} onResult={onResult} />
   if (ready?.kind === 'android')
-    return <AndroidOnboardingApp appId={appId} initialProgress={ready.progress} androidDir={androidDir} apikey={apikey} supaHost={supaHost} onResult={onResult} />
+    return <AndroidOnboardingApp appId={appId} initialProgress={ready.progress} androidDir={androidDir} apikey={apikey} supaHost={supaHost} journeyId={journeyId} onStep={onStep} onResult={onResult} />
 
   // Not ready yet: the platform picker (or a brief framed load). The picker is
   // NOT gated to the full 80×49 onboarding floor — it's small and adapts

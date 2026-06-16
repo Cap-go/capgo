@@ -47,6 +47,8 @@ export const statsActionFilters = [
   ['action-webview-unclean-restart', 'webview_unclean_restart'],
   ['action-webview-render-process-gone', 'webview_render_process_gone'],
   ['action-webview-content-process-terminated', 'webview_content_process_terminated'],
+  ['action-os-version-changed', 'os_version_changed'],
+  ['action-native-app-version-changed', 'native_app_version_changed'],
   ['action-uninstall', 'uninstall'],
   ['action-need-plan-upgrade', 'needPlanUpgrade'],
   ['action-missing-bundle', 'missingBundle'],
