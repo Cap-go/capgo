@@ -20,10 +20,15 @@
 -- block: a failing app is skipped, never blocking the others, and no data is
 -- lost.
 
--- Real-bundle detector: true when an app has at least one REAL bundle --
--- excluding 'builtin'/'unknown' placeholders and seeded demo bundles (a version
--- whose manifest lives under 'demo/<app_id>/...', mirroring has_seeded_demo_data).
--- Used only to SELECT apps that have genuinely been used for a real upload.
+-- Real-bundle detector: true when an app has at least one UPLOAD-READY, real
+-- bundle. "Upload-ready" reuses the predicate the (reverted)
+-- complete_onboarding_after_first_upload trigger used -- an external bundle with
+-- a non-blank external_url, or a stored bundle with a non-blank r2_path -- so
+-- metadata-only version rows (e.g. `--dry-upload`, or a created-but-not-finished
+-- upload) do NOT qualify. Demo-seeded versions are excluded via the
+-- onboarding_demo_data provenance table (the authoritative demo marker), and
+-- 'builtin'/'unknown' placeholders are never counted. Used only to SELECT apps
+-- that have genuinely shipped a real upload.
 CREATE OR REPLACE FUNCTION public.app_has_real_bundle(p_app_id text)
 RETURNS boolean
 LANGUAGE sql
@@ -36,11 +41,16 @@ AS $$
     WHERE v.app_id = p_app_id
       AND v.deleted = false
       AND v.name NOT IN ('builtin', 'unknown')
+      AND (
+        (v.storage_provider = 'external' AND NULLIF(BTRIM(COALESCE(v.external_url, '')), '') IS NOT NULL)
+        OR (v.storage_provider <> 'r2-direct' AND NULLIF(BTRIM(COALESCE(v.r2_path, '')), '') IS NOT NULL)
+      )
       AND NOT EXISTS (
         SELECT 1
-        FROM public.manifest m
-        WHERE m.app_version_id = v.id
-          AND m.s3_path LIKE 'demo/' || p_app_id || '/%'
+        FROM public.onboarding_demo_data odd
+        WHERE odd.app_id = p_app_id
+          AND odd.relation_name = 'app_versions'
+          AND odd.row_key = v.id::text
       )
   );
 $$;
@@ -49,7 +59,7 @@ ALTER FUNCTION public.app_has_real_bundle(text) OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.app_has_real_bundle(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.app_has_real_bundle(text) TO service_role;
 
--- Hourly auto-complete of finished onboarding apps.
+-- Daily auto-complete of finished onboarding apps.
 CREATE OR REPLACE FUNCTION public.cleanup_completed_onboarding_apps()
 RETURNS void
 LANGUAGE plpgsql
@@ -61,8 +71,9 @@ DECLARE
   v_completed integer := 0;
   v_skipped integer := 0;
 BEGIN
-  -- Target apps that clearly finished real onboarding: a real upload, created
-  -- more than 15 days ago, and not still carrying seeded demo data.
+  -- Target apps that clearly finished real onboarding: an upload-ready real
+  -- bundle, created more than 15 days ago, and not still carrying seeded demo
+  -- data.
   FOR v_app IN
     SELECT id, app_id
     FROM public.apps
@@ -97,7 +108,9 @@ ALTER FUNCTION public.cleanup_completed_onboarding_apps() OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.cleanup_completed_onboarding_apps() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.cleanup_completed_onboarding_apps() TO service_role;
 
--- Register hourly cron task (consolidated cron_tasks system).
+-- Register a DAILY cron task (consolidated cron_tasks system). The transition is
+-- gated by created_at < now() - 15 days, so an app becomes eligible at most
+-- once -- a daily pass is plenty; runs at 04:00 UTC, after cleanup_expired_demo_apps (03:00).
 INSERT INTO public.cron_tasks (
   name,
   description,
@@ -113,13 +126,13 @@ INSERT INTO public.cron_tasks (
   run_on_day
 ) VALUES (
   'cleanup_completed_onboarding_apps',
-  'Hourly: clear apps.need_onboarding for apps that finished real onboarding (>=1 real bundle, created >15 days ago, no seeded demo data)',
+  'Daily: clear apps.need_onboarding for apps that finished real onboarding (upload-ready bundle, created >15 days ago, no seeded demo data)',
   'function',
   'public.cleanup_completed_onboarding_apps()',
   null,
   null,
-  1,
   null,
+  4,
   0,
   0,
   null,
