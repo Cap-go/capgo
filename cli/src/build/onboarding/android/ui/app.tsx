@@ -2015,7 +2015,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         // to inject supaHost (parity with main's bespoke requesting-build,
         // which passed supaHost directly to requestBuildInternal).
         requestBuildInternal: (id, options, silent, logger) =>
-          requestBuildInternal(id, { ...options, supaHost }, silent, logger),
+          requestBuildInternal(id, { ...options, supaHost, builderJourneyId: journeyId }, silent, logger),
 
         // ── streaming / telemetry / preload sinks (forwarded into the shared tail) ──
         // The rich streaming BuildLogger requesting-build forwards into

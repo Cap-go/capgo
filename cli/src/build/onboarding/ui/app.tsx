@@ -2743,7 +2743,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         // so the driver injects the gateway override here (parity with main's
         // bespoke requesting-build body).
         requestBuildInternal: (id, options, silent, logger) =>
-          requestBuildInternal(id, { ...options, supaHost }, silent, logger),
+          requestBuildInternal(id, { ...options, supaHost, builderJourneyId: journeyId }, silent, logger),
 
         // ── streaming / telemetry / preload sinks (forwarded into the shared tail) ──
         // The rich streaming BuildLogger requesting-build forwards into
