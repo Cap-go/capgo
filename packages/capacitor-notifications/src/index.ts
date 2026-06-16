@@ -116,6 +116,8 @@ const state: RuntimeState = {
   },
 }
 
+let fallbackEventCounter = 0
+
 function assertNativePlatform(): CapgoNotificationPlatform {
   const platform = Capacitor.getPlatform()
   if (platform === 'ios' || platform === 'android')
@@ -563,6 +565,20 @@ function badgeFromNotification(notification?: CapgoPushNotificationSchema): { ba
   }
 }
 
+function createEventSuffix() {
+  if (typeof globalThis.crypto?.randomUUID === 'function')
+    return globalThis.crypto.randomUUID()
+
+  if (typeof globalThis.crypto?.getRandomValues === 'function') {
+    const bytes = new Uint8Array(16)
+    globalThis.crypto.getRandomValues(bytes)
+    return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
+  }
+
+  fallbackEventCounter += 1
+  return `${Date.now()}:${fallbackEventCounter}`
+}
+
 function createEventId(event: QueuedNotificationEventName, input: CapgoNotificationEvent, appId: string, deviceKey: string) {
   if (input.eventId)
     return input.eventId
@@ -570,7 +586,7 @@ function createEventId(event: QueuedNotificationEventName, input: CapgoNotificat
     return `notification:${event}:${appId}:${input.campaignId}:${input.notificationId}:${deviceKey}`
   if (event === 'badge_applied' && Number.isFinite(input.badgeRevision))
     return `badge:${event}:${appId}:${deviceKey}:${Math.trunc(input.badgeRevision ?? 0)}:${Math.trunc(input.badge ?? 0)}`
-  return `manual:${event}:${appId}:${deviceKey}:${Date.now()}:${Math.random().toString(36).slice(2)}`
+  return `manual:${event}:${appId}:${deviceKey}:${Date.now()}:${createEventSuffix()}`
 }
 
 function queueEvent(appId: string, event: QueuedNotificationEvent) {
