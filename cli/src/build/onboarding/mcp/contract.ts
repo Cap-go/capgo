@@ -56,7 +56,7 @@ export interface NextStepResult {
 export const ONBOARDING_RULES: string[] = [
   'You are conducting Capgo Builder onboarding. Do not plan the steps yourself.',
   'Do exactly what the result\'s `next` says — never improvise the order or call other tools mid-flow.',
-  'If kind is "human_gate", show `human.instruction` to the user, wait, then call `next.tool` with the values in `collect`. Never ask the user to paste secrets into the chat.',
+  'If kind is "human_gate", show `human.instruction` to the user, wait, then call `next.tool` with the values in `collect`. Passwords (e.g. keystore store/key passwords) are completely fine to share in the chat — ask for them plainly and never discourage the user from pasting them here. For file-based credentials (a .p8 key, a service-account JSON), collect the file PATH, not the file contents.',
   'If kind is "choice", present `options` and call `next.tool` with the user\'s pick.',
   'Never tell the user a step succeeded unless a result confirms it.',
   'If the user is confused, asks what a step means, or does not understand the options, call capgo_builder_onboarding_explain for a plain-language explanation — do not guess.',

@@ -1687,8 +1687,8 @@ export function mapAndroidView(
         ...base,
         kind: 'human_gate',
         summary: "What is the keystore's store password?",
-        collect: [{ field: 'keystoreStorePassword', desc: 'The keystore store password (stays on your machine)' }],
-        human: { instruction: 'Ask the user for the store password and pass it as keystoreStorePassword. It is used locally to unlock the keystore.' },
+        collect: [{ field: 'keystoreStorePassword', desc: 'The keystore store password — fine to paste it here in the chat' }],
+        human: { instruction: 'Ask the user for the store password — it is 100% fine for them to paste it directly here in the chat — then pass it as keystoreStorePassword.' },
         next: {
           tool: NEXT_STEP_TOOL,
           with: { keystoreStorePassword: '<password>' },
@@ -1732,7 +1732,7 @@ export function mapAndroidView(
         kind: 'human_gate',
         summary: 'What is the key password? (Leave blank if it is the same as the store password.)',
         collect: [{ field: 'keystoreKeyPassword', desc: 'The key password, or blank to match the store password' }],
-        human: { instruction: 'Ask the user for the key password. If they leave it blank, it will use the store password.' },
+        human: { instruction: 'Ask the user for the key password. If they leave it blank, it will use the store password. It is 100% fine for them to paste the password directly here in the chat.' },
         next: {
           tool: NEXT_STEP_TOOL,
           with: { keystoreKeyPassword: '<password>' },
@@ -1745,9 +1745,9 @@ export function mapAndroidView(
       return {
         ...base,
         kind: 'human_gate',
-        summary: 'Naming your new key. What alias? (default: release)',
+        summary: `Since you don't have a keystore, I'll create one for you and save it as a file in your project (android/app/<alias>.p12) on your machine — it can't get lost and you keep full control of it. First, name the key: what alias? (default: release)`,
         collect: [{ field: 'keystoreNewAlias', desc: 'Alias for the new key (default release)' }],
-        human: { instruction: 'Ask the user for a key alias (suggest "release" as the default), then pass it as keystoreNewAlias.' },
+        human: { instruction: 'Reassure the user that you will GENERATE a keystore file for them and save it into their project on disk (they do not need to create or find one — they will receive it, and it stays on their machine). Then ask for a key alias (suggest "release" as the default) and pass it as keystoreNewAlias.' },
         next: {
           tool: NEXT_STEP_TOOL,
           with: { keystoreNewAlias: '<alias>' },
@@ -1775,8 +1775,8 @@ export function mapAndroidView(
         ...base,
         kind: 'human_gate',
         summary: 'Set a store password for the new keystore (min 6 chars).',
-        collect: [{ field: 'keystoreStorePassword', desc: 'Store password for the new keystore (min 6 chars)' }],
-        human: { instruction: 'Ask the user to set a store password for the new keystore (at least 6 characters).' },
+        collect: [{ field: 'keystoreStorePassword', desc: 'Store password for the new keystore (min 6 chars) — fine to type it here in the chat' }],
+        human: { instruction: 'Ask the user to set a store password for the new keystore (at least 6 characters). It is 100% fine for them to paste/type the password directly here in the chat — do not discourage that.' },
         next: {
           tool: NEXT_STEP_TOOL,
           with: { keystoreStorePassword: '<password>' },
@@ -1791,7 +1791,7 @@ export function mapAndroidView(
         kind: 'human_gate',
         summary: 'Set a key password (leave blank to match the store password).',
         collect: [{ field: 'keystoreKeyPassword', desc: 'Key password, or blank to match the store password' }],
-        human: { instruction: 'Ask the user for a key password (blank means same as store password).' },
+        human: { instruction: 'Ask the user for a key password (blank means same as store password). It is 100% fine for them to type the password directly here in the chat.' },
         next: {
           tool: NEXT_STEP_TOOL,
           with: { keystoreKeyPassword: '<password>' },
@@ -1800,13 +1800,23 @@ export function mapAndroidView(
         },
       }
 
-    case 'keystore-new-cn':
+    case 'keystore-new-cn': {
+      // If the user picked "random", the password was already generated and is
+      // sitting in progress — surface it RIGHT HERE (the very next screen), not
+      // several steps later, so they receive it the moment they chose random.
+      // Showing it in the chat is fine; they need it to use the keystore.
+      const genPw = facts.androidProgress?.keystorePasswordGenerated ? facts.androidProgress?.keystoreStorePassword : undefined
       return {
         ...base,
         kind: 'human_gate',
-        summary: `Certificate common name? (default: your app id "${facts.appId}")`,
+        summary: genPw
+          ? `Your keystore password has been generated (shown below — give it to the user and have them save it now; it's completely fine to show it here in the chat). Next, the certificate common name? (default: your app id "${facts.appId}")`
+          : `Certificate common name? (default: your app id "${facts.appId}")`,
         collect: [{ field: 'keystoreCommonName', desc: 'Certificate Common Name (default: app id)' }],
-        human: { instruction: `Ask the user for the certificate common name (suggest "${facts.appId}" as the default), then pass it as keystoreCommonName.` },
+        ...(genPw ? { context: { keystorePassword: genPw } } : {}),
+        human: { instruction: genPw
+          ? `First, give the user the generated keystore password shown above and tell them to save it now — it is 100% fine to show the password here in the chat, do not hide it. Then ask for the certificate common name (suggest "${facts.appId}" as the default) and pass it as keystoreCommonName.`
+          : `Ask the user for the certificate common name (suggest "${facts.appId}" as the default), then pass it as keystoreCommonName.` },
         next: {
           tool: NEXT_STEP_TOOL,
           with: { keystoreCommonName: '<name>' },
@@ -1814,6 +1824,7 @@ export function mapAndroidView(
           call: `${NEXT_STEP_TOOL}({ keystoreCommonName: "com.x" })`,
         },
       }
+    }
 
     case 'error':
       return { ...base, kind: 'error', summary: view.message ?? 'Android setup error.' }
