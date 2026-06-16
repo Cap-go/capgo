@@ -5,9 +5,11 @@ import { getEnv } from './utils.ts'
 
 // Builder analytics for the admin dashboard. Live (no cache):
 //  - Onboarding funnel / AI usage / per-org journeys come from PostHog (HogQL).
-//  - Build outcomes / failures / durations come from Postgres (build_requests/build_logs).
+//  - Build outcomes / failures / durations come from Postgres (build_requests).
 // PostHog is read via a personal API key in POSTHOG_READ_KEY; if unset, the PostHog-derived
-// sections come back empty and the Postgres build sections still populate.
+// sections come back empty and the Postgres build sections still populate. The response
+// carries posthog_configured / posthog_connected so the UI can distinguish "no data" from
+// "PostHog unavailable".
 
 // ----------------------------------------------------------------- onboarding model
 
@@ -22,8 +24,14 @@ const MILESTONES: Milestone[] = [
 ]
 const TERMINAL_STEP = 'build-complete'
 const AI_STEPS = new Set(['ai-analysis-prompt', 'ai-analysis-result', 'ai-analysis-running', 'ai-analysis-result-scroll'])
-const FIRST_STEPS = new Set(['welcome', 'resume-prompt', 'setup-method-select'])
+// Restart markers for synthetic (no journey_id) sessionization. Deliberately excludes
+// 'setup-method-select' (it is a milestone-1 step; treating it as a restart marker would
+// score a freshly-split session as milestone 1 without it ever reaching credentials).
+const FIRST_STEPS = new Set(['welcome', 'resume-prompt'])
 const GAP_MS = 30 * 60 * 1000
+const ONBOARDING_EVENT_LIMIT = 200_000
+const BUILD_ROW_LIMIT = 100_000
+const NEW_ERROR_MS = 3 * 24 * 60 * 60 * 1000
 
 const STEP_TO_MILESTONE = new Map<string, number>()
 MILESTONES.forEach((m, i) => m.steps.forEach(s => STEP_TO_MILESTONE.set(s, i)))
@@ -34,6 +42,10 @@ interface Journey { appId: string, orgId: string, platform: string, startedAt: n
 function sessionize(events: OnbEvent[]): Journey[] {
   const byKey = new Map<string, OnbEvent[]>()
   for (const e of events) {
+    // Events with neither a journey_id nor an app_id cannot be attributed; skip them so
+    // they do not all collapse into a single bogus "a:" journey.
+    if (!e.journeyId && !e.appId)
+      continue
     const key = e.journeyId ? `j:${e.journeyId}` : `a:${e.appId}`
     if (!byKey.has(key))
       byKey.set(key, [])
@@ -99,16 +111,18 @@ function sqlStr(v: string): string {
 }
 
 async function hogql(c: Context, query: string): Promise<Record<string, unknown>[]> {
-  const key = getEnv(c, 'POSTHOG_READ_KEY')
+  const key = (getEnv(c, 'POSTHOG_READ_KEY') || '').trim()
   if (!key)
     return []
-  const host = (getEnv(c, 'POSTHOG_READ_HOST') || 'https://eu.posthog.com').replace(/\/$/, '')
-  const project = getEnv(c, 'POSTHOG_READ_PROJECT_ID') || '22029'
+  const host = ((getEnv(c, 'POSTHOG_READ_HOST') || 'https://eu.posthog.com').trim()).replace(/\/$/, '')
+  const project = (getEnv(c, 'POSTHOG_READ_PROJECT_ID') || '22029').trim()
   try {
     const res = await fetch(`${host}/api/projects/${project}/query/`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: { kind: 'HogQLQuery', query } }),
+      // Bound the request so a slow/unresponsive PostHog can't hang the Worker.
+      signal: AbortSignal.timeout(20_000),
     })
     if (!res.ok) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'posthog_query_failed', status: res.status })
@@ -149,17 +163,21 @@ async function loadOnboardingEvents(c: Context, start: string, end: string): Pro
       AND timestamp >= parseDateTimeBestEffort(${sqlStr(start)})
       AND timestamp <= parseDateTimeBestEffort(${sqlStr(end)})
     ORDER BY timestamp ASC
-    LIMIT 200000`
+    LIMIT ${ONBOARDING_EVENT_LIMIT}`
   const rows = await hogql(c, q)
-  return rows.map(r => ({
-    ts: num(r.ts) * 1000,
-    appId: str(r.app_id),
-    orgId: str(r.org_id),
-    platform: str(r.platform),
-    step: str(r.step),
-    journeyId: str(r.journey_id),
-    errorCategory: str(r.error_category),
-  }))
+  if (rows.length >= ONBOARDING_EVENT_LIMIT)
+    cloudlog({ requestId: c.get('requestId'), message: 'builder_analytics onboarding events truncated', limit: ONBOARDING_EVENT_LIMIT })
+  return rows
+    .map(r => ({
+      ts: num(r.ts) * 1000,
+      appId: str(r.app_id),
+      orgId: str(r.org_id),
+      platform: str(r.platform),
+      step: str(r.step),
+      journeyId: str(r.journey_id),
+      errorCategory: str(r.error_category),
+    }))
+    .filter(e => e.appId || e.journeyId)
 }
 
 async function loadAiChoiceCount(c: Context, start: string, end: string): Promise<number> {
@@ -178,7 +196,7 @@ async function loadAiChoiceCount(c: Context, start: string, end: string): Promis
 
 function fingerprint(raw: string): { fp: string, title: string } {
   const firstLine = (raw || '').split('\n')[0].trim()
-  let norm = firstLine.toLowerCase()
+  const norm = firstLine.toLowerCase()
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '<uuid>')
     .replace(/\/[^\s'"]+/g, '<path>')
     .replace(/0x[0-9a-f]+/gi, '<hex>')
@@ -204,16 +222,22 @@ interface BuildRow { appId: string, ownerOrg: string, platform: string, status: 
 export async function getAdminBuilderAnalytics(c: Context, startDate: string, endDate: string) {
   const nowMs = Date.now()
   const startMs = Date.parse(startDate)
+  const endMs = Date.parse(endDate)
+  const posthogConfigured = Boolean((getEnv(c, 'POSTHOG_READ_KEY') || '').trim())
 
-  // --- PostHog onboarding ---
-  const events = await loadOnboardingEvents(c, startDate, endDate)
-  const journeys = sessionize(events).filter(j => j.startedAt >= startMs)
-  const aiOrgs = await loadAiChoiceCount(c, startDate, endDate)
+  // --- PostHog onboarding (parallel, each bounded by a fetch timeout) ---
+  const [events, aiOrgs] = await Promise.all([
+    loadOnboardingEvents(c, startDate, endDate),
+    loadAiChoiceCount(c, startDate, endDate),
+  ])
+  // Keep only journeys that reached a recognized milestone, so the KPI count, the funnel
+  // top, the orgs rollup and the quit metrics are all computed over the same population.
+  const journeys = sessionize(events).filter(j => j.milestone >= 0 && j.startedAt >= startMs)
 
   const starts = journeys.length
   const completions = journeys.filter(j => j.completed).length
 
-  // Funnel (furthest milestone reached).
+  // Funnel (furthest milestone reached). reached[0] === starts by construction above.
   const reached = MILESTONES.map(() => 0)
   for (const j of journeys) {
     for (let i = 0; i <= j.milestone; i++) reached[i]++
@@ -247,14 +271,18 @@ export async function getAdminBuilderAnalytics(c: Context, startDate: string, en
 
   // --- Postgres builds ---
   let builds: BuildRow[] = []
+  let buildsTruncated = false
   const pgClient = getPgClient(c, true)
   try {
     const res = await pgClient.query(
       `SELECT app_id, owner_org, platform, status, last_error, ai_analyzed,
          (extract(epoch from created_at) * 1000)::bigint AS created_ms
-       FROM build_requests WHERE created_at >= $1 AND created_at <= $2 ORDER BY created_at ASC`,
+       FROM build_requests WHERE created_at >= $1 AND created_at <= $2 ORDER BY created_at ASC LIMIT ${BUILD_ROW_LIMIT}`,
       [startDate, endDate],
     )
+    buildsTruncated = res.rows.length >= BUILD_ROW_LIMIT
+    if (buildsTruncated)
+      cloudlog({ requestId: c.get('requestId'), message: 'builder_analytics builds truncated', limit: BUILD_ROW_LIMIT })
     builds = res.rows.map((r: Record<string, unknown>) => ({
       appId: str(r.app_id),
       ownerOrg: str(r.owner_org),
@@ -279,9 +307,11 @@ export async function getAdminBuilderAnalytics(c: Context, startDate: string, en
     const STATUSES = ['succeeded', 'failed', 'expired', 'cancelled', 'starting']
     const status_breakdown = STATUSES.map(s => ({ key: s, count: builds.filter(b => b.status === s).length }))
 
-    // Daily outcomes.
+    // Daily outcomes — bounded by the selected endDate (never past it), so historical
+    // ranges are not padded with empty days up to today.
+    const lastMs = Math.min(endMs, nowMs)
     const dayMap = new Map<string, { succeeded: number, failed: number }>()
-    for (let t = startMs; t <= nowMs; t += DAY) dayMap.set(dayKey(t), { succeeded: 0, failed: 0 })
+    for (let t = startMs; t <= lastMs; t += DAY) dayMap.set(dayKey(t), { succeeded: 0, failed: 0 })
     for (const b of builds) {
       const d = dayMap.get(dayKey(b.createdMs))
       if (!d)
@@ -293,8 +323,11 @@ export async function getAdminBuilderAnalytics(c: Context, startDate: string, en
     }
     const builds_daily = [...dayMap.entries()].map(([date, v]) => ({ date, succeeded: v.succeeded, failed: v.failed }))
 
-    // Failure groups + new-in-3-days (from last_error; novelty derived within window).
-    const groups = new Map<string, { title: string, count: number, firstMs: number }>()
+    // Failure groups + "new in last 3 days". Novelty is window-relative (no historical
+    // baseline is stored); it is only meaningful when the window extends past the 3-day
+    // cutoff, otherwise every error in the window is trivially "new" — so guard for that.
+    const noveltyMeaningful = startMs <= nowMs - NEW_ERROR_MS
+    const groups = new Map<string, { fp: string, title: string, count: number, firstMs: number }>()
     for (const b of builds) {
       if (b.status !== 'failed' || !b.lastError)
         continue
@@ -305,34 +338,42 @@ export async function getAdminBuilderAnalytics(c: Context, startDate: string, en
         g.firstMs = Math.min(g.firstMs, b.createdMs)
       }
       else {
-        groups.set(fp, { title, count: 1, firstMs: b.createdMs })
+        groups.set(fp, { fp, title, count: 1, firstMs: b.createdMs })
       }
     }
     const error_groups = [...groups.values()]
-      .map(g => ({ title: g.title, count: g.count, is_new: g.firstMs >= nowMs - 3 * DAY }))
+      .map(g => ({ fingerprint: g.fp, title: g.title, count: g.count, is_new: noveltyMeaningful && g.firstMs >= nowMs - NEW_ERROR_MS }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 40)
 
-    // Per-org rollup.
-    const orgAgg = new Map<string, { attempts: number, completed: number, usedAi: boolean, builds: number, buildsFailed: number, lastSeen: number }>()
+    // Per-org rollup — seeded from journeys AND builds, so build-only orgs are not dropped.
+    interface OrgAgg { attempts: number, completed: number, usedAi: boolean, builds: number, buildsFailed: number, lastSeen: number }
+    const orgAgg = new Map<string, OrgAgg>()
+    const ensureOrg = (id: string): OrgAgg => {
+      let a = orgAgg.get(id)
+      if (!a) {
+        a = { attempts: 0, completed: 0, usedAi: false, builds: 0, buildsFailed: 0, lastSeen: 0 }
+        orgAgg.set(id, a)
+      }
+      return a
+    }
     for (const j of journeys) {
-      const id = j.orgId || `app:${j.appId}`
-      const a = orgAgg.get(id) || { attempts: 0, completed: 0, usedAi: false, builds: 0, buildsFailed: 0, lastSeen: 0 }
+      const a = ensureOrg(j.orgId || `app:${j.appId}`)
       a.attempts++
       if (j.completed)
         a.completed++
       if (j.usedAi)
         a.usedAi = true
       a.lastSeen = Math.max(a.lastSeen, j.endedAt)
-      orgAgg.set(id, a)
     }
     for (const b of builds) {
-      const a = orgAgg.get(b.ownerOrg)
-      if (!a)
+      if (!b.ownerOrg)
         continue
+      const a = ensureOrg(b.ownerOrg)
       a.builds++
       if (b.status === 'failed')
         a.buildsFailed++
+      a.lastSeen = Math.max(a.lastSeen, b.createdMs)
     }
     const orgs = [...orgAgg.entries()].map(([id, a]) => ({
       org_id: id,
@@ -363,14 +404,17 @@ export async function getAdminBuilderAnalytics(c: Context, startDate: string, en
       funnel,
       quit_steps,
       builds_daily,
+      builds_truncated: buildsTruncated,
       status_breakdown,
       errors: {
         failed_builds: failed,
         groups: error_groups,
         new_count: error_groups.filter(g => g.is_new).length,
+        novelty_meaningful: noveltyMeaningful,
         onboarding_error_categories,
       },
       orgs,
+      posthog_configured: posthogConfigured,
       posthog_connected: events.length > 0 || starts > 0,
     }
   }

@@ -19,7 +19,7 @@ import { useMainStore } from '~/stores/main'
 
 interface FunnelStep { key: string, label: string, reached: number, drop_pct: number, of_start_pct: number }
 interface Tally { key: string, count: number }
-interface ErrorGroup { title: string, count: number, is_new: boolean }
+interface ErrorGroup { fingerprint: string, title: string, count: number, is_new: boolean }
 interface OrgRow {
   org_id: string
   org_name: string
@@ -46,9 +46,11 @@ interface BuilderAnalytics {
   funnel: FunnelStep[]
   quit_steps: Tally[]
   builds_daily: { date: string, succeeded: number, failed: number }[]
+  builds_truncated: boolean
   status_breakdown: Tally[]
-  errors: { failed_builds: number, groups: ErrorGroup[], new_count: number, onboarding_error_categories: Tally[] }
+  errors: { failed_builds: number, groups: ErrorGroup[], new_count: number, novelty_meaningful: boolean, onboarding_error_categories: Tally[] }
   orgs: OrgRow[]
+  posthog_configured: boolean
   posthog_connected: boolean
 }
 
@@ -101,6 +103,17 @@ const newErrorGroups = computed(() => errorGroups.value.filter(g => g.is_new))
 const onbErrorCategories = computed(() => data.value?.errors?.onboarding_error_categories ?? [])
 const orgs = computed(() => data.value?.orgs ?? [])
 
+// PostHog half can be unconfigured or unreachable; surface that instead of silently showing
+// empty onboarding/AI numbers.
+const posthogWarning = computed(() => {
+  const d = data.value
+  if (!d || d.posthog_connected)
+    return ''
+  return d.posthog_configured
+    ? 'PostHog returned no data or was unreachable for this period — onboarding funnel & AI metrics may be incomplete.'
+    : 'PostHog is not configured (POSTHOG_READ_KEY) — onboarding funnel & AI metrics are unavailable. Build metrics below come from the database.'
+})
+
 function humanStep(step: string): string {
   if (!step)
     return '-'
@@ -122,7 +135,6 @@ watch(() => adminStore.refreshTrigger, () => loadData())
 
 onMounted(async () => {
   if (!mainStore.isAdmin) {
-    console.error('Non-admin user attempted to access admin dashboard')
     router.push('/dashboard')
     return
   }
@@ -147,6 +159,14 @@ displayStore.defaultBack = '/dashboard'
         </div>
 
         <div v-else class="space-y-6">
+          <!-- PostHog availability warning -->
+          <div
+            v-if="posthogWarning"
+            class="rounded-md border border-amber-500/40 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+          >
+            {{ posthogWarning }}
+          </div>
+
           <!-- KPI cards -->
           <div class="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
             <AdminStatsCard title="Onboarding starts" :value="kpis?.onboarding_starts ?? 0" color-class="text-primary" :is-loading="isLoadingData" subtitle="Journeys started" />
@@ -170,14 +190,14 @@ displayStore.defaultBack = '/dashboard'
                   New build errors (last 3 days)
                 </h2>
                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                  Failure signatures first seen recently — possible new/regressed issue
+                  Failure signatures first seen in the last 3 days within the selected range — possible new/regressed issue
                 </p>
               </div>
             </template>
             <ul class="space-y-2">
               <li
                 v-for="g in newErrorGroups"
-                :key="g.title"
+                :key="g.fingerprint"
                 class="flex items-start justify-between gap-3 rounded-md border border-amber-500/40 bg-amber-50 px-3 py-2 dark:bg-amber-900/20"
               >
                 <span class="min-w-0 break-words text-sm text-slate-700 dark:text-slate-200">{{ g.title }}</span>
@@ -209,6 +229,7 @@ displayStore.defaultBack = '/dashboard'
               :labels="funnelLabels"
               :values="funnelValues"
               label="Journeys reached"
+              value-mode="count"
               :total="funnelStart"
               :is-loading="isLoadingData"
             />
@@ -228,6 +249,7 @@ displayStore.defaultBack = '/dashboard'
                 </h2>
                 <p class="text-xs text-slate-500 dark:text-slate-400">
                   Succeeded vs failed native builds per day (Supabase build_requests)
+                  <span v-if="data?.builds_truncated" class="text-amber-500"> · results truncated at 100k rows; narrow the date range</span>
                 </p>
               </div>
             </template>
@@ -301,7 +323,7 @@ displayStore.defaultBack = '/dashboard'
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
-                  <tr v-for="g in errorGroups" :key="g.title">
+                  <tr v-for="g in errorGroups" :key="g.fingerprint">
                     <td class="px-4 py-3">
                       <span class="break-words text-slate-700 dark:text-slate-200">{{ g.title }}</span>
                       <span v-if="g.is_new" class="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">NEW</span>
@@ -328,7 +350,7 @@ displayStore.defaultBack = '/dashboard'
                   Organizations
                 </h2>
                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                  Every org that started builder onboarding in this period
+                  Orgs that started builder onboarding or ran builds in this period
                 </p>
               </div>
             </template>
