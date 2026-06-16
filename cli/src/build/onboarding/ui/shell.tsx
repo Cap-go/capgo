@@ -105,6 +105,8 @@ export interface OnboardingShellProps {
    * Undefined → up to date → no prompt.
    */
   updateInfo?: { currentVersion: string, latestVersion: string }
+  /** Shows the terminal replay/analytics opt-out notice on the first shell screen. */
+  analyticsNotice?: boolean
   /** Called once a platform is chosen so the caller can print the completion breadcrumb. */
   onResolvePlatform?: (platform: Platform) => void
   /** Called by the mounted app on every step transition, so the caller can record
@@ -117,7 +119,13 @@ export interface OnboardingShellProps {
   onResult?: (result: OnboardingResult) => void
 }
 
-const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, iosDir, androidDir, guidedHelperUsable, apikey, supaHost, journeyId, initialPlatform, updateInfo, onResolvePlatform, onStep, onResult }) => {
+const AnalyticsNotice: FC = () => (
+  <Box marginTop={1}>
+    <Text dimColor>Analytics: this onboarding records usage and terminal replay to improve Capgo. Opt out with --no-analytics.</Text>
+  </Box>
+)
+
+const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, iosDir, androidDir, guidedHelperUsable, apikey, supaHost, journeyId, initialPlatform, updateInfo, analyticsNotice, onResolvePlatform, onStep, onResult }) => {
   const { exit } = useApp()
   const { cols, rows } = useTerminalSize()
   const [ready, setReady] = useState<ReadyApp | null>(null)
@@ -202,6 +210,7 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
     return (
       <Box flexDirection="column" minHeight={rows} padding={1}>
         <Header />
+        {analyticsNotice && <AnalyticsNotice />}
         <UpdatePrompt
           layout={pickPlatformLayout(cols, rows)}
           currentVersion={updateInfo.currentVersion}
@@ -223,6 +232,7 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
   return (
     <Box flexDirection="column" minHeight={rows} padding={1}>
       <Header />
+      {analyticsNotice && <AnalyticsNotice />}
       {!initialPlatform && <PlatformPicker layout={pickPlatformLayout(cols, rows)} onSelect={choose} />}
     </Box>
   )

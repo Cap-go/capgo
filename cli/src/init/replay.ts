@@ -22,7 +22,8 @@ const REPLAY_PADDING_PX = 32
 const REPLAY_FRAME_THROTTLE_MS = 1000
 const REPLAY_FLUSH_TIMEOUT_MS = 1500
 const REPLAY_IDENTITY_TIMEOUT_MS = 3000
-const REPLAY_CURRENT_URL = 'capgo-cli://init'
+const DEFAULT_REPLAY_CURRENT_URL = 'capgo-cli://init'
+const DEFAULT_REPLAY_SESSION_PREFIX = 'init'
 
 type CliStream = typeof stdout | typeof stderr
 type StreamWrite = CliStream['write']
@@ -81,12 +82,15 @@ type InitReplayTransport = (url: string, body: InitReplaySnapshotBody, signal?: 
 interface StartInitReplayOptions {
   analyticsEnabled?: boolean
   apikey?: string
+  ariaLabel?: string
   cols?: number
+  currentUrl?: string
   identity?: InitReplayIdentity
   identityResolver?: (apikey: string) => Promise<InitReplayIdentity | undefined>
   posthogToken?: string
   replayUrl?: string
   rows?: number
+  sessionPrefix?: string
   throttleMs?: number
   transport?: InitReplayTransport
 }
@@ -96,10 +100,15 @@ export interface InitReplayController {
   sessionId: string
 }
 
+let activeReplayFinish: (() => Promise<void>) | undefined
 let activeReplaySessionId: string | undefined
 
-export function getActiveInitReplaySessionId() {
+export function getActiveCliReplaySessionId() {
   return activeReplaySessionId
+}
+
+export async function finishActiveCliReplay() {
+  await activeReplayFinish?.()
 }
 
 export function isCliTelemetryDisabled() {
@@ -249,10 +258,13 @@ function escapeHtml(text: string) {
 }
 
 export async function renderRedactedTerminalFrame(rawAnsi: string, cols = DEFAULT_COLS, rows = DEFAULT_ROWS): Promise<TerminalReplayFrame> {
-  const redactedAnsi = redactSecrets(rawAnsi)
+  const normalizedTerminal = createTerminal(cols, rows)
+  await writeTerminal(normalizedTerminal.term, rawAnsi)
+  const text = redactSecrets(visibleTerminalText(normalizedTerminal.term))
+  normalizedTerminal.term.dispose()
+
   const { serializeAddon, term } = createTerminal(cols, rows)
-  await writeTerminal(term, redactedAnsi)
-  const text = visibleTerminalText(term)
+  await writeTerminal(term, text)
   const html = extractHtmlFragment(serializeAddon.serializeAsHTML({ includeGlobalBackground: true, scrollback: 0 }))
   const viewport = getReplayViewportSize(cols, rows)
   term.dispose()
@@ -357,16 +369,16 @@ function buildTerminalImageDataUrl(frame: TerminalReplayFrame) {
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
 }
 
-export async function createTerminalSnapshot(frameInput: TerminalReplayFrame | string): Promise<TerminalSnapshot> {
+export async function createTerminalSnapshot(frameInput: TerminalReplayFrame | string, options: { ariaLabel?: string, currentUrl?: string } = {}): Promise<TerminalSnapshot> {
   const frame = normalizeTerminalFrame(frameInput)
-  const window = new Window({ url: REPLAY_CURRENT_URL })
+  const window = new Window({ url: options.currentUrl || DEFAULT_REPLAY_CURRENT_URL })
   const document = window.document as HappyDocument
 
   document.documentElement.setAttribute('style', 'margin:0;min-height:100%;background:#0d1117;color:#d6deeb;')
   document.body.setAttribute('style', 'margin:0;min-height:100%;background:#0d1117;color:#d6deeb;')
 
   const terminal = document.createElement('div')
-  terminal.setAttribute('aria-label', 'Capgo init terminal replay')
+  terminal.setAttribute('aria-label', options.ariaLabel || 'Capgo terminal replay')
   terminal.setAttribute('aria-multiline', 'true')
   terminal.setAttribute('data-capgo-terminal', 'true')
   terminal.setAttribute('role', 'textbox')
@@ -449,6 +461,7 @@ export function createTerminalInteractionEvents(input: {
 
 
 export function buildInitReplayBody(input: {
+  currentUrl?: string
   events: eventWithTime[]
   identity?: InitReplayIdentity
   sessionId: string
@@ -462,7 +475,7 @@ export function buildInitReplayBody(input: {
     distinct_id: distinctId,
     event: '$snapshot',
     properties: {
-      $current_url: REPLAY_CURRENT_URL,
+      $current_url: input.currentUrl || DEFAULT_REPLAY_CURRENT_URL,
       $lib: '@capgo/cli',
       $lib_version: pack.version,
       $session_id: input.sessionId,
@@ -495,7 +508,7 @@ const defaultReplayTransport: InitReplayTransport = async (url, body, signal) =>
 }
 
 class InitReplayRecorder implements InitReplayController {
-  readonly sessionId = `init-${randomUUID()}`
+  readonly sessionId: string
   private readonly pendingSends = new Set<Promise<boolean>>()
   private readonly restoreWrites: Array<() => void> = []
   private readonly serializeAddon: SerializeAddon
@@ -512,19 +525,23 @@ class InitReplayRecorder implements InitReplayController {
     private readonly replayUrl: string,
     private readonly transport: InitReplayTransport,
     private readonly identity: Promise<InitReplayIdentity | undefined>,
+    private readonly currentUrl: string,
+    private readonly ariaLabel: string | undefined,
     private readonly cols: number,
     private readonly rows: number,
     private readonly throttleMs: number,
+    sessionPrefix: string,
   ) {
+    this.sessionId = `${sessionPrefix}-${randomUUID()}`
     const { serializeAddon, term } = createTerminal(cols, rows)
     this.serializeAddon = serializeAddon
     this.term = term
     this.patchStream(stdout)
     this.patchStream(stderr)
     stdout.on('resize', this.resize)
+    activeReplayFinish = () => this.finish()
     activeReplaySessionId = this.sessionId
   }
-
   async finish() {
     if (this.disposed)
       return
@@ -535,7 +552,7 @@ class InitReplayRecorder implements InitReplayController {
       this.captureTimer = undefined
     }
 
-    await this.captureFrame(true)
+    await this.captureFrame(true).catch(() => {})
     this.restore()
 
     const inFlight = [...this.pendingSends]
@@ -545,10 +562,11 @@ class InitReplayRecorder implements InitReplayController {
         new Promise(resolve => setTimeout(resolve, REPLAY_FLUSH_TIMEOUT_MS)),
       ])
     }
-
     this.term.dispose()
-    if (activeReplaySessionId === this.sessionId)
+    if (activeReplaySessionId === this.sessionId) {
+      activeReplayFinish = undefined
       activeReplaySessionId = undefined
+    }
   }
 
   private patchStream(stream: CliStream) {
@@ -588,7 +606,7 @@ class InitReplayRecorder implements InitReplayController {
 
     this.captureTimer = setTimeout(() => {
       this.captureTimer = undefined
-      void this.captureFrame(false)
+      void this.captureFrame(false).catch(() => {})
     }, this.throttleMs)
     this.captureTimer.unref?.()
   }
@@ -612,7 +630,7 @@ class InitReplayRecorder implements InitReplayController {
       const metaEventWithTime = {
         data: {
           height: viewport.height,
-          href: REPLAY_CURRENT_URL,
+          href: this.currentUrl,
           width: viewport.width,
         },
         timestamp,
@@ -622,7 +640,7 @@ class InitReplayRecorder implements InitReplayController {
       this.hasSentMeta = true
     }
 
-    const terminalSnapshot = await createTerminalSnapshot(frame)
+    const terminalSnapshot = await createTerminalSnapshot(frame, { ariaLabel: this.ariaLabel, currentUrl: this.currentUrl })
     const snapshotEventWithTime = {
       data: {
         initialOffset: { left: 0, top: 0 },
@@ -639,11 +657,12 @@ class InitReplayRecorder implements InitReplayController {
       timestamp: timestamp + 1,
     }))
 
+    const identity = await this.identity
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), REPLAY_FLUSH_TIMEOUT_MS)
     timeout.unref?.()
-    const identity = await this.identity
     const body = buildInitReplayBody({
+      currentUrl: this.currentUrl,
       events,
       identity,
       sessionId: this.sessionId,
@@ -688,6 +707,8 @@ export function startInitReplay(options: StartInitReplayOptions = {}): InitRepla
 
   try {
     const apikey = options.apikey?.trim() || ''
+    const currentUrl = options.currentUrl?.trim() || DEFAULT_REPLAY_CURRENT_URL
+    const sessionPrefix = options.sessionPrefix?.trim() || DEFAULT_REPLAY_SESSION_PREFIX
     const identityPromise = options.identity
       ? Promise.resolve(options.identity)
       : withTimeout((options.identityResolver || resolveInitReplayIdentity)(apikey), REPLAY_IDENTITY_TIMEOUT_MS)
@@ -697,9 +718,12 @@ export function startInitReplay(options: StartInitReplayOptions = {}): InitRepla
       replayUrl,
       options.transport || defaultReplayTransport,
       identityPromise,
+      currentUrl,
+      options.ariaLabel,
       options.cols || stdout.columns || DEFAULT_COLS,
       options.rows || stdout.rows || DEFAULT_ROWS,
       options.throttleMs || REPLAY_FRAME_THROTTLE_MS,
+      sessionPrefix,
     )
   }
   catch {

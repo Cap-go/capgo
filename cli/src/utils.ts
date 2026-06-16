@@ -29,6 +29,7 @@ import { nativePackageSchema } from './schemas/common'
 import { formatApiErrorForCli, parseSecurityPolicyError } from './utils/security_policy_errors'
 import { createTimedFetch, isSupabaseInstrumentationEnabled } from './analytics/supabase-perf'
 import { getGlobalAnalyticsProps } from './analytics/global-props'
+import { isTruthyEnvValue } from './posthog'
 
 export const baseKey = '.capgo_key'
 export const baseKeyV2 = '.capgo_key_v2'
@@ -1516,6 +1517,9 @@ export async function updateOrCreateChannel(supabase: SupabaseClient<Database>, 
 }
 
 export async function sendEvent(capgkey: string, payload: TrackOptions & { notifyConsole?: boolean, nonPersonTags?: Record<string, string | number | boolean> }, verbose?: boolean, signal?: AbortSignal): Promise<void> {
+  if (isTruthyEnvValue(env.CAPGO_DISABLE_TELEMETRY) || isTruthyEnvValue(env.CAPGO_DISABLE_POSTHOG))
+    return
+
   try {
     // Attach the global analytics props as nonPersonTags — event properties the
     // backend never writes as PostHog person properties ($set) — built

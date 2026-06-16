@@ -16,9 +16,10 @@ import { ASC_KEY_CHANNEL } from './asc-key/protocol.js'
 import { getPlatformDirFromCapacitorConfig } from '../platform-paths.js'
 import OnboardingShell from './ui/shell.js'
 import { checkForCliUpdate, manualUpdateHint, runUpdateAndReexec } from './self-update.js'
+import { startInitReplay } from '../../init/replay.js'
 import type { OnboardingResult } from './types.js'
-
 export interface OnboardingBuilderOptions {
+  analytics?: boolean
   apikey?: string
   platform?: string
   // Capgo API gateway override (--supa-host) — threaded to the wizard so its
@@ -194,6 +195,15 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
   // entrypoint — so both `build init` and the `bundle upload` → launch-onboarding
   // handoff each get exactly one.
   const journeyId = newBuilderJourneyId()
+  const analyticsEnabled = options.enableSelfUpdate === true && options.analytics !== false
+  const replayApikey = options.apikey?.trim() || findSavedKeySilent()
+  const buildReplay = startInitReplay({
+    analyticsEnabled,
+    apikey: replayApikey,
+    ariaLabel: 'Capgo build onboarding terminal replay',
+    currentUrl: 'capgo-cli://build-onboarding',
+    sessionPrefix: 'build-onboarding',
+  })
   const journeyStartedAt = Date.now()
   // The most recent step the wizard reported. Lets the quit event below record
   // WHERE the user dropped off regardless of HOW they left (keypress, Ctrl+C,
@@ -217,6 +227,7 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
       // Whether the iOS flow may offer guided ASC-key creation (see the probe
       // above). The shell threads it into the iOS OnboardingApp only.
       guidedHelperUsable,
+      analyticsNotice: Boolean(buildReplay),
       updateInfo: updateInfo ?? undefined,
       onResolvePlatform: (platform: Platform) => {
         resolvedPlatform = platform
@@ -239,6 +250,7 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
   // of silently continuing on the stale version the user chose to leave.
   if (result.outcome === 'update-requested' && updateInfo) {
     try {
+      await buildReplay?.finish()
       runUpdateAndReexec(updateInfo.latestVersion)
     }
     catch (error) {
@@ -325,4 +337,6 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
       }
     }
   }
+
+  await buildReplay?.finish()
 }

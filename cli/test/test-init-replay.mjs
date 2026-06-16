@@ -46,6 +46,9 @@ assert.match(styledFrame.html, /color:/, 'terminal HTML keeps xterm color styles
 assert.match(styledFrame.html, /hello replay/, 'terminal HTML includes visible text')
 const node = await createTerminalSnapshotNode(styledFrame)
 const serializedNode = JSON.stringify(node)
+const ansiSplitSecret = await renderRedactedTerminalText('capg_1234\u001B[31m567890abcdef\u001B[0m', 120, 10)
+assert.match(ansiSplitSecret, /\[REDACTED\]/, 'ANSI-normalized secret is redacted')
+assert.doesNotMatch(ansiSplitSecret, /capg_1234567890abcdef/, 'ANSI-split Capgo API key is redacted after terminal normalization')
 assert.match(serializedNode, /data-capgo-terminal/, 'snapshot includes the terminal wrapper')
 assert.match(serializedNode, /hello replay/, 'snapshot includes visible terminal text')
 const terminalSnapshot = await createTerminalSnapshot('hello input replay')
@@ -102,6 +105,18 @@ assert.equal(typeof body.properties.$snapshot_bytes, 'number')
 assert.ok(body.properties.$snapshot_bytes > 0, 'snapshot byte size is included')
 assert.doesNotMatch(JSON.stringify(body.properties), /capgo-key/, 'Capgo API keys are not replay properties')
 
+const buildOnboardingBody = buildInitReplayBody({
+  currentUrl: 'capgo-cli://build-onboarding',
+  events: [event],
+  sessionId: 'build-onboarding-session-123',
+  timestamp: '2026-06-16T00:00:00.000Z',
+  token: 'phc-token',
+  windowId: 'window-123',
+})
+assert.equal(buildOnboardingBody.distinct_id, 'cli:build-onboarding-session-123', 'build onboarding replay falls back to replay session distinct_id')
+assert.equal(buildOnboardingBody.properties.$session_id, 'build-onboarding-session-123')
+assert.equal(buildOnboardingBody.properties.$current_url, 'capgo-cli://build-onboarding')
+
 const identifiedBody = buildInitReplayBody({
   events: [event],
   identity: { distinctId: 'user-uuid-123', email: 'user@example.com', userId: 'user-uuid-123' },
@@ -118,6 +133,10 @@ assert.deepEqual(identifiedBody.properties.$set, { email: 'user@example.com' }, 
 const envTarget = {}
 assert.equal(applyCommandAnalyticsOptOut('init', { analytics: false }, envTarget), true)
 assert.equal(envTarget.CAPGO_DISABLE_TELEMETRY, 'true')
+const buildEnvTarget = {}
+assert.equal(applyCommandAnalyticsOptOut('build init', { analytics: false }, buildEnvTarget), true)
+assert.equal(buildEnvTarget.CAPGO_DISABLE_TELEMETRY, 'true')
+assert.equal(applyCommandAnalyticsOptOut('build onboarding', { analytics: false }, {}), true)
 assert.equal(applyCommandAnalyticsOptOut('bundle upload', { analytics: false }, {}), false)
 assert.equal(applyCommandAnalyticsOptOut('init', { analytics: true }, {}), false)
 
