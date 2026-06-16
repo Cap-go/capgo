@@ -1,5 +1,4 @@
 import type { Buffer } from 'node:buffer'
-import type { ExecSyncOptions } from 'node:child_process'
 import type { ExistingOrganizationApp, Options, PendingOnboardingApp } from '../api/app'
 import type { Organization } from '../utils'
 import type { InitCodeDiff, InitEncryptionPhase, InitEncryptionSummary } from './runtime'
@@ -51,7 +50,6 @@ const defaultChannel = 'production'
 const channelNameRegex = /^[\w.-]+$/
 const appIdRegex = /^[a-z0-9]+(?:\.[\w-]+)+$/i
 const whitespaceSplitPattern = /\s+/
-const execOption = { stdio: 'pipe' }
 const capacitorConfigFiles = ['capacitor.config.ts', 'capacitor.config.js', 'capacitor.config.json']
 const capacitorGettingStartedUrl = 'https://capacitorjs.com/docs/getting-started'
 const nextWebDirPattern = /["']?webDir["']?\s*:\s*["']out["']/
@@ -113,14 +111,24 @@ let globalAutoTestChange: InitAutoTestChange | undefined
 
 const CODE_DIFF_CONTEXT_LINES = 5
 
-function getNativePlatformAvailability(config?: CapacitorConfigSnapshot) {
+function getNativePlatformAvailability(config?: CapacitorConfigSnapshot, rootDir = cwd()) {
   const iosDir = getPlatformDirFromCapacitorConfig(config, 'ios')
   const androidDir = getPlatformDirFromCapacitorConfig(config, 'android')
   return {
     iosDir,
     androidDir,
-    ios: existsSync(join(cwd(), iosDir)),
-    android: existsSync(join(cwd(), androidDir)),
+    ios: existsSync(join(rootDir, iosDir)),
+    android: existsSync(join(rootDir, androidDir)),
+  }
+}
+async function withTemporaryCwd<T>(targetDir: string, action: () => Promise<T>): Promise<T> {
+  const previousCwd = cwd()
+  try {
+    chdir(targetDir)
+    return await action()
+  }
+  finally {
+    chdir(previousCwd)
   }
 }
 
@@ -890,10 +898,13 @@ async function maybeRunCapacitorInit(projectDir: string, projectType: string, in
   }
 }
 
-function runCapacitorPlatformAdd(platformName: 'ios' | 'android', runner: string): boolean {
+function runCapacitorPlatformAdd(platformName: 'ios' | 'android', runner: string, commandCwd = cwd()): boolean {
   const command = formatRunnerCommand(runner, ['cap', 'add', platformName])
   const spinner = pSpinner()
-  spinner.start(`Running: ${command}`)
+  const runMessage = commandCwd === cwd()
+    ? `Running: ${command}`
+    : `Running in ${commandCwd}: ${command}`
+  spinner.start(runMessage)
 
   let parsedRunner: { command: string, args: string[] }
   try {
@@ -905,7 +916,7 @@ function runCapacitorPlatformAdd(platformName: 'ios' | 'android', runner: string
     return false
   }
 
-  const result = spawnSync(parsedRunner.command, [...parsedRunner.args, 'cap', 'add', platformName], { stdio: 'inherit' })
+  const result = spawnSync(parsedRunner.command, [...parsedRunner.args, 'cap', 'add', platformName], { stdio: 'inherit', cwd: commandCwd })
   if (result.error || result.status !== 0) {
     spinner.stop(`Could not add ${platformName} automatically ❌`)
     if (result.error)
@@ -936,7 +947,7 @@ async function ensureWorkspaceReadyForInit(initialAppId?: string): Promise<strin
     const nearestCapacitorConfig = findNearestCapacitorConfig(currentDir)
     const nearestPackageJson = findNearestPackageJson(currentDir)
     const projectDir = nearestCapacitorConfig?.dir || (nearestPackageJson ? dirname(nearestPackageJson) : currentDir)
-    const projectType = await findProjectType({ quiet: true })
+    const projectType = await findProjectType({ quiet: true, packageJsonPath: globalPathToPackageJson })
     const frameworkKind = getFrameworkKind(projectType)
 
     if (nearestCapacitorConfig?.dir === currentDir) {
@@ -2408,10 +2419,13 @@ async function addUpdaterStep(orgId: string, apikey: string, appId: string) {
     const s = pSpinner()
     s.start(`Updating config file`)
     delta = !!doDirectInstall
-    if (doDirectInstall) {
-      await updateConfigbyKey('SplashScreen', { launchAutoHide: false })
-    }
-    await updateConfigUpdater(getInitUpdaterPluginConfig(appId, delta))
+    const projectDir = dirname(path)
+    await withTemporaryCwd(projectDir, async () => {
+      if (doDirectInstall) {
+        await updateConfigbyKey('SplashScreen', { launchAutoHide: false })
+      }
+      await updateConfigUpdater(getInitUpdaterPluginConfig(appId, delta))
+    })
     s.stop(`Config file updated ✅`)
     break
   }
@@ -2434,10 +2448,13 @@ async function addCodeStep(orgId: string, apikey: string, appId: string) {
     const s = pSpinner()
     s.start(`Adding @capacitor-updater to your main file`)
 
-    const projectType = await findProjectType({ quiet: true })
+    const packageJsonPath = path.resolve(globalPathToPackageJson ?? join(findRoot(cwd()), PACKNAME))
+    const projectDir = dirname(packageJsonPath)
+    const resolveProjectFilePath = (filePath: string) => path.isAbsolute(filePath) ? filePath : join(projectDir, filePath)
+    const projectType = await findProjectType({ quiet: true, packageJsonPath })
     if (projectType === 'nuxtjs-js' || projectType === 'nuxtjs-ts') {
       // Nuxt.js specific logic
-      const nuxtDir = join('plugins')
+      const nuxtDir = join(projectDir, 'plugins')
       if (!existsSync(nuxtDir)) {
         mkdirSync(nuxtDir, { recursive: true })
       }
@@ -2492,13 +2509,14 @@ async function addCodeStep(orgId: string, apikey: string, appId: string) {
     }
     else {
       // Handle other project types
-      let mainFilePath
+      let mainFilePath: string | null = null
       if (projectType === 'unknown') {
-        mainFilePath = await findMainFile(true)
+        mainFilePath = await findMainFile(true, projectDir)
       }
       else {
         const isTypeScript = projectType.endsWith('-ts')
-        mainFilePath = findMainFileForProjectType(projectType, isTypeScript)
+        const projectTypeMainFile = findMainFileForProjectType(projectType, isTypeScript, projectDir)
+        mainFilePath = projectTypeMainFile ? resolveProjectFilePath(projectTypeMainFile) : projectTypeMainFile
       }
 
       // Open main file and inject codeInject
@@ -2507,7 +2525,7 @@ async function addCodeStep(orgId: string, apikey: string, appId: string) {
         const userProvidedPath = await pText({
           message: `Provide the correct relative path to your main file (JS or TS):`,
           validate: (value) => {
-            if (!value || !existsSync(value))
+            if (!value || !existsSync(resolveProjectFilePath(value)))
               return 'File does not exist. Please provide a valid path.'
           },
         })
@@ -2515,7 +2533,7 @@ async function addCodeStep(orgId: string, apikey: string, appId: string) {
           pCancel('Operation cancelled.')
           exit(1)
         }
-        mainFilePath = userProvidedPath
+        mainFilePath = resolveProjectFilePath(userProvidedPath as string)
       }
       const mainFile = readFileSync(mainFilePath, 'utf8')
       const mainFileContent = mainFile.toString()
@@ -2581,7 +2599,9 @@ async function addEncryptionStep(orgId: string, apikey: string, appId: string) {
   if (globalCodeDiff) {
     setInitCodeDiff(globalCodeDiff)
   }
-  const dependencies = await getAllPackagesDependencies()
+  const packageJsonPath = path.resolve(globalPathToPackageJson ?? join(findRoot(cwd()), PACKNAME))
+  const projectDir = dirname(packageJsonPath)
+  const dependencies = await getAllPackagesDependencies(undefined, packageJsonPath)
   const coreVersion = dependencies.get('@capacitor/core')
   const normalizedCoreVersion = normalizeConcreteVersion(coreVersion)
   if (!coreVersion) {
@@ -2729,7 +2749,14 @@ async function addEncryptionStep(orgId: string, apikey: string, appId: string) {
     // setupChannel=false avoids a rogue clack confirm when an old private
     // key is present in the config.
     try {
-      await createKeyInternal({ force: true, setupChannel: false }, true)
+      const previousCwd = cwd()
+      try {
+        chdir(projectDir)
+        await createKeyInternal({ force: true, setupChannel: false }, true)
+      }
+      finally {
+        chdir(previousCwd)
+      }
       // Intentionally stop without a success message: the persistent
       // encryption summary panel renders on the next step and already shows
       // the outcome. Passing a message here would push it into the rolling
@@ -2750,11 +2777,12 @@ async function addEncryptionStep(orgId: string, apikey: string, appId: string) {
       // every native platform that's already been `cap add`-ed, which is
       // exactly what we want — the key needs to end up in whichever
       // native projects exist.
-      await ensureUpdaterReadyBeforeSync(pm, orgId, apikey)
+      await ensureUpdaterReadyBeforeSync(pm, orgId, apikey, packageJsonPath)
       const syncResult = await streamCommandInInitPanel({
         title: '🔐 Syncing native project so the public key is bundled',
         runner: pm.runner,
         args: ['cap', 'sync'],
+        cwd: projectDir,
       })
       // Small dwell so the user can read the final state of the panel
       // (success banner or the last few lines of an error) before we
@@ -2833,6 +2861,7 @@ async function streamCommandInInitPanel(params: {
   title: string
   runner: string // e.g. "npx", "bunx", "yarn dlx"
   args: string[]
+  cwd?: string
 }): Promise<{ success: boolean, error?: Error }> {
   // `pm.runner` can contain a space ("yarn dlx", "pnpm exec"). `spawn`
   // without `shell:true` can't handle that, and `shell:true` brings
@@ -2868,6 +2897,7 @@ async function streamCommandInInitPanel(params: {
         // stdin ignored — cap sync is non-interactive. stdout/stderr piped
         // so Node can read them without touching the parent TTY that Ink
         // is actively rendering into.
+        cwd: params.cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
       })
     }
@@ -2963,11 +2993,11 @@ type IosRunTargetResolution = RunDeviceStepOutcome | typeof iosRunTargetActions.
 type IosSimulatorRunTargetResolution = RunDeviceStepOutcome | typeof iosRunTargetActions.refresh
 type CapacitorRunTargetResolution = RunDeviceStepOutcome | typeof iosRunTargetActions.refresh
 
-async function ensureNativePlatformForBuild(platform: PlatformChoice, config: CapacitorConfigSnapshot | undefined, runner: string): Promise<void> {
+async function ensureNativePlatformForBuild(platform: PlatformChoice, config: CapacitorConfigSnapshot | undefined, runner: string, projectDir = cwd()): Promise<void> {
   const addPlatformCommand = formatRunnerCommand(runner, ['cap', 'add', platform])
 
   while (true) {
-    const availablePlatforms = getNativePlatformAvailability(config)
+    const availablePlatforms = getNativePlatformAvailability(config, projectDir)
     const platformExists = platform === 'ios' ? availablePlatforms.ios : availablePlatforms.android
     if (platformExists)
       return
@@ -2994,7 +3024,7 @@ async function ensureNativePlatformForBuild(platform: PlatformChoice, config: Ca
       continue
     }
 
-    if (!runCapacitorPlatformAdd(platform, runner))
+    if (!runCapacitorPlatformAdd(platform, runner, projectDir))
       pLog.warn(`Still could not add ${platform}.`)
   }
 }
@@ -3040,13 +3070,13 @@ async function getCompatibleUpdaterVersionForPackage(packageJsonPath: string, pm
 async function handleBuildAndSyncFailure(
   platform: PlatformChoice,
   buildAndSyncCommand: string,
+  packageJsonPath: string,
   pm: PackageManagerInfo,
   orgId: string,
   apikey: string,
   error: unknown,
 ): Promise<'retry' | 'completed'> {
   const formattedError = formatError(error)
-  const packageJsonPath = globalPathToPackageJson ?? join(findRoot(cwd()), PACKNAME)
   const updaterState = getUpdaterInstallState(packageJsonPath)
 
   pLog.error(`Build or sync failed: ${formattedError}`)
@@ -3078,8 +3108,7 @@ async function handleBuildAndSyncFailure(
   return 'retry'
 }
 
-async function ensureUpdaterReadyBeforeSync(pm: PackageManagerInfo, orgId: string, apikey: string): Promise<void> {
-  const packageJsonPath = globalPathToPackageJson ?? join(findRoot(cwd()), PACKNAME)
+async function ensureUpdaterReadyBeforeSync(pm: PackageManagerInfo, orgId: string, apikey: string, packageJsonPath: string): Promise<void> {
   const updaterState = getUpdaterInstallState(packageJsonPath)
   if (updaterState.ready)
     return
@@ -3091,28 +3120,39 @@ async function ensureUpdaterReadyBeforeSync(pm: PackageManagerInfo, orgId: strin
   })
 }
 
-async function runBuildAndSyncLoop(platform: PlatformChoice, buildAndSyncCommand: string, pm: PackageManagerInfo, orgId: string, apikey: string): Promise<void> {
+async function runBuildAndSyncLoop(
+  platform: PlatformChoice,
+  buildAndSyncCommand: string,
+  buildAndSyncCwd: string,
+  packageJsonPath: string,
+  pm: PackageManagerInfo,
+  orgId: string,
+  apikey: string,
+): Promise<void> {
   let iosSyncFailureCount = 0
 
   while (true) {
-    await ensureUpdaterReadyBeforeSync(pm, orgId, apikey)
+    await ensureUpdaterReadyBeforeSync(pm, orgId, apikey, packageJsonPath)
 
     const spinner = pSpinner()
-    spinner.start('Checking project type')
-    spinner.message(`Running: ${buildAndSyncCommand}`)
+    spinner.start('Preparing build and sync')
+    const runMessage = buildAndSyncCwd === cwd()
+      ? `Running: ${buildAndSyncCommand}`
+      : `Running in ${buildAndSyncCwd}: ${buildAndSyncCommand}`
+    spinner.stop(runMessage, 'neutral')
     try {
-      execSync(buildAndSyncCommand, execOption as ExecSyncOptions)
+      execSync(buildAndSyncCommand, { stdio: 'inherit', cwd: buildAndSyncCwd })
     }
     catch (error) {
-      spinner.stop('Build or sync failed ❌')
-      const recovery = await handleBuildAndSyncFailure(platform, buildAndSyncCommand, pm, orgId, apikey, error)
+      pLog.error('Build or sync failed ❌')
+      const recovery = await handleBuildAndSyncFailure(platform, buildAndSyncCommand, packageJsonPath, pm, orgId, apikey, error)
       if (recovery === 'completed')
         return
       continue
     }
 
     if (platform === 'ios') {
-      const syncValidation = validateIosUpdaterSync(cwd(), globalPathToPackageJson)
+      const syncValidation = validateIosUpdaterSync(buildAndSyncCwd, packageJsonPath)
       if (syncValidation.shouldCheck && !syncValidation.valid) {
         iosSyncFailureCount += 1
         spinner.stop('iOS sync check failed ❌')
@@ -3121,34 +3161,36 @@ async function runBuildAndSyncLoop(platform: PlatformChoice, buildAndSyncCommand
         continue
       }
     }
-
     spinner.stop('Build & Sync Done ✅')
     promoteEncryptionSummaryToEnabled()
     return
   }
 }
-
 async function runProjectBuildAndSync(appId: string, platform: PlatformChoice, orgId: string, apikey: string, pm: PackageManagerInfo): Promise<BuildProjectStepOutcome> {
-  const projectType = await findProjectType()
+  const packageJsonPath = path.resolve(globalPathToPackageJson ?? join(findRoot(cwd()), PACKNAME))
+  const projectDir = dirname(packageJsonPath)
+  const projectType = await findProjectType({ packageJsonPath })
   const buildCommand = await findBuildCommandForProjectType(projectType)
-  const packScripts = getPackageScripts()
+  const packScripts = getPackageScripts(undefined, packageJsonPath)
 
   if (!packScripts[buildCommand])
     return handleMissingBuildScript(buildCommand, appId, platform, orgId, apikey, pm)
 
   const buildAndSyncCommand = `${pm.pm} run ${buildCommand} && ${pm.runner} cap sync ${platform}`
-  await runBuildAndSyncLoop(platform, buildAndSyncCommand, pm, orgId, apikey)
+  await runBuildAndSyncLoop(platform, buildAndSyncCommand, projectDir, packageJsonPath, pm, orgId, apikey)
   return 'completed'
 }
 
 async function buildProjectStep(orgId: string, apikey: string, appId: string, platform: 'ios' | 'android', config?: CapacitorConfigSnapshot) {
   const pm = getPMAndCommand()
-  await ensureNativePlatformForBuild(platform, config, pm.runner)
+  const packageJsonPath = path.resolve(globalPathToPackageJson ?? join(findRoot(cwd()), PACKNAME))
+  const projectDir = dirname(packageJsonPath)
+  await ensureNativePlatformForBuild(platform, config, pm.runner, projectDir)
 
   const doBuild = await pConfirm({ message: `Automatic build ${appId} with "${pm.pm} run build" ?` })
   await cancelCommand(doBuild, orgId, apikey)
   if (!doBuild) {
-    pLog.info(`Build yourself with command: ${pm.pm} run build && ${pm.runner} cap sync ${platform}`)
+    pLog.info(`Build yourself in ${projectDir} with command: ${pm.pm} run build && ${pm.runner} cap sync ${platform}`)
     await markStep(orgId, apikey, 'build-project', appId)
     return
   }
@@ -3239,7 +3281,7 @@ function getCapacitorRunTargetListTimeoutMs(): number {
     : DEFAULT_CAPACITOR_RUN_TARGET_LIST_TIMEOUT_MS
 }
 
-function runPackageRunnerForTargetList(runner: string, args: string[], timeoutMs: number): Promise<PackageRunnerListResult> {
+function runPackageRunnerForTargetList(runner: string, args: string[], timeoutMs: number, projectDir = cwd()): Promise<PackageRunnerListResult> {
   let parsedRunner: ReturnType<typeof splitRunnerCommand>
   try {
     parsedRunner = splitRunnerCommand(runner)
@@ -3275,6 +3317,7 @@ function runPackageRunnerForTargetList(runner: string, args: string[], timeoutMs
 
     const child = spawn(parsedRunner.command, [...parsedRunner.args, ...args], {
       stdio: ['ignore', 'pipe', 'pipe'],
+      cwd: projectDir,
     })
 
     timeout = setTimeout(() => {
@@ -3316,10 +3359,10 @@ function createCapacitorRunTargetListError(runner: string, platformName: Platfor
   return new Error(output || `cap run ${platformName} --list exited with code ${result.status ?? 'unknown'}. Run manually to see the native error: ${command}`)
 }
 
-async function getCapacitorRunTargetList(runner: string, platformName: PlatformChoice): Promise<CapacitorRunTargetListResult> {
+async function getCapacitorRunTargetList(runner: string, platformName: PlatformChoice, projectDir = cwd()): Promise<CapacitorRunTargetListResult> {
   try {
     const args = ['cap', 'run', platformName, '--list', '--json']
-    const result = await runPackageRunnerForTargetList(runner, args, getCapacitorRunTargetListTimeoutMs())
+    const result = await runPackageRunnerForTargetList(runner, args, getCapacitorRunTargetListTimeoutMs(), projectDir)
 
     if (result.timedOut || result.error)
       return { targets: [], error: createCapacitorRunTargetListError(runner, platformName, result) }
@@ -3338,12 +3381,12 @@ async function getCapacitorRunTargetList(runner: string, platformName: PlatformC
   }
 }
 
-async function getCapacitorRunTargetListWithStatus(pm: PackageManagerInfo, platformName: PlatformChoice, message: string): Promise<CapacitorRunTargetListResult> {
+async function getCapacitorRunTargetListWithStatus(pm: PackageManagerInfo, platformName: PlatformChoice, message: string, projectDir = cwd()): Promise<CapacitorRunTargetListResult> {
   const s = pSpinner()
   s.start(message)
   await new Promise<void>(resolve => setTimeout(resolve, 0))
   try {
-    const result = await getCapacitorRunTargetList(pm.runner, platformName)
+    const result = await getCapacitorRunTargetList(pm.runner, platformName, projectDir)
     if (result.error)
       s.stop('Device check failed ❌', 'error')
     else
@@ -3470,13 +3513,13 @@ async function handleMissingSimulatorIosRunTargets(cancelHandler: RunDeviceCance
   return getSkippedRunDeviceCommand(pm, 'ios')
 }
 
-async function selectSimulatorIosRunTarget(cancelHandler: RunDeviceCancelHandler, pm: PackageManagerInfo, initialTargets?: CapacitorRunTarget[]): Promise<RunDeviceStepOutcome> {
+async function selectSimulatorIosRunTarget(cancelHandler: RunDeviceCancelHandler, pm: PackageManagerInfo, initialTargets?: CapacitorRunTarget[], projectDir = cwd()): Promise<RunDeviceStepOutcome> {
   let knownTargets = initialTargets
 
   while (true) {
     const result = knownTargets
       ? { targets: knownTargets }
-      : await getCapacitorRunTargetListWithStatus(pm, 'ios', 'Checking iOS Simulators...')
+      : await getCapacitorRunTargetListWithStatus(pm, 'ios', 'Checking iOS Simulators...', projectDir)
     knownTargets = undefined
 
     if ('error' in result && result.error)
@@ -3493,11 +3536,11 @@ async function selectSimulatorIosRunTarget(cancelHandler: RunDeviceCancelHandler
   }
 }
 
-async function selectPhysicalIosRunTarget(cancelHandler: RunDeviceCancelHandler, pm: PackageManagerInfo): Promise<RunDeviceStepOutcome> {
+async function selectPhysicalIosRunTarget(cancelHandler: RunDeviceCancelHandler, pm: PackageManagerInfo, projectDir = cwd()): Promise<RunDeviceStepOutcome> {
   pLog.info('Connect your iPhone or iPad, unlock it, and tap Trust if prompted.')
 
   while (true) {
-    const result = await getCapacitorRunTargetListWithStatus(pm, 'ios', 'Checking connected iOS devices...')
+    const result = await getCapacitorRunTargetListWithStatus(pm, 'ios', 'Checking connected iOS devices...', projectDir)
     if (result.error)
       pLog.warn(`Could not check connected iOS devices: ${formatError(result.error)}`)
 
@@ -3509,7 +3552,7 @@ async function selectPhysicalIosRunTarget(cancelHandler: RunDeviceCancelHandler,
     if (selectionResult === iosRunTargetActions.refresh)
       continue
     if (selectionResult === iosRunTargetActions.simulator)
-      return selectSimulatorIosRunTarget(cancelHandler, pm, result.targets)
+      return selectSimulatorIosRunTarget(cancelHandler, pm, result.targets, projectDir)
     return selectionResult
   }
 }
@@ -3568,9 +3611,9 @@ async function handleMissingCapacitorRunTargets(cancelHandler: RunDeviceCancelHa
   return getSkippedRunDeviceCommand(pm, platformName)
 }
 
-async function selectCapacitorRunTarget(cancelHandler: RunDeviceCancelHandler, pm: PackageManagerInfo, platformName: PlatformChoice): Promise<RunDeviceStepOutcome> {
+async function selectCapacitorRunTarget(cancelHandler: RunDeviceCancelHandler, pm: PackageManagerInfo, platformName: PlatformChoice, projectDir = cwd()): Promise<RunDeviceStepOutcome> {
   while (true) {
-    const result = await getCapacitorRunTargetListWithStatus(pm, platformName, 'Checking available Android devices and emulators...')
+    const result = await getCapacitorRunTargetListWithStatus(pm, platformName, 'Checking available Android devices and emulators...', projectDir)
     if (result.error)
       pLog.warn(`Could not check available devices: ${formatError(result.error)}`)
 
@@ -3583,9 +3626,9 @@ async function selectCapacitorRunTarget(cancelHandler: RunDeviceCancelHandler, p
   }
 }
 
-export async function resolveRunDeviceCommand(cancelHandler: RunDeviceCancelHandler, pm: PackageManagerInfo, platformName: PlatformChoice): Promise<RunDeviceStepOutcome> {
+export async function resolveRunDeviceCommand(cancelHandler: RunDeviceCancelHandler, pm: PackageManagerInfo, platformName: PlatformChoice, projectDir = cwd()): Promise<RunDeviceStepOutcome> {
   if (platformName !== 'ios')
-    return selectCapacitorRunTarget(cancelHandler, pm, platformName)
+    return selectCapacitorRunTarget(cancelHandler, pm, platformName, projectDir)
 
   const targetKind = await pSelect({
     message: 'Where do you want to run the iOS app?',
@@ -3599,13 +3642,13 @@ export async function resolveRunDeviceCommand(cancelHandler: RunDeviceCancelHand
     await cancelHandler()
 
   if (targetKind === 'simulator')
-    return selectSimulatorIosRunTarget(cancelHandler, pm)
+    return selectSimulatorIosRunTarget(cancelHandler, pm, undefined, projectDir)
 
-  return selectPhysicalIosRunTarget(cancelHandler, pm)
+  return selectPhysicalIosRunTarget(cancelHandler, pm, projectDir)
 }
 
-function getSelectablePlatformOptions(config?: CapacitorConfigSnapshot): Array<{ value: PlatformChoice, label: string }> {
-  const availablePlatforms = getNativePlatformAvailability(config)
+function getSelectablePlatformOptions(config?: CapacitorConfigSnapshot, projectDir = cwd()): Array<{ value: PlatformChoice, label: string }> {
+  const availablePlatforms = getNativePlatformAvailability(config, projectDir)
   const options: Array<{ value: PlatformChoice, label: string }> = []
   if (availablePlatforms.ios)
     options.push({ value: 'ios', label: 'IOS' })
@@ -3629,7 +3672,7 @@ async function promptForSelectedPlatform(orgId: string, apikey: string, options:
   return platform
 }
 
-async function handleMissingPlatformSelection(orgId: string, apikey: string, availablePlatforms: ReturnType<typeof getNativePlatformAvailability>): Promise<void> {
+async function handleMissingPlatformSelection(orgId: string, apikey: string, availablePlatforms: ReturnType<typeof getNativePlatformAvailability>, projectDir = cwd()): Promise<void> {
   const { pm, capAddAndroid, capAddIos } = getInitRecoveryCommands()
   pLog.warn(`⚠️  No native platform directories found (${availablePlatforms.iosDir}/ or ${availablePlatforms.androidDir}/).`)
   const recoveryChoice = await pSelect({
@@ -3651,7 +3694,7 @@ async function handleMissingPlatformSelection(orgId: string, apikey: string, ava
   }
 
   const platformToAdd = recoveryChoice === 'add-ios' ? 'ios' : 'android'
-  if (!runCapacitorPlatformAdd(platformToAdd, pm.runner))
+  if (!runCapacitorPlatformAdd(platformToAdd, pm.runner, projectDir))
     pLog.warn(`Still could not add ${platformToAdd}.`)
 }
 
@@ -3662,38 +3705,41 @@ export function normalizeRunDevicePlatform(platformName: string): PlatformChoice
   throw new Error('Platform must be "ios" or "android".')
 }
 
-async function selectPlatformStep(orgId: string, apikey: string, config?: CapacitorConfigSnapshot): Promise<'ios' | 'android'> {
+async function selectPlatformStep(orgId: string, apikey: string, config?: CapacitorConfigSnapshot, projectDir = cwd()): Promise<'ios' | 'android'> {
   pLog.info(`📱 Platform selection for onboarding`)
   pLog.info(`   This is just for testing during onboarding - your app will work on all platforms`)
 
   while (true) {
-    const options = getSelectablePlatformOptions(config)
+    const options = getSelectablePlatformOptions(config, projectDir)
     if (options.length > 0)
       return promptForSelectedPlatform(orgId, apikey, options)
 
-    await handleMissingPlatformSelection(orgId, apikey, getNativePlatformAvailability(config))
+    await handleMissingPlatformSelection(orgId, apikey, getNativePlatformAvailability(config, projectDir), projectDir)
   }
 }
 
-async function runDeviceStep(orgId: string, apikey: string, appId: string, platform: 'ios' | 'android') {
+async function runDeviceStep(orgId: string, apikey: string, appId: string, platform: 'ios' | 'android', projectDir = cwd()) {
   const pm = getPMAndCommand()
   const doRun = await pConfirm({ message: `Run ${appId} on ${platform.toUpperCase()} device now to test the initial version?` })
   await cancelCommand(doRun, orgId, apikey)
   if (doRun) {
-    const runCommand = await resolveRunDeviceCommand(() => exitCanceledInitOnboarding(orgId, apikey), pm, platform)
+    const runCommand = await resolveRunDeviceCommand(() => exitCanceledInitOnboarding(orgId, apikey), pm, platform, projectDir)
     if (!runCommand.args) {
-      pLog.info(`Skipped device launch. You can run it manually with: ${runCommand.command}`)
+      pLog.info(`Skipped device launch. You can run it manually in ${projectDir} with: ${runCommand.command}`)
       await markStep(orgId, apikey, 'run-device', appId)
       return
     }
 
     const s = pSpinner()
-    s.start(`Running: ${runCommand.command}`)
+    const runMessage = projectDir === cwd()
+      ? `Running: ${runCommand.command}`
+      : `Running in ${projectDir}: ${runCommand.command}`
+    s.start(runMessage)
 
     let runResult: ReturnType<typeof spawnSync> | undefined
     let runError: Error | undefined
     try {
-      runResult = runPackageRunnerSync(pm.runner, runCommand.args, { stdio: 'inherit' })
+      runResult = runPackageRunnerSync(pm.runner, runCommand.args, { stdio: 'inherit', cwd: projectDir })
     }
     catch (error) {
       runError = error instanceof Error ? error : new Error(String(error))
@@ -3716,12 +3762,12 @@ async function runDeviceStep(orgId: string, apikey: string, appId: string, platf
         const s2 = pSpinner()
         s2.start(`Opening ${platform === 'ios' ? 'Xcode' : 'Android Studio'}...`)
         try {
-          const openResult = runPackageRunnerSync(pm.runner, ['cap', 'open', platform], { stdio: 'inherit' })
+          const openResult = runPackageRunnerSync(pm.runner, ['cap', 'open', platform], { stdio: 'inherit', cwd: projectDir })
           if (openResult.error || openResult.status !== 0) {
             s2.stop(`Could not open ${platform === 'ios' ? 'Xcode' : 'Android Studio'} ❌`)
             if (openResult.error)
               pLog.error(formatError(openResult.error))
-            pLog.info(`You can run the app manually with: ${runCommand.command}`)
+            pLog.info(`You can run the app manually in ${projectDir} with: ${runCommand.command}`)
           }
           else {
             s2.stop(`IDE opened ✅`)
@@ -3731,11 +3777,11 @@ async function runDeviceStep(orgId: string, apikey: string, appId: string, platf
         catch (error) {
           s2.stop(`Could not open ${platform === 'ios' ? 'Xcode' : 'Android Studio'} ❌`)
           pLog.error(formatError(error))
-          pLog.info(`You can run the app manually with: ${runCommand.command}`)
+          pLog.info(`You can run the app manually in ${projectDir} with: ${runCommand.command}`)
         }
       }
       else {
-        pLog.info(`You can run the app manually with: ${runCommand.command}`)
+        pLog.info(`You can run the app manually in ${projectDir} with: ${runCommand.command}`)
       }
     }
     else {
@@ -3745,7 +3791,7 @@ async function runDeviceStep(orgId: string, apikey: string, appId: string, platf
     }
   }
   else {
-    pLog.info(`If you change your mind, run it for yourself with: ${pm.runner} cap run ${platform}`)
+    pLog.info(`If you change your mind, run it for yourself in ${projectDir} with: ${pm.runner} cap run ${platform}`)
   }
   await markStep(orgId, apikey, 'run-device', appId)
 }
@@ -3754,6 +3800,8 @@ async function addCodeChangeStep(orgId: string, apikey: string, appId: string, p
   pLog.info(`🎯 Now let's test Capgo by making a visible change and deploying an update!`)
   // Keep any restored auto-test change metadata on resume so step 12 can
   // still offer cleanup after an interrupted step-9 flow.
+  const packageJsonPath = path.resolve(globalPathToPackageJson ?? join(findRoot(cwd()), PACKNAME))
+  const projectDir = dirname(packageJsonPath)
 
   const modificationType = await pSelect({
     message: 'How would you like to test the update?',
@@ -3787,18 +3835,20 @@ async function addCodeChangeStep(orgId: string, apikey: string, appId: string, p
       'public/style.css',
     ]
 
-    for (const filePath of possibleFiles) {
+    for (const relativeFilePath of possibleFiles) {
+      const filePath = join(projectDir, relativeFilePath)
       if (existsSync(filePath) && !changed) {
         try {
           const content = readFileSync(filePath, 'utf8')
-          const appliedChange = applyInitAutoTestChange(filePath, content)
+          const appliedChange = applyInitAutoTestChange(relativeFilePath, content)
           if (appliedChange) {
             writeFileSync(filePath, appliedChange.content, 'utf8')
-            s.stop(`✅ Made test changes to ${filePath}`)
+            const displayPath = formatInitFilePath(filePath)
+            s.stop(`✅ Made test changes to ${displayPath}`)
             pLog.info(`📝 Added visible test modification to verify the update works`)
             globalAutoTestChange = {
               filePath,
-              displayPath: formatInitFilePath(filePath),
+              displayPath,
               kind: appliedChange.kind,
             }
             // Persist the step-8 checkpoint immediately so resume can still
@@ -3875,13 +3925,12 @@ async function addCodeChangeStep(orgId: string, apikey: string, appId: string, p
     newVersion = userVersion as string
   }
   pLog.info(`🧭 This OTA upload will use version ${newVersion}. For the next test, increment it again.`)
-
   // Build after modifications
   const pm = getPMAndCommand()
-  const projectType = await findProjectType()
+  const projectType = await findProjectType({ packageJsonPath })
   const buildCommand = await findBuildCommandForProjectType(projectType)
   const printManualOtaBuildInstructions = () => {
-    pLog.info(`Build web assets manually with: ${pm.pm} run ${buildCommand}`)
+    pLog.info(`Build web assets manually in ${projectDir} with: ${pm.pm} run ${buildCommand}`)
     pLog.warn(`Do NOT run "${pm.runner} cap sync ${platform}" for this OTA test.`)
     pLog.warn(`Why: "${pm.runner} cap sync ${platform}" copies the current web build into the native project and regenerates native plugin files.`)
     pLog.warn('If you sync now, the native app already contains your new change before Capgo download, so you cannot verify OTA behavior.')
@@ -3894,8 +3943,8 @@ async function addCodeChangeStep(orgId: string, apikey: string, appId: string, p
   await cancelCommand(doBuild, orgId, apikey)
   if (doBuild) {
     const s = pSpinner()
-    s.start(`Running: ${pm.pm} run ${buildCommand}`)
-    const packScripts = getPackageScripts()
+    s.start(`Running in ${projectDir}: ${pm.pm} run ${buildCommand}`)
+    const packScripts = getPackageScripts(undefined, packageJsonPath)
     // check in script build exist
     if (!packScripts[buildCommand]) {
       s.stop('Missing build script', 'neutral')
@@ -3918,7 +3967,7 @@ async function addCodeChangeStep(orgId: string, apikey: string, appId: string, p
     }
     else {
       try {
-        const buildResult = spawnSync(pm.pm, ['run', buildCommand], { stdio: 'pipe' })
+        const buildResult = spawnSync(pm.pm, ['run', buildCommand], { stdio: 'pipe', cwd: projectDir })
         if (buildResult.error) {
           throw buildResult.error
         }
@@ -4011,7 +4060,7 @@ async function maybeOfferAutoTestCleanup(orgId: string, apikey: string, appId: s
 
   let buildCommand = 'build'
   try {
-    const projectType = await findProjectType()
+    const projectType = await findProjectType({ packageJsonPath: globalPathToPackageJson })
     buildCommand = await findBuildCommandForProjectType(projectType)
   }
   catch (err) {
@@ -4039,6 +4088,8 @@ async function maybeOfferAutoTestCleanup(orgId: string, apikey: string, appId: s
 
 async function uploadStep(orgId: string, apikey: string, appId: string, newVersion: string, delta: boolean) {
   const pm = getPMAndCommand()
+  const selectedPackageJsonPath = globalPathToPackageJson ? path.resolve(globalPathToPackageJson) : undefined
+  const selectedProjectDir = selectedPackageJsonPath ? dirname(selectedPackageJsonPath) : cwd()
   const doBundle = await pConfirm({ message: `Upload the updated ${appId} bundle (v${newVersion}) to Capgo?` })
   await cancelCommand(doBundle, orgId, apikey)
   if (doBundle) {
@@ -4064,17 +4115,24 @@ async function uploadStep(orgId: string, apikey: string, appId: string, newVersi
 
       let uploadRes: Awaited<ReturnType<typeof uploadBundleInternal>> | undefined
       try {
-        uploadRes = await uploadBundleInternal(appId, {
-          channel: globalChannelName,
-          apikey,
-          packageJson: isMonorepo ? globalPathToPackageJson : undefined,
-          nodeModules: isMonorepo ? nodeModulesPath : undefined,
-          deltaOnly: delta,
-          bundle: newVersion,
-          ignoreChecksumCheck: true,
-          // Onboarding owns replication UX after the upload spinner stops.
-          showReplicationProgress: false,
-        }, false)
+        const previousCwd = cwd()
+        try {
+          chdir(selectedProjectDir)
+          uploadRes = await uploadBundleInternal(appId, {
+            channel: globalChannelName,
+            apikey,
+            packageJson: isMonorepo ? selectedPackageJsonPath : undefined,
+            nodeModules: isMonorepo ? nodeModulesPath : undefined,
+            deltaOnly: delta,
+            bundle: newVersion,
+            ignoreChecksumCheck: true,
+            // Onboarding owns replication UX after the upload spinner stops.
+            showReplicationProgress: false,
+          }, false)
+        }
+        finally {
+          chdir(previousCwd)
+        }
       }
       catch (error) {
         s.stop('Upload failed ❌')
@@ -4111,7 +4169,7 @@ async function uploadStep(orgId: string, apikey: string, appId: string, newVersi
       globalPathToPackageJson ? `--package-json ${globalPathToPackageJson}` : '',
     ]
     const manualUploadCommand = manualUploadCommandParts.filter(Boolean).join(' ')
-    pLog.info(`Upload yourself with command: ${manualUploadCommand}`)
+    pLog.info(`Upload yourself from ${selectedProjectDir} with command: ${manualUploadCommand}`)
   }
   await markStep(orgId, apikey, 'upload', appId)
 }
@@ -4315,6 +4373,8 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   await ensureGitRepoCleanBeforeInit(stepToSkip > 0 ? globalAutoTestChange : undefined)
 
   appId = await ensureWorkspaceReadyForInit(appId) ?? appId
+  let selectedPackageJsonPath = path.resolve(globalPathToPackageJson ?? join(findRoot(cwd()), PACKNAME))
+  let selectedProjectDir = dirname(selectedPackageJsonPath)
   const versionStatus = await checkVersionStatus()
   if (versionStatus.isOutdated) {
     setInitVersionWarning(versionStatus.currentVersion, versionStatus.latestVersion, versionStatus.majorVersion)
@@ -4323,14 +4383,14 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   let extConfig: Awaited<ReturnType<typeof getConfig>> | undefined
   if (!options.supaAnon || !options.supaHost) {
     try {
-      extConfig = await getConfig()
+      extConfig = await withTemporaryCwd(selectedProjectDir, () => getConfig())
     }
     catch {
       extConfig = undefined
     }
   }
   else {
-    extConfig = await updateConfigUpdater({
+    extConfig = await withTemporaryCwd(selectedProjectDir, () => updateConfigUpdater({
       statsUrl: `${options.supaHost}/functions/v1/stats`,
       channelUrl: `${options.supaHost}/functions/v1/channel_self`,
       updateUrl: `${options.supaHost}/functions/v1/updates`,
@@ -4338,13 +4398,13 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
       localS3: true,
       localSupa: options.supaHost,
       localSupaAnon: options.supaAnon,
-    })
+    }))
   }
   // Warn if this doesn't look like a Capacitor project
-  const hasCapacitorConfig = capacitorConfigFiles.some(file => existsSync(join(cwd(), file)))
+  const hasCapacitorConfig = capacitorConfigFiles.some(file => existsSync(join(selectedProjectDir, file)))
   if (!hasCapacitorConfig) {
-    pLog.warn('⚠️  No capacitor.config.* found in the current directory.')
-    pLog.info('   Capgo requires a Capacitor project. Make sure you run this from your project root.')
+    pLog.warn('⚠️  No capacitor.config.* found in the selected project directory.')
+    pLog.info(`   Capgo requires a Capacitor project. Selected project: ${selectedProjectDir}`)
     pLog.info('   Learn more: https://capacitorjs.com/docs/getting-started')
     const continueAnyway = await pSelect({
       message: 'Continue anyway?',
@@ -4359,7 +4419,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
     }
   }
   else {
-    const availablePlatforms = getNativePlatformAvailability(extConfig?.config)
+    const availablePlatforms = getNativePlatformAvailability(extConfig?.config, selectedProjectDir)
     if (!availablePlatforms.ios && !availablePlatforms.android) {
       const { pm, capAddAndroid, capAddIos } = getInitRecoveryCommands()
       pLog.warn(`⚠️  No native platform directories found (${availablePlatforms.iosDir}/ or ${availablePlatforms.androidDir}/).`)
@@ -4381,7 +4441,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
 
       if (continueWithout === 'add-ios' || continueWithout === 'add-android') {
         const platformToAdd = continueWithout === 'add-ios' ? 'ios' : 'android'
-        const added = runCapacitorPlatformAdd(platformToAdd, pm.runner)
+        const added = runCapacitorPlatformAdd(platformToAdd, pm.runner, selectedProjectDir)
         if (!added) {
           const recoveryChoice = await pSelect({
             message: `Could not add ${platformToAdd}. What do you want to do next?`,
@@ -4408,7 +4468,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
           }
 
           if (recoveryChoice === 'retry') {
-            const retried = runCapacitorPlatformAdd(platformToAdd, pm.runner)
+            const retried = runCapacitorPlatformAdd(platformToAdd, pm.runner, selectedProjectDir)
             if (!retried) {
               pLog.warn(`Still could not add ${platformToAdd}. Continuing without native platforms for now.`)
             }
@@ -4418,7 +4478,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
     }
   }
 
-  const localConfig = await getLocalConfig()
+  const localConfig = await withTemporaryCwd(selectedProjectDir, () => getLocalConfig())
   appId = getAppId(appId, extConfig?.config)
 
   appId ??= await askForAppId('Enter your appId:')
@@ -4521,6 +4581,8 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   const pendingOnboardingSelection = await maybeReusePendingOnboardingApp(organization, options.apikey, appId, supabase)
   appId = pendingOnboardingSelection.appId ?? appId
   await ensureCapacitorProjectReady(orgId, options.apikey, appId, pendingOnboardingSelection.pendingApp)
+  selectedPackageJsonPath = path.resolve(globalPathToPackageJson ?? join(findRoot(cwd()), PACKNAME))
+  selectedProjectDir = dirname(selectedPackageJsonPath)
 
   if (pendingOnboardingSelection.reusedPendingApp) {
     stepToSkip = Math.max(stepToSkip, 1)
@@ -4568,6 +4630,14 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
       delta = res.delta
       globalCurrentVersion = currentVersion
       globalDelta = delta
+      selectedPackageJsonPath = path.resolve(globalPathToPackageJson ?? join(findRoot(cwd()), PACKNAME))
+      selectedProjectDir = dirname(selectedPackageJsonPath)
+      try {
+        extConfig = await withTemporaryCwd(selectedProjectDir, () => getConfig())
+      }
+      catch {
+        extConfig = undefined
+      }
       markStepDone(3)
     }
 
@@ -4592,7 +4662,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
 
     if (stepToSkip < 6) {
       renderCurrentStep(6)
-      platform = await selectPlatformStep(orgId, options.apikey, extConfig?.config)
+      platform = await selectPlatformStep(orgId, options.apikey, extConfig?.config, selectedProjectDir)
       globalPlatform = platform
       markStepDone(6)
     }
@@ -4621,7 +4691,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
 
     if (stepToSkip < 8) {
       renderCurrentStep(8)
-      await runDeviceStep(orgId, options.apikey, appId, platform)
+      await runDeviceStep(orgId, options.apikey, appId, platform, selectedProjectDir)
       markStepDone(8)
     }
 
