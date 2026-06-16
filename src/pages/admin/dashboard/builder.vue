@@ -57,6 +57,7 @@ interface OrgRow {
   succeeded: boolean
   used_ai: boolean
   builds: number
+  builds_succeeded: number
   builds_failed: number
   last_seen: number
 }
@@ -90,9 +91,8 @@ interface BuilderAnalytics {
   funnel: FunnelStep[]
   quit_steps: Tally[]
   builds_daily: { date: string, succeeded: number, failed: number }[]
-  builds_truncated: boolean
   status_breakdown: Tally[]
-  errors: { failed_builds: number, groups: ErrorGroup[], new_count: number, novelty_meaningful: boolean, onboarding_error_categories: Tally[] }
+  errors: { failed_builds: number, groups: ErrorGroup[], new_count: number, novelty_meaningful: boolean, truncated: boolean, onboarding_error_categories: Tally[] }
   orgs: OrgRow[]
   journeys: JourneyRow[]
   posthog_configured: boolean
@@ -333,11 +333,17 @@ function ago(ms: number): string {
     return `${Math.floor(sec / 3600)}h ago`
   return `${Math.floor(sec / 86400)}d ago`
 }
-function spoof(orgId: string) {
+async function spoof(orgId: string) {
   // Reuse the platform-admin impersonation flow (private/log_as accepts a user id,
   // email, or org id — here we pass the org id to log in as its owner).
-  if (orgId && !orgId.startsWith('app:'))
-    logAsUser(orgId, router)
+  if (!orgId || orgId.startsWith('app:'))
+    return
+  try {
+    await logAsUser(orgId, router)
+  }
+  catch (error) {
+    console.error('[Admin Builder] Spoof failed:', error)
+  }
 }
 
 // ---- shared lifecycle ----
@@ -352,7 +358,11 @@ function sendNonAdminBack() {
 
 watch(
   [() => adminStore.activeDateRange, () => adminStore.refreshTrigger],
-  () => loadAll(),
+  () => {
+    // Guard: a non-admin who slipped past onMounted's redirect must not trigger admin fetches.
+    if (mainStore.isAdmin)
+      loadAll()
+  },
   { deep: true },
 )
 
@@ -447,7 +457,7 @@ displayStore.defaultBack = '/dashboard'
           <div class="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
             <AdminStatsCard title="Onboarding starts" :value="kpis?.onboarding_starts ?? 0" color-class="text-primary" :is-loading="isLoadingData" subtitle="Journeys started" />
             <AdminStatsCard title="Completed" :value="kpis?.completions ?? 0" color-class="text-emerald-500" :is-loading="isLoadingData" :subtitle="`${round1(kpis?.completion_rate)}% completion`" />
-            <AdminStatsCard title="Onboarding builds" :value="kpis?.builds_total ?? 0" color-class="text-[#119eff]" :is-loading="isLoadingData" :subtitle="`${round1(kpis?.build_success_rate)}% success`" />
+            <AdminStatsCard title="Builds (period)" :value="kpis?.builds_total ?? 0" color-class="text-[#119eff]" :is-loading="isLoadingData" :subtitle="`${round1(kpis?.build_success_rate)}% success · all native builds`" />
             <AdminStatsCard title="Build failures" :value="kpis?.builds_failed ?? 0" color-class="text-red-500" :is-loading="isLoadingData" subtitle="Failed builds" />
             <AdminStatsCard title="AI orgs" :value="kpis?.ai_orgs ?? 0" color-class="text-purple-500" :is-loading="isLoadingData" subtitle="Orgs that used AI" />
             <AdminStatsCard title="Journeys w/ AI" :value="kpis?.journeys_used_ai ?? 0" color-class="text-purple-400" :is-loading="isLoadingData" subtitle="Onboarding used AI" />
@@ -525,7 +535,6 @@ displayStore.defaultBack = '/dashboard'
                 </h2>
                 <p class="text-xs text-slate-500 dark:text-slate-400">
                   Succeeded vs failed native builds per day (Supabase build_requests)
-                  <span v-if="data?.builds_truncated" class="text-amber-500"> · results truncated at 100k rows; narrow the date range</span>
                 </p>
               </div>
             </template>
@@ -582,9 +591,14 @@ displayStore.defaultBack = '/dashboard'
             no-data-message="No failed builds in this period"
           >
             <template #header>
-              <h2 class="text-2xl font-semibold leading-tight dark:text-white text-slate-600">
-                Build failure signatures
-              </h2>
+              <div class="flex flex-col gap-1">
+                <h2 class="text-2xl font-semibold leading-tight dark:text-white text-slate-600">
+                  Build failure signatures
+                </h2>
+                <p v-if="data?.errors?.truncated" class="text-xs text-amber-500">
+                  Error sample truncated at 50k failed builds — counts for rare signatures may be low; narrow the date range
+                </p>
+              </div>
             </template>
             <div class="h-full overflow-auto">
               <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
@@ -740,7 +754,7 @@ displayStore.defaultBack = '/dashboard'
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
-                  <tr v-for="(j, i) in journeysShown" :key="`${j.org_id}-${j.app_id}-${j.started_at}-${i}`">
+                  <tr v-for="j in journeysShown" :key="`${j.org_id}-${j.app_id}-${j.started_at}`">
                     <td class="px-3 py-3">
                       <span class="font-medium text-slate-900 dark:text-white">{{ j.org_name }}</span>
                       <span v-if="j.used_ai" class="ml-1.5 text-[10px] text-purple-500">AI</span>

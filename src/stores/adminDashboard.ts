@@ -39,8 +39,10 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
   const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
   const cache = ref<Map<string, CachedData>>(new Map())
 
-  // Loading state
-  const isLoading = ref(false)
+  // Loading state — a counter (not a boolean) so concurrent fetchStats() calls (e.g. the
+  // builder page loads two categories at once) don't clobber each other's flag.
+  const loadingCount = ref(0)
+  const isLoading = computed(() => loadingCount.value > 0)
   const loadingCategory = ref<MetricCategory | null>(null)
 
   // Refresh trigger - increment this to force all watchers to refetch
@@ -150,7 +152,7 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
       return cached?.data
     }
 
-    isLoading.value = true
+    loadingCount.value++
     loadingCategory.value = category
 
     try {
@@ -205,13 +207,10 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
 
       return data.data
     }
-    catch (error) {
-      console.error(`Error fetching ${category}:`, error)
-      throw error
-    }
     finally {
-      isLoading.value = false
-      loadingCategory.value = null
+      loadingCount.value = Math.max(0, loadingCount.value - 1)
+      if (loadingCount.value === 0)
+        loadingCategory.value = null
     }
   }
 
@@ -224,7 +223,7 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
   function $reset() {
     clearFilters()
     invalidateCache()
-    isLoading.value = false
+    loadingCount.value = 0
     loadingCategory.value = null
   }
 

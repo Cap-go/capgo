@@ -330,7 +330,8 @@ app.post('/', middlewareAuth, async (c) => {
     })
   }
   catch (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'admin_stats_error', error })
-    throw simpleError('admin_stats_error', 'Error fetching admin statistics', { error })
+    const message = error instanceof Error ? error.message : String(error)
+    cloudlog({ requestId: c.get('requestId'), message: 'admin_stats_error', error: message })
+    throw simpleError('admin_stats_error', 'Error fetching admin statistics', { error: message })
   }
 })
