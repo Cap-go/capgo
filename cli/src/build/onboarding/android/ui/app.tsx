@@ -735,6 +735,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       appId,
       platform: 'android',
       apikey,
+      journeyId,
       packageManager: selectedPackageManager ?? normalizePackageManager(pm.pm),
       buildScriptType: buildScriptChoice?.type,
       decision: options.decision,

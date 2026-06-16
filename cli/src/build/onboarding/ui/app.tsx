@@ -763,7 +763,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     else {
       pendingTelemetryRef.current.push(eventPayload)
     }
-  }, [step, appId, resolvedOrgId, error])
+  }, [step, appId, resolvedOrgId, error, journeyId])
 
   // Report each step up to the shell/command so the quit event can name where
   // the user dropped off. Deliberately separate from the analytics effect above
@@ -801,7 +801,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         pendingActionTelemetryRef.current.push(payload)
       }
     },
-    [appId, resolvedOrgId, step],
+    [appId, resolvedOrgId, step, journeyId],
   )
   const [teamId, setTeamId] = useState(initialProgress?.completedSteps.certificateCreated?.teamId || '')
   const [certData, setCertData] = useState<CertificateData | null>(initialProgress?.completedSteps.certificateCreated || null)
