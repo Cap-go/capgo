@@ -113,6 +113,8 @@ beforeAll(async () => {
       new_paying_orgs: 1,
       canceled_orgs: 0,
       upgraded_orgs: 0,
+      trial_extended_orgs: 1,
+      trial_extended_subscribed_orgs: 0,
       mrr: 120,
       total_revenue: 1440,
       revenue_solo: 120,
@@ -147,6 +149,8 @@ beforeAll(async () => {
       new_paying_orgs: 2,
       canceled_orgs: 1,
       upgraded_orgs: 1,
+      trial_extended_orgs: 3,
+      trial_extended_subscribed_orgs: 2,
       mrr: 240,
       total_revenue: 2880,
       revenue_solo: 240,
@@ -498,6 +502,8 @@ describe('/private/admin_stats', () => {
         updates: number
         updates_external: number
         previous_mrr: number
+        trial_extended_orgs: number
+        trial_extended_subscribed_orgs: number
       }>
     }
 
@@ -510,6 +516,8 @@ describe('/private/admin_stats', () => {
     expect(latest?.updates).toBe(150)
     expect(latest?.updates_external).toBe(10)
     expect(latest?.previous_mrr).toBe(120)
+    expect(latest?.trial_extended_orgs).toBe(3)
+    expect(latest?.trial_extended_subscribed_orgs).toBe(2)
   })
 
   it.concurrent('returns last bundle upload for trial organizations and excludes builtin versions', async () => {

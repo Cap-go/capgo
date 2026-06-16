@@ -91,6 +91,10 @@ interface LtvStats {
   shortest_ltv: number
   longest_ltv: number
 }
+type TrialExtensionStats = {
+  trial_extended_orgs: number
+  trial_extended_subscribed_orgs: number
+}
 interface GlobalStats {
   apps: PromiseLike<number>
   updates: PromiseLike<number>
@@ -114,6 +118,7 @@ interface GlobalStats {
   new_paying_orgs: PromiseLike<number>
   canceled_orgs: PromiseLike<number>
   upgraded_orgs: PromiseLike<number>
+  trial_extension_stats: PromiseLike<TrialExtensionStats>
   credits_bought: PromiseLike<number>
   credits_consumed: PromiseLike<number>
   demo_apps_created: PromiseLike<number>
@@ -841,6 +846,57 @@ async function countDemoSeededApps(c: Context, createdAfterIso: string): Promise
   }
 }
 
+async function getTrialExtensionStats(c: Context, window: CurrentDayWindow): Promise<TrialExtensionStats> {
+  const pgClient = getPgClient(c, false)
+  const drizzleClient = getDrizzleClient(pgClient)
+  const dayStartIso = window.dayStart.toISOString()
+  const nextDayStartIso = window.nextDayStart.toISOString()
+
+  try {
+    const result = await drizzleClient.execute<TrialExtensionStats>(sql`
+      WITH extension_events AS (
+        SELECT DISTINCT tee.org_id
+        FROM public.trial_extension_events tee
+        WHERE tee.created_at >= ${dayStartIso}::timestamptz
+          AND tee.created_at < ${nextDayStartIso}::timestamptz
+      ),
+      subscribed_extended AS (
+        SELECT DISTINCT o.id AS org_id
+        FROM public.orgs o
+        INNER JOIN public.stripe_info si ON si.customer_id = o.customer_id
+        WHERE si.paid_at IS NOT NULL
+          AND si.paid_at >= ${dayStartIso}::timestamptz
+          AND si.paid_at < ${nextDayStartIso}::timestamptz
+          AND EXISTS (
+            SELECT 1
+            FROM public.trial_extension_events tee
+            WHERE tee.org_id = o.id
+              AND tee.created_at <= si.paid_at
+          )
+      )
+      SELECT
+        (SELECT COUNT(*) FROM extension_events)::int AS trial_extended_orgs,
+        (SELECT COUNT(*) FROM subscribed_extended)::int AS trial_extended_subscribed_orgs
+    `)
+
+    const row = result.rows[0]
+    return {
+      trial_extended_orgs: Number(row?.trial_extended_orgs) || 0,
+      trial_extended_subscribed_orgs: Number(row?.trial_extended_subscribed_orgs) || 0,
+    }
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'trial extension stats unavailable', error })
+    return {
+      trial_extended_orgs: 0,
+      trial_extended_subscribed_orgs: 0,
+    }
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
+}
+
 function getStats(c: Context, window?: DailyWindow): GlobalStats {
   const supabase = supabaseAdmin(c)
   const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
@@ -1018,6 +1074,7 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
         const uniqueCustomers = new Set((res.data || []).map(row => row.customer_id))
         return uniqueCustomers.size
       }),
+    trial_extension_stats: getTrialExtensionStats(c, metricWindow),
     credits_bought: supabase
       .from('usage_credit_grants')
       .select('credits_total')
@@ -1087,6 +1144,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     new_paying_orgs,
     canceled_orgs,
     upgraded_orgs,
+    trial_extension_stats,
     credits_bought,
     credits_consumed,
     demo_apps_created,
@@ -1118,6 +1176,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.new_paying_orgs,
     res.canceled_orgs,
     res.upgraded_orgs,
+    res.trial_extension_stats,
     res.credits_bought,
     res.credits_consumed,
     res.demo_apps_created,
@@ -1151,6 +1210,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     registers_today,
     bundle_storage_gb,
     demo_apps_created,
+    trial_extension_stats,
   })
   // cloudlog(c.get('requestId'), 'app', app.app_id, downloads, versions, shared, channels)
   const newData: Database['public']['Tables']['global_stats']['Insert'] = {
@@ -1205,6 +1265,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     new_paying_orgs,
     canceled_orgs,
     upgraded_orgs,
+    trial_extended_orgs: trial_extension_stats.trial_extended_orgs,
+    trial_extended_subscribed_orgs: trial_extension_stats.trial_extended_subscribed_orgs,
     // Credits tracking (round to integers for bigint column)
     credits_bought: Math.round(credits_bought),
     credits_consumed: Math.round(credits_consumed),

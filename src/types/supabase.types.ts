@@ -1523,6 +1523,8 @@ export type Database = {
           updates_external: number | null
           updates_last_month: number | null
           upgraded_orgs: number
+          trial_extended_orgs: number
+          trial_extended_subscribed_orgs: number
           users: number | null
           users_active: number | null
         }
@@ -1607,6 +1609,8 @@ export type Database = {
           updates_external?: number | null
           updates_last_month?: number | null
           upgraded_orgs?: number
+          trial_extended_orgs?: number
+          trial_extended_subscribed_orgs?: number
           users?: number | null
           users_active?: number | null
         }
@@ -1691,6 +1695,8 @@ export type Database = {
           updates_external?: number | null
           updates_last_month?: number | null
           upgraded_orgs?: number
+          trial_extended_orgs?: number
+          trial_extended_subscribed_orgs?: number
           users?: number | null
           users_active?: number | null
         }
@@ -2585,6 +2591,51 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "plans"
             referencedColumns: ["stripe_id"]
+          },
+        ]
+      }
+      trial_extension_events: {
+        Row: {
+          created_at: string
+          customer_id: string
+          extension_days: number
+          id: number
+          new_trial_at: string
+          org_id: string
+          previous_trial_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          extension_days: number
+          id?: number
+          new_trial_at: string
+          org_id: string
+          previous_trial_at: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          extension_days?: number
+          id?: number
+          new_trial_at?: string
+          org_id?: string
+          previous_trial_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trial_extension_events_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "stripe_info"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "trial_extension_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
           },
         ]
       }
