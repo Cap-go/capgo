@@ -67,6 +67,8 @@ function subscriptionUpdated(c: Context, event: Stripe.CustomerSubscriptionCreat
     ? new Date(currentCycleItem.current_period_end * 1000).toISOString()
     : undefined
   data.canceled_at = getSubscriptionEndDate(subscription, currentCycleItem)
+  if (typeof subscription.trial_end === 'number')
+    data.trial_at = new Date(subscription.trial_end * 1000).toISOString()
   data.price_id = currentLicensedItem?.plan.id
   data.product_id = currentLicensedItem?.plan.product
     ? String(currentLicensedItem.plan.product)
