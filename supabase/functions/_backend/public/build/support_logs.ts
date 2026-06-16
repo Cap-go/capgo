@@ -1,8 +1,12 @@
 import type { Context } from 'hono'
+import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
+import { sql } from 'drizzle-orm'
 import { CacheHelper } from '../../utils/cache.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlogErr } from '../../utils/logging.ts'
+import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
+import { checkPermission } from '../../utils/rbac.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 // Proxy for the CLI's "Email Capgo support" logs upload — forwards gzipped text
@@ -49,14 +53,85 @@ async function bumpWindow(c: Context, path: string, userId: string, limit: numbe
   }
 }
 
+async function appExists(c: Context, appId: string): Promise<boolean> {
+  let pgClient
+  try {
+    pgClient = getPgClient(c)
+    const drizzleClient = getDrizzleClient(pgClient)
+    const result = await drizzleClient.execute(
+      sql`SELECT EXISTS (
+        SELECT 1
+        FROM public.apps
+        WHERE app_id = ${appId}
+      ) AS exists`,
+    )
+    return (result.rows[0] as any)?.exists === true
+  }
+  catch (err) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'support-logs app existence check failed',
+      error: err instanceof Error ? err.message : String(err),
+    })
+    return true
+  }
+  finally {
+    if (pgClient)
+      closeClient(c, pgClient)
+  }
+}
+
+async function hasCurrentWriteCapableOrgBinding(c: Context, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<boolean> {
+  if (!apikey.rbac_id)
+    return false
+
+  let pgClient
+  try {
+    pgClient = getPgClient(c)
+    const drizzleClient = getDrizzleClient(pgClient)
+    const result = await drizzleClient.execute(
+      sql`SELECT public.apikey_has_current_org_create_capability(${apikey.rbac_id}::uuid) AS allowed`,
+    )
+    return (result.rows[0] as any)?.allowed === true
+  }
+  catch (err) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'support-logs org write capability check failed',
+      error: err instanceof Error ? err.message : String(err),
+    })
+    return false
+  }
+  finally {
+    if (pgClient)
+      closeClient(c, pgClient)
+  }
+}
+
+export async function hasSupportLogUploadPermission(
+  c: Context,
+  apikey: Database['public']['Tables']['apikeys']['Row'],
+  appId?: string,
+): Promise<boolean> {
+  const targetAppId = appId?.trim()
+  if (targetAppId) {
+    if (await checkPermission(c as Context<MiddlewareKeyVariables>, 'app.build_native', { appId: targetAppId }))
+      return true
+    if (await appExists(c, targetAppId))
+      return false
+  }
+
+  return hasCurrentWriteCapableOrgBinding(c, apikey)
+}
+
 export async function uploadSupportLogs(
   c: Context,
   apikey: Database['public']['Tables']['apikeys']['Row'],
   body: { appId?: string, jobId?: string, gzB64: string },
 ): Promise<Response> {
-  // Deliberately NO app-ownership permission check: onboarding failures can
-  // reference apps that were never registered, and these are the caller's own
-  // logs — the authenticated account (capgkey) is the abuse anchor.
+  if (!await hasSupportLogUploadPermission(c, apikey, body.appId))
+    throw simpleError('unauthorized', 'You do not have permission to upload support logs')
+
   if (body.gzB64.length > MAX_GZ_B64_LENGTH)
     throw quickError(413, 'too_big', 'Logs exceed the 10 MB gzipped limit')
 

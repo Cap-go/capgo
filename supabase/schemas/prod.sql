@@ -17967,7 +17967,7 @@ ALTER TABLE ONLY "public"."channel_devices"
 
 
 ALTER TABLE ONLY "public"."channel_devices"
-    ADD CONSTRAINT "channel_devices_channel_id_fkey" FOREIGN KEY ("channel_id") REFERENCES "public"."channels"("id");
+    ADD CONSTRAINT "channel_devices_channel_id_fkey" FOREIGN KEY ("channel_id") REFERENCES "public"."channels"("id") ON DELETE CASCADE;
 
 
 
