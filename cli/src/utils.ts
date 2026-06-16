@@ -1435,6 +1435,23 @@ export async function updateOrCreateChannel(supabase: SupabaseClient<Database>, 
 
 export async function sendEvent(capgkey: string, payload: TrackOptions & { notifyConsole?: boolean }, verbose?: boolean, signal?: AbortSignal): Promise<void> {
   try {
+    // Build the enriched payload first and DEFENSIVELY: a fault while reading
+    // the global analytics props must degrade to the caller's own tags and must
+    // never drop the event. sendEvent is the single send path that trackEvent()
+    // and every direct caller funnel through, so OS/version segmentation stays
+    // complete. Caller-supplied tags win on key conflict.
+    let globalProps = {}
+    try {
+      globalProps = getGlobalAnalyticsProps()
+    }
+    catch (enrichError) {
+      if (verbose)
+        log.error(`Failed to enrich event tags, sending caller tags only: ${formatError(enrichError)}`)
+    }
+    const enrichedPayload = {
+      ...payload,
+      tags: { ...globalProps, ...(payload.tags ?? {}) },
+    }
     if (verbose) {
       log.info(`Get remove config: for ${payload.event}`)
     }
@@ -1442,7 +1459,7 @@ export async function sendEvent(capgkey: string, payload: TrackOptions & { notif
     // not bypass an Ink-controlled stdout (e.g. during `capgo init`).
     const config = await getRemoteConfig(true, signal)
     if (verbose) {
-      log.info(`Sending LogSnag event: ${JSON.stringify(payload)}`)
+      log.info(`Sending LogSnag event: ${JSON.stringify(enrichedPayload)}`)
     }
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 seconds timeout
@@ -1451,15 +1468,6 @@ export async function sendEvent(capgkey: string, payload: TrackOptions & { notif
     const eventSignal = signal
       ? (typeof AbortSignal.any === 'function' ? AbortSignal.any([controller.signal, signal]) : signal)
       : controller.signal
-
-    // Inject the shared global analytics props (OS, arch, OS release, CLI/Node
-    // versions, CI context) on every event. sendEvent is the single send path
-    // that trackEvent() and all direct callers funnel through, so segmentation
-    // by OS/version stays complete. Caller-supplied tags win on conflict.
-    const enrichedPayload = {
-      ...payload,
-      tags: { ...getGlobalAnalyticsProps(), ...(payload.tags ?? {}) },
-    }
 
     try {
       const fetchResponse = await fetch(`${config.hostApi}/private/events`, {

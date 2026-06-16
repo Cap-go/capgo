@@ -6,6 +6,36 @@ import { existInEnv, getEnv } from './utils.ts'
 const POSTHOG_CAPTURE_URL = 'https://eu.i.posthog.com/capture/'
 const POSTHOG_EXCEPTION_URL = 'https://eu.i.posthog.com/i/v0/e/'
 
+// Global analytics props the CLI attaches to EVERY event (see
+// cli/src/analytics/global-props.ts). They describe the event's runtime
+// environment, not stable identity traits, so they must NOT be written as
+// PostHog person properties ($set): volatile dimensions like is_tty and
+// invocation_source would otherwise become last-write-wins per actor. They
+// still ride along as regular event properties (the tags spread, not $set).
+const NON_PERSON_PROPERTY_TAG_KEYS = new Set([
+  'cli_version',
+  'node_version',
+  'os_platform',
+  'os_arch',
+  'os_release',
+  'timezone',
+  'is_ci',
+  'is_tty',
+  'invocation_source',
+  'ci_provider',
+])
+
+function toPersonProperties(tags?: Record<string, any>): Record<string, any> | undefined {
+  if (!tags)
+    return tags
+  const personProps: Record<string, any> = {}
+  for (const [key, value] of Object.entries(tags)) {
+    if (!NON_PERSON_PROPERTY_TAG_KEYS.has(key))
+      personProps[key] = value
+  }
+  return personProps
+}
+
 export type PostHogGroups = Record<string, string>
 
 interface PostHogCapturePayload extends Pick<TrackOptions, 'event'>, Pick<TrackOptions, 'channel' | 'description'> {
@@ -38,7 +68,7 @@ export async function trackPosthogEvent(c: Context, payload: PostHogCapturePaylo
     ...(payload.tags || {}),
     channel: payload.channel,
     description: payload.description,
-    ...(payload.setPersonProperties === false ? {} : { $set: payload.tags }),
+    ...(payload.setPersonProperties === false ? {} : { $set: toPersonProperties(payload.tags) }),
     ...(hasGroups ? { $groups: payload.groups } : {}),
   }
 

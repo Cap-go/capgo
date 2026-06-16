@@ -41,7 +41,7 @@ export function getGlobalAnalyticsProps(): GlobalAnalyticsProps {
     os_platform: platform(),
     os_arch: arch,
     os_release: release(),
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'undefined',
     is_ci: isCI,
     is_tty: Boolean(process.stdout.isTTY),
     invocation_source: invocationSource,
