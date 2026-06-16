@@ -722,11 +722,13 @@ displayStore.defaultBack = '/dashboard'
                   <input
                     v-model="journeySearch"
                     type="search"
+                    aria-label="Search journeys by org or app"
                     placeholder="Search org or app…"
                     class="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
                   >
                   <select
                     v-model="journeyPlatform"
+                    aria-label="Filter journeys by platform"
                     class="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
                   >
                     <option value="">All platforms</option>
