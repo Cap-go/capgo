@@ -7,6 +7,8 @@ export interface TrackBuilderOnboardingStepInput {
   apikey: string
   appId: string
   orgId: string
+  /** Correlation id tying every event from one onboarding run together. */
+  journeyId: string
   platform: Platform
   step: OnboardingStep | AndroidOnboardingStep
   durationMs?: number
@@ -31,6 +33,8 @@ export interface TrackBuilderOnboardingActionInput {
   apikey: string
   appId: string
   orgId: string
+  /** Correlation id tying every event from one onboarding run together. */
+  journeyId: string
   platform: Platform
   step: OnboardingStep | AndroidOnboardingStep
   action: BuilderOnboardingAction
@@ -39,6 +43,7 @@ export interface TrackBuilderOnboardingActionInput {
 
 export async function trackBuilderOnboardingStep(input: TrackBuilderOnboardingStepInput): Promise<void> {
   const tags: Record<string, string> = {
+    journey_id: input.journeyId,
     step: input.step,
     platform: input.platform,
     app_id: input.appId,
@@ -82,6 +87,7 @@ export async function trackBuilderOnboardingAction(input: TrackBuilderOnboarding
   for (const [key, value] of Object.entries(input.tags ?? {}))
     tags[key] = String(value)
 
+  tags.journey_id = input.journeyId
   tags.step = input.step
   tags.platform = input.platform
   tags.app_id = input.appId
@@ -100,5 +106,62 @@ export async function trackBuilderOnboardingAction(input: TrackBuilderOnboarding
   }
   catch {
     // Telemetry must never break the wizard.
+  }
+}
+
+export interface TrackBuilderOnboardingCancelledInput {
+  apikey: string
+  appId: string
+  /** May be undefined when the owner org couldn't be resolved post-exit. */
+  orgId?: string
+  /** Correlation id tying every event from one onboarding run together. */
+  journeyId: string
+  /**
+   * The platform being onboarded, or undefined when the user quit BEFORE
+   * choosing one (e.g. on the platform picker). The undefined case is itself a
+   * useful signal — it isolates "left at the very first screen" drop-off.
+   */
+  platform?: Platform
+  /** The step the user was on when they quit, when known. */
+  lastStep?: string
+  /** Total wall-clock duration of the journey, from launch to quit. */
+  durationMs?: number
+}
+
+/**
+ * Emits the terminal "Builder Onboarding Quit" event when a journey ends
+ * without reaching build-complete (user cancel, Ctrl+C, missing platform, or a
+ * fatal error that exits). Fired ONCE from command.ts after the wizard tears
+ * down — never mid-flow — so each journey has at most one quit marker. Unlike
+ * the per-step events this carries no org-scoped requirement: it sends with
+ * whatever org id could be resolved (possibly none) rather than dropping the
+ * event, because a quit is exactly when we most want the funnel exit recorded.
+ */
+export async function trackBuilderOnboardingCancelled(input: TrackBuilderOnboardingCancelledInput): Promise<void> {
+  const tags: Record<string, string> = {
+    journey_id: input.journeyId,
+    app_id: input.appId,
+  }
+
+  if (input.platform)
+    tags.platform = input.platform
+  if (input.lastStep)
+    tags.last_step = input.lastStep
+  if (typeof input.durationMs === 'number' && Number.isFinite(input.durationMs))
+    tags.duration_ms = String(Math.round(input.durationMs))
+
+  try {
+    await sendEvent(input.apikey, {
+      event: 'Builder Onboarding Quit',
+      channel: 'builder-onboarding',
+      icon: '🚪',
+      notify: false,
+      org_id: input.orgId,
+      tracking_version: 2,
+      tags,
+    })
+  }
+  catch {
+    // Telemetry must never break the exit path.
   }
 }

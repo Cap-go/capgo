@@ -167,6 +167,11 @@ interface AppProps {
   apikey?: string
   // Capgo API gateway override (--supa-host); prod when omitted.
   supaHost?: string
+  /** Correlation id for this onboarding run; emitted as `journey_id` on every analytics event. */
+  journeyId: string
+  /** Reports the current step to the shell on every transition, so the caller can
+   *  record where the user dropped off for the quit event. */
+  onStep?: (step: string) => void
   /** Reports the wizard outcome to the shell when it reaches build-complete, so
    *  the caller prints an accurate post-exit message + durable summary instead of
    *  always claiming success. Never fires on cancel/missing-platform exits. */
@@ -254,7 +259,7 @@ function emptyProgress(appId: string): AndroidOnboardingProgress {
   }
 }
 
-const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir, apikey, supaHost, onResult }) => {
+const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir, apikey, supaHost, journeyId, onStep, onResult }) => {
   const { exit } = useApp()
   const startStep: AndroidOnboardingStep = getAndroidResumeStep(initialProgress)
 
@@ -360,6 +365,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         void trackBuilderOnboardingStep({
           apikey: resolvedApiKeyRef.current,
           appId,
+          journeyId,
           orgId: resolvedOrgId,
           platform: 'android',
           ...queued,
@@ -372,6 +378,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         void trackBuilderOnboardingAction({
           apikey: resolvedApiKeyRef.current,
           appId,
+          journeyId,
           orgId: resolvedOrgId,
           platform: 'android',
           ...queued,
@@ -417,6 +424,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       void trackBuilderOnboardingStep({
         apikey: resolvedApiKeyRef.current,
         appId,
+        journeyId,
         orgId: resolvedOrgId,
         platform: 'android',
         ...eventPayload,
@@ -426,6 +434,14 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       pendingTelemetryRef.current.push(eventPayload)
     }
   }, [step, appId, resolvedOrgId, error])
+
+  // Report each step up to the shell/command so the quit event can name where
+  // the user dropped off. Deliberately separate from the analytics effect above
+  // (which is gated on a resolved api key) — drop-off location must be captured
+  // for the quit event even when no telemetry key is present.
+  useEffect(() => {
+    onStep?.(step)
+  }, [step, onStep])
 
   const trackAction = useCallback(
     (
@@ -441,6 +457,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         void trackBuilderOnboardingAction({
           apikey: resolvedApiKeyRef.current,
           appId,
+          journeyId,
           orgId: resolvedOrgId,
           platform: 'android',
           ...payload,

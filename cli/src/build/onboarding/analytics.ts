@@ -25,6 +25,8 @@ interface TrackBuildOnboardingWorkflowOptions extends WorkflowDiffTelemetry {
   appId: string
   platform: 'ios' | 'android'
   apikey?: string
+  /** Correlation id tying every event from one onboarding run together. */
+  journeyId?: string
   decision?: BuildOnboardingWorkflowDecision
   packageManager?: PackageManager
   buildScriptType?: BuildScriptChoice['type']
@@ -72,6 +74,8 @@ async function trackBuildOnboardingWorkflowEventAsync(options: TrackBuildOnboard
     'diff-removed': options.diffRemoved,
   }
 
+  if (options.journeyId)
+    tags['journey-id'] = options.journeyId
   if (options.decision)
     tags.decision = options.decision
   if (options.packageManager)

@@ -48,7 +48,7 @@ function makeStdin() {
 async function renderShell(props) {
   const stdout = makeStdout(100, 50)
   const instance = render(
-    React.createElement(OnboardingShell, { appId: 'com.test.app', iosDir: 'ios', androidDir: 'android', ...props }),
+    React.createElement(OnboardingShell, { appId: 'com.test.app', iosDir: 'ios', androidDir: 'android', journeyId: 'bj_test', ...props }),
     { stdout, stderr: makeStdout(100, 50), stdin: makeStdin(), debug: true, exitOnCtrlC: false, patchConsole: false },
   )
   // Poll for the first painted (non-empty) frame instead of a fixed sleep, so a

@@ -5,9 +5,12 @@ import { log } from '@clack/prompts'
 // src/build/onboarding/command.ts
 import { render } from 'ink'
 import React from 'react'
+import { resolveOwnerOrgId } from '../../analytics/org-resolver.js'
 import { trackEvent } from '../../analytics/track.js'
-import { getAppId, getConfig } from '../../utils.js'
+import { findSavedKeySilent, getAppId, getConfig } from '../../utils.js'
 import { appendInternalLog, startInternalLog } from '../../support/internal-log.js'
+import { newBuilderJourneyId } from './journey.js'
+import { trackBuilderOnboardingCancelled } from './telemetry.js'
 import { isMacOS, probeGuidedHelper } from './asc-key/helper.js'
 import { ASC_KEY_CHANNEL } from './asc-key/protocol.js'
 import { getPlatformDirFromCapacitorConfig } from '../platform-paths.js'
@@ -185,6 +188,17 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
   // when it reaches build-complete. Any other exit (missing platform, user
   // cancel, error) leaves this untouched, so we never claim false success.
   let result: OnboardingResult = { outcome: 'cancelled' }
+  // One correlation id for this entire journey, threaded into every analytics
+  // event the wizard emits so a single run's events group together (and the
+  // quit event below ties to them). Generated here — the single onboarding
+  // entrypoint — so both `build init` and the `bundle upload` → launch-onboarding
+  // handoff each get exactly one.
+  const journeyId = newBuilderJourneyId()
+  const journeyStartedAt = Date.now()
+  // The most recent step the wizard reported. Lets the quit event below record
+  // WHERE the user dropped off regardless of HOW they left (keypress, Ctrl+C,
+  // or a fatal error that exits) — none of which run React cleanup reliably.
+  let lastStep: string | undefined
   const { waitUntilExit } = render(
     React.createElement(OnboardingShell, {
       appId,
@@ -198,6 +212,7 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
       androidDir,
       apikey: options.apikey,
       supaHost: options.supaHost,
+      journeyId,
       initialPlatform,
       // Whether the iOS flow may offer guided ASC-key creation (see the probe
       // above). The shell threads it into the iOS OnboardingApp only.
@@ -205,6 +220,9 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
       updateInfo: updateInfo ?? undefined,
       onResolvePlatform: (platform: Platform) => {
         resolvedPlatform = platform
+      },
+      onStep: (step: string) => {
+        lastStep = step
       },
       onResult: (r: OnboardingResult) => {
         result = r
@@ -259,5 +277,26 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
     // the user why it stopped (e.g. the "no native platform" screen); this is
     // just a neutral closing line so the exit isn't silent.
     process.stdout.write(`\nCapgo onboarding exited — setup not completed. Re-run \`capgo build init\` to continue.\n`)
+
+    // Record the funnel exit so quit/drop-off is measurable alongside the
+    // per-step events (all sharing this journeyId). Best-effort: resolve
+    // whatever auth + org we can and emit one event. Awaited so the request
+    // flushes before the process exits; trackBuilderOnboardingCancelled
+    // swallows every error, so this never blocks or breaks the exit.
+    if (result.outcome === 'cancelled') {
+      const apikey = options.apikey?.trim() || findSavedKeySilent()
+      if (apikey) {
+        const orgId = await resolveOwnerOrgId(apikey, appId)
+        await trackBuilderOnboardingCancelled({
+          apikey,
+          appId,
+          orgId,
+          journeyId,
+          platform: resolvedPlatform,
+          lastStep,
+          durationMs: Date.now() - journeyStartedAt,
+        })
+      }
+    }
   }
 }
