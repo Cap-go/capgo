@@ -42,6 +42,8 @@ const globalStatsTrendData = ref<Array<{
   plan_enterprise: number
   registers_today: number
   devices_last_month: number
+  devices_last_month_ios: number
+  devices_last_month_android: number
 }>>([])
 
 const isLoadingGlobalStatsTrend = ref(false)
@@ -123,6 +125,22 @@ const devicesTrendSeries = computed(() => {
         value: item.devices_last_month,
       })),
       color: '#06b6d4', // cyan
+    },
+    {
+      label: 'iOS Devices',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.devices_last_month_ios || 0,
+      })),
+      color: '#000000', // black (Apple)
+    },
+    {
+      label: 'Android Devices',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.devices_last_month_android || 0,
+      })),
+      color: '#3ddc84', // Android green
     },
   ]
 })
