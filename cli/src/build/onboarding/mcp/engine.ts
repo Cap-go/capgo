@@ -2031,7 +2031,7 @@ export async function decideAndroid(
           ...baseGate,
           summary: `Next: connect your Google account so Capgo can set up Play Console publishing (Google Play + Google Cloud access). Tell me to continue and I'll create your sign-in link.`,
           human: { instruction: `We'll connect your Google account to provision Play Console access. When you tell me to continue I'll create a sign-in link — I can open it in your browser for you, or give you the link to open yourself.` },
-          next: { tool: NEXT_STEP_TOOL, instruction: `Call ${NEXT_STEP_TOOL}({}) to start the Google sign-in and get the link.`, call: `${NEXT_STEP_TOOL}({})` },
+          next: { tool: NEXT_STEP_TOOL, instruction: `STOP here and tell the user you'll connect their Google account for Play Console access. WAIT for their reply — do NOT call ${NEXT_STEP_TOOL} yet. Only once they tell you to continue, call ${NEXT_STEP_TOOL}({}) to create the sign-in link.`, call: `${NEXT_STEP_TOOL}({})` },
         }
       }
 
@@ -2053,7 +2053,7 @@ export async function decideAndroid(
             ...baseGate,
             summary: `Google sign-in could not start (${reason}). Tell me to continue to try again.`,
             human: { instruction: `The Google sign-in could not start (${reason}). Tell me to continue and I'll try again.` },
-            next: { tool: NEXT_STEP_TOOL, instruction: `Tell the user what went wrong, then call ${NEXT_STEP_TOOL}({}) to retry.`, call: `${NEXT_STEP_TOOL}({})` },
+            next: { tool: NEXT_STEP_TOOL, instruction: `Tell the user the sign-in could not start and STOP — do NOT call ${NEXT_STEP_TOOL} on your own. Only when they ask to try again, call ${NEXT_STEP_TOOL}({}).`, call: `${NEXT_STEP_TOOL}({})` },
           }
         }
       }
@@ -2078,7 +2078,7 @@ export async function decideAndroid(
             ...baseGate,
             summary: `I opened the Google sign-in page in your browser. Approve the permissions; you'll then see a confirmation code — read it back to me.`,
             human: { instruction: `Your browser should now show the Google sign-in. Approve every requested permission. When it finishes you'll see a confirmation code (like "ABCD-2345") — tell me that code. If the browser didn't open, the link is: ${signInUrl}` },
-            next: { tool: NEXT_STEP_TOOL, instruction: `When the user gives you the code shown in their browser, call ${NEXT_STEP_TOOL}({ confirmCode: "<code>" }). If they aren't signed in yet, call ${NEXT_STEP_TOOL}({}) to check again.`, call: `${NEXT_STEP_TOOL}({ confirmCode: "ABCD-2345" })` },
+            next: { tool: NEXT_STEP_TOOL, instruction: `Tell the user you opened the sign-in page, then STOP and WAIT — do NOT call ${NEXT_STEP_TOOL} before they respond. When they read back the confirmation code, call ${NEXT_STEP_TOOL}({ confirmCode: "<code>" }). If they say they finished or cancelled but have no code, call ${NEXT_STEP_TOOL}({}) to check the status.`, call: `${NEXT_STEP_TOOL}({ confirmCode: "ABCD-2345" })` },
           }
         }
         if (justBegan) {
@@ -2086,14 +2086,14 @@ export async function decideAndroid(
             ...baseGate,
             summary: `Open this link to sign in with Google: ${signInUrl} — or tell me to open it in your browser for you.`,
             human: { instruction: `Give the user this Google sign-in link so they can open it: ${signInUrl}\nYou can also open it for them. After they sign in they'll see a confirmation code (like "ABCD-2345") to read back to you.` },
-            next: { tool: NEXT_STEP_TOOL, instruction: `Show the user the link above. EITHER call ${NEXT_STEP_TOOL}({ openSignInBrowser: true }) to open it in their browser for them, OR have them open it themselves. Once they've signed in and have the confirmation code, call ${NEXT_STEP_TOOL}({ confirmCode: "<code>" }).`, call: `${NEXT_STEP_TOOL}({ openSignInBrowser: true })` },
+            next: { tool: NEXT_STEP_TOOL, instruction: `Show the user the sign-in link, then STOP and WAIT for their reply — do NOT call ${NEXT_STEP_TOOL} before they respond. If they ask you to open it for them, call ${NEXT_STEP_TOOL}({ openSignInBrowser: true }). When they read back the confirmation code, call ${NEXT_STEP_TOOL}({ confirmCode: "<code>" }). If they say they finished or hit a problem signing in, call ${NEXT_STEP_TOOL}({}) to check the status.`, call: `${NEXT_STEP_TOOL}({ openSignInBrowser: true })` },
           }
         }
         return {
           ...baseGate,
           summary: `Still waiting on your Google sign-in. Finish it in the browser, then tell me the confirmation code shown. Sign-in link: ${signInUrl}`,
           human: { instruction: `The Google sign-in isn't complete yet. Open the link if you haven't (${signInUrl}), approve the permissions, and tell me the confirmation code you see. If you're stuck, tell me to reopen the sign-in.` },
-          next: { tool: NEXT_STEP_TOOL, instruction: `When the user has the confirmation code, call ${NEXT_STEP_TOOL}({ confirmCode: "<code>" }). To re-check, call ${NEXT_STEP_TOOL}({}). To start over, call ${NEXT_STEP_TOOL}({ reopenSignIn: true }).`, call: `${NEXT_STEP_TOOL}({})` },
+          next: { tool: NEXT_STEP_TOOL, instruction: `STOP and WAIT for the user — do NOT call ${NEXT_STEP_TOOL} on your own. When the user reads back the confirmation code, call ${NEXT_STEP_TOOL}({ confirmCode: "<code>" }). If they ask to start over, call ${NEXT_STEP_TOOL}({ reopenSignIn: true }).`, call: `${NEXT_STEP_TOOL}({ confirmCode: "ABCD-2345" })` },
         }
       }
 
@@ -2103,7 +2103,7 @@ export async function decideAndroid(
           ...baseGate,
           summary: `You're signed in — now enter the confirmation code shown on the sign-in page.${wrong}`,
           human: { instruction: `Your browser shows a confirmation code (like "ABCD-2345"). Read it back to me to finish connecting your Google account.${wrong}` },
-          next: { tool: NEXT_STEP_TOOL, instruction: `Ask the user for the code shown in their browser, then call ${NEXT_STEP_TOOL}({ confirmCode: "<the code>" }).`, call: `${NEXT_STEP_TOOL}({ confirmCode: "ABCD-2345" })` },
+          next: { tool: NEXT_STEP_TOOL, instruction: `Ask the user for the confirmation code shown in their browser and WAIT — do NOT call ${NEXT_STEP_TOOL} on your own. Only when they give you the code, call ${NEXT_STEP_TOOL}({ confirmCode: "<the code>" }).`, call: `${NEXT_STEP_TOOL}({ confirmCode: "ABCD-2345" })` },
         }
       }
 
@@ -2114,7 +2114,7 @@ export async function decideAndroid(
           ...baseGate,
           summary: `Google sign-in did not complete (${reason}). Tell me to continue to try again.`,
           human: { instruction: `The Google sign-in did not complete (${reason}). Tell me to continue and I'll start a fresh sign-in.` },
-          next: { tool: NEXT_STEP_TOOL, instruction: `Tell the user what went wrong, then call ${NEXT_STEP_TOOL}({}) to retry.`, call: `${NEXT_STEP_TOOL}({})` },
+          next: { tool: NEXT_STEP_TOOL, instruction: `Tell the user the sign-in did not complete and STOP — do NOT call ${NEXT_STEP_TOOL} on your own. Only when they ask to try again, call ${NEXT_STEP_TOOL}({}) to start a fresh sign-in.`, call: `${NEXT_STEP_TOOL}({})` },
         }
       }
 
