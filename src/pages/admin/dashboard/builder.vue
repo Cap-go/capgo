@@ -121,9 +121,20 @@ const onbErrorCategories = computed(() => data.value?.errors?.onboarding_error_c
 const orgs = computed(() => data.value?.orgs ?? [])
 const journeyQuitOnly = ref(false)
 const journeys = computed(() => data.value?.journeys ?? [])
-const journeysShown = computed(() =>
-  journeyQuitOnly.value ? journeys.value.filter(j => j.outcome === 'quit') : journeys.value,
-)
+const journeySearch = ref('')
+const journeyPlatform = ref('')
+const journeysShown = computed(() => {
+  const q = journeySearch.value.trim().toLowerCase()
+  return journeys.value.filter((j) => {
+    if (journeyQuitOnly.value && j.outcome !== 'quit')
+      return false
+    if (journeyPlatform.value && j.platform !== journeyPlatform.value)
+      return false
+    if (q && !`${j.org_name} ${j.app_id}`.toLowerCase().includes(q))
+      return false
+    return true
+  })
+})
 function fmtDuration(ms: number): string {
   const s = Math.round(ms / 1000)
   if (s < 60)
@@ -464,9 +475,25 @@ displayStore.defaultBack = '/dashboard'
                     {{ journeysShown.length }} of {{ journeys.length }} journeys — who started, how far they got, and where they dropped
                   </p>
                 </div>
-                <label class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                  <input v-model="journeyQuitOnly" type="checkbox" class="rounded"> Quit only
-                </label>
+                <div class="flex flex-wrap items-center gap-2">
+                  <input
+                    v-model="journeySearch"
+                    type="search"
+                    placeholder="Search org or app…"
+                    class="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                  >
+                  <select
+                    v-model="journeyPlatform"
+                    class="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                  >
+                    <option value="">All platforms</option>
+                    <option value="ios">iOS</option>
+                    <option value="android">Android</option>
+                  </select>
+                  <label class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                    <input v-model="journeyQuitOnly" type="checkbox" class="rounded"> Quit only
+                  </label>
+                </div>
               </div>
             </template>
             <div class="h-full overflow-auto">
