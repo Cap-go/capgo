@@ -75,7 +75,7 @@ async function trackBuildOnboardingWorkflowEventAsync(options: TrackBuildOnboard
   }
 
   if (options.journeyId)
-    tags['journey-id'] = options.journeyId
+    tags.journey_id = options.journeyId
   if (options.decision)
     tags.decision = options.decision
   if (options.packageManager)
