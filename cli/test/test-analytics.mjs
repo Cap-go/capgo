@@ -30,6 +30,7 @@ try {
   assert.equal(typeof props.os_platform, 'string')
   assert.equal(typeof props.os_arch, 'string')
   assert.equal(typeof props.os_release, 'string')
+  assert.equal(typeof props.timezone, 'string')
   assert.equal(typeof props.is_ci, 'boolean')
   assert.equal(typeof props.is_tty, 'boolean')
   assert.equal(props.invocation_source, 'cli')

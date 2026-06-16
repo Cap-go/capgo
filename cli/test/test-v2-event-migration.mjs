@@ -41,7 +41,7 @@ try {
   assert.equal(typeof body.tags.os_arch, 'string')
   assert.equal(typeof body.tags.cli_version, 'string')
   // ...then assert the caller-specific tags exactly, ignoring the globals.
-  const GLOBAL_TAG_KEYS = ['cli_version', 'node_version', 'os_platform', 'os_arch', 'os_release', 'is_ci', 'is_tty', 'invocation_source', 'ci_provider']
+  const GLOBAL_TAG_KEYS = ['cli_version', 'node_version', 'os_platform', 'os_arch', 'os_release', 'is_ci', 'is_tty', 'invocation_source', 'ci_provider', 'timezone']
   const callerTags = { ...body.tags }
   for (const key of GLOBAL_TAG_KEYS)
     delete callerTags[key]

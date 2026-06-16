@@ -21,6 +21,7 @@ export interface GlobalAnalyticsProps {
   os_platform: string
   os_arch: string
   os_release: string
+  timezone: string
   is_ci: boolean
   is_tty: boolean
   invocation_source: InvocationSource
@@ -31,7 +32,7 @@ export interface GlobalAnalyticsProps {
  * Properties attached to every CLI telemetry event. Injected at the shared
  * sendEvent() send path (see cli/src/utils.ts) so both trackEvent() and the
  * many direct sendEvent() callers are tagged with the runtime OS, arch, OS
- * release, CLI/Node versions and CI context.
+ * release, timezone, CLI/Node versions and CI context.
  */
 export function getGlobalAnalyticsProps(): GlobalAnalyticsProps {
   const props: GlobalAnalyticsProps = {
@@ -40,6 +41,7 @@ export function getGlobalAnalyticsProps(): GlobalAnalyticsProps {
     os_platform: platform(),
     os_arch: arch,
     os_release: release(),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     is_ci: isCI,
     is_tty: Boolean(process.stdout.isTTY),
     invocation_source: invocationSource,

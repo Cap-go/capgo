@@ -5,7 +5,7 @@ import { trackBuilderOnboardingAction, trackBuilderOnboardingCancelled, trackBui
 // sendEvent() now injects the shared global analytics props (OS, arch, OS
 // release, CLI/Node versions, CI context) on every event. Strip them so the
 // caller-tag assertions below stay focused on event-specific dimensions.
-const GLOBAL_TAG_KEYS = ['cli_version', 'node_version', 'os_platform', 'os_arch', 'os_release', 'is_ci', 'is_tty', 'invocation_source', 'ci_provider']
+const GLOBAL_TAG_KEYS = ['cli_version', 'node_version', 'os_platform', 'os_arch', 'os_release', 'is_ci', 'is_tty', 'invocation_source', 'ci_provider', 'timezone']
 function callerTags(tags) {
   const rest = { ...tags }
   for (const key of GLOBAL_TAG_KEYS)
