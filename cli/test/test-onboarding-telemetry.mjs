@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict'
 import { trackBuilderOnboardingAction, trackBuilderOnboardingCancelled, trackBuilderOnboardingStep } from '../src/build/onboarding/telemetry.ts'
 
+
 console.log('🧪 Testing onboarding telemetry...\n')
 
 const originalFetch = globalThis.fetch
@@ -30,7 +31,13 @@ function findEventBody(requests) {
   assert.equal(eventRequest.init.headers.capgkey, 'capgo-key')
   assert.equal(eventRequest.init.headers['Content-Type'], 'application/json')
   assert.equal(eventRequest.init.signal instanceof AbortSignal, true)
-  return JSON.parse(eventRequest.init.body)
+  const body = JSON.parse(eventRequest.init.body)
+  // The shared global analytics props ride in nonPersonTags on every event.
+  assert.equal(typeof body.nonPersonTags.os_release, 'string', 'global os_release tag present')
+  assert.equal(typeof body.nonPersonTags.os_platform, 'string', 'global os_platform tag present')
+  assert.equal(typeof body.nonPersonTags.os_arch, 'string', 'global os_arch tag present')
+  assert.equal(typeof body.nonPersonTags.cli_version, 'string', 'global cli_version tag present')
+  return body
 }
 
 try {

@@ -33,6 +33,14 @@ try {
   assert.equal(body.org_id, 'org-123', 'org is now sent as org_id (not user_id)')
   assert.equal(body.tracking_version, 2, 'event opts into the v2 actor-scoped contract')
   assert.equal(body.user_id, undefined, 'CLI must not send user_id (backend derives the actor from the key)')
+  // Global analytics props now ride in nonPersonTags (event-only; the backend
+  // never writes them as PostHog person properties / $set). Caller tags stay in
+  // tags — markSnag's direct (non-trackEvent) send path included.
+  assert.equal(typeof body.nonPersonTags.os_release, 'string', 'OS release rides on the shared send path')
+  assert.equal(typeof body.nonPersonTags.os_platform, 'string')
+  assert.equal(typeof body.nonPersonTags.os_arch, 'string')
+  assert.equal(typeof body.nonPersonTags.timezone, 'string')
+  assert.equal(typeof body.nonPersonTags.cli_version, 'string')
   assert.deepEqual(body.tags, { 'app-id': 'com.example.app' })
 
   console.log('✅ v2 event migration tests passed')
