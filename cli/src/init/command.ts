@@ -82,6 +82,7 @@ const frameworkSetupGuides = {
 type CapacitorConfigSnapshot = Awaited<ReturnType<typeof getConfig>>['config']
 type CancelablePromptValue = boolean | string | symbol
 type InitAutoTestChangeKind = 'html-banner' | 'vue-banner' | 'css-background'
+type DirtyGitStatusAction = 'check-again' | 'continue-dirty'
 
 interface GitRepoStatus {
   inRepo: boolean
@@ -377,6 +378,21 @@ export function isOnlyAllowedInitAutoTestChange(status: GitRepoStatus, allowedCh
   }
 }
 
+export function getDirtyGitStatusActionOptions(): { value: DirtyGitStatusAction, label: string, hint: string }[] {
+  return [
+    {
+      value: 'check-again',
+      label: 'Check again',
+      hint: 'recommended after committing or stashing changes',
+    },
+    {
+      value: 'continue-dirty',
+      label: 'Continue anyway',
+      hint: 'not recommended; onboarding may edit files',
+    },
+  ]
+}
+
 async function waitForGitRepoCleanRetry() {
   const ready = await pText({
     message: 'Type "ready" once the repository is clean and you want me to check again.',
@@ -429,17 +445,17 @@ async function ensureGitRepoCleanBeforeInit(allowedAutoTestChange?: InitAutoTest
     if (status.entries.length > 10) {
       pLog.warn(`  ...and ${status.entries.length - 10} more`)
     }
-    pLog.info('Clean, commit, or stash those changes before init continues.')
+    pLog.info('Clean, commit, or stash those changes before init continues, or continue anyway if you accept the risk.')
 
-    const confirmed = await pConfirm({
-      message: 'Have you cleaned the repository? I will check again.',
-      initialValue: false,
+    const action = await pSelect<DirtyGitStatusAction>({
+      message: 'How do you want to handle the dirty git status?',
+      options: getDirtyGitStatusActionOptions(),
     })
-    cancelBeforeAuthenticatedOnboarding(confirmed)
+    cancelBeforeAuthenticatedOnboarding(action)
 
-    if (!confirmed) {
-      pLog.warn('Init is paused until the repository is clean.')
-      await waitForGitRepoCleanRetry()
+    if (action === 'continue-dirty') {
+      pLog.warn('Continuing with dirty git status. This is not recommended.')
+      return
     }
   }
 }
