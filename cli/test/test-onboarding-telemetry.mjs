@@ -2,6 +2,17 @@
 import assert from 'node:assert/strict'
 import { trackBuilderOnboardingAction, trackBuilderOnboardingCancelled, trackBuilderOnboardingStep } from '../src/build/onboarding/telemetry.ts'
 
+// sendEvent() now injects the shared global analytics props (OS, arch, OS
+// release, CLI/Node versions, CI context) on every event. Strip them so the
+// caller-tag assertions below stay focused on event-specific dimensions.
+const GLOBAL_TAG_KEYS = ['cli_version', 'node_version', 'os_platform', 'os_arch', 'os_release', 'is_ci', 'is_tty', 'invocation_source', 'ci_provider']
+function callerTags(tags) {
+  const rest = { ...tags }
+  for (const key of GLOBAL_TAG_KEYS)
+    delete rest[key]
+  return rest
+}
+
 console.log('🧪 Testing onboarding telemetry...\n')
 
 const originalFetch = globalThis.fetch
@@ -30,7 +41,13 @@ function findEventBody(requests) {
   assert.equal(eventRequest.init.headers.capgkey, 'capgo-key')
   assert.equal(eventRequest.init.headers['Content-Type'], 'application/json')
   assert.equal(eventRequest.init.signal instanceof AbortSignal, true)
-  return JSON.parse(eventRequest.init.body)
+  const body = JSON.parse(eventRequest.init.body)
+  // sendEvent() injects the shared global analytics props on every event.
+  assert.equal(typeof body.tags.os_release, 'string', 'global os_release tag present')
+  assert.equal(typeof body.tags.os_platform, 'string', 'global os_platform tag present')
+  assert.equal(typeof body.tags.os_arch, 'string', 'global os_arch tag present')
+  assert.equal(typeof body.tags.cli_version, 'string', 'global cli_version tag present')
+  return body
 }
 
 try {
@@ -62,7 +79,7 @@ try {
     assert.equal(body.notify, false)
     assert.equal(body.org_id, 'org-id')
     assert.equal(body.tracking_version, 2)
-    assert.deepEqual(body.tags, {
+    assert.deepEqual(callerTags(body.tags), {
       accepted: 'true',
       action: 'android_sa_method_selected',
       app_id: 'com.example.app',
@@ -92,7 +109,7 @@ try {
     const body = findEventBody(requests)
     assert.equal(body.event, 'Builder Onboarding Step')
     assert.equal(body.channel, 'builder-onboarding')
-    assert.deepEqual(body.tags, {
+    assert.deepEqual(callerTags(body.tags), {
       app_id: 'com.example.app',
       duration_ms: '1234',
       duration_step: 'welcome',
@@ -123,7 +140,7 @@ try {
     assert.equal(body.notify, false)
     assert.equal(body.org_id, 'org-id')
     assert.equal(body.tracking_version, 2)
-    assert.deepEqual(body.tags, {
+    assert.deepEqual(callerTags(body.tags), {
       app_id: 'com.example.app',
       duration_ms: '9876', // rounded
       journey_id: 'bj_journey-3',
@@ -148,7 +165,7 @@ try {
     assert.equal(body.org_id, undefined)
     // Only the always-present tags survive; the optional dimensions are omitted
     // rather than sent as empty/undefined strings.
-    assert.deepEqual(body.tags, {
+    assert.deepEqual(callerTags(body.tags), {
       app_id: 'com.example.app',
       journey_id: 'bj_journey-4',
     })

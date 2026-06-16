@@ -33,7 +33,19 @@ try {
   assert.equal(body.org_id, 'org-123', 'org is now sent as org_id (not user_id)')
   assert.equal(body.tracking_version, 2, 'event opts into the v2 actor-scoped contract')
   assert.equal(body.user_id, undefined, 'CLI must not send user_id (backend derives the actor from the key)')
-  assert.deepEqual(body.tags, { 'app-id': 'com.example.app' })
+  // sendEvent() injects the shared global analytics props (OS, arch, OS
+  // release, CLI/Node versions, CI context) on every event — including
+  // markSnag's direct (non-trackEvent) send path. Assert they ride along...
+  assert.equal(typeof body.tags.os_release, 'string', 'OS release rides on the shared send path')
+  assert.equal(typeof body.tags.os_platform, 'string')
+  assert.equal(typeof body.tags.os_arch, 'string')
+  assert.equal(typeof body.tags.cli_version, 'string')
+  // ...then assert the caller-specific tags exactly, ignoring the globals.
+  const GLOBAL_TAG_KEYS = ['cli_version', 'node_version', 'os_platform', 'os_arch', 'os_release', 'is_ci', 'is_tty', 'invocation_source', 'ci_provider']
+  const callerTags = { ...body.tags }
+  for (const key of GLOBAL_TAG_KEYS)
+    delete callerTags[key]
+  assert.deepEqual(callerTags, { 'app-id': 'com.example.app' })
 
   console.log('✅ v2 event migration tests passed')
 }

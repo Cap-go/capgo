@@ -1,7 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { platform, release } from 'node:os'
-import { arch, env, version as nodeVersion } from 'node:process'
-import { isCI, name as ciName } from 'ci-info'
+import { env } from 'node:process'
 import pack from '../../package.json'
 import { isTruthyEnvValue } from '../posthog'
 import { findSavedKeySilent, getAppId, getConfig, sendEvent } from '../utils'
@@ -10,48 +8,14 @@ import { categorizeCliError, categorizeHttpStatus } from './error-category'
 import { deriveSupabaseOperation, setSupabaseCallRecorder, SLOW_THRESHOLD_MS, withSupabaseSource } from './supabase-perf'
 import type { SupabaseCallInfo } from './supabase-perf'
 
-type InvocationSource = 'cli' | 'mcp'
-
-let invocationSource: InvocationSource = 'cli'
-
-export function setInvocationSource(source: InvocationSource): void {
-  invocationSource = source
-}
-
-export function getInvocationSource(): InvocationSource {
-  return invocationSource
-}
+// Global analytics props + invocation source live in ./global-props so the
+// shared sendEvent() path (cli/src/utils.ts) can inject them on every event
+// without a circular import. Re-exported here for existing import sites.
+export { getGlobalAnalyticsProps, getInvocationSource, setInvocationSource } from './global-props'
+export type { GlobalAnalyticsProps, InvocationSource } from './global-props'
 
 export function isTelemetryDisabled(): boolean {
   return isTruthyEnvValue(env.CAPGO_DISABLE_TELEMETRY) || isTruthyEnvValue(env.CAPGO_DISABLE_POSTHOG)
-}
-
-export interface GlobalAnalyticsProps {
-  cli_version: string
-  node_version: string
-  os_platform: string
-  os_arch: string
-  os_release: string
-  is_ci: boolean
-  is_tty: boolean
-  invocation_source: InvocationSource
-  ci_provider?: string
-}
-
-export function getGlobalAnalyticsProps(): GlobalAnalyticsProps {
-  const props: GlobalAnalyticsProps = {
-    cli_version: pack.version,
-    node_version: nodeVersion,
-    os_platform: platform(),
-    os_arch: arch,
-    os_release: release(),
-    is_ci: isCI,
-    is_tty: Boolean(process.stdout.isTTY),
-    invocation_source: invocationSource,
-  }
-  if (ciName)
-    props.ci_provider = ciName
-  return props
 }
 
 // --- flush registry: keep in-flight telemetry alive until the process drains ---
@@ -152,7 +116,6 @@ export function trackEvent(input: TrackEventInput): Promise<void> {
       }
 
       const tags: Record<string, string | number | boolean> = {
-        ...getGlobalAnalyticsProps(),
         ...(appId ? { app_id: appId } : {}),
         ...(input.tags ?? {}),
       }

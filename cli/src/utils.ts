@@ -28,6 +28,7 @@ import { loadConfig, writeConfig } from './config'
 import { nativePackageSchema } from './schemas/common'
 import { formatApiErrorForCli, parseSecurityPolicyError } from './utils/security_policy_errors'
 import { createTimedFetch, isSupabaseInstrumentationEnabled } from './analytics/supabase-perf'
+import { getGlobalAnalyticsProps } from './analytics/global-props'
 
 export const baseKey = '.capgo_key'
 export const baseKeyV2 = '.capgo_key_v2'
@@ -1451,10 +1452,19 @@ export async function sendEvent(capgkey: string, payload: TrackOptions & { notif
       ? (typeof AbortSignal.any === 'function' ? AbortSignal.any([controller.signal, signal]) : signal)
       : controller.signal
 
+    // Inject the shared global analytics props (OS, arch, OS release, CLI/Node
+    // versions, CI context) on every event. sendEvent is the single send path
+    // that trackEvent() and all direct callers funnel through, so segmentation
+    // by OS/version stays complete. Caller-supplied tags win on conflict.
+    const enrichedPayload = {
+      ...payload,
+      tags: { ...getGlobalAnalyticsProps(), ...(payload.tags ?? {}) },
+    }
+
     try {
       const fetchResponse = await fetch(`${config.hostApi}/private/events`, {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: JSON.stringify(enrichedPayload),
         headers: {
           'Content-Type': 'application/json',
           'capgkey': capgkey,
