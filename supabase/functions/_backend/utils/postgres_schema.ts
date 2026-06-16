@@ -162,6 +162,8 @@ export const stripe_info = pgTable('stripe_info', {
   trial_at: text('trial_at'),
   is_good_plan: boolean('is_good_plan'),
   mau_exceeded: boolean('mau_exceeded'),
+  past_due_at: timestamp('past_due_at', { withTimezone: true }),
+  churn_reason: text('churn_reason'),
   storage_exceeded: boolean('storage_exceeded'),
   bandwidth_exceeded: boolean('bandwidth_exceeded'),
 })
