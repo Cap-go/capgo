@@ -194,7 +194,7 @@ displayStore.defaultBack = '/dashboard'
                 </p>
               </div>
             </template>
-            <ul class="space-y-2">
+            <ul class="space-y-2 h-full overflow-y-auto">
               <li
                 v-for="g in newErrorGroups"
                 :key="g.fingerprint"
@@ -269,7 +269,7 @@ displayStore.defaultBack = '/dashboard'
                   Where users drop off
                 </h2>
               </template>
-              <div class="space-y-2">
+              <div class="space-y-2 h-full overflow-y-auto">
                 <div v-for="q in quitItems" :key="q.key" class="flex items-center justify-between gap-3 text-sm">
                   <span class="min-w-0 truncate text-slate-700 dark:text-slate-200">{{ humanStep(q.key) }}</span>
                   <span class="shrink-0 font-semibold text-slate-500 dark:text-slate-400">{{ q.count }}</span>
@@ -289,7 +289,7 @@ displayStore.defaultBack = '/dashboard'
                   Onboarding error categories
                 </h2>
               </template>
-              <div class="space-y-2">
+              <div class="space-y-2 h-full overflow-y-auto">
                 <div v-for="e in onbErrorCategories" :key="e.key" class="flex items-center justify-between gap-3 text-sm">
                   <span class="min-w-0 truncate text-slate-700 dark:text-slate-200">{{ humanStep(e.key) }}</span>
                   <span class="shrink-0 font-semibold text-slate-500 dark:text-slate-400">{{ e.count }}</span>
@@ -310,7 +310,7 @@ displayStore.defaultBack = '/dashboard'
                 Build failure signatures
               </h2>
             </template>
-            <div class="overflow-x-auto">
+            <div class="h-full overflow-auto">
               <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
                 <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-900 dark:text-slate-400">
                   <tr>
@@ -350,11 +350,11 @@ displayStore.defaultBack = '/dashboard'
                   Organizations
                 </h2>
                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                  Orgs that started builder onboarding or ran builds in this period
+                  {{ orgs.length }} orgs that started builder onboarding or ran builds in this period — scroll for more
                 </p>
               </div>
             </template>
-            <div class="overflow-x-auto">
+            <div class="h-full overflow-auto">
               <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
                 <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-900 dark:text-slate-400">
                   <tr>

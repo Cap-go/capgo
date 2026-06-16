@@ -347,12 +347,12 @@ export async function getAdminBuilderAnalytics(c: Context, startDate: string, en
       .slice(0, 40)
 
     // Per-org rollup — seeded from journeys AND builds, so build-only orgs are not dropped.
-    interface OrgAgg { attempts: number, completed: number, usedAi: boolean, builds: number, buildsFailed: number, lastSeen: number }
+    interface OrgAgg { attempts: number, completed: number, usedAi: boolean, builds: number, buildsSucceeded: number, buildsFailed: number, lastSeen: number }
     const orgAgg = new Map<string, OrgAgg>()
     const ensureOrg = (id: string): OrgAgg => {
       let a = orgAgg.get(id)
       if (!a) {
-        a = { attempts: 0, completed: 0, usedAi: false, builds: 0, buildsFailed: 0, lastSeen: 0 }
+        a = { attempts: 0, completed: 0, usedAi: false, builds: 0, buildsSucceeded: 0, buildsFailed: 0, lastSeen: 0 }
         orgAgg.set(id, a)
       }
       return a
@@ -371,7 +371,9 @@ export async function getAdminBuilderAnalytics(c: Context, startDate: string, en
         continue
       const a = ensureOrg(b.ownerOrg)
       a.builds++
-      if (b.status === 'failed')
+      if (b.status === 'succeeded')
+        a.buildsSucceeded++
+      else if (b.status === 'failed')
         a.buildsFailed++
       a.lastSeen = Math.max(a.lastSeen, b.createdMs)
     }
@@ -380,9 +382,10 @@ export async function getAdminBuilderAnalytics(c: Context, startDate: string, en
       org_name: names[id] || (id.startsWith('app:') ? id.slice(4) : id),
       attempts: a.attempts,
       completed: a.completed,
-      succeeded: a.completed > 0,
+      succeeded: a.completed > 0 || a.buildsSucceeded > 0,
       used_ai: a.usedAi,
       builds: a.builds,
+      builds_succeeded: a.buildsSucceeded,
       builds_failed: a.buildsFailed,
       last_seen: a.lastSeen,
     })).sort((x, y) => y.last_seen - x.last_seen).slice(0, 200)
