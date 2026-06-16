@@ -684,24 +684,24 @@ async function getBuildStats(c: Context, window?: DailyWindow): Promise<BuildSta
       successAndroidResult,
       dailyBuildStats,
     ] = await Promise.all([
-      // Count total builds (all time)
-      supabase.from('build_logs').select('*', { count: 'exact', head: true }),
-      // Count iOS builds (all time)
-      supabase.from('build_logs').select('*', { count: 'exact', head: true }).eq('platform', 'ios'),
-      // Count Android builds (all time)
-      supabase.from('build_logs').select('*', { count: 'exact', head: true }).eq('platform', 'android'),
+      // Count total builds up to the snapshot end
+      supabase.from('build_logs').select('*', { count: 'exact', head: true }).lt('created_at', last30daysEnd),
+      // Count iOS builds up to the snapshot end
+      supabase.from('build_logs').select('*', { count: 'exact', head: true }).eq('platform', 'ios').lt('created_at', last30daysEnd),
+      // Count Android builds up to the snapshot end
+      supabase.from('build_logs').select('*', { count: 'exact', head: true }).eq('platform', 'android').lt('created_at', last30daysEnd),
       // Count total builds (last 30 days)
       supabase.from('build_logs').select('*', { count: 'exact', head: true }).gte('created_at', last30daysStart).lt('created_at', last30daysEnd),
       // Count iOS builds (last 30 days)
       supabase.from('build_logs').select('*', { count: 'exact', head: true }).eq('platform', 'ios').gte('created_at', last30daysStart).lt('created_at', last30daysEnd),
       // Count Android builds (last 30 days)
       supabase.from('build_logs').select('*', { count: 'exact', head: true }).eq('platform', 'android').gte('created_at', last30daysStart).lt('created_at', last30daysEnd),
-      // Count successful builds (all time)
-      supabase.from('build_requests').select('*', { count: 'exact', head: true }).eq('status', 'succeeded'),
-      // Count successful iOS builds (all time)
-      supabase.from('build_requests').select('*', { count: 'exact', head: true }).eq('platform', 'ios').eq('status', 'succeeded'),
-      // Count successful Android builds (all time)
-      supabase.from('build_requests').select('*', { count: 'exact', head: true }).eq('platform', 'android').eq('status', 'succeeded'),
+      // Count successful builds up to the snapshot end
+      supabase.from('build_requests').select('*', { count: 'exact', head: true }).eq('status', 'succeeded').lt('created_at', last30daysEnd),
+      // Count successful iOS builds up to the snapshot end
+      supabase.from('build_requests').select('*', { count: 'exact', head: true }).eq('platform', 'ios').eq('status', 'succeeded').lt('created_at', last30daysEnd),
+      // Count successful Android builds up to the snapshot end
+      supabase.from('build_requests').select('*', { count: 'exact', head: true }).eq('platform', 'android').eq('status', 'succeeded').lt('created_at', last30daysEnd),
       aggregateDailyBuildStats(c, prevDayStart, prevDayEnd),
     ])
 
