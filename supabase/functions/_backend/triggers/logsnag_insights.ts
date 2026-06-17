@@ -2508,6 +2508,9 @@ function scheduleLogsnagInsightsShardUpdate(
       }
     })
 
+  if (retryMsgId === null && retryCount >= LOGSNAG_INSIGHTS_BACKGROUND_MAX_RETRIES)
+    return task
+
   return backgroundTask(c, task)
 }
 

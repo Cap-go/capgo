@@ -574,6 +574,40 @@ describe('logsnag revenue metric helpers', () => {
     }
   })
 
+  it('returns failure when the shard retry budget is exhausted and the shard update fails', async () => {
+    const globalWithEdgeRuntime = globalThis as typeof globalThis & {
+      EdgeRuntime?: { waitUntil: (promise: Promise<unknown>) => void }
+    }
+    const previousEdgeRuntime = globalWithEdgeRuntime.EdgeRuntime
+    const waitUntil = vi.fn()
+
+    globalWithEdgeRuntime.EdgeRuntime = { waitUntil }
+
+    try {
+      const app = new Hono()
+      const runShard = vi.fn(async (_c: Context, _shard: string, _dateId: string) => {
+        throw new Error('shard failed after retry budget')
+      })
+      app.post('/', async (c) => {
+        await logsnagInsightsTestUtils.scheduleLogsnagInsightsShardUpdate(c, 'core', '2026-03-24', {
+          retryCount: logsnagInsightsTestUtils.LOGSNAG_INSIGHTS_BACKGROUND_MAX_RETRIES,
+          retryMsgId: null,
+          runShard,
+        })
+        return c.json({ status: 'ok' })
+      })
+
+      const response = await Promise.resolve(app.request('http://localhost/', { method: 'POST' }))
+      expect(response.status).toBe(500)
+      expect(waitUntil).not.toHaveBeenCalled()
+      expect(runShard).toHaveBeenCalledTimes(1)
+      expect(runShard).toHaveBeenCalledWith(expect.anything(), 'core', '2026-03-24')
+    }
+    finally {
+      globalWithEdgeRuntime.EdgeRuntime = previousEdgeRuntime
+    }
+  })
+
   it('cancels a reserved retry when the background snapshot succeeds', async () => {
     const globalWithEdgeRuntime = globalThis as typeof globalThis & {
       EdgeRuntime?: { waitUntil: (promise: Promise<unknown>) => void }
