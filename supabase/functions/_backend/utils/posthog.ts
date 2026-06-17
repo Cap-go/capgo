@@ -82,18 +82,29 @@ export async function trackPosthogEvent(c: Context, payload: PostHogCapturePaylo
   }
 }
 
+function trimTrailingSlashes(value: string) {
+  let end = value.length
+  while (end > 0 && value.charCodeAt(end - 1) === 47)
+    end--
+  return value.slice(0, end)
+}
+
+function stripPostHogEndpoint(host: string) {
+  for (const suffix of ['/i/v0/e', '/capture', '/e']) {
+    if (host.endsWith(suffix))
+      return `${host.slice(0, -suffix.length)}/`
+  }
+  return host
+}
+
 function getPostHogSnapshotUrl(host: string) {
-  const trimmedHost = host.replace(/\/+$/g, '')
+  const trimmedHost = trimTrailingSlashes(host)
   if (trimmedHost.endsWith('/s'))
     return `${trimmedHost}/`
 
-  const normalizedHost = trimmedHost
-    .replace(/\/i\/v0\/e$/g, '/')
-    .replace(/\/capture$/g, '/')
-    .replace(/\/e$/g, '/')
+  const normalizedHost = stripPostHogEndpoint(trimmedHost)
   return new URL('s/', normalizedHost.endsWith('/') ? normalizedHost : `${normalizedHost}/`).toString()
 }
-
 function jsonByteLength(value: unknown) {
   return new TextEncoder().encode(JSON.stringify(value)).length
 }
@@ -173,14 +184,13 @@ export async function capturePosthogReplaySnapshot(c: Context, payload: PostHogR
 }
 
 function getPostHogExceptionUrl(host: string) {
-  const trimmedHost = host.replace(/\/+$/g, '')
+  const trimmedHost = trimTrailingSlashes(host)
   if (trimmedHost.endsWith('/i/v0/e'))
     return `${trimmedHost}/`
 
-  const normalizedHost = trimmedHost.replace(/\/capture$/g, '/')
+  const normalizedHost = trimmedHost.endsWith('/capture') ? `${trimmedHost.slice(0, -'/capture'.length)}/` : trimmedHost
   return new URL('i/v0/e/', normalizedHost.endsWith('/') ? normalizedHost : `${normalizedHost}/`).toString()
 }
-
 function getRequestPath(url: string) {
   try {
     return new URL(url).pathname || '/'
