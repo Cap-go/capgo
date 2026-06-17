@@ -3243,16 +3243,22 @@ async function runPackageRunnerInherited(runner: string, args: string[], options
 
 interface InheritedCommandResult {
   error?: Error
-  signal: NodeJS.Signals | null
+  signal: NodeJS.Signals | number | null
   status: number | null
 }
 
 interface InheritedCommandOptions {
   cwd?: string
-  shell?: boolean
+  forcePty?: boolean
 }
 
 export async function runInheritedCommand(command: string, args: string[], options: InheritedCommandOptions = {}): Promise<InheritedCommandResult> {
+  if (options.forcePty || (stdin.isTTY && stdout.isTTY))
+    return runPtyInheritedCommand(command, args, options)
+  return runPipedInheritedCommand(command, args, options)
+}
+
+function runPipedInheritedCommand(command: string, args: string[], options: Pick<InheritedCommandOptions, 'cwd'> = {}): Promise<InheritedCommandResult> {
   return new Promise((resolve) => {
     let settled = false
     const finish = (result: InheritedCommandResult) => {
@@ -3266,7 +3272,6 @@ export async function runInheritedCommand(command: string, args: string[], optio
     try {
       child = spawn(command, args, {
         cwd: options.cwd,
-        shell: options.shell,
         stdio: ['inherit', 'pipe', 'pipe'],
       })
     }
@@ -3290,8 +3295,95 @@ export async function runInheritedCommand(command: string, args: string[], optio
   })
 }
 
+function runDirectInheritedCommand(command: string, args: string[], options: Pick<InheritedCommandOptions, 'cwd'> = {}): Promise<InheritedCommandResult> {
+  return new Promise((resolve) => {
+    let child
+    try {
+      child = spawn(command, args, { cwd: options.cwd, stdio: 'inherit' })
+    }
+    catch (error) {
+      resolve({
+        status: null,
+        signal: null,
+        error: error instanceof Error ? error : new Error(String(error)),
+      })
+      return
+    }
+
+    child.once('error', error => resolve({
+      status: null,
+      signal: null,
+      error,
+    }))
+    child.once('close', (status, signal) => resolve({ status, signal }))
+  })
+}
+
+async function runPtyInheritedCommand(command: string, args: string[], options: Pick<InheritedCommandOptions, 'cwd'> = {}): Promise<InheritedCommandResult> {
+  let spawnPty: typeof import('node-pty').spawn
+  try {
+    ;({ spawn: spawnPty } = await import('node-pty'))
+  }
+  catch {
+    return runDirectInheritedCommand(command, args, options)
+  }
+
+  return new Promise((resolve) => {
+    let settled = false
+    let previousRawMode: boolean | undefined
+    let ptyProcess: import('node-pty').IPty | undefined
+    const inputHandler = (chunk: Buffer | string) => ptyProcess?.write(chunk)
+    const resizeHandler = () => {
+      try {
+        ptyProcess?.resize(stdout.columns || 100, stdout.rows || 30)
+      }
+      catch {}
+    }
+    const cleanup = () => {
+      stdout.off('resize', resizeHandler)
+      stdin.off('data', inputHandler)
+      if (stdin.isTTY && typeof previousRawMode === 'boolean')
+        stdin.setRawMode?.(previousRawMode)
+    }
+    const finish = (result: InheritedCommandResult) => {
+      if (settled)
+        return
+      settled = true
+      cleanup()
+      resolve(result)
+    }
+
+    try {
+      ptyProcess = spawnPty(command, args, {
+        cols: stdout.columns || 100,
+        cwd: options.cwd || cwd(),
+        env,
+        name: env.TERM || 'xterm-256color',
+        rows: stdout.rows || 30,
+      })
+    }
+    catch {
+      cleanup()
+      void runDirectInheritedCommand(command, args, options).then(resolve)
+      return
+    }
+
+    ptyProcess.onData(data => stdout.write(data))
+    ptyProcess.onExit(({ exitCode, signal }) => finish({ status: exitCode, signal: signal ?? null }))
+    stdout.on('resize', resizeHandler)
+    stdin.on('data', inputHandler)
+    if (stdin.isTTY) {
+      previousRawMode = stdin.isRaw
+      stdin.setRawMode?.(true)
+      stdin.resume()
+    }
+  })
+}
+
 function runInheritedShellCommand(command: string, options: Pick<InheritedCommandOptions, 'cwd'> = {}) {
-  return runInheritedCommand(command, [], { cwd: options.cwd, shell: true })
+  const shellCommand = platform === 'win32' ? (env.ComSpec || 'cmd.exe') : (env.SHELL || '/bin/sh')
+  const shellArgs = platform === 'win32' ? ['/d', '/s', '/c', command] : ['-lc', command]
+  return runInheritedCommand(shellCommand, shellArgs, options)
 }
 
 function formatInheritedCommandFailure(result: InheritedCommandResult) {

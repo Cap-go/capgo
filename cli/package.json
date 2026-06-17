@@ -169,18 +169,19 @@
   },
   "dependencies": {
     "@inkjs/ui": "^2.0.0",
-    "ink": "^7.0.4",
-    "ink-spinner": "^5.0.0",
-    "jsonwebtoken": "^9.0.3",
-    "node-forge": "^1.4.0",
-    "qrcode": "^1.5.4",
-    "react": "^19.2.6",
-    "string-width": "^8.2.1",
     "@rrweb/types": "^2.0.1",
     "@xterm/addon-serialize": "^0.14.0",
     "@xterm/headless": "^6.0.0",
     "happy-dom": "^20.10.4",
-    "rrweb-snapshot": "^2.0.1"
+    "ink": "^7.0.4",
+    "ink-spinner": "^5.0.0",
+    "jsonwebtoken": "^9.0.3",
+    "node-forge": "^1.4.0",
+    "node-pty": "^1.1.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.6",
+    "rrweb-snapshot": "^2.0.1",
+    "string-width": "^8.2.1"
   },
   "optionalDependencies": {
     "@capgo/cli-helper-darwin-arm64": "^1.1.1",
