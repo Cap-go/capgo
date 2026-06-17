@@ -4,7 +4,6 @@ export type { AppDebugOptions, AppOptions, AppSettingOptions } from './app'
 
 // Auth (MCP login/logout)
 export { mcpLoginInputSchema, mcpLogoutInputSchema } from './auth'
-export type { McpLoginInput, McpLogoutInput } from './auth'
 
 // Base
 export { optionsBaseSchema } from './base'
