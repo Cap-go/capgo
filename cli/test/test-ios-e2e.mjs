@@ -486,6 +486,26 @@ await test('(d) ERROR: a failing verifying-key effect → next=error; transient 
   assertProgressClean(res.progress, 'error result progress')
 })
 
+await test('(d) ERROR: a 403 unsigned-agreement at verifying-key surfaces the agreement guidance (not a key re-check)', async () => {
+  // Mirrors the real verifyApiKey behavior for Apple 403
+  // FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED: a VALID key blocked by an
+  // unsigned/expired agreement. The user must NOT be told to re-check the key.
+  const agreementMsg = 'Apple is blocking App Store Connect API access because your developer account has a required agreement that is unsigned or has expired.\n'
+    + '  - Open "Business" (Agreements, Tax, and Banking) and accept the pending or updated agreement'
+  const deps = makeDeps({
+    carried: { p8Content: P8_BYTES },
+    verifyApiKey: async () => { throw new Error(agreementMsg) },
+  })
+  const progress = iosProgress({ setupMethod: 'create-new', p8Path: '/x.p8', keyId: 'K', issuerId: 'I' })
+  const res = await runIosEffect('verifying-key', progress, deps)
+  assertEquals(res.next, 'error', 'an unsigned-agreement 403 routes to the error step')
+  assert(res.transient && res.transient.error.includes('required agreement'), 'the error surfaces the agreement guidance')
+  assert(!res.transient.error.includes('Key ID matches'), 'it does NOT tell the user to re-check the key (the key is valid)')
+  assertEquals(res.transient.retryStep, 'verifying-key', 'recoverable: retry routes back to verifying-key once the agreement is signed')
+  const view = iosViewForStep('error', iosProgress(), { appId: APP_ID, error: res.transient.error, retryStep: 'verifying-key' })
+  assert(view.message.includes('Agreements, Tax, and Banking'), 'the error VIEW renders the actionable agreement message')
+})
+
 await test('(d) ERROR VIEW: iosViewForStep(error) renders the carried message + Try again / Restart / Exit', async () => {
   const view = iosViewForStep('error', iosProgress(), { appId: APP_ID, error: 'API key verification failed: 401 Unauthorized', retryStep: 'verifying-key' })
   assertEquals(view.kind, 'error', 'the error step is kind=error')
