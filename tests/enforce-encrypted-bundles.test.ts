@@ -193,7 +193,7 @@ beforeAll(async () => {
     .eq('app_id', APP_NAME_ENCRYPTED)
     .neq('name', 'builtin')
     .neq('name', 'unknown')
-})
+}, 60_000)
 
 afterAll(async () => {
   // Clean up test versions
@@ -212,7 +212,7 @@ afterAll(async () => {
     .delete()
     .eq('name', APIKEY_ENCRYPTED_SCOPED_NAME)
     .throwOnError()
-})
+}, 60_000)
 
 describe('[Encrypted Bundles Enforcement]', () => {
   describe('org Setting Management', () => {

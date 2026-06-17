@@ -1,4 +1,9 @@
-name: Build and publish CLI keychain helper
+name: Build and publish CLI helper
+
+# Builds BOTH macOS helpers (keychain export + App Store Connect API key),
+# Developer ID signs + notarizes + staples each, stages both into the per-arch
+# package, and publishes @capgo/cli-helper-darwin-{arm64,x64}. Supersedes the
+# standalone publish_asc_key_helper.yml.
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -25,7 +30,7 @@ permissions: {}
 jobs:
   publish_cli_helper:
     runs-on: macos-latest
-    name: Build, sign, notarize, publish keychain helper
+    name: Build, sign, notarize, publish CLI helpers
     timeout-minutes: 45
     permissions:
       # The workflow creates the cli-helper-<version> tag + GitHub release with
@@ -65,8 +70,10 @@ jobs:
           else
             echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
           fi
-      - name: Build helper bundles
+      - name: Build keychain helper bundles
         run: bash cli-helper/scripts/build.sh "${{ steps.version.outputs.version }}"
+      - name: Build ASC key helper universal .app
+        run: bash cli/scripts/package-asc-key-helper-app.sh "${{ steps.version.outputs.version }}"
       - name: Import Developer ID certificate into throwaway keychain
         env:
           DEVELOPER_ID_CERT_BASE64: ${{ secrets.DEVELOPER_ID_CERT_BASE64 }}
@@ -114,12 +121,46 @@ jobs:
           APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
         run: bash cli-helper/scripts/sign-and-notarize.sh
+      - name: Sign, notarize, staple ASC key helper
+        # Mirrors publish_asc_key_helper.yml's proven sign/notarize step. Reuses
+        # DEVELOPER_ID_IDENTITY + APPLE_KEY_PATH set by the steps above. The
+        # designated requirement the CLI enforces at runtime pins this exact
+        # bundle id (app.capgo.asc-key-helper) + the same team (UVTJ336J2D).
+        env:
+          APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
+          APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          APP="cli/dist-helper/CapgoAscKeyHelper.app"
+          ENTITLEMENTS="cli/native/asc-key-helper/assets/entitlements.plist"
+          echo "── Signing $APP (Developer ID + hardened runtime)"
+          codesign --force --options runtime --timestamp \
+            --entitlements "$ENTITLEMENTS" \
+            --identifier "app.capgo.asc-key-helper" \
+            --sign "$DEVELOPER_ID_IDENTITY" "$APP"
+          echo "── Notarizing $APP"
+          ditto -c -k --keepParent "$APP" "$RUNNER_TEMP/CapgoAscKeyHelper.zip"
+          out=$(xcrun notarytool submit "$RUNNER_TEMP/CapgoAscKeyHelper.zip" \
+            --key "$APPLE_KEY_PATH" --key-id "$APPLE_KEY_ID" --issuer "$APPLE_ISSUER_ID" \
+            --wait --timeout 30m --output-format json) || true
+          id=$(echo "$out" | jq -r '.id // empty')
+          status=$(echo "$out" | jq -r '.status // empty')
+          if [ "$status" != "Accepted" ]; then
+            echo "::error::Notarization failed for $APP (status: ${status:-unknown})"
+            [ -n "$id" ] && xcrun notarytool log "$id" \
+              --key "$APPLE_KEY_PATH" --key-id "$APPLE_KEY_ID" --issuer "$APPLE_ISSUER_ID" || true
+            exit 1
+          fi
+          echo "── Accepted ($id); stapling + verifying"
+          xcrun stapler staple "$APP"
+          codesign --verify --strict --deep "$APP"
+          spctl -a -t exec -vv "$APP"
       - name: Smoke test signed binary
         run: |
           arch="$(uname -m)"
           case "$arch" in
-            arm64) helper="./cli-helper/dist/arm64/Capgo.app/Contents/MacOS/capgo" ;;
-            x86_64) helper="./cli-helper/dist/x64/Capgo.app/Contents/MacOS/capgo" ;;
+            arm64) helper="./cli-helper/dist/arm64/CapgoKeychainHelper.app/Contents/MacOS/capgo" ;;
+            x86_64) helper="./cli-helper/dist/x64/CapgoKeychainHelper.app/Contents/MacOS/capgo" ;;
             *) echo "::error::unsupported runner arch: $arch"; exit 1 ;;
           esac
           set +e
@@ -133,8 +174,8 @@ jobs:
         run: |
           arch="$(uname -m)"
           case "$arch" in
-            arm64) helper="./cli-helper/dist/arm64/Capgo.app/Contents/MacOS/capgo" ;;
-            x86_64) helper="./cli-helper/dist/x64/Capgo.app/Contents/MacOS/capgo" ;;
+            arm64) helper="./cli-helper/dist/arm64/CapgoKeychainHelper.app/Contents/MacOS/capgo" ;;
+            x86_64) helper="./cli-helper/dist/x64/CapgoKeychainHelper.app/Contents/MacOS/capgo" ;;
             *) echo "::error::unsupported runner arch: $arch"; exit 1 ;;
           esac
           # No --invoked-by: the caller gate must reject before anything else
@@ -148,8 +189,8 @@ jobs:
         run: |
           arch="$(uname -m)"
           case "$arch" in
-            arm64) helper="./cli-helper/dist/arm64/Capgo.app/Contents/MacOS/capgo" ;;
-            x86_64) helper="./cli-helper/dist/x64/Capgo.app/Contents/MacOS/capgo" ;;
+            arm64) helper="./cli-helper/dist/arm64/CapgoKeychainHelper.app/Contents/MacOS/capgo" ;;
+            x86_64) helper="./cli-helper/dist/x64/CapgoKeychainHelper.app/Contents/MacOS/capgo" ;;
             *) echo "::error::unsupported runner arch: $arch"; exit 1 ;;
           esac
           # WITH the handshake and a passphrase on stdin, the helper passes the gate,
@@ -164,7 +205,7 @@ jobs:
         run: node cli-helper/scripts/prepare-publish.mjs "${{ steps.version.outputs.version }}"
       # Publish under the `rc` dist-tag while the package is new/unproven, so it
       # never becomes npm `latest`. This does NOT affect @capgo/cli installs:
-      # its optionalDependencies `^1.0.0` resolve against published versions, not
+      # its optionalDependencies `^1.1.0` resolve against published versions, not
       # dist-tags. To promote to stable later, either change `--tag rc` to drop
       # the flag, or run: npm dist-tag add <pkg>@<version> latest
       - name: Publish darwin-arm64
@@ -179,16 +220,18 @@ jobs:
         run: npm publish --provenance --access public --tag ${{ steps.version.outputs.npm_tag }}
       - name: Zip signed bundles for release assets
         run: |
-          ditto -c -k --keepParent cli-helper/dist/arm64/Capgo.app cli-helper/dist/Capgo-arm64.zip
-          ditto -c -k --keepParent cli-helper/dist/x64/Capgo.app   cli-helper/dist/Capgo-x64.zip
+          ditto -c -k --keepParent cli-helper/dist/arm64/CapgoKeychainHelper.app cli-helper/dist/CapgoKeychainHelper-arm64.zip
+          ditto -c -k --keepParent cli-helper/dist/x64/CapgoKeychainHelper.app   cli-helper/dist/CapgoKeychainHelper-x64.zip
+          ditto -c -k --keepParent cli/dist-helper/CapgoAscKeyHelper.app          cli-helper/dist/CapgoAscKeyHelper-universal.zip
       - name: Create tag + GitHub release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: cli-helper-${{ steps.version.outputs.version }}
           target_commitish: ${{ github.sha }}
           files: |
-            cli-helper/dist/Capgo-arm64.zip
-            cli-helper/dist/Capgo-x64.zip
+            cli-helper/dist/CapgoKeychainHelper-arm64.zip
+            cli-helper/dist/CapgoKeychainHelper-x64.zip
+            cli-helper/dist/CapgoAscKeyHelper-universal.zip
           make_latest: false
           # Built-in token (NOT a PAT): a GITHUB_TOKEN-created tag does not
           # re-trigger this workflow's push:tags trigger, avoiding a publish loop.

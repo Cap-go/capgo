@@ -429,8 +429,8 @@ t('filterProfilesForApp accepts the bare "*" wildcard against any concrete appId
 // ─── helperPackageName ────────────────────────────────────────────────
 
 t('helperPackageName maps arm64 and x64 to scoped packages', () => {
-  assert.equal(helperPackageName('arm64'), '@capgo/cli-keychain-darwin-arm64')
-  assert.equal(helperPackageName('x64'), '@capgo/cli-keychain-darwin-x64')
+  assert.equal(helperPackageName('arm64'), '@capgo/cli-helper-darwin-arm64')
+  assert.equal(helperPackageName('x64'), '@capgo/cli-helper-darwin-x64')
 })
 
 t('helperPackageName returns null for unsupported architectures', () => {
@@ -450,11 +450,11 @@ t('helperSignatureRequirement pins identifier + Developer ID + team', () => {
 
 // ─── resolveHelperBinary ──────────────────────────────────────────────
 
-// Builds a fake package dir containing a Capgo.app/Contents/MacOS/capgo bundle.
+// Builds a fake package dir containing a CapgoKeychainHelper.app/Contents/MacOS/capgo bundle.
 // `bin` is the inner executable path resolveHelperBinary returns.
 function makeFakeHelper() {
   const dir = mkdtempSync(join(tmpdir(), 'capgo-helper-test-'))
-  const macosDir = join(dir, 'Capgo.app', 'Contents', 'MacOS')
+  const macosDir = join(dir, 'CapgoKeychainHelper.app', 'Contents', 'MacOS')
   mkdirSync(macosDir, { recursive: true })
   const bin = join(macosDir, 'capgo')
   writeFileSync(bin, '#!/bin/sh\nexit 0\n')
@@ -475,7 +475,7 @@ await tAsync('resolveHelperBinary rejects unsupported architectures', async () =
 await tAsync('resolveHelperBinary names the missing package in its error', async () => {
   await assert.rejects(
     resolveHelperBinary({ arch: 'arm64', resolve: () => { throw new Error('not found') } }),
-    /@capgo\/cli-keychain-darwin-arm64.*not installed/s,
+    /@capgo\/cli-helper-darwin-arm64.*not installed/s,
   )
 })
 

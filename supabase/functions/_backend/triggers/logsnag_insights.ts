@@ -91,6 +91,18 @@ interface LtvStats {
   shortest_ltv: number
   longest_ltv: number
 }
+type TrialExtensionStats = {
+  trial_extended_orgs: number
+  trial_extended_subscribed_orgs: number
+}
+interface PastDueOrgStats {
+  past_due_orgs: number
+  past_due_orgs_average_days: number
+}
+interface PastDueOrgRow extends CustomerIdRow {
+  past_due_at?: string | null
+  updated_at?: string | null
+}
 interface GlobalStats {
   apps: PromiseLike<number>
   updates: PromiseLike<number>
@@ -114,6 +126,8 @@ interface GlobalStats {
   new_paying_orgs: PromiseLike<number>
   canceled_orgs: PromiseLike<number>
   upgraded_orgs: PromiseLike<number>
+  trial_extension_stats: PromiseLike<TrialExtensionStats>
+  past_due_org_stats: PromiseLike<PastDueOrgStats>
   credits_bought: PromiseLike<number>
   credits_consumed: PromiseLike<number>
   demo_apps_created: PromiseLike<number>
@@ -126,6 +140,7 @@ interface GlobalStats {
 interface CustomerIdRow {
   customer_id: string
 }
+const REVENUE_ACTIVE_STRIPE_STATUSES: Database['public']['Enums']['stripe_status'][] = ['succeeded']
 
 function getDateId(targetDate = new Date()): string {
   return new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate())).toISOString().slice(0, 10)
@@ -213,6 +228,52 @@ function calculateChurnRevenue(dailyChanges: DailyRevenueChangeSummary) {
   return Number((dailyChanges.churnMrr + dailyChanges.contractionMrr).toFixed(2))
 }
 
+function calculateAveragePastDueDays(rows: PastDueOrgRow[], snapshotAt: Date) {
+  const startTimeByCustomer = getPastDueStartTimesByCustomer(rows, snapshotAt)
+  const snapshotTime = snapshotAt.getTime()
+
+  const durations = Array.from(startTimeByCustomer.values())
+    .map(startTime => (snapshotTime - startTime) / (24 * 60 * 60 * 1000))
+
+  if (durations.length === 0)
+    return 0
+
+  const totalDays = durations.reduce((sum, days) => sum + days, 0)
+  return Number((totalDays / durations.length).toFixed(1))
+}
+
+function getPastDueStartTimesByCustomer(rows: PastDueOrgRow[], snapshotAt: Date) {
+  const snapshotTime = snapshotAt.getTime()
+  const startTimeByCustomer = new Map<string, number>()
+
+  for (const row of rows) {
+    if (!row.customer_id)
+      continue
+
+    const startDate = row.past_due_at ?? row.updated_at
+    if (!startDate)
+      continue
+
+    const startTime = new Date(startDate).getTime()
+    if (!Number.isFinite(startTime) || startTime > snapshotTime)
+      continue
+
+    const previousStartTime = startTimeByCustomer.get(row.customer_id)
+    if (previousStartTime === undefined || startTime < previousStartTime)
+      startTimeByCustomer.set(row.customer_id, startTime)
+  }
+
+  return startTimeByCustomer
+}
+
+function calculatePastDueOrgStats(rows: PastDueOrgRow[], snapshotAt: Date): PastDueOrgStats {
+  const startTimeByCustomer = getPastDueStartTimesByCustomer(rows, snapshotAt)
+  return {
+    past_due_orgs: startTimeByCustomer.size,
+    past_due_orgs_average_days: calculateAveragePastDueDays(rows, snapshotAt),
+  }
+}
+
 function isMissingBuildMetricColumnError(error: unknown): boolean {
   const errorCode = String((error as any)?.code ?? '').toUpperCase()
   const message = String((error as any)?.message ?? '').toLowerCase()
@@ -274,7 +335,7 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
         price_id,
         plans!stripe_info_product_id_fkey(name)
       `)
-      .eq('status', 'succeeded')
+      .in('status', REVENUE_ACTIVE_STRIPE_STATUSES)
       .eq('is_good_plan', true)
 
     if (subsError || !subsData) {
@@ -841,6 +902,57 @@ async function countDemoSeededApps(c: Context, createdAfterIso: string): Promise
   }
 }
 
+async function getTrialExtensionStats(c: Context, window: CurrentDayWindow): Promise<TrialExtensionStats> {
+  const pgClient = getPgClient(c, false)
+  const drizzleClient = getDrizzleClient(pgClient)
+  const dayStartIso = window.dayStart.toISOString()
+  const nextDayStartIso = window.nextDayStart.toISOString()
+
+  try {
+    const result = await drizzleClient.execute<TrialExtensionStats>(sql`
+      WITH extension_events AS (
+        SELECT DISTINCT tee.org_id
+        FROM public.trial_extension_events tee
+        WHERE tee.created_at >= ${dayStartIso}::timestamptz
+          AND tee.created_at < ${nextDayStartIso}::timestamptz
+      ),
+      subscribed_extended AS (
+        SELECT DISTINCT o.id AS org_id
+        FROM public.orgs o
+        INNER JOIN public.stripe_info si ON si.customer_id = o.customer_id
+        WHERE si.paid_at IS NOT NULL
+          AND si.paid_at >= ${dayStartIso}::timestamptz
+          AND si.paid_at < ${nextDayStartIso}::timestamptz
+          AND EXISTS (
+            SELECT 1
+            FROM public.trial_extension_events tee
+            WHERE tee.org_id = o.id
+              AND tee.created_at <= si.paid_at
+          )
+      )
+      SELECT
+        (SELECT COUNT(*) FROM extension_events)::int AS trial_extended_orgs,
+        (SELECT COUNT(*) FROM subscribed_extended)::int AS trial_extended_subscribed_orgs
+    `)
+
+    const row = result.rows[0]
+    return {
+      trial_extended_orgs: Number(row?.trial_extended_orgs) || 0,
+      trial_extended_subscribed_orgs: Number(row?.trial_extended_subscribed_orgs) || 0,
+    }
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'trial extension stats unavailable', error })
+    return {
+      trial_extended_orgs: 0,
+      trial_extended_subscribed_orgs: 0,
+    }
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
+}
+
 function getStats(c: Context, window?: DailyWindow): GlobalStats {
   const supabase = supabaseAdmin(c)
   const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
@@ -875,7 +987,7 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
     paying_orgs_for_conversion: supabase
       .from('orgs')
       .select('id, stripe_info!inner(customer_id)', { count: 'exact', head: true })
-      .eq('stripe_info.status', 'succeeded')
+      .in('stripe_info.status', REVENUE_ACTIVE_STRIPE_STATUSES)
       .eq('stripe_info.is_good_plan', true)
       .then((res) => {
         if (res.error) {
@@ -975,7 +1087,7 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
         .from('stripe_info')
         .select('customer_id')
         .is('paid_at', null)
-        .eq('status', 'succeeded')
+        .in('status', REVENUE_ACTIVE_STRIPE_STATUSES)
         .eq('is_good_plan', true)
         .gte('created_at', dayStartIso)
         .lt('created_at', nextDayStartIso),
@@ -1018,6 +1130,21 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
         const uniqueCustomers = new Set((res.data || []).map(row => row.customer_id))
         return uniqueCustomers.size
       }),
+    trial_extension_stats: getTrialExtensionStats(c, metricWindow),
+    past_due_org_stats: (async () => {
+      const res = await supabase
+        .from('stripe_info')
+        .select('customer_id, past_due_at, updated_at')
+        .not('past_due_at', 'is', null)
+        .lt('past_due_at', nextDayStartIso)
+
+      if (res.error) {
+        cloudlog({ requestId: c.get('requestId'), message: 'past_due_org_stats error', error: res.error })
+        return { past_due_orgs: 0, past_due_orgs_average_days: 0 }
+      }
+
+      return calculatePastDueOrgStats((res.data || []) as PastDueOrgRow[], nextDayStart)
+    })(),
     credits_bought: supabase
       .from('usage_credit_grants')
       .select('credits_total')
@@ -1050,7 +1177,9 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
 }
 
 export const logsnagInsightsTestUtils = {
+  REVENUE_ACTIVE_STRIPE_STATUSES,
   calculateChurnRevenue,
+  calculatePastDueOrgStats,
   calculateNrr,
   countUniqueCustomers,
   getCompletedDayWindow,
@@ -1087,6 +1216,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     new_paying_orgs,
     canceled_orgs,
     upgraded_orgs,
+    trial_extension_stats,
+    past_due_org_stats,
     credits_bought,
     credits_consumed,
     demo_apps_created,
@@ -1118,6 +1249,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.new_paying_orgs,
     res.canceled_orgs,
     res.upgraded_orgs,
+    res.trial_extension_stats,
+    res.past_due_org_stats,
     res.credits_bought,
     res.credits_consumed,
     res.demo_apps_created,
@@ -1151,6 +1284,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     registers_today,
     bundle_storage_gb,
     demo_apps_created,
+    trial_extension_stats,
   })
   // cloudlog(c.get('requestId'), 'app', app.app_id, downloads, versions, shared, channels)
   const newData: Database['public']['Tables']['global_stats']['Insert'] = {
@@ -1203,8 +1337,12 @@ app.post('/', middlewareAPISecret, async (c) => {
     plan_enterprise_yearly: revenue.plan_enterprise_yearly,
     // Subscription flow tracking
     new_paying_orgs,
+    past_due_orgs: past_due_org_stats.past_due_orgs,
+    past_due_orgs_average_days: past_due_org_stats.past_due_orgs_average_days,
     canceled_orgs,
     upgraded_orgs,
+    trial_extended_orgs: trial_extension_stats.trial_extended_orgs,
+    trial_extended_subscribed_orgs: trial_extension_stats.trial_extended_subscribed_orgs,
     // Credits tracking (round to integers for bigint column)
     credits_bought: Math.round(credits_bought),
     credits_consumed: Math.round(credits_consumed),

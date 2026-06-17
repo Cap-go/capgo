@@ -1687,6 +1687,9 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       tags: {
         'app-id': appId,
         'platform': platform,
+        // Present only for onboarding-initiated builds — correlates this build
+        // with the rest of the journey's events.
+        ...(options.builderJourneyId ? { journey_id: options.builderJourneyId } : {}),
       },
       notify: false,
     }).catch()
@@ -2325,6 +2328,9 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           'platform': platform,
           'status': finalStatus || 'unknown',
           'time': buildTime,
+          // Present only for onboarding-initiated builds — correlates the build
+          // outcome with the rest of the journey's events.
+          ...(options.builderJourneyId ? { journey_id: options.builderJourneyId } : {}),
         },
         notify: false,
       }).catch()

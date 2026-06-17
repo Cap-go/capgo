@@ -113,6 +113,10 @@ beforeAll(async () => {
       new_paying_orgs: 1,
       canceled_orgs: 0,
       upgraded_orgs: 0,
+      trial_extended_orgs: 1,
+      trial_extended_subscribed_orgs: 0,
+      past_due_orgs: 1,
+      past_due_orgs_average_days: 2.5,
       mrr: 120,
       total_revenue: 1440,
       revenue_solo: 120,
@@ -147,6 +151,10 @@ beforeAll(async () => {
       new_paying_orgs: 2,
       canceled_orgs: 1,
       upgraded_orgs: 1,
+      trial_extended_orgs: 3,
+      trial_extended_subscribed_orgs: 2,
+      past_due_orgs: 2,
+      past_due_orgs_average_days: 3.75,
       mrr: 240,
       total_revenue: 2880,
       revenue_solo: 240,
@@ -203,6 +211,7 @@ beforeAll(async () => {
       subscription_id: null,
       trial_at: '2026-03-01T00:00:00.000Z',
       canceled_at: '2026-03-20T08:00:00.000Z',
+      churn_reason: 'past_due_unresolved',
       paid_at: null,
       is_good_plan: true,
       plan_usage: 2,
@@ -498,6 +507,10 @@ describe('/private/admin_stats', () => {
         updates: number
         updates_external: number
         previous_mrr: number
+        trial_extended_orgs: number
+        trial_extended_subscribed_orgs: number
+        past_due_orgs: number
+        past_due_orgs_average_days: number
       }>
     }
 
@@ -508,8 +521,12 @@ describe('/private/admin_stats', () => {
     expect(latest).toBeTruthy()
     expect(latest?.apps).toBe(11)
     expect(latest?.updates).toBe(150)
+    expect(latest?.past_due_orgs).toBe(2)
+    expect(latest?.past_due_orgs_average_days).toBe(3.75)
     expect(latest?.updates_external).toBe(10)
     expect(latest?.previous_mrr).toBe(120)
+    expect(latest?.trial_extended_orgs).toBe(3)
+    expect(latest?.trial_extended_subscribed_orgs).toBe(2)
   })
 
   it.concurrent('returns last bundle upload for trial organizations and excludes builtin versions', async () => {
@@ -694,6 +711,7 @@ describe('/private/admin_stats', () => {
           org_id: string
           plan_name: string | null
           billing_type: 'monthly' | 'yearly' | null
+          cancellation_reason: string | null
           subscription_or_signup_date: string
         }>
       }
@@ -710,6 +728,7 @@ describe('/private/admin_stats', () => {
     const monthlyOrganization = payload.data.organizations.find(org => org.org_id === CANCELLED_MONTHLY_ORG_ID)
     expect(monthlyOrganization).toBeTruthy()
     expect(monthlyOrganization?.plan_name).toBe('Solo')
+    expect(monthlyOrganization?.cancellation_reason).toBe('Failed to resolve past due')
     expect(monthlyOrganization?.billing_type).toBe('monthly')
     expect(monthlyOrganization?.subscription_or_signup_date).toBe(creatorUserCreatedAt)
   })

@@ -148,7 +148,7 @@ function tailResumeStep(progress: OnboardingProgress): OnboardingStep | null {
   return 'build-complete'
 }
 
-export function getIosResumeStep(progress: OnboardingProgress | null): OnboardingStep {
+export function getIosResumeStep(progress: OnboardingProgress | null, canAutomate = true): OnboardingStep {
   if (!progress)
     return 'welcome'
 
@@ -181,5 +181,5 @@ export function getIosResumeStep(progress: OnboardingProgress | null): Onboardin
   // saving-credentials. Delegated VERBATIM to the existing partial resume so the
   // import app_store `verifying-key` round-trip (and every other already-tested
   // branch) is preserved unchanged.
-  return getResumeStep(progress)
+  return getResumeStep(progress, canAutomate)
 }
