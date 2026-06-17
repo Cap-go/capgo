@@ -77,6 +77,17 @@ const statusCounts = computed(() => {
 
 const uniqueVersionsCount = computed(() => new Set(nativePackages.value.map(pkg => pkg.version)).size)
 
+const sameVersionChecksumChanges = computed(() => comparisons.value.some(entry => {
+  const isSameVersion = entry.status === 'changed'
+    && !!entry.baselineVersion
+    && !!entry.candidateVersion
+    && entry.baselineVersion === entry.candidateVersion
+  if (!isSameVersion)
+    return false
+
+  return platformChecksumDiffs(entry).length > 0
+}))
+
 const compareStatusMessage = computed(() => {
   if (!nativePackages.value.length)
     return ''
@@ -101,6 +112,8 @@ function reasonLabel(reason: IncompatibilityReason): string {
       return t('compat-reason-removed-plugin')
     case 'version_mismatch':
       return t('compat-reason-version-mismatch')
+    case 'requested_version_changed':
+      return t('compat-reason-requested-version-changed')
     case 'ios_code_changed':
       return t('compat-reason-ios-changed')
     case 'android_code_changed':
@@ -112,8 +125,89 @@ function reasonLabel(reason: IncompatibilityReason): string {
   }
 }
 
-function reasonsLabel(reasons: IncompatibilityReason[]): string {
-  return reasons.map(reasonLabel).join(', ')
+function hideHash(hash?: string) {
+  if (!hash)
+    return ''
+  if (hash.length <= 12)
+    return hash
+  return `${hash.slice(0, 6)}...${hash.slice(-6)}`
+}
+
+interface PlatformChecksumDiff {
+  platform: 'iOS' | 'Android'
+  baseline: string
+  candidate: string
+}
+
+function isSameVersion(entry: PackageComparison): boolean {
+  return entry.status === 'changed'
+    && !!entry.baselineVersion
+    && !!entry.candidateVersion
+    && entry.baselineVersion === entry.candidateVersion
+}
+
+function isVersionMismatch(entry: PackageComparison): boolean {
+  return entry.reasons.includes('version_mismatch')
+}
+
+function requestedVersionRangeChanged(entry: PackageComparison): boolean {
+  return entry.reasons.includes('requested_version_changed')
+}
+
+function platformChecksumDiffs(entry: PackageComparison): PlatformChecksumDiff[] {
+  const diffs: PlatformChecksumDiff[] = []
+
+  if (entry.baselineIosChecksum && entry.candidateIosChecksum && entry.baselineIosChecksum !== entry.candidateIosChecksum) {
+    diffs.push({
+      platform: 'iOS',
+      baseline: entry.baselineIosChecksum,
+      candidate: entry.candidateIosChecksum,
+    })
+  }
+
+  if (entry.baselineAndroidChecksum && entry.candidateAndroidChecksum && entry.baselineAndroidChecksum !== entry.candidateAndroidChecksum) {
+    diffs.push({
+      platform: 'Android',
+      baseline: entry.baselineAndroidChecksum,
+      candidate: entry.candidateAndroidChecksum,
+    })
+  }
+
+  return diffs
+}
+
+function versionMismatchReason(entry: PackageComparison): string | null {
+  if (!isVersionMismatch(entry))
+    return null
+  return t('dependencies-version-mismatch-with-values', {
+    baseline: entry.baselineVersion ?? t('unknown'),
+    candidate: entry.candidateVersion ?? t('unknown'),
+  })
+}
+
+function sameVersionReason(entry: PackageComparison): string | null {
+  if (isVersionMismatch(entry) || !isSameVersion(entry))
+    return null
+  return t('dependencies-version-text-unchanged')
+}
+
+function requestedRangeReason(entry: PackageComparison): string | null {
+  if (!requestedVersionRangeChanged(entry))
+    return null
+  return t('dependencies-constraint-changed', {
+    baseline: entry.baselineRequestedVersion ?? t('unknown'),
+    candidate: entry.candidateRequestedVersion ?? t('unknown'),
+  })
+}
+
+function filteredReasons(entry: PackageComparison) {
+  return entry.reasons
+    .filter(reason => reason !== 'version_mismatch'
+      && reason !== 'requested_version_changed'
+      && reason !== 'ios_code_changed'
+      && reason !== 'android_code_changed'
+      && reason !== 'both_platforms_changed')
+    .map(reasonLabel)
 }
 
 function openNpmPackage(packageName: string) {
@@ -407,10 +501,13 @@ watch(bundleRouteKey, async (key) => {
                 </p>
               </div>
 
-              <p v-if="compareStatusMessage" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                {{ compareStatusMessage }}
-              </p>
-            </div>
+               <p v-if="compareStatusMessage" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                 {{ compareStatusMessage }}
+               </p>
+               <p v-if="sameVersionChecksumChanges" class="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                 {{ t('dependencies-same-version-changed-hint') }}
+               </p>
+             </div>
 
             <div class="px-2 pb-2 relative">
               <!-- Comparison view: status-aware rows with the candidate→baseline diff -->
@@ -448,9 +545,35 @@ watch(bundleRouteKey, async (key) => {
                             <IconExternalLink class="w-4 h-4 text-gray-400 cursor-pointer hover:text-blue-500 dark:hover:text-blue-400" />
                           </button>
                         </div>
-                        <p v-if="!entry.compatible" class="mt-1 text-xs text-red-600 dark:text-red-400">
-                          {{ reasonsLabel(entry.reasons) }}
-                        </p>
+                        <div v-if="!entry.compatible" class="mt-1 space-y-1 text-xs text-red-600 dark:text-red-400">
+                          <p v-if="versionMismatchReason(entry)">
+                            {{ versionMismatchReason(entry) }}
+                          </p>
+                          <p v-else-if="sameVersionReason(entry)" class="text-slate-600 dark:text-slate-300">
+                            {{ sameVersionReason(entry) }}
+                          </p>
+
+                          <p v-if="requestedRangeReason(entry)" class="text-slate-600 dark:text-slate-300">
+                            {{ requestedRangeReason(entry) }}
+                          </p>
+
+                          <p v-if="isSameVersion(entry) && platformChecksumDiffs(entry).length > 0" class="text-slate-600 dark:text-slate-300">
+                            {{ t('dependencies-checksum-same-version-warning') }}
+                          </p>
+
+                          <p v-for="diff in platformChecksumDiffs(entry)" :key="`checksum-${diff.platform}`" class="text-slate-600 dark:text-slate-300">
+                            <span v-if="diff.platform === 'iOS'" :title="`${diff.baseline} → ${diff.candidate}`">
+                              {{ t('dependencies-checksum-diff-ios', { before: hideHash(diff.baseline), after: hideHash(diff.candidate) }) }}
+                            </span>
+                            <span v-else :title="`${diff.baseline} → ${diff.candidate}`">
+                              {{ t('dependencies-checksum-diff-android', { before: hideHash(diff.baseline), after: hideHash(diff.candidate) }) }}
+                            </span>
+                          </p>
+
+                          <p v-if="filteredReasons(entry).length > 0">
+                            {{ filteredReasons(entry).join(', ') }}
+                          </p>
+                        </div>
                       </td>
                       <td class="px-6 py-4 text-sm whitespace-nowrap">
                         <span class="px-2 py-1 text-xs font-medium rounded-full" :class="STATUS_STYLES[entry.status].pill">

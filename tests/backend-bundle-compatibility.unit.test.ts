@@ -58,6 +58,21 @@ describe('backend bundle compatibility helpers', () => {
     })
   })
 
+  it.concurrent('flags requested version constraint changes when resolved versions match', () => {
+    const comparisons = compareNativePackages(
+      [pkg('@capgo/native', '1.2.0', { requested_version: '^1.2.0' })],
+      [pkg('@capgo/native', '1.2.0', { requested_version: '1.2.x' })],
+    )
+
+    expect(comparisons[0]).toMatchObject({
+      status: 'changed',
+      compatible: false,
+      reasons: ['requested_version_changed'],
+      candidateRequestedVersion: '^1.2.0',
+      baselineRequestedVersion: '1.2.x',
+    })
+  })
+
   it.concurrent('selects the current default-channel deployment and previous baseline', () => {
     const pair = selectCurrentDeploymentPair([
       { id: 30, version_id: 300, deployed_at: '2026-06-03T10:00:00.000Z' },

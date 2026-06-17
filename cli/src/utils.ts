@@ -1980,10 +1980,11 @@ export async function getLocalDependencies(packageJsonPath: string | undefined, 
 
   let anyInvalid = false
   const dependenciesObject = await Promise.all(Array.from(dependencies.entries())
-    .map(async ([key, value]) => {
+      .map(async ([key, value]) => {
       let dependencyFound = false
       let hasNativeFiles = false
       let actualVersion = value
+      const requestedVersion = value
       let foundDependencyPath: string | undefined
 
       for (const modulePath of nodeModulesPaths) {
@@ -2020,12 +2021,12 @@ export async function getLocalDependencies(packageJsonPath: string | undefined, 
         }
       }
 
-      if (!dependencyFound) {
-        anyInvalid = true
-        const pm = findPackageManagerType(dir, 'npm')
-        const installCmd = findInstallCommand(pm)
-        log.error(`Missing dependency ${key}, please run ${pm} ${installCmd}`)
-        return { name: key, version: value }
+         if (!dependencyFound) {
+         anyInvalid = true
+         const pm = findPackageManagerType(dir, 'npm')
+         const installCmd = findInstallCommand(pm)
+         log.error(`Missing dependency ${key}, please run ${pm} ${installCmd}`)
+         return { name: key, version: actualVersion, requested_version: requestedVersion }
       }
 
       // Calculate platform checksums for native packages
@@ -2037,14 +2038,15 @@ export async function getLocalDependencies(packageJsonPath: string | undefined, 
         android_checksum = checksums.android_checksum
       }
 
-      return {
-        name: key,
-        version: actualVersion,
-        native: hasNativeFiles,
-        ios_checksum,
-        android_checksum,
-      }
-    })).catch(() => [])
+        return {
+          name: key,
+          version: actualVersion,
+          requested_version: requestedVersion,
+          native: hasNativeFiles,
+          ios_checksum,
+          android_checksum,
+        }
+      })).catch(() => [])
 
   if (anyInvalid || dependenciesObject.some(a => a.native === undefined)) {
     log.error('Missing dependencies or invalid dependencies')
@@ -2052,7 +2054,7 @@ export async function getLocalDependencies(packageJsonPath: string | undefined, 
     throw new Error('Missing dependencies or invalid dependencies')
   }
 
-  return dependenciesObject as { name: string, version: string, native: boolean, ios_checksum?: string, android_checksum?: string }[]
+   return dependenciesObject as { name: string, version: string, requested_version?: string, native: boolean, ios_checksum?: string, android_checksum?: string }[]
 }
 
 interface ChannelChecksum {
@@ -2169,6 +2171,10 @@ export function getCompatibilityDetails(pkg: Compatibility): CompatibilityDetail
     reasons.push('version_mismatch')
   }
 
+  if (pkg.localRequestedVersion && pkg.remoteRequestedVersion && pkg.localRequestedVersion.trim() !== pkg.remoteRequestedVersion.trim()) {
+    reasons.push('requested_version_changed')
+  }
+
   // Check checksum changes (even if versions match, native code could have changed)
   const iosChanged = pkg.localIosChecksum && pkg.remoteIosChecksum && pkg.localIosChecksum !== pkg.remoteIosChecksum
   const androidChanged = pkg.localAndroidChecksum && pkg.remoteAndroidChecksum && pkg.localAndroidChecksum !== pkg.remoteAndroidChecksum
@@ -2197,6 +2203,9 @@ export function getCompatibilityDetails(pkg: Compatibility): CompatibilityDetail
     switch (reason) {
       case 'version_mismatch':
         messages.push(`version changed: ${pkg.remoteVersion} → ${pkg.localVersion}`)
+        break
+      case 'requested_version_changed':
+        messages.push(`requested version changed: ${pkg.remoteRequestedVersion ?? 'unknown'} → ${pkg.localRequestedVersion ?? 'unknown'}`)
         break
       case 'ios_code_changed':
         messages.push('iOS native code changed')
@@ -2242,7 +2251,9 @@ export async function checkCompatibilityCloud(supabase: SupabaseClient<Database>
         return {
           name: local.name,
           localVersion: local.version,
+          localRequestedVersion: local.requested_version,
           remoteVersion: remotePackage.version,
+          remoteRequestedVersion: remotePackage.requested_version,
           localIosChecksum: local.ios_checksum,
           remoteIosChecksum: remotePackage.ios_checksum,
           localAndroidChecksum: local.android_checksum,
@@ -2250,26 +2261,28 @@ export async function checkCompatibilityCloud(supabase: SupabaseClient<Database>
         }
       }
 
-      return {
-        name: local.name,
-        localVersion: local.version,
-        remoteVersion: undefined,
-        localIosChecksum: local.ios_checksum,
-        localAndroidChecksum: local.android_checksum,
-      }
-    })
+        return {
+          name: local.name,
+          localVersion: local.version,
+          localRequestedVersion: local.requested_version,
+          remoteVersion: undefined,
+          localIosChecksum: local.ios_checksum,
+          localAndroidChecksum: local.android_checksum,
+        }
+      })
 
   // Only include remote packages that are not in local for informational purposes
   // These won't affect compatibility
   const removeNotInLocal = [...mappedRemoteNativePackages]
     .filter(([remoteName]) => !dependenciesObject.some(a => a.name === remoteName))
-    .map(([name, pkg]) => ({
-      name,
-      localVersion: undefined,
-      remoteVersion: pkg.version,
-      remoteIosChecksum: pkg.ios_checksum,
-      remoteAndroidChecksum: pkg.android_checksum,
-    }))
+      .map(([name, pkg]) => ({
+        name,
+        localVersion: undefined,
+        remoteVersion: pkg.version,
+        remoteRequestedVersion: pkg.requested_version,
+        remoteIosChecksum: pkg.ios_checksum,
+        remoteAndroidChecksum: pkg.android_checksum,
+      }))
 
   finalDependencies.push(...removeNotInLocal)
 
@@ -2289,7 +2302,9 @@ export async function checkCompatibilityNativePackages(supabase: SupabaseClient<
         return {
           name: local.name,
           localVersion: local.version,
+          localRequestedVersion: local.requested_version,
           remoteVersion: remotePackage.version,
+          remoteRequestedVersion: remotePackage.requested_version,
           localIosChecksum: local.ios_checksum,
           remoteIosChecksum: remotePackage.ios_checksum,
           localAndroidChecksum: local.android_checksum,
@@ -2297,26 +2312,28 @@ export async function checkCompatibilityNativePackages(supabase: SupabaseClient<
         }
       }
 
-      return {
-        name: local.name,
-        localVersion: local.version,
-        remoteVersion: undefined,
-        localIosChecksum: local.ios_checksum,
-        localAndroidChecksum: local.android_checksum,
-      }
+        return {
+          name: local.name,
+          localVersion: local.version,
+          localRequestedVersion: local.requested_version,
+          remoteVersion: undefined,
+          localIosChecksum: local.ios_checksum,
+          localAndroidChecksum: local.android_checksum,
+        }
     })
 
   // Only include remote packages that are not in local for informational purposes
   // These won't affect compatibility
   const removeNotInLocal = [...mappedRemoteNativePackages]
     .filter(([remoteName]) => !nativePackages.some(a => a.name === remoteName))
-    .map(([name, pkg]) => ({
-      name,
-      localVersion: undefined,
-      remoteVersion: pkg.version,
-      remoteIosChecksum: pkg.ios_checksum,
-      remoteAndroidChecksum: pkg.android_checksum,
-    }))
+      .map(([name, pkg]) => ({
+        name,
+        localVersion: undefined,
+        remoteVersion: pkg.version,
+        remoteRequestedVersion: pkg.requested_version,
+        remoteIosChecksum: pkg.ios_checksum,
+        remoteAndroidChecksum: pkg.android_checksum,
+      }))
 
   finalDependencies.push(...removeNotInLocal)
 

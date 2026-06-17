@@ -11,6 +11,7 @@ import { z } from 'zod'
 export const nativePackageSchema = z.object({
   name: z.string().min(1),
   version: z.string().min(1),
+  requested_version: z.string().optional(),
   ios_checksum: z.string().optional(),
   android_checksum: z.string().optional(),
 })
@@ -25,6 +26,7 @@ export const incompatibilityReasonSchema = z.enum([
   'new_plugin',
   'removed_plugin',
   'version_mismatch',
+  'requested_version_changed',
   'ios_code_changed',
   'android_code_changed',
   'both_platforms_changed',
@@ -36,6 +38,8 @@ export const compatibilitySchema = z.object({
   name: z.string(),
   localVersion: z.string().optional(),
   remoteVersion: z.string().optional(),
+  localRequestedVersion: z.string().optional(),
+  remoteRequestedVersion: z.string().optional(),
   localIosChecksum: z.string().optional(),
   remoteIosChecksum: z.string().optional(),
   localAndroidChecksum: z.string().optional(),
