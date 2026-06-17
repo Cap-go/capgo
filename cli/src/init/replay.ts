@@ -138,6 +138,24 @@ async function resolveConfiguredCapgoReplayUrl() {
   const config = await getRemoteConfig(true).catch(() => ({ hostApi: DEFAULT_REPLAY_API_HOST }))
   return resolveCapgoReplayUrl(config.hostApi)
 }
+
+export async function resolveReplayUrlForFlush(replayUrl: Promise<string | undefined>, timeoutMs = REPLAY_FLUSH_TIMEOUT_MS) {
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      replayUrl.catch(() => undefined),
+      new Promise<undefined>((resolve) => {
+        timeout = setTimeout(() => resolve(undefined), timeoutMs)
+        timeout.unref?.()
+      }),
+    ])
+  }
+  finally {
+    if (timeout)
+      clearTimeout(timeout)
+  }
+}
+
 function isUsableTerminalPixelSize(size?: TerminalPixelSize): size is TerminalPixelSize {
   return Boolean(
     size
@@ -681,12 +699,14 @@ class InitReplayRecorder implements InitReplayController {
       timestamp: timestamp + 1,
     }))
 
-    const replayUrl = await this.replayUrl.catch(() => undefined)
+    const flushStartedAt = Date.now()
+    const replayUrl = await resolveReplayUrlForFlush(this.replayUrl)
     if (!replayUrl)
       return
 
+    const remainingFlushMs = Math.max(1, REPLAY_FLUSH_TIMEOUT_MS - (Date.now() - flushStartedAt))
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), REPLAY_FLUSH_TIMEOUT_MS)
+    const timeout = setTimeout(() => controller.abort(), remainingFlushMs)
     timeout.unref?.()
     const body = buildInitReplayBody({
       currentUrl: this.currentUrl,
