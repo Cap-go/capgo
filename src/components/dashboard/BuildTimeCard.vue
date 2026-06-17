@@ -20,6 +20,8 @@ const props = defineProps({
   reloadTrigger: { type: Number, default: 0 },
 })
 
+const emit = defineEmits<{ 'update:loading': [value: boolean] }>()
+
 const { t } = useI18n()
 const supabase = useSupabase()
 const organizationStore = useOrganizationStore()
@@ -49,20 +51,31 @@ async function calculateStats() {
     const startDate = last30DaysStart.toISOString()
     const endDate = last30DaysEnd.toISOString()
 
-    const { data, error } = await supabase
-      .from('build_logs')
-      .select('created_at, build_time_unit')
-      .eq('app_id', props.appId)
-      .gte('created_at', startDate)
-      .lte('created_at', endDate)
-      .order('created_at')
+    // Paginate so apps with more than Supabase's max_rows cap are not undercounted.
+    const PAGE_SIZE = 1000
+    const rows: { created_at: string | null, build_time_unit: number | null }[] = []
+    for (let offset = 0; ; offset += PAGE_SIZE) {
+      const { data, error } = await supabase
+        .from('build_logs')
+        .select('created_at, build_time_unit')
+        .eq('app_id', props.appId)
+        .gte('created_at', startDate)
+        .lte('created_at', endDate)
+        .order('created_at')
+        .range(offset, offset + PAGE_SIZE - 1)
 
-    if (error)
-      throw error
+      if (error)
+        throw error
+      if (!data || data.length === 0)
+        break
+      rows.push(...data)
+      if (data.length < PAGE_SIZE)
+        break
+    }
 
     // Accumulate real build seconds per day, then convert to minutes for display.
     const secondsPerDay = Array.from({ length: WINDOW_DAYS }).fill(0) as number[]
-    for (const row of data ?? []) {
+    for (const row of rows) {
       if (!row.created_at || row.build_time_unit == null)
         continue
       const dayIndex = dayIndexInWindow(new Date(row.created_at), last30DaysStart)
@@ -117,6 +130,8 @@ watch(() => props.reloadTrigger, async (newVal) => {
     await calculateStats()
 })
 
+watch(isLoading, value => emit('update:loading', value), { immediate: true })
+
 onMounted(async () => {
   await calculateStats()
 })
@@ -132,7 +147,7 @@ onMounted(async () => {
     :has-data="hasData"
   >
     <BuildTimeChart
-      :key="JSON.stringify(minutesPerDay)"
+      :key="`${appId}:${JSON.stringify(minutesPerDay)}`"
       :data="minutesPerDay"
       :use-billing-period="useBillingPeriod"
       :accumulated="accumulated"

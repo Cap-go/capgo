@@ -33,11 +33,20 @@ const props = defineProps({
 const isDark = useDark()
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
-const targetOrg = organizationStore.getOrgByAppId(props.appId) ?? organizationStore.currentOrganization
-const cycleStart = new Date(targetOrg?.subscription_start ?? new Date())
-const cycleEnd = new Date(targetOrg?.subscription_end ?? new Date())
-cycleStart.setHours(0, 0, 0, 0)
-cycleEnd.setHours(0, 0, 0, 0)
+// Resolve the app's organization (may differ from the selected org) so the
+// billing cycle stays correct, and stay reactive to appId changes.
+const cycleStart = computed(() => {
+  const org = organizationStore.getOrgByAppId(props.appId) ?? organizationStore.currentOrganization
+  const date = new Date(org?.subscription_start ?? new Date())
+  date.setHours(0, 0, 0, 0)
+  return date
+})
+const cycleEnd = computed(() => {
+  const org = organizationStore.getOrgByAppId(props.appId) ?? organizationStore.currentOrganization
+  const date = new Date(org?.subscription_end ?? new Date())
+  date.setHours(0, 0, 0, 0)
+  return date
+})
 
 Chart.register(
   Tooltip,
@@ -61,13 +70,13 @@ const SERIES_STYLE: Record<string, { labelKey: string, bar: string, line: string
 }
 
 function monthdays() {
-  return generateMonthDays(props.useBillingPeriod, cycleStart, cycleEnd)
+  return generateMonthDays(props.useBillingPeriod, cycleStart.value, cycleEnd.value)
 }
 
 const chartData = computed<ChartData<any>>(() => {
   const labels = monthdays()
   const labelCount = labels.length
-  const limitIndex = getTodayLimit(labelCount, props.useBillingPeriod, cycleStart, cycleEnd)
+  const limitIndex = getTodayLimit(labelCount, props.useBillingPeriod, cycleStart.value, cycleEnd.value)
   const source = props.dataBySeries as Record<string, number[]>
 
   const datasets = BUILD_SERIES_KEYS.map((key, index) => {
@@ -102,7 +111,7 @@ const todayLineOptions = computed(() => {
     return { enabled: false }
 
   const labels = Array.isArray(chartData.value.labels) ? chartData.value.labels : []
-  const index = getTodayLimit(labels.length, props.useBillingPeriod, cycleStart, cycleEnd)
+  const index = getTodayLimit(labels.length, props.useBillingPeriod, cycleStart.value, cycleEnd.value)
   if (index < 0 || index >= labels.length)
     return { enabled: false }
 
@@ -120,7 +129,7 @@ const chartOptions = computed(() => ({
   plugins: {
     legend: createLegendConfig(isDark.value, true),
     title: { display: false },
-    tooltip: createTooltipConfig(true, props.accumulated, props.useBillingPeriod ? cycleStart : false, undefined),
+    tooltip: createTooltipConfig(true, props.accumulated, props.useBillingPeriod ? cycleStart.value : false, undefined),
     todayLine: todayLineOptions.value,
   },
 }))

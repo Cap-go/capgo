@@ -6,7 +6,7 @@ import CalendarDaysIcon from '~icons/heroicons/calendar-days'
 import ChartBarIcon from '~icons/heroicons/chart-bar'
 
 const props = defineProps({
-  useBillingPeriod: { type: Boolean, default: true },
+  useBillingPeriod: { type: Boolean, default: false },
   showCumulative: { type: Boolean, default: false },
   isRefreshing: { type: Boolean, default: false },
 })
@@ -35,6 +35,8 @@ function setBillingPeriod() {
 
 function setLast30Days() {
   emit('update:useBillingPeriod', false)
+  // Cumulative is billing-period-only, so disable it when leaving billing period.
+  emit('update:showCumulative', false)
 }
 </script>
 

@@ -24,6 +24,8 @@ const props = defineProps({
   reloadTrigger: { type: Number, default: 0 },
 })
 
+const emit = defineEmits<{ 'update:loading': [value: boolean] }>()
+
 const { t } = useI18n()
 const supabase = useSupabase()
 const organizationStore = useOrganizationStore()
@@ -53,21 +55,32 @@ async function calculateStats() {
     const startDate = last30DaysStart.toISOString()
     const endDate = last30DaysEnd.toISOString()
 
-    const { data, error } = await supabase
-      .from('build_requests')
-      .select('created_at, platform, status')
-      .eq('app_id', props.appId)
-      .gte('created_at', startDate)
-      .lte('created_at', endDate)
-      .order('created_at')
+    // Paginate so apps with more than Supabase's max_rows cap are not undercounted.
+    const PAGE_SIZE = 1000
+    const rows: { created_at: string | null, platform: string | null, status: string | null }[] = []
+    for (let offset = 0; ; offset += PAGE_SIZE) {
+      const { data, error } = await supabase
+        .from('build_requests')
+        .select('created_at, platform, status')
+        .eq('app_id', props.appId)
+        .gte('created_at', startDate)
+        .lte('created_at', endDate)
+        .order('created_at')
+        .range(offset, offset + PAGE_SIZE - 1)
 
-    if (error)
-      throw error
+      if (error)
+        throw error
+      if (!data || data.length === 0)
+        break
+      rows.push(...data)
+      if (data.length < PAGE_SIZE)
+        break
+    }
 
     const series = emptyBuildSeries()
     const dailyTriggered = Array.from({ length: WINDOW_DAYS }).fill(0) as number[]
 
-    for (const row of data ?? []) {
+    for (const row of rows) {
       if (!row.created_at)
         continue
       const dayIndex = dayIndexInWindow(new Date(row.created_at), last30DaysStart)
@@ -88,7 +101,7 @@ async function calculateStats() {
     let finalDailyTriggered = dailyTriggered
 
     if (props.useBillingPeriod) {
-      const filtered = emptyBuildSeries(0) as Record<string, number[]>
+      const filtered: Record<string, number[]> = {}
       for (const key of BUILD_SERIES_KEYS)
         filtered[key] = filterToBillingPeriod(series[key], last30DaysStart, billingStart)
       finalSeries = filtered as typeof series
@@ -135,6 +148,8 @@ watch(() => props.reloadTrigger, async (newVal) => {
     await calculateStats()
 })
 
+watch(isLoading, value => emit('update:loading', value), { immediate: true })
+
 onMounted(async () => {
   await calculateStats()
 })
@@ -150,7 +165,7 @@ onMounted(async () => {
     :has-data="hasData"
   >
     <BuildStatsChart
-      :key="JSON.stringify(dataBySeries)"
+      :key="`${appId}:${JSON.stringify(dataBySeries)}`"
       :data-by-series="dataBySeries"
       :use-billing-period="useBillingPeriod"
       :accumulated="accumulated"

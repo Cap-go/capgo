@@ -69,9 +69,9 @@ export function filterToBillingPeriod(fullData: number[], last30DaysStart: Date,
     currentBillingDay = currentDate.getDate()
   }
   else {
-    const billingStartDay = billingStart.getUTCDate()
-    const daysInMonth = new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth() + 1, 0)).getUTCDate()
-    currentBillingDay = (currentDate.getUTCDate() - billingStartDay + 1 + daysInMonth) % daysInMonth
+    const billingStartDay = billingStart.getDate()
+    const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate()
+    currentBillingDay = (currentDate.getDate() - billingStartDay + 1 + daysInMonth) % daysInMonth
     if (currentBillingDay === 0)
       currentBillingDay = daysInMonth
   }
@@ -124,11 +124,12 @@ export function transformSeries(source: number[], accumulated: boolean, labelCou
   const display: Array<number | null> = Array.from({ length: labelCount }).fill(null) as Array<number | null>
   const base: Array<number | null> = Array.from({ length: labelCount }).fill(null) as Array<number | null>
 
-  if (limitIndex < 0)
+  const safeLimit = Math.min(limitIndex, labelCount - 1)
+  if (safeLimit < 0)
     return { display, base }
 
   let runningTotal = 0
-  for (let index = 0; index <= limitIndex; index++) {
+  for (let index = 0; index <= safeLimit; index++) {
     const hasValue = index < source.length && typeof source[index] === 'number' && Number.isFinite(source[index])
     const numericValue = hasValue ? source[index] as number : 0
 

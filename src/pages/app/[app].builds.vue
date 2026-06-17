@@ -26,6 +26,11 @@ const showCumulative = ref(route.query.cumulative === 'true')
 const reloadTrigger = ref(0)
 const accumulated = computed(() => useBillingPeriod.value && showCumulative.value)
 
+// Reload-button spinner reflects either chart card fetching.
+const statsLoading = ref(false)
+const timeLoading = ref(false)
+const chartsRefreshing = computed(() => statsLoading.value || timeLoading.value)
+
 async function loadAppInfo() {
   try {
     const { data: dataApp } = await supabase
@@ -71,6 +76,7 @@ watchEffect(async () => {
             <BuildChartControls
               v-model:use-billing-period="useBillingPeriod"
               v-model:show-cumulative="showCumulative"
+              :is-refreshing="chartsRefreshing"
               class="mb-4"
               @reload="reloadTrigger++"
             />
@@ -81,6 +87,7 @@ watchEffect(async () => {
                 :accumulated="accumulated"
                 :reload-trigger="reloadTrigger"
                 class="sm:col-span-1"
+                @update:loading="statsLoading = $event"
               />
               <BuildTimeCard
                 :app-id="id"
@@ -88,6 +95,7 @@ watchEffect(async () => {
                 :accumulated="accumulated"
                 :reload-trigger="reloadTrigger"
                 class="sm:col-span-1"
+                @update:loading="timeLoading = $event"
               />
             </div>
           </div>
