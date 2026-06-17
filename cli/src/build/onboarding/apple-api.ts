@@ -130,7 +130,7 @@ export async function verifyApiKey(token: string): Promise<{ valid: true, teamId
     }
     if (is401 || is403) {
       throw new AppleApiHttpError(
-        status ?? 401,
+        status ?? (is403 ? 403 : 401),
         'API key verification failed. Please check:\n'
         + '  - The .p8 file is correct and hasn\'t been modified\n'
         + '  - The Key ID matches the key shown in App Store Connect\n'

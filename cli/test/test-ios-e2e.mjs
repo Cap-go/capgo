@@ -486,24 +486,28 @@ await test('(d) ERROR: a failing verifying-key effect → next=error; transient 
   assertProgressClean(res.progress, 'error result progress')
 })
 
-await test('(d) ERROR: a 403 unsigned-agreement at verifying-key surfaces the agreement guidance (not a key re-check)', async () => {
-  // Mirrors the real verifyApiKey behavior for Apple 403
-  // FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED: a VALID key blocked by an
-  // unsigned/expired agreement. The user must NOT be told to re-check the key.
-  const agreementMsg = 'Apple is blocking App Store Connect API access because your developer account has a required agreement that is unsigned or has expired.\n'
-    + '  - Open "Business" (Agreements, Tax, and Banking) and accept the pending or updated agreement'
+await test('(d) ERROR: a verify failure carrying agreement guidance routes to error intact (engine routing)', async () => {
+  // ENGINE ROUTING only: runIosEffect serializes the thrown error to a message
+  // string, so we inject a representative agreement message and assert it routes
+  // to the error step intact + recoverable, with the message carried verbatim
+  // (no mangling) and NOT the credential checklist. The REAL verifyApiKey throw,
+  // the exact user-facing copy, the apple_agreements_missing telemetry category,
+  // and the corrected recovery menu (no "Create a new key") are exercised
+  // end-to-end against the real CLI + fake-asc 403 in cli-mcp-tests#9 (golden +
+  // harness test) — this test deliberately does not re-assert that prose.
+  const agreementMsg = 'Apple is blocking App Store Connect API access because your developer account has a required agreement that is unsigned or has expired.'
   const deps = makeDeps({
     carried: { p8Content: P8_BYTES },
     verifyApiKey: async () => { throw new Error(agreementMsg) },
   })
   const progress = iosProgress({ setupMethod: 'create-new', p8Path: '/x.p8', keyId: 'K', issuerId: 'I' })
   const res = await runIosEffect('verifying-key', progress, deps)
-  assertEquals(res.next, 'error', 'an unsigned-agreement 403 routes to the error step')
-  assert(res.transient && res.transient.error.includes('required agreement'), 'the error surfaces the agreement guidance')
-  assert(!res.transient.error.includes('Key ID matches'), 'it does NOT tell the user to re-check the key (the key is valid)')
-  assertEquals(res.transient.retryStep, 'verifying-key', 'recoverable: retry routes back to verifying-key once the agreement is signed')
+  assertEquals(res.next, 'error', 'a verify failure routes to the error step')
+  assertEquals(res.transient && res.transient.error, agreementMsg, 'the exact failure message is carried into the error transient intact')
+  assert(!res.transient.error.includes('Key ID matches'), 'the carried message is the agreement guidance, not the credential checklist')
+  assertEquals(res.transient.retryStep, 'verifying-key', 'recoverable: retry routes back to verifying-key')
   const view = iosViewForStep('error', iosProgress(), { appId: APP_ID, error: res.transient.error, retryStep: 'verifying-key' })
-  assert(view.message.includes('Agreements, Tax, and Banking'), 'the error VIEW renders the actionable agreement message')
+  assertEquals(view.message, agreementMsg, 'the error VIEW renders the carried message verbatim')
 })
 
 await test('(d) ERROR VIEW: iosViewForStep(error) renders the carried message + Try again / Restart / Exit', async () => {

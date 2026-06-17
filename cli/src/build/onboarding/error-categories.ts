@@ -46,10 +46,17 @@ export function mapIosOnboardingError(
   const status = getStatus(error)
   const code = getCode(error)
   const message = error instanceof Error ? error.message : ''
-  // A 403 carrying the agreements code is a VALID key blocked by an unsigned or
-  // expired Apple agreement — keep it distinct from a genuine auth failure so the
-  // UI can tell the user to sign the agreement rather than re-check the key.
-  if (status === 403 && (code === 'FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED' || /required agreement/i.test(message)))
+  // A required-agreement block is a VALID key gated by an unsigned/expired Apple
+  // agreement — keep it distinct from a genuine auth failure so the UI tells the
+  // user to sign the agreement, not re-check the key. Detect by Apple's error code
+  // when present, OR by a SPECIFIC message phrase. The phrase match is load-bearing
+  // (not just a fallback): the iOS TUI engine collapses the error to its message
+  // string before this maps it, so the reconstructed Error carries no status/code —
+  // the message is the only signal that survives. The phrase requires "agreement"
+  // adjacent to a signing/expiry word, so it can't match an unrelated 403.
+  const isAgreement = code === 'FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED'
+    || /required agreement[^.]{0,60}\b(unsigned|expired|missing|not been signed)\b/i.test(message)
+  if (isAgreement)
     return 'apple_agreements_missing'
   if (status === 401)
     return 'apple_api_unauthorized'
