@@ -46,6 +46,7 @@ import { explainOnboarding, runAdvance, runStart } from './engine.js'
 import { getSession } from './session-state.js'
 import type { BuildJobDeps } from './build-job.js'
 import { buildJobDeps, registerBuildTools } from './build-tools.js'
+import { type CredentialsManageDeps, registerCredentialsManageTool } from './credentials-manage.js'
 
 /** Minimal shape of the MCP server's tool registrar (matches McpServer.tool). */
 interface McpLike {
@@ -505,7 +506,7 @@ export function buildDeps(sdk: CapgoSDK): EngineDeps {
  * Register the 2-tool onboarding spine onto an MCP server.
  * `depsOverride` is for tests; production passes only `server` + `sdk`.
  */
-export function registerOnboardingTools(server: McpLike, sdk: CapgoSDK, depsOverride?: EngineDeps, buildJobDepsOverride?: BuildJobDeps): void {
+export function registerOnboardingTools(server: McpLike, sdk: CapgoSDK, depsOverride?: EngineDeps, buildJobDepsOverride?: BuildJobDeps, credentialsManageDepsOverride?: CredentialsManageDeps): void {
   const deps = depsOverride ?? buildDeps(sdk)
 
   server.tool(
@@ -547,6 +548,10 @@ export function registerOnboardingTools(server: McpLike, sdk: CapgoSDK, depsOver
   // hands back to capgo_builder_onboarding_next_step({ checkBuild }) for the tail.
   registerBuildTools(server, deps.getAppId, buildJobDepsOverride ?? buildJobDeps(deps.cwd))
 
+  // ── Credentials management (post-onboarding) ─────────────────────────────────
+  // Manage credentials that ALREADY exist: export to .env, or add/edit/remove a
+  // field. Refuses (and points at onboarding) when no credentials exist for the app.
+  registerCredentialsManageTool(server, deps.getAppId, credentialsManageDepsOverride)
   // ── Discoverable, client-agnostic entry point (MCP prompt) ──────────────────
   // Clients that support MCP prompts surface this as a slash command (e.g.
   // /capgo-builder-setup). Invoking it injects the message below, which kicks
