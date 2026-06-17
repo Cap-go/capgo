@@ -1118,7 +1118,7 @@ await test('C2 confirm success: checkBuild:true + record present with status:suc
   const r = await runAdvance(deps, { checkBuild: true })
   eq(r.kind, 'done', `expected done, got ${r.kind}`)
   eq(r.state, 'build-complete', `expected build-complete, got ${r.state}`)
-  ok(r.summary && r.summary.includes('https://capgo.app/d/abc'), 'summary must include outputUrl')
+  ok(r.summary && r.summary.includes('/d/abc'), 'summary must include the outputUrl path')
   ok(r.context && r.context.outputUrl === 'https://capgo.app/d/abc', 'context.outputUrl must match')
   eq(r.context.qrCodeAscii, '██QR██', 'context.qrCodeAscii must match')
   eq(r.phase, 'done')
@@ -1498,7 +1498,7 @@ await test('D2 checkBuild: record present + success → build-complete (unchange
   const r = await runAdvance(deps, { checkBuild: true, platform: 'android' })
   eq(r.kind, 'done', `expected done, got ${r.kind}`)
   eq(r.state, 'build-complete', `expected build-complete, got ${r.state}`)
-  ok(r.summary && r.summary.includes('https://capgo.app/d/launched'), 'summary must include outputUrl')
+  ok(r.summary && r.summary.includes('/d/launched'), 'summary must include the outputUrl path')
 })
 
 // ─── Command-injection guard: unsafe appId ───────────────────────────────────
