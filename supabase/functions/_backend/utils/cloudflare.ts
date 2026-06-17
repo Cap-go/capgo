@@ -1008,17 +1008,22 @@ export async function readActiveAppsCF(c: Context, referenceDate?: Date) {
 
 const LAST_MONTH_ANALYTICS_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
 
+export function getLastMonthAnalyticsWindowStart(referenceDate?: Date): Date {
+  const end = referenceDate && !Number.isNaN(referenceDate.getTime()) ? referenceDate : new Date(Date.now())
+  return new Date(end.getTime() - LAST_MONTH_ANALYTICS_WINDOW_MS)
+}
+
 export function getLastMonthAnalyticsWindow(referenceDate?: Date) {
+  const start = getLastMonthAnalyticsWindowStart(referenceDate)
+
   if (!referenceDate) {
-    const oneMonthAgo = new Date(Date.now() - LAST_MONTH_ANALYTICS_WINDOW_MS)
     return {
-      startExpression: `toDateTime('${formatDateCF(oneMonthAgo)}')`,
+      startExpression: `toDateTime('${formatDateCF(start)}')`,
       endExpression: 'now()',
     }
   }
 
-  const end = Number.isNaN(referenceDate.getTime()) ? new Date() : referenceDate
-  const start = new Date(end.getTime() - LAST_MONTH_ANALYTICS_WINDOW_MS)
+  const end = Number.isNaN(referenceDate.getTime()) ? new Date(Date.now()) : referenceDate
   return {
     startExpression: `toDateTime('${formatDateCF(start)}')`,
     endExpression: `toDateTime('${formatDateCF(end)}')`,

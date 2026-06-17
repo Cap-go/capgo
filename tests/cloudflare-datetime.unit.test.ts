@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { formatDateCF, getLastMonthAnalyticsWindow } from '../supabase/functions/_backend/utils/cloudflare.ts'
+import { formatDateCF, getLastMonthAnalyticsWindow, getLastMonthAnalyticsWindowStart } from '../supabase/functions/_backend/utils/cloudflare.ts'
 
 describe('formatDateCF', () => {
   it.concurrent('normalizes Date objects to a stable UTC SQL timestamp', () => {
@@ -21,6 +21,10 @@ describe('getLastMonthAnalyticsWindow', () => {
       startExpression: "toDateTime('2026-02-23 00:00:00')",
       endExpression: "toDateTime('2026-03-25 00:00:00')",
     })
+  })
+
+  it.concurrent('exposes the rolling analytics start for matching database fallbacks', () => {
+    expect(getLastMonthAnalyticsWindowStart(new Date('2026-03-25T00:00:00.000Z')).toISOString()).toBe('2026-02-23T00:00:00.000Z')
   })
 
   it('preserves time-of-day for the default rolling analytics lower bound', () => {

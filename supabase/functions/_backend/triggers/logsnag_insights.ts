@@ -5,7 +5,7 @@ import type { Database, Json } from '../utils/supabase.types.ts'
 import { sql } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 
-import { getPluginBreakdownCF, readActiveAppsCF, readLastMonthDevicesByPlatformCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
+import { getLastMonthAnalyticsWindowStart, getPluginBreakdownCF, readActiveAppsCF, readLastMonthDevicesByPlatformCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
 import { BRES, middlewareAPISecret, quickError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { logsnagInsights } from '../utils/logsnag.ts'
@@ -1710,6 +1710,7 @@ async function countActiveUsersForSnapshot(c: Context, appIds: string[], window:
     return 0
 
   const db = getPgClient(c, false)
+  const activeWindowStartIso = getLastMonthAnalyticsWindowStart(window.prevDayEnd).toISOString()
 
   try {
     const result = await db.query<{ count: number | string | null }>(`
@@ -1745,7 +1746,7 @@ async function countActiveUsersForSnapshot(c: Context, appIds: string[], window:
       ) active_owner_orgs
       INNER JOIN public.orgs orgs ON orgs.id = active_owner_orgs.owner_org
       WHERE orgs.created_at < $2::timestamptz
-    `, [appIds, window.prevDayEnd.toISOString(), window.prevDayStart.toISOString()])
+    `, [appIds, window.prevDayEnd.toISOString(), activeWindowStartIso])
 
     return Number(result.rows[0]?.count) || 0
   }
