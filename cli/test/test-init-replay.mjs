@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict'
 import { applyCommandAnalyticsOptOut, applyRawCommandAnalyticsOptOut } from '../src/analytics/opt-out.ts'
-import { buildInitReplayBody, createTerminalInteractionEvents, createTerminalSnapshot, createTerminalSnapshotNode, getReplayViewportSize, parseTerminalPixelSizeResponse, renderRedactedTerminalFrame, renderRedactedTerminalText, resolvePosthogReplayUrl, shouldStartInitReplay } from '../src/init/replay.ts'
+import { buildInitReplayBody, createTerminalInteractionEvents, createTerminalSnapshot, createTerminalSnapshotNode, getReplayViewportSize, parseTerminalPixelSizeResponse, renderRedactedTerminalFrame, renderRedactedTerminalText, resolveCapgoReplayUrl, shouldStartInitReplay } from '../src/init/replay.ts'
 
 console.log('🧪 Testing init replay telemetry...\n')
 
@@ -9,7 +9,6 @@ const baseGate = {
   analyticsEnabled: true,
   apikey: 'capgo-key',
   isCi: false,
-  posthogToken: 'phc-token',
   stdinIsTTY: true,
   stdoutIsTTY: true,
   telemetryDisabled: false,
@@ -19,16 +18,13 @@ assert.equal(shouldStartInitReplay(baseGate), true, 'interactive init with keys 
 assert.equal(shouldStartInitReplay({ ...baseGate, analyticsEnabled: false }), false, '--no-analytics disables replay')
 assert.equal(shouldStartInitReplay({ ...baseGate, apikey: '' }), false, 'missing Capgo API key disables replay')
 assert.equal(shouldStartInitReplay({ ...baseGate, isCi: true }), false, 'CI disables replay')
-assert.equal(shouldStartInitReplay({ ...baseGate, posthogToken: '' }), false, 'missing PostHog token disables replay')
 assert.equal(shouldStartInitReplay({ ...baseGate, stdinIsTTY: false }), false, 'non-interactive stdin disables replay')
 assert.equal(shouldStartInitReplay({ ...baseGate, stdoutIsTTY: false }), false, 'non-interactive stdout disables replay')
 assert.equal(shouldStartInitReplay({ ...baseGate, telemetryDisabled: true }), false, 'env opt-out disables replay')
 
-assert.equal(resolvePosthogReplayUrl('https://eu.i.posthog.com/i/v0/e'), 'https://eu.i.posthog.com/s/')
-assert.equal(resolvePosthogReplayUrl('https://eu.i.posthog.com/capture'), 'https://eu.i.posthog.com/s/')
-assert.equal(resolvePosthogReplayUrl('https://eu.i.posthog.com/s/'), 'https://eu.i.posthog.com/s/')
-assert.equal(resolvePosthogReplayUrl('not a url'), undefined)
-assert.deepEqual(getReplayViewportSize(100, 30), { height: 632, width: 932 }, 'terminal cells are converted to replay pixels')
+assert.equal(resolveCapgoReplayUrl('https://api.capgo.app'), 'https://api.capgo.app/private/replay')
+assert.equal(resolveCapgoReplayUrl('https://api.capgo.app/private/replay'), 'https://api.capgo.app/private/replay')
+assert.equal(resolveCapgoReplayUrl('not a url'), undefined)
 assert.deepEqual(getReplayViewportSize(20, 5), { height: 480, width: 800 }, 'replay viewport has readable minimum dimensions')
 assert.deepEqual(parseTerminalPixelSizeResponse('\u001B[4;412;640t'), { height: 412, width: 640 }, 'xterm pixel-size report is parsed as height and width')
 assert.equal(parseTerminalPixelSizeResponse('\u001B[4;0;640t'), undefined, 'invalid terminal pixel reports are ignored')
@@ -99,45 +95,31 @@ const body = buildInitReplayBody({
   events: [event],
   sessionId: 'init-session-123',
   timestamp: '2026-06-16T00:00:00.000Z',
-  token: 'phc-token',
   windowId: 'window-123',
 })
 assert.equal(body.event, '$snapshot')
-assert.equal(body.api_key, 'phc-token')
-assert.equal(body.distinct_id, 'cli:init-session-123')
-assert.equal(body.properties.distinct_id, 'cli:init-session-123')
 assert.equal(body.properties.$session_id, 'init-session-123')
 assert.equal(body.properties.$window_id, 'window-123')
 assert.equal(body.properties.$current_url, 'capgo-cli://init')
 assert.deepEqual(body.properties.$snapshot_data, [event])
 assert.equal(typeof body.properties.$snapshot_bytes, 'number')
 assert.ok(body.properties.$snapshot_bytes > 0, 'snapshot byte size is included')
-assert.doesNotMatch(JSON.stringify(body.properties), /capgo-key/, 'Capgo API keys are not replay properties')
+assert.doesNotMatch(JSON.stringify(body), /capgo-key/, 'Capgo API keys are not replay properties')
+assert.doesNotMatch(JSON.stringify(body), /phc-token/, 'PostHog project tokens are not sent by the CLI')
+assert.equal('api_key' in body, false, 'backend owns the PostHog API key')
+assert.equal('distinct_id' in body, false, 'backend owns replay identity')
+assert.equal('token' in body.properties, false, 'backend owns PostHog token properties')
+assert.equal('$set' in body.properties, false, 'backend owns PostHog person properties')
 
 const buildOnboardingBody = buildInitReplayBody({
   currentUrl: 'capgo-cli://build-onboarding',
   events: [event],
   sessionId: 'build-onboarding-session-123',
   timestamp: '2026-06-16T00:00:00.000Z',
-  token: 'phc-token',
   windowId: 'window-123',
 })
-assert.equal(buildOnboardingBody.distinct_id, 'cli:build-onboarding-session-123', 'build onboarding replay falls back to replay session distinct_id')
 assert.equal(buildOnboardingBody.properties.$session_id, 'build-onboarding-session-123')
 assert.equal(buildOnboardingBody.properties.$current_url, 'capgo-cli://build-onboarding')
-
-const identifiedBody = buildInitReplayBody({
-  events: [event],
-  identity: { distinctId: 'user-uuid-123', email: 'user@example.com', userId: 'user-uuid-123' },
-  sessionId: 'init-session-123',
-  timestamp: '2026-06-16T00:00:00.000Z',
-  token: 'phc-token',
-  windowId: 'window-123',
-})
-assert.equal(identifiedBody.distinct_id, 'user-uuid-123', 'replay uses API-key owner as PostHog distinct_id')
-assert.equal(identifiedBody.properties.distinct_id, 'user-uuid-123')
-assert.equal(identifiedBody.properties.user_id, 'user-uuid-123')
-assert.deepEqual(identifiedBody.properties.$set, { email: 'user@example.com' }, 'replay sets PostHog person email')
 
 const envTarget = {}
 assert.equal(applyCommandAnalyticsOptOut('init', { analytics: false }, envTarget), true)

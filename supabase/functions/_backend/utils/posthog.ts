@@ -5,6 +5,7 @@ import { existInEnv, getEnv } from './utils.ts'
 
 const POSTHOG_CAPTURE_URL = 'https://eu.i.posthog.com/capture/'
 const POSTHOG_EXCEPTION_URL = 'https://eu.i.posthog.com/i/v0/e/'
+const POSTHOG_SNAPSHOT_URL = 'https://eu.i.posthog.com/s/'
 
 export type PostHogGroups = Record<string, string>
 
@@ -77,6 +78,96 @@ export async function trackPosthogEvent(c: Context, payload: PostHogCapturePaylo
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'PostHog fetch failed', error: serializeError(e), event: payload.event, distinctId })
+    return false
+  }
+}
+
+function getPostHogSnapshotUrl(host: string) {
+  const trimmedHost = host.replace(/\/+$/g, '')
+  if (trimmedHost.endsWith('/s'))
+    return `${trimmedHost}/`
+
+  const normalizedHost = trimmedHost
+    .replace(/\/i\/v0\/e$/g, '/')
+    .replace(/\/capture$/g, '/')
+    .replace(/\/e$/g, '/')
+  return new URL('s/', normalizedHost.endsWith('/') ? normalizedHost : `${normalizedHost}/`).toString()
+}
+
+function jsonByteLength(value: unknown) {
+  return new TextEncoder().encode(JSON.stringify(value)).length
+}
+
+export interface PostHogReplaySnapshotPayload {
+  currentUrl: string
+  distinctId: string
+  events: unknown[]
+  lib: string
+  libVersion: string
+  sessionId: string
+  snapshotBytes?: number
+  timestamp: string
+  userEmail?: string
+  userId: string
+  windowId: string
+}
+
+export async function capturePosthogReplaySnapshot(c: Context, payload: PostHogReplaySnapshotPayload) {
+  const apiKey = getEnv(c, 'POSTHOG_API_KEY')
+  if (!apiKey || !existInEnv(c, 'POSTHOG_API_KEY')) {
+    cloudlog({ requestId: c.get('requestId'), message: 'PostHog not configured' })
+    return false
+  }
+
+  const host = getEnv(c, 'POSTHOG_API_HOST') || POSTHOG_SNAPSHOT_URL
+  let posthogUrl: string
+  try {
+    posthogUrl = getPostHogSnapshotUrl(host)
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid PostHog replay host', error: serializeError(e), host })
+    return false
+  }
+
+  const body = {
+    api_key: apiKey,
+    distinct_id: payload.distinctId,
+    event: '$snapshot',
+    properties: {
+      $current_url: payload.currentUrl,
+      $lib: payload.lib,
+      $lib_version: payload.libVersion,
+      $session_id: payload.sessionId,
+      ...(payload.userEmail ? { $set: { email: payload.userEmail } } : {}),
+      $snapshot_bytes: payload.snapshotBytes ?? jsonByteLength(payload.events),
+      $snapshot_data: payload.events,
+      $snapshot_source: 'web',
+      $window_id: payload.windowId,
+      distinct_id: payload.distinctId,
+      token: apiKey,
+      user_id: payload.userId,
+    },
+    timestamp: payload.timestamp,
+  }
+
+  try {
+    const res = await fetch(posthogUrl, {
+      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    })
+
+    if (!res.ok) {
+      const error = await res.text()
+      cloudlogErr({ requestId: c.get('requestId'), message: 'PostHog replay error', status: res.status, error, sessionId: payload.sessionId, distinctId: payload.distinctId })
+      return false
+    }
+
+    cloudlog({ requestId: c.get('requestId'), message: 'PostHog replay sent', sessionId: payload.sessionId, distinctId: payload.distinctId })
+    return true
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'PostHog replay fetch failed', error: serializeError(e), sessionId: payload.sessionId, distinctId: payload.distinctId })
     return false
   }
 }

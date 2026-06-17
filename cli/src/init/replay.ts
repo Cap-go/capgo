@@ -9,11 +9,11 @@ import { isCI } from 'ci-info'
 import { Window } from 'happy-dom'
 import { snapshot } from 'rrweb-snapshot'
 import pack from '../../package.json'
-import { getPosthogToken, isTruthyEnvValue } from '../posthog'
+import { isTruthyEnvValue } from '../posthog'
 import { redactSecrets } from '../support/redact'
-import { createSupabaseClient } from '../utils'
+import { defaultApiHost, getRemoteConfig } from '../utils'
 
-const DEFAULT_REPLAY_URL = 'https://eu.i.posthog.com/s/'
+const DEFAULT_REPLAY_API_HOST = defaultApiHost
 const DEFAULT_COLS = 100
 const DEFAULT_ROWS = 30
 const REPLAY_CHAR_WIDTH_PX = 9
@@ -21,7 +21,6 @@ const REPLAY_LINE_HEIGHT_PX = 20
 const REPLAY_PADDING_PX = 32
 const REPLAY_FRAME_THROTTLE_MS = 1000
 const REPLAY_FLUSH_TIMEOUT_MS = 1500
-const REPLAY_IDENTITY_TIMEOUT_MS = 3000
 const TERMINAL_PIXEL_SIZE_TIMEOUT_MS = 200
 const DEFAULT_REPLAY_CURRENT_URL = 'capgo-cli://init'
 const DEFAULT_REPLAY_SESSION_PREFIX = 'init'
@@ -52,41 +51,26 @@ interface InitReplayGateInput {
   analyticsEnabled?: boolean
   apikey?: string
   isCi?: boolean
-  posthogToken?: string
   stdinIsTTY?: boolean
   stdoutIsTTY?: boolean
   telemetryDisabled?: boolean
 }
-export interface InitReplayIdentity {
-  distinctId: string
-  email?: string
-  userId?: string
-}
-
 interface InitReplaySnapshotBody {
-  api_key: string
-  distinct_id: string
   event: '$snapshot'
   properties: {
     $current_url: string
     $lib: string
     $lib_version: string
     $session_id: string
-    $set?: {
-      email?: string
-    }
     $snapshot_bytes: number
     $snapshot_data: eventWithTime[]
     $snapshot_source: string
     $window_id: string
-    distinct_id: string
-    token: string
-    user_id?: string
   }
   timestamp: string
 }
 
-type InitReplayTransport = (url: string, body: InitReplaySnapshotBody, signal?: AbortSignal) => Promise<boolean>
+type InitReplayTransport = (url: string, body: InitReplaySnapshotBody, apikey: string, signal?: AbortSignal) => Promise<boolean>
 
 interface StartInitReplayOptions {
   analyticsEnabled?: boolean
@@ -94,9 +78,6 @@ interface StartInitReplayOptions {
   ariaLabel?: string
   cols?: number
   currentUrl?: string
-  identity?: InitReplayIdentity
-  identityResolver?: (apikey: string, signal?: AbortSignal) => Promise<InitReplayIdentity | undefined>
-  posthogToken?: string
   replayUrl?: string
   rows?: number
   sessionPrefix?: string
@@ -132,74 +113,30 @@ export function shouldStartInitReplay(input: InitReplayGateInput) {
     && input.stdinIsTTY
     && input.stdoutIsTTY
     && !input.isCi
-    && !input.telemetryDisabled
-    && input.posthogToken?.trim(),
+    && !input.telemetryDisabled,
   )
 }
 
-export async function resolveInitReplayIdentity(apikey: string, signal?: AbortSignal): Promise<InitReplayIdentity | undefined> {
-  const trimmedApiKey = apikey.trim()
-  if (!trimmedApiKey)
-    return undefined
-
-  try {
-    const supabase = await createSupabaseClient(trimmedApiKey, undefined, undefined, true, false, signal)
-    let query = supabase
-      .rpc('get_user_identity_for_apikey' as never, { apikey: trimmedApiKey } as never)
-    if (signal)
-      query = query.abortSignal(signal)
-    const { data, error } = await query.maybeSingle()
-
-    if (error || !data)
-      return undefined
-
-    const row = data as { correlation_id?: unknown }
-    const distinctId = typeof row.correlation_id === 'string' && row.correlation_id.trim() ? row.correlation_id : undefined
-    return distinctId ? { distinctId } : undefined
-  }
-  catch {
-    return undefined
-  }
-}
-
-function withTimeout<T>(task: (signal: AbortSignal) => Promise<T>, timeoutMs: number): Promise<T | undefined> {
-  const controller = new AbortController()
-  let timer: NodeJS.Timeout | undefined
-  return Promise.race([
-    task(controller.signal).catch(() => undefined),
-    new Promise<undefined>((resolve) => {
-      timer = setTimeout(() => {
-        controller.abort()
-        resolve(undefined)
-      }, timeoutMs)
-      timer.unref?.()
-    }),
-  ]).finally(() => {
-    if (timer)
-      clearTimeout(timer)
-  })
-}
-
-export function resolvePosthogReplayUrl(host = env.CAPGO_CLI_POSTHOG_API_HOST?.trim() || env.POSTHOG_API_HOST?.trim() || DEFAULT_REPLAY_URL) {
+export function resolveCapgoReplayUrl(host = env.CAPGO_CLI_REPLAY_API_HOST?.trim() || env.CAPGO_API_HOST?.trim() || DEFAULT_REPLAY_API_HOST) {
   const trimmedHost = host.trim()
   if (!trimmedHost)
     return undefined
 
   try {
     const withoutTrailingSlash = trimmedHost.replace(/\/+$/, '')
-    if (withoutTrailingSlash.endsWith('/s'))
-      return `${withoutTrailingSlash}/`
+    if (withoutTrailingSlash.endsWith('/private/replay'))
+      return withoutTrailingSlash
 
-    const normalizedHost = withoutTrailingSlash
-      .replace(/\/i\/v0\/e$/, '/')
-      .replace(/\/capture$/, '/')
-      .replace(/\/e$/, '/')
-
-    return new URL('s/', normalizedHost.endsWith('/') ? normalizedHost : `${normalizedHost}/`).toString()
+    return new URL('private/replay', withoutTrailingSlash.endsWith('/') ? withoutTrailingSlash : `${withoutTrailingSlash}/`).toString()
   }
   catch {
     return undefined
   }
+}
+
+async function resolveConfiguredCapgoReplayUrl() {
+  const config = await getRemoteConfig(true).catch(() => ({ hostApi: DEFAULT_REPLAY_API_HOST }))
+  return resolveCapgoReplayUrl(config.hostApi)
 }
 function isUsableTerminalPixelSize(size?: TerminalPixelSize): size is TerminalPixelSize {
   return Boolean(
@@ -551,44 +488,37 @@ export function createTerminalInteractionEvents(input: {
   return [clickEventWithTime, inputEventWithTime]
 }
 
-
 export function buildInitReplayBody(input: {
   currentUrl?: string
   events: eventWithTime[]
-  identity?: InitReplayIdentity
   sessionId: string
   timestamp: string
-  token: string
   windowId: string
 }): InitReplaySnapshotBody {
-  const distinctId = input.identity?.distinctId || `cli:${input.sessionId}`
   return {
-    api_key: input.token,
-    distinct_id: distinctId,
     event: '$snapshot',
     properties: {
       $current_url: input.currentUrl || DEFAULT_REPLAY_CURRENT_URL,
       $lib: '@capgo/cli',
       $lib_version: pack.version,
       $session_id: input.sessionId,
-      ...(input.identity?.email ? { $set: { email: input.identity.email } } : {}),
-      $snapshot_bytes: Buffer.byteLength(JSON.stringify(input.events)),
+      $snapshot_bytes: new TextEncoder().encode(JSON.stringify(input.events)).length,
       $snapshot_data: input.events,
       $snapshot_source: 'web',
       $window_id: input.windowId,
-      distinct_id: distinctId,
-      token: input.token,
-      ...(input.identity?.userId ? { user_id: input.identity.userId } : {}),
     },
     timestamp: input.timestamp,
   }
 }
 
-const defaultReplayTransport: InitReplayTransport = async (url, body, signal) => {
+const defaultReplayTransport: InitReplayTransport = async (url, body, apikey, signal) => {
   try {
     const response = await fetch(url, {
       body: JSON.stringify(body),
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'capgkey': apikey,
+      },
       method: 'POST',
       signal,
     })
@@ -614,10 +544,9 @@ class InitReplayRecorder implements InitReplayController {
   private readonly windowId = `cli-${randomUUID()}`
 
   constructor(
-    private readonly token: string,
-    private readonly replayUrl: string,
+    private readonly apikey: string,
+    private readonly replayUrl: Promise<string | undefined>,
     private readonly transport: InitReplayTransport,
-    private readonly identity: Promise<InitReplayIdentity | undefined>,
     private readonly currentUrl: string,
     private readonly ariaLabel: string | undefined,
     private readonly cols: number,
@@ -752,20 +681,21 @@ class InitReplayRecorder implements InitReplayController {
       timestamp: timestamp + 1,
     }))
 
-    const identity = await this.identity
+    const replayUrl = await this.replayUrl.catch(() => undefined)
+    if (!replayUrl)
+      return
+
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), REPLAY_FLUSH_TIMEOUT_MS)
     timeout.unref?.()
     const body = buildInitReplayBody({
       currentUrl: this.currentUrl,
       events,
-      identity,
       sessionId: this.sessionId,
       timestamp: new Date(timestamp).toISOString(),
-      token: this.token,
       windowId: this.windowId,
     })
-    const pending = this.transport(this.replayUrl, body, controller.signal)
+    const pending = this.transport(replayUrl, body, this.apikey, controller.signal)
       .catch(() => false)
       .finally(() => {
         clearTimeout(timeout)
@@ -790,41 +720,33 @@ class InitReplayRecorder implements InitReplayController {
 }
 
 export function startInitReplay(options: StartInitReplayOptions = {}): InitReplayController | undefined {
-  const token = options.posthogToken?.trim() || getPosthogToken()
+  const apikey = options.apikey?.trim() || ''
   const shouldStart = shouldStartInitReplay({
     analyticsEnabled: options.analyticsEnabled,
-    apikey: options.apikey,
+    apikey,
     isCi: isCI,
-    posthogToken: token,
     stdinIsTTY: Boolean(stdin.isTTY),
     stdoutIsTTY: Boolean(stdout.isTTY),
     telemetryDisabled: isCliTelemetryDisabled(),
   })
 
-  if (!shouldStart || !token)
-    return undefined
-
-  const replayUrl = resolvePosthogReplayUrl(options.replayUrl)
-  if (!replayUrl)
+  if (!shouldStart)
     return undefined
 
   try {
-    const apikey = options.apikey?.trim() || ''
+    const replayUrl = options.replayUrl
+      ? Promise.resolve(resolveCapgoReplayUrl(options.replayUrl))
+      : resolveConfiguredCapgoReplayUrl()
     const currentUrl = options.currentUrl?.trim() || DEFAULT_REPLAY_CURRENT_URL
     const sessionPrefix = options.sessionPrefix?.trim() || DEFAULT_REPLAY_SESSION_PREFIX
-    const identityResolver = options.identityResolver || resolveInitReplayIdentity
-    const identityPromise = options.identity
-      ? Promise.resolve(options.identity)
-      : withTimeout(signal => identityResolver(apikey, signal), REPLAY_IDENTITY_TIMEOUT_MS)
     const terminalPixelSize = options.terminalPixelSize
       ? Promise.resolve(options.terminalPixelSize)
       : queryTerminalPixelSize()
 
     return new InitReplayRecorder(
-      token,
+      apikey,
       replayUrl,
       options.transport || defaultReplayTransport,
-      identityPromise,
       currentUrl,
       options.ariaLabel,
       options.cols || stdout.columns || DEFAULT_COLS,
