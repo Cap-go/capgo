@@ -4062,7 +4062,7 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
   // buildScriptCustom / workflowFileAction). Validated by the strict tail gate
   // against the EFFECTIVE tail step (the session-parked interactive step when
   // one is parked, else the platform resume step) BEFORE anything is applied —
-  // an off-step / mis-vocabulary / batched answer is rejected with a correction
+  // an off-step / wrong-vocabulary / batched answer is rejected with a correction
   // and NOTHING is applied. A valid answer records its pref via the shared
   // applyTailInput reducer, persists the SLIM progress, clears the park and
   // re-drives the platform with the TUI-routed next step.
