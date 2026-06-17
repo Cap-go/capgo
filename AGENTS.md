@@ -85,6 +85,39 @@ testing against Cloudflare Workers.
   - `triggers/` - Database triggers and CRON functions
   - `utils/` - Shared utilities and database schemas
 
+### Production Scale Guardrails
+
+Capgo production data is large enough that "small queue" designs are
+incorrect by default. Before changing queue, storage, manifest, cron, or
+backfill code, design for this scale:
+
+- `manifest` has millions of rows, and operational scripts can need to scan or
+  repair millions of records.
+- A normal app bundle can contain thousands of files; 5k files in one bundle is
+  expected, not an edge case.
+- R2 storage is at TB scale. Do not download objects locally for copy, repair,
+  size, or migration jobs when the provider supports server-side operations.
+- Manifest size work must handle large batches. A design that only processes
+  `100` files every `10` seconds is not acceptable for manifest-size backfills,
+  per-bundle processing, or upload finalization.
+- Queue consumers must be sized from measured throughput: batch size,
+  concurrency, visibility timeout, retry count, provider/API limits, and caller
+  timeout must all fit the same worst-case calculation.
+- Do not assume a `202` HTTP response means queue work finished. If the handler
+  uses background work, prove the work can finish inside the runtime limits and
+  that successful queue messages are deleted before visibility timeout expires.
+- For high-volume internal queue dispatch, avoid routing through unstable or
+  low-timeout paths. Use the production Cloudflare path when that is the runtime
+  intended to handle the traffic, and make database `pg_net` timeouts match the
+  real batch duration.
+- For data repair scripts, use indexed pagination over the owning table's key
+  path, keep DB writes batched, make work resumable, and write failed records to
+  a report file for later inspection.
+- GUESS IS NOT AN OPTION for production scale failures. Find the exact
+  production evidence in database state, queue/archive tables, provider logs, or
+  HTTP/runtime logs. If the current logs cannot identify the cause, first add
+  logging that will identify it in the next occurrence.
+
 ### AI Workflow Notes
 
 - **Hono v4 HEAD routing:** do not add HEAD routes with `app.on`. Hono v4 removed `app.head()` because `GET` handlers implicitly serve `HEAD`; keep shared GET/HEAD logic in the `app.get(...)` handler and branch on `c.req.raw.method` only when the behavior must differ.
