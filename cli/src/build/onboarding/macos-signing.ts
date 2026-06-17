@@ -454,7 +454,7 @@ export async function resolveHelperBinary(options: ResolveHelperBinaryOptions = 
 
   // Resolve the helper's package.json from (1) the CLI's own node_modules, then
   // (2) the project the user is working in. The project fallback means a local
-  // `npm i @capgo/cli-keychain-darwin-*` is honored even when the CLI runs from a
+  // `npm i @capgo/cli-helper-darwin-*` is honored even when the CLI runs from a
   // global install or the MCP server — which resolves modules relative to the CLI,
   // NOT the user's project. `options.resolve` (tests) takes sole precedence.
   const resolveBases = options.resolve
