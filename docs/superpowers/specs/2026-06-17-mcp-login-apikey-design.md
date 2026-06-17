@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-17
 **Status:** Draft for review
-**Flow:** A — paste-key (full-access, no-expiry key generated on a dashboard page, pasted into the AI, saved by an MCP tool)
+**Flow:** A — paste-key (an `org_admin` key generated on a dashboard page, pasted into the AI, saved by an MCP tool)
 **Related (not built):** [CLI device-login design](./2026-06-03-cli-device-login-design.md) — the heavyweight device-flow (Flow B) alternative, kept on the shelf as a future upgrade.
 
 ## Problem
@@ -18,22 +18,34 @@ tool to tell the user *whether they are logged in at all*.
 
 A user can sign in **without leaving the AI conversation**:
 
-1. Open a dashboard page, click one button → a **full-access, non-expiring** API key is
-   minted and shown once with a copy box and a ready-to-paste instruction line.
+1. Open a dashboard page, click one button → an **`org_admin`, non-expiring** API key for
+   the user's **currently-active organization** is minted and shown once with a copy box
+   and a ready-to-paste instruction line.
 2. Paste that line to the AI → the AI calls a `capgo_login` MCP tool that validates the
    key, saves it to `~/.capgo`, and **re-initializes the running SDK** so the next tool
    call is authenticated with no server restart.
 3. The **onboarding MCP** refuses build/credential actions when logged out, with clear
    guidance to run this flow first.
 
+## What "full access" means here
+
+"Full access" = the **`org_admin`** API key the dashboard already mints today. The
+generated key carries a single `org_admin` binding for one organization — produced by
+calling `createDefaultApiKey(supabase, name, { orgId })` with **no `appId`** (see
+`src/services/apikeys.ts:59-65`, the same call `StepsApp.vue` / `StepsBuild.vue` /
+`StepsBundle.vue` make). It is therefore scoped to the **active organization**
+(`organizationStore.currentOrganization`), not to every org the user belongs to. A
+multi-org user who wants a key for another org switches the active org and regenerates.
+This deliberately mirrors existing key creation — no new permission model.
+
 ## Non-goals
 
 - **No device flow / OAuth choreography.** No `cli_login_sessions` table, no
   confirmation phrase, no AES-GCM `delivery_key`, no `/cli-auth/*` endpoints. Those
   belong to the separate (unbuilt) device-login spec, which remains the future upgrade.
-- **No scope picker.** The generated key is full-access across all the user's orgs at the
-  top role, with no expiry (the user's chosen default). Scoped/expiring keys remain
-  available through the existing `/apikeys` page.
+- **No scope picker.** No org/app/role selectors on the page. The key is `org_admin` for
+  the active org, no expiry. Scoped/expiring keys remain available through the existing
+  `/apikeys` page.
 - **No new backend endpoint.** Key minting reuses the existing `POST /apikey` path via
   the existing `createDefaultApiKey()` service.
 - Manual `capgo login <key>` in a terminal is retained, unchanged.
@@ -41,7 +53,7 @@ A user can sign in **without leaving the AI conversation**:
 ## Security note (accepted tradeoff)
 
 Flow A puts the **plaintext key into the chat transcript** (and the AI provider's logs).
-This was an explicit, informed choice for simplicity. The key is full-access and
+This was an explicit, informed choice for simplicity. The key is `org_admin` and
 non-expiring, so the page must state plainly that it is a powerful secret shown once, and
 the dashboard's existing key-revocation UI is the mitigation if a transcript leaks. The
 device-login spec exists as the no-secret-in-chat upgrade path if this tradeoff ever
@@ -53,7 +65,7 @@ needs to change.
  Browser (dashboard, logged in → JWT)            AI client + MCP server (stdio)
   /connect page                                   |
    click "Generate key for your AI"               |
-   → createDefaultApiKey() (existing /apikey)      |
+   → createDefaultApiKey(name,{orgId}) (existing)  |
    → show plaintext key once + copy box            |
    → "Log into Capgo with this key: capgo_xxx"      |
           user copies the line  -----------------> pastes into the AI
@@ -72,15 +84,16 @@ needs to change.
 - Authenticated page (existing `auth` middleware). **Adapted from** the existing
   `cli-login` authorize mockup
   (`docs/superpowers/specs/assets/2026-06-03-cli-device-login-authorize-mockup.html`) for
-  visual continuity, but **stripped** of the confirmation phrase, scope pickers, and
-  authorize/cancel choreography.
+  visual continuity, but **stripped** of the confirmation phrase, org/app/role scope
+  pickers, and authorize/cancel choreography.
 - Renders a single primary action: **"Generate key for your AI assistant."**
-- On click → calls the existing `createDefaultApiKey()` (`src/services/apikeys.ts`) with
-  full access across the user's orgs and **no expiry**. The Supabase function returns the
-  plaintext key **once**.
+- On click → calls the existing `createDefaultApiKey(supabase, name, { orgId: organizationStore.currentOrganization?.gid })`
+  (`src/services/apikeys.ts`) with **no `appId`** → an `org_admin` key for the active org,
+  **no expiry**. The Supabase function returns the plaintext key **once**.
+- Shows the active organization's name so the user knows which org the key is for.
 - Shows the key in a read-only copy box plus a ready-to-paste instruction line:
   *"Log into Capgo with this key: `capgo_xxx`"* and a one-click "Copy" button.
-- Shows a clear warning: full-access, non-expiring, shown once, revoke from
+- Shows a clear warning: `org_admin`, non-expiring, shown once, revoke from
   `/apikeys` if leaked.
 - Reuses `login.vue` / `ApiKeys.vue` styling and existing i18n patterns. No new backend.
 
@@ -139,7 +152,8 @@ surface it when a tool fails with an auth error.
 
 | Need | Reused from |
 |---|---|
-| Key minting (full access, no expiry) | `createDefaultApiKey()` + existing `POST /apikey` |
+| Key minting (`org_admin`, no expiry) | `createDefaultApiKey({ orgId })` + existing `POST /apikey` |
+| Active-org context | `organizationStore.currentOrganization` (as in `StepsApp.vue`) |
 | Key validation | `resolveUserIdFromApiKey()` (today's `capgo login`) |
 | Key persistence (`~/.capgo`, 0o600) | `login.ts` writer |
 | Page look & feel | `cli-login` authorize mockup (stripped) + `login.vue` styling |
@@ -154,8 +168,8 @@ surface it when a tool fails with an auth error.
   `capgo_logout` returns to unauthenticated.
 - **Integration (onboarding MCP):** `start_capgo_builder_onboarding` and
   `credentials_manage` refuse when logged out and proceed after `capgo_login`.
-- **Frontend:** `/connect` renders the generate button; clicking mints a key and shows
-  the copy box + paste line; warning copy present.
+- **Frontend:** `/connect` renders the generate button + active-org name; clicking mints
+  a key and shows the copy box + paste line; warning copy present.
 - Target ≥80% coverage on new modules.
 
 ## Open decisions
