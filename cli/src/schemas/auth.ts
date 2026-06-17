@@ -7,7 +7,7 @@ import { z } from 'zod'
 const saveScopeSchema = z.enum(['global', 'local']).optional()
 
 export const mcpLoginInputSchema = z.object({
-  apikey: z.string().describe('A Capgo API key (generate one at https://app.capgo.app/connect).'),
+  apikey: z.string().min(1, 'API key cannot be empty').describe('A Capgo API key (generate one at https://app.capgo.app/connect).'),
   scope: saveScopeSchema.describe('Where to save the key: "global" (~/.capgo, default, all projects) or "local" (./.capgo, this project only — requires a git repo).'),
 })
 
