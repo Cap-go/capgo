@@ -14,8 +14,10 @@ import {
 import { getRuntimeKey } from 'hono/adapter'
 import { getAppStatus, setAppStatus } from './appStatus.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
+import { invalidIpInfo } from './invalids_ip.ts'
 import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
+import { getClientIP } from './rate_limit.ts'
 import { sendNotifOrgCached } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres, setReplicationLagHeader } from './pg.ts'
 import { makeDevice } from './plugin_parser.ts'
@@ -52,6 +54,7 @@ const UPDATE_BLOCKED_CODES = new Set([
   'disable_device',
   'disable_emulator',
   'key_id_mismatch',
+  'provider_infrastructure_request_blocked',
 ])
 
 export function getUpdateResponseKind(errorCode: string): UpdateResponseKind {
@@ -274,8 +277,6 @@ export async function updateWithPG(
   const version = channelOverride?.version ?? channelData.version
   const manifestEntries = (channelOverride?.manifestEntries ?? channelData?.manifestEntries ?? []) as Partial<Database['public']['Tables']['manifest']['Row']>[]
   // device.version = versionData ? versionData.id : version.id
-
-  // TODO: find better solution to check if device is from apple or google, currently not working in
 
   if (!version.external_url && !version.r2_path && !isInternalVersionName(version.name) && (!manifestEntries || manifestEntries.length === 0)) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot get bundle', id: app_id, version, manifestEntriesLength: manifestEntries ? manifestEntries.length : 0, channelData: channelData ? channelData.channels.name : 'no channel data', defaultChannel })
@@ -505,6 +506,21 @@ export async function updateWithPG(
 }
 
 export async function update(c: Context, body: AppInfos) {
+  const requestIp = getClientIP(c)
+  if (requestIp !== 'unknown') {
+    const providerInfo = await invalidIpInfo(requestIp, c)
+    if (providerInfo.blocked) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'Blocking update request from provider infrastructure IP',
+        ip: requestIp,
+        provider: providerInfo.provider,
+      })
+      return updateError200(c, 'provider_infrastructure_request_blocked', 'Update requests from known provider infrastructure are blocked', {
+        provider: providerInfo.provider,
+      })
+    }
+  }
   const pgClient = getPgClient(c, true)
 
   await setReplicationLagHeader(c, pgClient)
