@@ -149,6 +149,33 @@ describe('logsnag revenue metric helpers', () => {
     expect(logsnagInsightsTestUtils.getMissingGlobalStatsShards(partiallySent)).toEqual(['notifications'])
   })
 
+  it.concurrent('uses notification claim markers to avoid replaying claimed sends', () => {
+    const ready = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
+      'core',
+      'usage',
+      'revenue',
+      'plugins',
+      'builds',
+      'retention',
+      'paid_products',
+      'ltv',
+    ])
+
+    expect(logsnagInsightsTestUtils.getGlobalStatsNotificationStepAction(ready, 'notifications_logsnag', 'notifications_logsnag_claim')).toBe('send')
+
+    const claimed = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
+      ...ready,
+      'notifications_logsnag_claim',
+    ])
+    expect(logsnagInsightsTestUtils.getGlobalStatsNotificationStepAction(claimed, 'notifications_logsnag', 'notifications_logsnag_claim')).toBe('complete_claimed')
+
+    const sent = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
+      ...claimed,
+      'notifications_logsnag',
+    ])
+    expect(logsnagInsightsTestUtils.getGlobalStatsNotificationStepAction(sent, 'notifications_logsnag', 'notifications_logsnag_claim')).toBe('skip')
+  })
+
   it.concurrent('computes NRR from prior MRR, churn, contraction, and expansion', () => {
     expect(logsnagInsightsTestUtils.calculateNrr(100, {
       churnMrr: 15,

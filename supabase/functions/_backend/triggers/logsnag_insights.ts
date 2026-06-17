@@ -225,6 +225,8 @@ const LOGSNAG_INSIGHTS_NOTIFICATION_DELAY_SECONDS = 180
 const GLOBAL_STATS_NOTIFICATION_LOCK_NAMESPACE = 'logsnag_insights_notifications'
 const GLOBAL_STATS_NOTIFICATION_LOGSNAG_STEP = 'notifications_logsnag'
 const GLOBAL_STATS_NOTIFICATION_TRACKING_STEP = 'notifications_tracking'
+const GLOBAL_STATS_NOTIFICATION_LOGSNAG_CLAIM = 'notifications_logsnag_claim'
+const GLOBAL_STATS_NOTIFICATION_TRACKING_CLAIM = 'notifications_tracking_claim'
 const GLOBAL_STATS_SHARDS = [
   'core',
   'usage',
@@ -240,6 +242,8 @@ const GLOBAL_STATS_COMPLETION_MARKERS = [
   ...GLOBAL_STATS_SHARDS,
   GLOBAL_STATS_NOTIFICATION_LOGSNAG_STEP,
   GLOBAL_STATS_NOTIFICATION_TRACKING_STEP,
+  GLOBAL_STATS_NOTIFICATION_LOGSNAG_CLAIM,
+  GLOBAL_STATS_NOTIFICATION_TRACKING_CLAIM,
 ] as const
 const GLOBAL_STATS_SHARD_SET = new Set<string>(GLOBAL_STATS_SHARDS)
 const GLOBAL_STATS_COMPLETION_MARKER_SET = new Set<string>(GLOBAL_STATS_COMPLETION_MARKERS)
@@ -247,6 +251,7 @@ const GLOBAL_STATS_COMPLETION_MARKER_SET = new Set<string>(GLOBAL_STATS_COMPLETI
 type GlobalStatsShard = typeof GLOBAL_STATS_SHARDS[number]
 type GlobalStatsCompletionMarker = typeof GLOBAL_STATS_COMPLETION_MARKERS[number]
 type RequiredGlobalStatsShard = Exclude<GlobalStatsShard, 'notifications'>
+type GlobalStatsNotificationStepAction = 'send' | 'complete_claimed' | 'skip'
 const REQUIRED_GLOBAL_STATS_SHARDS = GLOBAL_STATS_SHARDS.filter((shard): shard is RequiredGlobalStatsShard => shard !== 'notifications')
 type GlobalStatsUpdate = Database['public']['Tables']['global_stats']['Update']
 type GlobalStatsRow = Database['public']['Tables']['global_stats']['Row']
@@ -1319,6 +1324,18 @@ function hasCompletedGlobalStatsNotifications(completedShards: ReadonlySet<Globa
   return completedShards.has('notifications')
 }
 
+function getGlobalStatsNotificationStepAction(
+  completedShards: ReadonlySet<GlobalStatsCompletionMarker>,
+  sentMarker: GlobalStatsCompletionMarker,
+  claimMarker: GlobalStatsCompletionMarker,
+): GlobalStatsNotificationStepAction {
+  if (completedShards.has(sentMarker))
+    return 'skip'
+  if (completedShards.has(claimMarker))
+    return 'complete_claimed'
+  return 'send'
+}
+
 async function readCompletedGlobalStatsShards(c: Context, dateId: string): Promise<Set<GlobalStatsCompletionMarker>> {
   const db = getPgClient(c)
 
@@ -1428,6 +1445,73 @@ async function markGlobalStatsShardComplete(c: Context, dateId: string, shard: G
   finally {
     await closeClient(c, db)
   }
+}
+
+async function removeGlobalStatsShardMarker(c: Context, dateId: string, shard: GlobalStatsCompletionMarker): Promise<void> {
+  const db = getPgClient(c)
+
+  try {
+    const result = await db.query(
+      `UPDATE public.global_stats
+      SET completed_shards = (
+        SELECT COALESCE(jsonb_agg(shard_name ORDER BY shard_name), '[]'::jsonb)
+        FROM (
+          SELECT DISTINCT shard_name
+          FROM jsonb_array_elements_text(completed_shards) AS shards(shard_name)
+          WHERE shard_name <> $2::text
+        ) deduped
+      )
+      WHERE date_id = $1`,
+      [dateId, shard],
+    )
+    if (result.rowCount !== 1)
+      throw new Error(`Expected one global_stats row for ${dateId}, updated ${result.rowCount ?? 0}`)
+  }
+  finally {
+    await closeClient(c, db)
+  }
+}
+
+async function runGlobalStatsNotificationProviderStep(
+  c: Context,
+  dateId: string,
+  provider: string,
+  completedShards: Set<GlobalStatsCompletionMarker>,
+  sentMarker: GlobalStatsCompletionMarker,
+  claimMarker: GlobalStatsCompletionMarker,
+  send: () => Promise<void>,
+): Promise<void> {
+  const action = getGlobalStatsNotificationStepAction(completedShards, sentMarker, claimMarker)
+  if (action === 'skip')
+    return
+
+  if (action === 'complete_claimed') {
+    await markGlobalStatsShardComplete(c, dateId, sentMarker)
+    completedShards.add(sentMarker)
+    cloudlog({ requestId: c.get('requestId'), message: 'Completed claimed global stats notification step', dateId, provider })
+    return
+  }
+
+  // This persistent claim prevents replay if the provider send succeeds but the sent-marker write fails.
+  await markGlobalStatsShardComplete(c, dateId, claimMarker)
+  completedShards.add(claimMarker)
+
+  try {
+    await send()
+  }
+  catch (error) {
+    completedShards.delete(claimMarker)
+    try {
+      await removeGlobalStatsShardMarker(c, dateId, claimMarker)
+    }
+    catch (cleanupError) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to clear global stats notification claim', dateId, provider, cleanupError })
+    }
+    throw error
+  }
+
+  await markGlobalStatsShardComplete(c, dateId, sentMarker)
+  completedShards.add(sentMarker)
 }
 
 function getLogsnagInsightsShardDelaySeconds(shard: GlobalStatsShard): number {
@@ -2154,62 +2238,72 @@ async function runNotificationsGlobalStatsShard(c: Context, window: DailyWindow)
       Trial: getNumber(snapshot.trial),
     })
 
-    if (!completedShards.has(GLOBAL_STATS_NOTIFICATION_LOGSNAG_STEP)) {
-      // Mark before the non-idempotent LogSnag write so a successful send followed by a DB write failure cannot replay the whole batch.
-      await markGlobalStatsShardComplete(c, window.prevDayDateId, GLOBAL_STATS_NOTIFICATION_LOGSNAG_STEP)
-      completedShards.add(GLOBAL_STATS_NOTIFICATION_LOGSNAG_STEP)
-      await logsnagInsights(c, [
-        { title: 'Apps', value: apps, icon: '📱' },
-        { title: 'Active Apps', value: getNumber(snapshot.apps_active), icon: '💃' },
-        { title: 'Updates', value: getNumber(snapshot.updates), icon: '📲' },
-        { title: 'Updates on premises', value: getNumber(snapshot.updates_external), icon: '📲' },
-        { title: 'Updates last month', value: getNumber(snapshot.updates_last_month), icon: '📲' },
-        { title: 'Bundle Storage (GB)', value: `${bundle_storage_gb.toFixed(2)} GB`, icon: '💾' },
-        { title: 'Total Users', value: users, icon: '👨' },
-        { title: 'Active Users', value: getNumber(snapshot.users_active), icon: '🎉' },
-        { title: 'Registrations Today', value: getNumber(snapshot.registers_today), icon: '🆕' },
-        { title: 'User onboarded', value: getNumber(snapshot.onboarded), icon: '✅' },
-        { title: 'Orgs', value: orgs, icon: '🏢' },
-        { title: 'Orgs with trial', value: plans.Trial, icon: '👶' },
-        { title: 'Orgs paying', value: paying, icon: '💰' },
-        { title: 'Org conversion rate', value: `${org_conversion_rate.toFixed(1)}%`, icon: '🎯' },
-        { title: 'Orgs yearly', value: formatPercentCount(getNumber(snapshot.paying_yearly), paying), icon: '🧧' },
-        { title: 'Orgs monthly', value: formatPercentCount(getNumber(snapshot.paying_monthly), paying), icon: '🗓️' },
-        { title: 'Orgs not paying', value: getNumber(snapshot.not_paying), icon: '🥲' },
-        { title: 'Orgs need upgrade', value: getNumber(snapshot.need_upgrade), icon: '🤒' },
-        { title: 'Orgs Solo Plan', value: formatPercentCount(plans.Solo, paying), icon: '🎸' },
-        { title: 'Orgs Maker Plan', value: formatPercentCount(plans.Maker, paying), icon: '🤝' },
-        { title: 'Orgs Team Plan', value: formatPercentCount(plans.Team, paying), icon: '👏' },
-        { title: 'Orgs Enterprise Plan', value: formatPercentCount(plans.Enterprise, paying), icon: '📈' },
-        { title: 'Devices iOS (30d)', value: getNumber(snapshot.devices_last_month_ios), icon: '🍎' },
-        { title: 'Devices Android (30d)', value: getNumber(snapshot.devices_last_month_android), icon: '🤖' },
-        { title: 'Total Builds', value: getNumber(snapshot.builds_total), icon: '🔨' },
-        { title: 'iOS Builds', value: getNumber(snapshot.builds_ios), icon: '🍏' },
-        { title: 'Android Builds', value: getNumber(snapshot.builds_android), icon: '🤖' },
-        { title: 'Builds (30d)', value: getNumber(snapshot.builds_last_month), icon: '🔨' },
-        { title: 'iOS Builds (30d)', value: getNumber(snapshot.builds_last_month_ios), icon: '🍏' },
-        { title: 'Android Builds (30d)', value: getNumber(snapshot.builds_last_month_android), icon: '🤖' },
-      ], { strict: true })
-    }
+    await runGlobalStatsNotificationProviderStep(
+      c,
+      window.prevDayDateId,
+      'logsnag',
+      completedShards,
+      GLOBAL_STATS_NOTIFICATION_LOGSNAG_STEP,
+      GLOBAL_STATS_NOTIFICATION_LOGSNAG_CLAIM,
+      async () => {
+        await logsnagInsights(c, [
+          { title: 'Apps', value: apps, icon: '📱' },
+          { title: 'Active Apps', value: getNumber(snapshot.apps_active), icon: '💃' },
+          { title: 'Updates', value: getNumber(snapshot.updates), icon: '📲' },
+          { title: 'Updates on premises', value: getNumber(snapshot.updates_external), icon: '📲' },
+          { title: 'Updates last month', value: getNumber(snapshot.updates_last_month), icon: '📲' },
+          { title: 'Bundle Storage (GB)', value: `${bundle_storage_gb.toFixed(2)} GB`, icon: '💾' },
+          { title: 'Total Users', value: users, icon: '👨' },
+          { title: 'Active Users', value: getNumber(snapshot.users_active), icon: '🎉' },
+          { title: 'Registrations Today', value: getNumber(snapshot.registers_today), icon: '🆕' },
+          { title: 'User onboarded', value: getNumber(snapshot.onboarded), icon: '✅' },
+          { title: 'Orgs', value: orgs, icon: '🏢' },
+          { title: 'Orgs with trial', value: plans.Trial, icon: '👶' },
+          { title: 'Orgs paying', value: paying, icon: '💰' },
+          { title: 'Org conversion rate', value: `${org_conversion_rate.toFixed(1)}%`, icon: '🎯' },
+          { title: 'Orgs yearly', value: formatPercentCount(getNumber(snapshot.paying_yearly), paying), icon: '🧧' },
+          { title: 'Orgs monthly', value: formatPercentCount(getNumber(snapshot.paying_monthly), paying), icon: '🗓️' },
+          { title: 'Orgs not paying', value: getNumber(snapshot.not_paying), icon: '🥲' },
+          { title: 'Orgs need upgrade', value: getNumber(snapshot.need_upgrade), icon: '🤒' },
+          { title: 'Orgs Solo Plan', value: formatPercentCount(plans.Solo, paying), icon: '🎸' },
+          { title: 'Orgs Maker Plan', value: formatPercentCount(plans.Maker, paying), icon: '🤝' },
+          { title: 'Orgs Team Plan', value: formatPercentCount(plans.Team, paying), icon: '👏' },
+          { title: 'Orgs Enterprise Plan', value: formatPercentCount(plans.Enterprise, paying), icon: '📈' },
+          { title: 'Devices iOS (30d)', value: getNumber(snapshot.devices_last_month_ios), icon: '🍎' },
+          { title: 'Devices Android (30d)', value: getNumber(snapshot.devices_last_month_android), icon: '🤖' },
+          { title: 'Total Builds', value: getNumber(snapshot.builds_total), icon: '🔨' },
+          { title: 'iOS Builds', value: getNumber(snapshot.builds_ios), icon: '🍏' },
+          { title: 'Android Builds', value: getNumber(snapshot.builds_android), icon: '🤖' },
+          { title: 'Builds (30d)', value: getNumber(snapshot.builds_last_month), icon: '🔨' },
+          { title: 'iOS Builds (30d)', value: getNumber(snapshot.builds_last_month_ios), icon: '🍏' },
+          { title: 'Android Builds (30d)', value: getNumber(snapshot.builds_last_month_android), icon: '🤖' },
+        ], { strict: true })
+      },
+    )
 
-    if (!completedShards.has(GLOBAL_STATS_NOTIFICATION_TRACKING_STEP)) {
-      // Mark before tracking fan-out for the same retry-idempotency reason as the LogSnag insight batch.
-      await markGlobalStatsShardComplete(c, window.prevDayDateId, GLOBAL_STATS_NOTIFICATION_TRACKING_STEP)
-      completedShards.add(GLOBAL_STATS_NOTIFICATION_TRACKING_STEP)
-      await sendEventToTracking(c, {
-        channel: 'updates-stats',
-        event: 'Updates last month',
-        user_id: 'admin',
-        tags: {
-          updates_last_month: getNumber(snapshot.updates_last_month),
-          success_rate,
-          registers_today: getNumber(snapshot.registers_today),
-          storage_gb: bundle_storage_gb,
-          org_conversion_rate,
-        },
-        icon: '📲',
-      }, { background: false, strict: true })
-    }
+    await runGlobalStatsNotificationProviderStep(
+      c,
+      window.prevDayDateId,
+      'tracking',
+      completedShards,
+      GLOBAL_STATS_NOTIFICATION_TRACKING_STEP,
+      GLOBAL_STATS_NOTIFICATION_TRACKING_CLAIM,
+      async () => {
+        await sendEventToTracking(c, {
+          channel: 'updates-stats',
+          event: 'Updates last month',
+          user_id: 'admin',
+          tags: {
+            updates_last_month: getNumber(snapshot.updates_last_month),
+            success_rate,
+            registers_today: getNumber(snapshot.registers_today),
+            storage_gb: bundle_storage_gb,
+            org_conversion_rate,
+          },
+          icon: '📲',
+        }, { background: false, strict: true })
+      },
+    )
 
     await markGlobalStatsShardComplete(c, window.prevDayDateId, 'notifications')
     cloudlog({ requestId: c.get('requestId'), message: 'Sent logsnag insights from global stats snapshot', dateId: window.prevDayDateId })
@@ -2269,6 +2363,7 @@ export const logsnagInsightsTestUtils = {
   getMissingGlobalStatsRequiredShards,
   getMissingGlobalStatsShards,
   hasCompletedGlobalStatsNotifications,
+  getGlobalStatsNotificationStepAction,
   normalizeCompletedGlobalStatsShards,
   getLogsnagInsightsShardFunctionName,
   getCompletedDayWindow,
