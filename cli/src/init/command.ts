@@ -2,10 +2,10 @@ import type { Buffer } from 'node:buffer'
 import type { ExistingOrganizationApp, Options, PendingOnboardingApp } from '../api/app'
 import type { Organization } from '../utils'
 import type { InitCodeDiff, InitEncryptionPhase, InitEncryptionSummary } from './runtime'
-import { execSync, spawn, spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path, { dirname, join } from 'node:path'
-import { chdir, cwd, env, exit, platform, stdin, stdout } from 'node:process'
+import { chdir, cwd, env, exit, platform, stderr, stdin, stdout } from 'node:process'
 import { canParse, format, increment, lessThan, parse } from '@std/semver'
 import open from 'open'
 import tmp from 'tmp'
@@ -920,7 +920,7 @@ async function maybeRunCapacitorInit(projectDir: string, projectType: string, in
   }
 }
 
-function runCapacitorPlatformAdd(platformName: 'ios' | 'android', runner: string, commandCwd = cwd()): boolean {
+async function runCapacitorPlatformAdd(platformName: 'ios' | 'android', runner: string, commandCwd = cwd()): Promise<boolean> {
   const command = formatRunnerCommand(runner, ['cap', 'add', platformName])
   const spinner = pSpinner()
   const runMessage = commandCwd === cwd()
@@ -938,11 +938,10 @@ function runCapacitorPlatformAdd(platformName: 'ios' | 'android', runner: string
     return false
   }
 
-  const result = spawnSync(parsedRunner.command, [...parsedRunner.args, 'cap', 'add', platformName], { stdio: 'inherit', cwd: commandCwd })
+  const result = await runInheritedCommand(parsedRunner.command, [...parsedRunner.args, 'cap', 'add', platformName], { cwd: commandCwd })
   if (result.error || result.status !== 0) {
     spinner.stop(`Could not add ${platformName} automatically ❌`)
-    if (result.error)
-      pLog.error(formatError(result.error))
+    pLog.error(formatInheritedCommandFailure(result))
     return false
   }
 
@@ -953,9 +952,11 @@ function runCapacitorPlatformAdd(platformName: 'ios' | 'android', runner: string
 async function runCreateAppTemplate() {
   const templateCommand = getCreateAppTemplateCommand()
   stopInitInkSession({ text: 'Starting Capacitor app template creation...', tone: 'green' })
-  const result = spawnSync(templateCommand.command, templateCommand.args, { stdio: 'inherit' })
+  const result = await runInheritedCommand(templateCommand.command, templateCommand.args)
   if (result.error || result.status !== 0) {
     stdout.write(`Capacitor app template creation failed. Run ${templateCommand.display} manually and try again.\n`)
+    if (result.error)
+      pLog.error(formatError(result.error))
     return await exitAfterFinishingReplay(1)
   }
 
@@ -1485,7 +1486,7 @@ async function maybeCancelAfterRepeatedIosSyncFailures(failureCount: number, org
     await exitCanceledInitOnboarding(orgId, apikey)
 }
 
-function runNativeResetCommand(platformRunner: string, nativePlatform: PlatformChoice, successMessage: string, failureMessage: string): void {
+async function runNativeResetCommand(platformRunner: string, nativePlatform: PlatformChoice, successMessage: string, failureMessage: string): Promise<void> {
   const resetAdvice = getNativeProjectResetAdvice(platformRunner, nativePlatform)
   const resetSpinner = pSpinner()
   resetSpinner.start(`Running: ${resetAdvice.command}`)
@@ -1493,13 +1494,13 @@ function runNativeResetCommand(platformRunner: string, nativePlatform: PlatformC
     const parsedRunner = splitRunnerCommand(platformRunner)
     rmSync(nativePlatform, { recursive: true, force: true })
 
-    const addResult = spawnSync(parsedRunner.command, [...parsedRunner.args, 'cap', 'add', nativePlatform], { stdio: 'inherit' })
+    const addResult = await runInheritedCommand(parsedRunner.command, [...parsedRunner.args, 'cap', 'add', nativePlatform])
     if (addResult.error || addResult.status !== 0)
-      throw addResult.error ?? new Error(`cap add ${nativePlatform} failed with code ${addResult.status ?? 'unknown'}`)
+      throw addResult.error ?? new Error(`cap add ${nativePlatform} failed with ${formatInheritedCommandFailure(addResult)}`)
 
-    const syncResult = spawnSync(parsedRunner.command, [...parsedRunner.args, 'cap', 'sync', nativePlatform], { stdio: 'inherit' })
+    const syncResult = await runInheritedCommand(parsedRunner.command, [...parsedRunner.args, 'cap', 'sync', nativePlatform])
     if (syncResult.error || syncResult.status !== 0)
-      throw syncResult.error ?? new Error(`cap sync ${nativePlatform} failed with code ${syncResult.status ?? 'unknown'}`)
+      throw syncResult.error ?? new Error(`cap sync ${nativePlatform} failed with ${formatInheritedCommandFailure(syncResult)}`)
 
     resetSpinner.stop(successMessage)
   }
@@ -1556,7 +1557,7 @@ async function handleBrokenIosSync(platformRunner: string, details: string[], or
   await cancelCommand(runResetNow, orgId, apikey)
 
   if (runResetNow) {
-    runNativeResetCommand(platformRunner, 'ios', 'iOS folder recreated and synced ✅', 'iOS folder reset failed ❌')
+    await runNativeResetCommand(platformRunner, 'ios', 'iOS folder recreated and synced ✅', 'iOS folder reset failed ❌')
     return
   }
 
@@ -3050,7 +3051,7 @@ async function ensureNativePlatformForBuild(platform: PlatformChoice, config: Ca
       continue
     }
 
-    if (!runCapacitorPlatformAdd(platform, runner, projectDir))
+    if (!await runCapacitorPlatformAdd(platform, runner, projectDir))
       pLog.warn(`Still could not add ${platform}.`)
   }
 }
@@ -3167,7 +3168,9 @@ async function runBuildAndSyncLoop(
       : `Running in ${buildAndSyncCwd}: ${buildAndSyncCommand}`
     spinner.stop(runMessage, 'neutral')
     try {
-      execSync(buildAndSyncCommand, { stdio: 'inherit', cwd: buildAndSyncCwd })
+      const result = await runInheritedShellCommand(buildAndSyncCommand, { cwd: buildAndSyncCwd })
+      if (result.error || result.status !== 0)
+        throw result.error ?? new Error(`Build or sync command failed with ${formatInheritedCommandFailure(result)}`)
     }
     catch (error) {
       pLog.error('Build or sync failed ❌')
@@ -3231,6 +3234,72 @@ async function buildProjectStep(orgId: string, apikey: string, appId: string, pl
 export function runPackageRunnerSync(runner: string, args: string[], options: Parameters<typeof spawnSync>[2]) {
   const parsedRunner = splitRunnerCommand(runner)
   return spawnSync(parsedRunner.command, [...parsedRunner.args, ...args], options)
+}
+
+async function runPackageRunnerInherited(runner: string, args: string[], options: Pick<InheritedCommandOptions, 'cwd'> = {}) {
+  const parsedRunner = splitRunnerCommand(runner)
+  return runInheritedCommand(parsedRunner.command, [...parsedRunner.args, ...args], options)
+}
+
+interface InheritedCommandResult {
+  error?: Error
+  signal: NodeJS.Signals | null
+  status: number | null
+}
+
+interface InheritedCommandOptions {
+  cwd?: string
+  shell?: boolean
+}
+
+export async function runInheritedCommand(command: string, args: string[], options: InheritedCommandOptions = {}): Promise<InheritedCommandResult> {
+  return new Promise((resolve) => {
+    let settled = false
+    const finish = (result: InheritedCommandResult) => {
+      if (settled)
+        return
+      settled = true
+      resolve(result)
+    }
+
+    let child
+    try {
+      child = spawn(command, args, {
+        cwd: options.cwd,
+        shell: options.shell,
+        stdio: ['inherit', 'pipe', 'pipe'],
+      })
+    }
+    catch (error) {
+      finish({
+        status: null,
+        signal: null,
+        error: error instanceof Error ? error : new Error(String(error)),
+      })
+      return
+    }
+
+    child.stdout?.on('data', chunk => stdout.write(chunk))
+    child.stderr?.on('data', chunk => stderr.write(chunk))
+    child.once('error', error => finish({
+      status: null,
+      signal: null,
+      error,
+    }))
+    child.once('close', (status, signal) => finish({ status, signal }))
+  })
+}
+
+function runInheritedShellCommand(command: string, options: Pick<InheritedCommandOptions, 'cwd'> = {}) {
+  return runInheritedCommand(command, [], { cwd: options.cwd, shell: true })
+}
+
+function formatInheritedCommandFailure(result: InheritedCommandResult) {
+  if (result.error)
+    return formatError(result.error)
+  if (result.signal)
+    return `signal ${result.signal}`
+  return `exit code ${result.status ?? 'unknown'}`
 }
 
 function getSpawnOutputText(output: string | Buffer | null | undefined): string {
@@ -3720,7 +3789,7 @@ async function handleMissingPlatformSelection(orgId: string, apikey: string, ava
   }
 
   const platformToAdd = recoveryChoice === 'add-ios' ? 'ios' : 'android'
-  if (!runCapacitorPlatformAdd(platformToAdd, pm.runner, projectDir))
+  if (!await runCapacitorPlatformAdd(platformToAdd, pm.runner, projectDir))
     pLog.warn(`Still could not add ${platformToAdd}.`)
 }
 
@@ -3762,10 +3831,10 @@ async function runDeviceStep(orgId: string, apikey: string, appId: string, platf
       : `Running in ${projectDir}: ${runCommand.command}`
     s.start(runMessage)
 
-    let runResult: ReturnType<typeof spawnSync> | undefined
+    let runResult: InheritedCommandResult | undefined
     let runError: Error | undefined
     try {
-      runResult = runPackageRunnerSync(pm.runner, runCommand.args, { stdio: 'inherit', cwd: projectDir })
+      runResult = await runPackageRunnerInherited(pm.runner, runCommand.args, { cwd: projectDir })
     }
     catch (error) {
       runError = error instanceof Error ? error : new Error(String(error))
@@ -3788,7 +3857,7 @@ async function runDeviceStep(orgId: string, apikey: string, appId: string, platf
         const s2 = pSpinner()
         s2.start(`Opening ${platform === 'ios' ? 'Xcode' : 'Android Studio'}...`)
         try {
-          const openResult = runPackageRunnerSync(pm.runner, ['cap', 'open', platform], { stdio: 'inherit', cwd: projectDir })
+          const openResult = await runPackageRunnerInherited(pm.runner, ['cap', 'open', platform], { cwd: projectDir })
           if (openResult.error || openResult.status !== 0) {
             s2.stop(`Could not open ${platform === 'ios' ? 'Xcode' : 'Android Studio'} ❌`)
             if (openResult.error)
@@ -4472,7 +4541,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
 
       if (continueWithout === 'add-ios' || continueWithout === 'add-android') {
         const platformToAdd = continueWithout === 'add-ios' ? 'ios' : 'android'
-        const added = runCapacitorPlatformAdd(platformToAdd, pm.runner, selectedProjectDir)
+        const added = await runCapacitorPlatformAdd(platformToAdd, pm.runner, selectedProjectDir)
         if (!added) {
           const recoveryChoice = await pSelect({
             message: `Could not add ${platformToAdd}. What do you want to do next?`,
@@ -4499,7 +4568,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
           }
 
           if (recoveryChoice === 'retry') {
-            const retried = runCapacitorPlatformAdd(platformToAdd, pm.runner, selectedProjectDir)
+            const retried = await runCapacitorPlatformAdd(platformToAdd, pm.runner, selectedProjectDir)
             if (!retried) {
               pLog.warn(`Still could not add ${platformToAdd}. Continuing without native platforms for now.`)
             }
