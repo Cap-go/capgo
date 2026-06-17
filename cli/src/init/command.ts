@@ -5,7 +5,7 @@ import type { InitCodeDiff, InitEncryptionPhase, InitEncryptionSummary } from '.
 import { execSync, spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path, { dirname, join } from 'node:path'
-import { chdir, cwd, env, exit, platform, stderr, stdin, stdout } from 'node:process'
+import { chdir, cwd, env, exit, platform, stdin, stdout } from 'node:process'
 import { canParse, format, increment, lessThan, parse } from '@std/semver'
 import open from 'open'
 import tmp from 'tmp'
@@ -78,50 +78,6 @@ async function exitAfterFinishingReplay(code?: number): Promise<never> {
   await finishActiveCliReplay()
   exit(code)
   throw new Error('process.exit returned unexpectedly')
-}
-function shouldCaptureInheritedChildOutput(options: Parameters<typeof spawnSync>[2]) {
-  return options?.stdio === 'inherit' && Boolean(getActiveCliReplaySessionId())
-}
-
-function writeChildOutput(output: string | Buffer | Uint8Array | null | undefined, stream: typeof stdout | typeof stderr) {
-  if (output)
-    stream.write(output)
-}
-
-function spawnSyncWithReplayOutput(command: string, args: string[], options: Parameters<typeof spawnSync>[2]) {
-  if (!shouldCaptureInheritedChildOutput(options))
-    return spawnSync(command, args, options)
-
-  const { stdio: _stdio, ...captureOptions } = options || {}
-  const result = spawnSync(command, args, { ...captureOptions, stdio: ['inherit', 'pipe', 'pipe'] })
-  writeChildOutput(result.stdout, stdout)
-  writeChildOutput(result.stderr, stderr)
-  return result
-}
-
-function execSyncWithReplayOutput(command: string, options: Parameters<typeof execSync>[1]) {
-  if (!shouldCaptureInheritedChildOutput(options as Parameters<typeof spawnSync>[2]))
-    return execSync(command, options)
-
-  const result = spawnSync(command, [], {
-    cwd: options?.cwd,
-    env: options?.env,
-    shell: true,
-    stdio: ['inherit', 'pipe', 'pipe'],
-  })
-  writeChildOutput(result.stdout, stdout)
-  writeChildOutput(result.stderr, stderr)
-  if (result.error)
-    throw result.error
-  if (result.status !== 0) {
-    const error = new Error(`Command failed: ${command}`) as Error & { signal?: NodeJS.Signals | null, status?: number | null, stderr?: string | Buffer | null, stdout?: string | Buffer | null }
-    error.status = result.status
-    error.signal = result.signal
-    error.stdout = result.stdout
-    error.stderr = result.stderr
-    throw error
-  }
-  return result.stdout
 }
 const frameworkSetupGuides = {
   nextjs: 'https://capgo.app/blog/nextjs-mobile-app-capacitor-from-scratch/',
@@ -982,7 +938,7 @@ function runCapacitorPlatformAdd(platformName: 'ios' | 'android', runner: string
     return false
   }
 
-  const result = spawnSyncWithReplayOutput(parsedRunner.command, [...parsedRunner.args, 'cap', 'add', platformName], { stdio: 'inherit', cwd: commandCwd })
+  const result = spawnSync(parsedRunner.command, [...parsedRunner.args, 'cap', 'add', platformName], { stdio: 'inherit', cwd: commandCwd })
   if (result.error || result.status !== 0) {
     spinner.stop(`Could not add ${platformName} automatically ❌`)
     if (result.error)
@@ -997,7 +953,7 @@ function runCapacitorPlatformAdd(platformName: 'ios' | 'android', runner: string
 async function runCreateAppTemplate() {
   const templateCommand = getCreateAppTemplateCommand()
   stopInitInkSession({ text: 'Starting Capacitor app template creation...', tone: 'green' })
-  const result = spawnSyncWithReplayOutput(templateCommand.command, templateCommand.args, { stdio: 'inherit' })
+  const result = spawnSync(templateCommand.command, templateCommand.args, { stdio: 'inherit' })
   if (result.error || result.status !== 0) {
     stdout.write(`Capacitor app template creation failed. Run ${templateCommand.display} manually and try again.\n`)
     return await exitAfterFinishingReplay(1)
@@ -1537,11 +1493,11 @@ function runNativeResetCommand(platformRunner: string, nativePlatform: PlatformC
     const parsedRunner = splitRunnerCommand(platformRunner)
     rmSync(nativePlatform, { recursive: true, force: true })
 
-    const addResult = spawnSyncWithReplayOutput(parsedRunner.command, [...parsedRunner.args, 'cap', 'add', nativePlatform], { stdio: 'inherit' })
+    const addResult = spawnSync(parsedRunner.command, [...parsedRunner.args, 'cap', 'add', nativePlatform], { stdio: 'inherit' })
     if (addResult.error || addResult.status !== 0)
       throw addResult.error ?? new Error(`cap add ${nativePlatform} failed with code ${addResult.status ?? 'unknown'}`)
 
-    const syncResult = spawnSyncWithReplayOutput(parsedRunner.command, [...parsedRunner.args, 'cap', 'sync', nativePlatform], { stdio: 'inherit' })
+    const syncResult = spawnSync(parsedRunner.command, [...parsedRunner.args, 'cap', 'sync', nativePlatform], { stdio: 'inherit' })
     if (syncResult.error || syncResult.status !== 0)
       throw syncResult.error ?? new Error(`cap sync ${nativePlatform} failed with code ${syncResult.status ?? 'unknown'}`)
 
@@ -3211,7 +3167,7 @@ async function runBuildAndSyncLoop(
       : `Running in ${buildAndSyncCwd}: ${buildAndSyncCommand}`
     spinner.stop(runMessage, 'neutral')
     try {
-      execSyncWithReplayOutput(buildAndSyncCommand, { stdio: 'inherit', cwd: buildAndSyncCwd })
+      execSync(buildAndSyncCommand, { stdio: 'inherit', cwd: buildAndSyncCwd })
     }
     catch (error) {
       pLog.error('Build or sync failed ❌')
@@ -3274,7 +3230,7 @@ async function buildProjectStep(orgId: string, apikey: string, appId: string, pl
 
 export function runPackageRunnerSync(runner: string, args: string[], options: Parameters<typeof spawnSync>[2]) {
   const parsedRunner = splitRunnerCommand(runner)
-  return spawnSyncWithReplayOutput(parsedRunner.command, [...parsedRunner.args, ...args], options)
+  return spawnSync(parsedRunner.command, [...parsedRunner.args, ...args], options)
 }
 
 function getSpawnOutputText(output: string | Buffer | null | undefined): string {
