@@ -34,10 +34,12 @@ import { createSupabaseClient, defaultApiHost, findBuildCommandForProjectType, f
 import { buildAppIdConflictSuggestions, isAppAlreadyExistsError } from './app-conflict'
 import { cancel as pCancel, confirm as pConfirm, intro as pIntro, isCancel as pIsCancel, log as pLog, outro as pOutro, select as pSelect, spinner as pSpinner, text as pText } from './prompts'
 import { appendInitStreamingLine, clearInitStreamingOutput, setInitCodeDiff, setInitEncryptionSummary, setInitVersionWarning, startInitStreamingOutput, stopInitInkSession, updateInitStreamingStatus } from './runtime'
+import { getActiveInitReplaySessionId, startInitReplay } from './replay'
 import { formatInitResumeMessage, initOnboardingSteps, renderInitOnboardingComplete, renderInitOnboardingFrame, renderInitOnboardingWelcome } from './ui'
 import { CAPGO_UPDATER_PACKAGE, getUpdaterInstallState } from './updater'
 
 interface SuperOptions extends Options {
+  analytics?: boolean
   local: boolean
 }
 
@@ -576,7 +578,7 @@ async function runInitDoctorDiagnostics(): Promise<void> {
 }
 
 async function exitCanceledInitOnboarding(orgId: string, apikey: string, message = 'You can resume the onboarding anytime by running the same command again'): Promise<never> {
-  await markSnag('onboarding-v2', orgId, apikey, 'canceled', undefined, '🤷')
+  await markInitSnag(orgId, apikey, 'canceled', undefined, '🤷')
   pOutro(`Bye 👋\n💡 ${message}`)
   exit(1)
 }
@@ -1221,7 +1223,7 @@ function cleanupStepsDone() {
 
 async function cancelCommand(command: boolean | string | symbol, orgId: string, apikey: string) {
   if (pIsCancel(command)) {
-    await markSnag('onboarding-v2', orgId, apikey, 'canceled', undefined, '🤷')
+    await markInitSnag(orgId, apikey, 'canceled', undefined, '🤷')
     pOutro(`Bye 👋\n💡 You can resume the onboarding anytime by running the same command again`)
     exit()
   }
@@ -1255,7 +1257,7 @@ async function selectRecoveryOption<T extends string>(
     })
 
     if (pIsCancel(choice) || choice === '__cancel__') {
-      await markSnag('onboarding-v2', orgId, apikey, 'canceled', undefined, '🤷')
+      await markInitSnag(orgId, apikey, 'canceled', undefined, '🤷')
       pOutro(`Bye 👋\n💡 You can resume the onboarding anytime by running the same command again`)
       exit(1)
     }
@@ -1398,10 +1400,14 @@ async function warnIfNotInCapacitorRoot() {
   }
 }
 
-async function markStep(orgId: string, apikey: string, step: string, appId: string) {
-  return markSnag('onboarding-v2', orgId, apikey, `onboarding-step-${step}`, appId)
+async function markInitSnag(orgId: string, apikey: string, event: string, appId?: string, icon = '✅') {
+  const replaySessionId = getActiveInitReplaySessionId()
+  return markSnag('onboarding-v2', orgId, apikey, event, appId, icon, replaySessionId ? { $session_id: replaySessionId } : undefined)
 }
 
+async function markStep(orgId: string, apikey: string, step: string, appId: string) {
+  return markInitSnag(orgId, apikey, `onboarding-step-${step}`, appId)
+}
 /**
  * Save the app ID to the CapacitorUpdater plugin config.
  */
@@ -1998,7 +2004,7 @@ async function askForReplacementAppId(
   await cancelCommand(choice, organization.gid, apikey)
 
   if (choice === 'cancel') {
-    await markSnag('onboarding-v2', organization.gid, apikey, 'canceled-appid-conflict', undefined, '🤷')
+    await markInitSnag(organization.gid, apikey, 'canceled-appid-conflict', undefined, '🤷')
     pOutro(`Bye 👋\n💡 You can resume the onboarding anytime by running the same command again`)
     exit()
   }
@@ -2779,7 +2785,7 @@ async function addEncryptionStep(orgId: string, apikey: string, appId: string) {
       // log buffer, which `renderInitOnboardingFrame` wipes when step 6
       // renders — producing a visible "flash" of the success line.
       s.stop()
-      await markSnag('onboarding-v2', orgId, apikey, 'Use encryption v2', appId)
+      await markInitSnag(orgId, apikey, 'Use encryption v2', appId)
 
       // Run `cap sync` now, inside step 5, so the public key we just wrote
       // to `capacitor.config.*` actually lands in the native projects
@@ -3827,7 +3833,7 @@ async function addCodeChangeStep(orgId: string, apikey: string, appId: string, p
     ],
   })
   if (pIsCancel(modificationType)) {
-    await markSnag('onboarding-v2', orgId, apikey, 'canceled', undefined, '🤷')
+    await markInitSnag(orgId, apikey, 'canceled', undefined, '🤷')
     pOutro(`Bye 👋\n💡 You can resume the onboarding anytime by running the same command again`)
     exit()
   }
@@ -3913,7 +3919,7 @@ async function addCodeChangeStep(orgId: string, apikey: string, appId: string, p
     ],
   })
   if (pIsCancel(versionChoice)) {
-    await markSnag('onboarding-v2', orgId, apikey, 'canceled', undefined, '🤷')
+    await markInitSnag(orgId, apikey, 'canceled', undefined, '🤷')
     pOutro(`Bye 👋\n💡 You can resume the onboarding anytime by running the same command again`)
     exit()
   }
@@ -3934,7 +3940,7 @@ async function addCodeChangeStep(orgId: string, apikey: string, appId: string, p
       },
     })
     if (pIsCancel(userVersion)) {
-      await markSnag('onboarding-v2', orgId, apikey, 'canceled', undefined, '🤷')
+      await markInitSnag(orgId, apikey, 'canceled', undefined, '🤷')
       pOutro(`Bye 👋\n💡 You can resume the onboarding anytime by running the same command again`)
       exit()
     }
@@ -4367,14 +4373,19 @@ async function maybeStarCapgoRepo(includeSkillsRepository = false, repository?: 
 export async function initApp(apikeyCommand: string, appId: string, options: SuperOptions) {
   globalSupaHost = options.supaHost // honor --supa-host for the support-logs upload
   const pm = getPMAndCommand()
+  options.apikey = apikeyCommand
+  const analyticsEnabled = options.analytics !== false
+  const initReplay = startInitReplay({
+    analyticsEnabled,
+    apikey: options.apikey?.trim() || findSavedKeySilent(),
+  })
   // Start the verbose internal log early so it captures the whole run (incl.
   // raw provider/API errors) and survives crashes for the support bundle.
   startInternalLog(appId || globalAppId)
   appendInternalLog(`init: onboarding started for app ${appId || globalAppId || 'unknown'}`)
   pIntro('Capgo onboarding')
-  renderInitOnboardingWelcome(initOnboardingSteps.length)
+  renderInitOnboardingWelcome(initOnboardingSteps.length, Boolean(initReplay))
 
-  options.apikey = apikeyCommand
   if (!options.apikey) {
     try {
       options.apikey ??= findSavedKey(true)
@@ -4751,6 +4762,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
       pLog.error('Could not save a support bundle automatically.')
     pLog.error(`Run ${doctor} for extra diagnostics before contacting support@capgo.app`)
     pLog.error('Manual installation guide: https://capgo.app/docs/getting-started/add-an-app/')
+    await initReplay?.finish()
     exit(1)
   }
 
@@ -4769,5 +4781,6 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   const didChooseSkills = await maybeInstallCapgoSkills()
   await maybeStarCapgoRepo(didChooseSkills)
   pOutro(`Bye 👋`)
+  await initReplay?.finish()
   exit()
 }

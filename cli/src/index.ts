@@ -3,6 +3,7 @@ import { log } from '@clack/prompts'
 import { Option, program } from 'commander'
 import pack from '../package.json'
 import { categorizeCliError } from './analytics/error-category'
+import { applyCommandAnalyticsOptOut } from './analytics/opt-out'
 import { enableSupabaseInstrumentation } from './analytics/supabase-perf'
 import { extractCommandContext, flushAnalytics, trackCommandFailed, trackCommandInvoked, trackCommandSucceeded } from './analytics/track'
 import { addApp } from './app/add'
@@ -78,6 +79,7 @@ let currentCommandPath = 'unknown'
 
 program.hook('preAction', (_thisCommand, actionCommand) => {
   currentCommandPath = getCommandPath(actionCommand)
+  applyCommandAnalyticsOptOut(currentCommandPath, actionCommand.opts())
   trackCommandInvoked(currentCommandPath, extractCommandContext(actionCommand))
 })
 
@@ -100,6 +102,7 @@ Example: npx @capgo/cli@latest init YOUR_API_KEY com.example.app`)
   .option('-i, --icon <icon>', `App icon path for display in Capgo Cloud`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+  .option('--no-analytics', 'Disable init analytics and terminal replay for this run')
 
 const run = program
   .command('run')
