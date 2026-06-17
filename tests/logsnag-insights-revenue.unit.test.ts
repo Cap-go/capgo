@@ -251,6 +251,16 @@ describe('logsnag revenue metric helpers', () => {
     expect(logsnagInsightsTestUtils.isUnpaidAtBillingSnapshot('2026-03-24T23:59:59.999Z', snapshotEnd)).toBe(false)
   })
 
+  it.concurrent('excludes unpaid trials from paid replay snapshots', () => {
+    const snapshotEnd = new Date('2026-03-25T00:00:00.000Z')
+
+    expect(logsnagInsightsTestUtils.isPaidPlanAtBillingSnapshot(null, '2026-03-26T00:00:00.000Z', snapshotEnd)).toBe(false)
+    expect(logsnagInsightsTestUtils.isPaidPlanAtBillingSnapshot(null, '2026-03-25T00:00:00.000Z', snapshotEnd)).toBe(true)
+    expect(logsnagInsightsTestUtils.isPaidPlanAtBillingSnapshot(null, '2026-03-24T23:59:59.999Z', snapshotEnd)).toBe(true)
+    expect(logsnagInsightsTestUtils.isPaidPlanAtBillingSnapshot('2026-03-25T00:00:00.000Z', '2026-03-24T00:00:00.000Z', snapshotEnd)).toBe(false)
+    expect(logsnagInsightsTestUtils.isPaidPlanAtBillingSnapshot('2026-03-24T23:59:59.999Z', '2026-03-26T00:00:00.000Z', snapshotEnd)).toBe(true)
+  })
+
   it.concurrent('normalizes snapshot billing counts from SQL rows', () => {
     expect(logsnagInsightsTestUtils.normalizeBillingSnapshotCounts([
       {

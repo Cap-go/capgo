@@ -196,6 +196,21 @@ function isUnpaidAtBillingSnapshot(paidAt: Date | string | null | undefined, sna
   return new Date(paidAt).getTime() >= snapshotExclusiveEnd.getTime()
 }
 
+function isPaidPlanAtBillingSnapshot(
+  paidAt: Date | string | null | undefined,
+  trialAt: Date | string | null | undefined,
+  snapshotExclusiveEnd: Date,
+): boolean {
+  if (paidAt)
+    return new Date(paidAt).getTime() < snapshotExclusiveEnd.getTime()
+
+  if (!trialAt)
+    return false
+
+  const trialAtTime = new Date(trialAt).getTime()
+  return Number.isFinite(trialAtTime) && trialAtTime <= snapshotExclusiveEnd.getTime()
+}
+
 function normalizeCoreSnapshotCounts(row: Partial<CoreSnapshotRow> | null | undefined): CoreSnapshotCounts {
   return {
     onboarded: Number(row?.onboarded) || 0,
@@ -574,7 +589,7 @@ async function calculateRevenue(c: Context, referenceDate?: Date): Promise<PlanR
       const snapshotEndIso = referenceDate.toISOString()
       subsQuery = subsQuery
         .lt('created_at', snapshotEndIso)
-        .or(`paid_at.lt.${snapshotEndIso},paid_at.is.null`)
+        .or(`paid_at.lt.${snapshotEndIso},and(paid_at.is.null,trial_at.lte.${snapshotEndIso})`)
         .in('status', ['succeeded', 'canceled', 'deleted'])
         .or(`canceled_at.is.null,canceled_at.gte.${snapshotEndIso}`)
         .gt('subscription_anchor_end', snapshotEndIso)
@@ -1484,7 +1499,13 @@ async function getBillingSnapshotCounts(c: Context, snapshotExclusiveEnd: Date):
         INNER JOIN public.plans p ON p.stripe_id = si.product_id
         WHERE si.is_good_plan = true
           AND si.created_at < ${snapshotExclusiveEndIso}::timestamptz
-          AND (si.paid_at < ${snapshotExclusiveEndIso}::timestamptz OR si.paid_at IS NULL)
+          AND (
+            si.paid_at < ${snapshotExclusiveEndIso}::timestamptz
+            OR (
+              si.paid_at IS NULL
+              AND si.trial_at <= ${snapshotExclusiveEndIso}::timestamptz
+            )
+          )
           AND si.status IN (
             'succeeded'::public.stripe_status,
             'canceled'::public.stripe_status,
@@ -2259,6 +2280,7 @@ export const logsnagInsightsTestUtils = {
   normalizePlanTotals,
   normalizeBillingSnapshotCounts,
   isUnpaidAtBillingSnapshot,
+  isPaidPlanAtBillingSnapshot,
   normalizeCoreSnapshotCounts,
   reserveLogsnagInsightsRetry,
   scheduleLogsnagInsightsUpdate,
