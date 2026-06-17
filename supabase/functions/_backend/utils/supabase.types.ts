@@ -1659,10 +1659,10 @@ export type Database = {
           live_updates_active_paying_clients_60d?: number
           longest_ltv?: number
           mrr?: number
-          past_due_orgs?: number
-          past_due_orgs_average_days?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
+          past_due_orgs?: number
+          past_due_orgs_average_days?: number
           not_paying?: number | null
           nrr?: number
           onboarded?: number | null
@@ -2528,8 +2528,8 @@ export type Database = {
           customer_id: string
           id: number
           is_good_plan: boolean | null
-          past_due_at: string | null
           last_stripe_event_at: string | null
+          past_due_at: string | null
           mau_exceeded: boolean | null
           paid_at: string | null
           plan_calculated_at: string | null
