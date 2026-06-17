@@ -400,7 +400,7 @@ export interface ResolveHelperBinaryOptions {
   allowEnvOverride?: boolean
   /**
    * Project directory to ALSO resolve the helper package from, in addition to the
-   * CLI's own node_modules. Lets a project-local `npm i @capgo/cli-keychain-darwin-*`
+   * CLI's own node_modules. Lets a project-local `npm i @capgo/cli-helper-darwin-*`
    * be picked up even when the CLI runs from a global install or the MCP server
    * (which doesn't resolve from the user's project). Defaults to `process.cwd()`.
    * Ignored when `resolve` is provided (tests).
