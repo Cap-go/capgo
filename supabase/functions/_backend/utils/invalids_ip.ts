@@ -24,6 +24,7 @@ interface InvalidIpInfo {
 const PROVIDER_IP_CACHE_PATH = '/provider-ip-classifier'
 const PROVIDER_IP_CACHE_TTL_SECONDS = 60 * 60 * 24 // 24h
 const PROVIDER_IP_FALLBACK_TTL_SECONDS = 60 * 60 // 1h after unresolved/failure
+
 const GOOGLE_KEYWORDS = ['google cloud', 'google llc', 'google infrastructure', 'google data center']
 const GOOGLE_ASNS = new Set(['AS15169', 'AS16591'])
 const APPLE_KEYWORDS = ['apple inc', 'apple computer', 'apple cloud', 'apple data', 'apple internet']
@@ -78,6 +79,25 @@ function parseProviderResult(res: IpApiResponse): InvalidIpInfo {
 
   const provider = classifyProvider(res)
   return { blocked: provider !== null, provider }
+}
+
+function isInternalOrPrivateIp(ip: string) {
+  const lower = ip.toLowerCase()
+  if (lower === 'localhost' || lower.startsWith('::1') || lower.startsWith('fc') || lower.startsWith('fd') || lower.startsWith('fe80'))
+    return true
+
+  if (lower.startsWith('10.') || lower.startsWith('127.') || lower.startsWith('192.168.') || lower.startsWith('169.254.'))
+    return true
+
+  if (!lower.startsWith('172.'))
+    return false
+
+  const secondOctetEnd = lower.indexOf('.', 4)
+  if (secondOctetEnd === -1)
+    return false
+
+  const secondOctet = Number.parseInt(lower.slice(4, secondOctetEnd), 10)
+  return secondOctet >= 16 && secondOctet <= 31
 }
 
 async function ipapi(ip: string, lang = 'en') {
@@ -192,11 +212,15 @@ async function fetchProviderIpInfo(ip: string, context?: Context) {
   }
 }
 
-function triggerProviderIpLookup(context: Context | undefined, ip: string) {
+function scheduleProviderIpLookup(context: Context | undefined, ip: string) {
   if (inflightLookups.has(ip))
     return
 
   const lookup = (async () => {
+    const cached = await cachedInvalidIpInfo(context, ip)
+    if (cached?.provider !== undefined)
+      return cached
+
     const result = await fetchProviderIpInfo(ip, context)
     const ttlSeconds = result.provider ? PROVIDER_IP_CACHE_TTL_SECONDS : PROVIDER_IP_FALLBACK_TTL_SECONDS
     await storeInvalidIpInfo(context, ip, result, ttlSeconds)
@@ -216,16 +240,23 @@ export async function invalidIpInfo(ip: string, context?: Context): Promise<Inva
   if (!ip)
     return { blocked: false, provider: null }
 
-  if (context) {
-    const cached = await cachedInvalidIpInfo(context, ip)
-    if (cached?.provider !== undefined)
-      return cached
+  if (isInternalOrPrivateIp(ip))
+    return { blocked: false, provider: null }
 
-    triggerProviderIpLookup(context, ip)
+  const inFlight = inflightLookups.get(ip)
+
+  if (context) {
+    const memoryCached = getCachedFromMemory(ip)
+    if (memoryCached)
+      return { blocked: memoryCached.blocked, provider: memoryCached.provider }
+
+    if (inFlight)
+      return { blocked: false, provider: null }
+
+    scheduleProviderIpLookup(context, ip)
     return { blocked: false, provider: null }
   }
 
-  const inFlight = inflightLookups.get(ip)
   if (inFlight)
     return inFlight.catch(() => ({ blocked: false, provider: null }))
 

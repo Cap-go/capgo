@@ -14,7 +14,6 @@ import {
 import { getRuntimeKey } from 'hono/adapter'
 import { getAppStatus, setAppStatus } from './appStatus.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
-import { invalidIpInfo } from './invalids_ip.ts'
 import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { getClientIP } from './rate_limit.ts'
@@ -31,6 +30,19 @@ const CHANNEL_SELF_STORE_MIN_V5 = '5.34.0'
 const CHANNEL_SELF_STORE_MIN_V6 = '6.34.0'
 const CHANNEL_SELF_STORE_MIN_V7 = '7.34.0'
 const CHANNEL_SELF_STORE_MIN_V8 = '8.0.0'
+
+type InvalidIpInfo = {
+  blocked: boolean
+  provider: 'google' | 'apple' | null
+}
+
+let loadInvalidIpInfo: Promise<((ip: string, context?: Context) => Promise<InvalidIpInfo>)> | null = null
+
+function getInvalidIpInfo(): Promise<(ip: string, context?: Context) => Promise<InvalidIpInfo>> {
+  if (!loadInvalidIpInfo)
+    loadInvalidIpInfo = import('./invalids_ip.ts').then(module => module.invalidIpInfo)
+  return loadInvalidIpInfo
+}
 
 export type UpdateResponseKind = 'up_to_date' | 'blocked' | 'failed'
 
@@ -508,6 +520,7 @@ export async function updateWithPG(
 export async function update(c: Context, body: AppInfos) {
   const requestIp = getClientIP(c)
   if (requestIp !== 'unknown') {
+    const invalidIpInfo = await getInvalidIpInfo()
     const providerInfo = await invalidIpInfo(requestIp, c)
     if (providerInfo.blocked) {
       cloudlog({
