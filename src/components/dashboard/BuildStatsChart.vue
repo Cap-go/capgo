@@ -27,13 +27,15 @@ const props = defineProps({
   dataBySeries: { type: Object, default: () => ({}) },
   useBillingPeriod: { type: Boolean, default: true },
   accumulated: { type: Boolean, default: false },
+  appId: { type: String, default: '' },
 })
 
 const isDark = useDark()
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
-const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
-const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
+const targetOrg = organizationStore.getOrgByAppId(props.appId) ?? organizationStore.currentOrganization
+const cycleStart = new Date(targetOrg?.subscription_start ?? new Date())
+const cycleEnd = new Date(targetOrg?.subscription_end ?? new Date())
 cycleStart.setHours(0, 0, 0, 0)
 cycleEnd.setHours(0, 0, 0, 0)
 

@@ -41,12 +41,13 @@ async function calculateStats() {
     if (!organizationStore.currentOrganization)
       await organizationStore.awaitInitialLoad()
 
-    const billingStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
+    const targetOrg = organizationStore.getOrgByAppId(props.appId) ?? organizationStore.currentOrganization
+    const billingStart = new Date(targetOrg?.subscription_start ?? new Date())
     billingStart.setHours(0, 0, 0, 0)
 
     const { last30DaysStart, last30DaysEnd } = getLast30DaysWindow()
-    const startDate = last30DaysStart.toISOString().split('T')[0]
-    const endDate = last30DaysEnd.toISOString().split('T')[0]
+    const startDate = last30DaysStart.toISOString()
+    const endDate = last30DaysEnd.toISOString()
 
     const { data, error } = await supabase
       .from('build_logs')
@@ -135,6 +136,7 @@ onMounted(async () => {
       :data="minutesPerDay"
       :use-billing-period="useBillingPeriod"
       :accumulated="accumulated"
+      :app-id="appId"
     />
   </ChartCard>
 </template>
