@@ -320,7 +320,6 @@ const buildCLI = Bun.build({
   minify: true,
   // Keep env access runtime-only unless explicitly defined below.
   env: 'disable',
-  external: HELPER_PACKAGES,
   define: {
     'process.env.SUPA_DB': '"production"',
     'globalThis.__CAPGO_DEV__': 'false',
@@ -355,7 +354,6 @@ const buildSDK = Bun.build({
   format: 'esm',
   // Keep env access runtime-only unless explicitly defined below.
   env: 'disable',
-  external: HELPER_PACKAGES,
   define: {
     'process.env.SUPA_DB': '"production"',
     'globalThis.__CAPGO_DEV__': 'false',
