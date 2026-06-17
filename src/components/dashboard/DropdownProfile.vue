@@ -26,6 +26,7 @@ const acronym = computed(() => {
   return res.toUpperCase()
 })
 const isLoading = ref(false)
+const spoofed = ref(isSpoofed())
 const logAsInput = ref('')
 
 async function openLogAsDialog() {
@@ -61,13 +62,25 @@ async function openLogAsDialog() {
 }
 
 async function resetSpoofedUser() {
-  if (await unspoofUser()) {
-    toast.error('Stop Spoofed, will reload')
+  isLoading.value = true
+  try {
+    const restored = await unspoofUser()
+    spoofed.value = isSpoofed()
+
+    if (!restored) {
+      toast.error(t('spoof-session-cleared'))
+      return
+    }
+
+    toast.success(t('spoof-stopped-reload'))
     setTimeout(() => {
       router.replace('/dashboard').then(() => {
         globalThis.location.reload()
       })
     }, 1000)
+  }
+  finally {
+    isLoading.value = false
   }
 }
 
@@ -125,14 +138,14 @@ async function logOut() {
         <div class="block py-2 px-3 rounded-lg cursor-pointer hover:bg-slate-700/50" @click="openSupport">
           {{ t('support') }}
         </div>
-        <div v-if="main.isAdmin && !isSpoofed()" class="block py-2 px-3 rounded-lg cursor-pointer hover:bg-slate-700/50" :class="{ 'opacity-50 cursor-not-allowed': isLoading }" @click="openLogAsDialog">
+        <div v-if="main.isAdmin && !spoofed" class="block py-2 px-3 rounded-lg cursor-pointer hover:bg-slate-700/50" :class="{ 'opacity-50 cursor-not-allowed': isLoading }" @click="openLogAsDialog">
           <span v-if="!isLoading">{{ t('log-as') }}</span>
           <span v-else class="flex items-center">
             <Spinner size="w-4 h-4" class="mr-2" />
             {{ t('loading') }}
           </span>
         </div>
-        <div v-if="isSpoofed()" class="block py-2 px-3 rounded-lg cursor-pointer hover:bg-slate-700/50" @click="resetSpoofedUser">
+        <div v-if="spoofed" class="block py-2 px-3 rounded-lg cursor-pointer hover:bg-slate-700/50" :class="{ 'opacity-50 cursor-not-allowed': isLoading }" @click="resetSpoofedUser">
           {{ t('reset-spoofed-user') }}
         </div>
         <div class="block py-2 px-3 rounded-lg cursor-pointer hover:bg-slate-700/50" @click="logOut">
