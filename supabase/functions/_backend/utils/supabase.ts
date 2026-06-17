@@ -169,7 +169,29 @@ export async function getAppsFromSB(c: Context, referenceDate?: Date): Promise<s
     page++
   }
 
-  return apps
+  if (createdBeforeIso) {
+    page = 0
+    while (true) {
+      const { data, error } = await supabaseAdmin(c)
+        .from('deleted_apps')
+        .select('app_id')
+        .gte('deleted_at', createdBeforeIso)
+        .range(page * limit, (page + 1) * limit - 1)
+
+      if (error) {
+        cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting deleted apps from Supabase', error })
+        break
+      }
+
+      if (data.length === 0)
+        break
+
+      apps = [...apps, ...data.map(row => row.app_id)]
+      page++
+    }
+  }
+
+  return Array.from(new Set(apps))
 }
 
 export async function updateOrCreateChannel(c: Context, update: Database['public']['Tables']['channels']['Insert']) {

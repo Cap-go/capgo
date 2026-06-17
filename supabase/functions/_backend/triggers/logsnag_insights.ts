@@ -565,8 +565,22 @@ function calculatePastDueOrgStats(rows: PastDueOrgRow[], snapshotAt: Date): Past
   }
 }
 
-function shouldRefreshMutablePastDueStats(window: DailyWindow, referenceDate = new Date()) {
-  return window.prevDayDateId === getDailyWindow(referenceDate).prevDayDateId
+function hasPersistedPastDueStats(snapshot: Pick<GlobalStatsSnapshotRow, 'past_due_orgs' | 'past_due_orgs_average_days'> | null | undefined): boolean {
+  return (Number(snapshot?.past_due_orgs) || 0) > 0 || (Number(snapshot?.past_due_orgs_average_days) || 0) > 0
+}
+
+function shouldRefreshMutablePastDueStats(
+  window: DailyWindow,
+  referenceDate = new Date(),
+  snapshot?: Pick<GlobalStatsSnapshotRow, 'past_due_orgs' | 'past_due_orgs_average_days'> | null,
+) {
+  if (window.prevDayDateId === getDailyWindow(referenceDate).prevDayDateId)
+    return true
+
+  if (snapshot === undefined)
+    return false
+
+  return !hasPersistedPastDueStats(snapshot)
 }
 
 function isMissingBuildMetricColumnError(error: unknown): boolean {
@@ -1965,7 +1979,8 @@ async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Prom
   const { dayStart, nextDayStart } = metricWindow
   const dayStartIso = dayStart.toISOString()
   const nextDayStartIso = nextDayStart.toISOString()
-  const refreshPastDueStats = shouldRefreshMutablePastDueStats(window)
+  const pastDueSnapshot = await readGlobalStatsPastDueSnapshot(c, window.prevDayDateId)
+  const refreshPastDueStats = shouldRefreshMutablePastDueStats(window, new Date(), pastDueSnapshot)
   const [
     revenue,
     new_paying_orgs,
@@ -2223,6 +2238,19 @@ async function readGlobalStatsSnapshot(c: Context, dateId: string): Promise<Glob
     quickError(503, 'global_stats_snapshot_not_ready', 'Global stats snapshot is not ready', { dateId }, error, { alert: false })
 
   return data as GlobalStatsSnapshotRow
+}
+
+async function readGlobalStatsPastDueSnapshot(c: Context, dateId: string): Promise<Pick<GlobalStatsSnapshotRow, 'past_due_orgs' | 'past_due_orgs_average_days'> | null> {
+  const { data, error } = await supabaseAdmin(c)
+    .from('global_stats')
+    .select('past_due_orgs, past_due_orgs_average_days')
+    .eq('date_id', dateId)
+    .maybeSingle()
+
+  if (error)
+    throw error
+
+  return data as Pick<GlobalStatsSnapshotRow, 'past_due_orgs' | 'past_due_orgs_average_days'> | null
 }
 
 function getNumber(value: number | null | undefined): number {

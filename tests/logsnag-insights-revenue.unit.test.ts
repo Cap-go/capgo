@@ -259,8 +259,9 @@ describe('logsnag revenue metric helpers', () => {
     })
   })
 
-  it.concurrent('only refreshes mutable past-due stats for the current daily snapshot', () => {
+  it.concurrent('only refreshes mutable past-due stats for the current daily snapshot or an empty first fill', () => {
     const currentWindow = logsnagInsightsTestUtils.getCompletedDayWindowForDateId('2026-03-24')
+    const replayReferenceDate = new Date('2026-03-26T00:00:00.000Z')
 
     expect(logsnagInsightsTestUtils.shouldRefreshMutablePastDueStats(
       currentWindow,
@@ -268,7 +269,17 @@ describe('logsnag revenue metric helpers', () => {
     )).toBe(true)
     expect(logsnagInsightsTestUtils.shouldRefreshMutablePastDueStats(
       currentWindow,
-      new Date('2026-03-26T00:00:00.000Z'),
+      replayReferenceDate,
+    )).toBe(false)
+    expect(logsnagInsightsTestUtils.shouldRefreshMutablePastDueStats(
+      currentWindow,
+      replayReferenceDate,
+      { past_due_orgs: 0, past_due_orgs_average_days: 0 },
+    )).toBe(true)
+    expect(logsnagInsightsTestUtils.shouldRefreshMutablePastDueStats(
+      currentWindow,
+      replayReferenceDate,
+      { past_due_orgs: 2, past_due_orgs_average_days: 3.8 },
     )).toBe(false)
   })
 
