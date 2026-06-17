@@ -3,7 +3,7 @@ import { log } from '@clack/prompts'
 import { Option, program } from 'commander'
 import pack from '../package.json'
 import { categorizeCliError } from './analytics/error-category'
-import { applyCommandAnalyticsOptOut } from './analytics/opt-out'
+import { applyCommandAnalyticsOptOut, applyRawCommandAnalyticsOptOut } from './analytics/opt-out'
 import { enableSupabaseInstrumentation } from './analytics/supabase-perf'
 import { extractCommandContext, flushAnalytics, trackCommandFailed, trackCommandInvoked, trackCommandSucceeded } from './analytics/track'
 import { addApp } from './app/add'
@@ -40,6 +40,7 @@ import { generateDocs } from './docs'
 import { defaultStarRepo } from './github'
 import { starAllRepositoriesCommand, starRepositoryCommand } from './github-command'
 import { initApp } from './init'
+import { finishActiveCliReplay } from './init/replay'
 import { createKey, deleteOldKey, saveKeyCommand } from './key'
 import { login } from './login'
 import { startMcpServer } from './mcp/server'
@@ -1160,6 +1161,7 @@ program.configureOutput({
     // Suppress Commander's default error output since we handle it in catch
   },
 })
+applyRawCommandAnalyticsOptOut(process.argv)
 
 void (async () => {
   try {
@@ -1190,7 +1192,7 @@ void (async () => {
       // Track the failure for usage analytics regardless of exception-capture
       // policy (commander usage errors are real failures, categorized 'commander').
       trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode })
-      await Promise.all([capturePromise, flushAnalytics()])
+      await Promise.all([capturePromise, flushAnalytics(), finishActiveCliReplay().catch(() => {})])
       exit(exitCode)
     }
     const capturePromise = capturePosthogException({
@@ -1202,7 +1204,7 @@ void (async () => {
     // For non-Commander errors, show full error details
     log.error(`Error: ${formatError(error)}`)
     trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode: 1 })
-    await Promise.all([capturePromise, flushAnalytics()])
+    await Promise.all([capturePromise, flushAnalytics(), finishActiveCliReplay().catch(() => {})])
     exit(1)
   }
 })()

@@ -5,7 +5,7 @@ import type { InitCodeDiff, InitEncryptionPhase, InitEncryptionSummary } from '.
 import { execSync, spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path, { dirname, join } from 'node:path'
-import { chdir, cwd, env, exit, platform, stdin, stdout } from 'node:process'
+import { chdir, cwd, env, exit, platform, stderr, stdin, stdout } from 'node:process'
 import { canParse, format, increment, lessThan, parse } from '@std/semver'
 import open from 'open'
 import tmp from 'tmp'
@@ -34,7 +34,7 @@ import { createSupabaseClient, defaultApiHost, findBuildCommandForProjectType, f
 import { buildAppIdConflictSuggestions, isAppAlreadyExistsError } from './app-conflict'
 import { cancel as pCancel, confirm as pConfirm, intro as pIntro, isCancel as pIsCancel, log as pLog, outro as pOutro, select as pSelect, spinner as pSpinner, text as pText } from './prompts'
 import { appendInitStreamingLine, clearInitStreamingOutput, setInitCodeDiff, setInitEncryptionSummary, setInitVersionWarning, startInitStreamingOutput, stopInitInkSession, updateInitStreamingStatus } from './runtime'
-import { finishActiveCliReplay, getActiveCliReplaySessionId, startInitReplay } from './replay'
+import { finishActiveCliReplay, getActiveCliReplaySessionId, isCliTelemetryDisabled, startInitReplay } from './replay'
 import { formatInitResumeMessage, initOnboardingSteps, renderInitOnboardingComplete, renderInitOnboardingFrame, renderInitOnboardingWelcome } from './ui'
 import { CAPGO_UPDATER_PACKAGE, getUpdaterInstallState } from './updater'
 
@@ -78,6 +78,50 @@ async function exitAfterFinishingReplay(code?: number): Promise<never> {
   await finishActiveCliReplay()
   exit(code)
   throw new Error('process.exit returned unexpectedly')
+}
+function shouldCaptureInheritedChildOutput(options: Parameters<typeof spawnSync>[2]) {
+  return options?.stdio === 'inherit' && Boolean(getActiveCliReplaySessionId())
+}
+
+function writeChildOutput(output: string | Buffer | Uint8Array | null | undefined, stream: typeof stdout | typeof stderr) {
+  if (output)
+    stream.write(output)
+}
+
+function spawnSyncWithReplayOutput(command: string, args: string[], options: Parameters<typeof spawnSync>[2]) {
+  if (!shouldCaptureInheritedChildOutput(options))
+    return spawnSync(command, args, options)
+
+  const { stdio: _stdio, ...captureOptions } = options || {}
+  const result = spawnSync(command, args, { ...captureOptions, stdio: ['inherit', 'pipe', 'pipe'] })
+  writeChildOutput(result.stdout, stdout)
+  writeChildOutput(result.stderr, stderr)
+  return result
+}
+
+function execSyncWithReplayOutput(command: string, options: Parameters<typeof execSync>[1]) {
+  if (!shouldCaptureInheritedChildOutput(options as Parameters<typeof spawnSync>[2]))
+    return execSync(command, options)
+
+  const result = spawnSync(command, [], {
+    cwd: options?.cwd,
+    env: options?.env,
+    shell: true,
+    stdio: ['inherit', 'pipe', 'pipe'],
+  })
+  writeChildOutput(result.stdout, stdout)
+  writeChildOutput(result.stderr, stderr)
+  if (result.error)
+    throw result.error
+  if (result.status !== 0) {
+    const error = new Error(`Command failed: ${command}`) as Error & { signal?: NodeJS.Signals | null, status?: number | null, stderr?: string | Buffer | null, stdout?: string | Buffer | null }
+    error.status = result.status
+    error.signal = result.signal
+    error.stdout = result.stdout
+    error.stderr = result.stderr
+    throw error
+  }
+  return result.stdout
 }
 const frameworkSetupGuides = {
   nextjs: 'https://capgo.app/blog/nextjs-mobile-app-capacitor-from-scratch/',
@@ -938,7 +982,7 @@ function runCapacitorPlatformAdd(platformName: 'ios' | 'android', runner: string
     return false
   }
 
-  const result = spawnSync(parsedRunner.command, [...parsedRunner.args, 'cap', 'add', platformName], { stdio: 'inherit', cwd: commandCwd })
+  const result = spawnSyncWithReplayOutput(parsedRunner.command, [...parsedRunner.args, 'cap', 'add', platformName], { stdio: 'inherit', cwd: commandCwd })
   if (result.error || result.status !== 0) {
     spinner.stop(`Could not add ${platformName} automatically ❌`)
     if (result.error)
@@ -953,7 +997,7 @@ function runCapacitorPlatformAdd(platformName: 'ios' | 'android', runner: string
 async function runCreateAppTemplate() {
   const templateCommand = getCreateAppTemplateCommand()
   stopInitInkSession({ text: 'Starting Capacitor app template creation...', tone: 'green' })
-  const result = spawnSync(templateCommand.command, templateCommand.args, { stdio: 'inherit' })
+  const result = spawnSyncWithReplayOutput(templateCommand.command, templateCommand.args, { stdio: 'inherit' })
   if (result.error || result.status !== 0) {
     stdout.write(`Capacitor app template creation failed. Run ${templateCommand.display} manually and try again.\n`)
     return await exitAfterFinishingReplay(1)
@@ -1493,11 +1537,11 @@ function runNativeResetCommand(platformRunner: string, nativePlatform: PlatformC
     const parsedRunner = splitRunnerCommand(platformRunner)
     rmSync(nativePlatform, { recursive: true, force: true })
 
-    const addResult = spawnSync(parsedRunner.command, [...parsedRunner.args, 'cap', 'add', nativePlatform], { stdio: 'inherit' })
+    const addResult = spawnSyncWithReplayOutput(parsedRunner.command, [...parsedRunner.args, 'cap', 'add', nativePlatform], { stdio: 'inherit' })
     if (addResult.error || addResult.status !== 0)
       throw addResult.error ?? new Error(`cap add ${nativePlatform} failed with code ${addResult.status ?? 'unknown'}`)
 
-    const syncResult = spawnSync(parsedRunner.command, [...parsedRunner.args, 'cap', 'sync', nativePlatform], { stdio: 'inherit' })
+    const syncResult = spawnSyncWithReplayOutput(parsedRunner.command, [...parsedRunner.args, 'cap', 'sync', nativePlatform], { stdio: 'inherit' })
     if (syncResult.error || syncResult.status !== 0)
       throw syncResult.error ?? new Error(`cap sync ${nativePlatform} failed with code ${syncResult.status ?? 'unknown'}`)
 
@@ -3167,7 +3211,7 @@ async function runBuildAndSyncLoop(
       : `Running in ${buildAndSyncCwd}: ${buildAndSyncCommand}`
     spinner.stop(runMessage, 'neutral')
     try {
-      execSync(buildAndSyncCommand, { stdio: 'inherit', cwd: buildAndSyncCwd })
+      execSyncWithReplayOutput(buildAndSyncCommand, { stdio: 'inherit', cwd: buildAndSyncCwd })
     }
     catch (error) {
       pLog.error('Build or sync failed ❌')
@@ -3230,7 +3274,7 @@ async function buildProjectStep(orgId: string, apikey: string, appId: string, pl
 
 export function runPackageRunnerSync(runner: string, args: string[], options: Parameters<typeof spawnSync>[2]) {
   const parsedRunner = splitRunnerCommand(runner)
-  return spawnSync(parsedRunner.command, [...parsedRunner.args, ...args], options)
+  return spawnSyncWithReplayOutput(parsedRunner.command, [...parsedRunner.args, ...args], options)
 }
 
 function getSpawnOutputText(output: string | Buffer | null | undefined): string {
@@ -4378,8 +4422,8 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   globalSupaHost = options.supaHost // honor --supa-host for the support-logs upload
   const pm = getPMAndCommand()
   options.apikey = apikeyCommand
-  const analyticsEnabled = options.analytics !== false
-  const initReplay = startInitReplay({
+  const analyticsEnabled = options.analytics !== false && !isCliTelemetryDisabled()
+  startInitReplay({
     analyticsEnabled,
     apikey: options.apikey?.trim() || findSavedKeySilent(),
   })
@@ -4388,7 +4432,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   startInternalLog(appId || globalAppId)
   appendInternalLog(`init: onboarding started for app ${appId || globalAppId || 'unknown'}`)
   pIntro('Capgo onboarding')
-  renderInitOnboardingWelcome(initOnboardingSteps.length, Boolean(initReplay))
+  renderInitOnboardingWelcome(initOnboardingSteps.length, analyticsEnabled)
 
   if (!options.apikey) {
     try {
@@ -4766,7 +4810,6 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
       pLog.error('Could not save a support bundle automatically.')
     pLog.error(`Run ${doctor} for extra diagnostics before contacting support@capgo.app`)
     pLog.error('Manual installation guide: https://capgo.app/docs/getting-started/add-an-app/')
-    await initReplay?.finish()
     return await exitAfterFinishingReplay(1)
   }
 
@@ -4785,6 +4828,5 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   const didChooseSkills = await maybeInstallCapgoSkills()
   await maybeStarCapgoRepo(didChooseSkills)
   pOutro(`Bye 👋`)
-  await initReplay?.finish()
   return await exitAfterFinishingReplay()
 }

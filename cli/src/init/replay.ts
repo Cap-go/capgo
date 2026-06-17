@@ -86,7 +86,7 @@ interface StartInitReplayOptions {
   cols?: number
   currentUrl?: string
   identity?: InitReplayIdentity
-  identityResolver?: (apikey: string) => Promise<InitReplayIdentity | undefined>
+  identityResolver?: (apikey: string, signal?: AbortSignal) => Promise<InitReplayIdentity | undefined>
   posthogToken?: string
   replayUrl?: string
   rows?: number
@@ -127,16 +127,18 @@ export function shouldStartInitReplay(input: InitReplayGateInput) {
   )
 }
 
-export async function resolveInitReplayIdentity(apikey: string): Promise<InitReplayIdentity | undefined> {
+export async function resolveInitReplayIdentity(apikey: string, signal?: AbortSignal): Promise<InitReplayIdentity | undefined> {
   const trimmedApiKey = apikey.trim()
   if (!trimmedApiKey)
     return undefined
 
   try {
-    const supabase = await createSupabaseClient(trimmedApiKey, undefined, undefined, true, false)
-    const { data, error } = await supabase
+    const supabase = await createSupabaseClient(trimmedApiKey, undefined, undefined, true, false, signal)
+    let query = supabase
       .rpc('get_user_identity_for_apikey' as never, { apikey: trimmedApiKey } as never)
-      .maybeSingle()
+    if (signal)
+      query = query.abortSignal(signal)
+    const { data, error } = await query.maybeSingle()
 
     if (error || !data)
       return undefined
@@ -152,12 +154,16 @@ export async function resolveInitReplayIdentity(apikey: string): Promise<InitRep
   }
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | undefined> {
+function withTimeout<T>(task: (signal: AbortSignal) => Promise<T>, timeoutMs: number): Promise<T | undefined> {
+  const controller = new AbortController()
   let timer: NodeJS.Timeout | undefined
   return Promise.race([
-    promise.catch(() => undefined),
+    task(controller.signal).catch(() => undefined),
     new Promise<undefined>((resolve) => {
-      timer = setTimeout(() => resolve(undefined), timeoutMs)
+      timer = setTimeout(() => {
+        controller.abort()
+        resolve(undefined)
+      }, timeoutMs)
       timer.unref?.()
     }),
   ]).finally(() => {
@@ -709,9 +715,10 @@ export function startInitReplay(options: StartInitReplayOptions = {}): InitRepla
     const apikey = options.apikey?.trim() || ''
     const currentUrl = options.currentUrl?.trim() || DEFAULT_REPLAY_CURRENT_URL
     const sessionPrefix = options.sessionPrefix?.trim() || DEFAULT_REPLAY_SESSION_PREFIX
+    const identityResolver = options.identityResolver || resolveInitReplayIdentity
     const identityPromise = options.identity
       ? Promise.resolve(options.identity)
-      : withTimeout((options.identityResolver || resolveInitReplayIdentity)(apikey), REPLAY_IDENTITY_TIMEOUT_MS)
+      : withTimeout(signal => identityResolver(apikey, signal), REPLAY_IDENTITY_TIMEOUT_MS)
 
     return new InitReplayRecorder(
       token,

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict'
-import { applyCommandAnalyticsOptOut } from '../src/analytics/opt-out.ts'
+import { applyCommandAnalyticsOptOut, applyRawCommandAnalyticsOptOut } from '../src/analytics/opt-out.ts'
 import { buildInitReplayBody, createTerminalInteractionEvents, createTerminalSnapshot, createTerminalSnapshotNode, getReplayViewportSize, renderRedactedTerminalFrame, renderRedactedTerminalText, resolvePosthogReplayUrl, shouldStartInitReplay } from '../src/init/replay.ts'
 
 console.log('🧪 Testing init replay telemetry...\n')
@@ -139,5 +139,12 @@ assert.equal(buildEnvTarget.CAPGO_DISABLE_TELEMETRY, 'true')
 assert.equal(applyCommandAnalyticsOptOut('build onboarding', { analytics: false }, {}), true)
 assert.equal(applyCommandAnalyticsOptOut('bundle upload', { analytics: false }, {}), false)
 assert.equal(applyCommandAnalyticsOptOut('init', { analytics: true }, {}), false)
+const rawInitEnvTarget = {}
+assert.equal(applyRawCommandAnalyticsOptOut(['node', 'capgo', 'init', '--no-analytics', '--bad-option'], rawInitEnvTarget), true)
+assert.equal(rawInitEnvTarget.CAPGO_DISABLE_TELEMETRY, 'true')
+const rawBuildEnvTarget = {}
+assert.equal(applyRawCommandAnalyticsOptOut(['node', 'capgo', 'build', 'onboarding', '--no-analytics', '--bad-option'], rawBuildEnvTarget), true)
+assert.equal(rawBuildEnvTarget.CAPGO_DISABLE_TELEMETRY, 'true')
+assert.equal(applyRawCommandAnalyticsOptOut(['node', 'capgo', 'bundle', 'upload', '--no-analytics'], {}), false)
 
 console.log('✅ init replay telemetry tests passed')
