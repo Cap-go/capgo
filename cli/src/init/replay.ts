@@ -691,7 +691,8 @@ class InitReplayRecorder implements InitReplayController {
     const viewport = getReplayViewportSize(stdout.columns || this.cols, stdout.rows || this.rows, terminalPixelSize)
     const events: eventWithTime[] = []
 
-    if (!this.hasSentMeta) {
+    const frameIncludesMeta = !this.hasSentMeta
+    if (frameIncludesMeta) {
       const metaEventWithTime = {
         data: {
           height: viewport.height,
@@ -702,7 +703,6 @@ class InitReplayRecorder implements InitReplayController {
         type: EventType.Meta,
       } satisfies metaEvent & { timestamp: number }
       events.push(metaEventWithTime)
-      this.hasSentMeta = true
     }
 
     const terminalSnapshot = await createTerminalSnapshot(frame, { ariaLabel: this.ariaLabel, currentUrl: this.currentUrl })
@@ -739,6 +739,11 @@ class InitReplayRecorder implements InitReplayController {
       windowId: this.windowId,
     })
     const pending = this.transport(replayUrl, body, this.apikey, controller.signal)
+      .then((sent) => {
+        if (sent && frameIncludesMeta)
+          this.hasSentMeta = true
+        return sent
+      })
       .catch(() => false)
       .finally(() => {
         clearTimeout(timeout)
