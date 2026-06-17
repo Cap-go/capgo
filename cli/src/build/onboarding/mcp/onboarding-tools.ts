@@ -8,29 +8,45 @@ import type { CapgoSDK } from '../../../sdk.js'
 import type { OnboardingNextStepInput } from '../../../schemas/onboarding.js'
 import { isAppAlreadyExistsError } from '../../../init/app-conflict.js'
 import { onboardingNextStepSchema } from '../../../schemas/onboarding.js'
-import { findSavedKeySilent, formatError, getAppId, getConfig } from '../../../utils.js'
+import { z } from 'zod'
+import { findBuildCommandForProjectType, findProjectType, findSavedKeySilent, getAppId, getConfig, getPackageScripts } from '../../../utils.js'
+import { findPackageManagerType } from '@capgo/find-package-manager'
 import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.js'
 import { getPlatformDirFromCapacitorConfig } from '../../platform-paths.js'
 import type { AndroidEffectDeps } from '../android/flow.js'
+import type { IosEffectDeps } from '../ios/flow.js'
 import { findAndroidApplicationIds } from '../android/gradle-parser.js'
 import { generateKeystore, listKeystoreAliases, sanitizeKeystoreAlias, tryUnlockPrivateKey } from '../android/keystore.js'
 import { fetchCapgoOAuthConfig } from '../android/oauth-config.js'
-import { fetchUserInfo, refreshAccessToken, revokeToken, runOAuthFlow, startOAuthFlow } from '../android/oauth-google.js'
+import { createCiSecretEntries, detectCiSecretTargets, getCiSecretRepoLabelAsync, listExistingCiSecretKeysAsync, uploadCiSecretsAsync } from '../ci-secrets.js'
+import { defaultExportPath, exportCredentialsToEnv } from '../env-export.js'
+import { generateWorkflow } from '../workflow-generator.js'
+import { writeWorkflowFile } from '../workflow-writer.js'
+import { fetchUserInfo, revokeToken, runOAuthFlow, startOAuthFlow } from '../android/oauth-google.js'
+import open from 'open'
 
 import { OAUTH_SCOPES_FOR_ONBOARDING } from '../android/oauth-scopes.js'
 import { createProject, createServiceAccountKey, enableService, ensureServiceAccount, listProjects } from '../android/gcp-api.js'
 import { inviteServiceAccount } from '../android/play-api.js'
 import { deleteAndroidProgress, loadAndroidProgress, saveAndroidProgress } from '../android/progress.js'
 import { validateServiceAccountJson } from '../android/service-account-validation.js'
-import { createCertificate, createProfile, ensureBundleId, generateJwt, verifyApiKey } from '../apple-api.js'
-import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
-import { loadProgress, saveProgress } from '../progress.js'
-import { defaultBuildRecordPath, readBuildOutputRecord } from '../../output-record.js'
+import type { AscDistributionCert } from '../apple-api.js'
+import { classifyCertAvailability, computeCertSha1, createCertificate, createProfile, deleteProfile, ensureBundleId, findCertIdBySha1, generateJwt, listApps, listBundleIds, listDistributionCerts, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
+import { exportP12FromKeychain, listSigningIdentities, scanProvisioningProfiles } from '../macos-signing.js'
+import { parseMobileprovisionBufferDetailed } from '../../mobileprovision-parser.js'
+import { createP12, generateCsr } from '../csr.js'
+import { detectIosBundleIds } from '../bundle-id-detector.js'
+import { writeReleaseBundleId } from '../../pbxproj-parser.js'
+import { deleteProgress, loadProgress, saveProgress } from '../progress.js'
+import { defaultBuildRecordPath, readBuildOutputRecord, removeBuildOutputRecord } from '../../output-record.js'
 import type { Platform } from './contract.js'
 import { renderResult } from './contract.js'
 import type { EngineDeps } from './engine.js'
 import { explainOnboarding, runAdvance, runStart } from './engine.js'
-import { canLaunchTerminal, launchBuildInTerminal } from './terminal-launch.js'
+import { getSession } from './session-state.js'
+import type { BuildJobDeps } from './build-job.js'
+import { buildJobDeps, registerBuildTools } from './build-tools.js'
+import { type CredentialsManageDeps, registerCredentialsManageTool } from './credentials-manage.js'
 
 /** Minimal shape of the MCP server's tool registrar (matches McpServer.tool). */
 interface McpLike {
@@ -39,6 +55,13 @@ interface McpLike {
     description: string,
     schema: Record<string, unknown>,
     handler: (args: any) => Promise<{ content: Array<{ type: 'text', text: string }> }>,
+  ) => unknown
+  // Optional: clients that support MCP prompts get a discoverable slash-command
+  // entry point. Optional so the 2-tool test mock (tool only) stays valid.
+  prompt?: (
+    name: string,
+    description: string,
+    handler: () => { messages: Array<{ role: 'user' | 'assistant', content: { type: 'text', text: string } }> },
   ) => unknown
 }
 
@@ -68,31 +91,18 @@ function buildAndroidEffectDeps(
     return configCache
   }
 
-  // Local access-token cache — cleared when the refresh token is revoked.
-  // Stores the token alongside its expiry so we can detect and refresh stale tokens.
-  let cachedAccessToken: { token: string, expiresAt: number } | null = null
-
   async function getAccessToken(): Promise<string> {
-    // Return cached token only if it is still valid with a 60s safety margin.
-    if (cachedAccessToken && Date.now() < cachedAccessToken.expiresAt - 60_000) {
-      return cachedAccessToken.token
-    }
+    // Broker model: the MCP cannot refresh a token issued to the broker's confidential Web client, so it uses
+    // the short-lived access token persisted at sign-in and re-signs-in once it expires (60s safety margin).
     const appId = await getAppIdFn()
-    if (!appId) {
+    if (!appId)
       throw new Error('Not signed in — re-run onboarding to re-authenticate with Google.')
-    }
     const progress = await loadAndroidProgress(appId)
-    const refreshToken = progress?._oauthRefreshToken
-    if (!refreshToken) {
-      throw new Error('Not signed in — re-run onboarding to re-authenticate with Google.')
-    }
-    const cfg = await getConfig_()
-    const tokens = await refreshAccessToken(
-      { clientId: cfg.clientId, clientSecret: cfg.clientSecret, scopes: OAUTH_SCOPES_FOR_ONBOARDING },
-      refreshToken,
-    )
-    cachedAccessToken = { token: tokens.accessToken, expiresAt: tokens.expiresAt }
-    return tokens.accessToken
+    const token = progress?._oauthAccessToken
+    const expiresAt = progress?._oauthAccessTokenExpiresAt
+    if (!token || !expiresAt || Date.now() >= expiresAt - 60_000)
+      throw new Error('Your Google sign-in has expired — re-run the Capgo Builder onboarding to sign in again with Google.')
+    return token
   }
 
   return {
@@ -132,12 +142,12 @@ function buildAndroidEffectDeps(
         callbacks,
       )
     },
+    // Open the broker sign-in link in the user's browser when the engine asks (best-effort; the engine shows
+    // the link as a fallback). `open` resolves once the OS hands off to the browser — never blocks the tool.
+    openBrowser: async (url: string) => { await open(url) },
     fetchUserInfo,
     getAccessToken,
-    revokeToken: async (refreshToken: string) => {
-      cachedAccessToken = null
-      return revokeToken(refreshToken)
-    },
+    revokeToken: async (token: string) => revokeToken(token),
 
     // ── GCP ───────────────────────────────────────────────────────────────────
     listProjects,
@@ -150,6 +160,30 @@ function buildAndroidEffectDeps(
     inviteServiceAccount: async (args) => {
       await inviteServiceAccount(args)
     },
+
+
+    // ── S8: shared post-save tail helpers (mirrors the TUI driver wiring in
+    // ui/app.tsx ~L2498-2570 / android/ui/app.tsx — headless: no React sinks).
+    // createCiSecretEntries pre-binds the RESOLVED Capgo key (the MCP has no
+    // --apikey flag, so the saved key IS the whole precedence chain) so
+    // CAPGO_TOKEN reaches the upload + the generated workflow's secret set.
+    // The key value rides only the session-registry entries — NEVER tool
+    // results or progress.json. The MCP driver persists the SLIM tail progress
+    // + markers itself (engine S8); the tail's own saveProgress stays unused
+    // by runTailEffect (the never-saveProgress tail rule).
+    createCiSecretEntries: creds => createCiSecretEntries(creds, findSavedKeySilent() || undefined),
+    detectCiSecretTargets,
+    getCiSecretRepoLabelAsync,
+    listExistingCiSecretKeysAsync,
+    uploadCiSecretsAsync,
+    exportCredentialsToEnv,
+    defaultExportPath,
+    detectPackageManager: () => findPackageManagerType(cwd, 'npm'),
+    generateWorkflow,
+    writeWorkflowFile,
+    getPackageScripts,
+    findProjectType,
+    findBuildCommandForProjectType,
 
     // ── Android Gradle detection ──────────────────────────────────────────────
     findAndroidApplicationIds: async () => {
@@ -166,8 +200,224 @@ function buildAndroidEffectDeps(
   }
 }
 
-/** Build the real IO deps from the SDK + CLI utils. */
-function buildDeps(sdk: CapgoSDK): EngineDeps {
+/**
+ * Build the iOS shared-engine effect deps the MCP driver injects into
+ * `decideIos` — headless (NO ink, NO native pickers, NO browser): the
+ * counterpart of the TUI's engine-driver wiring in ui/app.tsx, with the raw
+ * apple-api helpers adapted from their JWT-token call shape to the engine's
+ * abstracted dep shapes via a per-call `getFreshToken` (a fresh ASC JWT minted
+ * from the persisted keyId/issuerId + the .p8 bytes — session-carried when
+ * present, else re-read from the persisted p8Path so a server restart
+ * self-heals).
+ *
+ * Headless adaptations vs the TUI:
+ *  - openExternal is a NO-OP: the MCP server never opens the user's browser —
+ *    the verify-app create-app gate surfaces the App Store Connect URL in the
+ *    result instead.
+ *  - the native file pickers are omitted (p8-method-select never runs on the
+ *    MCP path; the single ios-api-key gate collects the path as text).
+ */
+function buildIosEffectDeps(cwd: string, getAppIdFn: () => Promise<string | undefined>): IosEffectDeps {
+  // The bundle-id detector needs the ios platform dir + capacitor appId
+  // SYNCHRONOUSLY (the dep mirrors the TUI's memo-bypassing detect call), but
+  // both come from the async capacitor-config read. Prime them once up front
+  // and make every Apple round-trip await the prime, so by the time verify-app
+  // calls detectBundleIds the real values are in place. Until primed the
+  // defaults match the overwhelmingly common layout ('ios' + no capacitor id).
+  let iosDirCache = 'ios'
+  let capacitorAppIdCache = ''
+  const primed = (async () => {
+    try {
+      const ext = await getConfig(true)
+      iosDirCache = getPlatformDirFromCapacitorConfig(ext?.config, 'ios') || 'ios'
+      capacitorAppIdCache = getAppId(undefined, ext?.config) ?? ''
+    }
+    catch {
+      // Not a Capacitor project / unreadable config — keep the defaults.
+    }
+  })()
+
+  /** Mint a fresh ASC JWT per call (mirrors the TUI's getFreshToken). */
+  async function getFreshToken(): Promise<string> {
+    await primed
+    const appId = await getAppIdFn()
+    if (!appId)
+      throw new Error('Cannot mint an App Store Connect token: no app id found in this project.')
+    const prog = await loadProgress(appId)
+    if (!prog?.keyId || !prog?.issuerId)
+      throw new Error('Missing App Store Connect API key details — provide the Key ID, Issuer ID, and .p8 path first.')
+    const carriedP8 = getSession(appId).iosCarried.p8Content
+    let content = carriedP8 ? carriedP8.toString('utf-8') : undefined
+    if (!content && prog.p8Path)
+      content = await readFile(prog.p8Path, 'utf-8')
+    if (!content)
+      throw new Error('The .p8 key file is unavailable — provide the p8Path again.')
+    return generateJwt(prog.keyId, prog.issuerId, content)
+  }
+
+  // S12: classifyCertAvailability pre-binds the single team-wide cert fetch +
+  // SHA-1 index (the TUI import driver's memo, ui/app.tsx ~L2192): one
+  // /certificates download, M SHA-1 hashes, then N O(1) lookups — NOT N
+  // re-downloads when import-validating-all-certs loops over the identities.
+  // SHORT-LIVED: the index expires after 5 minutes so a long-lived MCP server
+  // never classifies against a stale cert list (the TUI rebuilds it per
+  // effect-driver mount; a tool-call burst within one onboarding shares it).
+  let certIndexCache: { promise: Promise<Map<string, AscDistributionCert>>, builtAt: number } | null = null
+  function getCertIndex(): Promise<Map<string, AscDistributionCert>> {
+    if (!certIndexCache || Date.now() - certIndexCache.builtAt > 5 * 60_000) {
+      const promise = (async () => {
+        const token = await getFreshToken()
+        const allCerts = await listDistributionCerts(token, { includeContent: true })
+        const bySha1 = new Map<string, AscDistributionCert>()
+        for (const cert of allCerts) {
+          if (!cert.certificateContent)
+            continue
+          bySha1.set(computeCertSha1(cert.certificateContent), cert)
+        }
+        return bySha1
+      })()
+      // A failed build must not poison the cache — drop it so the next call retries.
+      promise.catch(() => {
+        if (certIndexCache?.promise === promise)
+          certIndexCache = null
+      })
+      certIndexCache = { promise, builtAt: Date.now() }
+    }
+    return certIndexCache.promise
+  }
+
+  return {
+    // ── apple-api (token-adapted, mirrors ui/app.tsx's engine-driver wiring) ──
+    verifyApiKey: async () => {
+      const r = await verifyApiKey(await getFreshToken())
+      return { teamId: r.teamId }
+    },
+    createCertificate: async ({ csr }) => createCertificate(await getFreshToken(), csr),
+    createProfile: async ({ bundleId, certificateId }) => {
+      const token = await getFreshToken()
+      const { bundleIdResourceId } = await ensureBundleId(token, bundleId)
+      const p = await createProfile(token, bundleIdResourceId, certificateId, bundleId)
+      return { profileId: p.profileId, profileName: p.profileName, profileBase64: p.profileContent }
+    },
+    // Scoped to the DISTRIBUTION pool — same reasoning as the TUI's cert-limit
+    // recovery: only same-type revocations free a slot.
+    listCertificates: async () => listDistributionCerts(await getFreshToken(), { types: ['DISTRIBUTION'] }),
+    // ── cert-limit / duplicate-profile recovery (S6b, mirrors ui/app.tsx) ──
+    revokeCertificate: async (certificateId) => {
+      await revokeCertificate(await getFreshToken(), certificateId)
+    },
+    deleteProfile: async (profileId) => {
+      await deleteProfile(await getFreshToken(), profileId)
+    },
+
+    // ── verify-app (remote App Store verification, PR #2397) ──
+    listApps: async () => listApps(await getFreshToken()),
+    listBundleIds: async () => listBundleIds(await getFreshToken()),
+    detectBundleIds: () => detectIosBundleIds({ cwd, iosDir: iosDirCache, capacitorAppId: capacitorAppIdCache }),
+    writeReleaseBundleId: (fromId, toId) => writeReleaseBundleId(cwd, iosDirCache, fromId, toId),
+    ensureBundleId: async (bundleId) => {
+      await ensureBundleId(await getFreshToken(), bundleId)
+    },
+    // HEADLESS: never open the user's browser from the MCP server. The engine
+    // surfaces the create-app URL in the verify-app gate result instead.
+    openExternal: () => {},
+
+    // ── csr (shape-adapted) ──
+    generateCsr: () => {
+      const r = generateCsr()
+      return { csr: r.csrPem, privateKeyPem: r.privateKeyPem }
+    },
+    createP12: ({ certificatePem, privateKeyPem, password }) =>
+      createP12(certificatePem, privateKeyPem, password).p12Base64,
+
+    // ── file system ──
+    readFile: (path: string) => readFile(path) as Promise<Buffer>,
+    copyFile,
+    isMacOS: () => process.platform === 'darwin',
+
+    // ── S12: import-existing sub-flow (macos-signing + apple-api, mirrors the
+    // TUI's engine-driven import driver in ui/app.tsx ~L2215-2280). Wiring
+    // listSigningIdentities + isMacOS is ALSO what exposes the setup-method
+    // fork (engine iosSetupForkStep: capability = macOS AND the scan dep).
+    // HEADLESS adaptations: openProfilePicker is NOT wired — decideIos injects
+    // a one-shot picker resolving the user-supplied profilePath (the manual
+    // arm); openExternal stays a no-op (the portal URL rides the result
+    // context instead of a browser open).
+    listSigningIdentities,
+    scanProvisioningProfiles,
+    // exportP12FromKeychain resolves + signature-verifies the precompiled
+    // signed helper internally (PR #2458 dropped the swiftc compile path, so
+    // there are no precompile/cache deps to wire — same as the TUI driver).
+    exportP12FromKeychain,
+    // classifyCertAvailability resolves the identity's cert from the memoized
+    // SHA-1 index, then enriches via the apple-api classifier — byte-for-byte
+    // the TUI driver's wiring (ui/app.tsx ~L2229-2249).
+    classifyCertAvailability: async (identity) => {
+      const bySha1 = await getCertIndex()
+      const cert = bySha1.get(identity.sha1.toLowerCase()) ?? null
+      const classified = classifyCertAvailability({
+        appleCertId: cert ? cert.id : null,
+        lookupError: null,
+      })
+      return {
+        available: classified.available,
+        reason: classified.reason,
+        reasonText: classified.reasonText,
+        appleCertId: classified.appleCertId,
+        ...(cert && classified.available
+          ? {
+              appleCertName: cert.name,
+              appleCertExpirationDate: cert.expirationDate,
+              appleCertSerialNumber: cert.serialNumber,
+            }
+          : {}),
+      }
+    },
+    listProfilesForCert: async certId => listProfilesForCert(await getFreshToken(), certId),
+    findCertIdBySha1: async sha1 => findCertIdBySha1(await getFreshToken(), sha1),
+    // The engine reads the .mobileprovision bytes via deps.readFile then parses
+    // them here — wire the BUFFER variant (the path-based parser re-reads the
+    // file, which the engine already did at its IO boundary).
+    parseMobileprovisionDetailed: bytes => parseMobileprovisionBufferDetailed(bytes),
+
+
+    // ── S8: shared post-save tail helpers (mirrors the TUI driver wiring in
+    // ui/app.tsx ~L2498-2570 / android/ui/app.tsx — headless: no React sinks).
+    // createCiSecretEntries pre-binds the RESOLVED Capgo key (the MCP has no
+    // --apikey flag, so the saved key IS the whole precedence chain) so
+    // CAPGO_TOKEN reaches the upload + the generated workflow's secret set.
+    // The key value rides only the session-registry entries — NEVER tool
+    // results or progress.json. The MCP driver persists the SLIM tail progress
+    // + markers itself (engine S8); the tail's own saveProgress stays unused
+    // by runTailEffect (the never-saveProgress tail rule).
+    createCiSecretEntries: creds => createCiSecretEntries(creds, findSavedKeySilent() || undefined),
+    detectCiSecretTargets,
+    getCiSecretRepoLabelAsync,
+    listExistingCiSecretKeysAsync,
+    uploadCiSecretsAsync,
+    exportCredentialsToEnv,
+    defaultExportPath,
+    detectPackageManager: () => findPackageManagerType(cwd, 'npm'),
+    generateWorkflow,
+    writeWorkflowFile,
+    getPackageScripts,
+    findProjectType,
+    findBuildCommandForProjectType,
+
+    // ── persistence (the shared tail's saving-credentials needs all of these) ──
+    loadProgress,
+    saveProgress,
+    deleteProgress,
+    updateSavedCredentials,
+    loadSavedCredentials: (appId: string) => loadSavedCredentials(appId),
+  }
+}
+
+/**
+ * Production EngineDeps wiring. Exported for tests that pin production-only
+ * behavior (clearBuildRecord wiring, keystore file modes).
+ */
+export function buildDeps(sdk: CapgoSDK): EngineDeps {
   const cwd = process.cwd()
   const getAppIdClosure = async (): Promise<string | undefined> => {
     try {
@@ -199,10 +449,12 @@ function buildDeps(sdk: CapgoSDK): EngineDeps {
       return out
     },
     isAppRegistered: async (appId: string) => {
-      const res = await sdk.listApps()
-      if (!res.success || !res.data)
-        return false
-      return res.data.some((a: { app_id?: string, appId?: string }) => a.app_id === appId || a.appId === appId)
+      // Targeted existence+access check — NOT listApps. The broad apps list times out
+      // on large databases (a full-table RBAC RLS scan) and would falsely report an
+      // app you OWN as unregistered, which then re-registers it and surfaces a bogus
+      // "already exists and is not in your account" conflict.
+      const res = await sdk.appHasAccess(appId)
+      return res.success && res.data === true
     },
     loadProgress: (appId: string) => loadProgress(appId),
     registerApp: async (appId: string) => {
@@ -213,87 +465,27 @@ function buildDeps(sdk: CapgoSDK): EngineDeps {
       return { ok: false as const, alreadyExists: isAppAlreadyExistsError(error), error }
     },
     loadAndroidProgress: (appId: string) => loadAndroidProgress(appId),
-    finalizeAndroidCredentials: async (appId: string) => {
-      const prog = await loadAndroidProgress(appId)
-      if (!prog?.serviceAccountJsonPath)
-        return { ok: false as const, error: 'No service-account JSON path on file.' }
-      let jsonBytes: Buffer
-      try {
-        jsonBytes = await readFile(prog.serviceAccountJsonPath)
-      }
-      catch {
-        return { ok: false as const, error: `Could not read the service-account file at ${prog.serviceAccountJsonPath}.` }
-      }
-      const validation = await validateServiceAccountJson({ jsonBytes, packageName: appId })
-      if (!validation.ok)
-        return { ok: false as const, error: validation.message }
-      if (!prog._keystoreBase64 || !prog.keystoreAlias || !prog.keystoreStorePassword || !prog.keystoreKeyPassword)
-        return { ok: false as const, error: 'Keystore is missing — re-run keystore generation.' }
-      await updateSavedCredentials(appId, 'android', {
-        ANDROID_KEYSTORE_FILE: prog._keystoreBase64,
-        KEYSTORE_KEY_ALIAS: prog.keystoreAlias,
-        KEYSTORE_KEY_PASSWORD: prog.keystoreKeyPassword,
-        KEYSTORE_STORE_PASSWORD: prog.keystoreStorePassword,
-        PLAY_CONFIG_JSON: jsonBytes.toString('base64'),
-      })
-      await saveAndroidProgress(appId, {
-        ...prog,
-        completedSteps: { ...prog.completedSteps, serviceAccountProvisioned: { email: validation.serviceAccountEmail, projectId: validation.projectId } },
-      })
-      return { ok: true as const }
-    },
     readBuildRecord: readBuildOutputRecord,
     buildRecordPath: defaultBuildRecordPath,
-    canLaunchTerminal: () => canLaunchTerminal(),
-    launchBuildInTerminal: (cmd: string) => launchBuildInTerminal(cmd),
-    setIosApiKey: async (appId: string, keyId: string, issuerId: string, p8Path: string) => {
-      const base = (await loadProgress(appId)) ?? { platform: 'ios' as const, appId, startedAt: new Date().toISOString(), completedSteps: {} }
-      await saveProgress(appId, { ...base, platform: 'ios', appId, setupMethod: 'create-new', keyId, issuerId, p8Path })
-    },
-    finalizeIosCredentials: async (appId: string) => {
-      const prog = await loadProgress(appId)
-      if (!prog?.keyId || !prog?.issuerId || !prog?.p8Path)
-        return { ok: false as const, error: 'Missing App Store Connect API key details.' }
-      try {
-        const p8Content = await readFile(prog.p8Path, 'utf-8')
-        const token = generateJwt(prog.keyId, prog.issuerId, p8Content)
-        await verifyApiKey(token)
-        const { csrPem, privateKeyPem } = generateCsr()
-        const cert = await createCertificate(token, csrPem)
-        const { p12Base64 } = createP12(cert.certificateContent, privateKeyPem)
-        const { bundleIdResourceId } = await ensureBundleId(token, appId)
-        const profile = await createProfile(token, bundleIdResourceId, cert.certificateId, appId)
-        await updateSavedCredentials(appId, 'ios', {
-          BUILD_CERTIFICATE_BASE64: p12Base64,
-          P12_PASSWORD: DEFAULT_P12_PASSWORD,
-          APPLE_KEY_ID: prog.keyId,
-          APPLE_ISSUER_ID: prog.issuerId,
-          APPLE_KEY_CONTENT: Buffer.from(p8Content).toString('base64'),
-          APP_STORE_CONNECT_TEAM_ID: cert.teamId,
-          CAPGO_IOS_PROVISIONING_MAP: JSON.stringify({ [appId]: profile.profileContent }),
-        })
-        await saveProgress(appId, {
-          ...prog,
-          completedSteps: {
-            ...prog.completedSteps,
-            apiKeyVerified: { keyId: prog.keyId, issuerId: prog.issuerId },
-            certificateCreated: { certificateId: cert.certificateId, expirationDate: cert.expirationDate, teamId: cert.teamId, p12Base64 },
-            profileCreated: { profileId: profile.profileId, profileName: profile.profileName, profileBase64: profile.profileContent },
-          },
-        })
-        return { ok: true as const }
-      }
-      catch (err) {
-        return { ok: false as const, error: formatError(err) }
-      }
-    },
+    clearBuildRecord: removeBuildOutputRecord,
+    iosEffectDeps: buildIosEffectDeps(cwd, getAppIdClosure),
     androidEffectDeps: buildAndroidEffectDeps(cwd, getAppIdClosure),
     writeKeystoreFile: async (appId: string, base64: string, alias: string): Promise<string> => {
-      // Write the generated/loaded keystore to android/app/<alias>.p12, mirroring
-      // the Ink wizard which uses the same path (keystore-generating hardcodes it).
+      // Write the generated/loaded keystore to <androidDir>/app/<alias>.p12. The
+      // android dir is resolved from capacitor.config (custom `android.path`
+      // projects exist — CodeRabbit #2394) exactly like findAndroidApplicationIds
+      // above; falls back to 'android' when the config is unreadable.
       // `alias` comes from user input — sanitize it for the ON-DISK filename only
       // (the crypto alias / KEYSTORE_KEY_ALIAS keep the user's exact value).
-      const androidAppDir = join(cwd, 'android', 'app')
+      let androidDir = 'android'
+      try {
+        const ext = await getConfig()
+        androidDir = getPlatformDirFromCapacitorConfig(ext?.config, 'android') || 'android'
+      }
+      catch {
+        // Not a Capacitor project or config unreadable — fall back to 'android'.
+      }
+      const androidAppDir = join(cwd, androidDir, 'app')
       await mkdir(androidAppDir, { recursive: true })
       const safe = sanitizeKeystoreAlias(alias)
       const filePath = join(androidAppDir, `${safe}.p12`)
@@ -301,9 +493,10 @@ function buildDeps(sdk: CapgoSDK): EngineDeps {
       const resolvedDir = resolve(androidAppDir)
       const resolvedFile = resolve(filePath)
       if (resolvedFile !== resolvedDir && !resolvedFile.startsWith(resolvedDir + sep))
-        throw new Error('Refusing to write keystore outside the android/app directory.')
+        throw new Error('Refusing to write keystore outside the android app directory.')
       const bytes = Buffer.from(base64, 'base64')
-      await writeFile(filePath, bytes)
+      // Owner-only: the .p12 holds the signing private key (hostile-review 2026-06-12).
+      await writeFile(filePath, bytes, { mode: 0o600 })
       return filePath
     },
   }
@@ -313,22 +506,22 @@ function buildDeps(sdk: CapgoSDK): EngineDeps {
  * Register the 2-tool onboarding spine onto an MCP server.
  * `depsOverride` is for tests; production passes only `server` + `sdk`.
  */
-export function registerOnboardingTools(server: McpLike, sdk: CapgoSDK, depsOverride?: EngineDeps): void {
+export function registerOnboardingTools(server: McpLike, sdk: CapgoSDK, depsOverride?: EngineDeps, buildJobDepsOverride?: BuildJobDeps, credentialsManageDepsOverride?: CredentialsManageDeps): void {
   const deps = depsOverride ?? buildDeps(sdk)
 
   server.tool(
     'start_capgo_builder_onboarding',
-    'Start or resume guided Capgo Builder onboarding — set up native iOS/Android cloud builds, signing, and a first cloud build. Call this whenever the user wants to set up, configure, or troubleshoot native builds. Takes no arguments; it inspects the project and returns the first step.',
-    {},
-    async () => {
-      const result = await runStart(deps)
+    'Start (or resume) the guided, tool-driven Capgo Builder setup for native iOS/Android cloud builds — App Store / Play credentials, certificates, keystores, signing, and the first cloud build. ALWAYS call this FIRST, and let it conduct the whole flow, whenever the user wants to set up, configure, connect, enable, or troubleshoot Capgo Builder, native builds, cloud builds, or signing. Do NOT inspect the repo, read config files, or web-search to do this yourself — this tool inspects the project and returns the exact next step to take. Optionally pass platform "ios" or "android" to set up (or SWITCH to) that platform directly — pass it when the user already named one ("set up Capgo Builder for iOS") or wants to switch after a wrong pick; omit it to let the tool ask. Do NOT call this tool to retry, skip, restart, or "continue past" a cloud build that already FAILED inside onboarding: a failed build is a REQUIRED gate, retried only with start_capgo_build once the user has addressed the cause — never by re-entering onboarding here.',
+    { platform: z.enum(['ios', 'android']).optional().describe('Set up (or switch to) a specific platform directly: "ios" or "android". Pass it when the user already said which platform, or to switch platforms; omit to be asked.') },
+    async (args: { platform?: 'ios' | 'android' }) => {
+      const result = await runStart(deps, args.platform)
       return { content: [{ type: 'text' as const, text: renderResult(result) }] }
     },
   )
 
   server.tool(
     'capgo_builder_onboarding_next_step',
-    'Advance the guided Capgo Builder onboarding by one step. Call ONLY as directed by the previous result\'s `next`. Pass the user\'s choice (e.g. platform) when the previous step asked for one.',
+    'Advance the guided Capgo Builder onboarding by one step. Call ONLY as directed by the previous result\'s `next`. Pass the user\'s choice (e.g. platform) when the previous step asked for one. Never call this to skip, retry, restart, or "continue past" a cloud build that FAILED — a failed build is retried only with start_capgo_build, never by advancing onboarding here.',
     onboardingNextStepSchema.shape,
     async (args: OnboardingNextStepInput) => {
       const result = await runAdvance(deps, args)
@@ -338,11 +531,44 @@ export function registerOnboardingTools(server: McpLike, sdk: CapgoSDK, depsOver
 
   server.tool(
     'capgo_builder_onboarding_explain',
-    'Explain the CURRENT Capgo Builder onboarding step in plain language — call this whenever the user is confused, asks what a step means, or does not understand the options. Read-only; it never advances the flow.',
-    {},
-    async () => {
-      const text = await explainOnboarding(deps)
+    'Explain a Capgo Builder onboarding step in plain language — call this whenever the user is confused, asks what a step means, or does not understand the options. Defaults to the CURRENT step; pass { state } to explain a specific one (e.g. a build-phase state like "build-waiting" whose protocol context is not on disk). Read-only; it never advances the flow.',
+    {
+      state: z.string().optional().describe('Optional state name to explain (from a prior result state field). Omit to explain the current step.'),
+    },
+    async (args: { state?: string }) => {
+      const text = await explainOnboarding(deps, args)
       return { content: [{ type: 'text' as const, text }] }
     },
+  )
+
+  // ── Cloud-build tools (start / wait / logs / cancel) ─────────────────────────
+  // The build phase runs the first cloud build via a tracked background child
+  // (no Terminal.app/AppleScript) + bounded-wait polling. The onboarding
+  // build-ready step points the agent at start_capgo_build; a COMPLETED build
+  // hands back to capgo_builder_onboarding_next_step({ checkBuild }) for the tail.
+  registerBuildTools(server, deps.getAppId, buildJobDepsOverride ?? buildJobDeps(deps.cwd))
+
+  // ── Credentials management (post-onboarding) ─────────────────────────────────
+  // Manage credentials that ALREADY exist: export to .env, or add/edit/remove a
+  // field. Refuses (and points at onboarding) when no credentials exist for the app.
+  registerCredentialsManageTool(server, deps.getAppId, credentialsManageDepsOverride)
+  // ── Discoverable, client-agnostic entry point (MCP prompt) ──────────────────
+  // Clients that support MCP prompts surface this as a slash command (e.g.
+  // /capgo-builder-setup). Invoking it injects the message below, which kicks
+  // off the tool-driven flow — so the user never has to name the tool, and the
+  // agent is told NOT to improvise the setup itself. Optional-chained so the
+  // 2-tool test mock (no .prompt) is unaffected.
+  server.prompt?.(
+    'capgo-builder-setup',
+    'Set up Capgo Builder native cloud builds (iOS/Android signing + first build) — starts the guided, tool-driven onboarding.',
+    () => ({
+      messages: [{
+        role: 'user' as const,
+        content: {
+          type: 'text' as const,
+          text: 'Set up Capgo Builder for native cloud builds in this project. Do it by calling the start_capgo_builder_onboarding tool now, then follow the `next` instruction in each result — calling capgo_builder_onboarding_next_step / capgo_builder_onboarding_explain exactly as directed — until setup is complete. Do NOT configure Capgo manually, read config files, or search the web: the onboarding tools conduct the entire flow.',
+        },
+      }],
+    }),
   )
 }
