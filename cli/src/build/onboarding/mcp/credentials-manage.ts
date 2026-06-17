@@ -113,6 +113,8 @@ export interface CredentialsManageDeps {
   exportCredentialsToEnv: typeof exportCredentialsToEnv
   /** Read a file and return its base64 — used by set + valueFile. Must reject symlinks. */
   readFileBase64: (path: string) => Promise<string>
+  /** True when a project-local .capgo-credentials.json holds this app — so set/remove write there, not global. */
+  localCredentialsExist: (appId: string) => Promise<boolean>
 }
 
 /** Build the real deps (global credential store) bound to a getAppId resolver. */
@@ -125,6 +127,7 @@ export function buildCredentialsManageDeps(getAppId: () => Promise<string | unde
     exportCredentialsToEnv,
     // Symlink-safe: a credential valueFile must never be followed through a symlink to read elsewhere.
     readFileBase64: async path => (await readSafeFileBytes(path)).toString('base64'),
+    localCredentialsExist: async appId => (await loadSavedCredentials(appId, true)) != null,
   }
 }
 
@@ -225,7 +228,9 @@ export async function runCredentialsManage(input: CredentialsManageInput, deps: 
       if (value === undefined)
         return 'action:"set" needs a value, or a valueFile (a path to base64-encode — for keystores, .p12, .p8, or service-account JSON).'
       try {
-        await deps.updateSavedCredentials(appId, input.platform!, { [input.key]: value } as Partial<BuildCredentials>)
+        // Write to the SAME store the load read from (local .capgo-credentials.json takes precedence).
+        const local = await deps.localCredentialsExist(appId)
+        await deps.updateSavedCredentials(appId, input.platform!, { [input.key]: value } as Partial<BuildCredentials>, local)
       }
       catch {
         return `Could not save ${input.key} for ${input.platform} on "${appId}" — writing to the credential store failed. Nothing was changed.`
@@ -242,7 +247,10 @@ export async function runCredentialsManage(input: CredentialsManageInput, deps: 
       if (!(input.key in platCreds))
         return `"${input.key}" is not set for ${input.platform} on "${appId}". Nothing to remove. Use action:"list" to see the saved fields.`
       try {
-        await deps.removeSavedCredentialKeys(appId, input.platform!, [input.key])
+        // Write to the SAME store the load read from: if a project-local .capgo-credentials.json
+        // wins, the global store edit would silently no-op for the user's builds.
+        const local = await deps.localCredentialsExist(appId)
+        await deps.removeSavedCredentialKeys(appId, input.platform!, [input.key], local)
       }
       catch {
         return `Could not remove ${input.key} for ${input.platform} on "${appId}" — writing to the credential store failed.`

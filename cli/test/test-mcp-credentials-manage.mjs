@@ -37,13 +37,13 @@ function makeDeps(opts = {}) {
   const deps = {
     getAppId: async () => appId,
     loadSavedCredentials: async id => store[id] ?? null,
-    updateSavedCredentials: async (id, platform, creds) => {
-      state.updates.push({ id, platform, creds })
+    updateSavedCredentials: async (id, platform, creds, local) => {
+      state.updates.push({ id, platform, creds, local })
       store[id] = store[id] ?? {}
       store[id][platform] = { ...store[id][platform], ...creds }
     },
-    removeSavedCredentialKeys: async (id, platform, keys) => {
-      state.removes.push({ id, platform, keys })
+    removeSavedCredentialKeys: async (id, platform, keys, local) => {
+      state.removes.push({ id, platform, keys, local })
       if (store[id]?.[platform]) for (const k of keys) delete store[id][platform][k]
     },
     exportCredentialsToEnv: (o) => {
@@ -57,6 +57,7 @@ function makeDeps(opts = {}) {
       if (!(p in files)) throw new Error('ENOENT')
       return Buffer.from(files[p]).toString('base64')
     },
+    localCredentialsExist: async () => opts.local ?? false,
   }
   return { deps, state, store }
 }
@@ -186,6 +187,18 @@ await test('screenExportPath keeps the .env inside the project dir', async () =>
   ok(!screenExportPath('sub/dir/.env', proj), 'allows a nested file in the project')
   ok(screenExportPath('/etc/cron.d/capgo', proj), 'refuses /etc/cron.d')
   ok(screenExportPath('../../../../etc/passwd', proj), 'refuses traversal out of the project')
+})
+
+await test('set/remove write to the LOCAL store when a project-local store wins the load', async () => {
+  const g = makeDeps({ store: { 'com.acme.app': { android: { ...ANDROID } } }, local: true })
+  await runCredentialsManage({ action: 'set', platform: 'android', key: 'KEYSTORE_STORE_PASSWORD', value: 'x' }, g.deps)
+  ok(g.state.updates[0].local === true, 'set passed local:true')
+  await runCredentialsManage({ action: 'remove', platform: 'android', key: 'KEYSTORE_KEY_ALIAS' }, g.deps)
+  ok(g.state.removes[0].local === true, 'remove passed local:true')
+  // default (no local store) → writes global
+  const gg = makeDeps({ store: { 'com.acme.app': { android: { ...ANDROID } } } })
+  await runCredentialsManage({ action: 'set', platform: 'android', key: 'KEYSTORE_STORE_PASSWORD', value: 'x' }, gg.deps)
+  ok(gg.state.updates[0].local === false, 'set passed local:false when no local store')
 })
 
 await test('set with an unknown key → still saves but warns about the field name', async () => {

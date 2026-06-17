@@ -89,11 +89,15 @@ export function buildJobDeps(cwd: string): BuildJobDeps {
         const st = await stat(logPath)
         if (cursor >= st.size)
           return { text: '', nextCursor: st.size, eof: true }
+        // Bound the read: capgo_build_logs only keeps the last MAX_LOG_CHARS, so a
+        // cursor:0 request on a huge native build log must NOT allocate the whole
+        // file — read at most the last 64 KiB (well above the 8k display cap).
+        const start = Math.max(cursor, st.size - 64 * 1024)
+        const len = st.size - start
         const fh = await open(logPath, 'r')
         try {
-          const len = st.size - cursor
           const buf = Buffer.alloc(len)
-          await fh.read(buf, 0, len, cursor)
+          await fh.read(buf, 0, len, start)
           return { text: buf.toString('utf8'), nextCursor: st.size, eof: true }
         }
         finally {

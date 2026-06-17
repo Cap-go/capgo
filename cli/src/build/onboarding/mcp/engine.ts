@@ -3390,9 +3390,9 @@ function buildFailedResult(appId: string, platform: Platform, rec: BuildOutputRe
     context: { appId, platform, jobId: rec.jobId, status: rec.status, recordPath },
     next: {
       tool: 'capgo_build_logs',
-      with: { platform },
-      instruction: 'Read the build logs with capgo_build_logs, tell the user what failed, and PROPOSE a fix. Do NOT act on your own behalf: do not edit files or retry automatically. Ask the user to confirm before retrying, and retry ONLY via start_capgo_build once they agree. Never call start_capgo_builder_onboarding or next_step to move past or restart onboarding — the build is a required gate.',
-      call: `capgo_build_logs({ platform: "${platform}" })`,
+      with: { job_id: rec.jobId },
+      instruction: 'Read the build logs with capgo_build_logs (pass the job_id), tell the user what failed, and PROPOSE a fix. Do NOT act on your own behalf: do not edit files or retry automatically. Ask the user to confirm before retrying, and retry ONLY via start_capgo_build once they agree. Never call start_capgo_builder_onboarding or next_step to move past or restart onboarding — the build is a required gate.',
+      call: `capgo_build_logs({ job_id: "${rec.jobId}" })`,
     },
     rules: ONBOARDING_RULES,
   }
@@ -4061,9 +4061,20 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
     if (tailAppId) {
       const androidProg = await deps.loadAndroidProgress(tailAppId)
       const iosProg = await deps.loadProgress(tailAppId)
-      const tailPlatform: Platform | null = androidProg?.completedSteps?.credentialsSaved
-        ? 'android'
-        : iosProg?.completedSteps?.credentialsSaved ? 'ios' : null
+      const androidReady = !!androidProg?.completedSteps?.credentialsSaved
+      const iosReady = !!iosProg?.completedSteps?.credentialsSaved
+      // Prefer the session's ACTIVE platform when BOTH platforms have saved
+      // credentials (e.g. android build was skipped and the user is now completing
+      // the iOS post-build tail) — a hard android-first precedence would misroute
+      // the iOS tail answer into android progress. Fall back to android-then-ios
+      // when the session platform is unknown (single-platform / fresh process).
+      const sessionPlatform = getSessionPlatform(tailAppId)
+      const tailPlatform: Platform | null
+        = (sessionPlatform === 'ios' && iosReady)
+          ? 'ios'
+          : (sessionPlatform === 'android' && androidReady)
+              ? 'android'
+              : androidReady ? 'android' : iosReady ? 'ios' : null
       const facts = await gatherFacts(deps)
       if (!tailPlatform) {
         // No tail in flight — a tail answer here is always stale/early.
