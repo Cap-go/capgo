@@ -9,7 +9,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import BeakerIcon from '~icons/heroicons/beaker'
 import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
-import Spinner from '~/components/Spinner.vue'
+import PageLoader from '~/components/PageLoader.vue'
 import { formatLocalDateTime } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { showUploadReplicationToast } from '~/services/updateReplicationToast'
@@ -202,9 +202,7 @@ displayStore.defaultBack = '/dashboard'
           {{ errorMessage }}
         </div>
 
-        <div v-else-if="isLoading && !data" class="flex items-center justify-center min-h-80">
-          <Spinner size="w-24 h-24" />
-        </div>
+        <PageLoader v-else-if="isLoading && !data" />
 
         <div v-else-if="data" class="space-y-6">
           <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">

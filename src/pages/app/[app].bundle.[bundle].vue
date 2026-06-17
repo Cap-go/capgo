@@ -195,7 +195,7 @@ async function getChannels() {
     }
   }))
   promotableChannelIds.value = new Set(channelPermissions.filter(result => result.allowed).map(result => result.channelId))
-  showBundleMetadataInput.value = !!channels.value.find(c => c.disable_auto_update === 'version_number')
+  showBundleMetadataInput.value = channels.value.some(c => c.disable_auto_update === 'version_number')
 }
 
 async function openChannelLink() {
@@ -224,18 +224,18 @@ const checksumInfo = computed(() => {
 async function setChannel(channel: Database['public']['Tables']['channels']['Row'], id: number | null) {
   if (!canPromoteChannel(channel.id)) {
     toast.error(t('no-permission'))
-    return Promise.reject(new Error('No permission'))
+    throw new Error('No permission')
   }
 
   if (id !== null && typeof id !== 'number') {
     console.error('Invalid version ID:', id)
     toast.error(t('error-invalid-version'))
-    return Promise.reject(new Error('Invalid version ID'))
+    throw new Error('Invalid version ID')
   }
 
   if (!(await checkPermissions('channel.promote_bundle', { channelId: channel.id }))) {
     toast.error(t('no-permission'))
-    return Promise.reject(new Error('No permission to update channel version'))
+    throw new Error('No permission to update channel version')
   }
 
   return supabase
@@ -300,7 +300,7 @@ async function handleChannelLink(chan: Database['public']['Tables']['channels'][
     } = await checkCompatibilityNativePackages(version.value.app_id, chan.name, (version.value.native_packages as any) ?? [])
 
     // Check if any package is incompatible
-    if (localDependencies.length > 0 && finalCompatibility.find(x => !isCompatible(x))) {
+    if (localDependencies.length > 0 && finalCompatibility.some(x => !isCompatible(x))) {
       toast.error(t('bundle-not-compatible-with-channel', { channel: chan.name }))
 
       dialogStore.openDialog({
@@ -823,9 +823,7 @@ async function deleteBundle() {
 
 <template>
   <div>
-    <div v-if="loading" class="flex flex-col justify-center items-center min-h-[50vh]">
-      <Spinner size="w-40 h-40" />
-    </div>
+    <PageLoader v-if="loading" />
     <div v-else-if="version">
       <div id="devices" class="mt-0 md:mt-8">
         <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
