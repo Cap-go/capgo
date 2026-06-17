@@ -82,13 +82,13 @@ const mockVersions: AppVersion[] = [
 ]
 
 type FilterValue
-  = { type: 'eq'; value: string }
-  | { type: 'neq'; value: string }
-  | { type: 'ilike'; value: string }
-  | { type: 'isNotNull'; value: true }
-  | { type: 'isNull'; value: true }
-  | { type: 'in'; value: number[] }
-  | { type: 'raw'; value: string }
+  = { type: 'eq', value: string }
+    | { type: 'neq', value: string }
+    | { type: 'ilike', value: string }
+    | { type: 'isNotNull', value: true }
+    | { type: 'isNull', value: true }
+    | { type: 'in', value: number[] }
+    | { type: 'raw', value: string }
 
 function getFilterValue(params: URLSearchParams, key: string): FilterValue | undefined {
   const value = params.get(key)
@@ -186,7 +186,7 @@ function mockRestTable(page: Page) {
       await route.abort()
     }),
     page.route('**/rest/v1/app_versions*', async (route) => {
-      const accept = route.request().headers()['accept'] ?? ''
+      const accept = route.request().headers().accept ?? ''
       const response = filterAppVersions(route.request().url(), accept)
       await routeToObject(route, response)
     }),

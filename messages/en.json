@@ -1004,6 +1004,7 @@
   "dependencies-unchanged-packages": "Unchanged",
   "dependencies-version-mismatch-with-values": "Native version changed: {baseline} → {candidate}",
   "dependencies-version-text-unchanged": "Version text is unchanged",
+  "deploy-confirm": "Deploy",
   "deploy-date": "Deploy Date",
   "deploy-default-channels-help": "Select the default channels that should receive this bundle.",
   "deploy-default-channels-label": "Default channels",

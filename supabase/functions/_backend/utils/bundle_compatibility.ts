@@ -113,6 +113,10 @@ function statusFor(
   return 'unchanged'
 }
 
+function isIncompatibleReason(reason: IncompatibilityReason) {
+  return reason !== 'requested_version_changed'
+}
+
 export function compareNativePackages(
   candidatePackages: readonly NativePackage[],
   baselinePackages: readonly NativePackage[],
@@ -136,7 +140,7 @@ export function compareNativePackages(
       candidateAndroidChecksum: candidate?.android_checksum,
       baselineAndroidChecksum: baseline?.android_checksum,
       status: statusFor(candidate, baseline, reasons),
-      compatible: reasons.length === 0,
+      compatible: !reasons.some(isIncompatibleReason),
       reasons,
     }
   }).sort((a, b) => {

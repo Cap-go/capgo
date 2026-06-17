@@ -58,7 +58,7 @@ describe('backend bundle compatibility helpers', () => {
     })
   })
 
-  it.concurrent('flags requested version constraint changes when resolved versions match', () => {
+  it.concurrent('flags requested version constraint changes as metadata when resolved versions match', () => {
     const comparisons = compareNativePackages(
       [pkg('@capgo/native', '1.2.0', { requested_version: '^1.2.0' })],
       [pkg('@capgo/native', '1.2.0', { requested_version: '1.2.x' })],
@@ -66,7 +66,7 @@ describe('backend bundle compatibility helpers', () => {
 
     expect(comparisons[0]).toMatchObject({
       status: 'changed',
-      compatible: false,
+      compatible: true,
       reasons: ['requested_version_changed'],
       candidateRequestedVersion: '^1.2.0',
       baselineRequestedVersion: '1.2.x',
