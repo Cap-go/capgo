@@ -93,8 +93,22 @@ backfill code, design for this scale:
 
 - `manifest` has millions of rows, and operational scripts can need to scan or
   repair millions of records.
+- Plugin endpoints serve roughly 2M to 50M device requests per day. Anything
+  used by `/updates`, `/stats`, `/channel_self`, or other plugin traffic must be
+  designed as a hot path first.
+- Plugin endpoints must never use the primary Supabase/Postgres database in the
+  request path. Design plugin-facing systems around replicated data, edge
+  caches, durable queues, or precomputed state that can survive this traffic
+  level without primary database fan-out.
+- The web console has a much smaller frontend audience, usually around 500 to
+  1k end users, so raw UI request scale is less often the bottleneck. Do not
+  apply console-scale assumptions to plugins, bundle processing, storage, or
+  automation systems.
 - A normal app bundle can contain thousands of files; 5k files in one bundle is
   expected, not an edge case.
+- Bundles and automation paths must be solid at backend scale. Audit logs and
+  manifest-related datasets can each be multiple GB, so scripts, jobs, and
+  queries must be bounded and resumable.
 - R2 storage is at TB scale. Do not download objects locally for copy, repair,
   size, or migration jobs when the provider supports server-side operations.
 - Manifest size work must handle large batches. A design that only processes
