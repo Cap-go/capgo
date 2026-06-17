@@ -392,6 +392,14 @@ describe('logsnag revenue metric helpers', () => {
         date_id: '2026-03-24',
       },
     })
+    expect(logsnagInsightsTestUtils.buildLogsnagInsightsShardMessage('revenue', '2026-03-24', 2)).toEqual({
+      function_name: 'logsnag_insights_revenue',
+      function_type: 'cloudflare',
+      payload: {
+        date_id: '2026-03-24',
+        retry_count: 2,
+      },
+    })
   })
 
   it.concurrent('normalizes global stats shard and date payloads', () => {
@@ -459,6 +467,107 @@ describe('logsnag revenue metric helpers', () => {
       resolveUpdate()
       await scheduledPromise
       expect(runUpdate).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      globalWithEdgeRuntime.EdgeRuntime = previousEdgeRuntime
+    }
+  })
+
+  it('schedules global stats shard work in the EdgeRuntime background path', async () => {
+    const globalWithEdgeRuntime = globalThis as typeof globalThis & {
+      EdgeRuntime?: { waitUntil: (promise: Promise<unknown>) => void }
+    }
+    const previousEdgeRuntime = globalWithEdgeRuntime.EdgeRuntime
+    let scheduledPromise: Promise<unknown> | null = null
+    let resolveShard!: () => void
+    const shardPromise = new Promise<void>((resolve) => {
+      resolveShard = resolve
+    })
+    const waitUntil = vi.fn((promise: Promise<unknown>) => {
+      scheduledPromise = promise
+    })
+
+    globalWithEdgeRuntime.EdgeRuntime = { waitUntil }
+
+    try {
+      const app = new Hono()
+      const runShard = vi.fn((_c: Context, _shard: string, _dateId: string) => shardPromise)
+      const cancelRetry = vi.fn(async (_c: Context, _retryMsgId: number) => {})
+      app.post('/', async (c) => {
+        await logsnagInsightsTestUtils.scheduleLogsnagInsightsShardUpdate(c, 'core', '2026-03-24', {
+          cancelRetry,
+          retryCount: 1,
+          retryMsgId: 654,
+          runShard,
+        })
+        return c.json({ status: 'ok' })
+      })
+
+      const requestTimeoutMs = 500
+      const responseStatusPromise = (async () => {
+        const response = await app.request('http://localhost/', { method: 'POST' })
+        return response.status
+      })()
+      const result = await Promise.race([
+        responseStatusPromise,
+        new Promise<'timeout'>(resolve => setTimeout(() => resolve('timeout'), requestTimeoutMs)),
+      ])
+
+      expect(result).toBe(200)
+      expect(waitUntil).toHaveBeenCalledTimes(1)
+      if (!scheduledPromise)
+        throw new Error('Expected waitUntil to receive a promise')
+
+      resolveShard()
+      await scheduledPromise
+      expect(runShard).toHaveBeenCalledTimes(1)
+      expect(runShard).toHaveBeenCalledWith(expect.anything(), 'core', '2026-03-24')
+      expect(cancelRetry).toHaveBeenCalledTimes(1)
+      expect(cancelRetry).toHaveBeenCalledWith(expect.anything(), 654)
+    }
+    finally {
+      globalWithEdgeRuntime.EdgeRuntime = previousEdgeRuntime
+    }
+  })
+
+  it('leaves a reserved shard retry queued when the background shard update fails', async () => {
+    const globalWithEdgeRuntime = globalThis as typeof globalThis & {
+      EdgeRuntime?: { waitUntil: (promise: Promise<unknown>) => void }
+    }
+    const previousEdgeRuntime = globalWithEdgeRuntime.EdgeRuntime
+    let scheduledPromise: Promise<unknown> | null = null
+    const waitUntil = vi.fn((promise: Promise<unknown>) => {
+      scheduledPromise = promise
+    })
+
+    globalWithEdgeRuntime.EdgeRuntime = { waitUntil }
+
+    try {
+      const app = new Hono()
+      const runShard = vi.fn(async (_c: Context, _shard: string, _dateId: string) => {
+        throw new Error('shard failed')
+      })
+      const cancelRetry = vi.fn(async (_c: Context, _retryMsgId: number) => {})
+      app.post('/', async (c) => {
+        await logsnagInsightsTestUtils.scheduleLogsnagInsightsShardUpdate(c, 'core', '2026-03-24', {
+          cancelRetry,
+          retryCount: 1,
+          retryMsgId: 654,
+          runShard,
+        })
+        return c.json({ status: 'ok' })
+      })
+
+      const response = await Promise.resolve(app.request('http://localhost/', { method: 'POST' }))
+      expect(response.status).toBe(200)
+      expect(waitUntil).toHaveBeenCalledTimes(1)
+      if (!scheduledPromise)
+        throw new Error('Expected waitUntil to receive a promise')
+
+      await scheduledPromise
+      expect(runShard).toHaveBeenCalledTimes(1)
+      expect(runShard).toHaveBeenCalledWith(expect.anything(), 'core', '2026-03-24')
+      expect(cancelRetry).not.toHaveBeenCalled()
     }
     finally {
       globalWithEdgeRuntime.EdgeRuntime = previousEdgeRuntime

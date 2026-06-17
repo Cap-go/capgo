@@ -270,6 +270,13 @@ interface ScheduleLogsnagInsightsUpdateOptions {
   cancelRetry?: (c: Context, retryMsgId: number) => Promise<void>
 }
 
+interface ScheduleLogsnagInsightsShardOptions {
+  retryCount?: number
+  retryMsgId?: number | null
+  cancelRetry?: (c: Context, retryMsgId: number) => Promise<void>
+  runShard?: (c: Context, shard: GlobalStatsShard, dateId: string) => Promise<void>
+}
+
 function normalizeLogsnagInsightsRetryCount(value: unknown): number {
   const retryCount = Number(value)
   if (!Number.isFinite(retryCount) || retryCount < 0)
@@ -292,12 +299,13 @@ function getLogsnagInsightsShardFunctionName(shard: GlobalStatsShard): string {
   return `logsnag_insights_${shard}`
 }
 
-function buildLogsnagInsightsShardMessage(shard: GlobalStatsShard, dateId: string) {
+function buildLogsnagInsightsShardMessage(shard: GlobalStatsShard, dateId: string, retryCount = 0) {
   return {
     function_name: getLogsnagInsightsShardFunctionName(shard),
     function_type: 'cloudflare',
     payload: {
       date_id: dateId,
+      ...(retryCount > 0 ? { retry_count: retryCount } : {}),
     },
   }
 }
@@ -368,6 +376,33 @@ async function reserveLogsnagInsightsRetry(c: Context, retryCount: number, dateI
     cloudlog({
       requestId: c.get('requestId'),
       message: 'Reserved logsnag insights dispatcher retry',
+      retryCount: nextRetryCount,
+      delaySeconds,
+      retryMsgId,
+      dateId,
+    })
+    return retryMsgId
+  }
+  finally {
+    await closeClient(c, db)
+  }
+}
+
+async function reserveLogsnagInsightsShardRetry(c: Context, shard: GlobalStatsShard, dateId: string, retryCount: number): Promise<number | null> {
+  if (retryCount >= LOGSNAG_INSIGHTS_BACKGROUND_MAX_RETRIES)
+    return null
+
+  const nextRetryCount = retryCount + 1
+  const delaySeconds = LOGSNAG_INSIGHTS_RETRY_DELAY_SECONDS * nextRetryCount
+  const retryMessage = buildLogsnagInsightsShardMessage(shard, dateId, nextRetryCount)
+  const db = getPgClient(c)
+
+  try {
+    const retryMsgId = await queueLogsnagInsightsMessage(db, retryMessage, delaySeconds)
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Reserved logsnag insights shard retry',
+      shard,
       retryCount: nextRetryCount,
       delaySeconds,
       retryMsgId,
@@ -2393,7 +2428,9 @@ export const logsnagInsightsTestUtils = {
   isPaidPlanAtBillingSnapshot,
   normalizeCoreSnapshotCounts,
   reserveLogsnagInsightsRetry,
+  reserveLogsnagInsightsShardRetry,
   scheduleLogsnagInsightsUpdate,
+  scheduleLogsnagInsightsShardUpdate,
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -2440,6 +2477,40 @@ async function runLogsnagInsightsShard(c: Context, shard: GlobalStatsShard, date
   }
 }
 
+function scheduleLogsnagInsightsShardUpdate(
+  c: Context,
+  shard: GlobalStatsShard,
+  dateId: string,
+  options: ScheduleLogsnagInsightsShardOptions = {},
+) {
+  const retryCount = options.retryCount ?? 0
+  const retryMsgId = options.retryMsgId ?? null
+  const cancelRetry = options.cancelRetry ?? cancelLogsnagInsightsRetry
+  const runShard = options.runShard ?? runLogsnagInsightsShard
+  let updateSucceeded = false
+  const task = Promise.resolve()
+    .then(() => runShard(c, shard, dateId))
+    .then(async () => {
+      updateSucceeded = true
+      if (retryMsgId === null)
+        return
+      await cancelRetry(c, retryMsgId)
+    })
+    .catch(async (error: unknown) => {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'logsnag insights shard background task failed', shard, dateId, retryCount, retryMsgId, updateSucceeded, error })
+      if (retryMsgId !== null && !updateSucceeded)
+        return
+      if (retryMsgId !== null)
+        throw error
+      if (retryCount >= LOGSNAG_INSIGHTS_BACKGROUND_MAX_RETRIES) {
+        cloudlogErr({ requestId: c.get('requestId'), message: 'logsnag insights shard background retry budget exhausted', shard, dateId, retryCount, error })
+        throw error
+      }
+    })
+
+  return backgroundTask(c, task)
+}
+
 async function runLogsnagInsightsUpdate(c: Context, dateId = getDailyWindow().prevDayDateId, retryCount = 0): Promise<void> {
   if (await shouldSkipCompletedLogsnagInsightsRetryDispatch(c, dateId, retryCount))
     return
@@ -2455,12 +2526,30 @@ function resolveLogsnagInsightsSnapshotDateId(payload: LogsnagInsightsPayload): 
   return payloadDateId ?? getDailyWindow().prevDayDateId
 }
 
+async function scheduleLogsnagInsightsShardRequest(c: Context, shard: GlobalStatsShard, snapshotDateId: string, retryCount: number): Promise<void> {
+  let retryMsgId: number | null = null
+
+  try {
+    retryMsgId = await reserveLogsnagInsightsShardRetry(c, shard, snapshotDateId, retryCount)
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to reserve logsnag insights shard retry', shard, retryCount, dateId: snapshotDateId, error })
+    quickError(503, 'logsnag_insights_shard_retry_reserve_failed', 'Failed to reserve logsnag insights shard retry', { shard, retryCount, dateId: snapshotDateId }, error, { alert: false })
+  }
+
+  await scheduleLogsnagInsightsShardUpdate(c, shard, snapshotDateId, {
+    retryCount,
+    retryMsgId,
+  })
+}
+
 function createLogsnagInsightsShardApp(shard: GlobalStatsShard): Hono<MiddlewareKeyVariables> {
   const shardApp = new Hono<MiddlewareKeyVariables>()
 
   shardApp.post('/', middlewareAPISecret, async (c) => {
     const payload = await readLogsnagInsightsPayload(c)
     const snapshotDateId = resolveLogsnagInsightsSnapshotDateId(payload)
+    const retryCount = normalizeLogsnagInsightsRetryCount(payload.retry_count)
 
     if (payload.shard !== undefined) {
       const payloadShard = normalizeLogsnagInsightsShard(payload.shard)
@@ -2468,8 +2557,8 @@ function createLogsnagInsightsShardApp(shard: GlobalStatsShard): Hono<Middleware
         quickError(400, 'invalid_global_stats_shard', 'Invalid global stats shard', { shard: payload.shard, expected: shard }, undefined, { alert: false })
     }
 
-    await runLogsnagInsightsShard(c, shard, snapshotDateId)
-    return c.json(BRES)
+    await scheduleLogsnagInsightsShardRequest(c, shard, snapshotDateId, retryCount)
+    return c.json(BRES, 202)
   })
 
   return shardApp
@@ -2490,17 +2579,17 @@ export const logsnagInsightsShardApps: Record<GlobalStatsShard, Hono<MiddlewareK
 app.post('/', middlewareAPISecret, async (c) => {
   const payload = await readLogsnagInsightsPayload(c)
   const snapshotDateId = resolveLogsnagInsightsSnapshotDateId(payload)
+  const retryCount = normalizeLogsnagInsightsRetryCount(payload.retry_count)
 
   if (payload.shard !== undefined) {
     const shard = normalizeLogsnagInsightsShard(payload.shard)
     if (shard === null)
       quickError(400, 'invalid_global_stats_shard', 'Invalid global stats shard', { shard: payload.shard }, undefined, { alert: false })
 
-    await runLogsnagInsightsShard(c, shard, snapshotDateId)
-    return c.json(BRES)
+    await scheduleLogsnagInsightsShardRequest(c, shard, snapshotDateId, retryCount)
+    return c.json(BRES, 202)
   }
 
-  const retryCount = normalizeLogsnagInsightsRetryCount(payload.retry_count)
   let retryMsgId: number | null = null
 
   try {
