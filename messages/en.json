@@ -478,7 +478,7 @@
   "build-step-android-setup-title": "Save Android signing credentials",
   "build-step-ios-setup-subtitle": "Run the guided CLI setup for certificates, profiles, and App Store Connect.",
   "build-step-ios-setup-title": "Set up iOS signing",
-  "runner-wait-time": "Wait Time",
+  "build-duration": "Build Duration",
   "build-step-request-subtitle-platform": "Request a {platform} build with the CLI.",
   "build-setup-invite-title": "Set up native builds",
   "build-setup-invite-subtitle": "You don't have any builds yet. Pick a platform to get started with Capgo native builds.",

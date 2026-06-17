@@ -33,6 +33,7 @@ const search = ref('')
 const showSteps = ref(false)
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const elements = ref<Element[]>([])
+const buildDurations = ref<Record<string, number>>({})
 const isLoading = ref(true)
 const currentPage = ref(1)
 const total = ref(0)
@@ -124,7 +125,9 @@ async function getData() {
       return
     }
 
-    elements.value = data || []
+    const builds = data || []
+    await loadBuildDurations(builds)
+    elements.value = builds
     total.value = count || 0
   }
   catch (error) {
@@ -134,6 +137,34 @@ async function getData() {
   finally {
     isLoading.value = false
   }
+}
+
+async function loadBuildDurations(builds: Element[]) {
+  const jobIds = builds
+    .map(build => build.builder_job_id)
+    .filter((id): id is string => !!id)
+
+  if (jobIds.length === 0) {
+    buildDurations.value = {}
+    return
+  }
+
+  const { data, error } = await supabase
+    .from('build_logs')
+    .select('build_id, build_time_unit')
+    .in('build_id', jobIds)
+
+  if (error) {
+    console.error('Error fetching build durations:', error)
+    return
+  }
+
+  const durations: Record<string, number> = {}
+  for (const log of data ?? []) {
+    if (log.build_id != null && log.build_time_unit != null)
+      durations[log.build_id] = log.build_time_unit
+  }
+  buildDurations.value = durations
 }
 
 async function reload() {
@@ -199,7 +230,7 @@ function getStatusColor(status: string): string {
   }
 }
 
-function formatWaitTime(seconds: number | null | undefined): string {
+function formatDuration(seconds: number | null | undefined): string {
   const safeSeconds = Math.max(0, Math.floor(seconds ?? 0))
   if (safeSeconds < 60)
     return `${safeSeconds}s`
@@ -235,10 +266,14 @@ columns.value = [
     },
   },
   {
-    label: t('runner-wait-time'),
-    key: 'runner_wait_seconds',
+    label: t('build-duration'),
+    key: 'build_duration',
     class: 'truncate max-w-24',
-    displayFunction: (elem: Element) => formatWaitTime(elem.runner_wait_seconds),
+    displayFunction: (elem: Element) => {
+      const jobId = elem.builder_job_id
+      const duration = jobId ? buildDurations.value[jobId] : undefined
+      return duration != null ? formatDuration(duration) : '—'
+    },
   },
   {
     label: t('status'),
