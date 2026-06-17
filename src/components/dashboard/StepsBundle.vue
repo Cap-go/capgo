@@ -23,6 +23,7 @@ const displayStore = useDisplayStore()
 const isLoading = ref(false)
 const step = ref(0)
 const clicked = ref(0)
+const detectedAppId = ref<string>()
 const realtimeListener = ref(false)
 const pollTimer = ref<number | null>(null)
 const initialCount = ref<number | null>(null)
@@ -195,6 +196,24 @@ async function getVersionsCount(): Promise<number> {
   return count ?? 0
 }
 
+async function getLatestVersionId(): Promise<string | undefined> {
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!orgId || !props.appId)
+    return undefined
+  const { data, error } = await supabase
+    .from('app_versions')
+    .select('id, created_at')
+    .eq('owner_org', orgId)
+    .eq('app_id', props.appId)
+    .eq('deleted', false)
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  if (error || !data || data.length === 0)
+    return undefined
+  return `${data[0].id}`
+}
+
 function openInviteDialog() {
   inviteModalRef.value?.openDialog()
 }
@@ -227,7 +246,9 @@ watchEffect(async () => {
       try {
         const current = await getVersionsCount()
         if (initialCount.value !== null && current > initialCount.value) {
+          const latestId = await getLatestVersionId()
           step.value += 1
+          detectedAppId.value = latestId ?? ''
           realtimeListener.value = false
           clearWatchers()
           setLog()
