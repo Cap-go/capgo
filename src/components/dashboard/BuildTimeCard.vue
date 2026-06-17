@@ -1,21 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-  computeLastDayEvolution,
-  dayIndexInWindow,
-  filterToBillingPeriod,
-  getLast30DaysWindow,
-  WINDOW_DAYS,
-} from '~/services/buildCharts'
+import { useBuildCardStats } from '~/composables/useBuildCardStats'
+import { computeLastDayEvolution, dayIndexInWindow, fetchAllRows } from '~/services/buildCharts'
 import { useSupabase } from '~/services/supabase'
-import { useOrganizationStore } from '~/stores/organization'
 import BuildTimeChart from './BuildTimeChart.vue'
 import ChartCard from './ChartCard.vue'
 
 const props = defineProps({
   appId: { type: String, default: '' },
-  useBillingPeriod: { type: Boolean, default: true },
+  useBillingPeriod: { type: Boolean, default: false },
   accumulated: { type: Boolean, default: false },
   reloadTrigger: { type: Number, default: 0 },
 })
@@ -24,117 +18,46 @@ const emit = defineEmits<{ 'update:loading': [value: boolean] }>()
 
 const { t } = useI18n()
 const supabase = useSupabase()
-const organizationStore = useOrganizationStore()
-let latestRequestToken = 0
 
-const totalMinutes = ref(0)
-const lastDayEvolution = ref(0)
-const minutesPerDay = ref<number[]>([])
-const isLoading = ref(true)
+interface BuildLogRow { created_at: string | null, build_time_unit: number | null }
+interface BuildTimeResult { minutesPerDay: number[], total: number, evolution: number }
 
-const hasData = computed(() => totalMinutes.value > 0)
-
-async function calculateStats() {
-  const startTime = Date.now()
-  const requestToken = ++latestRequestToken
-  isLoading.value = true
-
-  try {
-    if (!organizationStore.currentOrganization)
-      await organizationStore.awaitInitialLoad()
-
-    const targetOrg = organizationStore.getOrgByAppId(props.appId) ?? organizationStore.currentOrganization
-    const billingStart = new Date(targetOrg?.subscription_start ?? new Date())
-    billingStart.setHours(0, 0, 0, 0)
-
-    const { last30DaysStart, last30DaysEnd } = getLast30DaysWindow()
-    const startDate = last30DaysStart.toISOString()
-    const endDate = last30DaysEnd.toISOString()
-
-    // Paginate so apps with more than Supabase's max_rows cap are not undercounted.
-    const PAGE_SIZE = 1000
-    const rows: { created_at: string | null, build_time_unit: number | null }[] = []
-    for (let offset = 0; ; offset += PAGE_SIZE) {
-      const { data, error } = await supabase
-        .from('build_logs')
-        .select('created_at, build_time_unit')
-        .eq('app_id', props.appId)
-        .gte('created_at', startDate)
-        .lte('created_at', endDate)
-        .order('created_at')
-        .range(offset, offset + PAGE_SIZE - 1)
-
-      if (error)
-        throw error
-      if (!data || data.length === 0)
-        break
-      rows.push(...data)
-      if (data.length < PAGE_SIZE)
-        break
-    }
+const { isLoading, result } = useBuildCardStats<BuildTimeResult>(props, emit, {
+  empty: () => ({ minutesPerDay: [], total: 0, evolution: 0 }),
+  load: async (window) => {
+    const rows = await fetchAllRows<BuildLogRow>((from, to) => supabase
+      .from('build_logs')
+      .select('created_at, build_time_unit')
+      .eq('app_id', props.appId)
+      .gte('created_at', window.startISO)
+      .lte('created_at', window.endISO)
+      .order('created_at')
+      .range(from, to))
 
     // Accumulate real build seconds per day, then convert to minutes for display.
-    const secondsPerDay = Array.from({ length: WINDOW_DAYS }).fill(0) as number[]
+    const secondsPerDay = Array.from({ length: window.dayCount }).fill(0) as number[]
     for (const row of rows) {
       if (!row.created_at || row.build_time_unit == null)
         continue
-      const dayIndex = dayIndexInWindow(new Date(row.created_at), last30DaysStart)
-      if (dayIndex < 0 || dayIndex >= WINDOW_DAYS)
+      const dayIndex = dayIndexInWindow(new Date(row.created_at), window.windowStart)
+      if (dayIndex < 0 || dayIndex >= window.dayCount)
         continue
       secondsPerDay[dayIndex] += row.build_time_unit
     }
 
-    const finalSeconds = props.useBillingPeriod
-      ? filterToBillingPeriod(secondsPerDay, last30DaysStart, billingStart)
-      : secondsPerDay
-
-    const finalMinutes = finalSeconds.map(seconds => Math.round((seconds / 60) * 10) / 10)
-
-    if (requestToken !== latestRequestToken)
-      return
-
-    minutesPerDay.value = finalMinutes
-    totalMinutes.value = Math.round(finalSeconds.reduce((sum, seconds) => sum + seconds, 0) / 60)
-    lastDayEvolution.value = computeLastDayEvolution(finalMinutes)
-  }
-  catch (error) {
-    console.error('Error fetching build time stats:', error)
-    if (requestToken === latestRequestToken) {
-      minutesPerDay.value = []
-      totalMinutes.value = 0
-      lastDayEvolution.value = 0
+    const minutesPerDay = secondsPerDay.map(seconds => Math.round((seconds / 60) * 10) / 10)
+    return {
+      minutesPerDay,
+      total: Math.round(secondsPerDay.reduce((sum, seconds) => sum + seconds, 0) / 60),
+      evolution: computeLastDayEvolution(minutesPerDay),
     }
-  }
-  finally {
-    if (requestToken === latestRequestToken) {
-      const elapsed = Date.now() - startTime
-      if (elapsed < 300)
-        await new Promise(resolve => setTimeout(resolve, 300 - elapsed))
-      isLoading.value = false
-    }
-  }
-}
-
-watch(() => props.appId, async () => {
-  await calculateStats()
-})
-watch(() => props.useBillingPeriod, async () => {
-  await calculateStats()
-})
-watch(() => organizationStore.currentOrganization?.gid, async (newOrgId, oldOrgId) => {
-  if (newOrgId && oldOrgId && newOrgId !== oldOrgId)
-    await calculateStats()
-})
-watch(() => props.reloadTrigger, async (newVal) => {
-  if (newVal > 0)
-    await calculateStats()
+  },
 })
 
-watch(isLoading, value => emit('update:loading', value), { immediate: true })
-
-onMounted(async () => {
-  await calculateStats()
-})
+const minutesPerDay = computed(() => result.value.minutesPerDay)
+const totalMinutes = computed(() => result.value.total)
+const lastDayEvolution = computed(() => result.value.evolution)
+const hasData = computed(() => totalMinutes.value > 0)
 </script>
 
 <template>

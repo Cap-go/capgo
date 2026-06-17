@@ -1,7 +1,4 @@
 // Shared helpers for the per-app build charts (Builds by status + Build time).
-// Mirrors the date-window / billing-period / series-transform logic used by the
-// existing dashboard cards (e.g. DeploymentStatsCard / DeploymentStatsChart) so
-// the two build chart components and their cards stay consistent.
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24
 export const WINDOW_DAYS = 30
@@ -20,8 +17,9 @@ export function emptyBuildSeries(length: number = WINDOW_DAYS): BuildSeriesData 
 }
 
 // Map a build_requests.status into a terminal outcome. Returns null for builds
-// that are still in flight (pending/running) or unknown — they are not counted
-// in the succeeded/failed breakdown.
+// that are still in flight (pending/ready/starting/running) or unknown — they
+// are not counted in the succeeded/failed breakdown. Both cancel spellings are
+// handled since the backend uses each in different places.
 export function bucketBuildStatus(status: string | null | undefined): 'succeeded' | 'failed' | null {
   switch (status) {
     case 'succeeded':
@@ -29,6 +27,7 @@ export function bucketBuildStatus(status: string | null | undefined): 'succeeded
       return 'succeeded'
     case 'failed':
     case 'cancelled':
+    case 'canceled':
     case 'expired':
       return 'failed'
     default:
@@ -45,48 +44,65 @@ export function buildSeriesKey(platform: string | null | undefined, outcome: 'su
   return null
 }
 
-// 30-day window aligned to local midnight (matches existing cards).
-export function getLast30DaysWindow() {
-  const last30DaysEnd = new Date()
-  const last30DaysStart = new Date()
-  last30DaysStart.setDate(last30DaysStart.getDate() - (WINDOW_DAYS - 1))
-  last30DaysStart.setHours(0, 0, 0, 0)
-  last30DaysEnd.setHours(23, 59, 59, 999)
-  return { last30DaysStart, last30DaysEnd }
+export interface BuildChartWindow {
+  windowStart: Date // local midnight of the first rendered day
+  startISO: string // inclusive lower bound for created_at queries
+  endISO: string // inclusive upper bound (end of today)
+  dayCount: number // number of days from windowStart..today inclusive
+}
+
+// Resolve the fetch/render window. In billing-period mode it starts at the
+// org's current cycle anchor (subscription_start) so the full cycle is covered
+// — including a 31st day — instead of a fixed 30-day buffer. In last-30-days
+// mode it is the trailing 30 days. Either way data is bucketed by day from
+// windowStart, so there is no separate billing remapping step.
+export function getBuildChartWindow(useBillingPeriod: boolean, subscriptionStart?: string | null): BuildChartWindow {
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  const endOfToday = new Date()
+  endOfToday.setHours(23, 59, 59, 999)
+
+  let windowStart = new Date(todayStart)
+
+  const cycleStart = subscriptionStart ? new Date(subscriptionStart) : null
+  if (useBillingPeriod && cycleStart && !Number.isNaN(cycleStart.getTime())) {
+    cycleStart.setHours(0, 0, 0, 0)
+    const elapsedDays = Math.floor((todayStart.getTime() - cycleStart.getTime()) / DAY_IN_MS)
+    // Guard against a future or implausibly old anchor; fall back to 30 days.
+    if (elapsedDays >= 0 && elapsedDays <= 366)
+      windowStart = cycleStart
+    else
+      windowStart.setDate(windowStart.getDate() - (WINDOW_DAYS - 1))
+  }
+  else {
+    windowStart.setDate(windowStart.getDate() - (WINDOW_DAYS - 1))
+  }
+
+  const dayCount = Math.max(Math.floor((todayStart.getTime() - windowStart.getTime()) / DAY_IN_MS) + 1, 1)
+  return { windowStart, startISO: windowStart.toISOString(), endISO: endOfToday.toISOString(), dayCount }
 }
 
 export function dayIndexInWindow(date: Date, windowStart: Date): number {
   return Math.floor((date.getTime() - windowStart.getTime()) / DAY_IN_MS)
 }
 
-// Map a 30-day series onto the current billing period. Copied from the existing
-// dashboard cards so build charts align to the billing cycle identically.
-export function filterToBillingPeriod(fullData: number[], last30DaysStart: Date, billingStart: Date): number[] {
-  const currentDate = new Date()
-
-  let currentBillingDay: number
-  if (billingStart.getDate() === 1) {
-    currentBillingDay = currentDate.getDate()
+// Paginate a Supabase range query so apps above the configured max_rows cap are
+// not silently undercounted. `runRange` must apply `.range(from, to)` and return
+// the supabase result.
+export async function fetchAllRows<T>(runRange: (from: number, to: number) => PromiseLike<{ data: T[] | null, error: unknown }>): Promise<T[]> {
+  const PAGE_SIZE = 1000
+  const rows: T[] = []
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const { data, error } = await runRange(offset, offset + PAGE_SIZE - 1)
+    if (error)
+      throw error
+    if (!data || data.length === 0)
+      break
+    rows.push(...data)
+    if (data.length < PAGE_SIZE)
+      break
   }
-  else {
-    const billingStartDay = billingStart.getDate()
-    const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate()
-    currentBillingDay = (currentDate.getDate() - billingStartDay + 1 + daysInMonth) % daysInMonth
-    if (currentBillingDay === 0)
-      currentBillingDay = daysInMonth
-  }
-
-  const billingData = Array.from({ length: currentBillingDay }).fill(0) as number[]
-  for (let i = 0; i < WINDOW_DAYS; i++) {
-    const dataDate = new Date(last30DaysStart)
-    dataDate.setDate(dataDate.getDate() + i)
-    if (dataDate >= billingStart && dataDate <= currentDate) {
-      const billingIndex = Math.floor((dataDate.getTime() - billingStart.getTime()) / DAY_IN_MS)
-      if (billingIndex >= 0 && billingIndex < currentBillingDay)
-        billingData[billingIndex] = fullData[i]
-    }
-  }
-  return billingData
+  return rows
 }
 
 // Percentage change between the last two non-zero days of a series.
@@ -100,7 +116,7 @@ export function computeLastDayEvolution(series: number[]): number {
 }
 
 // Index of "today" within the rendered labels (so future billing-period days
-// stay empty). Mirrors DeploymentStatsChart.getTodayLimit.
+// stay empty).
 export function getTodayLimit(labelCount: number, useBillingPeriod: boolean, cycleStart: Date, cycleEnd: Date): number {
   if (!useBillingPeriod)
     return labelCount - 1
@@ -119,7 +135,7 @@ export function getTodayLimit(labelCount: number, useBillingPeriod: boolean, cyc
 }
 
 // Turn a raw per-day series into chart display values (daily or cumulative),
-// stopping at `limitIndex`. Mirrors DeploymentStatsChart.transformSeries.
+// stopping at `limitIndex` (clamped to the array bounds).
 export function transformSeries(source: number[], accumulated: boolean, labelCount: number, limitIndex: number) {
   const display: Array<number | null> = Array.from({ length: labelCount }).fill(null) as Array<number | null>
   const base: Array<number | null> = Array.from({ length: labelCount }).fill(null) as Array<number | null>
