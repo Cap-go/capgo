@@ -7,7 +7,7 @@ import pack from '../../package.json'
 import { enableSupabaseInstrumentation, setInvocationSource, trackMcpServerStarted, withMcpToolTracking } from '../analytics/track'
 import { addAppOptionsSchema, cleanupOptionsSchema, getStatsOptionsSchema, requestBuildOptionsSchema, starAllRepositoriesOptionsSchema, starRepoOptionsSchema, updateAppOptionsSchema, updateChannelOptionsSchema, uploadOptionsSchema } from '../schemas/sdk'
 import { CapgoSDK } from '../sdk'
-import { clearSavedKey, getLoginState, validateAndSaveKey } from '../auth/session'
+import { clearSavedKey, getLoginState, loginSuccessMessage, logoutMessage, validateAndSaveKey, whoamiMessage } from '../auth/session'
 import { findSavedKey } from '../utils'
 import { registerOnboardingTools } from '../build/onboarding/mcp/onboarding-tools'
 import { buildServerInstructions } from './instructions'
@@ -632,10 +632,7 @@ export async function startMcpServer(): Promise<void> {
         // Re-point the in-memory SDK at the new key so the very next tool call is authenticated.
         sdk = new CapgoSDK({ apikey })
         return {
-          content: [{
-            type: 'text' as const,
-            text: `Signed in to Capgo (user ${userId}). Saved to ${scope === 'local' ? './.capgo' : '~/.capgo'}. You can now use the authenticated tools.`,
-          }],
+          content: [{ type: 'text' as const, text: loginSuccessMessage(userId, scope === 'local') }],
         }
       }
       catch (error) {
@@ -656,12 +653,7 @@ export async function startMcpServer(): Promise<void> {
     {},
     async () => {
       const state = await getLoginState({ validate: true })
-      const text = state.loggedIn
-        ? `Signed in to Capgo (user ${state.userId}) using the ${state.source} key.`
-        : state.source
-          ? `Not signed in: a saved ${state.source} key exists but is no longer valid. Generate a new one at https://app.capgo.app/connect and call capgo_login.`
-          : 'Not signed in. Generate a key at https://app.capgo.app/connect and call capgo_login.'
-      return { content: [{ type: 'text' as const, text }] }
+      return { content: [{ type: 'text' as const, text: whoamiMessage(state) }] }
     },
   )
 
@@ -673,14 +665,13 @@ export async function startMcpServer(): Promise<void> {
     },
     async ({ scope }) => {
       const { cleared } = await clearSavedKey({ local: scope === 'local' })
-      // Drop the in-memory key so subsequent authed calls correctly fail until the next login.
+      // Drop the in-memory key so the main tools de-authenticate immediately.
       sdk = new CapgoSDK({})
-      const where = scope === 'local' ? './.capgo' : '~/.capgo'
+      // Be honest: if a credential is still reachable (CAPGO_TOKEN, or the other
+      // on-disk scope), say so rather than falsely claiming a full sign-out.
+      const remaining = await getLoginState()
       return {
-        content: [{
-          type: 'text' as const,
-          text: cleared ? `Signed out — removed ${where}.` : `No ${where} key to remove.`,
-        }],
+        content: [{ type: 'text' as const, text: logoutMessage(cleared, scope === 'local', remaining) }],
       }
     },
   )
@@ -690,7 +681,7 @@ export async function startMcpServer(): Promise<void> {
   // the full journey (android + iOS + tail) ships through the shared engine.
   // `bun run dev` keeps the flag undefined-safe; release builds define it to true.
   if (onboardingEnabled)
-    registerOnboardingTools(server, sdk)
+    registerOnboardingTools(server, () => sdk) // live accessor: honors capgo_login/logout reassignment
 
   // Start the server with stdio transport. Route ambient stdout (stray clack/console
   // output from any tool or dependency) to stderr so it can't corrupt the JSON-RPC

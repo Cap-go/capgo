@@ -4,9 +4,14 @@
  * validate/persist/introspect path behind `capgo login` and the MCP
  * capgo_login / capgo_whoami / capgo_logout tools.
  *
- * Covers the deterministic, offline surface: input guards, env-source
- * detection, and local-key removal. The network validation path
- * (resolveUserIdFromApiKey) is exercised by the integration smoke test.
+ * Covers the deterministic, offline surface: input guards, env-source detection,
+ * local-key removal, and the pure user-facing message builders (which encode the
+ * exact login / whoami / logout wording the tool handlers return — including the
+ * honest "you are still signed in via …" logout branches).
+ *
+ * NOT covered here: the network validate+write success path of validateAndSaveKey,
+ * which needs a live Capgo backend (resolveUserIdFromApiKey RPC). It is exercised
+ * manually / via higher-level e2e, not by this unit suite.
  */
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -24,7 +29,14 @@ async function test(name, fn) {
 function ok(c, m) { if (!c) throw new Error(m || 'expected truthy') }
 function eq(a, b, m) { if (a !== b) throw new Error(m || `expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`) }
 
-const { validateAndSaveKey, getLoginState, clearSavedKey } = await import('../src/auth/session.ts')
+const {
+  validateAndSaveKey,
+  getLoginState,
+  clearSavedKey,
+  loginSuccessMessage,
+  whoamiMessage,
+  logoutMessage,
+} = await import('../src/auth/session.ts')
 
 await test('validateAndSaveKey rejects an empty key (no write, no network)', async () => {
   let threw = false
@@ -73,6 +85,30 @@ await test('clearSavedKey(local) removes ./.capgo and is idempotent', async () =
     eq((await clearSavedKey({ local: true })).cleared, false, 'idempotent after removal')
   }
   finally { process.chdir(prev) }
+})
+
+await test('whoamiMessage covers signed-in / unverified / invalid / signed-out', () => {
+  ok(/user u123/.test(whoamiMessage({ loggedIn: true, userId: 'u123', source: 'global', verified: true })), 'signed-in names the user')
+  ok(/could not be reached/i.test(whoamiMessage({ loggedIn: true, source: 'env', verified: false })), 'unverified reported distinctly, not as logged-out')
+  ok(/no longer valid/i.test(whoamiMessage({ loggedIn: false, source: 'local' })), 'present-but-invalid key is called out')
+  ok(/not signed in\./i.test(whoamiMessage({ loggedIn: false })), 'no key → not signed in')
+})
+
+await test('logoutMessage is honest when a credential still remains', () => {
+  const envRemains = logoutMessage(true, false, { loggedIn: true, source: 'env' })
+  ok(/still signed in/i.test(envRemains) && /CAPGO_TOKEN/.test(envRemains), 'must warn the env token still authenticates')
+
+  const localRemains = logoutMessage(true, false, { loggedIn: true, source: 'local' })
+  ok(/still signed in/i.test(localRemains) && /scope "local"/.test(localRemains), 'must warn a cross-scope local key still authenticates')
+
+  ok(/signed out/i.test(logoutMessage(true, false, { loggedIn: false })), 'clean sign-out when nothing remains')
+  ok(/no .*to remove/i.test(logoutMessage(false, true, { loggedIn: false })), 'nothing-to-remove path')
+})
+
+await test('loginSuccessMessage names the user and the scope path', () => {
+  const global = loginSuccessMessage('u9', false)
+  ok(/user u9/.test(global) && global.includes('~/.capgo'), 'global path mentions user + ~/.capgo')
+  ok(loginSuccessMessage('u9', true).includes('./.capgo'), 'local path mentions ./.capgo')
 })
 
 console.log(`📊 Results: ${pass} passed, ${fail} failed`)

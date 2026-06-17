@@ -1,8 +1,8 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import process from 'node:process'
-import { createSupabaseClient, findSavedKeySilent, resolveUserIdFromApiKey, sendEvent } from '../utils'
+import { createSupabaseClient, resolveUserIdFromApiKey, sendEvent } from '../utils'
 import { appendToSafeFile, writeFileAtomic } from '../utils/safeWrites'
 
 /**
@@ -11,17 +11,26 @@ import { appendToSafeFile, writeFileAtomic } from '../utils/safeWrites'
  * `cli/src/login.ts` (the interactive `capgo login` command) and the MCP login
  * tools (`capgo_login` / `capgo_whoami` / `capgo_logout`) all funnel through these
  * helpers so there is a single validate / persist / introspect path — no forked
- * security logic.
+ * security logic. The user-facing message builders live here too (pure functions)
+ * so the tool wording is covered by unit tests rather than only the integration
+ * smoke test.
  */
 
 export type KeySource = 'env' | 'global' | 'local'
 
 export interface LoginState {
   loggedIn: boolean
-  /** Resolved user id — only populated when `validate` was requested and the key is valid. */
+  /** Resolved user id — only populated when `validate` succeeded. */
   userId?: string
-  /** Where the saved key was found, if any (even when it failed validation). */
+  /** Where the resolved key came from, if any (also set when a present key fails validation). */
   source?: KeySource
+  /**
+   * Only meaningful when `validate` was requested. `true` = confirmed valid this
+   * call; `false` = a key is present but could NOT be verified (network/server
+   * error), so it is reported as still-logged-in-but-unverified rather than as a
+   * definitive sign-out. Undefined when no validation was attempted.
+   */
+  verified?: boolean
 }
 
 export interface SaveKeyOptions {
@@ -34,15 +43,35 @@ export interface SaveKeyOptions {
 const globalKeyPath = () => `${homedir()}/.capgo`
 const LOCAL_KEY_PATH = '.capgo'
 
-/** Which source `findSavedKeySilent()` would resolve a key from, in precedence order. */
-function detectSource(): KeySource | undefined {
-  if (process.env.CAPGO_TOKEN?.trim())
-    return 'env'
-  if (existsSync(globalKeyPath()))
-    return 'global'
-  if (existsSync(LOCAL_KEY_PATH))
-    return 'local'
-  return undefined
+/** Read a key file's content, treating empty/whitespace/unreadable as absent. */
+function readKeyFile(path: string): string | undefined {
+  try {
+    const value = readFileSync(path, 'utf8').trim()
+    return value || undefined
+  }
+  catch {
+    return undefined
+  }
+}
+
+/**
+ * Resolve the key AND its source together, by the SAME precedence and the SAME
+ * content read `findSavedKeySilent()` uses (env → ~/.capgo → ./.capgo). Returning
+ * both from one resolution avoids a separate existsSync scan drifting from the key
+ * actually selected (e.g. an empty ~/.capgo would be skipped for the key but a
+ * parallel existsSync would wrongly label the source 'global').
+ */
+function resolveKeyAndSource(): { key?: string, source?: KeySource } {
+  const envKey = process.env.CAPGO_TOKEN?.trim()
+  if (envKey)
+    return { key: envKey, source: 'env' }
+  const globalKey = readKeyFile(globalKeyPath())
+  if (globalKey)
+    return { key: globalKey, source: 'global' }
+  const localKey = readKeyFile(LOCAL_KEY_PATH)
+  if (localKey)
+    return { key: localKey, source: 'local' }
+  return {}
 }
 
 /**
@@ -91,8 +120,7 @@ export async function validateAndSaveKey(apikey: string, options: SaveKeyOptions
  * the key still authenticates and resolve the user id.
  */
 export async function getLoginState(options: { validate?: boolean } = {}): Promise<LoginState> {
-  const key = findSavedKeySilent()
-  const source = detectSource()
+  const { key, source } = resolveKeyAndSource()
   if (!key)
     return { loggedIn: false }
 
@@ -102,11 +130,15 @@ export async function getLoginState(options: { validate?: boolean } = {}): Promi
   try {
     const supabase = await createSupabaseClient(key, undefined, undefined, true)
     const userId = await resolveUserIdFromApiKey(supabase, key, true)
-    return { loggedIn: true, userId, source }
+    return { loggedIn: true, userId, source, verified: true }
   }
-  catch {
-    // A key is on disk but no longer valid (revoked/expired).
-    return { loggedIn: false, source }
+  catch (error) {
+    // Only a definitively-bad key reads as logged-out; a transient failure
+    // (network/server) keeps the present key as logged-in-but-unverified.
+    const message = error instanceof Error ? error.message : String(error)
+    if (/invalid api key|insufficient permissions/i.test(message))
+      return { loggedIn: false, source }
+    return { loggedIn: true, source, verified: false }
   }
 }
 
@@ -121,4 +153,42 @@ export async function clearSavedKey(options: { local?: boolean } = {}): Promise<
     return { cleared: false }
   await rm(path, { force: true })
   return { cleared: true }
+}
+
+// ── User-facing message builders (pure, unit-tested) ─────────────────────────
+
+/** Success text for capgo_login. */
+export function loginSuccessMessage(userId: string, local: boolean): string {
+  const where = local ? './.capgo' : '~/.capgo'
+  return `Signed in to Capgo (user ${userId}). Saved to ${where}. You can now use the authenticated tools.`
+}
+
+/** Status text for capgo_whoami, covering verified / unverified / invalid / signed-out. */
+export function whoamiMessage(state: LoginState): string {
+  if (state.loggedIn && state.verified === false)
+    return `A ${state.source} Capgo key is set, but Capgo could not be reached to verify it right now. Tools may still work if the key is valid.`
+  if (state.loggedIn)
+    return `Signed in to Capgo (user ${state.userId}) using the ${state.source} key.`
+  if (state.source)
+    return `Not signed in: a saved ${state.source} key exists but is no longer valid. Generate a new one at https://app.capgo.app/connect and call capgo_login.`
+  return 'Not signed in. Generate a key at https://app.capgo.app/connect and call capgo_login.'
+}
+
+/**
+ * Honest text for capgo_logout. `remaining` is the post-clear login state: if a
+ * credential is still reachable (CAPGO_TOKEN, or the other on-disk scope) we say
+ * so explicitly instead of falsely claiming the session is signed out.
+ */
+export function logoutMessage(cleared: boolean, removedLocal: boolean, remaining: LoginState): string {
+  const where = removedLocal ? './.capgo' : '~/.capgo'
+  if (remaining.loggedIn) {
+    const via = remaining.source === 'env'
+      ? 'the CAPGO_TOKEN environment variable'
+      : `a ${remaining.source} key (${remaining.source === 'local' ? './.capgo' : '~/.capgo'})`
+    const how = remaining.source === 'env'
+      ? 'Unset CAPGO_TOKEN to fully sign out.'
+      : `Run capgo_logout with scope "${remaining.source}" to remove it.`
+    return `${cleared ? `Removed ${where}` : `No ${where} to remove`}, but you are still signed in via ${via}. ${how}`
+  }
+  return cleared ? `Signed out — removed ${where}.` : `No ${where} key to remove; you are signed out.`
 }

@@ -105,8 +105,25 @@ async function generate(): Promise<void> {
     generatedKey.value = key
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
-  catch {
-    toast.error(t('connect-generate-error'))
+  catch (e) {
+    // Surface actionable backend errors (e.g. a forbidden binding for a non-admin)
+    // instead of a blind generic toast; log for diagnostics, keep a generic fallback.
+    console.error('createAiApiKey failed', e)
+    let detail = ''
+    try {
+      const ctx = (e as { context?: { json?: () => Promise<{ error?: string, message?: string }> } }).context
+      if (ctx?.json) {
+        const body = await ctx.json()
+        detail = body?.error ?? body?.message ?? ''
+      }
+      else if (e instanceof Error && e.message && e.message !== 'missing key') {
+        detail = e.message
+      }
+    }
+    catch {
+      // response body wasn't JSON / unreadable — fall back to the generic message
+    }
+    toast.error(detail ? `${t('connect-generate-error')}: ${detail}` : t('connect-generate-error'))
   }
   finally {
     isGenerating.value = false
