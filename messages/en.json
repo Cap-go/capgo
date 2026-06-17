@@ -1804,6 +1804,8 @@
   "attempted-destination": "Attempted destination:",
   "reset-password": "Reset Password",
   "reset-spoofed-user": "Stop spoofing",
+  "spoof-session-cleared": "Stale spoof session cleared",
+  "spoof-stopped-reload": "Stopped spoofing, will reload",
   "reset-your-password": "Reset your password",
   "resource": "Resource",
   "response-body": "Response Body",
