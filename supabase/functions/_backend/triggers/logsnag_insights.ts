@@ -1377,6 +1377,13 @@ function hasCompletedGlobalStatsNotifications(completedShards: ReadonlySet<Globa
   return completedShards.has('notifications')
 }
 
+function shouldSkipCompletedGlobalStatsShardRetry(
+  completedShards: ReadonlySet<GlobalStatsCompletionMarker>,
+  shard: GlobalStatsShard,
+): boolean {
+  return shard !== 'notifications' && completedShards.has(shard)
+}
+
 function getGlobalStatsNotificationStepAction(
   completedShards: ReadonlySet<GlobalStatsCompletionMarker>,
   sentMarker: GlobalStatsCompletionMarker,
@@ -1761,7 +1768,11 @@ async function getCoreSnapshotCounts(c: Context, snapshotExclusiveEnd: Date): Pr
           deleted_apps.owner_org
         ) AS owner_org
         FROM public.deleted_apps deleted_apps
-        WHERE deleted_apps.created_at < ${snapshotExclusiveEndIso}::timestamptz
+        WHERE (
+          deleted_apps.created_at < ${snapshotExclusiveEndIso}::timestamptz
+          -- Legacy deleted_apps rows used created_at=deleted_at before the trigger copied the original app timestamp.
+          OR deleted_apps.created_at = deleted_apps.deleted_at
+        )
           AND deleted_apps.deleted_at >= ${snapshotExclusiveEndIso}::timestamptz
       )
       SELECT
@@ -1830,7 +1841,11 @@ async function countActiveUsersForSnapshot(c: Context, appIds: string[], window:
         ) AS owner_org
         FROM public.deleted_apps deleted_apps
         INNER JOIN active_app_ids active ON active.app_id = deleted_apps.app_id
-        WHERE deleted_apps.created_at < $2::timestamptz
+        WHERE (
+          deleted_apps.created_at < $2::timestamptz
+          -- Legacy deleted_apps rows used created_at=deleted_at before the trigger copied the original app timestamp.
+          OR deleted_apps.created_at = deleted_apps.deleted_at
+        )
           AND deleted_apps.deleted_at >= $3::timestamptz
       )
       SELECT COUNT(DISTINCT orgs.created_by)::int AS count
@@ -2483,6 +2498,7 @@ export const logsnagInsightsTestUtils = {
   getMissingGlobalStatsRequiredShards,
   getMissingGlobalStatsShards,
   hasCompletedGlobalStatsNotifications,
+  shouldSkipCompletedGlobalStatsShardRetry,
   getGlobalStatsNotificationStepAction,
   normalizeCompletedGlobalStatsShards,
   getLogsnagInsightsShardFunctionName,
@@ -2506,6 +2522,17 @@ export const logsnagInsightsTestUtils = {
 export const app = new Hono<MiddlewareKeyVariables>()
 
 async function runLogsnagInsightsShard(c: Context, shard: GlobalStatsShard, dateId: string): Promise<void> {
+  const completedShards = await readCompletedGlobalStatsShards(c, dateId)
+  if (shouldSkipCompletedGlobalStatsShardRetry(completedShards, shard)) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Skipping completed logsnag insights shard retry',
+      shard,
+      dateId,
+    })
+    return
+  }
+
   const window = getCompletedDayWindowForDateId(dateId)
 
   switch (shard) {

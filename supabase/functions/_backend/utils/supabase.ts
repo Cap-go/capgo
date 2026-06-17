@@ -170,25 +170,37 @@ export async function getAppsFromSB(c: Context, referenceDate?: Date): Promise<s
   }
 
   if (createdBeforeIso) {
-    page = 0
-    while (true) {
-      const { data, error } = await supabaseAdmin(c)
-        .from('deleted_apps')
-        .select('app_id')
-        .lt('created_at', createdBeforeIso)
-        .gte('deleted_at', createdBeforeIso)
-        .range(page * limit, (page + 1) * limit - 1)
+    const pgClient = getPgClient(c, false)
 
-      if (error) {
-        cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting deleted apps from Supabase', error })
-        break
+    try {
+      page = 0
+      while (true) {
+        const { rows } = await pgClient.query<{ app_id: string }>(
+          `SELECT app_id
+          FROM public.deleted_apps
+          WHERE (
+            created_at < $1::timestamptz
+            -- Legacy rows used created_at=deleted_at before on_app_delete copied the original app timestamp.
+            OR created_at = deleted_at
+          )
+            AND deleted_at >= $1::timestamptz
+          ORDER BY app_id
+          LIMIT $2 OFFSET $3`,
+          [createdBeforeIso, limit, page * limit],
+        )
+
+        if (rows.length === 0)
+          break
+
+        apps = [...apps, ...rows.map(row => row.app_id)]
+        page++
       }
-
-      if (data.length === 0)
-        break
-
-      apps = [...apps, ...data.map(row => row.app_id)]
-      page++
+    }
+    catch (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting deleted apps from Supabase', error })
+    }
+    finally {
+      await closeClient(c, pgClient)
     }
   }
 
