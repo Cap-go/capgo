@@ -375,14 +375,24 @@ export interface ResolveHelperBinaryOptions {
   /** Override `process.arch` (tests). */
   arch?: string
   /**
-   * Override module resolution (tests). Receives the package's
-   * `package.json` specifier; must return its absolute path or throw.
+   * Override module resolution (tests). Each resolver receives the package's
+   * `package.json` specifier and must return its absolute path or throw. Pass an
+   * ARRAY to test the fallback chain (each base is tried in order until one
+   * resolves); a single function is treated as a one-element chain.
    */
-  resolve?: (specifier: string) => string
+  resolve?: ((specifier: string) => string) | Array<(specifier: string) => string>
   /** Override the codesign spawn (tests). */
   codesignRunner?: CodesignRunner
   /** Force the dev env-override gate (tests). Defaults to the build-time flag. */
   allowEnvOverride?: boolean
+  /**
+   * Project directory to ALSO resolve the helper package from, in addition to the
+   * CLI's own node_modules. Lets a project-local `npm i @capgo/cli-keychain-darwin-*`
+   * be picked up even when the CLI runs from a global install or the MCP server
+   * (which doesn't resolve from the user's project). Defaults to `process.cwd()`.
+   * Ignored when `resolve` is provided (tests).
+   */
+  cwd?: string
 }
 
 /**
@@ -429,16 +439,32 @@ export async function resolveHelperBinary(options: ResolveHelperBinaryOptions = 
     )
   }
 
-  const resolveSpecifier = options.resolve ?? createRequire(import.meta.url).resolve
-  let packageJsonPath: string
-  try {
-    packageJsonPath = resolveSpecifier(`${packageName}/package.json`)
+  // Resolve the helper's package.json from (1) the CLI's own node_modules, then
+  // (2) the project the user is working in. The project fallback means a local
+  // `npm i @capgo/cli-keychain-darwin-*` is honored even when the CLI runs from a
+  // global install or the MCP server — which resolves modules relative to the CLI,
+  // NOT the user's project. `options.resolve` (tests) takes sole precedence.
+  const resolveBases = options.resolve
+    ? (Array.isArray(options.resolve) ? options.resolve : [options.resolve])
+    : [
+        createRequire(import.meta.url).resolve,
+        createRequire(join(options.cwd ?? process.cwd(), 'package.json')).resolve,
+      ]
+  let packageJsonPath: string | undefined
+  for (const resolveSpecifier of resolveBases) {
+    try {
+      packageJsonPath = resolveSpecifier(`${packageName}/package.json`)
+      break
+    }
+    catch {
+      // Try the next resolution base.
+    }
   }
-  catch {
+  if (!packageJsonPath) {
     throw new MacOSSigningError(
       `The Capgo keychain helper package (${packageName}) is not installed. `
       + `It ships as an optional dependency of @capgo/cli — reinstall without `
-      + `--no-optional / --omit=optional, or install it directly: npm i ${packageName}`,
+      + `--no-optional / --omit=optional, or install it in this project: npm i ${packageName}`,
     )
   }
 

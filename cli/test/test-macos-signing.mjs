@@ -494,6 +494,38 @@ await tAsync('resolveHelperBinary returns the binary when signature verifies', a
   }
 })
 
+await tAsync('resolveHelperBinary falls back to the next resolve base (project node_modules)', async () => {
+  // First base (the CLI's own node_modules) throws — as it does when the helper is
+  // installed in the user's PROJECT rather than next to the CLI. The second base
+  // (project / cwd) resolves it. This is what makes a project-local
+  // `npm i @capgo/cli-keychain-darwin-arm64` work under the MCP server.
+  const { dir, bin } = makeFakeHelper()
+  try {
+    const resolved = await resolveHelperBinary({
+      arch: 'arm64',
+      resolve: [
+        () => { throw new Error('not in the CLI node_modules') },
+        () => join(dir, 'package.json'),
+      ],
+      codesignRunner: okCodesign,
+    })
+    assert.equal(resolved, bin)
+  }
+  finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+await tAsync('resolveHelperBinary errors only after EVERY resolve base misses', async () => {
+  await assert.rejects(
+    resolveHelperBinary({
+      arch: 'arm64',
+      resolve: [() => { throw new Error('cli miss') }, () => { throw new Error('project miss') }],
+    }),
+    /@capgo\/cli-keychain-darwin-arm64.*not installed/s,
+  )
+})
+
 await tAsync('resolveHelperBinary hard-errors when signature verification fails', async () => {
   const { dir } = makeFakeHelper()
   try {
