@@ -207,7 +207,7 @@
     },
     "cli": {
       "name": "@capgo/cli",
-      "version": "8.8.0",
+      "version": "8.9.0",
       "bin": {
         "capgo": "dist/index.js",
       },
@@ -221,7 +221,6 @@
         "ink-spinner": "^5.0.0",
         "jsonwebtoken": "^9.0.3",
         "node-forge": "^1.4.0",
-        "node-pty": "^1.1.0",
         "qrcode": "^1.5.4",
         "react": "^19.2.6",
         "rrweb-snapshot": "^2.0.1",
@@ -270,6 +269,7 @@
       "optionalDependencies": {
         "@capgo/cli-helper-darwin-arm64": "^1.1.1",
         "@capgo/cli-helper-darwin-x64": "^1.1.1",
+        "node-pty": "^1.1.0",
       },
     },
   },

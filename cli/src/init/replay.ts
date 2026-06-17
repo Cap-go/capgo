@@ -153,11 +153,9 @@ export async function resolveInitReplayIdentity(apikey: string, signal?: AbortSi
     if (error || !data)
       return undefined
 
-    const row = data as { email?: unknown, user_id?: unknown }
-    const userId = typeof row.user_id === 'string' && row.user_id.trim() ? row.user_id : undefined
-    const email = typeof row.email === 'string' && row.email.trim() ? row.email : undefined
-    const distinctId = userId || email
-    return distinctId ? { distinctId, email, userId } : undefined
+    const row = data as { correlation_id?: unknown }
+    const distinctId = typeof row.correlation_id === 'string' && row.correlation_id.trim() ? row.correlation_id : undefined
+    return distinctId ? { distinctId } : undefined
   }
   catch {
     return undefined

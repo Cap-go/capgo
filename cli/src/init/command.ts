@@ -3381,8 +3381,8 @@ async function runPtyInheritedCommand(command: string, args: string[], options: 
 }
 
 function runInheritedShellCommand(command: string, options: Pick<InheritedCommandOptions, 'cwd'> = {}) {
-  const shellCommand = platform === 'win32' ? (env.ComSpec || 'cmd.exe') : (env.SHELL || '/bin/sh')
-  const shellArgs = platform === 'win32' ? ['/d', '/s', '/c', command] : ['-lc', command]
+  const shellCommand = platform === 'win32' ? (env.ComSpec || 'cmd.exe') : '/bin/sh'
+  const shellArgs = platform === 'win32' ? ['/d', '/s', '/c', command] : ['-c', command]
   return runInheritedCommand(shellCommand, shellArgs, options)
 }
 

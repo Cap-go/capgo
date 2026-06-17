@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION "public"."get_user_identity_for_apikey"("apikey" "text")
-RETURNS TABLE("user_id" "uuid", "email" "text")
+RETURNS TABLE("correlation_id" "text")
 LANGUAGE "plpgsql"
 SECURITY DEFINER
 SET "search_path" TO ''
@@ -14,10 +14,7 @@ BEGIN
   END IF;
 
   RETURN QUERY
-  SELECT users.id, users.email::text
-  FROM public.users
-  WHERE users.id = api_key.user_id
-  LIMIT 1;
+  SELECT concat('capgo-cli-user:', md5(api_key.user_id::text));
 END;
 $$;
 
@@ -31,4 +28,4 @@ GRANT EXECUTE ON FUNCTION "public"."get_user_identity_for_apikey"("apikey" "text
 GRANT EXECUTE ON FUNCTION "public"."get_user_identity_for_apikey"("apikey" "text") TO "service_role";
 
 COMMENT ON FUNCTION "public"."get_user_identity_for_apikey"("apikey" "text")
-IS 'Returns the owner user id and email only when the caller already has a valid, non-expired API key. This limited exposure is intentional so CLI onboarding replay can attach to the same PostHog person as product analytics instead of creating anonymous replay-only users.';
+IS 'Returns only an opaque stable correlation id for a valid, non-expired API key owner. It intentionally does not expose user ids or emails through the public RPC surface.';
