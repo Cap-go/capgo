@@ -9,6 +9,43 @@ describe('mapIosOnboardingError', () => {
     expect(mapIosOnboardingError(err)).toBe('apple_api_unauthorized')
   })
 
+  it.concurrent('maps a 403 with the agreements code to apple_agreements_missing', () => {
+    const err = Object.assign(
+      new Error('Apple API error (403): A required agreement is missing or has expired. — sign it (FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED)'),
+      { status: 403, code: 'FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED' },
+    )
+    expect(mapIosOnboardingError(err)).toBe('apple_agreements_missing')
+  })
+
+  it.concurrent('maps a 403 agreements error by message when no code is present', () => {
+    const err = Object.assign(new Error('A required agreement is missing or has expired.'), { status: 403 })
+    expect(mapIosOnboardingError(err)).toBe('apple_agreements_missing')
+  })
+
+  it.concurrent('maps the friendly agreement message to apple_agreements_missing even when status/code are stripped (real TUI flow)', () => {
+    // The iOS TUI engine collapses the AppleApiHttpError to its message string and
+    // reconstructs a plain Error(message) before mapping — no status/code survive.
+    // The mapper must still classify it from the message alone, or PostHog records
+    // 'unknown' for the exact scenario this whole feature targets.
+    const reconstructed = new Error(
+      'Apple is blocking App Store Connect API access because your developer account has a required agreement that is unsigned or has expired.\n'
+      + '  - Sign in as the Account Holder at https://appstoreconnect.apple.com',
+    )
+    expect(mapIosOnboardingError(reconstructed, 'verifying-key')).toBe('apple_agreements_missing')
+  })
+
+  it.concurrent('does NOT classify an unrelated 403 that loosely mentions "agreement" as agreements-missing', () => {
+    // The phrase requires "required agreement" adjacent to a signing/expiry word;
+    // a generic mention must fall through to apple_api_forbidden.
+    const err = Object.assign(new Error('Forbidden: your team agreement role is insufficient'), { status: 403 })
+    expect(mapIosOnboardingError(err)).toBe('apple_api_forbidden')
+  })
+
+  it.concurrent('maps other 403s to apple_api_forbidden', () => {
+    const err = Object.assign(new Error('Forbidden'), { status: 403 })
+    expect(mapIosOnboardingError(err)).toBe('apple_api_forbidden')
+  })
+
   it.concurrent('maps 429 to apple_api_rate_limited', () => {
     const err = Object.assign(new Error('Too many'), { status: 429 })
     expect(mapIosOnboardingError(err)).toBe('apple_api_rate_limited')

@@ -1093,12 +1093,13 @@ export type Database = {
       }
       daily_revenue_metrics: {
         Row: {
-          churn_mrr: number
           churn_reason: string | null
+          churn_mrr: number
           churn_mrr_enterprise: number
           churn_mrr_maker: number
           churn_mrr_solo: number
           churn_mrr_team: number
+          churn_reason: string | null
           contraction_mrr: number
           contraction_mrr_enterprise: number
           contraction_mrr_maker: number
@@ -1113,12 +1114,13 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          churn_mrr?: number
           churn_reason?: string | null
+          churn_mrr?: number
           churn_mrr_enterprise?: number
           churn_mrr_maker?: number
           churn_mrr_solo?: number
           churn_mrr_team?: number
+          churn_reason?: string | null
           contraction_mrr?: number
           contraction_mrr_enterprise?: number
           contraction_mrr_maker?: number
@@ -1133,8 +1135,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          churn_mrr?: number
           churn_reason?: string | null
+          churn_mrr?: number
           churn_mrr_enterprise?: number
           churn_mrr_maker?: number
           churn_mrr_solo?: number
@@ -1446,6 +1448,8 @@ export type Database = {
       }
       global_stats: {
         Row: {
+          past_due_orgs: number
+          past_due_orgs_average_days: number
           apps: number
           apps_active: number | null
           average_ltv: number
@@ -1485,8 +1489,6 @@ export type Database = {
           mrr: number
           need_upgrade: number | null
           new_paying_orgs: number
-          past_due_orgs: number
-          past_due_orgs_average_days: number
           not_paying: number | null
           nrr: number
           onboarded: number | null
@@ -1494,6 +1496,8 @@ export type Database = {
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
+          past_due_orgs: number
+          past_due_orgs_average_days: number
           plan_enterprise: number | null
           plan_enterprise_conversion_rate: number
           plan_enterprise_monthly: number
@@ -1524,16 +1528,18 @@ export type Database = {
           success_rate: number | null
           total_revenue: number
           trial: number | null
+          trial_extended_orgs: number
+          trial_extended_subscribed_orgs: number
           updates: number
           updates_external: number | null
           updates_last_month: number | null
           upgraded_orgs: number
-          trial_extended_orgs: number
-          trial_extended_subscribed_orgs: number
           users: number | null
           users_active: number | null
         }
         Insert: {
+          past_due_orgs?: number
+          past_due_orgs_average_days?: number
           apps: number
           apps_active?: number | null
           average_ltv?: number
@@ -1573,8 +1579,6 @@ export type Database = {
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
-          past_due_orgs?: number
-          past_due_orgs_average_days?: number
           not_paying?: number | null
           nrr?: number
           onboarded?: number | null
@@ -1582,6 +1586,8 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
+          past_due_orgs?: number
+          past_due_orgs_average_days?: number
           plan_enterprise?: number | null
           plan_enterprise_conversion_rate?: number
           plan_enterprise_monthly?: number
@@ -1612,16 +1618,18 @@ export type Database = {
           success_rate?: number | null
           total_revenue?: number
           trial?: number | null
+          trial_extended_orgs?: number
+          trial_extended_subscribed_orgs?: number
           updates: number
           updates_external?: number | null
           updates_last_month?: number | null
           upgraded_orgs?: number
-          trial_extended_orgs?: number
-          trial_extended_subscribed_orgs?: number
           users?: number | null
           users_active?: number | null
         }
         Update: {
+          past_due_orgs?: number
+          past_due_orgs_average_days?: number
           apps?: number
           apps_active?: number | null
           average_ltv?: number
@@ -1659,8 +1667,6 @@ export type Database = {
           live_updates_active_paying_clients_60d?: number
           longest_ltv?: number
           mrr?: number
-          past_due_orgs?: number
-          past_due_orgs_average_days?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
           not_paying?: number | null
@@ -1700,12 +1706,12 @@ export type Database = {
           success_rate?: number | null
           total_revenue?: number
           trial?: number | null
+          trial_extended_orgs?: number
+          trial_extended_subscribed_orgs?: number
           updates?: number
           updates_external?: number | null
           updates_last_month?: number | null
           upgraded_orgs?: number
-          trial_extended_orgs?: number
-          trial_extended_subscribed_orgs?: number
           users?: number | null
           users_active?: number | null
         }
@@ -2519,6 +2525,8 @@ export type Database = {
       }
       stripe_info: {
         Row: {
+          churn_reason: string | null
+          past_due_at: string | null
           bandwidth_exceeded: boolean | null
           build_time_exceeded: boolean | null
           canceled_at: string | null
@@ -2528,10 +2536,10 @@ export type Database = {
           customer_id: string
           id: number
           is_good_plan: boolean | null
-          past_due_at: string | null
           last_stripe_event_at: string | null
           mau_exceeded: boolean | null
           paid_at: string | null
+          past_due_at: string | null
           plan_calculated_at: string | null
           plan_usage: number | null
           price_id: string | null
@@ -2546,6 +2554,8 @@ export type Database = {
           upgraded_at: string | null
         }
         Insert: {
+          churn_reason?: string | null
+          past_due_at?: string | null
           bandwidth_exceeded?: boolean | null
           build_time_exceeded?: boolean | null
           canceled_at?: string | null
@@ -2556,9 +2566,9 @@ export type Database = {
           id?: number
           is_good_plan?: boolean | null
           last_stripe_event_at?: string | null
-          past_due_at?: string | null
           mau_exceeded?: boolean | null
           paid_at?: string | null
+          past_due_at?: string | null
           plan_calculated_at?: string | null
           plan_usage?: number | null
           price_id?: string | null
@@ -2573,6 +2583,8 @@ export type Database = {
           upgraded_at?: string | null
         }
         Update: {
+          churn_reason?: string | null
+          past_due_at?: string | null
           bandwidth_exceeded?: boolean | null
           build_time_exceeded?: boolean | null
           canceled_at?: string | null
@@ -2583,9 +2595,9 @@ export type Database = {
           id?: number
           is_good_plan?: boolean | null
           last_stripe_event_at?: string | null
-          past_due_at?: string | null
           mau_exceeded?: boolean | null
           paid_at?: string | null
+          past_due_at?: string | null
           plan_calculated_at?: string | null
           plan_usage?: number | null
           price_id?: string | null
@@ -2606,51 +2618,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "plans"
             referencedColumns: ["stripe_id"]
-          },
-        ]
-      }
-      trial_extension_events: {
-        Row: {
-          created_at: string
-          customer_id: string
-          extension_days: number
-          id: number
-          new_trial_at: string
-          org_id: string
-          previous_trial_at: string
-        }
-        Insert: {
-          created_at?: string
-          customer_id: string
-          extension_days: number
-          id?: number
-          new_trial_at: string
-          org_id: string
-          previous_trial_at: string
-        }
-        Update: {
-          created_at?: string
-          customer_id?: string
-          extension_days?: number
-          id?: number
-          new_trial_at?: string
-          org_id?: string
-          previous_trial_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "trial_extension_events_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "stripe_info"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "trial_extension_events_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
           },
         ]
       }
@@ -2735,6 +2702,51 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trial_extension_events: {
+        Row: {
+          created_at: string
+          customer_id: string
+          extension_days: number
+          id: number
+          new_trial_at: string
+          org_id: string
+          previous_trial_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          extension_days: number
+          id?: number
+          new_trial_at: string
+          org_id: string
+          previous_trial_at: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          extension_days?: number
+          id?: number
+          new_trial_at?: string
+          org_id?: string
+          previous_trial_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trial_extension_events_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "stripe_info"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "trial_extension_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
             referencedColumns: ["id"]
           },
         ]

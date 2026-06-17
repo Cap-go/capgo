@@ -114,6 +114,8 @@ export type OnboardingStep
 
 export type OnboardingErrorCategory
   = | 'apple_api_unauthorized'
+    | 'apple_api_forbidden'
+    | 'apple_agreements_missing'
     | 'apple_api_rate_limited'
     | 'cert_limit_reached'
     | 'profile_creation_failed'

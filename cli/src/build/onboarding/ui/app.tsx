@@ -1533,8 +1533,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     setError(message)
     setRetryStep(failedStep)
     // A key that won't validate on macOS-with-helper → offer the guided creation
-    // as the lead recovery option (e.g. the user pasted a stale/wrong .p8).
-    setOfferGuidedKeyFallback(failedStep === 'verifying-key' && guidedHelperUsable)
+    // as the lead recovery option (e.g. the user pasted a stale/wrong .p8). But NOT
+    // when the key is valid and Apple is blocking on an unsigned/expired agreement —
+    // creating a new key cannot resolve that, so don't lead the user down it.
+    setOfferGuidedKeyFallback(
+      failedStep === 'verifying-key'
+      && guidedHelperUsable
+      && errorCategoryRef.current !== 'apple_agreements_missing',
+    )
     setRetryCount(nextRetryCount)
     if (nextRetryCount > 1) {
       addLog(`⚠ Attempt ${nextRetryCount} failed. Recovery steps and a support bundle are available below.`, 'yellow')
