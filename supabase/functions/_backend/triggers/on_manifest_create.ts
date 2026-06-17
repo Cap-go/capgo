@@ -9,7 +9,7 @@ import { isRetryablePostgrestResult, retryWithBackoff } from '../utils/retry.ts'
 import { s3 } from '../utils/s3.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
-const SIZE_RETRY_ATTEMPTS = 3
+const SIZE_RETRY_ATTEMPTS = 1
 const SIZE_RETRY_DELAY_MS = 500
 const MANIFEST_UPDATE_RETRY_ATTEMPTS = 3
 const MANIFEST_UPDATE_RETRY_DELAY_MS = 300
@@ -139,4 +139,5 @@ export const onManifestCreateTestUtils = {
   isRetryablePostgrestResult,
   runManifestUpdateWithRetry,
   shouldRetryManifestSizeLookup,
+  sizeRetryAttempts: SIZE_RETRY_ATTEMPTS,
 }
