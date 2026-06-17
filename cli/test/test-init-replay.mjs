@@ -27,9 +27,12 @@ assert.equal(resolveCapgoReplayUrl('https://api.capgo.app/private/replay'), 'htt
 assert.equal(resolveCapgoReplayUrl('not a url'), undefined)
 assert.deepEqual(getReplayViewportSize(20, 5), { height: 480, width: 800 }, 'replay viewport has readable minimum dimensions')
 const resolvedReplayUrl = 'https://api.capgo.app/private/replay'
-assert.equal(await resolveReplayUrlForFlush(Promise.resolve(resolvedReplayUrl), 20), resolvedReplayUrl, 'replay URL resolves before the flush deadline')
+let abortedReplayLookup = false
+assert.equal(await resolveReplayUrlForFlush(Promise.resolve(resolvedReplayUrl), 20, () => { abortedReplayLookup = true }), resolvedReplayUrl, 'replay URL resolves before the flush deadline')
+assert.equal(abortedReplayLookup, false, 'resolved replay URL lookup is not aborted')
 const replayTimeoutStartedAt = Date.now()
-assert.equal(await resolveReplayUrlForFlush(new Promise(() => {}), 20), undefined, 'stalled replay URL lookup times out')
+assert.equal(await resolveReplayUrlForFlush(new Promise(() => {}), 20, () => { abortedReplayLookup = true }), undefined, 'stalled replay URL lookup times out')
+assert.equal(abortedReplayLookup, true, 'stalled replay URL lookup is aborted on timeout')
 assert.ok(Date.now() - replayTimeoutStartedAt < 1000, 'stalled replay URL lookup does not block final flush')
 assert.deepEqual(parseTerminalPixelSizeResponse('\u001B[4;412;640t'), { height: 412, width: 640 }, 'xterm pixel-size report is parsed as height and width')
 assert.equal(parseTerminalPixelSizeResponse('\u001B[4;0;640t'), undefined, 'invalid terminal pixel reports are ignored')

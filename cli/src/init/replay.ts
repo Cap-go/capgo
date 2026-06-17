@@ -134,18 +134,21 @@ export function resolveCapgoReplayUrl(host = env.CAPGO_CLI_REPLAY_API_HOST?.trim
   }
 }
 
-async function resolveConfiguredCapgoReplayUrl() {
-  const config = await getRemoteConfig(true).catch(() => ({ hostApi: DEFAULT_REPLAY_API_HOST }))
+async function resolveConfiguredCapgoReplayUrl(signal?: AbortSignal) {
+  const config = await getRemoteConfig(true, signal).catch(() => ({ hostApi: DEFAULT_REPLAY_API_HOST }))
   return resolveCapgoReplayUrl(config.hostApi)
 }
 
-export async function resolveReplayUrlForFlush(replayUrl: Promise<string | undefined>, timeoutMs = REPLAY_FLUSH_TIMEOUT_MS) {
+export async function resolveReplayUrlForFlush(replayUrl: Promise<string | undefined>, timeoutMs = REPLAY_FLUSH_TIMEOUT_MS, onTimeout?: () => void) {
   let timeout: ReturnType<typeof setTimeout> | undefined
   try {
     return await Promise.race([
       replayUrl.catch(() => undefined),
       new Promise<undefined>((resolve) => {
-        timeout = setTimeout(() => resolve(undefined), timeoutMs)
+        timeout = setTimeout(() => {
+          onTimeout?.()
+          resolve(undefined)
+        }, timeoutMs)
         timeout.unref?.()
       }),
     ])
@@ -564,6 +567,7 @@ class InitReplayRecorder implements InitReplayController {
   constructor(
     private readonly apikey: string,
     private readonly replayUrl: Promise<string | undefined>,
+    private readonly abortReplayUrlLookup: (() => void) | undefined,
     private readonly transport: InitReplayTransport,
     private readonly currentUrl: string,
     private readonly ariaLabel: string | undefined,
@@ -700,7 +704,7 @@ class InitReplayRecorder implements InitReplayController {
     }))
 
     const flushStartedAt = Date.now()
-    const replayUrl = await resolveReplayUrlForFlush(this.replayUrl)
+    const replayUrl = await resolveReplayUrlForFlush(this.replayUrl, REPLAY_FLUSH_TIMEOUT_MS, this.abortReplayUrlLookup)
     if (!replayUrl)
       return
 
@@ -754,9 +758,14 @@ export function startInitReplay(options: StartInitReplayOptions = {}): InitRepla
     return undefined
 
   try {
+    let abortReplayUrlLookup: (() => void) | undefined
     const replayUrl = options.replayUrl
       ? Promise.resolve(resolveCapgoReplayUrl(options.replayUrl))
-      : resolveConfiguredCapgoReplayUrl()
+      : (() => {
+          const controller = new AbortController()
+          abortReplayUrlLookup = () => controller.abort()
+          return resolveConfiguredCapgoReplayUrl(controller.signal)
+        })()
     const currentUrl = options.currentUrl?.trim() || DEFAULT_REPLAY_CURRENT_URL
     const sessionPrefix = options.sessionPrefix?.trim() || DEFAULT_REPLAY_SESSION_PREFIX
     const terminalPixelSize = options.terminalPixelSize
@@ -766,6 +775,7 @@ export function startInitReplay(options: StartInitReplayOptions = {}): InitRepla
     return new InitReplayRecorder(
       apikey,
       replayUrl,
+      abortReplayUrlLookup,
       options.transport || defaultReplayTransport,
       currentUrl,
       options.ariaLabel,
