@@ -168,12 +168,12 @@ export async function decideStart(
       roadmap: ROADMAP,
       context: { appId: facts.appId, platformsDetected: facts.platformsDetected },
       human: {
-        instruction: 'Get an API key at app.capgo.io — Account — API keys, then run `npx @capgo/cli login` in your terminal so it is stored locally. Do not paste the key into this chat.',
+        instruction: 'Ask the user to generate an API key for their AI assistant at https://app.capgo.app/connect and paste it into the chat, then call the capgo_login tool with that key to sign in.',
       },
       next: {
-        tool: NEXT_STEP_TOOL,
-        instruction: 'After the user has run `capgo login`, call next_step again (no arguments) to continue.',
-        call: `${NEXT_STEP_TOOL}({})`,
+        tool: 'capgo_login',
+        instruction: 'When the user provides their key, call capgo_login with it. Once signed in, call next_step (no arguments) to continue.',
+        call: 'capgo_login({ apikey: "<the key the user pasted>" })',
       },
       rules: ONBOARDING_RULES,
     }

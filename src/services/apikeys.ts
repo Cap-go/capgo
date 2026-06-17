@@ -74,6 +74,58 @@ export async function createDefaultApiKey(
   })
 }
 
+export async function createAiApiKey(
+  supabase: SupabaseClient<Database>,
+  name: string,
+  options: {
+    orgId: string
+    role: 'admin' | 'member'
+    appUuids?: string[]
+  },
+) {
+  const { orgId, role } = options
+
+  if (!orgId) {
+    throw new Error('Cannot create an AI API key without an organization')
+  }
+
+  const bindings: Array<{
+    role_name: string
+    scope_type: 'org' | 'app'
+    org_id: string
+    app_id?: string
+  }> = role === 'admin'
+    ? [
+        {
+          role_name: 'org_admin',
+          scope_type: 'org',
+          org_id: orgId,
+        },
+      ]
+    : [
+        {
+          role_name: 'org_member',
+          scope_type: 'org',
+          org_id: orgId,
+        },
+        ...(options.appUuids ?? []).map(uuid => ({
+          role_name: 'app_admin',
+          scope_type: 'app' as const,
+          org_id: orgId,
+          app_id: uuid,
+        })),
+      ]
+
+  return supabase.functions.invoke('apikey', {
+    method: 'POST',
+    body: {
+      name,
+      hashed: false,
+      bindings,
+    },
+  })
+}
+
 export async function findUsablePlainApiKey(
   supabase: SupabaseClient<Database>,
   userId: string,

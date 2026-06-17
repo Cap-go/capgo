@@ -7,6 +7,7 @@ import pack from '../../package.json'
 import { enableSupabaseInstrumentation, setInvocationSource, trackMcpServerStarted, withMcpToolTracking } from '../analytics/track'
 import { addAppOptionsSchema, cleanupOptionsSchema, getStatsOptionsSchema, requestBuildOptionsSchema, starAllRepositoriesOptionsSchema, starRepoOptionsSchema, updateAppOptionsSchema, updateChannelOptionsSchema, uploadOptionsSchema } from '../schemas/sdk'
 import { CapgoSDK } from '../sdk'
+import { clearSavedKey, getLoginState, validateAndSaveKey } from '../auth/session'
 import { findSavedKey } from '../utils'
 import { registerOnboardingTools } from '../build/onboarding/mcp/onboarding-tools'
 import { buildServerInstructions } from './instructions'
@@ -64,7 +65,9 @@ export async function startMcpServer(): Promise<void> {
   catch {
     savedApiKey = undefined
   }
-  const sdk = new CapgoSDK({ apikey: savedApiKey })
+  // `let` (not `const`): capgo_login/capgo_logout reassign this so the running session
+  // re-authenticates without a restart. Tool handlers close over the binding, not the value.
+  let sdk = new CapgoSDK({ apikey: savedApiKey })
 
   // ============================================================================
   // App Management Tools
@@ -607,6 +610,76 @@ export async function startMcpServer(): Promise<void> {
         content: [{
           type: 'text' as const,
           text: JSON.stringify(result.data, null, 2),
+        }],
+      }
+    },
+  )
+
+  // ============================================================================
+  // Authentication Tools
+  // ============================================================================
+
+  server.tool(
+    'capgo_login',
+    'Sign in to Capgo by saving an API key. Generate a key for your AI at https://app.capgo.app/connect, then call this with it. Authenticates the current MCP session immediately — no restart needed.',
+    {
+      apikey: z.string().describe('A Capgo API key (generate one at https://app.capgo.app/connect).'),
+      scope: z.enum(['global', 'local']).optional().describe('Where to save the key: "global" (~/.capgo, default, all projects) or "local" (./.capgo, this project only — requires a git repo).'),
+    },
+    async ({ apikey, scope }) => {
+      try {
+        const { userId } = await validateAndSaveKey(apikey, { local: scope === 'local' })
+        // Re-point the in-memory SDK at the new key so the very next tool call is authenticated.
+        sdk = new CapgoSDK({ apikey })
+        return {
+          content: [{
+            type: 'text' as const,
+            text: `Signed in to Capgo (user ${userId}). Saved to ${scope === 'local' ? './.capgo' : '~/.capgo'}. You can now use the authenticated tools.`,
+          }],
+        }
+      }
+      catch (error) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: `Login failed: ${error instanceof Error ? error.message : String(error)}. Generate a fresh key at https://app.capgo.app/connect and try again.`,
+          }],
+          isError: true as const,
+        }
+      }
+    },
+  )
+
+  server.tool(
+    'capgo_whoami',
+    'Report whether the Capgo MCP is signed in, and if so which user and where the key is stored. Validates the saved key against Capgo.',
+    {},
+    async () => {
+      const state = await getLoginState({ validate: true })
+      const text = state.loggedIn
+        ? `Signed in to Capgo (user ${state.userId}) using the ${state.source} key.`
+        : state.source
+          ? `Not signed in: a saved ${state.source} key exists but is no longer valid. Generate a new one at https://app.capgo.app/connect and call capgo_login.`
+          : 'Not signed in. Generate a key at https://app.capgo.app/connect and call capgo_login.'
+      return { content: [{ type: 'text' as const, text }] }
+    },
+  )
+
+  server.tool(
+    'capgo_logout',
+    'Sign out by deleting the saved Capgo API key. Clears the global key (~/.capgo) by default, or the project-local key (./.capgo) with scope "local". Does not unset the CAPGO_TOKEN env var.',
+    {
+      scope: z.enum(['global', 'local']).optional().describe('Which saved key to remove: "global" (~/.capgo, default) or "local" (./.capgo).'),
+    },
+    async ({ scope }) => {
+      const { cleared } = await clearSavedKey({ local: scope === 'local' })
+      // Drop the in-memory key so subsequent authed calls correctly fail until the next login.
+      sdk = new CapgoSDK({})
+      const where = scope === 'local' ? './.capgo' : '~/.capgo'
+      return {
+        content: [{
+          type: 'text' as const,
+          text: cleared ? `Signed out — removed ${where}.` : `No ${where} key to remove.`,
         }],
       }
     },
