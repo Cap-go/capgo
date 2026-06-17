@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import BuildTimeChart from '~/components/dashboard/BuildTimeChart.vue'
+import ChartCard from '~/components/dashboard/ChartCard.vue'
 import { useBuildCardStats } from '~/composables/useBuildCardStats'
 import { computeLastDayEvolution, dayIndexInWindow, fetchAllRows } from '~/services/buildCharts'
 import { useSupabase } from '~/services/supabase'
-import BuildTimeChart from './BuildTimeChart.vue'
-import ChartCard from './ChartCard.vue'
 
 const props = defineProps({
   appId: { type: String, default: '' },

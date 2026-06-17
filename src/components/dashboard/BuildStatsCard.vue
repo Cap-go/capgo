@@ -2,6 +2,8 @@
 import type { BuildSeriesData } from '~/services/buildCharts'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import BuildStatsChart from '~/components/dashboard/BuildStatsChart.vue'
+import ChartCard from '~/components/dashboard/ChartCard.vue'
 import { useBuildCardStats } from '~/composables/useBuildCardStats'
 import {
   bucketBuildStatus,
@@ -13,8 +15,6 @@ import {
   fetchAllRows,
 } from '~/services/buildCharts'
 import { useSupabase } from '~/services/supabase'
-import BuildStatsChart from './BuildStatsChart.vue'
-import ChartCard from './ChartCard.vue'
 
 const props = defineProps({
   appId: { type: String, default: '' },
