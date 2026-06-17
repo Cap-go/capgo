@@ -11,6 +11,7 @@ import { checkChannelSelfIPRateLimit, isChannelSelfRateLimited, recordChannelSel
 import { deleteChannelSelfOverride, getChannelSelfOverride, isChannelSelfStoreEnabled, setChannelSelfOverride } from '../utils/channelSelfStore.ts'
 import { BRES, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { invalidIpInfo } from '../utils/invalids_ip.ts'
 import { sendNotifOrgCached } from '../utils/notifications.ts'
 import { sendNotifToOrgMembersCached } from '../utils/org_email_notifications.ts'
 import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getChannelByIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, setReplicationLagHeader, upsertChannelDevicePg } from '../utils/pg.ts'
@@ -18,6 +19,7 @@ import { convertQueryToBody, makeDevice, parsePluginBody } from '../utils/plugin
 import { channelSelfGetRequestSchema, channelSelfRequestSchema, isDevicePlatform } from '../utils/plugin_validation.ts'
 import { buildRateLimitInfo } from '../utils/rateLimitInfo.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
+import { getClientIP } from '../utils/rate_limit.ts'
 import { backgroundTask, isDeprecatedPluginVersion, isLimited } from '../utils/utils.ts'
 
 // Minimum versions for local channel storage behavior
@@ -27,6 +29,25 @@ const CHANNEL_SELF_MIN_V7 = '7.34.0'
 const CHANNEL_SELF_MIN_V8 = '8.0.0'
 
 const PLAN_MAU_ACTIONS: Array<'mau'> = ['mau']
+
+async function blockProviderInfrastructure(c: Context, route: string) {
+  const requestIp = getClientIP(c)
+  if (requestIp === 'unknown')
+    return null
+
+  const providerInfo = await invalidIpInfo(requestIp, c)
+  if (!providerInfo.blocked)
+    return null
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Blocking /channel_self request from provider infrastructure IP',
+    ip: requestIp,
+    provider: providerInfo.provider,
+    route,
+  })
+  return c.json({ error: 'provider_infrastructure_request_blocked', message: 'Provider infrastructure requests are blocked' }, 429)
+}
 
 async function assertChannelSelfIPRateLimit(c: Context, appId: string) {
   // IP rate limit: per-minute cap (default 1000/min via RATE_LIMIT_CHANNEL_SELF_IP) to mitigate device_id spoofing
@@ -620,6 +641,10 @@ async function runChannelSelfDeviceOperation(
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', async (c) => {
+  const blocked = await blockProviderInfrastructure(c, 'POST')
+  if (blocked)
+    return blocked
+
   const body = await parseBody<DeviceLink>(c)
   const parsed = await parseChannelSelfPluginRequest(c, body, 'post body', channelSelfRequestSchema)
   if ('response' in parsed) {
@@ -642,6 +667,10 @@ app.post('/', async (c) => {
 })
 
 app.put('/', async (c) => {
+  const blocked = await blockProviderInfrastructure(c, 'PUT')
+  if (blocked)
+    return blocked
+
   // TODO: Used as get, should be refactor with query param instead
   const body = await parseBody<DeviceLink>(c)
   const parsed = await parseChannelSelfPluginRequest(c, body, 'put body', channelSelfRequestSchema)
@@ -661,6 +690,10 @@ app.put('/', async (c) => {
 })
 
 app.delete('/', async (c) => {
+  const blocked = await blockProviderInfrastructure(c, 'DELETE')
+  if (blocked)
+    return blocked
+
   const body = convertQueryToBody(c.req.query())
   const parsed = await parseChannelSelfPluginRequest(c, body, 'delete body', channelSelfRequestSchema)
   if ('response' in parsed) {
@@ -679,6 +712,10 @@ app.delete('/', async (c) => {
 })
 
 app.get('/', async (c) => {
+  const blocked = await blockProviderInfrastructure(c, 'GET')
+  if (blocked)
+    return blocked
+
   const body = convertQueryToBody(c.req.query())
   const parsed = await parseChannelSelfPluginRequest(c, body, 'list compatible channels', channelSelfGetRequestSchema as StandardSchema<DeviceLink>, false)
   if ('response' in parsed) {

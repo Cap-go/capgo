@@ -7,9 +7,11 @@ import { Hono } from 'hono/tiny'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { BRES, simpleError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { invalidIpInfo } from '../utils/invalids_ip.ts'
 import { sendNotifOrgCached } from '../utils/notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
+import { getClientIP } from '../utils/rate_limit.ts'
 import { statsRequestSchema } from '../utils/plugin_validation.ts'
 import { createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/stats.ts'
 import { backgroundTask, INVALID_STRING_APP_ID, isLimited, MISSING_STRING_APP_ID, reverseDomainRegex } from '../utils/utils.ts'
@@ -17,6 +19,25 @@ import { backgroundTask, INVALID_STRING_APP_ID, isLimited, MISSING_STRING_APP_ID
 const PLAN_ERROR = 'Cannot send stats, upgrade plan to continue to update'
 const DOWNLOAD_FAIL_FIXED_PLUGIN_VERSION = parse('7.17.0')
 const DOWNLOAD_FAIL_FIXED_PLUGIN_VERSION_V6 = parse('6.14.25')
+
+async function blockProviderInfrastructure(c: Context) {
+  const requestIp = getClientIP(c)
+  if (requestIp === 'unknown')
+    return null
+
+  const providerInfo = await invalidIpInfo(requestIp, c)
+  if (!providerInfo.blocked)
+    return null
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Blocking /stats request from provider infrastructure IP',
+    ip: requestIp,
+    provider: providerInfo.provider,
+  })
+  return c.json({ error: 'provider_infrastructure_request_blocked', message: 'Provider infrastructure requests are blocked' }, 429)
+}
+
 
 export interface BatchStatsResult {
   status: 'ok' | 'error'
@@ -187,6 +208,10 @@ async function parseBodyRaw(c: Context): Promise<AppStats | AppStats[]> {
 }
 
 app.post('/', async (c) => {
+  const blocked = await blockProviderInfrastructure(c)
+  if (blocked)
+    return blocked
+
   const body = await parseBodyRaw(c)
   const isBatch = Array.isArray(body)
   const events = isBatch ? body : [body]
