@@ -1099,7 +1099,6 @@ export type Database = {
           churn_mrr_maker: number
           churn_mrr_solo: number
           churn_mrr_team: number
-          churn_reason: string | null
           contraction_mrr: number
           contraction_mrr_enterprise: number
           contraction_mrr_maker: number
@@ -1120,7 +1119,6 @@ export type Database = {
           churn_mrr_maker?: number
           churn_mrr_solo?: number
           churn_mrr_team?: number
-          churn_reason?: string | null
           contraction_mrr?: number
           contraction_mrr_enterprise?: number
           contraction_mrr_maker?: number
@@ -1496,8 +1494,6 @@ export type Database = {
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
-          past_due_orgs: number
-          past_due_orgs_average_days: number
           plan_enterprise: number | null
           plan_enterprise_conversion_rate: number
           plan_enterprise_monthly: number
@@ -1586,8 +1582,6 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
-          past_due_orgs?: number
-          past_due_orgs_average_days?: number
           plan_enterprise?: number | null
           plan_enterprise_conversion_rate?: number
           plan_enterprise_monthly?: number
@@ -2538,7 +2532,6 @@ export type Database = {
           past_due_at: string | null
           mau_exceeded: boolean | null
           paid_at: string | null
-          past_due_at: string | null
           plan_calculated_at: string | null
           plan_usage: number | null
           price_id: string | null
@@ -2566,7 +2559,6 @@ export type Database = {
           past_due_at?: string | null
           mau_exceeded?: boolean | null
           paid_at?: string | null
-          past_due_at?: string | null
           plan_calculated_at?: string | null
           plan_usage?: number | null
           price_id?: string | null
@@ -2594,7 +2586,6 @@ export type Database = {
           past_due_at?: string | null
           mau_exceeded?: boolean | null
           paid_at?: string | null
-          past_due_at?: string | null
           plan_calculated_at?: string | null
           plan_usage?: number | null
           price_id?: string | null
