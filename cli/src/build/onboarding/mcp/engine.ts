@@ -1509,21 +1509,10 @@ export function mapAndroidView(
       }
     }
 
-    case 'google-sign-in':
-      return {
-        ...base,
-        kind: 'human_gate',
-        summary: `"${facts.appId}" needs access to Google Play. I will open your browser for a Google sign-in.`,
-        human: {
-          instruction: `I will open your browser for a Google sign-in. Approve every requested permission. Your tokens are used only during setup and are revoked when onboarding finishes; they never reach Capgo servers. Open your browser, approve the permissions, then tell me to continue.`,
-        },
-        next: {
-          tool: NEXT_STEP_TOOL,
-          instruction: 'After the user approves in the browser, call next_step with no arguments to continue.',
-          call: `${NEXT_STEP_TOOL}({})`,
-        },
-      }
-
+    // NOTE: the 'google-sign-in' step is rendered by the broker sign-in flow in
+    // decideAndroid (signInProceed) BEFORE mapAndroidView is consulted, so there is
+    // no 'google-sign-in' case here — it would be dead and its old loopback copy
+    // ("tokens never reach Capgo servers") is no longer true with the broker.
     case 'play-developer-id-input':
       return {
         ...base,

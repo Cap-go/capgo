@@ -8,9 +8,16 @@
 //     too — bootstrapping a new platform's signing is onboarding's job, not an ad-hoc field edit.
 // Secret VALUES never leave through tool output (export writes them to a 0600 .env file; list shows
 // field names only; set takes a value — or a file to base64-encode — without echoing it back).
+//
+// SECURITY: the "caller" of this tool is an LLM agent, so every path it supplies is untrusted (prompt
+// injection). valueFile reads are screened to credential files only and never from secret dirs, and
+// export is contained to the project directory — see screenValueFilePath / screenExportPath.
 import type { BuildCredentials } from '../../../schemas/build.js'
-import { readFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
+import { extname, join, resolve, sep } from 'node:path'
+import { cwd } from 'node:process'
 import { z } from 'zod'
+import { readSafeFileBytes } from '../../../utils/safeWrites.js'
 import {
   loadSavedCredentials,
   removeSavedCredentialKeys,
@@ -36,12 +43,61 @@ export const KNOWN_CREDENTIAL_KEYS: ReadonlySet<string> = new Set([
   'PLAY_STORE_IN_APP_UPDATE_PRIORITY',
 ])
 
+/** valueFile must be one of these credential-file extensions — blocks reading ~/.ssh keys, /etc/passwd,
+ *  ~/.aws/credentials (all extensionless), and the like into the credential store. */
+const CREDENTIAL_FILE_EXTENSIONS: ReadonlySet<string> = new Set([
+  '.keystore', '.jks', '.p12', '.pfx', '.key', '.json', '.p8', '.cer', '.pem', '.der', '.mobileprovision', '.provisionprofile',
+])
+
+/** Home-relative directories a credential file must never be read from (defense for the .json/.pem
+ *  case the extension allow-list lets through — e.g. ~/.config/gcloud/*.json, ~/.capgo-credentials). */
+const SENSITIVE_HOME_DIRS: readonly string[] = ['.ssh', '.aws', '.gnupg', '.kube', '.docker', '.capgo-credentials', join('.config', 'gcloud')]
+
+function sensitiveDirHit(absPath: string): string | null {
+  const home = homedir()
+  for (const d of SENSITIVE_HOME_DIRS) {
+    const blocked = join(home, d)
+    if (absPath === blocked || absPath.startsWith(blocked + sep))
+      return d
+  }
+  return null
+}
+
+/**
+ * Screen a valueFile path BEFORE reading it. The MCP caller (an LLM) supplies this path, so an injected
+ * prompt could try to read ~/.ssh/id_ed25519 or another app's ~/.capgo-credentials into the store (which
+ * is then sent to the build server). Allow only credential-file extensions, and never read from a known
+ * secret directory. Returns an error string to surface to the caller, or null when the path is acceptable.
+ */
+export function screenValueFilePath(filePath: string): string | null {
+  const ext = extname(filePath).toLowerCase()
+  if (!CREDENTIAL_FILE_EXTENSIONS.has(ext))
+    return `Refusing to read "${filePath}" as a credential file: only ${[...CREDENTIAL_FILE_EXTENSIONS].join(', ')} are allowed. For a plain value (e.g. a password) pass "value", not "valueFile".`
+  const hit = sensitiveDirHit(resolve(filePath))
+  if (hit)
+    return `Refusing to read "${filePath}": it is inside a sensitive directory (~/${hit}). A build credential file must not come from there.`
+  return null
+}
+
+/**
+ * Screen an export targetPath: the .env (which holds real secrets) must stay INSIDE the project
+ * directory so the tool can never be steered into writing to e.g. /etc/cron.d or ~/.bashrc. Returns an
+ * error string, or null when the path stays in the project.
+ */
+export function screenExportPath(targetPath: string, projectDir: string): string | null {
+  const root = resolve(projectDir)
+  const abs = resolve(projectDir, targetPath)
+  if (abs !== root && !abs.startsWith(root + sep))
+    return `Refusing to export to "${targetPath}": the .env file holds secrets and must stay inside the project directory (${root}).`
+  return null
+}
+
 export interface CredentialsManageInput {
   action: 'list' | 'export' | 'set' | 'remove'
   platform?: 'ios' | 'android'
   key?: string
   value?: string
-  /** For set: a path to a file whose base64 becomes the value (keystores, .p12, service-account JSON). */
+  /** For set: a path to a credential file whose base64 becomes the value (keystores, .p12, .p8, service-account JSON). */
   valueFile?: string
   path?: string
   overwrite?: boolean
@@ -55,7 +111,7 @@ export interface CredentialsManageDeps {
   updateSavedCredentials: typeof updateSavedCredentials
   removeSavedCredentialKeys: typeof removeSavedCredentialKeys
   exportCredentialsToEnv: typeof exportCredentialsToEnv
-  /** Read a file and return its base64 — used by set + valueFile. */
+  /** Read a file and return its base64 — used by set + valueFile. Must reject symlinks. */
   readFileBase64: (path: string) => Promise<string>
 }
 
@@ -67,7 +123,8 @@ export function buildCredentialsManageDeps(getAppId: () => Promise<string | unde
     updateSavedCredentials,
     removeSavedCredentialKeys,
     exportCredentialsToEnv,
-    readFileBase64: async path => (await readFile(path)).toString('base64'),
+    // Symlink-safe: a credential valueFile must never be followed through a symlink to read elsewhere.
+    readFileBase64: async path => (await readSafeFileBytes(path)).toString('base64'),
   }
 }
 
@@ -130,8 +187,19 @@ export async function runCredentialsManage(input: CredentialsManageInput, deps: 
     }
 
     case 'export': {
+      if (input.path) {
+        const screen = screenExportPath(input.path, cwd())
+        if (screen)
+          return screen
+      }
       const creds = saved[input.platform!]!
-      const result = deps.exportCredentialsToEnv({ appId, platform: input.platform!, credentials: creds, targetPath: input.path, overwrite: input.overwrite })
+      let result
+      try {
+        result = deps.exportCredentialsToEnv({ appId, platform: input.platform!, credentials: creds, targetPath: input.path, overwrite: input.overwrite })
+      }
+      catch {
+        return `Could not export the ${input.platform} credentials for "${appId}" — writing the .env failed (the target may be a symlink or unwritable). Nothing was written.`
+      }
       if (result.kind === 'empty')
         return `The ${input.platform} credentials for "${appId}" have no exportable values. Nothing was written.`
       if (result.kind === 'exists')
@@ -144,6 +212,9 @@ export async function runCredentialsManage(input: CredentialsManageInput, deps: 
         return 'action:"set" needs a key (the credential field name, e.g. "KEYSTORE_STORE_PASSWORD" or "ANDROID_KEYSTORE_FILE").'
       let value = input.value
       if (input.valueFile) {
+        const screen = screenValueFilePath(input.valueFile)
+        if (screen)
+          return screen
         try {
           value = await deps.readFileBase64(input.valueFile)
         }
@@ -152,8 +223,13 @@ export async function runCredentialsManage(input: CredentialsManageInput, deps: 
         }
       }
       if (value === undefined)
-        return 'action:"set" needs a value, or a valueFile (a path to base64-encode — for keystores, .p12, or service-account JSON).'
-      await deps.updateSavedCredentials(appId, input.platform!, { [input.key]: value } as Partial<BuildCredentials>)
+        return 'action:"set" needs a value, or a valueFile (a path to base64-encode — for keystores, .p12, .p8, or service-account JSON).'
+      try {
+        await deps.updateSavedCredentials(appId, input.platform!, { [input.key]: value } as Partial<BuildCredentials>)
+      }
+      catch {
+        return `Could not save ${input.key} for ${input.platform} on "${appId}" — writing to the credential store failed. Nothing was changed.`
+      }
       const src = input.valueFile ? ` from ${input.valueFile}` : ''
       const note = KNOWN_CREDENTIAL_KEYS.has(input.key) ? '' : ` (heads-up: "${input.key}" is not a standard Capgo credential field — double-check the name)`
       return `Set ${input.key} for ${input.platform} on "${appId}"${src}${note}. The value was saved but not echoed back.`
@@ -165,7 +241,12 @@ export async function runCredentialsManage(input: CredentialsManageInput, deps: 
       const platCreds = saved[input.platform!] ?? {}
       if (!(input.key in platCreds))
         return `"${input.key}" is not set for ${input.platform} on "${appId}". Nothing to remove. Use action:"list" to see the saved fields.`
-      await deps.removeSavedCredentialKeys(appId, input.platform!, [input.key])
+      try {
+        await deps.removeSavedCredentialKeys(appId, input.platform!, [input.key])
+      }
+      catch {
+        return `Could not remove ${input.key} for ${input.platform} on "${appId}" — writing to the credential store failed.`
+      }
       return `Removed ${input.key} from ${input.platform} on "${appId}".`
     }
 
@@ -180,8 +261,8 @@ export const credentialsManageSchema = {
   platform: z.enum(['ios', 'android']).optional().describe('Required for export/set/remove. The platform whose credentials to act on (must already be set up).'),
   key: z.string().optional().describe('For set/remove: the credential field name (e.g. KEYSTORE_STORE_PASSWORD, ANDROID_KEYSTORE_FILE, PLAY_CONFIG_JSON, P12_PASSWORD).'),
   value: z.string().optional().describe('For set: the new value to save (never echoed back).'),
-  valueFile: z.string().optional().describe('For set: a path to a file whose contents are base64-encoded into the value — use for FILE fields like ANDROID_KEYSTORE_FILE, PLAY_CONFIG_JSON, or BUILD_CERTIFICATE_BASE64.'),
-  path: z.string().optional().describe('For export: the target .env path. Defaults to .env.capgo.<appId>.<platform> in the project dir.'),
+  valueFile: z.string().optional().describe('For set: a path to a credential FILE (.keystore/.jks/.p12/.json/.p8/.cer/.mobileprovision) whose contents are base64-encoded into the value — use for FILE fields like ANDROID_KEYSTORE_FILE, PLAY_CONFIG_JSON, BUILD_CERTIFICATE_BASE64, or APPLE_KEY_CONTENT (the .p8 key). Non-credential files, and files in sensitive dirs (~/.ssh, ~/.aws, ~/.capgo-credentials), are refused.'),
+  path: z.string().optional().describe('For export: the target .env path (must stay inside the project dir). Defaults to .env.capgo.<appId>.<platform> in the project dir.'),
   overwrite: z.boolean().optional().describe('For export: overwrite the target file if it already exists.'),
   appId: z.string().optional().describe('App id to target. Defaults to the current Capacitor project.'),
 }
@@ -191,7 +272,7 @@ const CREDENTIALS_MANAGE_DESCRIPTION
     + 'Use this ONLY when the platform already has credentials saved — for example to fix a wrong keystore/password after a build fails, rotate a key, or export the credentials. '
     + 'Do NOT use it to set up, connect, configure, or troubleshoot native builds for the FIRST time, and do NOT use it when no credentials exist yet (or for a platform that is not set up): that is what start_capgo_builder_onboarding is for; call that instead. '
     + 'This tool never creates credentials or runs onboarding — if none exist it refuses and tells you to onboard. '
-    + 'To replace a keystore / .p12 / service-account FILE, pass valueFile (a path); the tool base64-encodes it. '
+    + 'To replace a keystore / .p12 / service-account FILE, pass valueFile (a path to that credential file); the tool base64-encodes it. '
     + 'Secret values never leave through tool output: export writes them to a 0600 .env file, list shows field NAMES only, and set takes a value (or file) you provide without echoing it back.'
 
 /** Minimal MCP server surface this registers against (mirrors onboarding-tools' McpLike.tool). */

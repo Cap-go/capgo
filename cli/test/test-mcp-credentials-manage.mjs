@@ -14,7 +14,9 @@ import process from 'node:process'
 
 console.log('🧪 Testing capgo_builder_credentials_manage...\n')
 
-const { runCredentialsManage, registerCredentialsManageTool, credentialsManageSchema, KNOWN_CREDENTIAL_KEYS } = await import('../src/build/onboarding/mcp/credentials-manage.ts')
+const { runCredentialsManage, registerCredentialsManageTool, credentialsManageSchema, KNOWN_CREDENTIAL_KEYS, screenValueFilePath, screenExportPath } = await import('../src/build/onboarding/mcp/credentials-manage.ts')
+const { homedir } = await import('node:os')
+const { join } = await import('node:path')
 
 let pass = 0
 let fail = 0
@@ -151,9 +153,39 @@ await test('set with valueFile base64-encodes the file (keystore replacement —
 
 await test('set with an unreadable valueFile → error, no mutation', async () => {
   const { deps, state } = makeDeps({ store: { 'com.acme.app': { android: { ...ANDROID } } }, files: {} })
-  const out = await runCredentialsManage({ action: 'set', platform: 'android', key: 'ANDROID_KEYSTORE_FILE', valueFile: '/nope' }, deps)
+  const out = await runCredentialsManage({ action: 'set', platform: 'android', key: 'ANDROID_KEYSTORE_FILE', valueFile: '/nope.keystore' }, deps)
   has(out, 'Could not read the file')
   ok(state.updates.length === 0)
+})
+
+// ── valueFile / export path screening (security — the caller is an untrusted LLM) ─
+await test('screenValueFilePath rejects non-credential extensions (SSH keys, /etc/passwd, no-ext secrets)', async () => {
+  for (const p of ['/Users/x/.ssh/id_ed25519', '/etc/passwd', '/Users/x/.aws/credentials', '/Users/x/notes.txt'])
+    ok(screenValueFilePath(p), `should refuse ${p}`)
+  ok(!screenValueFilePath('/Users/x/Downloads/release.keystore'), 'allows a .keystore')
+  ok(!screenValueFilePath('/tmp/play.json'), 'allows a .json service account')
+})
+
+await test('screenValueFilePath rejects credential-extension files inside sensitive dirs', async () => {
+  has(screenValueFilePath(join(homedir(), '.capgo-credentials', 'credentials.json')), 'sensitive directory')
+  has(screenValueFilePath(join(homedir(), '.config', 'gcloud', 'application_default_credentials.json')), 'sensitive directory')
+  has(screenValueFilePath(join(homedir(), '.ssh', 'key.pem')), 'sensitive directory')
+})
+
+await test('set refuses a valueFile outside the credential-file allow-list — no read, no mutation', async () => {
+  const { deps, state } = makeDeps({ store: { 'com.acme.app': { android: { ...ANDROID } } }, files: { '/Users/x/.ssh/id_ed25519': 'PRIVATEKEY' } })
+  const out = await runCredentialsManage({ action: 'set', platform: 'android', key: 'ANDROID_KEYSTORE_FILE', valueFile: '/Users/x/.ssh/id_ed25519' }, deps)
+  has(out, 'Refusing to read')
+  ok(state.reads.length === 0, 'never read the file')
+  ok(state.updates.length === 0, 'never mutated the store')
+})
+
+await test('screenExportPath keeps the .env inside the project dir', async () => {
+  const proj = '/Users/x/proj'
+  ok(!screenExportPath('.env.capgo.app.android', proj), 'allows a file in the project')
+  ok(!screenExportPath('sub/dir/.env', proj), 'allows a nested file in the project')
+  ok(screenExportPath('/etc/cron.d/capgo', proj), 'refuses /etc/cron.d')
+  ok(screenExportPath('../../../../etc/passwd', proj), 'refuses traversal out of the project')
 })
 
 await test('set with an unknown key → still saves but warns about the field name', async () => {
