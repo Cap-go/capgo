@@ -4115,10 +4115,13 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
     }
   }
 
-  // Detect sign-in proceed: plain continue (no android/ios/tail input, no platform choice) at google-sign-in.
+  // Land straight on the sign-in link. Whenever we're at the google-sign-in step — the user just chose the
+  // guided setup (serviceAccountMethod/saMethodChoice), switched to it, or sent a plain continue — proceed to
+  // create + show the sign-in link (and poll on later continues) instead of parking on a separate
+  // "tell me to continue" gate first. decideAndroid's signInProceed branch is the only side-effecting render
+  // (begin/poll happen once per turn there); the non-signInProceed pass in decideAdvance stays side-effect-free.
   let signInProceed = false
-  const isPlainContinue = !input || (!input.platform && !input.runBuild && !input.checkBuild && !androidInputPresent && !iosInputPresent && !tailInputPresent)
-  if (isPlainContinue) {
+  {
     const spAppId = await deps.getAppId()
     if (spAppId) {
       const spProgress = await deps.loadAndroidProgress(spAppId)
