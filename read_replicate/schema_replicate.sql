@@ -396,7 +396,9 @@ CREATE TABLE public.stripe_info (
     upgraded_at timestamp with time zone,
     paid_at timestamp with time zone,
     customer_country character varying(2),
-    last_stripe_event_at timestamp with time zone
+    last_stripe_event_at timestamp with time zone,
+    past_due_at timestamp with time zone,
+    churn_reason text
 );
 
 
@@ -861,6 +863,13 @@ CREATE INDEX idx_orgs_email_preferences ON public.orgs USING gin (email_preferen
 --
 
 CREATE INDEX idx_stripe_info_customer_covering ON public.stripe_info USING btree (customer_id) INCLUDE (product_id, subscription_anchor_start, subscription_anchor_end);
+
+
+--
+-- Name: idx_stripe_info_past_due_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_stripe_info_past_due_at ON public.stripe_info USING btree (past_due_at) WHERE (past_due_at IS NOT NULL);
 
 
 --

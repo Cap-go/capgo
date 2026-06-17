@@ -125,6 +125,15 @@ interface CoreSnapshotRow {
 interface CustomerIdRow {
   customer_id: string
 }
+interface PastDueOrgStats {
+  past_due_orgs: number
+  past_due_orgs_average_days: number
+}
+interface PastDueOrgRow extends CustomerIdRow {
+  past_due_at?: string | null
+  updated_at?: string | null
+}
+const REVENUE_ACTIVE_STRIPE_STATUSES: Database['public']['Enums']['stripe_status'][] = ['succeeded']
 
 function getDateId(targetDate = new Date()): string {
   return new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate())).toISOString().slice(0, 10)
@@ -453,6 +462,52 @@ function calculateNrr(previousMrr: number, dailyChanges: DailyRevenueChangeSumma
 
 function calculateChurnRevenue(dailyChanges: DailyRevenueChangeSummary) {
   return Number((dailyChanges.churnMrr + dailyChanges.contractionMrr).toFixed(2))
+}
+
+function calculateAveragePastDueDays(rows: PastDueOrgRow[], snapshotAt: Date) {
+  const startTimeByCustomer = getPastDueStartTimesByCustomer(rows, snapshotAt)
+  const snapshotTime = snapshotAt.getTime()
+
+  const durations = Array.from(startTimeByCustomer.values())
+    .map(startTime => (snapshotTime - startTime) / (24 * 60 * 60 * 1000))
+
+  if (durations.length === 0)
+    return 0
+
+  const totalDays = durations.reduce((sum, days) => sum + days, 0)
+  return Number((totalDays / durations.length).toFixed(1))
+}
+
+function getPastDueStartTimesByCustomer(rows: PastDueOrgRow[], snapshotAt: Date) {
+  const snapshotTime = snapshotAt.getTime()
+  const startTimeByCustomer = new Map<string, number>()
+
+  for (const row of rows) {
+    if (!row.customer_id)
+      continue
+
+    const startDate = row.past_due_at ?? row.updated_at
+    if (!startDate)
+      continue
+
+    const startTime = new Date(startDate).getTime()
+    if (!Number.isFinite(startTime) || startTime > snapshotTime)
+      continue
+
+    const previousStartTime = startTimeByCustomer.get(row.customer_id)
+    if (previousStartTime === undefined || startTime < previousStartTime)
+      startTimeByCustomer.set(row.customer_id, startTime)
+  }
+
+  return startTimeByCustomer
+}
+
+function calculatePastDueOrgStats(rows: PastDueOrgRow[], snapshotAt: Date): PastDueOrgStats {
+  const startTimeByCustomer = getPastDueStartTimesByCustomer(rows, snapshotAt)
+  return {
+    past_due_orgs: startTimeByCustomer.size,
+    past_due_orgs_average_days: calculateAveragePastDueDays(rows, snapshotAt),
+  }
 }
 
 function isMissingBuildMetricColumnError(error: unknown): boolean {
@@ -1771,6 +1826,7 @@ async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Prom
     canceled_orgs,
     upgraded_orgs,
     trialExtensionStats,
+    pastDueOrgStats,
     credits_bought,
     credits_consumed,
   ] = await Promise.all([
@@ -1787,7 +1843,7 @@ async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Prom
         .from('stripe_info')
         .select('customer_id')
         .is('paid_at', null)
-        .eq('status', 'succeeded')
+        .in('status', REVENUE_ACTIVE_STRIPE_STATUSES)
         .eq('is_good_plan', true)
         .gte('created_at', dayStartIso)
         .lt('created_at', nextDayStartIso),
@@ -1828,6 +1884,20 @@ async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Prom
         return new Set((res.data || []).map(row => row.customer_id)).size
       }),
     getTrialExtensionStats(c, metricWindow),
+    (async () => {
+      const res = await supabase
+        .from('stripe_info')
+        .select('customer_id, past_due_at, updated_at')
+        .not('past_due_at', 'is', null)
+        .lt('past_due_at', nextDayStartIso)
+
+      if (res.error) {
+        cloudlog({ requestId: c.get('requestId'), message: 'past_due_org_stats error', error: res.error })
+        return { past_due_orgs: 0, past_due_orgs_average_days: 0 }
+      }
+
+      return calculatePastDueOrgStats((res.data || []) as PastDueOrgRow[], nextDayStart)
+    })(),
     supabase
       .from('usage_credit_grants')
       .select('credits_total')
@@ -1860,6 +1930,8 @@ async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Prom
     credits_consumed: Math.round(credits_consumed),
     mrr: revenue.mrr,
     new_paying_orgs,
+    past_due_orgs: pastDueOrgStats.past_due_orgs,
+    past_due_orgs_average_days: pastDueOrgStats.past_due_orgs_average_days,
     plan_enterprise_monthly: revenue.plan_enterprise_monthly,
     plan_enterprise_yearly: revenue.plan_enterprise_yearly,
     plan_maker_monthly: revenue.plan_maker_monthly,
@@ -2163,7 +2235,9 @@ export const logsnagInsightsTestUtils = {
   buildLogsnagInsightsRetryMessage,
   buildLogsnagInsightsShardMessage,
   readLogsnagInsightsPayload,
+  REVENUE_ACTIVE_STRIPE_STATUSES,
   LOGSNAG_INSIGHTS_BACKGROUND_MAX_RETRIES,
+  calculatePastDueOrgStats,
   calculateChurnRevenue,
   calculateNrr,
   countUniqueCustomers,

@@ -23,6 +23,10 @@ function withTestEnv(values: Record<string, string>) {
 }
 
 describe('logsnag revenue metric helpers', () => {
+  it.concurrent('keeps revenue-active snapshots limited to succeeded subscriptions', () => {
+    expect(logsnagInsightsTestUtils.REVENUE_ACTIVE_STRIPE_STATUSES).toEqual(['succeeded'])
+  })
+
   it.concurrent('counts paid customers from paid_at rows and legacy fallback rows', () => {
     expect(logsnagInsightsTestUtils.countUniqueCustomers(
       [
@@ -167,6 +171,65 @@ describe('logsnag revenue metric helpers', () => {
       contractionMrr: 7.75,
       expansionMrr: 0,
     })).toBe(26)
+  })
+
+  it.concurrent('calculates current past-due org count and average days', () => {
+    expect(logsnagInsightsTestUtils.calculatePastDueOrgStats([
+      {
+        customer_id: 'cus_due_1',
+        past_due_at: '2026-03-20T00:00:00.000Z',
+        updated_at: '2026-03-21T00:00:00.000Z',
+      },
+      {
+        customer_id: 'cus_due_2',
+        past_due_at: '2026-03-22T12:00:00.000Z',
+        updated_at: '2026-03-22T12:00:00.000Z',
+      },
+      {
+        customer_id: 'cus_due_2',
+        past_due_at: '2026-03-22T12:00:00.000Z',
+        updated_at: '2026-03-22T12:00:00.000Z',
+      },
+    ], new Date('2026-03-25T00:00:00.000Z'))).toEqual({
+      past_due_orgs: 2,
+      past_due_orgs_average_days: 3.8,
+    })
+  })
+
+  it.concurrent('ignores future past-due rows and uses the earliest start per customer', () => {
+    expect(logsnagInsightsTestUtils.calculatePastDueOrgStats([
+      {
+        customer_id: 'cus_due_1',
+        past_due_at: '2026-03-24T00:00:00.000Z',
+        updated_at: '2026-03-24T00:00:00.000Z',
+      },
+      {
+        customer_id: 'cus_due_1',
+        past_due_at: '2026-03-22T00:00:00.000Z',
+        updated_at: '2026-03-22T00:00:00.000Z',
+      },
+      {
+        customer_id: 'cus_due_future',
+        past_due_at: '2026-03-25T12:00:00.000Z',
+        updated_at: '2026-03-25T12:00:00.000Z',
+      },
+    ], new Date('2026-03-25T00:00:00.000Z'))).toEqual({
+      past_due_orgs: 1,
+      past_due_orgs_average_days: 3,
+    })
+  })
+
+  it.concurrent('falls back to updated_at for past-due duration during rollout', () => {
+    expect(logsnagInsightsTestUtils.calculatePastDueOrgStats([
+      {
+        customer_id: 'cus_due_rollout',
+        past_due_at: null,
+        updated_at: '2026-03-24T00:00:00.000Z',
+      },
+    ], new Date('2026-03-25T00:00:00.000Z'))).toEqual({
+      past_due_orgs: 1,
+      past_due_orgs_average_days: 1,
+    })
   })
 
   it.concurrent('defaults missing plan buckets to zero for global stats snapshots', () => {

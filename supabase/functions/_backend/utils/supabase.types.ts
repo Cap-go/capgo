@@ -1094,6 +1094,7 @@ export type Database = {
       daily_revenue_metrics: {
         Row: {
           churn_mrr: number
+          churn_reason: string | null
           churn_mrr_enterprise: number
           churn_mrr_maker: number
           churn_mrr_solo: number
@@ -1113,6 +1114,7 @@ export type Database = {
         }
         Insert: {
           churn_mrr?: number
+          churn_reason?: string | null
           churn_mrr_enterprise?: number
           churn_mrr_maker?: number
           churn_mrr_solo?: number
@@ -1132,6 +1134,7 @@ export type Database = {
         }
         Update: {
           churn_mrr?: number
+          churn_reason?: string | null
           churn_mrr_enterprise?: number
           churn_mrr_maker?: number
           churn_mrr_solo?: number
@@ -1482,6 +1485,8 @@ export type Database = {
           mrr: number
           need_upgrade: number | null
           new_paying_orgs: number
+          past_due_orgs: number
+          past_due_orgs_average_days: number
           not_paying: number | null
           nrr: number
           onboarded: number | null
@@ -1568,6 +1573,8 @@ export type Database = {
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
+          past_due_orgs?: number
+          past_due_orgs_average_days?: number
           not_paying?: number | null
           nrr?: number
           onboarded?: number | null
@@ -1652,6 +1659,8 @@ export type Database = {
           live_updates_active_paying_clients_60d?: number
           longest_ltv?: number
           mrr?: number
+          past_due_orgs?: number
+          past_due_orgs_average_days?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
           not_paying?: number | null
@@ -2513,11 +2522,13 @@ export type Database = {
           bandwidth_exceeded: boolean | null
           build_time_exceeded: boolean | null
           canceled_at: string | null
+          churn_reason: string | null
           created_at: string
           customer_country: string | null
           customer_id: string
           id: number
           is_good_plan: boolean | null
+          past_due_at: string | null
           last_stripe_event_at: string | null
           mau_exceeded: boolean | null
           paid_at: string | null
@@ -2538,12 +2549,14 @@ export type Database = {
           bandwidth_exceeded?: boolean | null
           build_time_exceeded?: boolean | null
           canceled_at?: string | null
+          churn_reason?: string | null
           created_at?: string
           customer_country?: string | null
           customer_id: string
           id?: number
           is_good_plan?: boolean | null
           last_stripe_event_at?: string | null
+          past_due_at?: string | null
           mau_exceeded?: boolean | null
           paid_at?: string | null
           plan_calculated_at?: string | null
@@ -2563,12 +2576,14 @@ export type Database = {
           bandwidth_exceeded?: boolean | null
           build_time_exceeded?: boolean | null
           canceled_at?: string | null
+          churn_reason?: string | null
           created_at?: string
           customer_country?: string | null
           customer_id?: string
           id?: number
           is_good_plan?: boolean | null
           last_stripe_event_at?: string | null
+          past_due_at?: string | null
           mau_exceeded?: boolean | null
           paid_at?: string | null
           plan_calculated_at?: string | null

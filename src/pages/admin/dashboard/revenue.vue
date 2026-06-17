@@ -57,6 +57,8 @@ const globalStatsTrendData = ref<Array<{
   new_paying_orgs: number
   canceled_orgs: number
   upgraded_orgs: number
+  past_due_orgs: number
+  past_due_orgs_average_days: number
   mrr: number
   previous_mrr: number
   previous_mrr_solo: number
@@ -148,6 +150,38 @@ const subscriptionFlowSeries = computed(() => {
         value: item.canceled_orgs || 0,
       })),
       color: '#ef4444', // red
+    },
+  ]
+})
+
+const pastDueOrgSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: t('past-due-organizations'),
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.past_due_orgs || 0,
+      })),
+      color: '#ef4444', // red
+    },
+  ]
+})
+
+const pastDueAverageDaysSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: t('average-past-due-days'),
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.past_due_orgs_average_days || 0,
+      })),
+      color: '#f59e0b', // amber
     },
   ]
 })
@@ -656,7 +690,7 @@ displayStore.defaultBack = '/dashboard'
           </div>
 
           <!-- Upgrade Metrics Cards -->
-          <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
             <!-- Organizations Needing Upgrade -->
             <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
               <div class="flex items-start justify-between mb-4">
@@ -702,6 +736,52 @@ displayStore.defaultBack = '/dashboard'
                 </p>
               </div>
             </div>
+
+            <!-- Past Due Organizations -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-error/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-error"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M9.172 4.172a4 4 0 015.656 0l5 5a4 4 0 010 5.656l-5 5a4 4 0 01-5.656 0l-5-5a4 4 0 010-5.656l5-5z" /></svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  {{ t('past-due-orgs') }}
+                </p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-error">
+                  {{ (latestGlobalStats.past_due_orgs || 0).toLocaleString() }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-error">
+                  0
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ t('stripe-subscriptions-past-due') }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Average Past Due Days -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-warning/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-warning"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" /></svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  {{ t('avg-past-due-days') }}
+                </p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-warning">
+                  {{ (latestGlobalStats.past_due_orgs_average_days || 0).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-warning">
+                  0.0
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ t('current-average-delay') }}
+                </p>
+              </div>
+            </div>
           </div>
 
           <!-- Charts - 2 per row -->
@@ -727,6 +807,31 @@ displayStore.defaultBack = '/dashboard'
               <AdminMultiLineChart
                 :series="subscriptionTypeSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+          </div>
+
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <ChartCard
+              :title="t('past-due-organizations')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="pastDueOrgSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="pastDueOrgSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+
+            <ChartCard
+              :title="t('average-past-due-days')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="pastDueAverageDaysSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="pastDueAverageDaysSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+                :value-suffix="` ${t('days')}`"
               />
             </ChartCard>
           </div>
