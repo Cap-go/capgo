@@ -14,9 +14,10 @@ import { updateManifestSize } from './on_manifest_create.ts'
 
 // Define constants
 const DEFAULT_BATCH_SIZE = 950 // Default batch size for queue reads limit of CF is 1000 fetches so we take a safe margin
-const MANIFEST_QUEUE_BATCH_SIZE = 100
 const DEFAULT_QUEUE_HTTP_CONCURRENCY = 25
-const MANIFEST_QUEUE_HTTP_CONCURRENCY = 10
+const MANIFEST_QUEUE_HTTP_CONCURRENCY = 100
+const DEFAULT_QUEUE_VISIBILITY_TIMEOUT_SECONDS = 120
+const MANIFEST_QUEUE_VISIBILITY_TIMEOUT_SECONDS = 900
 const QUEUE_HTTP_TIMEOUT_MS = 15_000
 const HEALTHCHECK_HTTP_TIMEOUT_MS = 8_000
 export const MAX_QUEUE_READS = 5
@@ -464,9 +465,7 @@ async function processQueueMessage(c: Context, queueName: string, message: Messa
   }
 }
 
-function getQueueBatchSize(queueName: string, requestedBatchSize: number): number {
-  if (queueName === 'on_manifest_create')
-    return Math.min(requestedBatchSize, MANIFEST_QUEUE_BATCH_SIZE)
+function getQueueBatchSize(_queueName: string, requestedBatchSize: number): number {
   return requestedBatchSize
 }
 
@@ -474,6 +473,12 @@ function getQueueHttpConcurrency(queueName: string): number {
   if (queueName === 'on_manifest_create')
     return MANIFEST_QUEUE_HTTP_CONCURRENCY
   return DEFAULT_QUEUE_HTTP_CONCURRENCY
+}
+
+function getQueueVisibilityTimeout(queueName: string): number {
+  if (queueName === 'on_manifest_create')
+    return MANIFEST_QUEUE_VISIBILITY_TIMEOUT_SECONDS
+  return DEFAULT_QUEUE_VISIBILITY_TIMEOUT_SECONDS
 }
 
 async function mapWithConcurrency<T, R>(
@@ -772,7 +777,7 @@ async function readQueue(c: Context, db: ReturnType<typeof getPgClient>, queueNa
   cloudlog({ requestId: c.get('requestId'), message: `[${queueKey}] Starting queue read at ${startTime}.` })
 
   try {
-    const visibilityTimeout = 120
+    const visibilityTimeout = getQueueVisibilityTimeout(queueName)
     cloudlog(`[${queueKey}] Reading messages from queue: ${queueName}`)
     try {
       const result = await db.query(
@@ -989,6 +994,35 @@ async function mass_edit_queue_messages_cf_ids(
 }
 
 // --- Hono app setup ---
+function shouldRunQueueSyncInBackground(queueName: string): boolean {
+  return queueName !== 'on_manifest_create'
+}
+
+async function runQueueSync(c: Context, queueName: string, finalBatchSize: number, healthcheckUrl: string | null, executionMode: 'background' | 'awaited'): Promise<QueueProcessResult> {
+  cloudlog({ requestId: c.get('requestId'), message: `[Queue Sync] Starting ${executionMode} execution for queue: ${queueName} with batch size: ${finalBatchSize}` })
+  let db: ReturnType<typeof getPgClient> | null = null
+  try {
+    db = getPgClient(c)
+    if (healthcheckUrl !== null)
+      await maybePingCronHealthcheckStart(healthcheckUrl)
+    const result = await processQueue(c, db, queueName, finalBatchSize)
+    await maybePingCronHealthcheck(result, healthcheckUrl)
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: result.success
+        ? `[Queue Sync] ${executionMode} execution finished successfully.`
+        : `[Queue Sync] ${executionMode} execution finished with queue failures.`,
+      executionMode,
+      result,
+    })
+    return result
+  }
+  finally {
+    if (db)
+      await closeClient(c, db)
+    cloudlog({ requestId: c.get('requestId'), message: `[Queue Sync] ${executionMode} PostgreSQL connection closed.` })
+  }
+}
 export const app = new Hono<MiddlewareKeyVariables>()
 
 // /health endpoint
@@ -1032,30 +1066,14 @@ app.post('/sync', async (c) => {
     })
   }
 
-  await backgroundTask(c, (async () => {
-    cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Starting background execution for queue: ${queueName} with batch size: ${finalBatchSize}` })
-    let db: ReturnType<typeof getPgClient> | null = null
-    try {
-      db = getPgClient(c)
-      if (healthcheckUrl !== null)
-        await maybePingCronHealthcheckStart(healthcheckUrl)
-      const result = await processQueue(c, db, queueName, finalBatchSize)
-      await maybePingCronHealthcheck(result, healthcheckUrl)
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: result.success
-          ? `[Background Queue Sync] Background execution finished successfully.`
-          : `[Background Queue Sync] Background execution finished with queue failures.`,
-        result,
-      })
-    }
-    finally {
-      if (db)
-        await closeClient(c, db)
-      cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] PostgreSQL connection closed.` })
-    }
-  })())
-  cloudlog({ requestId: c.get('requestId'), message: `[Sync Request] Responding 202 Accepted. Time: ${Date.now() - handlerStart}ms` })
+  if (shouldRunQueueSyncInBackground(queueName)) {
+    await backgroundTask(c, runQueueSync(c, queueName, finalBatchSize, healthcheckUrl, 'background'))
+    cloudlog({ requestId: c.get('requestId'), message: `[Sync Request] Responding 202 Accepted. Time: ${Date.now() - handlerStart}ms` })
+    return c.json(BRES, 202)
+  }
+
+  await runQueueSync(c, queueName, finalBatchSize, healthcheckUrl, 'awaited')
+  cloudlog({ requestId: c.get('requestId'), message: `[Sync Request] Responding 202 Accepted after awaited queue processing. Time: ${Date.now() - handlerStart}ms` })
   return c.json(BRES, 202)
 })
 
@@ -1068,6 +1086,8 @@ export const __queueConsumerTestUtils__ = {
   getQueueBatchSize,
   getQueueHttpConcurrency,
   httpExceptionToQueueResponse,
+  getQueueVisibilityTimeout,
+  shouldRunQueueSyncInBackground,
   maybePingCronHealthcheck,
   maybePingCronHealthcheckStart,
   queueFailureResponse,
