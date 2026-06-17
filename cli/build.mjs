@@ -8,6 +8,11 @@ const HELPER_PACKAGES = [
   '@capgo/cli-helper-darwin-x64',
 ]
 
+const EXTERNAL_PACKAGES = [
+  ...HELPER_PACKAGES,
+  'node-pty',
+]
+
 // Shared plugin definitions - Bun's plugin API is compatible with esbuild's
 const stubSemver = {
   name: 'stub-semver',
@@ -310,7 +315,7 @@ const buildCLI = Bun.build({
   entrypoints: ['src/index.ts'],
   target: 'node',
   outdir: 'dist',
-  naming: 'index.js',
+  external: EXTERNAL_PACKAGES,
   sourcemap: env.NODE_ENV === 'development' ? 'linked' : 'none',
   minify: true,
   // Keep env access runtime-only unless explicitly defined below.
@@ -345,7 +350,7 @@ const buildSDK = Bun.build({
   target: 'node',
   outdir: 'dist/src',
   naming: 'sdk.js',
-  sourcemap: env.NODE_ENV === 'development' ? 'linked' : 'none',
+  external: EXTERNAL_PACKAGES,
   minify: true,
   format: 'esm',
   // Keep env access runtime-only unless explicitly defined below.
