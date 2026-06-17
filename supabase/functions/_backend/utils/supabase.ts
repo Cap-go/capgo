@@ -175,6 +175,7 @@ export async function getAppsFromSB(c: Context, referenceDate?: Date): Promise<s
       const { data, error } = await supabaseAdmin(c)
         .from('deleted_apps')
         .select('app_id')
+        .lt('created_at', createdBeforeIso)
         .gte('deleted_at', createdBeforeIso)
         .range(page * limit, (page + 1) * limit - 1)
 
