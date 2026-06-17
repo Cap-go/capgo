@@ -103,6 +103,7 @@ async function getData() {
   if (!organizationStore.currentOrganization) {
     return
   }
+  const orgId = organizationStore.currentOrganization.gid
 
   isLoading.value = true
   try {
@@ -126,7 +127,7 @@ async function getData() {
     }
 
     const builds = data || []
-    await loadBuildDurations(builds)
+    await loadBuildDurations(builds, orgId)
     elements.value = builds
     total.value = count || 0
   }
@@ -139,13 +140,12 @@ async function getData() {
   }
 }
 
-async function loadBuildDurations(builds: Element[]) {
-  const orgId = organizationStore.currentOrganization?.gid
+async function loadBuildDurations(builds: Element[], orgId: string) {
   const jobIds = builds
     .map(build => build.builder_job_id)
     .filter((id): id is string => !!id)
 
-  if (!orgId || jobIds.length === 0) {
+  if (jobIds.length === 0) {
     buildDurations.value = {}
     return
   }
