@@ -4543,6 +4543,8 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   startInitReplay({
     analyticsEnabled,
     apikey: options.apikey?.trim() || findSavedKeySilent(),
+    supaAnon: options.supaAnon,
+    supaHost: options.supaHost,
   })
   // Start the verbose internal log early so it captures the whole run (incl.
   // raw provider/API errors) and survives crashes for the support bundle.

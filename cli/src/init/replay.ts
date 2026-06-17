@@ -81,6 +81,8 @@ interface StartInitReplayOptions {
   replayUrl?: string
   rows?: number
   sessionPrefix?: string
+  supaAnon?: string
+  supaHost?: string
   throttleMs?: number
   terminalPixelSize?: TerminalPixelSize
   transport?: InitReplayTransport
@@ -128,6 +130,23 @@ export function resolveCapgoReplayUrl(host = env.CAPGO_CLI_REPLAY_API_HOST?.trim
       return withoutTrailingSlash
 
     return new URL('private/replay', withoutTrailingSlash.endsWith('/') ? withoutTrailingSlash : `${withoutTrailingSlash}/`).toString()
+  }
+  catch {
+    return undefined
+  }
+}
+
+export function resolveSupabaseReplayUrl(supaHost?: string) {
+  const trimmedHost = supaHost?.trim()
+  if (!trimmedHost)
+    return undefined
+
+  try {
+    const withoutTrailingSlash = trimmedHost.replace(/\/+$/, '')
+    if (withoutTrailingSlash.endsWith('/functions/v1/private/replay'))
+      return withoutTrailingSlash
+
+    return new URL('functions/v1/private/replay', `${withoutTrailingSlash}/`).toString()
   }
   catch {
     return undefined
@@ -745,8 +764,14 @@ class InitReplayRecorder implements InitReplayController {
 
 export function startInitReplay(options: StartInitReplayOptions = {}): InitReplayController | undefined {
   const apikey = options.apikey?.trim() || ''
+  const customSupabaseReplayRequested = Boolean(options.supaHost?.trim() || options.supaAnon?.trim())
+  const customSupabaseReplayUrl = options.supaHost?.trim() && options.supaAnon?.trim()
+    ? resolveSupabaseReplayUrl(options.supaHost)
+    : undefined
+  const replayAnalyticsEnabled = options.analyticsEnabled !== false
+    && (!customSupabaseReplayRequested || Boolean(options.replayUrl || customSupabaseReplayUrl))
   const shouldStart = shouldStartInitReplay({
-    analyticsEnabled: options.analyticsEnabled,
+    analyticsEnabled: replayAnalyticsEnabled,
     apikey,
     isCi: isCI,
     stdinIsTTY: Boolean(stdin.isTTY),
@@ -761,11 +786,13 @@ export function startInitReplay(options: StartInitReplayOptions = {}): InitRepla
     let abortReplayUrlLookup: (() => void) | undefined
     const replayUrl = options.replayUrl
       ? Promise.resolve(resolveCapgoReplayUrl(options.replayUrl))
-      : (() => {
-          const controller = new AbortController()
-          abortReplayUrlLookup = () => controller.abort()
-          return resolveConfiguredCapgoReplayUrl(controller.signal)
-        })()
+      : customSupabaseReplayUrl
+        ? Promise.resolve(customSupabaseReplayUrl)
+        : (() => {
+            const controller = new AbortController()
+            abortReplayUrlLookup = () => controller.abort()
+            return resolveConfiguredCapgoReplayUrl(controller.signal)
+          })()
     const currentUrl = options.currentUrl?.trim() || DEFAULT_REPLAY_CURRENT_URL
     const sessionPrefix = options.sessionPrefix?.trim() || DEFAULT_REPLAY_SESSION_PREFIX
     const terminalPixelSize = options.terminalPixelSize
