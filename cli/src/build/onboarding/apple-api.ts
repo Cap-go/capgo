@@ -45,10 +45,14 @@ interface AppleApiError {
 // falling through to 'unknown'.
 export class AppleApiHttpError extends Error {
   readonly status: number
-  constructor(status: number, message: string) {
+  // The Apple error code (e.g. 'FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED')
+  // when present, so callers can distinguish error sub-types within one status.
+  readonly code?: string
+  constructor(status: number, message: string, code?: string) {
     super(message)
     this.name = 'AppleApiHttpError'
     this.status = status
+    this.code = code
   }
 }
 
@@ -76,7 +80,7 @@ async function ascFetch(
     // (secret-redacted on write) so non-build failures are diagnosable.
     appendInternalLog(`apple-api ${options.method ?? 'GET'} ${path}: HTTP ${res.status} ${res.statusText} ${JSON.stringify(body?.errors ?? body ?? null)} | ${safeHeaders(res.headers)}`)
     if (first) {
-      throw new AppleApiHttpError(res.status, `Apple API error (${res.status}): ${first.title} — ${first.detail} (${first.code})`)
+      throw new AppleApiHttpError(res.status, `Apple API error (${res.status}): ${first.title} — ${first.detail} (${first.code})`, first.code)
     }
     throw new AppleApiHttpError(res.status, `Apple API error: HTTP ${res.status} ${res.statusText}`)
   }
@@ -104,13 +108,35 @@ export async function verifyApiKey(token: string): Promise<{ valid: true, teamId
     return { valid: true, teamId }
   }
   catch (err: any) {
-    if (err.message?.includes('401') || err.message?.includes('403')) {
-      throw new Error(
+    const status = typeof err?.status === 'number' ? err.status : undefined
+    const code = typeof err?.code === 'string' ? err.code : undefined
+    const is401 = status === 401 || err.message?.includes('401')
+    const is403 = status === 403 || err.message?.includes('403')
+
+    // Apple returns 403 FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED when the
+    // account holder hasn't signed (or must re-sign) a required agreement. The key
+    // itself is valid — point the user at the agreements page instead of sending
+    // them to re-check credentials that are fine. Preserve status/code so
+    // error-categories maps it to 'apple_agreements_missing' (not 'unknown').
+    if (is403 && (code === 'FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED' || /required agreement/i.test(err.message ?? ''))) {
+      throw new AppleApiHttpError(
+        403,
+        'Apple is blocking App Store Connect API access because your developer account has a required agreement that is unsigned or has expired.\n'
+        + '  - Sign in as the Account Holder at https://appstoreconnect.apple.com\n'
+        + '  - Open "Business" (Agreements, Tax, and Banking) and accept the pending or updated agreement\n'
+        + '  - Then run this step again — your API key is valid, so no key changes are needed',
+        code,
+      )
+    }
+    if (is401 || is403) {
+      throw new AppleApiHttpError(
+        status ?? 401,
         'API key verification failed. Please check:\n'
         + '  - The .p8 file is correct and hasn\'t been modified\n'
         + '  - The Key ID matches the key shown in App Store Connect\n'
         + '  - The Issuer ID is correct (shown at the top of the API keys page)\n'
         + '  - The key has "Admin" or "Developer" access',
+        code,
       )
     }
     throw err

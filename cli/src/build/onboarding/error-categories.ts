@@ -18,6 +18,13 @@ function getStatus(error: unknown): number | undefined {
   return typeof candidate === 'number' ? candidate : undefined
 }
 
+function getCode(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object')
+    return undefined
+  const candidate = (error as { code?: unknown }).code
+  return typeof candidate === 'string' ? candidate : undefined
+}
+
 function getPhase(error: unknown): string | undefined {
   if (!error || typeof error !== 'object')
     return undefined
@@ -37,8 +44,17 @@ export function mapIosOnboardingError(
     return 'cert_limit_reached'
 
   const status = getStatus(error)
+  const code = getCode(error)
+  const message = error instanceof Error ? error.message : ''
+  // A 403 carrying the agreements code is a VALID key blocked by an unsigned or
+  // expired Apple agreement — keep it distinct from a genuine auth failure so the
+  // UI can tell the user to sign the agreement rather than re-check the key.
+  if (status === 403 && (code === 'FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED' || /required agreement/i.test(message)))
+    return 'apple_agreements_missing'
   if (status === 401)
     return 'apple_api_unauthorized'
+  if (status === 403)
+    return 'apple_api_forbidden'
   if (status === 429)
     return 'apple_api_rate_limited'
 

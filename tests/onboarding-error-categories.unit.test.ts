@@ -9,6 +9,24 @@ describe('mapIosOnboardingError', () => {
     expect(mapIosOnboardingError(err)).toBe('apple_api_unauthorized')
   })
 
+  it.concurrent('maps a 403 with the agreements code to apple_agreements_missing', () => {
+    const err = Object.assign(
+      new Error('Apple API error (403): A required agreement is missing or has expired. — sign it (FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED)'),
+      { status: 403, code: 'FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED' },
+    )
+    expect(mapIosOnboardingError(err)).toBe('apple_agreements_missing')
+  })
+
+  it.concurrent('maps a 403 agreements error by message when no code is present', () => {
+    const err = Object.assign(new Error('A required agreement is missing or has expired.'), { status: 403 })
+    expect(mapIosOnboardingError(err)).toBe('apple_agreements_missing')
+  })
+
+  it.concurrent('maps other 403s to apple_api_forbidden', () => {
+    const err = Object.assign(new Error('Forbidden'), { status: 403 })
+    expect(mapIosOnboardingError(err)).toBe('apple_api_forbidden')
+  })
+
   it.concurrent('maps 429 to apple_api_rate_limited', () => {
     const err = Object.assign(new Error('Too many'), { status: 429 })
     expect(mapIosOnboardingError(err)).toBe('apple_api_rate_limited')
