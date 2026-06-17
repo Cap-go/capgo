@@ -1101,6 +1101,7 @@
   "error-deleting-non-compliant-bundles": "Failed to delete non-compliant bundles. Please try again.",
   "error-fetching-audit-logs": "Error fetching audit logs",
   "error-fetching-builds": "Error fetching build requests",
+  "error-fetching-build-durations": "Error fetching build durations",
   "error-fetching-deploy-history": "Error fetching deployment history",
   "error-fetching-groups": "Error fetching groups",
   "error-fetching-history": "Error fetching history",

@@ -140,22 +140,29 @@ async function getData() {
 }
 
 async function loadBuildDurations(builds: Element[]) {
+  const orgId = organizationStore.currentOrganization?.gid
   const jobIds = builds
     .map(build => build.builder_job_id)
     .filter((id): id is string => !!id)
 
-  if (jobIds.length === 0) {
+  if (!orgId || jobIds.length === 0) {
     buildDurations.value = {}
     return
   }
 
+  // Scope to the current org: build_logs.build_id is only unique per
+  // (build_id, org_id), so an unscoped lookup could pick up a colliding
+  // row from another org the user can read.
   const { data, error } = await supabase
     .from('build_logs')
     .select('build_id, build_time_unit')
+    .eq('org_id', orgId)
     .in('build_id', jobIds)
 
   if (error) {
     console.error('Error fetching build durations:', error)
+    buildDurations.value = {}
+    toast.error(t('error-fetching-build-durations'))
     return
   }
 
