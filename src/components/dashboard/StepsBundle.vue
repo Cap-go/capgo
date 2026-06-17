@@ -23,9 +23,9 @@ const displayStore = useDisplayStore()
 const isLoading = ref(false)
 const step = ref(0)
 const clicked = ref(0)
-const latestVersionId = ref<string>()
+const detectedAppId = ref<string>()
 const realtimeListener = ref(false)
-const pollTimer = ref<ReturnType<typeof globalThis.setInterval> | null>(null)
+const pollTimer = ref<number | null>(null)
 const initialCount = ref<number | null>(null)
 const supabase = useSupabase()
 const main = useMainStore()
@@ -242,13 +242,13 @@ watchEffect(async () => {
 
     clearWatchers()
 
-    pollTimer.value = globalThis.setInterval(async () => {
+    pollTimer.value = window.setInterval(async () => {
       try {
         const current = await getVersionsCount()
         if (initialCount.value !== null && current > initialCount.value) {
           const latestId = await getLatestVersionId()
           step.value += 1
-          latestVersionId.value = latestId ?? ''
+          detectedAppId.value = latestId ?? ''
           realtimeListener.value = false
           clearWatchers()
           setLog()

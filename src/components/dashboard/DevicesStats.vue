@@ -109,8 +109,8 @@ const organizationStore = useOrganizationStore()
 const supabase = useSupabase()
 const rawChartData = ref<ChartApiData | null>(null)
 
-const routeAppId = ref('')
-const activeAppId = computed(() => props.appId || routeAppId.value)
+const detectedAppId = ref('')
+const activeAppId = computed(() => props.appId || detectedAppId.value)
 const isNativeUsage = computed(() => props.usageKind === 'native')
 const titleKey = computed(() => isNativeUsage.value ? 'active_users_by_native_version' : 'active_users_by_version')
 
@@ -164,95 +164,12 @@ const tooltipClickHandler = computed<TooltipClickHandler | undefined>(() => {
   }
 })
 const isLoading = ref(true)
-interface ChartRange { startDate: Date, endDate: Date }
-interface ChartCacheEntry { data: ChartApiData, range: ChartRange }
-const currentRange = ref<ChartRange | null>(null)
+const currentRange = ref<{ startDate: Date, endDate: Date } | null>(null)
 let requestToken = 0
 
 // Cache for both billing period and last 30 days data
-const cachedBillingData = ref<ChartCacheEntry | null>(null)
-const cached30DayData = ref<ChartCacheEntry | null>(null)
-function finiteChartValue(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null
-}
-
-function resolveBaseValue(currentValue: number | null, hasSeenValue: boolean, lastKnownBaseValue: number): number | null {
-  if (currentValue !== null)
-    return currentValue
-  if (hasSeenValue)
-    return lastKnownBaseValue
-  return null
-}
-
-function buildAccumulatedSeries(
-  paddedValues: Array<number | undefined>,
-  previousDatasetData: Array<number | null | undefined> | undefined,
-  datasetIndex: number,
-  globalLastDataIndex: number,
-): { processedData: Array<number | null>, tooltipBaseValues: Array<number | null> } {
-  let lastKnownBaseValue = 0
-  let hasSeenValue = false
-  const tooltipBaseValues: Array<number | null> = []
-
-  const processedData = paddedValues.map((value, pointIndex) => {
-    if (globalLastDataIndex < 0 || pointIndex > globalLastDataIndex) {
-      tooltipBaseValues.push(null)
-      return null
-    }
-
-    const numericValue = finiteChartValue(value)
-    if (numericValue !== null) {
-      lastKnownBaseValue = numericValue
-      hasSeenValue = true
-    }
-
-    const baseValue = resolveBaseValue(numericValue, hasSeenValue, lastKnownBaseValue)
-    tooltipBaseValues.push(baseValue)
-    if (baseValue === null)
-      return null
-
-    const previousValue = finiteChartValue(previousDatasetData?.[pointIndex])
-    const hasPreviousValue = previousValue !== null
-    const stackedValue = datasetIndex === 0 ? baseValue : baseValue + (previousValue ?? 0)
-
-    if (Number.isFinite(stackedValue))
-      return stackedValue
-    if (datasetIndex > 0 && hasPreviousValue)
-      return previousValue
-    return null
-  })
-
-  return { processedData, tooltipBaseValues }
-}
-
-function buildRawSeries(
-  paddedValues: Array<number | undefined>,
-  paddedCountValues: Array<number | undefined>,
-  globalLastDataIndex: number,
-): { processedData: Array<number | null>, tooltipBaseValues: Array<number | null> } {
-  const tooltipBaseValues: Array<number | null> = []
-  const processedData = paddedValues.map((value, pointIndex) => {
-    if (globalLastDataIndex >= 0 && pointIndex > globalLastDataIndex) {
-      tooltipBaseValues.push(null)
-      paddedCountValues[pointIndex] = undefined
-      return null
-    }
-
-    const numericValue = finiteChartValue(value)
-    tooltipBaseValues.push(numericValue)
-    return numericValue
-  })
-
-  return { processedData, tooltipBaseValues }
-}
-
-function getDatasetFill(accumulated: boolean, datasetIndex: number): string | boolean {
-  if (!accumulated)
-    return false
-  if (datasetIndex === 0)
-    return 'origin'
-  return '-1'
-}
+const cachedBillingData = ref<{ data: ChartApiData, range: { startDate: Date, endDate: Date } } | null>(null)
+const cached30DayData = ref<{ data: ChartApiData, range: { startDate: Date, endDate: Date } } | null>(null)
 
 const latestVersion = computed(() => {
   const chartData = rawChartData.value
@@ -497,15 +414,59 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
     const previousDatasetData = previousDataset && Array.isArray(previousDataset.data)
       ? previousDataset.data as Array<number | null | undefined>
       : undefined
-    const series = props.accumulated
-      ? buildAccumulatedSeries(paddedValues, previousDatasetData, datasetIndex, globalLastDataIndex)
-      : buildRawSeries(paddedValues, paddedCountValues, globalLastDataIndex)
-    const { processedData, tooltipBaseValues } = series
+    let lastKnownBaseValue = 0
+    let hasSeenValue = false
+    const tooltipBaseValues: Array<number | null> = []
+    const processedData = props.accumulated
+      ? paddedValues.map((value, pointIndex) => {
+          if (globalLastDataIndex < 0) {
+            tooltipBaseValues.push(null)
+            return null
+          }
+          if (globalLastDataIndex >= 0 && pointIndex > globalLastDataIndex) {
+            tooltipBaseValues.push(null)
+            return null
+          }
+          if (typeof value === 'number' && Number.isFinite(value)) {
+            lastKnownBaseValue = value
+            hasSeenValue = true
+          }
+
+          const hasValidValue = typeof value === 'number' && Number.isFinite(value)
+          const baseValue = hasValidValue
+            ? value
+            : hasSeenValue
+              ? lastKnownBaseValue
+              : null
+          tooltipBaseValues.push(baseValue)
+          const previousValueRaw = previousDatasetData?.[pointIndex]
+          const hasPreviousValue = typeof previousValueRaw === 'number' && Number.isFinite(previousValueRaw)
+          const previousValue = hasPreviousValue ? previousValueRaw : 0
+          if (baseValue === null)
+            return null
+
+          const stackedValue = datasetIndex === 0 ? baseValue : baseValue + previousValue
+
+          if (!Number.isFinite(stackedValue))
+            return datasetIndex > 0 && hasPreviousValue ? previousValue : null
+
+          return stackedValue
+        })
+      : paddedValues.map((val, pointIndex) => {
+          if (globalLastDataIndex >= 0 && pointIndex > globalLastDataIndex) {
+            tooltipBaseValues.push(null)
+            paddedCountValues[pointIndex] = undefined
+            return null
+          }
+          const numericValue = typeof val === 'number' && Number.isFinite(val) ? val : null
+          tooltipBaseValues.push(numericValue)
+          return numericValue
+        })
 
     const chartDataset = {
       ...dataset,
       data: processedData,
-      fill: getDatasetFill(props.accumulated, datasetIndex),
+      fill: props.accumulated ? (datasetIndex === 0 ? 'origin' : '-1') : false,
       tension: 0.3,
       pointRadius: props.accumulated ? 0 : 2,
       pointBorderWidth: 0,
@@ -606,62 +567,6 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
 })
 
 const chartPlugins = [verticalLinePlugin, todayLinePlugin] as unknown as Plugin<'line'>[]
-function applyDemoChartData(): void {
-  const { startDate, endDate } = getDateRange()
-  const days = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
-  rawChartData.value = generateDemoDevicesData(days, props.usageKind)
-  currentRange.value = { startDate, endDate }
-  isLoading.value = false
-}
-
-async function prepareOrganizationData(): Promise<void> {
-  try {
-    await organizationStore.dedupFetchOrganizations()
-    await organizationStore.awaitInitialLoad()
-  }
-  catch (error) {
-    console.error('[DevicesStats] Error preparing organization data for mobile stats:', error)
-  }
-}
-
-function getCacheForMode(isBillingMode: boolean): ChartCacheEntry | null {
-  return isBillingMode ? cachedBillingData.value : cached30DayData.value
-}
-
-function rangeMatches(range: ChartRange, startDate: Date, endDate: Date): boolean {
-  return range.startDate.getTime() === startDate.getTime()
-    && range.endDate.getTime() === endDate.getTime()
-}
-
-function applyCachedData(cacheEntry: ChartCacheEntry | null, startDate: Date, endDate: Date, forceRefetch: boolean): boolean {
-  if (!cacheEntry || forceRefetch || !rangeMatches(cacheEntry.range, startDate, endDate))
-    return false
-
-  rawChartData.value = cacheEntry.data
-  currentRange.value = cacheEntry.range
-  return true
-}
-
-function clearStaleCache(isBillingMode: boolean, cacheEntry: ChartCacheEntry | null, startDate: Date, endDate: Date): void {
-  if (!cacheEntry || rangeMatches(cacheEntry.range, startDate, endDate))
-    return
-
-  if (isBillingMode) {
-    cachedBillingData.value = null
-    return
-  }
-
-  cached30DayData.value = null
-}
-
-function setCacheForMode(isBillingMode: boolean, cacheEntry: ChartCacheEntry): void {
-  if (isBillingMode) {
-    cachedBillingData.value = cacheEntry
-    return
-  }
-
-  cached30DayData.value = cacheEntry
-}
 
 async function loadData(forceRefetch = false) {
   if (!activeAppId.value) {
@@ -669,21 +574,51 @@ async function loadData(forceRefetch = false) {
     return
   }
 
+  // If forceDemo is true (payment failed), use demo data instead of fetching
   if (props.forceDemo) {
-    applyDemoChartData()
+    const { startDate, endDate } = getDateRange()
+    const days = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+    const demoData = generateDemoDevicesData(days, props.usageKind)
+    rawChartData.value = demoData
+    currentRange.value = { startDate, endDate }
+    isLoading.value = false
     return
   }
 
-  await prepareOrganizationData()
+  try {
+    await organizationStore.dedupFetchOrganizations()
+    await organizationStore.awaitInitialLoad()
+  }
+  catch (error) {
+    console.error('[DevicesStats] Error preparing organization data for mobile stats:', error)
+  }
 
   const { startDate, endDate } = getDateRange()
   const isBillingMode = props.useBillingPeriod
-  const cachedData = getCacheForMode(isBillingMode)
 
-  if (applyCachedData(cachedData, startDate, endDate, forceRefetch))
+  // Check if we have cached data for this mode that matches the current date range
+  const cachedData = isBillingMode ? cachedBillingData.value : cached30DayData.value
+
+  // Validate cache: dates must match (comparing timestamps to avoid reference issues)
+  const cacheIsValid = cachedData
+    && cachedData.range.startDate.getTime() === startDate.getTime()
+    && cachedData.range.endDate.getTime() === endDate.getTime()
+
+  if (cacheIsValid && !forceRefetch) {
+    rawChartData.value = cachedData.data
+    currentRange.value = cachedData.range
     return
+  }
 
-  clearStaleCache(isBillingMode, cachedData, startDate, endDate)
+  // Clear invalid cache for this mode
+  if (cachedData && !cacheIsValid) {
+    if (isBillingMode) {
+      cachedBillingData.value = null
+    }
+    else {
+      cached30DayData.value = null
+    }
+  }
 
   const currentToken = ++requestToken
   isLoading.value = true
@@ -691,14 +626,21 @@ async function loadData(forceRefetch = false) {
   currentRange.value = { startDate, endDate }
 
   try {
-    const usageKind = props.usageKind === 'native' ? 'native' : 'bundle'
-    const data = await useChartData(supabase, activeAppId.value, startDate, endDate, usageKind)
+    const data = await useChartData(supabase, activeAppId.value, startDate, endDate, props.usageKind === 'native' ? 'native' : 'bundle')
 
     if (currentToken !== requestToken)
       return
 
     rawChartData.value = data
-    setCacheForMode(isBillingMode, { data, range: { startDate, endDate } })
+
+    // Cache the data for this mode
+    const cacheEntry = { data, range: { startDate, endDate } }
+    if (isBillingMode) {
+      cachedBillingData.value = cacheEntry
+    }
+    else {
+      cached30DayData.value = cacheEntry
+    }
   }
   catch (error) {
     console.error('[DevicesStats] Error fetching chart data:', error)
@@ -707,10 +649,12 @@ async function loadData(forceRefetch = false) {
     rawChartData.value = null
   }
   finally {
-    if (currentToken === requestToken)
+    if (currentToken === requestToken) {
       isLoading.value = false
+    }
   }
 }
+
 // Watch billing period changes - use cached data if available
 watch(() => props.useBillingPeriod, async () => {
   if (activeAppId.value)
@@ -738,7 +682,7 @@ watch(
     // Check for app route pattern
     if (path.includes('/app/') && packageId) {
       const packageChanged = packageId !== oldPackageId
-      routeAppId.value = packageId
+      detectedAppId.value = packageId
       if (packageChanged) {
         // Clear cache when switching apps
         cachedBillingData.value = null
@@ -751,7 +695,7 @@ watch(
       }
     }
     else {
-      routeAppId.value = ''
+      detectedAppId.value = ''
       requestToken++
       rawChartData.value = null
       isLoading.value = true
@@ -771,7 +715,7 @@ watch(
       return
 
     if (packageId)
-      routeAppId.value = packageId
+      detectedAppId.value = packageId
 
     if (!activeAppId.value)
       return
