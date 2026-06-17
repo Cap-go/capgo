@@ -2134,6 +2134,9 @@ async function runNotificationsGlobalStatsShard(c: Context, window: DailyWindow)
     })
 
     if (!completedShards.has(GLOBAL_STATS_NOTIFICATION_LOGSNAG_STEP)) {
+      // Mark before the non-idempotent LogSnag write so a successful send followed by a DB write failure cannot replay the whole batch.
+      await markGlobalStatsShardComplete(c, window.prevDayDateId, GLOBAL_STATS_NOTIFICATION_LOGSNAG_STEP)
+      completedShards.add(GLOBAL_STATS_NOTIFICATION_LOGSNAG_STEP)
       await logsnagInsights(c, [
         { title: 'Apps', value: apps, icon: '📱' },
         { title: 'Active Apps', value: getNumber(snapshot.apps_active), icon: '💃' },
@@ -2166,11 +2169,12 @@ async function runNotificationsGlobalStatsShard(c: Context, window: DailyWindow)
         { title: 'iOS Builds (30d)', value: getNumber(snapshot.builds_last_month_ios), icon: '🍏' },
         { title: 'Android Builds (30d)', value: getNumber(snapshot.builds_last_month_android), icon: '🤖' },
       ], { strict: true })
-      await markGlobalStatsShardComplete(c, window.prevDayDateId, GLOBAL_STATS_NOTIFICATION_LOGSNAG_STEP)
-      completedShards.add(GLOBAL_STATS_NOTIFICATION_LOGSNAG_STEP)
     }
 
     if (!completedShards.has(GLOBAL_STATS_NOTIFICATION_TRACKING_STEP)) {
+      // Mark before tracking fan-out for the same retry-idempotency reason as the LogSnag insight batch.
+      await markGlobalStatsShardComplete(c, window.prevDayDateId, GLOBAL_STATS_NOTIFICATION_TRACKING_STEP)
+      completedShards.add(GLOBAL_STATS_NOTIFICATION_TRACKING_STEP)
       await sendEventToTracking(c, {
         channel: 'updates-stats',
         event: 'Updates last month',
@@ -2184,8 +2188,6 @@ async function runNotificationsGlobalStatsShard(c: Context, window: DailyWindow)
         },
         icon: '📲',
       }, { background: false, strict: true })
-      await markGlobalStatsShardComplete(c, window.prevDayDateId, GLOBAL_STATS_NOTIFICATION_TRACKING_STEP)
-      completedShards.add(GLOBAL_STATS_NOTIFICATION_TRACKING_STEP)
     }
 
     await markGlobalStatsShardComplete(c, window.prevDayDateId, 'notifications')
