@@ -234,8 +234,15 @@ function chunkToString(chunk: unknown, encoding?: BufferEncoding) {
 function visibleTerminalText(term: Terminal) {
   const lines: string[] = []
   const buffer = term.buffer.active
-  for (let i = 0; i < buffer.length; i++)
-    lines.push(buffer.getLine(i)?.translateToString(true) ?? '')
+  for (let i = 0; i < buffer.length; i++) {
+    const line = buffer.getLine(i)
+    const text = line?.translateToString(true) ?? ''
+    if (line?.isWrapped && lines.length > 0) {
+      lines[lines.length - 1] += text
+      continue
+    }
+    lines.push(text)
+  }
 
   while (lines.length > 0 && lines[lines.length - 1] === '')
     lines.pop()
