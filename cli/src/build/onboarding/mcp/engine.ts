@@ -1503,7 +1503,7 @@ export function mapAndroidView(
         next: {
           tool: NEXT_STEP_TOOL,
           with: { serviceAccountMethod: '<generate|existing>' },
-          instruction: 'Present the options to the user, then call next_step with serviceAccountMethod.',
+          instruction: 'Present the two options to the user. As soon as the user picks one — INCLUDING when they say they already have a service-account JSON ("use my existing file") — call next_step with serviceAccountMethod ("existing" or "generate") to record the choice. Do NOT ask the user for the JSON file path yourself: choosing the method is its own step, and the flow will ask for the path next.',
           call: `${NEXT_STEP_TOOL}({ serviceAccountMethod: "generate" })`,
         },
       }
