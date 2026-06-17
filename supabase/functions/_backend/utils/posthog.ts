@@ -6,6 +6,7 @@ import { existInEnv, getEnv } from './utils.ts'
 const POSTHOG_CAPTURE_URL = 'https://eu.i.posthog.com/capture/'
 const POSTHOG_EXCEPTION_URL = 'https://eu.i.posthog.com/i/v0/e/'
 const POSTHOG_SNAPSHOT_URL = 'https://eu.i.posthog.com/s/'
+const POSTHOG_DELIVERY_TIMEOUT_MS = 5000
 
 export type PostHogGroups = Record<string, string>
 
@@ -160,22 +161,29 @@ export async function capturePosthogReplaySnapshot(c: Context, payload: PostHogR
     },
     timestamp: payload.timestamp,
   }
-
   try {
-    const res = await fetch(posthogUrl, {
-      body: JSON.stringify(body),
-      headers: { 'Content-Type': 'application/json' },
-      method: 'POST',
-    })
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), POSTHOG_DELIVERY_TIMEOUT_MS)
+    try {
+      const res = await fetch(posthogUrl, {
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        signal: controller.signal,
+      })
 
-    if (!res.ok) {
-      const error = await res.text()
-      cloudlogErr({ requestId: c.get('requestId'), message: 'PostHog replay error', status: res.status, error, sessionId: payload.sessionId, distinctId: payload.distinctId })
-      return false
+      if (!res.ok) {
+        const error = await res.text()
+        cloudlogErr({ requestId: c.get('requestId'), message: 'PostHog replay error', status: res.status, error, sessionId: payload.sessionId, distinctId: payload.distinctId })
+        return false
+      }
+
+      cloudlog({ requestId: c.get('requestId'), message: 'PostHog replay sent', sessionId: payload.sessionId, distinctId: payload.distinctId })
+      return true
     }
-
-    cloudlog({ requestId: c.get('requestId'), message: 'PostHog replay sent', sessionId: payload.sessionId, distinctId: payload.distinctId })
-    return true
+    finally {
+      clearTimeout(timeoutId)
+    }
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'PostHog replay fetch failed', error: serializeError(e), sessionId: payload.sessionId, distinctId: payload.distinctId })
@@ -310,7 +318,7 @@ export async function capturePosthogException(c: Context, payload: {
 
   try {
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 5000)
+    const timeoutId = setTimeout(() => controller.abort(), POSTHOG_DELIVERY_TIMEOUT_MS)
     let res: Response
     try {
       res = await fetch(posthogUrl, {
@@ -327,7 +335,6 @@ export async function capturePosthogException(c: Context, payload: {
       clearTimeout(timeoutId)
       throw fetchError
     }
-
     if (!res.ok) {
       const error = await res.text()
       cloudlogErr({ requestId: c.get('requestId'), message: 'PostHog exception error', status: res.status, error, event: '$exception', distinctId })

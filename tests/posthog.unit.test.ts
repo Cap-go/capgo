@@ -133,6 +133,7 @@ describe('posthog helper', () => {
     expect(body.properties.$session_id).toBe('init-session')
     expect(body.properties.$window_id).toBe('window-id')
     expect(body.properties.$snapshot_data).toHaveLength(1)
+    expect(request?.[1]?.signal).toBeInstanceOf(AbortSignal)
   })
 
   it('uses the full exception endpoint host and only sends the request path for exceptions', async () => {
