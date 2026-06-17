@@ -1275,6 +1275,7 @@ export type Database = {
           deleted_at: string | null
           id: number
           owner_org: string
+          transfer_history: Json[] | null
         }
         Insert: {
           app_id: string
@@ -1282,6 +1283,7 @@ export type Database = {
           deleted_at?: string | null
           id?: number
           owner_org: string
+          transfer_history?: Json[] | null
         }
         Update: {
           app_id?: string
@@ -1289,6 +1291,7 @@ export type Database = {
           deleted_at?: string | null
           id?: number
           owner_org?: string
+          transfer_history?: Json[] | null
         }
         Relationships: []
       }
