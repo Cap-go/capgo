@@ -259,6 +259,19 @@ describe('logsnag revenue metric helpers', () => {
     })
   })
 
+  it.concurrent('only refreshes mutable past-due stats for the current daily snapshot', () => {
+    const currentWindow = logsnagInsightsTestUtils.getCompletedDayWindowForDateId('2026-03-24')
+
+    expect(logsnagInsightsTestUtils.shouldRefreshMutablePastDueStats(
+      currentWindow,
+      new Date('2026-03-25T12:00:00.000Z'),
+    )).toBe(true)
+    expect(logsnagInsightsTestUtils.shouldRefreshMutablePastDueStats(
+      currentWindow,
+      new Date('2026-03-26T00:00:00.000Z'),
+    )).toBe(false)
+  })
+
   it.concurrent('defaults missing plan buckets to zero for global stats snapshots', () => {
     expect(logsnagInsightsTestUtils.normalizePlanTotals({ Solo: 12, Team: Number.NaN })).toEqual({
       Enterprise: 0,

@@ -530,6 +530,10 @@ function calculatePastDueOrgStats(rows: PastDueOrgRow[], snapshotAt: Date): Past
   }
 }
 
+function shouldRefreshMutablePastDueStats(window: DailyWindow, referenceDate = new Date()) {
+  return window.prevDayDateId === getDailyWindow(referenceDate).prevDayDateId
+}
+
 function isMissingBuildMetricColumnError(error: unknown): boolean {
   const errorCode = String((error as any)?.code ?? '').toUpperCase()
   const message = String((error as any)?.message ?? '').toLowerCase()
@@ -1926,6 +1930,7 @@ async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Prom
   const { dayStart, nextDayStart } = metricWindow
   const dayStartIso = dayStart.toISOString()
   const nextDayStartIso = nextDayStart.toISOString()
+  const refreshPastDueStats = shouldRefreshMutablePastDueStats(window)
   const [
     revenue,
     new_paying_orgs,
@@ -1990,20 +1995,22 @@ async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Prom
         return new Set((res.data || []).map(row => row.customer_id)).size
       }),
     getTrialExtensionStats(c, metricWindow),
-    (async () => {
-      const res = await supabase
-        .from('stripe_info')
-        .select('customer_id, past_due_at, updated_at')
-        .not('past_due_at', 'is', null)
-        .lt('past_due_at', nextDayStartIso)
+    refreshPastDueStats
+      ? (async () => {
+          const res = await supabase
+            .from('stripe_info')
+            .select('customer_id, past_due_at, updated_at')
+            .not('past_due_at', 'is', null)
+            .lt('past_due_at', nextDayStartIso)
 
-      if (res.error) {
-        cloudlog({ requestId: c.get('requestId'), message: 'past_due_org_stats error', error: res.error })
-        return { past_due_orgs: 0, past_due_orgs_average_days: 0 }
-      }
+          if (res.error) {
+            cloudlog({ requestId: c.get('requestId'), message: 'past_due_org_stats error', error: res.error })
+            return { past_due_orgs: 0, past_due_orgs_average_days: 0 }
+          }
 
-      return calculatePastDueOrgStats((res.data || []) as PastDueOrgRow[], nextDayStart)
-    })(),
+          return calculatePastDueOrgStats((res.data || []) as PastDueOrgRow[], nextDayStart)
+        })()
+      : Promise.resolve({ past_due_orgs: 0, past_due_orgs_average_days: 0 }),
     supabase
       .from('usage_credit_grants')
       .select('credits_total')
@@ -2030,14 +2037,12 @@ async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Prom
       }),
   ])
 
-  await updateGlobalStatsSnapshot(c, window.prevDayDateId, {
+  const snapshotPatch: GlobalStatsSnapshotPatch = {
     canceled_orgs,
     credits_bought: Math.round(credits_bought),
     credits_consumed: Math.round(credits_consumed),
     mrr: revenue.mrr,
     new_paying_orgs,
-    past_due_orgs: pastDueOrgStats.past_due_orgs,
-    past_due_orgs_average_days: pastDueOrgStats.past_due_orgs_average_days,
     plan_enterprise_monthly: revenue.plan_enterprise_monthly,
     plan_enterprise_yearly: revenue.plan_enterprise_yearly,
     plan_maker_monthly: revenue.plan_maker_monthly,
@@ -2054,7 +2059,15 @@ async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Prom
     trial_extended_subscribed_orgs: trialExtensionStats.trial_extended_subscribed_orgs,
     total_revenue: revenue.total_revenue,
     upgraded_orgs,
-  })
+  }
+
+  // stripe_info only stores current past_due_at; old replays must not overwrite historical values after recovery.
+  if (refreshPastDueStats) {
+    snapshotPatch.past_due_orgs = pastDueOrgStats.past_due_orgs
+    snapshotPatch.past_due_orgs_average_days = pastDueOrgStats.past_due_orgs_average_days
+  }
+
+  await updateGlobalStatsSnapshot(c, window.prevDayDateId, snapshotPatch)
 
   cloudlog({ requestId: c.get('requestId'), message: 'Updated global stats revenue shard', dateId: window.prevDayDateId, mrr: revenue.mrr, new_paying_orgs, canceled_orgs })
 }
@@ -2356,6 +2369,7 @@ export const logsnagInsightsTestUtils = {
   REVENUE_ACTIVE_STRIPE_STATUSES,
   LOGSNAG_INSIGHTS_BACKGROUND_MAX_RETRIES,
   calculatePastDueOrgStats,
+  shouldRefreshMutablePastDueStats,
   calculateChurnRevenue,
   calculateNrr,
   countUniqueCustomers,
