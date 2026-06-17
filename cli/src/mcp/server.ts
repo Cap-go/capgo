@@ -1,4 +1,5 @@
 import type { SDKResult } from '../schemas/sdk'
+import process from 'node:process'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
@@ -8,6 +9,8 @@ import { addAppOptionsSchema, cleanupOptionsSchema, getStatsOptionsSchema, reque
 import { CapgoSDK } from '../sdk'
 import { findSavedKey } from '../utils'
 import { registerOnboardingTools } from '../build/onboarding/mcp/onboarding-tools'
+import { buildServerInstructions } from './instructions'
+import { installMcpStdoutGuard } from './stdout-guard'
 
 /**
  * Format an SDK result error for MCP response.
@@ -32,10 +35,14 @@ function formatMcpError<T>(result: SDKResult<T>): { content: Array<{ type: 'text
  * This allows AI agents to interact with Capgo Cloud programmatically.
  */
 export async function startMcpServer(): Promise<void> {
-  const server = new McpServer({
-    name: 'capgo',
-    version: pack.version,
-  })
+  // Computed once: gates BOTH the onboarding-tool registration (below) and the
+  // onboarding steer appended to the server instructions, so we never advertise a
+  // start_capgo_builder_onboarding tool we didn't actually register.
+  const onboardingEnabled = Boolean(globalThis.__CAPGO_MCP_ONBOARDING__)
+  const server = new McpServer(
+    { name: 'capgo', version: pack.version },
+    { instructions: buildServerInstructions(onboardingEnabled) },
+  )
 
   setInvocationSource('mcp')
   enableSupabaseInstrumentation()
@@ -605,14 +612,18 @@ export async function startMcpServer(): Promise<void> {
     },
   )
 
-  // MCP-conducted Builder onboarding (2-tool spine). Build-time gated OFF until the
-  // flow is finished (PR 2) — DCE strips it (and the MCP-only deciders) from the
-  // release bundle. The shared engine still ships (the ink TUI uses it).
-  if (globalThis.__CAPGO_MCP_ONBOARDING__)
+  // MCP-conducted Builder onboarding (2-tool spine + explain). Build-time gated:
+  // OFF in PR 1 while the flow was under construction, flipped ON in PR 2 now that
+  // the full journey (android + iOS + tail) ships through the shared engine.
+  // `bun run dev` keeps the flag undefined-safe; release builds define it to true.
+  if (onboardingEnabled)
     registerOnboardingTools(server, sdk)
 
-  // Start the server with stdio transport
-  const transport = new StdioServerTransport()
+  // Start the server with stdio transport. Route ambient stdout (stray clack/console
+  // output from any tool or dependency) to stderr so it can't corrupt the JSON-RPC
+  // frames a strict client reads — otherwise the transport drops ("Transport closed").
+  const transportStdout = installMcpStdoutGuard()
+  const transport = new StdioServerTransport(process.stdin, transportStdout)
   await server.connect(transport)
   trackMcpServerStarted(Boolean(savedApiKey))
 }
