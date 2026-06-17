@@ -22,8 +22,12 @@ const REPLAY_PADDING_PX = 32
 const REPLAY_FRAME_THROTTLE_MS = 1000
 const REPLAY_FLUSH_TIMEOUT_MS = 1500
 const REPLAY_IDENTITY_TIMEOUT_MS = 3000
+const TERMINAL_PIXEL_SIZE_TIMEOUT_MS = 200
 const DEFAULT_REPLAY_CURRENT_URL = 'capgo-cli://init'
 const DEFAULT_REPLAY_SESSION_PREFIX = 'init'
+const XTERM_ESCAPE = String.fromCharCode(27)
+const XTERM_REPORT_TEXT_AREA_SIZE = `${XTERM_ESCAPE}[14t`
+const XTERM_TEXT_AREA_SIZE_RESPONSE = new RegExp(`${XTERM_ESCAPE}\\[4;(\\d+);(\\d+)t`)
 
 type CliStream = typeof stdout | typeof stderr
 type StreamWrite = CliStream['write']
@@ -36,6 +40,11 @@ export interface TerminalReplayFrame {
   height: number
   html: string
   text: string
+  width: number
+}
+
+export interface TerminalPixelSize {
+  height: number
   width: number
 }
 
@@ -92,6 +101,7 @@ interface StartInitReplayOptions {
   rows?: number
   sessionPrefix?: string
   throttleMs?: number
+  terminalPixelSize?: TerminalPixelSize
   transport?: InitReplayTransport
 }
 
@@ -193,7 +203,30 @@ export function resolvePosthogReplayUrl(host = env.CAPGO_CLI_POSTHOG_API_HOST?.t
     return undefined
   }
 }
-export function getReplayViewportSize(cols = DEFAULT_COLS, rows = DEFAULT_ROWS) {
+function isUsableTerminalPixelSize(size?: TerminalPixelSize): size is TerminalPixelSize {
+  return Boolean(
+    size
+    && Number.isFinite(size.height)
+    && Number.isFinite(size.width)
+    && size.height > 0
+    && size.width > 0,
+  )
+}
+
+export function parseTerminalPixelSizeResponse(input: string): TerminalPixelSize | undefined {
+  const match = XTERM_TEXT_AREA_SIZE_RESPONSE.exec(input)
+  if (!match)
+    return undefined
+
+  const height = Number(match[1])
+  const width = Number(match[2])
+  return isUsableTerminalPixelSize({ height, width }) ? { height, width } : undefined
+}
+
+export function getReplayViewportSize(cols = DEFAULT_COLS, rows = DEFAULT_ROWS, terminalPixelSize?: TerminalPixelSize) {
+  if (isUsableTerminalPixelSize(terminalPixelSize))
+    return { height: Math.round(terminalPixelSize.height), width: Math.round(terminalPixelSize.width) }
+
   return {
     height: Math.max(480, Math.round(rows * REPLAY_LINE_HEIGHT_PX + REPLAY_PADDING_PX)),
     width: Math.max(800, Math.round(cols * REPLAY_CHAR_WIDTH_PX + REPLAY_PADDING_PX)),
@@ -229,6 +262,54 @@ function chunkToString(chunk: unknown, encoding?: BufferEncoding) {
   if (chunk instanceof Uint8Array)
     return Buffer.from(chunk).toString(encoding || 'utf8')
   return String(chunk ?? '')
+}
+
+export function queryTerminalPixelSize(timeoutMs = TERMINAL_PIXEL_SIZE_TIMEOUT_MS): Promise<TerminalPixelSize | undefined> {
+  if (!stdin.isTTY || !stdout.isTTY || typeof stdin.setRawMode !== 'function')
+    return Promise.resolve(undefined)
+
+  return new Promise((resolve) => {
+    let settled = false
+    let response = ''
+    const wasPaused = stdin.isPaused()
+    const wasRaw = stdin.isRaw
+    const timer = setTimeout(() => cleanup(undefined), timeoutMs)
+    timer.unref?.()
+
+    function cleanup(size: TerminalPixelSize | undefined) {
+      if (settled)
+        return
+
+      settled = true
+      clearTimeout(timer)
+      stdin.off('data', onData)
+      try {
+        if (!wasRaw)
+          stdin.setRawMode(false)
+        if (wasPaused)
+          stdin.pause()
+      }
+      catch {}
+      resolve(size)
+    }
+
+    function onData(chunk: Buffer | string) {
+      response += chunkToString(chunk)
+      const size = parseTerminalPixelSizeResponse(response)
+      if (size)
+        cleanup(size)
+    }
+
+    try {
+      stdin.setRawMode(true)
+      stdin.resume()
+      stdin.on('data', onData)
+      stdout.write(XTERM_REPORT_TEXT_AREA_SIZE)
+    }
+    catch {
+      cleanup(undefined)
+    }
+  })
 }
 
 function visibleTerminalText(term: Terminal) {
@@ -270,7 +351,7 @@ function escapeHtml(text: string) {
     .replace(/'/g, '&#39;')
 }
 
-export async function renderRedactedTerminalFrame(rawAnsi: string, cols = DEFAULT_COLS, rows = DEFAULT_ROWS): Promise<TerminalReplayFrame> {
+export async function renderRedactedTerminalFrame(rawAnsi: string, cols = DEFAULT_COLS, rows = DEFAULT_ROWS, terminalPixelSize?: TerminalPixelSize): Promise<TerminalReplayFrame> {
   const normalizedTerminal = createTerminal(cols, rows)
   await writeTerminal(normalizedTerminal.term, rawAnsi)
   const text = redactSecrets(visibleTerminalText(normalizedTerminal.term))
@@ -279,7 +360,7 @@ export async function renderRedactedTerminalFrame(rawAnsi: string, cols = DEFAUL
   const { serializeAddon, term } = createTerminal(cols, rows)
   await writeTerminal(term, text)
   const html = extractHtmlFragment(serializeAddon.serializeAsHTML({ includeGlobalBackground: true, scrollback: 0 }))
-  const viewport = getReplayViewportSize(cols, rows)
+  const viewport = getReplayViewportSize(cols, rows, terminalPixelSize)
   term.dispose()
   return { height: viewport.height, html, text, width: viewport.width }
 }
@@ -531,6 +612,7 @@ class InitReplayRecorder implements InitReplayController {
   private hasSentMeta = false
   private lastSnapshotText = ''
   private pendingTerminalWrite = Promise.resolve()
+  private resolvedTerminalPixelSize: TerminalPixelSize | undefined
   private readonly windowId = `cli-${randomUUID()}`
 
   constructor(
@@ -543,6 +625,7 @@ class InitReplayRecorder implements InitReplayController {
     private readonly cols: number,
     private readonly rows: number,
     private readonly throttleMs: number,
+    private readonly terminalPixelSize: Promise<TerminalPixelSize | undefined>,
     sessionPrefix: string,
   ) {
     this.sessionId = `${sessionPrefix}-${randomUUID()}`
@@ -630,13 +713,14 @@ class InitReplayRecorder implements InitReplayController {
     await this.pendingTerminalWrite
 
     const rawAnsi = this.serializeAddon.serialize({ scrollback: 0 })
-    const frame = await renderRedactedTerminalFrame(rawAnsi, stdout.columns || this.cols, stdout.rows || this.rows)
+    const terminalPixelSize = await this.resolveTerminalPixelSize()
+    const frame = await renderRedactedTerminalFrame(rawAnsi, stdout.columns || this.cols, stdout.rows || this.rows, terminalPixelSize)
     if (!frame.text || (!force && frame.text === this.lastSnapshotText))
       return
 
     this.lastSnapshotText = frame.text
     const timestamp = Date.now()
-    const viewport = getReplayViewportSize(stdout.columns || this.cols, stdout.rows || this.rows)
+    const viewport = getReplayViewportSize(stdout.columns || this.cols, stdout.rows || this.rows, terminalPixelSize)
     const events: eventWithTime[] = []
 
     if (!this.hasSentMeta) {
@@ -692,6 +776,14 @@ class InitReplayRecorder implements InitReplayController {
     this.pendingSends.add(pending)
   }
 
+  private async resolveTerminalPixelSize() {
+    if (this.resolvedTerminalPixelSize)
+      return this.resolvedTerminalPixelSize
+
+    this.resolvedTerminalPixelSize = await this.terminalPixelSize.catch(() => undefined)
+    return this.resolvedTerminalPixelSize
+  }
+
   private restore() {
     stdout.off('resize', this.resize)
     while (this.restoreWrites.length > 0)
@@ -726,6 +818,9 @@ export function startInitReplay(options: StartInitReplayOptions = {}): InitRepla
     const identityPromise = options.identity
       ? Promise.resolve(options.identity)
       : withTimeout(signal => identityResolver(apikey, signal), REPLAY_IDENTITY_TIMEOUT_MS)
+    const terminalPixelSize = options.terminalPixelSize
+      ? Promise.resolve(options.terminalPixelSize)
+      : queryTerminalPixelSize()
 
     return new InitReplayRecorder(
       token,
@@ -737,6 +832,7 @@ export function startInitReplay(options: StartInitReplayOptions = {}): InitRepla
       options.cols || stdout.columns || DEFAULT_COLS,
       options.rows || stdout.rows || DEFAULT_ROWS,
       options.throttleMs || REPLAY_FRAME_THROTTLE_MS,
+      terminalPixelSize,
       sessionPrefix,
     )
   }

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict'
 import { applyCommandAnalyticsOptOut, applyRawCommandAnalyticsOptOut } from '../src/analytics/opt-out.ts'
-import { buildInitReplayBody, createTerminalInteractionEvents, createTerminalSnapshot, createTerminalSnapshotNode, getReplayViewportSize, renderRedactedTerminalFrame, renderRedactedTerminalText, resolvePosthogReplayUrl, shouldStartInitReplay } from '../src/init/replay.ts'
+import { buildInitReplayBody, createTerminalInteractionEvents, createTerminalSnapshot, createTerminalSnapshotNode, getReplayViewportSize, parseTerminalPixelSizeResponse, renderRedactedTerminalFrame, renderRedactedTerminalText, resolvePosthogReplayUrl, shouldStartInitReplay } from '../src/init/replay.ts'
 
 console.log('🧪 Testing init replay telemetry...\n')
 
@@ -30,6 +30,12 @@ assert.equal(resolvePosthogReplayUrl('https://eu.i.posthog.com/s/'), 'https://eu
 assert.equal(resolvePosthogReplayUrl('not a url'), undefined)
 assert.deepEqual(getReplayViewportSize(100, 30), { height: 632, width: 932 }, 'terminal cells are converted to replay pixels')
 assert.deepEqual(getReplayViewportSize(20, 5), { height: 480, width: 800 }, 'replay viewport has readable minimum dimensions')
+assert.deepEqual(parseTerminalPixelSizeResponse('\u001B[4;412;640t'), { height: 412, width: 640 }, 'xterm pixel-size report is parsed as height and width')
+assert.equal(parseTerminalPixelSizeResponse('\u001B[4;0;640t'), undefined, 'invalid terminal pixel reports are ignored')
+assert.deepEqual(getReplayViewportSize(20, 5, { height: 412, width: 640 }), { height: 412, width: 640 }, 'reported terminal pixels override computed fallback size')
+const pixelSizedFrame = await renderRedactedTerminalFrame('small real terminal', 20, 5, { height: 412, width: 640 })
+assert.equal(pixelSizedFrame.width, 640, 'terminal frame uses reported pixel width')
+assert.equal(pixelSizedFrame.height, 412, 'terminal frame uses reported pixel height')
 
 const redacted = await renderRedactedTerminalText([
   'capg_1234567890abcdef',
