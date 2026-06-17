@@ -1786,10 +1786,20 @@ async function countActiveUsersForSnapshot(c: Context, appIds: string[], window:
         WHERE apps.created_at < $2::timestamptz
       ),
       deleted_active_owner_orgs AS (
-        SELECT deleted_apps.owner_org
+        SELECT COALESCE(
+          (
+            SELECT (transfer_entry.entry->>'transferred_from')::uuid
+            FROM unnest(COALESCE(deleted_apps.transfer_history, '{}'::jsonb[])) AS transfer_entry(entry)
+            WHERE (transfer_entry.entry->>'transferred_at')::timestamptz >= $2::timestamptz
+            ORDER BY (transfer_entry.entry->>'transferred_at')::timestamptz ASC
+            LIMIT 1
+          ),
+          deleted_apps.owner_org
+        ) AS owner_org
         FROM public.deleted_apps deleted_apps
         INNER JOIN active_app_ids active ON active.app_id = deleted_apps.app_id
-        WHERE deleted_apps.deleted_at >= $3::timestamptz
+        WHERE deleted_apps.created_at < $2::timestamptz
+          AND deleted_apps.deleted_at >= $3::timestamptz
       )
       SELECT COUNT(DISTINCT orgs.created_by)::int AS count
       FROM (
