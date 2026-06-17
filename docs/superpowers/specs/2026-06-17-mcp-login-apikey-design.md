@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-17
 **Status:** Draft for review
-**Flow:** A — paste-key (an `org_admin` key generated on a dashboard page, pasted into the AI, saved by an MCP tool)
+**Flow:** A — paste-key (a key generated on a dashboard page, pasted into the AI, saved by an MCP tool)
 **Related (not built):** [CLI device-login design](./2026-06-03-cli-device-login-design.md) — the heavyweight device-flow (Flow B) alternative, kept on the shelf as a future upgrade.
 
 ## Problem
@@ -18,36 +18,40 @@ tool to tell the user *whether they are logged in at all*.
 
 A user can sign in **without leaving the AI conversation**:
 
-1. Open a dashboard page, click one button → an **`org_admin`, non-expiring** API key for
-   the user's **currently-active organization** is minted and shown once with a copy box
-   and a ready-to-paste instruction line.
+1. On a dashboard page, pick a role (Admin, or Member + specific apps) → a **non-expiring**
+   API key for the **currently-active organization** is minted and shown once with a copy
+   box and a ready-to-paste instruction line.
 2. Paste that line to the AI → the AI calls a `capgo_login` MCP tool that validates the
    key, saves it to `~/.capgo`, and **re-initializes the running SDK** so the next tool
    call is authenticated with no server restart.
 3. The **onboarding MCP** refuses build/credential actions when logged out, with clear
    guidance to run this flow first.
 
-## What "full access" means here
+## Key scope — Admin or Member + apps
 
-"Full access" = the **`org_admin`** API key the dashboard already mints today. The
-generated key carries a single `org_admin` binding for one organization — produced by
-calling `createDefaultApiKey(supabase, name, { orgId })` with **no `appId`** (see
-`src/services/apikeys.ts:59-65`, the same call `StepsApp.vue` / `StepsBuild.vue` /
-`StepsBundle.vue` make). It is therefore scoped to the **active organization**
-(`organizationStore.currentOrganization`), not to every org the user belongs to. A
-multi-org user who wants a key for another org switches the active org and regenerates.
-This deliberately mirrors existing key creation — no new permission model.
+The `/connect` page offers a **role** choice, always scoped to the **active organization**
+(`organizationStore.currentOrganization`):
+
+- **Admin** → a single **`org_admin`** binding (full access to every app in the org).
+- **Member** → an **`org_member`** binding plus one **`app_admin`** binding per app the
+  user ticks in a searchable multi-select.
+
+Both are minted through the new `createAiApiKey(supabase, name, { orgId, role, appUuids })`
+service (`src/services/apikeys.ts`), which builds the v2 RBAC bindings (same shape as the
+existing `createDefaultApiKey`) and calls the same `functions.invoke('apikey', …)` backend.
+Keys never expire (no `expires_at`). A multi-org user switches the active org and
+regenerates for a key in another org. No new permission model.
 
 ## Non-goals
 
 - **No device flow / OAuth choreography.** No `cli_login_sessions` table, no
   confirmation phrase, no AES-GCM `delivery_key`, no `/cli-auth/*` endpoints. Those
   belong to the separate (unbuilt) device-login spec, which remains the future upgrade.
-- **No scope picker.** No org/app/role selectors on the page. The key is `org_admin` for
-  the active org, no expiry. Scoped/expiring keys remain available through the existing
-  `/apikeys` page.
+- **No org switcher / no expiry control.** The org is the dashboard's active org
+  (read-only on the page), not a switcher; keys never expire (the chosen default).
+  Expiring keys remain available through the existing `/apikeys` page.
 - **No new backend endpoint.** Key minting reuses the existing `POST /apikey` path via
-  the existing `createDefaultApiKey()` service.
+  the new `createAiApiKey()` service (a thin sibling of `createDefaultApiKey`).
 - Manual `capgo login <key>` in a terminal is retained, unchanged.
 
 ## Security note (accepted tradeoff)
@@ -65,7 +69,7 @@ needs to change.
  Browser (dashboard, logged in → JWT)            AI client + MCP server (stdio)
   /connect page                                   |
    click "Generate key for your AI"               |
-   → createDefaultApiKey(name,{orgId}) (existing)  |
+   → createAiApiKey(name,{orgId,role,apps})        |
    → show plaintext key once + copy box            |
    → "Log into Capgo with this key: capgo_xxx"      |
           user copies the line  -----------------> pastes into the AI
@@ -79,23 +83,25 @@ needs to change.
 
 ## Components
 
-### 1. Dashboard page — `src/pages/connect-ai.vue` (route `/connect`)
+### 1. Dashboard page — `src/pages/connect.vue` (route `/connect`) + `src/components/connect/ConnectAppPicker.vue`
 
-- Authenticated page (existing `auth` middleware). **Adapted from** the existing
-  `cli-login` authorize mockup
+- Authenticated page (file-based route → `/connect`, auto `meta.middleware='auth'`).
+  **Adapted from** the `cli-login` authorize mockup
   (`docs/superpowers/specs/assets/2026-06-03-cli-device-login-authorize-mockup.html`) for
-  visual continuity, but **stripped** of the confirmation phrase, org/app/role scope
-  pickers, and authorize/cancel choreography.
-- Renders a single primary action: **"Generate key for your AI assistant."**
-- On click → calls the existing `createDefaultApiKey(supabase, name, { orgId: organizationStore.currentOrganization?.gid })`
-  (`src/services/apikeys.ts`) with **no `appId`** → an `org_admin` key for the active org,
-  **no expiry**. The Supabase function returns the plaintext key **once**.
-- Shows the active organization's name so the user knows which org the key is for.
-- Shows the key in a read-only copy box plus a ready-to-paste instruction line:
-  *"Log into Capgo with this key: `capgo_xxx`"* and a one-click "Copy" button.
-- Shows a clear warning: `org_admin`, non-expiring, shown once, revoke from
-  `/apikeys` if leaked.
-- Reuses `login.vue` / `ApiKeys.vue` styling and existing i18n patterns. No new backend.
+  visual continuity, but reframed as a self-initiated **generate → copy → paste** flow
+  (no confirmation phrase, no device/terminal framing, no authorize/cancel).
+- **Generate view:** token name, read-only active-org name, a **role** select
+  (Admin / Member), and — for Member — the searchable multi-select `ConnectAppPicker`
+  (checkbox rows with name + `app_id` + an `app_admin` tag, select-all/clear-all, a
+  selected counter). Apps come from `supabase.from('apps').select('id, app_id, name, owner_org').in('owner_org', [orgId])`.
+  Generate is disabled with no active org, or for Member with zero apps selected.
+- On generate → `createAiApiKey(supabase, name, { orgId, role, appUuids })` returns the
+  plaintext key **once**.
+- **Success view:** the key in a read-only copy box (Copy button, toast on copy), a
+  ready-to-paste line *"Log into Capgo with this key: `…`"* (its own Copy), a scope chip,
+  a "shown once / revoke from `/apikeys`" warning, and a Back button to generate another.
+- Tailwind + DaisyUI/slate styling with `dark:` variants; `vue-sonner` toasts; new
+  `connect-*` i18n keys in `messages/en.json`. No new backend.
 
 ### 2. Shared auth module — `cli/src/auth/session.ts` (new)
 
