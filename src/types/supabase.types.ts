@@ -2522,7 +2522,6 @@ export type Database = {
           bandwidth_exceeded: boolean | null
           build_time_exceeded: boolean | null
           canceled_at: string | null
-          churn_reason: string | null
           created_at: string
           customer_country: string | null
           customer_id: string
@@ -2549,7 +2548,6 @@ export type Database = {
           bandwidth_exceeded?: boolean | null
           build_time_exceeded?: boolean | null
           canceled_at?: string | null
-          churn_reason?: string | null
           created_at?: string
           customer_country?: string | null
           customer_id: string
@@ -2576,7 +2574,6 @@ export type Database = {
           bandwidth_exceeded?: boolean | null
           build_time_exceeded?: boolean | null
           canceled_at?: string | null
-          churn_reason?: string | null
           created_at?: string
           customer_country?: string | null
           customer_id?: string
