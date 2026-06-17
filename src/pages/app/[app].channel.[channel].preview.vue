@@ -144,9 +144,7 @@ watchEffect(async () => {
 
 <template>
   <div>
-    <div v-if="loading" class="flex flex-col justify-center items-center min-h-[50vh]">
-      <Spinner size="w-40 h-40" />
-    </div>
+    <PageLoader v-if="loading" />
 
     <div v-else-if="!channel" class="flex flex-col justify-center items-center min-h-[50vh]">
       <IconAlertCircle class="w-16 h-16 mb-4 text-destructive" />

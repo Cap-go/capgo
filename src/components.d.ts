@@ -64,6 +64,7 @@ declare module 'vue' {
     LineChartStats: typeof import('./components/dashboard/LineChartStats.vue')['default']
     LogTable: typeof import('./components/tables/LogTable.vue')['default']
     Navbar: typeof import('./components/Navbar.vue')['default']
+    PageLoader: typeof import('./components/PageLoader.vue')['default']
     PasswordPolicyWarningBanner: typeof import('./components/PasswordPolicyWarningBanner.vue')['default']
     PaymentRequiredModal: typeof import('./components/PaymentRequiredModal.vue')['default']
     RbacPermissionOnlyModal: typeof import('./components/RbacPermissionOnlyModal.vue')['default']
