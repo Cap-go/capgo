@@ -1715,7 +1715,7 @@ async function getCoreSnapshotCounts(c: Context, snapshotExclusiveEnd: Date): Pr
   const drizzleClient = getDrizzleClient(pgClient)
   const snapshotExclusiveEndIso = snapshotExclusiveEnd.toISOString()
 
-    // stripe_info stores current plan-state flags; plan_calculated_at bounds dated replays against later recalculations.
+  // stripe_info stores current plan-state flags; plan_calculated_at bounds dated replays against later recalculations.
   try {
     const result = await drizzleClient.execute<CoreSnapshotRow>(sql`
       WITH active_need_upgrade AS (
@@ -1734,12 +1734,44 @@ async function getCoreSnapshotCounts(c: Context, snapshotExclusiveEnd: Date): Pr
           AND (si.canceled_at IS NULL OR si.canceled_at >= ${snapshotExclusiveEndIso}::timestamptz)
           AND si.subscription_anchor_end > ${snapshotExclusiveEndIso}::timestamptz
         ORDER BY si.customer_id, si.created_at DESC
+      ),
+      current_onboarded_owner_orgs AS (
+        SELECT COALESCE(
+          (
+            SELECT (transfer_entry.entry->>'transferred_from')::uuid
+            FROM unnest(COALESCE(apps.transfer_history, '{}'::jsonb[])) AS transfer_entry(entry)
+            WHERE (transfer_entry.entry->>'transferred_at')::timestamptz >= ${snapshotExclusiveEndIso}::timestamptz
+            ORDER BY (transfer_entry.entry->>'transferred_at')::timestamptz ASC
+            LIMIT 1
+          ),
+          apps.owner_org
+        ) AS owner_org
+        FROM public.apps apps
+        WHERE apps.created_at < ${snapshotExclusiveEndIso}::timestamptz
+      ),
+      deleted_onboarded_owner_orgs AS (
+        SELECT COALESCE(
+          (
+            SELECT (transfer_entry.entry->>'transferred_from')::uuid
+            FROM unnest(COALESCE(deleted_apps.transfer_history, '{}'::jsonb[])) AS transfer_entry(entry)
+            WHERE (transfer_entry.entry->>'transferred_at')::timestamptz >= ${snapshotExclusiveEndIso}::timestamptz
+            ORDER BY (transfer_entry.entry->>'transferred_at')::timestamptz ASC
+            LIMIT 1
+          ),
+          deleted_apps.owner_org
+        ) AS owner_org
+        FROM public.deleted_apps deleted_apps
+        WHERE deleted_apps.created_at < ${snapshotExclusiveEndIso}::timestamptz
+          AND deleted_apps.deleted_at >= ${snapshotExclusiveEndIso}::timestamptz
       )
       SELECT
         (
-          SELECT COUNT(DISTINCT apps.owner_org)::int
-          FROM public.apps apps
-          WHERE apps.created_at < ${snapshotExclusiveEndIso}::timestamptz
+          SELECT COUNT(DISTINCT owner_org)::int
+          FROM (
+            SELECT owner_org FROM current_onboarded_owner_orgs
+            UNION
+            SELECT owner_org FROM deleted_onboarded_owner_orgs
+          ) onboarded_owner_orgs
         ) AS onboarded,
         (
           SELECT COUNT(*)::int
