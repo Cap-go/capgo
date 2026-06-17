@@ -8,7 +8,8 @@ import { enableSupabaseInstrumentation, setInvocationSource, trackMcpServerStart
 import { addAppOptionsSchema, cleanupOptionsSchema, getStatsOptionsSchema, requestBuildOptionsSchema, starAllRepositoriesOptionsSchema, starRepoOptionsSchema, updateAppOptionsSchema, updateChannelOptionsSchema, uploadOptionsSchema } from '../schemas/sdk'
 import { CapgoSDK } from '../sdk'
 import { clearSavedKey, getLoginState, loginSuccessMessage, logoutMessage, validateAndSaveKey, whoamiMessage } from '../auth/session'
-import { findSavedKey } from '../utils'
+import { mcpLoginInputSchema, mcpLogoutInputSchema } from '../schemas/auth'
+import { findSavedKey, formatError } from '../utils'
 import { registerOnboardingTools } from '../build/onboarding/mcp/onboarding-tools'
 import { buildServerInstructions } from './instructions'
 import { installMcpStdoutGuard } from './stdout-guard'
@@ -622,24 +623,30 @@ export async function startMcpServer(): Promise<void> {
   server.tool(
     'capgo_login',
     'Sign in to Capgo by saving an API key. Generate a key for your AI at https://app.capgo.app/connect, then call this with it. Authenticates the current MCP session immediately — no restart needed.',
-    {
-      apikey: z.string().describe('A Capgo API key (generate one at https://app.capgo.app/connect).'),
-      scope: z.enum(['global', 'local']).optional().describe('Where to save the key: "global" (~/.capgo, default, all projects) or "local" (./.capgo, this project only — requires a git repo).'),
-    },
+    mcpLoginInputSchema.shape,
     async ({ apikey, scope }) => {
       try {
         const { userId } = await validateAndSaveKey(apikey, { local: scope === 'local' })
-        // Re-point the in-memory SDK at the new key so the very next tool call is authenticated.
-        sdk = new CapgoSDK({ apikey })
+        // Re-init from call-time resolution (env → global → local) — the SAME source of
+        // truth whoami/logout/onboarding use — so the SDK never authenticates as a
+        // different identity than the one we report.
+        sdk = new CapgoSDK({})
+        let text = loginSuccessMessage(userId, scope === 'local')
+        // If a higher-precedence credential overrides the key we just saved, say so:
+        // tools will run as THAT credential, not the one just pasted.
+        const active = await getLoginState()
+        const savedSource = scope === 'local' ? 'local' : 'global'
+        if (active.source && active.source !== savedSource)
+          text += ` Note: a ${active.source} credential takes precedence over the ${savedSource} key you just saved, so tools will use it until it is removed.`
         return {
-          content: [{ type: 'text' as const, text: loginSuccessMessage(userId, scope === 'local') }],
+          content: [{ type: 'text' as const, text }],
         }
       }
       catch (error) {
         return {
           content: [{
             type: 'text' as const,
-            text: `Login failed: ${error instanceof Error ? error.message : String(error)}. Generate a fresh key at https://app.capgo.app/connect and try again.`,
+            text: `Login failed: ${formatError(error)}. Generate a fresh key at https://app.capgo.app/connect and try again.`,
           }],
           isError: true as const,
         }
@@ -660,9 +667,7 @@ export async function startMcpServer(): Promise<void> {
   server.tool(
     'capgo_logout',
     'Sign out by deleting the saved Capgo API key. Clears the global key (~/.capgo) by default, or the project-local key (./.capgo) with scope "local". Does not unset the CAPGO_TOKEN env var.',
-    {
-      scope: z.enum(['global', 'local']).optional().describe('Which saved key to remove: "global" (~/.capgo, default) or "local" (./.capgo).'),
-    },
+    mcpLogoutInputSchema.shape,
     async ({ scope }) => {
       const { cleared } = await clearSavedKey({ local: scope === 'local' })
       // Drop the in-memory key so the main tools de-authenticate immediately.

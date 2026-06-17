@@ -75,6 +75,23 @@ function resolveKeyAndSource(): { key?: string, source?: KeySource } {
 }
 
 /**
+ * Append an entry to `.gitignore` only if it isn't already present, so repeated
+ * project-local logins don't accumulate duplicate lines.
+ */
+async function ensureGitignored(entry: string): Promise<void> {
+  let existing = ''
+  try {
+    existing = readFileSync('.gitignore', 'utf8')
+  }
+  catch {
+    existing = ''
+  }
+  const alreadyListed = existing.split(/\r?\n/).some(line => line.trim() === entry)
+  if (!alreadyListed)
+    await appendToSafeFile('.gitignore', `${entry}\n`, 0o600)
+}
+
+/**
  * Validate an API key against Capgo and, if valid, persist it (0o600).
  * Returns the resolved user id. Throws on a missing/invalid key or a disallowed
  * local write (local requires a git repository, mirroring `capgo login --local`).
@@ -95,7 +112,7 @@ export async function validateAndSaveKey(apikey: string, options: SaveKeyOptions
 
   if (local) {
     await writeFileAtomic(LOCAL_KEY_PATH, `${apikey}\n`, { mode: 0o600 })
-    await appendToSafeFile('.gitignore', '.capgo\n', 0o600)
+    await ensureGitignored('.capgo')
   }
   else {
     await writeFileAtomic(globalKeyPath(), `${apikey}\n`, { mode: 0o600 })

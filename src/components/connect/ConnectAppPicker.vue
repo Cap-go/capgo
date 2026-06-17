@@ -85,6 +85,7 @@ function appLetter(app: ConnectApp): string {
         <input
           v-model="search"
           type="text"
+          :aria-label="t('connect-search-apps')"
           :placeholder="t('connect-search-apps')"
           class="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-700 outline-none focus:border-azure-500 focus:ring-2 focus:ring-azure-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
         >

@@ -172,7 +172,7 @@ export async function decideStart(
       },
       next: {
         tool: 'capgo_login',
-        instruction: 'When the user provides their key, call capgo_login with it. Once signed in, call next_step (no arguments) to continue.',
+        instruction: `When the user provides their key, call capgo_login with it. Once signed in, call ${NEXT_STEP_TOOL} (no arguments) to continue.`,
         call: 'capgo_login({ apikey: "<the key the user pasted>" })',
       },
       rules: ONBOARDING_RULES,

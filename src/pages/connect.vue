@@ -52,7 +52,7 @@ async function loadApps(orgId: string): Promise<void> {
     const { data, error } = await supabase
       .from('apps')
       .select('id, app_id, name, owner_org')
-      .in('owner_org', [orgId])
+      .eq('owner_org', orgId)
       .order('name', { ascending: true })
 
     if (error)
@@ -183,10 +183,11 @@ function back(): void {
         <div class="mt-6 space-y-5">
           <!-- Token name -->
           <div>
-            <label class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200">
+            <label for="connect-token-name-input" class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200">
               {{ t('connect-token-name') }}
             </label>
             <input
+              id="connect-token-name-input"
               v-model="tokenName"
               type="text"
               class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-azure-500 focus:ring-2 focus:ring-azure-500/25 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
@@ -205,10 +206,11 @@ function back(): void {
             </div>
             <!-- Role -->
             <div>
-              <label class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200">
+              <label for="connect-role-select" class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200">
                 {{ t('connect-role') }}
               </label>
               <select
+                id="connect-role-select"
                 v-model="role"
                 class="w-full appearance-none rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-azure-500 focus:ring-2 focus:ring-azure-500/25 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
               >
