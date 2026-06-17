@@ -6,6 +6,7 @@ import { sql } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 
 import { getLastMonthAnalyticsWindowStart, getPluginBreakdownCF, readActiveAppsCF, readLastMonthDevicesByPlatformCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
+import { GLOBAL_STATS_SHARDS, REQUIRED_GLOBAL_STATS_SHARDS } from '../utils/global_stats.ts'
 import { BRES, middlewareAPISecret, quickError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { logsnagInsights } from '../utils/logsnag.ts'
@@ -227,17 +228,6 @@ const GLOBAL_STATS_NOTIFICATION_LOGSNAG_STEP = 'notifications_logsnag'
 const GLOBAL_STATS_NOTIFICATION_TRACKING_STEP = 'notifications_tracking'
 const GLOBAL_STATS_NOTIFICATION_LOGSNAG_CLAIM = 'notifications_logsnag_claim'
 const GLOBAL_STATS_NOTIFICATION_TRACKING_CLAIM = 'notifications_tracking_claim'
-const GLOBAL_STATS_SHARDS = [
-  'core',
-  'usage',
-  'revenue',
-  'plugins',
-  'builds',
-  'retention',
-  'paid_products',
-  'ltv',
-  'notifications',
-] as const
 const GLOBAL_STATS_COMPLETION_MARKERS = [
   ...GLOBAL_STATS_SHARDS,
   GLOBAL_STATS_NOTIFICATION_LOGSNAG_STEP,
@@ -250,9 +240,8 @@ const GLOBAL_STATS_COMPLETION_MARKER_SET = new Set<string>(GLOBAL_STATS_COMPLETI
 
 type GlobalStatsShard = typeof GLOBAL_STATS_SHARDS[number]
 type GlobalStatsCompletionMarker = typeof GLOBAL_STATS_COMPLETION_MARKERS[number]
-type RequiredGlobalStatsShard = Exclude<GlobalStatsShard, 'notifications'>
+type RequiredGlobalStatsShard = typeof REQUIRED_GLOBAL_STATS_SHARDS[number]
 type GlobalStatsNotificationStepAction = 'send' | 'complete_claimed' | 'skip'
-const REQUIRED_GLOBAL_STATS_SHARDS = GLOBAL_STATS_SHARDS.filter((shard): shard is RequiredGlobalStatsShard => shard !== 'notifications')
 type GlobalStatsUpdate = Database['public']['Tables']['global_stats']['Update']
 type GlobalStatsRow = Database['public']['Tables']['global_stats']['Row']
 type GlobalStatsSnapshotPatch = GlobalStatsUpdate & { orgs?: number }
