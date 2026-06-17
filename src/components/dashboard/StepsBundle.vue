@@ -25,7 +25,7 @@ const step = ref(0)
 const clicked = ref(0)
 const latestVersionId = ref<string>()
 const realtimeListener = ref(false)
-const pollTimer = ref<number | null>(null)
+const pollTimer = ref<ReturnType<typeof globalThis.setInterval> | null>(null)
 const initialCount = ref<number | null>(null)
 const supabase = useSupabase()
 const main = useMainStore()
@@ -242,7 +242,7 @@ watchEffect(async () => {
 
     clearWatchers()
 
-    pollTimer.value = window.setInterval(async () => {
+    pollTimer.value = globalThis.setInterval(async () => {
       try {
         const current = await getVersionsCount()
         if (initialCount.value !== null && current > initialCount.value) {
