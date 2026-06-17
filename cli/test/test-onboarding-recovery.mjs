@@ -64,6 +64,21 @@ t('build onboarding advice suggests login and build request after missing auth',
     throw new Error('Expected build request command in recovery advice')
 })
 
+t('build onboarding advice for an unsigned/expired Apple agreement points at the agreements page', () => {
+  const advice = getBuildOnboardingRecoveryAdvice(
+    'Apple is blocking App Store Connect API access because your developer account has a required agreement that is unsigned or has expired.',
+    'verifying-key',
+    'bunx',
+    'com.example.app',
+  )
+  if (!advice.summary.some(line => line.toLowerCase().includes('required agreement')))
+    throw new Error('Expected agreement-specific summary line')
+  if (!advice.docs.includes('https://appstoreconnect.apple.com/agreements'))
+    throw new Error('Expected the App Store Connect agreements page in docs')
+  if (advice.summary.some(line => line.includes('Double-check the .p8')))
+    throw new Error('Agreement errors must NOT surface the credential-checklist advice')
+})
+
 t('runner command helper rejects unexpected executors', () => {
   let threw = false
   try {

@@ -237,6 +237,59 @@ await test('two generated keystores are distinct', async () => {
   assert(a.p12Base64 !== b.p12Base64, 'different invocations must yield different keystores (new key pair each time)')
 })
 
+// ─── sanitizeKeystoreAlias (path-traversal guard for the on-disk filename) ───
+// The alias originates from user input (keystoreNewAlias). It is used verbatim
+// for the keystore crypto + KEYSTORE_KEY_ALIAS, but the ON-DISK filename
+// (android/app/<alias>.p12) must be sanitized so a value like "../../evil" or
+// "/etc/x" cannot escape android/app/.
+
+await test('sanitizeKeystoreAlias: normal alias passes through unchanged', async () => {
+  const { sanitizeKeystoreAlias } = await importKeystore()
+  assertEquals(sanitizeKeystoreAlias('release'), 'release')
+  assertEquals(sanitizeKeystoreAlias('my_app-key.v2'), 'my_app-key.v2')
+})
+
+await test('sanitizeKeystoreAlias: ../../etc/passwd → no slashes, no ..', async () => {
+  const { sanitizeKeystoreAlias } = await importKeystore()
+  const out = sanitizeKeystoreAlias('../../etc/passwd')
+  assert(!out.includes('/'), `must not contain "/": got ${out}`)
+  assert(!out.includes('\\'), `must not contain "\\": got ${out}`)
+  assert(!out.includes('..'), `must not contain "..": got ${out}`)
+  // basename of the path is "passwd"
+  assertEquals(out, 'passwd')
+})
+
+await test('sanitizeKeystoreAlias: a/b → basename only', async () => {
+  const { sanitizeKeystoreAlias } = await importKeystore()
+  assertEquals(sanitizeKeystoreAlias('a/b'), 'b')
+})
+
+await test('sanitizeKeystoreAlias: backslash path → basename only', async () => {
+  const { sanitizeKeystoreAlias } = await importKeystore()
+  const out = sanitizeKeystoreAlias('a\\b\\c')
+  assert(!out.includes('\\'), `must not contain "\\": got ${out}`)
+  assert(!out.includes('/'), `must not contain "/": got ${out}`)
+  assertEquals(out, 'c')
+})
+
+await test('sanitizeKeystoreAlias: empty / . / .. → safe default', async () => {
+  const { sanitizeKeystoreAlias } = await importKeystore()
+  assertEquals(sanitizeKeystoreAlias(''), 'keystore')
+  assertEquals(sanitizeKeystoreAlias('.'), 'keystore')
+  assertEquals(sanitizeKeystoreAlias('..'), 'keystore')
+  // a path whose basename is a dot-only segment also normalizes to the default
+  assertEquals(sanitizeKeystoreAlias('foo/..'), 'keystore')
+})
+
+await test('sanitizeKeystoreAlias: weird chars → underscored', async () => {
+  const { sanitizeKeystoreAlias } = await importKeystore()
+  assertEquals(sanitizeKeystoreAlias('a b$c'), 'a_b_c')
+  assertEquals(sanitizeKeystoreAlias('key@home!'), 'key_home_')
+  // result never contains separators or traversal sequences
+  const out = sanitizeKeystoreAlias('..\\..\\weird name')
+  assert(!out.includes('/') && !out.includes('\\') && !out.includes('..'), `unsafe chars leaked: ${out}`)
+})
+
 console.log(`\n📊 Results: ${testsPassed} passed, ${testsFailed} failed`)
 if (testsFailed > 0)
   process.exit(1)

@@ -237,6 +237,12 @@ export interface AndroidOnboardingProgress extends TailProgress {
   // Ephemeral — wiped when onboarding finishes. Held on disk only so resume
   // across a crash doesn't force a full re-auth. NEVER written to credentials.
   _oauthRefreshToken?: string
+  // MCP broker OAuth (access-token model). The MCP process can't refresh a token issued to the broker's
+  // confidential Web client, so it stores the short-lived access token + its expiry and re-signs-in on expiry.
+  _oauthAccessToken?: string
+  _oauthAccessTokenExpiresAt?: number
+  // In-flight broker sign-in handle — persisted so polling survives the MCP process restarting between calls.
+  _brokerOAuth?: { pubId: string, pollSecret: string, signInUrl: string, expiresAt: number }
   _keystoreBase64?: string
   /** Base64 of the downloaded SA JSON key — saved as PLAY_CONFIG_JSON at end. */
   _serviceAccountKeyBase64?: string

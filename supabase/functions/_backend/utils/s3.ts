@@ -136,6 +136,10 @@ function isMissingObjectError(error: unknown): boolean {
   return candidate.status === 404 || candidate.statusCode === 404 || candidate.code === 'NoSuchKey'
 }
 
+function shouldUseSizeRangeFallback(size: number, headError: unknown): boolean {
+  return !size && !isMissingObjectError(headError)
+}
+
 async function moveObjectToTrash(c: Context, fileId: string) {
   if (fileId.startsWith(R2_TRASH_PREFIX))
     return true
@@ -408,7 +412,7 @@ async function getSizeForKey(c: Context, client: ReturnType<typeof initS3>, file
     })
   }
 
-  if (!size) {
+  if (shouldUseSizeRangeFallback(size, headError)) {
     diagnostic.usedFallback = true
     diagnostic.range = await getSizeFromRangeFallback(c, client, fileId, headError ? 'head_error' : 'missing_head_size')
     size = diagnostic.range.size
@@ -505,4 +509,8 @@ export const s3 = {
   getSignedUrl,
   getUploadUrl,
   getObject,
+}
+
+export const s3TestUtils = {
+  shouldUseSizeRangeFallback,
 }
