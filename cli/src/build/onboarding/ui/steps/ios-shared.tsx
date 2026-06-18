@@ -31,8 +31,10 @@ import type { AiResultKind } from '../components.js'
 //     this frame renders.
 import { Select } from '@inkjs/ui'
 import { Box, Newline, Text } from 'ink'
+import { pickAiPreviewTail } from '../../ai-fit.js'
 import React from 'react'
 import { AiResultBanner, ErrorLine, SpinnerLine, SuccessLine } from '../components.js'
+import { buildHelpMenuOptions } from '../../../../support/help-menu.js'
 
 // ── welcome ─────────────────────────────────────────────────────────────────
 export const WelcomeStep: FC = () => (
@@ -129,6 +131,7 @@ export const AiAnalysisPromptStep: FC<AiAnalysisPromptStepProps> = ({ dense = fa
     <Text>We can analyze the build log with Capgo AI and suggest a fix.</Text>
     <Select
       options={[
+        { label: '📨  Email Capgo support', value: 'support' },
         { label: '🤖  Debug with AI', value: 'debug' },
         { label: '⏭   Skip', value: 'skip' },
       ]}
@@ -138,11 +141,30 @@ export const AiAnalysisPromptStep: FC<AiAnalysisPromptStepProps> = ({ dense = fa
 )
 
 // ── ai-analysis-running ─────────────────────────────────────────────────────────
-export const AiAnalysisRunningStep: FC = () => (
-  <Box flexDirection="column" marginTop={1}>
-    <SpinnerLine text="Analyzing build log with Capgo AI..." />
-  </Box>
-)
+export const AiAnalysisRunningStep: FC<{ streamText?: string, terminalRows: number, terminalCols: number }> = ({ streamText, terminalRows, terminalCols }) => {
+  // Live tail of the streaming analysis (pre-rendered ANSI from the parent),
+  // sized to the ACTUAL viewport via the shared wrap-aware fit math in
+  // ai-fit.ts — no arbitrary cap; lines scroll off only when the terminal is
+  // genuinely out of rows. Flicker rules (learned the hard way):
+  //   • height only ever GROWS (text appends; the helper caps at the viewport
+  //     budget) — no padding, so the frame starts compact like other steps;
+  //   • ONE <Text> node for the tail so Ink diffs the block in place;
+  //   • the "… earlier lines" marker row is always rendered (blank when
+  //     nothing is hidden) so it never pops in and shifts layout.
+  // The result step owns full-text display with proper fit/scroll handling.
+  const { rows, hidden } = pickAiPreviewTail(streamText ?? '', terminalRows, terminalCols)
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <SpinnerLine text="Analyzing build log with Capgo AI..." />
+      {rows.length > 0 && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text dimColor>{hidden > 0 ? `… ${hidden} earlier line${hidden === 1 ? '' : 's'}` : ' '}</Text>
+          <Text>{rows.join('\n')}</Text>
+        </Box>
+      )}
+    </Box>
+  )
+}
 
 // ── ai-analysis-result ──────────────────────────────────────────────────────────
 // Renders the diagnosis (or fallback banner), then a retry/skip Select. The
@@ -230,6 +252,7 @@ export const AiAnalysisResultStep: FC<AiAnalysisResultStepProps> = ({
             : [
                 { label: '✔  Continue', value: 'continue' },
               ]),
+          { label: '📨  Still stuck — email Capgo support', value: 'support' },
           // Only offered when the analysis is in the scroll viewer (collapsed);
           // when shown inline there's nothing to re-read.
           ...(collapsed ? [{ label: '📖  Re-read analysis', value: 'reread' }] : []),
@@ -270,14 +293,32 @@ export interface ErrorStepProps {
    *  error headline + the action prompt here — keeping Try again / Restart /
    *  Exit reachable no matter how long the advice was. */
   collapsed?: boolean
+  /** A captured build log exists for this run (e.g. a build was attempted), so
+   *  the help menu may offer the "Ask AI for help" option. Defaults to false. */
+  hasBuildLog?: boolean
+  /** Offer "✨ Create a new key for me (guided)" as the first recovery option —
+   *  set when an App Store Connect key failed to validate on a host where the
+   *  guided macOS helper is available. Defaults to false. */
+  showGuidedKey?: boolean
   onChange: (value: string) => void | Promise<void>
 }
 
-const RETRY_OPTIONS = [
-  { label: '🔄  Try again', value: 'retry' },
-  { label: '↩️   Restart onboarding', value: 'restart' },
-  { label: '❌  Exit', value: 'exit' },
-]
+const RESTART_OPTION = { label: '↩️   Restart onboarding', value: 'restart' }
+const GUIDED_KEY_OPTION = { label: '✨  Create a new key for me (guided)', value: 'guided-key' }
+
+// Build the failure-menu options: support-first (and AI iff a build log exists)
+// from the shared `buildHelpMenuOptions`, with the onboarding-specific
+// "Restart onboarding" action spliced in just before Exit so it stays reachable.
+// When `showGuidedKey` is set (an ASC key failed to validate and the macOS helper
+// is available) the guided-creation option leads the list as the default action.
+function buildErrorMenuOptions(hasBuildLog: boolean, showGuidedKey = false): { label: string, value: string }[] {
+  const options = buildHelpMenuOptions({ hasBuildLog })
+  const exitIndex = options.findIndex(option => option.value === 'exit')
+  const withRestart = exitIndex === -1
+    ? [...options, RESTART_OPTION]
+    : [...options.slice(0, exitIndex), RESTART_OPTION, ...options.slice(exitIndex)]
+  return showGuidedKey ? [GUIDED_KEY_OPTION, ...withRestart] : withRestart
+}
 
 // Flatten an error + its recovery advice into plain text lines for the
 // scrollable FullscreenAiViewer. The recovery advice is UNBOUNDED — a stacked
@@ -339,6 +380,8 @@ export function estimateErrorBodyRows(
   supportBundlePath: string | null,
   cols: number,
   showRetry: boolean,
+  hasBuildLog: boolean,
+  showGuidedKey = false,
 ): number {
   let rows = 1 // outer marginTop
   rows += wrapRows(`✖  ${error}`, cols) // ErrorLine (wraps)
@@ -362,11 +405,16 @@ export function estimateErrorBodyRows(
     rows += 2 + wrapRows(supportBundlePath, cols) // Newline + "Support bundle" + path
   rows += 1 // Newline before the action prompt
   if (showRetry)
-    rows += 5 // "What do you want to do?" + Newline + Select (3 options)
+    // "What do you want to do?" + Newline + Select (one row per option). The
+    // option count tracks buildErrorMenuOptions (guided-key iff showGuidedKey +
+    // support [+ AI iff hasBuildLog] + retry + restart + exit), so it stays
+    // correct as the menu grows.
+    rows += 2 + buildErrorMenuOptions(hasBuildLog, showGuidedKey).length
   return rows
 }
 
-export const ErrorStep: FC<ErrorStepProps> = ({ error, recoveryAdvice, supportBundlePath, showRetry, collapsed = false, onChange }) => {
+export const ErrorStep: FC<ErrorStepProps> = ({ error, recoveryAdvice, supportBundlePath, showRetry, collapsed = false, hasBuildLog = false, showGuidedKey = false, onChange }) => {
+  const errorMenuOptions = buildErrorMenuOptions(hasBuildLog, showGuidedKey)
   // Collapsed form: the full error + recovery advice was too tall for the
   // viewport, so the parent already showed it in the scrollable viewer. Render
   // only the error headline + the action prompt, so Try again / Restart / Exit
@@ -381,7 +429,7 @@ export const ErrorStep: FC<ErrorStepProps> = ({ error, recoveryAdvice, supportBu
             <Newline />
             <Text bold>What do you want to do?</Text>
             <Newline />
-            <Select options={RETRY_OPTIONS} onChange={onChange} />
+            <Select options={errorMenuOptions} onChange={onChange} />
           </>
         )}
       </Box>
@@ -435,7 +483,7 @@ export const ErrorStep: FC<ErrorStepProps> = ({ error, recoveryAdvice, supportBu
         <>
           <Text bold>What do you want to do?</Text>
           <Newline />
-          <Select options={RETRY_OPTIONS} onChange={onChange} />
+          <Select options={errorMenuOptions} onChange={onChange} />
         </>
       )}
     </Box>

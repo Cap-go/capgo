@@ -83,6 +83,27 @@ describe('posthog helper', () => {
     expect(body.properties.$set).toEqual({ app_id: 'app-id' })
   })
 
+  it('can send historical events without updating person properties', async () => {
+    const { trackPosthogEvent } = await import('../supabase/functions/_backend/utils/posthog.ts')
+
+    await trackPosthogEvent(createContext(), {
+      event: 'Historical Event',
+      channel: 'usage',
+      description: 'tracked',
+      setPersonProperties: false,
+      tags: { source_record_id: '123' },
+      timestamp: '2026-03-01T00:00:00.000Z',
+      user_id: 'org-id',
+    })
+
+    const request = fetchMock.mock.calls[0]
+    const body = JSON.parse(request?.[1]?.body as string)
+
+    expect(body.timestamp).toBe('2026-03-01T00:00:00.000Z')
+    expect(body.properties.source_record_id).toBe('123')
+    expect(body.properties).not.toHaveProperty('$set')
+  })
+
   it('uses the full exception endpoint host and only sends the request path for exceptions', async () => {
     const { capturePosthogException } = await import('../supabase/functions/_backend/utils/posthog.ts')
     envState.posthogApiHost = 'https://eu.i.posthog.com/i/v0/e'

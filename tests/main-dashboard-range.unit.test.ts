@@ -16,7 +16,7 @@ vi.mock('~/services/supabase', () => ({
   getLocalConfig: () => ({ supaHost: 'https://supabase.capgo.test' }),
   getTotalStorage: mockGetTotalStorage,
   normalizeDashboardDateRange: mockNormalizeDashboardDateRange,
-  unspoofUser: vi.fn(),
+  clearSpoof: vi.fn(),
   useSupabase: () => ({
     auth: {
       onAuthStateChange: vi.fn(() => ({

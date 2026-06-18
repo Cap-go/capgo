@@ -101,9 +101,7 @@ watchEffect(async () => {
 
 <template>
   <div>
-    <div v-if="isLoading" class="flex flex-col justify-center items-center min-h-[50vh]">
-      <Spinner size="w-40 h-40" />
-    </div>
+    <PageLoader v-if="isLoading" />
     <div v-else-if="device" id="deployments">
       <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
         <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">

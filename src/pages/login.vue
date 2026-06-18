@@ -115,7 +115,7 @@ const authGhostButtonClass = [
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--color-azure-500)]',
 ].join(' ')
 
-const registerUrl = window.location.host === 'console.capgo.app' ? 'https://capgo.app/register/' : `/register/`
+const registerUrl = globalThis.location.host === 'console.capgo.app' ? 'https://capgo.app/register/' : `/register/`
 
 function focusLoginEmailInput(attempt = 0) {
   globalThis.setTimeout(() => {
@@ -149,7 +149,7 @@ function scheduleCaptchaInitTimeout() {
 
   clearCaptchaInitTimeout()
   captchaInitTimeout = setTimeout(() => {
-    if (!turnstileToken.value && !window.turnstile) {
+    if (!turnstileToken.value && !(globalThis as typeof globalThis & { turnstile?: unknown }).turnstile) {
       captchaStatus.value = 'unavailable'
       console.error('Turnstile failed to initialize')
     }
@@ -374,7 +374,7 @@ async function handleSsoLogin() {
   const domain = emailForLogin.value.split('@')[1]
 
   try {
-    const redirectUrl = new URL('/sso-callback', window.location.origin)
+    const redirectUrl = new URL('/sso-callback', globalThis.location.origin)
     if (route.query.to && typeof route.query.to === 'string') {
       redirectUrl.searchParams.set('to', route.query.to)
     }
@@ -402,7 +402,7 @@ async function handleSsoLogin() {
     }
 
     if (data?.url) {
-      window.location.href = data.url
+      globalThis.location.href = data.url
     }
   }
   catch (err) {
@@ -485,7 +485,7 @@ async function checkAuthUser() {
 }
 
 async function checkMagicLink() {
-  const parsedUrl = new URL(route.fullPath, window.location.origin)
+  const parsedUrl = new URL(route.fullPath, globalThis.location.origin)
 
   const hash = parsedUrl.hash
   const params = new URLSearchParams(hash.slice(1))
@@ -537,12 +537,12 @@ async function openScan() {
 
 async function checkLogin() {
   try {
-    const parsedUrl = new URL(route.fullPath, window.location.origin)
+    const parsedUrl = new URL(route.fullPath, globalThis.location.origin)
     const params = new URLSearchParams(parsedUrl.search)
 
     if (params.get('message') === 'sso_account_linked') {
       parsedUrl.searchParams.delete('message')
-      window.history.replaceState({}, '', parsedUrl.toString())
+      globalThis.history.replaceState({}, '', parsedUrl.toString())
       toast.success(t('sso-account-linked'))
     }
 
@@ -552,7 +552,7 @@ async function checkLogin() {
     if (!!accessToken && !!refreshToken) {
       parsedUrl.searchParams.delete('access_token')
       parsedUrl.searchParams.delete('refresh_token')
-      window.history.replaceState({}, '', parsedUrl.toString())
+      globalThis.history.replaceState({}, '', parsedUrl.toString())
 
       querySessionAccessToken.value = accessToken
       querySessionRefreshToken.value = refreshToken
@@ -819,6 +819,7 @@ onMounted(checkLogin)
                           {{ t('dont-have-an-account') }}
                         </span>
                         <a
+                          v-if="!isMobile"
                           :href="registerUrl"
                           data-test="register"
                           :class="authInlineLinkClass"
@@ -985,6 +986,7 @@ onMounted(checkLogin)
 
                         <div :class="authPanelClass">
                           <a
+                            v-if="!isMobile"
                             :href="registerUrl"
                             data-test="register"
                             :class="authInlineLinkClass"

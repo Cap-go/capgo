@@ -5,14 +5,35 @@ import { log } from '@clack/prompts'
 // src/build/onboarding/command.ts
 import { render } from 'ink'
 import React from 'react'
-import { getAppId, getConfig } from '../../utils.js'
+import { resolveOwnerOrgId } from '../../analytics/org-resolver.js'
+import { trackEvent } from '../../analytics/track.js'
+import { findSavedKeySilent, getAppId, getConfig } from '../../utils.js'
+import { appendInternalLog, startInternalLog } from '../../support/internal-log.js'
+import { newBuilderJourneyId } from './journey.js'
+import { trackBuilderOnboardingCancelled } from './telemetry.js'
+import { isMacOS, probeGuidedHelper } from './asc-key/helper.js'
+import { ASC_KEY_CHANNEL } from './asc-key/protocol.js'
 import { getPlatformDirFromCapacitorConfig } from '../platform-paths.js'
 import OnboardingShell from './ui/shell.js'
+import { checkForCliUpdate, manualUpdateHint, runUpdateAndReexec } from './self-update.js'
 import type { OnboardingResult } from './types.js'
 
 export interface OnboardingBuilderOptions {
   apikey?: string
   platform?: string
+  // Capgo API gateway override (--supa-host) — threaded to the wizard so its
+  // build request AND AI analysis hit the same host as the plain CLI flow
+  // (preprod/self-hosted testing). Defaults to prod when omitted.
+  supaHost?: string
+  /**
+   * Offer the self-update prompt as the first wizard screen. ONLY the genuine
+   * `build init` / `onboarding` entrypoint sets this. Other callers that reach
+   * onboarding as a sub-step (`bundle upload`'s launch-onboarding,
+   * `build credentials manage`) must leave it false: their process.argv is the
+   * wrapper command (`bundle upload …`), so a re-exec would repeat THAT command
+   * (e.g. re-run the upload) instead of `build init`.
+   */
+  enableSelfUpdate?: boolean
 }
 
 type Platform = 'ios' | 'android'
@@ -109,6 +130,13 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
     log.error('Could not detect app ID from capacitor.config.ts. Make sure you are in a Capacitor project directory.')
     process.exit(1)
   }
+
+  // Start the verbose internal log up front so EVERY step transition, validation
+  // result, and error from this run is captured for the support bundle. Without
+  // this, getInternalLogPath() is null and all appendInternalLog calls no-op —
+  // which is why the bundle's "Internal log" section used to be empty for build init.
+  startInternalLog(appId)
+  appendInternalLog(`build init: started for ${appId} (platform ${options.platform ?? 'auto'}, host ${options.supaHost ?? 'prod'})`)
   // If config.appId is missing (very rare — CapacitorConfig.appId is required
   // for `cap sync` to produce a working iOS project), fall back to the
   // resolved Capgo lookup key. Mismatch detection will still surface the
@@ -116,6 +144,41 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
   const iosBundleIdForOnboarding = iosBundleIdInitial || appId
 
   const initialPlatform = resolveInitialPlatform(options, iosDir, androidDir)
+
+  // Resolve update availability BEFORE render so the wizard can show the
+  // self-update offer as its first screen. Gated to the real `build init`
+  // entrypoint (see enableSelfUpdate) so a re-exec can't repeat a wrapper
+  // command. Timeout-bounded (and skipped on the re-exec'd child via
+  // CAPGO_SKIP_UPDATE_PROMPT), so this never stalls startup.
+  const updateInfo = options.enableSelfUpdate ? await checkForCliUpdate() : null
+
+  // Decide BEFORE rendering whether guided App Store Connect key creation can
+  // actually run here: macOS + the signed helper installed + its Developer-ID
+  // signature/team verified. The iOS flow uses this to gate the "create one for
+  // me" offer, so a user is NEVER asked "do you have a .p8?" / offered guided
+  // creation only to be rejected when the helper can't launch (not installed,
+  // wrong signature, wrong team). When it can't run the flow goes straight to
+  // the manual .p8 instructions — exactly as it did before the helper existed,
+  // and as it always does on Linux. The probe spawns codesign, so do it once,
+  // up front (off-macOS it returns immediately without spawning anything).
+  const guidedProbe = await probeGuidedHelper()
+  const guidedHelperUsable = guidedProbe.usable
+  if (!guidedProbe.usable && isMacOS()) {
+    appendInternalLog(`build init: guided ASC key creation unavailable (${guidedProbe.reason})${guidedProbe.detail ? `: ${guidedProbe.detail}` : ''}`)
+    // Only the integrity failure is worth a telemetry event: the helper IS
+    // installed on this Mac but its signature/team didn't verify (tampered,
+    // wrong build, or wrong team) — a security-relevant signal worth surfacing.
+    // not-installed / unsupported-os are expected, benign config states.
+    if (guidedProbe.reason === 'untrusted') {
+      void trackEvent({
+        channel: ASC_KEY_CHANNEL,
+        event: 'ASC Key: Helper Untrusted',
+        icon: '🔑',
+        apikey: options.apikey,
+        tags: { reason: guidedProbe.reason },
+      })
+    }
+  }
 
   // The shell resolves the platform (immediately if initialPlatform is set,
   // else once the user picks). Capture it so the breadcrumb below — printed
@@ -125,6 +188,17 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
   // when it reaches build-complete. Any other exit (missing platform, user
   // cancel, error) leaves this untouched, so we never claim false success.
   let result: OnboardingResult = { outcome: 'cancelled' }
+  // One correlation id for this entire journey, threaded into every analytics
+  // event the wizard emits so a single run's events group together (and the
+  // quit event below ties to them). Generated here — the single onboarding
+  // entrypoint — so both `build init` and the `bundle upload` → launch-onboarding
+  // handoff each get exactly one.
+  const journeyId = newBuilderJourneyId()
+  const journeyStartedAt = Date.now()
+  // The most recent step the wizard reported. Lets the quit event below record
+  // WHERE the user dropped off regardless of HOW they left (keypress, Ctrl+C,
+  // or a fatal error that exits) — none of which run React cleanup reliably.
+  let lastStep: string | undefined
   const { waitUntilExit } = render(
     React.createElement(OnboardingShell, {
       appId,
@@ -137,9 +211,18 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
       iosDir,
       androidDir,
       apikey: options.apikey,
+      supaHost: options.supaHost,
+      journeyId,
       initialPlatform,
+      // Whether the iOS flow may offer guided ASC-key creation (see the probe
+      // above). The shell threads it into the iOS OnboardingApp only.
+      guidedHelperUsable,
+      updateInfo: updateInfo ?? undefined,
       onResolvePlatform: (platform: Platform) => {
         resolvedPlatform = platform
+      },
+      onStep: (step: string) => {
+        lastStep = step
       },
       onResult: (r: OnboardingResult) => {
         result = r
@@ -148,6 +231,24 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
     { alternateScreen: true },
   )
   await waitUntilExit()
+
+  // The user accepted the self-update offer: Ink has restored the primary
+  // buffer, so the install + re-exec can take over the terminal (it needs
+  // stdio inheritance). On success this never returns — it exits with the
+  // child's status code; on failure, fall back to a manual-update hint instead
+  // of silently continuing on the stale version the user chose to leave.
+  if (result.outcome === 'update-requested' && updateInfo) {
+    try {
+      runUpdateAndReexec(updateInfo.latestVersion)
+    }
+    catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      log.warn(`Could not auto-update (${message}). Still on @capgo/cli@${updateInfo.currentVersion}.`)
+      process.stdout.write(`Re-run \`capgo build init\` to try again, or update manually: ${manualUpdateHint()}\n`)
+      process.exit(1)
+    }
+    return
+  }
 
   // Durable post-exit output in the user's normal terminal flow — the alt buffer
   // restore wiped the wizard's last frame, so anything the user needs to keep
@@ -176,5 +277,52 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
     // the user why it stopped (e.g. the "no native platform" screen); this is
     // just a neutral closing line so the exit isn't silent.
     process.stdout.write(`\nCapgo onboarding exited — setup not completed. Re-run \`capgo build init\` to continue.\n`)
+
+    // Record the funnel exit so quit/drop-off is measurable alongside the
+    // per-step events (all sharing this journeyId). Best-effort: resolve
+    // whatever auth + org we can and emit one event. Awaited so the request
+    // flushes before the process exits; trackBuilderOnboardingCancelled
+    // swallows every error, so this never blocks or breaks the exit.
+    //
+    // Time-boxed: the whole resolve+send path is raced against a single
+    // deadline so a stalled network can never keep the CLI alive after the
+    // user has already quit. On timeout we abort the org lookup and skip the
+    // event — losing one best-effort quit beacon is preferable to a hang.
+    if (result.outcome === 'cancelled') {
+      const apikey = options.apikey?.trim() || findSavedKeySilent()
+      if (apikey) {
+        const timeoutMs = 1500
+        const controller = new AbortController()
+        let timer: ReturnType<typeof setTimeout> | undefined
+        const deadline = new Promise<void>((resolve) => {
+          timer = setTimeout(() => {
+            controller.abort()
+            resolve()
+          }, timeoutMs)
+        })
+        try {
+          await Promise.race([
+            (async () => {
+              const orgId = await resolveOwnerOrgId(apikey, appId, undefined, controller.signal)
+              await trackBuilderOnboardingCancelled({
+                apikey,
+                appId,
+                orgId,
+                journeyId,
+                platform: resolvedPlatform,
+                lastStep,
+                durationMs: Date.now() - journeyStartedAt,
+                signal: controller.signal,
+              })
+            })(),
+            deadline,
+          ])
+        }
+        finally {
+          if (timer)
+            clearTimeout(timer)
+        }
+      }
+    }
   }
 }

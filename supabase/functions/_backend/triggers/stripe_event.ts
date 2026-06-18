@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type Stripe from 'stripe'
 import type { MiddlewareKeyVariablesStripe } from '../utils/hono_middleware_stripe.ts'
-import type { StripeData } from '../utils/stripe.ts'
+import type { StripeData, StripeWebhookStatus } from '../utils/stripe.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { eq, sql } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
@@ -22,6 +22,7 @@ export const app = new Hono<MiddlewareKeyVariablesStripe>()
 
 interface Org {
   id: string
+  name: string
   management_email: string
   created_by: string
   customer_id?: string | null
@@ -40,6 +41,10 @@ type StripeInfoRevenueState = {
 type RevenuePlanRow = Pick<PlanRow, 'name' | 'price_m' | 'price_m_id' | 'price_y' | 'price_y_id' | 'stripe_id'>
 type RevenuePlanKey = 'solo' | 'maker' | 'team' | 'enterprise'
 type RevenuePlanBreakdown = Record<RevenuePlanKey, number>
+type ChurnReason = 'past_due_unresolved'
+const CHURNED_SUBSCRIPTION_STATUSES = new Set<Database['public']['Enums']['stripe_status']>(['canceled', 'deleted'])
+const REVENUE_SUBSCRIPTION_STATUSES = new Set<Database['public']['Enums']['stripe_status']>(['succeeded'])
+const SUBSCRIPTION_UPDATE_STATUSES = new Set<StripeWebhookStatus>(['created', 'succeeded', 'updated', 'past_due'])
 
 interface RevenueMovement {
   currentMrr: number
@@ -66,11 +71,13 @@ const STRIPE_INFO_TRANSACTION_COLUMNS = [
   'bandwidth_exceeded',
   'build_time_exceeded',
   'canceled_at',
+  'churn_reason',
   'customer_country',
   'is_good_plan',
   'last_stripe_event_at',
   'mau_exceeded',
   'paid_at',
+  'past_due_at',
   'plan_calculated_at',
   'plan_usage',
   'price_id',
@@ -103,9 +110,15 @@ function isCustomerProfileEvent(event: Stripe.Event) {
   return customerProfileEventTypes.has(event.type)
 }
 
+function isSubscriptionUpdateStatus(
+  status: StripeWebhookStatus | null | undefined,
+): status is StripeWebhookStatus {
+  return Boolean(status && SUBSCRIPTION_UPDATE_STATUSES.has(status))
+}
+
 function getPaidAtUpdate(
   currentStripeInfo: Pick<StripeInfoRow, 'paid_at' | 'status'> | null | undefined,
-  nextStatus: Database['public']['Enums']['stripe_status'] | null | undefined,
+  nextStatus: StripeWebhookStatus | null | undefined,
   eventOccurredAtIso: string = new Date().toISOString(),
 ) {
   if (!nextStatus || !['created', 'succeeded'].includes(nextStatus))
@@ -121,9 +134,12 @@ function getPaidAtUpdate(
 }
 
 function toStripeInfoUpdate(data: StripeData['data']): StripeInfoUpdate {
-  return Object.fromEntries(
+  const updateData = Object.fromEntries(
     Object.entries(data).filter(([_, value]) => value !== undefined),
   ) as StripeInfoUpdate
+  if (data.status === 'past_due')
+    updateData.status = 'succeeded'
+  return updateData
 }
 
 function compactMetadata(metadata: Record<string, string | undefined>) {
@@ -147,7 +163,7 @@ function getPlanType(
 
 function getSubscriptionTrackingState(
   stripeData: Pick<StripeData, 'data' | 'isUpgrade' | 'previousPriceId' | 'previousProductId'>,
-  originalStatus: Database['public']['Enums']['stripe_status'] | null | undefined,
+  originalStatus: StripeWebhookStatus | null | undefined,
 ) {
   return {
     shouldSendPlanChange: Boolean(
@@ -230,7 +246,7 @@ function getPlanByProductId(plans: RevenuePlanRow[], productId: string | null | 
 }
 
 function getSubscriptionPlan(plans: RevenuePlanRow[], stripeInfo: StripeInfoRevenueState) {
-  if (!stripeInfo || stripeInfo.status !== 'succeeded' || stripeInfo.is_good_plan === false)
+  if (!stripeInfo || !stripeInfo.status || !REVENUE_SUBSCRIPTION_STATUSES.has(stripeInfo.status) || stripeInfo.is_good_plan === false)
     return null
 
   return getPlanByProductId(plans, stripeInfo.product_id)
@@ -315,6 +331,30 @@ function hasRevenueMovement(movement: RevenueMovement) {
     || movement.churnMrr > 0
 }
 
+function getChurnReason(
+  currentStripeInfo: Pick<StripeInfoRow, 'past_due_at' | 'status'> | null | undefined,
+  nextStripeInfo: Pick<StripeInfoUpdate, 'status'> | null | undefined,
+): ChurnReason | null {
+  if (!nextStripeInfo?.status || !CHURNED_SUBSCRIPTION_STATUSES.has(nextStripeInfo.status))
+    return null
+
+  if (currentStripeInfo?.past_due_at)
+    return 'past_due_unresolved'
+
+  return null
+}
+
+function getRevenueChurnReason(
+  currentStripeInfo: Pick<StripeInfoRow, 'past_due_at' | 'status'> | null | undefined,
+  nextStripeInfo: Pick<StripeInfoUpdate, 'status'> | null | undefined,
+  movement: RevenueMovement,
+): ChurnReason | null {
+  if (movement.churnMrr <= 0)
+    return null
+
+  return getChurnReason(currentStripeInfo, nextStripeInfo)
+}
+
 function shouldTrackOrganizationUpgrade(isUpgrade: boolean, movement: RevenueMovement) {
   if (isUpgrade)
     return true
@@ -381,10 +421,9 @@ async function persistStripeInfoAndRevenueMovement(
     ...updateData,
     last_stripe_event_at: eventOccurredAtIso,
   }
-  const updateStatement = buildStripeInfoUpdateStatement(customerId, transactionUpdateData)
   const shouldRecordMovement = hasRevenueMovement(movement)
 
-  if (!updateStatement && !shouldRecordMovement)
+  if (Object.keys(transactionUpdateData).length === 0 && !shouldRecordMovement)
     return 'applied'
 
   const pgClient = getPgClient(c, false)
@@ -394,8 +433,8 @@ async function persistStripeInfoAndRevenueMovement(
 
     // Lock the row so concurrent retries serialize before we classify
     // the event as missing/stale and before we append revenue movement.
-    const stripeInfoRow = await pgClient.query<Pick<StripeInfoRow, 'last_stripe_event_at'>>(
-      'SELECT last_stripe_event_at FROM public.stripe_info WHERE customer_id = $1 FOR UPDATE',
+    const stripeInfoRow = await pgClient.query<Pick<StripeInfoRow, 'last_stripe_event_at' | 'past_due_at' | 'status'>>(
+      'SELECT last_stripe_event_at, past_due_at, status FROM public.stripe_info WHERE customer_id = $1 FOR UPDATE',
       [customerId],
     )
     const lockedStripeInfo = stripeInfoRow.rows[0]
@@ -409,6 +448,19 @@ async function persistStripeInfoAndRevenueMovement(
       await pgClient.query('ROLLBACK')
       return 'stale'
     }
+
+    const churnReason = getChurnReason(lockedStripeInfo, transactionUpdateData)
+    const revenueChurnReason = getRevenueChurnReason(lockedStripeInfo, transactionUpdateData, movement)
+    if (churnReason) {
+      transactionUpdateData.churn_reason = churnReason
+    }
+    else if (transactionUpdateData.status && !CHURNED_SUBSCRIPTION_STATUSES.has(transactionUpdateData.status)) {
+      transactionUpdateData.churn_reason = null
+    }
+    if (transactionUpdateData.past_due_at === undefined && transactionUpdateData.status && lockedStripeInfo.past_due_at)
+      transactionUpdateData.past_due_at = null
+
+    const updateStatement = buildStripeInfoUpdateStatement(customerId, transactionUpdateData)
 
     if (shouldRecordMovement) {
       const processedEvent = await pgClient.query(`
@@ -451,6 +503,7 @@ async function persistStripeInfoAndRevenueMovement(
           expansion_mrr,
           contraction_mrr,
           churn_mrr,
+          churn_reason,
           churn_mrr_solo,
           churn_mrr_maker,
           churn_mrr_team,
@@ -460,7 +513,7 @@ async function persistStripeInfoAndRevenueMovement(
           contraction_mrr_team,
           contraction_mrr_enterprise
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
         ON CONFLICT (date_id, customer_id)
         DO UPDATE SET
           updated_at = now(),
@@ -468,6 +521,7 @@ async function persistStripeInfoAndRevenueMovement(
           expansion_mrr = public.daily_revenue_metrics.expansion_mrr + EXCLUDED.expansion_mrr,
           contraction_mrr = public.daily_revenue_metrics.contraction_mrr + EXCLUDED.contraction_mrr,
           churn_mrr = public.daily_revenue_metrics.churn_mrr + EXCLUDED.churn_mrr,
+          churn_reason = COALESCE(EXCLUDED.churn_reason, public.daily_revenue_metrics.churn_reason),
           churn_mrr_solo = public.daily_revenue_metrics.churn_mrr_solo + EXCLUDED.churn_mrr_solo,
           churn_mrr_maker = public.daily_revenue_metrics.churn_mrr_maker + EXCLUDED.churn_mrr_maker,
           churn_mrr_team = public.daily_revenue_metrics.churn_mrr_team + EXCLUDED.churn_mrr_team,
@@ -484,6 +538,7 @@ async function persistStripeInfoAndRevenueMovement(
         movement.expansionMrr,
         movement.contractionMrr,
         movement.churnMrr,
+        revenueChurnReason,
         churnBreakdown.solo,
         churnBreakdown.maker,
         churnBreakdown.team,
@@ -713,6 +768,7 @@ async function customerSourceCreated(c: Context, org: Org, stripeEvent: Stripe.C
       event: 'org:card_added',
       preferenceKey: 'credit_usage',
       uniqId: 'org:card_added',
+      audience: 'billing',
     },
     channel: 'usage',
     event: 'Credit Card Added',
@@ -733,6 +789,7 @@ async function customerSourceExpiring(c: Context, org: Org) {
       event: 'org:card_expiring',
       preferenceKey: 'credit_usage',
       uniqId: 'org:card_expiring',
+      audience: 'billing',
     },
     channel: 'usage',
     event: 'Credit Card Expiring',
@@ -767,10 +824,11 @@ async function invoiceUpcoming(c: Context, org: Org, stripeEvent: Stripe.Invoice
   await sendEventToTracking(c, {
     bento: {
       cron: '* * * * *',
-      data: { plan_name: planName, price, plan_type: planType },
+      data: { plan_name: planName, price, plan_type: planType, org_name: org.name },
       event: 'org:invoice_upcoming',
       preferenceKey: 'credit_usage',
       uniqId: 'org:invoice_upcoming',
+      audience: 'billing',
     },
     channel: 'usage',
     event: 'Invoice Upcoming',
@@ -789,7 +847,7 @@ async function createdOrUpdated(
   org: Org,
   currentStripeInfo: StripeInfoRow | null | undefined,
   eventOccurredAtIso: string,
-  originalStatus?: Database['public']['Enums']['stripe_status'] | null,
+  originalStatus?: StripeWebhookStatus | null,
 ): Promise<Response | void> {
   const status = originalStatus ?? stripeData.data.status
   let statusName: string = status ?? ''
@@ -813,6 +871,13 @@ async function createdOrUpdated(
     const trackingState = getSubscriptionTrackingState(stripeData, status)
     statusName = trackingState.statusName
     const updateData = toStripeInfoUpdate(stripeData.data)
+    if (status === 'past_due') {
+      updateData.past_due_at = currentStripeInfo?.past_due_at ?? eventOccurredAtIso
+      updateData.churn_reason = null
+    }
+    else {
+      updateData.past_due_at = null
+    }
     const paidAt = getPaidAtUpdate(currentStripeInfo, status, eventOccurredAtIso)
     if (paidAt)
       updateData.paid_at = paidAt
@@ -852,6 +917,9 @@ async function createdOrUpdated(
     if (didPersist === 'missing')
       return quickError(404, 'succeeded_customer_id_not_found', `succeeded: customer_id not found`, { stripeData })
 
+    if (status === 'past_due')
+      return
+
     let previousPlan: PlanRow | null = null
     if (trackingState.shouldSendPlanChange && stripeData.previousProductId) {
       const previousProduct = await supabaseAdmin(c)
@@ -869,6 +937,7 @@ async function createdOrUpdated(
           event: 'user:plan_change',
           preferenceKey: 'credit_usage',
           uniqId: 'user:plan_change',
+          audience: 'billing',
         },
         channel: 'usage',
         event: planChangeEventName,
@@ -898,6 +967,7 @@ async function createdOrUpdated(
         event: eventName,
         preferenceKey: 'credit_usage',
         uniqId: `subscription:${eventName}:${plan.name}`,
+        audience: 'billing',
       },
       channel: 'usage',
       event: isNewSubscription ? 'User subscribe' : 'User update subscribe',
@@ -948,6 +1018,7 @@ async function didCancel(c: Context, org: Org) {
       event: 'user:cancel',
       preferenceKey: 'credit_usage',
       uniqId: 'user:cancel',
+      audience: 'billing',
     },
     channel: 'usage',
     event: 'User cancel',
@@ -971,7 +1042,7 @@ async function didCancel(c: Context, org: Org) {
 async function getOrg(c: Context, stripeData: StripeData) {
   const { error: dbError, data: org } = await supabaseAdmin(c)
     .from('orgs')
-    .select('id, management_email, created_by')
+    .select('id, management_email, created_by, name')
     .eq('customer_id', stripeData.data.customer_id)
     .single()
   if (dbError) {
@@ -1001,7 +1072,7 @@ async function orgHasActiveUsageCredits(c: Context, orgId: string): Promise<bool
 async function cancelingOrFinished(
   c: Context,
   stripeEvent: Stripe.Event,
-  stripeData: Database['public']['Tables']['stripe_info']['Insert'],
+  stripeData: StripeData['data'],
   currentStripeInfo: Pick<StripeInfoRow, 'last_stripe_event_at'> | null | undefined,
 ) {
   const eventOccurredAtIso = new Date(stripeEvent.created * 1000).toISOString()
@@ -1082,11 +1153,11 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
     return invoiceUpcoming(c, org, stripeEvent, stripeData)
   }
 
-  if (['created', 'succeeded', 'updated'].includes(stripeData.data.status ?? '') && stripeData.data.price_id && stripeData.data.product_id) {
+  if (isSubscriptionUpdateStatus(stripeData.data.status) && stripeData.data.price_id && stripeData.data.product_id) {
     const originalStatus = stripeData.data.status
     const eventOccurredAtIso = new Date(stripeEvent.created * 1000).toISOString()
     stripeData.data.status = 'succeeded'
-    const createdOrUpdatedResponse = await createdOrUpdated(c, stripeData, org, customer, eventOccurredAtIso, originalStatus!)
+    const createdOrUpdatedResponse = await createdOrUpdated(c, stripeData, org, customer, eventOccurredAtIso, originalStatus)
     if (createdOrUpdatedResponse)
       return createdOrUpdatedResponse
   }
@@ -1100,7 +1171,7 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
     // Update the database with failed status
     await updateStripeInfo(c, stripeData)
   }
-  else if (['created', 'succeeded', 'updated'].includes(stripeData.data.status ?? '') && (!stripeData.data.price_id || !stripeData.data.product_id)) {
+  else if (isSubscriptionUpdateStatus(stripeData.data.status) && (!stripeData.data.price_id || !stripeData.data.product_id)) {
     // Subscription event without price/product data - log warning but don't process
     cloudlog({ requestId: c.get('requestId'), message: 'Subscription webhook missing price_id or product_id', stripeData, subscriptionId: stripeData.data.subscription_id })
   }
@@ -1124,14 +1195,15 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
       if (stripeData.data.subscription_anchor_end && new Date(stripeData.data.subscription_anchor_end) > new Date()) {
         stripeData.data.status = 'succeeded'
       }
+      const updateData = toStripeInfoUpdate(stripeData.data)
       const revenuePlans = await getRevenuePlans(c)
-      const revenueMovement = classifyRevenueMovement(customer, stripeData.data, revenuePlans)
+      const revenueMovement = classifyRevenueMovement(customer, updateData, revenuePlans)
       // Otherwise keep it as 'canceled' since the period has ended
       const didPersist = await persistStripeInfoAndRevenueMovement(
         c,
         stripeData.data.customer_id,
         stripeEvent.id,
-        toStripeInfoUpdate(stripeData.data),
+        updateData,
         eventOccurredAtIso,
         revenueMovement,
       )
@@ -1178,6 +1250,7 @@ export const stripeEventTestUtils = {
   getMovementPlanBreakdown,
   getPaidAtUpdate,
   getPlanChangeTrackingEventName,
+  getChurnReason,
   getSubscriptionMrr,
   getSubscriptionTrackingState,
   isStaleStripeEvent,

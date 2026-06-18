@@ -8,7 +8,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import plusOutline from '~icons/ion/add-outline'
 import IconAlertCircle from '~icons/lucide/alert-circle'
-import { useSupabase } from '~/services/supabase'
+import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { withBuiltinChannelVersion } from '~/services/versions'
 import { useAppDetailStore } from '~/stores/appDetail'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -115,6 +115,28 @@ async function customDeviceOverwritePart4(
   await dialogStore.onDialogDismiss()
 }
 
+async function setChannelDeviceOverride(deviceId: string) {
+  const { data: currentSession } = await supabase.auth.getSession()!
+  const currentJwt = currentSession.session?.access_token
+  if (!currentJwt)
+    throw new Error('Missing session')
+
+  const response = await fetch(`${defaultApiHost}/private/channel_device`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'authorization': `Bearer ${currentJwt}`,
+    },
+    body: JSON.stringify({
+      app_id: route.params.app as string,
+      channel_id: Number(route.params.channel),
+      device_id: deviceId.toLowerCase(),
+    }),
+  })
+  if (!response.ok)
+    throw new Error(`Cannot set channel override: HTTP ${response.status}`)
+}
+
 async function customDeviceOverwritePart5(
   deviceId: string,
   platform: 'ios' | 'android',
@@ -141,16 +163,11 @@ async function customDeviceOverwritePart5(
     return
   }
 
-  const { error: overwriteError } = await supabase.from('channel_devices')
-    .insert({
-      app_id: route.params.app as string,
-      channel_id: Number(route.params.channel),
-      device_id: deviceId.toLowerCase(),
-      owner_org: channel.value?.owner_org ?? '',
-    })
-
-  if (overwriteError) {
-    console.error('overwriteError', overwriteError)
+  try {
+    await setChannelDeviceOverride(deviceId)
+  }
+  catch (error) {
+    console.error('overwriteError', error)
     toast.error(t('cannot-create-overwrite'))
     return
   }
@@ -269,9 +286,7 @@ watchEffect(async () => {
 
 <template>
   <div>
-    <div v-if="loading" class="flex flex-col justify-center items-center min-h-[50vh]">
-      <Spinner size="w-40 h-40" />
-    </div>
+    <PageLoader v-if="loading" />
     <div v-else-if="channel">
       <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
         <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">

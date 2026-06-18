@@ -1,5 +1,6 @@
 import type { TrackOptions } from '@logsnag/node'
 import type { Context } from 'hono'
+import type { EmailPreferenceKey, NotificationAudience } from './org_email_notifications.ts'
 import type { PostHogGroups } from './posthog.ts'
 import { cloudlogErr, serializeError } from './logging.ts'
 import { logsnag } from './logsnag.ts'
@@ -19,24 +20,30 @@ export interface BentoTrackingPayload {
    * not re-fire on retries (e.g. an incompatible bundle version). Ignores `cron`.
    */
   once?: boolean
-  preferenceKey: import('./org_email_notifications.ts').EmailPreferenceKey
+  preferenceKey: EmailPreferenceKey
   uniqId: string
+  /** Which org members receive the email. Defaults to 'admins'; use 'billing' for payment/subscription events. */
+  audience?: NotificationAudience
 }
 
 export interface SendEventToTrackingPayload extends TrackOptions {
   bento?: BentoTrackingPayload
   groups?: PostHogGroups
   sentToBento?: boolean
+  nonPersonTags?: Record<string, string | number | boolean>
 }
 
 export interface SendEventToTrackingOptions {
   background?: boolean
   ip?: string
+  strict?: boolean
 }
 
-async function runTrackedCall(c: Context, provider: string, task: () => Promise<unknown>) {
+async function runTrackedCall(c: Context, provider: string, task: () => Promise<unknown>, strict = false) {
   try {
-    await task()
+    const result = await task()
+    if (strict && result === false)
+      throw new Error(`${provider} tracking returned false`)
   }
   catch (error) {
     cloudlogErr({
@@ -45,6 +52,8 @@ async function runTrackedCall(c: Context, provider: string, task: () => Promise<
       provider,
       error: serializeError(error),
     })
+    if (strict)
+      throw error
   }
 }
 
@@ -57,16 +66,17 @@ function getTrackingIp(c: Context, ip?: string) {
 
 async function executeTracking(c: Context, payload: SendEventToTrackingPayload, options: SendEventToTrackingOptions) {
   const tasks: Array<Promise<void>> = [
-    runTrackedCall(c, 'logsnag', () => logsnag(c).track(payload)),
+    runTrackedCall(c, 'logsnag', () => logsnag(c).track(payload), options.strict),
     runTrackedCall(c, 'posthog', () => trackPosthogEvent(c, {
       event: payload.event,
       user_id: payload.user_id,
       tags: payload.tags,
+      nonPersonTags: payload.nonPersonTags,
       channel: payload.channel,
       description: payload.description,
       groups: payload.groups,
       ip: getTrackingIp(c, options.ip),
-    })),
+    }), options.strict),
   ]
 
   await Promise.all(tasks)
@@ -115,6 +125,7 @@ async function executeBentoTracking(c: Context, payload: SendEventToTrackingPayl
           orgId,
           bento.uniqId,
           getDrizzleClient(pgClient),
+          bento.audience,
         )
       }
       else {
@@ -127,6 +138,7 @@ async function executeBentoTracking(c: Context, payload: SendEventToTrackingPayl
           bento.uniqId,
           bento.cron ?? '* * * * *',
           getDrizzleClient(pgClient),
+          bento.audience,
         )
       }
     }

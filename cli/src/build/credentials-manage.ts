@@ -1,11 +1,10 @@
 import type { BuildCredentials, SavedCredentials } from '../schemas/build'
 import { Buffer } from 'node:buffer'
-import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, unlinkSync } from 'node:fs'
 import { chmod, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { cwd, exit, platform as osPlatform } from 'node:process'
+import { cwd, exit } from 'node:process'
 import {
   cancel as pCancel,
   confirm as pConfirm,
@@ -31,6 +30,7 @@ import {
 import { escapeDotenvValue, renderEnvFile } from './env-render'
 import { onboardingBuilderCommand } from './onboarding/command'
 import { canUseFilePicker, openSaveFilePicker } from './onboarding/file-picker'
+import { copyToClipboard } from '../support/clipboard'
 
 interface ManageCredentialsOptions {
   appId?: string
@@ -923,39 +923,6 @@ function actionCopyField(row: FieldRow): void {
     pLog.success(`✓ Copied ${row.key} (${row.value.length} chars) to clipboard via ${result.method}.`)
   else
     pLog.warn(`✗ Clipboard not available — could not copy ${row.key}. Use "Show value" and copy manually.`)
-}
-
-interface ClipboardCandidate {
-  cmd: string
-  args: string[]
-}
-
-function copyToClipboard(text: string): { ok: boolean, method?: string } {
-  const candidates: ClipboardCandidate[] = []
-  if (osPlatform === 'darwin') {
-    candidates.push({ cmd: 'pbcopy', args: [] })
-  }
-  else if (osPlatform === 'win32') {
-    candidates.push({ cmd: 'clip', args: [] })
-  }
-  else {
-    candidates.push({ cmd: 'wl-copy', args: [] })
-    candidates.push({ cmd: 'xclip', args: ['-selection', 'clipboard'] })
-    candidates.push({ cmd: 'xsel', args: ['--clipboard', '--input'] })
-  }
-  for (const candidate of candidates) {
-    try {
-      const result = spawnSync(candidate.cmd, candidate.args, { input: text })
-      if (result.error)
-        continue
-      if (result.status === 0)
-        return { ok: true, method: candidate.cmd }
-    }
-    catch {
-      // Try next candidate.
-    }
-  }
-  return { ok: false }
 }
 
 async function actionEditField(entry: AppEntry, row: FieldRow): Promise<boolean> {

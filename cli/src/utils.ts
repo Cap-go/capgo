@@ -28,6 +28,7 @@ import { loadConfig, writeConfig } from './config'
 import { nativePackageSchema } from './schemas/common'
 import { formatApiErrorForCli, parseSecurityPolicyError } from './utils/security_policy_errors'
 import { createTimedFetch, isSupabaseInstrumentationEnabled } from './analytics/supabase-perf'
+import { getGlobalAnalyticsProps } from './analytics/global-props'
 
 export const baseKey = '.capgo_key'
 export const baseKeyV2 = '.capgo_key_v2'
@@ -41,6 +42,7 @@ export const UPLOAD_TIMEOUT = 120000
 export const ALERT_UPLOAD_SIZE_BYTES = 1024 * 1024 * 20 // 20MB
 export const MAX_UPLOAD_LENGTH_BYTES = 1024 * 1024 * 1024 // 1GB
 export const MAX_CHUNK_SIZE_BYTES = 1024 * 1024 * 99 // 99MB
+export const TUS_UPLOAD_RETRY_DELAYS = [0, 1000, 3000, 5000, 10000]
 
 export const PACKNAME = 'package.json'
 
@@ -1005,69 +1007,150 @@ export function getContentType(filename: string): string {
   return mimeTypes[ext] || 'application/octet-stream'
 }
 
-export async function findProjectType(options?: { quiet?: boolean }) {
-  // for nuxtjs check if nuxt.config.js exists
-  // for nextjs check if next.config.js exists
-  // for angular check if angular.json exists
-  // for sveltekit check if svelte.config.js exists or svelte is in package.json dependencies
-  // for vue check if vue.config.js exists or vue is in package.json dependencies
-  // for react check if package.json exists and react is in dependencies
+type ProjectFramework = 'angular' | 'nuxtjs' | 'nextjs' | 'sveltekit' | 'svelte' | 'vue' | 'react'
+
+function getProjectTypeWithLanguage(framework: ProjectFramework, isTypeScript: boolean) {
+  return `${framework}-${isTypeScript ? 'ts' : 'js'}`
+}
+
+function logFoundProject(framework: ProjectFramework, quiet: boolean) {
+  if (!quiet)
+    log.info(`Found ${framework} project`)
+}
+
+function detectProjectFrameworkFromConfig(projectDir: string): ProjectFramework | undefined {
+  if (existsSync(resolve(projectDir, 'angular.json')))
+    return 'angular'
+  if (existsSync(resolve(projectDir, 'nuxt.config.js')) || existsSync(resolve(projectDir, 'nuxt.config.ts')))
+    return 'nuxtjs'
+  if (existsSync(resolve(projectDir, 'next.config.js')) || existsSync(resolve(projectDir, 'next.config.mjs')) || existsSync(resolve(projectDir, 'next.config.ts')))
+    return 'nextjs'
+  if (existsSync(resolve(projectDir, 'svelte.config.js')) || existsSync(resolve(projectDir, 'svelte.config.ts')))
+    return 'sveltekit'
+  if (existsSync(resolve(projectDir, 'vue.config.js')) || existsSync(resolve(projectDir, 'vue.config.ts')))
+    return 'vue'
+}
+
+function detectProjectFrameworkFromDependencies(dependencies: Map<string, string>): ProjectFramework | undefined {
+  if (dependencies.get('@angular/core'))
+    return 'angular'
+  if (dependencies.get('nuxt'))
+    return 'nuxtjs'
+  if (dependencies.get('next'))
+    return 'nextjs'
+  if (dependencies.get('@sveltejs/kit'))
+    return 'sveltekit'
+  if (dependencies.get('svelte'))
+    return 'svelte'
+  if (dependencies.get('vue'))
+    return 'vue'
+  if (dependencies.get('react'))
+    return 'react'
+}
+
+async function detectProjectTypeInDir(projectDir: string, quiet: boolean): Promise<string | undefined> {
+  const isTypeScript = existsSync(resolve(projectDir, 'tsconfig.json'))
+  const frameworkFromConfig = detectProjectFrameworkFromConfig(projectDir)
+  if (frameworkFromConfig) {
+    logFoundProject(frameworkFromConfig, quiet)
+    return getProjectTypeWithLanguage(frameworkFromConfig, isTypeScript)
+  }
+
+  const packageJsonPath = resolve(projectDir, PACKNAME)
+  if (!existsSync(packageJsonPath))
+    return undefined
+
+  const dependencies = await getAllPackagesDependencies(undefined, packageJsonPath)
+  const frameworkFromDependencies = detectProjectFrameworkFromDependencies(dependencies)
+  if (!frameworkFromDependencies)
+    return undefined
+
+  logFoundProject(frameworkFromDependencies, quiet)
+  return getProjectTypeWithLanguage(frameworkFromDependencies, isTypeScript)
+}
+
+function addProjectTypeCandidateDir(dirs: string[], dir: string | undefined) {
+  if (!dir)
+    return
+  const normalized = resolve(dir)
+  if (!dirs.includes(normalized))
+    dirs.push(normalized)
+}
+
+function getNearestPackageDir(startDir: string) {
+  let currentDir = startDir
+  const rootDir = path.parse(currentDir).root
+
+  while (true) {
+    if (existsSync(resolve(currentDir, PACKNAME)))
+      return currentDir
+    if (currentDir === rootDir)
+      return undefined
+    const parentDir = dirname(currentDir)
+    if (parentDir === currentDir)
+      return undefined
+    currentDir = parentDir
+  }
+}
+
+function getProjectTypeCandidateDirs(packageJsonPath?: string) {
+  const dirs: string[] = []
+  const firstPackageJsonPath = packageJsonPath
+    ?.split(',')
+    .map(path => path.trim())
+    .filter(Boolean)[0]
+
+  if (firstPackageJsonPath)
+    addProjectTypeCandidateDir(dirs, dirname(resolve(firstPackageJsonPath)))
+
+  addProjectTypeCandidateDir(dirs, getNearestPackageDir(cwd()))
+  addProjectTypeCandidateDir(dirs, findRoot(cwd()))
+  return dirs
+}
+
+export async function findProjectType(options?: { quiet?: boolean, packageJsonPath?: string }) {
   const pwd = cwd()
   let isTypeScript = false
   const quiet = options?.quiet ?? false
 
-  // Check for TypeScript configuration file
-  const tsConfigPath = resolve(pwd, 'tsconfig.json')
-  if (existsSync(tsConfigPath)) {
-    isTypeScript = true
+  for (const candidateDir of getProjectTypeCandidateDirs(options?.packageJsonPath)) {
+    const detected = await detectProjectTypeInDir(candidateDir, quiet)
+    if (detected)
+      return detected
   }
 
+  const tsConfigPath = resolve(pwd, 'tsconfig.json')
+  if (existsSync(tsConfigPath))
+    isTypeScript = true
+
   for await (const f of getFiles(pwd)) {
-    // find number of folder in path after pwd
     if (f.includes('angular.json')) {
-      if (!quiet)
-        log.info('Found angular project')
-      return isTypeScript ? 'angular-ts' : 'angular-js'
+      logFoundProject('angular', quiet)
+      return getProjectTypeWithLanguage('angular', isTypeScript)
     }
     if (f.includes('nuxt.config.js') || f.includes('nuxt.config.ts')) {
-      if (!quiet)
-        log.info('Found nuxtjs project')
-      return isTypeScript ? 'nuxtjs-ts' : 'nuxtjs-js'
+      logFoundProject('nuxtjs', quiet)
+      return getProjectTypeWithLanguage('nuxtjs', isTypeScript)
     }
-    if (f.includes('next.config.js') || f.includes('next.config.mjs')) {
-      if (!quiet)
-        log.info('Found nextjs project')
-      return isTypeScript ? 'nextjs-ts' : 'nextjs-js'
+    if (f.includes('next.config.js') || f.includes('next.config.mjs') || f.includes('next.config.ts')) {
+      logFoundProject('nextjs', quiet)
+      return getProjectTypeWithLanguage('nextjs', isTypeScript)
     }
-    if (f.includes('svelte.config.js')) {
-      if (!quiet)
-        log.info('Found sveltekit project')
-      return isTypeScript ? 'sveltekit-ts' : 'sveltekit-js'
+    if (f.includes('svelte.config.js') || f.includes('svelte.config.ts')) {
+      logFoundProject('sveltekit', quiet)
+      return getProjectTypeWithLanguage('sveltekit', isTypeScript)
     }
-    if (f.includes('rolluconfig.js')) {
-      if (!quiet)
-        log.info('Found svelte project')
-      return isTypeScript ? 'svelte-ts' : 'svelte-js'
-    }
-    if (f.includes('vue.config.js')) {
-      if (!quiet)
-        log.info('Found vue project')
-      return isTypeScript ? 'vue-ts' : 'vue-js'
+    if (f.includes('vue.config.js') || f.includes('vue.config.ts')) {
+      logFoundProject('vue', quiet)
+      return getProjectTypeWithLanguage('vue', isTypeScript)
     }
     if (f.includes(PACKNAME)) {
       const folder = dirname(f)
       const dependencies = await getAllPackagesDependencies(folder)
-      if (dependencies) {
-        if (dependencies.get('react')) {
-          if (!quiet)
-            log.info('Found react project')
-          return isTypeScript ? 'react-ts' : 'react-js'
-        }
-        if (dependencies.get('vue')) {
-          if (!quiet)
-            log.info('Found vue project')
-          return isTypeScript ? 'vue-ts' : 'vue-js'
-        }
+      const frameworkFromDependencies = detectProjectFrameworkFromDependencies(dependencies)
+      if (frameworkFromDependencies) {
+        logFoundProject(frameworkFromDependencies, quiet)
+        return getProjectTypeWithLanguage(frameworkFromDependencies, isTypeScript)
       }
     }
   }
@@ -1075,7 +1158,7 @@ export async function findProjectType(options?: { quiet?: boolean }) {
   return 'unknown'
 }
 
-export function findMainFileForProjectType(projectType: string, isTypeScript: boolean): string | null {
+export function findMainFileForProjectType(projectType: string, isTypeScript: boolean, rootDir: string = cwd()): string | null {
   if (projectType === 'angular-js' || projectType === 'angular-ts') {
     return isTypeScript ? 'src/main.ts' : 'src/main.js'
   }
@@ -1093,7 +1176,7 @@ export function findMainFileForProjectType(projectType: string, isTypeScript: bo
     // Check for main first, then fall back to index
     const mainExt = isTypeScript ? 'src/main.tsx' : 'src/main.js'
     const indexExt = isTypeScript ? 'src/index.tsx' : 'src/index.js'
-    if (existsSync(resolve(cwd(), mainExt))) {
+    if (existsSync(resolve(rootDir, mainExt))) {
       return mainExt
     }
     return indexExt
@@ -1103,17 +1186,18 @@ export function findMainFileForProjectType(projectType: string, isTypeScript: bo
 // create a function to find the right command to build the project in static mode depending on the project type
 
 export async function findBuildCommandForProjectType(projectType: string) {
-  if (projectType === 'angular') {
+  const framework = projectType.replace(/-(?:ts|js)$/, '')
+  if (framework === 'angular') {
     log.info('Angular project detected')
     return 'build'
   }
 
-  if (projectType === 'nuxtjs') {
+  if (framework === 'nuxtjs') {
     log.info('Nuxtjs project detected')
     return 'generate'
   }
 
-  if (projectType === 'nextjs') {
+  if (framework === 'nextjs') {
     log.info('Nextjs project detected')
     log.warn('Please make sure you have configured static export in your next.config.js: https://nextjs.org/docs/pages/building-your-application/deploying/static-exports')
     log.warn('Please make sure you have the output: \'export\' and distDir: \'dist\' in your next.config.js')
@@ -1126,7 +1210,7 @@ export async function findBuildCommandForProjectType(projectType: string) {
     return 'build'
   }
 
-  if (projectType === 'sveltekit') {
+  if (framework === 'sveltekit') {
     log.info('Sveltekit project detected')
     log.warn('Please make sure you have the adapter-static installed: https://kit.svelte.dev/docs/adapter-static')
     log.warn('Please make sure you have the pages: \'dist\' and assets: \'dest\', in your svelte.config.js adapter')
@@ -1142,12 +1226,12 @@ export async function findBuildCommandForProjectType(projectType: string) {
   return 'build'
 }
 
-export async function findMainFile(silent = false) {
+export async function findMainFile(silent = false, rootDir: string = cwd()) {
   // eslint-disable-next-line regexp/no-unused-capturing-group
   const mainRegex = /(main|index)\.(ts|tsx|js|jsx)$/
   // search for main.ts or main.js in local dir and subdirs
   let mainFile = ''
-  const pwd = cwd()
+  const pwd = resolve(rootDir)
   const pwdL = pwd.split('/').length
   for await (const f of getFiles(pwd)) {
     // find number of folder in path after pwd
@@ -1317,6 +1401,7 @@ export async function uploadTUS(apikey: string, data: Buffer, orgId: string, app
       endpoint: `${localConfig.hostFilesApi}/files/upload/attachments/`,
       // parallelUploads: multipart,
       chunkSize,
+      retryDelays: [...TUS_UPLOAD_RETRY_DELAYS],
       metadataForPartialUploads: {
         filename: `orgs/${orgId}/apps/${appId}/${name}.zip`,
         filetype: 'application/gzip',
@@ -1430,8 +1515,26 @@ export async function updateOrCreateChannel(supabase: SupabaseClient<Database>, 
     .single()
 }
 
-export async function sendEvent(capgkey: string, payload: TrackOptions & { notifyConsole?: boolean }, verbose?: boolean, signal?: AbortSignal): Promise<void> {
+export async function sendEvent(capgkey: string, payload: TrackOptions & { notifyConsole?: boolean, nonPersonTags?: Record<string, string | number | boolean> }, verbose?: boolean, signal?: AbortSignal): Promise<void> {
   try {
+    // Attach the global analytics props as nonPersonTags — event properties the
+    // backend never writes as PostHog person properties ($set) — built
+    // DEFENSIVELY: a fault while reading them degrades to the caller's tags and
+    // must never drop the event. sendEvent is the single send path that
+    // trackEvent() and every direct caller funnel through, so OS/version
+    // segmentation stays complete. Caller-supplied nonPersonTags win on conflict.
+    let globalProps = {}
+    try {
+      globalProps = getGlobalAnalyticsProps()
+    }
+    catch (enrichError) {
+      if (verbose)
+        log.error(`Failed to enrich event tags, sending caller tags only: ${formatError(enrichError)}`)
+    }
+    const enrichedPayload = {
+      ...payload,
+      nonPersonTags: { ...globalProps, ...(payload.nonPersonTags ?? {}) },
+    }
     if (verbose) {
       log.info(`Get remove config: for ${payload.event}`)
     }
@@ -1439,7 +1542,7 @@ export async function sendEvent(capgkey: string, payload: TrackOptions & { notif
     // not bypass an Ink-controlled stdout (e.g. during `capgo init`).
     const config = await getRemoteConfig(true, signal)
     if (verbose) {
-      log.info(`Sending LogSnag event: ${JSON.stringify(payload)}`)
+      log.info(`Sending LogSnag event: ${JSON.stringify(enrichedPayload)}`)
     }
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 seconds timeout
@@ -1452,7 +1555,7 @@ export async function sendEvent(capgkey: string, payload: TrackOptions & { notif
     try {
       const fetchResponse = await fetch(`${config.hostApi}/private/events`, {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: JSON.stringify(enrichedPayload),
         headers: {
           'Content-Type': 'application/json',
           'capgkey': capgkey,
@@ -2018,23 +2121,6 @@ export async function getRemoteDependencies(supabase: SupabaseClient<Database>, 
   return convertNativePackages(((remoteNativePackages.version as any)?.native_packages as any) ?? [])
 }
 
-export async function checkChecksum(supabase: SupabaseClient<Database>, appId: string, channel: string, currentChecksum: string) {
-  const s = spinnerC()
-  s.start(`Checking bundle checksum compatibility with channel ${channel}`)
-  const remoteChecksum = await getRemoteChecksums(supabase, appId, channel)
-
-  if (!remoteChecksum) {
-    s.stop(`No checksum found for channel ${channel}, the bundle will be uploaded`)
-    return
-  }
-  if (remoteChecksum && remoteChecksum === currentChecksum) {
-    // cannot upload the same bundle - stop spinner before throwing
-    s.stop(`Checksum check failed`)
-    log.error(`Cannot upload the same bundle content.\nCurrent bundle checksum matches remote bundle for channel ${channel}\nDid you build your app before uploading?\nPS: You can ignore this check with "--ignore-checksum-check"`)
-    throw new Error('Cannot upload the same bundle content')
-  }
-  s.stop(`Checksum compatible with ${channel} channel`)
-}
 
 export type { Compatibility, CompatibilityDetails, IncompatibilityReason } from './schemas/common'
 

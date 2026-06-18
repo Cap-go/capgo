@@ -82,6 +82,12 @@ export const buildRequestOptionsSchema = optionsBaseSchema.extend({
   prescan: z.boolean().optional(),
   prescanIgnoreFatal: z.boolean().optional(),
   failOnWarnings: z.boolean().optional(),
+  // Correlation id for the Builder onboarding journey, set ONLY when the build
+  // is requested from the onboarding wizard. Threaded onto the `Build requested`
+  // / `Build succeeded` / `Build failed` events so the journey's funnel reaches
+  // all the way to the build outcome. Absent for the standalone `build request`
+  // command (no journey).
+  builderJourneyId: z.string().optional(),
 })
 
 export type BuildRequestOptions = z.infer<typeof buildRequestOptionsSchema>

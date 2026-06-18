@@ -6,9 +6,12 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import AdminOnlyModal from '~/components/AdminOnlyModal.vue'
+import IconArrowRight from '~icons/lucide/arrow-right'
+import IconCheckCircle from '~icons/lucide/check-circle'
 import CreditsCta from '~/components/CreditsCta.vue'
+import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { formatIncludedThenPrice } from '~/services/creditPricing'
+import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { checkPermissions } from '~/services/permissions'
 import { getDatafastAttribution, openCheckout } from '~/services/stripe'
 import { getCreditUnitPricing, getCurrentPlanNameOrg, useSupabase } from '~/services/supabase'
@@ -16,7 +19,7 @@ import { openSupport } from '~/services/support'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
-import { isSuperAdminRole, useOrganizationStore } from '~/stores/organization'
+import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
 const mainStore = useMainStore()
@@ -34,13 +37,7 @@ const router = useRouter()
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const dialogStore = useDialogV2Store()
-const isMobile = Capacitor.isNativePlatform()
-
-// Check if user is super_admin
-const isSuperAdmin = computed(() => {
-  const orgId = organizationStore.currentOrganization?.gid
-  return organizationStore.hasPermissionsInRole('super_admin', ['org_super_admin'], orgId)
-})
+const isMobile = isNativeAppStoreContext()
 
 // Modal state for non-admin access
 const showAdminModal = ref(false)
@@ -217,8 +214,9 @@ async function openSafariStripeCheckout(plan: Database['public']['Tables']['plan
 }
 
 async function openChangePlan(plan: Database['public']['Tables']['plans']['Row'], index: number) {
-  // Show admin modal for non-admins instead of blocking
-  if (!isSuperAdmin.value) {
+  // Show the permission modal instead of blocking when the user can't manage billing.
+  const orgId = currentOrganization.value?.gid
+  if (!orgId || !(await checkPermissions('org.update_billing', { orgId }))) {
     showAdminModal.value = true
     return
   }
@@ -279,6 +277,18 @@ async function loadData(initial: boolean) {
   initialLoad.value = true
 }
 
+// Pick the org with the most apps where the user can actually manage billing.
+// Used as a fallback when the current org's billing is not accessible.
+async function findBillableFallbackOrg() {
+  const candidates = [...organizationStore.getAllOrgs()]
+    .map(([_, org]) => org)
+    .sort((a, b) => b.app_count - a.app_count)
+  for (const org of candidates) {
+    if (await checkPermissions('org.update_billing', { orgId: org.gid }))
+      return org
+  }
+  return undefined
+}
 watch(currentOrganization, async (newOrg, prevOrg) => {
   if (newOrg) {
     // Check permission directly instead of relying on computedAsync default
@@ -286,14 +296,9 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
 
     if (!hasUpdateBillingPermission) {
       if (!initialLoad.value) {
-        const orgsMap = organizationStore.getAllOrgs()
-        const newOrg = [...orgsMap]
-          .map(([_, a]) => a)
-          .filter(org => isSuperAdminRole(org.role))
-          .sort((a, b) => b.app_count - a.app_count)[0]
-
-        if (newOrg) {
-          organizationStore.setCurrentOrganization(newOrg.gid)
+        const fallbackOrg = await findBillableFallbackOrg()
+        if (fallbackOrg) {
+          organizationStore.setCurrentOrganization(fallbackOrg.gid)
           return
         }
       }
@@ -324,6 +329,11 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
 
 watchEffect(async () => {
   if (route.path === '/settings/organization/plans') {
+    if (isMobile) {
+      router.replace('/settings/organization/usage')
+      return
+    }
+
     // if success is in url params show modal success plan setup
     if (route.query.success) {
       // toast.success(t('usage-success'))
@@ -340,14 +350,9 @@ watchEffect(async () => {
         const hasUpdateBillingPermission = await checkPermissions('org.update_billing', { orgId: currentOrganization.value.gid })
 
         if (!hasUpdateBillingPermission) {
-          const orgsMap = organizationStore.getAllOrgs()
-          const newOrg = [...orgsMap]
-            .map(([_, a]) => a)
-            .filter(org => isSuperAdminRole(org.role))
-            .sort((a, b) => b.app_count - a.app_count)[0]
-
-          if (newOrg) {
-            organizationStore.setCurrentOrganization(newOrg.gid)
+          const fallbackOrg = await findBillableFallbackOrg()
+          if (fallbackOrg) {
+            organizationStore.setCurrentOrganization(fallbackOrg.gid)
             return
           }
 
@@ -414,7 +419,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
 </script>
 
 <template>
-  <div class="flex flex-col pb-8 bg-white border shadow-lg md:p-8 md:pb-0 md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+  <div class="flex flex-col bg-white border shadow-lg md:p-8 md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900" :class="thankYouPage ? 'pb-0' : 'pb-8 md:pb-0'">
     <div v-if="!thankYouPage" class="flex flex-col w-full h-full">
       <!-- Header Section -->
       <div class="flex flex-col items-center justify-between gap-4 mb-6 sm:flex-row shrink-0">
@@ -425,6 +430,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
             </h1>
             <!-- Custom Plan Trigger -->
             <button
+              v-if="!isMobile"
               class="items-center hidden px-3 py-1 text-xs font-medium text-blue-700 transition-colors rounded-full bg-blue-50 lg:inline-flex dark:text-blue-300 hover:bg-blue-100 dark:bg-blue-900/30"
               @click="openSupport()"
             >
@@ -434,7 +440,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {{ t('plan-desc') }}
           </p>
-          <p class="mt-2 text-sm">
+          <p v-if="!isMobile" class="mt-2 text-sm">
             <a class="font-medium text-blue-600 hover:underline dark:text-blue-300" href="https://capgo.app/pricing/#compare-plans">
               {{ t('plan-full-comparison-link') }}
             </a>
@@ -467,10 +473,10 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
       </div>
 
       <!-- Credits CTA: shows info banner for credits-only orgs, upsell CTA for others -->
-      <CreditsCta class="mb-6 shrink-0" :credits-only="isCreditsOnly" />
+      <CreditsCta v-if="!isMobile" class="mb-6 shrink-0" :credits-only="isCreditsOnly" />
 
       <!-- Expert as a Service CTA -->
-      <div class="mb-6 shrink-0">
+      <div v-if="!isMobile" class="mb-6 shrink-0">
         <div class="flex flex-col gap-3 p-4 border border-amber-200 bg-amber-50 rounded-2xl text-amber-900 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p class="text-sm font-semibold">
@@ -586,23 +592,40 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
     </div>
 
     <!-- Thank You Page -->
-    <div v-else class="flex items-center justify-center w-full h-full bg-gray-50 dark:bg-base-300">
-      <div class="text-center">
-        <img src="/capgo.webp" alt="logo" class="w-20 h-20 mx-auto mb-8 animate-bounce">
-        <h2 class="mb-4 text-3xl font-bold text-gray-900 dark:text-white">
+    <div v-else class="flex w-full min-h-[calc(100dvh-10rem)] items-center justify-center overflow-hidden rounded-lg bg-linear-to-br from-slate-50 via-white to-blue-50 px-4 py-8 dark:from-base-300 dark:via-gray-900 dark:to-slate-950 sm:min-h-[560px] sm:px-6 md:px-8">
+      <section aria-live="polite" class="mx-auto flex w-full max-w-2xl flex-col items-center text-center">
+        <div class="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-blue-100 text-blue-600 ring-8 ring-blue-50 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500/10 sm:h-24 sm:w-24">
+          <IconCheckCircle class="h-11 w-11 sm:h-12 sm:w-12" aria-hidden="true" />
+        </div>
+
+        <h2 class="max-w-xl text-2xl font-bold leading-tight text-gray-900 dark:text-white sm:text-3xl">
           {{ t('thank-you-for-sub') }}
         </h2>
-        <div class="mb-8 text-6xl">
-          🎉
+
+        <p class="mt-4 max-w-xl text-base leading-7 text-gray-600 dark:text-gray-300">
+          {{ t('usage-success') }}
+        </p>
+
+        <div class="mt-8 flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center sm:justify-center">
+          <router-link to="/apps" class="d-btn d-btn-primary min-h-12 w-full rounded-lg px-5 text-base font-semibold sm:w-auto">
+            <span>{{ t('use-capgo') }}</span>
+            <IconArrowRight class="h-4 w-4" aria-hidden="true" />
+          </router-link>
+
+          <router-link to="/settings/organization/usage" class="d-btn d-btn-ghost min-h-12 w-full rounded-lg px-5 text-base font-semibold text-gray-700 dark:text-gray-200 sm:w-auto">
+            {{ t('usage') }}
+          </router-link>
         </div>
-        <router-link to="/apps" class="inline-flex items-center px-6 py-3 text-base font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700">
-          {{ t('use-capgo') }} 🚀
-        </router-link>
-      </div>
+      </section>
     </div>
 
-    <!-- Admin-only modal for non-admin users -->
-    <AdminOnlyModal v-if="showAdminModal" @click="showAdminModal = false" />
+    <!-- Permission modal shown when the user can't manage billing -->
+    <RbacPermissionOnlyModal
+      v-if="showAdminModal"
+      :title="t('billing-access-required')"
+      permission="org.update_billing"
+      @click="showAdminModal = false"
+    />
   </div>
 </template>
 

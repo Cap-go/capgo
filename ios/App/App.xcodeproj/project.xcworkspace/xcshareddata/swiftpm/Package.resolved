@@ -1,5 +1,5 @@
 {
-  "originHash" : "f152cdb6913d3043085000e58fcedce3ab7d660fa46fe7c80d13dbe048aebaf3",
+  "originHash" : "ab06eac6f466fa5a658cff1940891bc0d5d22a674cbf5f219ad0cdd49e671f87",
   "pins" : [
     {
       "identity" : "alamofire",
@@ -8,15 +8,6 @@
       "state" : {
         "revision" : "7595cbcf59809f9977c5f6378500de2ad73b7ddb",
         "version" : "5.12.0"
-      }
-    },
-    {
-      "identity" : "appsflyerframework-static",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/AppsFlyerSDK/AppsFlyerFramework-Static.git",
-      "state" : {
-        "revision" : "d07a2b2ae1b5f1ef4c369ed8e3f85fabc6061915",
-        "version" : "6.18.0"
       }
     },
     {
@@ -78,8 +69,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/intercom/intercom-ios-sp.git",
       "state" : {
-        "revision" : "acf168853d46c3e2fd21e70336643c7af1974703",
-        "version" : "19.6.0"
+        "revision" : "1ec7bb229a892b6dfa440ac5e8c0347fd91a5760",
+        "version" : "19.5.7"
       }
     },
     {

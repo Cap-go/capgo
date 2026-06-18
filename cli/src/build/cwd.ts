@@ -1,5 +1,6 @@
 // src/build/cwd.ts
 import { chdir, cwd } from 'node:process'
+import { appendInternalLog } from '../support/internal-log.js'
 
 /**
  * Single in-process queue guarding `process.chdir()`. Both `build request`
@@ -32,7 +33,8 @@ export async function withCwd<T>(dir: string, fn: () => Promise<T>): Promise<T> 
       try {
         chdir(previous)
       }
-      catch {
+      catch (err) {
+        appendInternalLog(`cwd restore failed (ignored): ${err instanceof Error ? err.message : String(err)}`)
         // Best-effort restore; ignore to avoid masking original errors.
       }
     }

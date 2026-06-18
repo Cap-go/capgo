@@ -14,6 +14,7 @@ import {
 
 // ---- fixtures -------------------------------------------------------------
 
+const CHANGE_AT = '2026-06-06T12:00:00.000Z'
 const PKG_V6: NativePackage[] = [{ name: '@capacitor/core', version: '6.0.0' }]
 // Major bump → version ranges do not intersect → incompatible.
 const PKG_V7: NativePackage[] = [{ name: '@capacitor/core', version: '7.0.0' }]
@@ -36,6 +37,8 @@ function newChannel(overrides: Partial<DecideCompatibilityEventsInput['newChanne
     android: false,
     electron: false,
     disable_auto_update: 'major',
+    // The platform downgrade guard, on by default (mirrors the column default).
+    disable_auto_update_under_native: true,
     ...overrides,
   }
 }
@@ -43,6 +46,7 @@ function newChannel(overrides: Partial<DecideCompatibilityEventsInput['newChanne
 describe('decideCompatibilityEvents', () => {
   it('emits an event for a same-channel incompatible version change (Case B)', () => {
     const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
       newChannel: newChannel(),
       currentBundle: bundle(700, '7.0.0', PKG_V7),
       previousDefaults: [{
@@ -70,6 +74,7 @@ describe('decideCompatibilityEvents', () => {
 
   it('emits an event for a default-channel switch (Case A)', () => {
     const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
       newChannel: newChannel(),
       currentBundle: bundle(700, '7.0.0', PKG_V7),
       previousDefaults: [{
@@ -86,6 +91,7 @@ describe('decideCompatibilityEvents', () => {
 
   it('emits no event when the change is OTA-compatible', () => {
     const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
       newChannel: newChannel(),
       currentBundle: bundle(700, '6.0.1', PKG_V6),
       previousDefaults: [{
@@ -100,6 +106,7 @@ describe('decideCompatibilityEvents', () => {
 
   it('emits no event under the metadata (version_number) strategy', () => {
     const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
       newChannel: newChannel({ disable_auto_update: 'version_number' }),
       currentBundle: bundle(700, '7.0.0', PKG_V7),
       previousDefaults: [{
@@ -114,6 +121,7 @@ describe('decideCompatibilityEvents', () => {
 
   it('emits no event when the current bundle has no native_packages', () => {
     const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
       newChannel: newChannel(),
       currentBundle: bundle(700, '7.0.0', null),
       previousDefaults: [{
@@ -128,6 +136,7 @@ describe('decideCompatibilityEvents', () => {
 
   it('emits no event when the previous bundle has no native_packages', () => {
     const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
       newChannel: newChannel(),
       currentBundle: bundle(700, '7.0.0', PKG_V7),
       previousDefaults: [{
@@ -144,6 +153,7 @@ describe('decideCompatibilityEvents', () => {
     // A soft-deleted previous bundle is still a valid baseline as long as its
     // metadata is present: we must still raise the event.
     const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
       newChannel: newChannel(),
       currentBundle: bundle(700, '7.0.0', PKG_V7),
       previousDefaults: [{
@@ -164,6 +174,7 @@ describe('decideCompatibilityEvents', () => {
     })
 
     const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
       newChannel: newChannel({ ios: true, android: true, electron: false }),
       currentBundle: bundle(700, '7.0.0', PKG_V7),
       previousDefaults: [previous('ios'), previous('android'), previous('electron')],
@@ -175,6 +186,7 @@ describe('decideCompatibilityEvents', () => {
 
   it('emits no event when the channel is not public', () => {
     const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
       newChannel: newChannel({ public: false }),
       currentBundle: bundle(700, '7.0.0', PKG_V7),
       previousDefaults: [{
@@ -189,6 +201,7 @@ describe('decideCompatibilityEvents', () => {
 
   it('emits no event when previous and current are the same bundle id', () => {
     const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
       newChannel: newChannel(),
       currentBundle: bundle(700, '7.0.0', PKG_V7),
       previousDefaults: [{
@@ -200,6 +213,133 @@ describe('decideCompatibilityEvents', () => {
 
     expect(events).toHaveLength(0)
   })
+
+  it.concurrent('suppresses the mirror event when reverting to an unresolved event\'s baseline', () => {
+    // E1 (prev=600, cur=700) is unresolved; the channel reverts 700 -> 600.
+    // Without suppression this raises E2 (prev=700, cur=600) and every rollback
+    // would raise the next mirror event, forever.
+    const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
+      newChannel: newChannel({ version: 600 }),
+      currentBundle: bundle(600, '6.0.0', PKG_V6),
+      previousDefaults: [{
+        platform: 'ios',
+        source: 'default_channel_version_changed',
+        bundle: bundle(700, '7.0.0', PKG_V7),
+      }],
+      unresolvedEvents: [{
+        id: 1,
+        platform: 'ios',
+        channel_id: 101,
+        previous_version_id: 600,
+        previous_version_name: '6.0.0',
+        current_version_id: 700,
+      }],
+    })
+
+    expect(events).toHaveLength(0)
+  })
+
+  it.concurrent('does NOT suppress a non-inverse transition into a known baseline (800 -> 600 with 600 -> 700 open)', () => {
+    // Only the exact inverse of the open event (700 -> 600) is a rollback; a
+    // transition from some other bundle (800) into the baseline must still
+    // raise its own event, because its immediate baseline is 800, not 700.
+    const pkgV8: NativePackage[] = [{ name: '@capacitor/core', version: '8.0.0' }]
+    const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
+      newChannel: newChannel({ version: 600 }),
+      currentBundle: bundle(600, '6.0.0', PKG_V6),
+      previousDefaults: [{
+        platform: 'ios',
+        source: 'default_channel_version_changed',
+        bundle: bundle(800, '8.0.0', pkgV8),
+      }],
+      unresolvedEvents: [{
+        id: 1,
+        platform: 'ios',
+        channel_id: 101,
+        previous_version_id: 600,
+        previous_version_name: '6.0.0',
+        current_version_id: 700,
+      }],
+    })
+
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({ previous_version_id: 800, current_version_id: 600 })
+  })
+
+  it.concurrent('does NOT suppress the mirror event when the downgrade guard is off', () => {
+    // With disable_auto_update_under_native off, devices that already installed
+    // the newer native build CAN receive the rolled-back bundle, so the mirror
+    // event is a real warning and must be raised.
+    const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
+      newChannel: newChannel({ version: 600, disable_auto_update_under_native: false }),
+      currentBundle: bundle(600, '6.0.0', PKG_V6),
+      previousDefaults: [{
+        platform: 'ios',
+        source: 'default_channel_version_changed',
+        bundle: bundle(700, '7.0.0', PKG_V7),
+      }],
+      unresolvedEvents: [{
+        id: 1,
+        platform: 'ios',
+        channel_id: 101,
+        previous_version_id: 600,
+        previous_version_name: '6.0.0',
+        current_version_id: 700,
+      }],
+    })
+
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({ previous_version_id: 700, current_version_id: 600 })
+  })
+
+  it.concurrent('does NOT suppress when the unresolved baseline belongs to another channel', () => {
+    const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
+      newChannel: newChannel({ version: 600 }),
+      currentBundle: bundle(600, '6.0.0', PKG_V6),
+      previousDefaults: [{
+        platform: 'ios',
+        source: 'default_channel_version_changed',
+        bundle: bundle(700, '7.0.0', PKG_V7),
+      }],
+      unresolvedEvents: [{
+        id: 1,
+        platform: 'ios',
+        channel_id: 999,
+        previous_version_id: 600,
+        previous_version_name: '6.0.0',
+        current_version_id: 700,
+      }],
+    })
+
+    expect(events).toHaveLength(1)
+  })
+
+  it.concurrent('does NOT suppress an incompatible change to a bundle no unresolved event knows as a baseline', () => {
+    const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
+      newChannel: newChannel({ version: 600 }),
+      currentBundle: bundle(600, '6.0.0', PKG_V6),
+      previousDefaults: [{
+        platform: 'ios',
+        source: 'default_channel_version_changed',
+        bundle: bundle(700, '7.0.0', PKG_V7),
+      }],
+      unresolvedEvents: [{
+        id: 1,
+        platform: 'ios',
+        channel_id: 101,
+        previous_version_id: 500,
+        previous_version_name: '5.0.0',
+        current_version_id: 700,
+      }],
+    })
+
+    expect(events).toHaveLength(1)
+  })
 })
 
 describe('decideAutoResolves', () => {
@@ -207,6 +347,7 @@ describe('decideAutoResolves', () => {
     return {
       id: 1,
       platform: 'ios',
+      channel_id: 101,
       previous_version_id: 600,
       previous_version_name: '6.0.0',
       current_version_id: 700,

@@ -18,9 +18,11 @@ const props = withDefaults(defineProps<{
   channelName?: string
   browserPreview?: boolean
   browserPreviewUnavailableReason?: 'missing-manifest' | 'encrypted' | null
+  nativeStylePreview?: boolean
 }>(), {
   browserPreview: true,
   browserPreviewUnavailableReason: null,
+  nativeStylePreview: false,
 })
 
 const { t } = useI18n()
@@ -66,6 +68,7 @@ function checkMobile() {
 
 const currentDevice = computed(() => devices[selectedDevice.value])
 const showBrowserPreview = computed(() => props.browserPreview)
+const showNativeStylePreview = computed(() => isNativePlatform || isMobile.value || props.nativeStylePreview)
 const showQrCode = computed(() => !!qrCodeDataUrl.value && (!isMobile.value || !showBrowserPreview.value))
 const browserPreviewHelp = computed(() => {
   if (props.browserPreviewUnavailableReason === 'missing-manifest') {
@@ -103,7 +106,7 @@ const previewUrl = computed<string | null>(() => {
       : buildPreviewSubdomain(props.appId, props.versionId as number)
     // Extract base domain from current host, default to capgo.app for localhost
     // Preserve environment segments (e.g., 'dev' in console.dev.capgo.app)
-    const hostname = window.location.hostname
+    const hostname = globalThis.location.hostname
     let baseDomain = 'capgo.app'
     if (hostname.includes('.') && hostname !== '127.0.0.1') {
       const hostParts = hostname.split('.')
@@ -141,6 +144,11 @@ const qrCodeUrl = computed<string | null>(() => {
 
   return previewUrl.value
 })
+const startPreviewDisabled = computed(() => {
+  if (isNativePlatform)
+    return !qrCodeUrl.value
+  return !previewUrl.value || !!browserPreviewHelp.value
+})
 
 function svgToDataUrl(svg: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
@@ -148,7 +156,7 @@ function svgToDataUrl(svg: string): string {
 
 // Generate QR code linking to the preview URL
 function generateQRCode() {
-  if (isNativePlatform || !qrCodeUrl.value) {
+  if (!qrCodeUrl.value) {
     qrCodeDataUrl.value = ''
     return
   }
@@ -184,21 +192,70 @@ async function startNativePreview() {
     query: { preview: qrCodeUrl.value },
   })
 }
+
+async function startPreview() {
+  if (startPreviewDisabled.value)
+    return
+
+  if (isNativePlatform) {
+    await startNativePreview()
+    return
+  }
+
+  openExternal()
+}
 </script>
 
 <template>
   <div
-    v-if="isNativePlatform"
-    class="flex min-h-[calc(100dvh-8rem)] w-full items-center justify-center px-4 py-6"
+    v-if="showNativeStylePreview"
+    class="flex min-h-[calc(100dvh-8rem)] w-full flex-col items-center justify-center gap-5 px-4 py-6"
   >
     <button
       class="inline-flex min-h-12 w-full max-w-xs items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
-      :disabled="!qrCodeUrl"
-      @click="startNativePreview"
+      :disabled="startPreviewDisabled"
+      @click="startPreview"
     >
       <IconPlay class="h-5 w-5" />
       {{ t('start-preview') }}
     </button>
+
+    <div
+      v-if="qrCodeDataUrl"
+      class="flex w-full max-w-xs flex-col items-center rounded-xl bg-white p-5 shadow-lg dark:bg-gray-800"
+    >
+      <img
+        :src="qrCodeDataUrl"
+        :alt="t('qr-code-preview-alt')"
+        class="mb-3 h-44 w-44"
+      >
+      <p class="max-w-40 text-center text-sm text-gray-600 dark:text-gray-400">
+        {{ t('scan-qr-to-preview') }}
+      </p>
+    </div>
+
+    <div
+      v-if="browserPreviewHelp && !isNativePlatform"
+      class="w-full max-w-xs rounded-lg border border-blue-100 bg-blue-50 p-3 text-left dark:border-blue-500/30 dark:bg-blue-500/10"
+    >
+      <div class="flex items-start gap-2">
+        <IconInfo class="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-300" />
+        <div class="min-w-0">
+          <p class="text-sm font-semibold text-blue-950 dark:text-blue-100">
+            {{ browserPreviewHelp.title }}
+          </p>
+          <p class="mt-1 text-xs leading-5 text-blue-900/80 dark:text-blue-100/80">
+            {{ browserPreviewHelp.description }}
+          </p>
+          <code
+            v-if="browserPreviewHelp.command"
+            class="mt-2 block overflow-x-auto rounded-md bg-white px-2 py-1.5 text-[11px] text-slate-800 dark:bg-slate-950 dark:text-slate-100"
+          >
+            {{ browserPreviewHelp.command }}
+          </code>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div v-else class="relative min-h-[calc(100dvh-8rem)] w-full overflow-y-auto px-3 py-4 md:px-6 md:py-6">
@@ -281,7 +338,7 @@ async function startNativePreview() {
       >
         <img
           :src="qrCodeDataUrl"
-          alt="QR Code to preview on phone"
+          :alt="t('qr-code-preview-alt')"
           class="mb-3 h-44 w-44"
         >
         <p class="text-sm text-center text-gray-600 dark:text-gray-400 max-w-40">

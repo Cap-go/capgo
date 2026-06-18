@@ -83,7 +83,14 @@ function parseMobileprovisionBuffer(data: Buffer, source: string): Mobileprovisi
   return { name, uuid, applicationIdentifier, bundleId }
 }
 
-function parseMobileprovisionBufferDetailed(data: Buffer, source: string): MobileprovisionDetail {
+/**
+ * Buffer-based variant of {@link parseMobileprovisionDetailed} — parses the raw
+ * .mobileprovision bytes directly instead of reading a path. Used by the iOS
+ * onboarding engine's import-provide-profile-path effect, which reads the file
+ * via its injected `readFile` dep (so the IO stays at the boundary) and parses
+ * the returned Buffer here. `source` is a label used only in error messages.
+ */
+export function parseMobileprovisionBufferDetailed(data: Buffer, source = '<buffer input>'): MobileprovisionDetail {
   const base = parseMobileprovisionBuffer(data, source)
 
   const xmlStartMarker = '<?xml'

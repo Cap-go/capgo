@@ -1,5 +1,6 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
+import { REQUIRED_GLOBAL_STATS_SHARDS } from '../utils/global_stats.ts'
 import { useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -24,6 +25,7 @@ app.get('/', async (c) => {
     .from('global_stats')
     .select()
     .lte('date_id', latestCompletedDateId)
+    .contains('completed_shards', [...REQUIRED_GLOBAL_STATS_SHARDS])
     .order('date_id', { ascending: false })
     .limit(1)
     .maybeSingle()

@@ -14,7 +14,7 @@ import AdminFunnelChart from '~/components/admin/AdminFunnelChart.vue'
 import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
 import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
-import Spinner from '~/components/Spinner.vue'
+import PageLoader from '~/components/PageLoader.vue'
 import { formatLocalDate, formatLocalDateTime } from '~/services/date'
 import { getEmoji } from '~/services/i18n'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
@@ -117,6 +117,8 @@ const globalStatsTrendData = ref<Array<{
   registers_today: number
   demo_apps_created: number
   devices_last_month: number
+  trial_extended_orgs: number
+  trial_extended_subscribed_orgs: number
 }>>([])
 
 const isLoadingGlobalStatsTrend = ref(false)
@@ -582,13 +584,17 @@ const trialPlanBreakdownPlanNames = computed(() => {
   return totals.map(plan => plan.plan_name)
 })
 
-function getTrialPlanChartColor(planName: string) {
-  const colors = ['#119eff', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#ef4444']
-  let hash = 0
-  for (let index = 0; index < planName.length; index++)
-    hash = (hash * 31 + planName.charCodeAt(index)) >>> 0
+const trialPlanChartColors: Record<string, string> = {
+  Solo: '#119eff',
+  Maker: '#d97706',
+  Team: '#8b5cf6',
+  Enterprise: '#059669',
+}
 
-  return colors[hash % colors.length]
+const fallbackTrialPlanChartColors = ['#119eff', '#d97706', '#8b5cf6', '#059669', '#db2777', '#0f766e', '#dc2626']
+
+function getTrialPlanChartColor(planName: string, index: number) {
+  return trialPlanChartColors[planName] ?? fallbackTrialPlanChartColors[index % fallbackTrialPlanChartColors.length]
 }
 
 const trialPlanBreakdownTrendSeries = computed(() => {
@@ -597,13 +603,13 @@ const trialPlanBreakdownTrendSeries = computed(() => {
     return []
 
   return trialPlanBreakdownPlanNames.value
-    .map(planName => ({
+    .map((planName, index) => ({
       label: planName,
       data: trend.map(item => ({
         date: item.date,
         value: item.plans[planName] ?? 0,
       })),
-      color: getTrialPlanChartColor(planName),
+      color: getTrialPlanChartColor(planName, index),
     }))
     .filter(series => series.data.some(item => item.value > 0))
 })
@@ -620,6 +626,30 @@ const registrationsTrendSeries = computed(() => {
         value: item.registers_today,
       })),
       color: '#3b82f6', // blue
+    },
+  ]
+})
+
+const trialExtensionTrendSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: t('trial-extensions'),
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.trial_extended_orgs ?? 0,
+      })),
+      color: '#119eff',
+    },
+    {
+      label: t('extended-trial-subscriptions'),
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.trial_extended_subscribed_orgs ?? 0,
+      })),
+      color: '#10b981',
     },
   ]
 })
@@ -878,9 +908,7 @@ displayStore.defaultBack = '/dashboard'
       <div class="w-full h-full px-4 pt-2 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
         <AdminFilterBar />
 
-        <div v-if="isLoading" class="flex items-center justify-center min-h-screen">
-          <Spinner size="w-24 h-24" />
-        </div>
+        <PageLoader v-if="isLoading" />
 
         <div v-else class="space-y-6">
           <!-- Onboarding Funnel Section -->
@@ -1291,6 +1319,18 @@ displayStore.defaultBack = '/dashboard'
             >
               <AdminMultiLineChart
                 :series="usersTrendSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+
+            <!-- Trial Extension Conversions -->
+            <ChartCard
+              :title="t('trial-extension-conversion-trend')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="trialExtensionTrendSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="trialExtensionTrendSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
               />
             </ChartCard>

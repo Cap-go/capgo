@@ -29,6 +29,7 @@ import { Header } from './components.js'
 import { pickPlatformLayout } from './frame-fit.js'
 import { TerminalTooSmallPrompt } from './min-size-gate.js'
 import { PlatformPicker } from './platform-picker.js'
+import { UpdatePrompt } from './update-prompt.js'
 
 // Progress shapes derived from the loaders so we don't re-import the type names.
 type IosProgress = Awaited<ReturnType<typeof loadProgress>>
@@ -86,11 +87,29 @@ export interface OnboardingShellProps {
   iosBundleIdInitial: string
   iosDir: string
   androidDir: string
+  /**
+   * Whether guided ASC-key creation may be offered (macOS + signed helper
+   * installed + signature/team verified — see the probe in command.ts).
+   * Threaded into the iOS OnboardingApp; the Android app ignores it.
+   */
+  guidedHelperUsable: boolean
   apikey?: string
+  supaHost?: string
+  /** Correlation id for this onboarding run; threaded into every analytics event the apps emit. */
+  journeyId: string
   /** Pre-resolved platform (--platform flag or the single existing native dir); skips the picker. */
   initialPlatform?: Platform
+  /**
+   * Set when a newer @capgo/cli is published. Drives the self-update prompt
+   * shown as the FIRST wizard screen (before platform selection / auto-load).
+   * Undefined → up to date → no prompt.
+   */
+  updateInfo?: { currentVersion: string, latestVersion: string }
   /** Called once a platform is chosen so the caller can print the completion breadcrumb. */
   onResolvePlatform?: (platform: Platform) => void
+  /** Called by the mounted app on every step transition, so the caller can record
+   *  where the user dropped off for the quit event. */
+  onStep?: (step: string) => void
   /** Called by the mounted app when it reaches the build-complete screen, so the
    *  caller prints the accurate post-exit message + durable summary. If the wizard
    *  exits any other way (cancel / missing platform), this never fires and the
@@ -98,7 +117,7 @@ export interface OnboardingShellProps {
   onResult?: (result: OnboardingResult) => void
 }
 
-const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, iosDir, androidDir, apikey, initialPlatform, onResolvePlatform, onResult }) => {
+const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, iosDir, androidDir, guidedHelperUsable, apikey, supaHost, journeyId, initialPlatform, updateInfo, onResolvePlatform, onStep, onResult }) => {
   const { exit } = useApp()
   const { cols, rows } = useTerminalSize()
   const [ready, setReady] = useState<ReadyApp | null>(null)
@@ -106,6 +125,9 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
   // throws for non-ENOENT errors, so without a rejection handler `choose` would
   // leave an unhandled promise rejection and the picker stuck with no feedback.
   const [loadError, setLoadError] = useState<string | null>(null)
+  // Whether the self-update prompt (first screen, when updateInfo is set) has
+  // been dismissed with "skip". On "update" we exit Ink instead (see below).
+  const [updateAnswered, setUpdateAnswered] = useState(false)
 
   // Begin loading the chosen platform's progress; mount the app once it lands.
   // The picker stays on screen during the (few-ms) load, so there's no loading
@@ -127,9 +149,11 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
 
   // Pre-resolved platform → load immediately (no picker shown).
   useEffect(() => {
-    if (initialPlatform)
+    // Hold the auto-load until the update prompt (if any) is answered, so the
+    // update offer is the first screen even when --platform pre-resolves.
+    if (initialPlatform && (!updateInfo || updateAnswered))
       choose(initialPlatform)
-  }, [initialPlatform, choose])
+  }, [initialPlatform, choose, updateInfo, updateAnswered])
 
   // Progress load failed (corrupt/unreadable saved state) — show why and exit,
   // rather than hanging on a frozen picker. The exit is scheduled in the .catch.
@@ -152,9 +176,9 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
   // exiting the wizard. The app owns the size decision so a shrink→regrow keeps
   // the user exactly where they were.
   if (ready?.kind === 'ios')
-    return <OnboardingApp appId={appId} iosBundleIdInitial={iosBundleIdInitial} initialProgress={ready.progress} iosDir={iosDir} apikey={apikey} onResult={onResult} />
+    return <OnboardingApp appId={appId} iosBundleIdInitial={iosBundleIdInitial} initialProgress={ready.progress} iosDir={iosDir} guidedHelperUsable={guidedHelperUsable} apikey={apikey} supaHost={supaHost} journeyId={journeyId} onStep={onStep} onResult={onResult} />
   if (ready?.kind === 'android')
-    return <AndroidOnboardingApp appId={appId} initialProgress={ready.progress} androidDir={androidDir} apikey={apikey} onResult={onResult} />
+    return <AndroidOnboardingApp appId={appId} initialProgress={ready.progress} androidDir={androidDir} apikey={apikey} supaHost={supaHost} journeyId={journeyId} onStep={onStep} onResult={onResult} />
 
   // Not ready yet: the platform picker (or a brief framed load). The picker is
   // NOT gated to the full 80×49 onboarding floor — it's small and adapts
@@ -167,6 +191,34 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
   // picker. Resize-reactive via cols/rows from useTerminalSize.
   if (!terminalFitsPicker(cols, rows))
     return <TerminalTooSmallPrompt cols={cols} rows={rows} minCols={PICKER_MIN_COLS} minRows={PICKER_MIN_ROWS} />
+
+  // Self-update offer — the first screen, before platform selection / auto-load.
+  // "update" exits Ink with `update-requested` so command.ts can install +
+  // re-exec OUTSIDE the alt-screen; "skip" continues onboarding on this version.
+  // Either choice transitions away (exit / setUpdateAnswered), unmounting the
+  // @inkjs/ui Select — which is what avoids its onChange-refires-while-mounted
+  // loop. The exit is deferred a tick so the closure's onResult lands first.
+  if (updateInfo && !updateAnswered) {
+    return (
+      <Box flexDirection="column" minHeight={rows} padding={1}>
+        <Header />
+        <UpdatePrompt
+          layout={pickPlatformLayout(cols, rows)}
+          currentVersion={updateInfo.currentVersion}
+          latestVersion={updateInfo.latestVersion}
+          onDecide={(choice) => {
+            if (choice === 'update') {
+              onResult?.({ outcome: 'update-requested' })
+              setTimeout(() => exit(), 50)
+            }
+            else {
+              setUpdateAnswered(true)
+            }
+          }}
+        />
+      </Box>
+    )
+  }
 
   return (
     <Box flexDirection="column" minHeight={rows} padding={1}>

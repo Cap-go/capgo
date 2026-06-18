@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       apikey_global_permissions: {
@@ -436,6 +461,36 @@ export type Database = {
           },
         ]
       }
+      backfill_progress: {
+        Row: {
+          created_at: string
+          cutover_at: string
+          job_name: string
+          last_processed_id: number | null
+          last_processed_occurred_at: string | null
+          scope_key: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cutover_at: string
+          job_name: string
+          last_processed_id?: number | null
+          last_processed_occurred_at?: string | null
+          scope_key: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cutover_at?: string
+          job_name?: string
+          last_processed_id?: number | null
+          last_processed_occurred_at?: string | null
+          scope_key?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       bandwidth_usage: {
         Row: {
           app_id: string
@@ -824,6 +879,7 @@ export type Database = {
       compatibility_events: {
         Row: {
           app_id: string
+          change_occurred_at: string
           channel_id: number | null
           channel_name: string
           created_at: string
@@ -843,6 +899,7 @@ export type Database = {
         }
         Insert: {
           app_id: string
+          change_occurred_at?: string
           channel_id?: number | null
           channel_name: string
           created_at?: string
@@ -862,6 +919,7 @@ export type Database = {
         }
         Update: {
           app_id?: string
+          change_occurred_at?: string
           channel_id?: number | null
           channel_name?: string
           created_at?: string
@@ -1040,6 +1098,7 @@ export type Database = {
           churn_mrr_maker: number
           churn_mrr_solo: number
           churn_mrr_team: number
+          churn_reason: string | null
           contraction_mrr: number
           contraction_mrr_enterprise: number
           contraction_mrr_maker: number
@@ -1059,6 +1118,7 @@ export type Database = {
           churn_mrr_maker?: number
           churn_mrr_solo?: number
           churn_mrr_team?: number
+          churn_reason?: string | null
           contraction_mrr?: number
           contraction_mrr_enterprise?: number
           contraction_mrr_maker?: number
@@ -1078,6 +1138,7 @@ export type Database = {
           churn_mrr_maker?: number
           churn_mrr_solo?: number
           churn_mrr_team?: number
+          churn_reason?: string | null
           contraction_mrr?: number
           contraction_mrr_enterprise?: number
           contraction_mrr_maker?: number
@@ -1428,6 +1489,8 @@ export type Database = {
           nrr: number
           onboarded: number | null
           org_conversion_rate: number
+          past_due_orgs: number
+          past_due_orgs_average_days: number
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
@@ -1461,6 +1524,8 @@ export type Database = {
           success_rate: number | null
           total_revenue: number
           trial: number | null
+          trial_extended_orgs: number
+          trial_extended_subscribed_orgs: number
           updates: number
           updates_external: number | null
           updates_last_month: number | null
@@ -1512,6 +1577,8 @@ export type Database = {
           nrr?: number
           onboarded?: number | null
           org_conversion_rate?: number
+          past_due_orgs?: number
+          past_due_orgs_average_days?: number
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
@@ -1545,6 +1612,8 @@ export type Database = {
           success_rate?: number | null
           total_revenue?: number
           trial?: number | null
+          trial_extended_orgs?: number
+          trial_extended_subscribed_orgs?: number
           updates: number
           updates_external?: number | null
           updates_last_month?: number | null
@@ -1596,6 +1665,8 @@ export type Database = {
           nrr?: number
           onboarded?: number | null
           org_conversion_rate?: number
+          past_due_orgs?: number
+          past_due_orgs_average_days?: number
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
@@ -1629,6 +1700,8 @@ export type Database = {
           success_rate?: number | null
           total_revenue?: number
           trial?: number | null
+          trial_extended_orgs?: number
+          trial_extended_subscribed_orgs?: number
           updates?: number
           updates_external?: number | null
           updates_last_month?: number | null
@@ -2449,6 +2522,7 @@ export type Database = {
           bandwidth_exceeded: boolean | null
           build_time_exceeded: boolean | null
           canceled_at: string | null
+          churn_reason: string | null
           created_at: string
           customer_country: string | null
           customer_id: string
@@ -2457,6 +2531,7 @@ export type Database = {
           last_stripe_event_at: string | null
           mau_exceeded: boolean | null
           paid_at: string | null
+          past_due_at: string | null
           plan_calculated_at: string | null
           plan_usage: number | null
           price_id: string | null
@@ -2474,6 +2549,7 @@ export type Database = {
           bandwidth_exceeded?: boolean | null
           build_time_exceeded?: boolean | null
           canceled_at?: string | null
+          churn_reason?: string | null
           created_at?: string
           customer_country?: string | null
           customer_id: string
@@ -2482,6 +2558,7 @@ export type Database = {
           last_stripe_event_at?: string | null
           mau_exceeded?: boolean | null
           paid_at?: string | null
+          past_due_at?: string | null
           plan_calculated_at?: string | null
           plan_usage?: number | null
           price_id?: string | null
@@ -2499,6 +2576,7 @@ export type Database = {
           bandwidth_exceeded?: boolean | null
           build_time_exceeded?: boolean | null
           canceled_at?: string | null
+          churn_reason?: string | null
           created_at?: string
           customer_country?: string | null
           customer_id?: string
@@ -2507,6 +2585,7 @@ export type Database = {
           last_stripe_event_at?: string | null
           mau_exceeded?: boolean | null
           paid_at?: string | null
+          past_due_at?: string | null
           plan_calculated_at?: string | null
           plan_usage?: number | null
           price_id?: string | null
@@ -2611,6 +2690,51 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trial_extension_events: {
+        Row: {
+          created_at: string
+          customer_id: string
+          extension_days: number
+          id: number
+          new_trial_at: string
+          org_id: string
+          previous_trial_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          extension_days: number
+          id?: number
+          new_trial_at: string
+          org_id: string
+          previous_trial_at: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          extension_days?: number
+          id?: number
+          new_trial_at?: string
+          org_id?: string
+          previous_trial_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trial_extension_events_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "stripe_info"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "trial_extension_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
             referencedColumns: ["id"]
           },
         ]
@@ -3166,6 +3290,7 @@ export type Database = {
         }
         Returns: string
       }
+      app_has_real_bundle: { Args: { p_app_id: string }; Returns: boolean }
       app_versions_has_app_permission: {
         Args: {
           p_apikey: string
@@ -3320,6 +3445,7 @@ export type Database = {
         Args: { p_app_uuid: string }
         Returns: undefined
       }
+      cleanup_completed_onboarding_apps: { Args: never; Returns: undefined }
       cleanup_expired_apikeys: { Args: never; Returns: undefined }
       cleanup_expired_demo_apps: { Args: never; Returns: undefined }
       cleanup_frequent_job_details: { Args: never; Returns: undefined }
@@ -4882,6 +5008,8 @@ export type Database = {
         | "webview_unclean_restart"
         | "webview_render_process_gone"
         | "webview_content_process_terminated"
+        | "os_version_changed"
+        | "native_app_version_changed"
       stripe_status:
         | "created"
         | "succeeded"
@@ -5056,6 +5184,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth", "build_time"],
@@ -5151,6 +5282,8 @@ export const Constants = {
         "webview_unclean_restart",
         "webview_render_process_gone",
         "webview_content_process_terminated",
+        "os_version_changed",
+        "native_app_version_changed",
       ],
       stripe_status: [
         "created",

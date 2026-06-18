@@ -1,5 +1,7 @@
 // src/build/onboarding/android/types.ts
 
+import type { TailProgress } from '../tail-types.js'
+
 export type AndroidOnboardingStep
   = | 'welcome'
     | 'resume-prompt'
@@ -76,6 +78,12 @@ export type AndroidOnboardingStep
     | 'ai-analysis-result-scroll'
     | 'build-complete'
     | 'error'
+    // Contact-support confirmation gate (shown before we save logs + open mail)
+    | 'support-confirm'
+    // Scrollable viewer of the exact bundle, reached from the confirm's "View logs first"
+    | 'support-log-view'
+    // Spinner while the bundle uploads to Capgo support
+    | 'support-uploading'
 
 export type AndroidOnboardingErrorCategory
   = | 'keystore_invalid'
@@ -138,7 +146,29 @@ export interface AndroidPackageChoice {
   source: 'gradle' | 'capacitor-config' | 'user-input'
 }
 
-export interface AndroidOnboardingProgress {
+// ── Post-save "tail" completion markers ──────────────────────────────────────
+// One marker per irreversible tail side-effect. They mirror the provisioning
+// markers above (small, JSON-serializable proof-of-completion objects) so the
+// resume router can skip past a step that already ran without re-firing it.
+
+export interface CredentialsSaved {
+  /** ISO timestamp credentials.json was written — purely informational. */
+  savedAt: string
+}
+
+export interface BuildRequested {
+  /** The build dashboard URL surfaced after the queue request succeeded. */
+  buildUrl: string
+}
+
+export interface CiSecretsUploaded {
+  /** Provider the secrets were pushed to (matches the chosen ciSecretTarget). */
+  provider: 'github' | 'gitlab'
+  /** How many env vars were pushed — informational. */
+  count: number
+}
+
+export interface AndroidOnboardingProgress extends TailProgress {
   platform: 'android'
   appId: string
   startedAt: string
@@ -182,14 +212,61 @@ export interface AndroidOnboardingProgress {
     androidPackageChosen?: AndroidPackageChoice
     serviceAccountProvisioned?: ServiceAccountProvisioned
     playInviteProvisioned?: PlayInviteProvisioned
+    // ── Post-save "tail" milestones (additive — present only once the
+    // matching side-effecting tail step has finished). They let
+    // `getAndroidResumeStep` route a saved progress THROUGH the tail
+    // (CI-secrets → env-export → workflow-file → build-request) without
+    // re-running a side-effecting step. Each is a marker in the same
+    // self-healing style as the provisioning markers above: presence means
+    // "this irreversible step already happened — do NOT do it again".
+    //
+    // The headless engine deletes the on-disk progress file at
+    // `saving-credentials` today, so these markers are written by whichever
+    // driver chooses to persist the tail for resume (the Ink TUI migration in
+    // a later phase). When absent, resume falls through to `saving-credentials`
+    // exactly as before — so legacy/in-flight progress files are unaffected.
+
+    /** Set once `saving-credentials` wrote credentials.json. Gates tail entry. */
+    credentialsSaved?: CredentialsSaved
+    /** Set once `requesting-build` queued a build. Guards a double build-request. */
+    buildRequested?: BuildRequested
+    /** Set once `uploading-ci-secrets` pushed the secrets. Guards a re-upload. */
+    ciSecretsUploaded?: CiSecretsUploaded
   }
 
   // Ephemeral — wiped when onboarding finishes. Held on disk only so resume
   // across a crash doesn't force a full re-auth. NEVER written to credentials.
   _oauthRefreshToken?: string
+  // MCP broker OAuth (access-token model). The MCP process can't refresh a token issued to the broker's
+  // confidential Web client, so it stores the short-lived access token + its expiry and re-signs-in on expiry.
+  _oauthAccessToken?: string
+  _oauthAccessTokenExpiresAt?: number
+  // In-flight broker sign-in handle — persisted so polling survives the MCP process restarting between calls.
+  _brokerOAuth?: { pubId: string, pollSecret: string, signInUrl: string, expiresAt: number }
   _keystoreBase64?: string
   /** Base64 of the downloaded SA JSON key — saved as PLAY_CONFIG_JSON at end. */
   _serviceAccountKeyBase64?: string
+  // ── MCP markers (added by the shared engine; harmless to the ink TUI) ──
+  /** Platform whose onboarding is currently in-flight. */
+  activePlatform?: 'android'
+  /** True when the new-keystore password was auto-generated (random). Never logged. */
+  keystorePasswordGenerated?: boolean
+  /** True once the user chose the MANUAL password method (lets the stateless MCP advance). */
+  keystorePasswordManual?: boolean
+  /**
+   * Data-safety gate state for the shared engine (mirrors main's ink TUI
+   * `credentials-exist` → `backing-up` flow). The Ink driver does not read this
+   * field — it gates the same situation via React state — so it is harmless to
+   * the TUI. Lifecycle:
+   *   - undefined → gate not yet evaluated (or no saved credentials exist)
+   *   - 'pending' → saved android credentials exist; awaiting the user's
+   *                 backup-or-cancel choice (the `credentials-exist` step)
+   *   - 'backup'  → user chose backup; the `backing-up` effect must still run
+   *   - 'done'    → backup performed (or source absent); proceed to keystore
+   *   - 'cancel'  → user chose to stop; onboarding halts to protect the
+   *                 existing credentials (mirrors main's exitOnboarding())
+   */
+  _credentialsExistGate?: 'pending' | 'backup' | 'done' | 'cancel'
 }
 
 export const ANDROID_STEP_PROGRESS: Record<AndroidOnboardingStep, number> = {
@@ -267,6 +344,9 @@ export const ANDROID_STEP_PROGRESS: Record<AndroidOnboardingStep, number> = {
   'ai-analysis-result': 99,
   'build-complete': 100,
   'error': 0,
+  'support-confirm': 0,
+  'support-log-view': 0,
+  'support-uploading': 0,
 }
 
 export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
@@ -344,6 +424,9 @@ export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
     case 'build-complete':
       return 'Complete'
     case 'error':
+    case 'support-confirm':
+    case 'support-log-view':
+    case 'support-uploading':
       return ''
   }
 }

@@ -6,6 +6,7 @@ import process from 'node:process'
 import net from 'node:net'
 import type { Page } from '@playwright/test'
 import { chromium } from '@playwright/test'
+import { createClient } from '@supabase/supabase-js'
 import { getPlaywrightStripeApiBaseUrl, getStripeEmulatorPort } from './playwright-stripe'
 import { getSupabaseWorktreeConfig } from './supabase-worktree-config'
 
@@ -92,7 +93,7 @@ const screens = [
   { slug: 'app-overview', path: '/app/com.demo.app' },
   { slug: 'channels', path: '/app/com.demo.app/channels' },
   { slug: 'devices', path: '/app/com.demo.app/devices' },
-  { slug: 'channel-statistics', path: '/app/com.demo.app/channel/1/statistics' },
+  { slug: 'preview-qr', path: '/app/com.demo.app/channel/1/preview?appStoreQr=1' },
 ]
 
 function sleep(ms: number): Promise<void> {
@@ -319,6 +320,32 @@ async function ensureLocalStack() {
     })
     await waitForHttp(`${screenshotBaseUrl}/login/`, 180_000, 'frontend')
   }
+
+  return { supabaseUrl, supabaseAnon }
+}
+
+async function prepareScreenshotData(supabaseUrl: string, supabaseAnon: string) {
+  const supabase = createClient(supabaseUrl, supabaseAnon, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+  })
+
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: 'test@capgo.app',
+    password: 'testtest',
+  })
+  if (signInError)
+    throw new Error(`Unable to sign in for screenshot data setup: ${signInError.message}`)
+
+  const { error } = await supabase
+    .from('apps')
+    .update({ allow_preview: true })
+    .eq('app_id', 'com.demo.app')
+  if (error)
+    throw new Error(`Unable to enable demo preview for screenshots: ${error.message}`)
 }
 
 async function login(page: Page) {
@@ -390,7 +417,8 @@ async function captureScreenshots() {
 }
 
 try {
-  await ensureLocalStack()
+  const localStack = await ensureLocalStack()
+  await prepareScreenshotData(localStack.supabaseUrl, localStack.supabaseAnon)
   await captureScreenshots()
   console.log(`Screenshots written to ${outputRoot}`)
 }

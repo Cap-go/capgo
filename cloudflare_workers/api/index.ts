@@ -1,6 +1,7 @@
 import { app as accept_invitation } from '../../supabase/functions/_backend/private/accept_invitation.ts'
 import { app as admin_credits } from '../../supabase/functions/_backend/private/admin_credits.ts'
 import { app as admin_stats } from '../../supabase/functions/_backend/private/admin_stats.ts'
+import { app as channel_device } from '../../supabase/functions/_backend/private/channel_device.ts'
 import { app as channel_stats } from '../../supabase/functions/_backend/private/channel_stats.ts'
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
 import { app as configBuilder } from '../../supabase/functions/_backend/private/config_builder.ts'
@@ -53,7 +54,7 @@ import { app as cron_reconcile_build_status } from '../../supabase/functions/_ba
 import { app as cron_stat_app } from '../../supabase/functions/_backend/triggers/cron_stat_app.ts'
 import { app as cron_stat_org } from '../../supabase/functions/_backend/triggers/cron_stat_org.ts'
 import { app as cron_sync_sub } from '../../supabase/functions/_backend/triggers/cron_sync_sub.ts'
-import { app as logsnag_insights } from '../../supabase/functions/_backend/triggers/logsnag_insights.ts'
+import { app as logsnag_insights, logsnagInsightsShardApps } from '../../supabase/functions/_backend/triggers/logsnag_insights.ts'
 import { app as on_app_create } from '../../supabase/functions/_backend/triggers/on_app_create.ts'
 import { app as on_app_delete } from '../../supabase/functions/_backend/triggers/on_app_delete.ts'
 import { app as on_app_update } from '../../supabase/functions/_backend/triggers/on_app_update.ts'
@@ -105,6 +106,7 @@ appPrivate.route('/config', config)
 appPrivate.route('/config/builder', configBuilder)
 appPrivate.route('/accept_invitation', accept_invitation)
 appPrivate.route('/devices', devices_priv)
+appPrivate.route('/channel_device', channel_device)
 appPrivate.route('/log_as', log_as)
 appPrivate.route('/invite_new_user_to_org', invite_new_user_to_org)
 appPrivate.route('/invite_existing_user_to_org', invite_existing_user_to_org)
@@ -141,6 +143,15 @@ appTriggers.route('/cron_clean_orphan_images', cron_clean_orphan_images)
 appTriggers.route('/cron_reconcile_build_status', cron_reconcile_build_status)
 appTriggers.route('/credit_usage_alerts', credit_usage_alerts)
 appTriggers.route('/logsnag_insights', logsnag_insights)
+appTriggers.route('/logsnag_insights_core', logsnagInsightsShardApps.core)
+appTriggers.route('/logsnag_insights_usage', logsnagInsightsShardApps.usage)
+appTriggers.route('/logsnag_insights_revenue', logsnagInsightsShardApps.revenue)
+appTriggers.route('/logsnag_insights_plugins', logsnagInsightsShardApps.plugins)
+appTriggers.route('/logsnag_insights_builds', logsnagInsightsShardApps.builds)
+appTriggers.route('/logsnag_insights_retention', logsnagInsightsShardApps.retention)
+appTriggers.route('/logsnag_insights_paid_products', logsnagInsightsShardApps.paid_products)
+appTriggers.route('/logsnag_insights_ltv', logsnagInsightsShardApps.ltv)
+appTriggers.route('/logsnag_insights_notifications', logsnagInsightsShardApps.notifications)
 appTriggers.route('/on_channel_update', on_channel_update)
 appTriggers.route('/on_app_create', on_app_create)
 appTriggers.route('/on_app_delete', on_app_delete)
