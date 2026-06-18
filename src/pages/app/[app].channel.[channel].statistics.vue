@@ -382,7 +382,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
       },
     },
   },
-}))
+} as unknown as ChartOptions<'line'>))
 
 async function getChannel() {
   if (!id.value)

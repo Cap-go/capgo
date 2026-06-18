@@ -74,6 +74,61 @@ export async function createDefaultApiKey(
   })
 }
 
+export async function createAiApiKey(
+  supabase: SupabaseClient<Database>,
+  name: string,
+  options: {
+    /** One or more organizations the key spans. */
+    orgIds: string[]
+    role: 'admin' | 'member'
+    /** Member role only: the apps to grant access on, each with its owning org and chosen app-level role. */
+    apps?: Array<{ uuid: string, orgId: string, role: string }>
+    /** Admin role only: also grant the `org.create` global permission (create new orgs). */
+    allowOrgCreate?: boolean
+  },
+) {
+  const { orgIds, role } = options
+
+  if (!orgIds || orgIds.length === 0) {
+    throw new Error('Cannot create an AI API key without an organization')
+  }
+
+  const bindings: Array<{
+    role_name: string
+    scope_type: 'org' | 'app'
+    org_id: string
+    app_id?: string
+  }> = []
+
+  if (role === 'admin') {
+    for (const orgId of orgIds)
+      bindings.push({ role_name: 'org_admin', scope_type: 'org', org_id: orgId })
+  }
+  else {
+    const orgIdSet = new Set(orgIds)
+    for (const orgId of orgIds)
+      bindings.push({ role_name: 'org_member', scope_type: 'org', org_id: orgId })
+    for (const app of options.apps ?? []) {
+      if (!orgIdSet.has(app.orgId))
+        throw new Error('Each app.orgId must be one of the selected orgIds')
+      bindings.push({ role_name: app.role, scope_type: 'app', org_id: app.orgId, app_id: app.uuid })
+    }
+  }
+
+  // `org.create` is only valid on a key that has an org-admin binding — i.e. the admin role.
+  const globalPermissions = role === 'admin' && options.allowOrgCreate ? ['org.create'] : undefined
+
+  return supabase.functions.invoke('apikey', {
+    method: 'POST',
+    body: {
+      name,
+      hashed: false,
+      bindings,
+      global_permissions: globalPermissions,
+    },
+  })
+}
+
 export async function findUsablePlainApiKey(
   supabase: SupabaseClient<Database>,
   userId: string,
