@@ -48,7 +48,6 @@ function acronym(name: string): string {
   return (first + second).toUpperCase()
 }
 
-const currentOrgId = computed(() => organizationStore.currentOrganization?.gid ?? null)
 const selectedOrgNames = computed(() =>
   orgs.value.filter(o => selectedOrgIds.value.includes(o.gid)).map(o => o.name),
 )
@@ -169,14 +168,7 @@ onMounted(() => {
   organizationStore.refreshOrganizationLogos().catch(() => {})
 })
 
-// Default the org selection to the active org (or the first admin org) once loaded.
-watch(orgs, (list) => {
-  if (selectedOrgIds.value.length === 0 && list.length > 0) {
-    const cur = currentOrgId.value
-    selectedOrgIds.value = cur && list.some(o => o.gid === cur) ? [cur] : [list[0].gid]
-  }
-}, { immediate: true })
-
+// No org is selected by default — the user picks which orgs the key spans.
 watch(selectedOrgIds, (ids) => {
   loadApps(ids)
 }, { deep: true })
@@ -509,3 +501,8 @@ function back(): void {
     </div>
   </div>
 </template>
+
+<route lang="yaml">
+meta:
+  layout: naked
+</route>
