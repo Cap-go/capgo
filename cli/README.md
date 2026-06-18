@@ -115,6 +115,7 @@ npx @capgo/cli@latest init YOUR_API_KEY com.example.app
 | **-i** | <code>string</code> | App icon path for display in Capgo Cloud |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+| **--no-analytics** | <code>boolean</code> | Disable init analytics and terminal replay for this run |
 
 
 ## <a id="run"></a> 📱 **Run**
@@ -1240,6 +1241,7 @@ Set up build credentials interactively (iOS: certificates + profiles automated; 
 | **-a** | <code>string</code> | API key to link to your account |
 | **-p** | <code>string</code> | Platform to onboard (ios or android). If omitted, auto-detects when only one native folder exists; prompts otherwise. |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--no-analytics** | <code>boolean</code> | Disable build onboarding analytics and terminal replay for this run |
 
 ### <a id="build-request"></a> 🔹 **Request**
 

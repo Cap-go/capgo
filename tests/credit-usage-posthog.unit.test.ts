@@ -52,7 +52,7 @@ const overageEvent = {
   credit_step_id: 7,
   credits_debited: 10,
   credits_estimated: 10,
-  details: { limit: 1800, usage: 5400 },
+  details: { limit: 3600, usage: 7200 },
   id: 'overage-1',
   metric: 'build_time',
   org_id: 'org-1',
@@ -118,8 +118,8 @@ describe('credit usage PostHog event builder', () => {
       metric: 'build_time',
       overage_event_id: 'overage-1',
       transaction_type: 'deduction',
-      usage: 5400,
-      limit: 1800,
+      usage: 7200,
+      limit: 3600,
     })
   })
 })

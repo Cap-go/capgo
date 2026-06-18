@@ -104,6 +104,38 @@ describe('posthog helper', () => {
     expect(body.properties).not.toHaveProperty('$set')
   })
 
+  it('sends replay snapshots with backend identity email', async () => {
+    const { capturePosthogReplaySnapshot } = await import('../supabase/functions/_backend/utils/posthog.ts')
+
+    await capturePosthogReplaySnapshot(createContext(), {
+      currentUrl: 'capgo-cli://init',
+      distinctId: 'user-id',
+      events: [{ data: { height: 600, href: 'capgo-cli://init', width: 900 }, timestamp: 123, type: 4 }],
+      lib: '@capgo/cli',
+      libVersion: '8.9.0',
+      sessionId: 'init-session',
+      timestamp: '2026-06-16T00:00:00.000Z',
+      userEmail: 'user@example.com',
+      userId: 'user-id',
+      windowId: 'window-id',
+    })
+
+    const request = fetchMock.mock.calls[0]
+    const body = JSON.parse(request?.[1]?.body as string)
+
+    expect(request?.[0]).toBe('https://eu.i.posthog.com/s/')
+    expect(body.event).toBe('$snapshot')
+    expect(body.api_key).toBe('posthog-key')
+    expect(body.distinct_id).toBe('user-id')
+    expect(body.properties.$set).toEqual({ email: 'user@example.com' })
+    expect(body.properties.token).toBe('posthog-key')
+    expect(body.properties.user_id).toBe('user-id')
+    expect(body.properties.$session_id).toBe('init-session')
+    expect(body.properties.$window_id).toBe('window-id')
+    expect(body.properties.$snapshot_data).toHaveLength(1)
+    expect(request?.[1]?.signal).toBeInstanceOf(AbortSignal)
+  })
+
   it('uses the full exception endpoint host and only sends the request path for exceptions', async () => {
     const { capturePosthogException } = await import('../supabase/functions/_backend/utils/posthog.ts')
     envState.posthogApiHost = 'https://eu.i.posthog.com/i/v0/e'

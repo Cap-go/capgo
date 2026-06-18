@@ -96,12 +96,13 @@ await test('decideStart: not a Capacitor project → error', async () => {
   eq(r.phase, 'preflight')
 })
 
-await test('decideStart: not authenticated → login human_gate, no chat paste', async () => {
+await test('decideStart: not authenticated → login human_gate via capgo_login', async () => {
   const r = await decideStart(facts({ authenticated: false }), null, minimalFakeDeps())
   eq(r.kind, 'human_gate')
   eq(r.state, 'login-required')
-  ok(/cli login/i.test(r.human.instruction), 'should mention the login command')
-  ok(/not paste/i.test(r.human.instruction), 'should warn against pasting into chat')
+  ok(/capgo_login/i.test(r.human.instruction), 'should direct the agent to the capgo_login tool')
+  ok(/connect/i.test(r.human.instruction), 'should point the user at the /connect key page')
+  eq(r.next.tool, 'capgo_login', 'next action should call capgo_login')
 })
 
 await test('decideStart: both platforms → choice with two options', async () => {

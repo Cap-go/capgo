@@ -51,6 +51,9 @@ extend-exclude = [
   "*.ttf",
   "*.eot",
   "cli/test/data.ts",
+  # prescan manifest-typo test fixtures intentionally misspell tags (activty/aplication/servce)
+  "cli/test/prescan/checks-android-manifest.test.ts",
+  "cli/test/prescan/manifest.test.ts",
 
   # Mobile platforms
   "ios/",

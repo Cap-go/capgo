@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import type { IncompatibilityReason, NativePackage, PackageComparison, PackageStatus } from '~/services/bundleCompatibility'
 import type { Database } from '~/types/supabase.types'
+import { FormKit } from '@formkit/vue'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconExternalLink from '~icons/heroicons/arrow-top-right-on-square'
 import IconCheckCircle from '~icons/heroicons/check-circle'
 import IconPuzzle from '~icons/heroicons/puzzle-piece'
+import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import { comparePackages, summarizeCompatibility } from '~/services/bundleCompatibility'
 import { useSupabase } from '~/services/supabase'
@@ -49,6 +51,7 @@ const selectedCompareVersion = ref<VersionRow | null>(null)
 const baselinePackages = ref<NativePackage[]>([])
 const baselinePackagesCache = ref<Record<number, NativePackage[]>>({})
 const compareRequestId = ref(0)
+const search = ref('')
 
 const nativePackages = computed<NativePackage[]>(() => {
   if (!version.value?.native_packages)
@@ -66,6 +69,32 @@ const comparisons = computed<PackageComparison[]>(() => {
   return comparePackages(nativePackages.value, baselinePackages.value)
 })
 
+const searchLower = computed(() => search.value.trim().toLowerCase())
+
+function matchesPackageSearch(name: string, ...versions: Array<string | undefined>) {
+  if (!searchLower.value)
+    return true
+  if (name.toLowerCase().includes(searchLower.value))
+    return true
+  return versions.some(version => version?.toLowerCase().includes(searchLower.value))
+}
+
+const displayComparisons = computed(() => {
+  if (!searchLower.value)
+    return comparisons.value
+  return comparisons.value.filter(entry => matchesPackageSearch(
+    entry.name,
+    entry.candidateVersion,
+    entry.baselineVersion,
+  ))
+})
+
+const displayNativePackages = computed(() => {
+  if (!searchLower.value)
+    return nativePackages.value
+  return nativePackages.value.filter(pkg => matchesPackageSearch(pkg.name, pkg.version))
+})
+
 const compatibilitySummary = computed(() => summarizeCompatibility(comparisons.value))
 
 const statusCounts = computed(() => {
@@ -76,6 +105,17 @@ const statusCounts = computed(() => {
 })
 
 const uniqueVersionsCount = computed(() => new Set(nativePackages.value.map(pkg => pkg.version)).size)
+
+const sameVersionChecksumChanges = computed(() => comparisons.value.some((entry) => {
+  const isSameVersion = entry.status === 'changed'
+    && !!entry.baselineVersion
+    && !!entry.candidateVersion
+    && entry.baselineVersion === entry.candidateVersion
+  if (!isSameVersion)
+    return false
+
+  return platformChecksumDiffs(entry).length > 0
+}))
 
 const compareStatusMessage = computed(() => {
   if (!nativePackages.value.length)
@@ -101,6 +141,8 @@ function reasonLabel(reason: IncompatibilityReason): string {
       return t('compat-reason-removed-plugin')
     case 'version_mismatch':
       return t('compat-reason-version-mismatch')
+    case 'requested_version_changed':
+      return t('compat-reason-requested-version-changed')
     case 'ios_code_changed':
       return t('compat-reason-ios-changed')
     case 'android_code_changed':
@@ -112,8 +154,89 @@ function reasonLabel(reason: IncompatibilityReason): string {
   }
 }
 
-function reasonsLabel(reasons: IncompatibilityReason[]): string {
-  return reasons.map(reasonLabel).join(', ')
+function hideHash(hash?: string) {
+  if (!hash)
+    return ''
+  if (hash.length <= 12)
+    return hash
+  return `${hash.slice(0, 6)}...${hash.slice(-6)}`
+}
+
+interface PlatformChecksumDiff {
+  platform: 'iOS' | 'Android'
+  baseline: string
+  candidate: string
+}
+
+function isSameVersion(entry: PackageComparison): boolean {
+  return entry.status === 'changed'
+    && !!entry.baselineVersion
+    && !!entry.candidateVersion
+    && entry.baselineVersion === entry.candidateVersion
+}
+
+function isVersionMismatch(entry: PackageComparison): boolean {
+  return entry.reasons.includes('version_mismatch')
+}
+
+function requestedVersionRangeChanged(entry: PackageComparison): boolean {
+  return entry.reasons.includes('requested_version_changed')
+}
+
+function platformChecksumDiffs(entry: PackageComparison): PlatformChecksumDiff[] {
+  const diffs: PlatformChecksumDiff[] = []
+
+  if (entry.baselineIosChecksum && entry.candidateIosChecksum && entry.baselineIosChecksum !== entry.candidateIosChecksum) {
+    diffs.push({
+      platform: 'iOS',
+      baseline: entry.baselineIosChecksum,
+      candidate: entry.candidateIosChecksum,
+    })
+  }
+
+  if (entry.baselineAndroidChecksum && entry.candidateAndroidChecksum && entry.baselineAndroidChecksum !== entry.candidateAndroidChecksum) {
+    diffs.push({
+      platform: 'Android',
+      baseline: entry.baselineAndroidChecksum,
+      candidate: entry.candidateAndroidChecksum,
+    })
+  }
+
+  return diffs
+}
+
+function versionMismatchReason(entry: PackageComparison): string | null {
+  if (!isVersionMismatch(entry))
+    return null
+  return t('dependencies-version-mismatch-with-values', {
+    baseline: entry.baselineVersion ?? t('unknown'),
+    candidate: entry.candidateVersion ?? t('unknown'),
+  })
+}
+
+function sameVersionReason(entry: PackageComparison): string | null {
+  if (isVersionMismatch(entry) || !isSameVersion(entry))
+    return null
+  return t('dependencies-version-text-unchanged')
+}
+
+function requestedRangeReason(entry: PackageComparison): string | null {
+  if (!requestedVersionRangeChanged(entry))
+    return null
+  return t('dependencies-constraint-changed', {
+    baseline: entry.baselineRequestedVersion ?? t('unknown'),
+    candidate: entry.candidateRequestedVersion ?? t('unknown'),
+  })
+}
+
+function filteredReasons(entry: PackageComparison) {
+  return entry.reasons
+    .filter(reason => reason !== 'version_mismatch'
+      && reason !== 'requested_version_changed'
+      && reason !== 'ios_code_changed'
+      && reason !== 'android_code_changed'
+      && reason !== 'both_platforms_changed')
+    .map(reasonLabel)
 }
 
 function openNpmPackage(packageName: string) {
@@ -270,6 +393,7 @@ watch(bundleRouteKey, async (key) => {
   packageId.value = app
   id.value = Number(bundle)
   baselinePackagesCache.value = {}
+  search.value = ''
   resetCompareSelection()
   await getVersion()
   // Pre-select from ?compare only after the version loads.
@@ -408,118 +532,164 @@ watch(bundleRouteKey, async (key) => {
               <p v-if="compareStatusMessage" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
                 {{ compareStatusMessage }}
               </p>
-            </div>
+              <p v-if="sameVersionChecksumChanges" class="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                {{ t('dependencies-same-version-changed-hint') }}
+              </p>
 
-            <div class="px-2 pb-2 relative">
-              <!-- Comparison view: status-aware rows with the candidate→baseline diff -->
-              <div v-if="compareVersionId && comparisons.length > 0" class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead class="bg-gray-50 dark:bg-gray-900">
-                    <tr>
-                      <th scope="col" class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-400">
-                        {{ t('package-name') }}
-                      </th>
-                      <th scope="col" class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-400">
-                        {{ t('status') }}
-                      </th>
-                      <th scope="col" class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-400">
-                        {{ t('version') }}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
-                    <tr
-                      v-for="entry in comparisons"
-                      :key="entry.name"
-                      class="hover:bg-gray-50 dark:hover:bg-gray-700"
-                      :class="STATUS_STYLES[entry.status].accent"
-                    >
-                      <td class="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap dark:text-gray-100">
-                        <div class="flex items-center gap-2">
-                          <IconPuzzle class="w-4 h-4 text-gray-400" />
-                          {{ entry.name }}
-                          <button
-                            class="p-1 transition-colors rounded-md hover:bg-gray-100 dark:hover:bg-gray-600"
-                            :title="t('view-on-npm')"
-                            @click="openNpmPackage(entry.name)"
-                          >
-                            <IconExternalLink class="w-4 h-4 text-gray-400 cursor-pointer hover:text-blue-500 dark:hover:text-blue-400" />
-                          </button>
-                        </div>
-                        <p v-if="!entry.compatible" class="mt-1 text-xs text-red-600 dark:text-red-400">
-                          {{ reasonsLabel(entry.reasons) }}
-                        </p>
-                      </td>
-                      <td class="px-6 py-4 text-sm whitespace-nowrap">
-                        <span class="px-2 py-1 text-xs font-medium rounded-full" :class="STATUS_STYLES[entry.status].pill">
-                          {{ t(`dependencies-status-${entry.status}`) }}
-                        </span>
-                      </td>
-                      <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap dark:text-gray-400">
-                        <!-- changed: old → new; added: new only; removed: old only; unchanged: single version -->
-                        <span v-if="entry.status === 'changed'" class="inline-flex items-center gap-2">
-                          <span class="px-2 py-1 text-xs font-medium rounded-full text-slate-600 bg-slate-100 line-through dark:text-slate-300 dark:bg-slate-700">{{ entry.baselineVersion }}</span>
-                          <span class="text-slate-400">→</span>
-                          <span class="px-2 py-1 text-xs font-medium rounded-full text-blue-800 bg-blue-100 dark:text-blue-200 dark:bg-blue-900">{{ entry.candidateVersion }}</span>
-                        </span>
-                        <span v-else-if="entry.status === 'added'" class="px-2 py-1 text-xs font-medium rounded-full text-emerald-800 bg-emerald-100 dark:text-emerald-200 dark:bg-emerald-900">
-                          {{ entry.candidateVersion }}
-                        </span>
-                        <span v-else-if="entry.status === 'removed'" class="px-2 py-1 text-xs font-medium rounded-full text-red-800 bg-red-100 line-through dark:text-red-200 dark:bg-red-900">
-                          {{ entry.baselineVersion }}
-                        </span>
-                        <span v-else class="px-2 py-1 text-xs font-medium rounded-full text-slate-600 bg-slate-100 dark:text-slate-300 dark:bg-slate-700">
-                          {{ entry.candidateVersion }}
-                        </span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              <div class="px-2 pb-2 relative">
+                <div class="px-2 py-3">
+                  <FormKit
+                    v-model="search"
+                    :prefix-icon="IconSearch"
+                    :placeholder="t('search-by-name')"
+                    :disabled="tableLoading"
+                    :classes="{ outer: 'mb-0! w-full md:w-96' }"
+                  />
+                </div>
 
-              <!-- No baseline selected: plain list of this bundle's packages -->
-              <div v-else-if="!compareVersionId && nativePackages.length > 0" class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead class="bg-gray-50 dark:bg-gray-900">
-                    <tr>
-                      <th scope="col" class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-400">
-                        {{ t('package-name') }}
-                      </th>
-                      <th scope="col" class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-400">
-                        {{ t('version') }}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
-                    <tr v-for="pkg in nativePackages" :key="`${pkg.name}@${pkg.version}`" class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td class="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap dark:text-gray-100">
-                        <div class="flex items-center gap-2">
-                          <IconPuzzle class="w-4 h-4 text-gray-400" />
-                          {{ pkg.name }}
-                          <button
-                            class="p-1 transition-colors rounded-md hover:bg-gray-100 dark:hover:bg-gray-600"
-                            :title="t('view-on-npm')"
-                            @click="openNpmPackage(pkg.name)"
-                          >
-                            <IconExternalLink class="w-4 h-4 text-gray-400 cursor-pointer hover:text-blue-500 dark:hover:text-blue-400" />
-                          </button>
-                        </div>
-                      </td>
-                      <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap dark:text-gray-400">
-                        <span class="px-2 py-1 text-xs font-medium text-blue-800 bg-blue-100 rounded-full dark:text-blue-200 dark:bg-blue-900">
-                          {{ pkg.version }}
-                        </span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+                <div
+                  v-if="searchLower && ((compareVersionId && comparisons.length > 0 && displayComparisons.length === 0) || (!compareVersionId && nativePackages.length > 0 && displayNativePackages.length === 0))"
+                  class="px-6 py-8 text-sm text-center text-slate-500 dark:text-slate-400"
+                >
+                  {{ t('try-a-different-search-term') }}
+                </div>
 
-              <div
-                v-if="tableLoading"
-                class="absolute inset-0 flex items-center justify-center bg-white/70 dark:bg-slate-900/70"
-              >
-                <Spinner size="w-10 h-10" />
+                <!-- Comparison view: status-aware rows with the candidate→baseline diff -->
+                <div v-else-if="compareVersionId && comparisons.length > 0 && displayComparisons.length > 0" class="overflow-x-auto">
+                  <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-900">
+                      <tr>
+                        <th scope="col" class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-400">
+                          {{ t('package-name') }}
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-400">
+                          {{ t('status') }}
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-400">
+                          {{ t('version') }}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
+                      <tr
+                        v-for="entry in displayComparisons"
+                        :key="entry.name"
+                        class="hover:bg-gray-50 dark:hover:bg-gray-700"
+                        :class="STATUS_STYLES[entry.status].accent"
+                      >
+                        <td class="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap dark:text-gray-100">
+                          <div class="flex items-center gap-2">
+                            <IconPuzzle class="w-4 h-4 text-gray-400" />
+                            {{ entry.name }}
+                            <button
+                              class="p-1 transition-colors rounded-md hover:bg-gray-100 dark:hover:bg-gray-600"
+                              :title="t('view-on-npm')"
+                              @click="openNpmPackage(entry.name)"
+                            >
+                              <IconExternalLink class="w-4 h-4 text-gray-400 cursor-pointer hover:text-blue-500 dark:hover:text-blue-400" />
+                            </button>
+                          </div>
+                          <div v-if="!entry.compatible" class="mt-1 space-y-1 text-xs text-red-600 dark:text-red-400">
+                            <p v-if="versionMismatchReason(entry)">
+                              {{ versionMismatchReason(entry) }}
+                            </p>
+                            <p v-else-if="sameVersionReason(entry)" class="text-slate-600 dark:text-slate-300">
+                              {{ sameVersionReason(entry) }}
+                            </p>
+
+                            <p v-if="requestedRangeReason(entry)" class="text-slate-600 dark:text-slate-300">
+                              {{ requestedRangeReason(entry) }}
+                            </p>
+
+                            <p v-if="isSameVersion(entry) && platformChecksumDiffs(entry).length > 0" class="text-slate-600 dark:text-slate-300">
+                              {{ t('dependencies-checksum-same-version-warning') }}
+                            </p>
+
+                            <p v-for="diff in platformChecksumDiffs(entry)" :key="`checksum-${diff.platform}`" class="text-slate-600 dark:text-slate-300">
+                              <span v-if="diff.platform === 'iOS'" :title="`${diff.baseline} → ${diff.candidate}`">
+                                {{ t('dependencies-checksum-diff-ios', { before: hideHash(diff.baseline), after: hideHash(diff.candidate) }) }}
+                              </span>
+                              <span v-else :title="`${diff.baseline} → ${diff.candidate}`">
+                                {{ t('dependencies-checksum-diff-android', { before: hideHash(diff.baseline), after: hideHash(diff.candidate) }) }}
+                              </span>
+                            </p>
+
+                            <p v-if="filteredReasons(entry).length > 0">
+                              {{ filteredReasons(entry).join(', ') }}
+                            </p>
+                          </div>
+                        </td>
+                        <td class="px-6 py-4 text-sm whitespace-nowrap">
+                          <span class="px-2 py-1 text-xs font-medium rounded-full" :class="STATUS_STYLES[entry.status].pill">
+                            {{ t(`dependencies-status-${entry.status}`) }}
+                          </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap dark:text-gray-400">
+                          <!-- changed: old → new; added: new only; removed: old only; unchanged: single version -->
+                          <span v-if="entry.status === 'changed'" class="inline-flex items-center gap-2">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full text-slate-600 bg-slate-100 line-through dark:text-slate-300 dark:bg-slate-700">{{ entry.baselineVersion }}</span>
+                            <span class="text-slate-400">→</span>
+                            <span class="px-2 py-1 text-xs font-medium rounded-full text-blue-800 bg-blue-100 dark:text-blue-200 dark:bg-blue-900">{{ entry.candidateVersion }}</span>
+                          </span>
+                          <span v-else-if="entry.status === 'added'" class="px-2 py-1 text-xs font-medium rounded-full text-emerald-800 bg-emerald-100 dark:text-emerald-200 dark:bg-emerald-900">
+                            {{ entry.candidateVersion }}
+                          </span>
+                          <span v-else-if="entry.status === 'removed'" class="px-2 py-1 text-xs font-medium rounded-full text-red-800 bg-red-100 line-through dark:text-red-200 dark:bg-red-900">
+                            {{ entry.baselineVersion }}
+                          </span>
+                          <span v-else class="px-2 py-1 text-xs font-medium rounded-full text-slate-600 bg-slate-100 dark:text-slate-300 dark:bg-slate-700">
+                            {{ entry.candidateVersion }}
+                          </span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <!-- No baseline selected: plain list of this bundle's packages -->
+                <div v-else-if="!compareVersionId && nativePackages.length > 0 && displayNativePackages.length > 0" class="overflow-x-auto">
+                  <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-900">
+                      <tr>
+                        <th scope="col" class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-400">
+                          {{ t('package-name') }}
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-400">
+                          {{ t('version') }}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
+                      <tr v-for="pkg in displayNativePackages" :key="`${pkg.name}@${pkg.version}`" class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td class="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap dark:text-gray-100">
+                          <div class="flex items-center gap-2">
+                            <IconPuzzle class="w-4 h-4 text-gray-400" />
+                            {{ pkg.name }}
+                            <button
+                              class="p-1 transition-colors rounded-md hover:bg-gray-100 dark:hover:bg-gray-600"
+                              :title="t('view-on-npm')"
+                              @click="openNpmPackage(pkg.name)"
+                            >
+                              <IconExternalLink class="w-4 h-4 text-gray-400 cursor-pointer hover:text-blue-500 dark:hover:text-blue-400" />
+                            </button>
+                          </div>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap dark:text-gray-400">
+                          <span class="px-2 py-1 text-xs font-medium text-blue-800 bg-blue-100 rounded-full dark:text-blue-200 dark:bg-blue-900">
+                            {{ pkg.version }}
+                          </span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div
+                  v-if="tableLoading"
+                  class="absolute inset-0 flex items-center justify-center bg-white/70 dark:bg-slate-900/70"
+                >
+                  <Spinner size="w-10 h-10" />
+                </div>
               </div>
             </div>
           </template>
