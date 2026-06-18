@@ -296,20 +296,28 @@ export interface ErrorStepProps {
   /** A captured build log exists for this run (e.g. a build was attempted), so
    *  the help menu may offer the "Ask AI for help" option. Defaults to false. */
   hasBuildLog?: boolean
+  /** Offer "✨ Create a new key for me (guided)" as the first recovery option —
+   *  set when an App Store Connect key failed to validate on a host where the
+   *  guided macOS helper is available. Defaults to false. */
+  showGuidedKey?: boolean
   onChange: (value: string) => void | Promise<void>
 }
 
 const RESTART_OPTION = { label: '↩️   Restart onboarding', value: 'restart' }
+const GUIDED_KEY_OPTION = { label: '✨  Create a new key for me (guided)', value: 'guided-key' }
 
 // Build the failure-menu options: support-first (and AI iff a build log exists)
 // from the shared `buildHelpMenuOptions`, with the onboarding-specific
 // "Restart onboarding" action spliced in just before Exit so it stays reachable.
-function buildErrorMenuOptions(hasBuildLog: boolean): { label: string, value: string }[] {
+// When `showGuidedKey` is set (an ASC key failed to validate and the macOS helper
+// is available) the guided-creation option leads the list as the default action.
+function buildErrorMenuOptions(hasBuildLog: boolean, showGuidedKey = false): { label: string, value: string }[] {
   const options = buildHelpMenuOptions({ hasBuildLog })
   const exitIndex = options.findIndex(option => option.value === 'exit')
-  if (exitIndex === -1)
-    return [...options, RESTART_OPTION]
-  return [...options.slice(0, exitIndex), RESTART_OPTION, ...options.slice(exitIndex)]
+  const withRestart = exitIndex === -1
+    ? [...options, RESTART_OPTION]
+    : [...options.slice(0, exitIndex), RESTART_OPTION, ...options.slice(exitIndex)]
+  return showGuidedKey ? [GUIDED_KEY_OPTION, ...withRestart] : withRestart
 }
 
 // Flatten an error + its recovery advice into plain text lines for the
@@ -373,6 +381,7 @@ export function estimateErrorBodyRows(
   cols: number,
   showRetry: boolean,
   hasBuildLog: boolean,
+  showGuidedKey = false,
 ): number {
   let rows = 1 // outer marginTop
   rows += wrapRows(`✖  ${error}`, cols) // ErrorLine (wraps)
@@ -397,14 +406,15 @@ export function estimateErrorBodyRows(
   rows += 1 // Newline before the action prompt
   if (showRetry)
     // "What do you want to do?" + Newline + Select (one row per option). The
-    // option count tracks buildErrorMenuOptions (support [+ AI iff hasBuildLog]
-    // + retry + restart + exit), so it stays correct as the menu grows.
-    rows += 2 + buildErrorMenuOptions(hasBuildLog).length
+    // option count tracks buildErrorMenuOptions (guided-key iff showGuidedKey +
+    // support [+ AI iff hasBuildLog] + retry + restart + exit), so it stays
+    // correct as the menu grows.
+    rows += 2 + buildErrorMenuOptions(hasBuildLog, showGuidedKey).length
   return rows
 }
 
-export const ErrorStep: FC<ErrorStepProps> = ({ error, recoveryAdvice, supportBundlePath, showRetry, collapsed = false, hasBuildLog = false, onChange }) => {
-  const errorMenuOptions = buildErrorMenuOptions(hasBuildLog)
+export const ErrorStep: FC<ErrorStepProps> = ({ error, recoveryAdvice, supportBundlePath, showRetry, collapsed = false, hasBuildLog = false, showGuidedKey = false, onChange }) => {
+  const errorMenuOptions = buildErrorMenuOptions(hasBuildLog, showGuidedKey)
   // Collapsed form: the full error + recovery advice was too tall for the
   // viewport, so the parent already showed it in the scrollable viewer. Render
   // only the error headline + the action prompt, so Try again / Restart / Exit

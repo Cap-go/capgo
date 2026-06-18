@@ -7,9 +7,11 @@ import IconCircleStack from '~icons/heroicons/circle-stack'
 import IconCurrencyDollar from '~icons/heroicons/currency-dollar'
 import IconPuzzle from '~icons/heroicons/puzzle-piece'
 import IconUsers from '~icons/heroicons/user-group'
+import IconBuild from '~icons/heroicons/wrench-screwdriver'
 
 export const adminTabs: Tab[] = [
   { label: 'overview', icon: IconChart, key: '' },
+  { label: 'builder', icon: IconBuild, key: '/builder' },
   { label: 'updates', icon: IconArrowPath, key: '/updates' },
   { label: 'replication', icon: IconCircleStack, key: '/replication' },
   { label: 'plugins', icon: IconPuzzle, key: '/plugins' },

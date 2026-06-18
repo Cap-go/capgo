@@ -2,7 +2,9 @@
 import { rmSync } from 'node:fs'
 import { buildMailtoUrl, MAILTO_BODY_MAX } from './mailto.js'
 
-const SUPPORT_EMAIL = 'support@capgo.app'
+// Exported so headless surfaces (the MCP onboarding error recovery) can point
+// users at the same address without duplicating it.
+export const SUPPORT_EMAIL = 'support@capgo.app'
 
 // Tell the user everything that's about to happen — before anything happens.
 function confirmMessage(hasUpload: boolean): string {

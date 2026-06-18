@@ -324,14 +324,22 @@ export function generateP12Passphrase(): string {
 const CAPGO_APPLE_TEAM_ID = 'UVTJ336J2D'
 
 /**
- * Bundle identifier (CFBundleIdentifier) the helper's Capgo.app is built with.
+ * Bundle identifier (CFBundleIdentifier) the keychain helper's CapgoKeychainHelper.app is built with.
  * Pinned in the designated requirement so the check accepts ONLY this binary,
  * not merely any binary signed with Capgo's Developer ID cert. Must match
  * cli-helper/assets/Info.plist.template and sign-and-notarize.sh.
  */
 const HELPER_BUNDLE_IDENTIFIER = 'app.capgo.cli.helper'
 
-const HELPER_PACKAGE_PREFIX = '@capgo/cli-keychain-darwin-'
+/**
+ * Bundle identifier of the App Store Connect key helper's CapgoAscKeyHelper.app.
+ * Pinned in its designated requirement exactly like the keychain helper above —
+ * same team, same Developer ID, different bundle id. Must match
+ * cli/scripts/package-asc-key-helper-app.sh and publish_cli_helper.yml's sign step.
+ */
+export const ASC_KEY_HELPER_BUNDLE_IDENTIFIER = 'app.capgo.asc-key-helper'
+
+const HELPER_PACKAGE_PREFIX = '@capgo/cli-helper-darwin-'
 
 /**
  * Map a Node `process.arch` value to the matching helper package name, or
@@ -345,14 +353,19 @@ export function helperPackageName(arch: string): string | null {
 
 /**
  * codesign designated requirement asserting: the exact helper bundle identifier
- * (app.capgo.cli.helper), an Apple-rooted chain, a Developer ID Application leaf
- * cert (OID 1.2.840.113635.100.6.1.13), and the given Apple Team ID as the
- * signing team. The identifier clause is what scopes the requirement to THIS
- * binary — without it, any other binary signed with Capgo's Developer ID cert
- * (a future tool, a leaked artifact) would also satisfy the check.
+ * (defaults to the keychain helper's app.capgo.cli.helper), an Apple-rooted
+ * chain, a Developer ID Application leaf cert (OID 1.2.840.113635.100.6.1.13),
+ * and the given Apple Team ID as the signing team. The identifier clause is what
+ * scopes the requirement to THIS binary — without it, any other binary signed
+ * with Capgo's Developer ID cert (a future tool, a leaked artifact) would also
+ * satisfy the check. Pass `bundleIdentifier` to scope it to a different Capgo
+ * helper (e.g. the ASC key helper) signed with the same Developer ID + team.
  */
-export function helperSignatureRequirement(teamId: string = CAPGO_APPLE_TEAM_ID): string {
-  return `=identifier "${HELPER_BUNDLE_IDENTIFIER}" and anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[subject.OU] = "${teamId}"`
+export function helperSignatureRequirement(
+  teamId: string = CAPGO_APPLE_TEAM_ID,
+  bundleIdentifier: string = HELPER_BUNDLE_IDENTIFIER,
+): string {
+  return `=identifier "${bundleIdentifier}" and anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[subject.OU] = "${teamId}"`
 }
 
 /**
@@ -365,7 +378,7 @@ export function helperSignatureRequirement(teamId: string = CAPGO_APPLE_TEAM_ID)
  */
 declare const __CAPGO_ALLOW_HELPER_ENV_OVERRIDE__: boolean | undefined
 
-interface CodesignRunner {
+export interface CodesignRunner {
   (args: readonly string[]): Promise<SpawnResult>
 }
 
@@ -375,14 +388,24 @@ export interface ResolveHelperBinaryOptions {
   /** Override `process.arch` (tests). */
   arch?: string
   /**
-   * Override module resolution (tests). Receives the package's
-   * `package.json` specifier; must return its absolute path or throw.
+   * Override module resolution (tests). Each resolver receives the package's
+   * `package.json` specifier and must return its absolute path or throw. Pass an
+   * ARRAY to test the fallback chain (each base is tried in order until one
+   * resolves); a single function is treated as a one-element chain.
    */
-  resolve?: (specifier: string) => string
+  resolve?: ((specifier: string) => string) | Array<(specifier: string) => string>
   /** Override the codesign spawn (tests). */
   codesignRunner?: CodesignRunner
   /** Force the dev env-override gate (tests). Defaults to the build-time flag. */
   allowEnvOverride?: boolean
+  /**
+   * Project directory to ALSO resolve the helper package from, in addition to the
+   * CLI's own node_modules. Lets a project-local `npm i @capgo/cli-helper-darwin-*`
+   * be picked up even when the CLI runs from a global install or the MCP server
+   * (which doesn't resolve from the user's project). Defaults to `process.cwd()`.
+   * Ignored when `resolve` is provided (tests).
+   */
+  cwd?: string
 }
 
 /**
@@ -391,7 +414,7 @@ export interface ResolveHelperBinaryOptions {
  *
  * Resolution order:
  *   1. CAPGO_KEYCHAIN_HELPER_PATH (dev builds only — see the build-time flag)
- *   2. The arch-matching @capgo/cli-keychain-darwin-* optional dependency
+ *   2. The arch-matching @capgo/cli-helper-darwin-* optional dependency
  *   3. Hard error with install guidance. There is no compile fallback.
  */
 export async function resolveHelperBinary(options: ResolveHelperBinaryOptions = {}): Promise<string> {
@@ -429,31 +452,47 @@ export async function resolveHelperBinary(options: ResolveHelperBinaryOptions = 
     )
   }
 
-  const resolveSpecifier = options.resolve ?? createRequire(import.meta.url).resolve
-  let packageJsonPath: string
-  try {
-    packageJsonPath = resolveSpecifier(`${packageName}/package.json`)
+  // Resolve the helper's package.json from (1) the CLI's own node_modules, then
+  // (2) the project the user is working in. The project fallback means a local
+  // `npm i @capgo/cli-helper-darwin-*` is honored even when the CLI runs from a
+  // global install or the MCP server — which resolves modules relative to the CLI,
+  // NOT the user's project. `options.resolve` (tests) takes sole precedence.
+  const resolveBases = options.resolve
+    ? (Array.isArray(options.resolve) ? options.resolve : [options.resolve])
+    : [
+        createRequire(import.meta.url).resolve,
+        createRequire(join(options.cwd ?? process.cwd(), 'package.json')).resolve,
+      ]
+  let packageJsonPath: string | undefined
+  for (const resolveSpecifier of resolveBases) {
+    try {
+      packageJsonPath = resolveSpecifier(`${packageName}/package.json`)
+      break
+    }
+    catch {
+      // Try the next resolution base.
+    }
   }
-  catch {
+  if (!packageJsonPath) {
     throw new MacOSSigningError(
       `The Capgo keychain helper package (${packageName}) is not installed. `
       + `It ships as an optional dependency of @capgo/cli — reinstall without `
-      + `--no-optional / --omit=optional, or install it directly: npm i ${packageName}`,
+      + `--no-optional / --omit=optional, or install it in this project: npm i ${packageName}`,
     )
   }
 
-  // The package ships a signed `Capgo.app` bundle (a directory). We verify the
+  // The package ships a signed `CapgoKeychainHelper.app` bundle (a directory). We verify the
   // bundle's code signature, then run the executable inside it. The bundle —
   // not a bare binary — is what gives the macOS Keychain prompts the "Capgo"
   // name + icon and keys the "Always Allow" grant to CFBundleIdentifier.
-  const bundlePath = join(dirname(packageJsonPath), 'Capgo.app')
+  const bundlePath = join(dirname(packageJsonPath), 'CapgoKeychainHelper.app')
   const execPath = join(bundlePath, 'Contents', 'MacOS', 'capgo')
   try {
     accessSync(execPath, constants.X_OK)
   }
   catch {
     throw new MacOSSigningError(
-      `The keychain helper package (${packageName}) is installed but its Capgo.app `
+      `The keychain helper package (${packageName}) is installed but its CapgoKeychainHelper.app `
       + `bundle is missing or not executable at ${execPath}. Reinstall ${packageName}.`,
     )
   }
@@ -474,13 +513,54 @@ async function verifyHelperSignature(
   packageName: string,
   runner: CodesignRunner,
 ): Promise<void> {
-  const result = await runner(['--verify', '--strict', '-R', helperSignatureRequirement(), binaryPath])
+  await verifyAppBundleSignature(binaryPath, {
+    bundleIdentifier: HELPER_BUNDLE_IDENTIFIER,
+    label: 'keychain helper',
+    reinstallHint: `Reinstall ${packageName} and try again.`,
+    codesignRunner: runner,
+  })
+}
+
+export interface VerifyAppBundleSignatureOptions {
+  /**
+   * Bundle identifier to pin in the designated requirement (e.g.
+   * app.capgo.cli.helper for the keychain helper, app.capgo.asc-key-helper for
+   * the ASC key helper). Both are signed with the same Developer ID + team.
+   */
+  bundleIdentifier: string
+  /** Human-readable name for the helper, used in the thrown error message. */
+  label?: string
+  /** Extra guidance appended to the error message (e.g. a reinstall hint). */
+  reinstallHint?: string
+  /** Override the codesign spawn (tests). */
+  codesignRunner?: CodesignRunner
+}
+
+/**
+ * Verify an app bundle's (or binary's) code signature against Capgo's designated
+ * requirement (Apple-rooted chain + Developer ID Application leaf + Capgo Team ID
+ * + the given bundle identifier). macOS validates the certificate chain and the
+ * seal, so this also detects post-install tampering. Throws — never returns —
+ * on any failure, so callers can verify-then-spawn safely.
+ *
+ * Shared by the keychain helper and the App Store Connect key helper: both ship
+ * inside the same npm package, signed with the same Developer ID, distinguished
+ * only by their bundle identifiers.
+ */
+export async function verifyAppBundleSignature(
+  bundlePath: string,
+  options: VerifyAppBundleSignatureOptions,
+): Promise<void> {
+  const runner = options.codesignRunner ?? defaultCodesignRunner
+  const requirement = helperSignatureRequirement(CAPGO_APPLE_TEAM_ID, options.bundleIdentifier)
+  const result = await runner(['--verify', '--strict', '-R', requirement, bundlePath])
   if (result.code !== 0) {
     const detail = result.stderr.trim() || result.stdout.trim()
+    const label = options.label ?? 'helper'
+    const hint = options.reinstallHint ? ` ${options.reinstallHint}` : ''
     throw new MacOSSigningError(
-      `Refusing to run the keychain helper at ${binaryPath}: its code signature `
-      + `did not verify as Capgo's (codesign exit ${result.code}${detail ? `: ${detail}` : ''}). `
-      + `Reinstall ${packageName} and try again.`,
+      `Refusing to run the ${label} at ${bundlePath}: its code signature `
+      + `did not verify as Capgo's (codesign exit ${result.code}${detail ? `: ${detail}` : ''}).${hint}`,
     )
   }
 }
@@ -566,7 +646,7 @@ export interface ExportP12Options {
  * runs against the same identity from the same binary are silent.
  *
  * Internally runs the precompiled, signature-verified `helper keychain-export`
- * subcommand from the arch-matching `@capgo/cli-keychain-darwin-*` package.
+ * subcommand from the arch-matching `@capgo/cli-helper-darwin-*` package.
  *
  * @param targetSha1 SHA1 of the identity to export (from {@link listSigningIdentities})
  * @param options    See {@link ExportP12Options}

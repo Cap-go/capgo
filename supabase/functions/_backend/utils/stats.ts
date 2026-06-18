@@ -363,24 +363,24 @@ export async function readDevices(c: Context, params: ReadDevicesParams, customI
   return { data, nextCursor, hasMore }
 }
 
-export async function countAllApps(c: Context): Promise<number> {
+export async function countAllApps(c: Context, referenceDate?: Date): Promise<number> {
   const [cloudflareApps, supabaseApps] = await Promise.all([
-    getAppsFromCF(c),
-    getAppsFromSB(c),
+    getAppsFromCF(c, referenceDate),
+    getAppsFromSB(c, referenceDate),
   ])
 
   const allApps = [...new Set([...cloudflareApps, ...supabaseApps])]
   return allApps.length
 }
 
-export async function countAllUpdates(c: Context): Promise<number> {
-  const logsCount = await countUpdatesFromLogsCF(c)
+export async function countAllUpdates(c: Context, referenceDate?: Date): Promise<number> {
+  const logsCount = await countUpdatesFromLogsCF(c, referenceDate)
 
   return logsCount
 }
 
-export async function countAllUpdatesExternal(c: Context): Promise<number> {
-  const externalCount = await countUpdatesFromLogsExternalCF(c)
+export async function countAllUpdatesExternal(c: Context, referenceDate?: Date): Promise<number> {
+  const externalCount = await countUpdatesFromLogsExternalCF(c, referenceDate)
   return externalCount
 }
 

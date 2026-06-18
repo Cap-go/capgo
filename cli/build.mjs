@@ -1,11 +1,11 @@
 import { copyFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { env, exit } from 'node:process'
 
-// Precompiled keychain helper packages resolve from node_modules at runtime
-// (binary-only optional deps) — never bundle them.
+// Precompiled helper packages (keychain + ASC key helper .apps) resolve from
+// node_modules at runtime (binary-only optional deps) — never bundle them.
 const HELPER_PACKAGES = [
-  '@capgo/cli-keychain-darwin-arm64',
-  '@capgo/cli-keychain-darwin-x64',
+  '@capgo/cli-helper-darwin-arm64',
+  '@capgo/cli-helper-darwin-x64',
 ]
 
 // Shared plugin definitions - Bun's plugin API is compatible with esbuild's
@@ -318,8 +318,10 @@ const buildCLI = Bun.build({
   external: HELPER_PACKAGES,
   define: {
     'process.env.SUPA_DB': '"production"',
+    // __CAPGO_DEV__ stays false forever — dev/spoof branches never ship.
     'globalThis.__CAPGO_DEV__': 'false',
-    'globalThis.__CAPGO_MCP_ONBOARDING__': 'false',
+    // MCP onboarding is release-ready as of PR 2: ship the onboarding tools.
+    'globalThis.__CAPGO_MCP_ONBOARDING__': 'true',
     // Gates the CAPGO_KEYCHAIN_HELPER_PATH dev override. `false` here makes
     // the minifier delete the whole branch from release bundles —
     // publish_cli.yml asserts the string is absent from dist/index.js.
@@ -353,8 +355,10 @@ const buildSDK = Bun.build({
   external: HELPER_PACKAGES,
   define: {
     'process.env.SUPA_DB': '"production"',
+    // __CAPGO_DEV__ stays false forever — dev/spoof branches never ship.
     'globalThis.__CAPGO_DEV__': 'false',
-    'globalThis.__CAPGO_MCP_ONBOARDING__': 'false',
+    // MCP onboarding is release-ready as of PR 2: ship the onboarding tools.
+    'globalThis.__CAPGO_MCP_ONBOARDING__': 'true',
     // Gates the CAPGO_KEYCHAIN_HELPER_PATH dev override. `false` here makes
     // the minifier delete the whole branch from release bundles —
     // publish_cli.yml asserts the string is absent from dist/index.js.

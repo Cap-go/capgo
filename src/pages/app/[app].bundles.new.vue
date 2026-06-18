@@ -82,9 +82,7 @@ onMounted(() => {
       <FailedCard />
     </div>
 
-    <div v-else-if="isLoading" class="flex flex-col justify-center items-center h-full">
-      <Spinner size="w-40 h-40" />
-    </div>
+    <PageLoader v-else-if="isLoading" />
 
     <div v-else>
       <StepsBundle

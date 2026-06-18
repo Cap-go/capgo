@@ -207,18 +207,25 @@ test("ci-secrets-setup · skip → bespoke 'build-complete' [DIVERGE: navigation
 // ci-secrets-target-select  (app.tsx L2832-2858) — multi-target, after build
 // ════════════════════════════════════════════════════════════════════════════
 // IN TAIL_INPUT_STEPS → writes ciSecretTarget. The bespoke routes per provider
-// (ask-github-actions-setup / ask-ci-secrets) or build-complete on skip/no-target;
-// the resume router collapses any chosen target onto the read-only check, and a
-// null target onto re-detection. These are effect-routed in the engine
-// (detecting-ci-secrets fans out by provider via runTailEffect).
-test("ci-secrets-target-select · github → bespoke 'ask-github-actions-setup' [DIVERGE: provider fan-out is effect-routed; resume → check]", () => {
+// (ask-github-actions-setup / ask-ci-secrets) or build-complete on skip/no-target.
+// The resume router collapses a GITLAB target (or a github target with a
+// DECIDED setupMode) onto the read-only check, and a null target onto
+// re-detection.
+// CONTRACT CHANGE (S14): a GitHub target with NO persisted setupMode decision
+// now resumes onto the UNANSWERED ask-github-actions-setup consent gate
+// instead of collapsing onto checking-ci-secrets — the old route silently
+// dropped the user's pending decision after an MCP server restart (the answer
+// was then rejected off-step; found by the live MCP e2e). The unanswered
+// consent gate must re-ask. The engine-derived next now EQUALS the bespoke
+// provider fan-out, so the github case is reclassified DIVERGE → MATCH.
+test("ci-secrets-target-select · github → bespoke 'ask-github-actions-setup' [MATCH: the unanswered consent gate is now resume-derivable (S14)]", () => {
   parity({
     step: 'ci-secrets-target-select',
     progress: afterBuildNoTarget(),
     input: { step: 'ci-secrets-target-select', ciSecretTarget: GITHUB_TARGET },
     bespoke: 'ask-github-actions-setup',
-    engine: 'checking-ci-secrets',
-    klass: 'DIVERGE',
+    engine: 'ask-github-actions-setup',
+    klass: 'MATCH',
   })
 })
 test("ci-secrets-target-select · gitlab → bespoke 'ask-ci-secrets' [DIVERGE: provider fan-out is effect-routed; resume → check]", () => {
@@ -250,6 +257,17 @@ test("ci-secrets-target-select · skip/null → bespoke 'build-complete' [DIVERG
 // uploaded); declined lands on the env-export prompt (no path recorded yet).
 const afterBuildGithub = () => savedTailProgress({
   ciSecretTarget: GITHUB_TARGET,
+  completedSteps: { buildRequested: BUILD_REQUESTED },
+})
+// Post-gate github shape: confirm-secrets-push / ci-secrets-failed are only
+// reachable AFTER ask-github-actions-setup was answered, so their fixtures
+// carry the decided setupMode. (An UNDECIDED github target now resumes to the
+// unanswered gate itself — the consent-gate re-ask contract; a persisted
+// target with no setupMode is an MCP-slim-progress shape the resolver routes
+// to 'ask-github-actions-setup' so a pending decision is never silently lost.)
+const afterBuildGithubDecided = () => savedTailProgress({
+  ciSecretTarget: GITHUB_TARGET,
+  setupMode: 'secrets-only',
   completedSteps: { buildRequested: BUILD_REQUESTED },
 })
 test("ask-github-actions-setup · with-workflow → bespoke 'checking-ci-secrets' [MATCH]", () => {
@@ -321,7 +339,7 @@ test("ask-ci-secrets · no → bespoke 'build-complete' [DIVERGE: navigation-onl
 test("confirm-secrets-push · confirm → bespoke 'uploading-ci-secrets' [DIVERGE: confirm fires AUTO upload; resume → check]", () => {
   parity({
     step: 'confirm-secrets-push',
-    progress: afterBuildGithub(),
+    progress: afterBuildGithubDecided(),
     input: { step: 'confirm-secrets-push', value: 'confirm' },
     bespoke: 'uploading-ci-secrets',
     engine: 'checking-ci-secrets',
@@ -331,7 +349,7 @@ test("confirm-secrets-push · confirm → bespoke 'uploading-ci-secrets' [DIVERG
 test("confirm-secrets-push · cancel → bespoke 'build-complete' [DIVERGE: navigation-only cancel; resume → check]", () => {
   parity({
     step: 'confirm-secrets-push',
-    progress: afterBuildGithub(),
+    progress: afterBuildGithubDecided(),
     input: { step: 'confirm-secrets-push', value: 'cancel' },
     bespoke: 'build-complete',
     engine: 'checking-ci-secrets',
@@ -373,7 +391,7 @@ test("confirm-ci-secret-overwrite · skip → bespoke 'build-complete' [DIVERGE:
 test("ci-secrets-failed · retry (target set) → bespoke 'checking-ci-secrets' [MATCH]", () => {
   parity({
     step: 'ci-secrets-failed',
-    progress: afterBuildGithub(),
+    progress: afterBuildGithubDecided(),
     input: { step: 'ci-secrets-failed', value: 'retry' },
     bespoke: 'checking-ci-secrets',
     engine: 'checking-ci-secrets',
@@ -393,7 +411,7 @@ test("ci-secrets-failed · retry (no target) → bespoke 'detecting-ci-secrets' 
 test("ci-secrets-failed · continue (target set) → bespoke 'build-complete' [DIVERGE: navigation-only; resume → check]", () => {
   parity({
     step: 'ci-secrets-failed',
-    progress: afterBuildGithub(),
+    progress: afterBuildGithubDecided(),
     input: { step: 'ci-secrets-failed', value: 'continue' },
     bespoke: 'build-complete',
     engine: 'checking-ci-secrets',

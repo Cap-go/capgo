@@ -29,14 +29,9 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="flex flex-col items-center justify-center py-16">
-    <div v-if="isLoading" class="flex flex-col items-center space-y-4">
-      <Spinner class="w-8 h-8" />
-      <p class="text-gray-700 dark:text-gray-300">
-        Attempting to log you in as the requested account...
-      </p>
-    </div>
-    <div v-else class="space-y-2 text-center">
+  <div>
+    <PageLoader v-if="isLoading" label="Attempting to log you in as the requested account..." size="w-8 h-8" />
+    <div v-else class="flex min-h-[calc(100dvh-8rem)] flex-col items-center justify-center space-y-2 px-4 py-16 text-center">
       <p class="text-lg font-semibold text-red-600 dark:text-red-400">
         Unable to spoof account.
       </p>

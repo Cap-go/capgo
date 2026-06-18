@@ -99,10 +99,31 @@ function tailResumeStep(progress: OnboardingProgress): OnboardingStep | null {
       return progress.envExportTargetPath ? 'exporting-env' : 'ask-export-env'
 
     // A destination is already chosen (single-target auto-pick, the
-    // target-select screen, or a decided setupMode) → the remote check is the
-    // next read-only step before the confirm gate + upload.
-    if (progress.ciSecretTarget)
+    // target-select screen, or a decided setupMode) → normally the remote
+    // check is the next read-only step before the confirm gate + upload.
+    if (progress.ciSecretTarget) {
+      // EXCEPT: a GitHub target whose 3-way ask-github-actions-setup consent
+      // gate is still UNANSWERED — no setupMode decision was ever persisted.
+      // The MCP slim progress persists the auto-picked target at tail ENTRY
+      // (before the user answers the gate), so a server restart parked on the
+      // unanswered gate used to collapse onto 'checking-ci-secrets', routing
+      // PAST the gate: the pending githubActionsSetup answer was then rejected
+      // off-step and the with-workflow arm became unreachable — the user's
+      // decision was silently lost (found by the live MCP e2e, S14). Re-ask
+      // the unanswered gate instead — the same principle as the S9-S11
+      // checkBuild re-poll park. Strictly `undefined`: the TUI's SYNTHETIC
+      // in-memory progress carries setupMode 'undecided' pre-answer (its
+      // in-session router must keep its routing), and the TUI never persists
+      // ciSecretTarget — the undefined shape is MCP-slim-progress-only.
+      // ASYMMETRY (GitLab, deliberate): its consent gate is ask-ci-secrets,
+      // whose yes/no is purely navigational and never persisted — resume
+      // cannot distinguish answered from unanswered, so 'checking-ci-secrets'
+      // stays its correct idempotent re-entry (the confirm-ci-secret-overwrite
+      // gate re-derives from the remote).
+      if (progress.ciSecretTarget.provider === 'github' && progress.setupMode === undefined)
+        return 'ask-github-actions-setup'
       return 'checking-ci-secrets'
+    }
 
     // Credentials saved + build queued but no CI work started yet → re-run the
     // read-only detection. Idempotent: it only inspects the repo and routes.
@@ -127,7 +148,7 @@ function tailResumeStep(progress: OnboardingProgress): OnboardingStep | null {
   return 'build-complete'
 }
 
-export function getIosResumeStep(progress: OnboardingProgress | null): OnboardingStep {
+export function getIosResumeStep(progress: OnboardingProgress | null, canAutomate = true): OnboardingStep {
   if (!progress)
     return 'welcome'
 
@@ -160,5 +181,5 @@ export function getIosResumeStep(progress: OnboardingProgress | null): Onboardin
   // saving-credentials. Delegated VERBATIM to the existing partial resume so the
   // import app_store `verifying-key` round-trip (and every other already-tested
   // branch) is preserved unchanged.
-  return getResumeStep(progress)
+  return getResumeStep(progress, canAutomate)
 }

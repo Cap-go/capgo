@@ -7,5 +7,8 @@ extend-exclude = [
 # checker mis-flags. Add identifiers here as "wrong" = "right" — but to
 # accept them as-is we set the value to the same word.
 [default.extend-words]
+# "CIPS" is a real App Store Connect role/plumbing value in Apple's session
+# payload (see native/asc-key-helper/Sources/Models/ASCSession.swift), not a typo.
+CIPS = "CIPS"
 UDID = "UDID"
 unparseable = "unparseable"

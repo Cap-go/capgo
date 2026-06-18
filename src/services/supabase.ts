@@ -205,7 +205,11 @@ export async function getSpoofedAdminJwt() {
   }
 
   const expiresAt = getJwtExpiresAt(spoofedAdminSession.jwt)
-  return expiresAt && expiresAt > Date.now() / 1000 ? spoofedAdminSession.jwt : null
+  if (expiresAt && expiresAt > Date.now() / 1000)
+    return spoofedAdminSession.jwt
+
+  clearSpoof()
+  return null
 }
 
 export async function hashEmail(email: string) {
@@ -223,12 +227,19 @@ export async function unspoofUser() {
   if (!spoofedAdminSession)
     return false
 
+  const restoredAdminSession = await refreshSpoofedAdminSession(spoofedAdminSession).catch(() => null)
+  if (!restoredAdminSession) {
+    clearSpoof()
+    return false
+  }
+
   const supabase = useSupabase()
-  const { data, error } = await supabase.auth.setSession({ access_token: spoofedAdminSession.jwt, refresh_token: spoofedAdminSession.refreshToken })
+  const { data, error } = await supabase.auth.setSession({ access_token: restoredAdminSession.jwt, refresh_token: restoredAdminSession.refreshToken })
+  clearSpoof()
+
   if (error || !data.session)
     return false
 
-  localStorage.removeItem(getSpoofedAdminStorageKey())
   return true
 }
 

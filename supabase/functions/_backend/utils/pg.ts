@@ -10,6 +10,7 @@ import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { CacheHelper } from './cache.ts'
 import { DISPOSABLE_EMAIL_DOMAINS, PERSONAL_EMAIL_DOMAINS } from './emailClassification.ts'
 import { getClientDbRegionSB } from './geolocation.ts'
+import { REQUIRED_GLOBAL_STATS_SHARDS } from './global_stats.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import * as schema from './postgres_schema.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
@@ -21,16 +22,16 @@ const REPLICATION_LAG_CACHE_TTL_MS = REPLICATION_LAG_CACHE_TTL_SECONDS * 1000
 type ReplicationStatus = 'ok' | 'lagging' | 'unknown'
 interface ChannelLookupResult { id: number, name: string, allow_device_self_set: boolean, public: boolean, owner_org: string }
 type PlanAction = 'mau' | 'storage' | 'bandwidth'
-type ReadReplicaHyperdriveBinding =
-  | 'HYPERDRIVE_CAPGO_READ_AS_JAPAN'
-  | 'HYPERDRIVE_CAPGO_READ_AS_INDIA'
-  | 'HYPERDRIVE_CAPGO_READ_NA'
-  | 'HYPERDRIVE_CAPGO_READ_EU'
-  | 'HYPERDRIVE_CAPGO_READ_OC'
-  | 'HYPERDRIVE_CAPGO_READ_SA'
-  | 'HYPERDRIVE_CAPGO_READ_ME'
-  | 'HYPERDRIVE_CAPGO_READ_AF'
-  | 'HYPERDRIVE_CAPGO_READ_HK'
+type ReadReplicaHyperdriveBinding
+  = | 'HYPERDRIVE_CAPGO_READ_AS_JAPAN'
+    | 'HYPERDRIVE_CAPGO_READ_AS_INDIA'
+    | 'HYPERDRIVE_CAPGO_READ_NA'
+    | 'HYPERDRIVE_CAPGO_READ_EU'
+    | 'HYPERDRIVE_CAPGO_READ_OC'
+    | 'HYPERDRIVE_CAPGO_READ_SA'
+    | 'HYPERDRIVE_CAPGO_READ_ME'
+    | 'HYPERDRIVE_CAPGO_READ_AF'
+    | 'HYPERDRIVE_CAPGO_READ_HK'
 
 interface ReplicationLagStatus {
   status: ReplicationStatus
@@ -62,7 +63,7 @@ const PLAN_EXCEEDED_COLUMNS: Record<PlanAction, string> = {
   bandwidth: 'bandwidth_exceeded',
 }
 
-function buildPlanValidationExpression(
+export function buildPlanValidationExpression(
   actions: PlanAction[],
   ownerColumn: typeof schema.app_versions.owner_org | typeof schema.apps.owner_org,
 ) {
@@ -1165,6 +1166,10 @@ export interface AdminGlobalStatsTrend {
   new_paying_orgs: number
   canceled_orgs: number
   upgraded_orgs: number
+  trial_extended_orgs: number
+  trial_extended_subscribed_orgs: number
+  past_due_orgs: number
+  past_due_orgs_average_days: number
   mrr: number
   previous_mrr: number
   previous_mrr_solo: number
@@ -1225,11 +1230,16 @@ export async function getAdminGlobalStatsTrend(
     // Extract just the date portion (YYYY-MM-DD) from ISO timestamps
     const startDateOnly = start_date.split('T')[0]
     const endDateOnly = end_date.split('T')[0]
+    const requiredCompletedShardsJson = JSON.stringify(REQUIRED_GLOBAL_STATS_SHARDS)
 
-    // Simple query - just SELECT all columns from global_stats
-    // Revenue metrics are already calculated and stored by logsnag_insights cron job
+    // Keep in-progress placeholder snapshots hidden until all core shards complete.
     const query = sql`
-      WITH stats AS (
+      WITH completed_stats AS (
+        SELECT *
+        FROM global_stats
+        WHERE completed_shards @> ${requiredCompletedShardsJson}::jsonb
+      ),
+      stats AS (
         SELECT
         gs.date_id AS date,
         gs.apps::int AS apps,
@@ -1263,8 +1273,12 @@ export async function getAdminGlobalStatsTrend(
         gs.paying_yearly::int AS paying_yearly,
         gs.paying_monthly::int AS paying_monthly,
         gs.new_paying_orgs::int AS new_paying_orgs,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'past_due_orgs', '')::int, 0)::int AS past_due_orgs,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'past_due_orgs_average_days', '')::float, 0)::float AS past_due_orgs_average_days,
         gs.canceled_orgs::int AS canceled_orgs,
         COALESCE(gs.upgraded_orgs, 0)::int AS upgraded_orgs,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'trial_extended_orgs', '')::int, 0)::int AS trial_extended_orgs,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'trial_extended_subscribed_orgs', '')::int, 0)::int AS trial_extended_subscribed_orgs,
         gs.mrr::float AS mrr,
         COALESCE(prev.mrr, 0)::float AS previous_mrr,
         (COALESCE(prev.revenue_solo, 0)::float / 12)::float AS previous_mrr_solo,
@@ -1332,8 +1346,8 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(NULLIF(to_jsonb(gs) ->> 'build_count_day_android', '')::int, NULLIF(to_jsonb(gs) ->> 'builds_day_android', '')::int, 0)::int AS build_count_day_android,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'builder_active_paying_clients_60d', '')::int, 0)::int AS builder_active_paying_clients_60d,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'live_updates_active_paying_clients_60d', '')::int, 0)::int AS live_updates_active_paying_clients_60d
-      FROM global_stats gs
-      LEFT JOIN global_stats prev ON prev.date_id = (
+      FROM completed_stats gs
+      LEFT JOIN completed_stats prev ON prev.date_id = (
         CASE
           WHEN gs.date_id ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN
             CASE
@@ -1390,10 +1404,14 @@ export async function getAdminGlobalStatsTrend(
       stars: Number(row.stars) || 0,
       need_upgrade: Number(row.need_upgrade) || 0,
       paying_yearly: Number(row.paying_yearly) || 0,
+      past_due_orgs: Number(row.past_due_orgs) || 0,
+      past_due_orgs_average_days: Number(row.past_due_orgs_average_days) || 0,
       paying_monthly: Number(row.paying_monthly) || 0,
       new_paying_orgs: Number(row.new_paying_orgs) || 0,
       canceled_orgs: Number(row.canceled_orgs) || 0,
       upgraded_orgs: Number(row.upgraded_orgs) || 0,
+      trial_extended_orgs: Number(row.trial_extended_orgs) || 0,
+      trial_extended_subscribed_orgs: Number(row.trial_extended_subscribed_orgs) || 0,
       mrr: Number(row.mrr) || 0,
       previous_mrr: Number(row.previous_mrr) || 0,
       previous_mrr_solo: Number(row.previous_mrr_solo) || 0,
@@ -2161,6 +2179,7 @@ export interface AdminCancelledOrganizationRow {
   canceled_at: string
   customer_id: string
   subscription_id: string | null
+  churn_reason: string | null
   plan_name: string | null
   billing_type: 'monthly' | 'yearly' | null
   subscription_or_signup_date: string
@@ -2199,6 +2218,7 @@ export async function getAdminCancelledOrganizations(
         o.management_email,
         si.canceled_at,
         si.customer_id,
+        si.churn_reason,
         si.subscription_id,
         p.name AS plan_name,
         CASE
@@ -2243,6 +2263,7 @@ export async function getAdminCancelledOrganizations(
       org_name: row.org_name,
       management_email: row.management_email,
       canceled_at: normalizeTimestamp(row.canceled_at) ?? '',
+      churn_reason: row.churn_reason ?? null,
       customer_id: row.customer_id,
       subscription_id: row.subscription_id,
       plan_name: row.plan_name ?? null,
@@ -2303,7 +2324,7 @@ export async function getAdminTrialOrganizations(
     // Filter logic:
     // - trial_at >= CURRENT_DATE: includes trials expiring today (days_remaining = 0)
     // - status IS NULL: new organizations that haven't attempted payment yet
-    // - status != 'succeeded': organizations without an active paid subscription
+    // - status not 'succeeded': organizations without an active subscription
     const query = sql`
       WITH latest_bundle_uploads AS (
         SELECT

@@ -134,6 +134,10 @@ function isFutureTimestamp(value: string | null | undefined): boolean {
   return Number.isFinite(timestamp) && timestamp > Date.now()
 }
 
+function isActivePlanStatus(status: string | null | undefined): boolean {
+  return status === 'succeeded'
+}
+
 function hasActivePlanEntitlement(org: Pick<OrgWithCustomerInfo, 'stripe_info'>): boolean {
   const stripeInfo = org.stripe_info
   if (!stripeInfo)
@@ -142,7 +146,7 @@ function hasActivePlanEntitlement(org: Pick<OrgWithCustomerInfo, 'stripe_info'>)
   if (isFutureTimestamp(stripeInfo.trial_at))
     return true
 
-  if (stripeInfo.status !== 'succeeded')
+  if (!isActivePlanStatus(stripeInfo.status))
     return false
 
   if (!stripeInfo.subscription_anchor_end)

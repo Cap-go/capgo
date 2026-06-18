@@ -14,7 +14,7 @@ import AdminFunnelChart from '~/components/admin/AdminFunnelChart.vue'
 import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
 import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
-import Spinner from '~/components/Spinner.vue'
+import PageLoader from '~/components/PageLoader.vue'
 import { formatLocalDate, formatLocalDateTime } from '~/services/date'
 import { getEmoji } from '~/services/i18n'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
@@ -117,6 +117,8 @@ const globalStatsTrendData = ref<Array<{
   registers_today: number
   demo_apps_created: number
   devices_last_month: number
+  trial_extended_orgs: number
+  trial_extended_subscribed_orgs: number
 }>>([])
 
 const isLoadingGlobalStatsTrend = ref(false)
@@ -628,6 +630,30 @@ const registrationsTrendSeries = computed(() => {
   ]
 })
 
+const trialExtensionTrendSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: t('trial-extensions'),
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.trial_extended_orgs ?? 0,
+      })),
+      color: '#119eff',
+    },
+    {
+      label: t('extended-trial-subscriptions'),
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.trial_extended_subscribed_orgs ?? 0,
+      })),
+      color: '#10b981',
+    },
+  ]
+})
+
 const planDistributionData = computed(() => {
   if (globalStatsTrendData.value.length === 0)
     return []
@@ -882,9 +908,7 @@ displayStore.defaultBack = '/dashboard'
       <div class="w-full h-full px-4 pt-2 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
         <AdminFilterBar />
 
-        <div v-if="isLoading" class="flex items-center justify-center min-h-screen">
-          <Spinner size="w-24 h-24" />
-        </div>
+        <PageLoader v-if="isLoading" />
 
         <div v-else class="space-y-6">
           <!-- Onboarding Funnel Section -->
@@ -1295,6 +1319,18 @@ displayStore.defaultBack = '/dashboard'
             >
               <AdminMultiLineChart
                 :series="usersTrendSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+
+            <!-- Trial Extension Conversions -->
+            <ChartCard
+              :title="t('trial-extension-conversion-trend')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="trialExtensionTrendSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="trialExtensionTrendSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
               />
             </ChartCard>
