@@ -24,12 +24,12 @@ on:
 permissions: {}
 
 env:
-  PRIVATE_SUITE_DIR: private/cli-mcp-tests
-  # Reuse the TUI R2 uploader, but point it at the MCP suite's results dir/report
-  # so it publishes cli/test/e2e-mcp/results/tree-report.html instead of the TUI
-  # report (the script reads RESULTS_DIR/REPORT_PATH from env).
-  RESULTS_DIR: private/cli-mcp-tests/cli/test/e2e-mcp/results
-  REPORT_PATH: private/cli-mcp-tests/cli/test/e2e-mcp/results/tree-report.html
+  # NOTE: the R2 uploader's RESULTS_DIR / REPORT_PATH are intentionally NOT
+  # top-level env here - they are set on the "Publish tree report to R2" step,
+  # pointing at the overlaid ${{ github.workspace }}/cli/test/e2e-mcp/results
+  # location the live run now writes to, so the script publishes the MCP report
+  # instead of the TUI one.
+  #
   # opencode-ai npm package version pinned for a reproducible CLI install (see
   # "Install opencode CLI" below). Bump deliberately, not via a floating tag.
   OPENCODE_VERSION: "1.17.4"
@@ -133,18 +133,31 @@ jobs:
       - name: Build local CLI dist
         run: bun run cli:build
 
-      - name: Install private suite dependencies
-        working-directory: ${{ env.PRIVATE_SUITE_DIR }}
-        run: bun install --frozen-lockfile
+      # The harness (verify-tree/run-tree/mcp-http-server + the flat test-mcp-*
+      # entries) lives ONLY in the private suite and imports capgo src via
+      # relative `../../src/...`, which resolves ONLY when the suite's `cli/` is
+      # rsync-overlaid onto capgo's `cli/`. The suite's `cli/` contains ONLY
+      # `test/` (no src/dist/package.json), so the overlay adds the harness test
+      # files without clobbering capgo's cli/src, cli/dist, or cli/package.json.
+      # Must run AFTER "Build local CLI dist" (that build happens at the repo
+      # root and must not be preceded by a test-only overlay). e2e-mcp deps are
+      # installed at the overlaid location; CAPGO_E2E_TUI_ROOT points the
+      # network-fakes smoke at the suite's read-only e2e-tui harness.
+      - name: Overlay private suite harness onto CLI
+        run: |
+          set -euo pipefail
+          rsync -a --exclude node_modules "$GITHUB_WORKSPACE/private/cli-mcp-tests/cli/" "$GITHUB_WORKSPACE/cli/"
+          (cd "$GITHUB_WORKSPACE/cli/test/e2e-mcp" && bun install)
+          echo "CAPGO_E2E_TUI_ROOT=$GITHUB_WORKSPACE/private/cli-mcp-tests/e2e-tui" >> "$GITHUB_ENV"
 
       - name: Hermetic MCP suites (hard fail)
-        working-directory: ${{ env.PRIVATE_SUITE_DIR }}
+        working-directory: ${{ github.workspace }}/cli/test/e2e-mcp
         env:
           CAPGO_CLI_ROOT: ${{ github.workspace }}/cli
         run: bun run test:mcp:hermetic
 
       - name: Live MCP tree — opencode + Workers AI (hard fail)
-        working-directory: ${{ env.PRIVATE_SUITE_DIR }}
+        working-directory: ${{ github.workspace }}/cli/test/e2e-mcp
         env:
           CAPGO_CLI_ROOT: ${{ github.workspace }}/cli
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -155,10 +168,12 @@ jobs:
 
       - name: Cost + report to step summary
         if: always()
-        working-directory: ${{ env.PRIVATE_SUITE_DIR }}
+        env:
+          # The live run now writes results to the overlaid CLI location.
+          COST_JSON: ${{ github.workspace }}/cli/test/e2e-mcp/results/cost.json
         run: |
           set -euo pipefail
-          if [ -f cli/test/e2e-mcp/results/cost.json ]; then
+          if [ -f "$COST_JSON" ]; then
             # Emit the cost line inside a fenced code block so its contents can't
             # inject markdown/HTML into the job summary. node strips any backticks
             # (char 96) from the value so it can't break out of the fence; the
@@ -166,7 +181,7 @@ jobs:
             {
               echo '### Live MCP cost'
               echo '```'
-              node -e 'const c=require("./cli/test/e2e-mcp/results/cost.json"); const bt=String.fromCharCode(96); process.stdout.write(String(c.line).split(bt).join("") + "\n")'
+              node -e 'const c=require(process.env.COST_JSON); const bt=String.fromCharCode(96); process.stdout.write(String(c.line).split(bt).join("") + "\n")'
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
           fi
@@ -176,6 +191,11 @@ jobs:
         id: r2
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # The live run writes results to the overlaid CLI location, so point
+          # the reused TUI uploader at the MCP suite's overlaid results dir +
+          # report (the script reads RESULTS_DIR / REPORT_PATH from env).
+          RESULTS_DIR: ${{ github.workspace }}/cli/test/e2e-mcp/results
+          REPORT_PATH: ${{ github.workspace }}/cli/test/e2e-mcp/results/tree-report.html
           R2_RESULTS_UPLOAD_ACCESS_KEY_ID: ${{ secrets.BUILDER_ONBOARDING_TUI_RESULTS_R2_UPLOAD_ACCESS_KEY_ID }}
           R2_RESULTS_UPLOAD_SECRET_ACCESS_KEY: ${{ secrets.TUI_RESULTS_R2_UPLOAD_SECRET_ACCESS_KEY }}
           R2_BUCKET: ${{ vars.BUILDER_ONBOARDING_TUI_R2_BUCKET }}
