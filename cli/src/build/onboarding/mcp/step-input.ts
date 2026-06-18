@@ -60,6 +60,7 @@ export const STEP_ALLOWED_FIELDS: Partial<Record<AndroidOnboardingStep, string[]
   'gcp-projects-loading': ['gcpProjectId', 'gcpProjectName'],
   'gcp-project-create-name': ['gcpProjectName'],
   'android-package-select': ['androidPackage'],
+  'android-app-verify': ['androidVerifyAction'],
   // ── Post-build tail steps (S9-S11) ─────────────────────────────────────────
   // Listed here so an ANDROID key sent while the user is parked on a tail step
   // is rejected with the tail field named (the tail fields themselves are
@@ -84,7 +85,7 @@ export const ANDROID_INPUT_KEYS: string[] = [
   'keystoreMethod', 'keystorePath', 'keystoreStorePassword', 'keystoreAlias',
   'keystoreKeyPassword', 'keystoreNewAlias', 'keystorePasswordMethod', 'keystoreCommonName',
   'serviceAccountMethod', 'serviceAccountJsonPath', 'saMethodChoice', 'playDeveloperId',
-  'gcpProjectId', 'gcpProjectName', 'androidPackage', 'credentialsExistChoice',
+  'gcpProjectId', 'gcpProjectName', 'androidPackage', 'androidVerifyAction', 'credentialsExistChoice',
 ]
 
 /**

@@ -15,6 +15,7 @@ export const onboardingNextStepSchema = z.object({
   gcpProjectId: z.string().optional().describe('Google Cloud project id to host the service account, or "__new__" to create one, when choosing'),
   gcpProjectName: z.string().optional().describe('Display name for a new Google Cloud project, when creating one'),
   androidPackage: z.string().optional().describe('The Android applicationId / package name to grant release access to, when asked'),
+  androidVerifyAction: z.enum(['open', 'recheck', 'cancel']).optional().describe('Answer to the Android verify-app gate (android-app-verify) when the chosen package does not yet exist in Play Console: "open" to surface the Play Console create-app page, "recheck" to re-run the apps:search check after creating it, or "cancel" to stop'),
   saMethodChoice: z.enum(['retry', 'save-anyway', 'oauth']).optional().describe('Recovery choice at service-account validation failure'),
   reopenSignIn: z.boolean().optional().describe('Set true at the Google sign-in step to (re)open the browser for a fresh Google authorization — use this when the browser did not open, was closed, or the sign-in stalled on "still waiting", so the user is never stuck'),
   openSignInBrowser: z.boolean().optional().describe('At the Google sign-in step: set true to have the assistant open the sign-in link in the user\'s browser for them; set false (or omit) when the user will open the shown link themselves. The link is always returned in the step result either way.'),

@@ -27,6 +27,7 @@ import open from 'open'
 
 import { OAUTH_REQUIRED_SCOPES, OAUTH_SCOPES_FOR_ONBOARDING } from '../android/oauth-scopes.js'
 import { createProject, createServiceAccountKey, enableService, ensureServiceAccount, listProjects } from '../android/gcp-api.js'
+import { listPlayApps } from '../android/reporting-api.js'
 import { inviteServiceAccount } from '../android/play-api.js'
 import { deleteAndroidProgress, loadAndroidProgress, saveAndroidProgress } from '../android/progress.js'
 import { validateServiceAccountJson } from '../android/service-account-validation.js'
@@ -151,6 +152,8 @@ function buildAndroidEffectDeps(
 
     // ── GCP ───────────────────────────────────────────────────────────────────
     listProjects,
+    // Play Developer Reporting (apps:search) for android-app-verify.
+    listPlayApps: (token: string) => listPlayApps(token),
     createProject,
     enableService,
     ensureServiceAccount,

@@ -32,6 +32,7 @@ import type { BuildScriptChoice, GeneratedWorkflow, PackageManager, WorkflowGene
 import type { WorkflowWriteOptions, WorkflowWriteResult } from '../workflow-writer.js'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { reconcileAndroidApp } from './app-verification-android.js'
 
 // ─── applyGoogleSignIn ────────────────────────────────────────────────────────
 
@@ -126,6 +127,15 @@ export interface AndroidStepView {
 export interface AndroidStepCtx {
   appId: string
   detectedPackageIds?: string[]
+  /**
+   * android-app-verify transient: the user's real Play Store apps (apps:search)
+   * + the reconcile outcome for the chosen package. Set in the effect's
+   * transient ONLY when the chosen package is not an exact match (and the
+   * fetch succeeded), so the view renders the create-app / re-check gate.
+   * Absent → the step is still auto (run the fetch) or already advanced.
+   */
+  playVerifyApps?: { packageName: string, displayName: string }[]
+  playVerifyOutcome?: 'no-app' | 'wrong-build-id' | 'multi-gradle'
   gcpProjects?: { projectId: string, name: string, projectNumber?: string }[]
   detectedAliases?: string[]
   saValidation?: { ok: false, kind: string, message: string } | { ok: true }
@@ -299,6 +309,11 @@ export const KIND_TABLE: Record<AndroidOnboardingStep, AndroidStepKind> = {
   'requesting-build': 'auto',
   'build-complete': 'done',
   'error': 'error',
+  // Base kind 'auto' — the effect runs apps:search + reconcile on entry and
+  // either advances (exact-match / degraded) or stashes a no-match result;
+  // androidViewForStep then dynamically returns 'choice' when user action is
+  // needed (create the app / re-check). Mirrors android-package-select.
+  'android-app-verify': 'auto',
 }
 
 // ─── Static option tables ─────────────────────────────────────────────────────
@@ -404,7 +419,11 @@ export function androidViewForStep(
     ? (ctx.detectedPackageIds === undefined
         ? 'auto'
         : ctx.detectedPackageIds.length > 0 ? 'choice' : 'input')
-    : KIND_TABLE[step]
+    : step === 'android-app-verify'
+      // 'auto' until the effect stashes a no-match outcome → then 'choice'
+      // (create-app / re-check gate). Mirrors android-package-select.
+      ? (ctx.playVerifyOutcome === undefined ? 'auto' : 'choice')
+      : KIND_TABLE[step]
 
   const base: AndroidStepView = { step, kind }
 
@@ -511,6 +530,23 @@ export function androidViewForStep(
       return base
     }
 
+    // ── Phase 4.6 — verify the chosen package exists in Play ──
+    case 'android-app-verify': {
+      if (kind === 'choice') {
+        const pkg = progress?.completedSteps.androidPackageChosen?.packageName ?? 'your package'
+        return {
+          ...base,
+          message: `No Play Store app exists yet for "${pkg}". Create it once in Play Console (https://play.google.com/console) — Capgo grants your build access to that exact package, so it must exist before provisioning — then re-check.`,
+          options: [
+            { value: 'open', label: 'Open Play Console to create this app' },
+            { value: 'recheck', label: 'I\'ve created it — re-check' },
+            { value: 'cancel', label: 'Cancel onboarding' },
+          ],
+        }
+      }
+      return base
+    }
+
     // ── Error ──
     case 'error':
       return { ...base, message: 'An error occurred. Check the details above.' }
@@ -602,6 +638,7 @@ export type AndroidInput =
   // (progress.serviceAccountMethod may already be set but is also passed
   // explicitly here to keep the function self-contained).
   | { step: 'android-package-select'; packageName: string; source: 'gradle' | 'capacitor-config' | 'user-input'; serviceAccountMethod: 'generate' | 'existing' }
+  | { step: 'android-app-verify'; verifyAction: 'open' | 'recheck' | 'cancel' }
 
   // ── Phase 6 — Post-save "tail" inputs ───────────────────────────────────────
   // One variant per tail choice/input step that records state on TailProgress.
@@ -989,6 +1026,15 @@ export interface AndroidEffectDeps {
    * Mirrors gcp-api.ts: listProjects(accessToken).
    */
   listProjects: (accessToken: string) => Promise<GcpProject[]>
+
+  /**
+   * List the user's Play Store apps via the Play Developer Reporting API
+   * (apps:search). OPTIONAL — present only when the optional
+   * playdeveloperreporting scope was granted; absent → android-app-verify
+   * degrades (advances without verifying, never blocks). Mirrors
+   * reporting-api.ts: listPlayApps(accessToken).
+   */
+  listPlayApps?: (accessToken: string) => Promise<{ packageName: string, displayName: string }[]>
 
   /**
    * Create a GCP project and wait for the operation to finish.
@@ -1733,6 +1779,50 @@ export async function runAndroidEffect(
             projectNumber: p.projectNumber,
           })),
         },
+      }
+    }
+
+    // ── android-app-verify ────────────────────────────────────────────────
+    //
+    // Generate path only: list the user's real Play apps (apps:search) and
+    // reconcile against the chosen package. Exact-match → mark verified + advance.
+    // No-match → stash apps+outcome in transient and STAY (the view becomes the
+    // create-app / re-check gate). Any failure (import path, no reporting scope,
+    // 403, network) → degrade: mark verified:false + advance. NEVER blocks.
+    case 'android-app-verify': {
+      const chosen = progress.completedSteps.androidPackageChosen?.packageName
+      const markAndAdvance = (verified: boolean): AndroidEffectResult => ({
+        progress: {
+          ...progress,
+          completedSteps: {
+            ...progress.completedSteps,
+            playAppVerified: { packageName: chosen ?? '', verified },
+          },
+        },
+        next: 'gcp-setup-running',
+      })
+      if (!chosen || progress.serviceAccountMethod !== 'generate' || !deps.listPlayApps)
+        return markAndAdvance(false)
+      try {
+        const tok = await deps.getAccessToken()
+        const apps = await deps.listPlayApps(tok)
+        const result = reconcileAndroidApp({ gradleIds: [chosen], apps })
+        if (result.kind === 'exact-match')
+          return markAndAdvance(true)
+        return {
+          progress,
+          next: 'android-app-verify',
+          transient: {
+            playVerifyApps: apps.map(a => ({ packageName: a.packageName, displayName: a.displayName })),
+            playVerifyOutcome: result.kind === 'no-app'
+              ? 'no-app'
+              : result.kind === 'multi-gradle' ? 'multi-gradle' : 'wrong-build-id',
+          },
+        }
+      }
+      catch {
+        // scope-missing / 403 / network — degrade, never block onboarding.
+        return markAndAdvance(false)
       }
     }
 

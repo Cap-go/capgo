@@ -111,6 +111,7 @@ import {
   WelcomeStep,
 } from '../../ui/steps/android-shared.js'
 import { findAndroidApplicationIds } from '../gradle-parser.js'
+import { listPlayApps } from '../reporting-api.js'
 import { validateServiceAccountJson } from '../service-account-validation.js'
 import { diffLines } from '../../diff-utils.js'
 import type { DiffLine } from '../../diff-utils.js'
@@ -587,6 +588,16 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [detectedPackageIds, setDetectedPackageIds] = useState<string[]>([])
   const [packageSelectMode, setPackageSelectMode] = useState<'choose' | 'manual'>('choose')
   const packageLoadedRef = useRef(false)
+  // android-app-verify (Play app existence gate). verifyOutcome is null while the
+  // apps:search check runs or after it advanced; set to a no-match kind when the
+  // chosen package isn't a real Play app → render the create-app / re-check gate.
+  const [verifyOutcome, setVerifyOutcome] = useState<'no-app' | 'wrong-build-id' | 'multi-gradle' | null>(null)
+  const verifyLoadedRef = useRef(false)
+  // Bumped on "re-check" to re-run the verify effect for the same step.
+  const [verifyRecheckNonce, setVerifyRecheckNonce] = useState(0)
+  // Remount key for the gate <Select> so the @inkjs/ui onChange re-fire bug
+  // can't replay the chosen action (mirrors the gateActionSeq pattern).
+  const [verifyActionSeq, setVerifyActionSeq] = useState(0)
 
   // Phase 5 — provisioning status stream
   const [setupStatus, setSetupStatus] = useState<string[]>([])
@@ -1742,6 +1753,11 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         return
       packageLoadedRef.current = true
     }
+    if (step === 'android-app-verify') {
+      if (verifyLoadedRef.current)
+        return
+      verifyLoadedRef.current = true
+    }
 
     let cancelled = false
     // Abort wiring for cloud round-trips — mirrors the SA-validation cleanup
@@ -1806,6 +1822,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         // GCP
         listProjects,
         createProject: gcpCreateProject,
+        // Play Developer Reporting (apps:search) for android-app-verify.
+        listPlayApps: token => listPlayApps(token),
         enableService,
         ensureServiceAccount,
         createServiceAccountKey,
@@ -1860,6 +1878,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           setDetectedPackageIds(t.detectedPackageIds)
         if (t?.detectedAliases !== undefined)
           setDetectedAliases(t.detectedAliases)
+        if (t?.playVerifyOutcome !== undefined)
+          setVerifyOutcome(t.playVerifyOutcome)
         if (t?.accessToken !== undefined)
           setAccessToken(t.accessToken)
 
@@ -1930,8 +1950,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       cancelled = true
       abort.abort()
     }
+    // verifyRecheckNonce re-runs ONLY this effect (the runAndroidEffect runner)
+    // for the android-app-verify "re-check" action.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step])
+  }, [step, verifyRecheckNonce])
 
   // ─── Engine-driven post-save TAIL driver (ink-thin-wrapper) ─────────────────
   // Delegate the post-save tail AUTO steps (TAIL_DRIVER_STEPS) to the shared
@@ -3007,6 +3029,56 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             }))
           }}
         />
+      )}
+
+      {step === 'android-app-verify' && (
+        verifyOutcome === null
+          ? (
+              <Box flexDirection="column" marginTop={1}>
+                <SpinnerLine text="Checking Play Console for your app..." />
+                <Text dimColor>Listing your Play Store apps to confirm the build matches a real app.</Text>
+              </Box>
+            )
+          : (
+              <Box flexDirection="column" marginTop={1}>
+                <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
+                  <Text bold color="cyan">Create your app in Play Console</Text>
+                  <Newline />
+                  <Text>
+                    {'No Play Store app exists yet for '}
+                    <Text bold color="cyan">{androidPackageChoice?.packageName ?? 'your package'}</Text>
+                    {'. Create it once in Play Console (the only manual step), then re-check — Capgo grants your build access to that exact package, so it must exist before provisioning.'}
+                  </Text>
+                  <Text dimColor>The Play Console API cannot create apps — this is a one-time manual step on the web.</Text>
+                </Box>
+                <Newline />
+                <Select
+                  key={`android-verify-${verifyActionSeq}`}
+                  options={[
+                    { label: '🌐 Open Play Console to create this app', value: 'open' },
+                    { label: '🔁 I\'ve created it — re-check', value: 'recheck' },
+                    { label: '❌ Cancel onboarding', value: 'cancel' },
+                  ]}
+                  onChange={(value) => {
+                    setVerifyActionSeq(s => s + 1)
+                    if (value === 'open') {
+                      void open('https://play.google.com/console').catch(() => {
+                        addLog('⚠ Could not open your browser. Visit https://play.google.com/console to create the app.', 'yellow')
+                      })
+                      return
+                    }
+                    if (value === 'recheck') {
+                      verifyLoadedRef.current = false
+                      setVerifyOutcome(null)
+                      setVerifyRecheckNonce(n => n + 1)
+                      return
+                    }
+                    addLog('Exiting onboarding.', 'yellow')
+                    exitOnboarding()
+                  }}
+                />
+              </Box>
+            )
       )}
 
       {step === 'android-package-select' && (

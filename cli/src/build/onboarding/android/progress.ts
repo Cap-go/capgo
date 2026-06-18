@@ -346,6 +346,13 @@ export function getAndroidResumeStep(progress: AndroidOnboardingProgress | null)
   if (!completedSteps.androidPackageChosen)
     return 'android-package-select'
 
+  // Phase 4.6 — Verify the chosen package exists in Play Console before
+  // provisioning (the per-package SA invite 400s on a non-existent package).
+  // The verify effect always writes this marker (verified true OR false on a
+  // degraded check) before advancing, so this never loops.
+  if (!completedSteps.playAppVerified)
+    return 'android-app-verify'
+
   // Phase 5 — Provisioning: SA creation marker + the SA's JSON key that
   // gets saved as PLAY_CONFIG_JSON. Missing either means we must re-run
   // the provisioning sequence.

@@ -60,6 +60,7 @@ interface OnboardingInput {
   gcpProjectId?: string
   gcpProjectName?: string
   androidPackage?: string
+  androidVerifyAction?: 'open' | 'recheck' | 'cancel'
   saMethodChoice?: 'retry' | 'save-anyway' | 'oauth'
   /** Set true at google-sign-in to (re)open the browser for a fresh OAuth — recovery when the browser didn't open, was closed, or the sign-in stalled. */
   reopenSignIn?: boolean
@@ -1599,6 +1600,23 @@ export function mapAndroidView(
         },
       }
     }
+
+    case 'android-app-verify':
+      // Only reached as a choice when the chosen package isn't a real Play app
+      // (the effect auto-advances on exact-match or a degraded/un-verifiable
+      // check). Surface the create-app / re-check gate.
+      return {
+        ...base,
+        kind: 'choice',
+        summary: view.message ?? 'Your build package does not exist in Play Console yet.',
+        options: (view.options ?? []).map(o => ({ value: o.value, label: o.label, note: o.note })),
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { androidVerifyAction: '<open|recheck|cancel>' },
+          instruction: 'Tell the user to create the app in Play Console (the package must exist before provisioning), then call next_step with androidVerifyAction: "recheck".',
+          call: `${NEXT_STEP_TOOL}({ androidVerifyAction: "recheck" })`,
+        },
+      }
 
     case 'sa-json-existing-path':
       return {
@@ -3143,6 +3161,16 @@ async function persistAndroidInput(deps: EngineDeps, appId: string, input: Onboa
       packageName: input.androidPackage,
       source: 'user-input',
       serviceAccountMethod: updated.serviceAccountMethod ?? 'generate',
+    })
+  }
+
+  // android-app-verify gate answer. 'recheck'/'open' leave progress unchanged so
+  // the next drive() re-runs the verify effect (transient isn't persisted → the
+  // apps:search check runs again). 'cancel' is surfaced by the engine's halt path.
+  if (input.androidVerifyAction) {
+    updated = applyAndroidInput('android-app-verify', updated, {
+      step: 'android-app-verify',
+      verifyAction: input.androidVerifyAction,
     })
   }
 
