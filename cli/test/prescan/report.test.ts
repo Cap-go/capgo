@@ -26,6 +26,23 @@ describe('renderTerminalReport', () => {
     // errors before warnings
     expect(out.indexOf('Certificate expired')).toBeLessThan(out.indexOf('Serial Gradle build'))
   })
+
+  it('omits ANSI color codes when color is disabled', () => {
+    const out = renderTerminalReport(report, { color: false })
+    // eslint-disable-next-line no-control-regex
+    expect(/\x1B\[/.test(out)).toBe(false)
+  })
+
+  it('emits ANSI color codes when color is enabled, without splitting plain substrings', () => {
+    const out = renderTerminalReport(report, { color: true })
+    expect(out).toContain('\x1B[') // some ANSI present
+    expect(out).toContain('\x1B[1m\x1B[31m✖ ERROR\x1B[0m') // bold red error badge
+    expect(out).toContain('\x1B[1m\x1B[33m⚠ WARN \x1B[0m') // bold yellow warn badge
+    // plain text the gate/tests rely on stays contiguous despite coloring
+    expect(out).toContain('Certificate expired')
+    expect(out).toContain('1 error')
+    expect(out).toContain('1 warning')
+  })
 })
 
 describe('renderJsonReport', () => {
