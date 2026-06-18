@@ -18,22 +18,28 @@ export interface ConnectApp {
 
 const props = defineProps<{
   apps: ConnectApp[]
-  modelValue: string[]
+  /** Map of selected app UUID -> chosen app-level role (e.g. { uuid: 'app_admin' }). */
+  modelValue: Record<string, string>
   /** Show each app's organization (when the key spans more than one org). */
   showOrg?: boolean
-  /** Short label for the app-level role granted on each ticked app (e.g. "App Admin"). */
-  roleTag?: string
 }>()
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: string[]): void
+  (e: 'update:modelValue', value: Record<string, string>): void
 }>()
 
 const { t } = useI18n()
 const search = ref('')
 const failedIcons = ref<Set<string>>(new Set())
 
-const selectedSet = computed(() => new Set(props.modelValue))
+// App-level roles the key can grant per app (app_admin is the default / recommended).
+const APP_ROLES = [
+  { value: 'app_admin', i18n: 'role-app-admin' },
+  { value: 'app_developer', i18n: 'role-app-developer' },
+  { value: 'app_uploader', i18n: 'role-app-uploader' },
+  { value: 'app_reader', i18n: 'role-app-reader' },
+] as const
+const DEFAULT_ROLE = 'app_admin'
 
 const filteredApps = computed(() => {
   const query = search.value.trim().toLowerCase()
@@ -45,26 +51,37 @@ const filteredApps = computed(() => {
   )
 })
 
-const allSelected = computed(() => props.apps.length > 0 && props.modelValue.length === props.apps.length)
+const selectedCount = computed(() => Object.keys(props.modelValue).length)
+const allSelected = computed(() => props.apps.length > 0 && selectedCount.value === props.apps.length)
 
 function isSelected(id: string): boolean {
-  return selectedSet.value.has(id)
+  return Object.prototype.hasOwnProperty.call(props.modelValue, id)
 }
 
 function toggle(id: string): void {
-  const next = new Set(props.modelValue)
-  if (next.has(id))
-    next.delete(id)
+  const next = { ...props.modelValue }
+  if (isSelected(id))
+    delete next[id]
   else
-    next.add(id)
-  emit('update:modelValue', [...next])
+    next[id] = DEFAULT_ROLE
+  emit('update:modelValue', next)
+}
+
+function setRole(id: string, role: string): void {
+  emit('update:modelValue', { ...props.modelValue, [id]: role })
 }
 
 function toggleAll(): void {
-  if (allSelected.value)
-    emit('update:modelValue', [])
-  else
-    emit('update:modelValue', props.apps.map(app => app.id))
+  if (allSelected.value) {
+    emit('update:modelValue', {})
+    return
+  }
+  const next: Record<string, string> = { ...props.modelValue }
+  for (const app of props.apps) {
+    if (!isSelected(app.id))
+      next[app.id] = DEFAULT_ROLE
+  }
+  emit('update:modelValue', next)
 }
 
 function showIcon(app: ConnectApp): boolean {
@@ -107,51 +124,63 @@ function onIconError(id: string): void {
       </div>
 
       <div class="max-h-64 space-y-1.5 overflow-y-auto pr-1">
-        <button
+        <div
           v-for="app in filteredApps"
           :key="app.id"
-          type="button"
-          class="flex w-full items-center gap-3 rounded-xl border bg-white px-3 py-2.5 text-left transition-colors dark:bg-slate-900"
+          class="flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors"
           :class="isSelected(app.id)
             ? 'border-azure-500 bg-azure-500/5'
-            : 'border-slate-200 hover:bg-azure-500/5 dark:border-slate-700'"
-          @click="toggle(app.id)"
+            : 'border-slate-200 bg-white hover:bg-azure-500/5 dark:border-slate-700 dark:bg-slate-900'"
         >
-          <span
-            class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border"
-            :class="isSelected(app.id)
-              ? 'border-azure-500 bg-azure-500 text-white'
-              : 'border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800'"
+          <button
+            type="button"
+            class="flex min-w-0 flex-1 items-center gap-3 text-left"
+            @click="toggle(app.id)"
           >
-            <IconCheck v-if="isSelected(app.id)" class="h-3.5 w-3.5" />
-          </span>
-          <img
-            v-if="showIcon(app)"
-            :src="app.icon!"
-            :alt="`App icon ${app.name ?? app.app_id}`"
-            class="h-9 w-9 shrink-0 rounded-sm object-cover d-mask d-mask-squircle"
-            @error="onIconError(app.id)"
-          >
-          <div
-            v-else
-            class="flex h-9 w-9 shrink-0 items-center justify-center bg-gray-700 text-sm font-medium text-gray-300 d-mask d-mask-squircle"
-          >
-            {{ (app.name ?? app.app_id).slice(0, 2).toUpperCase() || 'AP' }}
-          </div>
-          <span class="min-w-0 flex-1">
-            <span class="block truncate text-sm font-medium text-slate-800 dark:text-slate-100">
-              {{ app.name ?? app.app_id }}
+            <span
+              class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border"
+              :class="isSelected(app.id)
+                ? 'border-azure-500 bg-azure-500 text-white'
+                : 'border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800'"
+            >
+              <IconCheck v-if="isSelected(app.id)" class="h-3.5 w-3.5" />
             </span>
-            <span class="block truncate font-mono text-xs text-slate-400">
-              {{ app.app_id }}<template v-if="showOrg && app.ownerOrgName"> · {{ app.ownerOrgName }}</template>
+            <img
+              v-if="showIcon(app)"
+              :src="app.icon!"
+              :alt="`App icon ${app.name ?? app.app_id}`"
+              class="h-9 w-9 shrink-0 rounded-sm object-cover d-mask d-mask-squircle"
+              @error="onIconError(app.id)"
+            >
+            <div
+              v-else
+              class="flex h-9 w-9 shrink-0 items-center justify-center bg-gray-700 text-sm font-medium text-gray-300 d-mask d-mask-squircle"
+            >
+              {{ (app.name ?? app.app_id).slice(0, 2).toUpperCase() || 'AP' }}
+            </div>
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-sm font-medium text-slate-800 dark:text-slate-100">
+                {{ app.name ?? app.app_id }}
+              </span>
+              <span class="block truncate font-mono text-xs text-slate-400">
+                {{ app.app_id }}<template v-if="showOrg && app.ownerOrgName"> · {{ app.ownerOrgName }}</template>
+              </span>
             </span>
-          </span>
-          <span
-            class="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.65rem] font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-800"
+          </button>
+
+          <select
+            v-if="isSelected(app.id)"
+            :value="modelValue[app.id]"
+            :aria-label="t('connect-app-role')"
+            class="shrink-0 appearance-none rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 outline-none focus:border-azure-500 focus:ring-2 focus:ring-azure-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+            @click.stop
+            @change="setRole(app.id, ($event.target as HTMLSelectElement).value)"
           >
-            {{ roleTag ?? 'App Admin' }}
-          </span>
-        </button>
+            <option v-for="r in APP_ROLES" :key="r.value" :value="r.value">
+              {{ t(r.i18n) }}
+            </option>
+          </select>
+        </div>
 
         <p v-if="filteredApps.length === 0" class="px-3 py-6 text-center text-sm text-slate-400">
           {{ t('connect-no-apps-match') }}
@@ -160,7 +189,7 @@ function onIconError(id: string): void {
     </div>
 
     <p class="mt-2 text-xs text-slate-400 dark:text-slate-500">
-      {{ t('connect-apps-selected', { count: modelValue.length, total: apps.length }) }}
+      {{ t('connect-apps-selected', { count: selectedCount, total: apps.length }) }}
     </p>
   </div>
 </template>

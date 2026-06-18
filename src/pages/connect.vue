@@ -24,29 +24,14 @@ const organizationStore = useOrganizationStore()
 const tokenName = ref(t('connect-token-name-default'))
 const role = ref<Role>('member')
 const apps = ref<ConnectApp[]>([])
-const selectedAppIds = ref<string[]>([])
+const selectedApps = ref<Record<string, string>>({})
 const selectedOrgIds = ref<string[]>([])
 const isLoadingApps = ref(false)
 const isGenerating = ref(false)
 const generatedKey = ref<string | null>(null)
 
-// Member: the app-level role granted on each ticked app (app_admin recommended).
-const appRole = ref('app_admin')
 // Admin: also allow the key to create new organizations (org.create global permission).
 const allowOrgCreate = ref(false)
-
-const APP_ROLES = [
-  { value: 'app_admin', i18n: 'role-app-admin', recommended: true },
-  { value: 'app_developer', i18n: 'role-app-developer', recommended: false },
-  { value: 'app_uploader', i18n: 'role-app-uploader', recommended: false },
-  { value: 'app_reader', i18n: 'role-app-reader', recommended: false },
-] as const
-
-const appRoleLabel = computed(() => t(APP_ROLES.find(r => r.value === appRole.value)?.i18n ?? 'role-app-admin'))
-
-function appRoleOptionLabel(r: typeof APP_ROLES[number]): string {
-  return r.recommended ? `${t(r.i18n)} — ${t('connect-recommended')}` : t(r.i18n)
-}
 
 // Only orgs where the user can actually mint a key (key creation requires org admin).
 const orgs = computed(() =>
@@ -76,13 +61,13 @@ const pasteLine = computed(() => `Log into Capgo with this key: ${generatedKey.v
 const scopeChip = computed(() => {
   if (role.value === 'admin')
     return t('connect-scope-admin')
-  return t('connect-scope-member', { count: selectedAppIds.value.length })
+  return t('connect-scope-member', { count: Object.keys(selectedApps.value).length })
 })
 
 const canGenerate = computed(() => {
   if (selectedOrgIds.value.length === 0 || isGenerating.value)
     return false
-  if (role.value === 'member' && selectedAppIds.value.length === 0)
+  if (role.value === 'member' && Object.keys(selectedApps.value).length === 0)
     return false
   return true
 })
@@ -110,7 +95,7 @@ async function loadApps(orgIds: string[]): Promise<void> {
   const run = ++appLoadRun
   if (orgIds.length === 0) {
     apps.value = []
-    selectedAppIds.value = []
+    selectedApps.value = {}
     return
   }
   isLoadingApps.value = true
@@ -141,7 +126,9 @@ async function loadApps(orgIds: string[]): Promise<void> {
 
     // Drop selections for apps no longer listed (e.g. an org was deselected).
     const ids = new Set(list.map(a => a.id))
-    selectedAppIds.value = selectedAppIds.value.filter(id => ids.has(id))
+    selectedApps.value = Object.fromEntries(
+      Object.entries(selectedApps.value).filter(([id]) => ids.has(id)),
+    )
 
     // App icons live in a private bucket — sign them, then patch into the rows.
     void signIcons(data ?? [], run)
@@ -199,17 +186,15 @@ async function generate(): Promise<void> {
   try {
     const appById = new Map(apps.value.map(a => [a.id, a]))
     const chosenApps = role.value === 'member'
-      ? selectedAppIds.value
-          .map(id => appById.get(id))
-          .filter((a): a is ConnectApp => Boolean(a))
-          .map(a => ({ uuid: a.id, orgId: a.ownerOrg }))
+      ? Object.entries(selectedApps.value)
+          .filter(([id]) => appById.has(id))
+          .map(([id, appRole]) => ({ uuid: id, orgId: appById.get(id)!.ownerOrg, role: appRole }))
       : undefined
 
     const { data, error } = await createAiApiKey(supabase, tokenName.value.trim() || t('connect-token-name-default'), {
       orgIds: [...selectedOrgIds.value],
       role: role.value,
       apps: chosenApps,
-      appRole: appRole.value,
       allowOrgCreate: allowOrgCreate.value,
     })
 
@@ -400,30 +385,13 @@ function back(): void {
             </select>
           </div>
 
-          <!-- Member: app permission + app picker -->
-          <template v-if="role === 'member'">
-            <div>
-              <label for="connect-app-role-select" class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ t('connect-app-role') }}
-              </label>
-              <select
-                id="connect-app-role-select"
-                v-model="appRole"
-                class="w-full appearance-none rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-azure-500 focus:ring-2 focus:ring-azure-500/25 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
-              >
-                <option v-for="r in APP_ROLES" :key="r.value" :value="r.value">
-                  {{ appRoleOptionLabel(r) }}
-                </option>
-              </select>
-            </div>
-
-            <ConnectAppPicker
-              v-model="selectedAppIds"
-              :apps="apps"
-              :show-org="selectedOrgIds.length > 1"
-              :role-tag="appRoleLabel"
-            />
-          </template>
+          <!-- Member: per-app picker — each ticked app gets its own permission -->
+          <ConnectAppPicker
+            v-if="role === 'member'"
+            v-model="selectedApps"
+            :apps="apps"
+            :show-org="selectedOrgIds.length > 1"
+          />
 
           <!-- Admin: full-org note + optional org-create capability -->
           <template v-else>
