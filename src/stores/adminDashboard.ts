@@ -136,10 +136,10 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
     const { start, end } = range
     const orgPart = selectedOrgId.value || 'global'
     const appPart = selectedAppId.value || 'all'
-    const endBucket = dateRangeMode.value === 'custom'
-      ? end.toISOString()
-      : end.toISOString().slice(0, 16)
-    return `${category}-${orgPart}-${appPart}-${start.toISOString()}-${endBucket}`
+    const isCustom = dateRangeMode.value === 'custom'
+    const startBucket = isCustom ? start.toISOString() : start.toISOString().slice(0, 16)
+    const endBucket = isCustom ? end.toISOString() : end.toISOString().slice(0, 16)
+    return `${category}-${orgPart}-${appPart}-${startBucket}-${endBucket}`
   }
 
   function isCacheValid(cacheKey: string): boolean {
