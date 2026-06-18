@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict'
+import { stdin, stdout } from 'node:process'
 import { applyCommandAnalyticsOptOut, applyRawCommandAnalyticsOptOut } from '../src/analytics/opt-out.ts'
-import { buildInitReplayBody, createTerminalInteractionEvents, createTerminalSnapshot, createTerminalSnapshotNode, getReplayViewportSize, parseTerminalPixelSizeResponse, renderRedactedTerminalFrame, renderRedactedTerminalText, resolveCapgoReplayUrl, resolveReplayUrlForFlush, resolveSupabaseReplayUrl, shouldStartInitReplay } from '../src/init/replay.ts'
+import { buildInitReplayBody, createTerminalInteractionEvents, createTerminalSnapshot, createTerminalSnapshotNode, getReplayViewportSize, parseTerminalPixelSizeResponse, queryTerminalPixelSize, renderRedactedTerminalFrame, renderRedactedTerminalText, resolveCapgoReplayUrl, resolveReplayUrlForFlush, resolveSupabaseReplayUrl, shouldStartInitReplay } from '../src/init/replay.ts'
 
 console.log('🧪 Testing init replay telemetry...\n')
 
@@ -43,6 +44,66 @@ assert.deepEqual(getReplayViewportSize(20, 5, { height: 412, width: 640 }), { he
 const pixelSizedFrame = await renderRedactedTerminalFrame('small real terminal', 20, 5, { height: 412, width: 640 })
 assert.equal(pixelSizedFrame.width, 640, 'terminal frame uses reported pixel width')
 assert.equal(pixelSizedFrame.height, 412, 'terminal frame uses reported pixel height')
+
+function replaceProcessProperty(target, key, value) {
+  const descriptor = Object.getOwnPropertyDescriptor(target, key)
+  Object.defineProperty(target, key, {
+    configurable: true,
+    value,
+    writable: true,
+  })
+  return () => {
+    if (descriptor)
+      Object.defineProperty(target, key, descriptor)
+    else delete target[key]
+  }
+}
+
+{
+  const restoreFns = []
+  const rawModeCalls = []
+  const promptListener = () => {}
+  let pauseCalls = 0
+  let paused = true
+
+  try {
+    restoreFns.push(replaceProcessProperty(stdin, 'isTTY', true))
+    restoreFns.push(replaceProcessProperty(stdout, 'isTTY', true))
+    restoreFns.push(replaceProcessProperty(stdin, 'isRaw', false))
+    restoreFns.push(replaceProcessProperty(stdin, 'isPaused', () => paused))
+    restoreFns.push(replaceProcessProperty(stdin, 'setRawMode', (value) => {
+      rawModeCalls.push(value)
+      Object.defineProperty(stdin, 'isRaw', {
+        configurable: true,
+        value,
+        writable: true,
+      })
+      return stdin
+    }))
+    restoreFns.push(replaceProcessProperty(stdin, 'resume', () => {
+      paused = false
+      return stdin
+    }))
+    restoreFns.push(replaceProcessProperty(stdin, 'pause', () => {
+      pauseCalls += 1
+      paused = true
+      return stdin
+    }))
+    restoreFns.push(replaceProcessProperty(stdout, 'write', () => true))
+
+    const pixelQuery = queryTerminalPixelSize(1000)
+    stdin.on('keypress', promptListener)
+    stdin.emit('data', '\u001B[4;412;640t')
+    assert.deepEqual(await pixelQuery, { height: 412, width: 640 }, 'terminal pixel query still reads the terminal response')
+    assert.deepEqual(rawModeCalls, [true], 'terminal pixel query does not disable raw mode after a prompt claims stdin')
+    assert.equal(pauseCalls, 0, 'terminal pixel query does not pause stdin after a prompt claims stdin')
+  }
+  finally {
+    stdin.off('keypress', promptListener)
+    while (restoreFns.length > 0)
+      restoreFns.pop()()
+  }
+}
 
 const redacted = await renderRedactedTerminalText([
   'capg_1234567890abcdef',
