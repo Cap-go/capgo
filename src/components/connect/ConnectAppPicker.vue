@@ -134,6 +134,7 @@ function onIconError(id: string): void {
         >
           <button
             type="button"
+            :aria-pressed="isSelected(app.id)"
             class="flex w-full items-center gap-3 px-3 py-2.5 text-left"
             @click="toggle(app.id)"
           >

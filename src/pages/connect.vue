@@ -65,7 +65,7 @@ const scopeChip = computed(() => {
 })
 
 const canGenerate = computed(() => {
-  if (selectedOrgIds.value.length === 0 || isGenerating.value)
+  if (selectedOrgIds.value.length === 0 || isGenerating.value || isLoadingApps.value)
     return false
   if (role.value === 'member' && Object.keys(selectedApps.value).length === 0)
     return false
@@ -318,6 +318,7 @@ function back(): void {
                   v-for="org in orgs"
                   :key="org.gid"
                   type="button"
+                  :aria-pressed="isOrgSelected(org.gid)"
                   class="flex w-full items-center gap-3 rounded-xl border bg-white px-3 py-2.5 text-left transition-colors dark:bg-slate-900"
                   :class="isOrgSelected(org.gid)
                     ? 'border-azure-500 bg-azure-500/5'

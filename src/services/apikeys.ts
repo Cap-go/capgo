@@ -105,10 +105,14 @@ export async function createAiApiKey(
       bindings.push({ role_name: 'org_admin', scope_type: 'org', org_id: orgId })
   }
   else {
+    const orgIdSet = new Set(orgIds)
     for (const orgId of orgIds)
       bindings.push({ role_name: 'org_member', scope_type: 'org', org_id: orgId })
-    for (const app of options.apps ?? [])
+    for (const app of options.apps ?? []) {
+      if (!orgIdSet.has(app.orgId))
+        throw new Error('Each app.orgId must be one of the selected orgIds')
       bindings.push({ role_name: app.role, scope_type: 'app', org_id: app.orgId, app_id: app.uuid })
+    }
   }
 
   // `org.create` is only valid on a key that has an org-admin binding — i.e. the admin role.
