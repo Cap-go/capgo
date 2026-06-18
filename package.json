@@ -169,9 +169,9 @@
     "deploy:cloudflare_env:plugin_hk:prod": "bunx wrangler secret bulk internal/cloudflare/.env.prod --config cloudflare_workers/plugin/wrangler.jsonc --env=prod_hk",
     "deploy:cloudflare_env:plugin_jp:prod": "bunx wrangler secret bulk internal/cloudflare/.env.prod --config cloudflare_workers/plugin/wrangler.jsonc --env=prod_jp",
     "deploy:supabase:prod": "bunx supabase functions deploy --project-ref xvwzpoazmxkqosrdewyv",
-    "deploy:supabase:preprod": "bunx supabase functions deploy --project-ref aucsybvnhavogdmzwtcw",
+    "deploy:supabase:preprod": "bunx supabase functions deploy --project-ref ibwjdnhknbkcqfbabwei",
     "deploy:supabase_env:prod": "bunx supabase secrets set --project-ref xvwzpoazmxkqosrdewyv --env-file internal/cloudflare/.env.prod",
-    "deploy:supabase_env:preprod": "bunx supabase secrets set --project-ref aucsybvnhavogdmzwtcw --env-file internal/cloudflare/.env.preprod",
+    "deploy:supabase_env:preprod": "bunx supabase secrets set --project-ref ibwjdnhknbkcqfbabwei --env-file internal/cloudflare/.env.preprod",
     "deploy:supabase_env:dev": "bunx supabase secrets set --project-ref aucsybvnhavogdmzwtcw --env-file internal/cloudflare/.env.alpha",
     "size": "bunx vite-bundle-visualizer"
   },
