@@ -248,6 +248,9 @@ export function queryTerminalPixelSize(timeoutMs = TERMINAL_PIXEL_SIZE_TIMEOUT_M
     let response = ''
     const wasPaused = stdin.isPaused()
     const wasRaw = stdin.isRaw
+    const initialDataListeners = stdin.listenerCount('data')
+    const initialKeypressListeners = stdin.listenerCount('keypress')
+    const initialReadableListeners = stdin.listenerCount('readable')
     const timer = setTimeout(() => cleanup(undefined), timeoutMs)
     timer.unref?.()
 
@@ -258,10 +261,13 @@ export function queryTerminalPixelSize(timeoutMs = TERMINAL_PIXEL_SIZE_TIMEOUT_M
       settled = true
       clearTimeout(timer)
       stdin.off('data', onData)
+      const inputWasClaimed = stdin.listenerCount('data') > initialDataListeners
+        || stdin.listenerCount('keypress') > initialKeypressListeners
+        || stdin.listenerCount('readable') > initialReadableListeners
       try {
-        if (!wasRaw)
+        if (!inputWasClaimed && !wasRaw)
           stdin.setRawMode(false)
-        if (wasPaused)
+        if (!inputWasClaimed && wasPaused)
           stdin.pause()
       }
       catch {}
