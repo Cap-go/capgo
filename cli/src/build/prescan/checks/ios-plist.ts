@@ -14,7 +14,10 @@ function plistStringValue(raw: string, key: string): string | null {
   return raw.match(re)?.[1] ?? null
 }
 
-const SCHEME_RE = /^[a-z][a-z0-9+.-]*$/i // RFC 3986/1738 scheme grammar — no underscores
+// RFC 3986/1738 scheme grammar - no underscores. Exported so the Android
+// deep-link check (manifest.ts re-exports this) validates schemes with the
+// exact same grammar as the iOS Info.plist scheme check.
+export const SCHEME_RE = /^[a-z][a-z0-9+.-]*$/i
 const PURPOSE_KEYS = [
   'NSCameraUsageDescription',
   'NSMicrophoneUsageDescription',
