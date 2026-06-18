@@ -12,6 +12,14 @@ interface AppleLookupResult {
   artworkUrl100?: string
   bundleId?: string
   screenshotUrls?: string[]
+  artistName?: string
+  sellerName?: string
+  artistViewUrl?: string
+}
+
+interface JsonLdAuthor {
+  name: string
+  url: string
 }
 
 const ALLOWED_STORE_HOSTS = new Set([
@@ -129,6 +137,72 @@ function extractTitle(html: string) {
   return titleMatch?.[1] ? decodeHtml(titleMatch[1]) : ''
 }
 
+function normalizeJsonLdEntries(parsed: unknown) {
+  return Array.isArray(parsed) ? parsed : [parsed]
+}
+
+function getJsonLdAuthor(entry: unknown): JsonLdAuthor | null {
+  if (!entry || typeof entry !== 'object' || !('author' in entry))
+    return null
+
+  const author = (entry as { author?: unknown }).author
+  if (!author || typeof author !== 'object')
+    return null
+
+  const candidate = author as { name?: unknown, url?: unknown }
+  const jsonLdAuthor = {
+    name: typeof candidate.name === 'string' ? decodeHtml(candidate.name).trim() : '',
+    url: typeof candidate.url === 'string' ? decodeHtml(candidate.url).trim() : '',
+  }
+
+  return jsonLdAuthor.name || jsonLdAuthor.url ? jsonLdAuthor : null
+}
+
+function parseJsonLdAuthor(rawJson: string) {
+  try {
+    const parsed = JSON.parse(rawJson)
+    for (const entry of normalizeJsonLdEntries(parsed)) {
+      const author = getJsonLdAuthor(entry)
+      if (author)
+        return author
+    }
+  }
+  catch {
+    // Store pages change often; keep parsing best-effort and fall back below.
+  }
+
+  return null
+}
+
+function extractJsonLdAuthor(html: string) {
+  const scriptPattern = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
+  let match: RegExpExecArray | null
+
+  while ((match = scriptPattern.exec(html)) !== null) {
+    const rawJson = decodeHtml(match[1]?.trim() ?? '')
+    if (!rawJson)
+      continue
+
+    const author = parseJsonLdAuthor(rawJson)
+    if (author)
+      return author
+  }
+
+  return { name: '', url: '' }
+}
+
+function extractGooglePlayDeveloperName(html: string, author: JsonLdAuthor | null) {
+  if (author?.name)
+    return author.name
+
+  const developerLinkMatch = /developer\?id=[^"']*["'][^>]*>\s*<span[^>]*>([^<]+)<\/span>/i.exec(html)
+  return developerLinkMatch?.[1] ? decodeHtml(developerLinkMatch[1]).trim() : ''
+}
+
+function extractDeveloperUrl(html: string, author: JsonLdAuthor | null) {
+  return author?.url || extractMetaTag(html, 'appstore:developer_url')
+}
+
 function decodeHtml(value: string) {
   return value
     .replace(/&quot;/g, '"')
@@ -189,6 +263,12 @@ export async function fetchStoreMetadata(c: Context<MiddlewareKeyVariables>, bod
   const screenshot_url = appleLookup?.screenshotUrls?.[0]?.trim() || null
   const app_id = android_app_id || ios_bundle_id
   const name = appleLookup?.trackName?.trim() || normalizeStoreName(scrapedName, parsedUrl)
+  const jsonLdAuthor = appleLookup ? null : extractJsonLdAuthor(html)
+  const developer_name = appleLookup?.sellerName?.trim()
+    || appleLookup?.artistName?.trim()
+    || extractGooglePlayDeveloperName(html, jsonLdAuthor)
+    || null
+  const developer_url = appleLookup?.artistViewUrl?.trim() || extractDeveloperUrl(html, jsonLdAuthor) || null
   const icon_url = appleLookup?.artworkUrl512?.trim() || appleLookup?.artworkUrl100?.trim() || scrapedIconUrl
   const icon_data_url = await fetchIconDataUrl(icon_url)
 
@@ -198,6 +278,8 @@ export async function fetchStoreMetadata(c: Context<MiddlewareKeyVariables>, bod
     icon_url,
     icon_data_url,
     screenshot_url,
+    developer_name,
+    developer_url,
     app_id,
     android_app_id,
     ios_bundle_id,

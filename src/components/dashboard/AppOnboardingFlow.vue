@@ -2,7 +2,7 @@
 import type { Database } from '~/types/supabase.types'
 import { FormKit } from '@formkit/vue'
 import { FunctionsHttpError } from '@supabase/supabase-js'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -41,6 +41,31 @@ const organizationStore = useOrganizationStore()
 const config = getLocalConfig()
 
 type AppRow = Database['public']['Tables']['apps']['Row']
+
+interface StoreUrls {
+  iosStoreUrl: string | null
+  androidStoreUrl: string | null
+}
+
+interface StoreMetadataResponse {
+  name?: unknown
+  icon_data_url?: unknown
+  icon_url?: unknown
+  screenshot_url?: unknown
+  app_id?: unknown
+}
+
+interface AppCreateValues {
+  ownerOrg: string
+  appName: string
+  initialAppId: string
+  existingApp: boolean
+}
+
+interface CreatedAppCandidate {
+  appId: string
+  responseData: AppRow
+}
 
 const isLoading = ref(true)
 const isSubmitting = ref(false)
@@ -191,7 +216,7 @@ function extractAndroidAppId(url: string) {
   }
 }
 
-function getStoreUrls(url: string) {
+function getStoreUrls(url: string): StoreUrls {
   if (!url)
     return { iosStoreUrl: null, androidStoreUrl: null }
 
@@ -312,6 +337,58 @@ async function loadResumeApp() {
   return true
 }
 
+function getInitialStoreUrlFromQuery() {
+  const value = route.query.store_url
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+async function applyStorePrefillFromQuery() {
+  const initialStoreUrl = getInitialStoreUrlFromQuery()
+  if (!initialStoreUrl)
+    return false
+
+  existingApp.value = true
+  await nextTick()
+  existingAppSetup.value = 'import'
+  storeUrl.value = initialStoreUrl
+  await importStoreMetadata()
+  return true
+}
+
+function getTrimmedString(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function isCurrentStoreImportRun(requestedRun: number, requestedUrl: string) {
+  return requestedRun === storeImportRun
+    && existingAppSetup.value === 'import'
+    && storeUrl.value.trim() === requestedUrl
+}
+
+function getImportedStoreIcon(data: StoreMetadataResponse) {
+  return getTrimmedString(data.icon_data_url) || getTrimmedString(data.icon_url)
+}
+
+function applyImportedStoreMetadata(data: StoreMetadataResponse) {
+  importedStoreAppId.value = ''
+  storeIconPreview.value = ''
+  storeScreenshotPreview.value = ''
+
+  const importedName = getTrimmedString(data.name)
+  if (importedName && !appName.value.trim())
+    appName.value = importedName
+
+  const importedIcon = getImportedStoreIcon(data)
+  if (importedIcon && !localIconPreview.value)
+    storeIconPreview.value = importedIcon
+
+  const screenshotUrl = getTrimmedString(data.screenshot_url)
+  storeScreenshotPreview.value = screenshotUrl
+
+  const importedAppId = getTrimmedString(data.app_id)
+  importedStoreAppId.value = importedAppId
+}
+
 async function importStoreMetadata() {
   const requestedUrl = storeUrl.value.trim()
   if (!requestedUrl || existingAppSetup.value !== 'import')
@@ -325,31 +402,16 @@ async function importStoreMetadata() {
       body: { url: requestedUrl },
     })
 
-    if (requestedRun !== storeImportRun || existingAppSetup.value !== 'import' || storeUrl.value.trim() !== requestedUrl)
+    if (!isCurrentStoreImportRun(requestedRun, requestedUrl))
       return
 
     if (error)
       throw error
 
-    if (typeof data?.name === 'string' && data.name.trim() && !appName.value.trim())
-      appName.value = data.name.trim()
-
-    const importedIcon = typeof data?.icon_data_url === 'string' && data.icon_data_url.trim()
-      ? data.icon_data_url.trim()
-      : typeof data?.icon_url === 'string' && data.icon_url.trim()
-        ? data.icon_url.trim()
-        : ''
-    if (importedIcon && !localIconPreview.value)
-      storeIconPreview.value = importedIcon
-
-    if (typeof data?.screenshot_url === 'string' && data.screenshot_url.trim())
-      storeScreenshotPreview.value = data.screenshot_url.trim()
-
-    if (typeof data?.app_id === 'string' && data.app_id.trim())
-      importedStoreAppId.value = data.app_id.trim()
+    applyImportedStoreMetadata((data ?? {}) as StoreMetadataResponse)
   }
   catch (error) {
-    if (requestedRun !== storeImportRun || existingAppSetup.value !== 'import' || storeUrl.value.trim() !== requestedUrl)
+    if (!isCurrentStoreImportRun(requestedRun, requestedUrl))
       return
 
     console.error('Cannot import store metadata', error)
@@ -361,13 +423,19 @@ async function importStoreMetadata() {
   }
 }
 
-function onSelectIconFormKit(value: unknown) {
+function resolveSelectedIconFile(value: unknown) {
   const fileValue = Array.isArray(value) ? value[0] : value
-  const file = fileValue && typeof fileValue === 'object' && 'file' in fileValue
-    ? (fileValue as { file?: File }).file ?? null
-    : fileValue instanceof File
-      ? fileValue
-      : null
+  if (fileValue instanceof File)
+    return fileValue
+
+  if (fileValue && typeof fileValue === 'object' && 'file' in fileValue)
+    return (fileValue as { file?: File }).file ?? null
+
+  return null
+}
+
+function onSelectIconFormKit(value: unknown) {
+  const file = resolveSelectedIconFile(value)
 
   selectedIconFile.value = file
   if (localIconPreview.value.startsWith('blob:'))
@@ -441,29 +509,43 @@ async function readFunctionError(error: unknown) {
   }
 }
 
+async function getRemoteIconFile(iconSourceUrl?: string) {
+  if (!iconSourceUrl)
+    return null
+
+  try {
+    const parsedIconUrl = new URL(iconSourceUrl)
+    if (parsedIconUrl.protocol === 'https:') {
+      const response = await fetch(parsedIconUrl.toString())
+      if (!response.ok) {
+        console.warn('Remote icon fetch failed', response.status, parsedIconUrl.toString())
+        return null
+      }
+
+      const contentType = response.headers.get('content-type') || ''
+      if (!contentType.startsWith('image/')) {
+        console.warn('Remote icon is not an image', contentType)
+        return null
+      }
+
+      const blob = await response.blob()
+      return new File([blob], 'store-icon.png', { type: blob.type || 'image/png' })
+    }
+
+    console.warn('Skipping non-HTTPS icon URL', iconSourceUrl)
+  }
+  catch (error) {
+    console.warn('Cannot fetch remote icon', error)
+  }
+
+  return null
+}
+
 async function uploadIcon(appId: string, iconSourceUrl?: string) {
   if (!currentOrg.value?.gid)
     return
 
-  let fileToUpload = selectedIconFile.value
-
-  if (!fileToUpload && iconSourceUrl) {
-    try {
-      const parsedIconUrl = new URL(iconSourceUrl)
-      if (parsedIconUrl.protocol !== 'https:') {
-        console.warn('Skipping non-HTTPS icon URL', iconSourceUrl)
-      }
-      else {
-        const response = await fetch(parsedIconUrl.toString())
-        const blob = await response.blob()
-        fileToUpload = new File([blob], 'store-icon.png', { type: blob.type || 'image/png' })
-      }
-    }
-    catch (error) {
-      console.warn('Cannot fetch remote icon', error)
-    }
-  }
-
+  const fileToUpload = selectedIconFile.value ?? await getRemoteIconFile(iconSourceUrl)
   if (!fileToUpload)
     return
 
@@ -486,103 +568,144 @@ async function uploadIcon(appId: string, iconSourceUrl?: string) {
     .eq('app_id', appId)
 }
 
-async function createAppRecord() {
-  if (!currentOrg.value?.gid) {
+function getAppCreateValues(): AppCreateValues | null {
+  const ownerOrg = currentOrg.value?.gid
+  if (!ownerOrg) {
     toast.error(t('app-onboarding-toast-no-organization'))
-    return
+    return null
   }
 
-  if (existingApp.value === null) {
+  const existingAppValue = existingApp.value
+  if (existingAppValue === null) {
     toast.error(t('app-onboarding-toast-existing-required'))
-    return
+    return null
   }
 
-  if (!appName.value.trim()) {
+  const appNameValue = appName.value.trim()
+  if (!appNameValue) {
     toast.error(t('app-onboarding-toast-name-required'))
+    return null
+  }
+
+  const initialAppId = generatedAppId.value.trim()
+  if (!initialAppId) {
+    toast.error(t('app-onboarding-toast-appid-required'))
+    return null
+  }
+
+  return {
+    ownerOrg,
+    appName: appNameValue,
+    initialAppId,
+    existingApp: existingAppValue,
+  }
+}
+
+function getNormalizedStoreUrlsForCreate(existingAppValue: boolean): StoreUrls {
+  if (existingAppValue && existingAppSetup.value === 'import')
+    return getStoreUrls(storeUrl.value.trim())
+
+  return { iosStoreUrl: null, androidStoreUrl: null }
+}
+
+async function createCandidateApp(values: AppCreateValues, candidateId: string, normalizedStoreUrls: StoreUrls) {
+  const { data, error } = await supabase.functions.invoke('app', {
+    method: 'POST',
+    body: {
+      owner_org: values.ownerOrg,
+      app_id: candidateId,
+      name: values.appName,
+      need_onboarding: true,
+      existing_app: values.existingApp,
+      ios_store_url: normalizedStoreUrls.iosStoreUrl,
+      android_store_url: normalizedStoreUrls.androidStoreUrl,
+    },
+  })
+
+  if (!error && data?.app_id)
+    return data as AppRow
+
+  const functionError = await readFunctionError(error)
+  const isConflict = isAppIdConflict({
+    status: functionError?.status ?? (error as { status?: number } | null | undefined)?.status,
+    message: `${functionError?.code ?? ''} ${functionError?.message ?? (error as { message?: string } | null | undefined)?.message ?? ''}`,
+  })
+
+  if (isConflict)
+    return null
+
+  appIdFeedback.value = functionError?.message ?? t('app-onboarding-toast-create-error')
+  toast.error(appIdFeedback.value)
+  throw error ?? new Error(appIdFeedback.value)
+}
+
+function applyCreatedCandidateFeedback(candidateId: string, initialAppId: string) {
+  manualAppId.value = candidateId
+  if (candidateId === initialAppId) {
+    appIdFeedback.value = ''
+    appIdSuggestions.value = []
     return
   }
 
-  if (!generatedAppId.value.trim()) {
-    toast.error(t('app-onboarding-toast-appid-required'))
-    return
+  appIdFeedback.value = t('app-onboarding-appid-taken-switched', {
+    original: initialAppId,
+    replacement: candidateId,
+  })
+  appIdSuggestions.value = buildAlternativeAppIds(initialAppId)
+  toast.info(appIdFeedback.value)
+}
+
+async function findCreatedAppCandidate(values: AppCreateValues, normalizedStoreUrls: StoreUrls): Promise<CreatedAppCandidate | null> {
+  const candidateIds = [values.initialAppId, ...buildAlternativeAppIds(values.initialAppId)]
+
+  for (const candidateId of candidateIds) {
+    const responseData = await createCandidateApp(values, candidateId, normalizedStoreUrls)
+    if (!responseData)
+      continue
+
+    applyCreatedCandidateFeedback(candidateId, values.initialAppId)
+    return { appId: candidateId, responseData }
   }
+
+  return null
+}
+
+function showNoAppIdCandidate(initialAppId: string) {
+  appIdSuggestions.value = buildAlternativeAppIds(initialAppId)
+  appIdFeedback.value = t('app-onboarding-appid-taken-pick-another', {
+    appId: initialAppId,
+  })
+  toast.error(appIdFeedback.value)
+}
+
+async function finishCreatedAppRecord(candidate: CreatedAppCandidate) {
+  const importedIconSource = canUseStoreImportPreview.value ? storeIconPreview.value : ''
+  await uploadIcon(candidate.appId, importedIconSource)
+  const { data: refreshed } = await supabase
+    .from('apps')
+    .select()
+    .eq('app_id', candidate.appId)
+    .single()
+
+  createdApp.value = refreshed ?? candidate.responseData
+  flowStep.value = 'choice'
+}
+
+async function createAppRecord() {
+  const values = getAppCreateValues()
+  if (!values)
+    return
 
   isSubmitting.value = true
   try {
-    const normalizedStoreUrls = existingApp.value === true && existingAppSetup.value === 'import'
-      ? getStoreUrls(storeUrl.value.trim())
-      : { iosStoreUrl: null, androidStoreUrl: null }
-
-    let appId = generatedAppId.value
-    let responseData: AppRow | null = null
-    const candidateIds = [appId, ...buildAlternativeAppIds(appId)]
-
-    for (const candidateId of candidateIds) {
-      const { data, error } = await supabase.functions.invoke('app', {
-        method: 'POST',
-        body: {
-          owner_org: currentOrg.value.gid,
-          app_id: candidateId,
-          name: appName.value.trim(),
-          need_onboarding: true,
-          existing_app: existingApp.value,
-          ios_store_url: normalizedStoreUrls.iosStoreUrl,
-          android_store_url: normalizedStoreUrls.androidStoreUrl,
-        },
-      })
-
-      if (!error && data?.app_id) {
-        responseData = data as AppRow
-        appId = candidateId
-        manualAppId.value = candidateId
-        if (candidateId !== candidateIds[0]) {
-          appIdFeedback.value = t('app-onboarding-appid-taken-switched', {
-            original: candidateIds[0],
-            replacement: candidateId,
-          })
-          appIdSuggestions.value = buildAlternativeAppIds(candidateIds[0])
-          toast.info(appIdFeedback.value)
-        }
-        else {
-          appIdFeedback.value = ''
-          appIdSuggestions.value = []
-        }
-        break
-      }
-
-      const functionError = await readFunctionError(error)
-      const isConflict = isAppIdConflict({
-        status: functionError?.status ?? (error as { status?: number } | null | undefined)?.status,
-        message: `${functionError?.code ?? ''} ${functionError?.message ?? (error as { message?: string } | null | undefined)?.message ?? ''}`,
-      })
-
-      if (isConflict)
-        continue
-
-      appIdFeedback.value = functionError?.message ?? t('app-onboarding-toast-create-error')
-      toast.error(appIdFeedback.value)
-      throw error ?? new Error(appIdFeedback.value)
-    }
-
-    if (!responseData) {
-      appIdSuggestions.value = buildAlternativeAppIds(candidateIds[0])
-      appIdFeedback.value = t('app-onboarding-appid-taken-pick-another', {
-        appId: candidateIds[0],
-      })
-      toast.error(appIdFeedback.value)
+    const normalizedStoreUrls = getNormalizedStoreUrlsForCreate(values.existingApp)
+    const candidate = await findCreatedAppCandidate(values, normalizedStoreUrls)
+    if (!candidate) {
+      showNoAppIdCandidate(values.initialAppId)
       return
     }
 
-    const importedIconSource = canUseStoreImportPreview.value ? storeIconPreview.value : ''
-    await uploadIcon(appId, importedIconSource)
-    const { data: refreshed } = await supabase
-      .from('apps')
-      .select()
-      .eq('app_id', appId)
-      .single()
-
-    createdApp.value = refreshed ?? responseData
-    flowStep.value = 'choice'
+    await finishCreatedAppRecord(candidate)
   }
   catch (error) {
     console.error('Cannot create onboarding app', error)
@@ -677,8 +800,10 @@ onMounted(async () => {
       toast.error(t('app-onboarding-toast-apikey-error'))
     }
     const resumed = await loadResumeApp()
-    if (!resumed)
+    if (!resumed) {
+      await applyStorePrefillFromQuery()
       flowStep.value = 'details'
+    }
   }
   finally {
     isLoading.value = false
@@ -690,8 +815,15 @@ onBeforeUnmount(() => {
     URL.revokeObjectURL(localIconPreview.value)
 })
 
+function getDefaultExistingAppSetup(value: boolean | null) {
+  if (value === false)
+    return 'manual'
+
+  return null
+}
+
 watch(existingApp, (value) => {
-  existingAppSetup.value = value === true ? null : value === false ? 'manual' : null
+  existingAppSetup.value = getDefaultExistingAppSetup(value)
   if (value !== true) {
     resetStoreImportState()
   }
@@ -837,15 +969,12 @@ watch(suggestedAppId, (value) => {
                 <p class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
                   {{ t('app-onboarding-command-help') }}
                 </p>
-                <div
+                <button
                   v-if="isCliCommandVisible"
-                  class="group relative mt-3 cursor-pointer rounded-xl bg-slate-950 p-4 pr-14 ring-1 ring-white/10 transition hover:ring-white/20"
-                  role="button"
-                  tabindex="0"
+                  type="button"
+                  class="d-btn d-btn-neutral group relative mt-3 h-auto min-h-0 w-full justify-start rounded-xl p-4 pr-14 text-left font-normal normal-case"
                   :aria-label="t('app-onboarding-command-copy')"
                   @click="copyCliCommand"
-                  @keydown.enter.prevent="copyCliCommand"
-                  @keydown.space.prevent="copyCliCommand"
                 >
                   <code class="block whitespace-pre-wrap break-all text-sm">
                     <span class="text-slate-500">npx</span>
@@ -857,7 +986,7 @@ watch(suggestedAppId, (value) => {
                     </template>
                   </code>
                   <IconCopy class="absolute right-4 top-4 h-5 w-5 text-muted-blue-300 transition group-hover:text-white" />
-                </div>
+                </button>
               </div>
 
               <div v-if="existingApp === true" class="space-y-5 border-t border-slate-200 pt-6 dark:border-white/15">
@@ -1162,14 +1291,11 @@ watch(suggestedAppId, (value) => {
               </button>
             </div>
 
-            <div
-              class="group relative cursor-pointer rounded-2xl bg-slate-950 p-5 pr-14 ring-1 ring-white/10 transition hover:ring-white/20"
-              role="button"
-              tabindex="0"
+            <button
+              type="button"
+              class="d-btn d-btn-neutral group relative h-auto min-h-0 w-full justify-start rounded-2xl p-5 pr-14 text-left font-normal normal-case"
               :aria-label="t('app-onboarding-command-copy')"
               @click="copyCliCommand"
-              @keydown.enter.prevent="copyCliCommand"
-              @keydown.space.prevent="copyCliCommand"
             >
               <code class="block whitespace-pre-wrap break-all text-sm">
                 <span class="text-slate-500">npx</span>
@@ -1181,7 +1307,7 @@ watch(suggestedAppId, (value) => {
                 </template>
               </code>
               <IconCopy class="absolute right-4 top-4 h-5 w-5 text-muted-blue-300 transition group-hover:text-white" />
-            </div>
+            </button>
 
             <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-700 dark:border-white/15 dark:bg-slate-950/90 dark:text-slate-200">
               <div class="flex flex-wrap items-start justify-between gap-3">
