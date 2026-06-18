@@ -27,6 +27,7 @@ import { markSnag } from './app/debug'
 import { findMonorepoRoot, findNXMonorepoRoot, isMonorepo, isNXMonorepo } from './capacitor-cli'
 import { getChecksum } from './checksum'
 import { loadConfig, writeConfig } from './config'
+import { isTruthyEnvValue } from './posthog'
 import { nativePackageSchema } from './schemas/common'
 import { formatApiErrorForCli, parseSecurityPolicyError } from './utils/security_policy_errors'
 
@@ -675,8 +676,8 @@ function normalizeSupabaseHost(host: string): string {
   return `${parsed.origin}${normalizedPath}`
 }
 
-export async function createSupabaseClient(apikey: string, supaHost?: string, supaKey?: string, silent = false, instrument = true) {
-  const config = await getRemoteConfig(silent)
+export async function createSupabaseClient(apikey: string, supaHost?: string, supaKey?: string, silent = false, instrument = true, signal?: AbortSignal) {
+  const config = await getRemoteConfig(silent, signal)
   if (supaHost && supaKey) {
     if (!silent)
       log.info('Using custom supabase instance from provided options')
@@ -1549,6 +1550,9 @@ export async function updateOrCreateChannel(supabase: SupabaseClient<Database>, 
 }
 
 export async function sendEvent(capgkey: string, payload: TrackOptions & { notifyConsole?: boolean, nonPersonTags?: Record<string, string | number | boolean> }, verbose?: boolean, signal?: AbortSignal): Promise<void> {
+  if (isTruthyEnvValue(env.CAPGO_DISABLE_TELEMETRY) || isTruthyEnvValue(env.CAPGO_DISABLE_POSTHOG))
+    return
+
   try {
     // Attach the global analytics props as nonPersonTags — event properties the
     // backend never writes as PostHog person properties ($set) — built
@@ -2516,7 +2520,7 @@ export async function promptAndSyncCapacitor(
   if (isCancel(shouldSync)) {
     // For init flow, mark the cancellation
     if (isInit && orgId && apikey) {
-      await markSnag('onboarding-v2', orgId, apikey, 'canceled', '🤷')
+      await markSnag('onboarding-v2', orgId, apikey, 'canceled', undefined, '🤷')
     }
     log.error('Canceled Capacitor sync')
     throw new Error('Capacitor sync cancelled')

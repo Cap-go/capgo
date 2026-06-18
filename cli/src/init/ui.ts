@@ -90,7 +90,7 @@ function progressPercent(stepNumber: number, totalSteps: number) {
   return Math.round(((stepNumber - 1) / totalSteps) * 100)
 }
 
-export function renderInitOnboardingWelcome(totalSteps: number): void {
+export function renderInitOnboardingWelcome(totalSteps: number, analyticsEnabled = true): void {
   clearInitLogs()
   setInitScreen({
     title: 'Capgo OTA Onboarding',
@@ -98,6 +98,7 @@ export function renderInitOnboardingWelcome(totalSteps: number): void {
       `Connect your Capacitor app to Capgo in ${totalSteps} guided steps.`,
       'Guide · https://capgo.app/docs/getting-started/onboarding/',
       'Session · ETA 2-10 min • Resume support automatic',
+      ...(analyticsEnabled ? ['Analytics: this onboarding records usage and terminal replay to improve Capgo. Opt out with --no-analytics.'] : []),
     ],
     tone: 'cyan',
   })
