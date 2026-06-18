@@ -16,7 +16,7 @@ import { ASC_KEY_CHANNEL } from './asc-key/protocol.js'
 import { getPlatformDirFromCapacitorConfig } from '../platform-paths.js'
 import OnboardingShell from './ui/shell.js'
 import { checkForCliUpdate, manualUpdateHint, runUpdateAndReexec } from './self-update.js'
-import { startInitReplay } from '../../init/replay.js'
+import { resolveSupabaseReplayUrl, startInitReplay } from '../../init/replay.js'
 import type { OnboardingResult } from './types.js'
 export interface OnboardingBuilderOptions {
   analytics?: boolean
@@ -197,12 +197,15 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
   const journeyId = newBuilderJourneyId()
   const analyticsEnabled = options.enableSelfUpdate === true && options.analytics !== false
   const replayApikey = options.apikey?.trim() || findSavedKeySilent()
+  const buildReplayUrl = resolveSupabaseReplayUrl(options.supaHost)
   const buildReplay = startInitReplay({
     analyticsEnabled,
     apikey: replayApikey,
     ariaLabel: 'Capgo build onboarding terminal replay',
     currentUrl: 'capgo-cli://build-onboarding',
+    replayUrl: buildReplayUrl,
     sessionPrefix: 'build-onboarding',
+    supaHost: options.supaHost,
   })
   let buildReplayFinished = false
   const finishBuildReplay = async (): Promise<void> => {
