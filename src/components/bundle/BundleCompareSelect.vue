@@ -309,8 +309,13 @@ function liveBadgeTitle(versionId: number): string {
   return t('currently-live-on', { channels: names.join(', ') })
 }
 
+function escapeIlike(term: string): string {
+  return term.replace(/[\\%_]/g, '\\$&')
+}
+
 async function searchCompareVersions(term: string) {
-  if (!props.appId || !term.trim()) {
+  const trimmed = term.trim()
+  if (!props.appId || !trimmed) {
     compareSearchResults.value = []
     compareSearchLoading.value = false
     return
@@ -322,14 +327,15 @@ async function searchCompareVersions(term: string) {
   // Each chain must start from its own builder: the Supabase query builder is
   // mutable and returns `this`, so reusing one instance across concurrent
   // chains would leak filters between the requests.
-  const numericId = Number(term)
+  const namePattern = `%${escapeIlike(trimmed)}%`
+  const numericId = /^\d+$/.test(trimmed) ? Number(trimmed) : Number.NaN
   let data: VersionRow[] | null = null
   let error: unknown = null
 
   if (Number.isNaN(numericId)) {
     const response = await buildCompareBaseQuery()
       .neq('id', props.currentVersionId)
-      .ilike('name', `%${term}%`)
+      .ilike('name', namePattern)
       .order('created_at', { ascending: false })
       .limit(5)
 
@@ -343,7 +349,7 @@ async function searchCompareVersions(term: string) {
     const [nameResponse, idResponse] = await Promise.all([
       buildCompareBaseQuery()
         .neq('id', props.currentVersionId)
-        .ilike('name', `%${term}%`)
+        .ilike('name', namePattern)
         .order('created_at', { ascending: false })
         .limit(5),
       buildCompareBaseQuery()
@@ -447,7 +453,7 @@ watch(
           tabindex="0"
           class="mt-1 w-full d-dropdown-content d-menu rounded-lg border border-slate-200 bg-white p-2 shadow-lg z-20 dark:border-slate-700 dark:bg-slate-900"
         >
-          <div class="p-2">
+          <div class="p-2" @mousedown.prevent>
             <FormKit
               v-model="compareSearch"
               :prefix-icon="IconSearch"
