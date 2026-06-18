@@ -326,6 +326,7 @@ const buildCLI = Bun.build({
     'globalThis.__CAPGO_DEV__': 'false',
     // MCP onboarding is release-ready as of PR 2: ship the onboarding tools.
     'globalThis.__CAPGO_MCP_ONBOARDING__': 'true',
+    'globalThis.__CAPGO_MCP_LIVE_UPDATE__': 'true',
     // Gates the CAPGO_KEYCHAIN_HELPER_PATH dev override. `false` here makes
     // the minifier delete the whole branch from release bundles —
     // publish_cli.yml asserts the string is absent from dist/index.js.
@@ -362,6 +363,7 @@ const buildSDK = Bun.build({
     'globalThis.__CAPGO_DEV__': 'false',
     // MCP onboarding is release-ready as of PR 2: ship the onboarding tools.
     'globalThis.__CAPGO_MCP_ONBOARDING__': 'true',
+    'globalThis.__CAPGO_MCP_LIVE_UPDATE__': 'true',
     // Gates the CAPGO_KEYCHAIN_HELPER_PATH dev override. `false` here makes
     // the minifier delete the whole branch from release bundles —
     // publish_cli.yml asserts the string is absent from dist/index.js.

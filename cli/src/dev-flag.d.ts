@@ -13,4 +13,7 @@ declare global {
   // registerOnboardingTools + the MCP-only deciders out of dist.
   // eslint-disable-next-line no-var, vars-on-top
   var __CAPGO_MCP_ONBOARDING__: boolean | undefined
+  // MCP live-update onboarding tools (OTA setup spine).
+  // eslint-disable-next-line no-var, vars-on-top
+  var __CAPGO_MCP_LIVE_UPDATE__: boolean | undefined
 }

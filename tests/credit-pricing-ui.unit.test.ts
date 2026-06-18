@@ -28,7 +28,7 @@ describe('credit pricing UI helpers', () => {
       unit_factor: 60,
     }, t)).toBe('Up to 100m')
 
-    expect(formatCreditPricingPrice('build_time', 0.16, t)).toBe('$0.16 per minute')
+    expect(formatCreditPricingPrice('build_time', 0.08, t)).toBe('$0.08 per minute')
   })
 
   it.concurrent('falls back to generic tier copy for custom org-scoped ranges', () => {
@@ -62,7 +62,7 @@ describe('credit pricing UI helpers', () => {
         type: 'build_time',
         step_min: 6000,
         step_max: 30000,
-        price_per_unit: 0.14,
+        price_per_unit: 0.07,
         unit_factor: 60,
       },
       {
@@ -76,16 +76,16 @@ describe('credit pricing UI helpers', () => {
         type: 'build_time',
         step_min: 0,
         step_max: 6000,
-        price_per_unit: 0.16,
+        price_per_unit: 0.08,
         unit_factor: 60,
       },
     ])).toEqual({
       bandwidth: 0.12,
-      build_time: 0.16,
+      build_time: 0.08,
     })
   })
 
   it.concurrent('formats plan overage copy from the shared price formatter', () => {
-    expect(formatIncludedThenPrice('build_time', 0.08, t)).toBe('Included in plan, then $0.08 per minute')
+    expect(formatIncludedThenPrice('build_time', 0.04, t)).toBe('Included in plan, then $0.04 per minute')
   })
 })

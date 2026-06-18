@@ -10,13 +10,13 @@
 //
 // Two checks:
 //   1. NONE of the forbidden dev markers appear in dist/index.js.
-//   2. ALL three onboarding tool names ARE present (the PR 2 flip shipped them).
+//   2. ALL six MCP onboarding tool names ARE present (builder + live-update).
 import { readFileSync } from 'node:fs'
 
 const bundle = readFileSync(new URL('../dist/index.js', import.meta.url), 'utf8')
 
-const forbidden = ['__CAPGO_DEV__', 'CAPGO_SPOOF', 'src/__dev__/', '__CAPGO_MCP_ONBOARDING__']
-const requiredTools = ['start_capgo_builder_onboarding', 'capgo_builder_onboarding_next_step', 'capgo_builder_onboarding_explain']
+const forbidden = ['__CAPGO_DEV__', 'CAPGO_SPOOF', 'src/__dev__/', '__CAPGO_MCP_ONBOARDING__', '__CAPGO_MCP_LIVE_UPDATE__']
+const requiredTools = ['start_capgo_builder_onboarding', 'capgo_builder_onboarding_next_step', 'capgo_builder_onboarding_explain', 'start_capgo_live_update_onboarding', 'capgo_live_update_onboarding_next_step', 'capgo_live_update_onboarding_explain']
 
 let fail = 0
 for (const m of forbidden) {
