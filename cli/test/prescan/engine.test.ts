@@ -82,10 +82,10 @@ describe('fixture helpers', () => {
 })
 
 describe('registry', () => {
-  it('contains all 22 phase-1 checks with unique ids', () => {
+  it('contains all 47 checks with unique ids', () => {
     const ids = ALL_CHECKS.map(c => c.id)
     expect(new Set(ids).size).toBe(ids.length)
-    expect(ids.length).toBe(22)
+    expect(ids.length).toBe(47)
     for (const expected of [
       'shared/apikey-permission', 'shared/app-exists', 'shared/credentials-saved',
       'shared/cap-sync-stale', 'shared/node-linker-layout', 'shared/bundle-id-consistency',
@@ -95,6 +95,18 @@ describe('registry', () => {
       'android/keystore-opens', 'android/keystore-expiry', 'android/cordova-vars-present',
       'android/gradle-props-heuristics', 'android/play-sa-json', 'android/flavor-exists',
       'android/agp8-package-attr',
+      // 13 android manifest checks
+      'android/manifest-well-formed', 'android/manifest-tag-typo', 'android/manifest-namespace-uri',
+      'android/manifest-missing-prefix', 'android/manifest-exported-missing', 'android/manifest-multiple-uses-sdk',
+      'android/manifest-duplicate-component', 'android/manifest-unique-permission', 'android/manifest-hardcoded-debuggable',
+      'android/manifest-mock-location', 'android/manifest-exported-unprotected', 'android/manifest-query-all-packages',
+      'android/manifest-deeplink-valid',
+      // 10 android gradle/project checks
+      'android/applicationid-present', 'android/capacitor-build-gradle-applied', 'android/gradle-wrapper-present',
+      'android/flavor-dimensions', 'android/google-services-file', 'android/local-properties-committed',
+      'android/sdk-floors', 'android/target-sdk-play', 'android/min-sdk-capacitor', 'android/version-fields',
+      // 2 store-access checks
+      'android/play-sa-access', 'ios/asc-key-access',
     ]) expect(ids).toContain(expected)
   })
 })

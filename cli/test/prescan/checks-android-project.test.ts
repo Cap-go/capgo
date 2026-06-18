@@ -2,10 +2,20 @@
 import { describe, expect, it } from 'bun:test'
 import {
   agp8PackageAttr,
+  applicationIdPresent,
+  capacitorBuildGradleApplied,
   cordovaVarsPresent,
+  flavorDimensions,
   flavorExists,
+  googleServicesFile,
   gradlePropsHeuristics,
+  gradleWrapperPresent,
+  localPropertiesCommitted,
+  minSdkCapacitor,
   playSaJson,
+  sdkFloors,
+  targetSdkPlay,
+  versionFields,
 } from '../../src/build/prescan/checks/android-project'
 import { makeCtx, makeProject } from './helpers'
 
@@ -211,5 +221,421 @@ describe('android/agp8-package-attr', () => {
       'android/app/build.gradle': `android { namespace "com.demo.app" }`,
     })
     expect(await agp8PackageAttr.run(aCtx(dir))).toEqual([])
+  })
+})
+
+describe('android/applicationid-present', () => {
+  it('passes when defaultConfig declares a live applicationId', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  defaultConfig {
+    applicationId "com.demo.app"
+  }
+}`,
+    })
+    expect(await applicationIdPresent.run(aCtx(dir))).toEqual([])
+  })
+  it('passes the Kotlin DSL form applicationId = "x"', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle.kts': `android {
+  defaultConfig {
+    applicationId = "com.demo.app"
+  }
+}`,
+    })
+    expect(await applicationIdPresent.run(aCtx(dir))).toEqual([])
+  })
+  it('passes when only a flavor provides applicationIdSuffix', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  defaultConfig { }
+  productFlavors {
+    dev {
+      applicationIdSuffix ".dev"
+    }
+  }
+}`,
+    })
+    expect(await applicationIdPresent.run(aCtx(dir))).toEqual([])
+  })
+  it('errors when no applicationId is declared anywhere', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  defaultConfig { }
+}`,
+    })
+    const f = await applicationIdPresent.run(aCtx(dir))
+    expect(f[0]?.severity).toBe('error')
+    expect(f[0]?.fix).toContain('applicationId')
+  })
+  it('does NOT count a commented-out applicationId', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  defaultConfig {
+    // applicationId "com.ghost.commented"
+  }
+}`,
+    })
+    const f = await applicationIdPresent.run(aCtx(dir))
+    expect(f[0]?.severity).toBe('error')
+  })
+  it('does not apply without an app/build.gradle', () => {
+    const dir = makeProject({ 'package.json': '{}' })
+    expect(applicationIdPresent.appliesTo!(aCtx(dir))).toBe(false)
+  })
+})
+
+describe('android/capacitor-build-gradle-applied', () => {
+  it('passes when apply present and capacitor.build.gradle exists', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `apply from: "capacitor.build.gradle"\nandroid { }`,
+      'android/app/capacitor.build.gradle': 'android { }',
+    })
+    expect(await capacitorBuildGradleApplied.run(aCtx(dir))).toEqual([])
+  })
+  it('errors when apply present but capacitor.build.gradle missing', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `apply from: 'capacitor.build.gradle'\nandroid { }`,
+    })
+    const f = await capacitorBuildGradleApplied.run(aCtx(dir))
+    expect(f[0]?.severity).toBe('error')
+    expect(f[0]?.fix).toContain('cap sync')
+  })
+  it('errors when the apply line is absent', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android { }`,
+      'android/app/capacitor.build.gradle': 'android { }',
+    })
+    const f = await capacitorBuildGradleApplied.run(aCtx(dir))
+    expect(f[0]?.severity).toBe('error')
+  })
+  it('does not count a commented-out apply line', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `// apply from: 'capacitor.build.gradle'\nandroid { }`,
+      'android/app/capacitor.build.gradle': 'android { }',
+    })
+    const f = await capacitorBuildGradleApplied.run(aCtx(dir))
+    expect(f[0]?.severity).toBe('error')
+  })
+})
+
+describe('android/gradle-wrapper-present', () => {
+  it('passes when wrapper properties declare a distributionUrl', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle': 'android { }',
+      'android/gradle/wrapper/gradle-wrapper.properties': 'distributionUrl=https\\://services.gradle.org/distributions/gradle-8.7-all.zip',
+    })
+    expect(await gradleWrapperPresent.run(aCtx(dir))).toEqual([])
+  })
+  it('errors when gradle-wrapper.properties is missing', async () => {
+    const dir = makeProject({ 'android/app/build.gradle': 'android { }' })
+    const f = await gradleWrapperPresent.run(aCtx(dir))
+    expect(f[0]?.severity).toBe('error')
+    expect(f[0]?.fix).toContain('cap sync')
+  })
+  it('errors when distributionUrl is absent from the wrapper', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle': 'android { }',
+      'android/gradle/wrapper/gradle-wrapper.properties': 'zipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists',
+    })
+    const f = await gradleWrapperPresent.run(aCtx(dir))
+    expect(f[0]?.severity).toBe('error')
+    expect(f[0]?.title).toContain('distributionUrl')
+  })
+  it('does not apply without an android directory', () => {
+    const dir = makeProject({ 'package.json': '{}' })
+    expect(gradleWrapperPresent.appliesTo!(aCtx(dir))).toBe(false)
+  })
+})
+
+describe('android/flavor-dimensions', () => {
+  it('errors when a flavor lacks dimension and no top-level flavorDimensions', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  productFlavors {
+    dev { }
+    prod { dimension "env" }
+  }
+}`,
+    })
+    const f = await flavorDimensions.run(aCtx(dir))
+    expect(f[0]?.severity).toBe('error')
+    expect(f[0]?.detail).toContain('dev')
+    expect(f[0]?.detail).not.toContain('prod')
+  })
+  it('passes when a top-level flavorDimensions is declared', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  flavorDimensions "env"
+  productFlavors {
+    dev { }
+    prod { }
+  }
+}`,
+    })
+    expect(await flavorDimensions.run(aCtx(dir))).toEqual([])
+  })
+  it('passes when every flavor declares a dimension', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  productFlavors {
+    dev { dimension "env" }
+    prod { dimension "env" }
+  }
+}`,
+    })
+    expect(await flavorDimensions.run(aCtx(dir))).toEqual([])
+  })
+  it('does not apply when no productFlavors block parses a flavor', () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android { buildTypes { release { } } }`,
+    })
+    expect(flavorDimensions.appliesTo!(aCtx(dir))).toBe(false)
+  })
+})
+
+describe('android/google-services-file', () => {
+  const APPLY = `apply plugin: 'com.google.gms.google-services'`
+  it('errors on an unguarded gms apply with no google-services.json', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android { }\n${APPLY}`,
+    })
+    const f = await googleServicesFile.run(aCtx(dir))
+    expect(f[0]?.severity).toBe('error')
+    expect(f[0]?.fix).toContain('google-services.json')
+  })
+  it('does not apply when the gms apply is guarded inside try/if', () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android { }
+try {
+  def servicesJSON = file('google-services.json')
+  if (servicesJSON.text) {
+    ${APPLY}
+  }
+} catch (Exception e) { }`,
+    })
+    expect(googleServicesFile.appliesTo!(aCtx(dir))).toBe(false)
+  })
+  it('passes when unguarded apply but google-services.json is present', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android { }\n${APPLY}`,
+      'android/app/google-services.json': '{}',
+    })
+    expect(await googleServicesFile.run(aCtx(dir))).toEqual([])
+  })
+  it('does not apply when no gms apply is detected', () => {
+    const dir = makeProject({ 'android/app/build.gradle': 'android { }' })
+    expect(googleServicesFile.appliesTo!(aCtx(dir))).toBe(false)
+  })
+  it('does not apply when the gms apply is commented out', () => {
+    const dir = makeProject({ 'android/app/build.gradle': `android { }\n// ${APPLY}` })
+    expect(googleServicesFile.appliesTo!(aCtx(dir))).toBe(false)
+  })
+})
+
+describe('android/local-properties-committed', () => {
+  it('warns on an absolute sdk.dir and NEVER echoes the path', async () => {
+    const dir = makeProject({
+      'android/local.properties': 'sdk.dir=/Users/secret/Library/Android/sdk',
+    })
+    const f = await localPropertiesCommitted.run(aCtx(dir))
+    expect(f[0]?.severity).toBe('warning')
+    expect(f[0]?.detail).toContain('sdk.dir')
+    expect(f[0]?.detail).not.toContain('/Users/secret')
+    expect(f[0]?.title).not.toContain('/Users/secret')
+    expect(f[0]?.fix).not.toContain('/Users/secret')
+  })
+  it('warns on a Windows absolute ndk.dir without echoing the path', async () => {
+    const dir = makeProject({
+      'android/local.properties': 'ndk.dir=C:\\\\Users\\\\secret\\\\AppData\\\\ndk',
+    })
+    const f = await localPropertiesCommitted.run(aCtx(dir))
+    expect(f[0]?.severity).toBe('warning')
+    expect(f[0]?.detail).toContain('ndk.dir')
+    expect(f[0]?.detail).not.toContain('secret')
+  })
+  it('is silent when local.properties has no absolute dir', async () => {
+    const dir = makeProject({
+      'android/local.properties': 'some.key=value',
+    })
+    expect(await localPropertiesCommitted.run(aCtx(dir))).toEqual([])
+  })
+  it('does not apply when local.properties is absent', () => {
+    const dir = makeProject({ 'package.json': '{}' })
+    expect(localPropertiesCommitted.appliesTo!(aCtx(dir))).toBe(false)
+  })
+})
+
+describe('android/sdk-floors', () => {
+  it('warns once per violated floor', async () => {
+    const dir = makeProject({
+      'android/variables.gradle': `ext {
+  minSdkVersion = 21
+  compileSdkVersion = 33
+  targetSdkVersion = 33
+}`,
+    })
+    const f = await sdkFloors.run(aCtx(dir))
+    expect(f.every(x => x.severity === 'warning')).toBe(true)
+    expect(f.some(x => x.title.includes('compileSdk'))).toBe(true)
+    expect(f.some(x => x.title.includes('targetSdk'))).toBe(true)
+    expect(f.some(x => x.title.includes('minSdk'))).toBe(true)
+  })
+  it('is silent when all floors are satisfied', async () => {
+    const dir = makeProject({
+      'android/variables.gradle': `ext {
+  minSdkVersion = 23
+  compileSdkVersion = 34
+  targetSdkVersion = 35
+}`,
+    })
+    expect(await sdkFloors.run(aCtx(dir))).toEqual([])
+  })
+  it('skips an unresolved dimension silently', async () => {
+    const dir = makeProject({
+      'android/variables.gradle': `ext { targetSdkVersion = 30 }`,
+    })
+    const f = await sdkFloors.run(aCtx(dir))
+    expect(f.length).toBe(1)
+    expect(f[0]?.title).toContain('targetSdk')
+  })
+  it('does not apply when no SDK dimension resolves', () => {
+    const dir = makeProject({ 'android/app/build.gradle': 'android { }' })
+    expect(sdkFloors.appliesTo!(aCtx(dir))).toBe(false)
+  })
+})
+
+describe('android/target-sdk-play', () => {
+  it('errors when targetSdk < 34 (cannot publish)', async () => {
+    const dir = makeProject({ 'android/variables.gradle': 'ext { targetSdkVersion = 33 }' })
+    const f = await targetSdkPlay.run(aCtx(dir))
+    expect(f[0]?.severity).toBe('error')
+  })
+  it('errors when 34<=target<35 AND uploading to Play', async () => {
+    const dir = makeProject({ 'android/variables.gradle': 'ext { targetSdkVersion = 34 }' })
+    const b64 = Buffer.from(JSON.stringify({ type: 'service_account' })).toString('base64')
+    const f = await targetSdkPlay.run(aCtx(dir, { credentials: { PLAY_CONFIG_JSON: b64 } }))
+    expect(f[0]?.severity).toBe('error')
+  })
+  it('warns when 34<=target<35 and NOT uploading to Play', async () => {
+    const dir = makeProject({ 'android/variables.gradle': 'ext { targetSdkVersion = 34 }' })
+    const f = await targetSdkPlay.run(aCtx(dir))
+    expect(f[0]?.severity).toBe('warning')
+  })
+  it('passes when target>=35', async () => {
+    const dir = makeProject({ 'android/variables.gradle': 'ext { targetSdkVersion = 35 }' })
+    expect(await targetSdkPlay.run(aCtx(dir))).toEqual([])
+  })
+  it('does not apply when targetSdk is unresolved', () => {
+    const dir = makeProject({ 'android/app/build.gradle': 'android { }' })
+    expect(targetSdkPlay.appliesTo!(aCtx(dir))).toBe(false)
+  })
+})
+
+describe('android/min-sdk-capacitor', () => {
+  const pkg = (capVersion: string) => JSON.stringify({ dependencies: { '@capacitor/core': capVersion } })
+  it('errors when minSdk is below the Capacitor 7 floor (23)', async () => {
+    const dir = makeProject({
+      'package.json': pkg('^7.0.0'),
+      'android/variables.gradle': 'ext { minSdkVersion = 22 }',
+    })
+    const f = await minSdkCapacitor.run(aCtx(dir))
+    expect(f[0]?.severity).toBe('error')
+    expect(f[0]?.detail).toContain('23')
+  })
+  it('passes when minSdk meets the Capacitor 7 floor', async () => {
+    const dir = makeProject({
+      'package.json': pkg('7.2.0'),
+      'android/variables.gradle': 'ext { minSdkVersion = 23 }',
+    })
+    expect(await minSdkCapacitor.run(aCtx(dir))).toEqual([])
+  })
+  it('uses the Cap6 floor (22)', async () => {
+    const dir = makeProject({
+      'package.json': pkg('^6.1.0'),
+      'android/variables.gradle': 'ext { minSdkVersion = 22 }',
+    })
+    expect(await minSdkCapacitor.run(aCtx(dir))).toEqual([])
+  })
+  it('does not apply when Capacitor major is unresolvable', () => {
+    const dir = makeProject({
+      'package.json': JSON.stringify({ dependencies: {} }),
+      'android/variables.gradle': 'ext { minSdkVersion = 22 }',
+    })
+    expect(minSdkCapacitor.appliesTo!(aCtx(dir))).toBe(false)
+  })
+  it('does not apply when minSdk is unresolvable', () => {
+    const dir = makeProject({ 'package.json': pkg('^7.0.0') })
+    expect(minSdkCapacitor.appliesTo!(aCtx(dir))).toBe(false)
+  })
+})
+
+describe('android/version-fields', () => {
+  it('passes when versionCode and versionName are in defaultConfig', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  defaultConfig {
+    versionCode 1
+    versionName "1.0"
+  }
+}`,
+    })
+    expect(await versionFields.run(aCtx(dir))).toEqual([])
+  })
+  it('accepts a gradle variable/function as a present versionCode', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  defaultConfig {
+    versionCode getVersionCode()
+    versionName project.versionName
+  }
+}`,
+    })
+    expect(await versionFields.run(aCtx(dir))).toEqual([])
+  })
+  it('warns when versionCode is missing and NOT uploading', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  defaultConfig {
+    versionName "1.0"
+  }
+}`,
+    })
+    const f = await versionFields.run(aCtx(dir))
+    expect(f.some(x => x.severity === 'warning' && x.title.includes('versionCode'))).toBe(true)
+  })
+  it('escalates the missing versionCode to error when uploading to Play', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  defaultConfig {
+    versionName "1.0"
+  }
+}`,
+    })
+    const b64 = Buffer.from(JSON.stringify({ type: 'service_account' })).toString('base64')
+    const f = await versionFields.run(aCtx(dir, { credentials: { PLAY_CONFIG_JSON: b64 } }))
+    expect(f.some(x => x.severity === 'error' && x.title.includes('versionCode'))).toBe(true)
+  })
+  it('falls back to the manifest for versionCode/versionName', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android { defaultConfig { } }`,
+      'android/app/src/main/AndroidManifest.xml': `<manifest android:versionCode="3" android:versionName="1.2"><application/></manifest>`,
+    })
+    expect(await versionFields.run(aCtx(dir))).toEqual([])
+  })
+  it('warns on a missing versionName', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  defaultConfig {
+    versionCode 1
+  }
+}`,
+    })
+    const f = await versionFields.run(aCtx(dir))
+    expect(f.some(x => x.title.includes('versionName'))).toBe(true)
+  })
+  it('does not apply without an app/build.gradle', () => {
+    const dir = makeProject({ 'package.json': '{}' })
+    expect(versionFields.appliesTo!(aCtx(dir))).toBe(false)
   })
 })
