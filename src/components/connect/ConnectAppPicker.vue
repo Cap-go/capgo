@@ -65,10 +65,6 @@ function toggleAll(): void {
     emit('update:modelValue', props.apps.map(app => app.id))
 }
 
-function appLetter(app: ConnectApp): string {
-  return (app.name ?? app.app_id).charAt(0).toUpperCase()
-}
-
 function showIcon(app: ConnectApp): boolean {
   return Boolean(app.icon) && !failedIcons.value.has(app.id)
 }
@@ -130,16 +126,16 @@ function onIconError(id: string): void {
           <img
             v-if="showIcon(app)"
             :src="app.icon!"
-            :alt="app.name ?? app.app_id"
-            class="h-9 w-9 shrink-0 rounded-lg object-cover"
+            :alt="`App icon ${app.name ?? app.app_id}`"
+            class="h-9 w-9 shrink-0 rounded-sm object-cover d-mask d-mask-squircle"
             @error="onIconError(app.id)"
           >
-          <span
+          <div
             v-else
-            class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-azure-500 text-sm font-bold text-white"
+            class="flex h-9 w-9 shrink-0 items-center justify-center bg-gray-700 text-sm font-medium text-gray-300 d-mask d-mask-squircle"
           >
-            {{ appLetter(app) }}
-          </span>
+            {{ (app.name ?? app.app_id).slice(0, 2).toUpperCase() || 'AP' }}
+          </div>
           <span class="min-w-0 flex-1">
             <span class="block truncate text-sm font-medium text-slate-800 dark:text-slate-100">
               {{ app.name ?? app.app_id }}

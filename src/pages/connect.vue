@@ -34,8 +34,19 @@ const generatedKey = ref<string | null>(null)
 const orgs = computed(() =>
   organizationStore.organizations
     .filter(o => isAdminRole(o.role))
-    .map(o => ({ gid: o.gid, name: o.name })),
+    .map(o => ({ gid: o.gid, name: o.name, logo: o.logo, logo_is_loading: o.logo_is_loading })),
 )
+
+// Two-letter org acronym fallback — same as the org switcher (DropdownOrganization).
+function acronym(name: string): string {
+  const trimmed = name.trim()
+  if (!trimmed)
+    return '?'
+  const parts = trimmed.split(/\s+/)
+  const first = parts[0]?.[0] ?? ''
+  const second = parts.length > 1 ? (parts[1]?.[0] ?? '') : (parts[0]?.[1] ?? '')
+  return (first + second).toUpperCase()
+}
 
 const currentOrgId = computed(() => organizationStore.currentOrganization?.gid ?? null)
 const selectedOrgNames = computed(() =>
@@ -154,6 +165,8 @@ async function signIcons(rows: Array<{ id: string | null, icon_url?: string | nu
 
 onMounted(() => {
   organizationStore.dedupFetchOrganizations().catch(() => {})
+  // Populate signed org logos (org.logo) — same source the org switcher uses.
+  organizationStore.refreshOrganizationLogos().catch(() => {})
 })
 
 // Default the org selection to the active org (or the first admin org) once loaded.
@@ -322,9 +335,25 @@ function back(): void {
                   >
                     <IconCheck v-if="isOrgSelected(org.gid)" class="h-3.5 w-3.5" />
                   </span>
-                  <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-azure-500 text-xs font-bold text-white">
-                    {{ (org.name || '?').charAt(0).toUpperCase() }}
-                  </span>
+                  <img
+                    v-if="org.logo"
+                    :src="org.logo"
+                    :alt="`${org.name} logo`"
+                    class="h-8 w-8 shrink-0 rounded-sm object-cover d-mask d-mask-squircle"
+                  >
+                  <div
+                    v-else-if="org.logo_is_loading"
+                    class="flex h-8 w-8 shrink-0 items-center justify-center bg-gray-700 d-mask d-mask-squircle"
+                    :aria-label="t('loading')"
+                  >
+                    <span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-400 border-t-transparent" />
+                  </div>
+                  <div
+                    v-else
+                    class="flex h-8 w-8 shrink-0 items-center justify-center bg-gray-700 text-xs font-semibold text-gray-300 d-mask d-mask-squircle"
+                  >
+                    {{ acronym(org.name) }}
+                  </div>
                   <span class="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-slate-100">
                     {{ org.name }}
                   </span>
