@@ -318,6 +318,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/connect': RouteRecordInfo<
+      '/connect',
+      '/connect',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/dashboard': RouteRecordInfo<
       '/dashboard',
       '/dashboard',
@@ -905,6 +912,14 @@ declare module 'vue-router/auto-routes' {
     'src/pages/confirm-signup.vue': {
       routes:
         | '/confirm-signup'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/connect.vue': {
+      routes:
+        | '/connect'
       views:
         | never
       pathParamNames:
