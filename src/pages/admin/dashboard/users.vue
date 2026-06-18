@@ -1144,74 +1144,19 @@ displayStore.defaultBack = '/dashboard'
               />
             </div>
 
-            <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
-              <ChartCard
-                :title="t('admin-users-country-chart')"
-                :is-loading="isLoadingCustomerCountryBreakdown"
-                :has-data="topCustomerCountryEntries.length > 0"
-              >
-                <AdminBarChart
-                  :labels="customerCountryChartLabels"
-                  :values="customerCountryChartValues"
-                  :label="t('organizations')"
-                  value-mode="count"
-                  :is-loading="isLoadingCustomerCountryBreakdown"
-                />
-              </ChartCard>
-
-              <div class="p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
-                <div class="flex flex-col gap-1">
-                  <h3 class="text-lg font-semibold">
-                    {{ t('admin-users-country-top-list') }}
-                  </h3>
-                  <p class="text-sm text-slate-600 dark:text-slate-400">
-                    {{ t('admin-users-country-top-list-description') }}
-                  </p>
-                </div>
-
-                <div v-if="isLoadingCustomerCountryBreakdown" class="flex items-center justify-center h-72">
-                  <span class="loading loading-spinner loading-lg" />
-                </div>
-
-                <div v-else-if="topCustomerCountryEntries.length > 0" class="mt-6 space-y-3">
-                  <div
-                    v-for="(country, index) in topCustomerCountryEntries"
-                    :key="country.country_code"
-                    class="flex items-center justify-between gap-4 p-4 border rounded-lg border-slate-200 dark:border-slate-700"
-                  >
-                    <div class="flex items-center gap-3 min-w-0">
-                      <div class="flex items-center justify-center w-9 h-9 text-sm font-semibold rounded-full bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-200 shrink-0">
-                        {{ index + 1 }}
-                      </div>
-                      <div class="text-2xl leading-none shrink-0">
-                        {{ getCountryFlag(country.country_code) }}
-                      </div>
-                      <div class="min-w-0">
-                        <p class="font-medium truncate">
-                          {{ getCountryLabel(country.country_code) }}
-                        </p>
-                        <p class="text-xs uppercase text-slate-500 dark:text-slate-400">
-                          {{ country.country_code }}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div class="text-right shrink-0">
-                      <p class="font-semibold">
-                        {{ country.organizations.toLocaleString() }}
-                      </p>
-                      <p class="text-xs text-slate-500 dark:text-slate-400">
-                        {{ country.percentage.toFixed(1) }}%
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div v-else class="flex items-center justify-center h-72 text-slate-400">
-                  {{ t('no-data-available') }}
-                </div>
-              </div>
-            </div>
+            <ChartCard
+              :title="t('admin-users-country-chart')"
+              :is-loading="isLoadingCustomerCountryBreakdown"
+              :has-data="topCustomerCountryEntries.length > 0"
+            >
+              <AdminBarChart
+                :key="customerCountryChartLabels.join('|')"
+                :labels="customerCountryChartLabels"
+                :values="customerCountryChartValues"
+                :label="t('organizations')"
+                value-mode="count"
+              />
+            </ChartCard>
           </div>
 
           <ChartCard

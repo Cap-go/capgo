@@ -1640,8 +1640,9 @@ export async function getAdminCustomerCountryBreakdown(
   }
 
   try {
-    const pgClient = getPgClient(c, true)
+    const pgClient = getPgClient(c, false)
     const drizzleClient = getDrizzleClient(pgClient)
+    const { startDay, endExclusive } = getAdminUtcDateRange(start_date, end_date)
 
     const query = sql`
       WITH country_counts AS (
@@ -1650,8 +1651,8 @@ export async function getAdminCustomerCountryBreakdown(
           COUNT(*)::int AS organizations
         FROM orgs o
         INNER JOIN stripe_info si ON si.customer_id = o.customer_id
-        WHERE o.created_at >= ${start_date}::timestamptz
-          AND o.created_at < ${end_date}::timestamptz
+        WHERE o.created_at >= ${startDay.toISOString()}::timestamptz
+          AND o.created_at < ${endExclusive.toISOString()}::timestamptz
           AND si.customer_country IS NOT NULL
           AND UPPER(BTRIM(si.customer_country)) ~ '^[A-Z]{2}$'
         GROUP BY UPPER(BTRIM(si.customer_country))
