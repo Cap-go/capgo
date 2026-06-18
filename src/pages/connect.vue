@@ -56,7 +56,7 @@ const selectedOrgNames = computed(() =>
 )
 const allOrgsSelected = computed(() => orgs.value.length > 0 && selectedOrgIds.value.length === orgs.value.length)
 
-const pasteLine = computed(() => `Log into Capgo with this key: ${generatedKey.value ?? ''}`)
+const pasteLine = computed(() => t('connect-paste-line', { key: generatedKey.value ?? '' }))
 
 const scopeChip = computed(() => {
   if (role.value === 'admin')
@@ -300,9 +300,9 @@ function back(): void {
           <!-- Organizations (multi-select) -->
           <div>
             <div class="mb-1.5 flex items-end justify-between gap-2">
-              <label class="block text-sm font-medium text-slate-700 dark:text-slate-200">
+              <span class="block text-sm font-medium text-slate-700 dark:text-slate-200">
                 {{ t('connect-organization') }}
-              </label>
+              </span>
               <button
                 v-if="orgs.length > 1"
                 type="button"

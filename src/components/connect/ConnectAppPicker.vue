@@ -96,9 +96,9 @@ function onIconError(id: string): void {
 <template>
   <div>
     <div class="mb-1.5 flex items-end justify-between gap-2">
-      <label class="block text-sm font-medium text-slate-700 dark:text-slate-200">
+      <span class="block text-sm font-medium text-slate-700 dark:text-slate-200">
         {{ t('connect-app-access') }}
-      </label>
+      </span>
       <button
         type="button"
         class="text-xs font-semibold text-azure-500 hover:underline"

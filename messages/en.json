@@ -766,6 +766,7 @@
   "connect-organization": "Organizations",
   "connect-orgs-selected": "{count} of {total} organizations selected",
   "connect-paste-hint": "The assistant calls capgo_login with this key.",
+  "connect-paste-line": "Log into Capgo with this key: {key}",
   "connect-paste-title": "Paste this to your AI",
   "connect-recommended": "Recommended",
   "connect-role": "Role for this key",
