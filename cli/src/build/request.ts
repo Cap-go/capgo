@@ -1266,7 +1266,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     // --prescan-ignore-fatal + --fail-on-warnings is contradictory (the spec says the
     // CLI rejects the combination on `build request` too, not just `build prescan`).
     // Validated before any network call so nothing is ever created server-side.
-    if (options.prescan !== false) {
+    if (options.prescan === true) {
       const { validateFlags } = await import('./prescan/command')
       validateFlags({ ignoreFatal: options.prescanIgnoreFatal, failOnWarnings: options.failOnWarnings })
     }
@@ -1588,10 +1588,13 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     }
 
     // ---- prescan gate (see src/build/prescan/) ----
+    // Opt-in: runs only when options.prescan === true, which ONLY the `build request` CLI
+    // command sets (requestBuildCommand). The onboarding wizard (build init), MCP build tools,
+    // and the SDK call requestBuildInternal without it, so prescan never runs on those paths.
     // Runs BEFORE the POST /build/request: a blocked prescan must not orphan a
     // created-but-never-uploaded build job server-side (stuck "pending" row in
     // the dashboard + skewed "Build requested" telemetry).
-    if (options.prescan !== false) {
+    if (options.prescan === true) {
       const { executePrescan, runPrescanGate } = await import('./prescan/command')
       const gate = await runPrescanGate(
         {
@@ -2405,7 +2408,10 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 }
 
 export async function requestBuildCommand(appId: string, options: BuildRequestOptions): Promise<void> {
-  const result = await requestBuildInternal(appId, options, false)
+  // `build request` is the ONLY entrypoint that opts into prescan (default on; --no-prescan
+  // turns it off). requestBuildInternal keeps the gate opt-in (options.prescan === true) so the
+  // onboarding wizard (build init), MCP build tools, and the SDK never trigger it.
+  const result = await requestBuildInternal(appId, { ...options, prescan: options.prescan !== false }, false)
 
   if (!result.success) {
     exit(1)

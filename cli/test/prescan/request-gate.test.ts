@@ -9,7 +9,9 @@ describe('build request rejects contradictory prescan flags', () => {
   it('--prescan-ignore-fatal + --fail-on-warnings fails before any network call', async () => {
     const result = await requestBuildInternal(
       'com.demo.app',
-      { platform: 'android', prescanIgnoreFatal: true, failOnWarnings: true } as BuildRequestOptions,
+      // prescan: true mirrors what requestBuildCommand injects for `build request` (the only
+      // entrypoint that opts in). The gate + flag validation are opt-in (options.prescan === true).
+      { platform: 'android', prescan: true, prescanIgnoreFatal: true, failOnWarnings: true } as BuildRequestOptions,
       true, // silent: no clack output from the test
     )
     expect(result.success).toBe(false)
