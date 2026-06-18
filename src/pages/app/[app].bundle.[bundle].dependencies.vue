@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import type { IncompatibilityReason, NativePackage, PackageComparison, PackageStatus } from '~/services/bundleCompatibility'
 import type { Database } from '~/types/supabase.types'
+import { FormKit } from '@formkit/vue'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconExternalLink from '~icons/heroicons/arrow-top-right-on-square'
 import IconCheckCircle from '~icons/heroicons/check-circle'
 import IconPuzzle from '~icons/heroicons/puzzle-piece'
+import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import { comparePackages, summarizeCompatibility } from '~/services/bundleCompatibility'
 import { useSupabase } from '~/services/supabase'
@@ -49,6 +51,7 @@ const selectedCompareVersion = ref<VersionRow | null>(null)
 const baselinePackages = ref<NativePackage[]>([])
 const baselinePackagesCache = ref<Record<number, NativePackage[]>>({})
 const compareRequestId = ref(0)
+const search = ref('')
 
 const nativePackages = computed<NativePackage[]>(() => {
   if (!version.value?.native_packages)
@@ -65,6 +68,33 @@ const comparisons = computed<PackageComparison[]>(() => {
     return []
   return comparePackages(nativePackages.value, baselinePackages.value)
 })
+
+const searchLower = computed(() => search.value.trim().toLowerCase())
+
+function matchesPackageSearch(name: string, ...versions: Array<string | undefined>) {
+  if (!searchLower.value)
+    return true
+  if (name.toLowerCase().includes(searchLower.value))
+    return true
+  return versions.some(version => version?.toLowerCase().includes(searchLower.value))
+}
+
+const displayComparisons = computed(() => {
+  if (!searchLower.value)
+    return comparisons.value
+  return comparisons.value.filter(entry => matchesPackageSearch(
+    entry.name,
+    entry.candidateVersion,
+    entry.baselineVersion,
+  ))
+})
+
+const displayNativePackages = computed(() => {
+  if (!searchLower.value)
+    return nativePackages.value
+  return nativePackages.value.filter(pkg => matchesPackageSearch(pkg.name, pkg.version))
+})
+
 
 const compatibilitySummary = computed(() => summarizeCompatibility(comparisons.value))
 
@@ -364,6 +394,7 @@ watch(bundleRouteKey, async (key) => {
   packageId.value = app
   id.value = Number(bundle)
   baselinePackagesCache.value = {}
+  search.value = ''
   resetCompareSelection()
   await getVersion()
   // Pre-select from ?compare only after the version loads.
@@ -507,8 +538,25 @@ watch(bundleRouteKey, async (key) => {
               </p>
 
               <div class="px-2 pb-2 relative">
+                <div class="px-2 py-3">
+                  <FormKit
+                    v-model="search"
+                    :prefix-icon="IconSearch"
+                    :placeholder="t('search-by-name')"
+                    :disabled="tableLoading"
+                    :classes="{ outer: 'mb-0! w-full md:w-96' }"
+                  />
+                </div>
+
+                <div
+                  v-if="searchLower && ((compareVersionId && comparisons.length > 0 && displayComparisons.length === 0) || (!compareVersionId && nativePackages.length > 0 && displayNativePackages.length === 0))"
+                  class="px-6 py-8 text-sm text-center text-slate-500 dark:text-slate-400"
+                >
+                  {{ t('try-a-different-search-term') }}
+                </div>
+
                 <!-- Comparison view: status-aware rows with the candidate→baseline diff -->
-                <div v-if="compareVersionId && comparisons.length > 0" class="overflow-x-auto">
+                <div v-else-if="compareVersionId && comparisons.length > 0 && displayComparisons.length > 0" class="overflow-x-auto">
                   <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead class="bg-gray-50 dark:bg-gray-900">
                       <tr>
@@ -525,7 +573,7 @@ watch(bundleRouteKey, async (key) => {
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
                       <tr
-                        v-for="entry in comparisons"
+                        v-for="entry in displayComparisons"
                         :key="entry.name"
                         class="hover:bg-gray-50 dark:hover:bg-gray-700"
                         :class="STATUS_STYLES[entry.status].accent"
@@ -599,8 +647,9 @@ watch(bundleRouteKey, async (key) => {
                   </table>
                 </div>
 
+
                 <!-- No baseline selected: plain list of this bundle's packages -->
-                <div v-else-if="!compareVersionId && nativePackages.length > 0" class="overflow-x-auto">
+                <div v-else-if="!compareVersionId && nativePackages.length > 0 && displayNativePackages.length > 0" class="overflow-x-auto">
                   <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead class="bg-gray-50 dark:bg-gray-900">
                       <tr>
@@ -613,7 +662,7 @@ watch(bundleRouteKey, async (key) => {
                       </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
-                      <tr v-for="pkg in nativePackages" :key="`${pkg.name}@${pkg.version}`" class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <tr v-for="pkg in displayNativePackages" :key="`${pkg.name}@${pkg.version}`" class="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td class="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap dark:text-gray-100">
                           <div class="flex items-center gap-2">
                             <IconPuzzle class="w-4 h-4 text-gray-400" />
@@ -636,6 +685,7 @@ watch(bundleRouteKey, async (key) => {
                     </tbody>
                   </table>
                 </div>
+
 
                 <div
                   v-if="tableLoading"
