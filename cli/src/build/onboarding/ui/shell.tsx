@@ -29,7 +29,9 @@ import { Header } from './components.js'
 import { pickPlatformLayout } from './frame-fit.js'
 import { TerminalTooSmallPrompt } from './min-size-gate.js'
 import { PlatformPicker } from './platform-picker.js'
+import { exitAfterOnboardingBeforeExit } from './exit.js'
 import { UpdatePrompt } from './update-prompt.js'
+import type { OnboardingBeforeExit } from './exit.js'
 
 // Progress shapes derived from the loaders so we don't re-import the type names.
 type IosProgress = Awaited<ReturnType<typeof loadProgress>>
@@ -117,6 +119,8 @@ export interface OnboardingShellProps {
    *  exits any other way (cancel / missing platform), this never fires and the
    *  caller treats it as cancelled. */
   onResult?: (result: OnboardingResult) => void
+  /** Awaited immediately before Ink exits so replay can capture the alt-screen frame. */
+  onBeforeExit?: OnboardingBeforeExit
 }
 
 const AnalyticsNotice: FC = () => (
@@ -125,7 +129,7 @@ const AnalyticsNotice: FC = () => (
   </Box>
 )
 
-const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, iosDir, androidDir, guidedHelperUsable, apikey, supaHost, journeyId, initialPlatform, updateInfo, analyticsNotice, onResolvePlatform, onStep, onResult }) => {
+const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, iosDir, androidDir, guidedHelperUsable, apikey, supaHost, journeyId, initialPlatform, updateInfo, analyticsNotice, onResolvePlatform, onStep, onResult, onBeforeExit }) => {
   const { exit } = useApp()
   const { cols, rows } = useTerminalSize()
   const [ready, setReady] = useState<ReadyApp | null>(null)
@@ -136,6 +140,9 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
   // Whether the self-update prompt (first screen, when updateInfo is set) has
   // been dismissed with "skip". On "update" we exit Ink instead (see below).
   const [updateAnswered, setUpdateAnswered] = useState(false)
+  const exitAfterBeforeExit = useCallback(() => {
+    exitAfterOnboardingBeforeExit(onBeforeExit, exit)
+  }, [exit, onBeforeExit])
 
   // Begin loading the chosen platform's progress; mount the app once it lands.
   // The picker stays on screen during the (few-ms) load, so there's no loading
@@ -151,9 +158,9 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
         const message = err instanceof Error ? err.message : String(err)
         setLoadError(message)
         onResult?.({ outcome: 'cancelled' })
-        setTimeout(() => exit(), 50)
+        setTimeout(exitAfterBeforeExit, 50)
       })
-  }, [appId, onResolvePlatform, onResult, exit])
+  }, [appId, onResolvePlatform, onResult, exitAfterBeforeExit])
 
   // Pre-resolved platform → load immediately (no picker shown).
   useEffect(() => {
@@ -184,9 +191,9 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
   // exiting the wizard. The app owns the size decision so a shrink→regrow keeps
   // the user exactly where they were.
   if (ready?.kind === 'ios')
-    return <OnboardingApp appId={appId} iosBundleIdInitial={iosBundleIdInitial} initialProgress={ready.progress} iosDir={iosDir} guidedHelperUsable={guidedHelperUsable} apikey={apikey} supaHost={supaHost} journeyId={journeyId} onStep={onStep} onResult={onResult} />
+    return <OnboardingApp appId={appId} iosBundleIdInitial={iosBundleIdInitial} initialProgress={ready.progress} iosDir={iosDir} guidedHelperUsable={guidedHelperUsable} apikey={apikey} supaHost={supaHost} journeyId={journeyId} onStep={onStep} onResult={onResult} onBeforeExit={onBeforeExit} />
   if (ready?.kind === 'android')
-    return <AndroidOnboardingApp appId={appId} initialProgress={ready.progress} androidDir={androidDir} apikey={apikey} supaHost={supaHost} journeyId={journeyId} onStep={onStep} onResult={onResult} />
+    return <AndroidOnboardingApp appId={appId} initialProgress={ready.progress} androidDir={androidDir} apikey={apikey} supaHost={supaHost} journeyId={journeyId} onStep={onStep} onResult={onResult} onBeforeExit={onBeforeExit} />
 
   // Not ready yet: the platform picker (or a brief framed load). The picker is
   // NOT gated to the full 80×49 onboarding floor — it's small and adapts
@@ -218,7 +225,7 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
           onDecide={(choice) => {
             if (choice === 'update') {
               onResult?.({ outcome: 'update-requested' })
-              setTimeout(() => exit(), 50)
+              setTimeout(exitAfterBeforeExit, 50)
             }
             else {
               setUpdateAnswered(true)

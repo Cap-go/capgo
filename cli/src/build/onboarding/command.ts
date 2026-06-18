@@ -204,6 +204,13 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
     currentUrl: 'capgo-cli://build-onboarding',
     sessionPrefix: 'build-onboarding',
   })
+  let buildReplayFinished = false
+  const finishBuildReplay = async (): Promise<void> => {
+    if (buildReplayFinished)
+      return
+    buildReplayFinished = true
+    await buildReplay?.finish()
+  }
   const journeyStartedAt = Date.now()
   // The most recent step the wizard reported. Lets the quit event below record
   // WHERE the user dropped off regardless of HOW they left (keypress, Ctrl+C,
@@ -238,6 +245,7 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
       onResult: (r: OnboardingResult) => {
         result = r
       },
+      onBeforeExit: finishBuildReplay,
     }),
     { alternateScreen: true },
   )
@@ -250,7 +258,7 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
   // of silently continuing on the stale version the user chose to leave.
   if (result.outcome === 'update-requested' && updateInfo) {
     try {
-      await buildReplay?.finish()
+      await finishBuildReplay()
       runUpdateAndReexec(updateInfo.latestVersion)
     }
     catch (error) {
@@ -338,5 +346,5 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
     }
   }
 
-  await buildReplay?.finish()
+  await finishBuildReplay()
 }
