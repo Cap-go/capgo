@@ -9,6 +9,7 @@ import { addAppOptionsSchema, cleanupOptionsSchema, getStatsOptionsSchema, reque
 import { CapgoSDK } from '../sdk'
 import { findSavedKey } from '../utils'
 import { registerOnboardingTools } from '../build/onboarding/mcp/onboarding-tools'
+import { registerLiveUpdateTools } from '../init/mcp/live-update-tools'
 import { buildServerInstructions } from './instructions'
 import { installMcpStdoutGuard } from './stdout-guard'
 
@@ -39,9 +40,10 @@ export async function startMcpServer(): Promise<void> {
   // onboarding steer appended to the server instructions, so we never advertise a
   // start_capgo_builder_onboarding tool we didn't actually register.
   const onboardingEnabled = Boolean(globalThis.__CAPGO_MCP_ONBOARDING__)
+  const liveUpdateEnabled = Boolean(globalThis.__CAPGO_MCP_LIVE_UPDATE__)
   const server = new McpServer(
     { name: 'capgo', version: pack.version },
-    { instructions: buildServerInstructions(onboardingEnabled) },
+    { instructions: buildServerInstructions({ onboardingEnabled, liveUpdateEnabled }) },
   )
 
   setInvocationSource('mcp')
@@ -618,6 +620,9 @@ export async function startMcpServer(): Promise<void> {
   // `bun run dev` keeps the flag undefined-safe; release builds define it to true.
   if (onboardingEnabled)
     registerOnboardingTools(server, sdk)
+
+  if (liveUpdateEnabled)
+    registerLiveUpdateTools(server, sdk)
 
   // Start the server with stdio transport. Route ambient stdout (stray clack/console
   // output from any tool or dependency) to stderr so it can't corrupt the JSON-RPC
