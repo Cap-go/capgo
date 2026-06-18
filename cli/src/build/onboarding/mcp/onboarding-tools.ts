@@ -25,7 +25,7 @@ import { writeWorkflowFile } from '../workflow-writer.js'
 import { fetchUserInfo, revokeToken, runOAuthFlow, startOAuthFlow } from '../android/oauth-google.js'
 import open from 'open'
 
-import { OAUTH_SCOPES_FOR_ONBOARDING } from '../android/oauth-scopes.js'
+import { OAUTH_REQUIRED_SCOPES, OAUTH_SCOPES_FOR_ONBOARDING } from '../android/oauth-scopes.js'
 import { createProject, createServiceAccountKey, enableService, ensureServiceAccount, listProjects } from '../android/gcp-api.js'
 import { inviteServiceAccount } from '../android/play-api.js'
 import { deleteAndroidProgress, loadAndroidProgress, saveAndroidProgress } from '../android/progress.js'
@@ -131,14 +131,14 @@ function buildAndroidEffectDeps(
     runOAuthFlow: async (callbacks) => {
       const cfg = await getConfig_()
       return runOAuthFlow(
-        { clientId: cfg.clientId, clientSecret: cfg.clientSecret, scopes: OAUTH_SCOPES_FOR_ONBOARDING },
+        { clientId: cfg.clientId, clientSecret: cfg.clientSecret, scopes: OAUTH_SCOPES_FOR_ONBOARDING, requiredScopes: OAUTH_REQUIRED_SCOPES },
         callbacks,
       )
     },
     startOAuthFlow: async (callbacks) => {
       const cfg = await getConfig_()
       return startOAuthFlow(
-        { clientId: cfg.clientId, clientSecret: cfg.clientSecret, scopes: OAUTH_SCOPES_FOR_ONBOARDING },
+        { clientId: cfg.clientId, clientSecret: cfg.clientSecret, scopes: OAUTH_SCOPES_FOR_ONBOARDING, requiredScopes: OAUTH_REQUIRED_SCOPES },
         callbacks,
       )
     },

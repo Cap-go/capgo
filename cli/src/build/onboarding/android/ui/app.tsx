@@ -234,6 +234,15 @@ const TAIL_DRIVER_STEPS = new Set<AndroidOnboardingStep>([
 const OAUTH_SCOPES_FOR_ONBOARDING = [
   ...GOOGLE_OAUTH_SCOPES_ANDROIDPUBLISHER,
   'https://www.googleapis.com/auth/cloud-platform',
+  // OPTIONAL — used by the app-existence verify step (apps:search). Declining it
+  // must NOT fail sign-in: it's excluded from OAUTH_REQUIRED_SCOPES below.
+  'https://www.googleapis.com/auth/playdeveloperreporting',
+] as const
+
+/** Subset whose absence FAILS sign-in (excludes the optional reporting scope). */
+const OAUTH_REQUIRED_SCOPES = [
+  ...GOOGLE_OAUTH_SCOPES_ANDROIDPUBLISHER,
+  'https://www.googleapis.com/auth/cloud-platform',
 ] as const
 
 function cleanPath(input: string): string {
@@ -1787,6 +1796,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             clientId: oauthCfg!.clientId,
             clientSecret: oauthCfg!.clientSecret,
             scopes: OAUTH_SCOPES_FOR_ONBOARDING,
+            requiredScopes: OAUTH_REQUIRED_SCOPES,
           },
           callbacks,
         ),
