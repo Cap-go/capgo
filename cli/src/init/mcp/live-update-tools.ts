@@ -20,7 +20,7 @@ import { findSavedKeySilent, findMainFile, findRoot, getAppId, getBundleVersion,
 import { formatRunnerCommand } from '../../runner-command.js'
 import { addChannelInternal } from '../../channel/add.js'
 import { uploadBundleInternal } from '../../bundle/upload.js'
-import { execSync } from 'node:child_process'
+import { execSync, spawnSync } from 'node:child_process'
 import type { Platform } from './contract.js'
 import { renderResult } from './contract.js'
 import type { EngineDeps } from './engine.js'
@@ -113,7 +113,9 @@ export function buildDeps(sdk: CapgoSDK, cwd = process.cwd()): EngineDeps {
         const installState = getUpdaterInstallState(packageJsonPath)
         if (!installState.ready) {
           const pm = getPMAndCommand()
-          execSync(`${pm.pm} add @capgo/capacitor-updater@latest`, { cwd: projectDir, stdio: 'pipe' })
+          const install = spawnSync(pm.pm, ['add', '@capgo/capacitor-updater@latest'], { cwd: projectDir, stdio: 'pipe' })
+          if (install.status !== 0)
+            throw new Error(install.stderr?.toString() || 'Package install failed')
         }
         const delta = false
         await updateConfigUpdater(getInitUpdaterPluginConfig(appId, delta))
@@ -192,7 +194,6 @@ export function buildDeps(sdk: CapgoSDK, cwd = process.cwd()): EngineDeps {
     },
     uploadBundle: async (appId: string, opts) => {
       try {
-        const projectDir = findRoot(cwd)
         const apikey = findSavedKeySilent() ?? ''
         await uploadBundleInternal(appId, {
           apikey,

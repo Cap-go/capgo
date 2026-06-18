@@ -1,5 +1,6 @@
 // src/init/mcp/progress.ts
-import { readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import tmp from 'tmp'
 
 export interface LiveUpdateProgress {
@@ -17,10 +18,7 @@ let tmpPath: string | undefined
 function ensureTmpPath(): string {
   if (tmpPath)
     return tmpPath
-  const found = readdirSync(tmp.tmpdir)
-    .map(name => ({ name, full: `${tmp.tmpdir}/${name}` }))
-    .find(obj => obj.name.startsWith('capgocli'))
-  tmpPath = found?.full ?? tmp.fileSync({ prefix: 'capgocli' }).name
+  tmpPath = join(tmp.tmpdir, 'capgocli-live-update-progress.json')
   return tmpPath
 }
 
@@ -30,7 +28,7 @@ export function loadLiveUpdateProgress(): LiveUpdateProgress | null {
     if (!raw)
       return null
     const parsed = JSON.parse(raw) as LiveUpdateProgress
-    if (typeof parsed.step_done !== 'number')
+    if (!Number.isInteger(parsed.step_done) || parsed.step_done < 0)
       return null
     return parsed
   }

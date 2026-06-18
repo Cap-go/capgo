@@ -125,10 +125,20 @@ function mergeProgress(deps: EngineDeps, progress: LiveUpdateProgress | null, pa
   return next
 }
 
+function progressForApp(appId: string | undefined, progress: LiveUpdateProgress | null): LiveUpdateProgress | null {
+  if (!progress)
+    return null
+  if (progress.appId && appId && progress.appId !== appId)
+    return null
+  if (progress.appId && !appId)
+    return null
+  return progress
+}
+
 export async function gatherFacts(deps: EngineDeps): Promise<LiveUpdateFacts> {
   const appId = await deps.getAppId()
   const authenticated = deps.hasSavedKey()
-  const progress = deps.loadProgress()
+  const progress = progressForApp(appId, deps.loadProgress())
 
   if (!appId) {
     return {

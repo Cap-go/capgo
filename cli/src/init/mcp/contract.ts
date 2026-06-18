@@ -59,7 +59,7 @@ export const LIVE_UPDATE_RULES: string[] = [
   'Log in with `npx @capgo/cli@latest login` in the terminal. Never ask the user to paste their API key into chat.',
 ]
 
-const SECRET_CONTEXT_KEY = /password|passphrase|secret|token|apikey|api_key|credential/i
+const SECRET_CONTEXT_KEY = /password|passphrase|secret|token|p12|p8|keycontent|credential/i
 
 function redactSecretContext(context: Record<string, unknown>): Record<string, unknown> {
   const redacted: Record<string, unknown> = {}

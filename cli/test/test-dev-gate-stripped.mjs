@@ -10,7 +10,7 @@
 //
 // Two checks:
 //   1. NONE of the forbidden dev markers appear in dist/index.js.
-//   2. ALL three onboarding tool names ARE present (the PR 2 flip shipped them).
+//   2. ALL six MCP onboarding tool names ARE present (builder + live-update).
 import { readFileSync } from 'node:fs'
 
 const bundle = readFileSync(new URL('../dist/index.js', import.meta.url), 'utf8')

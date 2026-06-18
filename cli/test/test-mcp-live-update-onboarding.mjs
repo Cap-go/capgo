@@ -110,6 +110,14 @@ await test('gatherFacts maps deps', async () => {
   eq(f.authenticated, true)
 })
 
+await test('gatherFacts ignores progress from another app', async () => {
+  const deps = fakeDeps({
+    loadProgress: () => ({ step_done: 10, appId: 'com.other.app' }),
+  })
+  const f = await gatherFacts(deps)
+  eq(f.progress, null)
+})
+
 await test('runStart enters prepare phase', async () => {
   const r = await runStart(fakeDeps())
   ok(r.onboarding === 'capgo-live-update')

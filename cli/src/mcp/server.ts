@@ -690,6 +690,9 @@ export async function startMcpServer(): Promise<void> {
   if (onboardingEnabled)
     registerOnboardingTools(server, () => sdk) // live accessor: honors capgo_login/logout reassignment
 
+  // MCP-conducted live-update (OTA) onboarding (3-tool spine: start, next, explain).
+  // Build-time gated: ships enabled in this release. The flag enables dead-code
+  // elimination when the feature is disabled; release builds define it to true.
   if (liveUpdateEnabled)
     registerLiveUpdateTools(server, sdk)
 
