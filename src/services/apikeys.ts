@@ -81,8 +81,12 @@ export async function createAiApiKey(
     /** One or more organizations the key spans. */
     orgIds: string[]
     role: 'admin' | 'member'
-    /** Member role only: the apps to grant `app_admin` on, each with its owning org. */
+    /** Member role only: the apps to grant the app-level role on, each with its owning org. */
     apps?: Array<{ uuid: string, orgId: string }>
+    /** Member role only: the app-level role granted on each app. Defaults to `app_admin`. */
+    appRole?: string
+    /** Admin role only: also grant the `org.create` global permission (create new orgs). */
+    allowOrgCreate?: boolean
   },
 ) {
   const { orgIds, role } = options
@@ -103,11 +107,15 @@ export async function createAiApiKey(
       bindings.push({ role_name: 'org_admin', scope_type: 'org', org_id: orgId })
   }
   else {
+    const appRole = options.appRole ?? 'app_admin'
     for (const orgId of orgIds)
       bindings.push({ role_name: 'org_member', scope_type: 'org', org_id: orgId })
     for (const app of options.apps ?? [])
-      bindings.push({ role_name: 'app_admin', scope_type: 'app', org_id: app.orgId, app_id: app.uuid })
+      bindings.push({ role_name: appRole, scope_type: 'app', org_id: app.orgId, app_id: app.uuid })
   }
+
+  // `org.create` is only valid on a key that has an org-admin binding — i.e. the admin role.
+  const globalPermissions = role === 'admin' && options.allowOrgCreate ? ['org.create'] : undefined
 
   return supabase.functions.invoke('apikey', {
     method: 'POST',
@@ -115,6 +123,7 @@ export async function createAiApiKey(
       name,
       hashed: false,
       bindings,
+      global_permissions: globalPermissions,
     },
   })
 }

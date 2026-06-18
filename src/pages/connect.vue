@@ -30,6 +30,24 @@ const isLoadingApps = ref(false)
 const isGenerating = ref(false)
 const generatedKey = ref<string | null>(null)
 
+// Member: the app-level role granted on each ticked app (app_admin recommended).
+const appRole = ref('app_admin')
+// Admin: also allow the key to create new organizations (org.create global permission).
+const allowOrgCreate = ref(false)
+
+const APP_ROLES = [
+  { value: 'app_admin', i18n: 'role-app-admin', recommended: true },
+  { value: 'app_developer', i18n: 'role-app-developer', recommended: false },
+  { value: 'app_uploader', i18n: 'role-app-uploader', recommended: false },
+  { value: 'app_reader', i18n: 'role-app-reader', recommended: false },
+] as const
+
+const appRoleLabel = computed(() => t(APP_ROLES.find(r => r.value === appRole.value)?.i18n ?? 'role-app-admin'))
+
+function appRoleOptionLabel(r: typeof APP_ROLES[number]): string {
+  return r.recommended ? `${t(r.i18n)} — ${t('connect-recommended')}` : t(r.i18n)
+}
+
 // Only orgs where the user can actually mint a key (key creation requires org admin).
 const orgs = computed(() =>
   organizationStore.organizations
@@ -191,6 +209,8 @@ async function generate(): Promise<void> {
       orgIds: [...selectedOrgIds.value],
       role: role.value,
       apps: chosenApps,
+      appRole: appRole.value,
+      allowOrgCreate: allowOrgCreate.value,
     })
 
     if (error)
@@ -380,26 +400,54 @@ function back(): void {
             </select>
           </div>
 
-          <!-- App scope: member only -->
-          <ConnectAppPicker
-            v-if="role === 'member'"
-            v-model="selectedAppIds"
-            :apps="apps"
-            :show-org="selectedOrgIds.length > 1"
-          />
-
-          <!-- Admin note -->
-          <div
-            v-else
-            class="rounded-2xl border border-azure-500/35 bg-azure-500/5 p-4"
-          >
-            <div class="flex items-start gap-2.5">
-              <IconLock class="mt-0.5 h-5 w-5 shrink-0 text-azure-500" />
-              <p class="text-sm leading-6 text-slate-600 dark:text-slate-300">
-                {{ t('connect-admin-note', { org: selectedOrgNames.join(', ') || '—' }) }}
-              </p>
+          <!-- Member: app permission + app picker -->
+          <template v-if="role === 'member'">
+            <div>
+              <label for="connect-app-role-select" class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ t('connect-app-role') }}
+              </label>
+              <select
+                id="connect-app-role-select"
+                v-model="appRole"
+                class="w-full appearance-none rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-azure-500 focus:ring-2 focus:ring-azure-500/25 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              >
+                <option v-for="r in APP_ROLES" :key="r.value" :value="r.value">
+                  {{ appRoleOptionLabel(r) }}
+                </option>
+              </select>
             </div>
-          </div>
+
+            <ConnectAppPicker
+              v-model="selectedAppIds"
+              :apps="apps"
+              :show-org="selectedOrgIds.length > 1"
+              :role-tag="appRoleLabel"
+            />
+          </template>
+
+          <!-- Admin: full-org note + optional org-create capability -->
+          <template v-else>
+            <div class="rounded-2xl border border-azure-500/35 bg-azure-500/5 p-4">
+              <div class="flex items-start gap-2.5">
+                <IconLock class="mt-0.5 h-5 w-5 shrink-0 text-azure-500" />
+                <p class="text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  {{ t('connect-admin-note', { org: selectedOrgNames.join(', ') || '—' }) }}
+                </p>
+              </div>
+            </div>
+
+            <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-800/50">
+              <input
+                v-model="allowOrgCreate"
+                type="checkbox"
+                class="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-azure-500 focus:ring-2 focus:ring-azure-500/30 dark:border-slate-600"
+              >
+              <span class="min-w-0">
+                <span class="block text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('connect-allow-org-create') }}</span>
+                <span class="mt-0.5 block text-xs text-slate-400">{{ t('connect-allow-org-create-hint') }}</span>
+              </span>
+            </label>
+          </template>
         </div>
 
         <div class="mt-7">

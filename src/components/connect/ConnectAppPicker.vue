@@ -21,6 +21,8 @@ const props = defineProps<{
   modelValue: string[]
   /** Show each app's organization (when the key spans more than one org). */
   showOrg?: boolean
+  /** Short label for the app-level role granted on each ticked app (e.g. "App Admin"). */
+  roleTag?: string
 }>()
 
 const emit = defineEmits<{
@@ -147,7 +149,7 @@ function onIconError(id: string): void {
           <span
             class="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.65rem] font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-800"
           >
-            app_admin
+            {{ roleTag ?? 'App Admin' }}
           </span>
         </button>
 
