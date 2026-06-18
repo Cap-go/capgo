@@ -10,6 +10,7 @@ import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { CacheHelper } from './cache.ts'
 import { DISPOSABLE_EMAIL_DOMAINS, PERSONAL_EMAIL_DOMAINS } from './emailClassification.ts'
 import { getClientDbRegionSB } from './geolocation.ts'
+import { REQUIRED_GLOBAL_STATS_SHARDS } from './global_stats.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import * as schema from './postgres_schema.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
@@ -1229,11 +1230,16 @@ export async function getAdminGlobalStatsTrend(
     // Extract just the date portion (YYYY-MM-DD) from ISO timestamps
     const startDateOnly = start_date.split('T')[0]
     const endDateOnly = end_date.split('T')[0]
+    const requiredCompletedShardsJson = JSON.stringify(REQUIRED_GLOBAL_STATS_SHARDS)
 
-    // Simple query - just SELECT all columns from global_stats
-    // Revenue metrics are already calculated and stored by logsnag_insights cron job
+    // Keep in-progress placeholder snapshots hidden until all core shards complete.
     const query = sql`
-      WITH stats AS (
+      WITH completed_stats AS (
+        SELECT *
+        FROM global_stats
+        WHERE completed_shards @> ${requiredCompletedShardsJson}::jsonb
+      ),
+      stats AS (
         SELECT
         gs.date_id AS date,
         gs.apps::int AS apps,
@@ -1340,8 +1346,8 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(NULLIF(to_jsonb(gs) ->> 'build_count_day_android', '')::int, NULLIF(to_jsonb(gs) ->> 'builds_day_android', '')::int, 0)::int AS build_count_day_android,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'builder_active_paying_clients_60d', '')::int, 0)::int AS builder_active_paying_clients_60d,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'live_updates_active_paying_clients_60d', '')::int, 0)::int AS live_updates_active_paying_clients_60d
-      FROM global_stats gs
-      LEFT JOIN global_stats prev ON prev.date_id = (
+      FROM completed_stats gs
+      LEFT JOIN completed_stats prev ON prev.date_id = (
         CASE
           WHEN gs.date_id ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN
             CASE

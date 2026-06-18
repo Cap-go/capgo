@@ -39,6 +39,9 @@ const browserPreviewAvailable = computed(() => {
   const currentVersion = channel.value?.version
   return !browserPreviewUnavailableReason.value && !!currentVersion
 })
+const promotionQrLayout = computed(() => route.query.appStoreQr === '1')
+const frameBrowserPreview = computed(() => !promotionQrLayout.value && browserPreviewAvailable.value)
+const frameBrowserPreviewUnavailableReason = computed(() => promotionQrLayout.value ? null : browserPreviewUnavailableReason.value)
 
 async function getChannel() {
   if (!id.value)
@@ -144,9 +147,7 @@ watchEffect(async () => {
 
 <template>
   <div>
-    <div v-if="loading" class="flex flex-col justify-center items-center min-h-[50vh]">
-      <Spinner size="w-40 h-40" />
-    </div>
+    <PageLoader v-if="loading" />
 
     <div v-else-if="!channel" class="flex flex-col justify-center items-center min-h-[50vh]">
       <IconAlertCircle class="w-16 h-16 mb-4 text-destructive" />
@@ -192,8 +193,9 @@ watchEffect(async () => {
         :app-id="packageId"
         :channel-id="id"
         :channel-name="channel.name"
-        :browser-preview="browserPreviewAvailable"
-        :browser-preview-unavailable-reason="browserPreviewUnavailableReason"
+        :browser-preview="frameBrowserPreview"
+        :browser-preview-unavailable-reason="frameBrowserPreviewUnavailableReason"
+        :native-style-preview="promotionQrLayout"
       />
     </div>
   </div>

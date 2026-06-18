@@ -229,7 +229,7 @@ async function handleVersionLink(appVersion: Database['public']['Tables']['app_v
   } = await checkCompatibilityNativePackages(appVersion.app_id, channel.value.name, (appVersion.native_packages as any) ?? [])
 
   // Check if any package is incompatible
-  if (localDependencies.length > 0 && finalCompatibility.find(x => !isCompatible(x))) {
+  if (localDependencies.length > 0 && finalCompatibility.some(x => !isCompatible(x))) {
     toast.error(t('bundle-not-compatible-with-channel', { channel: channel.value.name }))
 
     dialogStore.openDialog({
@@ -621,9 +621,7 @@ async function copyCurlCommand() {
 
 <template>
   <div>
-    <div v-if="loading" class="flex flex-col justify-center items-center min-h-[50vh]">
-      <Spinner size="w-40 h-40" />
-    </div>
+    <PageLoader v-if="loading" />
     <div v-else-if="channel" class="mt-0 md:mt-8">
       <div class="w-full h-full px-0 pt-0 mx-auto mb-8 sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
         <div class="flex flex-col bg-white border shadow-lg md:rounded-lg border-slate-300 dark:border-slate-900 dark:bg-slate-800">
