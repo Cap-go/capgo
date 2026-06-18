@@ -234,6 +234,13 @@ declare module 'vue-router/auto-routes' {
       { app: ParamValue<false> },
       | never
     >,
+    '/app/[app].compatibility': RouteRecordInfo<
+      '/app/[app].compatibility',
+      '/app/:app/compatibility',
+      { app: ParamValue<true> },
+      { app: ParamValue<false> },
+      | never
+    >,
     '/app/[app].device.[device]': RouteRecordInfo<
       '/app/[app].device.[device]',
       '/app/:app/device/:device',
@@ -307,6 +314,13 @@ declare module 'vue-router/auto-routes' {
     '/confirm-signup': RouteRecordInfo<
       '/confirm-signup',
       '/confirm-signup',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/connect': RouteRecordInfo<
+      '/connect',
+      '/connect',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -804,6 +818,14 @@ declare module 'vue-router/auto-routes' {
       pathParamNames:
         | 'app'
     }
+    'src/pages/app/[app].compatibility.vue': {
+      routes:
+        | '/app/[app].compatibility'
+      views:
+        | never
+      pathParamNames:
+        | 'app'
+    }
     'src/pages/app/[app].device.[device].vue': {
       routes:
         | '/app/[app].device.[device]'
@@ -890,6 +912,14 @@ declare module 'vue-router/auto-routes' {
     'src/pages/confirm-signup.vue': {
       routes:
         | '/confirm-signup'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/connect.vue': {
+      routes:
+        | '/connect'
       views:
         | never
       pathParamNames:

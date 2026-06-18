@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import type { ConnectApp } from '~/components/connect/ConnectAppPicker.vue'
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconArrowLeft from '~icons/heroicons/arrow-left-20-solid'
+import IconCheck from '~icons/heroicons/check'
 import IconCheckCircle from '~icons/heroicons/check-circle'
 import IconClipboard from '~icons/heroicons/clipboard-document'
 import IconKey from '~icons/heroicons/key'
 import IconLock from '~icons/heroicons/lock-closed'
 import ConnectAppPicker from '~/components/connect/ConnectAppPicker.vue'
 import { createAiApiKey } from '~/services/apikeys'
+import { createSignedImageUrl, resolveImagePath } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
-import { useOrganizationStore } from '~/stores/organization'
+import { isAdminRole, useOrganizationStore } from '~/stores/organization'
 
 type Role = 'admin' | 'member'
 
@@ -23,12 +25,23 @@ const tokenName = ref(t('connect-token-name-default'))
 const role = ref<Role>('member')
 const apps = ref<ConnectApp[]>([])
 const selectedAppIds = ref<string[]>([])
+const selectedOrgIds = ref<string[]>([])
 const isLoadingApps = ref(false)
 const isGenerating = ref(false)
 const generatedKey = ref<string | null>(null)
 
+// Only orgs where the user can actually mint a key (key creation requires org admin).
+const orgs = computed(() =>
+  organizationStore.organizations
+    .filter(o => isAdminRole(o.role))
+    .map(o => ({ gid: o.gid, name: o.name })),
+)
+
 const currentOrgId = computed(() => organizationStore.currentOrganization?.gid ?? null)
-const currentOrgName = computed(() => organizationStore.currentOrganization?.name ?? '')
+const selectedOrgNames = computed(() =>
+  orgs.value.filter(o => selectedOrgIds.value.includes(o.gid)).map(o => o.name),
+)
+const allOrgsSelected = computed(() => orgs.value.length > 0 && selectedOrgIds.value.length === orgs.value.length)
 
 const pasteLine = computed(() => `Log into Capgo with this key: ${generatedKey.value ?? ''}`)
 
@@ -39,60 +52,140 @@ const scopeChip = computed(() => {
 })
 
 const canGenerate = computed(() => {
-  if (!currentOrgId.value || isGenerating.value)
+  if (selectedOrgIds.value.length === 0 || isGenerating.value)
     return false
   if (role.value === 'member' && selectedAppIds.value.length === 0)
     return false
   return true
 })
 
-async function loadApps(orgId: string): Promise<void> {
+function isOrgSelected(gid: string): boolean {
+  return selectedOrgIds.value.includes(gid)
+}
+
+function toggleOrg(gid: string): void {
+  const next = new Set(selectedOrgIds.value)
+  if (next.has(gid))
+    next.delete(gid)
+  else
+    next.add(gid)
+  selectedOrgIds.value = [...next]
+}
+
+function toggleAllOrgs(): void {
+  selectedOrgIds.value = allOrgsSelected.value ? [] : orgs.value.map(o => o.gid)
+}
+
+let appLoadRun = 0
+
+async function loadApps(orgIds: string[]): Promise<void> {
+  const run = ++appLoadRun
+  if (orgIds.length === 0) {
+    apps.value = []
+    selectedAppIds.value = []
+    return
+  }
   isLoadingApps.value = true
   try {
     const { data, error } = await supabase
       .from('apps')
-      .select('id, app_id, name, owner_org')
-      .eq('owner_org', orgId)
+      .select('id, app_id, name, owner_org, icon_url')
+      .in('owner_org', orgIds)
       .order('name', { ascending: true })
 
     if (error)
       throw error
+    if (run !== appLoadRun)
+      return
 
-    apps.value = (data ?? [])
+    const orgNameById = new Map(orgs.value.map(o => [o.gid, o.name]))
+    const list: ConnectApp[] = (data ?? [])
       .filter((app): app is typeof app & { id: string } => typeof app.id === 'string')
       .map(app => ({
         id: app.id,
         app_id: app.app_id,
         name: app.name,
+        icon: null,
+        ownerOrg: app.owner_org,
+        ownerOrgName: orgNameById.get(app.owner_org) ?? undefined,
       }))
+    apps.value = list
+
+    // Drop selections for apps no longer listed (e.g. an org was deselected).
+    const ids = new Set(list.map(a => a.id))
+    selectedAppIds.value = selectedAppIds.value.filter(id => ids.has(id))
+
+    // App icons live in a private bucket — sign them, then patch into the rows.
+    void signIcons(data ?? [], run)
   }
   catch {
-    apps.value = []
-    toast.error(t('connect-generate-error'))
+    if (run === appLoadRun) {
+      apps.value = []
+      toast.error(t('connect-generate-error'))
+    }
   }
   finally {
-    isLoadingApps.value = false
+    if (run === appLoadRun)
+      isLoadingApps.value = false
   }
 }
 
-watch(currentOrgId, (orgId) => {
-  selectedAppIds.value = []
-  apps.value = []
-  if (orgId)
-    loadApps(orgId)
+async function signIcons(rows: Array<{ id: string | null, icon_url?: string | null }>, run: number): Promise<void> {
+  await Promise.all(rows.map(async (row) => {
+    if (!row.id)
+      return
+    const { normalized, shouldSign } = resolveImagePath(row.icon_url)
+    let url = shouldSign ? '' : normalized
+    if (shouldSign) {
+      try {
+        url = (await createSignedImageUrl(row.icon_url)) || ''
+      }
+      catch {
+        url = ''
+      }
+    }
+    if (run !== appLoadRun || !url)
+      return
+    const idx = apps.value.findIndex(a => a.id === row.id)
+    if (idx >= 0)
+      apps.value[idx] = { ...apps.value[idx], icon: url }
+  }))
+}
+
+onMounted(() => {
+  organizationStore.dedupFetchOrganizations().catch(() => {})
+})
+
+// Default the org selection to the active org (or the first admin org) once loaded.
+watch(orgs, (list) => {
+  if (selectedOrgIds.value.length === 0 && list.length > 0) {
+    const cur = currentOrgId.value
+    selectedOrgIds.value = cur && list.some(o => o.gid === cur) ? [cur] : [list[0].gid]
+  }
 }, { immediate: true })
 
+watch(selectedOrgIds, (ids) => {
+  loadApps(ids)
+}, { deep: true })
+
 async function generate(): Promise<void> {
-  const orgId = currentOrgId.value
-  if (!orgId || !canGenerate.value)
+  if (!canGenerate.value)
     return
 
   isGenerating.value = true
   try {
+    const appById = new Map(apps.value.map(a => [a.id, a]))
+    const chosenApps = role.value === 'member'
+      ? selectedAppIds.value
+          .map(id => appById.get(id))
+          .filter((a): a is ConnectApp => Boolean(a))
+          .map(a => ({ uuid: a.id, orgId: a.ownerOrg }))
+      : undefined
+
     const { data, error } = await createAiApiKey(supabase, tokenName.value.trim() || t('connect-token-name-default'), {
-      orgId,
+      orgIds: [...selectedOrgIds.value],
       role: role.value,
-      appUuids: role.value === 'member' ? [...selectedAppIds.value] : undefined,
+      apps: chosenApps,
     })
 
     if (error)
@@ -194,34 +287,76 @@ function back(): void {
             >
           </div>
 
-          <div class="grid gap-4 sm:grid-cols-2">
-            <!-- Organization (read-only scope) -->
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200">
+          <!-- Organizations (multi-select) -->
+          <div>
+            <div class="mb-1.5 flex items-end justify-between gap-2">
+              <label class="block text-sm font-medium text-slate-700 dark:text-slate-200">
                 {{ t('connect-organization') }}
               </label>
-              <div class="flex items-center rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100">
-                <span class="truncate">{{ currentOrgName || '—' }}</span>
+              <button
+                v-if="orgs.length > 1"
+                type="button"
+                class="text-xs font-semibold text-azure-500 hover:underline"
+                @click="toggleAllOrgs"
+              >
+                {{ allOrgsSelected ? t('connect-clear-all') : t('connect-select-all') }}
+              </button>
+            </div>
+            <div class="rounded-2xl border border-slate-200 bg-white/70 p-2 dark:border-slate-700 dark:bg-slate-800/50">
+              <div class="max-h-48 space-y-1.5 overflow-y-auto pr-1">
+                <button
+                  v-for="org in orgs"
+                  :key="org.gid"
+                  type="button"
+                  class="flex w-full items-center gap-3 rounded-xl border bg-white px-3 py-2.5 text-left transition-colors dark:bg-slate-900"
+                  :class="isOrgSelected(org.gid)
+                    ? 'border-azure-500 bg-azure-500/5'
+                    : 'border-slate-200 hover:bg-azure-500/5 dark:border-slate-700'"
+                  @click="toggleOrg(org.gid)"
+                >
+                  <span
+                    class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border"
+                    :class="isOrgSelected(org.gid)
+                      ? 'border-azure-500 bg-azure-500 text-white'
+                      : 'border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800'"
+                  >
+                    <IconCheck v-if="isOrgSelected(org.gid)" class="h-3.5 w-3.5" />
+                  </span>
+                  <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-azure-500 text-xs font-bold text-white">
+                    {{ (org.name || '?').charAt(0).toUpperCase() }}
+                  </span>
+                  <span class="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-slate-100">
+                    {{ org.name }}
+                  </span>
+                </button>
+
+                <p v-if="orgs.length === 0" class="px-3 py-6 text-center text-sm text-slate-400">
+                  {{ t('connect-no-org') }}
+                </p>
               </div>
             </div>
-            <!-- Role -->
-            <div>
-              <label for="connect-role-select" class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ t('connect-role') }}
-              </label>
-              <select
-                id="connect-role-select"
-                v-model="role"
-                class="w-full appearance-none rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-azure-500 focus:ring-2 focus:ring-azure-500/25 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
-              >
-                <option value="member">
-                  {{ t('connect-role-member') }}
-                </option>
-                <option value="admin">
-                  {{ t('connect-role-admin') }}
-                </option>
-              </select>
-            </div>
+            <p v-if="orgs.length > 0" class="mt-2 text-xs text-slate-400 dark:text-slate-500">
+              {{ t('connect-orgs-selected', { count: selectedOrgIds.length, total: orgs.length }) }}
+            </p>
+          </div>
+
+          <!-- Role -->
+          <div>
+            <label for="connect-role-select" class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ t('connect-role') }}
+            </label>
+            <select
+              id="connect-role-select"
+              v-model="role"
+              class="w-full appearance-none rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-azure-500 focus:ring-2 focus:ring-azure-500/25 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+            >
+              <option value="member">
+                {{ t('connect-role-member') }}
+              </option>
+              <option value="admin">
+                {{ t('connect-role-admin') }}
+              </option>
+            </select>
           </div>
 
           <!-- App scope: member only -->
@@ -229,6 +364,7 @@ function back(): void {
             v-if="role === 'member'"
             v-model="selectedAppIds"
             :apps="apps"
+            :show-org="selectedOrgIds.length > 1"
           />
 
           <!-- Admin note -->
@@ -239,16 +375,11 @@ function back(): void {
             <div class="flex items-start gap-2.5">
               <IconLock class="mt-0.5 h-5 w-5 shrink-0 text-azure-500" />
               <p class="text-sm leading-6 text-slate-600 dark:text-slate-300">
-                {{ t('connect-admin-note', { org: currentOrgName }) }}
+                {{ t('connect-admin-note', { org: selectedOrgNames.join(', ') || '—' }) }}
               </p>
             </div>
           </div>
         </div>
-
-        <!-- No org hint -->
-        <p v-if="!currentOrgId" class="mt-5 text-sm text-error">
-          {{ t('connect-no-org') }}
-        </p>
 
         <div class="mt-7">
           <button

@@ -78,14 +78,16 @@ export async function createAiApiKey(
   supabase: SupabaseClient<Database>,
   name: string,
   options: {
-    orgId: string
+    /** One or more organizations the key spans. */
+    orgIds: string[]
     role: 'admin' | 'member'
-    appUuids?: string[]
+    /** Member role only: the apps to grant `app_admin` on, each with its owning org. */
+    apps?: Array<{ uuid: string, orgId: string }>
   },
 ) {
-  const { orgId, role } = options
+  const { orgIds, role } = options
 
-  if (!orgId) {
+  if (!orgIds || orgIds.length === 0) {
     throw new Error('Cannot create an AI API key without an organization')
   }
 
@@ -94,27 +96,18 @@ export async function createAiApiKey(
     scope_type: 'org' | 'app'
     org_id: string
     app_id?: string
-  }> = role === 'admin'
-    ? [
-        {
-          role_name: 'org_admin',
-          scope_type: 'org',
-          org_id: orgId,
-        },
-      ]
-    : [
-        {
-          role_name: 'org_member',
-          scope_type: 'org',
-          org_id: orgId,
-        },
-        ...(options.appUuids ?? []).map(uuid => ({
-          role_name: 'app_admin',
-          scope_type: 'app' as const,
-          org_id: orgId,
-          app_id: uuid,
-        })),
-      ]
+  }> = []
+
+  if (role === 'admin') {
+    for (const orgId of orgIds)
+      bindings.push({ role_name: 'org_admin', scope_type: 'org', org_id: orgId })
+  }
+  else {
+    for (const orgId of orgIds)
+      bindings.push({ role_name: 'org_member', scope_type: 'org', org_id: orgId })
+    for (const app of options.apps ?? [])
+      bindings.push({ role_name: 'app_admin', scope_type: 'app', org_id: app.orgId, app_id: app.uuid })
+  }
 
   return supabase.functions.invoke('apikey', {
     method: 'POST',

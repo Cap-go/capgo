@@ -8,11 +8,19 @@ export interface ConnectApp {
   id: string
   app_id: string
   name: string | null
+  /** Signed icon URL (ready to use as <img src>), or null/empty when none. */
+  icon?: string | null
+  /** Owning organization (UUID) — used to build per-app bindings across orgs. */
+  ownerOrg: string
+  /** Owning organization name — shown on the row when a key spans multiple orgs. */
+  ownerOrgName?: string
 }
 
 const props = defineProps<{
   apps: ConnectApp[]
   modelValue: string[]
+  /** Show each app's organization (when the key spans more than one org). */
+  showOrg?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -21,6 +29,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const search = ref('')
+const failedIcons = ref<Set<string>>(new Set())
 
 const selectedSet = computed(() => new Set(props.modelValue))
 
@@ -58,6 +67,14 @@ function toggleAll(): void {
 
 function appLetter(app: ConnectApp): string {
   return (app.name ?? app.app_id).charAt(0).toUpperCase()
+}
+
+function showIcon(app: ConnectApp): boolean {
+  return Boolean(app.icon) && !failedIcons.value.has(app.id)
+}
+
+function onIconError(id: string): void {
+  failedIcons.value = new Set(failedIcons.value).add(id)
 }
 </script>
 
@@ -110,7 +127,15 @@ function appLetter(app: ConnectApp): string {
           >
             <IconCheck v-if="isSelected(app.id)" class="h-3.5 w-3.5" />
           </span>
+          <img
+            v-if="showIcon(app)"
+            :src="app.icon!"
+            :alt="app.name ?? app.app_id"
+            class="h-9 w-9 shrink-0 rounded-lg object-cover"
+            @error="onIconError(app.id)"
+          >
           <span
+            v-else
             class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-azure-500 text-sm font-bold text-white"
           >
             {{ appLetter(app) }}
@@ -120,7 +145,7 @@ function appLetter(app: ConnectApp): string {
               {{ app.name ?? app.app_id }}
             </span>
             <span class="block truncate font-mono text-xs text-slate-400">
-              {{ app.app_id }}
+              {{ app.app_id }}<template v-if="showOrg && app.ownerOrgName"> · {{ app.ownerOrgName }}</template>
             </span>
           </span>
           <span
