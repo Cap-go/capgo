@@ -1093,7 +1093,6 @@ export type Database = {
       }
       daily_revenue_metrics: {
         Row: {
-          churn_reason: string | null
           churn_mrr: number
           churn_mrr_enterprise: number
           churn_mrr_maker: number
@@ -1114,7 +1113,6 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          churn_reason?: string | null
           churn_mrr?: number
           churn_mrr_enterprise?: number
           churn_mrr_maker?: number
@@ -1448,8 +1446,6 @@ export type Database = {
       }
       global_stats: {
         Row: {
-          past_due_orgs: number
-          past_due_orgs_average_days: number
           apps: number
           apps_active: number | null
           average_ltv: number
@@ -1538,8 +1534,6 @@ export type Database = {
           users_active: number | null
         }
         Insert: {
-          past_due_orgs?: number
-          past_due_orgs_average_days?: number
           apps: number
           apps_active?: number | null
           average_ltv?: number
@@ -2525,8 +2519,6 @@ export type Database = {
       }
       stripe_info: {
         Row: {
-          churn_reason: string | null
-          past_due_at: string | null
           bandwidth_exceeded: boolean | null
           build_time_exceeded: boolean | null
           canceled_at: string | null
@@ -2554,8 +2546,6 @@ export type Database = {
           upgraded_at: string | null
         }
         Insert: {
-          churn_reason?: string | null
-          past_due_at?: string | null
           bandwidth_exceeded?: boolean | null
           build_time_exceeded?: boolean | null
           canceled_at?: string | null
@@ -2583,8 +2573,6 @@ export type Database = {
           upgraded_at?: string | null
         }
         Update: {
-          churn_reason?: string | null
-          past_due_at?: string | null
           bandwidth_exceeded?: boolean | null
           build_time_exceeded?: boolean | null
           canceled_at?: string | null
