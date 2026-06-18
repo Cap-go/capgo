@@ -71,6 +71,7 @@ export async function confirmWithRememberedChoice({
 
   if (pIsCancel(choice))
     return false
+  const confirmedChoice = choice === true
 
   const shouldRememberChoice = await pConfirm({
     message: rememberMessage,
@@ -78,7 +79,7 @@ export async function confirmWithRememberedChoice({
   })
 
   if (!pIsCancel(shouldRememberChoice) && shouldRememberChoice)
-    await rememberPromptPreferenceSafely(preferenceKey, choice)
+    await rememberPromptPreferenceSafely(preferenceKey, confirmedChoice)
 
-  return choice
+  return confirmedChoice
 }

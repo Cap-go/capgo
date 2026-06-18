@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   applyInitAutoTestChange,
+  getDirtyGitStatusActionOptions,
   getGitRepoStatus,
   getInitOtaVersionBase,
   getInitSuggestedOtaVersion,
@@ -65,6 +66,15 @@ t('git status helper detects clean and dirty repos', () => {
     assert.equal(dirtyStatus.clean, false)
     assert.ok(dirtyStatus.entries.some(entry => entry.includes('dirty.txt')))
   })
+})
+
+t('dirty git status prompt keeps clean repo as the recommended path', () => {
+  const options = getDirtyGitStatusActionOptions()
+
+  assert.equal(options[0]?.value, 'check-again')
+  assert.match(options[0]?.hint ?? '', /recommended/)
+  assert.equal(options[1]?.value, 'continue-dirty')
+  assert.match(options[1]?.hint ?? '', /not recommended/)
 })
 
 t('git status helper reports git status failures inside a repo', () => {
@@ -154,6 +164,9 @@ t('resume allowlist only accepts the exact cli-managed test diff', () => {
     execSync('git init', { cwd: root, stdio: 'ignore' })
     execSync('git config user.email "test@example.com"', { cwd: root, stdio: 'ignore' })
     execSync('git config user.name "Test User"', { cwd: root, stdio: 'ignore' })
+    // Hermetic against host gitconfig: a global commit.gpgsign=true would make
+    // the temp-repo commit below fail (no pinentry in non-interactive runs).
+    execSync('git config commit.gpgsign false', { cwd: root, stdio: 'ignore' })
 
     mkdirSync(join(root, 'src'), { recursive: true })
     const filePath = join(root, 'src', 'main.css')

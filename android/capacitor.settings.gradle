@@ -69,7 +69,7 @@ include ':capacitor-toast'
 project(':capacitor-toast').projectDir = new File('../node_modules/.bun/@capacitor+toast@8.0.1+1b808583819c2ac6/node_modules/@capacitor/toast/android')
 
 include ':capgo-camera-preview'
-project(':capgo-camera-preview').projectDir = new File('../node_modules/.bun/@capgo+camera-preview@8.4.1+1b808583819c2ac6/node_modules/@capgo/camera-preview/android')
+project(':capgo-camera-preview').projectDir = new File('../node_modules/.bun/@capgo+camera-preview@8.4.4+1b808583819c2ac6/node_modules/@capgo/camera-preview/android')
 
 include ':capgo-capacitor-accelerometer'
 project(':capgo-capacitor-accelerometer').projectDir = new File('../node_modules/.bun/@capgo+capacitor-accelerometer@8.0.30+1b808583819c2ac6/node_modules/@capgo/capacitor-accelerometer/android')
@@ -128,14 +128,8 @@ project(':capgo-capacitor-document-scanner').projectDir = new File('../node_modu
 include ':capgo-capacitor-downloader'
 project(':capgo-capacitor-downloader').projectDir = new File('../node_modules/.bun/@capgo+capacitor-downloader@8.1.24+1b808583819c2ac6/node_modules/@capgo/capacitor-downloader/android')
 
-include ':capgo-capacitor-file'
-project(':capgo-capacitor-file').projectDir = new File('../node_modules/.bun/@capgo+capacitor-file@8.0.12+1b808583819c2ac6/node_modules/@capgo/capacitor-file/android')
-
 include ':capgo-capacitor-file-compressor'
 project(':capgo-capacitor-file-compressor').projectDir = new File('../node_modules/.bun/@capgo+capacitor-file-compressor@8.0.29+1b808583819c2ac6/node_modules/@capgo/capacitor-file-compressor/android')
-
-include ':capgo-capacitor-file-picker'
-project(':capgo-capacitor-file-picker').projectDir = new File('../node_modules/.bun/@capgo+capacitor-file-picker@8.1.7+1b808583819c2ac6/node_modules/@capgo/capacitor-file-picker/android')
 
 include ':capgo-capacitor-file-sharer'
 project(':capgo-capacitor-file-sharer').projectDir = new File('../node_modules/.bun/@capgo+capacitor-file-sharer@8.1.2+1b808583819c2ac6/node_modules/@capgo/capacitor-file-sharer/android')
@@ -221,9 +215,6 @@ project(':capgo-capacitor-pedometer').projectDir = new File('../node_modules/.bu
 include ':capgo-capacitor-persistent-account'
 project(':capgo-capacitor-persistent-account').projectDir = new File('../node_modules/.bun/@capgo+capacitor-persistent-account@8.0.29+1b808583819c2ac6/node_modules/@capgo/capacitor-persistent-account/android')
 
-include ':capgo-capacitor-photo-library'
-project(':capgo-capacitor-photo-library').projectDir = new File('../node_modules/.bun/@capgo+capacitor-photo-library@8.0.13+1b808583819c2ac6/node_modules/@capgo/capacitor-photo-library/android')
-
 include ':capgo-capacitor-pretty-toast'
 project(':capgo-capacitor-pretty-toast').projectDir = new File('../node_modules/.bun/@capgo+capacitor-pretty-toast@8.1.7+1b808583819c2ac6/node_modules/@capgo/capacitor-pretty-toast/android')
 
@@ -267,7 +258,7 @@ include ':capgo-capacitor-textinteraction'
 project(':capgo-capacitor-textinteraction').projectDir = new File('../node_modules/.bun/@capgo+capacitor-textinteraction@8.0.25+1b808583819c2ac6/node_modules/@capgo/capacitor-textinteraction/android')
 
 include ':capgo-capacitor-updater'
-project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.bun/@capgo+capacitor-updater@8.47.9+1b808583819c2ac6/node_modules/@capgo/capacitor-updater/android')
+project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.bun/@capgo+capacitor-updater@8.49.1+1b808583819c2ac6/node_modules/@capgo/capacitor-updater/android')
 
 include ':capgo-capacitor-uploader'
 project(':capgo-capacitor-uploader').projectDir = new File('../node_modules/.bun/@capgo+capacitor-uploader@8.2.1+1b808583819c2ac6/node_modules/@capgo/capacitor-uploader/android')
@@ -298,6 +289,3 @@ project(':capgo-capacitor-zebra-datawedge').projectDir = new File('../node_modul
 
 include ':capgo-capacitor-zip'
 project(':capgo-capacitor-zip').projectDir = new File('../node_modules/.bun/@capgo+capacitor-zip@8.1.10+1b808583819c2ac6/node_modules/@capgo/capacitor-zip/android')
-
-include ':revenuecat-purchases-capacitor'
-project(':revenuecat-purchases-capacitor').projectDir = new File('../node_modules/.bun/@revenuecat+purchases-capacitor@13.1.5+1b808583819c2ac6/node_modules/@revenuecat/purchases-capacitor/android')

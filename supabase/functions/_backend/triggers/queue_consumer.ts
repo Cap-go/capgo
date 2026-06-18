@@ -14,9 +14,10 @@ import { updateManifestSize } from './on_manifest_create.ts'
 
 // Define constants
 const DEFAULT_BATCH_SIZE = 950 // Default batch size for queue reads limit of CF is 1000 fetches so we take a safe margin
-const MANIFEST_QUEUE_BATCH_SIZE = 100
 const DEFAULT_QUEUE_HTTP_CONCURRENCY = 25
-const MANIFEST_QUEUE_HTTP_CONCURRENCY = 10
+const MANIFEST_QUEUE_HTTP_CONCURRENCY = 100
+const DEFAULT_QUEUE_VISIBILITY_TIMEOUT_SECONDS = 120
+const MANIFEST_QUEUE_VISIBILITY_TIMEOUT_SECONDS = 900
 const QUEUE_HTTP_TIMEOUT_MS = 15_000
 const HEALTHCHECK_HTTP_TIMEOUT_MS = 8_000
 export const MAX_QUEUE_READS = 5
@@ -95,6 +96,40 @@ function extractMessageBody(message: Message): Record<string, unknown> {
 
   const { function_name: _functionName, function_type: _functionType, ...legacyBody } = message.message ?? {}
   return legacyBody
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+function getQueueMessageTrace(functionName: string, body: Record<string, unknown>): Record<string, unknown> | null {
+  if (functionName !== 'on_version_update' || body.table !== 'app_versions' || body.type !== 'UPDATE')
+    return null
+
+  const record = isRecord(body.record) ? body.record : {}
+  const oldRecord = isRecord(body.old_record) ? body.old_record : {}
+  const manifest = record.manifest
+  let manifestEntries = 0
+  if (Array.isArray(manifest))
+    manifestEntries = manifest.length
+  else if (manifest)
+    manifestEntries = 1
+
+  return {
+    app_id: record.app_id ?? null,
+    deleted_at: record.deleted_at ?? null,
+    id: record.id ?? null,
+    manifest_count: record.manifest_count ?? null,
+    manifest_entries: manifestEntries,
+    old_deleted_at: oldRecord.deleted_at ?? null,
+    old_r2_path: oldRecord.r2_path ?? null,
+    old_storage_provider: oldRecord.storage_provider ?? null,
+    old_updated_at: oldRecord.updated_at ?? null,
+    r2_path: record.r2_path ?? null,
+    storage_provider: record.storage_provider ?? null,
+    updated_at: record.updated_at ?? null,
+    version_name: record.name ?? null,
+  }
 }
 
 function getActionableQueueFailures(failureDetails: FailureDetail[]): FailureDetail[] {
@@ -321,22 +356,54 @@ async function processQueueMessage(c: Context, queueName: string, message: Messa
   const payloadSize = JSON.stringify(body).length
   const start = Date.now()
   const targetUrl = function_name === 'on_manifest_create' ? 'direct:on_manifest_create' : resolveFunctionUrl(c, function_name, function_type)
+  const trace = getQueueMessageTrace(function_name, body)
 
   try {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Queue message dispatching.`,
+      body_trace: trace,
+      cfId,
+      function_name,
+      function_type,
+      msgId: message.msg_id,
+      payloadSize,
+      readCount: message.read_ct,
+      targetUrl,
+    })
     const result = await dispatchQueueMessage(c, function_name, function_type, body, cfId, {
       msgId: message.msg_id,
       queueName,
       readCount: message.read_ct,
     }, targetUrl)
     const errorDetails = await extractErrorDetails(result.response)
+    const durationMs = Date.now() - start
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Queue message processed.`,
+      body_trace: trace,
+      cfId,
+      durationMs,
+      errorCode: errorDetails.errorCode,
+      errorMessage: errorDetails.errorMessage,
+      function_name,
+      function_type,
+      msgId: message.msg_id,
+      payloadSize,
+      readCount: message.read_ct,
+      responseOk: result.response.status >= 200 && result.response.status < 300,
+      responseStatus: result.response.status,
+      targetUrl: result.targetUrl,
+    })
 
     return {
       httpResponse: result.response,
       errorDetails,
       cfId,
       payloadSize,
-      durationMs: Date.now() - start,
-      targetUrl,
+      durationMs,
+      targetUrl: result.targetUrl,
       ...message,
     }
   }
@@ -361,6 +428,7 @@ async function processQueueMessage(c: Context, queueName: string, message: Messa
       durationMs,
       error: serializedError,
       responseStatus: httpResponse.status,
+      body_trace: trace,
       function_name,
       function_type,
       msgId: message.msg_id,
@@ -368,6 +436,22 @@ async function processQueueMessage(c: Context, queueName: string, message: Messa
       targetUrl,
     })
     const errorDetails = await extractErrorDetails(httpResponse)
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Queue message processed as failure response.`,
+      body_trace: trace,
+      cfId,
+      durationMs,
+      errorCode: errorDetails.errorCode,
+      errorMessage: errorDetails.errorMessage,
+      function_name,
+      function_type,
+      msgId: message.msg_id,
+      payloadSize,
+      readCount: message.read_ct,
+      responseStatus: httpResponse.status,
+      targetUrl,
+    })
 
     return {
       httpResponse,
@@ -381,9 +465,7 @@ async function processQueueMessage(c: Context, queueName: string, message: Messa
   }
 }
 
-function getQueueBatchSize(queueName: string, requestedBatchSize: number): number {
-  if (queueName === 'on_manifest_create')
-    return Math.min(requestedBatchSize, MANIFEST_QUEUE_BATCH_SIZE)
+function getQueueBatchSize(_queueName: string, requestedBatchSize: number): number {
   return requestedBatchSize
 }
 
@@ -391,6 +473,12 @@ function getQueueHttpConcurrency(queueName: string): number {
   if (queueName === 'on_manifest_create')
     return MANIFEST_QUEUE_HTTP_CONCURRENCY
   return DEFAULT_QUEUE_HTTP_CONCURRENCY
+}
+
+function getQueueVisibilityTimeout(queueName: string): number {
+  if (queueName === 'on_manifest_create')
+    return MANIFEST_QUEUE_VISIBILITY_TIMEOUT_SECONDS
+  return DEFAULT_QUEUE_VISIBILITY_TIMEOUT_SECONDS
 }
 
 async function mapWithConcurrency<T, R>(
@@ -689,7 +777,7 @@ async function readQueue(c: Context, db: ReturnType<typeof getPgClient>, queueNa
   cloudlog({ requestId: c.get('requestId'), message: `[${queueKey}] Starting queue read at ${startTime}.` })
 
   try {
-    const visibilityTimeout = 120
+    const visibilityTimeout = getQueueVisibilityTimeout(queueName)
     cloudlog(`[${queueKey}] Reading messages from queue: ${queueName}`)
     try {
       const result = await db.query(
@@ -906,6 +994,35 @@ async function mass_edit_queue_messages_cf_ids(
 }
 
 // --- Hono app setup ---
+function shouldRunQueueSyncInBackground(queueName: string): boolean {
+  return queueName !== 'on_manifest_create'
+}
+
+async function runQueueSync(c: Context, queueName: string, finalBatchSize: number, healthcheckUrl: string | null, executionMode: 'background' | 'awaited'): Promise<QueueProcessResult> {
+  cloudlog({ requestId: c.get('requestId'), message: `[Queue Sync] Starting ${executionMode} execution for queue: ${queueName} with batch size: ${finalBatchSize}` })
+  let db: ReturnType<typeof getPgClient> | null = null
+  try {
+    db = getPgClient(c)
+    if (healthcheckUrl !== null)
+      await maybePingCronHealthcheckStart(healthcheckUrl)
+    const result = await processQueue(c, db, queueName, finalBatchSize)
+    await maybePingCronHealthcheck(result, healthcheckUrl)
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: result.success
+        ? `[Queue Sync] ${executionMode} execution finished successfully.`
+        : `[Queue Sync] ${executionMode} execution finished with queue failures.`,
+      executionMode,
+      result,
+    })
+    return result
+  }
+  finally {
+    if (db)
+      await closeClient(c, db)
+    cloudlog({ requestId: c.get('requestId'), message: `[Queue Sync] ${executionMode} PostgreSQL connection closed.` })
+  }
+}
 export const app = new Hono<MiddlewareKeyVariables>()
 
 // /health endpoint
@@ -949,41 +1066,28 @@ app.post('/sync', async (c) => {
     })
   }
 
-  await backgroundTask(c, (async () => {
-    cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Starting background execution for queue: ${queueName} with batch size: ${finalBatchSize}` })
-    let db: ReturnType<typeof getPgClient> | null = null
-    try {
-      db = getPgClient(c)
-      if (healthcheckUrl !== null)
-        await maybePingCronHealthcheckStart(healthcheckUrl)
-      const result = await processQueue(c, db, queueName, finalBatchSize)
-      await maybePingCronHealthcheck(result, healthcheckUrl)
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: result.success
-          ? `[Background Queue Sync] Background execution finished successfully.`
-          : `[Background Queue Sync] Background execution finished with queue failures.`,
-        result,
-      })
-    }
-    finally {
-      if (db)
-        await closeClient(c, db)
-      cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] PostgreSQL connection closed.` })
-    }
-  })())
-  cloudlog({ requestId: c.get('requestId'), message: `[Sync Request] Responding 202 Accepted. Time: ${Date.now() - handlerStart}ms` })
+  if (shouldRunQueueSyncInBackground(queueName)) {
+    await backgroundTask(c, runQueueSync(c, queueName, finalBatchSize, healthcheckUrl, 'background'))
+    cloudlog({ requestId: c.get('requestId'), message: `[Sync Request] Responding 202 Accepted. Time: ${Date.now() - handlerStart}ms` })
+    return c.json(BRES, 202)
+  }
+
+  await runQueueSync(c, queueName, finalBatchSize, healthcheckUrl, 'awaited')
+  cloudlog({ requestId: c.get('requestId'), message: `[Sync Request] Responding 202 Accepted after awaited queue processing. Time: ${Date.now() - handlerStart}ms` })
   return c.json(BRES, 202)
 })
 
 export const __queueConsumerTestUtils__ = {
   extractErrorDetails,
   extractMessageBody,
+  getQueueMessageTrace,
   getActionableQueueFailures,
   getCronHealthcheckStartUrl,
   getQueueBatchSize,
   getQueueHttpConcurrency,
   httpExceptionToQueueResponse,
+  getQueueVisibilityTimeout,
+  shouldRunQueueSyncInBackground,
   maybePingCronHealthcheck,
   maybePingCronHealthcheckStart,
   queueFailureResponse,

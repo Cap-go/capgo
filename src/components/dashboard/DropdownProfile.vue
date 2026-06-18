@@ -26,10 +26,11 @@ const acronym = computed(() => {
   return res.toUpperCase()
 })
 const isLoading = ref(false)
+const spoofed = ref(isSpoofed())
 const logAsInput = ref('')
 
 async function openLogAsDialog() {
-  let userId = ''
+  let identifier = ''
   logAsInput.value = ''
 
   dialogStore.openDialog({
@@ -42,17 +43,17 @@ async function openLogAsDialog() {
       {
         text: t('log-as'),
         handler: () => {
-          userId = logAsInput.value
+          identifier = logAsInput.value
         },
       },
     ],
   })
   await dialogStore.onDialogDismiss()
 
-  if (userId) {
+  if (identifier) {
     isLoading.value = true
     try {
-      await logAsUser(userId, router)
+      await logAsUser(identifier, router)
     }
     finally {
       isLoading.value = false
@@ -60,14 +61,26 @@ async function openLogAsDialog() {
   }
 }
 
-function resetSpoofedUser() {
-  if (unspoofUser()) {
-    toast.error('Stop Spoofed, will reload')
+async function resetSpoofedUser() {
+  isLoading.value = true
+  try {
+    const restored = await unspoofUser()
+    spoofed.value = isSpoofed()
+
+    if (!restored) {
+      toast.error(t('spoof-session-cleared'))
+      return
+    }
+
+    toast.success(t('spoof-stopped-reload'))
     setTimeout(() => {
       router.replace('/dashboard').then(() => {
-        window.location.reload()
+        globalThis.location.reload()
       })
     }, 1000)
+  }
+  finally {
+    isLoading.value = false
   }
 }
 
@@ -125,14 +138,14 @@ async function logOut() {
         <div class="block py-2 px-3 rounded-lg cursor-pointer hover:bg-slate-700/50" @click="openSupport">
           {{ t('support') }}
         </div>
-        <div v-if="main.isAdmin && !isSpoofed()" class="block py-2 px-3 rounded-lg cursor-pointer hover:bg-slate-700/50" :class="{ 'opacity-50 cursor-not-allowed': isLoading }" @click="openLogAsDialog">
+        <div v-if="main.isAdmin && !spoofed" class="block py-2 px-3 rounded-lg cursor-pointer hover:bg-slate-700/50" :class="{ 'opacity-50 cursor-not-allowed': isLoading }" @click="openLogAsDialog">
           <span v-if="!isLoading">{{ t('log-as') }}</span>
           <span v-else class="flex items-center">
             <Spinner size="w-4 h-4" class="mr-2" />
             {{ t('loading') }}
           </span>
         </div>
-        <div v-if="isSpoofed()" class="block py-2 px-3 rounded-lg cursor-pointer hover:bg-slate-700/50" @click="resetSpoofedUser">
+        <div v-if="spoofed" class="block py-2 px-3 rounded-lg cursor-pointer hover:bg-slate-700/50" :class="{ 'opacity-50 cursor-not-allowed': isLoading }" @click="resetSpoofedUser">
           {{ t('reset-spoofed-user') }}
         </div>
         <div class="block py-2 px-3 rounded-lg cursor-pointer hover:bg-slate-700/50" @click="logOut">
@@ -146,7 +159,7 @@ async function logOut() {
         <input
           v-model="logAsInput"
           type="text"
-          :placeholder="t('user-id')"
+          :placeholder="t('user-email-or-org-id')"
           class="p-3 w-full rounded-lg border border-gray-300 dark:text-white dark:bg-gray-800 dark:border-gray-600"
           @keydown.enter="$event.preventDefault()"
         >

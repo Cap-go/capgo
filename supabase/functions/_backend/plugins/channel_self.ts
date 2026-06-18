@@ -8,11 +8,12 @@ import { parse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { checkChannelSelfIPRateLimit, isChannelSelfRateLimited, recordChannelSelfIPRequest, recordChannelSelfRequest } from '../utils/channelSelfRateLimit.ts'
+import { deleteChannelSelfOverride, getChannelSelfOverride, isChannelSelfStoreEnabled, setChannelSelfOverride } from '../utils/channelSelfStore.ts'
 import { BRES, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrgCached } from '../utils/notifications.ts'
 import { sendNotifToOrgMembersCached } from '../utils/org_email_notifications.ts'
-import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, setReplicationLagHeader, upsertChannelDevicePg } from '../utils/pg.ts'
+import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getChannelByIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, setReplicationLagHeader, upsertChannelDevicePg } from '../utils/pg.ts'
 import { convertQueryToBody, makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { channelSelfGetRequestSchema, channelSelfRequestSchema, isDevicePlatform } from '../utils/plugin_validation.ts'
 import { buildRateLimitInfo } from '../utils/rateLimitInfo.ts'
@@ -66,6 +67,8 @@ async function recordChannelSelfRequestSafely(
 }
 
 type AppOwnerResult = Awaited<ReturnType<typeof getAppOwnerPostgres>>
+type ChannelSelfOverrideResult = Awaited<ReturnType<typeof getChannelDeviceOverridePg>>
+type ChannelSelfDeviceOperation = 'set' | 'get' | 'delete'
 
 async function assertChannelSelfCachedStatus(
   c: Context,
@@ -139,27 +142,108 @@ function isChannelSelfLocalChannelStorageVersion(c: Context, body: DeviceLink, o
   }
 }
 
+async function getChannelSelfOverrideForDevice(
+  c: Context<MiddlewareKeyVariables>,
+  appId: string,
+  deviceId: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<ChannelSelfOverrideResult> {
+  if (isChannelSelfStoreEnabled(c)) {
+    const storedOverride = await getChannelSelfOverride(c, appId, deviceId)
+    if (!storedOverride)
+      return null
+
+    const channel = await getChannelByIdPg(c, appId, storedOverride.channel_id.id, drizzleClient)
+    if (!channel)
+      return null
+
+    return {
+      app_id: storedOverride.app_id,
+      device_id: storedOverride.device_id,
+      channel_id: {
+        id: channel.id,
+        allow_device_self_set: channel.allow_device_self_set,
+        name: channel.name,
+      },
+    }
+  }
+
+  return getChannelDeviceOverridePg(c, appId, deviceId, drizzleClient)
+}
+
+async function deleteChannelSelfOverrideForDevice(
+  c: Context<MiddlewareKeyVariables>,
+  appId: string,
+  deviceId: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+) {
+  if (isChannelSelfStoreEnabled(c))
+    return deleteChannelSelfOverride(c, appId, deviceId)
+
+  return deleteChannelDevicePg(c, appId, deviceId, drizzleClient)
+}
+
+async function upsertChannelSelfOverrideForDevice(
+  c: Context<MiddlewareKeyVariables>,
+  appId: string,
+  deviceId: string,
+  channel: NonNullable<Awaited<ReturnType<typeof getChannelByNamePg>>>,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+) {
+  if (isChannelSelfStoreEnabled(c)) {
+    return setChannelSelfOverride(c, appId, deviceId, {
+      app_id: appId,
+      device_id: deviceId,
+      channel_id: {
+        id: channel.id,
+      },
+    })
+  }
+
+  return upsertChannelDevicePg(c, {
+    device_id: deviceId,
+    channel_id: channel.id,
+    app_id: appId,
+    owner_org: channel.owner_org,
+  }, drizzleClient)
+}
+
+async function prepareChannelSelfDeviceRequest(
+  c: Context,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  body: DeviceLink,
+  operationLabel: string,
+): Promise<{ response: Response } | { appOwner: NonNullable<AppOwnerResult>, device: ReturnType<typeof makeDevice> }> {
+  const { app_id, device_id } = body
+  const cachedAppStatus = await getAppStatus(c, app_id)
+  const cachedLimit = await assertChannelSelfCachedStatus(c, cachedAppStatus.status, app_id, makeDevice(body, cachedAppStatus.allow_device_custom_id), operationLabel.toLowerCase())
+  if (cachedLimit) {
+    return { response: cachedLimit }
+  }
+
+  const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
+  const device = makeDevice(body, appOwner?.allow_device_custom_id)
+  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, operationLabel, device_id)
+  if ('response' in ownerRes) {
+    return { response: ownerRes.response }
+  }
+
+  return { appOwner: ownerRes.appOwner, device }
+}
+
 async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'post channel self body', body })
   const { app_id, device_id, channel } = body
 
-  const cachedAppStatus = await getAppStatus(c, app_id)
-  const cachedLimit = await assertChannelSelfCachedStatus(c, cachedAppStatus.status, app_id, makeDevice(body, cachedAppStatus.allow_device_custom_id), 'post')
-  if (cachedLimit) {
-    return cachedLimit
+  const requestContext = await prepareChannelSelfDeviceRequest(c, drizzleClient, body, 'POST')
+  if ('response' in requestContext) {
+    return requestContext.response
   }
-  const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
-  const device = makeDevice(body, appOwner?.allow_device_custom_id)
+  const { appOwner: validatedAppOwner, device } = requestContext
 
-  // Check if app exists first - Read operation can use v2 flag
-  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, 'POST', device_id)
-  if ('response' in ownerRes) {
-    return ownerRes.response
-  }
-  const validatedAppOwner = ownerRes.appOwner
-
-  // Read operations can use v2 flag
-  const dataChannelOverride = await getChannelDeviceOverridePg(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
+  const isNewVersion = isChannelSelfLocalChannelStorageVersion(c, body, 'POST')
+  // Only old versions use server-side channel_self storage.
+  const dataChannelOverride = isNewVersion ? null : await getChannelSelfOverrideForDevice(c, app_id, device_id, drizzleClient)
 
   if (!channel) {
     return simpleError200(c, 'cannot_override', 'Missing channel')
@@ -217,20 +301,8 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     return simpleError200(c, 'channel_self_set_not_allowed', 'This channel does not allow devices to self associate', { channel, app_id })
   }
 
-  const isNewVersion = isChannelSelfLocalChannelStorageVersion(c, body, 'POST')
-
-  // For vX.34.0+: Only validate, don't store in channel_devices
+  // For vX.34.0+: only validate. Do not read or write server-side channel_self storage.
   if (isNewVersion) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Plugin vX.34.0+ detected, cleaning up old channel_devices entry if exists' })
-
-    // Clean up any existing channel_devices entry (migration)
-    if (dataChannelOverride) {
-      const success = await deleteChannelDevicePg(c, app_id, device_id, drizzleClient)
-      if (!success) {
-        cloudlog({ requestId: c.get('requestId'), message: 'Failed to delete old channel_devices entry during migration' })
-      }
-    }
-
     // Return validation result only (plugin will store locally)
     await sendStatsAndDevice(c, device, [{ action: 'setChannel' }])
     return c.json({
@@ -239,12 +311,12 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     })
   }
 
-  // Old behavior (< v7.34.0): Store in channel_devices table
+  // Old behavior (< v7.34.0): persist the override server-side.
   // Get the main channel - Read operation can use v2 flag
   const mainChannel = await getMainChannelsPg(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
   // We DO NOT return if there is no main channel as it's not a critical error
-  // We will just set the channel_devices as the user requested
+  // We will just set the override as the user requested
   let mainChannelName = null as string | null
   if (mainChannel && mainChannel.length > 0) {
     const devicePlatform = body.platform as Database['public']['Enums']['platform_os']
@@ -259,7 +331,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   if (mainChannelName && mainChannelName === channel) {
     // Write operation - use the PG client created by the route handler
 
-    const success = await deleteChannelDevicePg(c, app_id, device_id, drizzleClient)
+    const success = await deleteChannelSelfOverrideForDevice(c, app_id, device_id, drizzleClient)
     if (!success) {
       return simpleError200(c, 'override_not_allowed', `Cannot remove channel override`)
     }
@@ -280,17 +352,12 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   // Write operations - use the PG client created by the route handler
 
   if (dataChannelOverride) {
-    const success = await deleteChannelDevicePg(c, app_id, device_id, drizzleClient)
+    const success = await deleteChannelSelfOverrideForDevice(c, app_id, device_id, drizzleClient)
     if (!success) {
       return simpleError200(c, 'override_not_allowed', `Cannot remove channel override`)
     }
   }
-  const success = await upsertChannelDevicePg(c, {
-    device_id,
-    channel_id: dataChannel.id,
-    app_id,
-    owner_org: dataChannel.owner_org,
-  }, drizzleClient)
+  const success = await upsertChannelSelfOverrideForDevice(c, app_id, device_id, dataChannel, drizzleClient)
   if (!success) {
     return simpleError200(c, 'override_not_allowed', `Cannot do channel override`)
   }
@@ -303,18 +370,11 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
   cloudlog({ requestId: c.get('requestId'), message: 'put channel self body', body })
   const { app_id, defaultChannel, device_id } = body
 
-  const cachedAppStatus = await getAppStatus(c, app_id)
-  const cachedLimit = await assertChannelSelfCachedStatus(c, cachedAppStatus.status, app_id, makeDevice(body, cachedAppStatus.allow_device_custom_id), 'put')
-  if (cachedLimit) {
-    return cachedLimit
+  const requestContext = await prepareChannelSelfDeviceRequest(c, drizzleClient, body, 'PUT')
+  if ('response' in requestContext) {
+    return requestContext.response
   }
-  const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
-  const device = makeDevice(body, appOwner?.allow_device_custom_id)
-
-  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, 'PUT', device_id)
-  if ('response' in ownerRes) {
-    return ownerRes.response
-  }
+  const { device } = requestContext
 
   const isNewVersion = isChannelSelfLocalChannelStorageVersion(c, body, 'PUT')
 
@@ -343,11 +403,11 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
     }
   }
 
-  // Old behavior (< v7.34.0): Query channel_devices table
+  // Old behavior (< v7.34.0): query server-side override storage.
   // Read operations can use v2 flag
   const dataChannel = await getChannelsPg(c, app_id, defaultChannel ? { defaultChannel } : { public: true }, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
-  const dataChannelOverride = await getChannelDeviceOverridePg(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
+  const dataChannelOverride = await getChannelSelfOverrideForDevice(c, app_id, device_id, drizzleClient)
   if (dataChannelOverride?.channel_id) {
     await sendStatsAndDevice(c, device, [{ action: 'getChannel' }])
     return c.json({
@@ -386,38 +446,25 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
     device_id,
     version_build,
   } = body
-  const cachedAppStatus = await getAppStatus(c, app_id)
-  const cachedLimit = await assertChannelSelfCachedStatus(c, cachedAppStatus.status, app_id, makeDevice(body, cachedAppStatus.allow_device_custom_id), 'delete')
-  if (cachedLimit) {
-    return cachedLimit
-  }
-  const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
-  const device = makeDevice(body, appOwner?.allow_device_custom_id)
   cloudlog({ requestId: c.get('requestId'), message: 'delete override', version_build })
 
-  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, 'DELETE', device_id)
-  if ('response' in ownerRes) {
-    return ownerRes.response
+  const requestContext = await prepareChannelSelfDeviceRequest(c, drizzleClient, body, 'DELETE')
+  if ('response' in requestContext) {
+    return requestContext.response
   }
-  const validatedAppOwner = ownerRes.appOwner
+  const { appOwner: validatedAppOwner, device } = requestContext
 
   const isNewVersion = isChannelSelfLocalChannelStorageVersion(c, body, 'DELETE')
 
-  // For vX.34.0+: Still check and clean up old channel_devices entries (migration cleanup)
-  // Read operation can use v2 flag
-  const dataChannelOverride = await getChannelDeviceOverridePg(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
+  // For vX.34.0+: do not read or write server-side channel_self storage.
+  const dataChannelOverride = isNewVersion ? null : await getChannelSelfOverrideForDevice(c, app_id, device_id, drizzleClient)
 
   if (isNewVersion) {
-    // For vX.34.0+: Clean up old entry if it exists from previous versions
-    if (dataChannelOverride?.channel_id) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Plugin vX.34.0+ detected in unsetChannel, cleaning up old channel_devices entry' })
-      await deleteChannelDevicePg(c, app_id, device_id, drizzleClient)
-    }
     await sendStatsAndDevice(c, device, [{ action: 'setChannel' }])
     return c.json(BRES)
   }
 
-  // Old behavior (< v7.34.0): Validate and delete from channel_devices table
+  // Old behavior (< v7.34.0): Validate and delete the server-side override.
 
   if (!dataChannelOverride?.channel_id) {
     return simpleError200(c, 'cannot_override', 'Cannot change device override current channel don\'t allow it')
@@ -443,7 +490,7 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
 
   // Write operation - use the PG client created by the route handler
 
-  const success = await deleteChannelDevicePg(c, app_id, device_id, drizzleClient)
+  const success = await deleteChannelSelfOverrideForDevice(c, app_id, device_id, drizzleClient)
   if (!success) {
     return simpleError200(c, 'override_not_allowed', `Cannot delete channel override`)
   }
@@ -538,6 +585,34 @@ async function runChannelSelfWithPgClient(
   }
 }
 
+async function runChannelSelfDeviceOperation(
+  c: Context,
+  bodyParsed: DeviceLink,
+  operation: ChannelSelfDeviceOperation,
+  operationLabel: string,
+  run: (drizzleClient: ReturnType<typeof getDrizzleClient>) => Promise<Response>,
+  channel?: string,
+) {
+  const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, operation, channel)
+  if (rateLimitStatus.limited) {
+    cloudlog({ requestId: c.get('requestId'), message: `Channel self ${operation} rate limited`, app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, channel })
+    return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
+  }
+
+  // Old KV-backed requests and new local-storage requests can use the read replica.
+  const pgClient = getPgClient(c, isChannelSelfStoreEnabled(c) || isChannelSelfLocalChannelStorageVersion(c, bodyParsed, operationLabel))
+
+  return await runChannelSelfWithPgClient(
+    c,
+    pgClient,
+    run,
+    async () => {
+      await recordChannelSelfRequestSafely(c, bodyParsed.app_id, bodyParsed.device_id, operation, channel)
+      recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
+    },
+  )
+}
+
 // Plugin endpoints are intentionally public device endpoints: their responses are
 // considered public data, so we do not require Capgo JWT/API-key auth or add
 // checks beyond Supabase/platform protections. Endpoint-specific validation, plan
@@ -556,24 +631,13 @@ app.post('/', async (c) => {
   }
 
   // Rate limit: max 5 set per second per device+app, and same set max once per 60 seconds
-  const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel)
-  if (rateLimitStatus.limited) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Channel self set rate limited', app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, channel: bodyParsed.channel })
-    return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
-  }
-
-  // POST has writes, so always create PG client
-  const pgClient = getPgClient(c)
-
-  return await runChannelSelfWithPgClient(
+  return await runChannelSelfDeviceOperation(
     c,
-    pgClient,
+    bodyParsed,
+    'set',
+    'POST',
     drizzleClient => post(c, drizzleClient, bodyParsed),
-    async () => {
-      // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse)
-      await recordChannelSelfRequestSafely(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel)
-      recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
-    },
+    bodyParsed.channel,
   )
 })
 
@@ -587,23 +651,12 @@ app.put('/', async (c) => {
   const { bodyParsed } = parsed
 
   // Rate limit: max 5 get per second per device+app
-  const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'get')
-  if (rateLimitStatus.limited) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Channel self get rate limited', app_id: bodyParsed.app_id, device_id: bodyParsed.device_id })
-    return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
-  }
-
-  const pgClient = getPgClient(c, isChannelSelfLocalChannelStorageVersion(c, bodyParsed, 'PUT'))
-
-  return await runChannelSelfWithPgClient(
+  return await runChannelSelfDeviceOperation(
     c,
-    pgClient,
+    bodyParsed,
+    'get',
+    'PUT',
     drizzleClient => put(c, drizzleClient, bodyParsed),
-    async () => {
-      // Record the request for rate limiting (all requests to prevent abuse)
-      await recordChannelSelfRequestSafely(c, bodyParsed.app_id, bodyParsed.device_id, 'get')
-      recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
-    },
   )
 })
 
@@ -616,24 +669,12 @@ app.delete('/', async (c) => {
   const { bodyParsed } = parsed
 
   // Rate limit: max 5 delete per second per device+app
-  const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'delete')
-  if (rateLimitStatus.limited) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Channel self delete rate limited', app_id: bodyParsed.app_id, device_id: bodyParsed.device_id })
-    return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
-  }
-
-  // DELETE has writes, so always create PG client
-  const pgClient = getPgClient(c)
-
-  return await runChannelSelfWithPgClient(
+  return await runChannelSelfDeviceOperation(
     c,
-    pgClient,
+    bodyParsed,
+    'delete',
+    'DELETE',
     drizzleClient => deleteOverride(c, drizzleClient, bodyParsed),
-    async () => {
-      // Record the request for rate limiting (all requests to prevent abuse)
-      await recordChannelSelfRequestSafely(c, bodyParsed.app_id, bodyParsed.device_id, 'delete')
-      recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
-    },
   )
 })
 

@@ -51,7 +51,7 @@ function makeStdin() {
 async function renderShellAt(cols, rows) {
   const stdout = makeStdout(cols, rows)
   const instance = render(
-    React.createElement(OnboardingShell, { appId: 'com.test.app', iosDir: 'ios', androidDir: 'android' }),
+    React.createElement(OnboardingShell, { appId: 'com.test.app', iosDir: 'ios', androidDir: 'android', journeyId: 'bj_test' }),
     { stdout, stderr: makeStdout(cols, rows), stdin: makeStdin(), debug: true, exitOnCtrlC: false, patchConsole: false },
   )
   await new Promise(r => setTimeout(r, 80))

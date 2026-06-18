@@ -44,11 +44,27 @@ export interface PreviousDefault {
 
 export interface DecideCompatibilityEventsInput {
   /** The new/current default channel row (`c.get('webhookBody')`). */
-  newChannel: Pick<ChannelRow, 'id' | 'app_id' | 'owner_org' | 'name' | 'version' | 'public' | 'ios' | 'android' | 'electron' | 'disable_auto_update'>
+  newChannel: Pick<ChannelRow, 'id' | 'app_id' | 'owner_org' | 'name' | 'version' | 'public' | 'ios' | 'android' | 'electron' | 'disable_auto_update' | 'disable_auto_update_under_native'>
   /** The bundle the new default channel now points at (`app_versions` of `newChannel.version`). */
   currentBundle: CompatibilityBundle | null
   /** Per-platform previous-default candidates the handler resolved. */
   previousDefaults: readonly PreviousDefault[]
+  /**
+   * The channel row's `updated_at` at this change — the occurrence identity.
+   * Part of the dedup key: a queue REDELIVERY of the same webhook carries the
+   * same value (still idempotent), while a genuine re-occurrence of the same
+   * transition carries a new one and inserts a fresh, unresolved row.
+   */
+  changeOccurredAt: string
+  /**
+   * Unresolved events already on file for this channel, used to recognize a
+   * REVERT: when the new default bundle is the `previous_version` of an
+   * unresolved event, users are being returned to the baseline they are
+   * already on, so no new (mirror) event should be raised — otherwise the
+   * recommended remediation (roll the channel back) would itself raise a fresh
+   * unresolved event, forever.
+   */
+  unresolvedEvents?: readonly UnresolvedCompatibilityEvent[]
 }
 
 /**
@@ -68,6 +84,7 @@ export interface CompatibilityEventInsert {
   previous_version_id: number | null
   previous_version_name: string
   offenders: string[]
+  change_occurred_at: string
 }
 
 /**
@@ -109,7 +126,7 @@ function hasNativePackages(bundle: CompatibilityBundle | null | undefined): bund
  * run it). The handler only excludes when the metadata is genuinely unavailable.
  */
 export function decideCompatibilityEvents(input: DecideCompatibilityEventsInput): CompatibilityEventInsert[] {
-  const { newChannel, currentBundle, previousDefaults } = input
+  const { newChannel, currentBundle, previousDefaults, changeOccurredAt, unresolvedEvents = [] } = input
 
   // The new channel must be a default (public) for any platform to matter.
   if (!newChannel.public)
@@ -139,6 +156,33 @@ export function decideCompatibilityEvents(input: DecideCompatibilityEventsInput)
     if (previous.bundle.id === currentBundle.id)
       continue
 
+    // REVERT: this change is the exact inverse of an unresolved event for this
+    // channel+platform (current/previous swapped) — i.e., the channel returns to
+    // the baseline the event says users are on, which is the remediation the
+    // event recommends, not a new incompatibility. Raising a mirror event here
+    // would loop forever (each rollback raising the next event). The matching
+    // unresolved event is auto-resolved by decideAutoResolves on this same pass.
+    // Requiring BOTH ids to match keeps any non-inverse transition (e.g. an
+    // 800 -> 600 change while a 600 -> 700 event is open) raising its own event.
+    //
+    // Only safe to suppress while the channel's downgrade guard is on:
+    // `disable_auto_update_under_native` makes the update endpoint refuse to
+    // serve a bundle below a device's native version, so devices that already
+    // installed the newer native build cannot receive the rolled-back bundle.
+    // With the guard off that delivery is possible and the event must be raised.
+    if (newChannel.disable_auto_update_under_native) {
+      // hasNativePackages' narrowing does not carry into the closure below.
+      const previousBundleId = previous.bundle.id
+      const isDirectRollback = unresolvedEvents.some(event =>
+        event.channel_id === newChannel.id
+        && event.platform === previous.platform
+        && event.previous_version_id === currentBundle.id
+        && event.current_version_id === previousBundleId,
+      )
+      if (isDirectRollback)
+        continue
+    }
+
     const summary: CompatibilitySummary = summarizeBundleCompatibility(
       compareNativePackages(currentBundle.nativePackages, previous.bundle.nativePackages),
     )
@@ -158,6 +202,7 @@ export function decideCompatibilityEvents(input: DecideCompatibilityEventsInput)
       previous_version_id: previous.bundle.id,
       previous_version_name: previous.bundle.name,
       offenders: summary.offenders,
+      change_occurred_at: changeOccurredAt,
     })
   }
 
@@ -168,6 +213,7 @@ export function decideCompatibilityEvents(input: DecideCompatibilityEventsInput)
 export interface UnresolvedCompatibilityEvent {
   id: number
   platform: CompatibilityPlatform
+  channel_id: number | null
   previous_version_id: number | null
   previous_version_name: string
   current_version_id: number | null

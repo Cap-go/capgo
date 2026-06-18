@@ -112,6 +112,7 @@ describe('sendEventToTracking', () => {
       'org:tracked',
       '* * * * *',
       expect.anything(),
+      undefined,
     )
   })
 

@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockGetSession = vi.fn()
 const mockSignOut = vi.fn()
+const mockGetSpoofedAdminJwt = vi.fn()
 
 vi.mock('~/services/supabase', () => ({
   defaultApiHost: 'https://api.capgo.test',
+  getSpoofedAdminJwt: mockGetSpoofedAdminJwt,
   useSupabase: () => ({
     auth: {
       getSession: mockGetSession,
@@ -67,6 +69,7 @@ describe('sso enforcement redirect handling', () => {
         },
       },
     })
+    mockGetSpoofedAdminJwt.mockReturnValue(null)
     mockSignOut.mockResolvedValue({ error: null })
   })
 
@@ -98,5 +101,52 @@ describe('sso enforcement redirect handling', () => {
 
     expect(mockSignOut).toHaveBeenCalledOnce()
     expect(next).toHaveBeenCalledWith('/login?sso_required=true')
+  })
+
+  it('sends the stored admin token for backend-verified impersonation bypass', async () => {
+    mockGetSpoofedAdminJwt.mockReturnValue('admin-token-456')
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ allowed: true }),
+    } as unknown as Response)
+
+    const guard = await getGuard()
+    const next = vi.fn()
+
+    await guard({ path: '/dashboard' }, { path: '/login' }, next)
+
+    expect(fetch).toHaveBeenCalledWith('https://api.capgo.test/private/sso/check-enforcement', expect.objectContaining({
+      headers: expect.objectContaining({
+        'Authorization': 'Bearer token-123',
+        'X-Capgo-Spoof-Admin-Authorization': 'Bearer admin-token-456',
+      }),
+    }))
+    expect(mockSignOut).not.toHaveBeenCalled()
+    expect(next).toHaveBeenCalledWith()
+  })
+
+  it('does not cache allow decisions from impersonation proof for later password checks', async () => {
+    mockGetSpoofedAdminJwt.mockReturnValueOnce('admin-token-456').mockReturnValueOnce(null)
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ allowed: true }),
+    } as unknown as Response)
+
+    const guard = await getGuard()
+
+    await guard({ path: '/dashboard' }, { path: '/login' }, vi.fn())
+    await guard({ path: '/dashboard' }, { path: '/login' }, vi.fn())
+
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(fetch).toHaveBeenNthCalledWith(1, 'https://api.capgo.test/private/sso/check-enforcement', expect.objectContaining({
+      headers: expect.objectContaining({
+        'X-Capgo-Spoof-Admin-Authorization': 'Bearer admin-token-456',
+      }),
+    }))
+    expect(fetch).toHaveBeenNthCalledWith(2, 'https://api.capgo.test/private/sso/check-enforcement', expect.objectContaining({
+      headers: expect.not.objectContaining({
+        'X-Capgo-Spoof-Admin-Authorization': expect.any(String),
+      }),
+    }))
   })
 })

@@ -21,6 +21,7 @@ import type { AddressInfo } from 'node:net'
 import crypto from 'node:crypto'
 import { createServer } from 'node:http'
 import open from 'open'
+import { appendInternalLog } from '../../../support/internal-log.js'
 
 export const GOOGLE_OAUTH_SCOPES_ANDROIDPUBLISHER = [
   'openid',
@@ -46,14 +47,6 @@ export interface GoogleOAuthConfig {
    */
   clientSecret?: string
   scopes: readonly string[]
-  /**
-   * Subset of `scopes` whose absence must FAIL sign-in. Any scope present in
-   * `scopes` but NOT listed here is *optional*: the user may deselect it on the
-   * consent screen and sign-in still succeeds (the feature relying on it is
-   * expected to degrade gracefully). Defaults to all of `scopes` when omitted,
-   * preserving the original "every requested scope is required" behavior.
-   */
-  requiredScopes?: readonly string[]
   /** Extra params to include on the auth URL (e.g. `login_hint`, `prompt`). */
   extraAuthParams?: Record<string, string>
 }
@@ -281,26 +274,11 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[c] as string))
 }
 
-/**
- * Human blurbs for OPTIONAL scopes a user may decline on the consent screen —
- * shown on the success page so they understand the implication right where the
- * decision just happened (the consent wording, e.g. "see metrics and data", is
- * Google's and reads scarier / vaguer than what the CLI actually does).
- */
-const OPTIONAL_SCOPE_BLURBS: Record<string, string> = {
-  'https://www.googleapis.com/auth/playdeveloperreporting':
-    'Play app list (Google words it "see metrics and data"): without it the CLI can\'t check that the app you\'re building exists in your Play Console, so it will trust the package from your Gradle config as-is.',
-}
-
-function successHtml(skippedOptionalScopes: readonly string[] = []): string {
-  const warning = skippedOptionalScopes.length > 0
-    ? `<div class="warn"><strong>Heads-up:</strong> you skipped ${skippedOptionalScopes.length === 1 ? 'an optional permission' : 'some optional permissions'} — that's fine, onboarding continues without it.<ul>${skippedOptionalScopes.map(s => `<li>${escapeHtml(OPTIONAL_SCOPE_BLURBS[s] ?? s)}</li>`).join('')}</ul>Want it after all? Re-run onboarding and leave it checked on the consent screen.</div>`
-    : ''
+function successHtml(): string {
   return `<!doctype html><html><head><meta charset="utf-8"><title>Capgo — signed in</title>
-<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:80px auto;padding:0 20px;color:#222}h1{font-size:22px}p{color:#555;line-height:1.5}.warn{background:#fff7e6;border:1px solid #f0d59c;border-radius:6px;padding:12px 16px;color:#5c4a1a;font-size:14px;line-height:1.5}.warn ul{margin:8px 0;padding-left:20px}</style>
+<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:80px auto;padding:0 20px;color:#222}h1{font-size:22px}p{color:#555;line-height:1.5}</style>
 </head><body><h1>✅ You can close this tab</h1>
 <p>Capgo CLI received your Google sign-in. Head back to your terminal to continue.</p>
-${warning}
 </body></html>`
 }
 
@@ -353,30 +331,6 @@ export class MissingScopesError extends Error {
 export function findMissingScopes(grantedScope: string, requestedScopes: readonly string[]): string[] {
   const granted = new Set(grantedScope.split(/\s+/).filter(s => s.length > 0))
   return requestedScopes.filter(s => !granted.has(s))
-}
-
-export interface MissingScopeSplit {
-  /** Required scopes the user didn't grant — sign-in must fail with a retry. */
-  missingRequired: string[]
-  /** Optional scopes the user declined — proceed, but tell them what they lose. */
-  skippedOptional: string[]
-}
-
-/**
- * Split the requested-but-not-granted scopes into the required ones (block
- * sign-in → `MissingScopesError`) and the optional ones (sign-in proceeds; the
- * success page + caller warn about the degraded behavior).
- */
-export function splitMissingScopes(
-  grantedScope: string,
-  scopes: readonly string[],
-  requiredScopes: readonly string[],
-): MissingScopeSplit {
-  const missingAll = findMissingScopes(grantedScope, scopes)
-  return {
-    missingRequired: missingAll.filter(s => requiredScopes.includes(s)),
-    skippedOptional: missingAll.filter(s => !requiredScopes.includes(s)),
-  }
 }
 
 export interface LoopbackCallbackResult {
@@ -542,16 +496,37 @@ function startLoopbackServer(args: {
 }
 
 /**
- * Run the full browser-based OAuth flow and return tokens.
- *
- * Side effects:
- *  - Opens a browser window at Google's consent screen.
- *  - Starts (and later stops) a loopback HTTP server on 127.0.0.1.
+ * The shape returned by `startOAuthFlow`. The loopback server is already
+ * running and the browser has been opened; the caller awaits `result` at a
+ * later point (fire-and-poll pattern for MCP).
  */
-export async function runOAuthFlow(
+export interface PendingOAuthSession {
+  /** Full Google authorization URL that was opened in the browser. */
+  authUrl: string
+  /** The loopback redirect URI embedded in the authUrl. */
+  redirectUri: string
+  /**
+   * Resolves with validated tokens once the browser callback lands,
+   * code is exchanged and scopes pass. Rejects on error/timeout/missing-scopes.
+   */
+  result: Promise<GoogleOAuthTokens>
+  /** Force-close the loopback server (safe after result settles). */
+  close: () => void
+}
+
+/**
+ * Non-blocking OAuth starter: opens the browser and starts the loopback
+ * listener, then returns IMMEDIATELY without waiting for the sign-in to
+ * complete. The caller can `await session.result` later to collect tokens.
+ *
+ * This is the foundation for the MCP fire-and-poll sign-in model. The Ink
+ * wizard uses `runOAuthFlow` (which internally calls this and then awaits
+ * `result`) to preserve its blocking behavior.
+ */
+export async function startOAuthFlow(
   config: GoogleOAuthConfig,
   options: RunOAuthFlowOptions = {},
-): Promise<GoogleOAuthTokens> {
+): Promise<PendingOAuthSession> {
   if (!config.clientId)
     throw new Error('Google OAuth clientId is required')
   if (!config.scopes.length)
@@ -567,69 +542,82 @@ export async function runOAuthFlow(
     signal: options.signal,
   })
 
+  const authUrl = buildAuthUrl({
+    clientId: config.clientId,
+    redirectUri: server.redirectUri,
+    scopes: config.scopes,
+    state,
+    codeChallenge: pkce.challenge,
+    extra: config.extraAuthParams,
+  })
+
+  options.onAuthUrl?.(authUrl)
+  options.onStatus?.('Opening browser for Google sign-in...')
   try {
-    const authUrl = buildAuthUrl({
-      clientId: config.clientId,
-      redirectUri: server.redirectUri,
-      scopes: config.scopes,
-      state,
-      codeChallenge: pkce.challenge,
-      extra: config.extraAuthParams,
-    })
-
-    options.onAuthUrl?.(authUrl)
-    options.onStatus?.('Opening browser for Google sign-in...')
-    try {
-      await open(authUrl)
-    }
-    catch {
-      options.onStatus?.('Could not open browser automatically — open the URL above manually.')
-    }
-    options.onStatus?.('Waiting for browser redirect...')
-
-    const { code, finishResponse } = await server.code
-
-    options.onStatus?.('Exchanging code for tokens...')
-    let tokens: GoogleOAuthTokens
-    try {
-      tokens = await exchangeAuthCode({
-        config,
-        code,
-        codeVerifier: pkce.verifier,
-        redirectUri: server.redirectUri,
-      })
-    }
-    catch (err) {
-      finishResponse(errorHtml(err instanceof Error ? err.message : String(err)), 500)
-      throw err
-    }
-
-    // Scope validation — Google lets users deselect scopes on the consent
-    // screen, and grants whatever subset they approved. Detect that here so
-    // the user gets a clear "please grant all permissions" message in BOTH
-    // the browser tab and the CLI, instead of failing several API calls
-    // later with confusing 403s.
-    //
-    // Only the REQUIRED scopes block sign-in. Optional scopes (in `scopes` but
-    // not in `requiredScopes`) may be declined — the caller is responsible for
-    // degrading gracefully when the granted token lacks them. Defaults to all
-    // requested scopes when `requiredScopes` is omitted.
-    const requiredScopes = config.requiredScopes ?? config.scopes
-    const { missingRequired, skippedOptional } = splitMissingScopes(tokens.scope, config.scopes, requiredScopes)
-    if (missingRequired.length > 0) {
-      finishResponse(scopeMissingHtml(missingRequired), 400)
-      throw new MissingScopesError(missingRequired, tokens.scope)
-    }
-
-    // Optional scopes declined → still a success, but say so in BOTH places:
-    // the browser tab (where the decline just happened) and the CLI status
-    // stream — so the later "verification skipped" warning isn't a surprise.
-    if (skippedOptional.length > 0)
-      options.onStatus?.('Note: you skipped the optional Play app-list permission — app-existence verification will be skipped.')
-    finishResponse(successHtml(skippedOptional))
-    return tokens
+    await open(authUrl)
   }
-  finally {
-    server.close()
+  catch (err) {
+    appendInternalLog(`google sign-in: could not auto-open browser: ${err instanceof Error ? err.message : String(err)}`)
+    options.onStatus?.('Could not open browser automatically — open the URL above manually.')
   }
+
+  // Build `result` as an async IIFE that awaits the callback, exchanges the
+  // code, validates scopes and delivers tokens. The server is closed in finally
+  // regardless of outcome.
+  const result: Promise<GoogleOAuthTokens> = (async () => {
+    try {
+      const { code, finishResponse } = await server.code
+      options.onStatus?.('Exchanging code for tokens...')
+
+      let tokens: GoogleOAuthTokens
+      try {
+        tokens = await exchangeAuthCode({
+          config,
+          code,
+          codeVerifier: pkce.verifier,
+          redirectUri: server.redirectUri,
+        })
+      }
+      catch (err) {
+        finishResponse(errorHtml(err instanceof Error ? err.message : String(err)), 500)
+        throw err
+      }
+
+      // Scope validation — Google lets users deselect scopes on the consent
+      // screen, and grants whatever subset they approved.
+      const missing = findMissingScopes(tokens.scope, config.scopes)
+      if (missing.length > 0) {
+        finishResponse(scopeMissingHtml(missing), 400)
+        throw new MissingScopesError(missing, tokens.scope)
+      }
+
+      finishResponse(successHtml())
+      return tokens
+    }
+    finally {
+      server.close()
+    }
+  })()
+
+  // Return immediately — do NOT await result.
+  return { authUrl, redirectUri: server.redirectUri, result, close: server.close }
+}
+
+/**
+ * Run the full browser-based OAuth flow and return tokens.
+ *
+ * Side effects:
+ *  - Opens a browser window at Google's consent screen.
+ *  - Starts (and later stops) a loopback HTTP server on 127.0.0.1.
+ *
+ * Delegates to `startOAuthFlow` and awaits the result — preserving the
+ * original blocking behavior Ink depends on.
+ */
+export async function runOAuthFlow(
+  config: GoogleOAuthConfig,
+  options: RunOAuthFlowOptions = {},
+): Promise<GoogleOAuthTokens> {
+  const session = await startOAuthFlow(config, options)
+  options.onStatus?.('Waiting for browser redirect...')
+  return await session.result
 }

@@ -10,6 +10,7 @@ export const appOptionsSchema = optionsBaseSchema.extend({
   icon: z.string().optional(),
   retention: z.number().optional(),
   exposeMetadata: z.boolean().optional(),
+  preview: z.boolean().optional(),
 })
 
 export type AppOptions = z.infer<typeof appOptionsSchema>

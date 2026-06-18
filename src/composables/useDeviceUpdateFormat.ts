@@ -1,5 +1,7 @@
 import type { Database } from '~/types/supabase.types'
 
+type DeviceRow = Database['public']['Tables']['devices']['Row']
+
 /**
  * Interface matching the update endpoint expected request format
  * Based on AppInfos from supabase/functions/_backend/utils/types.ts
@@ -16,6 +18,7 @@ export interface UpdateEndpointRequest {
   app_id: string
   device_id: string
   defaultChannel: string
+  channel?: string
 }
 
 /**
@@ -23,9 +26,10 @@ export interface UpdateEndpointRequest {
  */
 export function useDeviceUpdateFormat() {
   function transformDeviceToUpdateRequest(
-    device: Database['public']['Tables']['devices']['Row'],
+    device: DeviceRow,
     appId: string,
     defaultChannel: string = 'production',
+    channelOverrideName?: string | null,
   ): UpdateEndpointRequest {
     return {
       version_name: device.version_name || '',
@@ -39,15 +43,17 @@ export function useDeviceUpdateFormat() {
       app_id: appId,
       device_id: device.device_id || '',
       defaultChannel,
+      ...(channelOverrideName ? { channel: channelOverrideName } : {}),
     }
   }
 
   function copyUpdateRequestToClipboard(
-    device: Database['public']['Tables']['devices']['Row'],
+    device: DeviceRow,
     appId: string,
     defaultChannel: string = 'production',
+    channelOverrideName?: string | null,
   ): Promise<void> {
-    const request = transformDeviceToUpdateRequest(device, appId, defaultChannel)
+    const request = transformDeviceToUpdateRequest(device, appId, defaultChannel, channelOverrideName)
     const jsonString = JSON.stringify(request, null, 2)
     return navigator.clipboard.writeText(jsonString)
   }

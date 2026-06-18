@@ -16,7 +16,10 @@ import { clearCredentialsCommand, listCredentialsCommand, migrateCredentialsComm
 import { manageCredentialsCommand } from './build/credentials-manage'
 import { lastOutputCommand } from './build/last-output-command'
 import { checkBuildNeeded } from './build/needed'
+import type { OnboardingBuilderOptions } from './build/onboarding/command'
 import { onboardingBuilderCommand } from './build/onboarding/command'
+import type { CreateAppleKeyOptions } from './build/onboarding/asc-key/command'
+import { createAppleKeyCommand } from './build/onboarding/asc-key/command'
 import { requestBuildCommand } from './build/request'
 import { cleanupBundle } from './bundle/cleanup'
 import { checkCompatibility } from './bundle/compatibility'
@@ -41,6 +44,7 @@ import { login } from './login'
 import { startMcpServer } from './mcp/server'
 import { addOrganization, deleteOrganization, listMembers, listOrganizations, setOrganization } from './organization'
 import { capturePosthogException, getCommandPath, shouldCapturePosthogException } from './posthog'
+import { getPreviewQr } from './preview/qr'
 import { probe } from './probe'
 import { testRunDeviceCommand } from './run/device'
 import { getUserId } from './user/account'
@@ -157,6 +161,25 @@ Example: npx @capgo/cli@latest login YOUR_API_KEY`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
+program
+  .command('get-qr [appId] [target]')
+  .description(`🔳 Print a terminal QR code for a bundle or channel preview.
+
+Preview must be enabled for the app.
+
+Examples:
+  npx @capgo/cli@latest get-qr com.example.app --bundle 1.2.3
+  npx @capgo/cli@latest get-qr com.example.app --bundle 123
+  npx @capgo/cli@latest get-qr com.example.app --channel production
+  npx @capgo/cli@latest get-qr com.example.app production --type channel`)
+  .action(getPreviewQr)
+  .option('-a, --apikey <apikey>', optionDescriptions.apikey)
+  .option('--bundle <bundle>', `Bundle name or id to preview`)
+  .option('--channel <channel>', `Channel name or id to preview`)
+  .addOption(new Option('--type <type>', `Type for positional target`).choices(['bundle', 'channel']))
+  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+
 const bundle = program
   .command('bundle')
   .description(`📦 Manage app bundles for deployment in Capgo Cloud, including upload, compatibility checks, and encryption.`)
@@ -171,11 +194,11 @@ Version must be > 0.0.0 and unique. Deleted versions cannot be reused for securi
 External option: Store only a URL link (useful for apps >200MB or privacy requirements).
 Capgo never inspects external content. Add encryption for trustless security.
 
-Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production`)
+Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production,beta`)
   .action(handleBundleUploadCommand)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('-p, --path <path>', `Path of the folder to upload, if not provided it will use the webDir set in capacitor.config`)
-  .option('-c, --channel <channel>', `Channel to link to`)
+  .option('-c, --channel <channel>', `Channel to link to. Use commas for multiple channels, for example production,beta`)
   .option('-e, --external <url>', `Link to external URL instead of upload to Capgo Cloud`)
   .option('--iv-session-key <key>', `Set the IV and session key for bundle URL external`)
   .option('--s3-region <region>', `Region for your S3 bucket`)
@@ -224,6 +247,7 @@ Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --cha
   .option('--disable-brotli', `Completely disable brotli compression even if updater version supports it`)
   .option('--version-exists-ok', `Exit successfully if bundle version already exists, useful for CI/CD workflows with monorepos`)
   .option('--self-assign', `Allow devices to auto-join this channel (updates channel setting)`)
+  .option('--qr-preview', `Print a terminal QR code for this bundle preview after upload`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
   .option('--verbose', optionDescriptions.verbose)
@@ -426,6 +450,8 @@ Example: npx @capgo/cli@latest app set com.example.app --name "Updated App" --re
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('-r, --retention <retention>', `Days to keep old bundles (0 = infinite, default: 0)`)
   .option('--expose-metadata <exposeMetadata>', `Expose bundle metadata (link and comment) to the plugin (true/false, default: false)`)
+  .option('--preview', `Enable bundle and channel preview QR codes for this app`)
+  .option('--no-preview', `Disable bundle and channel preview QR codes for this app`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
@@ -521,6 +547,7 @@ Example: npx @capgo/cli@latest channel set production com.example.app --bundle 1
   .option('--no-emulator', `Disable sending update to emulator devices`)
   .option('--device', `Allow sending update to physical devices`)
   .option('--no-device', `Disable sending update to physical devices`)
+  .option('--qr-preview', `Print a terminal QR code for this channel preview after updating it`)
   .option('--package-json <packageJson>', optionDescriptions.packageJson)
   .option('--ignore-metadata-check', `Ignore checking node_modules compatibility if present in the bundle`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
@@ -796,7 +823,11 @@ build
   .description('Set up build credentials interactively (iOS: certificates + profiles automated; Android: keystore + Google OAuth provisions GCP service account and Play Console invite)')
   .option('-a, --apikey <apikey>', 'API key to link to your account')
   .option('-p, --platform <platform>', 'Platform to onboard (ios or android). If omitted, auto-detects when only one native folder exists; prompts otherwise.')
-  .action(onboardingBuilderCommand)
+  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  // enableSelfUpdate is set ONLY here (the genuine `build init` entrypoint) so
+  // the self-update prompt's re-exec replays `build init`, never a wrapper
+  // command that reached onboarding as a sub-step (bundle upload / credentials).
+  .action((options: OnboardingBuilderOptions) => onboardingBuilderCommand({ ...options, enableSelfUpdate: true }))
 
 build
   .command('request [appId]')
@@ -881,6 +912,24 @@ const buildCredentials = build
 📚 DOCUMENTATION:
    iOS setup: https://capgo.app/docs/cli/cloud-build/ios/
    Android setup: https://capgo.app/docs/cli/cloud-build/android/`)
+
+buildCredentials
+  .command('apple-key')
+  .alias('asc-key')
+  .description(`Create an App Store Connect team API key with a guided macOS helper (macOS only).
+
+Opens a native window that walks you through Apple's App Store Connect UI in an
+embedded browser, auto-captures the Issuer ID + Key ID, intercepts the one-time
+.p8, validates it against Apple, and saves it to ~/.appstoreconnect/private_keys.
+Progress statistics are forwarded to Capgo analytics (disable with CAPGO_DISABLE_TELEMETRY).
+
+Example:
+  npx @capgo/cli build credentials apple-key --appId com.example.app`)
+  .action((options: CreateAppleKeyOptions) => createAppleKeyCommand(options))
+  .option('-a, --apikey <apikey>', optionDescriptions.apikey)
+  .option('--appId <appId>', 'Save the captured key into this app iOS build credentials')
+  .option('--local', 'Save into the per-project .capgo-credentials.json instead of the global file')
+  .option('--json', 'Print the captured Key ID / Issuer ID / .p8 path as JSON')
 
 buildCredentials
   .command('save')

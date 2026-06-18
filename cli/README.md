@@ -30,6 +30,7 @@ Follow the documentation here: https://capacitorjs.com/docs/getting-started/
 - 🔹 [Star-all](#star-all)
 - 👨‍⚕️ [Doctor](#doctor)
 - 🔑 [Login](#login)
+- 🔹 [Get-qr](#get-qr)
 - 📦 [Bundle](#bundle)
   - [Upload](#bundle-upload)
   - [Compatibility](#bundle-compatibility)
@@ -76,6 +77,7 @@ Follow the documentation here: https://capacitorjs.com/docs/getting-started/
   - [Request](#build-request)
   - [Last-output](#build-last-output)
   - [Credentials](#build-credentials)
+    - [Apple-key](#build-credentials-apple-key)
     - [Save](#build-credentials-save)
     - [List](#build-credentials-list)
     - [Clear](#build-credentials-clear)
@@ -220,6 +222,32 @@ npx @capgo/cli@latest login YOUR_API_KEY
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 
 
+## <a id="get-qr"></a> 🔹 **Get-qr**
+
+```bash
+npx @capgo/cli@latest get-qr
+```
+
+🔳 Print a terminal QR code for a bundle or channel preview.
+Preview must be enabled for the app.
+Examples:
+  npx @capgo/cli@latest get-qr com.example.app --bundle 1.2.3
+  npx @capgo/cli@latest get-qr com.example.app --bundle 123
+  npx @capgo/cli@latest get-qr com.example.app --channel production
+  npx @capgo/cli@latest get-qr com.example.app production --type channel
+
+## <a id="options-get-qr"></a> Options (Get-qr)
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-a** | <code>string</code> | API key to link to your account |
+| **--bundle** | <code>string</code> | Bundle name or id to preview |
+| **--channel** | <code>string</code> | Channel name or id to preview |
+| **--type** | <code>string</code> | Type for positional target |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+
+
 ## <a id="bundle"></a> 📦 **Bundle**
 
 📦 Manage app bundles for deployment in Capgo Cloud, including upload, compatibility checks, and encryption.
@@ -240,7 +268,7 @@ Capgo never inspects external content. Add encryption for trustless security.
 **Example:**
 
 ```bash
-npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production
+npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production,beta
 ```
 
 **Options:**
@@ -249,7 +277,7 @@ npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel prod
 | -------------- | ------------- | -------------------- |
 | **-a** | <code>string</code> | API key to link to your account |
 | **-p** | <code>string</code> | Path of the folder to upload, if not provided it will use the webDir set in capacitor.config |
-| **-c** | <code>string</code> | Channel to link to |
+| **-c** | <code>string</code> | Channel to link to. Use commas for multiple channels, for example production,beta |
 | **-e** | <code>string</code> | Link to external URL instead of upload to Capgo Cloud |
 | **--iv-session-key** | <code>string</code> | Set the IV and session key for bundle URL external |
 | **--s3-region** | <code>string</code> | Region for your S3 bucket |
@@ -295,6 +323,7 @@ npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel prod
 | **--disable-brotli** | <code>boolean</code> | Completely disable brotli compression even if updater version supports it |
 | **--version-exists-ok** | <code>boolean</code> | Exit successfully if bundle version already exists, useful for CI/CD workflows with monorepos |
 | **--self-assign** | <code>boolean</code> | Allow devices to auto-join this channel (updates channel setting) |
+| **--qr-preview** | <code>boolean</code> | Print a terminal QR code for this bundle preview after upload |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 | **--verbose** | <code>boolean</code> | Enable verbose output with detailed logging |
@@ -652,6 +681,8 @@ npx @capgo/cli@latest app set com.example.app --name "Updated App" --retention 3
 | **-a** | <code>string</code> | API key to link to your account |
 | **-r** | <code>string</code> | Days to keep old bundles (0 = infinite, default: 0) |
 | **--expose-metadata** | <code>string</code> | Expose bundle metadata (link and comment) to the plugin (true/false, default: false) |
+| **--preview** | <code>boolean</code> | Enable bundle and channel preview QR codes for this app |
+| **--no-preview** | <code>boolean</code> | Disable bundle and channel preview QR codes for this app |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 
@@ -803,6 +834,7 @@ npx @capgo/cli@latest channel set production com.example.app --bundle 1.0.0 --st
 | **--no-emulator** | <code>boolean</code> | Disable sending update to emulator devices |
 | **--device** | <code>boolean</code> | Allow sending update to physical devices |
 | **--no-device** | <code>boolean</code> | Disable sending update to physical devices |
+| **--qr-preview** | <code>boolean</code> | Print a terminal QR code for this channel preview after updating it |
 | **--package-json** | <code>string</code> | Paths to package.json files for monorepos (comma-separated) |
 | **--ignore-metadata-check** | <code>boolean</code> | Ignore checking node_modules compatibility if present in the bundle |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
@@ -1207,6 +1239,7 @@ Set up build credentials interactively (iOS: certificates + profiles automated; 
 | -------------- | ------------- | -------------------- |
 | **-a** | <code>string</code> | API key to link to your account |
 | **-p** | <code>string</code> | Platform to onboard (ios or android). If omitted, auto-detects when only one native folder exists; prompts otherwise. |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 
 ### <a id="build-request"></a> 🔹 **Request**
 
@@ -1302,6 +1335,36 @@ Manage build credentials stored locally on your machine.
 📚 DOCUMENTATION:
    iOS setup: https://capgo.app/docs/cli/cloud-build/ios/
    Android setup: https://capgo.app/docs/cli/cloud-build/android/
+
+#### <a id="build-credentials-apple-key"></a> 🔹 **Apple-key**
+
+**Alias:** `asc-key`
+
+```bash
+npx @capgo/cli@latest build credentials apple-key
+```
+
+Create an App Store Connect team API key with a guided macOS helper (macOS only).
+Opens a native window that walks you through Apple's App Store Connect UI in an
+embedded browser, auto-captures the Issuer ID + Key ID, intercepts the one-time
+.p8, validates it against Apple, and saves it to ~/.appstoreconnect/private_keys.
+Progress statistics are forwarded to Capgo analytics (disable with CAPGO_DISABLE_TELEMETRY).
+  npx @capgo/cli build credentials apple-key --appId com.example.app
+
+**Example:**
+
+```bash
+Example:
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-a** | <code>string</code> | API key to link to your account |
+| **--appId** | <code>string</code> | Save the captured key into this app iOS build credentials |
+| **--local** | <code>boolean</code> | Save into the per-project .capgo-credentials.json instead of the global file |
+| **--json** | <code>boolean</code> | Print the captured Key ID / Issuer ID / .p8 path as JSON |
 
 #### <a id="build-credentials-save"></a> 🔹 **Save**
 

@@ -31,7 +31,7 @@ import type { FC } from 'react'
 // single SpinnerLine and render identically in both forms, so they take no
 // `dense` prop.
 import { Alert, Select } from '@inkjs/ui'
-import { Box, Newline, Text } from 'ink'
+import { Box, Newline, Text, useInput } from 'ink'
 import React from 'react'
 import { Divider, ErrorLine, FilteredTextInput, SpinnerLine, SuccessLine } from '../components.js'
 
@@ -117,6 +117,92 @@ export const SetupMethodSelectStep: FC<SetupMethodSelectStepProps> = ({ dense = 
   </Box>
 )
 
+// ── p8-source-select ──────────────────────────────────────────────────────────
+// First fork of the ASC API-key step: does the user already have a .p8 file? If
+// not — and we can drive the guided macOS helper — offer to create one for them.
+export interface P8SourceSelectStepProps {
+  dense?: boolean
+  /** True when the guided macOS helper is available (macOS + binary present). */
+  canAutomate: boolean
+  onChange: (value: string) => void | Promise<void>
+}
+
+export const P8SourceSelectStep: FC<P8SourceSelectStepProps> = ({ dense = false, canAutomate, onChange }) => (
+  <Box flexDirection="column" marginTop={1}>
+    <Alert variant="info">
+      Do you already have an App Store Connect API key (.p8 file)?
+    </Alert>
+    {!dense && <Newline />}
+    <Select
+      options={[
+        {
+          label: canAutomate
+            ? '✨  No — create one for me (guided, opens a window)'
+            : '🆕  No — I will create one at App Store Connect',
+          value: 'create',
+        },
+        { label: '✓  Yes — I have a .p8 file', value: 'have' },
+      ]}
+      onChange={onChange}
+    />
+  </Box>
+)
+
+// ── asc-key-generating ────────────────────────────────────────────────────────
+// Spinner shown while the guided macOS helper runs in its own window.
+export const AscKeyGeneratingStep: FC = () => (
+  <Box flexDirection="column" marginTop={1}>
+    <SpinnerLine text="Guiding you through App Store Connect — finish in the window that opened…" />
+  </Box>
+)
+
+// ── asc-key-created ───────────────────────────────────────────────────────────
+// Large success screen shown once the guided helper has created + validated the
+// key. This is the gate that hands control back: the helper window stays open
+// until the user presses Enter here, which closes it and continues. Styled like
+// the platform picker (centered, fills the frame).
+export interface AscKeyCreatedStepProps {
+  keyId: string
+  onContinue: () => void
+}
+
+export const AscKeyCreatedStep: FC<AscKeyCreatedStepProps> = ({ keyId, onContinue }) => {
+  useInput((_input, key) => {
+    if (key.return)
+      onContinue()
+  })
+  // A single centered "card" (bordered box) so the whole celebration reads as one
+  // intentional unit, vertically + horizontally centered in the frame — instead
+  // of the emoji floating mid-screen with the prompt stranded at the bottom.
+  return (
+    <Box flexGrow={1} alignItems="center" justifyContent="center">
+      <Box
+        flexDirection="column"
+        alignItems="center"
+        borderStyle="round"
+        borderColor="green"
+        paddingX={6}
+        paddingY={1}
+      >
+        <Text>🎉</Text>
+        <Box marginTop={1}>
+          <Text bold color="green">App Store Connect API key created</Text>
+        </Box>
+        <Box marginTop={1} flexDirection="column" alignItems="center">
+          <Text>Your key was created and validated with Apple.</Text>
+          {keyId
+            ? <Text dimColor>{`Key ID: ${keyId}`}</Text>
+            : null}
+        </Box>
+        <Box marginTop={1}>
+          <Text bold color="cyan">Press Enter to continue  →</Text>
+        </Box>
+        <Text dimColor>This closes the helper window and finishes your setup here.</Text>
+      </Box>
+    </Box>
+  )
+}
+
 // ── api-key-instructions ─────────────────────────────────────────────────────
 // `canUseFilePicker` decides which control to show: the picker/manual fork
 // (Select) or a direct path input (FilteredTextInput). The submit handler for
@@ -131,13 +217,17 @@ export const SetupMethodSelectStep: FC<SetupMethodSelectStepProps> = ({ dense = 
 // single <Newline/> spacer between the picker prompt and its Select.
 export interface ApiKeyInstructionsStepProps {
   canUseFilePicker: boolean
+  /** macOS + helper available: also offer "✨ Create one for me (guided)" as an
+   *  alternative to providing the .p8 by hand. Defaults to false. */
+  canCreateGuided?: boolean
   dense?: boolean
-  onMethodChange: (value: string) => void
+  onMethodChange: (value: string) => void | Promise<void>
   onPathSubmit: (value: string) => void | Promise<void>
 }
 
 export const ApiKeyInstructionsStep: FC<ApiKeyInstructionsStepProps> = ({
   canUseFilePicker,
+  canCreateGuided = false,
   dense = false,
   onMethodChange,
   onPathSubmit,
@@ -151,6 +241,9 @@ export const ApiKeyInstructionsStep: FC<ApiKeyInstructionsStepProps> = ({
             options={[
               { label: '📂  Open file picker', value: 'picker' },
               { label: '📝  Type the path', value: 'manual' },
+              // Escape hatch: let the user switch to the guided creation instead
+              // of hunting for / generating the .p8 by hand (macOS only).
+              ...(canCreateGuided ? [{ label: '✨  Create one for me instead (guided)', value: 'guided' }] : []),
             ]}
             onChange={onMethodChange}
           />
@@ -348,12 +441,15 @@ export const VerifyingKeyStep: FC = () => (
 export const CreatingCertificateStep: FC = () => (
   <Box flexDirection="column" marginTop={1}>
     <SpinnerLine text="Generating signing key and CSR..." />
-    <SpinnerLine text="Creating iOS distribution certificate..." />
+    <SpinnerLine text="Creating Apple Distribution certificate..." />
   </Box>
 )
 
 // ── cert-limit-prompt ─────────────────────────────────────────────────────────
-// Apple caps distribution certs at 3; the user must revoke one to continue.
+// Apple caps Apple Distribution certs per team; the user must revoke one to
+// continue. The list is scoped to the DISTRIBUTION pool (the type the wizard
+// creates) — legacy iOS Distribution certs are excluded because revoking one
+// would not free a slot here.
 // `options` is built by the parent (one row per existing cert + an exit row)
 // so this component stays presentational. `existingCount` drives the header.
 //
@@ -370,7 +466,7 @@ export interface CertLimitPromptStepProps {
 
 export const CertLimitPromptStep: FC<CertLimitPromptStepProps> = ({ existingCount, options, dense = false, onChange }) => (
   <Box flexDirection="column" marginTop={1}>
-    <ErrorLine text={`iOS distribution certificate limit reached (${existingCount} existing).`} />
+    <ErrorLine text={`Apple Distribution certificate limit reached (${existingCount} existing).`} />
     {!dense && <Newline />}
     <Text bold>Select a certificate to revoke:</Text>
     {!dense && <Newline />}

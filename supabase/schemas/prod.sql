@@ -313,7 +313,9 @@ CREATE TYPE "public"."stats_action" AS ENUM (
     'webview_security_policy_violation',
     'webview_unclean_restart',
     'webview_render_process_gone',
-    'webview_content_process_terminated'
+    'webview_content_process_terminated',
+    'os_version_changed',
+    'native_app_version_changed'
 );
 
 
@@ -807,6 +809,34 @@ $$;
 
 
 ALTER FUNCTION "public"."apikeys_strip_plain_key_for_hashed"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."app_has_real_bundle"("p_app_id" "text") RETURNS boolean
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.app_versions v
+    WHERE v.app_id = p_app_id
+      AND v.deleted = false
+      AND v.name NOT IN ('builtin', 'unknown')
+      AND (
+        (v.storage_provider = 'external' AND NULLIF(BTRIM(COALESCE(v.external_url, '')), '') IS NOT NULL)
+        OR (v.storage_provider <> 'r2-direct' AND NULLIF(BTRIM(COALESCE(v.r2_path, '')), '') IS NOT NULL)
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.onboarding_demo_data odd
+        WHERE odd.app_id = p_app_id
+          AND odd.relation_name = 'app_versions'
+          AND odd.row_key = v.id::text
+      )
+  );
+$$;
+
+
+ALTER FUNCTION "public"."app_has_real_bundle"("p_app_id" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."app_versions_has_app_permission"("p_min_right" "public"."user_min_right", "p_owner_org" "uuid", "p_app_id" character varying, "p_user_id" "uuid", "p_apikey" "text") RETURNS boolean
@@ -2912,6 +2942,58 @@ $$;
 ALTER FUNCTION "public"."cleanup_apikey_role_bindings"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."cleanup_completed_onboarding_apps"() RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_app record;
+  v_completed integer := 0;
+  v_skipped integer := 0;
+BEGIN
+  -- Target apps that clearly finished real onboarding: an upload-ready real
+  -- bundle, created more than 15 days ago, and not still carrying seeded demo
+  -- data. The 15-day gate is deliberately on the app's age (not the upload's
+  -- age): once an app is well past the onboarding window AND has a real upload,
+  -- clearing the banner is correct -- there is no value in keeping a "demo data"
+  -- banner on an app that already shipped a real bundle.
+  FOR v_app IN
+    SELECT id, app_id
+    FROM public.apps
+    WHERE need_onboarding IS TRUE
+      AND created_at < now() - interval '15 days'
+      AND NOT public.has_seeded_demo_data(app_id)
+      AND public.app_has_real_bundle(app_id)
+  LOOP
+    BEGIN
+      -- Flipping the flag fires cleanup_onboarding_app_data_on_complete, whose
+      -- provenance-based reset only removes tracked demo rows.
+      UPDATE public.apps
+      SET need_onboarding = false
+      WHERE id = v_app.id;
+
+      v_completed := v_completed + 1;
+    EXCEPTION WHEN raise_exception THEN
+      -- SQLSTATE P0001 only: the provenance reset refused (it would have
+      -- cascaded into real data). Leave this app pending and continue with the
+      -- rest of the batch. Any OTHER error class (programming errors in the
+      -- cleanup chain, deadlocks, infra failures) is intentionally NOT caught
+      -- here, so a genuine defect surfaces loudly instead of being silently
+      -- downgraded to a benign-looking "left pending".
+      v_skipped := v_skipped + 1;
+      RAISE WARNING 'cleanup_completed_onboarding_apps: left app % (%) pending: %',
+        v_app.app_id, v_app.id, SQLERRM;
+    END;
+  END LOOP;
+
+  RAISE NOTICE 'cleanup_completed_onboarding_apps: completed %, skipped %', v_completed, v_skipped;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."cleanup_completed_onboarding_apps"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."cleanup_expired_apikeys"() RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -3344,36 +3426,36 @@ CREATE OR REPLACE FUNCTION "public"."count_all_plans_v2"() RETURNS TABLE("plan_n
     SET "search_path" TO ''
     AS $$
 BEGIN
-  RETURN QUERY 
+  RETURN QUERY
   WITH ActiveSubscriptions AS (
     SELECT DISTINCT ON (si.customer_id)
       p.name AS product_name,
       si.customer_id
     FROM public.stripe_info si
-    INNER JOIN public.plans p ON si.product_id = p.stripe_id 
+    INNER JOIN public.plans p ON si.product_id = p.stripe_id
     WHERE si.status = 'succeeded'
     ORDER BY si.customer_id, si.created_at DESC
   ),
   TrialUsers AS (
     SELECT DISTINCT ON (si.customer_id)
-      'Trial' AS product_name,
+      'Trial'::character varying AS product_name,
       si.customer_id
     FROM public.stripe_info si
-    WHERE si.trial_at > NOW() 
-    AND si.status IS NULL
-    AND NOT EXISTS (
-      SELECT 1 FROM ActiveSubscriptions a 
-      WHERE a.customer_id = si.customer_id
-    )
+    WHERE si.trial_at > NOW()
+      AND si.status IS DISTINCT FROM 'succeeded'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM ActiveSubscriptions a
+        WHERE a.customer_id = si.customer_id
+      )
+    ORDER BY si.customer_id, si.created_at DESC
   )
-  SELECT 
-    product_name as plan_name,
-    COUNT(*) as count
+  SELECT product_name, COUNT(*) AS count
   FROM (
-    SELECT product_name, customer_id FROM ActiveSubscriptions
+    SELECT product_name FROM ActiveSubscriptions
     UNION ALL
-    SELECT product_name, customer_id FROM TrialUsers
-  ) all_subs
+    SELECT product_name FROM TrialUsers
+  ) combined
   GROUP BY product_name;
 END;
 $$;
@@ -4303,6 +4385,41 @@ $$;
 
 
 ALTER FUNCTION "public"."enqueue_credit_usage_alert"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."enqueue_credit_usage_posthog_event"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  IF TG_OP <> 'INSERT' THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+
+  BEGIN
+    PERFORM pgmq.send(
+      'credit_usage_posthog',
+      jsonb_build_object(
+        'function_name', 'credit_usage_posthog',
+        'function_type', NULL,
+        'payload', jsonb_build_object(
+          'transaction_id', NEW.id,
+          'org_id', NEW.org_id,
+          'transaction_type', NEW.transaction_type,
+          'occurred_at', NEW.occurred_at
+        )
+      )
+    );
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'Failed to enqueue credit usage PostHog event for transaction %: %', NEW.id, SQLERRM;
+  END;
+
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."enqueue_credit_usage_posthog_event"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."exist_app_v2"("appid" character varying) RETURNS boolean
@@ -5435,7 +5552,6 @@ CREATE OR REPLACE FUNCTION "public"."get_customer_counts"() RETURNS TABLE("yearl
 BEGIN
   RETURN QUERY
   WITH ActiveSubscriptions AS (
-    -- Get the most recent subscription for each customer
     SELECT DISTINCT ON (customer_id)
       customer_id,
       price_id,
@@ -5446,14 +5562,8 @@ BEGIN
     ORDER BY customer_id, created_at DESC
   )
   SELECT
-    COUNT(CASE 
-      WHEN s.price_id IN (SELECT price_y_id FROM public.plans WHERE price_y_id IS NOT NULL) 
-      THEN 1 
-    END) AS yearly,
-    COUNT(CASE 
-      WHEN s.price_id IN (SELECT price_m_id FROM public.plans WHERE price_m_id IS NOT NULL) 
-      THEN 1 
-    END) AS monthly,
+    COUNT(CASE WHEN s.price_id IN (SELECT price_y_id FROM public.plans WHERE price_y_id IS NOT NULL) THEN 1 END) AS yearly,
+    COUNT(CASE WHEN s.price_id IN (SELECT price_m_id FROM public.plans WHERE price_m_id IS NOT NULL) THEN 1 END) AS monthly,
     COUNT(*) AS total
   FROM ActiveSubscriptions s;
 END;
@@ -10547,32 +10657,40 @@ CREATE OR REPLACE FUNCTION "public"."process_function_queue"("queue_name" "text"
     SET "search_path" TO ''
     AS $$
 DECLARE
-  headers jsonb;
-  url text;
-  queue_size bigint;
   calls_needed int;
+  headers jsonb;
+  queue_size bigint;
+  request_timeout_ms int;
+  url text;
 BEGIN
-  -- Check if the queue has elements
-  EXECUTE format('SELECT count(*) FROM pgmq.q_%I', queue_name) INTO queue_size;
+  EXECUTE pg_catalog.format('SELECT count(*) FROM pgmq.%I', 'q_' || queue_name)
+  INTO queue_size;
 
-  -- Only make the HTTP request if the queue is not empty
   IF queue_size > 0 THEN
-    headers := jsonb_build_object(
+    headers := pg_catalog.jsonb_build_object(
       'Content-Type', 'application/json',
       'apisecret', public.get_apikey()
     );
+    request_timeout_ms := CASE
+      WHEN queue_name = 'on_manifest_create' THEN 60000
+      ELSE 8000
+    END;
     url := public.get_db_url() || '/functions/v1/triggers/queue_consumer/sync';
 
-    -- Calculate how many times to call the sync endpoint (1 call per batch_size items, max 10 calls)
-    calls_needed := least(ceil(queue_size / batch_size::float)::int, 10);
+    calls_needed := LEAST(
+      pg_catalog.ceil(queue_size / batch_size::double precision)::int,
+      10
+    );
 
-    -- Call the endpoint multiple times if needed (fire-and-forget)
     FOR i IN 1..calls_needed LOOP
       PERFORM net.http_post(
         url := url,
         headers := headers,
-        body := jsonb_build_object('queue_name', queue_name, 'batch_size', batch_size),
-        timeout_milliseconds := 8000
+        body := pg_catalog.jsonb_build_object(
+          'queue_name', queue_name,
+          'batch_size', batch_size
+        ),
+        timeout_milliseconds := request_timeout_ms
       );
     END LOOP;
   END IF;
@@ -10592,6 +10710,7 @@ DECLARE
   headers jsonb;
   queue_name text;
   queue_size bigint;
+  request_timeout_ms int;
   url text;
 BEGIN
   IF batch_size IS NULL OR batch_size <= 0 THEN
@@ -10618,6 +10737,11 @@ BEGIN
         calls_needed := 1;
       END IF;
 
+      request_timeout_ms := CASE
+        WHEN queue_name = 'on_manifest_create' THEN 60000
+        ELSE 8000
+      END;
+
       FOR i IN 1..calls_needed LOOP
         PERFORM net.http_post(
           url := url,
@@ -10627,11 +10751,13 @@ BEGIN
             'batch_size', batch_size,
             'healthcheck_url', healthcheck_url
           )),
-          timeout_milliseconds := 8000
+          timeout_milliseconds := request_timeout_ms
         );
       END LOOP;
     EXCEPTION WHEN OTHERS THEN
-      RAISE WARNING 'process_queue_with_healthcheck failed for queue "%": %', queue_name, SQLERRM;
+      RAISE WARNING 'process_queue_with_healthcheck failed for queue "%": %',
+        queue_name,
+        SQLERRM;
     END;
   END LOOP;
 END;
@@ -12923,6 +13049,53 @@ $$;
 
 
 ALTER FUNCTION "public"."record_email_otp_verified"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."record_trial_extension_event"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  org_id_for_event uuid;
+  extension_days_for_event integer;
+BEGIN
+  IF NEW.trial_at <= OLD.trial_at THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT
+    public.orgs.id,
+    GREATEST(0, (NEW.trial_at::date - public.orgs.created_at::date - 15))::integer
+  INTO org_id_for_event, extension_days_for_event
+  FROM public.orgs
+  WHERE public.orgs.customer_id = NEW.customer_id
+  LIMIT 1;
+
+  IF org_id_for_event IS NULL OR extension_days_for_event <= 0 THEN
+    RETURN NEW;
+  END IF;
+
+  INSERT INTO public.trial_extension_events (
+    org_id,
+    customer_id,
+    previous_trial_at,
+    new_trial_at,
+    extension_days
+  )
+  VALUES (
+    org_id_for_event,
+    NEW.customer_id,
+    OLD.trial_at,
+    NEW.trial_at,
+    extension_days_for_event
+  );
+
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."record_trial_extension_event"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."refresh_app_rollups_after_demo_reset"("p_app_uuid" "uuid", "p_app_id" "text", "p_owner_org" "uuid") RETURNS "void"
@@ -16169,6 +16342,20 @@ ALTER SEQUENCE "public"."audit_logs_id_seq" OWNED BY "public"."audit_logs"."id";
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."backfill_progress" (
+    "job_name" "text" NOT NULL,
+    "scope_key" "text" NOT NULL,
+    "cutover_at" timestamp with time zone NOT NULL,
+    "last_processed_occurred_at" timestamp with time zone,
+    "last_processed_id" bigint,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."backfill_progress" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."bandwidth_usage" (
     "id" integer NOT NULL,
     "device_id" character varying(255) NOT NULL,
@@ -16441,7 +16628,8 @@ CREATE TABLE IF NOT EXISTS "public"."compatibility_events" (
     "resolved_at" timestamp with time zone,
     "resolved_by" "uuid",
     "resolution_kind" "text",
-    "resolution_note" "text"
+    "resolution_note" "text",
+    "change_occurred_at" timestamp with time zone DEFAULT "now"() NOT NULL
 );
 
 
@@ -16587,7 +16775,8 @@ CREATE TABLE IF NOT EXISTS "public"."daily_revenue_metrics" (
     "contraction_mrr_solo" double precision DEFAULT 0 NOT NULL,
     "contraction_mrr_maker" double precision DEFAULT 0 NOT NULL,
     "contraction_mrr_team" double precision DEFAULT 0 NOT NULL,
-    "contraction_mrr_enterprise" double precision DEFAULT 0 NOT NULL
+    "contraction_mrr_enterprise" double precision DEFAULT 0 NOT NULL,
+    "churn_reason" "text"
 );
 
 
@@ -16647,6 +16836,10 @@ COMMENT ON COLUMN "public"."daily_revenue_metrics"."contraction_mrr_team" IS 'Te
 
 
 COMMENT ON COLUMN "public"."daily_revenue_metrics"."contraction_mrr_enterprise" IS 'Enterprise plan MRR lost to downgrades on the day.';
+
+
+
+COMMENT ON COLUMN "public"."daily_revenue_metrics"."churn_reason" IS 'Internal churn reason captured for a customer daily churn movement.';
 
 
 
@@ -16929,7 +17122,11 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
     "plan_total_conversion_rate" double precision DEFAULT 0 NOT NULL,
     "average_ltv" double precision DEFAULT 0 NOT NULL,
     "shortest_ltv" double precision DEFAULT 0 NOT NULL,
-    "longest_ltv" double precision DEFAULT 0 NOT NULL
+    "longest_ltv" double precision DEFAULT 0 NOT NULL,
+    "trial_extended_orgs" integer DEFAULT 0 NOT NULL,
+    "trial_extended_subscribed_orgs" integer DEFAULT 0 NOT NULL,
+    "past_due_orgs" integer DEFAULT 0 NOT NULL,
+    "past_due_orgs_average_days" double precision DEFAULT 0 NOT NULL
 );
 
 
@@ -17141,6 +17338,22 @@ COMMENT ON COLUMN "public"."global_stats"."shortest_ltv" IS 'Lowest estimated cu
 
 
 COMMENT ON COLUMN "public"."global_stats"."longest_ltv" IS 'Highest estimated customer LTV in dollars for the daily snapshot.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."trial_extended_orgs" IS 'Number of organizations whose trial was extended during the UTC day.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."trial_extended_subscribed_orgs" IS 'Number of organizations with a recorded trial extension that first subscribed during the UTC day.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."past_due_orgs" IS 'Number of organizations currently in Stripe past_due status for the daily snapshot.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."past_due_orgs_average_days" IS 'Average number of days organizations in Stripe past_due status have been past due for the daily snapshot.';
 
 
 
@@ -17600,7 +17813,9 @@ CREATE TABLE IF NOT EXISTS "public"."stripe_info" (
     "upgraded_at" timestamp with time zone,
     "paid_at" timestamp with time zone,
     "customer_country" character varying(2),
-    "last_stripe_event_at" timestamp with time zone
+    "last_stripe_event_at" timestamp with time zone,
+    "past_due_at" timestamp with time zone,
+    "churn_reason" "text"
 );
 
 ALTER TABLE ONLY "public"."stripe_info" REPLICA IDENTITY FULL;
@@ -17626,6 +17841,14 @@ COMMENT ON COLUMN "public"."stripe_info"."customer_country" IS 'Latest ISO 3166-
 
 
 COMMENT ON COLUMN "public"."stripe_info"."last_stripe_event_at" IS 'Timestamp of the most recent Stripe event applied to this row, used for webhook ordering checks.';
+
+
+
+COMMENT ON COLUMN "public"."stripe_info"."past_due_at" IS 'Timestamp when the subscription entered the current Stripe past_due state.';
+
+
+
+COMMENT ON COLUMN "public"."stripe_info"."churn_reason" IS 'Internal churn reason captured when a subscription cancels because an unresolved past_due state was not fixed.';
 
 
 
@@ -17705,6 +17928,39 @@ ALTER SEQUENCE "public"."to_delete_accounts_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."to_delete_accounts_id_seq" OWNED BY "public"."to_delete_accounts"."id";
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."trial_extension_events" (
+    "id" bigint NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "org_id" "uuid" NOT NULL,
+    "customer_id" character varying NOT NULL,
+    "previous_trial_at" timestamp with time zone NOT NULL,
+    "new_trial_at" timestamp with time zone NOT NULL,
+    "extension_days" integer NOT NULL
+);
+
+
+ALTER TABLE "public"."trial_extension_events" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."trial_extension_events" IS 'Internal event log for exact daily trial extension metrics.';
+
+
+
+COMMENT ON COLUMN "public"."trial_extension_events"."extension_days" IS 'Days added beyond the default 15-day trial window after the extension update.';
+
+
+
+ALTER TABLE "public"."trial_extension_events" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "public"."trial_extension_events_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
 
 
 
@@ -18219,6 +18475,11 @@ ALTER TABLE ONLY "public"."audit_logs"
 
 
 
+ALTER TABLE ONLY "public"."backfill_progress"
+    ADD CONSTRAINT "backfill_progress_pkey" PRIMARY KEY ("job_name", "scope_key");
+
+
+
 ALTER TABLE ONLY "public"."bandwidth_usage"
     ADD CONSTRAINT "bandwidth_usage_pkey" PRIMARY KEY ("id");
 
@@ -18486,6 +18747,11 @@ ALTER TABLE ONLY "public"."tmp_users"
 
 ALTER TABLE ONLY "public"."to_delete_accounts"
     ADD CONSTRAINT "to_delete_accounts_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."trial_extension_events"
+    ADD CONSTRAINT "trial_extension_events_pkey" PRIMARY KEY ("id");
 
 
 
@@ -18943,7 +19209,23 @@ CREATE INDEX "idx_stripe_info_customer_covering" ON "public"."stripe_info" USING
 
 
 
+CREATE INDEX "idx_stripe_info_past_due_at" ON "public"."stripe_info" USING "btree" ("past_due_at") WHERE ("past_due_at" IS NOT NULL);
+
+
+
 CREATE INDEX "idx_stripe_info_trial" ON "public"."stripe_info" USING "btree" ("trial_at") WHERE ("trial_at" IS NOT NULL);
+
+
+
+CREATE INDEX "idx_trial_extension_events_created_at" ON "public"."trial_extension_events" USING "btree" ("created_at");
+
+
+
+CREATE INDEX "idx_trial_extension_events_customer_created" ON "public"."trial_extension_events" USING "btree" ("customer_id", "created_at" DESC);
+
+
+
+CREATE INDEX "idx_trial_extension_events_org_created" ON "public"."trial_extension_events" USING "btree" ("org_id", "created_at" DESC);
 
 
 
@@ -19103,7 +19385,7 @@ CREATE UNIQUE INDEX "unique_app_version_positive" ON "public"."version_meta" USI
 
 
 
-CREATE UNIQUE INDEX "uq_compatibility_events_dedup" ON "public"."compatibility_events" USING "btree" ("app_id", "channel_id", "platform", "current_version_id", "previous_version_id") NULLS NOT DISTINCT;
+CREATE UNIQUE INDEX "uq_compatibility_events_dedup" ON "public"."compatibility_events" USING "btree" ("app_id", "channel_id", "platform", "current_version_id", "previous_version_id", "change_occurred_at") NULLS NOT DISTINCT;
 
 
 
@@ -19196,6 +19478,10 @@ CREATE OR REPLACE TRIGGER "cleanup_onboarding_app_data_on_complete" AFTER UPDATE
 
 
 CREATE OR REPLACE TRIGGER "credit_usage_alert_on_transactions" AFTER INSERT ON "public"."usage_credit_transactions" FOR EACH ROW EXECUTE FUNCTION "public"."enqueue_credit_usage_alert"();
+
+
+
+CREATE OR REPLACE TRIGGER "credit_usage_posthog_on_transactions" AFTER INSERT ON "public"."usage_credit_transactions" FOR EACH ROW EXECUTE FUNCTION "public"."enqueue_credit_usage_posthog_event"();
 
 
 
@@ -19403,7 +19689,7 @@ CREATE OR REPLACE TRIGGER "record_deployment_history_trigger" AFTER UPDATE OF "v
 
 
 
-CREATE OR REPLACE TRIGGER "replicate_devices" AFTER INSERT OR DELETE OR UPDATE ON "public"."devices" FOR EACH ROW EXECUTE FUNCTION "public"."trigger_http_queue_post_to_function"('replicate_data', 'cloudflare');
+CREATE OR REPLACE TRIGGER "record_trial_extension_event_on_stripe_info" AFTER UPDATE OF "trial_at" ON "public"."stripe_info" FOR EACH ROW EXECUTE FUNCTION "public"."record_trial_extension_event"();
 
 
 
@@ -19780,6 +20066,16 @@ ALTER TABLE ONLY "public"."to_delete_accounts"
 
 
 
+ALTER TABLE ONLY "public"."trial_extension_events"
+    ADD CONSTRAINT "trial_extension_events_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "public"."stripe_info"("customer_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."trial_extension_events"
+    ADD CONSTRAINT "trial_extension_events_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."usage_credit_consumptions"
     ADD CONSTRAINT "usage_credit_consumptions_grant_id_fkey" FOREIGN KEY ("grant_id") REFERENCES "public"."usage_credit_grants"("id") ON DELETE CASCADE;
 
@@ -20023,7 +20319,7 @@ CREATE POLICY "Allow org member to update devices" ON "public"."devices" FOR UPD
 
 
 
-CREATE POLICY "Allow org members to select build_logs" ON "public"."build_logs" FOR SELECT TO "anon", "authenticated" USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity_org_allowed"('{read,upload,write,all}'::"public"."key_mode"[], "org_id"), "org_id", NULL::character varying, NULL::bigint));
+CREATE POLICY "Allow org members to select build_logs" ON "public"."build_logs" FOR SELECT TO "anon", "authenticated" USING (("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity_org_allowed"('{read,upload,write,all}'::"public"."key_mode"[], "org_id"), "org_id", NULL::character varying, NULL::bigint) OR "public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity_org_appid"('{read,upload,write,all}'::"public"."key_mode"[], "org_id", "app_id"), "org_id", "app_id", NULL::bigint)));
 
 
 
@@ -20245,6 +20541,10 @@ CREATE POLICY "Deny all" ON "public"."org_metrics_cache" USING (false) WITH CHEC
 
 
 
+CREATE POLICY "Deny all access" ON "public"."backfill_progress" USING (false) WITH CHECK (false);
+
+
+
 CREATE POLICY "Deny all access" ON "public"."cron_tasks" USING (false) WITH CHECK (false);
 
 
@@ -20293,6 +20593,10 @@ CREATE POLICY "Deny delete on deploy history" ON "public"."deploy_history" FOR D
 
 
 
+CREATE POLICY "Deny delete on trial_extension_events" ON "public"."trial_extension_events" AS RESTRICTIVE FOR DELETE TO "anon", "authenticated" USING (false);
+
+
+
 CREATE POLICY "Deny insert for org members" ON "public"."usage_credit_consumptions" AS RESTRICTIVE FOR INSERT TO "anon", "authenticated" WITH CHECK (false);
 
 
@@ -20317,7 +20621,15 @@ CREATE POLICY "Deny insert on daily_storage_hourly" ON "public"."daily_storage_h
 
 
 
+CREATE POLICY "Deny insert on trial_extension_events" ON "public"."trial_extension_events" AS RESTRICTIVE FOR INSERT TO "anon", "authenticated" WITH CHECK (false);
+
+
+
 CREATE POLICY "Deny select on apikey_global_permissions" ON "public"."apikey_global_permissions" AS RESTRICTIVE FOR SELECT TO "anon", "authenticated" USING (false);
+
+
+
+CREATE POLICY "Deny select on trial_extension_events" ON "public"."trial_extension_events" AS RESTRICTIVE FOR SELECT TO "anon", "authenticated" USING (false);
 
 
 
@@ -20342,6 +20654,10 @@ CREATE POLICY "Deny update on apikey_global_permissions" ON "public"."apikey_glo
 
 
 CREATE POLICY "Deny update on daily_storage_hourly" ON "public"."daily_storage_hourly" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
+
+
+
+CREATE POLICY "Deny update on trial_extension_events" ON "public"."trial_extension_events" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
 
 
 
@@ -20429,7 +20745,7 @@ CREATE POLICY "Prevent users from inserting manifest entries" ON "public"."manif
 
 
 
-CREATE POLICY "Prevent users from updating manifest entries" ON "public"."manifest" FOR UPDATE TO "authenticated" USING (false);
+CREATE POLICY "Prevent users from updating manifest entries" ON "public"."manifest" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
 
 
 
@@ -20472,6 +20788,9 @@ ALTER TABLE "public"."apps" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."audit_logs" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."backfill_progress" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."bandwidth_usage" ENABLE ROW LEVEL SECURITY;
@@ -20881,6 +21200,9 @@ ALTER TABLE "public"."tmp_users" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."to_delete_accounts" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."trial_extension_events" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."usage_credit_consumptions" ENABLE ROW LEVEL SECURITY;
@@ -21388,6 +21710,11 @@ GRANT ALL ON FUNCTION "public"."apikeys_strip_plain_key_for_hashed"() TO "servic
 
 
 
+REVOKE ALL ON FUNCTION "public"."app_has_real_bundle"("p_app_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."app_has_real_bundle"("p_app_id" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."app_versions_has_app_permission"("p_min_right" "public"."user_min_right", "p_owner_org" "uuid", "p_app_id" character varying, "p_user_id" "uuid", "p_apikey" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."app_versions_has_app_permission"("p_min_right" "public"."user_min_right", "p_owner_org" "uuid", "p_app_id" character varying, "p_user_id" "uuid", "p_apikey" "text") TO "service_role";
 GRANT ALL ON FUNCTION "public"."app_versions_has_app_permission"("p_min_right" "public"."user_min_right", "p_owner_org" "uuid", "p_app_id" character varying, "p_user_id" "uuid", "p_apikey" "text") TO "anon";
@@ -21537,6 +21864,11 @@ GRANT ALL ON FUNCTION "public"."claim_legacy_onboarding_demo_data"("p_app_uuid" 
 
 REVOKE ALL ON FUNCTION "public"."cleanup_apikey_role_bindings"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."cleanup_apikey_role_bindings"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."cleanup_completed_onboarding_apps"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."cleanup_completed_onboarding_apps"() TO "service_role";
 
 
 
@@ -21735,6 +22067,10 @@ REVOKE ALL ON FUNCTION "public"."enqueue_channel_device_counts"() FROM PUBLIC;
 
 
 REVOKE ALL ON FUNCTION "public"."enqueue_credit_usage_alert"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."enqueue_credit_usage_posthog_event"() FROM PUBLIC;
 
 
 
@@ -23229,6 +23565,11 @@ GRANT ALL ON FUNCTION "public"."record_email_otp_verified"("p_user_id" "uuid") T
 
 
 
+REVOKE ALL ON FUNCTION "public"."record_trial_extension_event"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."record_trial_extension_event"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."refresh_app_rollups_after_demo_reset"("p_app_uuid" "uuid", "p_app_id" "text", "p_owner_org" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."refresh_app_rollups_after_demo_reset"("p_app_uuid" "uuid", "p_app_id" "text", "p_owner_org" "uuid") TO "service_role";
 
@@ -23599,6 +23940,10 @@ GRANT ALL ON SEQUENCE "public"."audit_logs_id_seq" TO "service_role";
 
 
 
+GRANT ALL ON TABLE "public"."backfill_progress" TO "service_role";
+
+
+
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."bandwidth_usage" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."bandwidth_usage" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."bandwidth_usage" TO "service_role";
@@ -23960,6 +24305,14 @@ GRANT ALL ON TABLE "public"."to_delete_accounts" TO "service_role";
 GRANT ALL ON SEQUENCE "public"."to_delete_accounts_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."to_delete_accounts_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."to_delete_accounts_id_seq" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."trial_extension_events" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."trial_extension_events_id_seq" TO "service_role";
 
 
 

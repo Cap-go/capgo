@@ -1,0 +1,14 @@
+{
+  "name": "@capgo/cli-helper-darwin-arm64",
+  "version": "1.1.0",
+  "description": "Precompiled macOS (Apple Silicon) helpers for @capgo/cli: keychain export + App Store Connect API key generation",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cap-go/capgo.git",
+    "directory": "cli-helper"
+  },
+  "license": "Apache-2.0",
+  "os": ["darwin"],
+  "cpu": ["arm64"],
+  "files": ["CapgoKeychainHelper.app", "CapgoAscKeyHelper.app"]
+}
