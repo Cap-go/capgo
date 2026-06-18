@@ -127,14 +127,14 @@ function onIconError(id: string): void {
         <div
           v-for="app in filteredApps"
           :key="app.id"
-          class="flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors"
+          class="overflow-hidden rounded-xl border transition-colors"
           :class="isSelected(app.id)
             ? 'border-azure-500 bg-azure-500/5'
             : 'border-slate-200 bg-white hover:bg-azure-500/5 dark:border-slate-700 dark:bg-slate-900'"
         >
           <button
             type="button"
-            class="flex min-w-0 flex-1 items-center gap-3 text-left"
+            class="flex w-full items-center gap-3 px-3 py-2.5 text-left"
             @click="toggle(app.id)"
           >
             <span
@@ -168,18 +168,32 @@ function onIconError(id: string): void {
             </span>
           </button>
 
-          <select
-            v-if="isSelected(app.id)"
-            :value="modelValue[app.id]"
-            :aria-label="t('connect-app-role')"
-            class="shrink-0 appearance-none rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 outline-none focus:border-azure-500 focus:ring-2 focus:ring-azure-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-            @click.stop
-            @change="setRole(app.id, ($event.target as HTMLSelectElement).value)"
-          >
-            <option v-for="r in APP_ROLES" :key="r.value" :value="r.value">
-              {{ t(r.i18n) }}
-            </option>
-          </select>
+          <div v-if="isSelected(app.id)" class="border-t border-azure-500/20 px-3 py-2.5">
+            <p class="mb-2 text-[0.7rem] font-semibold uppercase tracking-wider text-slate-400">
+              {{ t('connect-app-role') }}
+            </p>
+            <div class="flex flex-wrap gap-1.5">
+              <button
+                v-for="r in APP_ROLES"
+                :key="r.value"
+                type="button"
+                class="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors"
+                :class="modelValue[app.id] === r.value
+                  ? 'border-azure-500 bg-azure-500 text-white'
+                  : 'border-slate-300 bg-white text-slate-600 hover:border-azure-500/50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300'"
+                @click="setRole(app.id, r.value)"
+              >
+                {{ t(r.i18n) }}
+                <span
+                  v-if="r.value === 'app_admin'"
+                  class="rounded-full px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide"
+                  :class="modelValue[app.id] === r.value ? 'bg-white/25 text-white' : 'bg-azure-500/15 text-azure-600 dark:text-azure-300'"
+                >
+                  {{ t('connect-recommended') }}
+                </span>
+              </button>
+            </div>
+          </div>
         </div>
 
         <p v-if="filteredApps.length === 0" class="px-3 py-6 text-center text-sm text-slate-400">
