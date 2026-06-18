@@ -95,7 +95,6 @@ const displayNativePackages = computed(() => {
   return nativePackages.value.filter(pkg => matchesPackageSearch(pkg.name, pkg.version))
 })
 
-
 const compatibilitySummary = computed(() => summarizeCompatibility(comparisons.value))
 
 const statusCounts = computed(() => {
@@ -647,7 +646,6 @@ watch(bundleRouteKey, async (key) => {
                   </table>
                 </div>
 
-
                 <!-- No baseline selected: plain list of this bundle's packages -->
                 <div v-else-if="!compareVersionId && nativePackages.length > 0 && displayNativePackages.length > 0" class="overflow-x-auto">
                   <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -685,7 +683,6 @@ watch(bundleRouteKey, async (key) => {
                     </tbody>
                   </table>
                 </div>
-
 
                 <div
                   v-if="tableLoading"

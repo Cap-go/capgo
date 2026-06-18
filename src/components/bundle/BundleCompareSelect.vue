@@ -309,7 +309,6 @@ function liveBadgeTitle(versionId: number): string {
   return t('currently-live-on', { channels: names.join(', ') })
 }
 
-
 function escapeIlike(term: string): string {
   return term.replace(/[\\%_]/g, '\\$&')
 }
