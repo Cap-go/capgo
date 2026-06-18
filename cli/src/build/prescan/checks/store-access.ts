@@ -23,7 +23,7 @@ import { Buffer } from 'node:buffer'
 import forge from 'node-forge'
 import { validateServiceAccountJson } from '../../onboarding/android/service-account-validation.js'
 import { assertAscAccess } from '../../onboarding/apple-access.js'
-import { gradleApplicationId } from '../gradle'
+import { resolveEffectiveApplicationId } from '../gradle'
 import { willUploadToAppStore, willUploadToPlay } from '../upload-intent'
 
 /** 7s per-request budget so the fetch aborts cleanly before the engine's 10s race. */
@@ -60,7 +60,14 @@ export function makePlaySaAccess(validator: PlayValidator): PrescanCheck {
       const raw = ctx.credentials?.PLAY_CONFIG_JSON
       if (!raw)
         return []
-      const packageName = gradleApplicationId(ctx.projectDir) ?? ctx.config?.appId ?? ctx.appId
+      // Probe the package the build will ACTUALLY upload: a flavored build
+      // applies the flavor's applicationId / applicationIdSuffix on top of
+      // defaultConfig, so probing the bare defaultConfig id 404s on a valid
+      // flavored Play app. When the effective id can't be resolved
+      // unambiguously, we keep the probe (for diagnostics) but downgrade a
+      // no-app-access result to a warning so we never block on a guess.
+      const effective = resolveEffectiveApplicationId(ctx.projectDir, ctx.androidFlavor)
+      const packageName = effective.packageName ?? ctx.config?.appId ?? ctx.appId
       const jsonBytes = Buffer.from(raw, 'base64')
 
       const { signal, clear } = abortAfter(STORE_ACCESS_TIMEOUT_MS)
@@ -83,9 +90,12 @@ export function makePlaySaAccess(validator: PlayValidator): PrescanCheck {
       switch (result.kind) {
         case 'no-app-access':
           // result.message names the SA email + package - both safe to print.
+          // Downgrade to a warning (mirroring the iOS side) when the effective
+          // package could not be resolved unambiguously: the 404 may just be
+          // the wrong probed package, not a genuine missing grant.
           return [{
             id: 'android/play-sa-access',
-            severity: 'error',
+            severity: effective.ambiguous ? 'warning' : 'error',
             title: 'The Play service account cannot access this app',
             detail: result.message,
             fix: PLAY_FIX,

@@ -45,6 +45,137 @@ export function gradleApplicationId(projectDir: string): string | null {
   return m?.[1] ?? null
 }
 
+export interface EffectiveApplicationId {
+  /** The resolved package name, or null when the base id is unknown. */
+  packageName: string | null
+  /**
+   * True when a productFlavors block exists (or a flavor was requested) but the
+   * effective applicationId for that flavor cannot be resolved unambiguously
+   * from static parsing. Callers should NOT emit a blocking error in this case.
+   */
+  ambiguous: boolean
+}
+
+/**
+ * Slice the body of the first `keyword { ... }` block via brace counting.
+ * Returns null when the keyword/open-brace is absent. Self-contained here so
+ * gradle.ts stays free of a dependency on the check modules.
+ */
+function braceBlockBody(source: string, keyword: string): string | null {
+  const header = source.match(new RegExp(`(?:^|[\\s;{}])${keyword}\\s*\\{`))
+  if (header?.index === undefined)
+    return null
+  const open = source.indexOf('{', header.index + header[0].length - 1)
+  if (open === -1)
+    return null
+  let depth = 0
+  for (let i = open; i < source.length; i++) {
+    if (source[i] === '{')
+      depth++
+    else if (source[i] === '}') {
+      depth--
+      if (depth === 0)
+        return source.slice(open + 1, i)
+    }
+  }
+  return null
+}
+
+/** Slice the body of the named direct child (depth-1) block of a DSL block. */
+function flavorBody(productFlavors: string, flavor: string): string | null {
+  let depth = 0
+  let segmentStart = 0
+  for (let i = 0; i < productFlavors.length; i++) {
+    const ch = productFlavors[i]
+    if (ch === '{') {
+      if (depth === 0) {
+        const header = productFlavors.slice(segmentStart, i)
+        const kts = header.match(/(?:create|register)\s*\(\s*["'](\w+)["']\s*\)\s*$/)
+        const creating = header.match(/val\s+(\w+)\s+by\s+creating\s*$/)
+        const groovy = header.match(/(?:^|[\s;}])(\w+)\s*$/)
+        const name = kts?.[1] ?? creating?.[1] ?? groovy?.[1]
+        if (name === flavor) {
+          // Found the flavor header; slice its brace body.
+          let inner = 0
+          for (let j = i; j < productFlavors.length; j++) {
+            if (productFlavors[j] === '{')
+              inner++
+            else if (productFlavors[j] === '}') {
+              inner--
+              if (inner === 0)
+                return productFlavors.slice(i + 1, j)
+            }
+          }
+          return null
+        }
+      }
+      depth++
+    }
+    else if (ch === '}') {
+      depth = Math.max(0, depth - 1)
+      if (depth === 0)
+        segmentStart = i + 1
+    }
+    else if (depth === 0 && (ch === '\n' || ch === ';')) {
+      segmentStart = i + 1
+    }
+  }
+  return null
+}
+
+/**
+ * Resolve the package name the build will actually upload, accounting for the
+ * active product flavor's `applicationId` override / `applicationIdSuffix` on
+ * top of defaultConfig. A store-access probe must target this final package,
+ * not the unflavored defaultConfig id, or it 404s on a valid flavored upload.
+ *
+ * Returns `ambiguous: true` (and a best-effort packageName) when a flavored
+ * build cannot be statically resolved, so the caller can downgrade rather than
+ * emit a blocking error.
+ */
+export function resolveEffectiveApplicationId(projectDir: string, flavor?: string): EffectiveApplicationId {
+  const base = gradleApplicationId(projectDir)
+  const gradle = appBuildGradle(projectDir)
+  const stripped = gradle === null ? null : stripGradleComments(gradle)
+  const hasFlavorsBlock = stripped !== null && braceBlockBody(stripped, 'productFlavors') !== null
+
+  // No flavor requested: only ambiguous if flavors exist (a default variant may
+  // still carry a suffix we cannot attribute) — but with no selected flavor we
+  // cannot know which variant uploads, so flag ambiguous to stay safe.
+  if (!flavor) {
+    if (hasFlavorsBlock)
+      return { packageName: base, ambiguous: true }
+    return { packageName: base, ambiguous: false }
+  }
+
+  // A flavor was requested but we cannot parse the productFlavors block.
+  if (stripped === null)
+    return { packageName: base, ambiguous: true }
+  const flavorsBlock = braceBlockBody(stripped, 'productFlavors')
+  if (flavorsBlock === null)
+    return { packageName: base, ambiguous: true }
+  const body = flavorBody(flavorsBlock, flavor)
+  if (body === null)
+    return { packageName: base, ambiguous: true }
+
+  // Full applicationId override on the flavor wins outright.
+  const override = body.match(/applicationId\s*[=( ]\s*["']([\w.]+)["']/)
+  if (override)
+    return { packageName: override[1], ambiguous: false }
+
+  // applicationIdSuffix is appended to the base defaultConfig id.
+  const suffix = body.match(/applicationIdSuffix\s*[=( ]\s*["']([\w.]+)["']/)
+  if (suffix) {
+    if (base === null)
+      return { packageName: null, ambiguous: true }
+    const sep = suffix[1].startsWith('.') ? '' : '.'
+    return { packageName: base + sep + suffix[1], ambiguous: false }
+  }
+
+  // Flavor exists but neither overrides the id: it inherits the base id.
+  return { packageName: base, ambiguous: false }
+}
+
 const SDK_DIMENSIONS = {
   minSdk: 'minSdkVersion',
   targetSdk: 'targetSdkVersion',
@@ -125,7 +256,11 @@ export function resolveSdk(projectDir: string, dim: SdkDimension): number | null
     return fromVars
   const manifest = readTextIfExists(join(projectDir, 'android', 'app', 'src', 'main', 'AndroidManifest.xml'))
   if (manifest) {
-    const m = manifest.match(new RegExp(`android:${key}\\s*=\\s*"(\\d+)"`))
+    // Strip XML comments first so a commented-out `<!-- <uses-sdk .../> -->`
+    // does not win over the live element (mirrors the manifest checks, which
+    // uniformly operate on a comment-stripped source).
+    const stripped = manifest.replace(/<!--[\s\S]*?-->/g, ' ')
+    const m = stripped.match(new RegExp(`android:${key}\\s*=\\s*"(\\d+)"`))
     if (m)
       return Number(m[1])
   }

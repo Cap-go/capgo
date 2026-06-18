@@ -95,16 +95,16 @@ export const manifestTagTypo: PrescanCheck = {
       // Skip valid tags, namespaced/custom tags, and tags we already reported.
       if (MANIFEST_VALID_TAGS.has(tag) || tag.includes(':') || seen.has(tag))
         continue
+      // Only flag a true single-char typo (distance == 1). Distance 2..3 fuzzy
+      // matches (e.g. profile->provider, paths->data) are too weak to justify a
+      // BLOCKING error against a hardcoded allowlist, so we never guess at them.
       let best: string | null = null
-      let bestDist = 4
       for (const valid of MANIFEST_VALID_TAGS) {
-        const d = editDistance(tag, valid, 3)
-        if (d >= 1 && d < bestDist) {
-          bestDist = d
+        if (editDistance(tag, valid, 1) === 1) {
           best = valid
+          break
         }
       }
-      // distance > 3 (or 0) => never guess.
       if (best === null)
         continue
       seen.add(tag)
@@ -217,6 +217,16 @@ export const manifestMissingPrefix: PrescanCheck = {
 
 const INTENT_COMPONENTS: ReadonlySet<string> = new Set(['activity', 'activity-alias', 'service', 'receiver'])
 
+/**
+ * An android:exported value the prescan cannot statically resolve to a boolean:
+ * a present value that is neither the literal "true" nor "false" (e.g. a
+ * `${manifestPlaceholder}` substitution that Gradle resolves at merge time).
+ * Absent (undefined) is NOT unresolved — that is a genuine missing-exported case.
+ */
+function isUnresolvedExported(value: string | undefined): boolean {
+  return value !== undefined && value !== 'true' && value !== 'false'
+}
+
 export const manifestExportedMissing: PrescanCheck = {
   id: 'android/manifest-exported-missing',
   platforms: ['android'],
@@ -240,8 +250,16 @@ export const manifestExportedMissing: PrescanCheck = {
       const body = elementBody(raw, el)
       const hasIntentFilter = /<intent-filter\b/.test(body)
       const hasExported = el.attrs['android:exported'] !== undefined
+      const exportedValue = el.attrs['android:exported']
       const isLauncher = /android\.intent\.category\.LAUNCHER/.test(body) && /android\.intent\.action\.MAIN/.test(body)
-      if (isLauncher && el.attrs['android:exported'] !== 'true') {
+      // A manifestPlaceholders substitution (e.g. android:exported="${isExported}")
+      // is a valid AGP pattern that resolves at merge time; the prescan sees the
+      // unresolved `${...}` token, so treat any non-true/false value as unresolved
+      // and do not block the launcher on it.
+      const launcherNeedsExported = isLauncher
+        && exportedValue !== 'true'
+        && !isUnresolvedExported(exportedValue)
+      if (launcherNeedsExported) {
         findings.push({
           id: 'android/manifest-exported-missing',
           severity: 'error',
@@ -521,24 +539,36 @@ export const manifestDeeplinkValid: PrescanCheck = {
     const findings: Finding[] = []
     for (const filter of viewBrowsableFilters(raw)) {
       const autoVerify = /android:autoVerify\s*=\s*"true"/.test(filter.openTag)
+      // Android App Links are canonically split across sibling <data> tags
+      // (`<data android:scheme="https"/>` + `<data android:host="example.com"/>`),
+      // so aggregate scheme/host across ALL <data> children before judging the
+      // filter rather than requiring both on one element.
+      const schemes: string[] = []
+      let hasHost = false
+      let hasHttpScheme = false
       for (const data of scanElements(filter.body)) {
         if (data.tag !== 'data')
           continue
+        if (data.attrs['android:host'] !== undefined)
+          hasHost = true
         const scheme = data.attrs['android:scheme']
-        const host = data.attrs['android:host']
         if (scheme === undefined)
           continue
-        const isHttp = scheme === 'http' || scheme === 'https'
-        if (autoVerify && !isHttp) {
-          findings.push(deeplinkWarning(`autoVerify deep link uses a non-http(s) scheme "${scheme}"`))
-        }
-        else if (autoVerify && isHttp && host === undefined) {
-          findings.push(deeplinkWarning('autoVerify http(s) deep link has no android:host'))
-        }
-        else if (!SCHEME_RE.test(scheme)) {
-          findings.push(deeplinkWarning(`deep-link android:scheme "${scheme}" is not a valid RFC-3986 scheme`))
-        }
+        schemes.push(scheme)
+        if (scheme === 'http' || scheme === 'https')
+          hasHttpScheme = true
       }
+      // Validate each scheme individually.
+      for (const scheme of schemes) {
+        const isHttp = scheme === 'http' || scheme === 'https'
+        if (autoVerify && !isHttp)
+          findings.push(deeplinkWarning(`autoVerify deep link uses a non-http(s) scheme "${scheme}"`))
+        else if (!isHttp && !SCHEME_RE.test(scheme))
+          findings.push(deeplinkWarning(`deep-link android:scheme "${scheme}" is not a valid RFC-3986 scheme`))
+      }
+      // An autoVerify http(s) filter needs at least one host somewhere in it.
+      if (autoVerify && hasHttpScheme && !hasHost)
+        findings.push(deeplinkWarning('autoVerify http(s) deep link has no android:host'))
     }
     return findings
   },

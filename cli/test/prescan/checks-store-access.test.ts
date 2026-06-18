@@ -188,6 +188,65 @@ describe('android/play-sa-access', () => {
     expect(receivedPackage).toBe('com.config.app')
   })
 
+  it('probes the FLAVORED applicationIdSuffix package, not the bare defaultConfig id', async () => {
+    let receivedPackage = ''
+    const fakeValidator = async (opts: { packageName: string }): Promise<ValidationResult> => {
+      receivedPackage = opts.packageName
+      return { ok: true, serviceAccountEmail: 'x', projectId: 'y' }
+    }
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  defaultConfig {
+    applicationId "com.x.app"
+  }
+  productFlavors {
+    prod {
+      applicationIdSuffix ".prod"
+    }
+  }
+}
+`,
+    })
+    const ctx = makeCtx({
+      projectDir: dir,
+      platform: 'android',
+      androidFlavor: 'prod',
+      credentials: { PLAY_CONFIG_JSON: PLAY_JSON_B64 },
+    })
+    await makePlaySaAccess(fakeValidator).run(ctx)
+    expect(receivedPackage).toBe('com.x.app.prod')
+  })
+
+  it('downgrades no-app-access to a WARNING when the effective package is ambiguous (flavors but no flavor selected)', async () => {
+    const fakeValidator = async (): Promise<ValidationResult> => ({
+      ok: false,
+      kind: 'no-app-access',
+      serviceAccountEmail: 'ci@demo.iam.gserviceaccount.com',
+      message: 'cannot access com.x.app',
+    })
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  defaultConfig {
+    applicationId "com.x.app"
+  }
+  productFlavors {
+    prod {
+      applicationIdSuffix ".prod"
+    }
+  }
+}
+`,
+    })
+    // No androidFlavor selected, but a productFlavors block exists -> ambiguous.
+    const ctx = makeCtx({
+      projectDir: dir,
+      platform: 'android',
+      credentials: { PLAY_CONFIG_JSON: PLAY_JSON_B64 },
+    })
+    const findings = await makePlaySaAccess(fakeValidator).run(ctx)
+    expect(findings.length).toBe(1)
+    expect(findings[0]!.severity).toBe('warning')
+  })
   // ---- appliesTo gating ----
   it('does NOT apply when PLAY_CONFIG_JSON is absent', () => {
     const ctx = androidCtx({ credentials: {} })

@@ -88,6 +88,14 @@ describe('android/manifest-well-formed', () => {
     </manifest>`
     expect(await manifestWellFormed.run(aCtx(withManifest(xml)))).toEqual([])
   })
+  it('passes a well-formed manifest whose <application> open tag uses a single-quoted attribute', async () => {
+    // Single-quoted attribute values are valid XML; the scanner must not drop
+    // the element (which previously yielded a false "found 0 <application>").
+    const xml = `<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+      <application android:label='Demo' android:exported="false"></application>
+    </manifest>`
+    expect(await manifestWellFormed.run(aCtx(withManifest(xml)))).toEqual([])
+  })
 })
 
 describe('android/manifest-tag-typo', () => {
@@ -125,6 +133,17 @@ describe('android/manifest-tag-typo', () => {
     const xml = `<manifest xmlns:android="http://schemas.android.com/apk/res/android">
       <application>
         <!-- <activty android:name=".X" /> -->
+      </application>
+    </manifest>`
+    expect(await manifestTagTypo.run(aCtx(withManifest(xml)))).toEqual([])
+  })
+  it('does NOT flag a distance-2/3 near-miss tag (only true single-char typos)', async () => {
+    // profile->provider (d=3) and paths->data (d=3) were false blocking errors;
+    // they must no longer be flagged.
+    const xml = `<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+      <application>
+        <profile android:name=".X" />
+        <paths android:name=".Y" />
       </application>
     </manifest>`
     expect(await manifestTagTypo.run(aCtx(withManifest(xml)))).toEqual([])
@@ -266,6 +285,22 @@ describe('android/manifest-exported-missing', () => {
           </intent-filter>
         </activity>
         <service android:name=".BgService" />
+      </application>
+    </manifest>`
+    const dir = withManifest(xml, { 'android/variables.gradle': 'ext { targetSdkVersion = 34 }' })
+    expect(await manifestExportedMissing.run(aCtx(dir))).toEqual([])
+  })
+  it('does NOT flag a launcher whose android:exported is a manifest placeholder', async () => {
+    // android:exported="${isExported}" is a valid manifestPlaceholders pattern;
+    // the unresolved ${...} token must not block the launcher.
+    const xml = `<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+      <application android:label="A">
+        <activity android:name=".MainActivity" android:exported="\${isExported}">
+          <intent-filter>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+          </intent-filter>
+        </activity>
       </application>
     </manifest>`
     const dir = withManifest(xml, { 'android/variables.gradle': 'ext { targetSdkVersion = 34 }' })
@@ -523,6 +558,12 @@ describe('android/manifest-deeplink-valid', () => {
   })
   it('passes a valid custom-scheme deep link (no autoVerify, no host required)', async () => {
     const xml = VIEW_BROWSABLE('<data android:scheme="myapp" android:host="open" />')
+    expect(await manifestDeeplinkValid.run(aCtx(withManifest(xml)))).toEqual([])
+  })
+  it('passes the standard split scheme/host App Links pattern (scheme and host in separate <data>)', async () => {
+    // Android docs recommend splitting attributes across sibling <data> tags;
+    // aggregating scheme/host across the filter must not false-positive "no host".
+    const xml = VIEW_BROWSABLE('<data android:scheme="https" /><data android:host="ex.com" />', true)
     expect(await manifestDeeplinkValid.run(aCtx(withManifest(xml)))).toEqual([])
   })
 })

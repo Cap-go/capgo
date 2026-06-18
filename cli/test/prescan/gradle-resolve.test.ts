@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'bun:test'
 import {
   gradleApplicationId,
+  resolveEffectiveApplicationId,
   resolveSdk,
   stripGradleComments,
   variablesGradle,
@@ -154,5 +155,110 @@ describe('resolveSdk', () => {
       'android/app/build.gradle': 'android { compileSdkVersion 34 }',
     })
     expect(resolveSdk(dir, 'compileSdk')).toBe(34)
+  })
+
+  it('ignores a commented-out <uses-sdk> in the manifest fallback (uses the live element)', () => {
+    const dir = makeProject({
+      'android/app/build.gradle': 'android { }',
+      'android/app/src/main/AndroidManifest.xml': `<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- <uses-sdk android:targetSdkVersion="22" /> -->
+  <uses-sdk android:targetSdkVersion="34" />
+</manifest>`,
+    })
+    expect(resolveSdk(dir, 'targetSdk')).toBe(34)
+  })
+})
+
+describe('resolveEffectiveApplicationId (flavor-aware)', () => {
+  it('returns the defaultConfig id (not ambiguous) when no flavors block exists', () => {
+    const dir = makeProject({
+      'android/app/build.gradle': 'android {\n  defaultConfig {\n    applicationId "com.x.app"\n  }\n}\n',
+    })
+    expect(resolveEffectiveApplicationId(dir)).toEqual({ packageName: 'com.x.app', ambiguous: false })
+  })
+
+  it('appends a flavor applicationIdSuffix to the base id', () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  defaultConfig {
+    applicationId "com.x.app"
+  }
+  productFlavors {
+    prod {
+      applicationIdSuffix ".prod"
+    }
+  }
+}
+`,
+    })
+    expect(resolveEffectiveApplicationId(dir, 'prod')).toEqual({ packageName: 'com.x.app.prod', ambiguous: false })
+  })
+
+  it('uses a flavor full applicationId override (white-label)', () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  defaultConfig {
+    applicationId "com.base.template"
+  }
+  productFlavors {
+    brandA {
+      applicationId "com.brand.a"
+    }
+  }
+}
+`,
+    })
+    expect(resolveEffectiveApplicationId(dir, 'brandA')).toEqual({ packageName: 'com.brand.a', ambiguous: false })
+  })
+
+  it('marks ambiguous (best-effort base) when the requested flavor is not found', () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  defaultConfig {
+    applicationId "com.x.app"
+  }
+  productFlavors {
+    prod {
+      applicationIdSuffix ".prod"
+    }
+  }
+}
+`,
+    })
+    expect(resolveEffectiveApplicationId(dir, 'missing')).toEqual({ packageName: 'com.x.app', ambiguous: true })
+  })
+
+  it('marks ambiguous when flavors exist but no flavor is selected', () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  defaultConfig {
+    applicationId "com.x.app"
+  }
+  productFlavors {
+    prod {
+      applicationIdSuffix ".prod"
+    }
+  }
+}
+`,
+    })
+    expect(resolveEffectiveApplicationId(dir)).toEqual({ packageName: 'com.x.app', ambiguous: true })
+  })
+
+  it('inherits the base id when a found flavor overrides neither id nor suffix', () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  defaultConfig {
+    applicationId "com.x.app"
+  }
+  productFlavors {
+    free {
+      dimension "tier"
+    }
+  }
+}
+`,
+    })
+    expect(resolveEffectiveApplicationId(dir, 'free')).toEqual({ packageName: 'com.x.app', ambiguous: false })
   })
 })

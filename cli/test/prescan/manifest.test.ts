@@ -63,6 +63,22 @@ describe('scanElements', () => {
     const els = scanElements('<application></application>')
     expect(els.map(e => e.tag)).toEqual(['application'])
   })
+
+  it('parses single-quoted attribute values (does not drop the element)', () => {
+    const els = scanElements(`<application android:label='Demo' android:exported="false"></application>`)
+    const app = els.find(e => e.tag === 'application')
+    expect(app).toBeDefined()
+    expect(app!.attrs['android:label']).toBe('Demo')
+    expect(app!.attrs['android:exported']).toBe('false')
+  })
+
+  it('parses mixed single/double-quoted attribute values', () => {
+    const els = scanElements(`<activity android:name=".X" android:label='Mixed' />`)
+    const act = els.find(e => e.tag === 'activity')
+    expect(act).toBeDefined()
+    expect(act!.attrs['android:name']).toBe('.X')
+    expect(act!.attrs['android:label']).toBe('Mixed')
+  })
 })
 
 describe('stripXmlComments', () => {

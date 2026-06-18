@@ -638,4 +638,26 @@ describe('android/version-fields', () => {
     const dir = makeProject({ 'package.json': '{}' })
     expect(versionFields.appliesTo!(aCtx(dir))).toBe(false)
   })
+  it('recognizes the Kotlin-DSL assignment form (versionName = "1.0") in build.gradle.kts', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle.kts': `android {
+  defaultConfig {
+    versionCode = 1
+    versionName = "1.0"
+  }
+}`,
+    })
+    expect(await versionFields.run(aCtx(dir))).toEqual([])
+  })
+  it('accepts a KTS variable/function as a present versionName (no quote)', async () => {
+    const dir = makeProject({
+      'android/app/build.gradle.kts': `android {
+  defaultConfig {
+    versionCode = computeVersionCode()
+    versionName = libVersion
+  }
+}`,
+    })
+    expect(await versionFields.run(aCtx(dir))).toEqual([])
+  })
 })

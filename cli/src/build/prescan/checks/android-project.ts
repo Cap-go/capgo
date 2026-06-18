@@ -9,7 +9,6 @@ import {
   resolveSdk,
   settingsGradleModuleCount,
   stripGradleComments,
-  variablesGradle,
 } from '../gradle'
 import { willUploadToPlay } from '../upload-intent'
 
@@ -580,9 +579,11 @@ function gradleVersionFields(projectDir: string): { code: boolean, name: boolean
   if (gradle === null)
     return { code: false, name: false }
   // Accept a literal, variable, or function call after the keyword (don't require an int).
+  // The `[=\s]` separator mirrors resolveSdk so the Kotlin-DSL assignment form
+  // (`versionName = "1.0"`) is recognized, not just the Groovy form (`versionName "1.0"`).
   return {
-    code: /versionCode\s+\S+/.test(gradle),
-    name: /versionName\s+["']/.test(gradle) || /versionName\s+\w/.test(gradle),
+    code: /versionCode\s*[=\s]\s*\S/.test(gradle),
+    name: /versionName\s*[=\s]\s*["']/.test(gradle) || /versionName\s*[=\s]\s*\w/.test(gradle),
   }
 }
 

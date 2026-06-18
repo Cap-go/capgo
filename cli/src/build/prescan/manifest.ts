@@ -66,8 +66,14 @@ export function stripXmlComments(raw: string): string {
   return raw.replace(/<!--[\s\S]*?-->/g, match => ' '.repeat(match.length))
 }
 
-const TAG_RE = /<([a-z][\w:-]*)((?:\s+[\w:.-]+\s*=\s*"[^"]*")*)\s*\/?>/gi
-const ATTR_RE = /([\w:.-]+)\s*=\s*"([^"]*)"/g
+// Attribute values may be double- OR single-quoted (both valid XML). The value
+// alternation captures the inner text in group 2 ("...") or group 3 ('...');
+// scanElements picks whichever matched. Accepting both quote styles stops an
+// element with a single-quoted attribute (e.g. android:label='Demo') from being
+// silently dropped, which would otherwise turn a valid manifest into a false
+// "found 0 <application>" error.
+const TAG_RE = /<([a-z][\w:-]*)((?:\s+[\w:.-]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*\/?>/gi
+const ATTR_RE = /([\w:.-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g
 
 /**
  * The one parse primitive consumed by every manifest check. Matches each
@@ -81,7 +87,7 @@ export function scanElements(raw: string): ScannedElement[] {
     const tag = m[1]
     const attrs: Record<string, string> = {}
     for (const a of (m[2] ?? '').matchAll(ATTR_RE))
-      attrs[a[1]] = a[2]
+      attrs[a[1]] = a[2] ?? a[3] ?? ''
     const start = m.index
     out.push({
       tag,
