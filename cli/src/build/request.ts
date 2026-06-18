@@ -1287,13 +1287,20 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     const host = options.supaHost || 'https://api.capgo.app'
 
     const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
-    await assertCliPermission(supabase, options.apikey, 'app.build_native', { appId }, {
-      message: `Insufficient permissions to request a native build for app ${appId}`,
-      silent,
-    })
+    // NOTE: the build-permission assert was moved below (after the prescan gate) so prescan's
+    // batched report — which includes shared/apikey-permission — is what users see first.
 
-    // Get organization ID for analytics
-    const orgId = await getOrganizationId(supabase, appId)
+    // Org id is best-effort, for analytics tags only. Don't hard-abort here when the app
+    // isn't visible to this key: prescan's shared/app-exists check explains *why* (and the
+    // permission backstop below still enforces access for --no-prescan), so letting the gate
+    // run first gives the batched report instead of a bare "Cannot get organization id".
+    let orgId = ''
+    try {
+      orgId = await getOrganizationId(supabase, appId)
+    }
+    catch {
+      // App not accessible / no org — surfaced by prescan (app-exists) and the permission backstop.
+    }
 
     log.info(`Requesting native build for ${appId}`)
     log.info(`Platform: ${platform}`)
@@ -1633,6 +1640,15 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         throw new Error('Prescan found blocking problems — the build was not requested and nothing was uploaded. Fix the errors above or re-run with --prescan-ignore-fatal / --no-prescan.')
       }
     }
+
+    // Permission backstop. Prescan's shared/apikey-permission check normally surfaces a
+    // missing build permission first — batched with every other problem — and blocks above.
+    // This hard assert still runs when prescan is skipped (--no-prescan) or bypassed
+    // (--prescan-ignore-fatal), so permission is always enforced before the POST.
+    await assertCliPermission(supabase, options.apikey, 'app.build_native', { appId }, {
+      message: `Insufficient permissions to request a native build for app ${appId}`,
+      silent,
+    })
 
     // Request build from Capgo backend (POST /build/request)
     log.info('Requesting build from Capgo...')
