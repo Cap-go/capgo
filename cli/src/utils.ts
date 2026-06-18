@@ -21,14 +21,14 @@ import { isCI } from 'ci-info'
 // Native fetch is available in Node.js >= 18
 import prettyjson from 'prettyjson'
 import * as tus from 'tus-js-client'
+import { getGlobalAnalyticsProps } from './analytics/global-props'
+import { createTimedFetch, isSupabaseInstrumentationEnabled } from './analytics/supabase-perf'
 import { markSnag } from './app/debug'
 import { findMonorepoRoot, findNXMonorepoRoot, isMonorepo, isNXMonorepo } from './capacitor-cli'
 import { getChecksum } from './checksum'
 import { loadConfig, writeConfig } from './config'
 import { nativePackageSchema } from './schemas/common'
 import { formatApiErrorForCli, parseSecurityPolicyError } from './utils/security_policy_errors'
-import { createTimedFetch, isSupabaseInstrumentationEnabled } from './analytics/supabase-perf'
-import { getGlobalAnalyticsProps } from './analytics/global-props'
 
 export const baseKey = '.capgo_key'
 export const baseKeyV2 = '.capgo_key_v2'
@@ -496,6 +496,39 @@ export async function getAllPackagesDependencies(f: string = findRoot(cwd()), fi
       dependencies.set(dependency, resolveInstalledVersion(dependency, pkg.devDependencies[dependency]))
     }
   }
+  return dependencies
+}
+
+export async function getDeclaredPackageVersionMap(f: string = findRoot(cwd()), file: string | undefined = undefined) {
+  // if file contain , split by comma and return the array
+  let files = file?.split(',').map(file => file.trim()).filter(Boolean)
+  files ??= [join(f, PACKNAME)]
+  if (files) {
+    for (const file of files) {
+      if (!existsSync(file)) {
+        const message = `Package.json at ${file} does not exist`
+        log.error(message)
+        throw new Error(message)
+      }
+    }
+  }
+
+  const dependencies = new Map<string, string>()
+
+  for (const file of files) {
+    const packageJson = readFileSync(file)
+    const pkg = JSON.parse(packageJson as any)
+
+    for (const dependency in (pkg.dependencies ?? {})) {
+      if (typeof pkg.dependencies[dependency] === 'string')
+        dependencies.set(dependency, pkg.dependencies[dependency])
+    }
+    for (const dependency in (pkg.devDependencies ?? {})) {
+      if (typeof pkg.devDependencies[dependency] === 'string')
+        dependencies.set(dependency, pkg.devDependencies[dependency])
+    }
+  }
+
   return dependencies
 }
 
@@ -1979,11 +2012,13 @@ export async function getLocalDependencies(packageJsonPath: string | undefined, 
   }
 
   let anyInvalid = false
+  const declaredDependencies = await getDeclaredPackageVersionMap(findRoot(cwd()), packageJsonPath)
   const dependenciesObject = await Promise.all(Array.from(dependencies.entries())
     .map(async ([key, value]) => {
       let dependencyFound = false
       let hasNativeFiles = false
       let actualVersion = value
+      const requestedVersion = declaredDependencies.get(key) ?? value
       let foundDependencyPath: string | undefined
 
       for (const modulePath of nodeModulesPaths) {
@@ -2025,7 +2060,7 @@ export async function getLocalDependencies(packageJsonPath: string | undefined, 
         const pm = findPackageManagerType(dir, 'npm')
         const installCmd = findInstallCommand(pm)
         log.error(`Missing dependency ${key}, please run ${pm} ${installCmd}`)
-        return { name: key, version: value }
+        return { name: key, version: actualVersion, requested_version: requestedVersion }
       }
 
       // Calculate platform checksums for native packages
@@ -2040,6 +2075,7 @@ export async function getLocalDependencies(packageJsonPath: string | undefined, 
       return {
         name: key,
         version: actualVersion,
+        requested_version: requestedVersion,
         native: hasNativeFiles,
         ios_checksum,
         android_checksum,
@@ -2052,7 +2088,7 @@ export async function getLocalDependencies(packageJsonPath: string | undefined, 
     throw new Error('Missing dependencies or invalid dependencies')
   }
 
-  return dependenciesObject as { name: string, version: string, native: boolean, ios_checksum?: string, android_checksum?: string }[]
+  return dependenciesObject as { name: string, version: string, requested_version?: string, native: boolean, ios_checksum?: string, android_checksum?: string }[]
 }
 
 interface ChannelChecksum {
@@ -2121,7 +2157,6 @@ export async function getRemoteDependencies(supabase: SupabaseClient<Database>, 
   return convertNativePackages(((remoteNativePackages.version as any)?.native_packages as any) ?? [])
 }
 
-
 export type { Compatibility, CompatibilityDetails, IncompatibilityReason } from './schemas/common'
 
 export function getAppId(appId: string | undefined, config: CapacitorConfig | undefined) {
@@ -2169,6 +2204,10 @@ export function getCompatibilityDetails(pkg: Compatibility): CompatibilityDetail
     reasons.push('version_mismatch')
   }
 
+  if (pkg.localRequestedVersion && pkg.remoteRequestedVersion && pkg.localRequestedVersion.trim() !== pkg.remoteRequestedVersion.trim()) {
+    reasons.push('requested_version_changed')
+  }
+
   // Check checksum changes (even if versions match, native code could have changed)
   const iosChanged = pkg.localIosChecksum && pkg.remoteIosChecksum && pkg.localIosChecksum !== pkg.remoteIosChecksum
   const androidChanged = pkg.localAndroidChecksum && pkg.remoteAndroidChecksum && pkg.localAndroidChecksum !== pkg.remoteAndroidChecksum
@@ -2183,20 +2222,15 @@ export function getCompatibilityDetails(pkg: Compatibility): CompatibilityDetail
     reasons.push('android_code_changed')
   }
 
-  // Build message
-  if (reasons.length === 0) {
-    return {
-      compatible: true,
-      reasons: [],
-      message: 'Compatible',
-    }
-  }
-
   const messages: string[] = []
+  const isIncompatibleReason = (reason: IncompatibilityReason) => reason !== 'requested_version_changed'
   for (const reason of reasons) {
     switch (reason) {
       case 'version_mismatch':
         messages.push(`version changed: ${pkg.remoteVersion} → ${pkg.localVersion}`)
+        break
+      case 'requested_version_changed':
+        messages.push(`requested version changed: ${pkg.remoteRequestedVersion ?? 'unknown'} → ${pkg.localRequestedVersion ?? 'unknown'}`)
         break
       case 'ios_code_changed':
         messages.push('iOS native code changed')
@@ -2213,6 +2247,15 @@ export function getCompatibilityDetails(pkg: Compatibility): CompatibilityDetail
       case 'removed_plugin':
         messages.push('plugin removed')
         break
+    }
+  }
+
+  const isCompatible = !reasons.some(isIncompatibleReason)
+  if (isCompatible) {
+    return {
+      compatible: true,
+      reasons,
+      message: messages.length > 0 ? messages.join(', ') : 'Compatible',
     }
   }
 
@@ -2242,7 +2285,9 @@ export async function checkCompatibilityCloud(supabase: SupabaseClient<Database>
         return {
           name: local.name,
           localVersion: local.version,
+          localRequestedVersion: local.requested_version,
           remoteVersion: remotePackage.version,
+          remoteRequestedVersion: remotePackage.requested_version,
           localIosChecksum: local.ios_checksum,
           remoteIosChecksum: remotePackage.ios_checksum,
           localAndroidChecksum: local.android_checksum,
@@ -2253,6 +2298,7 @@ export async function checkCompatibilityCloud(supabase: SupabaseClient<Database>
       return {
         name: local.name,
         localVersion: local.version,
+        localRequestedVersion: local.requested_version,
         remoteVersion: undefined,
         localIosChecksum: local.ios_checksum,
         localAndroidChecksum: local.android_checksum,
@@ -2267,6 +2313,7 @@ export async function checkCompatibilityCloud(supabase: SupabaseClient<Database>
       name,
       localVersion: undefined,
       remoteVersion: pkg.version,
+      remoteRequestedVersion: pkg.requested_version,
       remoteIosChecksum: pkg.ios_checksum,
       remoteAndroidChecksum: pkg.android_checksum,
     }))
@@ -2289,7 +2336,9 @@ export async function checkCompatibilityNativePackages(supabase: SupabaseClient<
         return {
           name: local.name,
           localVersion: local.version,
+          localRequestedVersion: local.requested_version,
           remoteVersion: remotePackage.version,
+          remoteRequestedVersion: remotePackage.requested_version,
           localIosChecksum: local.ios_checksum,
           remoteIosChecksum: remotePackage.ios_checksum,
           localAndroidChecksum: local.android_checksum,
@@ -2300,6 +2349,7 @@ export async function checkCompatibilityNativePackages(supabase: SupabaseClient<
       return {
         name: local.name,
         localVersion: local.version,
+        localRequestedVersion: local.requested_version,
         remoteVersion: undefined,
         localIosChecksum: local.ios_checksum,
         localAndroidChecksum: local.android_checksum,
@@ -2314,6 +2364,7 @@ export async function checkCompatibilityNativePackages(supabase: SupabaseClient<
       name,
       localVersion: undefined,
       remoteVersion: pkg.version,
+      remoteRequestedVersion: pkg.requested_version,
       remoteIosChecksum: pkg.ios_checksum,
       remoteAndroidChecksum: pkg.android_checksum,
     }))
