@@ -55,7 +55,10 @@ export function mapIosOnboardingError(
   // the message is the only signal that survives. The phrase requires "agreement"
   // adjacent to a signing/expiry word, so it can't match an unrelated 403.
   const isAgreement = code === 'FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED'
+    || code === 'FORBIDDEN_ERROR.PLA_NOT_ACCEPTED'
     || /required agreement[^.]{0,60}\b(unsigned|expired|missing|not been signed)\b/i.test(message)
+    || /\b(unsigned|expired)\b[^.]{0,40}\bagreement\b/i.test(message)
+    || /program license agreement/i.test(message)
   if (isAgreement)
     return 'apple_agreements_missing'
   if (status === 401)

@@ -34,7 +34,8 @@ export function getBuildOnboardingRecoveryAdvice(
     commands.add(syncIosCommand)
   }
 
-  if (lower.includes('required agreement') || lower.includes('agreements, tax, and banking')) {
+  if (lower.includes('required agreement') || lower.includes('agreements, tax, and banking')
+    || lower.includes('program license agreement') || lower.includes('pla_not_accepted') || lower.includes('pla update available')) {
     summary.push(
       'Apple is blocking App Store Connect API access because a required agreement is unsigned or has expired.',
       'Your API key is fine — the Account Holder must accept the agreement in App Store Connect, then retry the saved step.',
