@@ -22,6 +22,7 @@ import {
   set_storage_exceeded,
   supabaseAdmin,
 } from './supabase.ts'
+import { buildOnboardingIntentBentoEventData, parseOrgOnboardingIntent } from './org_onboarding_intent.ts'
 import { sendEventToTracking } from './tracking.ts'
 import { isStripeConfigured } from './utils.ts'
 
@@ -477,7 +478,7 @@ async function userIsAtPlanUsage(c: Context, orgId: string, customerId: string |
 export async function getOrgWithCustomerInfo(c: Context, orgId: string) {
   const { data: org, error: userError } = await supabaseAdmin(c)
     .from('orgs')
-    .select('customer_id, has_usage_credits, name, website, stripe_info(status, subscription_id, subscription_anchor_start, subscription_anchor_end, trial_at)')
+    .select('customer_id, has_usage_credits, name, website, onboarding, stripe_info(status, subscription_id, subscription_anchor_start, subscription_anchor_end, trial_at)')
     .eq('id', orgId)
     .maybeSingle()
   if (userError)
@@ -548,11 +549,12 @@ export async function handleOrgNotificationsAndEvents(c: Context, org: any, orgI
     finalIsGoodPlan = !needsUpgrade
   }
   else if (!is_onboarded && is_onboarding_needed) {
-    const sent = await sendNotifToOrgMembersOnce(c, 'user:need_onboarding', 'onboarding', {
-      org_id: orgId,
-      org_name: org.name ?? '',
-      org_website: org.website ?? null,
-    }, orgId, orgId, drizzleClient)
+    const onboardingIntent = parseOrgOnboardingIntent(org.onboarding)
+    const sent = await sendNotifToOrgMembersOnce(c, 'user:need_onboarding', 'onboarding', buildOnboardingIntentBentoEventData(c, onboardingIntent, {
+      id: orgId,
+      name: org.name ?? '',
+      website: org.website ?? null,
+    }), orgId, orgId, drizzleClient)
     if (sent) {
       await sendEventToTracking(c, {
         channel: 'usage',

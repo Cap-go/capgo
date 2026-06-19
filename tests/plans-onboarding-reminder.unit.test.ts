@@ -64,6 +64,7 @@ vi.mock('../supabase/functions/_backend/utils/tracking.ts', () => ({
 }))
 
 vi.mock('../supabase/functions/_backend/utils/utils.ts', () => ({
+  getEnv: vi.fn((_c: unknown, key: string) => key === 'WEBAPP_URL' ? 'https://console.capgo.app/' : undefined),
   isStripeConfigured: vi.fn(),
 }))
 
@@ -113,11 +114,15 @@ describe('handleOrgNotificationsAndEvents onboarding reminder', () => {
       expect.anything(),
       'user:need_onboarding',
       'onboarding',
-      {
+      expect.objectContaining({
         org_id: orgId,
         org_name: 'Acme Mobile',
         org_website: 'https://acme.example/',
-      },
+        onboarding_intent: 'unknown',
+        onboarding_url: 'https://console.capgo.app/apps',
+        onboarding_url_ota: 'https://console.capgo.app/app/new',
+        onboarding_url_builder: 'https://console.capgo.app/app/new',
+      }),
       orgId,
       orgId,
       expect.anything(),
