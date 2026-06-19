@@ -619,11 +619,16 @@ class InitReplayRecorder implements InitReplayController {
     if (this.disposed)
       return
 
-    this.disposed = true
     if (this.captureTimer) {
       clearTimeout(this.captureTimer)
       this.captureTimer = undefined
     }
+
+    // Apply any queued resize/clear before marking disposed so the forced final
+    // snapshot is not captured at stale terminal dimensions.
+    await this.pendingTerminalWrite
+
+    this.disposed = true
 
     await this.captureFrame(true).catch(() => {})
     this.restore()

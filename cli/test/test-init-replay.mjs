@@ -285,5 +285,59 @@ assert.equal(applyRawCommandAnalyticsOptOut(['node', 'capgo', 'bundle', 'upload'
   }
 }
 
+{
+  const captured = []
+  const restoreFns = []
+  let cols = 80
+  let rows = 24
+  const columnsDescriptor = Object.getOwnPropertyDescriptor(stdout, 'columns')
+  const rowsDescriptor = Object.getOwnPropertyDescriptor(stdout, 'rows')
+
+  try {
+    restoreFns.push(replaceProcessProperty(stdout, 'isTTY', true))
+    restoreFns.push(replaceProcessProperty(stdin, 'isTTY', true))
+    Object.defineProperty(stdout, 'columns', { configurable: true, enumerable: true, get: () => cols })
+    Object.defineProperty(stdout, 'rows', { configurable: true, enumerable: true, get: () => rows })
+
+    const replay = startInitReplay({
+      apikey: 'capgo-key',
+      isCi: false,
+      replayUrl: 'https://api.capgo.app/private/replay',
+      cols: 80,
+      rows: 24,
+      throttleMs: 20,
+      terminalPixelSize: { height: 480, width: 800 },
+      transport: async (_url, body) => {
+        captured.push(body)
+        return true
+      },
+    })
+    assert.ok(replay, 'replay starts for finish/resize race test')
+
+    stdout.write('before finish resize\r\n')
+    await new Promise(resolve => setTimeout(resolve, 40))
+    cols = 100
+    rows = 30
+    stdout.emit('resize')
+    stdout.write('after finish resize\r\n')
+    await replay.finish()
+
+    const lastInput = captured.at(-1)?.properties.$snapshot_data.find(event => event.type === 3 && event.data.source === 5)
+    assert.ok(lastInput, 'finish after resize produces a terminal input snapshot')
+    assert.match(lastInput.data.text, /after finish resize/, 'finish applies queued resize before the forced snapshot')
+    assert.doesNotMatch(lastInput.data.text, /before finish resize/, 'forced snapshot does not keep pre-resize rows')
+  }
+  finally {
+    if (columnsDescriptor)
+      Object.defineProperty(stdout, 'columns', columnsDescriptor)
+    else delete stdout.columns
+    if (rowsDescriptor)
+      Object.defineProperty(stdout, 'rows', rowsDescriptor)
+    else delete stdout.rows
+    while (restoreFns.length > 0)
+      restoreFns.pop()()
+  }
+}
+
 
 console.log('✅ init replay telemetry tests passed')
