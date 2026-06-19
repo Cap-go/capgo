@@ -1,8 +1,9 @@
 import type { Context } from 'hono'
-import { addTagBento, isBentoConfigured } from './bento.ts'
+import { isBentoConfigured, syncBentoSubscriberTags } from './bento.ts'
 import { cloudlog } from './logging.ts'
-import { getPgClient } from './pg.ts'
-import { backgroundTask, getEnv } from './utils.ts'
+import { getOrgAdminMemberEmailsForTags } from './org_email_notifications.ts'
+import { getDrizzleClient, getPgClient } from './pg.ts'
+import { getEnv } from './utils.ts'
 
 export const ORG_ONBOARDING_INTENTS = ['unknown', 'ota', 'builder', 'both', 'exploring'] as const
 export type OrgOnboardingIntent = typeof ORG_ONBOARDING_INTENTS[number]
@@ -93,9 +94,11 @@ export async function syncOrgOnboardingIntentBentoTags(
   if (uniqueEmails.length === 0)
     return
 
-  await Promise.all(uniqueEmails.map(email =>
-    backgroundTask(c, addTagBento(c, email, tags)),
-  ))
+  await syncBentoSubscriberTags(c, uniqueEmails.map(email => ({
+    email,
+    segments: tags.segments,
+    deleteSegments: tags.deleteSegments,
+  })))
 
   cloudlog({
     requestId: c.get('requestId'),
@@ -107,18 +110,30 @@ export async function syncOrgOnboardingIntentBentoTags(
 
 export async function syncOrgOnboardingIntentForOrg(
   c: Context,
-  org: { management_email?: string | null, created_by?: string | null, onboarding?: unknown },
+  org: { id: string, management_email?: string | null, created_by?: string | null, onboarding?: unknown },
 ) {
   const intent = parseOrgOnboardingIntent(org.onboarding)
-  const emails = [org.management_email]
+  const pgClient = getPgClient(c, true)
+  const drizzleClient = getDrizzleClient(pgClient)
 
-  if (org.created_by) {
-    const creatorEmail = await lookupUserEmail(c, org.created_by)
-    if (creatorEmail)
-      emails.push(creatorEmail)
+  try {
+    const { emails: adminEmails } = await getOrgAdminMemberEmailsForTags(c, org.id, drizzleClient)
+    const emails = [...adminEmails]
+
+    if (org.management_email)
+      emails.push(org.management_email)
+
+    if (emails.length === 0 && org.created_by) {
+      const creatorEmail = await lookupUserEmail(c, org.created_by)
+      if (creatorEmail)
+        emails.push(creatorEmail)
+    }
+
+    await syncOrgOnboardingIntentBentoTags(c, intent, emails)
   }
-
-  await syncOrgOnboardingIntentBentoTags(c, intent, emails)
+  finally {
+    await pgClient.end()
+  }
 }
 
 export const orgOnboardingIntentTestUtils = {

@@ -749,6 +749,141 @@ export async function sendNotifToOrgMembersCached(
   return result === true
 }
 
+
+/**
+ * Resolve org admin/super_admin member emails for Bento profile tagging.
+ * Unlike notification delivery, tagging ignores email preference opt-outs.
+ */
+export async function getOrgAdminMemberEmailsForTags(
+  c: Context,
+  orgId: string,
+  drizzle: ReturnType<typeof getDrizzleClient>,
+  audience: NotificationAudience = 'admins',
+): Promise<EligibleOrgMemberEmailsResult> {
+  const adminRoleNames = AUDIENCE_ROLE_NAMES[audience]
+  const now = new Date()
+  let resolutionFailed = false
+  const userIds = new Set<string>()
+
+  try {
+    let rbacUserBindings: { principal_id: string | null, expires_at: Date | null }[] = []
+    try {
+      rbacUserBindings = await drizzle
+        .select({
+          principal_id: schema.role_bindings.principal_id,
+          expires_at: schema.role_bindings.expires_at,
+        })
+        .from(schema.role_bindings)
+        .innerJoin(schema.roles, eq(schema.role_bindings.role_id, schema.roles.id))
+        .where(
+          and(
+            eq(schema.role_bindings.org_id, orgId),
+            eq(schema.role_bindings.principal_type, 'user'),
+            eq(schema.role_bindings.scope_type, 'org'),
+            inArray(schema.roles.name, adminRoleNames),
+          ),
+        )
+    }
+    catch (error) {
+      resolutionFailed = true
+      cloudlog({ requestId: c.get('requestId'), message: 'getOrgAdminMemberEmailsForTags rbac user error', orgId, error })
+    }
+
+    for (const binding of rbacUserBindings ?? []) {
+      const expiresAt = binding.expires_at ? new Date(binding.expires_at) : null
+      if (expiresAt && expiresAt <= now)
+        continue
+      const principalId = binding.principal_id
+      if (principalId)
+        userIds.add(principalId)
+    }
+
+    let rbacGroupBindings: { principal_id: string | null, expires_at: Date | null }[] = []
+    try {
+      rbacGroupBindings = await drizzle
+        .select({
+          principal_id: schema.role_bindings.principal_id,
+          expires_at: schema.role_bindings.expires_at,
+        })
+        .from(schema.role_bindings)
+        .innerJoin(schema.roles, eq(schema.role_bindings.role_id, schema.roles.id))
+        .where(
+          and(
+            eq(schema.role_bindings.org_id, orgId),
+            eq(schema.role_bindings.principal_type, 'group'),
+            eq(schema.role_bindings.scope_type, 'org'),
+            inArray(schema.roles.name, adminRoleNames),
+          ),
+        )
+    }
+    catch (error) {
+      resolutionFailed = true
+      cloudlog({ requestId: c.get('requestId'), message: 'getOrgAdminMemberEmailsForTags rbac group error', orgId, error })
+    }
+
+    const groupIds = (rbacGroupBindings ?? [])
+      .filter((binding) => {
+        const expiresAt = binding.expires_at ? new Date(binding.expires_at) : null
+        return !expiresAt || expiresAt > now
+      })
+      .map(binding => binding.principal_id)
+      .filter((groupId): groupId is string => Boolean(groupId))
+
+    if (groupIds.length > 0) {
+      let groupMembers: { user_id: string | null }[] = []
+      try {
+        groupMembers = await drizzle
+          .select({ user_id: schema.group_members.user_id })
+          .from(schema.group_members)
+          .where(inArray(schema.group_members.group_id, groupIds))
+      }
+      catch (error) {
+        resolutionFailed = true
+        cloudlog({ requestId: c.get('requestId'), message: 'getOrgAdminMemberEmailsForTags group members error', orgId, error })
+      }
+
+      for (const member of groupMembers ?? []) {
+        if (member.user_id)
+          userIds.add(member.user_id)
+      }
+    }
+
+    const userIdList = Array.from(userIds)
+    if (userIdList.length === 0)
+      return { emails: [], resolutionFailed }
+
+    let users: { email: string | null }[] = []
+    try {
+      users = await drizzle
+        .select({ email: schema.users.email })
+        .from(schema.users)
+        .where(inArray(schema.users.id, userIdList))
+    }
+    catch (error) {
+      resolutionFailed = true
+      cloudlog({ requestId: c.get('requestId'), message: 'getOrgAdminMemberEmailsForTags users error', orgId, error })
+      return { emails: [], resolutionFailed }
+    }
+
+    const emails: string[] = []
+    const emailSet = new Set<string>()
+    for (const user of users) {
+      const email = user.email?.trim().toLowerCase()
+      if (!email || emailSet.has(email))
+        continue
+      emailSet.add(email)
+      emails.push(email)
+    }
+
+    return { emails, resolutionFailed }
+  }
+  catch (error) {
+    resolutionFailed = true
+    cloudlog({ requestId: c.get('requestId'), message: 'getOrgAdminMemberEmailsForTags error', orgId, error })
+    return { emails: [], resolutionFailed }
+  }
+}
+
 export const orgEmailNotificationTestUtils = {
   getEligibleEmailTargets,
 }
