@@ -587,6 +587,7 @@ class InitReplayRecorder implements InitReplayController {
   private lastSnapshotText = ''
   private pendingTerminalWrite = Promise.resolve()
   private resolvedTerminalPixelSize: TerminalPixelSize | undefined
+  private terminalPixelSizeSource: Promise<TerminalPixelSize | undefined>
   private readonly windowId = `cli-${randomUUID()}`
 
   constructor(
@@ -599,9 +600,10 @@ class InitReplayRecorder implements InitReplayController {
     private readonly cols: number,
     private readonly rows: number,
     private readonly throttleMs: number,
-    private readonly terminalPixelSize: Promise<TerminalPixelSize | undefined>,
+    terminalPixelSize: Promise<TerminalPixelSize | undefined>,
     sessionPrefix: string,
   ) {
+    this.terminalPixelSizeSource = terminalPixelSize
     this.sessionId = `${sessionPrefix}-${randomUUID()}`
     const { serializeAddon, term } = createTerminal(cols, rows)
     this.serializeAddon = serializeAddon
@@ -654,7 +656,22 @@ class InitReplayRecorder implements InitReplayController {
     if (this.disposed)
       return
 
-    this.term.resize(stdout.columns || this.cols, stdout.rows || this.rows)
+    const cols = stdout.columns || this.cols
+    const rows = stdout.rows || this.rows
+    this.lastSnapshotText = ''
+    this.hasSentMeta = false
+    this.resolvedTerminalPixelSize = undefined
+    this.terminalPixelSizeSource = queryTerminalPixelSize()
+
+    // Drain in-flight stdout writes before clearing — otherwise a stale chunk
+    // from the old dimensions can land after clear and corrupt the next frame.
+    this.pendingTerminalWrite = this.pendingTerminalWrite.then(async () => {
+      if (this.disposed)
+        return
+      this.term.resize(cols, rows)
+      this.term.clear()
+    }).catch(() => {})
+
     this.scheduleCapture()
   }
 
@@ -762,7 +779,7 @@ class InitReplayRecorder implements InitReplayController {
     if (this.resolvedTerminalPixelSize)
       return this.resolvedTerminalPixelSize
 
-    this.resolvedTerminalPixelSize = await this.terminalPixelSize.catch(() => undefined)
+    this.resolvedTerminalPixelSize = await this.terminalPixelSizeSource.catch(() => undefined)
     return this.resolvedTerminalPixelSize
   }
 

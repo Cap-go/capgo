@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { stdin, stdout } from 'node:process'
 import { applyCommandAnalyticsOptOut, applyRawCommandAnalyticsOptOut } from '../src/analytics/opt-out.ts'
-import { buildInitReplayBody, createTerminalInteractionEvents, createTerminalSnapshot, createTerminalSnapshotNode, getReplayViewportSize, parseTerminalPixelSizeResponse, queryTerminalPixelSize, renderRedactedTerminalFrame, renderRedactedTerminalText, resolveCapgoReplayUrl, resolveReplayUrlForFlush, resolveSupabaseReplayUrl, shouldStartInitReplay } from '../src/init/replay.ts'
+import { buildInitReplayBody, createTerminalInteractionEvents, createTerminalSnapshot, createTerminalSnapshotNode, getReplayViewportSize, parseTerminalPixelSizeResponse, queryTerminalPixelSize, renderRedactedTerminalFrame, renderRedactedTerminalText, resolveCapgoReplayUrl, resolveReplayUrlForFlush, resolveSupabaseReplayUrl, shouldStartInitReplay, startInitReplay } from '../src/init/replay.ts'
 
 console.log('🧪 Testing init replay telemetry...\n')
 
@@ -209,5 +209,73 @@ const rawBuildEnvTarget = {}
 assert.equal(applyRawCommandAnalyticsOptOut(['node', 'capgo', 'build', 'onboarding', '--no-analytics', '--bad-option'], rawBuildEnvTarget), true)
 assert.equal(rawBuildEnvTarget.CAPGO_DISABLE_TELEMETRY, 'true')
 assert.equal(applyRawCommandAnalyticsOptOut(['node', 'capgo', 'bundle', 'upload', '--no-analytics'], {}), false)
+
+
+{
+  const captured = []
+  const restoreFns = []
+  let cols = 80
+  let rows = 24
+  const columnsDescriptor = Object.getOwnPropertyDescriptor(stdout, 'columns')
+  const rowsDescriptor = Object.getOwnPropertyDescriptor(stdout, 'rows')
+
+  try {
+    restoreFns.push(replaceProcessProperty(stdout, 'isTTY', true))
+    restoreFns.push(replaceProcessProperty(stdin, 'isTTY', true))
+    Object.defineProperty(stdout, 'columns', { configurable: true, enumerable: true, get: () => cols })
+    Object.defineProperty(stdout, 'rows', { configurable: true, enumerable: true, get: () => rows })
+
+    const replay = startInitReplay({
+      apikey: 'capgo-key',
+      replayUrl: 'https://api.capgo.app/private/replay',
+      cols: 80,
+      rows: 24,
+      throttleMs: 20,
+      terminalPixelSize: { height: 480, width: 800 },
+      transport: async (_url, body) => {
+        captured.push(body)
+        return true
+      },
+    })
+    assert.ok(replay, 'replay starts with mocked terminal dimensions')
+
+    stdout.write('before resize line\r\n')
+    await new Promise(resolve => setTimeout(resolve, 80))
+
+    cols = 100
+    rows = 30
+    stdout.emit('resize')
+    stdout.write('after resize line\r\n')
+    await new Promise(resolve => setTimeout(resolve, 80))
+
+    await replay.finish()
+
+    assert.ok(captured.length >= 2, 'terminal resize produces another replay snapshot')
+    const metaEvents = captured.flatMap(body => body.properties.$snapshot_data.filter(event => event.type === 4))
+    const resizedMeta = metaEvents.at(-1)
+    assert.ok(resizedMeta, 'resize sends a fresh viewport meta event')
+    assert.deepEqual(
+      { height: resizedMeta.data.height, width: resizedMeta.data.width },
+      getReplayViewportSize(100, 30),
+      'post-resize meta uses the new terminal dimensions',
+    )
+
+    const lastInput = captured.at(-1)?.properties.$snapshot_data.find(event => event.type === 3 && event.data.source === 5)
+    assert.ok(lastInput, 'post-resize snapshot includes terminal input')
+    assert.match(lastInput.data.text, /after resize line/, 'post-resize snapshot reflects the redrawn frame')
+    assert.doesNotMatch(lastInput.data.text, /before resize line/, 'pre-resize rows are cleared from replay after resize')
+  }
+  finally {
+    if (columnsDescriptor)
+      Object.defineProperty(stdout, 'columns', columnsDescriptor)
+    else delete stdout.columns
+    if (rowsDescriptor)
+      Object.defineProperty(stdout, 'rows', rowsDescriptor)
+    else delete stdout.rows
+    while (restoreFns.length > 0)
+      restoreFns.pop()()
+  }
+}
+
 
 console.log('✅ init replay telemetry tests passed')
