@@ -1475,6 +1475,7 @@ export type Database = {
           churn_revenue_maker: number
           churn_revenue_solo: number
           churn_revenue_team: number
+          completed_shards: Json
           created_at: string | null
           credits_bought: number
           credits_consumed: number
@@ -1492,6 +1493,7 @@ export type Database = {
           nrr: number
           onboarded: number | null
           org_conversion_rate: number
+          orgs: number
           past_due_orgs: number
           past_due_orgs_average_days: number
           paying: number | null
@@ -1563,6 +1565,7 @@ export type Database = {
           churn_revenue_maker?: number
           churn_revenue_solo?: number
           churn_revenue_team?: number
+          completed_shards?: Json
           created_at?: string | null
           credits_bought?: number
           credits_consumed?: number
@@ -1580,6 +1583,7 @@ export type Database = {
           nrr?: number
           onboarded?: number | null
           org_conversion_rate?: number
+          orgs?: number
           past_due_orgs?: number
           past_due_orgs_average_days?: number
           paying?: number | null
@@ -1651,6 +1655,7 @@ export type Database = {
           churn_revenue_maker?: number
           churn_revenue_solo?: number
           churn_revenue_team?: number
+          completed_shards?: Json
           created_at?: string | null
           credits_bought?: number
           credits_consumed?: number
@@ -1668,6 +1673,7 @@ export type Database = {
           nrr?: number
           onboarded?: number | null
           org_conversion_rate?: number
+          orgs?: number
           past_due_orgs?: number
           past_due_orgs_average_days?: number
           paying?: number | null
