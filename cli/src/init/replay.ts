@@ -78,6 +78,7 @@ interface StartInitReplayOptions {
   ariaLabel?: string
   cols?: number
   currentUrl?: string
+  isCi?: boolean
   replayUrl?: string
   rows?: number
   sessionPrefix?: string
@@ -661,7 +662,9 @@ class InitReplayRecorder implements InitReplayController {
     this.lastSnapshotText = ''
     this.hasSentMeta = false
     this.resolvedTerminalPixelSize = undefined
-    this.terminalPixelSizeSource = queryTerminalPixelSize()
+    // Re-querying pixel size touches shared stdin and can leak CSI responses into
+    // active Ink prompts; fall back to cols/rows-based viewport sizing instead.
+    this.terminalPixelSizeSource = Promise.resolve(undefined)
 
     // Drain in-flight stdout writes before clearing — otherwise a stale chunk
     // from the old dimensions can land after clear and corrupt the next frame.
@@ -801,7 +804,7 @@ export function startInitReplay(options: StartInitReplayOptions = {}): InitRepla
   const shouldStart = shouldStartInitReplay({
     analyticsEnabled: replayAnalyticsEnabled,
     apikey,
-    isCi: isCI,
+    isCi: options.isCi ?? isCI,
     stdinIsTTY: Boolean(stdin.isTTY),
     stdoutIsTTY: Boolean(stdout.isTTY),
     telemetryDisabled: isCliTelemetryDisabled(),

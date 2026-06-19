@@ -225,8 +225,15 @@ assert.equal(applyRawCommandAnalyticsOptOut(['node', 'capgo', 'bundle', 'upload'
     Object.defineProperty(stdout, 'columns', { configurable: true, enumerable: true, get: () => cols })
     Object.defineProperty(stdout, 'rows', { configurable: true, enumerable: true, get: () => rows })
 
+    const rawModeCalls = []
+    restoreFns.push(replaceProcessProperty(stdin, 'setRawMode', (value) => {
+      rawModeCalls.push(value)
+      return stdin
+    }))
+
     const replay = startInitReplay({
       apikey: 'capgo-key',
+      isCi: false,
       replayUrl: 'https://api.capgo.app/private/replay',
       cols: 80,
       rows: 24,
@@ -264,6 +271,7 @@ assert.equal(applyRawCommandAnalyticsOptOut(['node', 'capgo', 'bundle', 'upload'
     assert.ok(lastInput, 'post-resize snapshot includes terminal input')
     assert.match(lastInput.data.text, /after resize line/, 'post-resize snapshot reflects the redrawn frame')
     assert.doesNotMatch(lastInput.data.text, /before resize line/, 'pre-resize rows are cleared from replay after resize')
+    assert.equal(rawModeCalls.length, 0, 'resize does not query stdin for pixel size while prompts may be active')
   }
   finally {
     if (columnsDescriptor)
