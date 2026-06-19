@@ -29,6 +29,33 @@ async function ensureFreshMediaUser(supabaseUrl, anonKey) {
   }).catch(() => {})
 }
 
+
+async function signInAndSeedSession(page, supabaseUrl, anonKey) {
+  await ensureFreshMediaUser(supabaseUrl, anonKey)
+
+  const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: {
+      apikey: anonKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email, password }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Failed to sign in media user (${response.status}): ${await response.text()}`)
+  }
+
+  const session = await response.json()
+  const hostname = new URL(supabaseUrl).hostname.split('.')[0]
+  const storageKey = `sb-${hostname}-auth-token`
+
+  await page.goto(`${baseURL}/login`)
+  await page.evaluate(({ storageKey, session }) => {
+    localStorage.setItem(storageKey, JSON.stringify(session))
+  }, { storageKey, session })
+}
+
 async function main() {
   await mkdir(outDir, { recursive: true })
 
@@ -45,16 +72,13 @@ async function main() {
   const suffix = Date.now()
   const appName = `Demo App ${suffix}`
 
-  const env = await page.goto(`${baseURL}/login`).then(() => page.evaluate(() => ({
-    supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
-    anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-  })))
-  await ensureFreshMediaUser(env.supabaseUrl, env.anonKey)
-  await page.locator('[data-test="email"]').fill(email)
-  await page.locator('[data-test="continue"]').click()
-  await page.locator('[data-test="password"]').fill(password)
-  await page.locator('[data-test="submit"]').click()
+  const supabaseUrl = process.env.VITE_SUPABASE_URL ?? 'http://127.0.0.1:55411'
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY ?? 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH'
+
+  await signInAndSeedSession(page, supabaseUrl, anonKey)
+  await page.goto(`${baseURL}/onboarding/app`)
   await page.waitForURL(/\/onboarding\/app/, { timeout: 60000 })
+  await page.waitForSelector('[data-test="app-onboarding-existing-no"]', { timeout: 60000 })
 
   await page.screenshot({ path: path.join(outDir, '01-app-onboarding.png'), fullPage: true })
 
@@ -85,11 +109,27 @@ main().catch((error) => {
 
 async function convertVideoToWebp() {
   const { execSync } = await import('node:child_process')
-  const { readdirSync } = await import('node:fs')
-  const videos = readdirSync(outDir).filter(name => name.endsWith('.webm'))
+  const { mkdtempSync, readdirSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const videos = readdirSync(outDir).filter(name => name.endsWith('.webm') && !name.startsWith('.'))
   if (!videos.length)
     return
+
   const input = path.join(outDir, videos[0])
   const output = path.join(outDir, 'app-first-onboarding.webp')
-  execSync(`ffmpeg -y -i ${JSON.stringify(input)} -vf fps=12,scale=1280:-1 -loop 0 -an ${JSON.stringify(output)}`, { stdio: 'inherit' })
+  const framesDir = mkdtempSync(path.join(tmpdir(), 'capgo-onboard-frames-'))
+
+  try {
+    execSync(`ffmpeg -y -i ${JSON.stringify(input)} -vf fps=10,scale=1280:-1 ${JSON.stringify(`${framesDir}/frame_%03d.png`)}`, { stdio: 'inherit' })
+    const frames = readdirSync(framesDir).filter(name => name.endsWith('.png')).sort()
+    if (!frames.length)
+      return
+    execSync(`img2webp -o ${JSON.stringify(output)} ${frames.map(frame => JSON.stringify(path.join(framesDir, frame))).join(' ')}`, { stdio: 'inherit' })
+  }
+  finally {
+    rmSync(framesDir, { recursive: true, force: true })
+  }
+
+  for (const video of videos)
+    rmSync(path.join(outDir, video), { force: true })
 }

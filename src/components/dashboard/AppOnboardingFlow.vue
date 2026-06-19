@@ -741,14 +741,20 @@ function openDashboard() {
 onMounted(async () => {
   isLoading.value = true
   try {
-    await organizationStore.awaitInitialLoad()
-    await main.awaitInitialLoad()
-
     if (props.preOrg) {
+      try {
+        await organizationStore.fetchOrganizations()
+      }
+      catch (error) {
+        console.error('Failed to load organizations during pre-org onboarding', error)
+      }
       restoreDraftState()
       flowStep.value = 'details'
       return
     }
+
+    await organizationStore.awaitInitialLoad()
+    await main.awaitInitialLoad()
 
     try {
       await ensureApiKey()
@@ -865,6 +871,7 @@ watch(suggestedAppId, (value) => {
                   :aria-pressed="existingApp === true"
                   class="group flex min-h-32 items-start gap-4 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
                   :class="whiteCardToggleButtonClass(existingApp === true)"
+                  data-test="app-onboarding-existing-yes"
                   @click="existingApp = true"
                 >
                   <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-500 text-white">
@@ -886,6 +893,7 @@ watch(suggestedAppId, (value) => {
                   :aria-pressed="existingApp === false"
                   class="group flex min-h-32 items-start gap-4 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
                   :class="whiteCardToggleButtonClass(existingApp === false)"
+                  data-test="app-onboarding-existing-no"
                   @click="existingApp = false"
                 >
                   <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-950">
@@ -987,6 +995,7 @@ watch(suggestedAppId, (value) => {
                   <input
                     id="app-onboarding-name"
                     v-model="appName"
+                    data-test="app-onboarding-name"
                     class="mt-2 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/20 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/30"
                     :placeholder="t('app-onboarding-name-placeholder')"
                     maxlength="100"
@@ -1046,7 +1055,10 @@ watch(suggestedAppId, (value) => {
                   <button class="d-btn min-h-12" :class="whiteCardSecondaryButtonClass()" @click="router.push('/apps')">
                     {{ t('button-cancel') }}
                   </button>
-                  <button class="d-btn min-h-12" :class="whiteCardPrimaryButtonClass()" :disabled="isSubmitting" @click="props.preOrg ? saveDraftAndContinue() : createAppRecord()">
+                  <button
+                    class="d-btn min-h-12" :class="whiteCardPrimaryButtonClass()" :disabled="isSubmitting" data-test="app-onboarding-continue"
+                    @click="props.preOrg ? saveDraftAndContinue() : createAppRecord()"
+                  >
                     <IconLoader v-if="isSubmitting" class="h-4 w-4 animate-spin" />
                     <span v-else>{{ props.preOrg ? t('app-onboarding-continue-to-org') : t('app-onboarding-continue') }}</span>
                     <IconArrowRight v-if="!isSubmitting" class="h-4 w-4" />

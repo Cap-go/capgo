@@ -5,18 +5,27 @@ Generate screenshots and a WebP walkthrough after local Supabase is running:
 ```bash
 bun run supabase:start
 bun run supabase:db:reset
-SUPABASE_SERVICE_KEY="$(grep SUPABASE_SERVICE_KEY .env.test | cut -d= -f2-)" \
-CAPGO_MEDIA_EMAIL="media-onboard@capgo.app" \
-CAPGO_MEDIA_PASSWORD="CapgoMediaLocal!2026" \
-BRANCH=local bun serve:dev
+bun backend
+```
+
+In one terminal (use your worktree Supabase port from `bun scripts/supabase-worktree.ts status`):
+
+```bash
+VITE_SUPABASE_URL=http://127.0.0.1:55411 \
+VITE_SUPABASE_ANON_KEY=sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH \
+VITE_API_HOST=http://127.0.0.1:55411/functions/v1 \
+VITE_APP_URL=http://localhost:5173 \
+BRANCH=local bun vite
 ```
 
 In another terminal:
 
 ```bash
-SUPABASE_SERVICE_KEY="$(grep SUPABASE_SERVICE_KEY .env.test | cut -d= -f2-)" \
+SUPABASE_SERVICE_KEY="$(bun scripts/supabase-worktree.ts status | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>console.log(JSON.parse(s).SERVICE_ROLE_KEY))')" \
+VITE_SUPABASE_URL=http://127.0.0.1:55411 \
+VITE_SUPABASE_ANON_KEY=sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH \
 CAPGO_MEDIA_EMAIL="media-onboard@capgo.app" \
-CAPGO_MEDIA_PASSWORD="CapgoMediaLocal!2026" \
+CAPGO_MEDIA_PASSWORD="CapgoMediaLocal!2026Zx" \
 node scripts/capture-app-first-onboarding-media.mjs
 ```
 
