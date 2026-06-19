@@ -24,9 +24,16 @@ import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
+import {
+  fileToDataUrl,
+  loadOnboardingAppDraft,
+  remoteImageToDataUrl,
+  saveOnboardingAppDraft,
+} from '~/utils/onboardingAppDraft'
 
 const props = defineProps<{
   onboarding: boolean
+  preOrg?: boolean
 }>()
 
 const route = useRoute('/app/new')
@@ -80,6 +87,10 @@ const resumeAppId = computed(() => {
   const value = route.query.resume
   return typeof value === 'string' ? value : ''
 })
+const resumeStep = computed(() => {
+  const value = route.query.step
+  return value === 'choice' || value === 'install' ? value : null
+})
 const canUseStoreImportPreview = computed(() => existingApp.value === true && existingAppSetup.value === 'import')
 const iconPreview = computed(() => localIconPreview.value || (canUseStoreImportPreview.value ? storeIconPreview.value : '') || '')
 const hasImportedStoreMetadata = computed(() => canUseStoreImportPreview.value && !!(importedStoreAppId.value || storeIconPreview.value || storeScreenshotPreview.value))
@@ -100,9 +111,13 @@ const suggestedAppId = computed(() => {
   if (existingApp.value === true && storeAppId)
     return storeAppId
 
-  const orgSlug = slugify(currentOrg.value?.name || 'capgo')
+  const orgSlug = props.preOrg
+    ? slugify(appName.value || 'mobile-app')
+    : slugify(currentOrg.value?.name || 'capgo')
   const appSlug = slugify(appName.value || 'mobile-app')
-  return `com.${orgSlug}.${appSlug}`
+  return props.preOrg
+    ? `com.${orgSlug}.${appSlug}`
+    : `com.${orgSlug}.${appSlug}`
 })
 const generatedAppId = computed(() => createdApp.value?.app_id || manualAppId.value.trim() || suggestedAppId.value)
 const aiHelpPrompt = computed(() => {
@@ -284,7 +299,7 @@ async function loadResumeApp() {
   localIconPreview.value = getImmediateImageUrl(data.icon_url) || ''
   void loadResumeIconPreview(data.icon_url, data.app_id, iconLoadRun)
   storeScreenshotPreview.value = ''
-  flowStep.value = 'install'
+  flowStep.value = resumeStep.value === 'choice' ? 'choice' : 'install'
   return true
 }
 
@@ -460,6 +475,89 @@ async function uploadIcon(appId: string, iconSourceUrl?: string) {
     .from('apps')
     .update({ icon_url: iconPath })
     .eq('app_id', appId)
+}
+
+function restoreDraftState() {
+  const draft = loadOnboardingAppDraft()
+  if (!draft)
+    return false
+
+  appName.value = draft.appName
+  manualAppId.value = draft.appId
+  hasEditedAppId.value = true
+  existingApp.value = draft.existingApp
+  existingAppSetup.value = draft.existingAppSetup
+  storeUrl.value = draft.storeUrl
+  importedStoreAppId.value = draft.importedStoreAppId
+  if (draft.storeIconDataUrl)
+    storeIconPreview.value = draft.storeIconDataUrl
+  if (draft.storeScreenshotUrl)
+    storeScreenshotPreview.value = draft.storeScreenshotUrl
+  if (draft.iconDataUrl)
+    localIconPreview.value = draft.iconDataUrl
+  return true
+}
+
+async function buildDraftFromForm() {
+  const normalizedStoreUrls = existingApp.value === true && existingAppSetup.value === 'import'
+    ? getStoreUrls(storeUrl.value.trim())
+    : { iosStoreUrl: null, androidStoreUrl: null }
+
+  let iconDataUrl: string | null = null
+  if (selectedIconFile.value)
+    iconDataUrl = await fileToDataUrl(selectedIconFile.value)
+  else if (localIconPreview.value.startsWith('blob:'))
+    iconDataUrl = null
+  else if (localIconPreview.value)
+    iconDataUrl = await remoteImageToDataUrl(localIconPreview.value)
+
+  let storeIconDataUrl = storeIconPreview.value || null
+  if (storeIconDataUrl && !storeIconDataUrl.startsWith('data:'))
+    storeIconDataUrl = await remoteImageToDataUrl(storeIconDataUrl)
+
+  return {
+    appName: appName.value.trim(),
+    appId: generatedAppId.value.trim(),
+    existingApp: existingApp.value === true,
+    existingAppSetup: existingAppSetup.value,
+    storeUrl: storeUrl.value.trim(),
+    importedStoreAppId: importedStoreAppId.value.trim(),
+    iosStoreUrl: normalizedStoreUrls.iosStoreUrl,
+    androidStoreUrl: normalizedStoreUrls.androidStoreUrl,
+    iconDataUrl,
+    storeIconDataUrl,
+    storeScreenshotUrl: storeScreenshotPreview.value || null,
+  }
+}
+
+async function saveDraftAndContinue() {
+  if (existingApp.value === null) {
+    toast.error(t('app-onboarding-toast-existing-required'))
+    return
+  }
+
+  if (!appName.value.trim()) {
+    toast.error(t('app-onboarding-toast-name-required'))
+    return
+  }
+
+  if (!generatedAppId.value.trim()) {
+    toast.error(t('app-onboarding-toast-appid-required'))
+    return
+  }
+
+  isSubmitting.value = true
+  try {
+    saveOnboardingAppDraft(await buildDraftFromForm())
+    await router.push('/onboarding/organization')
+  }
+  catch (error) {
+    console.error('Cannot save onboarding app draft', error)
+    toast.error(t('app-onboarding-toast-create-error'))
+  }
+  finally {
+    isSubmitting.value = false
+  }
 }
 
 async function createAppRecord() {
@@ -645,6 +743,13 @@ onMounted(async () => {
   try {
     await organizationStore.awaitInitialLoad()
     await main.awaitInitialLoad()
+
+    if (props.preOrg) {
+      restoreDraftState()
+      flowStep.value = 'details'
+      return
+    }
+
     try {
       await ensureApiKey()
     }
@@ -705,7 +810,7 @@ watch(suggestedAppId, (value) => {
               : t('app-onboarding-title-return') }}
           </h1>
           <p class="mt-2 text-base leading-7 text-slate-600 dark:text-slate-300">
-            {{ t('app-onboarding-subtitle') }}
+            {{ props.preOrg ? t('app-onboarding-subtitle-pre-org') : t('app-onboarding-subtitle') }}
           </p>
 
           <nav class="mt-6" :aria-label="t('app-onboarding-step-details')">
@@ -941,9 +1046,9 @@ watch(suggestedAppId, (value) => {
                   <button class="d-btn min-h-12" :class="whiteCardSecondaryButtonClass()" @click="router.push('/apps')">
                     {{ t('button-cancel') }}
                   </button>
-                  <button class="d-btn min-h-12" :class="whiteCardPrimaryButtonClass()" :disabled="isSubmitting" @click="createAppRecord">
+                  <button class="d-btn min-h-12" :class="whiteCardPrimaryButtonClass()" :disabled="isSubmitting" @click="props.preOrg ? saveDraftAndContinue() : createAppRecord()">
                     <IconLoader v-if="isSubmitting" class="h-4 w-4 animate-spin" />
-                    <span v-else>{{ t('app-onboarding-continue') }}</span>
+                    <span v-else>{{ props.preOrg ? t('app-onboarding-continue-to-org') : t('app-onboarding-continue') }}</span>
                     <IconArrowRight v-if="!isSubmitting" class="h-4 w-4" />
                   </button>
                 </div>

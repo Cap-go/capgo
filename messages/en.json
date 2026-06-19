@@ -1644,7 +1644,7 @@
   "organization-onboarding-step-invite": "Invite teammates",
   "organization-onboarding-step-logo": "Add logo",
   "organization-onboarding-starting-plan": "Starting plan",
-  "organization-onboarding-subtitle": "Create the org first, then add a logo and invite your team before you start creating apps.",
+  "organization-onboarding-subtitle": "Name your organization, add a logo, and invite your team. Your app details are already saved.",
   "organization-onboarding-summary": "Summary",
   "organization-onboarding-title": "Create your organization",
   "organization-onboarding-user-scale-required": "Select active users",
@@ -2246,5 +2246,11 @@
   "restore-account": "Restore account",
   "restoring-account": "Restoring account...",
   "translation-not-ready": "Translation is being prepared. Try again in a bit.",
-  "translation-unavailable": "This language is not available right now."
+  "translation-unavailable": "This language is not available right now.",
+  "organization-onboarding-subtitle-after-app": "Your app is ready. Now create the organization that will own it.",
+  "organization-onboarding-mode-app-name": "Use {name}",
+  "organization-onboarding-mode-app-name-helper": "Keep the same name as your app. You can still edit it below.",
+  "organization-onboarding-finish-setup": "Finish setup",
+  "app-onboarding-subtitle-pre-org": "Start with your app. Capgo saves these details while you create the organization next.",
+  "app-onboarding-continue-to-org": "Continue to organization"
 }

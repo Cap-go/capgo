@@ -19,9 +19,10 @@ test.describe('Registration', () => {
     await page.goto('/register/')
   })
 
-  test('should redirect new users to org onboarding until the org is created', async ({ page }) => {
+  test('should redirect new users through app-first onboarding until the org is created', async ({ page }) => {
     const uniqueSuffix = Date.now()
     const email = `no-org-e2e-${uniqueSuffix}@example.com`
+    const appName = `No Org App ${uniqueSuffix}`
 
     await page.fill('[data-test="email"]', email)
     await page.fill('[data-test="first_name"]', 'No')
@@ -30,18 +31,16 @@ test.describe('Registration', () => {
     await page.fill('[data-test="confirm-password"]', 'Password123!')
     await page.click('[data-test="submit"]')
 
-    await page.waitForURL(/\/onboarding\/organization/)
-    // New users are first asked their intent; the org form is revealed only
-    // after a choice is made, so pick an option before continuing.
-    await page.click('[data-test="onboarding-intent-ota"]')
-    await expect(page.locator('[data-test="onboarding-mode-name"]')).toBeVisible()
-    // The redirect opens a fresh page where the intent hasn't been answered yet
-    // (it's only persisted after org creation), so assert on the always-present
-    // logout control rather than the intent-gated org form.
-    await expectProtectedRouteRedirect(page, '/apps', /\/onboarding\/organization/, '[data-test="onboarding-logout"]')
+    await page.waitForURL(/\/onboarding\/app/)
+    await page.click('[data-test="app-onboarding-existing-no"]')
+    await page.fill('[data-test="app-onboarding-name"]', appName)
+    await page.click('[data-test="app-onboarding-continue"]')
 
-    await page.click('[data-test="onboarding-mode-name"]')
-    await page.fill('[data-test="onboarding-org-name"]', `No Org E2E ${uniqueSuffix}`)
+    await page.waitForURL(/\/onboarding\/organization/)
+    await expectProtectedRouteRedirect(page, '/apps', /\/onboarding\/app/, '[data-test="onboarding-logout"]')
+
+    await page.click('[data-test="onboarding-intent-ota"]')
+    await page.click('[data-test="onboarding-mode-app-name"]')
     await page.locator('[data-test="onboarding-estimated-users-option"]').first().click()
     await expect(page.locator('[data-test="onboarding-create-org"]')).toBeEnabled()
     await page.click('[data-test="onboarding-create-org"]')
@@ -51,7 +50,7 @@ test.describe('Registration', () => {
 
     await page.waitForURL(/step=invite/)
     await page.click('[data-test="onboarding-finish"]')
-    await page.waitForURL('/app/new')
+    await page.waitForURL(/\/app\/new\?resume=.*step=choice/)
   })
 
   test('should allow new users to log out from org onboarding', async ({ page }) => {
@@ -65,7 +64,7 @@ test.describe('Registration', () => {
     await page.fill('[data-test="confirm-password"]', 'Password123!')
     await page.click('[data-test="submit"]')
 
-    await page.waitForURL(/\/onboarding\/organization/)
+    await page.waitForURL(/\/onboarding\/app/)
     await page.click('[data-test="onboarding-logout"]')
 
     await page.waitForURL(/\/login\/?$/)
