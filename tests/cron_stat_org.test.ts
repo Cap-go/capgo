@@ -286,10 +286,10 @@ describe('[POST] /triggers/cron_stat_org', () => {
       .single()
     expect(latestBandwidthError).toBeFalsy()
 
-    // Solo plan bandwidth limit is 13958643712 (~13GB), so we need to exceed that
+    // Solo plan bandwidth limit is 27917287424 (~26GB), so we need to exceed that
     const { error: setBandwidthError } = await supabase
       .from('daily_bandwidth')
-      .update({ bandwidth: 20000000000 })
+      .update({ bandwidth: 32212254720 })
       .eq('app_id', APPNAME)
       .eq('date', latestBandwidthData?.date ?? '')
     expect(setBandwidthError).toBeFalsy()
@@ -473,10 +473,10 @@ describe('[POST] /triggers/cron_stat_org', () => {
       .limit(1)
       .single()
 
-    // Solo plan bandwidth limit is 13958643712 (~13GB), so use 20GB
+    // Solo plan bandwidth limit is 27917287424 (~26GB), so use 30GB
     await supabase
       .from('daily_bandwidth')
-      .update({ bandwidth: 20000000000 })
+      .update({ bandwidth: 32212254720 })
       .eq('app_id', APPNAME)
       .eq('date', latestBandwidthData?.date ?? '')
 
