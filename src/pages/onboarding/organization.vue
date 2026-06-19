@@ -8,7 +8,6 @@ import IconBuilding from '~icons/lucide/building-2'
 import IconCheck from '~icons/lucide/check'
 import IconCompass from '~icons/lucide/compass'
 import IconGlobe from '~icons/lucide/globe-2'
-import IconImage from '~icons/lucide/image'
 import IconLayers from '~icons/lucide/layers'
 import IconLoader from '~icons/lucide/loader-2'
 import IconPencil from '~icons/lucide/pencil-line'
@@ -621,7 +620,7 @@ onUnmounted(() => {
 
 <template>
   <section class="h-full min-h-0 overflow-y-auto bg-slate-50 px-4 py-4 text-slate-950 sm:px-5 sm:py-6 lg:px-6 dark:bg-slate-950 dark:text-slate-50">
-    <div class="relative mx-auto flex w-full max-w-5xl flex-col gap-4">
+    <div class="relative mx-auto flex w-full max-w-3xl flex-col gap-4">
       <InviteTeammateModal ref="inviteModalRef" @success="onInviteSuccess" />
       <input
         ref="logoInput"
@@ -656,101 +655,91 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
-        <div class="space-y-4">
-          <div>
-            <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:text-slate-200 dark:shadow-lg dark:shadow-black/20">
-              <IconSparkles class="h-3.5 w-3.5" />
-              {{ onboardingBadge }}
-            </div>
-            <h1 class="mt-3 max-w-3xl text-2xl font-semibold text-slate-950 sm:text-3xl dark:text-white">
-              {{ onboardingTitle }}
-            </h1>
-            <p class="mt-2 max-w-2xl text-base leading-6 text-slate-600 sm:text-sm dark:text-slate-300">
-              {{ onboardingSubtitle }}
-            </p>
+      <div class="mx-auto w-full max-w-3xl space-y-6">
+        <header>
+          <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:text-slate-200">
+            <IconSparkles class="h-3.5 w-3.5" />
+            {{ onboardingBadge }}
           </div>
+          <h1 class="mt-3 text-2xl font-semibold text-slate-950 sm:text-3xl dark:text-white">
+            {{ onboardingTitle }}
+          </h1>
+          <p class="mt-2 text-base leading-6 text-slate-600 dark:text-slate-300">
+            {{ onboardingSubtitle }}
+          </p>
 
-          <div class="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
-            <div class="grid gap-2 sm:grid-cols-3">
-              <div
+          <nav class="mt-6" :aria-label="t('organization-onboarding-step-details')">
+            <ol class="flex items-center gap-2">
+              <li
                 v-for="(entry, index) in onboardingSteps"
                 :key="entry.id"
-                class="flex min-h-12 items-center gap-2 rounded-xl border px-2.5 py-1.5 transition"
+                class="flex min-w-0 flex-1 items-center gap-2"
                 :aria-current="isStepActive(entry.id) ? 'step' : undefined"
-                :class="[
-                  isStepActive(entry.id) ? 'border-primary-500/30 bg-slate-100 text-slate-950 ring-1 ring-primary-500/10 dark:border-primary-500/60 dark:bg-primary-500/25 dark:text-white dark:ring-primary-500/20' : '',
-                  !isStepActive(entry.id) && isStepDone(entry.id) ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-400/40 dark:bg-emerald-400/15 dark:text-emerald-100' : '',
-                  !isStepActive(entry.id) && !isStepDone(entry.id) ? 'border-transparent bg-slate-50 text-slate-500 dark:border-white/10 dark:bg-slate-950/90 dark:text-slate-400' : '',
-                ]"
               >
                 <span
                   class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
-                  :class="isStepDone(entry.id) ? 'bg-emerald-500 text-white' : isStepActive(entry.id) ? 'bg-primary-500 text-white' : 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300'"
+                  :class="isStepDone(entry.id) ? 'bg-emerald-500 text-white' : isStepActive(entry.id) ? 'bg-primary-500 text-white' : 'bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400'"
                 >
                   <IconCheck v-if="isStepDone(entry.id)" class="h-3.5 w-3.5" />
                   <span v-else>{{ index + 1 }}</span>
                 </span>
-                <span class="min-w-0">
-                  <span class="block truncate text-xs font-semibold sm:text-sm">{{ entry.label }}</span>
-                  <span class="mt-0.5 block text-xs opacity-75">
-                    {{ t('organization-onboarding-progress-count', { current: index + 1, total: onboardingSteps.length }) }}
-                  </span>
+                <span
+                  class="hidden truncate text-sm font-medium sm:block"
+                  :class="isStepActive(entry.id) ? 'text-slate-950 dark:text-white' : isStepDone(entry.id) ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-400 dark:text-slate-500'"
+                >
+                  {{ entry.label }}
                 </span>
-              </div>
-            </div>
-            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-950" aria-hidden="true">
+                <span
+                  v-if="index < onboardingSteps.length - 1"
+                  class="mx-1 hidden h-px flex-1 bg-slate-200 sm:block dark:bg-white/15"
+                  aria-hidden="true"
+                />
+              </li>
+            </ol>
+            <div class="mt-3 h-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800" aria-hidden="true">
               <div class="h-full rounded-full bg-primary-500 transition-all duration-300" :style="{ width: stepProgress }" />
             </div>
-          </div>
+          </nav>
+        </header>
 
-          <div v-if="step === 'details'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
-            <div class="space-y-4">
-              <div>
-                <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
-                  {{ t('organization-onboarding-intent-step') }}
-                </p>
-                <h2 class="mt-1.5 text-xl font-semibold text-slate-950 dark:text-white">
-                  {{ t('organization-onboarding-intent-question') }}
-                </h2>
-                <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                  {{ t('organization-onboarding-intent-hint') }}
-                </p>
-              </div>
-
-              <div class="grid gap-3 sm:grid-cols-2">
-                <button
-                  v-for="option in intentOptions"
-                  :key="option.value"
-                  type="button"
-                  class="group flex min-h-24 items-start gap-3 rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
-                  :class="whiteCardToggleButtonClass(selectedIntent === option.value)"
-                  :data-test="`onboarding-intent-${option.value}`"
-                  @click="selectedIntent = option.value"
-                >
-                  <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-500 dark:bg-primary-500/20">
-                    <component :is="option.icon" class="h-5 w-5" />
-                  </span>
-                  <span class="min-w-0">
-                    <span class="block text-sm font-semibold text-slate-950 dark:text-white">
-                      {{ t(`organization-onboarding-intent-option-${option.value}-label`) }}
-                    </span>
-                    <span class="mt-1 block text-xs leading-5 text-slate-600 dark:text-slate-300">
-                      {{ t(`organization-onboarding-intent-option-${option.value}-desc`) }}
-                    </span>
-                  </span>
-                </button>
-              </div>
+        <div v-if="step === 'details'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 dark:border-white/15 dark:bg-slate-900/95">
+          <div class="space-y-6">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-950 dark:text-white">
+                {{ t('organization-onboarding-intent-question') }}
+              </h2>
+              <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                {{ t('organization-onboarding-intent-hint') }}
+              </p>
             </div>
-          </div>
 
-          <div v-if="step === 'details' && !!selectedIntent" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
-            <div class="space-y-4">
-              <div>
-                <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
-                  {{ t('organization-onboarding-step-details') }}
-                </p>
-                <h2 class="mt-1.5 text-xl font-semibold text-slate-950 dark:text-white">
+            <div class="grid gap-3 sm:grid-cols-2">
+              <button
+                v-for="option in intentOptions"
+                :key="option.value"
+                type="button"
+                class="group flex min-h-20 items-start gap-3 rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
+                :class="whiteCardToggleButtonClass(selectedIntent === option.value)"
+                :data-test="`onboarding-intent-${option.value}`"
+                @click="selectedIntent = option.value"
+              >
+                <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-500 dark:bg-primary-500/20">
+                  <component :is="option.icon" class="h-5 w-5" />
+                </span>
+                <span class="min-w-0">
+                  <span class="block text-sm font-semibold text-slate-950 dark:text-white">
+                    {{ t(`organization-onboarding-intent-option-${option.value}-label`) }}
+                  </span>
+                  <span class="mt-1 block text-xs leading-5 text-slate-600 dark:text-slate-300">
+                    {{ t(`organization-onboarding-intent-option-${option.value}-desc`) }}
+                  </span>
+                </span>
+              </button>
+            </div>
+
+            <template v-if="selectedIntent">
+              <div class="border-t border-slate-200 pt-6 dark:border-white/15">
+                <h2 class="text-lg font-semibold text-slate-950 dark:text-white">
                   {{ t('organization-onboarding-question') }}
                 </h2>
               </div>
@@ -834,7 +823,27 @@ onUnmounted(() => {
               </div>
 
               <template v-if="canShowOrgDetails">
-                <div class="border-t border-slate-200 pt-4 dark:border-white/15">
+                <div v-if="orgNameInput.trim() || importedLogoUrl" class="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-white/15 dark:bg-slate-950/90">
+                  <div class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-200 text-sm font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    <img
+                      v-if="importedLogoUrl"
+                      :src="importedLogoUrl"
+                      :alt="t('organization-onboarding-logo-preview-alt', { name: orgNameInput || t('organization-onboarding-org-placeholder') })"
+                      class="h-full w-full object-cover"
+                    >
+                    <span v-else>{{ (orgNameInput || 'O').slice(0, 2).toUpperCase() }}</span>
+                  </div>
+                  <div class="min-w-0">
+                    <p class="truncate text-base font-semibold text-slate-950 dark:text-white">
+                      {{ orgNameInput || t('organization-onboarding-org-placeholder') }}
+                    </p>
+                    <p v-if="websiteHostname" class="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
+                      {{ websiteHostname }}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
                   <label for="onboarding-org-name-input" class="text-sm font-medium text-slate-800 dark:text-slate-200">
                     {{ t('organization-name') }}
                   </label>
@@ -853,31 +862,14 @@ onUnmounted(() => {
                   </p>
                 </div>
 
-                <div class="border-t border-slate-200 pt-4 dark:border-white/15">
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div class="min-w-0">
-                      <p id="estimated-users-label" class="flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-200">
-                        <IconUsers class="h-4 w-4 text-primary-500" />
-                        {{ t('organization-onboarding-existing-users-label') }}
-                      </p>
-                      <p id="estimated-users-help" class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                        {{ t('organization-onboarding-existing-users-helper') }}
-                      </p>
-                    </div>
-                    <div
-                      class="shrink-0 rounded-xl border px-3 py-1.5 text-left sm:text-right"
-                      :class="selectedUserCountStop ? 'border-primary-500/20 bg-slate-100 text-slate-900 dark:border-primary-500/60 dark:bg-primary-500/25 dark:text-slate-100' : 'border-slate-200 bg-slate-50 text-slate-500 dark:border-white/15 dark:bg-slate-950/90 dark:text-slate-400'"
-                    >
-                      <div class="text-xs font-medium uppercase">
-                        {{ t('organization-onboarding-starting-plan') }}
-                      </div>
-                      <div class="mt-0.5 text-sm font-semibold">
-                        {{ selectedUserCountStop
-                          ? `${selectedUserCountStop.planName} · ${selectedUserCountStop.label}`
-                          : t('organization-onboarding-user-scale-required') }}
-                      </div>
-                    </div>
-                  </div>
+                <div>
+                  <p id="estimated-users-label" class="flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-200">
+                    <IconUsers class="h-4 w-4 text-primary-500" />
+                    {{ t('organization-onboarding-existing-users-label') }}
+                  </p>
+                  <p id="estimated-users-help" class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                    {{ t('organization-onboarding-existing-users-helper') }}
+                  </p>
 
                   <div
                     id="estimated-users"
@@ -952,288 +944,143 @@ onUnmounted(() => {
                   </button>
                 </div>
               </template>
-            </div>
-          </div>
-
-          <div v-else-if="step === 'logo'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
-            <div class="space-y-4">
-              <div>
-                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500 text-white">
-                  <IconImage class="h-5 w-5" />
-                </div>
-                <p class="mt-3 text-sm font-semibold text-primary-500 dark:text-slate-300">
-                  {{ t('organization-onboarding-step-logo') }}
-                </p>
-                <h2 class="mt-1.5 text-xl font-semibold text-slate-950 dark:text-white">
-                  {{ t('organization-onboarding-logo-title') }}
-                </h2>
-                <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                  {{ t('organization-onboarding-logo-subtitle') }}
-                </p>
-              </div>
-
-              <div class="flex flex-col gap-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 sm:flex-row sm:items-center dark:border-white/20 dark:bg-slate-950/90">
-                <div class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-900 text-xl font-semibold text-white dark:bg-slate-800">
-                  <img
-                    v-if="currentOrganization?.gid === activeOrgId && currentOrganization?.logo"
-                    :src="currentOrganization.logo"
-                    :alt="t('organization-onboarding-logo-alt', { name: activeOrgName || t('organization-onboarding-org-placeholder') })"
-                    class="h-full w-full object-cover"
-                  >
-                  <img
-                    v-else-if="selectedLogoPreview"
-                    :src="selectedLogoPreview"
-                    :alt="t('organization-onboarding-logo-preview-alt', { name: activeOrgName || t('organization-onboarding-org-placeholder') })"
-                    class="h-full w-full object-cover"
-                  >
-                  <span v-else>{{ (activeOrgName || 'O').slice(0, 2).toUpperCase() }}</span>
-                </div>
-                <div class="min-w-0">
-                  <div class="text-lg font-semibold text-slate-950 dark:text-white">
-                    {{ activeOrgName || t('organization-onboarding-org-placeholder') }}
-                  </div>
-                  <div class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                    {{ t('organization-onboarding-logo-helper') }}
-                  </div>
-                  <button type="button" class="d-btn mt-3 min-h-10" :class="whiteCardSecondaryButtonClass()" data-test="onboarding-upload-logo" :disabled="isUploadingLogo" @click="openLogoPicker">
-                    <IconUpload class="h-4 w-4" />
-                    {{ t('organization-onboarding-upload-logo') }}
-                  </button>
-                </div>
-              </div>
-
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-if="importedLogoUrl"
-                  type="button"
-                  class="d-btn min-h-11"
-                  :class="whiteCardPrimaryButtonClass()"
-                  data-test="onboarding-use-imported-logo"
-                  :disabled="isUploadingLogo"
-                  @click="useImportedLogo"
-                >
-                  <IconSparkles class="h-4 w-4" />
-                  {{ t('organization-onboarding-use-imported-logo') }}
-                </button>
-                <button
-                  type="button"
-                  class="d-btn min-h-11"
-                  :class="hasSavedLogo ? whiteCardPrimaryButtonClass() : whiteCardSecondaryButtonClass()"
-                  data-test="onboarding-logo-action"
-                  :disabled="isUploadingLogo"
-                  @click="skipLogo"
-                >
-                  {{ hasSavedLogo ? t('button-next') : t('skip') }}
-                  <IconArrowRight v-if="hasSavedLogo" class="h-4 w-4" />
-                </button>
-              </div>
-              <p v-if="hasSavedLogo" class="text-sm font-medium text-emerald-600 dark:text-emerald-300" aria-live="polite">
-                {{ t('organization-onboarding-logo-saved') }}
-              </p>
-            </div>
-          </div>
-
-          <div v-else-if="step === 'invite'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
-            <div class="space-y-4">
-              <div>
-                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500 text-white">
-                  <IconUserPlus class="h-5 w-5" />
-                </div>
-                <p class="mt-3 text-sm font-semibold text-primary-500 dark:text-slate-300">
-                  {{ t('organization-onboarding-step-invite') }}
-                </p>
-                <h2 class="mt-1.5 text-xl font-semibold text-slate-950 dark:text-white">
-                  {{ t('organization-onboarding-invite-title') }}
-                </h2>
-                <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                  {{ t('organization-onboarding-invite-subtitle') }}
-                </p>
-              </div>
-
-              <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/15 dark:bg-slate-950/90">
-                <div class="flex items-start gap-4">
-                  <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white dark:bg-slate-800">
-                    <IconBuilding class="h-5 w-5" />
-                  </div>
-                  <div class="min-w-0">
-                    <div class="truncate text-base font-semibold text-slate-950 dark:text-white">
-                      {{ activeOrgName || t('organization-onboarding-org-placeholder') }}
-                    </div>
-                    <p class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                      {{ inviteSuccessCount > 0
-                        ? t('organization-onboarding-invite-success-state')
-                        : t('organization-onboarding-invite-empty-state') }}
-                    </p>
-                  </div>
-                </div>
-
-                <ul v-if="inviteSuccessCount > 0" class="mt-4 space-y-3">
-                  <li
-                    v-for="invite in sentInvites"
-                    :key="invite.email"
-                    class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-white/15 dark:bg-slate-900/95"
-                  >
-                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-500 text-xs font-semibold text-white">
-                      {{ getInviteInitials(invite) }}
-                    </div>
-                    <div class="min-w-0">
-                      <div class="truncate text-sm font-semibold text-slate-950 dark:text-white">
-                        {{ getInviteDisplayName(invite) }}
-                      </div>
-                      <div class="truncate text-xs text-slate-500 dark:text-slate-400">
-                        {{ invite.email }}
-                      </div>
-                    </div>
-                  </li>
-                </ul>
-              </div>
-
-              <div class="flex flex-wrap gap-2">
-                <button type="button" class="d-btn min-h-11" :class="whiteCardPrimaryButtonClass()" data-test="onboarding-invite-users" @click="openInviteModal">
-                  <IconUserPlus class="h-4 w-4" />
-                  {{ t('organization-onboarding-open-invite') }}
-                </button>
-                <button type="button" class="d-btn min-h-11" :class="whiteCardSecondaryButtonClass()" data-test="onboarding-finish" @click="finishOnboarding">
-                  {{ t('organization-onboarding-create-app') }}
-                  <IconArrowRight class="h-4 w-4" />
-                </button>
-              </div>
-            </div>
+            </template>
           </div>
         </div>
 
-        <aside class="rounded-2xl border border-slate-900 bg-slate-950 p-4 text-white shadow-xl lg:sticky lg:top-6 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
-          <div class="flex items-center gap-4">
-            <div class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-800 text-xl font-semibold">
-              <img
-                v-if="importedLogoUrl || selectedLogoPreview || (currentOrganization?.gid === activeOrgId && currentOrganization?.logo)"
-                :src="(currentOrganization?.gid === activeOrgId ? currentOrganization.logo : '') || selectedLogoPreview || importedLogoUrl"
-                :alt="t('organization-onboarding-logo-preview-alt', { name: activeOrgName || t('organization-onboarding-org-placeholder') })"
-                class="h-full w-full object-cover"
-              >
-              <IconBuilding v-else-if="!activeOrgName" class="h-7 w-7 text-slate-400" />
-              <span v-else>{{ activeOrgName.slice(0, 2).toUpperCase() }}</span>
-            </div>
-            <div class="min-w-0">
-              <p class="text-xs font-medium uppercase text-slate-400">
-                {{ t('organization-onboarding-summary') }}
-              </p>
-              <p class="mt-1 truncate text-lg font-semibold">
-                {{ activeOrgName || t('organization-onboarding-org-placeholder') }}
-              </p>
-              <p class="mt-1 truncate text-xs text-slate-400">
-                {{ websiteHostname || t('organization-onboarding-mode-name') }}
+        <div v-else-if="step === 'logo'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 dark:border-white/15 dark:bg-slate-900/95">
+          <div class="space-y-4">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-950 dark:text-white">
+                {{ t('organization-onboarding-logo-title') }}
+              </h2>
+              <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                {{ t('organization-onboarding-logo-subtitle') }}
               </p>
             </div>
-          </div>
 
-          <div class="mt-4 grid gap-2 text-sm">
-            <div class="rounded-xl border border-white/10 bg-white/5 p-3">
-              <div class="text-xs font-medium uppercase text-slate-500">
-                {{ t('organization-onboarding-selected-path') }}
-              </div>
-              <div class="mt-1 font-semibold text-white">
-                {{ mode === 'website'
-                  ? t('organization-onboarding-mode-website')
-                  : mode === 'name'
-                    ? t('organization-onboarding-mode-name')
-                    : t('organization-onboarding-no-choice') }}
-              </div>
-            </div>
-            <div class="rounded-xl border border-white/10 bg-white/5 p-3">
-              <div class="text-xs font-medium uppercase text-slate-500">
-                {{ t('organization-onboarding-starting-plan') }}
-              </div>
-              <div class="mt-1 font-semibold text-white">
-                {{ selectedUserCountStop
-                  ? `${selectedUserCountStop.planName} · ${selectedUserCountStop.label}`
-                  : t('organization-onboarding-user-scale-required') }}
-              </div>
-            </div>
-          </div>
-
-          <div v-if="step === 'details'" class="mt-4 border-t border-white/10 pt-4">
-            <p class="text-xs font-medium uppercase text-slate-500">
-              {{ t('organization-onboarding-next-steps') }}
-            </p>
-            <ul class="mt-3 space-y-2 text-sm leading-6 text-slate-300">
-              <li class="flex gap-3">
-                <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-400" />
-                {{ mode === 'website' && importedLogoUrl
-                  ? t('organization-onboarding-next-invite-direct')
-                  : t('organization-onboarding-next-logo') }}
-              </li>
-              <li class="flex gap-3">
-                <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-400" />
-                {{ mode === 'website' && importedLogoUrl
-                  ? t('organization-onboarding-next-create-app-direct')
-                  : t('organization-onboarding-next-invite') }}
-              </li>
-              <li class="flex gap-3">
-                <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-400" />
-                {{ mode === 'website' && importedLogoUrl
-                  ? t('organization-onboarding-next-assets-direct')
-                  : t('organization-onboarding-next-create-app') }}
-              </li>
-            </ul>
-          </div>
-
-          <div v-else-if="step === 'logo'" class="mt-4 border-t border-white/10 pt-4">
-            <p class="text-xs font-medium uppercase text-slate-500">
-              {{ t('organization-onboarding-import-preview') }}
-            </p>
-            <div class="mt-4 flex items-center gap-4">
-              <img
-                v-if="importedLogoUrl"
-                :src="importedLogoUrl"
-                :alt="t('organization-onboarding-imported-logo-preview-alt')"
-                class="h-14 w-14 rounded-xl border border-white/10 object-cover"
-              >
-              <div v-else class="flex h-14 w-14 items-center justify-center rounded-xl border border-dashed border-white/15 bg-white/5 text-xs text-slate-400">
-                {{ t('organization-onboarding-no-logo') }}
+            <div class="flex flex-col gap-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 sm:flex-row sm:items-center dark:border-white/20 dark:bg-slate-950/90">
+              <div class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-900 text-xl font-semibold text-white dark:bg-slate-800">
+                <img
+                  v-if="currentOrganization?.gid === activeOrgId && currentOrganization?.logo"
+                  :src="currentOrganization.logo"
+                  :alt="t('organization-onboarding-logo-alt', { name: activeOrgName || t('organization-onboarding-org-placeholder') })"
+                  class="h-full w-full object-cover"
+                >
+                <img
+                  v-else-if="selectedLogoPreview"
+                  :src="selectedLogoPreview"
+                  :alt="t('organization-onboarding-logo-preview-alt', { name: activeOrgName || t('organization-onboarding-org-placeholder') })"
+                  class="h-full w-full object-cover"
+                >
+                <span v-else>{{ (activeOrgName || 'O').slice(0, 2).toUpperCase() }}</span>
               </div>
               <div class="min-w-0">
-                <p class="truncate text-sm font-semibold text-white">
+                <div class="text-lg font-semibold text-slate-950 dark:text-white">
                   {{ activeOrgName || t('organization-onboarding-org-placeholder') }}
-                </p>
-                <p class="mt-1 truncate text-xs text-slate-400">
-                  {{ websiteHostname || t('organization-onboarding-mode-name') }}
-                </p>
+                </div>
+                <div class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  {{ t('organization-onboarding-logo-helper') }}
+                </div>
+                <button type="button" class="d-btn mt-3 min-h-10" :class="whiteCardSecondaryButtonClass()" data-test="onboarding-upload-logo" :disabled="isUploadingLogo" @click="openLogoPicker">
+                  <IconUpload class="h-4 w-4" />
+                  {{ t('organization-onboarding-upload-logo') }}
+                </button>
               </div>
             </div>
 
-            <ul class="mt-4 space-y-2 text-sm leading-6 text-slate-300">
-              <li class="flex gap-3">
-                <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-400" />
-                {{ t('organization-onboarding-logo-tip-upload') }}
-              </li>
-              <li class="flex gap-3">
-                <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-400" />
-                {{ t('organization-onboarding-logo-tip-skip') }}
-              </li>
-            </ul>
-          </div>
-
-          <div v-else class="mt-4 border-t border-white/10 pt-4">
-            <p class="text-xs font-medium uppercase text-slate-500">
-              {{ t('organization-onboarding-what-next') }}
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-if="importedLogoUrl"
+                type="button"
+                class="d-btn min-h-11"
+                :class="whiteCardPrimaryButtonClass()"
+                data-test="onboarding-use-imported-logo"
+                :disabled="isUploadingLogo"
+                @click="useImportedLogo"
+              >
+                <IconSparkles class="h-4 w-4" />
+                {{ t('organization-onboarding-use-imported-logo') }}
+              </button>
+              <button
+                type="button"
+                class="d-btn min-h-11"
+                :class="hasSavedLogo ? whiteCardPrimaryButtonClass() : whiteCardSecondaryButtonClass()"
+                data-test="onboarding-logo-action"
+                :disabled="isUploadingLogo"
+                @click="skipLogo"
+              >
+                {{ hasSavedLogo ? t('button-next') : t('skip') }}
+                <IconArrowRight v-if="hasSavedLogo" class="h-4 w-4" />
+              </button>
+            </div>
+            <p v-if="hasSavedLogo" class="text-sm font-medium text-emerald-600 dark:text-emerald-300" aria-live="polite">
+              {{ t('organization-onboarding-logo-saved') }}
             </p>
-            <ul class="mt-3 space-y-2 text-sm leading-6 text-slate-300">
-              <li class="flex gap-3">
-                <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-400" />
-                {{ t('organization-onboarding-after-invite-1') }}
-              </li>
-              <li class="flex gap-3">
-                <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-400" />
-                {{ t('organization-onboarding-after-invite-2') }}
-              </li>
-              <li class="flex gap-3">
-                <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-400" />
-                {{ t('organization-onboarding-after-create-app') }}
-              </li>
-            </ul>
           </div>
-        </aside>
+        </div>
+
+        <div v-else-if="step === 'invite'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 dark:border-white/15 dark:bg-slate-900/95">
+          <div class="space-y-4">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-950 dark:text-white">
+                {{ t('organization-onboarding-invite-title') }}
+              </h2>
+              <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                {{ t('organization-onboarding-invite-subtitle') }}
+              </p>
+            </div>
+
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/15 dark:bg-slate-950/90">
+              <div class="flex items-start gap-4">
+                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white dark:bg-slate-800">
+                  <IconBuilding class="h-5 w-5" />
+                </div>
+                <div class="min-w-0">
+                  <div class="truncate text-base font-semibold text-slate-950 dark:text-white">
+                    {{ activeOrgName || t('organization-onboarding-org-placeholder') }}
+                  </div>
+                  <p class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                    {{ inviteSuccessCount > 0
+                      ? t('organization-onboarding-invite-success-state')
+                      : t('organization-onboarding-invite-empty-state') }}
+                  </p>
+                </div>
+              </div>
+
+              <ul v-if="inviteSuccessCount > 0" class="mt-4 space-y-3">
+                <li
+                  v-for="invite in sentInvites"
+                  :key="invite.email"
+                  class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-white/15 dark:bg-slate-900/95"
+                >
+                  <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-500 text-xs font-semibold text-white">
+                    {{ getInviteInitials(invite) }}
+                  </div>
+                  <div class="min-w-0">
+                    <div class="truncate text-sm font-semibold text-slate-950 dark:text-white">
+                      {{ getInviteDisplayName(invite) }}
+                    </div>
+                    <div class="truncate text-xs text-slate-500 dark:text-slate-400">
+                      {{ invite.email }}
+                    </div>
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+              <button type="button" class="d-btn min-h-11" :class="whiteCardPrimaryButtonClass()" data-test="onboarding-invite-users" @click="openInviteModal">
+                <IconUserPlus class="h-4 w-4" />
+                {{ t('organization-onboarding-open-invite') }}
+              </button>
+              <button type="button" class="d-btn min-h-11" :class="whiteCardSecondaryButtonClass()" data-test="onboarding-finish" @click="finishOnboarding">
+                {{ t('organization-onboarding-create-app') }}
+                <IconArrowRight class="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
