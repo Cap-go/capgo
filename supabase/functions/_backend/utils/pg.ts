@@ -111,6 +111,96 @@ export function selectOne(pgClient: ReturnType<typeof getPgClient>) {
   return pgClient.query('SELECT 1')
 }
 
+function parseDatabaseUrl(databaseUrl: string): URL | null {
+  try {
+    return new URL(databaseUrl)
+  }
+  catch {
+    return null
+  }
+}
+
+export function isLocalDatabaseUrl(databaseUrl: string): boolean {
+  const parsed = parseDatabaseUrl(databaseUrl)
+  if (!parsed)
+    return false
+
+  const hostname = parsed.hostname.toLowerCase()
+  return hostname === 'localhost'
+    || hostname === '127.0.0.1'
+    || hostname === '::1'
+    || hostname.startsWith('supabase_db_')
+}
+
+export function isHostedSupabaseDatabaseUrl(databaseUrl: string): boolean {
+  const parsed = parseDatabaseUrl(databaseUrl)
+  if (!parsed)
+    return false
+
+  const hostname = parsed.hostname.toLowerCase()
+  return hostname.endsWith('.supabase.co') || hostname.endsWith('.supabase.com')
+}
+
+function isSupabasePoolerDatabaseUrl(databaseUrl: string): boolean {
+  const parsed = parseDatabaseUrl(databaseUrl)
+  if (!parsed)
+    return false
+
+  const port = parsed.port || '5432'
+  return port === '6543' && isHostedSupabaseDatabaseUrl(databaseUrl)
+}
+
+function usesHyperdriveDatabaseSource(databaseSource: string): boolean {
+  return databaseSource.startsWith('HYPERDRIVE_')
+}
+
+export function shouldEnforceProdDatabaseSsl(databaseUrl: string, databaseSource: string): boolean {
+  if (usesHyperdriveDatabaseSource(databaseSource))
+    return false
+
+  return isHostedSupabaseDatabaseUrl(databaseUrl) && !isLocalDatabaseUrl(databaseUrl)
+}
+
+export function ensureProdDatabaseSslMode(databaseUrl: string): string {
+  const parsed = parseDatabaseUrl(databaseUrl)
+  if (!parsed || !isHostedSupabaseDatabaseUrl(databaseUrl) || isLocalDatabaseUrl(databaseUrl))
+    return databaseUrl
+
+  parsed.searchParams.delete('ssl')
+  const sslMode = parsed.searchParams.get('sslmode')?.toLowerCase()
+  if (!sslMode || sslMode === 'prefer' || sslMode === 'allow' || sslMode === 'disable')
+    parsed.searchParams.set('sslmode', 'require')
+
+  return parsed.toString()
+}
+
+function shouldAllowSelfSignedPgCertificate(c: Context, databaseUrl: string): boolean {
+  const allowSelfSigned = getEnv(c, 'PG_ALLOW_SELF_SIGNED_CERT')?.trim().toLowerCase()
+  if (allowSelfSigned === 'true' || allowSelfSigned === '1')
+    return true
+  if (allowSelfSigned === 'false' || allowSelfSigned === '0')
+    return false
+
+  const rejectUnauthorized = getEnv(c, 'PG_SSL_REJECT_UNAUTHORIZED')?.trim()
+  if (rejectUnauthorized === '0')
+    return true
+  if (rejectUnauthorized === '1')
+    return false
+
+  return isSupabasePoolerDatabaseUrl(databaseUrl)
+}
+
+export function getPgPoolSslOptions(
+  c: Context,
+  databaseUrl: string,
+  databaseSource: string,
+): false | { rejectUnauthorized: boolean } {
+  if (!shouldEnforceProdDatabaseSsl(databaseUrl, databaseSource))
+    return false
+
+  return { rejectUnauthorized: !shouldAllowSelfSignedPgCertificate(c, databaseUrl) }
+}
+
 function fixSupabaseHost(host: string): string {
   if (host.includes('postgres:postgres@supabase_db_')) {
     // Supabase adds a prefix to the hostname that breaks connection in local docker
@@ -333,9 +423,13 @@ export function getPgClient(c: Context, readOnly = false) {
   const dbName = String(c.get('databaseSource') ?? c.res.headers.get('X-Database-Source') ?? 'unknown source')
   cloudlog({ requestId, message: 'SUPABASE_DB_URL selected', dbName, appName, readOnly })
 
+  const connectionString = shouldEnforceProdDatabaseSsl(dbUrl, dbName)
+    ? ensureProdDatabaseSslMode(dbUrl)
+    : dbUrl
+  const ssl = getPgPoolSslOptions(c, connectionString, dbName)
   const isPooler = dbName.startsWith('sb_pooler')
   const options = {
-    connectionString: dbUrl,
+    connectionString,
     max: 4,
     application_name: `${appName}-${dbName}`,
     idleTimeoutMillis: 20000, // Increase from 2 to 20 seconds
@@ -343,6 +437,7 @@ export function getPgClient(c: Context, readOnly = false) {
     maxLifetimeMillis: 30 * 60 * 1000, // 30 minutes
     // PgBouncer/Supabase pooler doesn't support the 'options' startup parameter
     options: readOnly && !isPooler ? '-c default_transaction_read_only=on' : undefined,
+    ...(ssl ? { ssl } : {}),
   }
 
   const pool = new Pool(options)
