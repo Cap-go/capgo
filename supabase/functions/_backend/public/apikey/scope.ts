@@ -85,7 +85,7 @@ async function getApiKeyManageableOrgIds(
   const callerOrgIds = (await loadApiKeyBindingOrgIdsForRbacIds(c, [authApikey.rbac_id])).get(authApikey.rbac_id) ?? []
   const manageableOrgIds = new Set<string>()
   for (const orgId of callerOrgIds) {
-    if (await checkPermission(c, 'org.update_user_roles', { orgId })) {
+    if (await checkPermission(c, 'org.manage_apikeys', { orgId })) {
       manageableOrgIds.add(orgId)
     }
   }
