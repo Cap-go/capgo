@@ -37,7 +37,7 @@ BEGIN
   SELECT * from get_plan_usage_percent_detailed('046a36ac-e03c-4590-9257-bd6c9dba9ee8') limit 1 into usage;
   RETURN NEXT IS(usage.storage_percent, (SELECT CAST ('30.0' AS DOUBLE PRECISION)), 'Storage usage = 30% for "Solo" plan');
   RETURN NEXT IS(usage.mau_percent, (SELECT CAST ('0.0' AS DOUBLE PRECISION)), 'Mau usage = 0% for "Solo" plan');
-  RETURN NEXT IS(usage.bandwidth_percent, (SELECT CAST ('0.5' AS DOUBLE PRECISION)), 'Bandwidth usage = 0.5% for "Solo" plan');
+  RETURN NEXT IS(usage.bandwidth_percent, (SELECT CAST ('0.0' AS DOUBLE PRECISION)), 'Bandwidth usage = 0% for "Solo" plan (sub-1% truncates)');
 
   -- Let's now add a second app to this org.
   ALTER TABLE public.app_versions DISABLE TRIGGER force_valid_owner_org_app_versions;
@@ -76,7 +76,7 @@ BEGIN
   SELECT * from get_plan_usage_percent_detailed('046a36ac-e03c-4590-9257-bd6c9dba9ee8') limit 1 into usage;
   RETURN NEXT IS(usage.storage_percent, (SELECT CAST ('40.0' AS DOUBLE PRECISION)), 'Storage usage = 40% for "Solo" plan (2 apps)');
   RETURN NEXT IS(usage.mau_percent, (SELECT CAST ('1.0' AS DOUBLE PRECISION)), 'Mau usage = 1% for "Solo" plan (2 apps)');
-  RETURN NEXT IS(usage.bandwidth_percent, (SELECT CAST ('1.0' AS DOUBLE PRECISION)), 'Bandwidth usage = 1% for "Solo" plan (2 apps)');
+  RETURN NEXT IS(usage.bandwidth_percent, (SELECT CAST ('0.0' AS DOUBLE PRECISION)), 'Bandwidth usage = 0% for "Solo" plan (2 apps, sub-1% truncates)');
 END;
 $$ LANGUAGE plpgsql;
 
