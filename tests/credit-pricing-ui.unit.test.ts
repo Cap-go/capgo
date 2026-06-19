@@ -69,7 +69,7 @@ describe('credit pricing UI helpers', () => {
         type: 'bandwidth',
         step_min: 0,
         step_max: 1099511627776,
-        price_per_unit: 0.12,
+        price_per_unit: 0.06,
         unit_factor: 1073741824,
       },
       {
@@ -80,7 +80,7 @@ describe('credit pricing UI helpers', () => {
         unit_factor: 60,
       },
     ])).toEqual({
-      bandwidth: 0.12,
+      bandwidth: 0.06,
       build_time: 0.08,
     })
   })
