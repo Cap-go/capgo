@@ -799,41 +799,6 @@ watch(suggestedAppId, (value) => {
                 </button>
               </div>
 
-              <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 dark:border-white/20 dark:bg-slate-950/90">
-                <button
-                  type="button"
-                  class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:text-white"
-                  @click="isCliCommandVisible = !isCliCommandVisible"
-                >
-                  <IconTerminal class="h-4 w-4" />
-                  {{ isCliCommandVisible ? t('app-onboarding-command-hide') : t('app-onboarding-command-show') }}
-                </button>
-                <p class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  {{ t('app-onboarding-command-help') }}
-                </p>
-                <div
-                  v-if="isCliCommandVisible"
-                  class="group relative mt-3 cursor-pointer rounded-xl bg-slate-950 p-4 pr-14 ring-1 ring-white/10 transition hover:ring-white/20"
-                  role="button"
-                  tabindex="0"
-                  :aria-label="t('app-onboarding-command-copy')"
-                  @click="copyCliCommand"
-                  @keydown.enter.prevent="copyCliCommand"
-                  @keydown.space.prevent="copyCliCommand"
-                >
-                  <code class="block whitespace-pre-wrap break-all text-sm">
-                    <span class="text-slate-500">npx</span>
-                    <span class="text-sky-300"> @capgo/cli@latest</span>
-                    <span class="mr-1 font-bold text-violet-300"> i</span>
-                    <span class="text-emerald-300"> {{ apiKey ?? '[APIKEY]' }}</span>
-                    <template v-for="(arg, index) in cliCommandArgs" :key="`${arg}-${index}`">
-                      <span :class="index % 2 === 0 ? 'text-amber-300' : 'text-cyan-300'"> {{ arg }}</span>
-                    </template>
-                  </code>
-                  <IconCopy class="absolute right-4 top-4 h-5 w-5 text-muted-blue-300 transition group-hover:text-white" />
-                </div>
-              </div>
-
               <div v-if="existingApp === true" class="space-y-5 border-t border-slate-200 pt-6 dark:border-white/15">
                 <div>
                   <p class="text-sm font-semibold text-slate-950 dark:text-white">
@@ -983,6 +948,55 @@ watch(suggestedAppId, (value) => {
                   </button>
                 </div>
               </template>
+
+              <div class="pt-1">
+                <button
+                  v-if="!isCliCommandVisible"
+                  type="button"
+                  class="text-[11px] text-slate-400/70 underline-offset-2 transition hover:text-slate-500 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-500/70 dark:hover:text-slate-400"
+                  @click="isCliCommandVisible = true"
+                >
+                  {{ t('app-onboarding-command-show') }}
+                </button>
+
+                <div
+                  v-else
+                  class="space-y-3 rounded-xl border border-slate-200/80 bg-slate-50/60 p-4 dark:border-white/10 dark:bg-slate-950/40"
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <p class="text-xs leading-5 text-slate-500 dark:text-slate-400">
+                      {{ t('app-onboarding-command-help') }}
+                    </p>
+                    <button
+                      type="button"
+                      class="shrink-0 text-[11px] text-slate-400 underline-offset-2 transition hover:text-slate-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-500 dark:hover:text-slate-300"
+                      @click="isCliCommandVisible = false"
+                    >
+                      {{ t('app-onboarding-command-hide') }}
+                    </button>
+                  </div>
+                  <div
+                    class="group relative cursor-pointer rounded-xl bg-slate-950 p-4 pr-14 ring-1 ring-white/10 transition hover:ring-white/20"
+                    role="button"
+                    tabindex="0"
+                    :aria-label="t('app-onboarding-command-copy')"
+                    @click="copyCliCommand"
+                    @keydown.enter.prevent="copyCliCommand"
+                    @keydown.space.prevent="copyCliCommand"
+                  >
+                    <code class="block whitespace-pre-wrap break-all text-sm">
+                      <span class="text-slate-500">npx</span>
+                      <span class="text-sky-300"> @capgo/cli@latest</span>
+                      <span class="mr-1 font-bold text-violet-300"> i</span>
+                      <span class="text-emerald-300"> {{ apiKey ?? '[APIKEY]' }}</span>
+                      <template v-for="(arg, index) in cliCommandArgs" :key="`${arg}-${index}`">
+                        <span :class="index % 2 === 0 ? 'text-amber-300' : 'text-cyan-300'"> {{ arg }}</span>
+                      </template>
+                    </code>
+                    <IconCopy class="absolute right-4 top-4 h-5 w-5 text-muted-blue-300 transition group-hover:text-white" />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
