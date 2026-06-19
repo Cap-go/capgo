@@ -1,15 +1,16 @@
--- Remove duplicate global bandwidth tiers if a prior upsert inserted instead of updating.
-DELETE FROM public.capgo_credits_steps AS duplicate
-WHERE duplicate.type = 'bandwidth'
-  AND duplicate.org_id IS NULL
-  AND EXISTS (
-    SELECT 1
-    FROM public.capgo_credits_steps AS keeper
-    WHERE keeper.type = 'bandwidth'
-      AND keeper.org_id IS NULL
-      AND keeper.step_min = duplicate.step_min
-      AND keeper.step_max = duplicate.step_max
-      AND keeper.id < duplicate.id
+-- Keep only the canonical global bandwidth tiers (TB-based boundaries).
+DELETE FROM public.capgo_credits_steps
+WHERE type = 'bandwidth'
+  AND org_id IS NULL
+  AND (step_min, step_max) NOT IN (
+    (0::bigint, 1099511627776::bigint),
+    (1099511627776::bigint, 2199023255552::bigint),
+    (2199023255552::bigint, 6597069766656::bigint),
+    (6597069766656::bigint, 13194139533312::bigint),
+    (13194139533312::bigint, 27487790694400::bigint),
+    (27487790694400::bigint, 69269232549888::bigint),
+    (69269232549888::bigint, 139637976727552::bigint),
+    (139637976727552::bigint, 9223372036854775807::bigint)
   );
 
 
