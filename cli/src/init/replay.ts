@@ -585,6 +585,7 @@ class InitReplayRecorder implements InitReplayController {
   private captureTimer: NodeJS.Timeout | undefined
   private disposed = false
   private hasSentMeta = false
+  private metaGeneration = 0
   private lastSnapshotText = ''
   private pendingTerminalWrite = Promise.resolve()
   private resolvedTerminalPixelSize: TerminalPixelSize | undefined
@@ -666,6 +667,7 @@ class InitReplayRecorder implements InitReplayController {
     const rows = stdout.rows || this.rows
     this.lastSnapshotText = ''
     this.hasSentMeta = false
+    this.metaGeneration += 1
     this.resolvedTerminalPixelSize = undefined
     // Re-querying pixel size touches shared stdin and can leak CSI responses into
     // active Ink prompts; fall back to cols/rows-based viewport sizing instead.
@@ -722,6 +724,7 @@ class InitReplayRecorder implements InitReplayController {
     const viewport = getReplayViewportSize(stdout.columns || this.cols, stdout.rows || this.rows, terminalPixelSize)
     const events: eventWithTime[] = []
 
+    const metaGenerationAtCapture = this.metaGeneration
     const frameIncludesMeta = !this.hasSentMeta
     if (frameIncludesMeta) {
       const metaEventWithTime = {
@@ -771,7 +774,7 @@ class InitReplayRecorder implements InitReplayController {
     })
     const pending = this.transport(replayUrl, body, this.apikey, controller.signal)
       .then((sent) => {
-        if (sent && frameIncludesMeta)
+        if (sent && frameIncludesMeta && metaGenerationAtCapture === this.metaGeneration)
           this.hasSentMeta = true
         return sent
       })

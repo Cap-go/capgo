@@ -339,5 +339,72 @@ assert.equal(applyRawCommandAnalyticsOptOut(['node', 'capgo', 'bundle', 'upload'
   }
 }
 
+{
+  const captured = []
+  const restoreFns = []
+  let cols = 80
+  let rows = 24
+  let releaseStaleSend
+  let staleSendStarted = false
+  const staleSendGate = new Promise((resolve) => {
+    releaseStaleSend = resolve
+  })
+  const columnsDescriptor = Object.getOwnPropertyDescriptor(stdout, 'columns')
+  const rowsDescriptor = Object.getOwnPropertyDescriptor(stdout, 'rows')
+
+  try {
+    restoreFns.push(replaceProcessProperty(stdout, 'isTTY', true))
+    restoreFns.push(replaceProcessProperty(stdin, 'isTTY', true))
+    Object.defineProperty(stdout, 'columns', { configurable: true, enumerable: true, get: () => cols })
+    Object.defineProperty(stdout, 'rows', { configurable: true, enumerable: true, get: () => rows })
+
+    const replay = startInitReplay({
+      apikey: 'capgo-key',
+      isCi: false,
+      replayUrl: 'https://api.capgo.app/private/replay',
+      cols: 80,
+      rows: 24,
+      throttleMs: 10,
+      terminalPixelSize: { height: 480, width: 800 },
+      transport: async (_url, body) => {
+        if (!staleSendStarted) {
+          staleSendStarted = true
+          await staleSendGate
+        }
+        captured.push(body)
+        return true
+      },
+    })
+    assert.ok(replay, 'replay starts for stale meta send test')
+
+    stdout.write('before stale send\r\n')
+    await new Promise(resolve => setTimeout(resolve, 40))
+    assert.equal(staleSendStarted, true, 'first snapshot send starts before resize')
+
+    cols = 100
+    rows = 30
+    stdout.emit('resize')
+    stdout.write('after stale send\r\n')
+    releaseStaleSend()
+    await new Promise(resolve => setTimeout(resolve, 80))
+    await replay.finish()
+
+    const resizedMeta = captured.flatMap(body => body.properties.$snapshot_data.filter(event => event.type === 4))
+      .find(event => event.data.width === getReplayViewportSize(100, 30).width
+        && event.data.height === getReplayViewportSize(100, 30).height)
+    assert.ok(resizedMeta, 'post-resize snapshot still includes fresh viewport meta after a stale send completes')
+  }
+  finally {
+    if (columnsDescriptor)
+      Object.defineProperty(stdout, 'columns', columnsDescriptor)
+    else delete stdout.columns
+    if (rowsDescriptor)
+      Object.defineProperty(stdout, 'rows', rowsDescriptor)
+    else delete stdout.rows
+    while (restoreFns.length > 0)
+      restoreFns.pop()()
+  }
+}
+
 
 console.log('✅ init replay telemetry tests passed')
