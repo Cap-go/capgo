@@ -9,7 +9,7 @@ import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { parseApiKeyGlobalPermissions, replaceApiKeyGlobalPermissions, validateApiKeyGlobalPermissionsForBindings } from './global_permissions.ts'
-import { requireApiKeyManagementAuth } from './scope.ts'
+import { ensureApiKeyManagementAllowed, requireApiKeyManagementAuth } from './scope.ts'
 
 interface BindingInput {
   role_name: string
@@ -68,16 +68,16 @@ async function createApiKeyRecord(
 
 app.post('/', middlewareAuth(), async (c) => {
   const auth = requireApiKeyManagementAuth(c, 'not_authorized', 'API key management requires authentication')
+  const authApikey = c.get('apikey') as ApiKeyRow | undefined
+
+  await ensureApiKeyManagementAllowed(c, auth, authApikey, 'cannot_create_apikey')
 
   const body = await parseBody<any>(c)
 
   const name = body.name ?? ''
 
-  if (auth.authType !== 'jwt' || !auth.userId) {
-    if (auth.authType === 'apikey') {
-      throw simpleError('cannot_create_apikey', 'API keys cannot create other API keys')
-    }
-    throw simpleError('not_authorized', 'Only user sessions can create API keys')
+  if (!auth.userId) {
+    throw simpleError('not_authorized', 'API key management requires authentication')
   }
   const expiresAt = body.expires_at ?? null
   const isHashed = body.hashed === true
@@ -131,8 +131,8 @@ app.post('/', middlewareAuth(), async (c) => {
   try {
     // Check RBAC permission for each unique org in the bindings before creating anything.
     for (const bindingOrgId of allOrgIds) {
-      if (!(await checkPermission(c, 'org.update_user_roles', { orgId: bindingOrgId }))) {
-        throw quickError(403, 'forbidden_binding', `Forbidden - Admin rights required for org ${bindingOrgId}`)
+      if (!(await checkPermission(c, 'org.manage_apikeys', { orgId: bindingOrgId }))) {
+        throw quickError(403, 'forbidden_binding', `Forbidden - API key management rights required for org ${bindingOrgId}`)
       }
     }
 
@@ -140,6 +140,8 @@ app.post('/', middlewareAuth(), async (c) => {
     const drizzle = getDrizzleClient(pgClient)
     const createdBindings: unknown[] = []
     const callerPrincipalId = auth.userId
+    const bindingAuthType = auth.authType === 'apikey' ? 'apikey' : 'jwt'
+    const callerApikeyRbacId = auth.authType === 'apikey' ? auth.apikey?.rbac_id : undefined
 
     await drizzle.transaction(async (tx) => {
       apikeyData = await createApiKeyRecord(tx, {
@@ -189,8 +191,8 @@ app.post('/', middlewareAuth(), async (c) => {
           tx as unknown as ReturnType<typeof getDrizzleClient>,
           bindingParams,
           auth.userId,
-          'jwt',
-          callerPrincipalId,
+          bindingAuthType,
+          bindingAuthType === 'apikey' && callerApikeyRbacId ? callerApikeyRbacId : callerPrincipalId,
         )
 
         if (!result.ok) {
