@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(6);
+SELECT plan(8);
 
 -- org.manage_apikeys permission and apikey_manager role exist
 SELECT ok(
@@ -119,6 +119,38 @@ SELECT ok(
     WHERE name IN ('channel_developer', 'channel_uploader')
   ),
   'legacy channel_developer and channel_uploader roles are not seeded'
+);
+
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM public.apikeys ak
+    JOIN public.role_bindings rb
+      ON rb.principal_type = public.rbac_principal_apikey()
+      AND rb.principal_id = ak.rbac_id
+    JOIN public.roles r ON r.id = rb.role_id
+    WHERE ak.id = 113
+      AND ak.key = 'd1e2f3a4-b5c6-4d7e-8f90-a1b2c3d4e5f6'
+      AND r.name = public.rbac_role_apikey_manager()
+  ),
+  'seed apikey 113 is bound to apikey_manager'
+);
+
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1
+    FROM public.apikeys ak
+    JOIN public.role_bindings rb
+      ON rb.principal_type = public.rbac_principal_apikey()
+      AND rb.principal_id = ak.rbac_id
+    JOIN public.roles r ON r.id = rb.role_id
+    JOIN public.role_permissions rp ON rp.role_id = r.id
+    JOIN public.permissions p ON p.id = rp.permission_id
+    WHERE ak.id = 113
+      AND p.key = public.rbac_perm_org_update_user_roles()
+  ),
+  'seed apikey 113 does not inherit org.update_user_roles'
 );
 
 SELECT * FROM finish();
