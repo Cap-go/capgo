@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
+  APIKEY_MANAGEMENT_APIKEY_MANAGER,
+  APIKEY_MANAGEMENT_APIKEY_MANAGER_ID,
   APIKEY_MANAGEMENT_ORG_SUPER_ADMIN,
   appApiKeyBindings,
   BASE_URL,
@@ -447,6 +449,94 @@ describe('[POST] /apikey operations', () => {
 
       const verifySiblingResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, { headers: dedicatedAuthHeaders })
       expect(verifySiblingResponse.status).toBe(404)
+    }
+    finally {
+      for (const keyId of createdKeyIds.reverse()) {
+        await fetch(`${BASE_URL}/apikey/${keyId}`, {
+          method: 'DELETE',
+          headers: dedicatedAuthHeaders,
+        })
+      }
+    }
+  })
+
+
+  it.concurrent('apikey_manager API key can manage sibling keys without role escalation', async () => {
+    const dedicatedAuthHeaders = await getAuthHeadersForCredentials(USER_EMAIL_APIKEY_MANAGEMENT, USER_PASSWORD)
+    const managerKeyHeaders = {
+      'Content-Type': 'application/json',
+      'capgkey': APIKEY_MANAGEMENT_APIKEY_MANAGER,
+    }
+    const createdKeyIds: number[] = []
+
+    try {
+      const siblingResponse = await fetch(`${BASE_URL}/apikey`, {
+        method: 'POST',
+        headers: dedicatedAuthHeaders,
+        body: JSON.stringify(orgKeyBody('apikey-manager-sibling-target', {
+          bindings: orgApiKeyBindings(ORG_ID_APIKEY_MANAGEMENT, 'org_member'),
+        })),
+      })
+      expect(siblingResponse.status).toBe(200)
+      const siblingData = await siblingResponse.json<{ id: number }>()
+      createdKeyIds.push(siblingData.id)
+
+      const listResponse = await fetch(`${BASE_URL}/apikey`, { method: 'GET', headers: managerKeyHeaders })
+      expect(listResponse.status).toBe(200)
+      const listData = await listResponse.json<Array<{ id: number }>>()
+      expect(listData.some(apikey => apikey.id === siblingData.id)).toBe(true)
+
+      const createResponse = await fetch(`${BASE_URL}/apikey`, {
+        method: 'POST',
+        headers: managerKeyHeaders,
+        body: JSON.stringify(orgKeyBody('apikey-manager-created-sibling', {
+          bindings: orgApiKeyBindings(ORG_ID_APIKEY_MANAGEMENT, 'org_member'),
+        })),
+      })
+      expect(createResponse.status).toBe(200)
+      const createdData = await createResponse.json<{ id: number, key: string }>()
+      createdKeyIds.push(createdData.id)
+
+      const updateResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
+        method: 'PUT',
+        headers: managerKeyHeaders,
+        body: JSON.stringify({ name: 'apikey-manager-renamed-sibling' }),
+      })
+      expect(updateResponse.status).toBe(200)
+
+      const bindingUpdateResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
+        method: 'PUT',
+        headers: managerKeyHeaders,
+        body: JSON.stringify({
+          bindings: orgApiKeyBindings(ORG_ID_APIKEY_MANAGEMENT, 'org_super_admin'),
+        }),
+      })
+      expect(bindingUpdateResponse.status).toBe(401)
+      await expect(bindingUpdateResponse.json()).resolves.toHaveProperty('error', 'cannot_update_apikey')
+
+      const privilegedCreateResponse = await fetch(`${BASE_URL}/apikey`, {
+        method: 'POST',
+        headers: managerKeyHeaders,
+        body: JSON.stringify(orgKeyBody('apikey-manager-blocked-privileged-create', {
+          bindings: orgApiKeyBindings(ORG_ID_APIKEY_MANAGEMENT, 'org_super_admin'),
+        })),
+      })
+      expect(privilegedCreateResponse.status).toBe(403)
+
+      const selfUpdateResponse = await fetch(`${BASE_URL}/apikey/${APIKEY_MANAGEMENT_APIKEY_MANAGER_ID}`, {
+        method: 'PUT',
+        headers: managerKeyHeaders,
+        body: JSON.stringify({ name: 'apikey-manager-self-update-blocked' }),
+      })
+      expect(selfUpdateResponse.status).toBe(401)
+      await expect(selfUpdateResponse.json()).resolves.toHaveProperty('error', 'cannot_update_apikey')
+
+      const deleteResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
+        method: 'DELETE',
+        headers: managerKeyHeaders,
+      })
+      expect(deleteResponse.status).toBe(200)
+      createdKeyIds.splice(createdKeyIds.indexOf(siblingData.id), 1)
     }
     finally {
       for (const keyId of createdKeyIds.reverse()) {

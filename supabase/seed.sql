@@ -575,7 +575,8 @@ BEGIN
     -- Dedicated user and API key for encrypted bundles tests (isolated to prevent interference)
     (111, NOW(), 'f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f708193', 'b8c9d0e1-f2a3-4b4c-9d5e-6f7a8b9c0d14', NOW(), 'encrypted test org super admin'),
     -- Dedicated user and API key for apikeys.test.ts API-key compatibility management
-    (112, NOW(), 'd0f1a2b3-c4d5-4e6f-8a90-b1c2d3e4f506', 'c9d0e1f2-a3b4-4c5d-8e6f-7a8b9c0d1e25', NOW(), 'apikey management test org super admin');
+    (112, NOW(), 'd0f1a2b3-c4d5-4e6f-8a90-b1c2d3e4f506', 'c9d0e1f2-a3b4-4c5d-8e6f-7a8b9c0d1e25', NOW(), 'apikey management test org super admin'),
+    (113, NOW(), 'd0f1a2b3-c4d5-4e6f-8a90-b1c2d3e4f506', 'd1e2f3a4-b5c6-4d7e-8f90-a1b2c3d4e5f6', NOW(), 'apikey management test apikey_manager');
 
     -- Hashed API key for testing (hash of 'test-hashed-apikey-for-auth-test')
     -- Used by 07_auth_functions.sql tests
@@ -620,7 +621,8 @@ BEGIN
         (102, public.rbac_role_org_super_admin()),
         (110, public.rbac_role_org_super_admin()),
         (111, public.rbac_role_org_super_admin()),
-        (112, public.rbac_role_org_super_admin())
+        (112, public.rbac_role_org_super_admin()),
+        (113, public.rbac_role_apikey_manager())
     )
     INSERT INTO public.role_bindings (
       principal_type,
@@ -738,7 +740,7 @@ BEGIN
 
     -- Drop replicated orgs but keet the the seed ones
     DELETE from "public"."orgs" where POSITION('organization' in orgs.name)=1;
-    PERFORM setval('public.apikeys_id_seq', 112, true);
+    PERFORM setval('public.apikeys_id_seq', 113, true);
     PERFORM setval('public.app_versions_id_seq', 16, true);
     PERFORM setval('public.channel_id_seq', 6, false);
     PERFORM setval('public.deploy_history_id_seq', 5, false);
