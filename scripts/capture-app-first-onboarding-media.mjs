@@ -1,5 +1,7 @@
 import { chromium } from 'playwright'
-import { mkdir } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
+import { mkdir, mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 const baseURL = process.env.CAPGO_MEDIA_BASE_URL ?? 'http://localhost:5173'
@@ -7,6 +9,9 @@ const email = process.env.CAPGO_MEDIA_EMAIL ?? `media-onboard-${Date.now()}@exam
 const password = process.env.CAPGO_MEDIA_PASSWORD ?? `CapgoMedia${Date.now()}!Zx`
 const outDir = path.resolve('docs/pr/app-first-onboarding')
 
+function isSafeFileName(name) {
+  return name.length > 0 && !name.includes('/') && !name.includes('\\') && name !== '.' && name !== '..'
+}
 
 async function ensureFreshMediaUser(supabaseUrl, anonKey) {
   const serviceKey = process.env.SUPABASE_SERVICE_KEY
@@ -29,31 +34,15 @@ async function ensureFreshMediaUser(supabaseUrl, anonKey) {
   }).catch(() => {})
 }
 
-
-async function signInAndSeedSession(page, supabaseUrl, anonKey) {
+async function signInThroughUi(page, supabaseUrl, anonKey) {
   await ensureFreshMediaUser(supabaseUrl, anonKey)
 
-  const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
-    method: 'POST',
-    headers: {
-      apikey: anonKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ email, password }),
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to sign in media user (${response.status}): ${await response.text()}`)
-  }
-
-  const session = await response.json()
-  const hostname = new URL(supabaseUrl).hostname.split('.')[0]
-  const storageKey = `sb-${hostname}-auth-token`
-
   await page.goto(`${baseURL}/login`)
-  await page.evaluate(({ storageKey, session }) => {
-    localStorage.setItem(storageKey, JSON.stringify(session))
-  }, { storageKey, session })
+  await page.fill('[data-test="email"]', email)
+  await page.click('[data-test="continue"]')
+  await page.fill('[data-test="password"]', password)
+  await page.click('[data-test="submit"]')
+  await page.waitForURL(/\/onboarding\/app/, { timeout: 60000 })
 }
 
 async function main() {
@@ -75,29 +64,30 @@ async function main() {
   const supabaseUrl = process.env.VITE_SUPABASE_URL ?? 'http://127.0.0.1:55411'
   const anonKey = process.env.VITE_SUPABASE_ANON_KEY ?? 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH'
 
-  await signInAndSeedSession(page, supabaseUrl, anonKey)
+  await signInThroughUi(page, supabaseUrl, anonKey)
   await page.goto(`${baseURL}/onboarding/app`)
   await page.waitForURL(/\/onboarding\/app/, { timeout: 60000 })
-  await page.waitForSelector('[data-test="app-onboarding-existing-no"]', { timeout: 60000 })
+  await page.waitForSelector('[data-test="onboarding-intent-ota"]', { timeout: 60000 })
 
-  await page.screenshot({ path: path.join(outDir, '01-app-onboarding.png'), fullPage: true })
+  await page.locator('[data-test="onboarding-intent-ota"]').click()
+  await page.screenshot({ path: path.join(outDir, '01-intent-step.png'), fullPage: true })
+  await page.locator('[data-test="app-onboarding-continue-intent"]').click()
 
   await page.locator('[data-test="app-onboarding-existing-no"]').click()
   await page.locator('[data-test="app-onboarding-name"]').fill(appName)
   await page.screenshot({ path: path.join(outDir, '02-app-details-filled.png'), fullPage: true })
   await page.locator('[data-test="app-onboarding-continue"]').click()
-  await page.waitForURL(/\/onboarding\/organization/, { timeout: 60000 })
 
-  await page.screenshot({ path: path.join(outDir, '03-organization-onboarding.png'), fullPage: true })
-  await page.locator('[data-test="onboarding-intent-ota"]').click()
   await page.locator('[data-test="onboarding-mode-app-name"]').click()
-  await page.locator('[data-test="onboarding-estimated-users-option"]').first().click()
-  await page.screenshot({ path: path.join(outDir, '04-organization-app-name-mode.png'), fullPage: true })
+  await page.screenshot({ path: path.join(outDir, '03-organization-step.png'), fullPage: true })
+  await page.locator('[data-test="onboarding-create-org"]').click()
+  await page.waitForSelector('[data-test="app-onboarding-command-copy"]', { timeout: 60000 })
+  await page.screenshot({ path: path.join(outDir, '04-setup-command.png'), fullPage: true })
 
   await context.close()
   await browser.close()
 
-  await convertVideoToWebp()
+  convertVideoToWebp()
   console.log(`Saved screenshots, video, and webp under ${outDir}`)
 }
 
@@ -106,30 +96,37 @@ main().catch((error) => {
   process.exit(1)
 })
 
+function convertVideoToWebp() {
+  const videos = readdirSync(outDir)
+    .filter(name => name.endsWith('.webm') && !name.startsWith('.') && isSafeFileName(name))
+    .map(name => ({
+      name,
+      mtime: statSync(path.join(outDir, name)).mtimeMs,
+    }))
+    .sort((left, right) => right.mtime - left.mtime)
 
-async function convertVideoToWebp() {
-  const { execSync } = await import('node:child_process')
-  const { mkdtempSync, readdirSync, rmSync } = await import('node:fs')
-  const { tmpdir } = await import('node:os')
-  const videos = readdirSync(outDir).filter(name => name.endsWith('.webm') && !name.startsWith('.'))
   if (!videos.length)
     return
 
-  const input = path.join(outDir, videos[0])
+  const input = path.join(outDir, videos[0].name)
   const output = path.join(outDir, 'app-first-onboarding.webp')
   const framesDir = mkdtempSync(path.join(tmpdir(), 'capgo-onboard-frames-'))
+  const framePattern = path.join(framesDir, 'frame_%03d.png')
 
   try {
-    execSync(`ffmpeg -y -i ${JSON.stringify(input)} -vf fps=10,scale=1280:-1 ${JSON.stringify(`${framesDir}/frame_%03d.png`)}`, { stdio: 'inherit' })
-    const frames = readdirSync(framesDir).filter(name => name.endsWith('.png')).sort()
+    execFileSync('ffmpeg', ['-y', '-i', input, '-vf', 'fps=10,scale=1280:-1', framePattern], { stdio: 'inherit' })
+    const frames = readdirSync(framesDir)
+      .filter(name => name.endsWith('.png') && isSafeFileName(name))
+      .sort()
     if (!frames.length)
       return
-    execSync(`img2webp -o ${JSON.stringify(output)} ${frames.map(frame => JSON.stringify(path.join(framesDir, frame))).join(' ')}`, { stdio: 'inherit' })
+
+    execFileSync('img2webp', ['-o', output, ...frames.map(frame => path.join(framesDir, frame))], { stdio: 'inherit' })
   }
   finally {
     rmSync(framesDir, { recursive: true, force: true })
   }
 
   for (const video of videos)
-    rmSync(path.join(outDir, video), { force: true })
+    rmSync(path.join(outDir, video.name), { force: true })
 }

@@ -68,6 +68,7 @@ async function readFunctionError(error: unknown) {
 
 async function uploadIconFromDraft(
   supabase: SupabaseClient<Database>,
+  ownerOrgId: string,
   appId: string,
   draft: OnboardingAppDraft,
 ) {
@@ -75,42 +76,47 @@ async function uploadIconFromDraft(
   if (!iconSource)
     return
 
-  let blob: Blob
-  if (iconSource.startsWith('data:')) {
-    const [header, payload = ''] = iconSource.split(',', 2)
-    const contentType = /^data:([^;]+)/.exec(header)?.[1] ?? 'image/png'
-    if (!payload)
+  try {
+    let blob: Blob
+    if (iconSource.startsWith('data:')) {
+      const [header, payload = ''] = iconSource.split(',', 2)
+      const contentType = /^data:([^;]+)/.exec(header)?.[1] ?? 'image/png'
+      if (!payload)
+        return
+
+      const binary = atob(payload)
+      const bytes = Uint8Array.from(binary, char => char.codePointAt(0) ?? 0)
+      blob = new Blob([bytes], { type: contentType })
+    }
+    else {
+      const response = await fetch(iconSource)
+      const contentType = response.headers.get('content-type')?.split(';')[0]?.trim() ?? ''
+      if (!response.ok || !contentType.startsWith('image/'))
+        return
+      blob = await response.blob()
+    }
+
+    const iconPath = `org/${ownerOrgId}/${appId}/icon`
+    const { error: uploadError } = await supabase.storage
+      .from('images')
+      .upload(iconPath, blob, {
+        upsert: true,
+        contentType: blob.type || 'image/png',
+      })
+
+    if (uploadError) {
+      console.error('Cannot upload onboarding app icon', uploadError)
       return
+    }
 
-    const binary = atob(payload)
-    const bytes = Uint8Array.from(binary, char => char.codePointAt(0) ?? 0)
-    blob = new Blob([bytes], { type: contentType })
+    await supabase
+      .from('apps')
+      .update({ icon_url: iconPath })
+      .eq('app_id', appId)
   }
-  else {
-    const response = await fetch(iconSource)
-    const contentType = response.headers.get('content-type')?.split(';')[0]?.trim() ?? ''
-    if (!response.ok || !contentType.startsWith('image/'))
-      return
-    blob = await response.blob()
+  catch (error) {
+    console.error('Cannot process onboarding app icon', error)
   }
-
-  const iconPath = `${appId}/icon.png`
-  const { error: uploadError } = await supabase.storage
-    .from('apps')
-    .upload(iconPath, blob, {
-      upsert: true,
-      contentType: blob.type || 'image/png',
-    })
-
-  if (uploadError) {
-    console.error('Cannot upload onboarding app icon', uploadError)
-    return
-  }
-
-  await supabase
-    .from('apps')
-    .update({ icon_url: iconPath })
-    .eq('app_id', appId)
 }
 
 export async function createOnboardingAppFromDraft(
@@ -160,7 +166,7 @@ export async function createOnboardingAppFromDraft(
   if (!responseData)
     throw new Error(`App ID ${candidateIds[0]} is already used.`)
 
-  await uploadIconFromDraft(supabase, responseData.app_id, draft)
+  await uploadIconFromDraft(supabase, ownerOrgId, responseData.app_id, draft)
 
   const { data: refreshed } = await supabase
     .from('apps')

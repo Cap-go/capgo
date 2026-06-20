@@ -32,25 +32,21 @@ test.describe('Registration', () => {
     await page.click('[data-test="submit"]')
 
     await page.waitForURL(/\/onboarding\/app/)
+    await page.click('[data-test="onboarding-intent-ota"]')
+    await page.click('[data-test="app-onboarding-continue-intent"]')
+
     await page.click('[data-test="app-onboarding-existing-no"]')
     await page.fill('[data-test="app-onboarding-name"]', appName)
     await page.click('[data-test="app-onboarding-continue"]')
 
-    await page.waitForURL(/\/onboarding\/organization/)
     await expectProtectedRouteRedirect(page, '/apps', /\/onboarding\/app/, '[data-test="onboarding-logout"]')
 
-    await page.click('[data-test="onboarding-intent-ota"]')
     await page.click('[data-test="onboarding-mode-app-name"]')
-    await page.locator('[data-test="onboarding-estimated-users-option"]').first().click()
     await expect(page.locator('[data-test="onboarding-create-org"]')).toBeEnabled()
     await page.click('[data-test="onboarding-create-org"]')
 
-    await page.waitForURL(/step=logo/)
-    await page.click('[data-test="onboarding-logo-action"]')
-
-    await page.waitForURL(/step=invite/)
-    await page.click('[data-test="onboarding-finish"]')
-    await page.waitForURL(/\/app\/new\?resume=.*step=choice/)
+    await page.waitForSelector('[data-test="app-onboarding-command-copy"]', { timeout: 60000 })
+    await expect(page).toHaveURL(/\/onboarding\/app/)
   })
 
   test('should allow new users to log out from org onboarding', async ({ page }) => {

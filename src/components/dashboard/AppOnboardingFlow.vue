@@ -18,18 +18,23 @@ import IconSmartphone from '~icons/lucide/smartphone'
 import IconSparkles from '~icons/lucide/sparkles'
 import IconStore from '~icons/lucide/store'
 import IconTerminal from '~icons/lucide/terminal'
+import IconCompass from '~icons/lucide/compass'
+import IconLayers from '~icons/lucide/layers'
+import IconPencil from '~icons/lucide/pencil-line'
+import IconRefresh from '~icons/lucide/refresh-cw'
+import IconUsers from '~icons/lucide/users-round'
 import { createDefaultApiKey, findUsablePlainApiKey } from '~/services/apikeys'
+import { pushEvent } from '~/services/posthog'
 import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 import {
-  fileToDataUrl,
+  clearOnboardingAppDraft,
   loadOnboardingAppDraft,
-  remoteImageToDataUrl,
-  saveOnboardingAppDraft,
 } from '~/utils/onboardingAppDraft'
+import { isValidAppId } from '~/utils/appId'
 import { slugifyOnboardingSegment } from '~/utils/onboardingSlug'
 
 const props = defineProps<{
@@ -44,9 +49,19 @@ const supabase = useSupabase()
 const dialogStore = useDialogV2Store()
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
+const onboardingUserId = computed(() => main.user?.id ?? main.auth?.id ?? null)
 const config = getLocalConfig()
 
 type AppRow = Database['public']['Tables']['apps']['Row']
+type StandardFlowStep = 'details' | 'choice' | 'install' | 'setup'
+type PreOrgFlowStep = 'intent' | 'details' | 'organization' | 'setup'
+type OrgOnboardingMode = 'app-name' | 'name' | null
+
+interface UserCountStop {
+  value: number
+  label: string
+  planName: string
+}
 
 const isLoading = ref(true)
 const isSubmitting = ref(false)
@@ -56,7 +71,7 @@ const isSeedingDemo = ref(false)
 const isCliCommandVisible = ref(false)
 const apiKey = ref<string | null>(null)
 const createdApp = ref<AppRow | null>(null)
-const flowStep = ref<'details' | 'choice' | 'install'>('details')
+const flowStep = ref<StandardFlowStep | PreOrgFlowStep>('details')
 const selectedIconFile = ref<File | null>(null)
 const localIconPreview = ref('')
 const storeIconPreview = ref('')
@@ -70,10 +85,31 @@ const manualAppId = ref('')
 const appIdSuggestions = ref<string[]>([])
 const appIdFeedback = ref('')
 const hasEditedAppId = ref(false)
+const selectedIntent = ref<string | null>(null)
+const orgMode = ref<OrgOnboardingMode>(null)
+const orgNameInput = ref('')
+const estimatedUsersIndex = ref<number | null>(null)
+
+const intentOptions = [
+  { value: 'ota', icon: IconRefresh },
+  { value: 'builder', icon: IconSmartphone },
+  { value: 'both', icon: IconLayers },
+  { value: 'exploring', icon: IconCompass },
+] as const
+
+const fallbackUserCountStops: UserCountStop[] = [
+  { value: 2000, label: '2K', planName: 'Solo' },
+  { value: 10000, label: '10K', planName: 'Maker' },
+  { value: 100000, label: '100K', planName: 'Team' },
+  { value: 1000000, label: '1M+', planName: 'Enterprise' },
+]
+const planNameOrder = ['Solo', 'Maker', 'Team', 'Enterprise'] as const
 
 const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ''
-const cliCommand = computed(() => `npx @capgo/cli@latest i ${apiKey.value ?? '[APIKEY]'}${localCommand}`)
-const redactedCliCommand = computed(() => `npx @capgo/cli@latest i [YOUR_CAPGO_API_KEY]${localCommand}`)
+const usesBuilderSetupCommand = computed(() => selectedIntent.value === 'builder')
+const cliSubcommand = computed(() => usesBuilderSetupCommand.value ? 'build init' : 'i')
+const cliCommand = computed(() => `npx @capgo/cli@latest ${cliSubcommand.value} ${apiKey.value ?? '[APIKEY]'}${localCommand}`)
+const redactedCliCommand = computed(() => `npx @capgo/cli@latest ${cliSubcommand.value} [YOUR_CAPGO_API_KEY]${localCommand}`)
 const cliCommandArgs = computed(() => {
   const args: string[] = []
 
@@ -90,7 +126,7 @@ const resumeAppId = computed(() => {
 })
 const resumeStep = computed(() => {
   const value = route.query.step
-  return value === 'choice' || value === 'install' ? value : null
+  return value === 'choice' || value === 'install' || value === 'setup' ? value : null
 })
 const canUseStoreImportPreview = computed(() => existingApp.value === true && existingAppSetup.value === 'import')
 const iconPreview = computed(() => localIconPreview.value || (canUseStoreImportPreview.value ? storeIconPreview.value : '') || '')
@@ -133,13 +169,42 @@ const aiHelpPrompt = computed(() => {
     command: redactedCliCommand.value,
   })
 })
-const appOnboardingSteps = computed<Array<{ id: 'details' | 'choice' | 'install', label: string }>>(() => [
-  { id: 'details', label: t('app-onboarding-step-details') },
-  { id: 'choice', label: t('app-onboarding-step-choice') },
-  { id: 'install', label: t('app-onboarding-step-install') },
-])
+const appOnboardingSteps = computed<Array<{ id: StandardFlowStep | PreOrgFlowStep, label: string }>>(() => {
+  if (props.preOrg) {
+    return [
+      { id: 'intent', label: t('unified-onboarding-step-intent') },
+      { id: 'details', label: t('app-onboarding-step-details') },
+      { id: 'organization', label: t('unified-onboarding-step-organization') },
+      { id: 'setup', label: t('unified-onboarding-step-setup') },
+    ]
+  }
+  return [
+    { id: 'details', label: t('app-onboarding-step-details') },
+    { id: 'choice', label: t('app-onboarding-step-choice') },
+    { id: 'install', label: t('app-onboarding-step-install') },
+  ]
+})
 const currentStepIndex = computed(() => Math.max(0, appOnboardingSteps.value.findIndex(entry => entry.id === flowStep.value)))
 const stepProgress = computed(() => `${((currentStepIndex.value + 1) / appOnboardingSteps.value.length) * 100}%`)
+const userCountStops = computed<UserCountStop[]>(() => {
+  const planStops = planNameOrder.map(planName => main.plans.find(plan => plan.name === planName)).flatMap((plan) => {
+    if (!plan?.mau) return []
+    const mau = Number(plan.mau)
+    if (!Number.isFinite(mau) || mau <= 0) return []
+    return [{ value: mau, label: formatUserCount(mau, plan.name === 'Enterprise'), planName: plan.name }]
+  })
+  return planStops.length == planNameOrder.length ? planStops : fallbackUserCountStops
+})
+const selectedUserCountStop = computed<UserCountStop | null>(() => estimatedUsersIndex.value === null ? null : userCountStops.value[Math.min(estimatedUsersIndex.value, userCountStops.value.length - 1)] ?? null)
+const canShowOrgDetails = computed(() => orgMode.value !== null)
+const canCreatePreOrgOrganization = computed(() => {
+  if (!orgMode.value || !orgNameInput.value.trim()) return false
+  if (existingApp.value === true) return selectedUserCountStop.value !== null
+  return true
+})
+const setupTitle = computed(() => usesBuilderSetupCommand.value ? t('unified-onboarding-setup-builder-title') : t('unified-onboarding-setup-ota-title'))
+const setupSubtitle = computed(() => usesBuilderSetupCommand.value ? t('unified-onboarding-setup-builder-subtitle') : t('unified-onboarding-setup-ota-subtitle'))
+
 function whiteCardToggleButtonClass(active: boolean) {
   return active
     ? 'border-primary-500 bg-slate-100 text-slate-950 ring-2 ring-primary-500/15 hover:border-primary-500 hover:bg-slate-100 dark:border-primary-500/80 dark:bg-primary-500/25 dark:text-white dark:ring-primary-500/30 dark:hover:bg-primary-500/30'
@@ -154,6 +219,17 @@ function whiteCardPrimaryButtonClass() {
   return 'border-primary-500 bg-primary-500 text-white hover:border-primary-500 hover:bg-primary-500/90 disabled:border-slate-300 disabled:bg-slate-300 disabled:text-white disabled:opacity-100 dark:border-primary-500/90 dark:bg-primary-500 dark:hover:border-primary-500 dark:hover:bg-primary-500/90 dark:disabled:border-white/15 dark:disabled:bg-slate-800 dark:disabled:text-slate-500'
 }
 
+function formatUserCount(value: number, plus = false) {
+  if (value >= 1_000_000) return plus ? '1M+' : '1M'
+  if (value >= 1000) return `${value / 1000}K`
+  return String(value)
+}
+function getUserCountStopTitle(stop: UserCountStop) {
+  if (stop.value >= 1_000_000) return t('organization-onboarding-active-users-plus', { count: stop.label })
+  return t('organization-onboarding-active-users-up-to', { count: stop.label })
+}
+function isUserCountStopSelected(index: number) { return estimatedUsersIndex.value === index }
+function selectUserCountStop(index: number) { estimatedUsersIndex.value = index }
 function extractAndroidAppId(url: string) {
   if (!url)
     return ''
@@ -284,7 +360,16 @@ async function loadResumeApp() {
   localIconPreview.value = getImmediateImageUrl(data.icon_url) || ''
   void loadResumeIconPreview(data.icon_url, data.app_id, iconLoadRun)
   storeScreenshotPreview.value = ''
-  flowStep.value = resumeStep.value === 'choice' ? 'choice' : 'install'
+  if (resumeStep.value === 'setup') {
+    flowStep.value = 'setup'
+    hydrateIntentFromCurrentOrg()
+    try { await ensureApiKey() } catch (error) {
+      console.error('Cannot ensure API key', error)
+      toast.error(t('app-onboarding-toast-apikey-error'))
+    }
+  } else {
+    flowStep.value = resumeStep.value === 'choice' ? 'choice' : 'install'
+  }
   return true
 }
 
@@ -462,8 +547,25 @@ async function uploadIcon(appId: string, iconSourceUrl?: string) {
     .eq('app_id', appId)
 }
 
+function ensureValidAppId(): boolean {
+  const appId = generatedAppId.value.trim()
+  if (!appId) {
+    toast.error(t('app-onboarding-toast-appid-required'))
+    return false
+  }
+
+  if (!isValidAppId(appId)) {
+    appIdFeedback.value = t('app-onboarding-appid-invalid-format')
+    toast.error(appIdFeedback.value)
+    return false
+  }
+
+  appIdFeedback.value = ''
+  return true
+}
+
 function restoreDraftState() {
-  const draft = loadOnboardingAppDraft()
+  const draft = loadOnboardingAppDraft(onboardingUserId.value)
   if (!draft)
     return false
 
@@ -483,37 +585,27 @@ function restoreDraftState() {
   return true
 }
 
-async function buildDraftFromForm() {
-  const normalizedStoreUrls = existingApp.value === true && existingAppSetup.value === 'import'
-    ? getStoreUrls(storeUrl.value.trim())
-    : { iosStoreUrl: null, androidStoreUrl: null }
 
-  let iconDataUrl: string | null = null
-  if (selectedIconFile.value)
-    iconDataUrl = await fileToDataUrl(selectedIconFile.value)
-  else if (localIconPreview.value && !localIconPreview.value.startsWith('blob:'))
-    iconDataUrl = await remoteImageToDataUrl(localIconPreview.value)
+function hydrateIntentFromCurrentOrg() {
+  const onboarding = (currentOrg.value as { onboarding?: unknown } | null | undefined)?.onboarding
+  if (!onboarding || typeof onboarding !== 'object' || Array.isArray(onboarding))
+    return
 
-  let storeIconDataUrl = storeIconPreview.value || null
-  if (storeIconDataUrl && !storeIconDataUrl.startsWith('data:'))
-    storeIconDataUrl = await remoteImageToDataUrl(storeIconDataUrl)
-
-  return {
-    appName: appName.value.trim(),
-    appId: generatedAppId.value.trim(),
-    existingApp: existingApp.value === true,
-    existingAppSetup: existingAppSetup.value,
-    storeUrl: storeUrl.value.trim(),
-    importedStoreAppId: importedStoreAppId.value.trim(),
-    iosStoreUrl: normalizedStoreUrls.iosStoreUrl,
-    androidStoreUrl: normalizedStoreUrls.androidStoreUrl,
-    iconDataUrl,
-    storeIconDataUrl,
-    storeScreenshotUrl: storeScreenshotPreview.value || null,
-  }
+  const intent = (onboarding as { intent?: unknown }).intent
+  if (typeof intent === 'string' && intent)
+    selectedIntent.value = intent
 }
 
-async function saveDraftAndContinue() {
+function continueFromIntent() {
+  if (!selectedIntent.value) {
+    toast.error(t('organization-onboarding-intent-required'))
+    return
+  }
+
+  flowStep.value = 'details'
+}
+
+function continuePreOrgDetails() {
   if (existingApp.value === null) {
     toast.error(t('app-onboarding-toast-existing-required'))
     return
@@ -529,21 +621,99 @@ async function saveDraftAndContinue() {
     return
   }
 
+  if (!ensureValidAppId())
+    return
+
+  if (!orgMode.value)
+    orgMode.value = 'app-name'
+
+  flowStep.value = 'organization'
+}
+
+async function createOrganizationAndApp() {
+  if (!selectedIntent.value) {
+    toast.error(t('organization-onboarding-intent-required'))
+    return
+  }
+
+  if (!canCreatePreOrgOrganization.value) {
+    toast.error(t('organization-onboarding-mode-required'))
+    return
+  }
+
+  const orgName = orgNameInput.value.trim()
+  const estimatedMau = existingApp.value === true
+    ? selectedUserCountStop.value?.value
+    : userCountStops.value[0]?.value
+
+  if (!estimatedMau) {
+    toast.error(t('organization-onboarding-user-scale-required'))
+    return
+  }
+
   isSubmitting.value = true
   try {
-    saveOnboardingAppDraft(await buildDraftFromForm())
-    await router.push('/onboarding/organization')
-  }
-  catch (error) {
-    console.error('Cannot save onboarding app draft', error)
-    toast.error(t('app-onboarding-toast-create-error'))
+    const { data, error } = await supabase.functions.invoke('organization', {
+      method: 'POST',
+      body: {
+        name: orgName,
+        email: main.auth?.email ?? '',
+        estimatedMau,
+        intent: selectedIntent.value,
+      },
+    })
+
+    if (error || !data?.id) {
+      console.error('Error creating organization during unified onboarding', error)
+      toast.error(error?.code === '23505'
+        ? t('org-with-this-name-exists')
+        : t('cannot-create-org'))
+      return
+    }
+
+    try {
+      pushEvent('onboarding_intent_selected', config.supaHost, {
+        intent: selectedIntent.value,
+        estimated_mau: estimatedMau,
+        org_id: data.id,
+      })
+    }
+    catch (eventError) {
+      console.error('Failed to track onboarding intent', eventError)
+    }
+
+    try {
+      await organizationStore.fetchOrganizations()
+      organizationStore.setCurrentOrganization(data.id)
+    }
+    catch (refreshError) {
+      console.error('Failed to refresh organizations after unified onboarding create', refreshError)
+      toast.error(t('organization-onboarding-refresh-failed'))
+      return
+    }
+
+    clearOnboardingAppDraft(onboardingUserId.value)
+    await createAppRecord({ nextStep: 'setup' })
+
+    if (!createdApp.value)
+      return
+
+    try {
+      await ensureApiKey()
+    }
+    catch (apiKeyError) {
+      console.error('Cannot ensure API key', apiKeyError)
+      toast.error(t('app-onboarding-toast-apikey-error'))
+    }
+
+    flowStep.value = 'setup'
   }
   finally {
     isSubmitting.value = false
   }
 }
 
-async function createAppRecord() {
+async function createAppRecord(options?: { nextStep?: StandardFlowStep | PreOrgFlowStep }) {
   if (!currentOrg.value?.gid) {
     toast.error(t('app-onboarding-toast-no-organization'))
     return
@@ -563,6 +733,9 @@ async function createAppRecord() {
     toast.error(t('app-onboarding-toast-appid-required'))
     return
   }
+
+  if (!ensureValidAppId())
+    return
 
   isSubmitting.value = true
   try {
@@ -639,7 +812,7 @@ async function createAppRecord() {
       .single()
 
     createdApp.value = refreshed ?? responseData
-    flowStep.value = 'choice'
+    flowStep.value = options?.nextStep ?? 'choice'
   }
   catch (error) {
     console.error('Cannot create onboarding app', error)
@@ -725,14 +898,8 @@ onMounted(async () => {
   isLoading.value = true
   try {
     if (props.preOrg) {
-      try {
-        await organizationStore.fetchOrganizations()
-      }
-      catch (error) {
-        console.error('Failed to load organizations during pre-org onboarding', error)
-      }
       restoreDraftState()
-      flowStep.value = 'details'
+      flowStep.value = 'intent'
       return
     }
 
@@ -765,8 +932,20 @@ watch(existingApp, (value) => {
   if (value !== true) {
     resetStoreImportState()
   }
+  if (value === false)
+    estimatedUsersIndex.value = 0
   appIdSuggestions.value = []
   appIdFeedback.value = ''
+})
+
+watch(orgMode, (value) => {
+  if (value === 'app-name')
+    orgNameInput.value = appName.value.trim()
+})
+
+watch(appName, (value) => {
+  if (orgMode.value === 'app-name')
+    orgNameInput.value = value.trim()
 })
 
 watch(existingAppSetup, (value) => {
@@ -798,8 +977,8 @@ watch(suggestedAppId, (value) => {
               ? t('app-onboarding-title-first')
               : t('app-onboarding-title-return') }}
           </h1>
-          <p class="mt-2 text-base leading-7 text-slate-600 dark:text-slate-300">
-            {{ props.preOrg ? t('app-onboarding-subtitle-pre-org') : t('app-onboarding-subtitle') }}
+          <p v-if="!props.preOrg" class="mt-2 text-base leading-7 text-slate-600 dark:text-slate-300">
+            {{ t('app-onboarding-subtitle') }}
           </p>
 
           <nav class="mt-6" :aria-label="t('app-onboarding-step-details')">
@@ -835,6 +1014,28 @@ watch(suggestedAppId, (value) => {
             </div>
           </nav>
         </header>
+
+        <div v-if="props.preOrg && flowStep === 'intent'" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95">
+          <div class="space-y-6">
+            <div>
+              <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">{{ t('unified-onboarding-step-intent') }}</p>
+              <h2 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">{{ t('organization-onboarding-intent-question') }}</h2>
+              <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{{ t('organization-onboarding-intent-hint') }}</p>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <button v-for="option in intentOptions" :key="option.value" type="button" class="group flex min-h-20 items-start gap-3 rounded-xl border p-3 text-left transition" :class="whiteCardToggleButtonClass(selectedIntent === option.value)" :data-test="`onboarding-intent-${option.value}`" @click="selectedIntent = option.value">
+                <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-500"><component :is="option.icon" class="h-5 w-5" /></span>
+                <span class="min-w-0">
+                  <span class="block text-sm font-semibold text-slate-950 dark:text-white">{{ t(`organization-onboarding-intent-option-${option.value}-label`) }}</span>
+                  <span class="mt-1 block text-xs leading-5 text-slate-600 dark:text-slate-300">{{ t(`organization-onboarding-intent-option-${option.value}-desc`) }}</span>
+                </span>
+              </button>
+            </div>
+            <div class="flex justify-end border-t border-slate-200 pt-6 dark:border-white/15">
+              <button type="button" class="d-btn min-h-12" :class="whiteCardPrimaryButtonClass()" data-test="app-onboarding-continue-intent" :disabled="!selectedIntent" @click="continueFromIntent()">{{ t('unified-onboarding-continue-intent') }}<IconArrowRight class="h-4 w-4" /></button>
+            </div>
+          </div>
+        </div>
 
         <div v-if="flowStep === 'details'">
           <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95">
@@ -1035,15 +1236,15 @@ watch(suggestedAppId, (value) => {
                 </div>
 
                 <div class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:items-center sm:justify-between dark:border-white/15">
-                  <button class="d-btn min-h-12" :class="whiteCardSecondaryButtonClass()" @click="router.push('/apps')">
-                    {{ t('button-cancel') }}
+                  <button class="d-btn min-h-12" :class="whiteCardSecondaryButtonClass()" @click="props.preOrg ? (flowStep = 'intent') : router.push('/apps')">
+                    {{ props.preOrg ? t('button-back') : t('button-cancel') }}
                   </button>
                   <button
                     class="d-btn min-h-12" :class="whiteCardPrimaryButtonClass()" :disabled="isSubmitting" data-test="app-onboarding-continue"
-                    @click="props.preOrg ? saveDraftAndContinue() : createAppRecord()"
+                    @click="props.preOrg ? continuePreOrgDetails() : createAppRecord()"
                   >
                     <IconLoader v-if="isSubmitting" class="h-4 w-4 animate-spin" />
-                    <span v-else>{{ props.preOrg ? t('app-onboarding-continue-to-org') : t('app-onboarding-continue') }}</span>
+                    <span v-else>{{ t('app-onboarding-continue') }}</span>
                     <IconArrowRight v-if="!isSubmitting" class="h-4 w-4" />
                   </button>
                 </div>
@@ -1087,7 +1288,7 @@ watch(suggestedAppId, (value) => {
                     <code class="block whitespace-pre-wrap break-all text-sm">
                       <span class="text-slate-500">npx</span>
                       <span class="text-sky-300"> @capgo/cli@latest</span>
-                      <span class="mr-1 font-bold text-violet-300"> i</span>
+                      <span class="mr-1 font-bold text-violet-300"> {{ cliSubcommand }}</span>
                       <span class="text-emerald-300"> {{ apiKey ?? '[APIKEY]' }}</span>
                       <template v-for="(arg, index) in cliCommandArgs" :key="`${arg}-${index}`">
                         <span :class="index % 2 === 0 ? 'text-amber-300' : 'text-cyan-300'"> {{ arg }}</span>
@@ -1101,7 +1302,216 @@ watch(suggestedAppId, (value) => {
           </div>
         </div>
 
-        <div v-else-if="flowStep === 'choice' && createdApp" class="space-y-6">
+        <div v-else-if="props.preOrg && flowStep === 'organization'" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95">
+          <div class="space-y-6">
+            <div>
+              <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
+                {{ t('unified-onboarding-step-organization') }}
+              </p>
+              <h2 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
+                {{ t('organization-onboarding-question') }}
+              </h2>
+            </div>
+
+            <div class="grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                class="group flex min-h-24 items-start gap-3 rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
+                :class="whiteCardToggleButtonClass(orgMode === 'app-name')"
+                data-test="onboarding-mode-app-name"
+                @click="orgMode = 'app-name'"
+              >
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-500 text-white">
+                  <IconSmartphone class="h-5 w-5" />
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="block text-base font-semibold">{{ t('organization-onboarding-mode-app-name', { name: appName || t('app-onboarding-preview-placeholder') }) }}</span>
+                  <span class="mt-1 block text-sm leading-6 text-slate-500 dark:text-slate-400">
+                    {{ t('organization-onboarding-mode-app-name-helper') }}
+                  </span>
+                </span>
+                <IconCheck v-if="orgMode === 'app-name'" class="h-5 w-5 shrink-0 text-primary-500" />
+              </button>
+              <button
+                type="button"
+                class="group flex min-h-24 items-start gap-3 rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
+                :class="whiteCardToggleButtonClass(orgMode === 'name')"
+                data-test="onboarding-mode-name"
+                @click="orgMode = 'name'"
+              >
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-950">
+                  <IconPencil class="h-5 w-5" />
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="block text-base font-semibold">{{ t('organization-onboarding-mode-name') }}</span>
+                  <span class="mt-1 block text-sm leading-6 text-slate-500 dark:text-slate-400">
+                    {{ t('organization-onboarding-mode-name-helper') }}
+                  </span>
+                </span>
+                <IconCheck v-if="orgMode === 'name'" class="h-5 w-5 shrink-0 text-primary-500" />
+              </button>
+            </div>
+
+            <template v-if="canShowOrgDetails">
+              <div>
+                <label for="onboarding-org-name-input" class="text-sm font-medium text-slate-800 dark:text-slate-200">
+                  {{ t('organization-name') }}
+                </label>
+                <input
+                  id="onboarding-org-name-input"
+                  v-model="orgNameInput"
+                  type="text"
+                  :placeholder="t('organization-name')"
+                  data-test="onboarding-org-name"
+                  class="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 sm:text-sm dark:border-white/20 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/30"
+                >
+              </div>
+
+              <div v-if="existingApp === true">
+                <p id="estimated-users-label" class="flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-200">
+                  <IconUsers class="h-4 w-4 text-primary-500" />
+                  {{ t('organization-onboarding-existing-users-label') }}
+                </p>
+                <p id="estimated-users-help" class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  {{ t('organization-onboarding-existing-users-helper') }}
+                </p>
+
+                <div
+                  id="estimated-users"
+                  class="mt-3 grid gap-2 sm:grid-cols-2"
+                  role="radiogroup"
+                  aria-labelledby="estimated-users-label"
+                  aria-describedby="estimated-users-help"
+                  data-test="onboarding-estimated-users"
+                >
+                  <label
+                    v-for="(stop, index) in userCountStops"
+                    :key="`${stop.planName}-${stop.value}`"
+                    class="group cursor-pointer"
+                    :data-value="stop.value"
+                    data-test="onboarding-estimated-users-option"
+                  >
+                    <input
+                      type="radio"
+                      name="estimated-users"
+                      class="peer sr-only"
+                      :value="index"
+                      :checked="isUserCountStopSelected(index)"
+                      @change="selectUserCountStop(index)"
+                    >
+                    <span
+                      class="flex min-h-16 items-center justify-between gap-3 rounded-xl border p-3 text-left transition peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-primary-500 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-white dark:peer-focus-visible:ring-offset-slate-900"
+                      :class="isUserCountStopSelected(index)
+                        ? 'border-primary-500 bg-slate-100 text-slate-950 ring-2 ring-primary-500/15 dark:border-primary-500/80 dark:bg-primary-500/25 dark:text-white dark:ring-primary-500/30'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-white/15 dark:bg-slate-950/90 dark:text-slate-200 dark:hover:border-white/30 dark:hover:bg-slate-900'"
+                    >
+                      <span class="min-w-0">
+                        <span class="block text-sm font-semibold">
+                          {{ getUserCountStopTitle(stop) }}
+                        </span>
+                        <span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                          {{ t('organization-onboarding-plan-match') }}: {{ stop.planName }}
+                        </span>
+                      </span>
+                      <span
+                        class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition"
+                        :class="isUserCountStopSelected(index) ? 'border-primary-500 bg-primary-500 text-white' : 'border-slate-300 bg-white text-transparent group-hover:border-slate-400 dark:border-white/20 dark:bg-slate-900'"
+                        aria-hidden="true"
+                      >
+                        <IconCheck class="h-3.5 w-3.5" />
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:items-center sm:justify-between dark:border-white/15">
+                <button type="button" class="d-btn min-h-12" :class="whiteCardSecondaryButtonClass()" @click="flowStep = 'details'">
+                  {{ t('button-back') }}
+                </button>
+                <button
+                  type="button"
+                  class="d-btn min-h-12"
+                  :class="whiteCardPrimaryButtonClass()"
+                  data-test="onboarding-create-org"
+                  :disabled="!canCreatePreOrgOrganization || isSubmitting"
+                  @click="createOrganizationAndApp()"
+                >
+                  <IconLoader v-if="isSubmitting" class="h-4 w-4 animate-spin" />
+                  <span v-else>{{ t('unified-onboarding-continue-organization') }}</span>
+                  <IconArrowRight v-if="!isSubmitting" class="h-4 w-4" />
+                </button>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <div v-else-if="flowStep === 'setup' && createdApp" class="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
+                {{ t('unified-onboarding-step-setup') }}
+              </p>
+              <h2 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
+                {{ setupTitle }}
+              </h2>
+              <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                {{ setupSubtitle }}
+              </p>
+            </div>
+            <button class="d-btn min-h-11" :class="whiteCardSecondaryButtonClass()" @click="openDashboard">
+              {{ t('app-onboarding-open-dashboard') }}
+            </button>
+          </div>
+
+          <div
+            class="group relative cursor-pointer rounded-2xl bg-slate-950 p-5 pr-14 ring-1 ring-white/10 transition hover:ring-white/20"
+            role="button"
+            tabindex="0"
+            data-test="app-onboarding-command-copy"
+            :aria-label="t('app-onboarding-command-copy')"
+            @click="copyCliCommand"
+            @keydown.enter.prevent="copyCliCommand"
+            @keydown.space.prevent="copyCliCommand"
+          >
+            <code class="block whitespace-pre-wrap break-all text-sm">
+              <span class="text-slate-500">npx</span>
+              <span class="text-sky-300"> @capgo/cli@latest</span>
+              <span class="mr-1 font-bold text-violet-300"> {{ cliSubcommand }}</span>
+              <span class="text-emerald-300"> {{ apiKey ?? '[APIKEY]' }}</span>
+              <template v-for="(arg, index) in cliCommandArgs" :key="`${arg}-${index}`">
+                <span :class="index % 2 === 0 ? 'text-amber-300' : 'text-cyan-300'"> {{ arg }}</span>
+              </template>
+            </code>
+            <IconCopy class="absolute right-4 top-4 h-5 w-5 text-muted-blue-300 transition group-hover:text-white" />
+          </div>
+
+          <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-700 dark:border-white/15 dark:bg-slate-950/90 dark:text-slate-200">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div class="max-w-2xl">
+                <p class="font-medium text-slate-950 dark:text-white">
+                  {{ t('app-onboarding-ai-help-title') }}
+                </p>
+                <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  {{ t('app-onboarding-ai-help-caption') }}
+                </p>
+              </div>
+              <button class="d-btn min-h-11" :class="whiteCardSecondaryButtonClass()" @click="copyAiInstructions">
+                <IconCopy class="h-4 w-4" />
+                {{ t('app-onboarding-ai-help-button') }}
+              </button>
+            </div>
+          </div>
+
+          <div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
+            <button class="d-btn min-h-11" :class="whiteCardPrimaryButtonClass()" @click="openDashboard">
+              {{ t('app-onboarding-install-later') }}
+              <IconArrowRight class="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <div v-else-if="!props.preOrg && flowStep === 'choice' && createdApp" class="space-y-6">
           <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -1172,7 +1582,7 @@ watch(suggestedAppId, (value) => {
           </div>
         </div>
 
-        <div v-else-if="flowStep === 'install' && createdApp">
+        <div v-else-if="!props.preOrg && flowStep === 'install' && createdApp">
           <div class="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95">
             <div class="flex flex-wrap items-start justify-between gap-4">
               <div>
@@ -1203,7 +1613,7 @@ watch(suggestedAppId, (value) => {
               <code class="block whitespace-pre-wrap break-all text-sm">
                 <span class="text-slate-500">npx</span>
                 <span class="text-sky-300"> @capgo/cli@latest</span>
-                <span class="mr-1 font-bold text-violet-300"> i</span>
+                <span class="mr-1 font-bold text-violet-300"> {{ cliSubcommand }}</span>
                 <span class="text-emerald-300"> {{ apiKey ?? '[APIKEY]' }}</span>
                 <template v-for="(arg, index) in cliCommandArgs" :key="`${arg}-${index}`">
                   <span :class="index % 2 === 0 ? 'text-amber-300' : 'text-cyan-300'"> {{ arg }}</span>

@@ -387,7 +387,12 @@ async function guard(
     }
 
     if (organizationsLoaded && !organizationStore.hasOrganizations && shouldRedirectToOrgOnboarding()) {
-      return next('/onboarding/app')
+      return next({
+        path: '/onboarding/app',
+        query: {
+          to: to.fullPath,
+        },
+      })
     }
 
     // Check if user is trying to access admin routes

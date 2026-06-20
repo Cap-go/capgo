@@ -78,7 +78,7 @@ const websitePreview = ref<WebsitePreview | null>(null)
 const inviteModalRef = ref<InviteTeammateModalRef | null>(null)
 const logoInputRef = useTemplateRef<HTMLInputElement>('logoInput')
 const isAdditionalOrgFlow = ref(false)
-const appDraft = ref(loadOnboardingAppDraft())
+const appDraft = ref(loadOnboardingAppDraft(main.user?.id ?? main.auth?.id))
 const estimatedUsersIndex = ref<number | null>(null)
 const config = getLocalConfig()
 
@@ -293,6 +293,7 @@ async function logoutFromOnboarding() {
   isLoggingOut.value = true
 
   try {
+    clearOnboardingAppDraft(main.user?.id ?? main.auth?.id)
     await main.logout()
     await router.replace('/login')
   }
@@ -595,7 +596,7 @@ async function finishOnboarding() {
         draft,
         activeOrgName.value,
       )
-      clearOnboardingAppDraft()
+      clearOnboardingAppDraft(main.user?.id ?? main.auth?.id)
       appDraft.value = null
       if (appIdFeedback)
         toast.info(appIdFeedback)
@@ -670,7 +671,7 @@ onMounted(async () => {
     ? route.query.source === 'org-switcher'
     : organizationStore.organizations.some(org => !org.role.includes('invite'))
 
-  appDraft.value = loadOnboardingAppDraft()
+  appDraft.value = loadOnboardingAppDraft(main.user?.id ?? main.auth?.id)
   if (!appDraft.value && !isAdditionalOrgFlow.value && typeof route.query.org !== 'string') {
     await router.replace('/onboarding/app')
     return

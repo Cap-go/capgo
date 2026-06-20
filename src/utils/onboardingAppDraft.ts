@@ -12,19 +12,33 @@ export interface OnboardingAppDraft {
   storeScreenshotUrl: string | null
 }
 
-const STORAGE_KEY = 'capgo:onboarding-app-draft'
+const STORAGE_KEY_PREFIX = 'capgo:onboarding-app-draft'
+const LEGACY_STORAGE_KEY = 'capgo:onboarding-app-draft'
 
-export function loadOnboardingAppDraft(): OnboardingAppDraft | null {
+function getDraftStorageKey(userId?: string | null): string | null {
+  const normalizedUserId = userId?.trim()
+  if (!normalizedUserId)
+    return null
+
+  return `${STORAGE_KEY_PREFIX}:${normalizedUserId}`
+}
+
+export function loadOnboardingAppDraft(userId?: string | null): OnboardingAppDraft | null {
   if (typeof sessionStorage === 'undefined')
     return null
 
-  const raw = sessionStorage.getItem(STORAGE_KEY)
+  const storageKey = getDraftStorageKey(userId)
+  const raw = storageKey
+    ? sessionStorage.getItem(storageKey)
+    : sessionStorage.getItem(LEGACY_STORAGE_KEY)
   if (!raw)
     return null
 
   try {
     const parsed = JSON.parse(raw) as Partial<OnboardingAppDraft>
-    if (!parsed.appName?.trim() || !parsed.appId?.trim())
+    if (typeof parsed.appName !== 'string' || !parsed.appName.trim())
+      return null
+    if (typeof parsed.appId !== 'string' || !parsed.appId.trim())
       return null
 
     return {
@@ -34,13 +48,13 @@ export function loadOnboardingAppDraft(): OnboardingAppDraft | null {
       existingAppSetup: parsed.existingAppSetup === 'import' || parsed.existingAppSetup === 'manual'
         ? parsed.existingAppSetup
         : null,
-      storeUrl: parsed.storeUrl?.trim() ?? '',
-      importedStoreAppId: parsed.importedStoreAppId?.trim() ?? '',
-      iosStoreUrl: parsed.iosStoreUrl ?? null,
-      androidStoreUrl: parsed.androidStoreUrl ?? null,
-      iconDataUrl: parsed.iconDataUrl ?? null,
-      storeIconDataUrl: parsed.storeIconDataUrl ?? null,
-      storeScreenshotUrl: parsed.storeScreenshotUrl ?? null,
+      storeUrl: typeof parsed.storeUrl === 'string' ? parsed.storeUrl.trim() : '',
+      importedStoreAppId: typeof parsed.importedStoreAppId === 'string' ? parsed.importedStoreAppId.trim() : '',
+      iosStoreUrl: typeof parsed.iosStoreUrl === 'string' ? parsed.iosStoreUrl : null,
+      androidStoreUrl: typeof parsed.androidStoreUrl === 'string' ? parsed.androidStoreUrl : null,
+      iconDataUrl: typeof parsed.iconDataUrl === 'string' ? parsed.iconDataUrl : null,
+      storeIconDataUrl: typeof parsed.storeIconDataUrl === 'string' ? parsed.storeIconDataUrl : null,
+      storeScreenshotUrl: typeof parsed.storeScreenshotUrl === 'string' ? parsed.storeScreenshotUrl : null,
     }
   }
   catch {
@@ -48,18 +62,26 @@ export function loadOnboardingAppDraft(): OnboardingAppDraft | null {
   }
 }
 
-export function saveOnboardingAppDraft(draft: OnboardingAppDraft) {
+export function saveOnboardingAppDraft(draft: OnboardingAppDraft, userId?: string | null) {
   if (typeof sessionStorage === 'undefined')
     return
 
-  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(draft))
+  const storageKey = getDraftStorageKey(userId)
+  if (!storageKey)
+    return
+
+  sessionStorage.setItem(storageKey, JSON.stringify(draft))
 }
 
-export function clearOnboardingAppDraft() {
+export function clearOnboardingAppDraft(userId?: string | null) {
   if (typeof sessionStorage === 'undefined')
     return
 
-  sessionStorage.removeItem(STORAGE_KEY)
+  const storageKey = getDraftStorageKey(userId)
+  if (storageKey)
+    sessionStorage.removeItem(storageKey)
+
+  sessionStorage.removeItem(LEGACY_STORAGE_KEY)
 }
 
 export async function fileToDataUrl(file: File): Promise<string> {

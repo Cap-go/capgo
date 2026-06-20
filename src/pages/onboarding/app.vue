@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconLoader from '~icons/lucide/loader-2'
 import AppOnboardingFlow from '~/components/dashboard/AppOnboardingFlow.vue'
+import { clearOnboardingAppDraft } from '~/utils/onboardingAppDraft'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 
@@ -20,6 +21,7 @@ async function logoutFromOnboarding() {
 
   isLoggingOut.value = true
   try {
+    clearOnboardingAppDraft(main.user?.id ?? main.auth?.id)
     await main.logout()
     await router.replace('/login')
   }
@@ -38,7 +40,7 @@ onMounted(async () => {
     return
   }
 
-  displayStore.NavTitle = t('app-onboarding-title-first')
+  displayStore.NavTitle = t('app-onboarding-badge')
   displayStore.defaultBack = '/login'
   isReady.value = true
 })
