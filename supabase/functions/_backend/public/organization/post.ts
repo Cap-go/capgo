@@ -30,10 +30,9 @@ const bodySchema = type({
 })
 
 
-function resolveOrgOnboarding(intent?: string) {
-  const normalizedIntent = intent ?? 'unknown'
-  if (normalizedIntent === 'ota' || normalizedIntent === 'builder' || normalizedIntent === 'both' || normalizedIntent === 'exploring')
-    return { intent: normalizedIntent }
+function resolveOrgOnboarding(intent = 'unknown') {
+  if (intent === 'ota' || intent === 'builder' || intent === 'both' || intent === 'exploring')
+    return { intent }
 
   return { intent: 'unknown' as const }
 }
