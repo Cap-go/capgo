@@ -1358,6 +1358,50 @@ BEGIN
     WHERE r.name = public.rbac_role_channel_reader()
     ON CONFLICT DO NOTHING;
 
+
+    -- Ensure dedicated apikey management test keys retain explicit RBAC bindings
+    -- after permission repopulation (seed_key_roles insert can be skipped silently).
+    DELETE FROM public.role_bindings rb
+    USING public.apikeys ak
+    WHERE rb.principal_type = public.rbac_principal_apikey()
+      AND rb.principal_id = ak.rbac_id
+      AND rb.scope_type = public.rbac_scope_org()
+      AND ak.key IN (
+        'c9d0e1f2-a3b4-4c5d-8e6f-7a8b9c0d1e25',
+        'd1e2f3a4-b5c6-4d7e-8f90-a1b2c3d4e5f6'
+      );
+
+    INSERT INTO public.role_bindings (
+      principal_type,
+      principal_id,
+      role_id,
+      scope_type,
+      org_id,
+      granted_by,
+      reason,
+      is_direct
+    )
+    SELECT
+      public.rbac_principal_apikey(),
+      ak.rbac_id,
+      roles.id,
+      public.rbac_scope_org(),
+      'f1a2b3c4-d5e6-4f70-8a9b-0c1d2e3f4a50'::uuid,
+      ak.user_id,
+      'Seeded apikey management test binding',
+      true
+    FROM public.apikeys ak
+    JOIN public.roles roles
+      ON roles.scope_type = public.rbac_scope_org()
+      AND roles.name = CASE ak.key
+        WHEN 'c9d0e1f2-a3b4-4c5d-8e6f-7a8b9c0d1e25' THEN public.rbac_role_org_super_admin()
+        WHEN 'd1e2f3a4-b5c6-4d7e-8f90-a1b2c3d4e5f6' THEN public.rbac_role_apikey_manager()
+      END
+    WHERE ak.key IN (
+      'c9d0e1f2-a3b4-4c5d-8e6f-7a8b9c0d1e25',
+      'd1e2f3a4-b5c6-4d7e-8f90-a1b2c3d4e5f6'
+    );
+
     RAISE NOTICE 'RBAC permissions populated: % permissions, % role_permissions',
       (SELECT COUNT(*) FROM public.permissions),
       (SELECT COUNT(*) FROM public.role_permissions);
