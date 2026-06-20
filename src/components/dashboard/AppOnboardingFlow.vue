@@ -30,6 +30,7 @@ import {
   remoteImageToDataUrl,
   saveOnboardingAppDraft,
 } from '~/utils/onboardingAppDraft'
+import { slugifyOnboardingSegment } from '~/utils/onboardingSlug'
 
 const props = defineProps<{
   onboarding: boolean
@@ -112,12 +113,10 @@ const suggestedAppId = computed(() => {
     return storeAppId
 
   const orgSlug = props.preOrg
-    ? slugify(appName.value || 'mobile-app')
-    : slugify(currentOrg.value?.name || 'capgo')
-  const appSlug = slugify(appName.value || 'mobile-app')
-  return props.preOrg
-    ? `com.${orgSlug}.${appSlug}`
-    : `com.${orgSlug}.${appSlug}`
+    ? slugifyOnboardingSegment(appName.value || 'mobile-app')
+    : slugifyOnboardingSegment(currentOrg.value?.name || 'capgo')
+  const appSlug = slugifyOnboardingSegment(appName.value || 'mobile-app')
+  return `com.${orgSlug}.${appSlug}`
 })
 const generatedAppId = computed(() => createdApp.value?.app_id || manualAppId.value.trim() || suggestedAppId.value)
 const aiHelpPrompt = computed(() => {
@@ -153,20 +152,6 @@ function whiteCardSecondaryButtonClass() {
 
 function whiteCardPrimaryButtonClass() {
   return 'border-primary-500 bg-primary-500 text-white hover:border-primary-500 hover:bg-primary-500/90 disabled:border-slate-300 disabled:bg-slate-300 disabled:text-white disabled:opacity-100 dark:border-primary-500/90 dark:bg-primary-500 dark:hover:border-primary-500 dark:hover:bg-primary-500/90 dark:disabled:border-white/15 dark:disabled:bg-slate-800 dark:disabled:text-slate-500'
-}
-
-function slugify(value: string) {
-  const slug = value
-    .normalize('NFKD')
-    .replace(/[^\w\s-]/g, '')
-    .trim()
-    .toLowerCase()
-    .replace(/[_\s-]+/g, '.')
-
-  return slug
-    .replace(/^\./g, '')
-    .replace(/\.$/g, '')
-    || 'app'
 }
 
 function extractAndroidAppId(url: string) {
@@ -396,7 +381,7 @@ function buildAlternativeAppIds(baseId: string) {
     `${normalized}.app`,
     `${normalized}.mobile`,
     `${normalized}.capgo`,
-    `${normalized}.${currentOrg.value?.name ? slugify(currentOrg.value.name) : 'prod'}`,
+    `${normalized}.${currentOrg.value?.name ? slugifyOnboardingSegment(currentOrg.value.name) : 'prod'}`,
     `${normalized}.${crypto.randomUUID().slice(0, 4)}`,
   ]
 
@@ -506,9 +491,7 @@ async function buildDraftFromForm() {
   let iconDataUrl: string | null = null
   if (selectedIconFile.value)
     iconDataUrl = await fileToDataUrl(selectedIconFile.value)
-  else if (localIconPreview.value.startsWith('blob:'))
-    iconDataUrl = null
-  else if (localIconPreview.value)
+  else if (localIconPreview.value && !localIconPreview.value.startsWith('blob:'))
     iconDataUrl = await remoteImageToDataUrl(localIconPreview.value)
 
   let storeIconDataUrl = storeIconPreview.value || null
