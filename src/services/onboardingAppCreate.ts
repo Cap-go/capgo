@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '~/types/supabase.types'
 import type { OnboardingAppDraft } from '~/utils/onboardingAppDraft'
 import { FunctionsHttpError } from '@supabase/supabase-js'
+import { slugifyOnboardingSegment, trimTrailingDots } from '~/utils/onboardingSlug'
 
 type AppRow = Database['public']['Tables']['apps']['Row']
 
@@ -21,23 +22,9 @@ function isAppIdConflict(error: { status?: number, message?: string } | null | u
   return ['duplicate', 'already exists', 'unique constraint', 'apps_pkey', 'app_id_key', 'app_id_already_exists'].some(fragment => message.includes(fragment))
 }
 
-function slugify(value: string) {
-  const slug = value
-    .normalize('NFKD')
-    .replace(/[^\w\s-]/g, '')
-    .trim()
-    .toLowerCase()
-    .replace(/[_\s-]+/g, '.')
-
-  return slug
-    .replace(/^\./g, '')
-    .replace(/\.$/g, '')
-    || 'prod'
-}
-
 function buildAlternativeAppIds(baseId: string, orgName?: string) {
-  const normalized = baseId.trim().replace(/\.+$/g, '') || baseId
-  const orgSlug = orgName ? slugify(orgName) : 'prod'
+  const normalized = trimTrailingDots(baseId) || baseId
+  const orgSlug = orgName ? slugifyOnboardingSegment(orgName, 'prod') : 'prod'
 
   const proposals = [
     `${normalized}.app`,
@@ -91,12 +78,12 @@ async function uploadIconFromDraft(
   let blob: Blob
   if (iconSource.startsWith('data:')) {
     const [header, payload = ''] = iconSource.split(',', 2)
-    const contentType = header.match(/^data:([^;]+)/)?.[1] ?? 'image/png'
+    const contentType = /^data:([^;]+)/.exec(header)?.[1] ?? 'image/png'
     if (!payload)
       return
 
     const binary = atob(payload)
-    const bytes = Uint8Array.from(binary, char => char.charCodeAt(0))
+    const bytes = Uint8Array.from(binary, char => char.codePointAt(0) ?? 0)
     blob = new Blob([bytes], { type: contentType })
   }
   else {
