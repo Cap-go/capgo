@@ -937,3 +937,38 @@ Rules:
   alongside Graphify's graph queries.
 - After code changes that should update the repository graph, run
   `bun run graphify:generate` and commit the resulting `graphify-out/` changes.
+
+## Cursor Cloud specific instructions
+
+These notes capture non-obvious caveats for running the stack in the Cursor
+Cloud VM. Standard commands live in the sections above; only the gotchas are
+repeated here.
+
+- **Docker must be started manually.** systemd is not running in the VM, so the
+  Docker daemon does not auto-start. Run `sudo service docker start` once per VM
+  boot before any Supabase command. The `ubuntu` user is already in the
+  `docker` group, so `docker`/`supabase` work without `sudo` after the daemon is
+  up. The daemon uses the `fuse-overlayfs` storage driver (configured in
+  `/etc/docker/daemon.json`) — do not switch it to `overlay2`.
+- **Supabase ports are worktree-isolated, not the documented defaults.** Each
+  git worktree gets its own ports (e.g. the API may be on `57671`, not `54321`).
+  Always run `bun run supabase:status` to read the current `SUPABASE_URL`,
+  keys, and DB URL. The worktree state lives under `.context/` (a local,
+  untracked artifact — do not commit it).
+- **Run the frontend with `bun run serve:worktree`, not `bun serve:local`.**
+  `serve:worktree` auto-injects the current worktree's Supabase URL/anon key into
+  the Vite dev server (still served on `http://localhost:5173`). Plain
+  `bun serve:local` points at the default ports, which will not match the
+  worktree's Supabase instance.
+- **Backend edge functions:** `bun run supabase:functions:serve` (or `bun
+  backend` to start Supabase + serve). They are served under the worktree API
+  URL at `/functions/v1/<name>`; `/functions/v1/ok` returns `{"status":"ok"}`.
+- **Tests need Supabase running and must be wrapped with the worktree env.** The
+  `test:*` scripts already wrap with `bun run supabase:with-env --`; for ad-hoc
+  single-file runs use e.g.
+  `bun run supabase:with-env -- bunx vitest run tests/app.test.ts`.
+- Local login uses the seeded accounts from the README: `test@capgo.app` /
+  `testtest` (demo data) and `admin@capgo.app` / `adminadmin` (admin).
+  Re-run `bun run supabase:db:reset` to refresh seed data.
+- Cloudflare Workers and the Playwright/Stripe harnesses are optional; the
+  product runs end-to-end on the Supabase stack + Vite frontend alone.
