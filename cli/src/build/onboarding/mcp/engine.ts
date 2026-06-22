@@ -169,7 +169,7 @@ export async function decideStart(
       roadmap: ROADMAP,
       context: { appId: facts.appId, platformsDetected: facts.platformsDetected },
       human: {
-        instruction: 'Ask the user to generate an API key for their AI assistant at https://app.capgo.app/connect and paste it into the chat, then call the capgo_login tool with that key to sign in.',
+        instruction: 'Ask the user to generate an API key for their AI assistant at https://console.capgo.app/connect and paste it into the chat, then call the capgo_login tool with that key to sign in.',
       },
       next: {
         tool: 'capgo_login',
