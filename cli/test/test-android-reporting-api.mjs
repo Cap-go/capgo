@@ -69,6 +69,12 @@ await t('parseAppsSearchResponse returns [] for garbage shapes', () => {
   assert.deepEqual(parseAppsSearchResponse('not an object'), [])
   assert.deepEqual(parseAppsSearchResponse(42), [])
   assert.deepEqual(parseAppsSearchResponse({ apps: null }), [])
+  // Truthy non-array `apps` must not throw (object/string/number) — guards the
+  // Array.isArray check, since `.flatMap` only exists on arrays.
+  assert.deepEqual(parseAppsSearchResponse({ apps: {} }), [])
+  assert.deepEqual(parseAppsSearchResponse({ apps: 'x' }), [])
+  assert.deepEqual(parseAppsSearchResponse({ apps: 7 }), [])
+  assert.deepEqual(parseAppsSearchResponse({ apps: true }), [])
 })
 
 // ─── listPlayApps (injected fetch) ─────────────────────────────────────────

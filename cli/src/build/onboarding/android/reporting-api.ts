@@ -35,7 +35,7 @@ export interface PlayApp {
  * pages.
  */
 export function parseAppsSearchResponse(json: any): PlayApp[] {
-  return (json?.apps || []).flatMap((app: any): PlayApp[] => {
+  return (Array.isArray(json?.apps) ? json.apps : []).flatMap((app: any): PlayApp[] => {
     const packageName = typeof app?.packageName === 'string' ? app.packageName : ''
     if (!packageName)
       return []

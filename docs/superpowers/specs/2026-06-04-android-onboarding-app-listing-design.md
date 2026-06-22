@@ -42,7 +42,7 @@ That's the whole invariant. If it holds, Capgo Builder's first build uploads as 
 | Creating a **public** Play app record is **UI-only** — no `apps.create`, no fastlane/Terraform/automation, Console login is bot-blocked | HIGH | androidpublisher ref; fastlane; gradle-play-publisher README; 2024–2026 release notes |
 | The **first** AAB upload to a never-released app **works via API as a `draft`** once the app record exists | MEDIUM | [fastlane #18293](https://github.com/fastlane/fastlane/discussions/18293) ("Only releases with status draft may be created on draft app") |
 | `edits.insert` 404s until the **app record exists** — so the hard gate is *app creation*, not the first upload | HIGH | gradle-play-publisher #75/#836; Codemagic docs |
-| Capgo Builder already uploads with `release_status: ENV['PLAY_STORE_RELEASE_STATUS'] || 'draft'` to the `internal` track | HIGH | `capgo_builder_new/src/fastlaneTemplateAndroid.ts:442` |
+| Capgo Builder already uploads with `release_status: ENV['PLAY_STORE_RELEASE_STATUS'] \|\| 'draft'` to the `internal` track | HIGH | `capgo_builder_new/src/fastlaneTemplateAndroid.ts:442` |
 | Whether `apps:search` lists a **zero-release Draft** app (created, never uploaded) | **UNVERIFIED** | needs one empirical probe (§11) |
 | The Custom App Publishing API can create+upload, but only **permanently-private managed Google Play** apps — irrelevant for public apps | HIGH | custom-app-api/publish |
 

@@ -351,13 +351,20 @@ export function getAndroidResumeStep(progress: AndroidOnboardingProgress | null)
   // The verify effect always writes this marker (verified true OR false on a
   // degraded check) before advancing, so this never loops.
   //
+  // Re-verify if the marker is for a DIFFERENT package than the one currently
+  // chosen (the user changed the package after a prior verify/proceed) - a stale
+  // marker must not skip the gate for the new package.
+  //
   // Backward-compat guard: only gate FRESH flows. Legacy / in-flight progress
   // recorded before this step existed (or any resume that already provisioned)
   // has no playAppVerified marker but must NOT be re-routed into the new gate;
   // if any provisioning marker is present, fall through to the Phase 5 / tail
   // routing below instead.
+  const verifiedMarker = completedSteps.playAppVerified
+  const chosenPackage = completedSteps.androidPackageChosen?.packageName
+  const verifyMatchesChosen = !!verifiedMarker && verifiedMarker.packageName === chosenPackage
   if (
-    !completedSteps.playAppVerified
+    !verifyMatchesChosen
     && !completedSteps.serviceAccountProvisioned
     && !completedSteps.playInviteProvisioned
     && !progress._serviceAccountKeyBase64

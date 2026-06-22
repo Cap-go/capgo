@@ -133,11 +133,11 @@ import {
 import { generateKeystore, generateRandomPassword, listKeystoreAliases, tryUnlockPrivateKey } from '../keystore.js'
 import {
   fetchUserInfo,
-  GOOGLE_OAUTH_SCOPES_ANDROIDPUBLISHER,
   refreshAccessToken,
   revokeToken,
   runOAuthFlow,
 } from '../oauth-google.js'
+import { OAUTH_REQUIRED_SCOPES, OAUTH_SCOPES_FOR_ONBOARDING } from '../oauth-scopes.js'
 import open from 'open'
 import { contactSupport } from '../../../../support/contact-support.js'
 import { uploadSupportLogs } from '../../../../support/support-upload.js'
@@ -233,23 +233,8 @@ const TAIL_DRIVER_STEPS = new Set<AndroidOnboardingStep>([
   'requesting-build',
 ])
 
-/** OAuth scopes — superset of `androidpublisher` because we also need
- *  cloud-platform to create GCP projects, service accounts, and keys on the
- *  user's behalf. userinfo.email + openid are for identifying the signed-in
- *  user in the UI. */
-const OAUTH_SCOPES_FOR_ONBOARDING = [
-  ...GOOGLE_OAUTH_SCOPES_ANDROIDPUBLISHER,
-  'https://www.googleapis.com/auth/cloud-platform',
-  // OPTIONAL — used by the app-existence verify step (apps:search). Declining it
-  // must NOT fail sign-in: it's excluded from OAUTH_REQUIRED_SCOPES below.
-  'https://www.googleapis.com/auth/playdeveloperreporting',
-] as const
-
-/** Subset whose absence FAILS sign-in (excludes the optional reporting scope). */
-const OAUTH_REQUIRED_SCOPES = [
-  ...GOOGLE_OAUTH_SCOPES_ANDROIDPUBLISHER,
-  'https://www.googleapis.com/auth/cloud-platform',
-] as const
+// OAUTH_SCOPES_FOR_ONBOARDING + OAUTH_REQUIRED_SCOPES are imported from
+// ../oauth-scopes.js (shared with the MCP bridge so the two drivers never drift).
 
 function cleanPath(input: string): string {
   let s = input.trim()
@@ -1982,10 +1967,24 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           return
         // MissingScopesError on google-sign-in is handled INSIDE the engine
         // (returns next: 'google-sign-in'); any other throw routes through the
-        // same retry/error UX the original effects used. android-package-select
-        // had no catch in the original (best-effort pre-load) — swallow there.
-        if (failedStep)
+        // same retry/error UX the original effects used.
+        if (failedStep) {
           handleError(err, failedStep)
+          return
+        }
+        // No failedStep mapping (best-effort steps). Do NOT just swallow: with the
+        // loading gates a swallowed throw would deadlock the spinner forever.
+        if (step === 'android-package-select') {
+          // Pre-load is best-effort: degrade to the plain picker.
+          setPlayVerifyApps(null)
+          setPackagePreloadDone(true)
+          addLog('⚠ Could not load Play Store app data; continuing without it.', 'yellow')
+          return
+        }
+        if (step === 'android-app-verify') {
+          // Surface a retryable error instead of hanging the verify spinner.
+          handleError(err, 'android-app-verify')
+        }
       }
     })()
 
