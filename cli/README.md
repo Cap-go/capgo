@@ -1303,7 +1303,8 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | **--no-prescan** | <code>boolean</code> | Skip the automatic pre-build scan |
 | **--prescan-ignore-fatal** | <code>boolean</code> | Run the pre-build scan but never block the build (report only) |
 | **--fail-on-warnings** | <code>boolean</code> | Treat prescan warnings as fatal |
-| **--send-logs** | <code>boolean</code> | On a CI/CD build failure, automatically upload the build logs to Capgo support (no email required). Capgo support is notified and will follow up by email. Additive to --ai-analytics — both can be passed. |
+| **--send-logs-to-support** | <code>boolean</code> | On a CI/CD build failure, automatically upload the build logs to Capgo support (no email required). Capgo support is notified and will follow up by email. Additive to --ai-analytics. |
+| **--send-logs** | <code>boolean</code> | Deprecated alias for --send-logs-to-support |
 | **-a** | <code>string</code> | API key to link to your account |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
