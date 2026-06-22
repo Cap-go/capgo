@@ -15,7 +15,7 @@ function t(name, fn) {
 // ─── buildRenameWorkspaceFiles ─────────────────────────────────────────────
 
 t('buildRenameWorkspaceFiles emits a type:module package.json with a pinned Trapeze dep', () => {
-  const { packageJson } = buildRenameWorkspaceFiles('ee.forgr.app')
+  const { packageJson } = buildRenameWorkspaceFiles('ee.forgr.app', 'android')
   const parsed = JSON.parse(packageJson)
   assert.equal(parsed.type, 'module')
   assert.equal(parsed.devDependencies['@trapezedev/project'], TRAPEZE_PROJECT_VERSION)
@@ -24,14 +24,14 @@ t('buildRenameWorkspaceFiles emits a type:module package.json with a pinned Trap
 })
 
 t('buildRenameWorkspaceFiles emits a rename.mjs that reads the appId from argv', () => {
-  const { renameMjs } = buildRenameWorkspaceFiles('ee.forgr.app')
+  const { renameMjs } = buildRenameWorkspaceFiles('ee.forgr.app', 'android')
   assert.match(renameMjs, /process\.argv\[2\]/)
   // The appId is NOT interpolated into the script — it always flows in via argv.
   assert.ok(!renameMjs.includes('ee.forgr.app'), 'package must not be templated into the script')
 })
 
 t('buildRenameWorkspaceFiles always calls all three setters in order', () => {
-  const { renameMjs } = buildRenameWorkspaceFiles('ee.forgr.app')
+  const { renameMjs } = buildRenameWorkspaceFiles('ee.forgr.app', 'android')
   const iPkg = renameMjs.indexOf('setPackageName(appId)')
   const iAppId = renameMjs.indexOf('setApplicationId(appId)')
   const iNs = renameMjs.indexOf('setNamespace(appId)')
@@ -41,6 +41,21 @@ t('buildRenameWorkspaceFiles always calls all three setters in order', () => {
   assert.ok(iPkg < iAppId && iAppId < iNs, 'setters must run in order: package → applicationId → namespace')
   assert.match(renameMjs, /project\.commit\(\)/)
   assert.match(renameMjs, /@trapezedev\/project/)
+})
+
+t('buildRenameWorkspaceFiles bakes the resolved android dir into the MobileProject config', () => {
+  const { renameMjs } = buildRenameWorkspaceFiles('ee.forgr.app', 'android')
+  // The configured native path is JSON-escaped into the MobileProject config.
+  assert.ok(renameMjs.includes('path: "android"'), 'default android dir must be in the MobileProject config')
+})
+
+t('buildRenameWorkspaceFiles honors a NON-default android dir (configured platform path)', () => {
+  const androidDir = 'apps/mobile/platforms/android-native'
+  const { renameMjs } = buildRenameWorkspaceFiles('ee.forgr.app', androidDir)
+  // The configured path is baked in verbatim, never the hardcoded ./android, so
+  // Trapeze edits the right native project (P1: stale ./android must not be hit).
+  assert.ok(renameMjs.includes(`path: ${JSON.stringify(androidDir)}`), 'must target the configured androidDir')
+  assert.ok(!renameMjs.includes('path: "android"'), 'must NOT fall back to the default android dir')
 })
 
 // ─── isAndroidStudioRunning ────────────────────────────────────────────────

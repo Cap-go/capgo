@@ -521,11 +521,33 @@ export function androidViewForStep(
     // kind is already set dynamically above; only add options when choice.
     case 'android-package-select': {
       if (kind === 'choice' && ctx.detectedPackageIds && ctx.detectedPackageIds.length > 0) {
+        // When the Play apps list was pre-loaded (generate path + reporting
+        // scope), annotate each id with whether it already exists in Play, so
+        // the user sees at pick time which ids clear the verify gate and which
+        // hit the create-app step. Absent (degrade) leaves the plain picker.
+        const detected = new Set(ctx.detectedPackageIds)
+        const playPackages = ctx.playVerifyApps
+          ? new Set(ctx.playVerifyApps.map(a => a.packageName))
+          : null
         const packageOptions: AndroidStepOption[] = ctx.detectedPackageIds.map(id => ({
           value: id,
           label: id,
+          ...(playPackages
+            ? { note: playPackages.has(id) ? '✓ exists in Play Store' : '⚠ not in Play Store yet' }
+            : {}),
         }))
-        return { ...base, options: packageOptions }
+        // Surface the user's other real Play apps (not auto-detected) as
+        // selectable options, so they can pick a guaranteed-existing app
+        // instead of typing one that may not exist. Picking one passes the
+        // verify gate (it is in apps:search, so it exact-matches).
+        const otherPlayApps: AndroidStepOption[] = (ctx.playVerifyApps ?? [])
+          .filter(a => !detected.has(a.packageName))
+          .map(a => ({
+            value: a.packageName,
+            label: a.displayName ? `${a.packageName} (${a.displayName})` : a.packageName,
+            note: '✓ exists in Play Store',
+          }))
+        return { ...base, options: [...packageOptions, ...otherPlayApps] }
       }
       return base
     }
@@ -1834,10 +1856,26 @@ export async function runAndroidEffect(
     // once detectedPackageIds is populated. Do NOT persist here.
     case 'android-package-select': {
       const ids = await deps.findAndroidApplicationIds()
+      // Enrich the picker with each id's Play Store status so the user sees, at
+      // pick time, which Gradle applicationIds already exist in Play (and which
+      // would hit the create-app gate). Best-effort: generate path only (the
+      // import path has no user OAuth token / reporting scope) and any failure
+      // (scope skipped, 403, network) degrades silently to the plain picker and
+      // never blocks. Reuses the same apps:search the verify step reconciles.
+      let playVerifyApps: { packageName: string, displayName: string }[] | undefined
+      if (progress.serviceAccountMethod === 'generate' && deps.listPlayApps) {
+        try {
+          const tok = await deps.getAccessToken()
+          playVerifyApps = await deps.listPlayApps(tok)
+        }
+        catch {
+          // degrade silently; the plain picker still works.
+        }
+      }
       return {
         progress,
         next: 'android-package-select',
-        transient: { detectedPackageIds: ids },
+        transient: { detectedPackageIds: ids, ...(playVerifyApps ? { playVerifyApps } : {}) },
       }
     }
 

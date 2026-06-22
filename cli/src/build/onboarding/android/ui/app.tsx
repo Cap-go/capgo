@@ -200,6 +200,7 @@ const ENGINE_AUTO_FAILED_STEP: { [K in AndroidOnboardingStep]?: AndroidOnboardin
   'google-sign-in-running': 'google-sign-in',
   'gcp-setup-running': 'gcp-setup-running',
   'android-package-select': undefined,
+  'android-app-verify': undefined,
 }
 
 // ─── TAIL_DRIVER_STEPS ────────────────────────────────────────────────────────
@@ -586,13 +587,23 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     initialProgress?.completedSteps.androidPackageChosen || null,
   )
   const [detectedPackageIds, setDetectedPackageIds] = useState<string[]>([])
-  const [packageSelectMode, setPackageSelectMode] = useState<'choose' | 'manual'>('choose')
+  // Play Store apps (apps:search) pre-loaded at package-select so the picker can
+  // annotate each Gradle id with its Play existence. null → not loaded / degraded
+  // (no reporting scope, import path, or fetch failed) → plain picker.
+  const [playVerifyApps, setPlayVerifyApps] = useState<{ packageName: string, displayName: string }[] | null>(null)
+  // Gates the picker behind a spinner until the (now network-touching) pre-load
+  // completes, so the manual-entry fallback never flashes mid-detection.
+  const [packagePreloadDone, setPackagePreloadDone] = useState(false)
+  const [packageSelectMode, setPackageSelectMode] = useState<'choose' | 'pick-existing' | 'manual'>('choose')
   const packageLoadedRef = useRef(false)
   // android-app-verify (Play app existence gate). verifyOutcome is null while the
   // apps:search check runs or after it advanced; set to a no-match kind when the
   // chosen package isn't a real Play app → render the create-app / re-check gate.
   const [verifyOutcome, setVerifyOutcome] = useState<'no-app' | 'wrong-build-id' | 'multi-gradle' | null>(null)
   const verifyLoadedRef = useRef(false)
+  // Session cache for apps:search, shared by the package-select pre-load and
+  // the verify step so they don't each pay the (slow) Play apps fetch.
+  const playAppsCacheRef = useRef<{ packageName: string, displayName: string }[] | null>(null)
   // Bumped on "re-check" to re-run the verify effect for the same step.
   const [verifyRecheckNonce, setVerifyRecheckNonce] = useState(0)
   // Remount key for the gate <Select> so the @inkjs/ui onChange re-fire bug
@@ -1081,6 +1092,9 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     // Phase 4.5 — Android package
     setAndroidPackageChoice(null)
     setDetectedPackageIds([])
+    setPlayVerifyApps(null)
+    playAppsCacheRef.current = null
+    setPackagePreloadDone(false)
     setPackageSelectMode('choose')
     packageLoadedRef.current = false
     // Phase 5 — provisioning outputs
@@ -1823,7 +1837,16 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         listProjects,
         createProject: gcpCreateProject,
         // Play Developer Reporting (apps:search) for android-app-verify.
-        listPlayApps: token => listPlayApps(token),
+        listPlayApps: async (token) => {
+          // Cache the apps:search result for the session so the package-select
+          // pre-load and the verify step share ONE fetch (apps:search is slow).
+          // Busted on "re-check" and on reset so a freshly-created app is seen.
+          if (playAppsCacheRef.current)
+            return playAppsCacheRef.current
+          const apps = await listPlayApps(token)
+          playAppsCacheRef.current = apps
+          return apps
+        },
         enableService,
         ensureServiceAccount,
         createServiceAccountKey,
@@ -1882,6 +1905,14 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           setVerifyOutcome(t.playVerifyOutcome)
         if (t?.accessToken !== undefined)
           setAccessToken(t.accessToken)
+        // Package-select pre-load finished: stash the Play apps used to annotate
+        // the picker (absent when degraded) and reveal it (the spinner gate was
+        // hiding the manual-entry fallback while the network check ran).
+        if (step === 'android-package-select') {
+          if (t?.playVerifyApps !== undefined)
+            setPlayVerifyApps(t.playVerifyApps)
+          setPackagePreloadDone(true)
+        }
 
         // ── Mirror engine-persisted progress into the render state that
         // downstream TUI code (doSaveCredentials, renders) reads directly ──────
@@ -3069,6 +3100,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                     }
                     if (value === 'recheck') {
                       verifyLoadedRef.current = false
+                      playAppsCacheRef.current = null
                       setVerifyOutcome(null)
                       setVerifyRecheckNonce(n => n + 1)
                       return
@@ -3081,7 +3113,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             )
       )}
 
-      {step === 'android-package-select' && (
+      {step === 'android-package-select' && !packagePreloadDone && (
+        <Box flexDirection="column" marginTop={1}>
+          <SpinnerLine text="Detecting your app's package and checking Play Console..." />
+        </Box>
+      )}
+
+      {step === 'android-package-select' && packagePreloadDone && packageSelectMode !== 'pick-existing' && (
         <AndroidPackageSelectStep
           dense={false}
           androidDir={androidDir}
@@ -3089,19 +3127,31 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           detectedCount={detectedPackageIds.length}
           detectedOptions={[
             ...detectedPackageIds.map(id => ({
-              label: `📦  ${id}`,
+              // Annotate with Play existence when the apps list was pre-loaded
+              // (generate path + reporting scope). Plain label otherwise.
+              label: playVerifyApps
+                ? `📦  ${id}  ${playVerifyApps.some(a => a.packageName === id) ? '✓ exists in Play Store' : '⚠ not in Play Store yet'}`
+                : `📦  ${id}`,
               value: id,
             })),
-            { label: '✍️   Type a different package name', value: '__manual__' },
+            // When the account has other real Play apps not auto-detected, this
+            // entry opens a sub-picker (select an existing app or type one);
+            // otherwise it goes straight to the manual text input.
+            (playVerifyApps ?? []).some(a => !detectedPackageIds.includes(a.packageName))
+              ? { label: '🔍  Use a different app (pick from Play or type)', value: '__different__' }
+              : { label: '✍️   Type a different package name', value: '__different__' },
           ]}
           onChooseDetected={(value) => {
             // Mode-switch path unmounts the <Select> synchronously, so the
             // @inkjs/ui re-fire bug can't replay it. The package-pick path
             // goes through async persistAndStep, which keeps the <Select>
-            // mounted long enough for the bug to spam — gate it with the
+            // mounted long enough for the bug to spam, so gate it with the
             // per-step guard.
-            if (value === '__manual__') {
-              setPackageSelectMode('manual')
+            if (value === '__different__') {
+              // Offer the existing-app sub-picker only when there are other Play
+              // apps to choose; otherwise go straight to typing.
+              const hasOthers = (playVerifyApps ?? []).some(a => !detectedPackageIds.includes(a.packageName))
+              setPackageSelectMode(hasOthers ? 'pick-existing' : 'manual')
               return
             }
             if (selectFiredRef.current)
@@ -3142,6 +3192,50 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             }))
           }}
         />
+      )}
+
+      {step === 'android-package-select' && packagePreloadDone && packageSelectMode === 'pick-existing' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold>Pick one of your Play Store apps, or type a package name:</Text>
+          <Text dimColor>These are the apps your Google account can access. Picking one guarantees it exists in Play Store.</Text>
+          <Newline />
+          <Select
+            key="android-pick-existing"
+            options={[
+              ...(playVerifyApps ?? [])
+                .filter(a => !detectedPackageIds.includes(a.packageName))
+                .map(a => ({
+                  label: a.displayName ? `📦  ${a.packageName}  (${a.displayName})` : `📦  ${a.packageName}`,
+                  value: a.packageName,
+                })),
+              { label: '✍️   Type a package name manually', value: '__type__' },
+            ]}
+            onChange={(value) => {
+              // Mode-switch to manual unmounts this <Select> synchronously, so
+              // the @inkjs/ui re-fire bug can't replay it. The pick path goes
+              // through async persistAndStep, so gate it with the per-step guard.
+              if (value === '__type__') {
+                setPackageSelectMode('manual')
+                return
+              }
+              if (selectFiredRef.current)
+                return
+              selectFiredRef.current = true
+              // The package came straight from apps:search, so it is guaranteed
+              // to exist in Play; the verify step will exact-match and advance.
+              const choice: AndroidPackageChoice = {
+                packageName: value,
+                source: 'user-input',
+              }
+              setAndroidPackageChoice(choice)
+              addLog(`✔ Android package — ${value}`)
+              persistAndStep((p) => ({
+                ...p,
+                completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
+              }))
+            }}
+          />
+        </Box>
       )}
 
       {step === 'gcp-setup-running' && (

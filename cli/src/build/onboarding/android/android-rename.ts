@@ -35,8 +35,13 @@ export interface RenameWorkspaceFiles {
  * interpolated into the script — the appId always flows in via argv at runtime,
  * which avoids any string-injection of an attacker-controlled package into the
  * generated JS.
+ *
+ * `androidDir` is the resolved native directory (from capacitor.config; it may be
+ * a non-default path like `apps/mobile/platforms/android-native`). It is baked
+ * into the MobileProject config JSON-escaped so the rename targets the CONFIGURED
+ * native project, never a hardcoded `./android` (which could mutate a stale tree).
  */
-export function buildRenameWorkspaceFiles(pkg: string): RenameWorkspaceFiles {
+export function buildRenameWorkspaceFiles(pkg: string, androidDir: string): RenameWorkspaceFiles {
   void pkg
   const packageJson = `${JSON.stringify(
     {
@@ -59,7 +64,7 @@ if (!appId) {
   process.exit(1)
 }
 
-const project = new MobileProject('.', { android: { path: 'android' } })
+const project = new MobileProject('.', { android: { path: ${JSON.stringify(androidDir)} } })
 await project.load()
 await project.android?.setPackageName(appId)
 const gradle = await project.android?.getGradleFile('app/build.gradle')
