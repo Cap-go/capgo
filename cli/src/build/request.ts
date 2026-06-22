@@ -33,7 +33,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { mkdir, readFile as readFileAsync, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
-import process, { chdir, cwd, exit } from 'node:process'
+import process, { cwd, exit } from 'node:process'
 import { isCancel as clackIsCancel, log as clackLog, select as clackSelect, confirm, select, spinner as spinnerC } from '@clack/prompts'
 import AdmZip from 'adm-zip'
 import { WebSocket as PartySocket } from 'partysocket'
@@ -67,6 +67,7 @@ import { offerSupportUploadBeforeAi } from '../support/support-upload-prompt.js'
 import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent, TUS_UPLOAD_RETRY_DELAYS } from '../utils'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
+import { withCwd } from './cwd'
 import { writeBuildOutputRecord } from './output-record'
 import { getPlatformDirFromCapacitorConfig } from './platform-paths'
 import { handleCustomMsg } from './qr.js'
@@ -198,42 +199,8 @@ function createDefaultLogger(silent: boolean): BuildLogger {
   }
 }
 
-let cwdQueue: Promise<unknown> = Promise.resolve()
-
-/**
- * Run an async function with the process working directory temporarily set to `dir`.
- *
- * NOTE: `process.chdir()` is global, so this uses a simple in-process queue to avoid
- * concurrent calls interfering with each other.
- */
-async function withCwd<T>(dir: string, fn: () => Promise<T>): Promise<T> {
-  const run = async () => {
-    const previous = cwd()
-    try {
-      chdir(dir)
-    }
-    catch (error) {
-      throw new Error(`Failed to change working directory to "${dir}": ${(error as Error).message}`)
-    }
-
-    try {
-      return await fn()
-    }
-    finally {
-      try {
-        chdir(previous)
-      }
-      catch (err) {
-        appendInternalLog(`cwd restore failed (ignored): ${err instanceof Error ? err.message : String(err)}`)
-        // Best-effort restore; ignore to avoid masking original errors.
-      }
-    }
-  }
-
-  const p = cwdQueue.then(run, run)
-  cwdQueue = p.then(() => undefined, () => undefined)
-  return p
-}
+// `withCwd` (the global chdir queue) lives in ./cwd so the prescan context
+// builder shares the same queue — see src/build/cwd.ts.
 
 /**
  * Fetch with retry logic for build requests
@@ -1300,6 +1267,14 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     : baseLogger
 
   try {
+    // --prescan-ignore-fatal + --fail-on-warnings is contradictory (the spec says the
+    // CLI rejects the combination on `build request` too, not just `build prescan`).
+    // Validated before any network call so nothing is ever created server-side.
+    if (options.prescan === true) {
+      const { validateFlags } = await import('./prescan/command')
+      validateFlags({ ignoreFatal: options.prescanIgnoreFatal, failOnWarnings: options.failOnWarnings })
+    }
+
     options.apikey = options.apikey || findSavedKey(silent)
     const projectDir = resolve(options.path || cwd())
 
@@ -1316,13 +1291,20 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     const host = options.supaHost || 'https://api.capgo.app'
 
     const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
-    await assertCliPermission(supabase, options.apikey, 'app.build_native', { appId }, {
-      message: `Insufficient permissions to request a native build for app ${appId}`,
-      silent,
-    })
+    // NOTE: the build-permission assert was moved below (after the prescan gate) so prescan's
+    // batched report — which includes shared/apikey-permission — is what users see first.
 
-    // Get organization ID for analytics
-    const orgId = await getOrganizationId(supabase, appId)
+    // Org id is best-effort, for analytics tags only. Don't hard-abort here when the app
+    // isn't visible to this key: prescan's shared/app-exists check explains *why* (and the
+    // permission backstop below still enforces access for --no-prescan), so letting the gate
+    // run first gives the batched report instead of a bare "Cannot get organization id".
+    let orgId = ''
+    try {
+      orgId = await getOrganizationId(supabase, appId)
+    }
+    catch {
+      // App not accessible / no org — surfaced by prescan (app-exists) and the permission backstop.
+    }
 
     log.info(`Requesting native build for ${appId}`)
     log.info(`Platform: ${platform}`)
@@ -1661,6 +1643,72 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       log.info(`Credentials provided: ${credentialKeys.join(', ')}`)
       log.info(`Build options: platform=${buildOptionsPayload.platform}, mode=${buildOptionsPayload.buildMode}, cliVersion=${buildOptionsPayload.cliVersion}`)
     }
+
+    // ---- prescan gate (see src/build/prescan/) ----
+    // Opt-in: runs only when options.prescan === true, which ONLY the `build request` CLI
+    // command sets (requestBuildCommand). The onboarding wizard (build init), MCP build tools,
+    // and the SDK call requestBuildInternal without it, so prescan never runs on those paths.
+    // Runs BEFORE the POST /build/request: a blocked prescan must not orphan a
+    // created-but-never-uploaded build job server-side (stuck "pending" row in
+    // the dashboard + skewed "Build requested" telemetry).
+    if (options.prescan === true) {
+      const { executePrescan, runPrescanGate } = await import('./prescan/command')
+      const gate = await runPrescanGate(
+        {
+          enabled: true,
+          ignoreFatal: options.prescanIgnoreFatal,
+          failOnWarnings: options.failOnWarnings,
+          silent,
+          // Route output through the BuildLogger: Ink onboarding / SDK / MCP stdio
+          // callers own the terminal — raw clack writes would corrupt it.
+          print: msg => log.info(msg),
+          warn: msg => log.warn(msg),
+        },
+        // The gate only needs the report; the apikey in PrescanExecution is for
+        // the standalone command's telemetry (request.ts sends its own events).
+        // Pass mergedCredentials so the scan validates the exact credential set the
+        // build will use (CLI flags + env + saved file), not a fresh re-merge that
+        // would miss flag overrides; flavor/distribution fall back to the merged
+        // CAPGO_ANDROID_FLAVOR / CAPGO_IOS_DISTRIBUTION inside buildScanContext.
+        async () => (await executePrescan(appId, {
+          platform,
+          path: projectDir,
+          apikey: options.apikey,
+          credentials: mergedCredentials as Record<string, string>,
+          androidFlavor: options.androidFlavor,
+          iosDist: options.iosDistribution,
+          supaHost: options.supaHost,
+          supaAnon: options.supaAnon,
+        })).report,
+      )
+      if (gate === 'block') {
+        await sendEvent(options.apikey, {
+          channel: 'native-builder',
+          event: 'Prescan blocked',
+          icon: '🛡️',
+          org_id: orgId,
+          tracking_version: 2,
+          tags: {
+            'app-id': appId,
+            'platform': platform,
+          },
+          notify: false,
+        }).catch()
+        // Thrown (not exit(1)) so requestBuildInternal keeps its no-exit contract for SDK
+        // callers: the outer catch logs the message and returns { success: false }, and
+        // requestBuildCommand turns that into exit code 1.
+        throw new Error('Prescan found blocking problems — the build was not requested and nothing was uploaded. Fix the errors above or re-run with --prescan-ignore-fatal / --no-prescan.')
+      }
+    }
+
+    // Permission backstop. Prescan's shared/apikey-permission check normally surfaces a
+    // missing build permission first — batched with every other problem — and blocks above.
+    // This hard assert still runs when prescan is skipped (--no-prescan) or bypassed
+    // (--prescan-ignore-fatal), so permission is always enforced before the POST.
+    await assertCliPermission(supabase, options.apikey, 'app.build_native', { appId }, {
+      message: `Insufficient permissions to request a native build for app ${appId}`,
+      silent,
+    })
 
     // Request build from Capgo backend (POST /build/request)
     log.info('Requesting build from Capgo...')
@@ -2540,7 +2588,10 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 }
 
 export async function requestBuildCommand(appId: string, options: BuildRequestOptions): Promise<void> {
-  const result = await requestBuildInternal(appId, options, false)
+  // `build request` is the ONLY entrypoint that opts into prescan (default on; --no-prescan
+  // turns it off). requestBuildInternal keeps the gate opt-in (options.prescan === true) so the
+  // onboarding wizard (build init), MCP build tools, and the SDK never trigger it.
+  const result = await requestBuildInternal(appId, { ...options, prescan: options.prescan !== false }, false)
 
   if (!result.success) {
     exit(1)

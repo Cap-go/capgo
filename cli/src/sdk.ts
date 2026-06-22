@@ -729,6 +729,10 @@ export class CapgoSDK {
         keystoreKeyPassword: creds?.KEYSTORE_KEY_PASSWORD,
         keystoreStorePassword: creds?.KEYSTORE_STORE_PASSWORD,
         playConfigJson: creds?.PLAY_CONFIG_JSON,
+        // Prescan escape hatch: SDK callers own their output channel and cannot
+        // pass CLI flags, so expose the gate controls directly.
+        prescan: options.prescan,
+        prescanIgnoreFatal: options.prescanIgnoreFatal,
       }
 
       const result = await requestBuildInternal(options.appId, internalOptions, true)
