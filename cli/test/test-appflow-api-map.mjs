@@ -28,4 +28,24 @@ const line = m.redactTrace('GET', 'https://api.ionicjs.com/apps/X/profiles/T/cre
 assert.ok(!line.includes('NovaCerts') && !line.includes('Q0VSVA=='), 'trace carries no secret values')
 assert.ok(line.includes('200') && line.includes('credentials/ios'), 'trace carries method/url/status/shape')
 
+
+// ── mappers OMIT absent fields (no literal "undefined"/"null" string values) ──
+// (C11/C17/C21) A null/empty raw must NOT produce { APPLE_APP_ID: 'undefined', ... }.
+const idEmpty = m.mapIosDistribution(null)
+assert.deepStrictEqual(idEmpty, {}, 'null raw -> empty record, no fabricated keys')
+const idPartial = m.mapIosDistribution({ user_name: 'a@b.com' })
+assert.deepStrictEqual(idPartial, { FASTLANE_USER: 'a@b.com' }, 'absent app_specific_password/apple_app_id/team_id omitted')
+assert.ok(!Object.values(idPartial).includes('undefined'), 'no literal "undefined" value')
+assert.ok(!('APPLE_APP_ID' in idPartial), 'APPLE_APP_ID omitted when source absent (not "undefined")')
+
+const sigEmpty = m.mapIosSigning(undefined)
+assert.deepStrictEqual(sigEmpty, {}, 'undefined ios signing raw -> empty record')
+const sigNoProfiles = m.mapIosSigning({ cert_file: 'data:application/x-pkcs12;base64,QkJC', cert_password: 'p' })
+assert.deepStrictEqual(sigNoProfiles, { BUILD_CERTIFICATE_BASE64: 'QkJC', P12_PASSWORD: 'p' }, 'no provisioning_profiles -> CAPGO_IOS_PROVISIONING_MAP omitted')
+assert.ok(!('CAPGO_IOS_PROVISIONING_MAP' in sigNoProfiles))
+
+const andEmpty = m.mapAndroidSigning(null)
+assert.deepStrictEqual(andEmpty, {}, 'null android signing raw -> empty record')
+const adEmpty = m.mapAndroidDistribution(null)
+assert.deepStrictEqual(adEmpty, {}, 'null android dist raw -> empty record')
 console.log('api mapping + redaction OK')

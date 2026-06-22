@@ -97,4 +97,41 @@ assert.ok((hb.options || []).some(o => o.value === 'skip'))
 assert.strictEqual(f.getAppflowResumeStep(null), 'explain')
 assert.strictEqual(f.getAppflowResumeStep({ scope: 'both', migratable: { ios: false, android: false }, completedSteps: ['explain'] }), 'authenticating')
 
+// ── token present + no org/app yet routes through the fetch-orgs/fetch-apps AUTO steps ──
+// (C2/C5/C26) Before fetch-orgs has run, resume must go to fetch-orgs (which
+// populates options); only after it's done does it route to the select-org prompt.
+assert.strictEqual(f.getAppflowResumeStep({ scope: 'both', token: { access_token: 't' }, migratable: { ios: false, android: false }, completedSteps: ['explain', 'authenticating'] }), 'fetch-orgs')
+assert.strictEqual(f.getAppflowResumeStep({ scope: 'both', token: { access_token: 't' }, migratable: { ios: false, android: false }, completedSteps: ['explain', 'authenticating', 'fetch-orgs'] }), 'select-org')
+assert.strictEqual(f.getAppflowResumeStep({ scope: 'both', token: { access_token: 't' }, orgSlug: 'o', migratable: { ios: false, android: false }, completedSteps: ['explain', 'authenticating', 'fetch-orgs'] }), 'fetch-apps')
+assert.strictEqual(f.getAppflowResumeStep({ scope: 'both', token: { access_token: 't' }, orgSlug: 'o', migratable: { ios: false, android: false }, completedSteps: ['explain', 'authenticating', 'fetch-orgs', 'fetch-apps'] }), 'select-app')
+
+// ── select-ios-cert / select-android-cert reducer STORES the chosen tag (C1/C6/C16) ──
+const certBase = { scope: 'both', token: { access_token: 't' }, orgSlug: 'o', appId: 'a', migratable: { ios: true, android: true }, completedSteps: ['explain', 'authenticating', 'fetch-orgs', 'fetch-apps', 'fetch-signing'] }
+const afterIosCert = f.appflowFlow.applyInput('select-ios-cert', certBase, { value: 'chosen-ios-tag' })
+assert.strictEqual(afterIosCert.iosCertTag, 'chosen-ios-tag', 'iOS cert tag stored (not discarded)')
+const afterAndCert = f.appflowFlow.applyInput('select-android-cert', certBase, { value: 'chosen-and-tag' })
+assert.strictEqual(afterAndCert.androidCertTag, 'chosen-and-tag', 'Android cert tag stored')
+
+// ── select-ios-dist / select-android-dist reducer stores the chosen id (C8) ──
+const afterIosDist = f.appflowFlow.applyInput('select-ios-dist', certBase, { value: '42' })
+assert.strictEqual(afterIosDist.iosDistId, '42')
+const afterAndDist = f.appflowFlow.applyInput('select-android-dist', certBase, { value: '7' })
+assert.strictEqual(afterAndDist.androidDistId, '7')
+
+// ── no-signing-submenu 'go-back' rewinds to the app picker (C7) ──
+const stuck = { scope: 'ios', token: { access_token: 't' }, orgSlug: 'o', appId: 'a', appSlug: 's', noSigningScope: 'ios', migratable: { ios: false, android: false }, completedSteps: ['explain', 'authenticating', 'fetch-orgs', 'fetch-apps', 'fetch-signing', 'no-signing-submenu'] }
+const goneBack = f.appflowFlow.applyInput('no-signing-submenu', stuck, { value: 'go-back' })
+assert.strictEqual(goneBack.appId, undefined, 'go-back clears appId')
+assert.ok(!goneBack.completedSteps.includes('fetch-signing'), 'go-back rewinds the fetch-signing completion')
+// resume now routes back toward app selection (fetch-apps), NOT forward to fetch-distribution
+assert.notStrictEqual(f.getAppflowResumeStep(goneBack), 'fetch-distribution')
+
+// ── new select-* views render the ctx options ──
+const certView = f.appflowFlow.viewForStep('select-ios-cert', certBase, { options: [{ value: 't1', label: 'Cert 1' }, { value: 't2', label: 'Cert 2' }] })
+assert.strictEqual(certView.kind, 'choice')
+assert.deepStrictEqual(certView.options.map(o => o.value), ['t1', 't2'])
+const distView = f.appflowFlow.viewForStep('select-ios-dist', certBase, { options: [{ value: '1', label: 'd1' }] })
+assert.strictEqual(distView.kind, 'choice')
+assert.deepStrictEqual(distView.options.map(o => o.value), ['1'])
+
 console.log('appflow flow OK')

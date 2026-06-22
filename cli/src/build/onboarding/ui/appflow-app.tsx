@@ -74,8 +74,14 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
     try {
       await persistAppflowCredentials(appId, finalProgress)
     }
-    catch {
-      // Persisting is best-effort here; the credentials still live in progress.
+    catch (err) {
+      // A persist FAILURE must NOT be reported as a successful migration: the
+      // credentials never reached the store. Surface it as an error instead.
+      const message = err instanceof Error ? err.message : String(err)
+      onResult?.({ outcome: 'cancelled' })
+      setFinished({ kind: 'error', message: `Appflow migration could not save your imported credentials: ${message}. Nothing was persisted — re-run the migration or email support@capgo.app.` })
+      setTimeout(exitNow, 50)
+      return
     }
     onResult?.({ outcome: 'completed' })
     const built = finalProgress.builtPlatforms ?? []
@@ -146,6 +152,26 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
   // Advance an interactive step with the user's answer (a choice value or a
   // collected input field), then re-derive the next step.
   const advance = useCallback((value?: string, text?: string) => {
+    // no-signing-submenu options that don't belong to the credential graph need
+    // explicit handling so they don't silently advance into a credential-less
+    // tail. 'go-back' is handled by the reducer (it rewinds appId) + resumeStep.
+    if (step === 'no-signing-submenu') {
+      if (value === 'email-support') {
+        // Surface the support contact and HOLD (the user can re-pick afterwards).
+        setError('We could not find signing credentials in Appflow. If you believe they exist, email support@capgo.app with your app id and we will help. You can then choose another option below.')
+        return
+      }
+      if (value === 'abandon') {
+        // Leave the migration. The TUI cannot relaunch native onboarding in-place,
+        // so finish with a clear, honest hand-off message (no fake success).
+        onResult?.({ outcome: 'cancelled' })
+        const native = progress.noSigningScope === 'android' ? 'android' : 'ios'
+        setFinished({ kind: 'error', message: `Appflow migration stopped. Run \`capgo build init\` and choose ${native === 'android' ? 'Android' : 'iOS'} onboarding to set up signing manually.` })
+        setTimeout(exitNow, 50)
+        return
+      }
+    }
+
     const next = appflowFlow.applyInput(step, progress, { value, text })
     setProgress(next)
 
@@ -176,9 +202,10 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
       void finishMigration(next)
       return
     }
+    setError(null)
     setCtx({})
     setStep(resumed)
-  }, [step, progress, finishMigration])
+  }, [step, progress, finishMigration, onResult, exitNow])
 
   if (finished) {
     return (

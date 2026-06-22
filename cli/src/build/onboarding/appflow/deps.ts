@@ -13,11 +13,12 @@
 // the SAME credential store the native flows write (updateSavedCredentials), so
 // downstream build/CI steps cannot tell migrated creds from natively-set-up ones.
 import { Buffer } from 'node:buffer'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
 import { appendInternalLog } from '../../../support/internal-log.js'
+import { ensureSecureDirectory, writeFileAtomic } from '../../../utils/safeWrites.js'
 import { updateSavedCredentials } from '../../credentials.js'
 import { validateServiceAccountJson as androidValidateServiceAccountJson } from '../android/service-account-validation.js'
 import { tryUnlockPrivateKey as androidTryUnlockPrivateKey } from '../android/keystore.js'
@@ -47,14 +48,19 @@ export function loadAppflowToken(): AppflowToken | null {
 }
 
 /** Persist an Appflow token to the credentials dir (0700 dir / best-effort). Never throws. */
+/** Persist an Appflow token to the credentials dir atomically (0700 dir / 0600
+ * file, temp+rename). Best-effort and never throws: a failure just means the next
+ * run re-auths. Uses the shared safe-write helpers (symlink-guarded, atomic). */
 export function saveAppflowToken(token: AppflowToken): void {
-  try {
-    mkdirSync(CREDENTIALS_DIR, { recursive: true, mode: 0o700 })
-    writeFileSync(APPFLOW_TOKEN_FILE, JSON.stringify(token), { encoding: 'utf8', mode: 0o600 })
-  }
-  catch {
-    // Token caching is best-effort: a failure just means the next run re-auths.
-  }
+  void (async () => {
+    try {
+      await ensureSecureDirectory(CREDENTIALS_DIR, 0o700)
+      await writeFileAtomic(APPFLOW_TOKEN_FILE, JSON.stringify(token), { mode: 0o600 })
+    }
+    catch {
+      // Token caching is best-effort: a failure just means the next run re-auths.
+    }
+  })()
 }
 
 /** Best-effort browser open, mirroring auth.ts's defaultOpen (also printed by the caller). */

@@ -20,4 +20,42 @@ assert.strictEqual(url.searchParams.get('state'), 'st8')
 assert.strictEqual(isExpired({ expires_in: 43200, capturedAtMs: Date.now() }), false)
 assert.strictEqual(isExpired({ expires_in: 43200, capturedAtMs: Date.now() - 43200_000 }), true)
 
+// ── sanitizeOauthError: strips control chars, caps length, never empty ──
+const auth = await import('../src/build/onboarding/appflow/auth.ts')
+assert.strictEqual(auth.sanitizeOauthError('access_denied'), 'access_denied')
+assert.ok(!/[\n\r<>]/.test(auth.sanitizeOauthError('a\nb<script>')), 'control/markup chars stripped')
+assert.ok(auth.sanitizeOauthError('x'.repeat(500)).length <= 80, 'length capped')
+assert.strictEqual(auth.sanitizeOauthError(null), 'unknown')
+assert.strictEqual(auth.sanitizeOauthError(''), 'unknown')
+
+// ── OAuth STATE validation (C10/C15/C29): a redirect carrying the WRONG state is
+// rejected, defeating login-CSRF / code injection. We drive loginWithBrowser and,
+// from the openBrowser callback, hit the real loopback with a bad state. The
+// promise MUST reject (and never exchange the injected code).
+{
+  const http = await import('node:http')
+  const hitLoopback = (query) => new Promise((resolve) => {
+    const req = http.request({ host: 'localhost', port: 8123, path: `/?${query}`, method: 'GET' }, (res) => {
+      res.on('data', () => {})
+      res.on('end', resolve)
+    })
+    req.on('error', resolve)
+    req.end()
+  })
+  // wrong state -> reject
+  await assert.rejects(
+    () => auth.loginWithBrowser({ openBrowser: () => { setTimeout(() => void hitLoopback('code=INJECTED&state=not-the-expected-state'), 20) } }),
+    /state mismatch/i,
+    'mismatched state is rejected',
+  )
+}
+
+// ── abort signal frees the loopback (no leak): aborting rejects with "cancelled" ──
+{
+  const ac = new AbortController()
+  const p = auth.loginWithBrowser({ openBrowser: () => {}, signal: ac.signal })
+  setTimeout(() => ac.abort(), 20)
+  await assert.rejects(() => p, /cancelled/i, 'abort frees the server and rejects')
+}
+
 console.log('auth pkce/url/expiry OK')

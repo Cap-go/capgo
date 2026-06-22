@@ -179,6 +179,53 @@ export function autoSelect<T>(items: T[]): T | 'prompt' | null {
   return 'prompt'
 }
 
+// Minimal typed shapes for the Appflow GraphQL/REST list responses the flow
+// inspects (tightens the prior `any` filters). Only the fields the flow reads.
+export interface AppflowCert { tag?: string, name?: string, type?: string, credentials?: { ios?: unknown, android?: unknown } }
+export interface AppflowDistCred { id?: number | string, type?: string, name?: string }
+
+// Resolve which signing certificate to download:
+//  - a previously stored tag (user already picked from select-*-cert) → use it
+//  - exactly one cert → its tag (auto-select)
+//  - 2+ certs and nothing stored → 'prompt' (show the picker, exactly once)
+//  - none / no tag available → null (nothing to download)
+function resolveCertTag(certs: AppflowCert[], storedTag: string | undefined): string | 'prompt' | null {
+  if (storedTag) {
+    const match = certs.find(c => c.tag === storedTag)
+    return match?.tag ?? storedTag
+  }
+  const sel = autoSelect(certs)
+  if (sel === 'prompt')
+    return 'prompt'
+  return sel?.tag ?? null
+}
+
+// Build the picker options for a cert list (value = the profile tag).
+function certOptions(certs: AppflowCert[]): StepView['options'] {
+  return certs
+    .filter(c => !!c.tag)
+    .map(c => ({ value: c.tag!, label: c.name ?? c.tag!, note: c.type }))
+}
+
+// Resolve which distribution credential id to download (same contract as certs,
+// keyed by the credential id rather than a tag).
+function resolveDistId(creds: AppflowDistCred[], storedId: string | undefined): string | 'prompt' | null {
+  if (storedId) {
+    const match = creds.find(c => String(c.id) === storedId)
+    return match ? String(match.id) : storedId
+  }
+  const sel = autoSelect(creds)
+  if (sel === 'prompt')
+    return 'prompt'
+  return sel?.id !== undefined ? String(sel.id) : null
+}
+
+function distOptions(creds: AppflowDistCred[]): StepView['options'] {
+  return creds
+    .filter(c => c.id !== undefined)
+    .map(c => ({ value: String(c.id), label: c.name ?? `${c.type ?? 'credential'} ${c.id}`, note: c.type }))
+}
+
 const inScope = (scope: AppflowProgress['scope'], p: 'ios' | 'android'): boolean => scope === 'both' || scope === p
 
 const hasCreds = (rec?: Record<string, string>): boolean => !!rec && Object.keys(rec).length > 0
@@ -316,6 +363,10 @@ export function appflowViewForStep(step: AppflowStep, progress: AppflowProgress,
       return { kind: 'choice', prompt: 'Which iOS signing certificate to migrate?', options: (ctx.options as StepView['options']) ?? [] }
     case 'select-android-cert':
       return { kind: 'choice', prompt: 'Which Android signing certificate to migrate?', options: (ctx.options as StepView['options']) ?? [] }
+    case 'select-ios-dist':
+      return { kind: 'choice', prompt: 'Which iOS upload (App Store) credential to migrate?', options: (ctx.options as StepView['options']) ?? [] }
+    case 'select-android-dist':
+      return { kind: 'choice', prompt: 'Which Android upload (Google Play) credential to migrate?', options: (ctx.options as StepView['options']) ?? [] }
     case 'no-signing-submenu': {
       const label = noSigningPlatformLabel(progress)
       const native = progress.noSigningScope === 'android' ? 'Android' : 'iOS'
@@ -323,10 +374,10 @@ export function appflowViewForStep(step: AppflowStep, progress: AppflowProgress,
         kind: 'choice',
         prompt: `${label} cannot be migrated - no signing configuration exists for this app in Appflow.`,
         options: [
-          { value: 'email-support', label: 'I believe credentials exist - email support' },
+          { value: 'email-support', label: `I believe credentials exist - email ${SUPPORT}` },
           { value: 'skip', label: `I understand, do not migrate ${label}` },
           { value: 'abandon', label: `Abandon Appflow migration and start ${native} onboarding instead` },
-          { value: 'go-back', label: 'Go back' },
+          { value: 'go-back', label: 'Go back (re-pick the Appflow app)' },
         ],
       }
     }
@@ -344,7 +395,10 @@ export function appflowViewForStep(step: AppflowStep, progress: AppflowProgress,
         kind: 'choice',
         prompt: 'No Android upload destination found in Appflow. Set up a Google Play service account?',
         options: [
-          { value: 'generate', label: 'Generate / provide a service-account JSON now' },
+          // The end-to-end service-account "generate" orchestration is interactive
+          // and not driven here, so present the HONEST option: finish it via the
+          // dedicated Android setup, or skip. (No fake "generates now" success.)
+          { value: 'generate', label: 'Set up a service account via `capgo build setup --android` (guided)' },
           { value: 'skip', label: 'Skip (set up upload later)' },
         ],
       }
@@ -364,13 +418,19 @@ export function appflowViewForStep(step: AppflowStep, progress: AppflowProgress,
       return { kind: 'auto', prompt: 'Validating imported credentials…' }
     case 'validate-results': {
       const results = (ctx.results as AppflowValidationResult[]) ?? []
+      const notes = progress.notes ?? []
+      const resultLines = results.length
+        ? `Validation results:\n${results.map(r => `${r.status === 'pass' ? 'OK' : r.status === 'warn' ? 'WARNING' : 'skipped'}: ${r.message}`).join('\n')}\nValidation never blocks - you can continue.`
+        : 'No credentials to validate. Continuing.'
+      // Surface any advisory notes accumulated by the auto generate steps (e.g. a
+      // p8 / service-account setup that couldn't complete here) — otherwise the
+      // feedback is lost when validate overwrites the transient ctx.
+      const noteLines = notes.length ? `\n\nNotes:\n${notes.map(n => `- ${n}`).join('\n')}` : ''
       return {
         kind: 'info',
-        prompt: results.length
-          ? `Validation results:\n${results.map(r => `${r.status === 'pass' ? 'OK' : r.status === 'warn' ? 'WARNING' : 'skipped'}: ${r.message}`).join('\n')}\nValidation never blocks - you can continue.`
-          : 'No credentials to validate. Continuing.',
+        prompt: `${resultLines}${noteLines}`,
         options: [{ value: 'continue', label: 'Continue' }],
-        context: { results },
+        context: { results, notes },
       }
     }
     case 'handoff-build': {
@@ -406,6 +466,8 @@ export function appflowViewForStep(step: AppflowStep, progress: AppflowProgress,
       // sub-flow, merges PLAY_CONFIG_JSON into android, then continues.
       return { kind: 'auto', prompt: 'Setting up a Google Play service account…' }
     case 'authenticating':
+    case 'fetch-orgs':
+    case 'fetch-apps':
     case 'fetch-signing':
     case 'fetch-distribution':
       return { kind: 'auto', prompt: 'Working...' }
@@ -435,7 +497,32 @@ export function applyAppflowInput(step: AppflowStep, progress: AppflowProgress, 
       return { ...base, orgSlug: input.value }
     case 'select-app':
       return { ...base, appId: input.value, appSlug: input.text ?? input.value }
+    case 'select-ios-cert':
+      // Store the chosen profile tag so fetch-signing downloads THIS cert on
+      // re-entry instead of re-prompting (defeats the multi-cert livelock).
+      return { ...base, iosCertTag: input.value }
+    case 'select-android-cert':
+      return { ...base, androidCertTag: input.value }
+    case 'select-ios-dist':
+      // Store the chosen distribution-credential id; fetch-distribution downloads
+      // exactly that one on re-entry (no silent drop, no re-prompt loop).
+      return { ...base, iosDistId: input.value }
+    case 'select-android-dist':
+      return { ...base, androidDistId: input.value }
     case 'no-signing-submenu':
+      // 'skip' marks the affected platform non-migratable. 'go-back' rewinds to
+      // the app picker (clears appId + the fetch-signing completion) so the user
+      // can re-select. 'email-support'/'abandon' are acted on by the driver
+      // (surface support / start native onboarding); state is left intact.
+      if (input.value === 'go-back') {
+        return {
+          ...base,
+          appId: undefined,
+          appSlug: undefined,
+          noSigningScope: undefined,
+          completedSteps: completed.filter(s => s !== 'fetch-signing' && s !== 'select-app' && s !== 'fetch-apps'),
+        }
+      }
       return { ...base, ...(input.value === 'skip' && progress.noSigningScope && progress.noSigningScope !== 'all' ? { migratable: { ...progress.migratable, [progress.noSigningScope]: false } } : {}) }
     case 'ios-dist-gapfill':
       return { ...base, iosDistGapfill: input.value === 'generate' ? 'generate' : 'skip' }
@@ -466,10 +553,13 @@ export function getAppflowResumeStep(progress: AppflowProgress | null): AppflowS
   const done = (s: AppflowStep) => progress.completedSteps.includes(s)
   if (!progress.token)
     return done('explain') ? 'authenticating' : 'explain'
+  // step 3: organization. fetch-orgs (auto) populates the picker / auto-selects a
+  // single org. If it already ran (2+ orgs) and the user hasn't picked, prompt.
   if (!progress.orgSlug)
-    return 'select-org'
+    return done('fetch-orgs') ? 'select-org' : 'fetch-orgs'
+  // step 4: app. Same shape.
   if (!progress.appId)
-    return 'select-app'
+    return done('fetch-apps') ? 'select-app' : 'fetch-apps'
   if (!done('fetch-signing'))
     return 'fetch-signing'
   if (!done('fetch-distribution'))
@@ -621,30 +711,72 @@ export async function runAppflowEffect(step: AppflowStep, progress: AppflowProgr
       if (!token)
         token = await loginWithBrowser({ openBrowser: deps.openBrowser })
       deps.saveToken?.(token)
-      return { progress: mark({ ...progress, token }, 'authenticating'), next: 'select-org' }
+      return { progress: mark({ ...progress, token }, 'authenticating'), next: 'fetch-orgs' }
+    }
+    case 'fetch-orgs': {
+      // List the Appflow organizations. 0 → loud error (the API call THROWS on
+      // failure, so reaching here with [] means the account genuinely has none).
+      // 1 → auto-select and continue. 2+ → mark done + prompt with real options.
+      const api = createAppflowApi(progress.token!.access_token, deps.log)
+      const orgs = await api.listOrgs()
+      const p = mark(progress, 'fetch-orgs')
+      if (orgs.length === 0)
+        throw new Error('No Appflow organizations are available on this account. Email ' + SUPPORT + ' if you expected one.')
+      const sel = autoSelect(orgs)
+      if (sel === 'prompt') {
+        return { progress: p, next: 'select-org', transient: { options: orgs.map(o => ({ value: o.slug, label: o.name ?? o.slug })) } }
+      }
+      return { progress: { ...p, orgSlug: sel!.slug }, next: 'fetch-apps' }
+    }
+    case 'fetch-apps': {
+      // List the apps in the chosen org. Same 0/1/2+ contract as fetch-orgs.
+      const api = createAppflowApi(progress.token!.access_token, deps.log)
+      const apps = await api.listApps(progress.orgSlug!)
+      const p = mark(progress, 'fetch-apps')
+      if (apps.length === 0)
+        throw new Error('No Appflow apps are available in this organization. Email ' + SUPPORT + ' if you expected one.')
+      const sel = autoSelect(apps)
+      if (sel === 'prompt') {
+        return { progress: p, next: 'select-app', transient: { options: apps.map(a => ({ value: a.id, label: a.name ?? a.slug ?? a.id, note: a.slug })) } }
+      }
+      return { progress: { ...p, appId: sel!.id, appSlug: sel!.slug ?? sel!.id }, next: 'fetch-signing' }
     }
     case 'fetch-signing': {
       const api = createAppflowApi(progress.token!.access_token, deps.log)
       const certs = await api.listCertificates(progress.appId!)
-      const iosCerts = certs.filter((c: any) => c.credentials?.ios)
-      const androidCerts = certs.filter((c: any) => c.credentials?.android)
+      const iosCerts = certs.filter((c: AppflowCert) => c.credentials?.ios)
+      const androidCerts = certs.filter((c: AppflowCert) => c.credentials?.android)
       const migratable = { ios: inScope(progress.scope, 'ios') && iosCerts.length > 0, android: inScope(progress.scope, 'android') && androidCerts.length > 0 }
-      let p: AppflowProgress = { ...progress, migratable }
+      // Mark fetch-signing done UP FRONT: re-entry (after the user picks a cert) must
+      // NOT route back here and re-prompt. The select-* steps store the chosen tag;
+      // we read it on re-entry and download THAT cert. (Defeats the livelock.)
+      let p: AppflowProgress = mark({ ...progress, migratable }, 'fetch-signing')
+      // Resolve the iOS signing cert: a stored tag (user already picked) wins; else
+      // 1 cert auto-selects; 2+ certs with no stored pick → prompt (do NOT loop —
+      // fetch-signing is already marked done, so the prompt is shown exactly once).
       if (migratable.ios) {
-        const sel = autoSelect(iosCerts)
-        if (sel === 'prompt')
-          return { progress: p, next: 'select-ios-cert', transient: { iosCerts } }
-        if (sel)
-          p = { ...p, ios: { ...p.ios, ...(await api.fetchIosSigning(progress.appId!, (sel as any).tag)) } }
+        const tag = resolveCertTag(iosCerts, progress.iosCertTag)
+        if (tag === 'prompt')
+          return { progress: p, next: 'select-ios-cert', transient: { options: certOptions(iosCerts) } }
+        if (tag)
+          p = { ...p, ios: { ...p.ios, ...(await api.fetchIosSigning(progress.appId!, tag)) } }
       }
+      // Process Android REGARDLESS of the iOS outcome above (no early-return that
+      // abandons the second platform on a scope:'both' app).
       if (migratable.android) {
-        const sel = autoSelect(androidCerts)
-        if (sel === 'prompt')
-          return { progress: p, next: 'select-android-cert', transient: { androidCerts } }
-        if (sel)
-          p = { ...p, android: { ...p.android, ...(await api.fetchAndroidSigning(progress.appId!, (sel as any).tag)) } }
+        const tag = resolveCertTag(androidCerts, progress.androidCertTag)
+        if (tag === 'prompt')
+          return { progress: p, next: 'select-android-cert', transient: { options: certOptions(androidCerts) } }
+        if (tag)
+          p = { ...p, android: { ...p.android, ...(await api.fetchAndroidSigning(progress.appId!, tag)) } }
       }
-      p = mark(p, 'fetch-signing')
+      // On a BOTH-scope migration where exactly one platform has signing, the
+      if (progress.scope === 'both' && (migratable.ios !== migratable.android)) {
+        const dropped = migratable.ios ? 'Android' : 'iOS'
+        const note = `No ${dropped} signing configuration was found in Appflow, so ${dropped} was not migrated. You can set it up later via \`capgo build init\` ${dropped === 'Android' ? '(Android)' : '(iOS)'} onboarding.`
+        if (!(p.notes ?? []).includes(note))
+          p = { ...p, notes: [...(p.notes ?? []), note] }
+      }
       const next = decideAfterFetchSigning(p)
       return { progress: next === 'no-signing-submenu' ? { ...p, noSigningScope: progress.scope === 'both' ? 'all' : progress.scope } : p, next }
     }
@@ -654,21 +786,28 @@ export async function runAppflowEffect(step: AppflowStep, progress: AppflowProgr
       let p: AppflowProgress = { ...progress }
       // Import whatever distribution credential exists for each in-scope, migrated
       // platform. A MISSING destination does NOT block — it routes to the step-6
-      // gap-fill via getAppflowResumeStep (do NOT early-return; the other platform
-      // must still be processed).
+      // gap-fill via getAppflowResumeStep. A 2+ ambiguity is RESOLVED by the
+      // select-* prompt (store id, re-enter) — not silently dropped. We mark
+      // fetch-distribution done up front so the prompt round-trip cannot loop;
+      // the stored id is consulted on re-entry. (Do NOT early-return abandoning
+      // the second platform.)
+      p = mark(p, 'fetch-distribution')
       if (inScope(progress.scope, 'ios') && hasCreds(p.ios)) {
-        const iosDist = dist.filter((d: any) => d.type === 'iTunes connect')
-        const sel = autoSelect(iosDist)
-        if (sel && sel !== 'prompt')
-          p = { ...p, ios: { ...p.ios, ...(await api.fetchIosDistribution(progress.appId!, (sel as any).id)) } }
+        const iosDist = dist.filter((d: AppflowDistCred) => d.type === 'iTunes connect')
+        const id = resolveDistId(iosDist, progress.iosDistId)
+        if (id === 'prompt')
+          return { progress: p, next: 'select-ios-dist', transient: { options: distOptions(iosDist) } }
+        if (id !== null)
+          p = { ...p, ios: { ...p.ios, ...(await api.fetchIosDistribution(progress.appId!, id)) } }
       }
       if (inScope(progress.scope, 'android') && hasCreds(p.android)) {
-        const andDist = dist.filter((d: any) => d.type === 'google play')
-        const sel = autoSelect(andDist)
-        if (sel && sel !== 'prompt')
-          p = { ...p, android: { ...p.android, ...(await api.fetchAndroidDistribution(progress.appId!, (sel as any).id)) } }
+        const andDist = dist.filter((d: AppflowDistCred) => d.type === 'google play')
+        const id = resolveDistId(andDist, progress.androidDistId)
+        if (id === 'prompt')
+          return { progress: p, next: 'select-android-dist', transient: { options: distOptions(andDist) } }
+        if (id !== null)
+          p = { ...p, android: { ...p.android, ...(await api.fetchAndroidDistribution(progress.appId!, id)) } }
       }
-      p = mark(p, 'fetch-distribution')
       return { progress: p, next: getAppflowResumeStep(p) }
     }
     case 'ios-p8-generate': {
@@ -694,6 +833,8 @@ export async function runAppflowEffect(step: AppflowStep, progress: AppflowProgr
         note = `App Store Connect API key setup skipped: ${e instanceof Error ? e.message : String(e)}.`
       }
       p = mark(p, 'ios-p8-generate')
+      if (note)
+        p = { ...p, notes: [...(p.notes ?? []), note] }
       return { progress: p, next: getAppflowResumeStep(p), transient: note ? { note } : undefined }
     }
     case 'android-sa-generate': {
@@ -715,6 +856,8 @@ export async function runAppflowEffect(step: AppflowStep, progress: AppflowProgr
         note = `Google Play service-account setup skipped: ${e instanceof Error ? e.message : String(e)}.`
       }
       p = mark(p, 'android-sa-generate')
+      if (note)
+        p = { ...p, notes: [...(p.notes ?? []), note] }
       return { progress: p, next: getAppflowResumeStep(p), transient: note ? { note } : undefined }
     }
     case 'validate': {

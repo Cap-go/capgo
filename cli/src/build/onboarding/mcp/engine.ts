@@ -1945,6 +1945,42 @@ function appflowProgressFor(step: AppflowStep): number {
   return Math.min(95, 10 + Math.round((idx / (order.length - 1)) * 80))
 }
 
+// Cap + flatten an exception/message before weaving it into an MCP summary so a
+// raw exception string (or a hostile API body fragment) cannot leak large/unsafe
+// content to the caller. Single line, allow-listed-ish, bounded.
+function sanitizeForSummary(message: string, max = 200): string {
+  const flat = String(message ?? '').replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim()
+  return flat.length > max ? `${flat.slice(0, max)}…` : flat
+}
+
+/**
+ * The no-signing submenu's 'email-support' arm: surface the Capgo support
+ * contact and HOLD on the submenu (the agent re-presents it). We cannot open a
+ * mail client over MCP, so we hand the caller the address + framing and a
+ * next_step that returns to the same choice.
+ */
+function appflowEmailSupportResult(facts: PreflightFacts): NextStepResult {
+  return {
+    onboarding: 'capgo-builder',
+    phase: APPFLOW_PHASE,
+    state: 'appflow-no-signing-submenu',
+    progress: appflowProgressFor('no-signing-submenu'),
+    kind: 'human_gate',
+    summary: `To get help migrating "${facts.appId}" from Appflow, email ${SUPPORT_EMAIL} (mention the app and that signing credentials appear missing). I cannot open your mail app from here.`,
+    human: {
+      instruction: `Email ${SUPPORT_EMAIL} describing your Appflow app ("${facts.appId}") and that the migration reported no signing configuration. After that, you can pick another option on the submenu.`,
+    },
+    context: { supportEmail: SUPPORT_EMAIL },
+    next: {
+      tool: NEXT_STEP_TOOL,
+      with: { value: '<skip|abandon|go-back>' },
+      instruction: 'After emailing support (or deciding not to), call next_step with the submenu choice you want: skip, abandon, or go-back.',
+      call: `${NEXT_STEP_TOOL}({ value: "go-back" })`,
+    },
+    rules: ONBOARDING_RULES,
+  }
+}
+
 /** Render a neutral appflow StepView (interactive — not 'auto') into an MCP NextStepResult. */
 function renderAppflowView(step: AppflowStep, view: StepView): NextStepResult {
   const base = {
@@ -2018,6 +2054,12 @@ export async function decideAppflow(
 
   const flowDeps = buildAppflowEffectDeps({ appId, packageName: facts.appId })
 
+  // Carries the most-recent AUTO effect's `transient` (e.g. the org/app/cert/dist
+  // option lists, or validation results) so the interactive step it transitions
+  // INTO renders with real options instead of an empty picker. Mirrors the TUI's
+  // setCtx(result.transient) threading.
+  let ctx: Record<string, unknown> = {}
+
   // Apply the user's answer to the step the migration is parked on (the
   // interactive step the previous call returned), then advance.
   //
@@ -2031,7 +2073,16 @@ export async function decideAppflow(
   const parkedView = appflowFlow.viewForStep(step, progress)
   const isInteractive = parkedView.kind !== 'auto'
   if (input && !isFreshEntry && isInteractive) {
-    progress = appflowFlow.applyInput(step, progress, { value: input.value, text: undefined })
+    // The no-signing submenu's 'email-support' surfaces the support contact and
+    // HOLDS the step (does not advance into a credential-less migration tail).
+    if (step === 'no-signing-submenu' && input.value === 'email-support') {
+      setAppflowProgress(appId, progress)
+      return appflowEmailSupportResult(facts)
+    }
+    // Thread any text answer (custom build command / .env export path) so a tail
+    // text-input step answered over MCP is not silently dropped (C31).
+    const inputText = input.buildScriptCustom ?? input.envExportPath ?? input.profilePath
+    progress = appflowFlow.applyInput(step, progress, { value: input.value, text: inputText })
     // 'abandon' on the no-signing submenu leaves the migration and starts native
     // onboarding for the affected platform (the spec's "come back later" exit).
     if (step === 'no-signing-submenu' && input.value === 'abandon') {
@@ -2040,6 +2091,8 @@ export async function decideAppflow(
       setSessionPlatform(appId, native)
       return native === 'android' ? decideAndroid(facts, deps) : decideIos(facts, deps)
     }
+    // 'go-back' rewinds (the reducer cleared appId/fetch-signing): just resume,
+    // which routes back to the app picker. No special intercept needed.
     // The build hand-off choice is resolved separately (persist + route/finish).
     if (step === 'handoff-build')
       return appflowHandoff(facts, deps, progress, input)
@@ -2047,7 +2100,7 @@ export async function decideAppflow(
   }
 
   for (let i = 0; i < MAX_AUTO_STEPS; i++) {
-    const view = appflowFlow.viewForStep(step, progress)
+    const view = appflowFlow.viewForStep(step, progress, ctx)
     if (view.kind !== 'auto') {
       // The build hand-off choice is resolved by appflowHandoff (persist creds +
       // route to build / finish) when the user answers it; until then it renders
@@ -2068,11 +2121,14 @@ export async function decideAppflow(
       return {
         onboarding: 'capgo-builder', phase: APPFLOW_PHASE, state: `appflow-${step}`, platform: undefined,
         progress: appflowProgressFor(step), kind: 'error',
-        summary: `Appflow migration error at "${step}": ${message}. If this persists, email ${SUPPORT_EMAIL}.`,
+        summary: `Appflow migration error at "${step}": ${sanitizeForSummary(message)}. If this persists, email ${SUPPORT_EMAIL}.`,
         rules: ONBOARDING_RULES,
       }
     }
     progress = result.progress
+    // Thread this auto effect's transient (option lists / results) into the next
+    // step's ctx so the interactive step it transitions to renders real options.
+    ctx = result.transient ?? {}
     setAppflowProgress(appId, progress)
     if (!result.next)
       break
@@ -2082,9 +2138,10 @@ export async function decideAppflow(
   // Landed on (or looped to) the build hand-off after the auto chain.
   if (step === 'handoff-build')
     return appflowHandoff(facts, deps, progress, input)
-  // Fallback: render whatever interactive step we ended on.
+  // Fallback: render whatever interactive step we ended on (with the last auto
+  // effect's transient as ctx so option lists survive).
   setAppflowProgress(appId, progress)
-  return renderAppflowView(step, appflowFlow.viewForStep(step, progress))
+  return renderAppflowView(step, appflowFlow.viewForStep(step, progress, ctx))
 }
 
 /**
@@ -2105,8 +2162,21 @@ async function appflowHandoff(
     return renderAppflowView('handoff-build', appflowFlow.viewForStep('handoff-build', progress))
   }
   // Persist the migrated per-platform creds into the real store before anything
-  // downstream reads them (so a build / `build request` sees them).
-  await persistAppflowCredentials(appId, progress).catch(() => {})
+  // downstream reads them (so a build / `build request` sees them). A persist
+  // FAILURE is surfaced loudly — we must NOT report "migration complete" when the
+  // credentials never reached the store.
+  try {
+    await persistAppflowCredentials(appId, progress)
+  }
+  catch (err) {
+    setAppflowProgress(appId, progress)
+    return {
+      onboarding: 'capgo-builder', phase: APPFLOW_PHASE, state: 'appflow-handoff-build', platform: undefined,
+      progress: appflowProgressFor('handoff-build'), kind: 'error',
+      summary: `Appflow migration could not save the imported credentials for "${appId}": ${sanitizeForSummary(err instanceof Error ? err.message : String(err))}. Nothing was persisted — re-run the migration, or email ${SUPPORT_EMAIL}.`,
+      rules: ONBOARDING_RULES,
+    }
+  }
   if (input.value === 'skip') {
     setAppflowProgress(appId, undefined)
     return {
@@ -2127,11 +2197,19 @@ async function appflowHandoff(
       rules: ONBOARDING_RULES,
     }
   }
+  // When BOTH platforms migrated we tell the user the SECOND platform's build is
+  // also ready (its credentials are already persisted) and can be started with
+  // `capgo build request --platform <other>` — so the second build is never
+  // silently dropped over MCP. The session commits to the first platform's build.
+  const others = targets.filter(p => p !== first)
+  const secondNote = others.length > 0
+    ? ` ${others.join(', ')} credentials are also saved — build ${others.join(', ')} with \`capgo build request --platform ${others[0]}\` after this one.`
+    : ''
   setAppflowProgress(appId, undefined)
   setSessionPlatform(appId, first)
   return {
     onboarding: 'capgo-builder', phase: 'build', state: 'build-ready', platform: first, progress: 90, kind: 'choice',
-    summary: `Credentials imported from Appflow for ${targets.join(', ')}. Run the first cloud build for ${first} now?`,
+    summary: `Credentials imported from Appflow for ${targets.join(', ')}. Run the first cloud build for ${first} now?${secondNote}`,
     options: [
       { value: 'build', label: `Build ${first} now` },
       { value: 'skip', label: 'Skip (build later with `capgo build request`)' },
