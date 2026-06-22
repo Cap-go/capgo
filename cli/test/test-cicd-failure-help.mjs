@@ -15,6 +15,7 @@ import { join } from 'node:path'
 import {
   CI_FAILURE_TIP,
   decideCiFailureActions,
+  shouldPrintCiTip,
 } from '../src/ai/analyze.ts'
 import { uploadSupportLogs } from '../src/support/support-upload.ts'
 
@@ -66,6 +67,26 @@ await test('both flags -> both actions run, no tip', () => {
   assert.equal(a.runAiAnalysis, true)
   assert.equal(a.sendLogs, true)
   assert.equal(a.tip, null)
+})
+
+// ---- shouldPrintCiTip: the reachable emit-site predicate ----
+// The tip prints at the build-failure point (independent of log capture) ONLY
+// for a non-interactive build where the user passed neither flag. Every other
+// combination is false: interactive uses the clack menu, and a set flag means
+// the corresponding action runs instead of the tip.
+await test('shouldPrintCiTip -> true only for non-TTY + neither flag', () => {
+  // The one true case.
+  assert.equal(shouldPrintCiTip({ isTTY: false, aiAnalytics: false, sendLogs: false }), true)
+  // Interactive: never (clack menu handles it).
+  assert.equal(shouldPrintCiTip({ isTTY: true, aiAnalytics: false, sendLogs: false }), false)
+  // A flag is set: the action runs, no tip.
+  assert.equal(shouldPrintCiTip({ isTTY: false, aiAnalytics: true, sendLogs: false }), false)
+  assert.equal(shouldPrintCiTip({ isTTY: false, aiAnalytics: false, sendLogs: true }), false)
+  assert.equal(shouldPrintCiTip({ isTTY: false, aiAnalytics: true, sendLogs: true }), false)
+  // Interactive + flags: still never.
+  assert.equal(shouldPrintCiTip({ isTTY: true, aiAnalytics: true, sendLogs: false }), false)
+  assert.equal(shouldPrintCiTip({ isTTY: true, aiAnalytics: false, sendLogs: true }), false)
+  assert.equal(shouldPrintCiTip({ isTTY: true, aiAnalytics: true, sendLogs: true }), false)
 })
 
 // ---- (b cont.) the --send-logs upload primitive: success path ----

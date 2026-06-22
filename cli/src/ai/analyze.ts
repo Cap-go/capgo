@@ -54,6 +54,25 @@ export function decideCiFailureActions(input: CiFailureActionsInput): CiFailureA
   }
 }
 
+export interface ShouldPrintCiTipInput {
+  // Is the current stdout an interactive terminal?
+  isTTY: boolean
+  // --ai-analytics passed?
+  aiAnalytics: boolean
+  // --send-logs passed?
+  sendLogs: boolean
+}
+
+// Whether to print CI_FAILURE_TIP at the build-failure point. This is the ONLY
+// case where the tip should appear: a non-interactive (CI/CD) build that failed
+// while the user opted into NEITHER --ai-analytics NOR --send-logs. Interactive
+// terminals use the clack menu instead; if either flag is set the corresponding
+// action runs and no tip is wanted. Pure + unit-tested so the emit site stays
+// trivial and self-documenting.
+export function shouldPrintCiTip(input: ShouldPrintCiTipInput): boolean {
+  return !input.isTTY && !input.aiAnalytics && !input.sendLogs
+}
+
 export async function writeLocalAiFile(jobId: string): Promise<string> {
   const logsPath = getLogCapturePath(jobId)
   const logs = await readFile(logsPath, 'utf8')

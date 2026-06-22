@@ -41,10 +41,12 @@ import * as tus from 'tus-js-client'
 import WS from 'ws' // TODO: remove when min version nodejs 22 is bump, should do it in july 2026 as it become deprecated
 import pack from '../../package.json'
 import {
+  CI_FAILURE_TIP,
   decideAnalyzeBehavior,
   decideCiFailureActions,
   isLogTooBig,
   postAnalyzeStreamRequest,
+  shouldPrintCiTip,
   writeLocalAiFile,
 } from '../ai/analyze'
 import {
@@ -1977,6 +1979,19 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       }
       else if (finalStatus === 'failed') {
         log.error(`Build failed`)
+        // Non-interactive (CI/CD) failure with neither --ai-analytics nor
+        // --send-logs: surface the discoverability tip here, INDEPENDENT of log
+        // capture. The in-handler AI/decideCiFailureActions block below is gated
+        // behind captureEnabled, which is false in exactly this case, so the tip
+        // would otherwise never print. Interactive terminals use the clack menu;
+        // if either flag is set the corresponding action runs and no tip is wanted.
+        if (shouldPrintCiTip({
+          isTTY: process.stdout.isTTY === true,
+          aiAnalytics: options.aiAnalytics === true,
+          sendLogs: options.sendLogs === true,
+        })) {
+          process.stderr.write(`${CI_FAILURE_TIP}\n`)
+        }
       }
       else {
         log.warn(`Build finished with status: ${finalStatus}`)
@@ -2329,9 +2344,12 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         try {
           if (behavior === 'skip' || behavior === 'auto_upload') {
             // Non-interactive (CI/CD). --ai-analytics and --send-logs are
-            // independent and additive: run whichever the user opted into, and
-            // print a tip when they opted into neither (instead of a silent
-            // failure). decideCiFailureActions is the pure, unit-tested seam.
+            // independent and additive: run whichever the user opted into.
+            // The neither-flag discoverability tip is NOT emitted here - it is
+            // printed at the build-failure point (see shouldPrintCiTip above),
+            // because reaching this block requires captureEnabled, which is
+            // false in the exact non-interactive + neither-flag case the tip is
+            // for. decideCiFailureActions is the pure, unit-tested seam.
             const actions = decideCiFailureActions({
               aiAnalyticsFlag: options.aiAnalytics === true,
               sendLogsFlag: options.sendLogs === true,
@@ -2346,10 +2364,6 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
               else {
                 await runCapgoAi('auto_upload', 'ci_flag')
               }
-            }
-            if (actions.tip) {
-              process.stderr.write(`${actions.tip}\n`)
-              await emitSkipChoice()
             }
           }
           else {
