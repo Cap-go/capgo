@@ -42,6 +42,7 @@ await expectBehavior('matrix: TTY + send-logs → auto_upload', { isTTY: true, a
 await expectBehavior('matrix: TTY + both flags → auto_upload', { isTTY: true, aiAnalyticsFlag: true, sendLogsFlag: true }, 'auto_upload')
 await expectBehavior('matrix: non-TTY + ai-analytics → auto_upload', { isTTY: false, aiAnalyticsFlag: true, sendLogsFlag: false }, 'auto_upload')
 await expectBehavior('matrix: non-TTY + send-logs → auto_upload', { isTTY: false, aiAnalyticsFlag: false, sendLogsFlag: true }, 'auto_upload')
+await expectBehavior('matrix: non-TTY + both flags → auto_upload', { isTTY: false, aiAnalyticsFlag: true, sendLogsFlag: true }, 'auto_upload')
 await expectBehavior('matrix: TTY + no flags → ask_then_menu', { isTTY: true, aiAnalyticsFlag: false, sendLogsFlag: false }, 'ask_then_menu')
 await expectBehavior('matrix: non-TTY + no flags → skip', { isTTY: false, aiAnalyticsFlag: false, sendLogsFlag: false }, 'skip')
 

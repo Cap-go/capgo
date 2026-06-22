@@ -55,6 +55,18 @@ await test('decideAnalyzeBehavior: CI + no flags → skip', () => {
   if (decideAnalyzeBehavior({ isTTY: false, aiAnalyticsFlag: false, sendLogsFlag: false }) !== 'skip')
     throw new Error('regression')
 })
+await test('decideAnalyzeBehavior: interactive + both flags → auto_upload', () => {
+  if (decideAnalyzeBehavior({ isTTY: true, aiAnalyticsFlag: true, sendLogsFlag: true }) !== 'auto_upload')
+    throw new Error('regression')
+})
+await test('decideAnalyzeBehavior: CI + send-logs → auto_upload', () => {
+  if (decideAnalyzeBehavior({ isTTY: false, aiAnalyticsFlag: false, sendLogsFlag: true }) !== 'auto_upload')
+    throw new Error('regression')
+})
+await test('decideAnalyzeBehavior: CI + both flags → auto_upload', () => {
+  if (decideAnalyzeBehavior({ isTTY: false, aiAnalyticsFlag: true, sendLogsFlag: true }) !== 'auto_upload')
+    throw new Error('regression')
+})
 
 // ---- runCapgoAiAnalysis ----
 function sseResponse(frames, status = 200) {
