@@ -3596,7 +3596,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               // Additive: offer to ALSO upload the logs to Capgo support
               // (upload-only, no mailto) BEFORE the AI analysis runs. This
               // awaits the user's yes/no and any upload, then proceeds.
-              await offerAiSupportUpload().catch((err) => { console.error('[support-flow]', err) })
+              await offerAiSupportUpload().catch((err) => { try { appendInternalLog(`[support-flow] ${String(err)}`) } catch {} })
               setStep('ai-analysis-running')
             }
             else {

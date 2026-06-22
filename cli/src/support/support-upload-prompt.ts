@@ -55,6 +55,14 @@ export interface OfferSupportUploadDeps {
 // an outcome the caller can feed to telemetry. NEVER throws — the AI analysis
 // that runs next must always proceed regardless of what happens here.
 export async function offerSupportUploadBeforeAi(deps: OfferSupportUploadDeps): Promise<SupportUploadOutcome> {
+  const safePrint = (message: string): void => {
+    try {
+      deps.print(message)
+    }
+    catch {
+      // never let UI logging break the contract
+    }
+  }
   let wants = false
   try {
     wants = await deps.confirm(SUPPORT_UPLOAD_PROMPT)
@@ -74,7 +82,7 @@ export async function offerSupportUploadBeforeAi(deps: OfferSupportUploadDeps): 
     files = null
   }
   if (!files) {
-    deps.print('Couldn\'t prepare your logs to send to Capgo support. You can email support@capgo.app and we\'ll help.')
+    safePrint('Couldn\'t prepare your logs to send to Capgo support. You can email support@capgo.app and we\'ll help.')
     return 'failed'
   }
 
@@ -86,10 +94,10 @@ export async function offerSupportUploadBeforeAi(deps: OfferSupportUploadDeps): 
     uploaded = null
   }
   if (!uploaded) {
-    deps.print('Logs upload to Capgo support is unavailable right now — continuing with AI analysis. You can email support@capgo.app if you need a hand.')
+    safePrint('Logs upload to Capgo support is unavailable right now — continuing with AI analysis. You can email support@capgo.app if you need a hand.')
     return 'unavailable'
   }
 
-  deps.print(supportUploadConfirmation(uploaded.url))
+  safePrint(supportUploadConfirmation(uploaded.url))
   return 'uploaded'
 }
