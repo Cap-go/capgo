@@ -1273,8 +1273,9 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | **--build-mode** | <code>string</code> | Build mode: debug or release (default: release) |
 | **--build-certificate-base64** | <code>string</code> | iOS: Base64-encoded .p12 certificate |
 | **--p12-password** | <code>string</code> | iOS: Certificate password (optional if cert has no password) |
-| **--apple-id** | <code>string</code> | iOS: Apple ID email |
-| **--apple-app-specific-password** | <code>string</code> | iOS: App-specific password |
+| **--apple-id** | <code>string</code> | iOS: Apple ID email for app-specific password uploads (alternative to App Store Connect API key) |
+| **--apple-app-specific-password** | <code>string</code> | iOS: App-specific password (xxxx-xxxx-xxxx-xxxx) for TestFlight uploads |
+| **--apple-app-id** | <code>string</code> | iOS: Numeric App Store Connect app id (required together with --apple-id and --apple-app-specific-password) |
 | **--apple-key-id** | <code>string</code> | iOS: App Store Connect API Key ID |
 | **--apple-issuer-id** | <code>string</code> | iOS: App Store Connect Issuer ID |
 | **--apple-key-content** | <code>string</code> | iOS: Base64-encoded App Store Connect API key (.p8) |
@@ -1422,8 +1423,9 @@ iOS Example:
 | **--apple-issuer-id** | <code>string</code> | iOS: App Store Connect Issuer ID |
 | **--apple-team-id** | <code>string</code> | iOS: App Store Connect Team ID |
 | **--ios-distribution** | <code>string</code> | iOS: Distribution mode |
-| **--apple-id** | <code>string</code> | iOS: Apple ID email (optional) |
-| **--apple-app-password** | <code>string</code> | iOS: App-specific password (optional) |
+| **--apple-id** | <code>string</code> | iOS: Apple ID email for app-specific password uploads (alternative to App Store Connect API key) |
+| **--apple-app-specific-password** | <code>string</code> | iOS: App-specific password (xxxx-xxxx-xxxx-xxxx) for TestFlight uploads |
+| **--apple-app-id** | <code>string</code> | iOS: Numeric App Store Connect app id (required together with --apple-id and --apple-app-specific-password) |
 | **--keystore** | <code>string</code> | Android: Path to keystore file (.keystore or .jks) |
 | **--keystore-alias** | <code>string</code> | Android: Keystore key alias |
 | **--keystore-key-password** | <code>string</code> | Android: Keystore key password |
@@ -1507,6 +1509,9 @@ Examples:
 | **--apple-key-id** | <code>string</code> | App Store Connect API Key ID |
 | **--apple-issuer-id** | <code>string</code> | App Store Connect Issuer ID |
 | **--apple-team-id** | <code>string</code> | App Store Connect Team ID |
+| **--apple-id** | <code>string</code> | iOS: Apple ID email for app-specific password uploads (alternative to App Store Connect API key) |
+| **--apple-app-specific-password** | <code>string</code> | iOS: App-specific password (xxxx-xxxx-xxxx-xxxx) for TestFlight uploads |
+| **--apple-app-id** | <code>string</code> | iOS: Numeric App Store Connect app id (required together with --apple-id and --apple-app-specific-password) |
 | **--ios-distribution** | <code>string</code> | iOS: Distribution mode |
 | **--keystore** | <code>string</code> | Path to keystore file (.keystore or .jks) |
 | **--keystore-alias** | <code>string</code> | Keystore key alias |
