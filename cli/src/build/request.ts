@@ -1753,10 +1753,15 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     // flag-OR, the CI auto_upload branch from decideAnalyzeBehavior would never
     // have a log file to read.
     const aiAnalysisMode: 'auto-prompt' | 'caller-handled' | 'skip' = options.aiAnalysisMode ?? 'auto-prompt'
+    // Effective "upload logs to support" intent: honor both the primary
+    // --send-logs-to-support flag and the deprecated --send-logs alias so the
+    // original 8.16.0 flag keeps working. Use this everywhere instead of reading
+    // options.sendLogs directly.
+    const wantsSendLogsToSupport = options.sendLogsToSupport === true || options.sendLogs === true
     // Capture when interactive, when the CI flag is set, OR when the caller asked
     // to drive the AI flow themselves (e.g. Ink onboarding) so the captured log
     // is available for runCapgoAiAnalysis.
-    const captureEnabled = (shouldCaptureLogs() || options.aiAnalytics === true || options.sendLogs === true || aiAnalysisMode === 'caller-handled')
+    const captureEnabled = (shouldCaptureLogs() || options.aiAnalytics === true || wantsSendLogsToSupport || aiAnalysisMode === 'caller-handled')
       && aiAnalysisMode !== 'skip'
     let capturedJobId: string | null = null
     let keepPromptFile = false // mutable so local-AI flow can set it true
@@ -2090,7 +2095,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         if (shouldPrintCiTip({
           isTTY: process.stdout.isTTY === true,
           aiAnalytics: options.aiAnalytics === true,
-          sendLogs: options.sendLogs === true,
+          sendLogs: wantsSendLogsToSupport,
         })) {
           process.stderr.write(`${CI_FAILURE_TIP}\n`)
         }
@@ -2152,7 +2157,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         const behavior = decideAnalyzeBehavior({
           isTTY: process.stdout.isTTY === true,
           aiAnalyticsFlag: options.aiAnalytics === true,
-          sendLogsFlag: options.sendLogs === true,
+          sendLogsFlag: wantsSendLogsToSupport,
         })
 
         const AI_WARNING = '⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.'
@@ -2177,7 +2182,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           if (triggeredBy === 'menu') {
             await offerSupportUploadBeforeAi({
               confirm: async (message) => {
-                const answer = await confirm({ message, initialValue: false })
+                const answer = await confirm({ message, initialValue: true })
                 return answer === true
               },
               buildFiles: () => {
@@ -2505,7 +2510,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
             // for. decideCiFailureActions is the pure, unit-tested seam.
             const actions = decideCiFailureActions({
               aiAnalyticsFlag: options.aiAnalytics === true,
-              sendLogsFlag: options.sendLogs === true,
+              sendLogsFlag: wantsSendLogsToSupport,
             })
             if (actions.sendLogs)
               await runSendLogs()

@@ -16,8 +16,8 @@
 // declined gate, a failed bundle, or a failed upload must NEVER throw or block
 // the AI analysis that follows.
 
-// The yes/no prompt shown before AI analysis. Leans to "No" at the call site
-// (default highlighted choice) so we never surprise-upload a user's logs.
+// The yes/no prompt shown before AI analysis. Defaults to "Yes" at the call
+// site (default highlighted choice) so logs reach support by default.
 export const SUPPORT_UPLOAD_PROMPT
   = 'Also upload these logs to Capgo support so our team can help? They\'ll follow up by email.'
 

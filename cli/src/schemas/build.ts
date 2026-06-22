@@ -80,6 +80,10 @@ export const buildRequestOptionsSchema = optionsBaseSchema.extend({
   // On a CI/CD (non-interactive) build failure, upload the captured build logs
   // to Capgo support via uploadSupportLogs. Additive to aiAnalytics — both can
   // be passed and both run. Requires log capture, which this flag also enables.
+  // Derived from --send-logs-to-support (primary) or --send-logs (deprecated alias).
+  sendLogsToSupport: z.boolean().optional(),
+  // Deprecated alias for sendLogsToSupport, kept so the original --send-logs flag
+  // (shipped in 8.16.0) keeps parsing. Callers honor either field.
   sendLogs: z.boolean().optional(),
   // Controls the on-failure AI-analysis flow inside requestBuildInternal:
   //   - 'auto-prompt' (default) — current behavior: clack-driven menu when

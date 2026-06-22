@@ -3678,8 +3678,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           <Text>{supportConfirmMessage}</Text>
           <Select
             options={[
-              { label: '✖  No, just run AI', value: 'no' },
               { label: '📤  Yes, upload my logs', value: 'yes' },
+              { label: '✖  No, just run AI', value: 'no' },
             ]}
             onChange={(value) => {
               const resolve = supportConfirmResolveRef.current
