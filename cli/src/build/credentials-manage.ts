@@ -121,19 +121,19 @@ const CREDENTIAL_KNOWLEDGE: Record<string, FieldKnowledge> = {
     scope: 'ios',
     type: 'string',
     category: 'credential',
-    explain: 'Apple ID email for app-specific password uploads (an alternative to the App Store Connect API key, used by migrated Ionic Appflow apps). Pairs with FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD and APPLE_APP_ID. fastlane reads it from the environment automatically.',
+    explain: 'Not recommended: app-specific password authentication is a discouraged Ionic Appflow migration fallback; prefer an App Store Connect API key (.p8). This is the Apple ID email for app-specific password uploads. Pairs with FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD and APPLE_APP_ID; fastlane reads it from the environment automatically.',
   },
   FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: {
     scope: 'ios',
     type: 'string',
     category: 'credential',
-    explain: 'App-specific password (format xxxx-xxxx-xxxx-xxxx) generated at appleid.apple.com. Lets fastlane upload to TestFlight without an App Store Connect API key. Requires FASTLANE_USER and APPLE_APP_ID to also be set. Capgo uses it server-side per build then discards it.',
+    explain: 'Not recommended: prefer an App Store Connect API key (.p8); this app-specific password path exists only as an Ionic Appflow migration fallback. App-specific password (format xxxx-xxxx-xxxx-xxxx) generated at appleid.apple.com. Lets fastlane upload to TestFlight without an App Store Connect API key. Requires FASTLANE_USER and APPLE_APP_ID to also be set. Capgo uses it server-side per build then discards it.',
   },
   APPLE_APP_ID: {
     scope: 'ios',
     type: 'string',
     category: 'credential',
-    explain: 'Numeric App Store Connect app id (e.g. 1234567890), found in App Store Connect → your app → App Information → Apple ID. Required for app-specific password uploads so fastlane can upload without an interactive 2FA login. Not used when an App Store Connect API key is configured.',
+    explain: 'Numeric App Store Connect app id (e.g. 1234567890), found in App Store Connect → your app → App Information → Apple ID. Required for the (not recommended) app-specific password upload path so fastlane can upload without an interactive 2FA login. Not used when an App Store Connect API key (.p8) is configured, which is the preferred option.',
   },
   CAPGO_IOS_PROVISIONING_MAP: {
     scope: 'ios',
