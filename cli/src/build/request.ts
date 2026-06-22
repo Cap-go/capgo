@@ -58,7 +58,7 @@ import {
 import { renderMarkdown } from '../ai/render-markdown'
 import { createStreamingMarkdownRenderer } from '../ai/stream-markdown'
 import { aiAnalysisResultFromPostAnalyze, trackAiAnalysisChoice, trackAiAnalysisResult } from '../ai/telemetry'
-import { writeSupportBundleFiles } from '../onboarding-support.js'
+import { type SupportBundleFiles, writeSupportBundleFiles } from '../onboarding-support.js'
 import { copyToClipboard, revealInFinder } from '../support/clipboard.js'
 import { contactSupport } from '../support/contact-support.js'
 import { appendInternalLog, getInternalLogPath, startInternalLog } from '../support/internal-log.js'
@@ -2194,7 +2194,18 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
         // Spec: at a build failure, "Email Capgo support" comes first — the same
         // contact-support flow as the onboarding wizard, with clack-flavored deps.
-        const runEmailSupport = async (): Promise<void> => {
+        // Shared bundle prep for both the interactive email flow and the CI/CD
+        // --send-logs flow: read the internal log + the full persisted build log
+        // (both best-effort) and render/gzip them into a support bundle. The
+        // bundle is gzipped + uploaded/attached, so size isn't a concern here —
+        // support needs the full build log, not a tail.
+        const prepareSupportLogBundle = ({
+          capturedJobId,
+          appId,
+        }: {
+          capturedJobId: string | null
+          appId: string
+        }): SupportBundleFiles | null => {
           const internalLogPath = getInternalLogPath()
           let internalLines: string[] = []
           if (internalLogPath) {
@@ -2206,11 +2217,19 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           let buildLogLines: string[] = []
           try {
             const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
-            // Full persisted build log — support needs all of it, not a tail. The
-            // bundle is gzipped + uploaded/attached, so size isn't a concern.
             buildLogLines = readFileSync(logsPath, 'utf8').split('\n')
           }
           catch { /* best-effort */ }
+          return writeSupportBundleFiles({
+            kind: 'build-request',
+            appId,
+            error: `Cloud build ${capturedJobId} failed`,
+            logs: buildLogLines,
+            sections: internalLines.length > 0 ? [{ title: 'Internal log', lines: internalLines }] : [],
+          })
+        }
+
+        const runEmailSupport = async (): Promise<void> => {
           await contactSupport({
             subject: `Capgo Builder support — ${appId} (${platform})`,
             body: `Hi Capgo team,\n\nMy cloud build failed and I'd like help.\n\nApp: ${appId}\nPlatform: ${platform}\nJob: ${capturedJobId}`,
@@ -2241,13 +2260,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
               const s = spinnerC()
               s.start('Preparing your logs to send…')
               try {
-                return writeSupportBundleFiles({
-                  kind: 'build-request',
-                  appId,
-                  error: `Cloud build ${capturedJobId} failed`,
-                  logs: buildLogLines,
-                  sections: internalLines.length > 0 ? [{ title: 'Internal log', lines: internalLines }] : [],
-                })
+                return prepareSupportLogBundle({ capturedJobId, appId })
               }
               finally {
                 s.stop('Logs ready.')
@@ -2274,28 +2287,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         // process or changes the exit code: any failure prints a graceful note
         // pointing at support@capgo.app.
         const runSendLogs = async (): Promise<void> => {
-          const internalLogPath = getInternalLogPath()
-          let internalLines: string[] = []
-          if (internalLogPath) {
-            try {
-              internalLines = readFileSync(internalLogPath, 'utf8').split('\n')
-            }
-            catch { /* best-effort */ }
-          }
-          let buildLogLines: string[] = []
-          try {
-            const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
-            buildLogLines = readFileSync(logsPath, 'utf8').split('\n')
-          }
-          catch { /* best-effort */ }
-
-          const files = writeSupportBundleFiles({
-            kind: 'build-request',
-            appId,
-            error: `Cloud build ${capturedJobId} failed`,
-            logs: buildLogLines,
-            sections: internalLines.length > 0 ? [{ title: 'Internal log', lines: internalLines }] : [],
-          })
+          const files = prepareSupportLogBundle({ capturedJobId, appId })
           if (!files) {
             process.stderr.write(`Could not prepare your build logs to upload. Please email support@capgo.app and describe the issue (job ${capturedJobId}).\n`)
             return

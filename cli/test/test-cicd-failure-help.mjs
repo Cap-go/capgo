@@ -149,6 +149,34 @@ await test('uploadSupportLogs returns null on a non-200 (graceful fallback)', as
   }
 })
 
+// ---- (b cont.) the --send-logs upload primitive: malformed 200 body (null) ----
+await test('uploadSupportLogs returns null on a 200 with an invalid body shape', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'capgo-sendlogs-'))
+  const gzPath = join(dir, 'bundle.log.gz')
+  writeFileSync(gzPath, Buffer.from('gzipped-bytes'))
+
+  const origFetch = globalThis.fetch
+  // id is a number, not a string — the response is 200 but the body fails
+  // validation, so the primitive must degrade to null rather than throw.
+  globalThis.fetch = async () => new Response(
+    JSON.stringify({ id: 123, url: 'https://capgo.app/logs/123' }),
+    { status: 200, headers: { 'content-type': 'application/json' } },
+  )
+  try {
+    const r = await uploadSupportLogs({
+      apiHost: 'https://api.test',
+      apikey: 'k',
+      appId: 'com.app',
+      jobId: 'job-1',
+      gzPath,
+    })
+    assert.equal(r, null, 'a malformed 200 body must degrade to null, never throw')
+  }
+  finally {
+    globalThis.fetch = origFetch
+  }
+})
+
 await test('uploadSupportLogs returns null when the gz file is missing (never throws)', async () => {
   const r = await uploadSupportLogs({
     apiHost: 'https://api.test',
