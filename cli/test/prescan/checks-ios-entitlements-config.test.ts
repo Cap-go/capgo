@@ -143,6 +143,59 @@ describe('ios/entitlements-vs-profile-capability', () => {
     expect(await entitlementsVsProfileCapability.run(ctx)).toEqual([])
   })
 
+  it('treats a resolved-team wildcard (TEAMID.*) profile member as covering all app members', async () => {
+    // Real profiles store the RESOLVED 10-char team prefix, e.g. `TEAM123456.*`,
+    // never the $(AppIdentifierPrefix) build variable. This must be recognized as a
+    // wildcard or it false-positives on every keychain-sharing app with a wildcard App ID.
+    const ctx = ctxWithEntitlements(
+      '<key>keychain-access-groups</key><array><string>$(AppIdentifierPrefix)app.capgo.plugin.TutorialBuild</string></array>',
+      { credentials: { CAPGO_IOS_PROVISIONING_MAP: mapWith(profileXml('<key>keychain-access-groups</key><array><string>TEAM123456.*</string></array>')) } },
+    )
+    expect(await entitlementsVsProfileCapability.run(ctx)).toEqual([])
+  })
+
+  it('matches a $(AppIdentifierPrefix)-prefixed app member against the profile resolved-team grant', async () => {
+    // App entitlements carry the unresolved $(AppIdentifierPrefix) prefix; the profile
+    // carries the resolved <teamid>. prefix. A literal (non-wildcard) grant of the same
+    // suffix must be treated as covered.
+    const ctx = ctxWithEntitlements(
+      '<key>keychain-access-groups</key><array><string>$(AppIdentifierPrefix)app.capgo.plugin.TutorialBuild</string></array>',
+      { credentials: { CAPGO_IOS_PROVISIONING_MAP: mapWith(profileXml('<key>keychain-access-groups</key><array><string>TEAM123456.app.capgo.plugin.TutorialBuild</string></array>')) } },
+    )
+    expect(await entitlementsVsProfileCapability.run(ctx)).toEqual([])
+  })
+
+  it('passes when the profile grants a non-allowlisted scalar/bool capability (App Attest, Siri)', async () => {
+    // Capability keys outside the legacy profile-parser allowlist must NOT be reported
+    // as ungranted when the profile actually grants them.
+    const ctx = ctxWithEntitlements(
+      `<key>com.apple.developer.devicecheck.appattest-environment</key><string>production</string>
+       <key>com.apple.developer.siri</key><true/>`,
+      { credentials: { CAPGO_IOS_PROVISIONING_MAP: mapWith(profileXml(`<key>com.apple.developer.devicecheck.appattest-environment</key><string>production</string>
+       <key>com.apple.developer.siri</key><true/>`)) } },
+    )
+    expect(await entitlementsVsProfileCapability.run(ctx)).toEqual([])
+  })
+
+  it('passes when the profile grants a non-allowlisted array capability (Sign in with Apple)', async () => {
+    const ctx = ctxWithEntitlements(
+      '<key>com.apple.developer.applesignin</key><array><string>Default</string></array>',
+      { credentials: { CAPGO_IOS_PROVISIONING_MAP: mapWith(profileXml('<key>com.apple.developer.applesignin</key><array><string>Default</string></array>')) } },
+    )
+    expect(await entitlementsVsProfileCapability.run(ctx)).toEqual([])
+  })
+
+  it('still errors when a non-allowlisted capability is declared but NOT granted', async () => {
+    // The downgrade must not silence genuine missing-capability errors.
+    const ctx = ctxWithEntitlements(
+      '<key>com.apple.developer.siri</key><true/>',
+      { credentials: { CAPGO_IOS_PROVISIONING_MAP: mapWith(profileXml('')) } },
+    )
+    const f = await entitlementsVsProfileCapability.run(ctx)
+    expect(f[0]?.severity).toBe('error')
+    expect(f[0]?.detail ?? f[0]?.title).toContain('com.apple.developer.siri')
+  })
+
   it('excludes auto-managed keys (aps-environment, get-task-allow, application-identifier, team-identifier)', async () => {
     // App declares only auto-managed keys; profile grants none of them -> no finding.
     const ctx = ctxWithEntitlements(
@@ -178,10 +231,36 @@ describe('ios/entitlements-aps-environment-vs-mode', () => {
     expect(apsEnvironmentVsMode.appliesTo?.(ctx)).toBe(false)
   })
 
-  it('errors when aps-environment=development but mode is app_store', async () => {
+  it('warns (does NOT error) when aps-environment=development but mode is app_store with no push evidence', async () => {
+    // The default Capacitor App.entitlements ships aps-environment=development. On a
+    // push-free app this is a benign leftover the builder neither rewrites nor fails
+    // on, so it must NOT hard-block an App Store build — it is a warning, not an error.
     const ctx = ctxWithEntitlements('<key>aps-environment</key><string>development</string>', { distributionMode: 'app_store' })
     const f = await apsEnvironmentVsMode.run(ctx)
-    expect(f[0]?.severity).toBe('error')
+    expect(f[0]?.severity).toBe('warning')
+    expect(f.some(x => x.severity === 'error')).toBe(false)
+  })
+
+  it('errors on development+app_store when a mapped profile grants production push (real mismatch)', async () => {
+    // A mapped profile granting aps-environment=production is independent evidence the
+    // app genuinely uses push, so a development app entitlement IS a real signing mismatch.
+    const ctx = ctxWithEntitlements('<key>aps-environment</key><string>development</string>', {
+      distributionMode: 'app_store',
+      credentials: { CAPGO_IOS_PROVISIONING_MAP: mapWith(profileXml('<key>aps-environment</key><string>production</string>')) },
+    })
+    const f = await apsEnvironmentVsMode.run(ctx)
+    expect(f.some(x => x.severity === 'error')).toBe(true)
+  })
+
+  it('errors on development+app_store when UIBackgroundModes declares remote-notification', async () => {
+    // remote-notification background mode is independent evidence the app uses push.
+    const dir = makeProject({
+      'ios/App/App/App.entitlements': entitlementsFile('<key>aps-environment</key><string>development</string>'),
+      'ios/App/App/Info.plist': `${PLIST_HEAD}\n<dict><key>UIBackgroundModes</key><array><string>remote-notification</string></array></dict>\n</plist>`,
+    })
+    const ctx = makeCtx({ projectDir: dir, platform: 'ios', distributionMode: 'app_store' })
+    const f = await apsEnvironmentVsMode.run(ctx)
+    expect(f.some(x => x.severity === 'error')).toBe(true)
   })
 
   it('warns when aps-environment=production but mode is ad_hoc', async () => {
@@ -204,11 +283,16 @@ describe('ios/entitlements-aps-environment-vs-mode', () => {
     expect(f.some(x => x.severity === 'error')).toBe(true)
   })
 
-  it('grounding (development) errors only once mode=app_store is set, the intended catch', async () => {
+  it('grounding (development, push-free) warns under app_store — never hard-blocks the default Capacitor entitlement', async () => {
+    // Restores the spec acceptance baseline: the grounding project (aps-environment=
+    // development, no push) must NOT produce a build-blocking error on the default
+    // app_store path. It surfaces a warning so the leftover is still visible.
     const noMode = ctxWithEntitlementsRaw(GROUNDING_ENTITLEMENTS)
     expect(apsEnvironmentVsMode.appliesTo?.(noMode)).toBe(false)
     const withMode = ctxWithEntitlementsRaw(GROUNDING_ENTITLEMENTS, { distributionMode: 'app_store' })
-    expect((await apsEnvironmentVsMode.run(withMode))[0]?.severity).toBe('error')
+    const f = await apsEnvironmentVsMode.run(withMode)
+    expect(f[0]?.severity).toBe('warning')
+    expect(f.some(x => x.severity === 'error')).toBe(false)
   })
 })
 

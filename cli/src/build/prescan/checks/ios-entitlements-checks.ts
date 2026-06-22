@@ -8,12 +8,34 @@
 // credential material — see types.ts Finding doc).
 import type { ProfileEntitlements } from '../../mobileprovision-parser'
 import type { Finding, PrescanCheck, ScanContext } from '../types'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { parseMobileprovisionDetailedFromBase64 } from '../../mobileprovision-parser'
 import { entArray, entString, readAppEntitlements } from '../ios-entitlements'
+import { plistArrayStrings } from './ios-plist-read'
 import { parseProvisioningMap } from './ios-profiles'
 
 const hasMap = (ctx: ScanContext): boolean => parseProvisioningMap(ctx).length > 0
 const hasAppEntitlements = (ctx: ScanContext): boolean => readAppEntitlements(ctx.projectDir) !== null
+
+/**
+ * Independent evidence the app actually uses push: the Info.plist declares the
+ * `remote-notification` background mode. Used to distinguish a genuine
+ * development-vs-app_store push mismatch from the benign default Capacitor
+ * `aps-environment=development` leftover that nearly every push-free app carries.
+ * Reads only the project Info.plist; never throws.
+ */
+function appUsesRemoteNotifications(projectDir: string): boolean {
+  const p = join(projectDir, 'ios', 'App', 'App', 'Info.plist')
+  if (!existsSync(p))
+    return false
+  try {
+    return plistArrayStrings(readFileSync(p, 'utf8'), 'UIBackgroundModes').includes('remote-notification')
+  }
+  catch {
+    return false
+  }
+}
 
 /** Parse a mapped profile's entitlements; {} when the blob is not a valid profile. */
 function profileEntitlementsOf(base64: string): ProfileEntitlements {
@@ -36,9 +58,28 @@ function isExcludedKey(key: string): boolean {
   return EXCLUDED_KEYS.has(key) || key.endsWith('.team-identifier')
 }
 
-// A profile array member that grants every requested member.
+// A profile array member that grants every requested member. Profiles store the
+// wildcard either as the bare `*`, the unresolved `$(VAR)*` template form, or the
+// RESOLVED 10-char-team-prefixed form `<teamid>.*` (e.g. `ABCDE12345.*`) — which is
+// what a signed wildcard-App-ID profile actually carries, never the $() variable.
 function isWildcardMember(member: string): boolean {
-  return member === '*' || member === '$(AppIdentifierPrefix)*' || /^\$\(\w+\)\*$/.test(member)
+  return member === '*'
+    || member === '$(AppIdentifierPrefix)*'
+    || /^\$\(\w+\)\*$/.test(member)
+    || /^[A-Z0-9]{10}\.\*$/.test(member)
+}
+
+// App entitlement array members carry the unresolved Xcode prefix variable
+// ($(AppIdentifierPrefix) / $(TeamIdentifierPrefix)), while the profile carries the
+// resolved 10-char team prefix. Strip both so the suffixes compare like-for-like.
+const APP_PREFIX_VAR_RE = /^\$\((?:AppIdentifierPrefix|TeamIdentifierPrefix)\)/
+const RESOLVED_TEAM_PREFIX_RE = /^[A-Z0-9]{10}\./
+function entitlementMemberSuffix(member: string): string {
+  if (APP_PREFIX_VAR_RE.test(member))
+    return member.replace(APP_PREFIX_VAR_RE, '')
+  if (RESOLVED_TEAM_PREFIX_RE.test(member))
+    return member.replace(RESOLVED_TEAM_PREFIX_RE, '')
+  return member
 }
 
 /**
@@ -78,7 +119,10 @@ export const entitlementsVsProfileCapability: PrescanCheck = {
           const profileMembers = Array.isArray(profileValue) ? profileValue : []
           if (profileMembers.some(isWildcardMember))
             continue
-          const uncovered = appMembers.filter(member => !profileMembers.includes(member))
+          // Compare on the prefix-normalized suffix: app members carry the
+          // $(AppIdentifierPrefix) variable, profile members the resolved team prefix.
+          const profileSuffixes = new Set(profileMembers.map(entitlementMemberSuffix))
+          const uncovered = appMembers.filter(member => !profileSuffixes.has(entitlementMemberSuffix(member)))
           if (uncovered.length > 0) {
             findings.push({
               id: 'ios/entitlements-vs-profile-capability',
@@ -121,12 +165,21 @@ export const apsEnvironmentVsMode: PrescanCheck = {
 
     const findings: Finding[] = []
     if (ctx.distributionMode === 'app_store' && value === 'development') {
+      // The default Capacitor App.entitlements ships aps-environment=development.
+      // On a push-free app this is a benign leftover the cloud builder neither
+      // rewrites nor fails the archive on — so it must NOT hard-block an App Store
+      // build. Only escalate to a blocking error when there is independent evidence
+      // the app genuinely uses push (a remote-notification background mode); the
+      // mapped-profile production mismatch is caught separately below as an error.
+      const usesPush = appUsesRemoteNotifications(ctx.projectDir)
       findings.push({
         id: 'ios/entitlements-aps-environment-vs-mode',
-        severity: 'error',
+        severity: usesPush ? 'error' : 'warning',
         title: 'aps-environment is "development" but the build distributes to the App Store / TestFlight',
-        detail: 'App Store and TestFlight builds need a production push environment',
-        fix: 'Set aps-environment=production in App.entitlements and use a production push profile',
+        detail: usesPush
+          ? 'The app declares the remote-notification background mode, so it needs a production push environment for App Store / TestFlight'
+          : 'App Store and TestFlight push needs a production environment; this is the default Capacitor leftover and is harmless unless the app uses push notifications',
+        fix: 'Set aps-environment=production in App.entitlements and use a production push profile (or remove aps-environment if the app does not use push)',
       })
     }
     else if (ctx.distributionMode === 'ad_hoc' && value === 'production') {

@@ -203,68 +203,50 @@ function extractCertificateSha1s(xml: string): string[] {
   return sha1s
 }
 
-// Capability-bearing keys read from the profile's Entitlements dict. Typed as
-// string / array / bool so callers compare without re-parsing. Keys that are
-// auto-managed (application-identifier, team identifier) are intentionally NOT
-// surfaced here — the coverage checks exclude them.
-const PROFILE_ENT_STRINGS = [
-  'aps-environment',
-  'com.apple.developer.ubiquity-kvstore-identifier',
-] as const
-const PROFILE_ENT_BOOLS = [
-  'get-task-allow',
-  'com.apple.developer.healthkit',
-] as const
-const PROFILE_ENT_ARRAYS = [
-  'com.apple.security.application-groups',
-  'com.apple.developer.associated-domains',
-  'com.apple.developer.icloud-container-identifiers',
-  'com.apple.developer.icloud-services',
-  'keychain-access-groups',
-  'com.apple.developer.in-app-payments',
-] as const
-
-/** `<string>` children of `<key>K</key>\s*<array>...</array>` inside a dict block. */
-function extractDictArrayStrings(dictXml: string, key: string): string[] | null {
-  const re = new RegExp(`<key>${escapeRegex(key)}</key>\\s*<array>([\\s\\S]*?)</array>`)
-  const block = dictXml.match(re)?.[1]
-  if (block === undefined)
-    return null
-  return Array.from(block.matchAll(/<string>([\s\S]*?)<\/string>/g), m => m[1].trim())
+// Auto-managed entitlement keys the profile always carries; never surfaced as
+// capabilities (the coverage checks exclude the same set on the app side).
+function isAutoManagedEntitlementKey(key: string): boolean {
+  return key === 'application-identifier' || key.endsWith('.team-identifier')
 }
 
-/** `<true/>`/`<false/>` for `<key>K</key>` inside a dict block, or null when absent. */
-function extractDictBool(dictXml: string, key: string): boolean | null {
-  const re = new RegExp(`<key>${escapeRegex(key)}</key>\\s*<(true|false)\\s*/>`)
-  const m = dictXml.match(re)
-  return m ? m[1] === 'true' : null
+/** `<string>` children of `<array>...</array>` block text. */
+function arrayStringMembers(arrayXml: string): string[] {
+  return Array.from(arrayXml.matchAll(/<string>([\s\S]*?)<\/string>/g), m => m[1].trim())
 }
 
 /**
  * Parse the capability keys from the profile's first `<key>Entitlements</key>`
- * dict (one-level capture, mirroring extractNestedPlistValue). Only keys present
- * in the dict are added, so a missing capability is absent (not a false value).
- * Never throws — returns {} when there is no Entitlements dict.
+ * dict (one-level capture, mirroring extractNestedPlistValue). EVERY key present
+ * in the dict is read generically by its sibling value tag (string / bool / array),
+ * so the profile side is symmetric with the app side — a granted capability outside
+ * any fixed allowlist is recorded, not silently treated as "missing" (which would
+ * false-positive in the entitlements-vs-profile coverage check). Auto-managed keys
+ * (application-identifier, *.team-identifier) are skipped. Only keys actually present
+ * are added, so a missing capability is absent (not a false value). Never throws —
+ * returns {} when there is no Entitlements dict.
  */
 function extractProfileEntitlements(xml: string): ProfileEntitlements {
   const dict = xml.match(/<key>Entitlements<\/key>\s*<dict>([\s\S]*?)<\/dict>/)?.[1]
   if (dict === undefined)
     return {}
   const out: ProfileEntitlements = {}
-  for (const key of PROFILE_ENT_STRINGS) {
-    const v = extractPlistValue(dict, key)
-    if (v !== null)
-      out[key] = v
-  }
-  for (const key of PROFILE_ENT_BOOLS) {
-    const v = extractDictBool(dict, key)
-    if (v !== null)
-      out[key] = v
-  }
-  for (const key of PROFILE_ENT_ARRAYS) {
-    const v = extractDictArrayStrings(dict, key)
-    if (v !== null)
-      out[key] = v
+  // Each <key>K</key> followed by its value: a self-closing <true/>/<false/>, an
+  // <array>...</array> (non-greedy, first close wins), or a scalar <tag>V</tag>.
+  const re = /<key>([\s\S]*?)<\/key>\s*(?:<(true|false)\s*\/>|<array>([\s\S]*?)<\/array>|<([a-z]+)>([\s\S]*?)<\/\4>)/g
+  for (const m of dict.matchAll(re)) {
+    const key = m[1].trim()
+    if (key in out || isAutoManagedEntitlementKey(key))
+      continue
+    if (m[2] !== undefined)
+      out[key] = m[2] === 'true'
+    else if (m[3] !== undefined)
+      out[key] = arrayStringMembers(m[3])
+    else if (m[4] === 'string')
+      out[key] = m[5].trim()
+    // Other scalar kinds (integer/real/date/data) are not capability-bearing and
+    // are intentionally not surfaced; their presence is still implied by the key.
+    else
+      out[key] = m[5].trim()
   }
   return out
 }

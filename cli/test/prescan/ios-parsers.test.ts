@@ -423,6 +423,31 @@ describe('mobileprovision-parser: profileEntitlements', () => {
     expect('application-identifier' in ent).toBe(false)
   })
 
+  it('surfaces capability keys outside the legacy allowlist (App Attest, Sign in with Apple, Siri)', () => {
+    // Regression: the profile side must scan ALL entitlement keys generically, the
+    // same way the app side does. Previously only a fixed ~10-key allowlist was read,
+    // so any granted-but-non-allowlisted capability looked "missing" and produced a
+    // false-positive blocking error in entitlements-vs-profile-capability.
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+<key>Name</key><string>Test</string>
+<key>UUID</key><string>u</string>
+<key>TeamIdentifier</key><array><string>TEAM123456</string></array>
+<key>Entitlements</key><dict>
+  <key>application-identifier</key><string>TEAM123456.com.demo.app</string>
+  <key>com.apple.developer.devicecheck.appattest-environment</key><string>production</string>
+  <key>com.apple.developer.siri</key><true/>
+  <key>com.apple.developer.applesignin</key><array><string>Default</string></array>
+</dict>
+</dict></plist>`
+    const ent = detailFromXml(xml).profileEntitlements
+    expect(ent['com.apple.developer.devicecheck.appattest-environment']).toBe('production')
+    expect(ent['com.apple.developer.siri']).toBe(true)
+    expect(ent['com.apple.developer.applesignin']).toEqual(['Default'])
+    // auto-managed keys stay hidden even with generic scanning.
+    expect('application-identifier' in ent).toBe(false)
+  })
+
   it('omits capability keys that are absent (missing != false)', () => {
     const ent = detailFromXml(makeProfileXml({ type: 'app_store' })).profileEntitlements
     expect('com.apple.security.application-groups' in ent).toBe(false)
