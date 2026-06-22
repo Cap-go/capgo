@@ -196,6 +196,26 @@ describe('ios/entitlements-vs-profile-capability', () => {
     expect(f[0]?.detail ?? f[0]?.title).toContain('com.apple.developer.siri')
   })
 
+  it('does NOT treat keys nested inside a dict-valued entitlement as capabilities', async () => {
+    // Regression: appEntitlementKeys must collect only TOP-LEVEL keys. The inner
+    // keys of a dict-valued entitlement must NOT leak into the capability set and
+    // get checked against the profile — that would be a false-positive blocking
+    // error. The profile grants only an UNRELATED capability, so the only thing
+    // that could surface the nested key names is the leak this fix prevents.
+    const ctx = ctxWithEntitlements(
+      `<key>com.apple.developer.networking.HotspotConfiguration</key><dict>`
+      + `<key>com.apple.private.nested.flag</key><true/>`
+      + `<key>com.apple.private.nested.list</key><array><string>x</string></array>`
+      + `</dict>`,
+      { credentials: { CAPGO_IOS_PROVISIONING_MAP: mapWith(profileXml('<key>com.apple.developer.healthkit</key><true/>')) } },
+    )
+    const f = await entitlementsVsProfileCapability.run(ctx)
+    const text = f.map(x => `${x.title} ${x.detail ?? ''}`).join(' ')
+    // The nested keys must NEVER appear as their own capability findings.
+    expect(text).not.toContain('com.apple.private.nested.flag')
+    expect(text).not.toContain('com.apple.private.nested.list')
+  })
+
   it('excludes auto-managed keys (aps-environment, get-task-allow, application-identifier, team-identifier)', async () => {
     // App declares only auto-managed keys; profile grants none of them -> no finding.
     const ctx = ctxWithEntitlements(

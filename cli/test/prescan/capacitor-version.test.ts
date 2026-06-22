@@ -57,7 +57,12 @@ describe('capacitor-version: capacitorMajor', () => {
     expect(capacitorMajor(dir)).toBe(8)
   })
 
-  it('grounds clean against the real Capacitor-8 tutorial project', () => {
-    expect(capacitorMajor('/Users/michaltremblay/Developer/capgo-saas/capgo_builder/tutorial-app')).toBe(8)
+  it('grounds clean against a real-shaped Capacitor-8 project (inline fixture)', () => {
+    // Self-contained inline fixture mirroring the real tutorial-app package.json
+    // Capacitor-8 dependency, so the grounding is REAL on CI (the external
+    // tutorial-app checkout does not exist there; reading it returned null and
+    // failed this assertion, not a meaningful grounding).
+    const dir = makeProject({ 'package.json': pkg({ '@capacitor/core': '^8.0.0', '@capacitor/ios': '^8.0.0' }) })
+    expect(capacitorMajor(dir)).toBe(8)
   })
 })

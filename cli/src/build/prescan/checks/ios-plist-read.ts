@@ -61,12 +61,38 @@ export function plistArrayStrings(raw: string, key: string): string[] {
 
 /**
  * Inner text of `<key>K</key>\s*<dict>...</dict>`, or null when the key is
- * absent. ONE-level non-greedy capture (the first `</dict>` closes the block) —
- * mirrors mobileprovision-parser's extractNestedPlistValue dict capture, so
- * nested dicts beyond one level are not resolved. Used to scope reads such as
- * NSAppTransportSecurity.
+ * absent. Returns the FULL balanced dict: it scans `<dict>` / `</dict>` depth
+ * from the opening dict to its matching close, so arbitrarily nested dicts are
+ * captured intact. This matters for keys like NSAppTransportSecurity, where a
+ * nested NSExceptionDomains dict appearing BEFORE a sibling such as
+ * NSAllowsArbitraryLoads would otherwise truncate the block at the first
+ * `</dict>` and hide the sibling. Used to scope reads such as
+ * NSAppTransportSecurity. Pure; returns null on a missing key or an unbalanced
+ * (malformed) dict.
  */
 export function plistDictBlock(raw: string, key: string): string | null {
-  const re = new RegExp(`<key>${escapeRegex(key)}</key>\\s*<dict>([\\s\\S]*?)</dict>`)
-  return raw.match(re)?.[1] ?? null
+  // Locate the opening `<dict>` that immediately follows the key.
+  const openRe = new RegExp(`<key>${escapeRegex(key)}</key>\\s*<dict>`)
+  const openMatch = raw.match(openRe)
+  if (openMatch?.index === undefined)
+    return null
+  const innerStart = openMatch.index + openMatch[0].length
+
+  // Walk forward tracking nesting depth so the matching `</dict>` wins, not the
+  // first one. depth starts at 1 for the opening dict already consumed.
+  const tagRe = /<dict>|<\/dict>/g
+  tagRe.lastIndex = innerStart
+  let depth = 1
+  for (let m = tagRe.exec(raw); m !== null; m = tagRe.exec(raw)) {
+    if (m[0] === '<dict>') {
+      depth++
+    }
+    else {
+      depth--
+      if (depth === 0)
+        return raw.slice(innerStart, m.index)
+    }
+  }
+  // Unbalanced — no matching close. Mirror the other readers' "skip" contract.
+  return null
 }

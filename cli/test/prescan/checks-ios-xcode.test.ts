@@ -19,8 +19,6 @@ import {
 } from '../../src/build/prescan/checks/ios-xcode'
 import { makeProject } from './helpers'
 
-const REAL_PBXPROJ = '/Users/michaltremblay/Developer/capgo-saas/capgo_builder/tutorial-app/ios/App/App.xcodeproj/project.pbxproj'
-
 const CAP8_PKG = JSON.stringify({ dependencies: { '@capacitor/core': '^8.0.0', '@capacitor/ios': '^8.0.0' } })
 
 /**
@@ -210,9 +208,29 @@ describe('ios-xcode: clean Capacitor-8 SPM fixture scans clean (regression basel
   }
 })
 
-describe('ios-xcode: grounding against the REAL pbxproj (every check clean)', () => {
-  const realPbx = require('node:fs').readFileSync(REAL_PBXPROJ, 'utf8')
-  const realDir = projectWith(realPbx)
+describe('ios-xcode: grounding against a real-shaped pbxproj fixture (every check clean)', () => {
+  // Self-contained inline fixture mirroring the real Capacitor-8 SPM tutorial
+  // project's distinctive build settings (real bundle id, team, AppIcon name,
+  // version pair) so the grounding assertions are REAL on CI, where the external
+  // tutorial-app checkout does not exist. Previously this read an absolute path
+  // outside the repo, which made the grounding pass vacuously / crash on CI.
+  const realShapedTarget = {
+    ASSETCATALOG_COMPILER_APPICON_NAME: 'AppIcon',
+    CODE_SIGN_STYLE: 'Automatic',
+    CURRENT_PROJECT_VERSION: '1',
+    DEVELOPMENT_TEAM: 'UVTJ336J2D',
+    IPHONEOS_DEPLOYMENT_TARGET: '15.0',
+    MARKETING_VERSION: '1.0',
+    PRODUCT_BUNDLE_IDENTIFIER: 'app.capgo.plugin.TutorialBuild',
+    PRODUCT_NAME: 'Tutorial Build example app',
+    SWIFT_VERSION: '5.0',
+    TARGETED_DEVICE_FAMILY: '1,2',
+  }
+  const realDir = projectWith(makePbx({
+    projectSettings: { IPHONEOS_DEPLOYMENT_TARGET: '15.0', SDKROOT: 'iphoneos' },
+    targetDebug: { ...realShapedTarget },
+    targetRelease: { ...realShapedTarget },
+  }))
   const checks = [
     deploymentTargetCapacitor,
     signingTeam,
@@ -223,7 +241,7 @@ describe('ios-xcode: grounding against the REAL pbxproj (every check clean)', ()
     multipleAppTargets,
   ]
   for (const check of checks) {
-    it(`${check.id} returns [] against the real project`, async () => {
+    it(`${check.id} returns [] against the real-shaped fixture`, async () => {
       const c = ctx(realDir)
       const applies = check.appliesTo ? check.appliesTo(c) : true
       const findings = applies ? await check.run(c) : []

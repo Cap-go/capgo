@@ -33,8 +33,79 @@ import { Buffer } from 'node:buffer'
 import { join } from 'node:path'
 import { makeProfileXml, makeProject } from './helpers'
 
-const REAL_INFO_PLIST = '/Users/michaltremblay/Developer/capgo-saas/capgo_builder/tutorial-app/ios/App/App/Info.plist'
-const REAL_PBXPROJ = '/Users/michaltremblay/Developer/capgo-saas/capgo_builder/tutorial-app/ios/App/App.xcodeproj/project.pbxproj'
+// Self-contained inline fixtures mirroring the real Capacitor-8 SPM tutorial
+// project's Info.plist and App.entitlements byte-for-byte (key set, $()-refs,
+// orientation arrays). These keep the grounding assertions REAL on CI, where the
+// external tutorial-app checkout does not exist — previously the grounding read
+// absolute paths outside the repo (vacuous pass / module-load crash on CI).
+const REAL_SHAPED_INFO_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CAPACITOR_DEBUG</key>
+	<string>$(CAPACITOR_DEBUG)</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Tutorial Build example app</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>armv7</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<true/>
+</dict>
+</plist>`
+
+// Real-shaped App.entitlements (aps-environment=development only, like the
+// stock Capacitor default).
+const REAL_SHAPED_ENTITLEMENTS = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>`
+
+// Real-shaped AppIcon Contents.json (single universal 1024 marketing icon).
+const REAL_SHAPED_APPICON_CONTENTS = JSON.stringify({
+  images: [{ idiom: 'universal', size: '1024x1024', filename: 'AppIcon-512@2x.png', platform: 'ios' }],
+  info: { author: 'xcode', version: 1 },
+}, null, 2)
 const plist = (body: string) => `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>${body}</dict></plist>`
@@ -123,10 +194,28 @@ describe('ios-plist-read: plistDictBlock', () => {
   it('does not throw on malformed input', () => {
     expect(plistDictBlock('<dict><<<', 'X')).toBeNull()
   })
+  it('returns the FULL balanced dict when a nested dict precedes a sibling key', () => {
+    // NSExceptionDomains (a nested dict) appears BEFORE NSAllowsArbitraryLoads.
+    // A lazy first-`</dict>` capture would truncate after NSExceptionDomains and
+    // hide NSAllowsArbitraryLoads; the balanced scan must keep the sibling.
+    const body = `<key>NSAppTransportSecurity</key><dict>`
+      + `<key>NSExceptionDomains</key><dict><key>example.com</key><dict><key>NSIncludesSubdomains</key><true/></dict></dict>`
+      + `<key>NSAllowsArbitraryLoads</key><true/>`
+      + `</dict>`
+    const inner = plistDictBlock(plist(body), 'NSAppTransportSecurity')
+    expect(inner).not.toBeNull()
+    expect(inner).toContain('NSExceptionDomains')
+    expect(inner).toContain('NSAllowsArbitraryLoads')
+    // The matching close wins, so the trailing sibling bool is inside the block.
+    expect(plistBool(inner!, 'NSAllowsArbitraryLoads')).toBe(true)
+  })
+  it('returns null on an unbalanced (never-closed) dict', () => {
+    expect(plistDictBlock(plist('<key>NSAppTransportSecurity</key><dict><key>A</key><dict>'), 'NSAppTransportSecurity')).toBeNull()
+  })
 })
 
-describe('ios-plist-read: grounding against the real Info.plist', () => {
-  const raw = require('node:fs').readFileSync(REAL_INFO_PLIST, 'utf8')
+describe('ios-plist-read: grounding against the real-shaped Info.plist', () => {
+  const raw = REAL_SHAPED_INFO_PLIST
   it('reads the literal CFBundleDisplayName', () => {
     expect(plistString(raw, 'CFBundleDisplayName')).toBe('Tutorial Build example app')
   })
@@ -325,8 +414,102 @@ describe('ios-pbxsettings: readTargetConfigs', () => {
   })
 })
 
-describe('ios-pbxsettings: grounding against the real pbxproj', () => {
-  const pbx = require('node:fs').readFileSync(REAL_PBXPROJ, 'utf8')
+// Real-shaped pbxproj mirroring the tutorial-app's distinctive build settings
+// (real bundle id, AppIcon name, version pair, Cap8 deployment target) so the
+// grounding assertions below are self-contained and REAL on CI.
+const REAL_SHAPED_PBX = `// !$*UTF8*$!
+{
+\tobjects = {
+/* Begin PBXNativeTarget section */
+\t\tAAA1 /* App */ = {
+\t\t\tisa = PBXNativeTarget;
+\t\t\tbuildConfigurationList = LIST_TARGET /* Build configuration list for PBXNativeTarget "App" */;
+\t\t\tname = App;
+\t\t\tproductType = "com.apple.product-type.application";
+\t\t};
+/* End PBXNativeTarget section */
+/* Begin PBXProject section */
+\t\tPROJ /* Project object */ = {
+\t\t\tisa = PBXProject;
+\t\t\tattributes = {
+\t\t\t\tTargetAttributes = {
+\t\t\t\t\tAAA1 = { ProvisioningStyle = Automatic; };
+\t\t\t\t};
+\t\t\t};
+\t\t\tbuildConfigurationList = LIST_PROJECT /* Build configuration list for PBXProject "App" */;
+\t\t\ttargets = (
+\t\t\t\tAAA1 /* App */,
+\t\t\t);
+\t\t};
+/* End PBXProject section */
+/* Begin XCBuildConfiguration section */
+\t\tCFG_PROJ_DEBUG /* Debug */ = {
+\t\t\tisa = XCBuildConfiguration;
+\t\t\tbuildSettings = {
+\t\t\t\tIPHONEOS_DEPLOYMENT_TARGET = 15.0;
+\t\t\t\tSDKROOT = iphoneos;
+\t\t\t};
+\t\t\tname = Debug;
+\t\t};
+\t\tCFG_PROJ_RELEASE /* Release */ = {
+\t\t\tisa = XCBuildConfiguration;
+\t\t\tbuildSettings = {
+\t\t\t\tIPHONEOS_DEPLOYMENT_TARGET = 15.0;
+\t\t\t\tSDKROOT = iphoneos;
+\t\t\t};
+\t\t\tname = Release;
+\t\t};
+\t\tCFG_TGT_DEBUG /* Debug */ = {
+\t\t\tisa = XCBuildConfiguration;
+\t\t\tbuildSettings = {
+\t\t\t\tASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+\t\t\t\tCODE_SIGN_STYLE = Automatic;
+\t\t\t\tCURRENT_PROJECT_VERSION = 1;
+\t\t\t\tMARKETING_VERSION = 1.0;
+\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = app.capgo.plugin.TutorialBuild;
+\t\t\t\tPRODUCT_NAME = "Tutorial Build example app";
+\t\t\t\tTARGETED_DEVICE_FAMILY = "1,2";
+\t\t\t};
+\t\t\tname = Debug;
+\t\t};
+\t\tCFG_TGT_RELEASE /* Release */ = {
+\t\t\tisa = XCBuildConfiguration;
+\t\t\tbuildSettings = {
+\t\t\t\tASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+\t\t\t\tCODE_SIGN_STYLE = Automatic;
+\t\t\t\tCURRENT_PROJECT_VERSION = 1;
+\t\t\t\tMARKETING_VERSION = 1.0;
+\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = app.capgo.plugin.TutorialBuild;
+\t\t\t\tPRODUCT_NAME = "Tutorial Build example app";
+\t\t\t\tTARGETED_DEVICE_FAMILY = "1,2";
+\t\t\t};
+\t\t\tname = Release;
+\t\t};
+/* End XCBuildConfiguration section */
+/* Begin XCConfigurationList section */
+\t\tLIST_PROJECT /* Build configuration list for PBXProject "App" */ = {
+\t\t\tisa = XCConfigurationList;
+\t\t\tbuildConfigurations = (
+\t\t\t\tCFG_PROJ_DEBUG /* Debug */,
+\t\t\t\tCFG_PROJ_RELEASE /* Release */,
+\t\t\t);
+\t\t\tdefaultConfigurationName = Release;
+\t\t};
+\t\tLIST_TARGET /* Build configuration list for PBXNativeTarget "App" */ = {
+\t\t\tisa = XCConfigurationList;
+\t\t\tbuildConfigurations = (
+\t\t\t\tCFG_TGT_DEBUG /* Debug */,
+\t\t\t\tCFG_TGT_RELEASE /* Release */,
+\t\t\t);
+\t\t\tdefaultConfigurationName = Release;
+\t\t};
+/* End XCConfigurationList section */
+\t};
+}
+`
+
+describe('ios-pbxsettings: grounding against the real-shaped pbxproj', () => {
+  const pbx = REAL_SHAPED_PBX
   it('reads the grounding scalar build settings (Release-preferred)', () => {
     expect(readBuildSetting(pbx, 'IPHONEOS_DEPLOYMENT_TARGET')).toBe('15.0')
     expect(readBuildSetting(pbx, 'PRODUCT_BUNDLE_IDENTIFIER')).toBe('app.capgo.plugin.TutorialBuild')
@@ -339,14 +522,14 @@ describe('ios-pbxsettings: grounding against the real pbxproj', () => {
     expect(readBuildSetting(pbx, 'ENABLE_BITCODE')).toBeNull()
   })
   it('resolves the real Info.plist $() refs against the real pbxproj', () => {
-    const info = require('node:fs').readFileSync(REAL_INFO_PLIST, 'utf8')
+    const info = REAL_SHAPED_INFO_PLIST
     expect(resolvePlistValue(plistString(info, 'CFBundleIdentifier')!, pbx)).toBe('app.capgo.plugin.TutorialBuild')
     expect(resolvePlistValue(plistString(info, 'CFBundleShortVersionString')!, pbx)).toBe('1.0')
     expect(resolvePlistValue(plistString(info, 'CFBundleVersion')!, pbx)).toBe('1')
     expect(resolvePlistValue(plistString(info, 'CFBundleName')!, pbx)).toBe('Tutorial Build example app')
   })
   it('leaves CAPACITOR_DEBUG unresolved (no pbxproj setting -> skip)', () => {
-    const info = require('node:fs').readFileSync(REAL_INFO_PLIST, 'utf8')
+    const info = REAL_SHAPED_INFO_PLIST
     expect(resolvePlistValue(plistString(info, 'CAPACITOR_DEBUG')!, pbx)).toBe('$(CAPACITOR_DEBUG)')
   })
   it('finds the single signable App target with Debug+Release configs', () => {
@@ -357,7 +540,15 @@ describe('ios-pbxsettings: grounding against the real pbxproj', () => {
   })
 })
 
-const REAL_PROJECT_DIR = '/Users/michaltremblay/Developer/capgo-saas/capgo_builder/tutorial-app'
+// A temp project dir populated with the real-shaped fixtures, standing in for
+// the external tutorial-app checkout so the on-disk grounding tests (entitlements
+// reader, appicon Contents.json) are self-contained and REAL on CI.
+const REAL_PROJECT_DIR = makeProject({
+  'ios/App/App/App.entitlements': REAL_SHAPED_ENTITLEMENTS,
+  'ios/App/App/Info.plist': REAL_SHAPED_INFO_PLIST,
+  'ios/App/App.xcodeproj/project.pbxproj': REAL_SHAPED_PBX,
+  'ios/App/App/Assets.xcassets/AppIcon.appiconset/Contents.json': REAL_SHAPED_APPICON_CONTENTS,
+})
 
 const entitlements = (body: string) => `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -544,7 +735,7 @@ describe('ios-appicon: grounding against the real AppIcon.appiconset', () => {
     expect(hasMarketingIcon(readContentsJson(realContents))).toBe(true)
   })
   it('resolves the real appicon dir from the pbxproj AppIcon name', () => {
-    const pbx = require('node:fs').readFileSync(REAL_PBXPROJ, 'utf8')
+    const pbx = REAL_SHAPED_PBX
     expect(appIconSetDir(REAL_PROJECT_DIR, pbx)).toBe(join(REAL_PROJECT_DIR, 'ios', 'App', 'App', 'Assets.xcassets', 'AppIcon.appiconset'))
   })
 })

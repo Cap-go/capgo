@@ -83,18 +83,53 @@ function entitlementMemberSuffix(member: string): string {
 }
 
 /**
- * Top-level entitlement keys present in the app entitlements `<dict>`, each tagged
- * with the kind of its sibling value (array vs scalar). ONE-level scan: only the
- * outermost `<key>` elements before the first nested close are considered, which
- * matches the flat shape of real entitlement files.
+ * TOP-LEVEL entitlement keys present in the app entitlements `<dict>`, each
+ * tagged with the kind of its sibling value (array vs scalar). When a key's
+ * value is a container (`<dict>` / `<array>`), the scan skips past that
+ * container's MATCHING close so keys nested inside it are NOT collected —
+ * otherwise a nested key would leak into the capability set and feed a false
+ * positive into the ERROR-severity entitlements-vs-profile-capability check.
+ * Self-closing empty containers (`<dict/>` / `<array/>`) carry no inner keys
+ * and need no skip. Pure; never throws.
  */
 function appEntitlementKeys(raw: string): { key: string, isArray: boolean }[] {
   const out: { key: string, isArray: boolean }[] = []
-  for (const m of raw.matchAll(/<key>([\s\S]*?)<\/key>\s*<(array|string|true|false|dict|integer|real|data|date)\b/g)) {
+  // A key element followed by its value's opening tag (or a self-closing one).
+  const keyRe = /<key>([\s\S]*?)<\/key>\s*<(array|string|true|false|dict|integer|real|data|date)(\/)?\s*>/g
+  let m = keyRe.exec(raw)
+  while (m !== null) {
     const key = m[1].trim()
-    out.push({ key, isArray: m[2] === 'array' })
+    const valueTag = m[2]
+    const selfClosing = m[3] === '/'
+    out.push({ key, isArray: valueTag === 'array' })
+    // For a non-empty container value, jump the cursor past its matching close
+    // so the next iteration resumes at the following TOP-LEVEL sibling key.
+    if (!selfClosing && (valueTag === 'dict' || valueTag === 'array')) {
+      const skipTo = matchingClose(raw, valueTag, m.index + m[0].length)
+      if (skipTo > keyRe.lastIndex)
+        keyRe.lastIndex = skipTo
+    }
+    m = keyRe.exec(raw)
   }
   return out
+}
+
+/**
+ * Index just past the `</tag>` that balances the container opened immediately
+ * before `from` (one level already open). Falls back to the input length when
+ * the container is never closed (malformed), which safely halts the outer scan.
+ */
+function matchingClose(raw: string, tag: 'dict' | 'array', from: number): number {
+  const tagRe = new RegExp(`<${tag}>|</${tag}>`, 'g')
+  tagRe.lastIndex = from
+  let depth = 1
+  for (let t = tagRe.exec(raw); t !== null; t = tagRe.exec(raw)) {
+    if (t[0] === `<${tag}>`)
+      depth++
+    else if (--depth === 0)
+      return tagRe.lastIndex
+  }
+  return raw.length
 }
 
 export const entitlementsVsProfileCapability: PrescanCheck = {

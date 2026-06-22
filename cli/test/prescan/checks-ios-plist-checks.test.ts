@@ -6,6 +6,7 @@
 // in-memory plist; the unresolved-$() fixture proves the resolvePlistValue guard.
 import { describe, expect, it } from 'bun:test'
 import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   plistAtsArbitraryLoads,
   plistBackgroundModesSanity,
@@ -19,10 +20,6 @@ import {
   plistVersionShortFormat,
 } from '../../src/build/prescan/checks/ios-plist-checks'
 import { makeCtx, makeProject } from './helpers'
-
-const REAL_IOS_DIR = '/Users/michaltremblay/Developer/capgo-saas/capgo_builder/tutorial-app/ios'
-const REAL_INFO_PLIST = `${REAL_IOS_DIR}/App/App/Info.plist`
-const REAL_PBXPROJ = `${REAL_IOS_DIR}/App/App.xcodeproj/project.pbxproj`
 
 const plist = (body: string) => `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -93,10 +90,14 @@ async function runGated(check: typeof ALL_CHECKS[number], ctx: ReturnType<typeof
   return check.run(ctx)
 }
 
-describe('§2.A regression baseline — real Capacitor-8 SPM project scans clean', () => {
-  const realCtx = makeCtx({ projectDir: REAL_IOS_DIR.replace(/\/ios$/, ''), platform: 'ios' })
-  // The real project nests ios/ under the tutorial-app dir; point projectDir at it.
-  const groundedCtx = makeCtx({ projectDir: '/Users/michaltremblay/Developer/capgo-saas/capgo_builder/tutorial-app', platform: 'ios' })
+describe('§2.A regression baseline — real-shaped Capacitor-8 project scans clean', () => {
+  // Self-contained inline fixture: HEALTHY_BODY + PBX mirror the real Capacitor-8
+  // SPM tutorial project's Info.plist + pbxproj shape ($()-ref'd bundle id /
+  // versions resolved by the Release config, all four ~ipad orientations, literal
+  // display name). Written to a temp project dir so the grounding assertions are
+  // REAL on CI — the previous external absolute path made every check early-return
+  // [] vacuously (the plist reader returns null on a missing file).
+  const groundedCtx = ctxFor(HEALTHY_BODY)
 
   for (const check of ALL_CHECKS) {
     it(`${check.id} produces no finding`, async () => {
@@ -104,10 +105,12 @@ describe('§2.A regression baseline — real Capacitor-8 SPM project scans clean
     })
   }
 
-  it('sanity: the real fixture files are readable', () => {
-    expect(readFileSync(REAL_INFO_PLIST, 'utf8')).toContain('CFBundleIdentifier')
-    expect(readFileSync(REAL_PBXPROJ, 'utf8')).toContain('PRODUCT_BUNDLE_IDENTIFIER')
-    expect(realCtx.platform).toBe('ios')
+  it('sanity: the inline fixture files are written and readable', () => {
+    const infoPlist = join(groundedCtx.projectDir, 'ios', 'App', 'App', 'Info.plist')
+    const pbxproj = join(groundedCtx.projectDir, 'ios', 'App', 'App.xcodeproj', 'project.pbxproj')
+    expect(readFileSync(infoPlist, 'utf8')).toContain('CFBundleIdentifier')
+    expect(readFileSync(pbxproj, 'utf8')).toContain('PRODUCT_BUNDLE_IDENTIFIER')
+    expect(groundedCtx.platform).toBe('ios')
   })
 })
 
@@ -222,6 +225,17 @@ describe('ios/plist-ats-arbitrary-loads', () => {
   it('no finding when NSAllowsArbitraryLoads is false', async () => {
     const body = `${HEALTHY_BODY}<key>NSAppTransportSecurity</key><dict><key>NSAllowsArbitraryLoads</key><false/></dict>`
     expect(await plistAtsArbitraryLoads.run(ctxFor(body))).toEqual([])
+  })
+  it('still detects NSAllowsArbitraryLoads=true when a nested NSExceptionDomains dict precedes it', async () => {
+    // The nested NSExceptionDomains dict comes BEFORE NSAllowsArbitraryLoads —
+    // a first-`</dict>` capture would truncate the ATS block and miss the flag.
+    const ats = `<key>NSAppTransportSecurity</key><dict>`
+      + `<key>NSExceptionDomains</key><dict><key>example.com</key><dict><key>NSIncludesSubdomains</key><true/></dict></dict>`
+      + `<key>NSAllowsArbitraryLoads</key><true/>`
+      + `</dict>`
+    const f = await plistAtsArbitraryLoads.run(ctxFor(`${HEALTHY_BODY}${ats}`))
+    expect(f.length).toBe(1)
+    expect(f[0].severity).toBe('warning')
   })
 })
 
