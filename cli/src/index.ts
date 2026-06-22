@@ -882,6 +882,7 @@ Example: npx @capgo/cli@latest build request com.example.app --platform ios --pa
   .option('--skip-build-number-bump', 'Skip automatic build number/version code incrementing. Uses whatever version is already in the project files.')
   .option('--no-skip-build-number-bump', 'Override saved credentials to re-enable automatic build number incrementing for this build only.')
   .option('--ai-analytics', 'On build failure, send logs to Capgo AI for diagnosis. In interactive terminals this skips the upfront confirmation; in CI this auto-uploads and prints the analysis to stderr.')
+  .option('--send-logs', 'On a CI/CD build failure, automatically upload the build logs to Capgo support (no email required). Capgo support is notified and will follow up by email. Additive to --ai-analytics — both can be passed.')
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)

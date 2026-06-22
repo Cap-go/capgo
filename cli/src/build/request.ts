@@ -42,6 +42,7 @@ import WS from 'ws' // TODO: remove when min version nodejs 22 is bump, should d
 import pack from '../../package.json'
 import {
   decideAnalyzeBehavior,
+  decideCiFailureActions,
   isLogTooBig,
   postAnalyzeStreamRequest,
   writeLocalAiFile,
@@ -1651,7 +1652,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     // Capture when interactive, when the CI flag is set, OR when the caller asked
     // to drive the AI flow themselves (e.g. Ink onboarding) so the captured log
     // is available for runCapgoAiAnalysis.
-    const captureEnabled = (shouldCaptureLogs() || options.aiAnalytics === true || aiAnalysisMode === 'caller-handled')
+    const captureEnabled = (shouldCaptureLogs() || options.aiAnalytics === true || options.sendLogs === true || aiAnalysisMode === 'caller-handled')
       && aiAnalysisMode !== 'skip'
     let capturedJobId: string | null = null
     let keepPromptFile = false // mutable so local-AI flow can set it true
@@ -2251,6 +2252,55 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           })
         }
 
+        // CI/CD --send-logs: build the SAME support bundle the interactive email
+        // flow uses (writeSupportBundleFiles → gz under the 10 MB cap), then
+        // upload it to Capgo support via uploadSupportLogs. We can't send email
+        // from CI — only upload — so there's no mailto here. Never crashes the
+        // process or changes the exit code: any failure prints a graceful note
+        // pointing at support@capgo.app.
+        const runSendLogs = async (): Promise<void> => {
+          const internalLogPath = getInternalLogPath()
+          let internalLines: string[] = []
+          if (internalLogPath) {
+            try {
+              internalLines = readFileSync(internalLogPath, 'utf8').split('\n')
+            }
+            catch { /* best-effort */ }
+          }
+          let buildLogLines: string[] = []
+          try {
+            const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
+            buildLogLines = readFileSync(logsPath, 'utf8').split('\n')
+          }
+          catch { /* best-effort */ }
+
+          const files = writeSupportBundleFiles({
+            kind: 'build-request',
+            appId,
+            error: `Cloud build ${capturedJobId} failed`,
+            logs: buildLogLines,
+            sections: internalLines.length > 0 ? [{ title: 'Internal log', lines: internalLines }] : [],
+          })
+          if (!files) {
+            process.stderr.write(`Could not prepare your build logs to upload. Please email support@capgo.app and describe the issue (job ${capturedJobId}).\n`)
+            return
+          }
+
+          const uploaded = await uploadSupportLogs({
+            apiHost: host,
+            apikey: options.apikey,
+            appId,
+            jobId: capturedJobId ?? undefined,
+            gzPath: files.gzPath,
+          })
+          if (uploaded) {
+            process.stderr.write(`Build logs uploaded to Capgo support automatically. Our team has been notified and will contact you by email soon.\nReference: ${uploaded.url}\n`)
+          }
+          else {
+            process.stderr.write(`Could not upload your build logs automatically. Please email support@capgo.app and describe the issue (job ${capturedJobId}).\n`)
+          }
+        }
+
         async function showMenu(): Promise<void> {
           if (await isLogTooBig(capturedJobId!)) {
             process.stdout.write('Log too big for AI analysis (>10 MB). Offering local AI instead.\n')
@@ -2277,16 +2327,29 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         }
 
         try {
-          if (behavior === 'skip') {
-            await emitSkipChoice()
-          }
-          else if (behavior === 'auto_upload') {
-            if (await isLogTooBig(capturedJobId)) {
-              process.stderr.write('Log too big for AI analysis (>10 MB), skipping\n')
-              await emitSkipChoice()
+          if (behavior === 'skip' || behavior === 'auto_upload') {
+            // Non-interactive (CI/CD). --ai-analytics and --send-logs are
+            // independent and additive: run whichever the user opted into, and
+            // print a tip when they opted into neither (instead of a silent
+            // failure). decideCiFailureActions is the pure, unit-tested seam.
+            const actions = decideCiFailureActions({
+              aiAnalyticsFlag: options.aiAnalytics === true,
+              sendLogsFlag: options.sendLogs === true,
+            })
+            if (actions.sendLogs)
+              await runSendLogs()
+            if (actions.runAiAnalysis) {
+              if (await isLogTooBig(capturedJobId)) {
+                process.stderr.write('Log too big for AI analysis (>10 MB), skipping\n')
+                await emitSkipChoice()
+              }
+              else {
+                await runCapgoAi('auto_upload', 'ci_flag')
+              }
             }
-            else {
-              await runCapgoAi('auto_upload', 'ci_flag')
+            if (actions.tip) {
+              process.stderr.write(`${actions.tip}\n`)
+              await emitSkipChoice()
             }
           }
           else {

@@ -66,6 +66,10 @@ export const buildRequestOptionsSchema = optionsBaseSchema.extend({
   playstoreUpload: z.boolean().optional(),
   verbose: z.boolean().optional(),
   aiAnalytics: z.boolean().optional(),
+  // On a CI/CD (non-interactive) build failure, upload the captured build logs
+  // to Capgo support via uploadSupportLogs. Additive to aiAnalytics — both can
+  // be passed and both run. Requires log capture, which this flag also enables.
+  sendLogs: z.boolean().optional(),
   // Controls the on-failure AI-analysis flow inside requestBuildInternal:
   //   - 'auto-prompt' (default) — current behavior: clack-driven menu when
   //     interactive, decideAnalyzeBehavior matrix in CI.
