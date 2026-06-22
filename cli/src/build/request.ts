@@ -1525,6 +1525,14 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         else if (hasCompleteAppSpecificPassword) {
           log.info('🔑 Using Apple ID + app-specific password for TestFlight upload (no App Store Connect API key)')
           log.info('   Build number will use a timestamp-based fallback (App Store Connect is not queried)')
+          // Warn on standalone `build request` only (never during the onboarding
+          // wizard, which sets builderJourneyId): the app-specific password path is
+          // a discouraged Appflow-migration fallback. An App Store Connect API key
+          // (.p8) is the recommended, more capable, and more secure option.
+          if (!options.builderJourneyId) {
+            log.warn('⚠️  App-specific password authentication is not recommended; it exists as an Ionic Appflow migration fallback.')
+            log.warn('   Prefer an App Store Connect API key (.p8): https://capgo.app/docs/builder/configuration/')
+          }
         }
         else if (anyAppSpecificField) {
           // Partial app-specific password — tell the user exactly which fields are missing
