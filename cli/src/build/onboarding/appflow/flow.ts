@@ -3,6 +3,13 @@
 // is a CREDENTIAL SOURCE: it collects per-platform Capgo creds into progress, then
 // hands off to the existing build/validate/CI tail. It NEVER generates signing
 // creds (migrate-or-skip); gap-fill generation exists only for step-6 distribution.
+//
+// Driver contract (shared by the TUI ui/appflow-app.tsx AND the MCP engine
+// decideAppflow): interactive steps (choice/info/human_gate) advance via
+// applyInput() -> resumeStep(); ONLY 'auto' steps run runEffect(). So the
+// interactive step graph (incl. step-6 gap-fill, step-7 validate, step-8 p8
+// upgrade) is encoded in getAppflowResumeStep, and 'validate' is an AUTO step that
+// runs the advisory checks and then transitions to the 'validate-results' info view.
 import type { PlatformFlow, StepView } from '../flow/contract'
 import type { AppflowInput, AppflowProgress, AppflowStep } from './types'
 import type { AppflowToken } from './auth'
@@ -31,6 +38,7 @@ export interface AppflowEffectDeps {
   validateServiceAccountJson?: (json: string, packageName?: string) => Promise<{ ok: boolean, reason?: string }>
   tryUnlockPrivateKey?: (keystoreB64: string, storePass: string, alias: string) => Promise<boolean>
   validateAppleAppPassword?: (user: string, pw: string) => Promise<{ valid: boolean, message?: string }>
+  validateP12?: (p12B64: string, password: string) => Promise<boolean>
   carried?: Record<string, unknown>
 }
 
@@ -46,6 +54,23 @@ export function autoSelect<T>(items: T[]): T | 'prompt' | null {
 }
 
 const inScope = (scope: AppflowProgress['scope'], p: 'ios' | 'android'): boolean => scope === 'both' || scope === p
+
+const hasCreds = (rec?: Record<string, string>): boolean => !!rec && Object.keys(rec).length > 0
+
+// iOS distribution (upload destination) is present iff an app-specific password was imported.
+function iosDistMissing(p: AppflowProgress): boolean {
+  return inScope(p.scope, 'ios') && hasCreds(p.ios) && !p.ios!.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD
+}
+
+// Android distribution (upload destination) is present iff a service-account JSON was imported.
+function androidDistMissing(p: AppflowProgress): boolean {
+  return inScope(p.scope, 'android') && hasCreds(p.android) && !p.android!.PLAY_CONFIG_JSON
+}
+
+// iOS imported an app-specific password -> eligible for the step-8 .p8 upgrade offer.
+function iosHasAppPassword(p: AppflowProgress): boolean {
+  return inScope(p.scope, 'ios') && !!p.ios?.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD
+}
 
 export function decideAfterFetchSigning(progress: Pick<AppflowProgress, 'scope' | 'migratable'>): AppflowStep {
   const scope = progress.scope ?? 'both'
@@ -108,6 +133,22 @@ export async function runValidations(progress: AppflowProgress, deps: AppflowEff
     }
     catch (e) {
       out.push({ id: 'app-password', status: 'skipped', message: `App-specific password check skipped: ${e instanceof Error ? e.message : String(e)}.` })
+    }
+  }
+
+  // iOS cert + provisioning profile are NOT verifiable remotely (do not attempt).
+  // Optional LIGHT local check: confirm the imported .p12 opens with P12_PASSWORD.
+  if (i.BUILD_CERTIFICATE_BASE64) {
+    try {
+      const ok = await deps.validateP12?.(i.BUILD_CERTIFICATE_BASE64, i.P12_PASSWORD ?? '')
+      out.push(ok === undefined
+        ? { id: 'p12', status: 'skipped', message: 'Signing certificate (.p12) not checked.' }
+        : ok
+          ? { id: 'p12', status: 'pass', message: 'Signing certificate (.p12) opens with the imported password.' }
+          : { id: 'p12', status: 'warn', message: 'Signing certificate (.p12) did not open with the imported password.' })
+    }
+    catch (e) {
+      out.push({ id: 'p12', status: 'skipped', message: `Certificate check skipped: ${e instanceof Error ? e.message : String(e)}.` })
     }
   }
 
@@ -180,7 +221,10 @@ export function appflowViewForStep(step: AppflowStep, progress: AppflowProgress,
           { value: 'skip', label: 'Keep the app-specific password' },
         ],
       }
-    case 'validate': {
+    case 'validate':
+      // AUTO: runValidations runs in runEffect, then transitions to validate-results.
+      return { kind: 'auto', prompt: 'Validating imported credentials…' }
+    case 'validate-results': {
       const results = (ctx.results as AppflowValidationResult[]) ?? []
       return {
         kind: 'info',
@@ -226,12 +270,22 @@ export function applyAppflowInput(step: AppflowStep, progress: AppflowProgress, 
       return { ...base, appId: input.value, appSlug: input.text ?? input.value }
     case 'no-signing-submenu':
       return { ...base, ...(input.value === 'skip' && progress.noSigningScope && progress.noSigningScope !== 'all' ? { migratable: { ...progress.migratable, [progress.noSigningScope]: false } } : {}) }
+    case 'ios-dist-gapfill':
+      return { ...base, iosDistGapfill: input.value === 'generate' ? 'generate' : 'skip' }
+    case 'android-dist-gapfill':
+      return { ...base, androidDistGapfill: input.value === 'generate' ? 'generate' : 'skip' }
+    case 'p8-upgrade-prompt':
+      return { ...base, p8Upgrade: input.value === 'convert' ? 'convert' : 'skip' }
     default:
       return base
   }
 }
 
 // ── resume ───────────────────────────────────────────────────────────────────
+// Single source of truth for the INTERACTIVE step graph. Both drivers call this
+// after applyInput to pick the next step. Step order mirrors the spec:
+// auth -> org -> app -> signing -> distribution -> step-6 gap-fill -> step-7
+// validate (auto) -> step-8 p8 upgrade -> handoff/build.
 export function getAppflowResumeStep(progress: AppflowProgress | null): AppflowStep {
   if (!progress)
     return 'explain'
@@ -246,8 +300,18 @@ export function getAppflowResumeStep(progress: AppflowProgress | null): AppflowS
     return 'fetch-signing'
   if (!done('fetch-distribution'))
     return 'fetch-distribution'
+  // step-6 gap-fill: offer to set up a missing upload destination (per platform),
+  // once each, before validation.
+  if (iosDistMissing(progress) && progress.iosDistGapfill === undefined)
+    return 'ios-dist-gapfill'
+  if (androidDistMissing(progress) && progress.androidDistGapfill === undefined)
+    return 'android-dist-gapfill'
+  // step-7 validation (auto step; runs the advisory checks).
   if (!done('validate'))
     return 'validate'
+  // step-8 iOS app-specific-password -> .p8 upgrade offer (once).
+  if (iosHasAppPassword(progress) && progress.p8Upgrade === undefined)
+    return 'p8-upgrade-prompt'
   return 'handoff-build'
 }
 
@@ -293,27 +357,28 @@ export async function runAppflowEffect(step: AppflowStep, progress: AppflowProgr
       const api = createAppflowApi(progress.token!.access_token, deps.log)
       const dist = await api.listDistribution(progress.appId!)
       let p: AppflowProgress = { ...progress }
-      if (inScope(progress.scope, 'ios') && p.ios) {
+      // Import whatever distribution credential exists for each in-scope, migrated
+      // platform. A MISSING destination does NOT block — it routes to the step-6
+      // gap-fill via getAppflowResumeStep (do NOT early-return; the other platform
+      // must still be processed).
+      if (inScope(progress.scope, 'ios') && hasCreds(p.ios)) {
         const iosDist = dist.filter((d: any) => d.type === 'iTunes connect')
         const sel = autoSelect(iosDist)
         if (sel && sel !== 'prompt')
           p = { ...p, ios: { ...p.ios, ...(await api.fetchIosDistribution(progress.appId!, (sel as any).id)) } }
-        else if (sel === null)
-          return { progress: p, next: 'ios-dist-gapfill' }
       }
-      if (inScope(progress.scope, 'android') && p.android) {
+      if (inScope(progress.scope, 'android') && hasCreds(p.android)) {
         const andDist = dist.filter((d: any) => d.type === 'google play')
         const sel = autoSelect(andDist)
         if (sel && sel !== 'prompt')
           p = { ...p, android: { ...p.android, ...(await api.fetchAndroidDistribution(progress.appId!, (sel as any).id)) } }
-        else if (sel === null)
-          return { progress: p, next: 'android-dist-gapfill' }
       }
-      return { progress: mark(p, 'fetch-distribution'), next: 'validate' }
+      p = mark(p, 'fetch-distribution')
+      return { progress: p, next: getAppflowResumeStep(p) }
     }
     case 'validate': {
       const results = await runValidations(progress, deps)
-      return { progress: mark(progress, 'validate'), next: 'handoff-build', transient: { results } }
+      return { progress: mark(progress, 'validate'), next: 'validate-results', transient: { results } }
     }
     default:
       return { progress }

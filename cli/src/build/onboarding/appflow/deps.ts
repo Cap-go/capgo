@@ -1,7 +1,7 @@
 // Production wiring for the Appflow migration flow's effect dependencies.
 //
 // The flow itself (flow.ts) is pure/injectable: it asks for a token cache, a
-// browser opener, a redacted logger, and three validators. This module builds
+// browser opener, a redacted logger, and four validators. This module builds
 // the REAL deps by reusing the existing CLI building blocks:
 //   - token cache  -> a JSON file under ~/.capgo-credentials/ (same dir as creds)
 //   - log          -> appendInternalLog (the support-bundle internal log; redacted)
@@ -45,7 +45,6 @@ export function loadAppflowToken(): AppflowToken | null {
   }
 }
 
-/** Persist an Appflow token to the credentials dir (0700 dir / best-effort). Never throws. */
 /** Persist an Appflow token to the credentials dir (0700 dir / best-effort). Never throws. */
 export function saveAppflowToken(token: AppflowToken): void {
   try {
@@ -103,6 +102,21 @@ function tryUnlockPrivateKey(keystoreB64: string, storePass: string, _alias: str
   }
 }
 
+/**
+ * Adapter: confirm an imported iOS signing certificate (.p12) opens with its
+ * password. A .p12 is a PKCS#12 container like an Android keystore, so the same
+ * node-forge unlock applies. LOCAL only (no remote calls), advisory, never throws.
+ */
+function validateP12(p12B64: string, password: string): Promise<boolean> {
+  try {
+    const bytes = Buffer.from(p12B64, 'base64')
+    return Promise.resolve(androidTryUnlockPrivateKey(bytes, password).ok)
+  }
+  catch {
+    return Promise.resolve(false)
+  }
+}
+
 /** Adapter: the flow asks for `(user, pw) => { valid, message? }`; reuse the iTMSTransporter probe. */
 function validateAppleAppPassword(user: string, pw: string): Promise<{ valid: boolean, message?: string }> {
   return iosValidateAppleAppPassword(user, pw).then(r => ({ valid: r.valid, message: r.message }))
@@ -124,6 +138,7 @@ export function buildAppflowEffectDeps(opts: { appId?: string, packageName?: str
     validateServiceAccountJson: makeValidateServiceAccountJson(opts.packageName ?? opts.appId),
     tryUnlockPrivateKey,
     validateAppleAppPassword,
+    validateP12,
   }
 }
 

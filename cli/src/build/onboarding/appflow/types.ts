@@ -13,7 +13,8 @@ export type AppflowStep =
   | 'fetch-distribution' // step 6: list + download distribution (auto)
   | 'ios-dist-gapfill' // step 6: no iOS dist -> offer p8 generate/provide
   | 'android-dist-gapfill' // step 6: no Android dist -> offer SA generate/provide
-  | 'validate' // step 7 (advisory, surfaced, non-blocking)
+  | 'validate' // step 7 (auto): run advisory checks, then show results
+  | 'validate-results' // step 7 (info): surface the advisory results, never block
   | 'p8-upgrade-prompt' // step 8 (iOS only)
   | 'handoff-build' // converge: hand to the build/tail steps
   | 'done'
@@ -32,6 +33,13 @@ export interface AppflowProgress {
   android?: Record<string, string> // mapped Capgo Android creds collected so far
   migratable: { ios: boolean, android: boolean }
   noSigningScope?: NoSigningScope
+  // step-6 gap-fill decisions (distribution / upload destination) per platform.
+  // 'generate' = the user opted to set up an upload destination via the existing
+  // p8 / service-account flow; 'skip' = finish without it. Undefined = not asked.
+  iosDistGapfill?: 'generate' | 'skip'
+  androidDistGapfill?: 'generate' | 'skip'
+  // step-8 iOS app-specific-password -> .p8 API key upgrade decision.
+  p8Upgrade?: 'convert' | 'skip'
   completedSteps: AppflowStep[]
 }
 
