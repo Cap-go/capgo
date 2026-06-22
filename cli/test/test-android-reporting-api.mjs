@@ -86,7 +86,7 @@ await t('listPlayApps returns parsed apps for a single page', async () => {
   assert.equal(calls.length, 1)
   // Bearer auth + the pageSize query are wired correctly.
   assert.equal(calls[0].init.headers.Authorization, 'Bearer tok')
-  assert.ok(calls[0].url.includes('playdeveloperreporting.googleapis.com'))
+  assert.equal(new URL(calls[0].url).hostname, 'playdeveloperreporting.googleapis.com')
   assert.ok(calls[0].url.includes('apps:search') || calls[0].url.includes('apps%3Asearch'))
   assert.ok(calls[0].url.includes('pageSize=1000'))
 })
