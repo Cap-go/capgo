@@ -60,6 +60,7 @@ import { copyToClipboard, revealInFinder } from '../support/clipboard.js'
 import { contactSupport } from '../support/contact-support.js'
 import { appendInternalLog, getInternalLogPath, startInternalLog } from '../support/internal-log.js'
 import { uploadSupportLogs } from '../support/support-upload.js'
+import { offerSupportUploadBeforeAi } from '../support/support-upload-prompt.js'
 import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent, TUS_UPLOAD_RETRY_DELAYS } from '../utils'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
@@ -2049,6 +2050,56 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
             choice,
             triggeredBy,
           })
+
+          // Additive support-log upload: when the user opts into Capgo AI from
+          // the interactive menu, ALSO offer to upload their logs so support can
+          // follow up by email. This is UPLOAD-ONLY (no mailto) and runs BEFORE
+          // the analysis; it's best-effort and never blocks the AI step. CI /
+          // auto_upload paths skip it (no human to ask).
+          if (triggeredBy === 'menu') {
+            await offerSupportUploadBeforeAi({
+              confirm: async (message) => {
+                const answer = await confirm({ message, initialValue: false })
+                return answer === true
+              },
+              buildFiles: () => {
+                const s = spinnerC()
+                s.start('Preparing your logs to send to Capgo support…')
+                try {
+                  let internalLines: string[] = []
+                  const internalLogPath = getInternalLogPath()
+                  if (internalLogPath) {
+                    try { internalLines = readFileSync(internalLogPath, 'utf8').split('\n') }
+                    catch { /* best-effort */ }
+                  }
+                  let buildLogLines: string[] = []
+                  try {
+                    const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
+                    buildLogLines = readFileSync(logsPath, 'utf8').split('\n')
+                  }
+                  catch { /* best-effort */ }
+                  return writeSupportBundleFiles({
+                    kind: 'build-request',
+                    appId,
+                    error: `Cloud build ${capturedJobId} failed`,
+                    logs: buildLogLines,
+                    sections: internalLines.length > 0 ? [{ title: 'Internal log', lines: internalLines }] : [],
+                  })
+                }
+                finally {
+                  s.stop('Logs ready.')
+                }
+              },
+              upload: async (gzPath) => {
+                const s = spinnerC()
+                s.start('Uploading your logs to Capgo support…')
+                const r = await uploadSupportLogs({ apiHost: host, apikey: options.apikey, appId, jobId: capturedJobId ?? undefined, gzPath })
+                s.stop(r ? 'Logs uploaded.' : 'Logs upload unavailable.')
+                return r
+              },
+              print: msg => clackLog.info(msg),
+            })
+          }
 
           const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
           let logs = ''
