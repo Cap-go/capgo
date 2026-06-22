@@ -19,6 +19,7 @@ import { lastOutputCommand } from './build/last-output-command'
 import { checkBuildNeeded } from './build/needed'
 import type { OnboardingBuilderOptions } from './build/onboarding/command'
 import { onboardingBuilderCommand } from './build/onboarding/command'
+import { prescanCommand } from './build/prescan/command'
 import type { CreateAppleKeyOptions } from './build/onboarding/asc-key/command'
 import { createAppleKeyCommand } from './build/onboarding/asc-key/command'
 import { requestBuildCommand } from './build/request'
@@ -883,11 +884,32 @@ Example: npx @capgo/cli@latest build request com.example.app --platform ios --pa
   .option('--skip-build-number-bump', 'Skip automatic build number/version code incrementing. Uses whatever version is already in the project files.')
   .option('--no-skip-build-number-bump', 'Override saved credentials to re-enable automatic build number incrementing for this build only.')
   .option('--ai-analytics', 'On build failure, send logs to Capgo AI for diagnosis. In interactive terminals this skips the upfront confirmation; in CI this auto-uploads and prints the analysis to stderr.')
+  .option('--no-prescan', 'Skip the automatic pre-build scan')
+  .option('--prescan-ignore-fatal', 'Run the pre-build scan but never block the build (report only)')
+  .option('--fail-on-warnings', 'Treat prescan warnings as fatal')
   .option('--send-logs', 'On a CI/CD build failure, automatically upload the build logs to Capgo support (no email required). Capgo support is notified and will follow up by email. Additive to --ai-analytics — both can be passed.')
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
   .option('--verbose', optionDescriptions.verbose)
+
+build
+  .command('prescan [appId]')
+  .description(`Scan your project and saved credentials for problems that would fail a cloud build — before uploading anything.
+
+Checks credentials (expiry, passwords, profile pairing), project state (cap sync, node_modules layout), and platform config. Runs automatically inside \`build request\`; this command runs it standalone (e.g. in CI).`)
+  .option('--platform <platform>', 'Target platform: ios or android (required)')
+  .option('--path <path>', 'Path to the project directory (default: current directory)')
+  .option('-a, --apikey <apikey>', optionDescriptions.apikey)
+  .option('--android-flavor <flavor>', 'Android: product flavor the build will use')
+  .addOption(new Option('--ios-dist <mode>', 'iOS: distribution mode to validate against').choices(['app_store', 'ad_hoc']))
+  .option('--json', 'Output a machine-readable JSON report')
+  .option('--fail-on-warnings', 'Exit non-zero when warnings are found (CI)')
+  .option('--ignore-fatal', 'Diagnostic mode: report everything but always exit 0')
+  .option('--verbose', optionDescriptions.verbose)
+  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+  .action(prescanCommand)
 
 build
   .command('last-output')
