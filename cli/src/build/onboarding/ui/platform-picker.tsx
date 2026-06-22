@@ -32,6 +32,8 @@ export function platformKeyAction(
     return { type: 'select', platform: 'ios' }
   if (key.rightArrow || input === 'l' || input === '2')
     return { type: 'select', platform: 'android' }
+  if (input === 'a' || input === '3')
+    return { type: 'select', platform: 'appflow' }
   return null
 }
 
@@ -85,6 +87,7 @@ export const PlatformPicker: FC<PlatformPickerProps> = ({ layout, onSelect }) =>
           options={[
             { label: '🍎  iOS', value: 'ios' },
             { label: '🤖  Android', value: 'android' },
+            { label: '🔄  Both, I\'m migrating from Ionic Appflow', value: 'appflow' },
           ]}
           onChange={value => onSelect(value as Platform)}
         />
@@ -103,9 +106,10 @@ export const PlatformPicker: FC<PlatformPickerProps> = ({ layout, onSelect }) =>
       <Box flexDirection="row" gap={3} marginTop={1}>
         <PlatformCard emoji="🍎" name="iOS" hint="Apple App Store" selected={selected === 'ios'} />
         <PlatformCard emoji="🤖" name="Android" hint="Google Play" selected={selected === 'android'} />
+        <PlatformCard emoji="🔄" name="Appflow" hint="Migrate from Ionic Appflow" selected={selected === 'appflow'} />
       </Box>
       <Box flexGrow={1} />
-      <Text dimColor>←  →  choose   ·   Enter  confirm</Text>
+      <Text dimColor>←  →  choose   ·   a  Appflow   ·   Enter  confirm</Text>
     </Box>
   )
 }

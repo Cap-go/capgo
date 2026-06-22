@@ -37,7 +37,7 @@ export interface OnboardingBuilderOptions {
   enableSelfUpdate?: boolean
 }
 
-type Platform = 'ios' | 'android'
+type Platform = 'ios' | 'android' | 'appflow'
 
 /**
  * Decide which platform to onboard WITHOUT prompting:
@@ -52,7 +52,7 @@ function resolveInitialPlatform(
   options: OnboardingBuilderOptions,
   iosDir: string,
   androidDir: string,
-): Platform | undefined {
+): 'ios' | 'android' | undefined {
   const requested = (options.platform || '').toLowerCase()
   if (requested === 'ios' || requested === 'android')
     return requested
