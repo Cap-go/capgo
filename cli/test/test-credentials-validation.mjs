@@ -56,6 +56,10 @@ function validateIosCredentials(credentials) {
     const anyAppSpecificField = hasFastlaneUser || hasAppSpecificPassword || hasAppleAppId
     const hasCompleteAppSpecificPassword = hasFastlaneUser && hasAppSpecificPassword && hasAppleAppId
 
+    if (hasAppleAppId && !/^\d+$/.test(String(credentials.APPLE_APP_ID).trim())) {
+      missingCreds.push('APPLE_APP_ID must be the app\'s numeric App Store Connect id (digits only, e.g. 1234567890)')
+    }
+
     if (hasCompleteAppleApiKey) {
       // App Store Connect API key present — default upload path.
     }
@@ -385,6 +389,21 @@ await test('iOS validation lists all missing app-specific password fields', () =
   assert(missingCreds.length === 1, `Should have 1 missing credential, got ${missingCreds.length}: ${missingCreds.join(', ')}`)
   assert(missingCreds[0].includes('FASTLANE_USER'), 'Should list FASTLANE_USER as missing')
   assert(missingCreds[0].includes('APPLE_APP_ID'), 'Should list APPLE_APP_ID as missing')
+})
+
+// Test 16: iOS app-specific password with a non-numeric APPLE_APP_ID → error
+await test('iOS validation rejects a non-numeric APPLE_APP_ID', () => {
+  const credentials = {
+    BUILD_CERTIFICATE_BASE64: 'cert',
+    CAPGO_IOS_PROVISIONING_MAP: '{"com.test.app":{"profile":"base64","name":"test"}}',
+    APP_STORE_CONNECT_TEAM_ID: 'teamid',
+    FASTLANE_USER: 'dev@example.com',
+    FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: 'abcd-efgh-ijkl-mnop',
+    APPLE_APP_ID: 'com.test.app', // bundle id by mistake, not the numeric id
+  }
+
+  const missingCreds = validateIosCredentials(credentials)
+  assert(missingCreds.some(c => c.includes('APPLE_APP_ID must be the app')), `Should reject non-numeric APPLE_APP_ID, got: ${missingCreds.join(', ')}`)
 })
 
 // Print summary

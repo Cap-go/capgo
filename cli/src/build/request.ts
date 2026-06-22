@@ -1512,6 +1512,13 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         const anyAppSpecificField = hasFastlaneUser || hasAppSpecificPassword || hasAppleAppId
         const hasCompleteAppSpecificPassword = hasFastlaneUser && hasAppSpecificPassword && hasAppleAppId
 
+        // APPLE_APP_ID is the app's numeric App Store Connect id; a non-numeric
+        // value would make the headless TestFlight upload fail with a cryptic
+        // fastlane error, so reject it early here (covers CLI, env, and saved creds).
+        if (hasAppleAppId && !/^\d+$/.test(String(mergedCredentials.APPLE_APP_ID).trim())) {
+          missingCreds.push('APPLE_APP_ID must be the app\'s numeric App Store Connect id (digits only, e.g. 1234567890)')
+        }
+
         if (hasCompleteAppleApiKey) {
           // App Store Connect API key present — default upload path, nothing to add.
         }
