@@ -100,6 +100,8 @@ export async function prescanCommand(appId: string | undefined, options: Prescan
       event: 'Prescan run',
       icon: '🛡️',
       tags: {
+        'source': 'standalone',
+        'result': report.counts.error > 0 ? (options.ignoreFatal ? 'bypassed' : 'blocked') : report.counts.warning > 0 ? 'warned' : 'clean',
         'app-id': appId ?? 'unknown',
         'platform': options.platform ?? 'unknown',
         'errors': String(report.counts.error),
@@ -129,6 +131,13 @@ export interface PrescanGateOptions {
   warn?: (msg: string) => void
 }
 
+export interface PrescanGateResult {
+  decision: 'proceed' | 'block'
+  /** null when the gate was disabled or the scan crashed (no scan ran) */
+  report: PrescanReport | null
+  crashed: boolean
+}
+
 /**
  * Used by build request. Runs the scan via the provided thunk, prints the report,
  * and resolves to 'proceed' | 'block'. NEVER throws: a crashing scanner proceeds with a notice
@@ -137,9 +146,9 @@ export interface PrescanGateOptions {
 export async function runPrescanGate(
   opts: PrescanGateOptions,
   scan: () => Promise<PrescanReport>,
-): Promise<'proceed' | 'block'> {
+): Promise<PrescanGateResult> {
   if (!opts.enabled)
-    return 'proceed'
+    return { decision: 'proceed', report: null, crashed: false }
   const noop = (): void => {}
   const print = opts.print ?? (opts.silent ? noop : (msg: string) => log.message(msg))
   const warn = opts.warn ?? (opts.silent ? noop : (msg: string) => log.warn(msg))
@@ -149,15 +158,15 @@ export async function runPrescanGate(
   }
   catch (e) {
     warn(`prescan crashed and was skipped: ${e instanceof Error ? e.message : String(e)}`)
-    return 'proceed'
+    return { decision: 'proceed', report: null, crashed: true }
   }
   if (report.findings.length > 0)
     print(renderTerminalReport(report, {}))
   const outcome = decideOutcome(report, { ignoreFatal: opts.ignoreFatal, failOnWarnings: opts.failOnWarnings })
-  if (outcome === 'ask') {
-    if (opts.interactive === false)
-      return 'proceed'
-    return resolveWarningGate('ask', { silent: opts.silent })
-  }
-  return outcome
+  let decision: 'proceed' | 'block'
+  if (outcome === 'ask')
+    decision = opts.interactive === false ? 'proceed' : await resolveWarningGate('ask', { silent: opts.silent })
+  else
+    decision = outcome
+  return { decision, report, crashed: false }
 }
