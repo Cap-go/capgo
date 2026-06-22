@@ -3,20 +3,23 @@ import { cleanupCapturedJobFiles, getAiPromptPath, getLogCapturePath } from './l
 import { SYSTEM_PROMPT } from './prompt'
 import { createSseParser } from './sse'
 
-export type AnalyzeBehavior = 'show_menu' | 'ask_then_menu' | 'auto_upload' | 'skip'
+export type AnalyzeBehavior = 'ask_then_menu' | 'auto_upload' | 'skip'
 
 export interface DecideInput {
   isTTY: boolean
   aiAnalyticsFlag: boolean
+  sendLogsFlag: boolean
 }
 
 export function decideAnalyzeBehavior(input: DecideInput): AnalyzeBehavior {
-  if (input.isTTY && input.aiAnalyticsFlag)
-    return 'show_menu'
-  if (input.isTTY && !input.aiAnalyticsFlag)
-    return 'ask_then_menu'
-  if (!input.isTTY && input.aiAnalyticsFlag)
+  // Explicit opt-in via --ai-analytics or --send-logs means the user has
+  // already chosen - run the action(s) directly, never prompt (any terminal).
+  if (input.aiAnalyticsFlag || input.sendLogsFlag)
     return 'auto_upload'
+  // No flags + interactive terminal: ask, then show the help menu.
+  if (input.isTTY)
+    return 'ask_then_menu'
+  // No flags + non-interactive (CI/CD): stay silent (+ existing CI tip).
   return 'skip'
 }
 
@@ -41,11 +44,12 @@ export interface CiFailureActions {
   tip: string | null
 }
 
-// Pure decision for the NON-INTERACTIVE (CI/CD) build-failure path. Both flags
-// are independent and additive: --ai-analytics and --send-logs can both be
-// passed and both run. When neither is passed we surface a one-line tip instead
-// of failing silently. Interactive terminals never reach this — they use the
-// decideAnalyzeBehavior clack menu instead.
+// Pure decision for the direct-action build-failure path (CI/CD, or any terminal
+// when --ai-analytics/--send-logs is passed). Both flags are independent and
+// additive: --ai-analytics and --send-logs can both be passed and both run.
+// When neither is passed we surface a one-line tip instead of failing silently.
+// No-flag interactive terminals never reach this; they use the
+// decideAnalyzeBehavior ask_then_menu flow instead.
 export function decideCiFailureActions(input: CiFailureActionsInput): CiFailureActions {
   return {
     runAiAnalysis: input.aiAnalyticsFlag,

@@ -9,7 +9,7 @@ import { addAppOptionsSchema, cleanupOptionsSchema, getStatsOptionsSchema, reque
 import { CapgoSDK } from '../sdk'
 import { clearSavedKey, getLoginState, loginSuccessMessage, logoutMessage, validateAndSaveKey, whoamiMessage } from '../auth/session'
 import { mcpLoginInputSchema, mcpLogoutInputSchema } from '../schemas/auth'
-import { findSavedKey, formatError } from '../utils'
+import { findSavedKeySilent, formatError } from '../utils'
 import { registerOnboardingTools } from '../build/onboarding/mcp/onboarding-tools'
 import { registerLiveUpdateTools } from '../init/mcp/live-update-tools'
 import { buildServerInstructions } from './instructions'
@@ -38,6 +38,13 @@ function formatMcpError<T>(result: SDKResult<T>): { content: Array<{ type: 'text
  * This allows AI agents to interact with Capgo Cloud programmatically.
  */
 export async function startMcpServer(): Promise<void> {
+  // Install the stdout guard FIRST, before any startup code (saved-key lookup, SDK init,
+  // lazily imported deps) can emit a stray clack/console line. It reroutes ambient stdout
+  // to stderr and returns the ONLY writer allowed to reach the real stdout for JSON-RPC
+  // frames. Installing it late (after this code ran) let a no-key "please login" clack
+  // line land on stdout and corrupt the initialize handshake.
+  const transportStdout = installMcpStdoutGuard()
+
   // Computed once: gates BOTH the onboarding-tool registration (below) and the
   // onboarding steer appended to the server instructions, so we never advertise a
   // start_capgo_builder_onboarding tool we didn't actually register.
@@ -60,14 +67,11 @@ export async function startMcpServer(): Promise<void> {
     return (originalTool as (...a: any[]) => unknown)(...args)
   }
 
-  // Initialize SDK - will use saved API key or require it per-call
-  let savedApiKey: string | undefined
-  try {
-    savedApiKey = findSavedKey(true)
-  }
-  catch {
-    savedApiKey = undefined
-  }
+  // Initialize the SDK from any saved key. Silent lookup (env -> ~/.capgo -> ./.capgo):
+  // it never logs or throws when no key exists, so a no-key startup stays clean. The
+  // throwing/logging findSavedKey() variant wrote a clack "please login" line to stdout,
+  // which corrupted the handshake. capgo_login fills this in later without a restart.
+  const savedApiKey = findSavedKeySilent()
   // `let` (not `const`): capgo_login/capgo_logout reassign this so the running session
   // re-authenticates without a restart. Tool handlers close over the binding, not the value.
   let sdk = new CapgoSDK({ apikey: savedApiKey })
@@ -624,7 +628,7 @@ export async function startMcpServer(): Promise<void> {
 
   server.tool(
     'capgo_login',
-    'Sign in to Capgo by saving an API key. Generate a key for your AI at https://app.capgo.app/connect, then call this with it. Authenticates the current MCP session immediately — no restart needed.',
+    'Sign in to Capgo by saving an API key. Generate a key for your AI at https://console.capgo.app/connect, then call this with it. Authenticates the current MCP session immediately — no restart needed.',
     mcpLoginInputSchema.shape,
     async ({ apikey, scope }) => {
       try {
@@ -648,7 +652,7 @@ export async function startMcpServer(): Promise<void> {
         return {
           content: [{
             type: 'text' as const,
-            text: `Login failed: ${formatError(error)}. Generate a fresh key at https://app.capgo.app/connect and try again.`,
+            text: `Login failed: ${formatError(error)}. Generate a fresh key at https://console.capgo.app/connect and try again.`,
           }],
           isError: true as const,
         }
@@ -696,10 +700,10 @@ export async function startMcpServer(): Promise<void> {
   if (liveUpdateEnabled)
     registerLiveUpdateTools(server, sdk)
 
-  // Start the server with stdio transport. Route ambient stdout (stray clack/console
-  // output from any tool or dependency) to stderr so it can't corrupt the JSON-RPC
-  // frames a strict client reads — otherwise the transport drops ("Transport closed").
-  const transportStdout = installMcpStdoutGuard()
+  // Start the server with stdio transport. The stdout guard installed at the top of this
+  // function already routed ambient stdout (stray clack/console output from any tool or
+  // dependency) to stderr, so only JSON-RPC frames reach the real stdout a strict client
+  // reads; otherwise the transport drops ("Transport closed").
   const transport = new StdioServerTransport(process.stdin, transportStdout)
   await server.connect(transport)
   trackMcpServerStarted(Boolean(savedApiKey))
