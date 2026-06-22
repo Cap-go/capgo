@@ -50,28 +50,45 @@ const child = spawn(process.execPath, [bundlePath, 'mcp'], {
 
 let stdoutBuf = ''
 let stderrBuf = ''
-const stdoutLines = [] // every complete non-empty line the server wrote to stdout
-let initResult = null
+child.stdout.on('data', d => (stdoutBuf += d.toString()))
 child.stderr.on('data', d => (stderrBuf += d.toString()))
-child.stdout.on('data', (d) => {
-  stdoutBuf += d.toString()
-  let nl
-  while ((nl = stdoutBuf.indexOf('\n')) >= 0) {
-    const line = stdoutBuf.slice(0, nl)
-    stdoutBuf = stdoutBuf.slice(nl + 1)
-    if (line.trim())
-      stdoutLines.push(line)
+
+// The initialize response is a single JSON line carrying id:1 and a result.
+const hasInitResponse = () => stdoutBuf.split('\n').some((line) => {
+  if (!line.trim())
+    return false
+  try {
+    const m = JSON.parse(line)
+    return m.id === 1 && Boolean(m.result)
+  }
+  catch {
+    return false
   }
 })
 
-const send = obj => child.stdin.write(`${JSON.stringify(obj)}\n`)
-send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'capgo-nokey', version: '0' } } })
+child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'capgo-nokey', version: '0' } } })}\n`)
 
-const settle = ms => new Promise(r => setTimeout(r, ms))
-// Give the server time to boot, respond, and flush any stray startup writes.
-await settle(6000)
+// Wait until the child's stdio has fully CLOSED before asserting, so no buffered stdout
+// (including a trailing chunk with no newline) is lost to an early SIGKILL. The server is
+// long-lived, so we kill it once the initialize response has arrived (plus a short grace
+// to capture any trailing stray write), or after a hard cap. Assertions run only after
+// the 'close' event, i.e. once every stdout/stderr byte has been delivered.
+await new Promise((resolve) => {
+  let grace = null
+  const hardCap = setTimeout(() => child.kill('SIGKILL'), 10000)
+  child.stdout.on('data', () => {
+    if (!grace && hasInitResponse())
+      grace = setTimeout(() => child.kill('SIGKILL'), 400)
+  })
+  child.once('error', () => { try { child.kill('SIGKILL') } catch {} })
+  child.once('close', () => {
+    clearTimeout(hardCap)
+    if (grace)
+      clearTimeout(grace)
+    resolve()
+  })
+})
 
-child.kill('SIGKILL')
 rmSync(emptyHome, { recursive: true, force: true })
 rmSync(emptyCwd, { recursive: true, force: true })
 
@@ -82,19 +99,25 @@ function test(name, fn) {
   catch (e) { console.error(`❌ FAILED: ${name}`); console.error(`   ${e.message}`); fail++ }
 }
 
+// Validate the FULL buffer. split('\n') keeps the final fragment, so a trailing non-
+// newline chunk (e.g. a stray write with no newline) is checked too, not dropped.
+const offenders = []
+let initResult = null
+for (const line of stdoutBuf.split('\n')) {
+  if (!line.trim())
+    continue
+  try {
+    const msg = JSON.parse(line)
+    if (msg.id === 1 && msg.result)
+      initResult = msg.result
+  }
+  catch {
+    offenders.push(line.trim().slice(0, 160))
+  }
+}
+
 // The core contract: NOTHING but JSON-RPC reaches stdout. A clack/console line fails here.
 test('every stdout line is valid JSON (no stray clack/console output corrupts the stream)', () => {
-  const offenders = []
-  for (const line of stdoutLines) {
-    try {
-      const msg = JSON.parse(line)
-      if (msg.id === 1 && msg.result)
-        initResult = msg.result
-    }
-    catch {
-      offenders.push(line.slice(0, 160))
-    }
-  }
   if (offenders.length)
     throw new Error(`Non-JSON line(s) on stdout would corrupt the handshake:\n   ${offenders.join('\n   ')}`)
 })
