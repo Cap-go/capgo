@@ -1653,7 +1653,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     // the dashboard + skewed "Build requested" telemetry).
     if (options.prescan === true) {
       const { executePrescan, runPrescanGate } = await import('./prescan/command')
-      const gate = await runPrescanGate(
+      const { decision: gateDecision, report: gateReport, crashed: gateCrashed } = await runPrescanGate(
         {
           enabled: true,
           ignoreFatal: options.prescanIgnoreFatal,
@@ -1681,19 +1681,38 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           supaAnon: options.supaAnon,
         })).report,
       )
-      if (gate === 'block') {
+      // Telemetry: emit one `Prescan run` event for the build-request gate on EVERY
+      // outcome (clean / warned / blocked / bypassed / crashed) so PostHog sees the full
+      // funnel — run volume, block rate, and which checks fire — not just blocks.
+      {
+        const pc = gateReport?.counts
+        const prescanResult = gateCrashed
+          ? 'crashed'
+          : !pc
+              ? 'skipped'
+              : pc.error > 0
+                  ? (options.prescanIgnoreFatal ? 'bypassed' : 'blocked')
+                  : pc.warning > 0 ? (options.failOnWarnings ? 'blocked' : 'warned') : 'clean'
         await sendEvent(options.apikey, {
           channel: 'native-builder',
-          event: 'Prescan blocked',
+          event: 'Prescan run',
           icon: '🛡️',
           org_id: orgId,
           tracking_version: 2,
           tags: {
+            'source': 'build-request',
+            'result': prescanResult,
             'app-id': appId,
             'platform': platform,
+            'errors': String(pc?.error ?? 0),
+            'warnings': String(pc?.warning ?? 0),
+            'finding-ids': gateReport ? gateReport.findings.filter(finding => finding.severity !== 'info').map(finding => finding.id).join(',').slice(0, 200) : '',
+            'bypassed': String(prescanResult === 'bypassed'),
           },
           notify: false,
-        }).catch()
+        }).catch(() => {})
+      }
+      if (gateDecision === 'block') {
         // Thrown (not exit(1)) so requestBuildInternal keeps its no-exit contract for SDK
         // callers: the outer catch logs the message and returns { success: false }, and
         // requestBuildCommand turns that into exit code 1.
