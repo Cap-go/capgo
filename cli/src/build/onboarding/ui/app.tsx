@@ -1716,7 +1716,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       },
       print: msg => addLog(msg, 'cyan'),
     })
-  }, [appId, apikey, aiJobId, error, log, buildOutput, askAiUploadConfirm, readInternalLogLines, addLog])
+  }, [appId, apikey, aiJobId, error, log, buildOutput, askAiUploadConfirm, readInternalLogLines, addLog, supaHost])
   // ── Async step handlers ──
 
   useEffect(() => {
@@ -5199,8 +5199,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             <Text>{supportConfirmMessage}</Text>
             <Select
               options={[
-                { label: '📤  Yes, upload my logs', value: 'yes' },
                 { label: '✖  No, just run AI', value: 'no' },
+                { label: '📤  Yes, upload my logs', value: 'yes' },
               ]}
               onChange={(value) => {
                 const resolve = supportConfirmResolveRef.current

@@ -1234,7 +1234,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       },
       print: msg => addLog(msg, 'cyan'),
     })
-  }, [appId, apikey, aiJobId, error, logLines, buildOutput, askAiUploadConfirm, readInternalLogLines, addLog])
+  }, [appId, apikey, aiJobId, error, logLines, buildOutput, askAiUploadConfirm, readInternalLogLines, addLog, supaHost])
   // Wire the forward-declared ref so `persistAndStep`'s catch can surface
   // saveAndroidProgress failures through the same retry/error UX without
   // making `handleError` a useCallback dep (it changes every retryCount tick).
@@ -3678,8 +3678,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           <Text>{supportConfirmMessage}</Text>
           <Select
             options={[
-              { label: '📤  Yes, upload my logs', value: 'yes' },
               { label: '✖  No, just run AI', value: 'no' },
+              { label: '📤  Yes, upload my logs', value: 'yes' },
             ]}
             onChange={(value) => {
               const resolve = supportConfirmResolveRef.current

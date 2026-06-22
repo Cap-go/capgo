@@ -55,7 +55,10 @@ await ta('accepting builds the bundle then uploads the GZIP', async () => {
 await ta('on upload success it prints the "support will be in touch by email" line — and no mailto', async () => {
   const { deps, calls } = makeDeps()
   await offerSupportUploadBeforeAi(deps)
-  assert.ok(calls.printed.some(m => m === supportUploadConfirmation()))
+  // The success line now appends a `Reference: <url>` line, so assert it STARTS
+  // WITH the base confirmation text and surfaces the uploaded URL.
+  const base = supportUploadConfirmation()
+  assert.ok(calls.printed.some(m => m.startsWith(base) && m.includes('https://api.capgo.app/builder_support_logs/')))
   const printed = calls.printed.join('\n')
   assert.ok(/in touch by email/i.test(printed))
   assert.ok(!printed.includes('mailto:')) // upload-only — never composes mail

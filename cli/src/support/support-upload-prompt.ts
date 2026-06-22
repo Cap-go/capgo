@@ -24,8 +24,9 @@ export const SUPPORT_UPLOAD_PROMPT
 // What we print after a successful upload. A function (not a const) to mirror
 // the rest of the support module's message helpers and leave room for future
 // per-context wording without breaking callers/tests.
-export function supportUploadConfirmation(): string {
-  return 'Logs uploaded — Capgo support will be in touch by email.'
+export function supportUploadConfirmation(url?: string): string {
+  const base = 'Logs uploaded — Capgo support will be in touch by email.'
+  return url ? `${base}\nReference: ${url}` : base
 }
 
 export type SupportUploadOutcome
@@ -89,6 +90,6 @@ export async function offerSupportUploadBeforeAi(deps: OfferSupportUploadDeps): 
     return 'unavailable'
   }
 
-  deps.print(supportUploadConfirmation())
+  deps.print(supportUploadConfirmation(uploaded.url))
   return 'uploaded'
 }

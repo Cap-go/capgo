@@ -2078,16 +2078,19 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
                     buildLogLines = readFileSync(logsPath, 'utf8').split('\n')
                   }
                   catch { /* best-effort */ }
-                  return writeSupportBundleFiles({
+                  const built = writeSupportBundleFiles({
                     kind: 'build-request',
                     appId,
                     error: `Cloud build ${capturedJobId} failed`,
                     logs: buildLogLines,
                     sections: internalLines.length > 0 ? [{ title: 'Internal log', lines: internalLines }] : [],
                   })
+                  s.stop(built ? 'Logs ready.' : 'Couldn\'t prepare logs.')
+                  return built
                 }
-                finally {
-                  s.stop('Logs ready.')
+                catch {
+                  s.stop('Couldn\'t prepare logs.')
+                  return null
                 }
               },
               upload: async (gzPath) => {
@@ -2276,16 +2279,19 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
               const s = spinnerC()
               s.start('Preparing your logs to send…')
               try {
-                return writeSupportBundleFiles({
+                const built = writeSupportBundleFiles({
                   kind: 'build-request',
                   appId,
                   error: `Cloud build ${capturedJobId} failed`,
                   logs: buildLogLines,
                   sections: internalLines.length > 0 ? [{ title: 'Internal log', lines: internalLines }] : [],
                 })
+                s.stop(built ? 'Logs ready.' : 'Couldn\'t prepare logs.')
+                return built
               }
-              finally {
-                s.stop('Logs ready.')
+              catch {
+                s.stop('Couldn\'t prepare logs.')
+                return null
               }
             },
             copyPath: p => copyToClipboard(p).ok,
