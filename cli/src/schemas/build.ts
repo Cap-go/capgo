@@ -14,6 +14,13 @@ export const buildCredentialsSchema = z.object({
   APPLE_ISSUER_ID: z.string().optional(),
   APPLE_KEY_CONTENT: z.string().optional(),
   APP_STORE_CONNECT_TEAM_ID: z.string().optional(),
+  // iOS app-specific password upload (alternative to the App Store Connect API key;
+  // used by migrated Ionic Appflow apps). fastlane reads FASTLANE_USER and
+  // FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD from the env automatically;
+  // APPLE_APP_ID is the app's numeric App Store Connect id (required for this path).
+  FASTLANE_USER: z.string().optional(),
+  FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: z.string().optional(),
+  APPLE_APP_ID: z.string().optional(),
   CAPGO_IOS_PROVISIONING_MAP: z.string().optional(),
   // Android credentials
   ANDROID_KEYSTORE_FILE: z.string().optional(),
@@ -45,6 +52,10 @@ export const buildRequestOptionsSchema = optionsBaseSchema.extend({
   appleIssuerId: z.string().optional(),
   appleKeyContent: z.string().optional(),
   appStoreConnectTeamId: z.string().optional(),
+  // iOS app-specific password upload (alternative to the App Store Connect API key)
+  appleId: z.string().optional(),
+  appleAppSpecificPassword: z.string().optional(),
+  appleAppId: z.string().optional(),
   iosScheme: z.string().optional(),
   iosTarget: z.string().optional(),
   iosDistribution: z.enum(['app_store', 'ad_hoc']).optional(),

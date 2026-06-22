@@ -1347,6 +1347,12 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       cliCredentials.APPLE_KEY_CONTENT = options.appleKeyContent
     if (options.appStoreConnectTeamId)
       cliCredentials.APP_STORE_CONNECT_TEAM_ID = options.appStoreConnectTeamId
+    if (options.appleId)
+      cliCredentials.FASTLANE_USER = options.appleId
+    if (options.appleAppSpecificPassword)
+      cliCredentials.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD = options.appleAppSpecificPassword
+    if (options.appleAppId)
+      cliCredentials.APPLE_APP_ID = options.appleAppId
     if (options.iosScheme)
       cliCredentials.CAPGO_IOS_SCHEME = options.iosScheme
     if (options.iosTarget)
@@ -1491,7 +1497,8 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       if (!mergedCredentials.CAPGO_IOS_PROVISIONING_MAP)
         missingCreds.push('CAPGO_IOS_PROVISIONING_MAP (use --ios-provisioning-profile or save via "build credentials save")')
 
-      // App Store Connect API key: only required for app_store mode
+      // Upload auth: app_store mode needs either an App Store Connect API key OR
+      // an Apple ID + app-specific password (e.g. migrated Ionic Appflow apps).
       if (distributionMode === 'app_store') {
         const hasAppleKeyId = !!mergedCredentials.APPLE_KEY_ID
         const hasAppleIssuerId = !!mergedCredentials.APPLE_ISSUER_ID
@@ -1499,27 +1506,67 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         const anyAppleApiField = hasAppleKeyId || hasAppleIssuerId || hasAppleKeyContent
         const hasCompleteAppleApiKey = hasAppleKeyId && hasAppleIssuerId && hasAppleKeyContent
 
-        if (!hasCompleteAppleApiKey) {
-          if (anyAppleApiField) {
-            // Partial API key — tell the user exactly which fields are missing
-            const missingAppleFields: string[] = []
-            if (!hasAppleKeyId)
-              missingAppleFields.push('APPLE_KEY_ID (or --apple-key-id)')
-            if (!hasAppleIssuerId)
-              missingAppleFields.push('APPLE_ISSUER_ID (or --apple-issuer-id)')
-            if (!hasAppleKeyContent)
-              missingAppleFields.push('APPLE_KEY_CONTENT (or --apple-key-content)')
-            missingCreds.push(`Incomplete App Store Connect API key - missing: ${missingAppleFields.join(', ')}`)
+        // Apple ID + app-specific password is an alternative upload path. All three
+        // fields are required together: fastlane needs the numeric app id (APPLE_APP_ID)
+        // and would otherwise fall back to interactive 2FA login.
+        const hasFastlaneUser = !!mergedCredentials.FASTLANE_USER
+        const hasAppSpecificPassword = !!mergedCredentials.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD
+        const hasAppleAppId = !!mergedCredentials.APPLE_APP_ID
+        const anyAppSpecificField = hasFastlaneUser || hasAppSpecificPassword || hasAppleAppId
+        const hasCompleteAppSpecificPassword = hasFastlaneUser && hasAppSpecificPassword && hasAppleAppId
+
+        // APPLE_APP_ID is the app's numeric App Store Connect id; a non-numeric
+        // value would make the headless TestFlight upload fail with a cryptic
+        // fastlane error, so reject it early here (covers CLI, env, and saved creds).
+        if (hasAppleAppId && !/^\d+$/.test(String(mergedCredentials.APPLE_APP_ID).trim())) {
+          missingCreds.push('APPLE_APP_ID must be the app\'s numeric App Store Connect id (digits only, e.g. 1234567890)')
+        }
+
+        if (hasCompleteAppleApiKey) {
+          // App Store Connect API key present — default upload path, nothing to add.
+        }
+        else if (hasCompleteAppSpecificPassword) {
+          log.info('🔑 Using Apple ID + app-specific password for TestFlight upload (no App Store Connect API key)')
+          log.info('   Build number will use a timestamp-based fallback (App Store Connect is not queried)')
+          // Warn on standalone `build request` only (never during the onboarding
+          // wizard, which sets builderJourneyId): the app-specific password path is
+          // a discouraged Appflow-migration fallback. An App Store Connect API key
+          // (.p8) is the recommended, more capable, and more secure option.
+          if (!options.builderJourneyId) {
+            log.warn('⚠️  App-specific password authentication is not recommended; it exists as an Ionic Appflow migration fallback.')
+            log.warn('   Prefer an App Store Connect API key (.p8): https://capgo.app/docs/builder/configuration/')
           }
-          else if (mergedCredentials.BUILD_OUTPUT_UPLOAD_ENABLED !== 'true') {
-            missingCreds.push('APPLE_KEY_ID/APPLE_ISSUER_ID/APPLE_KEY_CONTENT or BUILD_OUTPUT_UPLOAD_ENABLED=true (or --output-upload) (build has no output destination - enable either TestFlight upload or Capgo download link)')
-          }
-          else if (mergedCredentials.SKIP_BUILD_NUMBER_BUMP !== 'true') {
-            missingCreds.push('APPLE_KEY_ID/APPLE_ISSUER_ID/APPLE_KEY_CONTENT or --skip-build-number-bump (App Store Connect API key not provided - build numbers cannot be auto-incremented without it)')
-          }
-          else {
-            log.warn('⚠️  App Store Connect API key not provided - build will succeed but cannot auto-upload to TestFlight')
-          }
+        }
+        else if (anyAppSpecificField) {
+          // Partial app-specific password — tell the user exactly which fields are missing
+          const missingAppSpecificFields: string[] = []
+          if (!hasFastlaneUser)
+            missingAppSpecificFields.push('FASTLANE_USER (or --apple-id)')
+          if (!hasAppSpecificPassword)
+            missingAppSpecificFields.push('FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD (or --apple-app-specific-password)')
+          if (!hasAppleAppId)
+            missingAppSpecificFields.push('APPLE_APP_ID (or --apple-app-id)')
+          missingCreds.push(`Incomplete app-specific password credentials - missing: ${missingAppSpecificFields.join(', ')}`)
+        }
+        else if (anyAppleApiField) {
+          // Partial API key — tell the user exactly which fields are missing
+          const missingAppleFields: string[] = []
+          if (!hasAppleKeyId)
+            missingAppleFields.push('APPLE_KEY_ID (or --apple-key-id)')
+          if (!hasAppleIssuerId)
+            missingAppleFields.push('APPLE_ISSUER_ID (or --apple-issuer-id)')
+          if (!hasAppleKeyContent)
+            missingAppleFields.push('APPLE_KEY_CONTENT (or --apple-key-content)')
+          missingCreds.push(`Incomplete App Store Connect API key - missing: ${missingAppleFields.join(', ')}`)
+        }
+        else if (mergedCredentials.BUILD_OUTPUT_UPLOAD_ENABLED !== 'true') {
+          missingCreds.push('App Store Connect API key (APPLE_KEY_ID/APPLE_ISSUER_ID/APPLE_KEY_CONTENT) or app-specific password (FASTLANE_USER + FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD + APPLE_APP_ID) or BUILD_OUTPUT_UPLOAD_ENABLED=true (or --output-upload) (build has no output destination - enable either TestFlight upload or Capgo download link)')
+        }
+        else if (mergedCredentials.SKIP_BUILD_NUMBER_BUMP !== 'true') {
+          missingCreds.push('App Store Connect API key (APPLE_KEY_ID/APPLE_ISSUER_ID/APPLE_KEY_CONTENT) or app-specific password or --skip-build-number-bump (build numbers cannot be auto-incremented without an App Store Connect API key)')
+        }
+        else {
+          log.warn('⚠️  No App Store Connect API key or app-specific password provided - build will succeed but cannot auto-upload to TestFlight')
         }
       }
       else if (distributionMode === 'ad_hoc') {
@@ -1582,7 +1629,13 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     if (!mergedCredentials.BUILD_OUTPUT_RETENTION_SECONDS) {
       log.info(`ℹ️  --output-retention not specified, defaulting to ${MIN_OUTPUT_RETENTION_SECONDS}s (1 hour)`)
     }
-    if (!mergedCredentials.SKIP_BUILD_NUMBER_BUMP) {
+    // The generic "auto-incremented" note only applies when the build number is
+    // managed via App Store Connect (needs an API key) or for Android. iOS uploads
+    // using an app-specific password or ad_hoc distribution use a timestamp-based
+    // fallback (already logged above), so skip the otherwise-contradictory message.
+    const iosWithoutApiKey = platform === 'ios'
+      && !(mergedCredentials.APPLE_KEY_ID && mergedCredentials.APPLE_ISSUER_ID && mergedCredentials.APPLE_KEY_CONTENT)
+    if (!mergedCredentials.SKIP_BUILD_NUMBER_BUMP && !iosWithoutApiKey) {
       log.info('ℹ️  --skip-build-number-bump not specified, build number will be auto-incremented (default)')
     }
 
