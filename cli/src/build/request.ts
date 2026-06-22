@@ -1691,7 +1691,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
               ? 'skipped'
               : pc.error > 0
                   ? (options.prescanIgnoreFatal ? 'bypassed' : 'blocked')
-                  : pc.warning > 0 ? 'warned' : 'clean'
+                  : pc.warning > 0 ? (options.failOnWarnings ? 'blocked' : 'warned') : 'clean'
         await sendEvent(options.apikey, {
           channel: 'native-builder',
           event: 'Prescan run',
@@ -1706,7 +1706,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
             'errors': String(pc?.error ?? 0),
             'warnings': String(pc?.warning ?? 0),
             'finding-ids': gateReport ? gateReport.findings.filter(finding => finding.severity !== 'info').map(finding => finding.id).join(',').slice(0, 200) : '',
-            'bypassed': String(Boolean(options.prescanIgnoreFatal)),
+            'bypassed': String(prescanResult === 'bypassed'),
           },
           notify: false,
         }).catch(() => {})

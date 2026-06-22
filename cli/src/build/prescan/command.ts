@@ -101,7 +101,7 @@ export async function prescanCommand(appId: string | undefined, options: Prescan
       icon: '🛡️',
       tags: {
         'source': 'standalone',
-        'result': report.counts.error > 0 ? (options.ignoreFatal ? 'bypassed' : 'blocked') : report.counts.warning > 0 ? 'warned' : 'clean',
+        'result': report.counts.error > 0 ? (options.ignoreFatal ? 'bypassed' : 'blocked') : report.counts.warning > 0 ? (options.failOnWarnings ? 'blocked' : 'warned') : 'clean',
         'app-id': appId ?? 'unknown',
         'platform': options.platform ?? 'unknown',
         'errors': String(report.counts.error),
