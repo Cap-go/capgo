@@ -20,6 +20,59 @@ export function decideAnalyzeBehavior(input: DecideInput): AnalyzeBehavior {
   return 'skip'
 }
 
+// Tip printed to stderr when a build fails non-interactively and the user opted
+// into NEITHER AI analysis nor log upload — so CI users discover both options
+// instead of getting a silent failure.
+export const CI_FAILURE_TIP = 'Build failed. Tip: re-run with --ai-analytics for an AI-powered diagnosis, or --send-logs to upload the build logs to Capgo support.'
+
+export interface CiFailureActionsInput {
+  // --ai-analytics passed?
+  aiAnalyticsFlag: boolean
+  // --send-logs passed?
+  sendLogsFlag: boolean
+}
+
+export interface CiFailureActions {
+  // Run the existing Capgo AI auto-upload analysis path.
+  runAiAnalysis: boolean
+  // Upload the captured build logs to Capgo support via uploadSupportLogs.
+  sendLogs: boolean
+  // Neither flag set — print CI_FAILURE_TIP so the user learns both options exist.
+  tip: string | null
+}
+
+// Pure decision for the NON-INTERACTIVE (CI/CD) build-failure path. Both flags
+// are independent and additive: --ai-analytics and --send-logs can both be
+// passed and both run. When neither is passed we surface a one-line tip instead
+// of failing silently. Interactive terminals never reach this — they use the
+// decideAnalyzeBehavior clack menu instead.
+export function decideCiFailureActions(input: CiFailureActionsInput): CiFailureActions {
+  return {
+    runAiAnalysis: input.aiAnalyticsFlag,
+    sendLogs: input.sendLogsFlag,
+    tip: (!input.aiAnalyticsFlag && !input.sendLogsFlag) ? CI_FAILURE_TIP : null,
+  }
+}
+
+export interface ShouldPrintCiTipInput {
+  // Is the current stdout an interactive terminal?
+  isTTY: boolean
+  // --ai-analytics passed?
+  aiAnalytics: boolean
+  // --send-logs passed?
+  sendLogs: boolean
+}
+
+// Whether to print CI_FAILURE_TIP at the build-failure point. This is the ONLY
+// case where the tip should appear: a non-interactive (CI/CD) build that failed
+// while the user opted into NEITHER --ai-analytics NOR --send-logs. Interactive
+// terminals use the clack menu instead; if either flag is set the corresponding
+// action runs and no tip is wanted. Pure + unit-tested so the emit site stays
+// trivial and self-documenting.
+export function shouldPrintCiTip(input: ShouldPrintCiTipInput): boolean {
+  return !input.isTTY && !input.aiAnalytics && !input.sendLogs
+}
+
 export async function writeLocalAiFile(jobId: string): Promise<string> {
   const logsPath = getLogCapturePath(jobId)
   const logs = await readFile(logsPath, 'utf8')
