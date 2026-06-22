@@ -237,7 +237,13 @@ export async function runCredentialsManage(input: CredentialsManageInput, deps: 
       }
       const src = input.valueFile ? ` from ${input.valueFile}` : ''
       const note = KNOWN_CREDENTIAL_KEYS.has(input.key) ? '' : ` (heads-up: "${input.key}" is not a standard Capgo credential field — double-check the name)`
-      return `Set ${input.key} for ${input.platform} on "${appId}"${src}${note}. The value was saved but not echoed back.`
+      // App-specific password auth is a discouraged Ionic Appflow migration fallback;
+      // steer the agent to the App Store Connect API key (.p8) when it sets one of these.
+      const APP_SPECIFIC_PASSWORD_KEYS = new Set(['FASTLANE_USER', 'FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD', 'APPLE_APP_ID'])
+      const aspNote = APP_SPECIFIC_PASSWORD_KEYS.has(input.key)
+        ? ' Note: app-specific password authentication is NOT recommended; it exists only as an Ionic Appflow migration fallback. Prefer an App Store Connect API key (.p8).'
+        : ''
+      return `Set ${input.key} for ${input.platform} on "${appId}"${src}${note}.${aspNote} The value was saved but not echoed back.`
     }
 
     case 'remove': {
