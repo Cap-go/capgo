@@ -113,12 +113,26 @@ export async function verifyApiKey(token: string): Promise<{ valid: true, teamId
     const is401 = status === 401 || err.message?.includes('401')
     const is403 = status === 403 || err.message?.includes('403')
 
-    // Apple returns 403 FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED when the
-    // account holder hasn't signed (or must re-sign) a required agreement. The key
-    // itself is valid — point the user at the agreements page instead of sending
-    // them to re-check credentials that are fine. Preserve status/code so
-    // error-categories maps it to 'apple_agreements_missing' (not 'unknown').
-    if (is403 && (code === 'FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED' || /required agreement/i.test(err.message ?? ''))) {
+    // Apple returns 403 when the team's Account Holder hasn't signed (or must
+    // re-sign) a required agreement. Two distinct codes show up in the wild:
+    //   - FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED (paid-apps / tax)
+    //   - FORBIDDEN_ERROR.PLA_NOT_ACCEPTED (the Apple Developer Program License
+    //     Agreement was updated and has not yet been accepted)
+    // In both cases the .p8, Key ID and Issuer ID are all valid, so the generic
+    // credential checklist below would send the user chasing the wrong thing.
+    // Detect it early and point them at the agreement instead. Preserve
+    // status/code so error-categories maps it to 'apple_agreements_missing'.
+    const isAgreementBlock = is403 && (
+      code === 'FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED'
+      || code === 'FORBIDDEN_ERROR.PLA_NOT_ACCEPTED'
+      || /\bPLA_NOT_ACCEPTED\b|required agreement|program license agreement/i.test(err.message ?? '')
+    )
+    if (isAgreementBlock) {
+      // Keep this copy STABLE: error-categories.ts (telemetry) and
+      // getBuildOnboardingRecoveryAdvice (the error-screen recovery advice +
+      // docs link) both detect the agreement case by matching the "required
+      // agreement ... unsigned/expired" phrase in this message. The Account
+      // Holder + appstoreconnect.com banner guidance applies to the PLA too.
       throw new AppleApiHttpError(
         403,
         'Apple is blocking App Store Connect API access because your developer account has a required agreement that is unsigned or has expired.\n'
