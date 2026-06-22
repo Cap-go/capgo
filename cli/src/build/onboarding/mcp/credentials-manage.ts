@@ -41,6 +41,9 @@ export const KNOWN_CREDENTIAL_KEYS: ReadonlySet<string> = new Set([
   'KEYSTORE_STORE_PASSWORD',
   'PLAY_CONFIG_JSON',
   'PLAY_STORE_IN_APP_UPDATE_PRIORITY',
+  'FASTLANE_USER',
+  'FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD',
+  'APPLE_APP_ID',
 ])
 
 /** valueFile must be one of these credential-file extensions — blocks reading ~/.ssh keys, /etc/passwd,
