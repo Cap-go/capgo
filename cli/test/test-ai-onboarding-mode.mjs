@@ -31,21 +31,28 @@ const TEST_DIR = join(tmpdir(), `capgo-ai-onboarding-test-${Date.now()}`)
 await mkdir(TEST_DIR, { recursive: true })
 process.env.CAPGO_AI_LOG_BASE_DIR = TEST_DIR
 
-// ---- decideAnalyzeBehavior unchanged ----
-await test('decideAnalyzeBehavior matrix unchanged: interactive+flag → show_menu', () => {
-  if (decideAnalyzeBehavior({ isTTY: true, aiAnalyticsFlag: true }) !== 'show_menu')
+// ---- decideAnalyzeBehavior: direct CLI invocation behavior ----
+// An explicit --ai-analytics/--send-logs opt-in runs the action(s) directly
+// without prompting, in ANY terminal (this is the build-failure fix). No flags:
+// interactive asks-then-menus, non-interactive stays silent.
+await test('decideAnalyzeBehavior: interactive + ai-analytics → auto_upload', () => {
+  if (decideAnalyzeBehavior({ isTTY: true, aiAnalyticsFlag: true, sendLogsFlag: false }) !== 'auto_upload')
     throw new Error('regression')
 })
-await test('decideAnalyzeBehavior matrix unchanged: interactive only → ask_then_menu', () => {
-  if (decideAnalyzeBehavior({ isTTY: true, aiAnalyticsFlag: false }) !== 'ask_then_menu')
+await test('decideAnalyzeBehavior: interactive + send-logs → auto_upload', () => {
+  if (decideAnalyzeBehavior({ isTTY: true, aiAnalyticsFlag: false, sendLogsFlag: true }) !== 'auto_upload')
     throw new Error('regression')
 })
-await test('decideAnalyzeBehavior matrix unchanged: CI+flag → auto_upload', () => {
-  if (decideAnalyzeBehavior({ isTTY: false, aiAnalyticsFlag: true }) !== 'auto_upload')
+await test('decideAnalyzeBehavior: interactive + no flags → ask_then_menu', () => {
+  if (decideAnalyzeBehavior({ isTTY: true, aiAnalyticsFlag: false, sendLogsFlag: false }) !== 'ask_then_menu')
     throw new Error('regression')
 })
-await test('decideAnalyzeBehavior matrix unchanged: CI alone → skip', () => {
-  if (decideAnalyzeBehavior({ isTTY: false, aiAnalyticsFlag: false }) !== 'skip')
+await test('decideAnalyzeBehavior: CI + ai-analytics → auto_upload', () => {
+  if (decideAnalyzeBehavior({ isTTY: false, aiAnalyticsFlag: true, sendLogsFlag: false }) !== 'auto_upload')
+    throw new Error('regression')
+})
+await test('decideAnalyzeBehavior: CI + no flags → skip', () => {
+  if (decideAnalyzeBehavior({ isTTY: false, aiAnalyticsFlag: false, sendLogsFlag: false }) !== 'skip')
     throw new Error('regression')
 })
 
