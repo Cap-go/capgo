@@ -55,6 +55,7 @@ const SECRET_KEYS = new Set([
   'ANDROID_KEYSTORE_FILE',
   'PLAY_CONFIG_JSON',
   'GOOGLE_OAUTH_REFRESH_TOKEN',
+  'FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD',
 ])
 
 type FieldScope = 'ios' | 'android' | 'shared'
@@ -115,6 +116,24 @@ const CREDENTIAL_KNOWLEDGE: Record<string, FieldKnowledge> = {
     type: 'string',
     category: 'credential',
     explain: 'Apple Developer team ID (10-char alphanumeric). Found at developer.apple.com → Membership. Used by xcodebuild to scope the signing context.',
+  },
+  FASTLANE_USER: {
+    scope: 'ios',
+    type: 'string',
+    category: 'credential',
+    explain: 'Apple ID email for app-specific password uploads (an alternative to the App Store Connect API key, used by migrated Ionic Appflow apps). Pairs with FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD and APPLE_APP_ID. fastlane reads it from the environment automatically.',
+  },
+  FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: {
+    scope: 'ios',
+    type: 'string',
+    category: 'credential',
+    explain: 'App-specific password (format xxxx-xxxx-xxxx-xxxx) generated at appleid.apple.com. Lets fastlane upload to TestFlight without an App Store Connect API key. Requires FASTLANE_USER and APPLE_APP_ID to also be set. Capgo uses it server-side per build then discards it.',
+  },
+  APPLE_APP_ID: {
+    scope: 'ios',
+    type: 'string',
+    category: 'credential',
+    explain: 'Numeric App Store Connect app id (e.g. 1234567890), found in App Store Connect → your app → App Information → Apple ID. Required for app-specific password uploads so fastlane can upload without an interactive 2FA login. Not used when an App Store Connect API key is configured.',
   },
   CAPGO_IOS_PROVISIONING_MAP: {
     scope: 'ios',
@@ -286,7 +305,7 @@ function gatherFieldRows(entry: AppEntry): FieldRow[] {
 }
 
 function inferScope(key: string): FieldScope {
-  if (key.startsWith('APPLE_') || key.startsWith('CAPGO_IOS_') || key.startsWith('BUILD_CERTIFICATE') || key === 'P12_PASSWORD' || key === 'APP_STORE_CONNECT_TEAM_ID' || key === 'BUILD_PROVISION_PROFILE_BASE64')
+  if (key.startsWith('APPLE_') || key.startsWith('FASTLANE_') || key.startsWith('CAPGO_IOS_') || key.startsWith('BUILD_CERTIFICATE') || key === 'P12_PASSWORD' || key === 'APP_STORE_CONNECT_TEAM_ID' || key === 'BUILD_PROVISION_PROFILE_BASE64')
     return 'ios'
   if (key.startsWith('KEYSTORE_') || key.startsWith('ANDROID_') || key.startsWith('PLAY_') || key.startsWith('CAPGO_ANDROID_') || key.startsWith('GOOGLE_'))
     return 'android'

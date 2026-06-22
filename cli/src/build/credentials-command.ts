@@ -42,6 +42,10 @@ interface SaveCredentialsOptions {
   appleIssuerId?: string
   appleTeamId?: string
   iosDistribution?: 'app_store' | 'ad_hoc'
+  // iOS app-specific password upload (alternative to App Store Connect API key)
+  appleId?: string
+  appleAppSpecificPassword?: string
+  appleAppId?: string
 
   // Android options
   keystore?: string
@@ -284,6 +288,13 @@ export async function saveCredentialsCommand(options: SaveCredentialsOptions): P
         credentials.APPLE_ISSUER_ID = options.appleIssuerId
       if (options.appleTeamId)
         credentials.APP_STORE_CONNECT_TEAM_ID = options.appleTeamId
+      // App-specific password upload (alternative to the App Store Connect API key)
+      if (options.appleId)
+        credentials.FASTLANE_USER = options.appleId
+      if (options.appleAppSpecificPassword)
+        credentials.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD = options.appleAppSpecificPassword
+      if (options.appleAppId)
+        credentials.APPLE_APP_ID = options.appleAppId
       if (options.iosDistribution) {
         credentials.CAPGO_IOS_DISTRIBUTION = options.iosDistribution
       }
@@ -386,17 +397,19 @@ export async function saveCredentialsCommand(options: SaveCredentialsOptions): P
       if (!fileCredentials.CAPGO_IOS_PROVISIONING_MAP)
         missingCreds.push('--ios-provisioning-profile <path> (Provisioning profile file)')
 
-      // App Store Connect API key: only required for app_store mode
+      // Upload auth: app_store mode needs either an App Store Connect API key OR
+      // an Apple ID + app-specific password (e.g. migrated Ionic Appflow apps).
       if (distributionMode === 'app_store') {
         const hasAppleApiKey = fileCredentials.APPLE_KEY_ID && fileCredentials.APPLE_ISSUER_ID && fileCredentials.APPLE_KEY_CONTENT
-        if (!hasAppleApiKey) {
+        const hasAppSpecificPassword = fileCredentials.FASTLANE_USER && fileCredentials.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD && fileCredentials.APPLE_APP_ID
+        if (!hasAppleApiKey && !hasAppSpecificPassword) {
           if (fileCredentials.BUILD_OUTPUT_UPLOAD_ENABLED === 'false') {
-            missingCreds.push('--apple-key/--apple-key-id/--apple-issuer-id OR --output-upload (Build has no output destination - enable either TestFlight upload or Capgo download link)')
+            missingCreds.push('--apple-key/--apple-key-id/--apple-issuer-id (App Store Connect API key) OR --apple-id/--apple-app-specific-password/--apple-app-id (app-specific password) OR --output-upload (Build has no output destination - enable either TestFlight upload or Capgo download link)')
           }
           else {
-            log.warn('⚠️  App Store Connect API key not provided - TestFlight auto-upload is disabled')
-            log.warn('   When building without API key, you must also set --skip-build-number-bump')
-            log.warn('   To enable auto-upload, add: --apple-key ./AuthKey.p8 --apple-key-id KEY_ID --apple-issuer-id ISSUER_ID')
+            log.warn('⚠️  No App Store Connect API key or app-specific password provided - TestFlight auto-upload is disabled')
+            log.warn('   When building without either, you must also set --skip-build-number-bump')
+            log.warn('   To enable auto-upload, add either an API key (--apple-key ./AuthKey.p8 --apple-key-id KEY_ID --apple-issuer-id ISSUER_ID) or an app-specific password (--apple-id EMAIL --apple-app-specific-password PASSWORD --apple-app-id NUMERIC_ID)')
           }
         }
       }
@@ -580,6 +593,12 @@ export async function listCredentialsCommand(options?: { appId?: string, local?:
           log.info(`    ✓ Apple Issuer ID: ${ios.APPLE_ISSUER_ID}`)
         if (ios.APP_STORE_CONNECT_TEAM_ID)
           log.info(`    ✓ Team ID: ${ios.APP_STORE_CONNECT_TEAM_ID}`)
+        if (ios.FASTLANE_USER)
+          log.info(`    ✓ Apple ID (app-specific password): ${ios.FASTLANE_USER}`)
+        if (ios.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD)
+          log.info('    ✓ App-Specific Password: ********')
+        if (ios.APPLE_APP_ID)
+          log.info(`    ✓ App Store Connect App ID: ${ios.APPLE_APP_ID}`)
         if (ios.CAPGO_IOS_DISTRIBUTION)
           log.info(`    ✓ Distribution Mode: ${ios.CAPGO_IOS_DISTRIBUTION}`)
       }
@@ -678,7 +697,7 @@ export async function updateCredentialsCommand(options: SaveCredentialsOptions):
     // Detect platform from provided options if not explicitly set
     const hasIosOptions = !!(options.certificate || (options.iosProvisioningProfile && options.iosProvisioningProfile.length > 0)
       || options.p12Password || options.appleKey || options.appleKeyId || options.appleIssuerId
-      || options.appleTeamId)
+      || options.appleTeamId || options.appleId || options.appleAppSpecificPassword || options.appleAppId)
     const hasAndroidOptions = !!(options.keystore || options.keystoreAlias || options.keystoreKeyPassword
       || options.keystoreStorePassword || options.playConfig || options.androidFlavor || options.inAppUpdatePriority !== undefined)
     const hasCrossPlatformOptions = options.outputUpload !== undefined || options.outputRetention !== undefined || options.skipBuildNumberBump !== undefined
@@ -822,6 +841,19 @@ export async function updateCredentialsCommand(options: SaveCredentialsOptions):
       if (options.appleTeamId) {
         credentials.APP_STORE_CONNECT_TEAM_ID = options.appleTeamId
         log.info(`✓ Updating Apple Team ID: ${options.appleTeamId}`)
+      }
+      // App-specific password upload (alternative to the App Store Connect API key)
+      if (options.appleId) {
+        credentials.FASTLANE_USER = options.appleId
+        log.info(`✓ Updating Apple ID: ${options.appleId}`)
+      }
+      if (options.appleAppSpecificPassword) {
+        credentials.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD = options.appleAppSpecificPassword
+        log.info('✓ Updating app-specific password')
+      }
+      if (options.appleAppId) {
+        credentials.APPLE_APP_ID = options.appleAppId
+        log.info(`✓ Updating App Store Connect App ID: ${options.appleAppId}`)
       }
       if (options.iosDistribution) {
         credentials.CAPGO_IOS_DISTRIBUTION = options.iosDistribution
