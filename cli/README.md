@@ -75,6 +75,7 @@ Follow the documentation here: https://capacitorjs.com/docs/getting-started/
   - [Needed](#build-needed)
   - [Init](#build-init)
   - [Request](#build-request)
+  - [Prescan](#build-prescan)
   - [Last-output](#build-last-output)
   - [Credentials](#build-credentials)
     - [Apple-key](#build-credentials-apple-key)
@@ -1299,34 +1300,23 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | **--skip-build-number-bump** | <code>boolean</code> | Skip automatic build number/version code incrementing. Uses whatever version is already in the project files. |
 | **--no-skip-build-number-bump** | <code>boolean</code> | Override saved credentials to re-enable automatic build number incrementing for this build only. |
 | **--ai-analytics** | <code>boolean</code> | On build failure, send logs to Capgo AI for diagnosis. In interactive terminals this skips the upfront confirmation; in CI this auto-uploads and prints the analysis to stderr. |
+| **--no-prescan** | <code>boolean</code> | Skip the automatic pre-build scan |
+| **--prescan-ignore-fatal** | <code>boolean</code> | Run the pre-build scan but never block the build (report only) |
+| **--fail-on-warnings** | <code>boolean</code> | Treat prescan warnings as fatal |
 | **--send-logs** | <code>boolean</code> | On a CI/CD build failure, automatically upload the build logs to Capgo support (no email required). Capgo support is notified and will follow up by email. Additive to --ai-analytics — both can be passed. |
 | **-a** | <code>string</code> | API key to link to your account |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 | **--verbose** | <code>boolean</code> | Enable verbose output with detailed logging |
 
-### <a id="build-prescan"></a> 🛡️ **Prescan**
+### <a id="build-prescan"></a> 🔹 **Prescan**
 
 ```bash
 npx @capgo/cli@latest build prescan
 ```
 
 Scan your project and saved credentials for problems that would fail a cloud build — before uploading anything.
-It runs automatically inside `build request`; run it standalone for CI or debugging.
-What it scans:
-- Account: API key permission and that the app exists in Capgo (skipped with a notice when no key is available)
-- Credentials: build credentials saved for the target platform
-- Project state: stale `cap sync`, pnpm/yarn node_modules layout, bundle id consistency across configs
-- iOS: .p12 certificate opens + expiry, provisioning profiles (expiry, bundle id, type vs distribution mode, certificate pairing, target coverage), Info.plist sanity, App Store Connect API key
-- Android: keystore opens + expiry, Cordova plugin variables, gradle.properties heuristics, Play service account JSON, product flavor, AGP 8 package attribute
-
-Exit codes: 0 clean, 1 errors found, 2 warnings found (only with `--fail-on-warnings`).
-
-**Example:**
-
-```bash
-npx @capgo/cli@latest build prescan com.example.app --platform ios --json
-```
+Checks credentials (expiry, passwords, profile pairing), project state (cap sync, node_modules layout), and platform config. Runs automatically inside `build request`; this command runs it standalone (e.g. in CI).
 
 **Options:**
 
@@ -1336,13 +1326,13 @@ npx @capgo/cli@latest build prescan com.example.app --platform ios --json
 | **--path** | <code>string</code> | Path to the project directory (default: current directory) |
 | **-a** | <code>string</code> | API key to link to your account |
 | **--android-flavor** | <code>string</code> | Android: product flavor the build will use |
-| **--ios-dist** | <code>string</code> | iOS: distribution mode to validate against (app_store or ad_hoc) |
-| **--json** | <code>boolean</code> | Output a machine-readable JSON report instead of the terminal summary |
-| **--fail-on-warnings** | <code>boolean</code> | Exit non-zero (code 2) when warnings are found (CI) |
+| **--ios-dist** | <code>string</code> | iOS: distribution mode to validate against |
+| **--json** | <code>boolean</code> | Output a machine-readable JSON report |
+| **--fail-on-warnings** | <code>boolean</code> | Exit non-zero when warnings are found (CI) |
 | **--ignore-fatal** | <code>boolean</code> | Diagnostic mode: report everything but always exit 0 |
 | **--verbose** | <code>boolean</code> | Enable verbose output with detailed logging |
-
-On `build request`, `--no-prescan` skips the scan entirely and `--prescan-ignore-fatal` reports problems without blocking the build.
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 
 ### <a id="build-last-output"></a> 🔹 **Last-output**
 
