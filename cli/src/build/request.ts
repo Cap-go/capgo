@@ -2177,7 +2177,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           if (triggeredBy === 'menu') {
             await offerSupportUploadBeforeAi({
               confirm: async (message) => {
-                const answer = await confirm({ message, initialValue: false })
+                const answer = await confirm({ message, initialValue: true })
                 return answer === true
               },
               buildFiles: () => {
