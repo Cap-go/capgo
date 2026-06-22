@@ -58,6 +58,18 @@ interface SaveCredentialsOptions {
 }
 
 /**
+ * APPLE_APP_ID is the app's numeric App Store Connect id. Reject non-numeric
+ * input at save/update time so users get immediate feedback instead of a
+ * cryptic fastlane failure at build time.
+ */
+function assertNumericAppleAppId(appleAppId: string | undefined): void {
+  if (appleAppId !== undefined && !/^\d+$/.test(appleAppId.trim())) {
+    log.error('❌ --apple-app-id must be the app\'s numeric App Store Connect id (digits only, e.g. 1234567890)')
+    exit(1)
+  }
+}
+
+/**
  * Provisioning map entry: stores the base64-encoded profile and its extracted name
  */
 interface ProvisioningMapEntry {
@@ -293,8 +305,10 @@ export async function saveCredentialsCommand(options: SaveCredentialsOptions): P
         credentials.FASTLANE_USER = options.appleId
       if (options.appleAppSpecificPassword)
         credentials.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD = options.appleAppSpecificPassword
-      if (options.appleAppId)
+      if (options.appleAppId) {
+        assertNumericAppleAppId(options.appleAppId)
         credentials.APPLE_APP_ID = options.appleAppId
+      }
       if (options.iosDistribution) {
         credentials.CAPGO_IOS_DISTRIBUTION = options.iosDistribution
       }
@@ -852,6 +866,7 @@ export async function updateCredentialsCommand(options: SaveCredentialsOptions):
         log.info('✓ Updating app-specific password')
       }
       if (options.appleAppId) {
+        assertNumericAppleAppId(options.appleAppId)
         credentials.APPLE_APP_ID = options.appleAppId
         log.info(`✓ Updating App Store Connect App ID: ${options.appleAppId}`)
       }
