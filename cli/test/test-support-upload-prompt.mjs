@@ -10,12 +10,14 @@ import {
 } from '../src/support/support-upload-prompt.ts'
 import { ta } from './support-harness.mjs'
 
+const MOCK_UPLOAD_URL = `https://api.capgo.app/builder_support_logs/${'a'.repeat(64)}`
+
 function makeDeps(overrides = {}) {
   const calls = { confirmed: [], built: 0, uploaded: [], printed: [] }
   const deps = {
     confirm: async (msg) => { calls.confirmed.push(msg); return true },
     buildFiles: () => { calls.built++; return { gzPath: '/x/b.log.gz' } },
-    upload: async (gzPath) => { calls.uploaded.push(gzPath); return { id: 'a'.repeat(64), url: 'https://api.capgo.app/builder_support_logs/' + 'a'.repeat(64) } },
+    upload: async (gzPath) => { calls.uploaded.push(gzPath); return { id: 'a'.repeat(64), url: MOCK_UPLOAD_URL } },
     print: (m) => { calls.printed.push(m) },
     ...overrides,
   }
@@ -55,10 +57,9 @@ await ta('accepting builds the bundle then uploads the GZIP', async () => {
 await ta('on upload success it prints the "support will be in touch by email" line — and no mailto', async () => {
   const { deps, calls } = makeDeps()
   await offerSupportUploadBeforeAi(deps)
-  // The success line now appends a `Reference: <url>` line, so assert it STARTS
-  // WITH the base confirmation text and surfaces the uploaded URL.
-  const base = supportUploadConfirmation()
-  assert.ok(calls.printed.some(m => m.startsWith(base) && m.includes('https://api.capgo.app/builder_support_logs/')))
+  // The success line now appends a `Reference: <url>` line, so assert the
+  // printed confirmation matches the helper output for the uploaded URL.
+  assert.ok(calls.printed.some(m => m === supportUploadConfirmation(MOCK_UPLOAD_URL)))
   const printed = calls.printed.join('\n')
   assert.ok(/in touch by email/i.test(printed))
   assert.ok(!printed.includes('mailto:')) // upload-only — never composes mail
