@@ -82,7 +82,7 @@ const appPwDone = { scope: 'ios', token: { access_token: 't' }, orgSlug: 'o', ap
 assert.strictEqual(f.getAppflowResumeStep(appPwDone), 'p8-upgrade-prompt')
 const afterP8 = f.appflowFlow.applyInput('p8-upgrade-prompt', appPwDone, { value: 'convert' })
 assert.strictEqual(afterP8.p8Upgrade, 'convert')
-assert.strictEqual(f.getAppflowResumeStep(afterP8), 'handoff-build') // asked once -> handoff
+assert.strictEqual(f.getAppflowResumeStep(afterP8), 'ios-p8-generate') // 'convert' drives the shared .p8 generate sub-flow
 
 // ── platformsToBuild (scope-aware) ──
 assert.deepStrictEqual(f.platformsToBuild({ scope: 'both', ios: { x: '1' }, android: {}, migratable: { ios: true, android: false }, completedSteps: [] }), ['ios'])

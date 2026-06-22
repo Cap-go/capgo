@@ -1936,7 +1936,8 @@ function appflowProgressFor(step: AppflowStep): number {
   const order: AppflowStep[] = [
     'explain', 'authenticating', 'select-org', 'select-app', 'fetch-signing',
     'select-ios-cert', 'select-android-cert', 'no-signing-submenu', 'fetch-distribution',
-    'ios-dist-gapfill', 'android-dist-gapfill', 'validate', 'p8-upgrade-prompt', 'handoff-build', 'done',
+    'ios-dist-gapfill', 'android-dist-gapfill', 'ios-p8-generate', 'android-sa-generate',
+    'validate', 'p8-upgrade-prompt', 'handoff-build', 'done',
   ]
   const idx = order.indexOf(step)
   if (idx < 0)

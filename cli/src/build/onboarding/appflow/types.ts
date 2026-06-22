@@ -19,6 +19,8 @@ export type AppflowOwnStep =
   | 'fetch-distribution' // step 6: list + download distribution (auto)
   | 'ios-dist-gapfill' // step 6: no iOS dist -> offer p8 generate/provide
   | 'android-dist-gapfill' // step 6: no Android dist -> offer SA generate/provide
+  | 'ios-p8-generate' // step 6/8 (auto): drive the shared asc-key .p8 generate/provide, capture APPLE_KEY_* into ios
+  | 'android-sa-generate' // step 6 (auto): drive the shared Google Play service-account flow, capture PLAY_CONFIG_JSON into android
   | 'validate' // step 7 (auto): run advisory checks, then show results
   | 'validate-results' // step 7 (info): surface the advisory results, never block
   | 'p8-upgrade-prompt' // step 8 (iOS only)

@@ -41,6 +41,15 @@ export interface AppflowValidationResult {
   message: string
 }
 
+// Outcome of an injected credential generator. `ok` true => `creds` holds the
+// Capgo cred fields to merge into the platform record (e.g. APPLE_KEY_* or
+// PLAY_CONFIG_JSON). `ok` false => `message` explains why (surfaced, advisory).
+export interface AppflowGenerateResult {
+  ok: boolean
+  creds?: Record<string, string>
+  message?: string
+}
+
 export interface AppflowEffectDeps {
   appId?: string
   log?: (s: string) => void
@@ -52,6 +61,13 @@ export interface AppflowEffectDeps {
   tryUnlockPrivateKey?: (keystoreB64: string, storePass: string, alias: string) => Promise<boolean>
   validateAppleAppPassword?: (user: string, pw: string) => Promise<{ valid: boolean, message?: string }>
   validateP12?: (p12B64: string, password: string) => Promise<boolean>
+  // injected credential generators (step-6 gap-fill / step-8 p8 upgrade). Each
+  // DRIVES an existing standalone sub-flow (iOS asc-key helper / Android Google
+  // Play service-account primitives) and returns the Capgo cred fields to merge.
+  // Advisory: on a non-ok outcome the flow records the message and continues —
+  // generation NEVER blocks the migration. `creds` is undefined unless ok.
+  generateIosP8Key?: () => Promise<AppflowGenerateResult>
+  generateAndroidServiceAccount?: (opts: { packageName?: string }) => Promise<AppflowGenerateResult>
   carried?: Record<string, unknown>
   // Build/CI tail wiring (consumed only when the flow delegates a shared tail
   // step). The driver supplies the API key / gateway / journey + the build-output
@@ -167,9 +183,11 @@ const inScope = (scope: AppflowProgress['scope'], p: 'ios' | 'android'): boolean
 
 const hasCreds = (rec?: Record<string, string>): boolean => !!rec && Object.keys(rec).length > 0
 
-// iOS distribution (upload destination) is present iff an app-specific password was imported.
+// iOS distribution (upload destination) is present iff an app-specific password
+// was imported OR an App Store Connect API key (.p8, APPLE_KEY_ID) is set — the
+// latter is what the gap-fill / p8-upgrade 'generate' path produces.
 function iosDistMissing(p: AppflowProgress): boolean {
-  return inScope(p.scope, 'ios') && hasCreds(p.ios) && !p.ios!.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD
+  return inScope(p.scope, 'ios') && hasCreds(p.ios) && !p.ios!.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD && !p.ios!.APPLE_KEY_ID
 }
 
 // Android distribution (upload destination) is present iff a service-account JSON was imported.
@@ -379,6 +397,14 @@ export function appflowViewForStep(step: AppflowStep, progress: AppflowProgress,
         ],
       }
     }
+    case 'ios-p8-generate':
+      // AUTO: runAppflowEffect drives the shared asc-key .p8 generate/provide
+      // sub-flow, merges APPLE_KEY_* into ios, then continues via the graph.
+      return { kind: 'auto', prompt: 'Setting up an App Store Connect API key (.p8)…' }
+    case 'android-sa-generate':
+      // AUTO: runAppflowEffect drives the shared Google Play service-account
+      // sub-flow, merges PLAY_CONFIG_JSON into android, then continues.
+      return { kind: 'auto', prompt: 'Setting up a Google Play service account…' }
     case 'authenticating':
     case 'fetch-signing':
     case 'fetch-distribution':
@@ -454,12 +480,23 @@ export function getAppflowResumeStep(progress: AppflowProgress | null): AppflowS
     return 'ios-dist-gapfill'
   if (androidDistMissing(progress) && progress.androidDistGapfill === undefined)
     return 'android-dist-gapfill'
+  // gap-fill 'generate' chose to set up an upload destination NOW: drive the
+  // shared generate sub-flow (auto effect), capture creds, then continue. Runs
+  // at most once (done-guarded); a non-ok outcome records a note and proceeds.
+  if (progress.iosDistGapfill === 'generate' && !done('ios-p8-generate'))
+    return 'ios-p8-generate'
+  if (progress.androidDistGapfill === 'generate' && !done('android-sa-generate'))
+    return 'android-sa-generate'
   // step-7 validation (auto step; runs the advisory checks).
   if (!done('validate'))
     return 'validate'
   // step-8 iOS app-specific-password -> .p8 upgrade offer (once).
   if (iosHasAppPassword(progress) && progress.p8Upgrade === undefined)
     return 'p8-upgrade-prompt'
+  // step-8 'convert' chose to upgrade the app-specific password to a .p8 API
+  // key: drive the SAME shared asc-key generate sub-flow, capture APPLE_KEY_*.
+  if (progress.p8Upgrade === 'convert' && !done('ios-p8-generate'))
+    return 'ios-p8-generate'
   // converge: the build hand-off choice (build now / skip).
   if (progress.handoffChoice === undefined)
     return 'handoff-build'
@@ -633,6 +670,52 @@ export async function runAppflowEffect(step: AppflowStep, progress: AppflowProgr
       }
       p = mark(p, 'fetch-distribution')
       return { progress: p, next: getAppflowResumeStep(p) }
+    }
+    case 'ios-p8-generate': {
+      // Drive the existing standalone asc-key .p8 generate/provide sub-flow via
+      // the injected generator. On success, merge the produced APPLE_KEY_* fields
+      // into ios and drop any imported app-specific password (the .p8 supersedes
+      // it — and clears the step-8 upgrade re-trigger). Advisory: a non-ok
+      // outcome (or absent dep, e.g. non-macOS) records a note and continues.
+      let p: AppflowProgress = { ...progress }
+      let note: string | undefined
+      try {
+        const r = await deps.generateIosP8Key?.()
+        if (r === undefined)
+          note = 'App Store Connect API key setup is unavailable here — skipped (set up later).'
+        else if (r.ok && r.creds) {
+          const { FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: _drop, ...keepIos } = { ...p.ios }
+          p = { ...p, ios: { ...keepIos, ...r.creds } }
+        }
+        else
+          note = `App Store Connect API key setup did not complete: ${r.message ?? 'unknown'}. You can set it up later.`
+      }
+      catch (e) {
+        note = `App Store Connect API key setup skipped: ${e instanceof Error ? e.message : String(e)}.`
+      }
+      p = mark(p, 'ios-p8-generate')
+      return { progress: p, next: getAppflowResumeStep(p), transient: note ? { note } : undefined }
+    }
+    case 'android-sa-generate': {
+      // Drive the existing standalone Google Play service-account sub-flow via
+      // the injected generator. On success, merge PLAY_CONFIG_JSON into android.
+      // Advisory: a non-ok outcome (or absent dep) records a note and continues.
+      let p: AppflowProgress = { ...progress }
+      let note: string | undefined
+      try {
+        const r = await deps.generateAndroidServiceAccount?.({ packageName: deps.appId })
+        if (r === undefined)
+          note = 'Google Play service-account setup is unavailable here — skipped (set up later).'
+        else if (r.ok && r.creds)
+          p = { ...p, android: { ...p.android, ...r.creds } }
+        else
+          note = `Google Play service-account setup did not complete: ${r.message ?? 'unknown'}. You can set it up later.`
+      }
+      catch (e) {
+        note = `Google Play service-account setup skipped: ${e instanceof Error ? e.message : String(e)}.`
+      }
+      p = mark(p, 'android-sa-generate')
+      return { progress: p, next: getAppflowResumeStep(p), transient: note ? { note } : undefined }
     }
     case 'validate': {
       const results = await runValidations(progress, deps)

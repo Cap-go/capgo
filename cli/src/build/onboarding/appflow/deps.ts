@@ -22,7 +22,8 @@ import { updateSavedCredentials } from '../../credentials.js'
 import { validateServiceAccountJson as androidValidateServiceAccountJson } from '../android/service-account-validation.js'
 import { tryUnlockPrivateKey as androidTryUnlockPrivateKey } from '../android/keystore.js'
 import { validateAppleAppPassword as iosValidateAppleAppPassword } from '../ios/validate-app-password.js'
-import type { AppflowEffectDeps } from './flow.js'
+import { isMacOS, runAscKeyHelper } from '../asc-key/helper.js'
+import type { AppflowEffectDeps, AppflowGenerateResult } from './flow.js'
 import type { AppflowProgress } from './types.js'
 import type { AppflowToken } from './auth.js'
 
@@ -123,6 +124,54 @@ function validateAppleAppPassword(user: string, pw: string): Promise<{ valid: bo
 }
 
 /**
+ * Generator: drive the EXISTING standalone App Store Connect API-key (.p8)
+ * helper (asc-key/helper.ts — the same self-contained, subprocess-driven module
+ * the iOS onboarding TUI uses) and map its result onto the Capgo iOS cred
+ * fields. Returns the SAME keys the native flow persists (`updateSavedCredentials`):
+ *   APPLE_KEY_ID / APPLE_ISSUER_ID / APPLE_KEY_CONTENT (base64 of the .p8).
+ * Never throws: NotMacOSError (or any error) becomes a non-ok advisory result.
+ */
+async function generateIosP8Key(): Promise<AppflowGenerateResult> {
+  if (!isMacOS())
+    return { ok: false, message: 'the App Store Connect API-key helper requires macOS 14+' }
+  try {
+    const outcome = await runAscKeyHelper()
+    if (!outcome.ok)
+      return { ok: false, message: outcome.message }
+    const { keyId, issuerId, privateKey } = outcome.credentials
+    return {
+      ok: true,
+      creds: {
+        APPLE_KEY_ID: keyId,
+        APPLE_ISSUER_ID: issuerId,
+        APPLE_KEY_CONTENT: Buffer.from(privateKey, 'utf8').toString('base64'),
+      },
+    }
+  }
+  catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+/**
+ * Generator: set up a Google Play service account (-> PLAY_CONFIG_JSON).
+ *
+ * The standalone Google API primitives (android/{oauth-google,gcp-api,play-api}.ts)
+ * are reusable, but the END-TO-END "generate" orchestration (project pick, Play
+ * developer-id entry, package pick) is interactive and lives in the Android
+ * onboarding wizard's own step graph; it cannot be driven non-interactively here
+ * without re-implementing that wizard. So the gap-fill records the intent and
+ * routes the user to the dedicated Android setup rather than blocking the
+ * migration. Advisory, never throws — the flow surfaces this note and continues.
+ */
+function generateAndroidServiceAccount(_opts: { packageName?: string }): Promise<AppflowGenerateResult> {
+  return Promise.resolve({
+    ok: false,
+    message: 'finish Google Play service-account setup with `capgo build setup --android` (interactive)',
+  })
+}
+
+/**
  * Build the production AppflowEffectDeps for a given app id. The `packageName`
  * (the Play package, when known) sharpens the service-account probe; pass the
  * appId as a fallback. Token cache, browser, logger, and validators are all
@@ -139,6 +188,8 @@ export function buildAppflowEffectDeps(opts: { appId?: string, packageName?: str
     tryUnlockPrivateKey,
     validateAppleAppPassword,
     validateP12,
+    generateIosP8Key,
+    generateAndroidServiceAccount,
   }
 }
 
