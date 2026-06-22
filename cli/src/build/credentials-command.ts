@@ -307,7 +307,7 @@ export async function saveCredentialsCommand(options: SaveCredentialsOptions): P
         credentials.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD = options.appleAppSpecificPassword
       if (options.appleAppId) {
         assertNumericAppleAppId(options.appleAppId)
-        credentials.APPLE_APP_ID = options.appleAppId
+        credentials.APPLE_APP_ID = options.appleAppId.trim()
       }
       if (options.iosDistribution) {
         credentials.CAPGO_IOS_DISTRIBUTION = options.iosDistribution
@@ -867,7 +867,7 @@ export async function updateCredentialsCommand(options: SaveCredentialsOptions):
       }
       if (options.appleAppId) {
         assertNumericAppleAppId(options.appleAppId)
-        credentials.APPLE_APP_ID = options.appleAppId
+        credentials.APPLE_APP_ID = options.appleAppId.trim()
         log.info(`✓ Updating App Store Connect App ID: ${options.appleAppId}`)
       }
       if (options.iosDistribution) {
