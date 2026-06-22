@@ -105,11 +105,14 @@ await test('decideStart: not authenticated → login human_gate via capgo_login'
   eq(r.next.tool, 'capgo_login', 'next action should call capgo_login')
 })
 
-await test('decideStart: both platforms → choice with two options', async () => {
+await test('decideStart: both platforms → choice with ios/android/appflow options', async () => {
   const r = await decideStart(facts(), null, minimalFakeDeps())
   eq(r.kind, 'choice')
   eq(r.state, 'platform-select')
-  eq(r.options.length, 2)
+  eq(r.options.length, 3)
+  ok(r.options.some(o => o.value === 'ios'), 'offers iOS')
+  ok(r.options.some(o => o.value === 'android'), 'offers Android')
+  ok(r.options.some(o => o.value === 'appflow'), 'offers the Appflow migration option')
   ok(r.roadmap.length >= 3, 'first decision should carry the roadmap')
 })
 

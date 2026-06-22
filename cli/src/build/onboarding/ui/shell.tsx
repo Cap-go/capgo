@@ -19,11 +19,13 @@ import type { OnboardingResult, Platform } from '../types.js'
 // `command.ts` passes `initialPlatform` to skip the picker, and
 // `onResolvePlatform` so it can print the post-exit completion breadcrumb.
 import { Box, Text, useApp, useStdout } from 'ink'
+import { Select } from '@inkjs/ui'
 import React, { useCallback, useEffect, useState } from 'react'
 import { loadAndroidProgress } from '../android/progress.js'
 import AndroidOnboardingApp from '../android/ui/app.js'
 import { loadProgress } from '../progress.js'
 import OnboardingApp from './app.js'
+import AppflowApp from './appflow-app.js'
 import { PICKER_MIN_COLS, PICKER_MIN_ROWS, terminalFitsPicker } from '../min-terminal-size.js'
 import { Header } from './components.js'
 import { pickPlatformLayout } from './frame-fit.js'
@@ -42,10 +44,17 @@ type AndroidProgress = Awaited<ReturnType<typeof loadAndroidProgress>>
 type ReadyApp
   = | { kind: 'ios', progress: IosProgress }
     | { kind: 'android', progress: AndroidProgress }
+    | { kind: 'appflow', scope: 'both' | 'ios' | 'android' }
 
 async function loadReady(platform: Platform, appId: string): Promise<ReadyApp> {
   if (platform === 'android')
     return { kind: 'android', progress: await loadAndroidProgress(appId) }
+  // The Appflow migration imports BOTH platforms by default (the picker's
+  // "migrating from Appflow" option). It has no on-disk progress loader — its
+  // cross-step state lives in the running Ink process (AppflowApp), so there is
+  // nothing to read here.
+  if (platform === 'appflow')
+    return { kind: 'appflow', scope: 'both' }
   return { kind: 'ios', progress: await loadProgress(appId) }
 }
 
@@ -140,6 +149,12 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
   // Whether the self-update prompt (first screen, when updateInfo is set) has
   // been dismissed with "skip". On "update" we exit Ink instead (see below).
   const [updateAnswered, setUpdateAnswered] = useState(false)
+  // When the user picks iOS or Android from the picker we first ask whether they
+  // are migrating from Ionic Appflow (the spec's single-platform migration gate).
+  // Holds the pending native platform while that yes/no is on screen; null when
+  // no gate is showing. The picker's appflow option skips the gate (it IS the
+  // migration). Pre-resolved --platform also skips it (the user already decided).
+  const [migrationGate, setMigrationGate] = useState<'ios' | 'android' | null>(null)
   const exitAfterBeforeExit = useCallback(() => {
     exitAfterOnboardingBeforeExit(onBeforeExit, exit)
   }, [exit, onBeforeExit])
@@ -161,6 +176,32 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
         setTimeout(exitAfterBeforeExit, 50)
       })
   }, [appId, onResolvePlatform, onResult, exitAfterBeforeExit])
+
+  // Picker answer. iOS / Android first pass through the "migrating from Appflow?"
+  // gate; the appflow option enters the (both-platform) migration directly.
+  const onPick = useCallback((platform: Platform) => {
+    if (platform === 'ios' || platform === 'android') {
+      setMigrationGate(platform)
+      return
+    }
+    choose(platform)
+  }, [choose])
+
+  // Answer to the migration gate: YES enters the Appflow migration scoped to the
+  // pending platform (no disk progress to load — the AppflowApp owns its state);
+  // NO proceeds to native onboarding for that platform.
+  const answerMigrationGate = useCallback((migrating: boolean) => {
+    const platform = migrationGate
+    setMigrationGate(null)
+    if (!platform)
+      return
+    if (migrating) {
+      onResolvePlatform?.('appflow')
+      setReady({ kind: 'appflow', scope: platform })
+      return
+    }
+    choose(platform)
+  }, [migrationGate, choose, onResolvePlatform])
 
   // Pre-resolved platform → load immediately (no picker shown).
   useEffect(() => {
@@ -194,6 +235,8 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
     return <OnboardingApp appId={appId} iosBundleIdInitial={iosBundleIdInitial} initialProgress={ready.progress} iosDir={iosDir} guidedHelperUsable={guidedHelperUsable} apikey={apikey} supaHost={supaHost} journeyId={journeyId} onStep={onStep} onResult={onResult} onBeforeExit={onBeforeExit} />
   if (ready?.kind === 'android')
     return <AndroidOnboardingApp appId={appId} initialProgress={ready.progress} androidDir={androidDir} apikey={apikey} supaHost={supaHost} journeyId={journeyId} onStep={onStep} onResult={onResult} onBeforeExit={onBeforeExit} />
+  if (ready?.kind === 'appflow')
+    return <AppflowApp appId={appId} scope={ready.scope} apikey={apikey} supaHost={supaHost} journeyId={journeyId} onStep={onStep} onResult={onResult} onBeforeExit={onBeforeExit} />
 
   // Not ready yet: the platform picker (or a brief framed load). The picker is
   // NOT gated to the full 80×49 onboarding floor — it's small and adapts
@@ -236,11 +279,38 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
     )
   }
 
+  // Migration gate: the user picked iOS / Android — ask whether they are
+  // migrating from Ionic Appflow before committing to native onboarding. YES
+  // routes into the Appflow migration scoped to that platform; NO continues to
+  // the native flow. Skipped entirely for the picker's appflow option and for a
+  // pre-resolved --platform.
+  if (migrationGate) {
+    const label = migrationGate === 'ios' ? 'iOS' : 'Android'
+    return (
+      <Box flexDirection="column" minHeight={rows} padding={1}>
+        <Header />
+        {analyticsNotice && <AnalyticsNotice />}
+        <Box marginTop={1} flexDirection="column">
+          <Text>{`Are you migrating ${label} from Ionic Appflow? We can import your existing ${label} signing and store credentials instead of creating new ones.`}</Text>
+          <Box marginTop={1}>
+            <Select
+              options={[
+                { label: `Yes, import my ${label} credentials from Appflow`, value: 'yes' },
+                { label: `No, set up ${label} fresh`, value: 'no' },
+              ]}
+              onChange={value => answerMigrationGate(value === 'yes')}
+            />
+          </Box>
+        </Box>
+      </Box>
+    )
+  }
+
   return (
     <Box flexDirection="column" minHeight={rows} padding={1}>
       <Header />
       {analyticsNotice && <AnalyticsNotice />}
-      {!initialPlatform && <PlatformPicker layout={pickPlatformLayout(cols, rows)} onSelect={choose} />}
+      {!initialPlatform && <PlatformPicker layout={pickPlatformLayout(cols, rows)} onSelect={onPick} />}
     </Box>
   )
 }

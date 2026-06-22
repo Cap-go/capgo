@@ -3,7 +3,7 @@ import type { AndroidOnboardingProgress, AndroidOnboardingStep } from '../androi
 import type { AndroidEffectDeps, AndroidStepCtx } from '../android/flow.js'
 import type { IosEffectDeps, IosStepCtx, IosStepView } from '../ios/flow.js'
 import type { OnboardingProgress, OnboardingStep } from '../types.js'
-import type { ChoiceOption, NextStepResult, Platform } from './contract.js'
+import type { ChoiceOption, NextStepResult, Platform, StepKind } from './contract.js'
 import type { IosCarried, TailParkedState } from './session-state.js'
 import type { BuildOutputRecord } from '../../output-record.js'
 import type { TailEffectProgress, TailStep, TailStepCtx } from '../tail/flow.js'
@@ -20,11 +20,17 @@ import { TAIL_INPUT_KEYS, validateIosStepInput, validateStepInput, validateStore
 import { androidViewForStep, applyAndroidInput, applyGoogleSignInBroker, runAndroidEffect } from '../android/flow.js'
 import { applyIosInput, iosViewForStep, runIosEffect } from '../ios/flow.js'
 import { applyTailInput, tailViewForStep } from '../tail/flow.js'
-import { clearSession, clearSessionCarried, dropIosCarried, getResumeResolvedFor, getSession, getSessionPlatform, mergeIosCarried, mergeTailCarried, setResumeResolvedFor, setSessionPlatform, setTailParked } from './session-state.js'
+import { clearSession, clearSessionCarried, dropIosCarried, getAppflowProgress, getResumeResolvedFor, getSession, getSessionPlatform, mergeIosCarried, mergeTailCarried, setAppflowGate, setAppflowProgress, setResumeResolvedFor, setSessionPlatform, setTailParked } from './session-state.js'
 import { slimAndroidTailProgress, slimIosTailProgress } from './tail-progress.js'
 import { brokerBegin, brokerClear, brokerPoll } from './broker-session.js'
 import type { GoogleUserInfo } from '../android/oauth-google.js'
 import { SUPPORT_EMAIL } from '../../../support/contact-support.js'
+import { appflowFlow } from '../appflow/flow.js'
+import type { AppflowEffectResult } from '../appflow/flow.js'
+import { platformsToBuild } from '../appflow/flow.js'
+import type { AppflowProgress, AppflowStep } from '../appflow/types.js'
+import type { StepView } from '../flow/contract.js'
+import { buildAppflowEffectDeps, persistAppflowCredentials } from '../appflow/deps.js'
 
 /** Facts gathered during preflight; the pure deciders branch only on these. */
 export interface PreflightFacts {
@@ -135,6 +141,11 @@ interface OnboardingInput {
   profilePath?: string
   /** Answer to import-export-warning: 'go' exports from the Keychain (the one macOS permission dialog), 'back' re-picks the profile, 'exit' stops. */
   exportConfirm?: 'go' | 'back' | 'exit'
+  // ── Appflow migration answers ───────────────────────────────────────────────
+  /** Generic choice value for the Appflow migration flow's neutral steps (org/app/cert pick, submenu, gap-fill, p8-upgrade, handoff-build). */
+  value?: string
+  /** Answer to the one-time single-platform "Are you migrating from Ionic Appflow?" gate. */
+  migratingFromAppflow?: 'yes' | 'no'
 }
 
 // decideStart
@@ -256,17 +267,17 @@ async function decidePlatform(facts: PreflightFacts, _progress: OnboardingProgre
     options: [
       { value: 'ios', label: 'iOS', note: 'you will create an App Store Connect API key' },
       { value: 'android', label: 'Android', note: 'mostly automatic; one Google sign-in' },
+      { value: 'appflow', label: 'Both, I\'m migrating from Ionic Appflow', note: 'import your signing + store credentials from Appflow' },
     ],
     next: {
       tool: NEXT_STEP_TOOL,
-      with: { platform: '<ios|android>' },
-      instruction: 'Ask the user which platform, then call next_step with their choice.',
+      with: { platform: '<ios|android|appflow>' },
+      instruction: 'Ask the user which platform (or whether they are migrating from Ionic Appflow), then call next_step with their choice.',
       call: `${NEXT_STEP_TOOL}({ platform: "ios" })`,
     },
     rules: ONBOARDING_RULES,
   }
 }
-
 // ─── iOS (granular shared-engine path, S6a) ───────────────────────────────────
 //
 // decideIos is a thin driver over the SHARED iOS flow engine (ios/flow.ts),
@@ -1899,6 +1910,241 @@ function androidEffectError(
   }
 }
 
+// ── Appflow migration (MCP) ───────────────────────────────────────────────────
+//
+// The Appflow migration is driven through the NEUTRAL PlatformFlow contract
+// (appflowFlow) rather than a bespoke decider: decideAppflow resolves the
+// resume step, runs auto effects in a bounded loop (the same MAX_AUTO_STEPS
+// guard as ios/android), and maps the flow's neutral StepView into the MCP
+// NextStepResult. Progress is process-local (session-state appflowProgress) —
+// there is no on-disk appflow loader; a restart re-runs from explain and the
+// flow self-heals via the cached token. On the build hand-off the collected
+// per-platform Capgo creds are persisted into the REAL credential store, so the
+// existing build/CI tail treats them like natively-set-up creds.
+const APPFLOW_PHASE = 'credentials' as const
+
+/** Map a neutral StepView.kind to the MCP StepKind (the neutral 'input' kind is unused by the appflow flow). */
+function appflowKind(kind: StepView['kind']): StepKind {
+  if (kind === 'choice' || kind === 'human_gate' || kind === 'info' || kind === 'done' || kind === 'error')
+    return kind
+  // 'auto' renders as an auto step; 'input' is never produced by appflowViewForStep.
+  return 'auto'
+}
+
+/** Coarse 0-100 progress for an appflow step (informational only). */
+function appflowProgressFor(step: AppflowStep): number {
+  const order: AppflowStep[] = [
+    'explain', 'authenticating', 'select-org', 'select-app', 'fetch-signing',
+    'select-ios-cert', 'select-android-cert', 'no-signing-submenu', 'fetch-distribution',
+    'ios-dist-gapfill', 'android-dist-gapfill', 'validate', 'p8-upgrade-prompt', 'handoff-build', 'done',
+  ]
+  const idx = order.indexOf(step)
+  if (idx < 0)
+    return 10
+  return Math.min(95, 10 + Math.round((idx / (order.length - 1)) * 80))
+}
+
+/** Render a neutral appflow StepView (interactive — not 'auto') into an MCP NextStepResult. */
+function renderAppflowView(step: AppflowStep, view: StepView): NextStepResult {
+  const base = {
+    onboarding: 'capgo-builder' as const,
+    phase: APPFLOW_PHASE,
+    state: `appflow-${step}`,
+    progress: appflowProgressFor(step),
+    kind: appflowKind(view.kind),
+    summary: view.prompt,
+    rules: ONBOARDING_RULES,
+  }
+  if (view.kind === 'choice') {
+    return {
+      ...base,
+      options: (view.options ?? []).map(o => ({ value: o.value, label: o.label, note: o.note })),
+      next: {
+        tool: NEXT_STEP_TOOL,
+        with: { value: '<one of the option values>' },
+        instruction: 'Present the options and call next_step with the user\'s pick as { value }.',
+        call: `${NEXT_STEP_TOOL}({ value: "${(view.options?.[0]?.value) ?? 'continue'}" })`,
+      },
+    }
+  }
+  if (view.kind === 'human_gate') {
+    return {
+      ...base,
+      human: { instruction: view.prompt },
+      next: {
+        tool: NEXT_STEP_TOOL,
+        instruction: 'Show the explanation, then call next_step({}) to continue.',
+        call: `${NEXT_STEP_TOOL}({})`,
+      },
+    }
+  }
+  if (view.kind === 'info') {
+    return {
+      ...base,
+      next: {
+        tool: NEXT_STEP_TOOL,
+        instruction: 'Show the information, then call next_step({}) to continue.',
+        call: `${NEXT_STEP_TOOL}({})`,
+      },
+    }
+  }
+  return base
+}
+
+/**
+ * Drive the Appflow migration flow.
+ *
+ * `scope` is the migration scope ('both' from the picker's Appflow option, or
+ * 'ios' / 'android' from the single-platform "migrating from Appflow?" gate).
+ * `input` carries the user's last answer (a choice value, or {} to advance an
+ * info / human_gate). The bounded loop runs auto effects until it lands on an
+ * interactive step or the build hand-off.
+ */
+export async function decideAppflow(
+  facts: PreflightFacts,
+  deps: EngineDeps,
+  scope: 'both' | 'ios' | 'android',
+  input?: OnboardingInput,
+): Promise<NextStepResult> {
+  const appId = facts.appId!
+  // Seed (or resume) the process-local progress. A fresh entry starts at the
+  // explain gate with the chosen scope.
+  let progress: AppflowProgress = getAppflowProgress(appId)
+    ?? { scope, migratable: { ios: false, android: false }, completedSteps: [] }
+  // Keep the scope in sync with the entry point on a truly fresh entry.
+  if (progress.scope !== scope && progress.completedSteps.length === 0)
+    progress = { ...progress, scope }
+
+  const flowDeps = buildAppflowEffectDeps({ appId, packageName: facts.appId })
+
+  // Apply the user's answer to the step the migration is parked on (the
+  // interactive step the previous call returned), then advance.
+  //
+  // A FRESH entry into the migration (the picker's `platform: 'appflow'`, or a
+  // single-platform gate `migratingFromAppflow: 'yes'`) must RENDER the resume
+  // step, not advance past it. Every other call is an advance of the parked
+  // interactive step: a bare next_step({}) advances an info / human_gate, and a
+  // next_step({ value }) answers a choice.
+  const isFreshEntry = input?.platform === 'appflow' || input?.migratingFromAppflow === 'yes'
+  let step = appflowFlow.resumeStep(progress)
+  const parkedView = appflowFlow.viewForStep(step, progress)
+  const isInteractive = parkedView.kind !== 'auto'
+  if (input && !isFreshEntry && isInteractive) {
+    progress = appflowFlow.applyInput(step, progress, { value: input.value, text: undefined })
+    // 'abandon' on the no-signing submenu leaves the migration and starts native
+    // onboarding for the affected platform (the spec's "come back later" exit).
+    if (step === 'no-signing-submenu' && input.value === 'abandon') {
+      const native: Platform = progress.noSigningScope === 'android' ? 'android' : 'ios'
+      setAppflowProgress(appId, undefined)
+      setSessionPlatform(appId, native)
+      return native === 'android' ? decideAndroid(facts, deps) : decideIos(facts, deps)
+    }
+    // The build hand-off choice is resolved separately (persist + route/finish).
+    if (step === 'handoff-build')
+      return appflowHandoff(facts, deps, progress, input)
+    step = appflowFlow.resumeStep(progress)
+  }
+
+  for (let i = 0; i < MAX_AUTO_STEPS; i++) {
+    const view = appflowFlow.viewForStep(step, progress)
+    if (view.kind !== 'auto') {
+      // The build hand-off choice is resolved by appflowHandoff (persist creds +
+      // route to build / finish) when the user answers it; until then it renders
+      // as an ordinary choice.
+      if (step === 'handoff-build')
+        return appflowHandoff(facts, deps, progress, input)
+      setAppflowProgress(appId, progress)
+      return renderAppflowView(step, view)
+    }
+    // Auto step → run the effect, persist, and continue the loop from `next`.
+    let result: AppflowEffectResult
+    try {
+      result = (await appflowFlow.runEffect(step, progress, flowDeps)) as AppflowEffectResult
+    }
+    catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      setAppflowProgress(appId, progress)
+      return {
+        onboarding: 'capgo-builder', phase: APPFLOW_PHASE, state: `appflow-${step}`, platform: undefined,
+        progress: appflowProgressFor(step), kind: 'error',
+        summary: `Appflow migration error at "${step}": ${message}. If this persists, email ${SUPPORT_EMAIL}.`,
+        rules: ONBOARDING_RULES,
+      }
+    }
+    progress = result.progress
+    setAppflowProgress(appId, progress)
+    if (!result.next)
+      break
+    step = result.next
+  }
+
+  // Landed on (or looped to) the build hand-off after the auto chain.
+  if (step === 'handoff-build')
+    return appflowHandoff(facts, deps, progress, input)
+  // Fallback: render whatever interactive step we ended on.
+  setAppflowProgress(appId, progress)
+  return renderAppflowView(step, appflowFlow.viewForStep(step, progress))
+}
+
+/**
+ * Resolve the build hand-off: when the user answers the handoff-build choice,
+ * persist the migrated creds and either route into the build phase ('build') or
+ * finish ('skip'). Without an answer yet, render the choice.
+ */
+async function appflowHandoff(
+  facts: PreflightFacts,
+  deps: EngineDeps,
+  progress: AppflowProgress,
+  input?: OnboardingInput,
+): Promise<NextStepResult> {
+  const appId = facts.appId!
+  const targets = platformsToBuild(progress)
+  if (!input || input.value === undefined) {
+    setAppflowProgress(appId, progress)
+    return renderAppflowView('handoff-build', appflowFlow.viewForStep('handoff-build', progress))
+  }
+  // Persist the migrated per-platform creds into the real store before anything
+  // downstream reads them (so a build / `build request` sees them).
+  await persistAppflowCredentials(appId, progress).catch(() => {})
+  if (input.value === 'skip') {
+    setAppflowProgress(appId, undefined)
+    return {
+      onboarding: 'capgo-builder', phase: 'done', state: 'appflow-done', progress: 100, kind: 'done',
+      summary: `Appflow migration complete for "${appId}". Imported credentials for: ${targets.join(', ') || 'no platforms'}. Start your first cloud build anytime with \`capgo build request\`.`,
+      rules: ONBOARDING_RULES,
+    }
+  }
+  // 'build' → commit the session to the (first) migrated platform and enter the
+  // build phase. The first build is run by start_capgo_build, exactly like the
+  // native flows.
+  const first = targets[0]
+  if (!first) {
+    setAppflowProgress(appId, undefined)
+    return {
+      onboarding: 'capgo-builder', phase: 'done', state: 'appflow-done', progress: 100, kind: 'done',
+      summary: `Appflow migration finished for "${appId}", but no platform credentials were imported. Re-run onboarding or email ${SUPPORT_EMAIL} if you expected credentials.`,
+      rules: ONBOARDING_RULES,
+    }
+  }
+  setAppflowProgress(appId, undefined)
+  setSessionPlatform(appId, first)
+  return {
+    onboarding: 'capgo-builder', phase: 'build', state: 'build-ready', platform: first, progress: 90, kind: 'choice',
+    summary: `Credentials imported from Appflow for ${targets.join(', ')}. Run the first cloud build for ${first} now?`,
+    options: [
+      { value: 'build', label: `Build ${first} now` },
+      { value: 'skip', label: 'Skip (build later with `capgo build request`)' },
+    ],
+    next: {
+      tool: 'start_capgo_build',
+      with: { platform: first },
+      instruction: `To build, call start_capgo_build({ platform: "${first}" }) and then poll capgo_build_wait. To skip, call ${NEXT_STEP_TOOL}({ runBuild: false, platform: "${first}" }).`,
+      call: `start_capgo_build({ platform: "${first}" })`,
+    },
+    rules: ONBOARDING_RULES,
+  }
+}
+
 export async function decideAndroid(
   facts: PreflightFacts,
   deps: EngineDeps,
@@ -2977,6 +3223,12 @@ export async function decideAdvance(
         exportConfirm: input.exportConfirm,
       }
     : undefined
+  // ── Appflow migration entry (picker option 'appflow' = scope 'both') ─────────
+  if (input?.platform === 'appflow') {
+    if (!facts.authenticated || !facts.appRegistered)
+      return decideStart(facts, progress, deps)
+    return decideAppflow(facts, deps, 'both', input)
+  }
   if (input?.platform === 'ios' || input?.platform === 'android') {
     if (!facts.authenticated)
       return decideStart(facts, progress, deps)
@@ -2984,6 +3236,20 @@ export async function decideAdvance(
       return decideStart(facts, progress, deps)
     if (!facts.appRegistered)
       return decideStart(facts, progress, deps)
+    // ── "Migrating from Appflow?" gate (single-platform entry, OPT-IN) ─────────
+    // The single-platform migration question is surfaced in the TUI (build init).
+    // Over MCP it is OPT-IN: a caller that already knows the user is migrating
+    // passes { migratingFromAppflow: 'yes' } to run the migration scoped to this
+    // platform; 'no' (or omitting the field) keeps the established direct-pick
+    // contract and goes straight to native onboarding. The answer is persisted so
+    // a resume never re-asks.
+    if (input.migratingFromAppflow === 'yes') {
+      if (facts.appId)
+        setAppflowGate(facts.appId, 'asked-yes')
+      return decideAppflow(facts, deps, input.platform, input)
+    }
+    if (input.migratingFromAppflow === 'no' && facts.appId)
+      setAppflowGate(facts.appId, 'asked-no')
     // Commit this session to the chosen platform (the picker answer / explicit
     // pick). Subsequent bare next_step({}) calls resume THIS platform from session
     // memory — never from whichever platform happens to have progress on disk.
@@ -2997,6 +3263,13 @@ export async function decideAdvance(
   // session memory, not disk), so a mid-flow next_step({}) continues the right flow.
   // With no committed platform (fresh start / post-restart) this falls to decideStart,
   // which offers the picker rather than guessing from disk.
+  // An in-flight Appflow migration (process-local progress) takes precedence — a
+  // bare next_step({ value }) answers the migration's current step.
+  if (facts.appId) {
+    const appflowInFlight = getAppflowProgress(facts.appId)
+    if (appflowInFlight)
+      return decideAppflow(facts, deps, appflowInFlight.scope, input)
+  }
   const active = facts.appId ? getSessionPlatform(facts.appId) : undefined
   if (active === 'android')
     return decideAndroid(facts, deps)
