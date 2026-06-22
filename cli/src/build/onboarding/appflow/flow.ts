@@ -10,11 +10,24 @@
 // interactive step graph (incl. step-6 gap-fill, step-7 validate, step-8 p8
 // upgrade) is encoded in getAppflowResumeStep, and 'validate' is an AUTO step that
 // runs the advisory checks and then transitions to the 'validate-results' info view.
+//
+// Build + finish (spec "Build + finish"): on `handoff-build` → 'build' the flow
+// REUSES the shared onboarding tail (../tail/flow.ts) inline for the chosen
+// platform — saving-credentials → ask-build → requesting-build → CI/CD secrets →
+// build-complete — exactly as the iOS/Android drivers do. Both-platform
+// migrations FIRST pick which platform to build (build-platform-pick), build it,
+// then offer the second. 'skip' finishes with creds persisted (build later via
+// `capgo build request`). The tail's effect/view/input steps are delegated to the
+// shared module via runTailEffect / tailViewForStep / applyTailInput.
 import type { PlatformFlow, StepView } from '../flow/contract'
 import type { AppflowInput, AppflowProgress, AppflowStep } from './types'
 import type { AppflowToken } from './auth'
 import { isExpired, loginWithBrowser, refresh } from './auth'
 import { createAppflowApi } from './api'
+import type { TailInput, TailStep, TailStepCtx, TailStepView } from '../tail/flow.js'
+import { applyTailInput, runTailEffect, tailViewForStep } from '../tail/flow.js'
+import type { AppflowTailDepsOptions, AppflowTailProgress } from './tail.js'
+import { toAppflowTailDeps } from './tail.js'
 
 export interface AppflowEffectResult {
   progress: AppflowProgress
@@ -40,9 +53,106 @@ export interface AppflowEffectDeps {
   validateAppleAppPassword?: (user: string, pw: string) => Promise<{ valid: boolean, message?: string }>
   validateP12?: (p12B64: string, password: string) => Promise<boolean>
   carried?: Record<string, unknown>
+  // Build/CI tail wiring (consumed only when the flow delegates a shared tail
+  // step). The driver supplies the API key / gateway / journey + the build-output
+  // and side-log sinks; the tail deps are built per-effect from these.
+  tailOptions?: AppflowTailDepsOptions
 }
 
 const SUPPORT = 'support@capgo.app'
+
+// ── shared tail step routing ──────────────────────────────────────────────────
+//
+// The shared tail step ids the appflow flow delegates to ../tail/flow.ts. EFFECT
+// steps run their effect via runTailEffect; VIEW steps render via tailViewForStep;
+// INPUT steps record state via applyTailInput. The id sets mirror the iOS engine's
+// TAIL_EFFECT_STEPS / TAIL_VIEW_STEPS / TAIL_INPUT_STEPS.
+const APPFLOW_TAIL_EFFECT_STEPS = new Set<TailStep>([
+  'saving-credentials',
+  'detecting-ci-secrets',
+  'checking-ci-secrets',
+  'uploading-ci-secrets',
+  'exporting-env',
+  'overwrite-and-export-env',
+  'writing-workflow-file',
+  'requesting-build',
+])
+
+const APPFLOW_TAIL_VIEW_STEPS = new Set<TailStep>([
+  'ci-secrets-setup',
+  'ci-secrets-target-select',
+  'ask-ci-secrets',
+  'confirm-ci-secret-overwrite',
+  'ci-secrets-failed',
+  'ask-github-actions-setup',
+  'confirm-secrets-push',
+  'ask-export-env',
+  'confirm-env-export-overwrite',
+  'pick-package-manager',
+  'pick-build-script',
+  'pick-build-script-custom',
+  'preview-workflow-file',
+  'view-workflow-diff',
+  'ask-build',
+  'build-complete',
+])
+
+const APPFLOW_TAIL_INPUT_STEPS = new Set<TailStep>([
+  'ci-secrets-target-select',
+  'ask-github-actions-setup',
+  'ask-export-env',
+  'pick-package-manager',
+  'pick-build-script',
+  'pick-build-script-custom',
+])
+
+export function isAppflowTailStep(step: AppflowStep): step is TailStep {
+  return APPFLOW_TAIL_EFFECT_STEPS.has(step as TailStep) || APPFLOW_TAIL_VIEW_STEPS.has(step as TailStep)
+}
+
+/** The tail-facing progress: the migration's progress with a guaranteed appId. */
+function toTailProgress(progress: AppflowProgress): AppflowTailProgress {
+  return { ...progress, appId: progress.appId ?? '' }
+}
+
+/** Map a neutral TailStepView onto the appflow neutral StepView (1:1 fields). */
+function mapTailViewToStepView(v: TailStepView): StepView {
+  return {
+    kind: v.kind,
+    prompt: v.prompt ?? v.title ?? v.message ?? '',
+    options: (v.options ?? []).map(o => ({ value: o.value, label: o.label ?? o.value, note: o.note })),
+    collect: v.collect?.map(field => ({ field, desc: field })),
+  }
+}
+
+/** Build the per-platform TailInput the shared reducer expects from a raw choice/text. */
+function toTailInput(step: TailStep, input: AppflowInput): TailInput {
+  switch (step) {
+    case 'ci-secrets-target-select':
+      // 'skip' clears the target; otherwise the engine re-resolves the target
+      // object at checking-ci-secrets (the appflow flow keeps no target table),
+      // so we record null here and let detection drive it. Mirrors the contract
+      // where ci-secrets-target-select carries a CiSecretTarget | null.
+      return { step, ciSecretTarget: null }
+    case 'ask-github-actions-setup':
+      return { step, value: (input.value as 'with-workflow' | 'secrets-only' | 'no') ?? 'no' }
+    case 'ask-export-env':
+      return input.value === 'yes'
+        ? { step, value: 'yes', envExportTargetPath: input.text ?? '' }
+        : { step, value: 'no' }
+    case 'pick-package-manager':
+      return { step, selectedPackageManager: (input.value as 'bun' | 'npm' | 'pnpm' | 'yarn') ?? 'npm' }
+    case 'pick-build-script':
+      return input.value === '__custom__'
+        ? { step, value: '__custom__' }
+        : { step, buildScriptChoice: { type: 'npm-script', name: input.value ?? '' } }
+    case 'pick-build-script-custom':
+      return { step, command: input.text ?? '' }
+    default:
+      // Navigation-only / spinner-gate steps fall through unchanged.
+      return { step, value: input.value } as unknown as TailInput
+  }
+}
 
 // ── pure helpers (unit-tested) ───────────────────────────────────────────────
 export function autoSelect<T>(items: T[]): T | 'prompt' | null {
@@ -86,6 +196,12 @@ export function platformsToBuild(progress: Pick<AppflowProgress, 'scope' | 'ios'
   if (inScope(scope, 'android') && progress.android && Object.keys(progress.android).length > 0)
     out.push('android')
   return out
+}
+
+/** Platforms still awaiting an inline build (migrated, not yet built). */
+export function platformsRemainingToBuild(progress: AppflowProgress): ('ios' | 'android')[] {
+  const built = new Set(progress.builtPlatforms ?? [])
+  return platformsToBuild(progress).filter(p => !built.has(p))
 }
 
 // Advisory, surfaced, NON-blocking. Failures -> 'warn'; thrown/absent -> 'skipped'.
@@ -161,6 +277,10 @@ function noSigningPlatformLabel(progress: AppflowProgress): string {
 }
 
 export function appflowViewForStep(step: AppflowStep, progress: AppflowProgress, ctx: Record<string, unknown> = {}): StepView {
+  // Shared tail steps render via the neutral tail view, mapped 1:1 onto StepView.
+  if (isAppflowTailStep(step))
+    return mapTailViewToStepView(tailViewForStep(step as TailStep, toTailProgress(progress), ctx as TailStepCtx))
+
   switch (step) {
     case 'explain':
       return {
@@ -246,6 +366,19 @@ export function appflowViewForStep(step: AppflowStep, progress: AppflowProgress,
         ],
       }
     }
+    case 'build-platform-pick': {
+      // Both platforms migrated — ask which to build first (the other is offered
+      // after the first build completes). Only the not-yet-built platforms appear.
+      const remaining = platformsRemainingToBuild(progress)
+      return {
+        kind: 'choice',
+        prompt: 'Which platform should we build first?',
+        options: [
+          ...remaining.map(p => ({ value: p, label: p === 'ios' ? 'iOS' : 'Android' })),
+          { value: 'skip', label: 'Skip build (finish; build later with `build request`)' },
+        ],
+      }
+    }
     case 'authenticating':
     case 'fetch-signing':
     case 'fetch-distribution':
@@ -263,6 +396,14 @@ export function appflowViewForStep(step: AppflowStep, progress: AppflowProgress,
 export function applyAppflowInput(step: AppflowStep, progress: AppflowProgress, input: AppflowInput): AppflowProgress {
   const completed = progress.completedSteps.includes(step) ? progress.completedSteps : [...progress.completedSteps, step]
   const base = { ...progress, completedSteps: completed }
+
+  // Shared tail input steps delegate to the shared reducer (records setupMode /
+  // ciSecretTarget / selectedPackageManager / buildScriptChoice / envExportTargetPath).
+  if (APPFLOW_TAIL_INPUT_STEPS.has(step as TailStep)) {
+    const tailProgress = applyTailInput(step as TailStep, toTailProgress(base), toTailInput(step as TailStep, input))
+    return { ...base, ...tailProgress, completedSteps: completed }
+  }
+
   switch (step) {
     case 'select-org':
       return { ...base, orgSlug: input.value }
@@ -276,6 +417,13 @@ export function applyAppflowInput(step: AppflowStep, progress: AppflowProgress, 
       return { ...base, androidDistGapfill: input.value === 'generate' ? 'generate' : 'skip' }
     case 'p8-upgrade-prompt':
       return { ...base, p8Upgrade: input.value === 'convert' ? 'convert' : 'skip' }
+    case 'handoff-build':
+      return { ...base, handoffChoice: input.value === 'build' ? 'build' : 'skip' }
+    case 'build-platform-pick':
+      // 'skip' ends the build hand-off; a platform value commits the next build.
+      return input.value === 'skip'
+        ? { ...base, handoffChoice: 'skip' }
+        : { ...base, buildPlatform: input.value === 'android' ? 'android' : 'ios' }
     default:
       return base
   }
@@ -312,12 +460,122 @@ export function getAppflowResumeStep(progress: AppflowProgress | null): AppflowS
   // step-8 iOS app-specific-password -> .p8 upgrade offer (once).
   if (iosHasAppPassword(progress) && progress.p8Upgrade === undefined)
     return 'p8-upgrade-prompt'
-  return 'handoff-build'
+  // converge: the build hand-off choice (build now / skip).
+  if (progress.handoffChoice === undefined)
+    return 'handoff-build'
+  // 'skip' finishes; the driver routes to done.
+  if (progress.handoffChoice === 'skip')
+    return 'done'
+  // 'build': drive the shared tail for the chosen platform.
+  return getAppflowBuildResumeStep(progress)
+}
+
+/**
+ * Resume the inline build phase after the user chose 'build'. Picks the platform
+ * to build (asking first when BOTH migrated and none/one is chosen), then enters
+ * the shared tail at saving-credentials. After a platform's build completes
+ * (recorded in builtPlatforms) it offers the next remaining platform, then done.
+ */
+export function getAppflowBuildResumeStep(progress: AppflowProgress): AppflowStep {
+  const remaining = platformsRemainingToBuild(progress)
+  if (remaining.length === 0)
+    return 'done'
+  // A platform is committed for the current build run.
+  if (progress.buildPlatform && remaining.includes(progress.buildPlatform))
+    return 'saving-credentials'
+  // Single remaining platform → build it directly (no pick needed).
+  if (remaining.length === 1)
+    return 'saving-credentials'
+  // 2+ remaining and none committed → ask which to build first.
+  return 'build-platform-pick'
+}
+
+// ── shared-tail interactive transitions ──────────────────────────────────────
+//
+// The shared tail's CHOICE/INPUT steps transition by driver logic, NOT by the
+// resume router (the bespoke iOS/Android drivers hard-code these; see android
+// ui/app.tsx). This pure table replicates that transition map for the POST-BUILD
+// tail the appflow flow drives, so the generic appflow renderer can advance the
+// tail without a bespoke per-step handler. Returns the next tail step id.
+export function nextTailStep(step: TailStep, value: string | undefined, progress: AppflowProgress): TailStep {
+  switch (step) {
+    case 'ci-secrets-setup':
+      return value === 'retry' ? 'detecting-ci-secrets' : 'build-complete'
+    case 'ci-secrets-target-select':
+      // The appflow flow keeps no target table, so a chosen provider re-enters
+      // detection (which re-resolves the target object), and skip finishes.
+      return value === 'skip' || !value ? 'build-complete' : 'detecting-ci-secrets'
+    case 'ask-ci-secrets':
+      return value === 'yes' ? 'checking-ci-secrets' : 'build-complete'
+    case 'ask-github-actions-setup':
+      // with-workflow / secrets-only → push the secrets (checking-ci-secrets);
+      // 'no' (declined) → offer the .env export instead.
+      return value === 'no' ? 'ask-export-env' : 'checking-ci-secrets'
+    case 'ask-export-env':
+      return value === 'yes' ? 'exporting-env' : 'build-complete'
+    case 'confirm-env-export-overwrite':
+      return value === 'replace' ? 'overwrite-and-export-env' : 'build-complete'
+    case 'pick-package-manager':
+      return 'pick-build-script'
+    case 'pick-build-script':
+      return value === '__custom__' ? 'pick-build-script-custom' : 'preview-workflow-file'
+    case 'pick-build-script-custom':
+      return 'preview-workflow-file'
+    case 'preview-workflow-file':
+      return value === 'view' ? 'view-workflow-diff' : value === 'write' ? 'writing-workflow-file' : 'build-complete'
+    case 'view-workflow-diff':
+      return 'preview-workflow-file'
+    case 'confirm-secrets-push':
+      return value === 'confirm' ? 'uploading-ci-secrets' : 'build-complete'
+    case 'confirm-ci-secret-overwrite':
+      return value === 'replace' ? 'uploading-ci-secrets' : 'build-complete'
+    case 'ci-secrets-failed':
+      return value === 'retry' ? (progress.ciSecretTarget ? 'checking-ci-secrets' : 'detecting-ci-secrets') : 'build-complete'
+    case 'ask-build':
+      return value === 'yes' ? 'requesting-build' : 'build-complete'
+    default:
+      return 'build-complete'
+  }
+}
+
+/**
+ * Record the just-finished platform's inline tail run as complete (reached at
+ * build-complete via any path — built, skipped, or failed) so a both-platform
+ * migration can offer the next platform. Returns the next overall appflow step
+ * (the second platform's tail entry, or 'done').
+ */
+export function markTailRunComplete(progress: AppflowProgress): { progress: AppflowProgress, next: AppflowStep } {
+  const remaining = platformsRemainingToBuild(progress)
+  const platform = progress.buildPlatform ?? remaining[0]
+  const built = new Set(progress.builtPlatforms ?? [])
+  if (platform)
+    built.add(platform)
+  const nextProgress: AppflowProgress = { ...progress, builtPlatforms: [...built], buildPlatform: undefined }
+  return { progress: nextProgress, next: getAppflowBuildResumeStep(nextProgress) }
 }
 
 // ── effects ──────────────────────────────────────────────────────────────────
 export async function runAppflowEffect(step: AppflowStep, progress: AppflowProgress, deps: AppflowEffectDeps): Promise<AppflowEffectResult> {
   const mark = (p: AppflowProgress, s: AppflowStep): AppflowProgress => ({ ...p, completedSteps: p.completedSteps.includes(s) ? p.completedSteps : [...p.completedSteps, s] })
+
+  // Shared tail EFFECT steps: build the tail deps for the committed platform and
+  // delegate to runTailEffect. The committed platform is buildPlatform, or the
+  // single remaining platform when only one migrated.
+  if (APPFLOW_TAIL_EFFECT_STEPS.has(step as TailStep)) {
+    const remaining = platformsRemainingToBuild(progress)
+    const platform = progress.buildPlatform ?? remaining[0] ?? 'ios'
+    const tailDeps = toAppflowTailDeps(platform, {
+      ...deps.tailOptions,
+      carried: { ...(deps.tailOptions?.carried ?? {}), ...((deps.carried as AppflowTailDepsOptions['carried']) ?? {}) },
+    })
+    const result = await runTailEffect(step as TailStep, toTailProgress(progress), tailDeps)
+    // Keep buildPlatform committed through the whole tail run — the build-complete
+    // ADVANCE (markTailRunComplete) records the built platform and re-picks. Merge
+    // the tail's returned progress (it threads ciSecretTarget / envExportTargetPath).
+    const nextProgress: AppflowProgress = { ...progress, ...result.progress, buildPlatform: platform }
+    return { progress: nextProgress, next: result.next as AppflowStep | undefined, transient: result.transient as Record<string, unknown> | undefined }
+  }
+
   switch (step) {
     case 'authenticating': {
       let token = deps.loadToken?.() ?? progress.token ?? null

@@ -10,11 +10,13 @@
 //   'auto'                -> runs the flow effect in a bounded loop (spinner)
 //   'done' / 'error'      -> terminal line + exit
 //
-// The flow is a CREDENTIAL SOURCE: on completion the collected per-platform
-// Capgo creds are persisted into the real credential store (persistAppflowCredentials)
-// and the wizard reports `completed` so the shell prints the breadcrumb. Build /
-// CI convergence is intentionally left to the standalone `capgo build request`
-// path (see the report notes) — this app finishes the migration with creds saved.
+// Build + finish: when the user picks 'build' at handoff-build the flow REUSES
+// the shared onboarding tail inline (saving-credentials → ask-build →
+// requesting-build → CI/CD secrets → build-complete) for the chosen platform —
+// the SAME generic StepView renderer drives the tail's choice/input/info/auto
+// steps, with ONE bespoke takeover: the fullscreen streaming build-output pane
+// (FullscreenBuildOutput) at requesting-build, mirroring the native app.tsx.
+// 'skip' finishes with creds persisted (build later via `capgo build request`).
 import type { FC } from 'react'
 import { Box, Text, useApp } from 'ink'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
@@ -23,9 +25,12 @@ import type { OnboardingResult } from '../types.js'
 import type { StepView } from '../flow/contract.js'
 import type { AppflowEffectResult } from '../appflow/flow.js'
 import type { AppflowProgress, AppflowStep, MigrationScope } from '../appflow/types.js'
-import { appflowFlow } from '../appflow/flow.js'
+import { appflowFlow, isAppflowTailStep, markTailRunComplete, nextTailStep } from '../appflow/flow.js'
+import type { TailStep } from '../tail/flow.js'
 import { buildAppflowEffectDeps, persistAppflowCredentials } from '../appflow/deps.js'
-import { Header, ErrorLine, SpinnerLine, SuccessLine, FilteredTextInput } from './components.js'
+import { sanitizeBuildLogLines } from '../build-log.js'
+import { Header, ErrorLine, SpinnerLine, SuccessLine, FilteredTextInput, FullscreenBuildOutput } from './components.js'
+import { useTerminalSize } from './shell.js'
 import { exitAfterOnboardingBeforeExit } from './exit.js'
 import type { OnboardingBeforeExit } from './exit.js'
 
@@ -41,15 +46,19 @@ export interface AppflowAppProps {
   onBeforeExit?: OnboardingBeforeExit
 }
 
-const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, onStep, onResult, onBeforeExit }) => {
+const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journeyId, onStep, onResult, onBeforeExit }) => {
   const { exit } = useApp()
+  const { rows: terminalRows } = useTerminalSize()
   const [progress, setProgress] = useState<AppflowProgress>(() => ({ scope, migratable: { ios: false, android: false }, completedSteps: [] }))
   const [step, setStep] = useState<AppflowStep>(() => appflowFlow.resumeStep(null))
   const [ctx, setCtx] = useState<Record<string, unknown>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [finished, setFinished] = useState<{ kind: 'done' | 'error', message: string } | null>(null)
-  // Guards a single deps build + a single in-flight auto effect per step.
+  // Streaming build-output lines for the fullscreen takeover at requesting-build.
+  const [buildOutput, setBuildOutput] = useState<string[]>([])
+  // Guards a single deps build (the appflow-side validators/token) + a single
+  // in-flight auto effect per step.
   const depsRef = useRef(buildAppflowEffectDeps({ appId, packageName: appId }))
 
   const exitNow = useCallback(() => exitAfterOnboardingBeforeExit(onBeforeExit, exit), [onBeforeExit, exit])
@@ -61,6 +70,22 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, onStep, onResult, onBef
 
   const view: StepView = appflowFlow.viewForStep(step, progress, ctx)
 
+  const finishMigration = useCallback(async (finalProgress: AppflowProgress) => {
+    try {
+      await persistAppflowCredentials(appId, finalProgress)
+    }
+    catch {
+      // Persisting is best-effort here; the credentials still live in progress.
+    }
+    onResult?.({ outcome: 'completed' })
+    const built = finalProgress.builtPlatforms ?? []
+    const message = built.length > 0
+      ? `Appflow migration complete. Build requested for: ${built.join(', ')}. Track it at https://capgo.app.`
+      : 'Appflow migration complete. Your imported credentials are saved — run `capgo build request` to build.'
+    setFinished({ kind: 'done', message })
+    setTimeout(exitNow, 50)
+  }, [appId, onResult, exitNow])
+
   // ── auto steps: run the flow effect, then advance to `next` ──────────────────
   useEffect(() => {
     if (view.kind !== 'auto' || busy || finished)
@@ -69,7 +94,30 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, onStep, onResult, onBef
     setBusy(true)
     void (async () => {
       try {
-        const result = (await appflowFlow.runEffect(step, progress, depsRef.current)) as AppflowEffectResult
+        // The shared build/CI tail effects need their deps + the prior effect's
+        // transient threaded back as `carried` (NEVER persisted). Build a per-effect
+        // deps object: the appflow validators/token from depsRef PLUS the tail
+        // wiring (api key / gateway / journey + build-output & side-log sinks) and
+        // the carried transient = the current ctx.
+        const effectDeps = {
+          ...depsRef.current,
+          carried: ctx,
+          tailOptions: {
+            apikey,
+            supaHost,
+            journeyId,
+            carried: ctx as Record<string, unknown>,
+            onBuildOutput: (line: string) => {
+              if (!cancelled)
+                setBuildOutput(prev => [...prev, ...sanitizeBuildLogLines(line)])
+            },
+            onLog: (_message: string, _color?: string) => {
+              // Side-log lines (✔ Credentials saved, ✔ Uploaded …) are informational;
+              // the wizard surfaces the build pane + step prompts, so we drop them here.
+            },
+          },
+        }
+        const result = (await appflowFlow.runEffect(step, progress, effectDeps)) as AppflowEffectResult
         if (cancelled)
           return
         setProgress(result.progress)
@@ -95,32 +143,41 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, onStep, onResult, onBef
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, view.kind])
 
-  const finishMigration = useCallback(async (finalProgress: AppflowProgress) => {
-    try {
-      await persistAppflowCredentials(appId, finalProgress)
-    }
-    catch {
-      // Persisting is best-effort here; the credentials still live in progress.
-    }
-    onResult?.({ outcome: 'completed' })
-    setFinished({ kind: 'done', message: 'Appflow migration complete. Your imported credentials are saved — run `capgo build request` to build.' })
-    setTimeout(exitNow, 50)
-  }, [appId, onResult, exitNow])
-
   // Advance an interactive step with the user's answer (a choice value or a
   // collected input field), then re-derive the next step.
   const advance = useCallback((value?: string, text?: string) => {
     const next = appflowFlow.applyInput(step, progress, { value, text })
     setProgress(next)
-    // handoff-build with 'skip' finishes; 'build' would converge onto the build
-    // tail — left to `capgo build request` for now (see report). Either way the
-    // migration is complete once creds are persisted.
-    if (step === 'handoff-build') {
+
+    // Shared tail interactive steps transition by the tail's driver table (NOT
+    // the resume router). build-complete is the tail terminal: record the run and
+    // route to the next platform's tail entry or finish.
+    if (isAppflowTailStep(step)) {
+      if (step === 'build-complete') {
+        const { progress: marked, next: after } = markTailRunComplete(next)
+        setProgress(marked)
+        if (after === 'done') {
+          void finishMigration(marked)
+          return
+        }
+        setCtx({})
+        setStep(after)
+        return
+      }
+      setCtx({})
+      setStep(nextTailStep(step as TailStep, value, next))
+      return
+    }
+
+    const resumed = appflowFlow.resumeStep(next)
+    // 'done' is terminal — finish (persist creds + report completed). Reached on a
+    // 'skip' hand-off, a build-platform-pick 'skip', or after all builds complete.
+    if (resumed === 'done') {
       void finishMigration(next)
       return
     }
     setCtx({})
-    setStep(appflowFlow.resumeStep(next))
+    setStep(resumed)
   }, [step, progress, finishMigration])
 
   if (finished) {
@@ -132,6 +189,13 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, onStep, onResult, onBef
         </Box>
       </Box>
     )
+  }
+
+  // Bespoke takeover: the streaming build-output pane (requesting-build). Owns the
+  // whole terminal like the native app.tsx so the unbounded log can't trip the
+  // wizard's body-measurement / too-small gate.
+  if (step === 'requesting-build') {
+    return <FullscreenBuildOutput title="Building..." lines={buildOutput} terminalRows={terminalRows} />
   }
 
   return (
@@ -162,8 +226,7 @@ function renderBody(view: StepView, busy: boolean, advance: (value?: string, tex
   }
   if (view.kind === 'input') {
     // Collect the FIRST field; multi-field collects advance one field per submit
-    // via the flow's applyInput (the appflow flow does not currently emit 'input',
-    // but the renderer supports it for completeness / future steps).
+    // via the flow's applyInput (the tail's pick-build-script-custom uses this).
     const field = view.collect?.[0]
     return (
       <FilteredTextInput
