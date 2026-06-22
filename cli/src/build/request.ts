@@ -41,9 +41,12 @@ import * as tus from 'tus-js-client'
 import WS from 'ws' // TODO: remove when min version nodejs 22 is bump, should do it in july 2026 as it become deprecated
 import pack from '../../package.json'
 import {
+  CI_FAILURE_TIP,
   decideAnalyzeBehavior,
+  decideCiFailureActions,
   isLogTooBig,
   postAnalyzeStreamRequest,
+  shouldPrintCiTip,
   writeLocalAiFile,
 } from '../ai/analyze'
 import {
@@ -55,7 +58,7 @@ import {
 import { renderMarkdown } from '../ai/render-markdown'
 import { createStreamingMarkdownRenderer } from '../ai/stream-markdown'
 import { aiAnalysisResultFromPostAnalyze, trackAiAnalysisChoice, trackAiAnalysisResult } from '../ai/telemetry'
-import { writeSupportBundleFiles } from '../onboarding-support.js'
+import { type SupportBundleFiles, writeSupportBundleFiles } from '../onboarding-support.js'
 import { copyToClipboard, revealInFinder } from '../support/clipboard.js'
 import { contactSupport } from '../support/contact-support.js'
 import { appendInternalLog, getInternalLogPath, startInternalLog } from '../support/internal-log.js'
@@ -1652,7 +1655,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     // Capture when interactive, when the CI flag is set, OR when the caller asked
     // to drive the AI flow themselves (e.g. Ink onboarding) so the captured log
     // is available for runCapgoAiAnalysis.
-    const captureEnabled = (shouldCaptureLogs() || options.aiAnalytics === true || aiAnalysisMode === 'caller-handled')
+    const captureEnabled = (shouldCaptureLogs() || options.aiAnalytics === true || options.sendLogs === true || aiAnalysisMode === 'caller-handled')
       && aiAnalysisMode !== 'skip'
     let capturedJobId: string | null = null
     let keepPromptFile = false // mutable so local-AI flow can set it true
@@ -1977,6 +1980,19 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       }
       else if (finalStatus === 'failed') {
         log.error(`Build failed`)
+        // Non-interactive (CI/CD) failure with neither --ai-analytics nor
+        // --send-logs: surface the discoverability tip here, INDEPENDENT of log
+        // capture. The in-handler AI/decideCiFailureActions block below is gated
+        // behind captureEnabled, which is false in exactly this case, so the tip
+        // would otherwise never print. Interactive terminals use the clack menu;
+        // if either flag is set the corresponding action runs and no tip is wanted.
+        if (shouldPrintCiTip({
+          isTTY: process.stdout.isTTY === true,
+          aiAnalytics: options.aiAnalytics === true,
+          sendLogs: options.sendLogs === true,
+        })) {
+          process.stderr.write(`${CI_FAILURE_TIP}\n`)
+        }
       }
       else {
         log.warn(`Build finished with status: ${finalStatus}`)
@@ -2232,7 +2248,18 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
         // Spec: at a build failure, "Email Capgo support" comes first — the same
         // contact-support flow as the onboarding wizard, with clack-flavored deps.
-        const runEmailSupport = async (): Promise<void> => {
+        // Shared bundle prep for both the interactive email flow and the CI/CD
+        // --send-logs flow: read the internal log + the full persisted build log
+        // (both best-effort) and render/gzip them into a support bundle. The
+        // bundle is gzipped + uploaded/attached, so size isn't a concern here —
+        // support needs the full build log, not a tail.
+        const prepareSupportLogBundle = ({
+          capturedJobId,
+          appId,
+        }: {
+          capturedJobId: string | null
+          appId: string
+        }): SupportBundleFiles | null => {
           const internalLogPath = getInternalLogPath()
           let internalLines: string[] = []
           if (internalLogPath) {
@@ -2244,11 +2271,19 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           let buildLogLines: string[] = []
           try {
             const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
-            // Full persisted build log — support needs all of it, not a tail. The
-            // bundle is gzipped + uploaded/attached, so size isn't a concern.
             buildLogLines = readFileSync(logsPath, 'utf8').split('\n')
           }
           catch { /* best-effort */ }
+          return writeSupportBundleFiles({
+            kind: 'build-request',
+            appId,
+            error: `Cloud build ${capturedJobId} failed`,
+            logs: buildLogLines,
+            sections: internalLines.length > 0 ? [{ title: 'Internal log', lines: internalLines }] : [],
+          })
+        }
+
+        const runEmailSupport = async (): Promise<void> => {
           await contactSupport({
             subject: `Capgo Builder support — ${appId} (${platform})`,
             body: `Hi Capgo team,\n\nMy cloud build failed and I'd like help.\n\nApp: ${appId}\nPlatform: ${platform}\nJob: ${capturedJobId}`,
@@ -2279,13 +2314,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
               const s = spinnerC()
               s.start('Preparing your logs to send…')
               try {
-                const built = writeSupportBundleFiles({
-                  kind: 'build-request',
-                  appId,
-                  error: `Cloud build ${capturedJobId} failed`,
-                  logs: buildLogLines,
-                  sections: internalLines.length > 0 ? [{ title: 'Internal log', lines: internalLines }] : [],
-                })
+                const built = prepareSupportLogBundle({ capturedJobId, appId })
                 s.stop(built ? 'Logs ready.' : 'Couldn\'t prepare logs.')
                 return built
               }
@@ -2306,6 +2335,34 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
               return r
             },
           })
+        }
+
+        // CI/CD --send-logs: build the SAME support bundle the interactive email
+        // flow uses (writeSupportBundleFiles → gz under the 10 MB cap), then
+        // upload it to Capgo support via uploadSupportLogs. We can't send email
+        // from CI — only upload — so there's no mailto here. Never crashes the
+        // process or changes the exit code: any failure prints a graceful note
+        // pointing at support@capgo.app.
+        const runSendLogs = async (): Promise<void> => {
+          const files = prepareSupportLogBundle({ capturedJobId, appId })
+          if (!files) {
+            process.stderr.write(`Could not prepare your build logs to upload. Please email support@capgo.app and describe the issue (job ${capturedJobId}).\n`)
+            return
+          }
+
+          const uploaded = await uploadSupportLogs({
+            apiHost: host,
+            apikey: options.apikey,
+            appId,
+            jobId: capturedJobId ?? undefined,
+            gzPath: files.gzPath,
+          })
+          if (uploaded) {
+            process.stderr.write(`Build logs uploaded to Capgo support automatically. Our team has been notified and will contact you by email soon.\nReference: ${uploaded.url}\n`)
+          }
+          else {
+            process.stderr.write(`Could not upload your build logs automatically. Please email support@capgo.app and describe the issue (job ${capturedJobId}).\n`)
+          }
         }
 
         async function showMenu(): Promise<void> {
@@ -2334,16 +2391,28 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         }
 
         try {
-          if (behavior === 'skip') {
-            await emitSkipChoice()
-          }
-          else if (behavior === 'auto_upload') {
-            if (await isLogTooBig(capturedJobId)) {
-              process.stderr.write('Log too big for AI analysis (>10 MB), skipping\n')
-              await emitSkipChoice()
-            }
-            else {
-              await runCapgoAi('auto_upload', 'ci_flag')
+          if (behavior === 'skip' || behavior === 'auto_upload') {
+            // Non-interactive (CI/CD). --ai-analytics and --send-logs are
+            // independent and additive: run whichever the user opted into.
+            // The neither-flag discoverability tip is NOT emitted here - it is
+            // printed at the build-failure point (see shouldPrintCiTip above),
+            // because reaching this block requires captureEnabled, which is
+            // false in the exact non-interactive + neither-flag case the tip is
+            // for. decideCiFailureActions is the pure, unit-tested seam.
+            const actions = decideCiFailureActions({
+              aiAnalyticsFlag: options.aiAnalytics === true,
+              sendLogsFlag: options.sendLogs === true,
+            })
+            if (actions.sendLogs)
+              await runSendLogs()
+            if (actions.runAiAnalysis) {
+              if (await isLogTooBig(capturedJobId)) {
+                process.stderr.write('Log too big for AI analysis (>10 MB), skipping\n')
+                await emitSkipChoice()
+              }
+              else {
+                await runCapgoAi('auto_upload', 'ci_flag')
+              }
             }
           }
           else {
