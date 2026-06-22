@@ -81,6 +81,35 @@ function braceBlockBody(source: string, keyword: string): string | null {
   return null
 }
 
+/**
+ * Return `source` with the first `keyword { ... }` block (header + braces)
+ * removed. Used to excise the `productFlavors` block before an SDK-literal scan
+ * so a per-flavor `minSdkVersion`/`targetSdkVersion` literal — which the active
+ * build does not necessarily apply — never leaks into the resolved value.
+ * Returns the source unchanged when the block is absent.
+ */
+function removeBraceBlock(source: string, keyword: string): string {
+  const header = source.match(new RegExp(`(?:^|[\\s;{}])${keyword}\\s*\\{`))
+  if (header?.index === undefined)
+    return source
+  const open = source.indexOf('{', header.index + header[0].length - 1)
+  if (open === -1)
+    return source
+  let depth = 0
+  for (let i = open; i < source.length; i++) {
+    if (source[i] === '{')
+      depth++
+    else if (source[i] === '}') {
+      depth--
+      if (depth === 0)
+        return source.slice(0, header.index) + ' ' + source.slice(i + 1)
+    }
+  }
+  // Unbalanced braces: drop from the keyword to end-of-source rather than risk
+  // reading a flavor literal past a malformed block.
+  return source.slice(0, header.index)
+}
+
 /** Slice the body of the named direct child (depth-1) block of a DSL block. */
 function flavorBody(productFlavors: string, flavor: string): string | null {
   let depth = 0
@@ -239,6 +268,15 @@ function sliceBraceBody(source: string, from: number): string {
  * then android/variables.gradle, then the manifest <uses-sdk>. Returns null
  * (skip the dimension) when unresolved so SDK checks agree on one source of
  * truth.
+ *
+ * The gradle literal scan excises the `productFlavors` block first. A flavor
+ * routinely pins a per-flavor SDK literal (e.g. a legacy/wear flavor with a
+ * lower minSdk) that the active build does not necessarily apply; reading the
+ * first literal anywhere in the file would let that flavor value drive a false
+ * blocking SDK error (minSdkCapacitor / targetSdkPlay). Excising productFlavors
+ * keeps the android-level `compileSdkVersion` and the defaultConfig
+ * `minSdkVersion`/`targetSdkVersion` (the values the build actually applies)
+ * while ignoring per-flavor overrides.
  */
 export function resolveSdk(projectDir: string, dim: SdkDimension): number | null {
   const key = SDK_DIMENSIONS[dim]
@@ -247,7 +285,9 @@ export function resolveSdk(projectDir: string, dim: SdkDimension): number | null
     // matches `targetSdkVersion 33`, `targetSdkVersion = 33`, `targetSdk = 33`
     const base = key.replace(/Version$/, '')
     const re = new RegExp(`\\b(?:${key}|${base})\\s*[=\\s]\\s*(\\d+)\\b`)
-    const m = stripGradleComments(gradle).match(re)
+    // Drop the productFlavors block so a per-flavor literal cannot win.
+    const scope = removeBraceBlock(stripGradleComments(gradle), 'productFlavors')
+    const m = scope.match(re)
     if (m)
       return Number(m[1])
   }

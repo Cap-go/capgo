@@ -10,6 +10,7 @@ import {
   settingsGradleModuleCount,
   stripGradleComments,
 } from '../gradle'
+import { readAndroidManifest, stripXmlComments } from '../manifest'
 import { willUploadToPlay } from '../upload-intent'
 
 function hasCordovaPlugins(ctx: ScanContext): boolean {
@@ -236,12 +237,19 @@ export const agp8PackageAttr: PrescanCheck = {
   id: 'android/agp8-package-attr',
   platforms: ['android'],
   async run(ctx): Promise<Finding[]> {
-    const manifest = readTextIfExists(join(ctx.projectDir, 'android', 'app', 'src', 'main', 'AndroidManifest.xml'))
+    const manifest = readAndroidManifest(ctx.projectDir)
     const gradle = appBuildGradle(ctx.projectDir)
     if (!manifest || !gradle)
       return []
-    const hasPackageAttr = /<manifest[^>]*\spackage\s*=\s*"/.test(manifest)
-    const hasNamespace = /namespace\s*[=( ]\s*["']/.test(gradle)
+    // Strip XML comments before the package= scan, mirroring every sibling
+    // manifest check: a commented-out `<!-- <manifest ... package="…"> -->`
+    // migration leftover must NOT trip this blocker (AGP ignores comments).
+    // `[^>]*` keeps the scan inside the single <manifest …> open tag (it cannot
+    // cross a `>` into other markup). The namespace probe is comment-stripped
+    // too so a commented `// namespace "…"` cannot fabricate the block condition.
+    const stripped = stripXmlComments(manifest.raw)
+    const hasPackageAttr = /<manifest[^>]*\spackage\s*=\s*"/.test(stripped)
+    const hasNamespace = /namespace\s*[=( ]\s*["']/.test(stripGradleComments(gradle))
     if (hasPackageAttr && hasNamespace) {
       return [{
         id: 'android/agp8-package-attr',

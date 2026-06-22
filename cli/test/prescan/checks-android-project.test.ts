@@ -222,6 +222,44 @@ describe('android/agp8-package-attr', () => {
     })
     expect(await agp8PackageAttr.run(aCtx(dir))).toEqual([])
   })
+  // Regression: a commented-out `<manifest ... package="…">` migration leftover
+  // (a common shape during AGP 8 / namespace migration) must NOT block the
+  // build — AGP ignores comments. The scan is comment-stripped like every
+  // sibling manifest check.
+  it('does NOT block on a commented-out package= attribute (no live package attr)', async () => {
+    const dir = makeProject({
+      'android/app/src/main/AndroidManifest.xml': `<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Migrated to namespace in build.gradle; was: <manifest package="com.old.app"> -->
+  <application/>
+</manifest>`,
+      'android/app/build.gradle': `android { namespace "com.demo.app" }`,
+    })
+    expect(await agp8PackageAttr.run(aCtx(dir))).toEqual([])
+  })
+  it('does NOT block on a multi-line commented-out <manifest …> opening tag', async () => {
+    const dir = makeProject({
+      'android/app/src/main/AndroidManifest.xml': `<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!--
+    Legacy reference:
+    <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+      package="com.legacy.app">
+  -->
+  <application/>
+</manifest>`,
+      'android/app/build.gradle': `android { namespace "com.demo.app" }`,
+    })
+    expect(await agp8PackageAttr.run(aCtx(dir))).toEqual([])
+  })
+  it('still blocks when a LIVE package= and namespace coexist (comment elsewhere)', async () => {
+    const dir = makeProject({
+      'android/app/src/main/AndroidManifest.xml': `<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.demo.app">
+  <!-- this comment is unrelated -->
+  <application/>
+</manifest>`,
+      'android/app/build.gradle': `android { namespace "com.demo.app" }`,
+    })
+    expect((await agp8PackageAttr.run(aCtx(dir)))[0]?.severity).toBe('error')
+  })
 })
 
 describe('android/applicationid-present', () => {
@@ -530,6 +568,27 @@ describe('android/target-sdk-play', () => {
     const dir = makeProject({ 'android/app/build.gradle': 'android { }' })
     expect(targetSdkPlay.appliesTo!(aCtx(dir))).toBe(false)
   })
+  // Regression: a low per-flavor targetSdk literal must not produce a false
+  // blocking error when defaultConfig (via variables.gradle) targets a
+  // Play-acceptable SDK. The active build targets 35, so no finding.
+  it('does NOT block on a low per-flavor targetSdk when defaultConfig targets 35', async () => {
+    const dir = makeProject({
+      'package.json': JSON.stringify({ dependencies: {} }),
+      'android/app/build.gradle': `android {
+  productFlavors {
+    old {
+      targetSdkVersion 28
+    }
+  }
+  defaultConfig {
+    targetSdkVersion rootProject.ext.targetSdkVersion
+  }
+}`,
+      'android/variables.gradle': 'ext { targetSdkVersion = 35 }',
+    })
+    const b64 = Buffer.from(JSON.stringify({ type: 'service_account' })).toString('base64')
+    expect(await targetSdkPlay.run(aCtx(dir, { credentials: { PLAY_CONFIG_JSON: b64 } }))).toEqual([])
+  })
 })
 
 describe('android/min-sdk-capacitor', () => {
@@ -567,6 +626,25 @@ describe('android/min-sdk-capacitor', () => {
   it('does not apply when minSdk is unresolvable', () => {
     const dir = makeProject({ 'package.json': pkg('^7.0.0') })
     expect(minSdkCapacitor.appliesTo!(aCtx(dir))).toBe(false)
+  })
+  // Regression: a low per-flavor minSdk literal must not drive a false blocking
+  // error when defaultConfig (via variables.gradle) meets the Capacitor floor.
+  it('does NOT block on a low per-flavor minSdk when defaultConfig meets the Cap6 floor', async () => {
+    const dir = makeProject({
+      'package.json': pkg('^6.0.0'),
+      'android/app/build.gradle': `android {
+  productFlavors {
+    legacy {
+      minSdkVersion 19
+    }
+  }
+  defaultConfig {
+    minSdkVersion rootProject.ext.minSdkVersion
+  }
+}`,
+      'android/variables.gradle': 'ext { minSdkVersion = 24 }',
+    })
+    expect(await minSdkCapacitor.run(aCtx(dir))).toEqual([])
   })
 })
 

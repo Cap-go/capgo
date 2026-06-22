@@ -167,6 +167,76 @@ describe('resolveSdk', () => {
     })
     expect(resolveSdk(dir, 'targetSdk')).toBe(34)
   })
+
+  // Regression: a per-flavor SDK literal inside productFlavors must NOT leak
+  // into the resolved value — the active build applies defaultConfig (and the
+  // variables.gradle value it references), not a legacy/wear flavor's override.
+  it('ignores a per-flavor minSdk literal and uses the variables.gradle value (flavor declared before defaultConfig)', () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  productFlavors {
+    legacy {
+      minSdkVersion 19
+    }
+  }
+  defaultConfig {
+    minSdkVersion rootProject.ext.minSdkVersion
+  }
+}`,
+      'android/variables.gradle': 'ext { minSdkVersion = 24 }',
+    })
+    expect(resolveSdk(dir, 'minSdk')).toBe(24)
+  })
+
+  it('ignores a per-flavor targetSdk literal and uses the variables.gradle value', () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  productFlavors {
+    old {
+      targetSdkVersion 28
+    }
+  }
+  defaultConfig {
+    targetSdkVersion rootProject.ext.targetSdkVersion
+  }
+}`,
+      'android/variables.gradle': 'ext { targetSdkVersion = 35 }',
+    })
+    expect(resolveSdk(dir, 'targetSdk')).toBe(35)
+  })
+
+  it('still resolves a defaultConfig literal even when a flavor declares a different SDK', () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  defaultConfig {
+    minSdkVersion 24
+  }
+  productFlavors {
+    legacy {
+      minSdkVersion 19
+    }
+  }
+}`,
+    })
+    expect(resolveSdk(dir, 'minSdk')).toBe(24)
+  })
+
+  it('still resolves an android-level compileSdkVersion when a defaultConfig and flavors exist', () => {
+    const dir = makeProject({
+      'android/app/build.gradle': `android {
+  compileSdkVersion 35
+  defaultConfig {
+    minSdkVersion 24
+  }
+  productFlavors {
+    legacy {
+      compileSdkVersion 28
+    }
+  }
+}`,
+    })
+    expect(resolveSdk(dir, 'compileSdk')).toBe(35)
+  })
 })
 
 describe('resolveEffectiveApplicationId (flavor-aware)', () => {
