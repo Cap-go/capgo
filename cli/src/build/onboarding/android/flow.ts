@@ -556,12 +556,30 @@ export function androidViewForStep(
     case 'android-app-verify': {
       if (kind === 'choice') {
         const pkg = progress?.completedSteps.androidPackageChosen?.packageName ?? 'your package'
+        // wrong-build-id: the account HAS Play apps but none match the chosen
+        // package, so the fix is to pick the right package, not create a duplicate.
+        // no-app: the account has no matching app, so creating it is the path.
+        // Both offer "proceed anyway" because apps:search can lag behind a
+        // just-created app that the provisioning invite would already accept.
+        if (ctx.playVerifyOutcome === 'wrong-build-id') {
+          return {
+            ...base,
+            message: `None of your Play Store apps match "${pkg}". Pick a different package (the applicationId your app is actually published under), or create "${pkg}" in Play Console (https://play.google.com/console). Capgo grants your build access to that exact package, so it must exist before provisioning.`,
+            options: [
+              { value: 'recheck', label: 'Re-check (I fixed the package / created the app)' },
+              { value: 'proceed', label: 'The app exists, proceed anyway' },
+              { value: 'open', label: 'Open Play Console' },
+              { value: 'cancel', label: 'Cancel onboarding' },
+            ],
+          }
+        }
         return {
           ...base,
-          message: `No Play Store app exists yet for "${pkg}". Create it once in Play Console (https://play.google.com/console) — Capgo grants your build access to that exact package, so it must exist before provisioning — then re-check.`,
+          message: `No Play Store app exists yet for "${pkg}". Create it once in Play Console (https://play.google.com/console), then re-check. Capgo grants your build access to that exact package, so it must exist before provisioning.`,
           options: [
             { value: 'open', label: 'Open Play Console to create this app' },
-            { value: 'recheck', label: 'I\'ve created it — re-check' },
+            { value: 'recheck', label: 'I\'ve created it, re-check' },
+            { value: 'proceed', label: 'I\'ve already created it, proceed anyway' },
             { value: 'cancel', label: 'Cancel onboarding' },
           ],
         }
@@ -660,7 +678,7 @@ export type AndroidInput =
   // (progress.serviceAccountMethod may already be set but is also passed
   // explicitly here to keep the function self-contained).
   | { step: 'android-package-select'; packageName: string; source: 'gradle' | 'capacitor-config' | 'user-input'; serviceAccountMethod: 'generate' | 'existing' }
-  | { step: 'android-app-verify'; verifyAction: 'open' | 'recheck' | 'cancel' }
+  | { step: 'android-app-verify'; verifyAction: 'open' | 'recheck' | 'cancel' | 'proceed' }
 
   // ── Phase 6 — Post-save "tail" inputs ───────────────────────────────────────
   // One variant per tail choice/input step that records state on TailProgress.
@@ -955,6 +973,29 @@ export function applyAndroidInput(
         serviceAccountMethod: i.serviceAccountMethod,
         completedSteps: { ...progress.completedSteps, androidPackageChosen: choice },
       }
+    }
+
+    // ── android-app-verify ────────────────────────────────────────────────
+    // The gate's action. 'proceed' = the user asserts the app exists despite the
+    // apps:search check not matching (e.g. Play data propagation lag, which the
+    // androidpublisher invite would still accept) → record the marker (unverified)
+    // so resume advances to provisioning. 'recheck' / 'open' / 'cancel' carry NO
+    // progress change here: recheck re-runs the effect, open is a browser
+    // side-effect, and cancel is halted by the driver (TUI exitOnboarding / MCP
+    // done-halt) before this reducer matters.
+    case 'android-app-verify': {
+      const i = input as Extract<AndroidInput, { step: 'android-app-verify' }>
+      if (i.verifyAction === 'proceed') {
+        const chosen = progress.completedSteps.androidPackageChosen?.packageName ?? ''
+        return {
+          ...progress,
+          completedSteps: {
+            ...progress.completedSteps,
+            playAppVerified: { packageName: chosen, verified: false },
+          },
+        }
+      }
+      return progress
     }
 
     default:
@@ -1813,38 +1854,52 @@ export async function runAndroidEffect(
     // 403, network) → degrade: mark verified:false + advance. NEVER blocks.
     case 'android-app-verify': {
       const chosen = progress.completedSteps.androidPackageChosen?.packageName
-      const markAndAdvance = (verified: boolean): AndroidEffectResult => ({
-        progress: {
+      // Persist the verification marker BEFORE advancing so a crash/resume between
+      // here and saving-credentials does not re-enter verify (and re-provision).
+      // Best-effort: a save failure must not throw out of the effect (that would
+      // hang the Ink spinner, whose failedStep is undefined); resume just re-runs
+      // the idempotent check.
+      const markAndAdvance = async (verified: boolean): Promise<AndroidEffectResult> => {
+        const nextProgress: AndroidOnboardingProgress = {
           ...progress,
           completedSteps: {
             ...progress.completedSteps,
             playAppVerified: { packageName: chosen ?? '', verified },
           },
-        },
-        next: 'gcp-setup-running',
-      })
+        }
+        try {
+          await deps.saveAndroidProgress(progress.appId, nextProgress)
+        }
+        catch {
+          // best-effort; resume re-runs the verify check if the marker didn't land.
+        }
+        return { progress: nextProgress, next: 'gcp-setup-running' }
+      }
       if (!chosen || progress.serviceAccountMethod !== 'generate' || !deps.listPlayApps)
-        return markAndAdvance(false)
+        return await markAndAdvance(false)
       try {
         const tok = await deps.getAccessToken()
         const apps = await deps.listPlayApps(tok)
         const result = reconcileAndroidApp({ gradleIds: [chosen], apps })
         if (result.kind === 'exact-match')
-          return markAndAdvance(true)
+          return await markAndAdvance(true)
+        // A single chosen id reconciles to only no-app or wrong-build-id here
+        // (multi-gradle needs >1 gradle id). Stash apps + outcome; the view
+        // becomes the create-app / pick-different gate.
         return {
           progress,
           next: 'android-app-verify',
           transient: {
             playVerifyApps: apps.map(a => ({ packageName: a.packageName, displayName: a.displayName })),
-            playVerifyOutcome: result.kind === 'no-app'
-              ? 'no-app'
-              : result.kind === 'multi-gradle' ? 'multi-gradle' : 'wrong-build-id',
+            playVerifyOutcome: result.kind === 'no-app' ? 'no-app' : 'wrong-build-id',
           },
         }
       }
-      catch {
-        // scope-missing / 403 / network — degrade, never block onboarding.
-        return markAndAdvance(false)
+      catch (err) {
+        // scope-missing / 403 / network: degrade (never block onboarding), but
+        // leave a breadcrumb so a genuine failure is not completely silent.
+        deps.onInternalLog?.(`android-app-verify: apps:search failed, continuing unverified (${err instanceof Error ? err.message : String(err)})`)
+        return await markAndAdvance(false)
       }
     }
 
@@ -1868,8 +1923,10 @@ export async function runAndroidEffect(
           const tok = await deps.getAccessToken()
           playVerifyApps = await deps.listPlayApps(tok)
         }
-        catch {
-          // degrade silently; the plain picker still works.
+        catch (err) {
+          // Degrade to the plain picker (the verify step re-checks anyway), but
+          // leave a breadcrumb so a real failure is not completely invisible.
+          deps.onInternalLog?.(`android-package-select: Play apps preload failed, showing plain picker (${err instanceof Error ? err.message : String(err)})`)
         }
       }
       return {

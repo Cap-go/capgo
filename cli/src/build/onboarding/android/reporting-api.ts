@@ -117,7 +117,10 @@ export async function listPlayApps(
 
     apps.push(...parseAppsSearchResponse(body))
 
-    const next: string | undefined = body?.nextPageToken
+    // Only follow a string pageToken. Guard against a malformed/non-string
+    // nextPageToken (untrusted API field) being coerced into the URL; anything
+    // else ends pagination rather than looping on a bogus token.
+    const next = typeof body?.nextPageToken === 'string' ? body.nextPageToken : undefined
     if (!next)
       break
     pageToken = next

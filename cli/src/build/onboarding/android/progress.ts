@@ -350,8 +350,20 @@ export function getAndroidResumeStep(progress: AndroidOnboardingProgress | null)
   // provisioning (the per-package SA invite 400s on a non-existent package).
   // The verify effect always writes this marker (verified true OR false on a
   // degraded check) before advancing, so this never loops.
-  if (!completedSteps.playAppVerified)
+  //
+  // Backward-compat guard: only gate FRESH flows. Legacy / in-flight progress
+  // recorded before this step existed (or any resume that already provisioned)
+  // has no playAppVerified marker but must NOT be re-routed into the new gate;
+  // if any provisioning marker is present, fall through to the Phase 5 / tail
+  // routing below instead.
+  if (
+    !completedSteps.playAppVerified
+    && !completedSteps.serviceAccountProvisioned
+    && !completedSteps.playInviteProvisioned
+    && !progress._serviceAccountKeyBase64
+  ) {
     return 'android-app-verify'
+  }
 
   // Phase 5 — Provisioning: SA creation marker + the SA's JSON key that
   // gets saved as PLAY_CONFIG_JSON. Missing either means we must re-run

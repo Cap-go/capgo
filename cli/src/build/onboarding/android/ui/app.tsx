@@ -1104,6 +1104,11 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     setPackagePreloadDone(false)
     setPackageSelectMode('choose')
     packageLoadedRef.current = false
+    // Phase 4.6 — Play app verification gate (reset the one-shot guard + outcome
+    // so an in-session "start over" re-runs the check instead of hanging/showing
+    // a stale gate).
+    setVerifyOutcome(null)
+    verifyLoadedRef.current = false
     // Phase 5 — provisioning outputs
     setServiceAccountProvisioned(null)
     setPlayInviteProvisioned(null)
@@ -3080,23 +3085,42 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           : (
               <Box flexDirection="column" marginTop={1}>
                 <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
-                  <Text bold color="cyan">Create your app in Play Console</Text>
+                  <Text bold color="cyan">{verifyOutcome === 'wrong-build-id' ? 'Pick the right Play Store app' : 'Create your app in Play Console'}</Text>
                   <Newline />
-                  <Text>
-                    {'No Play Store app exists yet for '}
-                    <Text bold color="cyan">{androidPackageChoice?.packageName ?? 'your package'}</Text>
-                    {'. Create it once in Play Console (the only manual step), then re-check — Capgo grants your build access to that exact package, so it must exist before provisioning.'}
-                  </Text>
-                  <Text dimColor>The Play Console API cannot create apps — this is a one-time manual step on the web.</Text>
+                  {verifyOutcome === 'wrong-build-id'
+                    ? (
+                        <Text>
+                          {'None of your Play Store apps match '}
+                          <Text bold color="cyan">{androidPackageChoice?.packageName ?? 'your package'}</Text>
+                          {'. Pick a different package (the applicationId your app is published under), or create it in Play Console. Capgo grants your build access to that exact package, so it must exist before provisioning.'}
+                        </Text>
+                      )
+                    : (
+                        <Text>
+                          {'No Play Store app exists yet for '}
+                          <Text bold color="cyan">{androidPackageChoice?.packageName ?? 'your package'}</Text>
+                          {'. Create it once in Play Console (the only manual step), then re-check. Capgo grants your build access to that exact package, so it must exist before provisioning.'}
+                        </Text>
+                      )}
+                  <Text dimColor>The Play Console API cannot create apps; this is a one-time manual step on the web.</Text>
                 </Box>
                 <Newline />
                 <Select
                   key={`android-verify-${verifyActionSeq}`}
-                  options={[
-                    { label: '🌐 Open Play Console to create this app', value: 'open' },
-                    { label: '🔁 I\'ve created it — re-check', value: 'recheck' },
-                    { label: '❌ Cancel onboarding', value: 'cancel' },
-                  ]}
+                  options={verifyOutcome === 'wrong-build-id'
+                    ? [
+                        { label: '📦  Pick a different package', value: 'pick-different' },
+                        { label: '🔁  Re-check', value: 'recheck' },
+                        { label: '➡️   The app exists, proceed anyway', value: 'proceed' },
+                        { label: '🌐  Open Play Console', value: 'open' },
+                        { label: '❌  Cancel onboarding', value: 'cancel' },
+                      ]
+                    : [
+                        { label: '🌐  Open Play Console to create this app', value: 'open' },
+                        { label: '🔁  I\'ve created it, re-check', value: 'recheck' },
+                        { label: '➡️   I\'ve already created it, proceed anyway', value: 'proceed' },
+                        { label: '❌  Cancel onboarding', value: 'cancel' },
+                      ]}
                   onChange={(value) => {
                     setVerifyActionSeq(s => s + 1)
                     if (value === 'open') {
@@ -3110,6 +3134,30 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                       playAppsCacheRef.current = null
                       setVerifyOutcome(null)
                       setVerifyRecheckNonce(n => n + 1)
+                      return
+                    }
+                    if (value === 'pick-different') {
+                      // Back to the package picker (keep the cached Play apps so the
+                      // sub-picker still lists them); the new pick re-runs verify.
+                      verifyLoadedRef.current = false
+                      setVerifyOutcome(null)
+                      setPackageSelectMode('choose')
+                      setStep('android-package-select')
+                      return
+                    }
+                    if (value === 'proceed') {
+                      // User asserts the app exists (apps:search can lag a just-created
+                      // app the provisioning invite would accept). Record the marker
+                      // (unverified) and advance; the invite is the real check.
+                      verifyLoadedRef.current = false
+                      addLog(`Proceeding without a confirmed Play Store match for ${androidPackageChoice?.packageName ?? 'your package'}.`, 'yellow')
+                      persistAndStep((p) => ({
+                        ...p,
+                        completedSteps: {
+                          ...p.completedSteps,
+                          playAppVerified: { packageName: androidPackageChoice?.packageName ?? '', verified: false },
+                        },
+                      }))
                       return
                     }
                     addLog('Exiting onboarding.', 'yellow')
