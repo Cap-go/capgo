@@ -90,6 +90,7 @@ function openP12Uncached(base64: string, password: string): OpenedP12 {
     throw new Error('no certificate inside the P12')
   const certDer = forge.asn1.toDer(forge.pki.certificateToAsn1(cert)).getBytes()
   const md = forge.md.sha1.create()
+  // lgtm[js/weak-cryptographic-algorithm] SHA1 is the certificate thumbprint Apple stores in provisioning profiles (the cert↔profile pairing identifier), not a security primitive.
   md.update(certDer)
   return { cert, sha1: md.digest().toHex().toLowerCase() }
 }

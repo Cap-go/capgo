@@ -30,6 +30,7 @@ export interface MadeP12 {
 function certSha1(cert: forge.pki.Certificate): string {
   const certDer = forge.asn1.toDer(forge.pki.certificateToAsn1(cert)).getBytes()
   const md = forge.md.sha1.create()
+  // lgtm[js/weak-cryptographic-algorithm] SHA1 cert thumbprint (test fixture), matches Apple's provisioning-profile identifier — not a security primitive.
   md.update(certDer)
   return md.digest().toHex().toLowerCase()
 }

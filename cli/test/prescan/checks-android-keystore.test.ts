@@ -123,6 +123,7 @@ function makeJksWithEntry(password: string, alias: string, certDer: Buffer): str
   const body = Buffer.concat(parts)
   const pwBytes = Buffer.from(password, 'utf16le').swap16() // utf-16BE
   const digest = createHash('sha1')
+    // lgtm[js/weak-cryptographic-algorithm] JKS integrity digest is defined as SHA1 by the keystore format (test fixture reproducing it), not a security choice.
     .update(Buffer.concat([pwBytes, Buffer.from('Mighty Aphrodite', 'utf8'), body]))
     .digest()
   return Buffer.concat([body, digest]).toString('base64')

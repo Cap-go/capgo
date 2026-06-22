@@ -104,7 +104,7 @@ export const ASC_AGREEMENTS_MESSAGE
   = 'Apple is blocking App Store Connect API access because your developer account has a required agreement that is unsigned or has expired.\n'
     + '  - Sign in as the Account Holder at https://appstoreconnect.apple.com\n'
     + '  - Open "Business" (Agreements, Tax, and Banking) and accept the pending or updated agreement\n'
-    + '  - Then run this step again, your API key is valid, so no key changes are needed'
+    + '  - Then run this step again — your API key is valid, so no key changes are needed'
 
 export const ASC_KEY_REJECTED_MESSAGE
   = 'API key verification failed. Please check:\n'
