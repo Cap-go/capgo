@@ -187,8 +187,8 @@ export function whoamiMessage(state: LoginState): string {
   if (state.loggedIn)
     return `Signed in to Capgo (user ${state.userId}) using the ${state.source} key.`
   if (state.source)
-    return `Not signed in: a saved ${state.source} key exists but is no longer valid. Generate a new one at https://app.capgo.app/connect and call capgo_login.`
-  return 'Not signed in. Generate a key at https://app.capgo.app/connect and call capgo_login.'
+    return `Not signed in: a saved ${state.source} key exists but is no longer valid. Generate a new one at https://console.capgo.app/connect and call capgo_login.`
+  return 'Not signed in. Generate a key at https://console.capgo.app/connect and call capgo_login.'
 }
 
 /**

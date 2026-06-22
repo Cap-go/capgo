@@ -2151,6 +2151,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         const behavior = decideAnalyzeBehavior({
           isTTY: process.stdout.isTTY === true,
           aiAnalyticsFlag: options.aiAnalytics === true,
+          sendLogsFlag: options.sendLogs === true,
         })
 
         const AI_WARNING = '⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.'
@@ -2436,8 +2437,10 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
         try {
           if (behavior === 'skip' || behavior === 'auto_upload') {
-            // Non-interactive (CI/CD). --ai-analytics and --send-logs are
-            // independent and additive: run whichever the user opted into.
+            // Direct-action path: 'auto_upload' (an explicit --ai-analytics
+            // and/or --send-logs opt-in, in ANY terminal) or 'skip' (no flags,
+            // non-interactive). --ai-analytics and --send-logs are independent
+            // and additive: run whichever the user opted into, never prompt.
             // The neither-flag discoverability tip is NOT emitted here - it is
             // printed at the build-failure point (see shouldPrintCiTip above),
             // because reaching this block requires captureEnabled, which is
@@ -2460,16 +2463,14 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
             }
           }
           else {
-            // interactive: show_menu or ask_then_menu
-            if (behavior === 'ask_then_menu') {
-              const wants = await confirm({ message: 'Build failed. See help options (email Capgo support / AI analysis)?' })
-              if (!wants || typeof wants === 'symbol') {
-                // user cancelled or declined — skip
-                await emitSkipChoice()
-              }
-              else {
-                await showMenu()
-              }
+            // No flags + interactive terminal: ask_then_menu. (auto_upload and
+            // skip are handled above; show_menu no longer exists - an explicit
+            // --ai-analytics/--send-logs opt-in now resolves to auto_upload and
+            // runs directly without prompting, in any terminal.)
+            const wants = await confirm({ message: 'Build failed. See help options (email Capgo support / AI analysis)?' })
+            if (!wants || typeof wants === 'symbol') {
+              // user cancelled or declined: skip
+              await emitSkipChoice()
             }
             else {
               await showMenu()
