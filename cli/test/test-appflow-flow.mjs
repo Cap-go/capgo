@@ -134,4 +134,19 @@ const distView = f.appflowFlow.viewForStep('select-ios-dist', certBase, { option
 assert.strictEqual(distView.kind, 'choice')
 assert.deepStrictEqual(distView.options.map(o => o.value), ['1'])
 
+// ── regression: picking a cert/dist re-runs the fetch step so the choice is DOWNLOADED ──
+// (bug: select-* stored the tag but left fetch-* marked done, so resumeStep skipped it
+//  and the chosen cert/dist was never downloaded -> validate saw "no credentials").
+const multiCert = { scope: 'ios', token: { access_token: 't' }, orgSlug: 'o', appId: 'a', migratable: { ios: true, android: false }, completedSteps: ['explain', 'fetch-orgs', 'fetch-apps', 'fetch-signing'] }
+const afterCertPick = f.appflowFlow.applyInput('select-ios-cert', multiCert, { value: 'tag-123' })
+assert.strictEqual(afterCertPick.iosCertTag, 'tag-123')
+assert.ok(!afterCertPick.completedSteps.includes('fetch-signing'), 'fetch-signing must be un-marked so it re-runs')
+assert.strictEqual(f.getAppflowResumeStep(afterCertPick), 'fetch-signing')
+
+const multiDist = { scope: 'ios', token: { access_token: 't' }, orgSlug: 'o', appId: 'a', ios: { BUILD_CERTIFICATE_BASE64: 'x' }, migratable: { ios: true, android: false }, completedSteps: ['explain', 'fetch-orgs', 'fetch-apps', 'fetch-signing', 'fetch-distribution'] }
+const afterDistPick = f.appflowFlow.applyInput('select-ios-dist', multiDist, { value: '42' })
+assert.strictEqual(afterDistPick.iosDistId, '42')
+assert.ok(!afterDistPick.completedSteps.includes('fetch-distribution'), 'fetch-distribution must be un-marked so it re-runs')
+assert.strictEqual(f.getAppflowResumeStep(afterDistPick), 'fetch-distribution')
+
 console.log('appflow flow OK')

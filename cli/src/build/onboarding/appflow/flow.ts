@@ -500,15 +500,15 @@ export function applyAppflowInput(step: AppflowStep, progress: AppflowProgress, 
     case 'select-ios-cert':
       // Store the chosen profile tag so fetch-signing downloads THIS cert on
       // re-entry instead of re-prompting (defeats the multi-cert livelock).
-      return { ...base, iosCertTag: input.value }
+      return { ...base, iosCertTag: input.value, completedSteps: base.completedSteps.filter(st => st !== 'fetch-signing') }
     case 'select-android-cert':
-      return { ...base, androidCertTag: input.value }
+      return { ...base, androidCertTag: input.value, completedSteps: base.completedSteps.filter(st => st !== 'fetch-signing') }
     case 'select-ios-dist':
       // Store the chosen distribution-credential id; fetch-distribution downloads
       // exactly that one on re-entry (no silent drop, no re-prompt loop).
-      return { ...base, iosDistId: input.value }
+      return { ...base, iosDistId: input.value, completedSteps: base.completedSteps.filter(st => st !== 'fetch-distribution') }
     case 'select-android-dist':
-      return { ...base, androidDistId: input.value }
+      return { ...base, androidDistId: input.value, completedSteps: base.completedSteps.filter(st => st !== 'fetch-distribution') }
     case 'no-signing-submenu':
       // 'skip' marks the affected platform non-migratable. 'go-back' rewinds to
       // the app picker (clears appId + the fetch-signing completion) so the user
