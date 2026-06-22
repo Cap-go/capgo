@@ -131,7 +131,7 @@ export function classifyAscAuthError(err: any): AscAuthClassification {
   const code = typeof err?.code === 'string' ? err.code : undefined
   const is401 = status === 401 || err?.message?.includes('401')
   const is403 = status === 403 || err?.message?.includes('403')
-  const isAgreements = Boolean(is403 && (code === 'FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED' || /required agreement/i.test(err?.message ?? '')))
+  const isAgreements = Boolean(is403 && (code === 'FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED' || code === 'FORBIDDEN_ERROR.PLA_NOT_ACCEPTED' || /\bPLA_NOT_ACCEPTED\b|required agreement|program license agreement/i.test(err?.message ?? '')))
   return {
     is401or403: Boolean(is401 || is403),
     isAgreements,
@@ -156,10 +156,12 @@ export async function verifyApiKey(token: string): Promise<{ valid: true, teamId
     return { valid: true, teamId }
   }
   catch (err: any) {
-    // Apple returns 403 FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED when the
-    // account holder hasn't signed (or must re-sign) a required agreement. The key
-    // itself is valid - point the user at the agreements page instead of sending
-    // them to re-check credentials that are fine. Preserve status/code so
+    // Apple returns 403 when the account holder must sign (or re-sign) a required
+    // agreement — FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED (paid-apps/tax) or
+    // FORBIDDEN_ERROR.PLA_NOT_ACCEPTED (updated Program License Agreement). The key
+    // itself is valid, so point the user at the agreements page instead of sending
+    // them to re-check credentials that are fine. classifyAscAuthError owns this
+    // detection (shared with assertAscAccess) and preserves status/code so
     // error-categories maps it to 'apple_agreements_missing' (not 'unknown').
     const cls = classifyAscAuthError(err)
     if (cls.isAgreements)

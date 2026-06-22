@@ -30,6 +30,7 @@ function assert(condition, message) {
 }
 
 // Helper: run iOS validation logic matching request.ts
+// Helper: run iOS validation logic matching request.ts
 function validateIosCredentials(credentials) {
   const missingCreds = []
   const distributionMode = credentials.CAPGO_IOS_DISTRIBUTION || 'app_store'
@@ -41,32 +42,57 @@ function validateIosCredentials(credentials) {
 
   // App Store Connect API key validation depends on distribution mode
   if (distributionMode === 'app_store') {
-    // app_store mode: API key logic unchanged
+    // app_store mode: needs either an App Store Connect API key OR an Apple ID +
+    // app-specific password (e.g. migrated Ionic Appflow apps).
     const hasAppleKeyId = !!credentials.APPLE_KEY_ID
     const hasAppleIssuerId = !!credentials.APPLE_ISSUER_ID
     const hasAppleKeyContent = !!credentials.APPLE_KEY_CONTENT
     const anyAppleApiField = hasAppleKeyId || hasAppleIssuerId || hasAppleKeyContent
     const hasCompleteAppleApiKey = hasAppleKeyId && hasAppleIssuerId && hasAppleKeyContent
 
-    if (!hasCompleteAppleApiKey) {
-      if (anyAppleApiField) {
-        const missingAppleFields = []
-        if (!hasAppleKeyId)
-          missingAppleFields.push('APPLE_KEY_ID')
-        if (!hasAppleIssuerId)
-          missingAppleFields.push('APPLE_ISSUER_ID')
-        if (!hasAppleKeyContent)
-          missingAppleFields.push('APPLE_KEY_CONTENT')
-        missingCreds.push(`Incomplete App Store Connect API key - missing: ${missingAppleFields.join(', ')}`)
-      }
-      else if (credentials.BUILD_OUTPUT_UPLOAD_ENABLED !== 'true') {
-        missingCreds.push('APPLE_KEY_ID/APPLE_ISSUER_ID/APPLE_KEY_CONTENT or BUILD_OUTPUT_UPLOAD_ENABLED=true')
-      }
-      else if (credentials.SKIP_BUILD_NUMBER_BUMP !== 'true') {
-        missingCreds.push('APPLE_KEY_ID/APPLE_ISSUER_ID/APPLE_KEY_CONTENT or --skip-build-number-bump')
-      }
-      // else: warn only, no error
+    const hasFastlaneUser = !!credentials.FASTLANE_USER
+    const hasAppSpecificPassword = !!credentials.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD
+    const hasAppleAppId = !!credentials.APPLE_APP_ID
+    const anyAppSpecificField = hasFastlaneUser || hasAppSpecificPassword || hasAppleAppId
+    const hasCompleteAppSpecificPassword = hasFastlaneUser && hasAppSpecificPassword && hasAppleAppId
+
+    if (hasAppleAppId && !/^\d+$/.test(String(credentials.APPLE_APP_ID).trim())) {
+      missingCreds.push('APPLE_APP_ID must be the app\'s numeric App Store Connect id (digits only, e.g. 1234567890)')
     }
+
+    if (hasCompleteAppleApiKey) {
+      // App Store Connect API key present — default upload path.
+    }
+    else if (hasCompleteAppSpecificPassword) {
+      // Apple ID + app-specific password present — alternative upload path.
+    }
+    else if (anyAppSpecificField) {
+      const missingAppSpecificFields = []
+      if (!hasFastlaneUser)
+        missingAppSpecificFields.push('FASTLANE_USER')
+      if (!hasAppSpecificPassword)
+        missingAppSpecificFields.push('FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD')
+      if (!hasAppleAppId)
+        missingAppSpecificFields.push('APPLE_APP_ID')
+      missingCreds.push(`Incomplete app-specific password credentials - missing: ${missingAppSpecificFields.join(', ')}`)
+    }
+    else if (anyAppleApiField) {
+      const missingAppleFields = []
+      if (!hasAppleKeyId)
+        missingAppleFields.push('APPLE_KEY_ID')
+      if (!hasAppleIssuerId)
+        missingAppleFields.push('APPLE_ISSUER_ID')
+      if (!hasAppleKeyContent)
+        missingAppleFields.push('APPLE_KEY_CONTENT')
+      missingCreds.push(`Incomplete App Store Connect API key - missing: ${missingAppleFields.join(', ')}`)
+    }
+    else if (credentials.BUILD_OUTPUT_UPLOAD_ENABLED !== 'true') {
+      missingCreds.push('APPLE_KEY_ID/APPLE_ISSUER_ID/APPLE_KEY_CONTENT or app-specific password or BUILD_OUTPUT_UPLOAD_ENABLED=true')
+    }
+    else if (credentials.SKIP_BUILD_NUMBER_BUMP !== 'true') {
+      missingCreds.push('APPLE_KEY_ID/APPLE_ISSUER_ID/APPLE_KEY_CONTENT or app-specific password or --skip-build-number-bump')
+    }
+    // else: warn only, no error
   }
   // ad_hoc mode: no API key required at all (no TestFlight, timestamp fallback for build numbers)
 
@@ -313,6 +339,71 @@ await test('iOS ad_hoc passes without output upload enabled', () => {
 
   const missingCreds = validateIosCredentials(credentials)
   assert(missingCreds.length === 0, `Should have no missing credentials, got: ${missingCreds.join(', ')}`)
+})
+
+// Test 13: iOS app-specific password (complete) passes without an API key
+await test('iOS validation accepts complete Apple ID + app-specific password', () => {
+  const credentials = {
+    BUILD_CERTIFICATE_BASE64: 'cert',
+    P12_PASSWORD: 'pass',
+    CAPGO_IOS_PROVISIONING_MAP: '{"com.test.app":{"profile":"base64","name":"test"}}',
+    APP_STORE_CONNECT_TEAM_ID: 'teamid',
+    FASTLANE_USER: 'dev@example.com',
+    FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: 'abcd-efgh-ijkl-mnop',
+    APPLE_APP_ID: '1234567890',
+    // No App Store Connect API key - app-specific password is the upload path
+  }
+
+  const missingCreds = validateIosCredentials(credentials)
+  assert(missingCreds.length === 0, `Should have no missing credentials, got: ${missingCreds.join(', ')}`)
+})
+
+// Test 14: iOS app-specific password missing the numeric app id → error
+await test('iOS validation reports missing APPLE_APP_ID for app-specific password', () => {
+  const credentials = {
+    BUILD_CERTIFICATE_BASE64: 'cert',
+    CAPGO_IOS_PROVISIONING_MAP: '{"com.test.app":{"profile":"base64","name":"test"}}',
+    APP_STORE_CONNECT_TEAM_ID: 'teamid',
+    FASTLANE_USER: 'dev@example.com',
+    FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: 'abcd-efgh-ijkl-mnop',
+    // Missing APPLE_APP_ID
+  }
+
+  const missingCreds = validateIosCredentials(credentials)
+  assert(missingCreds.length === 1, `Should have 1 missing credential, got ${missingCreds.length}: ${missingCreds.join(', ')}`)
+  assert(missingCreds[0].includes('Incomplete app-specific password'), 'Should report incomplete app-specific password')
+  assert(missingCreds[0].includes('APPLE_APP_ID'), 'Should list APPLE_APP_ID as missing')
+})
+
+// Test 15: iOS app-specific password with only the password set → lists the other two
+await test('iOS validation lists all missing app-specific password fields', () => {
+  const credentials = {
+    BUILD_CERTIFICATE_BASE64: 'cert',
+    CAPGO_IOS_PROVISIONING_MAP: '{"com.test.app":{"profile":"base64","name":"test"}}',
+    APP_STORE_CONNECT_TEAM_ID: 'teamid',
+    FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: 'abcd-efgh-ijkl-mnop',
+    // Missing FASTLANE_USER and APPLE_APP_ID
+  }
+
+  const missingCreds = validateIosCredentials(credentials)
+  assert(missingCreds.length === 1, `Should have 1 missing credential, got ${missingCreds.length}: ${missingCreds.join(', ')}`)
+  assert(missingCreds[0].includes('FASTLANE_USER'), 'Should list FASTLANE_USER as missing')
+  assert(missingCreds[0].includes('APPLE_APP_ID'), 'Should list APPLE_APP_ID as missing')
+})
+
+// Test 16: iOS app-specific password with a non-numeric APPLE_APP_ID → error
+await test('iOS validation rejects a non-numeric APPLE_APP_ID', () => {
+  const credentials = {
+    BUILD_CERTIFICATE_BASE64: 'cert',
+    CAPGO_IOS_PROVISIONING_MAP: '{"com.test.app":{"profile":"base64","name":"test"}}',
+    APP_STORE_CONNECT_TEAM_ID: 'teamid',
+    FASTLANE_USER: 'dev@example.com',
+    FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: 'abcd-efgh-ijkl-mnop',
+    APPLE_APP_ID: 'com.test.app', // bundle id by mistake, not the numeric id
+  }
+
+  const missingCreds = validateIosCredentials(credentials)
+  assert(missingCreds.some(c => c.includes('APPLE_APP_ID must be the app')), `Should reject non-numeric APPLE_APP_ID, got: ${missingCreds.join(', ')}`)
 })
 
 // Print summary

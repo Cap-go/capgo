@@ -1273,8 +1273,9 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | **--build-mode** | <code>string</code> | Build mode: debug or release (default: release) |
 | **--build-certificate-base64** | <code>string</code> | iOS: Base64-encoded .p12 certificate |
 | **--p12-password** | <code>string</code> | iOS: Certificate password (optional if cert has no password) |
-| **--apple-id** | <code>string</code> | iOS: Apple ID email |
-| **--apple-app-specific-password** | <code>string</code> | iOS: App-specific password |
+| **--apple-id** | <code>string</code> | iOS: Apple ID email for app-specific password uploads (alternative to App Store Connect API key) |
+| **--apple-app-specific-password** | <code>string</code> | iOS: App-specific password (xxxx-xxxx-xxxx-xxxx) for TestFlight uploads |
+| **--apple-app-id** | <code>string</code> | iOS: Numeric App Store Connect app id (required together with --apple-id and --apple-app-specific-password) |
 | **--apple-key-id** | <code>string</code> | iOS: App Store Connect API Key ID |
 | **--apple-issuer-id** | <code>string</code> | iOS: App Store Connect Issuer ID |
 | **--apple-key-content** | <code>string</code> | iOS: Base64-encoded App Store Connect API key (.p8) |
@@ -1298,6 +1299,7 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | **--skip-build-number-bump** | <code>boolean</code> | Skip automatic build number/version code incrementing. Uses whatever version is already in the project files. |
 | **--no-skip-build-number-bump** | <code>boolean</code> | Override saved credentials to re-enable automatic build number incrementing for this build only. |
 | **--ai-analytics** | <code>boolean</code> | On build failure, send logs to Capgo AI for diagnosis. In interactive terminals this skips the upfront confirmation; in CI this auto-uploads and prints the analysis to stderr. |
+| **--send-logs** | <code>boolean</code> | On a CI/CD build failure, automatically upload the build logs to Capgo support (no email required). Capgo support is notified and will follow up by email. Additive to --ai-analytics — both can be passed. |
 | **-a** | <code>string</code> | API key to link to your account |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
@@ -1460,8 +1462,9 @@ iOS Example:
 | **--apple-issuer-id** | <code>string</code> | iOS: App Store Connect Issuer ID |
 | **--apple-team-id** | <code>string</code> | iOS: App Store Connect Team ID |
 | **--ios-distribution** | <code>string</code> | iOS: Distribution mode |
-| **--apple-id** | <code>string</code> | iOS: Apple ID email (optional) |
-| **--apple-app-password** | <code>string</code> | iOS: App-specific password (optional) |
+| **--apple-id** | <code>string</code> | iOS: Apple ID email for app-specific password uploads (alternative to App Store Connect API key) |
+| **--apple-app-specific-password** | <code>string</code> | iOS: App-specific password (xxxx-xxxx-xxxx-xxxx) for TestFlight uploads |
+| **--apple-app-id** | <code>string</code> | iOS: Numeric App Store Connect app id (required together with --apple-id and --apple-app-specific-password) |
 | **--keystore** | <code>string</code> | Android: Path to keystore file (.keystore or .jks) |
 | **--keystore-alias** | <code>string</code> | Android: Keystore key alias |
 | **--keystore-key-password** | <code>string</code> | Android: Keystore key password |
@@ -1545,6 +1548,9 @@ Examples:
 | **--apple-key-id** | <code>string</code> | App Store Connect API Key ID |
 | **--apple-issuer-id** | <code>string</code> | App Store Connect Issuer ID |
 | **--apple-team-id** | <code>string</code> | App Store Connect Team ID |
+| **--apple-id** | <code>string</code> | iOS: Apple ID email for app-specific password uploads (alternative to App Store Connect API key) |
+| **--apple-app-specific-password** | <code>string</code> | iOS: App-specific password (xxxx-xxxx-xxxx-xxxx) for TestFlight uploads |
+| **--apple-app-id** | <code>string</code> | iOS: Numeric App Store Connect app id (required together with --apple-id and --apple-app-specific-password) |
 | **--ios-distribution** | <code>string</code> | iOS: Distribution mode |
 | **--keystore** | <code>string</code> | Path to keystore file (.keystore or .jks) |
 | **--keystore-alias** | <code>string</code> | Keystore key alias |

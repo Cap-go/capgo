@@ -9,11 +9,9 @@ import { toast } from 'vue-sonner'
 import IconCopy from '~icons/ion/copy-outline'
 import IconAppWindow from '~icons/lucide/app-window'
 import IconArrowRight from '~icons/lucide/arrow-right'
-import IconBadgeCheck from '~icons/lucide/badge-check'
 import IconCheck from '~icons/lucide/check'
 import IconCode from '~icons/lucide/code-2'
 import IconGlobe from '~icons/lucide/globe-2'
-import IconImage from '~icons/lucide/image'
 import IconLoader from '~icons/lucide/loader-2'
 import IconPackage from '~icons/lucide/package'
 import IconSmartphone from '~icons/lucide/smartphone'
@@ -128,28 +126,6 @@ const appOnboardingSteps = computed<Array<{ id: 'details' | 'choice' | 'install'
 ])
 const currentStepIndex = computed(() => Math.max(0, appOnboardingSteps.value.findIndex(entry => entry.id === flowStep.value)))
 const stepProgress = computed(() => `${((currentStepIndex.value + 1) / appOnboardingSteps.value.length) * 100}%`)
-const selectedStartLabel = computed(() => {
-  if (existingApp.value === true)
-    return t('app-onboarding-existing-yes')
-  if (existingApp.value === false)
-    return t('app-onboarding-existing-no')
-  return t('app-onboarding-not-selected')
-})
-const selectedSetupLabel = computed(() => {
-  if (existingApp.value === false)
-    return t('app-onboarding-mode-manual')
-  if (existingAppSetup.value === 'import')
-    return t('app-onboarding-mode-import')
-  if (existingAppSetup.value === 'manual')
-    return t('app-onboarding-mode-manual')
-  return t('app-onboarding-not-selected')
-})
-const previewStatusLabel = computed(() => {
-  if (createdApp.value?.existing_app || existingApp.value === true)
-    return t('app-onboarding-ai-help-status-existing')
-  return t('app-onboarding-ai-help-status-new')
-})
-
 function whiteCardToggleButtonClass(active: boolean) {
   return active
     ? 'border-primary-500 bg-slate-100 text-slate-950 ring-2 ring-primary-500/15 hover:border-primary-500 hover:bg-slate-100 dark:border-primary-500/80 dark:bg-primary-500/25 dark:text-white dark:ring-primary-500/30 dark:hover:bg-primary-500/30'
@@ -712,64 +688,62 @@ watch(suggestedAppId, (value) => {
 
 <template>
   <section class="min-h-full overflow-y-auto bg-slate-50 px-4 py-6 sm:px-6 lg:px-8 dark:bg-slate-950">
-    <div class="mx-auto w-full max-w-7xl">
+    <div class="mx-auto w-full max-w-3xl">
       <div v-if="isLoading" class="flex min-h-[50vh] items-center justify-center">
         <Spinner size="w-32 h-32" />
       </div>
 
       <div v-else class="space-y-6">
-        <header class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_25rem] lg:items-end">
-          <div>
-            <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:text-slate-200 dark:shadow-lg dark:shadow-black/20">
-              <IconSparkles class="h-4 w-4" />
-              {{ t('app-onboarding-badge') }}
-            </div>
-            <h1 class="mt-4 max-w-3xl text-3xl font-semibold text-slate-950 sm:text-4xl dark:text-white">
-              {{ props.onboarding
-                ? t('app-onboarding-title-first')
-                : t('app-onboarding-title-return') }}
-            </h1>
-            <p class="mt-3 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-300">
-              {{ t('app-onboarding-subtitle') }}
-            </p>
+        <header>
+          <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:text-slate-200">
+            <IconSparkles class="h-4 w-4" />
+            {{ t('app-onboarding-badge') }}
           </div>
+          <h1 class="mt-4 text-2xl font-semibold text-slate-950 sm:text-3xl dark:text-white">
+            {{ props.onboarding
+              ? t('app-onboarding-title-first')
+              : t('app-onboarding-title-return') }}
+          </h1>
+          <p class="mt-2 text-base leading-7 text-slate-600 dark:text-slate-300">
+            {{ t('app-onboarding-subtitle') }}
+          </p>
 
-          <div class="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
-            <div class="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
-              <div
+          <nav class="mt-6" :aria-label="t('app-onboarding-step-details')">
+            <ol class="flex items-center gap-2">
+              <li
                 v-for="(entry, index) in appOnboardingSteps"
                 :key="entry.id"
-                class="flex min-h-14 items-center gap-3 rounded-xl border px-3 py-2 transition"
+                class="flex min-w-0 flex-1 items-center gap-2"
                 :aria-current="flowStep === entry.id ? 'step' : undefined"
-                :class="[
-                  flowStep === entry.id ? 'border-primary-500/30 bg-slate-100 text-slate-950 ring-1 ring-primary-500/10 dark:border-primary-500/60 dark:bg-primary-500/25 dark:text-white dark:ring-primary-500/20' : '',
-                  flowStep !== entry.id && index < currentStepIndex ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-400/40 dark:bg-emerald-400/15 dark:text-emerald-100' : '',
-                  flowStep !== entry.id && index > currentStepIndex ? 'border-transparent bg-slate-50 text-slate-500 dark:border-white/10 dark:bg-slate-950/90 dark:text-slate-400' : '',
-                ]"
               >
                 <span
-                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
-                  :class="index < currentStepIndex ? 'bg-emerald-500 text-white' : flowStep === entry.id ? 'bg-primary-500 text-white' : 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300'"
+                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                  :class="index < currentStepIndex ? 'bg-emerald-500 text-white' : flowStep === entry.id ? 'bg-primary-500 text-white' : 'bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400'"
                 >
-                  <IconCheck v-if="index < currentStepIndex" class="h-4 w-4" />
+                  <IconCheck v-if="index < currentStepIndex" class="h-3.5 w-3.5" />
                   <span v-else>{{ index + 1 }}</span>
                 </span>
-                <span class="min-w-0">
-                  <span class="block truncate text-sm font-semibold">{{ entry.label }}</span>
-                  <span class="mt-0.5 block text-xs opacity-75">
-                    {{ t('app-onboarding-progress-count', { current: index + 1, total: appOnboardingSteps.length }) }}
-                  </span>
+                <span
+                  class="hidden truncate text-sm font-medium sm:block"
+                  :class="flowStep === entry.id ? 'text-slate-950 dark:text-white' : index < currentStepIndex ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-400 dark:text-slate-500'"
+                >
+                  {{ entry.label }}
                 </span>
-              </div>
-            </div>
-            <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-950" aria-hidden="true">
+                <span
+                  v-if="index < appOnboardingSteps.length - 1"
+                  class="mx-1 hidden h-px flex-1 bg-slate-200 sm:block dark:bg-white/15"
+                  aria-hidden="true"
+                />
+              </li>
+            </ol>
+            <div class="mt-3 h-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800" aria-hidden="true">
               <div class="h-full rounded-full bg-primary-500 transition-all duration-300" :style="{ width: stepProgress }" />
             </div>
-          </div>
+          </nav>
         </header>
 
-        <div v-if="flowStep === 'details'" class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
-          <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
+        <div v-if="flowStep === 'details'">
+          <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95">
             <div class="space-y-6">
               <div>
                 <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
@@ -823,41 +797,6 @@ watch(suggestedAppId, (value) => {
                   </span>
                   <IconCheck v-if="existingApp === false" class="h-5 w-5 shrink-0 text-current" />
                 </button>
-              </div>
-
-              <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 dark:border-white/20 dark:bg-slate-950/90">
-                <button
-                  type="button"
-                  class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:text-white"
-                  @click="isCliCommandVisible = !isCliCommandVisible"
-                >
-                  <IconTerminal class="h-4 w-4" />
-                  {{ isCliCommandVisible ? t('app-onboarding-command-hide') : t('app-onboarding-command-show') }}
-                </button>
-                <p class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  {{ t('app-onboarding-command-help') }}
-                </p>
-                <div
-                  v-if="isCliCommandVisible"
-                  class="group relative mt-3 cursor-pointer rounded-xl bg-slate-950 p-4 pr-14 ring-1 ring-white/10 transition hover:ring-white/20"
-                  role="button"
-                  tabindex="0"
-                  :aria-label="t('app-onboarding-command-copy')"
-                  @click="copyCliCommand"
-                  @keydown.enter.prevent="copyCliCommand"
-                  @keydown.space.prevent="copyCliCommand"
-                >
-                  <code class="block whitespace-pre-wrap break-all text-sm">
-                    <span class="text-slate-500">npx</span>
-                    <span class="text-sky-300"> @capgo/cli@latest</span>
-                    <span class="mr-1 font-bold text-violet-300"> i</span>
-                    <span class="text-emerald-300"> {{ apiKey ?? '[APIKEY]' }}</span>
-                    <template v-for="(arg, index) in cliCommandArgs" :key="`${arg}-${index}`">
-                      <span :class="index % 2 === 0 ? 'text-amber-300' : 'text-cyan-300'"> {{ arg }}</span>
-                    </template>
-                  </code>
-                  <IconCopy class="absolute right-4 top-4 h-5 w-5 text-muted-blue-300 transition group-hover:text-white" />
-                </div>
               </div>
 
               <div v-if="existingApp === true" class="space-y-5 border-t border-slate-200 pt-6 dark:border-white/15">
@@ -922,7 +861,23 @@ watch(suggestedAppId, (value) => {
               </div>
 
               <template v-if="canShowAppDetails">
-                <div class="border-t border-slate-200 pt-6 dark:border-white/15">
+                <div class="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-white/15 dark:bg-slate-950/90">
+                  <div class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-200 ring-1 ring-slate-300 dark:bg-slate-800 dark:ring-white/10">
+                    <img v-if="iconPreview" :src="iconPreview" :alt="t('app-onboarding-icon-preview-alt')" class="h-full w-full object-cover">
+                    <span v-else-if="isResumeIconLoading" class="h-5 w-5 rounded-full border-2 border-primary-500 border-t-transparent animate-spin" :aria-label="t('loading')" />
+                    <IconSmartphone v-else class="h-6 w-6 text-slate-400" aria-hidden="true" />
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-base font-semibold text-slate-950 dark:text-white">
+                      {{ appName || t('app-onboarding-preview-placeholder') }}
+                    </p>
+                    <p class="mt-0.5 truncate font-mono text-xs text-slate-500 dark:text-slate-400">
+                      {{ generatedAppId }}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
                   <label for="app-onboarding-name" class="text-sm font-medium text-slate-800 dark:text-slate-200">{{ t('app-name') }}</label>
                   <input
                     id="app-onboarding-name"
@@ -963,26 +918,23 @@ watch(suggestedAppId, (value) => {
                   </div>
                 </div>
 
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/15 dark:bg-slate-950/90">
-                  <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-primary-500 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-white/10">
-                      <IconImage class="h-5 w-5" />
-                    </span>
-                    <div class="min-w-0 flex-1">
-                      <FormKit
-                        type="file"
-                        :label="t('app-onboarding-icon-label')"
-                        accept="image/*"
-                        outer-class="mt-0"
-                        label-class="text-sm font-medium text-slate-800 dark:text-slate-200"
-                        input-class="mt-2 block w-full min-h-11 text-sm text-slate-600 file:mr-3 file:min-h-9 file:rounded-lg file:border-0 file:bg-white file:px-3 file:text-sm file:font-medium file:text-slate-700 dark:text-slate-300 dark:file:bg-slate-900 dark:file:text-slate-200"
-                        @update:model-value="onSelectIconFormKit"
-                      />
-                      <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                        {{ t('app-onboarding-icon-help') }}
-                      </p>
-                    </div>
-                  </div>
+                <div>
+                  <FormKit
+                    type="file"
+                    :label="t('app-onboarding-icon-label')"
+                    accept="image/*"
+                    outer-class="mt-0"
+                    label-class="text-sm font-medium text-slate-800 dark:text-slate-200"
+                    input-class="mt-2 block w-full min-h-11 text-sm text-slate-600 file:mr-3 file:min-h-9 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:text-sm file:font-medium file:text-slate-700 dark:text-slate-300 dark:file:bg-slate-800 dark:file:text-slate-200"
+                    @update:model-value="onSelectIconFormKit"
+                  />
+                  <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                    {{ t('app-onboarding-icon-help') }}
+                  </p>
+                </div>
+
+                <div v-if="storeScreenshotPreview" class="overflow-hidden rounded-xl border border-slate-200 dark:border-white/15">
+                  <img :src="storeScreenshotPreview" :alt="t('app-onboarding-store-screenshot-alt')" class="mx-auto aspect-9/19.5 max-h-48 w-auto object-cover object-top">
                 </div>
 
                 <div class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:items-center sm:justify-between dark:border-white/15">
@@ -996,80 +948,57 @@ watch(suggestedAppId, (value) => {
                   </button>
                 </div>
               </template>
+
+              <div class="pt-1">
+                <button
+                  v-if="!isCliCommandVisible"
+                  type="button"
+                  class="text-[11px] text-slate-400/70 underline-offset-2 transition hover:text-slate-500 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-500/70 dark:hover:text-slate-400"
+                  @click="isCliCommandVisible = true"
+                >
+                  {{ t('app-onboarding-command-show') }}
+                </button>
+
+                <div
+                  v-else
+                  class="space-y-3 rounded-xl border border-slate-200/80 bg-slate-50/60 p-4 dark:border-white/10 dark:bg-slate-950/40"
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <p class="text-xs leading-5 text-slate-500 dark:text-slate-400">
+                      {{ t('app-onboarding-command-help') }}
+                    </p>
+                    <button
+                      type="button"
+                      class="shrink-0 text-[11px] text-slate-400 underline-offset-2 transition hover:text-slate-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-500 dark:hover:text-slate-300"
+                      @click="isCliCommandVisible = false"
+                    >
+                      {{ t('app-onboarding-command-hide') }}
+                    </button>
+                  </div>
+                  <div
+                    class="group relative cursor-pointer rounded-xl bg-slate-950 p-4 pr-14 ring-1 ring-white/10 transition hover:ring-white/20"
+                    role="button"
+                    tabindex="0"
+                    :aria-label="t('app-onboarding-command-copy')"
+                    @click="copyCliCommand"
+                    @keydown.enter.prevent="copyCliCommand"
+                    @keydown.space.prevent="copyCliCommand"
+                  >
+                    <code class="block whitespace-pre-wrap break-all text-sm">
+                      <span class="text-slate-500">npx</span>
+                      <span class="text-sky-300"> @capgo/cli@latest</span>
+                      <span class="mr-1 font-bold text-violet-300"> i</span>
+                      <span class="text-emerald-300"> {{ apiKey ?? '[APIKEY]' }}</span>
+                      <template v-for="(arg, index) in cliCommandArgs" :key="`${arg}-${index}`">
+                        <span :class="index % 2 === 0 ? 'text-amber-300' : 'text-cyan-300'"> {{ arg }}</span>
+                      </template>
+                    </code>
+                    <IconCopy class="absolute right-4 top-4 h-5 w-5 text-muted-blue-300 transition group-hover:text-white" />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-
-          <aside class="rounded-2xl border border-slate-800 bg-slate-950 p-5 text-white shadow-sm lg:sticky lg:top-6 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30" :aria-label="t('app-onboarding-preview-label')">
-            <div class="flex items-center gap-4">
-              <div class="flex h-18 w-18 items-center justify-center overflow-hidden rounded-[22px] bg-slate-900 ring-1 ring-white/10">
-                <img v-if="iconPreview" :src="iconPreview" :alt="t('app-onboarding-icon-preview-alt')" class="h-full w-full object-cover">
-                <span v-else-if="isResumeIconLoading" class="h-7 w-7 rounded-full border-2 border-primary-500 border-t-transparent animate-spin" :aria-label="t('loading')" />
-                <IconSmartphone v-else class="h-8 w-8 text-slate-500" aria-hidden="true" />
-              </div>
-              <div class="min-w-0">
-                <p class="text-xs font-semibold uppercase text-slate-400">
-                  {{ t('app-onboarding-preview-label') }}
-                </p>
-                <p class="truncate text-lg font-semibold">
-                  {{ appName || t('app-onboarding-preview-placeholder') }}
-                </p>
-                <p class="mt-1 truncate font-mono text-xs text-slate-400">
-                  {{ generatedAppId }}
-                </p>
-              </div>
-            </div>
-
-            <div v-if="storeScreenshotPreview" class="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-slate-900">
-              <img :src="storeScreenshotPreview" :alt="t('app-onboarding-store-screenshot-alt')" class="aspect-9/19.5 w-full object-cover object-top">
-            </div>
-
-            <dl class="mt-6 grid gap-3 text-sm">
-              <div class="rounded-xl bg-white/5 p-3">
-                <dt class="text-xs font-semibold uppercase text-slate-400">
-                  {{ t('app-onboarding-summary-source') }}
-                </dt>
-                <dd class="mt-1 text-slate-100">
-                  {{ selectedStartLabel }}
-                </dd>
-              </div>
-              <div class="rounded-xl bg-white/5 p-3">
-                <dt class="text-xs font-semibold uppercase text-slate-400">
-                  {{ t('app-onboarding-summary-method') }}
-                </dt>
-                <dd class="mt-1 text-slate-100">
-                  {{ selectedSetupLabel }}
-                </dd>
-              </div>
-              <div class="rounded-xl bg-white/5 p-3">
-                <dt class="text-xs font-semibold uppercase text-slate-400">
-                  {{ t('app-onboarding-summary-status') }}
-                </dt>
-                <dd class="mt-1 text-slate-100">
-                  {{ previewStatusLabel }}
-                </dd>
-              </div>
-            </dl>
-
-            <div class="mt-6 border-t border-white/10 pt-5">
-              <p class="text-sm font-semibold text-white">
-                {{ t('app-onboarding-next-title') }}
-              </p>
-              <ul class="mt-3 space-y-3 text-sm leading-6 text-slate-300">
-                <li class="flex gap-3">
-                  <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-400" />
-                  {{ t('app-onboarding-preview-bullet-one') }}
-                </li>
-                <li class="flex gap-3">
-                  <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-400" />
-                  {{ t('app-onboarding-preview-bullet-two') }}
-                </li>
-                <li class="flex gap-3">
-                  <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-400" />
-                  {{ t('app-onboarding-preview-bullet-three') }}
-                </li>
-              </ul>
-            </div>
-          </aside>
         </div>
 
         <div v-else-if="flowStep === 'choice' && createdApp" class="space-y-6">
@@ -1143,8 +1072,8 @@ watch(suggestedAppId, (value) => {
           </div>
         </div>
 
-        <div v-else-if="flowStep === 'install' && createdApp" class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
-          <div class="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
+        <div v-else-if="flowStep === 'install' && createdApp">
+          <div class="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95">
             <div class="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
@@ -1210,37 +1139,6 @@ watch(suggestedAppId, (value) => {
               </button>
             </div>
           </div>
-
-          <aside class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30" :aria-label="t('app-onboarding-install-ready-title')">
-            <div class="flex items-center gap-3">
-              <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500 text-white">
-                <IconBadgeCheck class="h-5 w-5" />
-              </span>
-              <div>
-                <p class="text-sm font-semibold text-slate-950 dark:text-white">
-                  {{ t('app-onboarding-install-ready-title') }}
-                </p>
-                <p class="text-sm text-slate-500 dark:text-slate-400">
-                  {{ createdApp.app_id }}
-                </p>
-              </div>
-            </div>
-            <p class="mt-6 text-sm font-semibold text-slate-950 dark:text-white">
-              {{ t('app-onboarding-next-title') }}
-            </p>
-            <ul class="mt-3 space-y-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-              <li class="flex gap-3">
-                <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-500" />
-                {{ createdApp.existing_app
-                  ? t('app-onboarding-next-existing')
-                  : t('app-onboarding-next-new') }}
-              </li>
-              <li class="flex gap-3">
-                <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-500" />
-                {{ t('app-onboarding-next-cleanup') }}
-              </li>
-            </ul>
-          </aside>
         </div>
       </div>
     </div>
