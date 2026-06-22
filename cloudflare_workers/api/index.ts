@@ -17,6 +17,7 @@ import { app as latency } from '../../supabase/functions/_backend/private/latenc
 import { app as log_as } from '../../supabase/functions/_backend/private/log_as.ts'
 import { app as plans } from '../../supabase/functions/_backend/private/plans.ts'
 import { app as publicStats } from '../../supabase/functions/_backend/private/public_stats.ts'
+import { app as replay } from '../../supabase/functions/_backend/private/replay.ts'
 import { app as set_org_email } from '../../supabase/functions/_backend/private/set_org_email.ts'
 import { app as sso_check_domain } from '../../supabase/functions/_backend/private/sso/check-domain.ts'
 import { app as sso_check_enforcement } from '../../supabase/functions/_backend/private/sso/check-enforcement.ts'
@@ -122,6 +123,7 @@ appPrivate.route('/verify_email_otp', verify_email_otp)
 appPrivate.route('/delete_failed_version', deleted_failed_version)
 appPrivate.route('/create_device', create_device)
 appPrivate.route('/latency', latency)
+appPrivate.route('/replay', replay)
 appPrivate.route('/events', events)
 appPrivate.route('/groups', groups)
 appPrivate.route('/sso/check-domain', sso_check_domain)

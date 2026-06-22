@@ -111,7 +111,7 @@ const chartOptions = computed<ChartOptions<'funnel'>>(() => ({
       <span class="loading loading-spinner loading-lg text-primary" />
     </div>
     <div v-else class="w-full h-full">
-      <ChartComponent type="funnel" :data="chartData" :options="chartOptions" />
+      <ChartComponent type="funnel" :data="chartData" :options="(chartOptions as unknown as ChartOptions)" />
     </div>
   </div>
 </template>

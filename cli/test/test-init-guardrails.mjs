@@ -14,6 +14,7 @@ import {
   getInitUpdaterPluginConfig,
   isOnlyAllowedInitAutoTestChange,
   revertInitAutoTestChangeContent,
+  runInheritedCommand,
 } from '../src/init/command.ts'
 import { usesAlwaysDirectUpdate } from '../src/updaterConfig.ts'
 
@@ -195,6 +196,53 @@ t('resume allowlist only accepts the exact cli-managed test diff', () => {
       kind: applied.kind,
     }), false)
   })
+})
+
+async function tAsync(name, fn) {
+  try {
+    await fn()
+    console.log(`✓ ${name}`)
+  }
+  catch (error) {
+    failures += 1
+    console.error(`❌ ${name}`)
+    console.error(error)
+  }
+}
+
+await tAsync('inherited child output flows through parent streams for replay capture', async () => {
+  const originalStdoutWrite = process.stdout.write
+  const originalStderrWrite = process.stderr.write
+  let capturedStdout = ''
+  let capturedStderr = ''
+
+  process.stdout.write = ((chunk, encoding, callback) => {
+    capturedStdout += Buffer.isBuffer(chunk) ? chunk.toString(typeof encoding === 'string' ? encoding : 'utf8') : String(chunk)
+    if (typeof encoding === 'function')
+      encoding()
+    if (typeof callback === 'function')
+      callback()
+    return true
+  })
+  process.stderr.write = ((chunk, encoding, callback) => {
+    capturedStderr += Buffer.isBuffer(chunk) ? chunk.toString(typeof encoding === 'string' ? encoding : 'utf8') : String(chunk)
+    if (typeof encoding === 'function')
+      encoding()
+    if (typeof callback === 'function')
+      callback()
+    return true
+  })
+
+  try {
+    const result = await runInheritedCommand(process.execPath, ['-e', "process.stdout.write('child stdout'); process.stderr.write('child stderr')"])
+    assert.equal(result.status, 0)
+    assert.match(capturedStdout, /child stdout/)
+    assert.match(capturedStderr, /child stderr/)
+  }
+  finally {
+    process.stdout.write = originalStdoutWrite
+    process.stderr.write = originalStderrWrite
+  }
 })
 
 if (failures > 0) {

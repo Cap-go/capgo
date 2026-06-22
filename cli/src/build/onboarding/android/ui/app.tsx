@@ -13,7 +13,9 @@ import type {
   ServiceAccountProvisioned,
 } from '../types.js'
 import type { OnboardingResult } from '../../types.js'
+import type { OnboardingBeforeExit } from '../../ui/exit.js'
 import { handleCustomMsg } from '../../../qr.js'
+import { exitAfterOnboardingBeforeExit } from '../../ui/exit.js'
 import { existsSync, readFileSync } from 'node:fs'
 import { copyFile, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -177,6 +179,8 @@ interface AppProps {
    *  the caller prints an accurate post-exit message + durable summary instead of
    *  always claiming success. Never fires on cancel/missing-platform exits. */
   onResult?: (result: OnboardingResult) => void
+  /** Awaited immediately before Ink exits so replay can capture the alt-screen frame. */
+  onBeforeExit?: OnboardingBeforeExit
 }
 
 const RELEASE_ALIAS_DEFAULT = 'release'
@@ -270,8 +274,11 @@ function emptyProgress(appId: string): AndroidOnboardingProgress {
   }
 }
 
-const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir, apikey, supaHost, journeyId, onStep, onResult }) => {
+const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir, apikey, supaHost, journeyId, onStep, onResult, onBeforeExit }) => {
   const { exit } = useApp()
+  const exitAfterBeforeExit = useCallback(() => {
+    exitAfterOnboardingBeforeExit(onBeforeExit, exit)
+  }, [exit, onBeforeExit])
   const startStep: AndroidOnboardingStep = getAndroidResumeStep(initialProgress)
 
   // When there's saved progress AND the resume target isn't trivially 'welcome',
@@ -807,8 +814,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     exitRequestedRef.current = true
     if (message)
       addLog(message, 'yellow')
-    setTimeout(() => exit(), 50)
-  }, [addLog, exit])
+    setTimeout(exitAfterBeforeExit, 50)
+  }, [addLog, exitAfterBeforeExit])
 
   useInput((input, key) => {
     if (key.ctrl && input === 'c')
@@ -818,7 +825,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     // auto-exit (that would wipe the frame on the alt-screen before it can be
     // read). Dismiss on Enter/Esc/q so it lasts until the user is ready.
     if (step === 'build-complete' && isBuildCompleteDismissKey(input, key)) {
-      exit()
+      exitAfterBeforeExit()
       return
     }
 
@@ -1283,7 +1290,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     }
 
     if (step === 'no-platform') {
-      setTimeout(() => { if (!cancelled) exit() }, 2000)
+      setTimeout(() => { if (!cancelled) exitAfterBeforeExit() }, 2000)
     }
 
     if (step !== 'keystore-existing-picker')

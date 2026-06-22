@@ -48,9 +48,7 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
   // Refresh trigger - increment this to force all watchers to refetch
   const refreshTrigger = ref(0)
 
-  // Computed date range based on mode
-  const activeDateRange = computed<DateRange>(() => {
-    const now = new Date()
+  function getRollingDateRange(now = new Date()): DateRange {
     switch (dateRangeMode.value) {
       case '3day':
         return {
@@ -100,6 +98,11 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
           end: now,
         }
     }
+  }
+
+  const activeDateRange = computed<DateRange>(() => {
+    void refreshTrigger.value
+    return getRollingDateRange()
   })
 
   // Actions
@@ -129,11 +132,14 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
     dateRangeMode.value = '30day'
   }
 
-  function getCacheKey(category: MetricCategory): string {
-    const { start, end } = activeDateRange.value
+  function getCacheKey(category: MetricCategory, range = getRollingDateRange()): string {
+    const { start, end } = range
     const orgPart = selectedOrgId.value || 'global'
     const appPart = selectedAppId.value || 'all'
-    return `${category}-${orgPart}-${appPart}-${start.toISOString()}-${end.toISOString()}`
+    const isCustom = dateRangeMode.value === 'custom'
+    const startBucket = isCustom ? start.toISOString() : start.toISOString().slice(0, 16)
+    const endBucket = isCustom ? end.toISOString() : end.toISOString().slice(0, 16)
+    return `${category}-${orgPart}-${appPart}-${startBucket}-${endBucket}`
   }
 
   function isCacheValid(cacheKey: string): boolean {
@@ -144,10 +150,12 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
   }
 
   async function fetchStats(category: MetricCategory, forceRefresh = false): Promise<any> {
-    const cacheKey = getCacheKey(category)
+    const requestDateRange = getRollingDateRange()
+    const cacheKey = getCacheKey(category, requestDateRange)
+    const skipCache = category === 'customer_country_breakdown'
 
     // Check cache
-    if (!forceRefresh && isCacheValid(cacheKey)) {
+    if (!forceRefresh && !skipCache && isCacheValid(cacheKey)) {
       const cached = cache.value.get(cacheKey)
       return cached?.data
     }
@@ -156,7 +164,7 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
     loadingCategory.value = category
 
     try {
-      const { start, end } = activeDateRange.value
+      const { start, end } = requestDateRange
       const supabase = useSupabase()
 
       const body: any = {

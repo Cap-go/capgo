@@ -420,7 +420,10 @@ function buildIosEffectDeps(cwd: string, getAppIdFn: () => Promise<string | unde
  * Production EngineDeps wiring. Exported for tests that pin production-only
  * behavior (clearBuildRecord wiring, keystore file modes).
  */
-export function buildDeps(sdk: CapgoSDK): EngineDeps {
+// Takes a LIVE accessor, not a captured instance: capgo_login/capgo_logout reassign
+// the server's `let sdk`, and onboarding must act as the currently-signed-in user.
+// getSdk() returns the live binding on every call.
+export function buildDeps(getSdk: () => CapgoSDK): EngineDeps {
   const cwd = process.cwd()
   const getAppIdClosure = async (): Promise<string | undefined> => {
     try {
@@ -456,12 +459,12 @@ export function buildDeps(sdk: CapgoSDK): EngineDeps {
       // on large databases (a full-table RBAC RLS scan) and would falsely report an
       // app you OWN as unregistered, which then re-registers it and surfaces a bogus
       // "already exists and is not in your account" conflict.
-      const res = await sdk.appHasAccess(appId)
+      const res = await getSdk().appHasAccess(appId)
       return res.success && res.data === true
     },
     loadProgress: (appId: string) => loadProgress(appId),
     registerApp: async (appId: string) => {
-      const res = await sdk.addApp({ appId })
+      const res = await getSdk().addApp({ appId })
       if (res.success)
         return { ok: true as const }
       const error = res.error || 'Failed to register app'
@@ -509,8 +512,8 @@ export function buildDeps(sdk: CapgoSDK): EngineDeps {
  * Register the 2-tool onboarding spine onto an MCP server.
  * `depsOverride` is for tests; production passes only `server` + `sdk`.
  */
-export function registerOnboardingTools(server: McpLike, sdk: CapgoSDK, depsOverride?: EngineDeps, buildJobDepsOverride?: BuildJobDeps, credentialsManageDepsOverride?: CredentialsManageDeps): void {
-  const deps = depsOverride ?? buildDeps(sdk)
+export function registerOnboardingTools(server: McpLike, getSdk: () => CapgoSDK, depsOverride?: EngineDeps, buildJobDepsOverride?: BuildJobDeps, credentialsManageDepsOverride?: CredentialsManageDeps): void {
+  const deps = depsOverride ?? buildDeps(getSdk)
 
   server.tool(
     'start_capgo_builder_onboarding',

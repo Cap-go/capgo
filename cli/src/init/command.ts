@@ -2,10 +2,10 @@ import type { Buffer } from 'node:buffer'
 import type { ExistingOrganizationApp, Options, PendingOnboardingApp } from '../api/app'
 import type { Organization } from '../utils'
 import type { InitCodeDiff, InitEncryptionPhase, InitEncryptionSummary } from './runtime'
-import { execSync, spawn, spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path, { dirname, join } from 'node:path'
-import { chdir, cwd, env, exit, platform, stdin, stdout } from 'node:process'
+import { chdir, cwd, env, exit, platform, stderr, stdin, stdout } from 'node:process'
 import { canParse, format, increment, lessThan, parse } from '@std/semver'
 import open from 'open'
 import tmp from 'tmp'
@@ -34,10 +34,12 @@ import { createSupabaseClient, defaultApiHost, findBuildCommandForProjectType, f
 import { buildAppIdConflictSuggestions, isAppAlreadyExistsError } from './app-conflict'
 import { cancel as pCancel, confirm as pConfirm, intro as pIntro, isCancel as pIsCancel, log as pLog, outro as pOutro, select as pSelect, spinner as pSpinner, text as pText } from './prompts'
 import { appendInitStreamingLine, clearInitStreamingOutput, setInitCodeDiff, setInitEncryptionSummary, setInitVersionWarning, startInitStreamingOutput, stopInitInkSession, updateInitStreamingStatus } from './runtime'
+import { finishActiveCliReplay, getActiveCliReplaySessionId, isCliTelemetryDisabled, startInitReplay } from './replay'
 import { formatInitResumeMessage, initOnboardingSteps, renderInitOnboardingComplete, renderInitOnboardingFrame, renderInitOnboardingWelcome } from './ui'
 import { CAPGO_UPDATER_PACKAGE, getUpdaterInstallState } from './updater'
 
 interface SuperOptions extends Options {
+  analytics?: boolean
   local: boolean
 }
 
@@ -72,6 +74,11 @@ body {
 }
 
 `
+async function exitAfterFinishingReplay(code?: number): Promise<never> {
+  await finishActiveCliReplay()
+  exit(code)
+  throw new Error('process.exit returned unexpectedly')
+}
 const frameworkSetupGuides = {
   nextjs: 'https://capgo.app/blog/nextjs-mobile-app-capacitor-from-scratch/',
   nuxtjs: 'https://capgo.app/blog/nuxt-mobile-app-capacitor-from-scratch/',
@@ -412,7 +419,7 @@ async function waitForGitRepoCleanRetry() {
         return 'Type "ready" when the repository is clean.'
     },
   })
-  cancelBeforeAuthenticatedOnboarding(ready)
+  await cancelBeforeAuthenticatedOnboarding(ready)
 }
 
 async function ensureGitRepoCleanBeforeInit(allowedAutoTestChange?: InitAutoTestChange) {
@@ -459,7 +466,7 @@ async function ensureGitRepoCleanBeforeInit(allowedAutoTestChange?: InitAutoTest
       message: 'How do you want to handle the dirty git status?',
       options: getDirtyGitStatusActionOptions(),
     })
-    cancelBeforeAuthenticatedOnboarding(action)
+    await cancelBeforeAuthenticatedOnboarding(action)
 
     if (action === 'continue-dirty') {
       pLog.warn('Continuing with dirty git status. This is not recommended.')
@@ -576,9 +583,9 @@ async function runInitDoctorDiagnostics(): Promise<void> {
 }
 
 async function exitCanceledInitOnboarding(orgId: string, apikey: string, message = 'You can resume the onboarding anytime by running the same command again'): Promise<never> {
-  await markSnag('onboarding-v2', orgId, apikey, 'canceled', undefined, '🤷')
+  await markInitSnag(orgId, apikey, 'canceled', undefined, '🤷')
   pOutro(`Bye 👋\n💡 ${message}`)
-  exit(1)
+  return await exitAfterFinishingReplay(1)
 }
 
 // Render an init-time file path with its project directory prefix so users
@@ -776,16 +783,15 @@ function getFrameworkSetupIssues(projectType: string, projectDir: string, capaci
 
   return issues
 }
-
-function exitBeforeAuthenticatedOnboarding() {
+async function exitBeforeAuthenticatedOnboarding() {
   pOutro(`Bye 👋\n💡 You can resume the onboarding anytime by running the same command again`)
-  exit(1)
+  return await exitAfterFinishingReplay(1)
 }
 
-function cancelBeforeAuthenticatedOnboarding(command: CancelablePromptValue) {
+async function cancelBeforeAuthenticatedOnboarding(command: CancelablePromptValue) {
   if (pIsCancel(command)) {
     pCancel('Operation cancelled.')
-    exitBeforeAuthenticatedOnboarding()
+    await exitBeforeAuthenticatedOnboarding()
   }
 }
 
@@ -818,7 +824,7 @@ async function waitUntilSetupIsDone(message = 'Type "ready" when the setup is do
           return 'Type "ready" when you are done.'
       },
     })
-    cancelBeforeAuthenticatedOnboarding(ready)
+    await cancelBeforeAuthenticatedOnboarding(ready)
     if (typeof ready === 'string' && ready.trim().toLowerCase() === 'ready')
       return
   }
@@ -833,7 +839,7 @@ async function askForAppName(message: string, initialValue: string) {
         return 'App name is required'
     },
   })
-  cancelBeforeAuthenticatedOnboarding(appName)
+  await cancelBeforeAuthenticatedOnboarding(appName)
   return (appName as string).trim()
 }
 
@@ -847,7 +853,7 @@ async function askForWebDir(projectType: string) {
         return 'Web directory is required'
     },
   })
-  cancelBeforeAuthenticatedOnboarding(webDir)
+  await cancelBeforeAuthenticatedOnboarding(webDir)
   return (webDir as string).trim()
 }
 
@@ -856,10 +862,10 @@ async function maybeRunCapacitorInit(projectDir: string, projectType: string, in
     message: 'Do you want me to install Capacitor here and run init now?',
     initialValue: true,
   })
-  cancelBeforeAuthenticatedOnboarding(shouldInitCapacitor)
+  await cancelBeforeAuthenticatedOnboarding(shouldInitCapacitor)
 
   if (!shouldInitCapacitor)
-    exitBeforeAuthenticatedOnboarding()
+    await exitBeforeAuthenticatedOnboarding()
 
   const appName = await askForAppName('App name for Capacitor:', getSuggestedAppName(projectDir))
   const capacitorAppId = initialAppId || await askForAppId('Enter your appId for Capacitor:')
@@ -907,14 +913,14 @@ async function maybeRunCapacitorInit(projectDir: string, projectType: string, in
       message: 'Capacitor init failed. Do you want to try again?',
       initialValue: true,
     })
-    cancelBeforeAuthenticatedOnboarding(retry)
+    await cancelBeforeAuthenticatedOnboarding(retry)
     if (retry)
       return maybeRunCapacitorInit(projectDir, projectType, capacitorAppId)
-    exitBeforeAuthenticatedOnboarding()
+    await exitBeforeAuthenticatedOnboarding()
   }
 }
 
-function runCapacitorPlatformAdd(platformName: 'ios' | 'android', runner: string, commandCwd = cwd()): boolean {
+async function runCapacitorPlatformAdd(platformName: 'ios' | 'android', runner: string, commandCwd = cwd()): Promise<boolean> {
   const command = formatRunnerCommand(runner, ['cap', 'add', platformName])
   const spinner = pSpinner()
   const runMessage = commandCwd === cwd()
@@ -932,11 +938,10 @@ function runCapacitorPlatformAdd(platformName: 'ios' | 'android', runner: string
     return false
   }
 
-  const result = spawnSync(parsedRunner.command, [...parsedRunner.args, 'cap', 'add', platformName], { stdio: 'inherit', cwd: commandCwd })
+  const result = await runInheritedCommand(parsedRunner.command, [...parsedRunner.args, 'cap', 'add', platformName], { cwd: commandCwd })
   if (result.error || result.status !== 0) {
     spinner.stop(`Could not add ${platformName} automatically ❌`)
-    if (result.error)
-      pLog.error(formatError(result.error))
+    pLog.error(formatInheritedCommandFailure(result))
     return false
   }
 
@@ -944,17 +949,19 @@ function runCapacitorPlatformAdd(platformName: 'ios' | 'android', runner: string
   return true
 }
 
-function runCreateAppTemplate() {
+async function runCreateAppTemplate() {
   const templateCommand = getCreateAppTemplateCommand()
   stopInitInkSession({ text: 'Starting Capacitor app template creation...', tone: 'green' })
-  const result = spawnSync(templateCommand.command, templateCommand.args, { stdio: 'inherit' })
+  const result = await runInheritedCommand(templateCommand.command, templateCommand.args)
   if (result.error || result.status !== 0) {
     stdout.write(`Capacitor app template creation failed. Run ${templateCommand.display} manually and try again.\n`)
-    exit(1)
+    if (result.error)
+      pLog.error(formatError(result.error))
+    return await exitAfterFinishingReplay(1)
   }
 
   stdout.write('Capacitor app template creation finished. Run init again from the new app folder.\n')
-  exit(0)
+  return await exitAfterFinishingReplay(0)
 }
 
 async function ensureWorkspaceReadyForInit(initialAppId?: string): Promise<string | undefined> {
@@ -1014,14 +1021,14 @@ async function ensureWorkspaceReadyForInit(initialAppId?: string): Promise<strin
       message: `This folder is not a web app yet. Do you want to start ${templateCommand.display} now?`,
       initialValue: true,
     })
-    cancelBeforeAuthenticatedOnboarding(createAppNow)
+    await cancelBeforeAuthenticatedOnboarding(createAppNow)
     if (createAppNow) {
-      runCreateAppTemplate()
+      await runCreateAppTemplate()
     }
     else {
       pLog.info(`Create a new Capacitor app first with: ${templateCommand.display}`)
       pLog.info('Then run this onboarding again from the new app folder.')
-      exitBeforeAuthenticatedOnboarding()
+      await exitBeforeAuthenticatedOnboarding()
     }
   }
 }
@@ -1221,9 +1228,9 @@ function cleanupStepsDone() {
 
 async function cancelCommand(command: boolean | string | symbol, orgId: string, apikey: string) {
   if (pIsCancel(command)) {
-    await markSnag('onboarding-v2', orgId, apikey, 'canceled', undefined, '🤷')
+    await markInitSnag(orgId, apikey, 'canceled', undefined, '🤷')
     pOutro(`Bye 👋\n💡 You can resume the onboarding anytime by running the same command again`)
-    exit()
+    return await exitAfterFinishingReplay()
   }
 }
 
@@ -1255,9 +1262,9 @@ async function selectRecoveryOption<T extends string>(
     })
 
     if (pIsCancel(choice) || choice === '__cancel__') {
-      await markSnag('onboarding-v2', orgId, apikey, 'canceled', undefined, '🤷')
+      await markInitSnag(orgId, apikey, 'canceled', undefined, '🤷')
       pOutro(`Bye 👋\n💡 You can resume the onboarding anytime by running the same command again`)
-      exit(1)
+      return await exitAfterFinishingReplay(1)
     }
 
     if (choice === '__doctor__') {
@@ -1375,7 +1382,7 @@ async function warnIfNotInCapacitorRoot() {
 
     if (pIsCancel(choice) || choice === 'exit') {
       pCancel('Operation cancelled.')
-      exit(1)
+      return await exitAfterFinishingReplay(1)
     }
 
     if (choice === 'switch') {
@@ -1394,14 +1401,18 @@ async function warnIfNotInCapacitorRoot() {
 
   if (pIsCancel(continueAnyway) || !continueAnyway) {
     pCancel('Operation cancelled.')
-    exit(1)
+    return await exitAfterFinishingReplay(1)
   }
 }
 
-async function markStep(orgId: string, apikey: string, step: string, appId: string) {
-  return markSnag('onboarding-v2', orgId, apikey, `onboarding-step-${step}`, appId)
+async function markInitSnag(orgId: string, apikey: string, event: string, appId?: string, icon = '✅') {
+  const replaySessionId = getActiveCliReplaySessionId()
+  return markSnag('onboarding-v2', orgId, apikey, event, appId, icon, replaySessionId ? { $session_id: replaySessionId } : undefined)
 }
 
+async function markStep(orgId: string, apikey: string, step: string, appId: string) {
+  return markInitSnag(orgId, apikey, `onboarding-step-${step}`, appId)
+}
 /**
  * Save the app ID to the CapacitorUpdater plugin config.
  */
@@ -1475,7 +1486,7 @@ async function maybeCancelAfterRepeatedIosSyncFailures(failureCount: number, org
     await exitCanceledInitOnboarding(orgId, apikey)
 }
 
-function runNativeResetCommand(platformRunner: string, nativePlatform: PlatformChoice, successMessage: string, failureMessage: string): void {
+async function runNativeResetCommand(platformRunner: string, nativePlatform: PlatformChoice, successMessage: string, failureMessage: string): Promise<void> {
   const resetAdvice = getNativeProjectResetAdvice(platformRunner, nativePlatform)
   const resetSpinner = pSpinner()
   resetSpinner.start(`Running: ${resetAdvice.command}`)
@@ -1483,13 +1494,13 @@ function runNativeResetCommand(platformRunner: string, nativePlatform: PlatformC
     const parsedRunner = splitRunnerCommand(platformRunner)
     rmSync(nativePlatform, { recursive: true, force: true })
 
-    const addResult = spawnSync(parsedRunner.command, [...parsedRunner.args, 'cap', 'add', nativePlatform], { stdio: 'inherit' })
+    const addResult = await runInheritedCommand(parsedRunner.command, [...parsedRunner.args, 'cap', 'add', nativePlatform])
     if (addResult.error || addResult.status !== 0)
-      throw addResult.error ?? new Error(`cap add ${nativePlatform} failed with code ${addResult.status ?? 'unknown'}`)
+      throw addResult.error ?? new Error(`cap add ${nativePlatform} failed with ${formatInheritedCommandFailure(addResult)}`)
 
-    const syncResult = spawnSync(parsedRunner.command, [...parsedRunner.args, 'cap', 'sync', nativePlatform], { stdio: 'inherit' })
+    const syncResult = await runInheritedCommand(parsedRunner.command, [...parsedRunner.args, 'cap', 'sync', nativePlatform])
     if (syncResult.error || syncResult.status !== 0)
-      throw syncResult.error ?? new Error(`cap sync ${nativePlatform} failed with code ${syncResult.status ?? 'unknown'}`)
+      throw syncResult.error ?? new Error(`cap sync ${nativePlatform} failed with ${formatInheritedCommandFailure(syncResult)}`)
 
     resetSpinner.stop(successMessage)
   }
@@ -1546,7 +1557,7 @@ async function handleBrokenIosSync(platformRunner: string, details: string[], or
   await cancelCommand(runResetNow, orgId, apikey)
 
   if (runResetNow) {
-    runNativeResetCommand(platformRunner, 'ios', 'iOS folder recreated and synced ✅', 'iOS folder reset failed ❌')
+    await runNativeResetCommand(platformRunner, 'ios', 'iOS folder recreated and synced ✅', 'iOS folder reset failed ❌')
     return
   }
 
@@ -1597,7 +1608,7 @@ async function askForAppId(message = 'Enter your appId:'): Promise<string> {
   if (pIsCancel(appId)) {
     pCancel('Operation cancelled.')
     pOutro(`Bye 👋\n💡 You can resume the onboarding anytime by running the same command again`)
-    exit()
+    return await exitAfterFinishingReplay()
   }
 
   return appId as string
@@ -1768,7 +1779,7 @@ async function selectOrganizationForInit(
 
   if (pIsCancel(organizationUidRaw)) {
     pOutro('Bye 👋\n💡 You can resume the onboarding anytime by running the same command again')
-    exit()
+    return await exitAfterFinishingReplay()
   }
 
   const organizationUid = organizationUidRaw as string
@@ -1837,7 +1848,7 @@ async function checkPrerequisitesStep(orgId: string, apikey: string) {
     if (!continueAnyway) {
       pLog.info(`📝 Please install a development environment and run the onboarding again`)
       pOutro(`Bye 👋\n💡 You can resume the onboarding anytime by running the same command again`)
-      exit()
+      return await exitAfterFinishingReplay()
     }
 
     pLog.warn(`⚠️  Continuing without development environment - you'll need to set it up later`)
@@ -1998,9 +2009,9 @@ async function askForReplacementAppId(
   await cancelCommand(choice, organization.gid, apikey)
 
   if (choice === 'cancel') {
-    await markSnag('onboarding-v2', organization.gid, apikey, 'canceled-appid-conflict', undefined, '🤷')
+    await markInitSnag(organization.gid, apikey, 'canceled-appid-conflict', undefined, '🤷')
     pOutro(`Bye 👋\n💡 You can resume the onboarding anytime by running the same command again`)
-    exit()
+    return await exitAfterFinishingReplay()
   }
 
   if (choice === 'custom')
@@ -2132,10 +2143,10 @@ function rememberPackageJsonPath(packageJsonPath: string): void {
   globalPathToPackageJson = packageJsonPath
 }
 
-function cancelPackageJsonSelection(command: boolean | string | symbol): void {
+async function cancelPackageJsonSelection(command: boolean | string | symbol): Promise<void> {
   if (pIsCancel(command)) {
     pCancel('Operation cancelled.')
-    exit(1)
+    return await exitAfterFinishingReplay(1)
   }
 }
 
@@ -2160,7 +2171,7 @@ async function selectPackageJsonFromTree(): Promise<string> {
       message: 'Select package.json file:',
       options,
     })
-    cancelPackageJsonSelection(selectedEntry)
+    await cancelPackageJsonSelection(selectedEntry)
     if (typeof selectedEntry !== 'string')
       continue
 
@@ -2179,13 +2190,13 @@ async function promptForPackageJsonPath(): Promise<string> {
     message: 'Enter path to package.json file:',
     validate: validatePackageJsonPath,
   }) as string
-  cancelPackageJsonSelection(packageJsonPath)
+  await cancelPackageJsonSelection(packageJsonPath)
   return packageJsonPath.trim()
 }
 
 async function resolvePackageJsonPath(): Promise<string | null> {
   const doSelect = await pConfirm({ message: 'Would you like to select the package.json file manually?' })
-  cancelPackageJsonSelection(doSelect)
+  await cancelPackageJsonSelection(doSelect)
   if (!doSelect)
     return null
 
@@ -2204,7 +2215,7 @@ async function resolvePackageJsonPath(): Promise<string | null> {
 
   if (!useNativePicker) {
     const useTreeSelect = await pConfirm({ message: 'Would you like to use a tree selector to choose the package.json file?' })
-    cancelPackageJsonSelection(useTreeSelect)
+    await cancelPackageJsonSelection(useTreeSelect)
     if (useTreeSelect)
       return selectPackageJsonFromTree()
   }
@@ -2547,7 +2558,7 @@ async function addCodeStep(orgId: string, apikey: string, appId: string) {
         })
         if (pIsCancel(userProvidedPath)) {
           pCancel('Operation cancelled.')
-          exit(1)
+          return await exitAfterFinishingReplay(1)
         }
         mainFilePath = resolveProjectFilePath(userProvidedPath as string)
       }
@@ -2572,7 +2583,7 @@ async function addCodeStep(orgId: string, apikey: string, appId: string) {
 
         if (!continueAnyway) {
           pOutro(`Bye 👋\n💡 You can resume the onboarding anytime by running the same command again`)
-          exit()
+          return await exitAfterFinishingReplay()
         }
 
         pLog.info(`⏭️  Skipping auto-injection - remember to add the code manually!`)
@@ -2779,7 +2790,7 @@ async function addEncryptionStep(orgId: string, apikey: string, appId: string) {
       // log buffer, which `renderInitOnboardingFrame` wipes when step 6
       // renders — producing a visible "flash" of the success line.
       s.stop()
-      await markSnag('onboarding-v2', orgId, apikey, 'Use encryption v2', appId)
+      await markInitSnag(orgId, apikey, 'Use encryption v2', appId)
 
       // Run `cap sync` now, inside step 5, so the public key we just wrote
       // to `capacitor.config.*` actually lands in the native projects
@@ -3032,7 +3043,7 @@ async function ensureNativePlatformForBuild(platform: PlatformChoice, config: Ca
 
     if (pIsCancel(recoveryChoice) || recoveryChoice === 'exit') {
       pOutro(`Bye 👋\n💡 Run "${addPlatformCommand}", then try again.`)
-      exit()
+      return await exitAfterFinishingReplay()
     }
 
     if (recoveryChoice === 'doctor') {
@@ -3040,7 +3051,7 @@ async function ensureNativePlatformForBuild(platform: PlatformChoice, config: Ca
       continue
     }
 
-    if (!runCapacitorPlatformAdd(platform, runner, projectDir))
+    if (!await runCapacitorPlatformAdd(platform, runner, projectDir))
       pLog.warn(`Still could not add ${platform}.`)
   }
 }
@@ -3065,7 +3076,7 @@ async function handleMissingBuildScript(buildCommand: string, appId: string, pla
   }
 
   pOutro(`Bye 👋\n💡 Add a "${buildCommand}" script to package.json and run the command again`)
-  exit()
+  return await exitAfterFinishingReplay()
 }
 
 async function getCompatibleUpdaterVersionForPackage(packageJsonPath: string, pm: PackageManagerInfo): Promise<string> {
@@ -3157,7 +3168,9 @@ async function runBuildAndSyncLoop(
       : `Running in ${buildAndSyncCwd}: ${buildAndSyncCommand}`
     spinner.stop(runMessage, 'neutral')
     try {
-      execSync(buildAndSyncCommand, { stdio: 'inherit', cwd: buildAndSyncCwd })
+      const result = await runInheritedShellCommand(buildAndSyncCommand, { cwd: buildAndSyncCwd })
+      if (result.error || result.status !== 0)
+        throw result.error ?? new Error(`Build or sync command failed with ${formatInheritedCommandFailure(result)}`)
     }
     catch (error) {
       pLog.error('Build or sync failed ❌')
@@ -3221,6 +3234,164 @@ async function buildProjectStep(orgId: string, apikey: string, appId: string, pl
 export function runPackageRunnerSync(runner: string, args: string[], options: Parameters<typeof spawnSync>[2]) {
   const parsedRunner = splitRunnerCommand(runner)
   return spawnSync(parsedRunner.command, [...parsedRunner.args, ...args], options)
+}
+
+async function runPackageRunnerInherited(runner: string, args: string[], options: Pick<InheritedCommandOptions, 'cwd'> = {}) {
+  const parsedRunner = splitRunnerCommand(runner)
+  return runInheritedCommand(parsedRunner.command, [...parsedRunner.args, ...args], options)
+}
+
+interface InheritedCommandResult {
+  error?: Error
+  signal: NodeJS.Signals | number | null
+  status: number | null
+}
+
+interface InheritedCommandOptions {
+  cwd?: string
+  forcePty?: boolean
+}
+
+export async function runInheritedCommand(command: string, args: string[], options: InheritedCommandOptions = {}): Promise<InheritedCommandResult> {
+  if (options.forcePty || (stdin.isTTY && stdout.isTTY))
+    return runPtyInheritedCommand(command, args, options)
+  return runPipedInheritedCommand(command, args, options)
+}
+
+function runPipedInheritedCommand(command: string, args: string[], options: Pick<InheritedCommandOptions, 'cwd'> = {}): Promise<InheritedCommandResult> {
+  return new Promise((resolve) => {
+    let settled = false
+    const finish = (result: InheritedCommandResult) => {
+      if (settled)
+        return
+      settled = true
+      resolve(result)
+    }
+
+    let child
+    try {
+      child = spawn(command, args, {
+        cwd: options.cwd,
+        stdio: ['inherit', 'pipe', 'pipe'],
+      })
+    }
+    catch (error) {
+      finish({
+        status: null,
+        signal: null,
+        error: error instanceof Error ? error : new Error(String(error)),
+      })
+      return
+    }
+
+    child.stdout?.on('data', chunk => stdout.write(chunk))
+    child.stderr?.on('data', chunk => stderr.write(chunk))
+    child.once('error', error => finish({
+      status: null,
+      signal: null,
+      error,
+    }))
+    child.once('close', (status, signal) => finish({ status, signal }))
+  })
+}
+
+function runDirectInheritedCommand(command: string, args: string[], options: Pick<InheritedCommandOptions, 'cwd'> = {}): Promise<InheritedCommandResult> {
+  return new Promise((resolve) => {
+    let child
+    try {
+      child = spawn(command, args, { cwd: options.cwd, stdio: 'inherit' })
+    }
+    catch (error) {
+      resolve({
+        status: null,
+        signal: null,
+        error: error instanceof Error ? error : new Error(String(error)),
+      })
+      return
+    }
+
+    child.once('error', error => resolve({
+      status: null,
+      signal: null,
+      error,
+    }))
+    child.once('close', (status, signal) => resolve({ status, signal }))
+  })
+}
+
+async function runPtyInheritedCommand(command: string, args: string[], options: Pick<InheritedCommandOptions, 'cwd'> = {}): Promise<InheritedCommandResult> {
+  let spawnPty: typeof import('node-pty').spawn
+  try {
+    ;({ spawn: spawnPty } = await import('node-pty'))
+  }
+  catch {
+    return runDirectInheritedCommand(command, args, options)
+  }
+
+  return new Promise((resolve) => {
+    let settled = false
+    let previousRawMode: boolean | undefined
+    let ptyProcess: import('node-pty').IPty | undefined
+    const inputHandler = (chunk: Buffer | string) => ptyProcess?.write(chunk)
+    const resizeHandler = () => {
+      try {
+        ptyProcess?.resize(stdout.columns || 100, stdout.rows || 30)
+      }
+      catch {}
+    }
+    const cleanup = () => {
+      stdout.off('resize', resizeHandler)
+      stdin.off('data', inputHandler)
+      if (stdin.isTTY && typeof previousRawMode === 'boolean')
+        stdin.setRawMode?.(previousRawMode)
+    }
+    const finish = (result: InheritedCommandResult) => {
+      if (settled)
+        return
+      settled = true
+      cleanup()
+      resolve(result)
+    }
+
+    try {
+      ptyProcess = spawnPty(command, args, {
+        cols: stdout.columns || 100,
+        cwd: options.cwd || cwd(),
+        env,
+        name: env.TERM || 'xterm-256color',
+        rows: stdout.rows || 30,
+      })
+    }
+    catch {
+      cleanup()
+      void runDirectInheritedCommand(command, args, options).then(resolve)
+      return
+    }
+
+    ptyProcess.onData(data => stdout.write(data))
+    ptyProcess.onExit(({ exitCode, signal }) => finish({ status: exitCode, signal: signal ?? null }))
+    stdout.on('resize', resizeHandler)
+    stdin.on('data', inputHandler)
+    if (stdin.isTTY) {
+      previousRawMode = stdin.isRaw
+      stdin.setRawMode?.(true)
+      stdin.resume()
+    }
+  })
+}
+
+function runInheritedShellCommand(command: string, options: Pick<InheritedCommandOptions, 'cwd'> = {}) {
+  const shellCommand = platform === 'win32' ? (env.ComSpec || 'cmd.exe') : '/bin/sh'
+  const shellArgs = platform === 'win32' ? ['/d', '/s', '/c', command] : ['-c', command]
+  return runInheritedCommand(shellCommand, shellArgs, options)
+}
+
+function formatInheritedCommandFailure(result: InheritedCommandResult) {
+  if (result.error)
+    return formatError(result.error)
+  if (result.signal)
+    return `signal ${result.signal}`
+  return `exit code ${result.status ?? 'unknown'}`
 }
 
 function getSpawnOutputText(output: string | Buffer | null | undefined): string {
@@ -3710,7 +3881,7 @@ async function handleMissingPlatformSelection(orgId: string, apikey: string, ava
   }
 
   const platformToAdd = recoveryChoice === 'add-ios' ? 'ios' : 'android'
-  if (!runCapacitorPlatformAdd(platformToAdd, pm.runner, projectDir))
+  if (!await runCapacitorPlatformAdd(platformToAdd, pm.runner, projectDir))
     pLog.warn(`Still could not add ${platformToAdd}.`)
 }
 
@@ -3752,10 +3923,10 @@ async function runDeviceStep(orgId: string, apikey: string, appId: string, platf
       : `Running in ${projectDir}: ${runCommand.command}`
     s.start(runMessage)
 
-    let runResult: ReturnType<typeof spawnSync> | undefined
+    let runResult: InheritedCommandResult | undefined
     let runError: Error | undefined
     try {
-      runResult = runPackageRunnerSync(pm.runner, runCommand.args, { stdio: 'inherit', cwd: projectDir })
+      runResult = await runPackageRunnerInherited(pm.runner, runCommand.args, { cwd: projectDir })
     }
     catch (error) {
       runError = error instanceof Error ? error : new Error(String(error))
@@ -3778,7 +3949,7 @@ async function runDeviceStep(orgId: string, apikey: string, appId: string, platf
         const s2 = pSpinner()
         s2.start(`Opening ${platform === 'ios' ? 'Xcode' : 'Android Studio'}...`)
         try {
-          const openResult = runPackageRunnerSync(pm.runner, ['cap', 'open', platform], { stdio: 'inherit', cwd: projectDir })
+          const openResult = await runPackageRunnerInherited(pm.runner, ['cap', 'open', platform], { cwd: projectDir })
           if (openResult.error || openResult.status !== 0) {
             s2.stop(`Could not open ${platform === 'ios' ? 'Xcode' : 'Android Studio'} ❌`)
             if (openResult.error)
@@ -3827,9 +3998,9 @@ async function addCodeChangeStep(orgId: string, apikey: string, appId: string, p
     ],
   })
   if (pIsCancel(modificationType)) {
-    await markSnag('onboarding-v2', orgId, apikey, 'canceled', undefined, '🤷')
+    await markInitSnag(orgId, apikey, 'canceled', undefined, '🤷')
     pOutro(`Bye 👋\n💡 You can resume the onboarding anytime by running the same command again`)
-    exit()
+    return await exitAfterFinishingReplay()
   }
 
   if (modificationType === 'auto') {
@@ -3913,9 +4084,9 @@ async function addCodeChangeStep(orgId: string, apikey: string, appId: string, p
     ],
   })
   if (pIsCancel(versionChoice)) {
-    await markSnag('onboarding-v2', orgId, apikey, 'canceled', undefined, '🤷')
+    await markInitSnag(orgId, apikey, 'canceled', undefined, '🤷')
     pOutro(`Bye 👋\n💡 You can resume the onboarding anytime by running the same command again`)
-    exit()
+    return await exitAfterFinishingReplay()
   }
 
   let newVersion: string
@@ -3934,9 +4105,9 @@ async function addCodeChangeStep(orgId: string, apikey: string, appId: string, p
       },
     })
     if (pIsCancel(userVersion)) {
-      await markSnag('onboarding-v2', orgId, apikey, 'canceled', undefined, '🤷')
+      await markInitSnag(orgId, apikey, 'canceled', undefined, '🤷')
       pOutro(`Bye 👋\n💡 You can resume the onboarding anytime by running the same command again`)
-      exit()
+      return await exitAfterFinishingReplay()
     }
     newVersion = userVersion as string
   }
@@ -4367,14 +4538,21 @@ async function maybeStarCapgoRepo(includeSkillsRepository = false, repository?: 
 export async function initApp(apikeyCommand: string, appId: string, options: SuperOptions) {
   globalSupaHost = options.supaHost // honor --supa-host for the support-logs upload
   const pm = getPMAndCommand()
+  options.apikey = apikeyCommand
+  const analyticsEnabled = options.analytics !== false && !isCliTelemetryDisabled()
+  startInitReplay({
+    analyticsEnabled,
+    apikey: options.apikey?.trim() || findSavedKeySilent(),
+    supaAnon: options.supaAnon,
+    supaHost: options.supaHost,
+  })
   // Start the verbose internal log early so it captures the whole run (incl.
   // raw provider/API errors) and survives crashes for the support bundle.
   startInternalLog(appId || globalAppId)
   appendInternalLog(`init: onboarding started for app ${appId || globalAppId || 'unknown'}`)
   pIntro('Capgo onboarding')
-  renderInitOnboardingWelcome(initOnboardingSteps.length)
+  renderInitOnboardingWelcome(initOnboardingSteps.length, analyticsEnabled)
 
-  options.apikey = apikeyCommand
   if (!options.apikey) {
     try {
       options.apikey ??= findSavedKey(true)
@@ -4431,7 +4609,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
     })
     if (pIsCancel(continueAnyway) || continueAnyway === 'no') {
       pOutro('Bye 👋')
-      exit()
+      return await exitAfterFinishingReplay()
     }
   }
   else {
@@ -4452,12 +4630,12 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
 
       if (pIsCancel(continueWithout) || continueWithout === 'no') {
         pOutro(`Bye 👋\n💡 Run "${capAddIos}" or "${capAddAndroid}", then try again.`)
-        exit()
+        return await exitAfterFinishingReplay()
       }
 
       if (continueWithout === 'add-ios' || continueWithout === 'add-android') {
         const platformToAdd = continueWithout === 'add-ios' ? 'ios' : 'android'
-        const added = runCapacitorPlatformAdd(platformToAdd, pm.runner, selectedProjectDir)
+        const added = await runCapacitorPlatformAdd(platformToAdd, pm.runner, selectedProjectDir)
         if (!added) {
           const recoveryChoice = await pSelect({
             message: `Could not add ${platformToAdd}. What do you want to do next?`,
@@ -4471,7 +4649,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
 
           if (pIsCancel(recoveryChoice) || recoveryChoice === 'exit') {
             pOutro(`Bye 👋\n💡 Run "${platformToAdd === 'ios' ? capAddIos : capAddAndroid}", then try again.`)
-            exit()
+            return await exitAfterFinishingReplay()
           }
 
           if (recoveryChoice === 'doctor') {
@@ -4484,7 +4662,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
           }
 
           if (recoveryChoice === 'retry') {
-            const retried = runCapacitorPlatformAdd(platformToAdd, pm.runner, selectedProjectDir)
+            const retried = await runCapacitorPlatformAdd(platformToAdd, pm.runner, selectedProjectDir)
             if (!retried) {
               pLog.warn(`Still could not add ${platformToAdd}. Continuing without native platforms for now.`)
             }
@@ -4751,7 +4929,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
       pLog.error('Could not save a support bundle automatically.')
     pLog.error(`Run ${doctor} for extra diagnostics before contacting support@capgo.app`)
     pLog.error('Manual installation guide: https://capgo.app/docs/getting-started/add-an-app/')
-    exit(1)
+    return await exitAfterFinishingReplay(1)
   }
 
   renderInitOnboardingComplete(
@@ -4769,5 +4947,5 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   const didChooseSkills = await maybeInstallCapgoSkills()
   await maybeStarCapgoRepo(didChooseSkills)
   pOutro(`Bye 👋`)
-  exit()
+  return await exitAfterFinishingReplay()
 }

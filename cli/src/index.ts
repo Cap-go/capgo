@@ -3,6 +3,7 @@ import { log } from '@clack/prompts'
 import { Option, program } from 'commander'
 import pack from '../package.json'
 import { categorizeCliError } from './analytics/error-category'
+import { applyCommandAnalyticsOptOut, applyRawCommandAnalyticsOptOut } from './analytics/opt-out'
 import { enableSupabaseInstrumentation } from './analytics/supabase-perf'
 import { extractCommandContext, flushAnalytics, trackCommandFailed, trackCommandInvoked, trackCommandSucceeded } from './analytics/track'
 import { addApp } from './app/add'
@@ -39,6 +40,7 @@ import { generateDocs } from './docs'
 import { defaultStarRepo } from './github'
 import { starAllRepositoriesCommand, starRepositoryCommand } from './github-command'
 import { initApp } from './init'
+import { finishActiveCliReplay } from './init/replay'
 import { createKey, deleteOldKey, saveKeyCommand } from './key'
 import { login } from './login'
 import { startMcpServer } from './mcp/server'
@@ -78,6 +80,7 @@ let currentCommandPath = 'unknown'
 
 program.hook('preAction', (_thisCommand, actionCommand) => {
   currentCommandPath = getCommandPath(actionCommand)
+  applyCommandAnalyticsOptOut(currentCommandPath, actionCommand.opts())
   trackCommandInvoked(currentCommandPath, extractCommandContext(actionCommand))
 })
 
@@ -100,6 +103,7 @@ Example: npx @capgo/cli@latest init YOUR_API_KEY com.example.app`)
   .option('-i, --icon <icon>', `App icon path for display in Capgo Cloud`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+  .option('--no-analytics', 'Disable init analytics and terminal replay for this run')
 
 const run = program
   .command('run')
@@ -824,6 +828,7 @@ build
   .option('-a, --apikey <apikey>', 'API key to link to your account')
   .option('-p, --platform <platform>', 'Platform to onboard (ios or android). If omitted, auto-detects when only one native folder exists; prompts otherwise.')
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  .option('--no-analytics', 'Disable build onboarding analytics and terminal replay for this run')
   // enableSelfUpdate is set ONLY here (the genuine `build init` entrypoint) so
   // the self-update prompt's re-exec replays `build init`, never a wrapper
   // command that reached onboarding as a sub-step (bundle upload / credentials).
@@ -1156,6 +1161,7 @@ program.configureOutput({
     // Suppress Commander's default error output since we handle it in catch
   },
 })
+applyRawCommandAnalyticsOptOut(process.argv)
 
 void (async () => {
   try {
@@ -1186,7 +1192,7 @@ void (async () => {
       // Track the failure for usage analytics regardless of exception-capture
       // policy (commander usage errors are real failures, categorized 'commander').
       trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode })
-      await Promise.all([capturePromise, flushAnalytics()])
+      await Promise.all([capturePromise, flushAnalytics(), finishActiveCliReplay().catch(() => {})])
       exit(exitCode)
     }
     const capturePromise = capturePosthogException({
@@ -1198,7 +1204,7 @@ void (async () => {
     // For non-Commander errors, show full error details
     log.error(`Error: ${formatError(error)}`)
     trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode: 1 })
-    await Promise.all([capturePromise, flushAnalytics()])
+    await Promise.all([capturePromise, flushAnalytics(), finishActiveCliReplay().catch(() => {})])
     exit(1)
   }
 })()

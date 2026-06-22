@@ -41,6 +41,32 @@ function findEventBody(requests) {
 }
 
 try {
+  // ── Env opt-out prevents direct onboarding telemetry sends ──────────────────
+  {
+    const requests = installFetchMock()
+    const previousTelemetryOptOut = process.env.CAPGO_DISABLE_TELEMETRY
+    process.env.CAPGO_DISABLE_TELEMETRY = 'true'
+    try {
+      await trackBuilderOnboardingAction({
+        action: 'android_sa_method_selected',
+        apikey: 'capgo-key',
+        appId: 'com.example.app',
+        orgId: 'org-id',
+        journeyId: 'bj_journey-opt-out',
+        platform: 'android',
+        step: 'service-account-method-select',
+      })
+    }
+    finally {
+      if (previousTelemetryOptOut === undefined)
+        delete process.env.CAPGO_DISABLE_TELEMETRY
+      else
+        process.env.CAPGO_DISABLE_TELEMETRY = previousTelemetryOptOut
+    }
+    assert.equal(requests.length, 0, 'telemetry opt-out prevents config and event requests')
+    console.log('✅ Env opt-out prevents builder onboarding telemetry')
+  }
+
   // ── Action event carries the journey id ───────────────────────────────────
   {
     const requests = installFetchMock()
@@ -50,6 +76,7 @@ try {
       appId: 'com.example.app',
       orgId: 'org-id',
       journeyId: 'bj_journey-1',
+      replaySessionId: 'build-onboarding-replay-1',
       platform: 'android',
       step: 'service-account-method-select',
       tags: {
@@ -74,6 +101,7 @@ try {
       action: 'android_sa_method_selected',
       app_id: 'com.example.app',
       attempt: '1',
+      $session_id: 'build-onboarding-replay-1',
       journey_id: 'bj_journey-1',
       method: 'existing',
       platform: 'android',
@@ -90,6 +118,7 @@ try {
       appId: 'com.example.app',
       orgId: 'org-id',
       journeyId: 'bj_journey-2',
+      replaySessionId: 'build-onboarding-replay-2',
       platform: 'ios',
       step: 'api-key-instructions',
       durationMs: 1234,
@@ -100,6 +129,7 @@ try {
     assert.equal(body.event, 'Builder Onboarding Step')
     assert.equal(body.channel, 'builder-onboarding')
     assert.deepEqual(body.tags, {
+      $session_id: 'build-onboarding-replay-2',
       app_id: 'com.example.app',
       duration_ms: '1234',
       duration_step: 'welcome',
@@ -118,6 +148,7 @@ try {
       appId: 'com.example.app',
       orgId: 'org-id',
       journeyId: 'bj_journey-3',
+      replaySessionId: 'build-onboarding-replay-3',
       platform: 'ios',
       lastStep: 'verifying-key',
       durationMs: 9876.4,
@@ -131,6 +162,7 @@ try {
     assert.equal(body.org_id, 'org-id')
     assert.equal(body.tracking_version, 2)
     assert.deepEqual(body.tags, {
+      $session_id: 'build-onboarding-replay-3',
       app_id: 'com.example.app',
       duration_ms: '9876', // rounded
       journey_id: 'bj_journey-3',

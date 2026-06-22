@@ -1,7 +1,14 @@
 import type { AndroidOnboardingErrorCategory, AndroidOnboardingStep } from './android/types.js'
 import type { OnboardingErrorCategory, OnboardingStep, Platform } from './types.js'
 import { sendEvent } from '../../utils.js'
+import { getActiveCliReplaySessionId } from '../../init/replay.js'
 import { mapAndroidOnboardingError, mapIosOnboardingError } from './error-categories.js'
+
+function addReplaySessionTag(tags: Record<string, string>, replaySessionId?: string) {
+  const sessionId = replaySessionId || getActiveCliReplaySessionId()
+  if (sessionId)
+    tags.$session_id = sessionId
+}
 
 export interface TrackBuilderOnboardingStepInput {
   apikey: string
@@ -18,6 +25,7 @@ export interface TrackBuilderOnboardingStepInput {
   error?: unknown
   /** Pre-computed category. Takes precedence over `error` if both are present. */
   errorCategory?: OnboardingErrorCategory | AndroidOnboardingErrorCategory
+  replaySessionId?: string
 }
 
 export type BuilderOnboardingAction
@@ -39,6 +47,7 @@ export interface TrackBuilderOnboardingActionInput {
   step: OnboardingStep | AndroidOnboardingStep
   action: BuilderOnboardingAction
   tags?: Record<string, boolean | number | string>
+  replaySessionId?: string
 }
 
 export async function trackBuilderOnboardingStep(input: TrackBuilderOnboardingStepInput): Promise<void> {
@@ -63,6 +72,8 @@ export async function trackBuilderOnboardingStep(input: TrackBuilderOnboardingSt
       ? mapIosOnboardingError(input.error)
       : mapAndroidOnboardingError(input.error)
   }
+
+  addReplaySessionTag(tags, input.replaySessionId)
 
   try {
     await sendEvent(input.apikey, {
@@ -92,6 +103,7 @@ export async function trackBuilderOnboardingAction(input: TrackBuilderOnboarding
   tags.platform = input.platform
   tags.app_id = input.appId
   tags.action = input.action
+  addReplaySessionTag(tags, input.replaySessionId)
 
   try {
     await sendEvent(input.apikey, {
@@ -131,6 +143,7 @@ export interface TrackBuilderOnboardingCancelledInput {
    * can't keep the CLI alive after the user has already exited the wizard.
    */
   signal?: AbortSignal
+  replaySessionId?: string
 }
 
 /**
@@ -154,6 +167,7 @@ export async function trackBuilderOnboardingCancelled(input: TrackBuilderOnboard
     tags.last_step = input.lastStep
   if (typeof input.durationMs === 'number' && Number.isFinite(input.durationMs))
     tags.duration_ms = String(Math.round(input.durationMs))
+  addReplaySessionTag(tags, input.replaySessionId)
 
   try {
     await sendEvent(input.apikey, {

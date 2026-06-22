@@ -8,6 +8,11 @@ const HELPER_PACKAGES = [
   '@capgo/cli-helper-darwin-x64',
 ]
 
+const EXTERNAL_PACKAGES = [
+  ...HELPER_PACKAGES,
+  'node-pty',
+]
+
 // Shared plugin definitions - Bun's plugin API is compatible with esbuild's
 const stubSemver = {
   name: 'stub-semver',
@@ -310,18 +315,18 @@ const buildCLI = Bun.build({
   entrypoints: ['src/index.ts'],
   target: 'node',
   outdir: 'dist',
-  naming: 'index.js',
+  external: EXTERNAL_PACKAGES,
   sourcemap: env.NODE_ENV === 'development' ? 'linked' : 'none',
   minify: true,
   // Keep env access runtime-only unless explicitly defined below.
   env: 'disable',
-  external: HELPER_PACKAGES,
   define: {
     'process.env.SUPA_DB': '"production"',
     // __CAPGO_DEV__ stays false forever — dev/spoof branches never ship.
     'globalThis.__CAPGO_DEV__': 'false',
     // MCP onboarding is release-ready as of PR 2: ship the onboarding tools.
     'globalThis.__CAPGO_MCP_ONBOARDING__': 'true',
+    'globalThis.__CAPGO_MCP_LIVE_UPDATE__': 'true',
     // Gates the CAPGO_KEYCHAIN_HELPER_PATH dev override. `false` here makes
     // the minifier delete the whole branch from release bundles —
     // publish_cli.yml asserts the string is absent from dist/index.js.
@@ -347,18 +352,18 @@ const buildSDK = Bun.build({
   target: 'node',
   outdir: 'dist/src',
   naming: 'sdk.js',
-  sourcemap: env.NODE_ENV === 'development' ? 'linked' : 'none',
+  external: EXTERNAL_PACKAGES,
   minify: true,
   format: 'esm',
   // Keep env access runtime-only unless explicitly defined below.
   env: 'disable',
-  external: HELPER_PACKAGES,
   define: {
     'process.env.SUPA_DB': '"production"',
     // __CAPGO_DEV__ stays false forever — dev/spoof branches never ship.
     'globalThis.__CAPGO_DEV__': 'false',
     // MCP onboarding is release-ready as of PR 2: ship the onboarding tools.
     'globalThis.__CAPGO_MCP_ONBOARDING__': 'true',
+    'globalThis.__CAPGO_MCP_LIVE_UPDATE__': 'true',
     // Gates the CAPGO_KEYCHAIN_HELPER_PATH dev override. `false` here makes
     // the minifier delete the whole branch from release bundles —
     // publish_cli.yml asserts the string is absent from dist/index.js.

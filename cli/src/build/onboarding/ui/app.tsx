@@ -12,6 +12,7 @@ import type { CertificateData, EnrichedIdentityAvailability, OnboardingErrorCate
 import type { BuildScriptChoice, PackageManager } from '../workflow-generator.js'
 import type { AiResultKind } from './components.js'
 import type { NoMatchReason } from './steps/ios-import.js'
+import type { OnboardingBeforeExit } from './exit.js'
 import { Buffer } from 'node:buffer'
 import { spawn } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
@@ -44,6 +45,7 @@ import { requestBuildInternal } from '../../request.js'
 import { isAiAnalysisTooTall, resolveAiResultRoute } from '../ai-fit.js'
 import { getWorkflowDiffTelemetry, trackBuildOnboardingWorkflowEvent } from '../analytics.js'
 import { evaluateGate } from '../app-verification.js'
+import { exitAfterOnboardingBeforeExit } from './exit.js'
 import { classifyCertAvailability, computeCertSha1, createCertificate, createProfile, deleteProfile, ensureBundleId, findCertIdBySha1, generateJwt, listApps, listBundleIds, listDistributionCerts, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
 import { runAscKeyHelper } from '../asc-key/helper.js'
 import { sanitizeBuildLogLines } from '../build-log.js'
@@ -287,6 +289,8 @@ interface AppProps {
    *  always claiming success. Never fires on cancel/missing-platform exits.
    */
   onResult?: (result: OnboardingResult) => void
+  /** Awaited immediately before Ink exits so replay can capture the alt-screen frame. */
+  onBeforeExit?: OnboardingBeforeExit
 }
 
 async function runRunnerCommand(runner: string, args: string[]): Promise<{ success: boolean, output: string[] }> {
@@ -326,8 +330,11 @@ async function runRunnerCommand(runner: string, args: string[]): Promise<{ succe
   })
 }
 
-const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgress, iosDir, guidedHelperUsable, apikey, supaHost, journeyId, onStep, onResult }) => {
+const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgress, iosDir, guidedHelperUsable, apikey, supaHost, journeyId, onStep, onResult, onBeforeExit }) => {
   const { exit } = useApp()
+  const exitAfterBeforeExit = useCallback(() => {
+    exitAfterOnboardingBeforeExit(onBeforeExit, exit)
+  }, [exit, onBeforeExit])
   // Pass helper availability so an automated-path resume only targets
   // asc-key-generating when the helper can actually run (else manual instructions).
   // guidedHelperUsable already folds in macOS + signed-helper-installed +
@@ -1222,8 +1229,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     exitRequestedRef.current = true
     if (message)
       addLog(message, 'yellow')
-    setTimeout(exit, 50)
-  }, [addLog, exit])
+    setTimeout(exitAfterBeforeExit, 50)
+  }, [addLog, exitAfterBeforeExit])
 
   // Open browser on Ctrl+O (FilteredTextInput ignores ctrl keys, so no conflict)
   useInput((input, key) => {
@@ -1236,7 +1243,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     // auto-exit (that would wipe the frame on the alt-screen before it can be
     // read). Dismiss on Enter/Esc/q so it lasts until the user is ready.
     if (step === 'build-complete' && isBuildCompleteDismissKey(input, key)) {
-      exit()
+      exitAfterBeforeExit()
       return
     }
 
