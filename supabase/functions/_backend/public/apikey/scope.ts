@@ -124,7 +124,7 @@ export async function assertApiKeyManagerCanAssignBindings(
     }
 
     for (const binding of bindings) {
-      if (binding.allowSystemRole === true) {
+      if (binding.allowSystemRole === true || binding.org_id !== orgId) {
         continue
       }
       if (APIKEY_MANAGER_DENIED_ASSIGNABLE_ROLES.has(binding.role_name)) {
