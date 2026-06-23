@@ -737,6 +737,29 @@ export async function getAppOwnerPostgres(
   }
 }
 
+export async function getAppBlockProviderInfraRequestsPostgres(
+  c: Context,
+  appId: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<boolean | null> {
+  try {
+    const app = await drizzleClient
+      .select({
+        block_provider_infra_requests: schema.apps.block_provider_infra_requests,
+      })
+      .from(schema.apps)
+      .where(eq(schema.apps.app_id, appId))
+      .limit(1)
+      .then(data => data[0])
+
+    return app?.block_provider_infra_requests ?? null
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAppBlockProviderInfraRequestsPostgres', e)
+    return null
+  }
+}
+
 export async function getAppVersionPostgres(
   c: Context,
   appId: string,

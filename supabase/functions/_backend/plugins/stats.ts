@@ -22,7 +22,10 @@ const DOWNLOAD_FAIL_FIXED_PLUGIN_VERSION_V6 = parse('6.14.25')
 
 type AppStatusResult = Awaited<ReturnType<typeof getAppStatus>>
 
-async function blockProviderInfrastructure(c: Context) {
+async function blockProviderInfrastructure(c: Context, shouldBlockProviderInfrastructure = true) {
+  if (!shouldBlockProviderInfrastructure)
+    return null
+
   const requestIp = getClientIP(c)
   if (requestIp === 'unknown')
     return null
@@ -51,6 +54,7 @@ export interface BatchStatsResult {
 
 interface PostResult {
   success: boolean
+  response?: Response
   error?: string
   message?: string
   isOnprem?: boolean
@@ -104,6 +108,11 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     await setAppStatus(c, app_id, 'onprem', true, cachedAppStatus.block_provider_infra_requests)
     await onPremStats(c, app_id, action, device, metadata)
     return { success: true, isOnprem: true }
+  }
+  if (!cachedAppStatus.cacheHit) {
+    const blocked = await blockProviderInfrastructure(c, appOwner.block_provider_infra_requests)
+    if (blocked)
+      return { success: false, response: blocked }
   }
   if (!appOwner.plan_valid) {
     await setAppStatus(c, app_id, 'cancelled', appOwner.allow_device_custom_id, appOwner.block_provider_infra_requests)
@@ -256,8 +265,8 @@ app.post('/', async (c) => {
   }
 
   const appStatus = await getAppStatus(c, firstAppId)
-  if (appStatus.block_provider_infra_requests && requestIp !== 'unknown') {
-    const blocked = await blockProviderInfrastructure(c)
+  if (appStatus.cacheHit && requestIp !== 'unknown') {
+    const blocked = await blockProviderInfrastructure(c, appStatus.block_provider_infra_requests)
     if (blocked)
       return blocked
   }
@@ -279,6 +288,9 @@ app.post('/', async (c) => {
     if (!isBatch) {
       const bodyParsed = parsePluginBody<AppStats>(c, events[0], statsRequestSchema)
       const result = await post(c, drizzleClient, bodyParsed, appStatus)
+      if (result.response) {
+        return result.response
+      }
       if (result.isOnprem) {
         return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
       }
@@ -299,6 +311,9 @@ app.post('/', async (c) => {
       try {
         const bodyParsed = parsePluginBody<AppStats>(c, event, statsRequestSchema)
         const result = await post(c, drizzleClient, bodyParsed, appStatus)
+        if (result.response) {
+          return result.response
+        }
 
         if (result.isOnprem) {
           results.push({

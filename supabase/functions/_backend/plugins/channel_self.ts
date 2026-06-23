@@ -248,6 +248,11 @@ async function prepareChannelSelfDeviceRequest(
 
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
   const device = makeDevice(body, appOwner?.allow_device_custom_id)
+  if (appOwner && !cachedAppStatus.cacheHit) {
+    const blocked = await blockProviderInfrastructure(c, operationLabel, appOwner.block_provider_infra_requests)
+    if (blocked)
+      return { response: blocked }
+  }
   const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, operationLabel, cachedAppStatus.block_provider_infra_requests, device_id)
   if ('response' in ownerRes) {
     return { response: ownerRes.response }
@@ -656,7 +661,7 @@ app.post('/', async (c) => {
   }
 
   const appStatus = await getAppStatus(c, bodyParsed.app_id)
-  const blocked = await blockProviderInfrastructure(c, 'POST', appStatus.block_provider_infra_requests)
+  const blocked = appStatus.cacheHit ? await blockProviderInfrastructure(c, 'POST', appStatus.block_provider_infra_requests) : null
   if (blocked)
     return blocked
 
@@ -680,7 +685,7 @@ app.put('/', async (c) => {
   }
   const { bodyParsed } = parsed
   const appStatus = await getAppStatus(c, bodyParsed.app_id)
-  const blocked = await blockProviderInfrastructure(c, 'PUT', appStatus.block_provider_infra_requests)
+  const blocked = appStatus.cacheHit ? await blockProviderInfrastructure(c, 'PUT', appStatus.block_provider_infra_requests) : null
   if (blocked)
     return blocked
 
@@ -702,7 +707,7 @@ app.delete('/', async (c) => {
   }
   const { bodyParsed } = parsed
   const appStatus = await getAppStatus(c, bodyParsed.app_id)
-  const blocked = await blockProviderInfrastructure(c, 'DELETE', appStatus.block_provider_infra_requests)
+  const blocked = appStatus.cacheHit ? await blockProviderInfrastructure(c, 'DELETE', appStatus.block_provider_infra_requests) : null
   if (blocked)
     return blocked
 
@@ -724,7 +729,7 @@ app.get('/', async (c) => {
   }
   const { body: bodyRaw, bodyParsed } = parsed
   const appStatus = await getAppStatus(c, bodyParsed.app_id)
-  const blocked = await blockProviderInfrastructure(c, 'GET', appStatus.block_provider_infra_requests)
+  const blocked = appStatus.cacheHit ? await blockProviderInfrastructure(c, 'GET', appStatus.block_provider_infra_requests) : null
   if (blocked)
     return blocked
 

@@ -7,6 +7,7 @@ const APP_STATUS_CACHE_TTL_SECONDS = 60
 
 export type AppStatus = 'cloud' | 'onprem' | 'cancelled'
 interface AppStatusCachePayload { status: AppStatus, allow_device_custom_id: boolean, block_provider_infra_requests: boolean }
+export interface AppStatusResult { status: AppStatus | null, allow_device_custom_id: boolean, block_provider_infra_requests: boolean, cacheHit: boolean }
 
 function buildAppStatusRequest(c: Context, appId: string) {
   const helper = new CacheHelper(c)
@@ -18,17 +19,17 @@ function buildAppStatusRequest(c: Context, appId: string) {
   }
 }
 
-export async function getAppStatus(c: Context, appId: string): Promise<{ status: AppStatus | null, allow_device_custom_id: boolean, block_provider_infra_requests: boolean }> {
+export async function getAppStatus(c: Context, appId: string): Promise<AppStatusResult> {
   const cacheEntry = buildAppStatusRequest(c, appId)
   if (!cacheEntry)
-    return { status: null, allow_device_custom_id: true, block_provider_infra_requests: true }
+    return { status: null, allow_device_custom_id: true, block_provider_infra_requests: true, cacheHit: false }
   const payload = await cacheEntry.helper.matchJson<AppStatusCachePayload>(cacheEntry.request)
   if (!payload)
-    return { status: null, allow_device_custom_id: true, block_provider_infra_requests: true }
+    return { status: null, allow_device_custom_id: true, block_provider_infra_requests: true, cacheHit: false }
   const blockProviderInfraRequests = payload.block_provider_infra_requests ?? true
   if (payload.status === 'cancelled' && !isStripeConfigured(c))
-    return { status: 'cloud', allow_device_custom_id: payload.allow_device_custom_id, block_provider_infra_requests: blockProviderInfraRequests }
-  return { status: payload.status, allow_device_custom_id: payload.allow_device_custom_id, block_provider_infra_requests: blockProviderInfraRequests }
+    return { status: 'cloud', allow_device_custom_id: payload.allow_device_custom_id, block_provider_infra_requests: blockProviderInfraRequests, cacheHit: true }
+  return { status: payload.status, allow_device_custom_id: payload.allow_device_custom_id, block_provider_infra_requests: blockProviderInfraRequests, cacheHit: true }
 }
 
 export function setAppStatus(c: Context, appId: string, status: AppStatus, allowDeviceCustomId: boolean, blockProviderInfraRequests = true) {
@@ -43,4 +44,11 @@ export function setAppStatus(c: Context, appId: string, status: AppStatus, allow
     }
     await cacheEntry.helper.putJson(cacheEntry.request, payload, APP_STATUS_CACHE_TTL_SECONDS)
   })
+}
+
+export async function deleteAppStatus(c: Context, appId: string) {
+  const cacheEntry = buildAppStatusRequest(c, appId)
+  if (!cacheEntry)
+    return
+  await cacheEntry.helper.delete(cacheEntry.request)
 }

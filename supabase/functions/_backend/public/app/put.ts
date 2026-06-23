@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { trackBentoEvent } from '../../utils/bento.ts'
+import { deleteAppStatus } from '../../utils/appStatus.ts'
 import { createIfNotExistStoreInfo } from '../../utils/cloudflare.ts'
 import { lockOnboardingApp, unlockOnboardingApp } from '../../utils/demo.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
@@ -89,6 +90,7 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
   if (dbError || !data) {
     throw simpleError('cannot_update_app', 'Cannot update app', { supabaseError: dbError })
   }
+  await deleteAppStatus(c, appId)
 
   if (data.icon_url) {
     const signedIcon = await createSignedImageUrl(c, data.icon_url)

@@ -18,7 +18,7 @@ import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { getClientIP } from './rate_limit.ts'
 import { sendNotifOrgCached } from './notifications.ts'
-import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres, setReplicationLagHeader } from './pg.ts'
+import { closeClient, getAppBlockProviderInfraRequestsPostgres, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres, setReplicationLagHeader } from './pg.ts'
 import { makeDevice } from './plugin_parser.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './stats.ts'
@@ -84,19 +84,17 @@ function updateError200(c: Context, errorCode: string, message: string, moreInfo
   })
 }
 
-async function providerInfrastructureBlockResponse(c: Context, blockProviderInfraRequests: boolean) {
-  if (!blockProviderInfraRequests)
-    return null
-
+async function getProviderInfrastructureInfo(c: Context) {
   const requestIp = getClientIP(c)
   if (requestIp === 'unknown')
     return null
 
   const invalidIpInfo = await getInvalidIpInfo()
   const providerInfo = await invalidIpInfo(requestIp, c)
-  if (!providerInfo.blocked)
-    return null
+  return { requestIp, providerInfo }
+}
 
+function providerInfrastructureBlockedResponse(c: Context, requestIp: string, providerInfo: InvalidIpInfo) {
   cloudlog({
     requestId: c.get('requestId'),
     message: 'Blocking update request from provider infrastructure IP',
@@ -106,6 +104,29 @@ async function providerInfrastructureBlockResponse(c: Context, blockProviderInfr
   return updateError200(c, 'provider_infrastructure_request_blocked', 'Update requests from known provider infrastructure are blocked', {
     provider: providerInfo.provider,
   })
+}
+
+async function providerInfrastructureBlockResponse(c: Context, blockProviderInfraRequests: boolean, knownProviderInfo?: Awaited<ReturnType<typeof getProviderInfrastructureInfo>>) {
+  if (!blockProviderInfraRequests)
+    return null
+
+  const providerInfo = knownProviderInfo ?? await getProviderInfrastructureInfo(c)
+  if (!providerInfo?.providerInfo.blocked)
+    return null
+
+  return providerInfrastructureBlockedResponse(c, providerInfo.requestIp, providerInfo.providerInfo)
+}
+
+async function providerInfrastructureColdCacheBlockResponse(c: Context, appId: string, drizzleClient: ReturnType<typeof getDrizzleClient>) {
+  const providerInfo = await getProviderInfrastructureInfo(c)
+  if (!providerInfo?.providerInfo.blocked)
+    return null
+
+  const blockProviderInfraRequests = await getAppBlockProviderInfraRequestsPostgres(c, appId, drizzleClient)
+  if (blockProviderInfraRequests === false)
+    return null
+
+  return providerInfrastructureBlockedResponse(c, providerInfo.requestIp, providerInfo.providerInfo)
 }
 
 export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[], expose_metadata: boolean = false) {
@@ -186,6 +207,12 @@ export async function updateWithPG(
   const existingUpdateEnumerationLimit = await isUpdateEnumerationLimited(c)
   if (existingUpdateEnumerationLimit.limited)
     return updateEnumerationLimitedResponse(c)
+
+  if (!cachedAppStatus.cacheHit) {
+    const providerBlockedResponse = await providerInfrastructureColdCacheBlockResponse(c, app_id, drizzleClient)
+    if (providerBlockedResponse)
+      return providerBlockedResponse
+  }
 
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT)
   // if version_build is not semver, then make it semver
@@ -548,7 +575,7 @@ export async function updateWithPG(
 
 export async function update(c: Context, body: AppInfos) {
   const appStatus = await getAppStatus(c, body.app_id)
-  if (appStatus.status !== null) {
+  if (appStatus.cacheHit) {
     const providerBlockedResponse = await providerInfrastructureBlockResponse(c, appStatus.block_provider_infra_requests)
     if (providerBlockedResponse)
       return providerBlockedResponse
