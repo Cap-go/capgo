@@ -1,8 +1,10 @@
 import type { Context } from 'hono'
+import { eq } from 'drizzle-orm'
 import { isBentoConfigured, syncBentoSubscriberTags } from './bento.ts'
 import { cloudlog } from './logging.ts'
 import { getOrgAdminMemberEmailsForTags } from './org_email_notifications.ts'
 import { getDrizzleClient, getPgClient } from './pg.ts'
+import * as schema from './postgres_schema.ts'
 import { getEnv } from './utils.ts'
 
 export const ORG_ONBOARDING_INTENTS = ['unknown', 'ota', 'builder', 'both', 'exploring'] as const
@@ -39,7 +41,7 @@ export function buildOnboardingIntentBentoEventData(
 ): Record<string, string | null> {
   const baseUrl = (getEnv(c, 'WEBAPP_URL') || '').replace(TRAILING_SLASHES_REGEX, '')
   const onboardingUrlOta = baseUrl ? `${baseUrl}/app/new` : null
-  const onboardingUrlBuilder = baseUrl ? `${baseUrl}/app/new` : null
+  const onboardingUrlBuilder = baseUrl ? `${baseUrl}/apps` : null
 
   let onboardingUrl: string | null = onboardingUrlOta
   if (intent === 'builder')
@@ -58,21 +60,23 @@ export function buildOnboardingIntentBentoEventData(
   }
 }
 
-async function lookupUserEmail(c: Context, userId: string): Promise<string | null> {
-  const pgClient = getPgClient(c, true)
+async function lookupUserEmail(
+  c: Context,
+  drizzle: ReturnType<typeof getDrizzleClient>,
+  userId: string,
+): Promise<string | null> {
   try {
-    const result = await pgClient.query<{ email: string }>(
-      'SELECT email FROM public.users WHERE id = $1::uuid LIMIT 1',
-      [userId],
-    )
-    return result.rows[0]?.email ?? null
+    const users = await drizzle
+      .select({ email: schema.users.email })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1)
+
+    return users[0]?.email ?? null
   }
   catch (error) {
     cloudlog({ requestId: c.get('requestId'), message: 'lookupUserEmail failed', userId, error })
     return null
-  }
-  finally {
-    await pgClient.end()
   }
 }
 
@@ -118,18 +122,21 @@ export async function syncOrgOnboardingIntentForOrg(
 
   try {
     const { emails: adminEmails } = await getOrgAdminMemberEmailsForTags(c, org.id, drizzleClient)
-    const emails = [...adminEmails]
+    const emailSet = new Set(adminEmails.map(email => email.trim().toLowerCase()))
 
-    if (org.management_email)
-      emails.push(org.management_email)
-
-    if (emails.length === 0 && org.created_by) {
-      const creatorEmail = await lookupUserEmail(c, org.created_by)
-      if (creatorEmail)
-        emails.push(creatorEmail)
+    if (org.management_email) {
+      const managementEmail = org.management_email.trim().toLowerCase()
+      if (managementEmail)
+        emailSet.add(managementEmail)
     }
 
-    await syncOrgOnboardingIntentBentoTags(c, intent, emails)
+    if (org.created_by) {
+      const creatorEmail = await lookupUserEmail(c, drizzleClient, org.created_by)
+      if (creatorEmail)
+        emailSet.add(creatorEmail.trim().toLowerCase())
+    }
+
+    await syncOrgOnboardingIntentBentoTags(c, intent, Array.from(emailSet))
   }
   finally {
     await pgClient.end()

@@ -6,6 +6,7 @@ import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { closeClient, getPgClient } from '../../utils/pg.ts'
 import { supabaseAdmin, supabaseWithAuth } from '../../utils/supabase.ts'
+import { parseOrgOnboardingIntent } from '../../utils/org_onboarding_intent.ts'
 import { normalizeWebsiteUrl } from './website.ts'
 
 const MAX_ESTIMATED_MAU = 1_000_000
@@ -29,13 +30,6 @@ const bodySchema = type({
   'intent?': "'ota' | 'builder' | 'both' | 'exploring' | 'unknown'",
 })
 
-
-function resolveOrgOnboarding(intent = 'unknown') {
-  if (intent === 'ota' || intent === 'builder' || intent === 'both' || intent === 'exploring')
-    return { intent }
-
-  return { intent: 'unknown' as const }
-}
 
 interface PgTransactionClient {
   query: <T = unknown>(text: string, params?: unknown[]) => Promise<{ rows: T[], rowCount?: number | null }>
@@ -282,7 +276,7 @@ export async function post(
   const ownerEmail = await getOwnerEmail(c, auth)
   const orgId = crypto.randomUUID()
   const pendingCustomerId = await createPendingStripeInfo(c, orgId, estimatedMau)
-  const onboarding = resolveOrgOnboarding(body.intent)
+  const onboarding = { intent: parseOrgOnboardingIntent({ intent: body.intent }) }
   const newOrg = {
     id: orgId,
     name: body.name,

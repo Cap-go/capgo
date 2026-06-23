@@ -47,7 +47,7 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c)
     website: record.website,
   })
 
-  await backgroundTask(c, syncOrgOnboardingIntentForOrg(c, record))
+  await syncOrgOnboardingIntentForOrg(c, record)
 
   await sendEventToTracking(c, {
     bento: {

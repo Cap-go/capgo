@@ -121,7 +121,7 @@ describe('handleOrgNotificationsAndEvents onboarding reminder', () => {
         onboarding_intent: 'unknown',
         onboarding_url: 'https://console.capgo.app/apps',
         onboarding_url_ota: 'https://console.capgo.app/app/new',
-        onboarding_url_builder: 'https://console.capgo.app/app/new',
+        onboarding_url_builder: 'https://console.capgo.app/apps',
       }),
       orgId,
       orgId,
