@@ -1255,7 +1255,7 @@ BEGIN
       public.rbac_perm_app_read(), public.rbac_perm_app_update_settings(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(),
       public.rbac_perm_app_create_channel(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_manage_devices(), public.rbac_perm_app_read_devices(),
       public.rbac_perm_app_build_native(), public.rbac_perm_app_read_audit(), public.rbac_perm_app_update_user_roles(),
-      public.rbac_perm_channel_read(), public.rbac_perm_channel_read_history(),
+      public.rbac_perm_channel_read(), public.rbac_perm_channel_update_settings(), public.rbac_perm_channel_read_history(),
       public.rbac_perm_channel_promote_bundle(), public.rbac_perm_channel_rollback_bundle(), public.rbac_perm_channel_manage_forced_devices(), public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
     )
     WHERE r.name = public.rbac_role_org_admin()
@@ -1320,6 +1320,22 @@ BEGIN
     )
     WHERE r.name = public.rbac_role_app_uploader()
     ON CONFLICT DO NOTHING;
+
+    INSERT INTO public.roles (name, scope_type, description, priority_rank, is_assignable, created_by)
+    VALUES (
+      public.rbac_role_apikey_manager(),
+      public.rbac_scope_org(),
+      'Manage API keys for CI/CD without org role assignment rights',
+      78,
+      true,
+      NULL
+    )
+    ON CONFLICT (name) DO UPDATE
+    SET
+      scope_type = EXCLUDED.scope_type,
+      description = EXCLUDED.description,
+      priority_rank = EXCLUDED.priority_rank,
+      is_assignable = EXCLUDED.is_assignable;
 
     -- apikey_manager: manage API keys and read org policy metadata without role assignment rights
     INSERT INTO public.role_permissions (role_id, permission_id)
@@ -1445,7 +1461,9 @@ BEGIN
     WHERE ak.key IN (
       'c9d0e1f2-a3b4-4c5d-8e6f-7a8b9c0d1e25',
       'd1e2f3a4-b5c6-4d7e-8f90-a1b2c3d4e5f6'
-    );
+    )
+    AND roles.id IS NOT NULL
+    AND ak.rbac_id IS NOT NULL;
 
     RAISE NOTICE 'RBAC permissions populated: % permissions, % role_permissions',
       (SELECT COUNT(*) FROM public.permissions),

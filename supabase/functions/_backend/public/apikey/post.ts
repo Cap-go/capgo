@@ -9,17 +9,9 @@ import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { parseApiKeyGlobalPermissions, replaceApiKeyGlobalPermissions, validateApiKeyGlobalPermissionsForBindings } from './global_permissions.ts'
-import { assertApiKeyManagerCanAssignBindings, ensureApiKeyManagementAllowed, requireApiKeyManagementAuth } from './scope.ts'
+import { assertApiKeyManagerCanAssignBindings, ensureApiKeyManagementAllowed, requireApiKeyManagementAuth, sanitizeClientBindings, type ClientBindingInput } from './scope.ts'
 
-interface BindingInput {
-  role_name: string
-  scope_type: 'org' | 'app' | 'channel'
-  org_id: string
-  app_id?: string | null
-  channel_id?: string | number | null
-  reason?: string
-}
-
+type BindingInput = ClientBindingInput
 type EnrichedBindingInput = BindingInput & { allowSystemRole?: boolean }
 type ApiKeyRow = Database['public']['Tables']['apikeys']['Row']
 
@@ -83,24 +75,10 @@ app.post('/', middlewareAuth(), async (c) => {
   const isHashed = body.hashed === true
 
   // Validate and parse bindings array
-  const bindings: BindingInput[] = Array.isArray(body.bindings) ? body.bindings : []
   if (body.bindings !== undefined && !Array.isArray(body.bindings)) {
     throw simpleError('invalid_bindings', 'bindings must be an array')
   }
-  for (const binding of bindings) {
-    if (!binding || typeof binding !== 'object') {
-      throw simpleError('invalid_bindings', 'Each binding must be an object')
-    }
-    if (typeof binding.role_name !== 'string' || !binding.role_name) {
-      throw simpleError('invalid_bindings', 'Each binding must have a role_name')
-    }
-    if (!['org', 'app', 'channel'].includes(binding.scope_type)) {
-      throw simpleError('invalid_bindings', 'Each binding must have a valid scope_type (org, app, channel)')
-    }
-    if (typeof binding.org_id !== 'string' || !binding.org_id) {
-      throw simpleError('invalid_bindings', 'Each binding must have an org_id')
-    }
-  }
+  const bindings: BindingInput[] = Array.isArray(body.bindings) ? sanitizeClientBindings(body.bindings) : []
 
   const hasBindings = bindings.length > 0
 

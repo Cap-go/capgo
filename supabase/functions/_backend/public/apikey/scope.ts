@@ -101,6 +101,55 @@ function assertTargetOrgIdsAreManageable(
 }
 
 
+
+export interface ClientBindingInput {
+  role_name: string
+  scope_type: 'org' | 'app' | 'channel'
+  org_id: string
+  app_id?: string | null
+  channel_id?: string | number | null
+  reason?: string
+}
+
+export function sanitizeClientBindings(bindings: unknown[]): ClientBindingInput[] {
+  return bindings.map((binding) => {
+    if (!binding || typeof binding !== 'object') {
+      throw quickError(400, 'invalid_bindings', 'Each binding must be an object')
+    }
+    const value = binding as Record<string, unknown>
+    const role_name = value.role_name
+    const scope_type = value.scope_type
+    const org_id = value.org_id
+    if (typeof role_name !== 'string' || !role_name) {
+      throw quickError(400, 'invalid_bindings', 'Each binding must have a role_name')
+    }
+    if (scope_type !== 'org' && scope_type !== 'app' && scope_type !== 'channel') {
+      throw quickError(400, 'invalid_bindings', 'Each binding must have a valid scope_type (org, app, channel)')
+    }
+    if (typeof org_id !== 'string' || !org_id) {
+      throw quickError(400, 'invalid_bindings', 'Each binding must have an org_id')
+    }
+    const app_id = value.app_id
+    const channel_id = value.channel_id
+    return {
+      role_name,
+      scope_type,
+      org_id,
+      app_id: app_id === undefined || app_id === null
+        ? null
+        : typeof app_id === 'string'
+          ? app_id
+          : (() => { throw quickError(400, 'invalid_bindings', 'app_id must be a string when provided') })(),
+      channel_id: channel_id === undefined || channel_id === null
+        ? null
+        : typeof channel_id === 'string' || typeof channel_id === 'number'
+          ? channel_id
+          : (() => { throw quickError(400, 'invalid_bindings', 'channel_id must be a string or number when provided') })(),
+      reason: typeof value.reason === 'string' ? value.reason : undefined,
+    }
+  })
+}
+
 const APIKEY_MANAGER_DENIED_ASSIGNABLE_ROLES = new Set([
   'org_super_admin',
   'org_admin',
@@ -111,20 +160,20 @@ const APIKEY_MANAGER_DENIED_ASSIGNABLE_ROLES = new Set([
 export async function assertApiKeyManagerCanAssignBindings(
   c: Parameters<typeof checkPermission>[0],
   auth: AuthInfo,
-  bindings: Array<{ role_name: string, org_id: string, allowSystemRole?: boolean }>,
+  bindings: Array<{ role_name: string, org_id: string }>,
 ) {
   if (auth.authType !== 'apikey') {
     return
   }
 
-  const orgIds = [...new Set(bindings.filter(binding => binding.allowSystemRole !== true).map(binding => binding.org_id))]
+  const orgIds = [...new Set(bindings.map(binding => binding.org_id))]
   for (const orgId of orgIds) {
     if (await checkPermission(c, 'org.update_user_roles', { orgId })) {
       continue
     }
 
     for (const binding of bindings) {
-      if (binding.allowSystemRole === true || binding.org_id !== orgId) {
+      if (binding.org_id !== orgId) {
         continue
       }
       if (APIKEY_MANAGER_DENIED_ASSIGNABLE_ROLES.has(binding.role_name)) {

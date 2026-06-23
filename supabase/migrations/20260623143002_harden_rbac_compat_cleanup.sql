@@ -5782,7 +5782,10 @@ BEGIN
     FROM public.find_apikey_by_value(v_api_key_text)
     LIMIT 1;
 
-    IF v_api_key.id IS NULL OR public.is_apikey_expired(v_api_key.expires_at) THEN
+    IF v_api_key.id IS NULL
+      OR public.is_apikey_expired(v_api_key.expires_at)
+      OR (v_user_id IS NOT NULL AND v_user_id IS DISTINCT FROM v_api_key.user_id)
+    THEN
       RETURN v_allowed;
     END IF;
 

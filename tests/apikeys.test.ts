@@ -538,6 +538,22 @@ describe('[POST] /apikey operations', () => {
       })
       expect(appAdminCreateResponse.status).toBe(403)
 
+      const allowSystemRoleBypassResponse = await fetch(`${BASE_URL}/apikey`, {
+        method: 'POST',
+        headers: managerKeyHeaders,
+        body: JSON.stringify({
+          name: 'apikey-manager-blocked-allow-system-role-bypass',
+          bindings: [{
+            role_name: 'app_admin',
+            scope_type: 'app',
+            org_id: ORG_ID_APIKEY_MANAGEMENT,
+            app_id: APPNAME,
+            allowSystemRole: true,
+          }],
+        }),
+      })
+      expect(allowSystemRoleBypassResponse.status).toBe(403)
+
       const selfUpdateResponse = await fetch(`${BASE_URL}/apikey/${APIKEY_MANAGEMENT_APIKEY_MANAGER_ID}`, {
         method: 'PUT',
         headers: managerKeyHeaders,
