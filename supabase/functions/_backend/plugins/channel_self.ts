@@ -30,7 +30,10 @@ const CHANNEL_SELF_MIN_V8 = '8.0.0'
 
 const PLAN_MAU_ACTIONS: Array<'mau'> = ['mau']
 
-async function blockProviderInfrastructure(c: Context, route: string) {
+async function blockProviderInfrastructure(c: Context, route: string, shouldBlockProviderInfrastructure: boolean) {
+  if (!shouldBlockProviderInfrastructure)
+    return null
+
   const requestIp = getClientIP(c)
   if (requestIp === 'unknown')
     return null
@@ -124,7 +127,7 @@ async function assertChannelSelfAppOwnerPlanValid(
   }
 
   if (!appOwner.plan_valid) {
-    await setAppStatus(c, appId, 'cancelled', appOwner.allow_device_custom_id)
+    await setAppStatus(c, appId, 'cancelled', appOwner.allow_device_custom_id, appOwner.block_provider_infra_requests)
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: appId })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
 
@@ -146,7 +149,7 @@ async function assertChannelSelfAppOwnerPlanValid(
     return { response: c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429) }
   }
 
-  await setAppStatus(c, appId, 'cloud', appOwner.allow_device_custom_id)
+  await setAppStatus(c, appId, 'cloud', appOwner.allow_device_custom_id, appOwner.block_provider_infra_requests)
   return { appOwner }
 }
 
@@ -641,10 +644,6 @@ async function runChannelSelfDeviceOperation(
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', async (c) => {
-  const blocked = await blockProviderInfrastructure(c, 'POST')
-  if (blocked)
-    return blocked
-
   const body = await parseBody<DeviceLink>(c)
   const parsed = await parseChannelSelfPluginRequest(c, body, 'post body', channelSelfRequestSchema)
   if ('response' in parsed) {
@@ -654,6 +653,11 @@ app.post('/', async (c) => {
   if (!bodyParsed.channel) {
     return simpleError200(c, 'missing_channel', 'Cannot find channel in body')
   }
+
+  const appStatus = await getAppStatus(c, bodyParsed.app_id)
+  const blocked = await blockProviderInfrastructure(c, 'POST', appStatus.block_provider_infra_requests)
+  if (blocked)
+    return blocked
 
   // Rate limit: max 5 set per second per device+app, and same set max once per 60 seconds
   return await runChannelSelfDeviceOperation(
@@ -667,10 +671,6 @@ app.post('/', async (c) => {
 })
 
 app.put('/', async (c) => {
-  const blocked = await blockProviderInfrastructure(c, 'PUT')
-  if (blocked)
-    return blocked
-
   // TODO: Used as get, should be refactor with query param instead
   const body = await parseBody<DeviceLink>(c)
   const parsed = await parseChannelSelfPluginRequest(c, body, 'put body', channelSelfRequestSchema)
@@ -678,6 +678,10 @@ app.put('/', async (c) => {
     return parsed.response
   }
   const { bodyParsed } = parsed
+  const appStatus = await getAppStatus(c, bodyParsed.app_id)
+  const blocked = await blockProviderInfrastructure(c, 'PUT', appStatus.block_provider_infra_requests)
+  if (blocked)
+    return blocked
 
   // Rate limit: max 5 get per second per device+app
   return await runChannelSelfDeviceOperation(
@@ -690,16 +694,16 @@ app.put('/', async (c) => {
 })
 
 app.delete('/', async (c) => {
-  const blocked = await blockProviderInfrastructure(c, 'DELETE')
-  if (blocked)
-    return blocked
-
   const body = convertQueryToBody(c.req.query())
   const parsed = await parseChannelSelfPluginRequest(c, body, 'delete body', channelSelfRequestSchema)
   if ('response' in parsed) {
     return parsed.response
   }
   const { bodyParsed } = parsed
+  const appStatus = await getAppStatus(c, bodyParsed.app_id)
+  const blocked = await blockProviderInfrastructure(c, 'DELETE', appStatus.block_provider_infra_requests)
+  if (blocked)
+    return blocked
 
   // Rate limit: max 5 delete per second per device+app
   return await runChannelSelfDeviceOperation(
@@ -712,16 +716,16 @@ app.delete('/', async (c) => {
 })
 
 app.get('/', async (c) => {
-  const blocked = await blockProviderInfrastructure(c, 'GET')
-  if (blocked)
-    return blocked
-
   const body = convertQueryToBody(c.req.query())
   const parsed = await parseChannelSelfPluginRequest(c, body, 'list compatible channels', channelSelfGetRequestSchema as StandardSchema<DeviceLink>, false)
   if ('response' in parsed) {
     return parsed.response
   }
   const { body: bodyRaw, bodyParsed } = parsed
+  const appStatus = await getAppStatus(c, bodyParsed.app_id)
+  const blocked = await blockProviderInfrastructure(c, 'GET', appStatus.block_provider_infra_requests)
+  if (blocked)
+    return blocked
 
   // Rate limit: max 5 list per second per device+app (if device_id is provided)
   if (bodyRaw.device_id) {

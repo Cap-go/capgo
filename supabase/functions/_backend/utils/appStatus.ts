@@ -6,7 +6,7 @@ const APP_STATUS_CACHE_PATH = '/.app-status-v3'
 const APP_STATUS_CACHE_TTL_SECONDS = 60
 
 export type AppStatus = 'cloud' | 'onprem' | 'cancelled'
-interface AppStatusCachePayload { status: AppStatus, allow_device_custom_id: boolean }
+interface AppStatusCachePayload { status: AppStatus, allow_device_custom_id: boolean, block_provider_infra_requests: boolean }
 
 function buildAppStatusRequest(c: Context, appId: string) {
   const helper = new CacheHelper(c)
@@ -18,24 +18,28 @@ function buildAppStatusRequest(c: Context, appId: string) {
   }
 }
 
-export async function getAppStatus(c: Context, appId: string): Promise<{ status: AppStatus | null, allow_device_custom_id: boolean }> {
+export async function getAppStatus(c: Context, appId: string): Promise<{ status: AppStatus | null, allow_device_custom_id: boolean, block_provider_infra_requests: boolean }> {
   const cacheEntry = buildAppStatusRequest(c, appId)
   if (!cacheEntry)
-    return { status: null, allow_device_custom_id: true }
+    return { status: null, allow_device_custom_id: true, block_provider_infra_requests: true }
   const payload = await cacheEntry.helper.matchJson<AppStatusCachePayload>(cacheEntry.request)
   if (!payload)
-    return { status: null, allow_device_custom_id: true }
+    return { status: null, allow_device_custom_id: true, block_provider_infra_requests: true }
   if (payload.status === 'cancelled' && !isStripeConfigured(c))
-    return { status: 'cloud', allow_device_custom_id: payload.allow_device_custom_id }
-  return { status: payload.status, allow_device_custom_id: payload.allow_device_custom_id }
+    return { status: 'cloud', allow_device_custom_id: payload.allow_device_custom_id, block_provider_infra_requests: payload.block_provider_infra_requests }
+  return { status: payload.status, allow_device_custom_id: payload.allow_device_custom_id, block_provider_infra_requests: payload.block_provider_infra_requests }
 }
 
-export function setAppStatus(c: Context, appId: string, status: AppStatus, allowDeviceCustomId: boolean) {
+export function setAppStatus(c: Context, appId: string, status: AppStatus, allowDeviceCustomId: boolean, blockProviderInfraRequests = true) {
   return backgroundTask(c, async () => {
     const cacheEntry = buildAppStatusRequest(c, appId)
     if (!cacheEntry)
       return
-    const payload: AppStatusCachePayload = { status, allow_device_custom_id: allowDeviceCustomId }
+    const payload: AppStatusCachePayload = {
+      status,
+      allow_device_custom_id: allowDeviceCustomId,
+      block_provider_infra_requests: blockProviderInfraRequests,
+    }
     await cacheEntry.helper.putJson(cacheEntry.request, payload, APP_STATUS_CACHE_TTL_SECONDS)
   })
 }

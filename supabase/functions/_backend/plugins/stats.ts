@@ -20,6 +20,8 @@ const PLAN_ERROR = 'Cannot send stats, upgrade plan to continue to update'
 const DOWNLOAD_FAIL_FIXED_PLUGIN_VERSION = parse('7.17.0')
 const DOWNLOAD_FAIL_FIXED_PLUGIN_VERSION_V6 = parse('6.14.25')
 
+type AppStatusResult = Awaited<ReturnType<typeof getAppStatus>>
+
 async function blockProviderInfrastructure(c: Context) {
   const requestIp = getClientIP(c)
   if (requestIp === 'unknown')
@@ -71,11 +73,11 @@ function shouldRecordStatsAction(action: string, pluginVersion: string) {
     || (pluginVersion.startsWith('6.') && greaterOrEqual(parsedPluginVersion, DOWNLOAD_FAIL_FIXED_PLUGIN_VERSION_V6))
 }
 
-async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: AppStats): Promise<PostResult> {
+async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: AppStats, appStatus?: AppStatusResult): Promise<PostResult> {
   const { app_id, action, version_name, old_version_name, plugin_version, metadata } = body
 
   const planActions: Array<'mau' | 'bandwidth'> = ['mau', 'bandwidth']
-  const cachedAppStatus = await getAppStatus(c, app_id)
+  const cachedAppStatus = appStatus ?? await getAppStatus(c, app_id)
   const cachedStatus = cachedAppStatus.status
   if (cachedStatus === 'onprem') {
     const device = makeDevice(body, cachedAppStatus.allow_device_custom_id)
@@ -99,12 +101,12 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   const allowDeviceCustomId = appOwner?.allow_device_custom_id
   const device = makeDevice(body, allowDeviceCustomId)
   if (!appOwner) {
-    await setAppStatus(c, app_id, 'onprem', true)
+    await setAppStatus(c, app_id, 'onprem', true, cachedAppStatus.block_provider_infra_requests)
     await onPremStats(c, app_id, action, device, metadata)
     return { success: true, isOnprem: true }
   }
   if (!appOwner.plan_valid) {
-    await setAppStatus(c, app_id, 'cancelled', appOwner.allow_device_custom_id)
+    await setAppStatus(c, app_id, 'cancelled', appOwner.allow_device_custom_id, appOwner.block_provider_infra_requests)
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     const upgradeActions: StatsActions[] = [{ action: 'needPlanUpgrade' }]
     if (allowDeviceCustomId === false && typeof body.custom_id === 'string' && body.custom_id.trim() !== '') {
@@ -119,7 +121,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
     return { success: false, error: 'need_plan_upgrade', message: 'Cannot update, upgrade plan to continue to update' }
   }
-  await setAppStatus(c, app_id, 'cloud', appOwner.allow_device_custom_id)
+  await setAppStatus(c, app_id, 'cloud', appOwner.allow_device_custom_id, appOwner.block_provider_infra_requests)
   const statsActions: StatsActions[] = []
   if (allowDeviceCustomId === false && typeof body.custom_id === 'string' && body.custom_id.trim() !== '') {
     statsActions.push({ action: 'customIdBlocked' })
@@ -208,13 +210,10 @@ async function parseBodyRaw(c: Context): Promise<AppStats | AppStats[]> {
 }
 
 app.post('/', async (c) => {
-  const blocked = await blockProviderInfrastructure(c)
-  if (blocked)
-    return blocked
-
   const body = await parseBodyRaw(c)
   const isBatch = Array.isArray(body)
   const events = isBatch ? body : [body]
+  const requestIp = getClientIP(c)
 
   // Handle empty batch early - no need to acquire DB connection
   if (isBatch && events.length === 0) {
@@ -256,6 +255,12 @@ app.post('/', async (c) => {
     return simpleRateLimit({ app_id: firstAppId })
   }
 
+  const appStatus = await getAppStatus(c, firstAppId)
+  if (appStatus.block_provider_infra_requests && requestIp !== 'unknown') {
+    const blocked = await blockProviderInfrastructure(c)
+    if (blocked)
+      return blocked
+  }
   // When clients send a custom_id, the app-level allow flag should take effect
   // immediately. Use a read-write (primary) connection in that case to avoid
   // replica staleness.
@@ -273,7 +278,7 @@ app.post('/', async (c) => {
     // For single event, process directly and let errors propagate for proper status codes
     if (!isBatch) {
       const bodyParsed = parsePluginBody<AppStats>(c, events[0], statsRequestSchema)
-      const result = await post(c, drizzleClient, bodyParsed)
+      const result = await post(c, drizzleClient, bodyParsed, appStatus)
       if (result.isOnprem) {
         return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
       }
@@ -293,7 +298,7 @@ app.post('/', async (c) => {
       const event = events[i]
       try {
         const bodyParsed = parsePluginBody<AppStats>(c, event, statsRequestSchema)
-        const result = await post(c, drizzleClient, bodyParsed)
+        const result = await post(c, drizzleClient, bodyParsed, appStatus)
 
         if (result.isOnprem) {
           results.push({

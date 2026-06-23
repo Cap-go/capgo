@@ -672,6 +672,7 @@ export interface AppOwnerPostgresResult {
   manifest_bundle_count: number
   expose_metadata: boolean
   allow_device_custom_id: boolean
+  block_provider_infra_requests: boolean
 }
 
 export async function getAppOwnerPostgres(
@@ -694,6 +695,7 @@ export async function getAppOwnerPostgres(
         manifest_bundle_count: schema.apps.manifest_bundle_count,
         expose_metadata: schema.apps.expose_metadata,
         allow_device_custom_id: schema.apps.allow_device_custom_id,
+        block_provider_infra_requests: schema.apps.block_provider_infra_requests,
         orgs: {
           created_by: orgAlias.created_by,
           id: orgAlias.id,

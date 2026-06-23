@@ -131,6 +131,7 @@ export async function updateWithPG(
   c: Context,
   body: AppInfos,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
+  appStatus?: Awaited<ReturnType<typeof getAppStatus>>,
 ) {
   cloudlog({ requestId: c.get('requestId'), message: 'body', body, date: new Date().toISOString() })
   const {
@@ -142,7 +143,7 @@ export async function updateWithPG(
     plugin_version = '2.3.3',
     defaultChannel,
   } = body
-  const cachedAppStatus = await getAppStatus(c, app_id)
+  const cachedAppStatus = appStatus ?? await getAppStatus(c, app_id)
   const cachedStatus = cachedAppStatus.status
   if (cachedStatus === 'onprem') {
     const updateEnumerationLimit = await recordUpdateEnumerationMiss(c, app_id)
@@ -174,7 +175,7 @@ export async function updateWithPG(
     return onPremStats(c, app_id, 'get', device)
   }
   if (!appOwner.plan_valid) {
-    await setAppStatus(c, app_id, 'cancelled', appOwner.allow_device_custom_id)
+    await setAppStatus(c, app_id, 'cancelled', appOwner.allow_device_custom_id, appOwner.block_provider_infra_requests)
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     // Send weekly notification about missing payment (not configurable - payment related)
@@ -185,7 +186,7 @@ export async function updateWithPG(
     }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
-  await setAppStatus(c, app_id, 'cloud', appOwner.allow_device_custom_id)
+  await setAppStatus(c, app_id, 'cloud', appOwner.allow_device_custom_id, appOwner.block_provider_infra_requests)
   const pluginVersion = parse(plugin_version)
   const shouldUseChannelSelfStore = usesLegacyChannelSelfStoreVersion(pluginVersion) && hasChannelSelfStoreBinding(c)
   const channelSelfOverride = shouldUseChannelSelfStore
@@ -518,8 +519,9 @@ export async function updateWithPG(
 }
 
 export async function update(c: Context, body: AppInfos) {
+  const appStatus = await getAppStatus(c, body.app_id)
   const requestIp = getClientIP(c)
-  if (requestIp !== 'unknown') {
+  if (appStatus.block_provider_infra_requests && requestIp !== 'unknown') {
     const invalidIpInfo = await getInvalidIpInfo()
     const providerInfo = await invalidIpInfo(requestIp, c)
     if (providerInfo.blocked) {
@@ -540,7 +542,7 @@ export async function update(c: Context, body: AppInfos) {
 
   const drizzlePg = pgClient ? getDrizzleClient(pgClient) : (null as any)
   // Use the active DB client only when needed
-  const res = await updateWithPG(c, body, drizzlePg)
+  const res = await updateWithPG(c, body, drizzlePg, appStatus)
   if (pgClient)
     await closeClient(c, pgClient)
   return res
