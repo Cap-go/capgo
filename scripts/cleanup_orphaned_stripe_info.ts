@@ -1,6 +1,8 @@
 /*
  * Delete stripe_info rows that no longer have a linked org.
  *
+ * Includes real Stripe customer IDs (cus_*) and pending placeholders (pending_{org_id}).
+ *
  * Run:
  *   bun run stripe:cleanup-orphaned-stripe-info
  *
@@ -90,9 +92,61 @@ async function fetchLinkedCustomerIds(supabase: SupabaseClient, customerIds: str
   return linked
 }
 
+async function fetchLinkedOrgIds(supabase: SupabaseClient) {
+  const linkedOrgIds = new Set<string>()
+  let lastSeenOrgId: string | null = null
+
+  while (true) {
+    let query = supabase
+      .from('orgs')
+      .select('id')
+      .order('id', { ascending: true })
+      .limit(DEFAULT_PAGE_SIZE)
+
+    if (lastSeenOrgId)
+      query = query.gt('id', lastSeenOrgId)
+
+    const { data, error } = await query
+    if (error)
+      throw error
+    if (!data?.length)
+      break
+
+    for (const row of data) {
+      if (row.id)
+        linkedOrgIds.add(row.id)
+    }
+
+    if (data.length < DEFAULT_PAGE_SIZE)
+      break
+    lastSeenOrgId = data.at(-1)?.id ?? null
+  }
+
+  return linkedOrgIds
+}
+
+function isOrphanedStripeInfoRow(
+  row: OrphanRow,
+  linkedCustomerIds: Set<string>,
+  linkedOrgIds: Set<string>,
+) {
+  if (linkedCustomerIds.has(row.customerId))
+    return false
+
+  if (row.customerId.startsWith('pending_')) {
+    const orgId = row.customerId.slice('pending_'.length)
+    return !!orgId && !linkedOrgIds.has(orgId)
+  }
+
+  return isActionableStripeCustomerId(row.customerId)
+}
+
 async function cancelStripeSubscriptions(stripe: Stripe, customerId: string) {
-  const subscriptions = await stripe.subscriptions.list({ customer: customerId, limit: 100 })
-  await Promise.all(subscriptions.data.map(subscription => stripe.subscriptions.cancel(subscription.id)))
+  for await (const subscription of stripe.subscriptions.list({ customer: customerId, status: 'all' })) {
+    if (subscription.status === 'canceled' || subscription.status === 'incomplete_expired')
+      continue
+    await stripe.subscriptions.cancel(subscription.id)
+  }
 }
 
 function toCsv(rows: OrphanRow[]) {
@@ -123,10 +177,10 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
     supabase,
     stripeInfoRows.map(row => row.customerId),
   )
+  const linkedOrgIds = await fetchLinkedOrgIds(supabase)
 
   const orphans = stripeInfoRows.filter(row =>
-    !linkedCustomerIds.has(row.customerId)
-    && isActionableStripeCustomerId(row.customerId))
+    isOrphanedStripeInfoRow(row, linkedCustomerIds, linkedOrgIds))
 
   await writeCsv(outputPath, toCsv(orphans))
   console.log(`Found ${orphans.length} orphaned stripe_info rows`)
@@ -141,7 +195,8 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
 
   await asyncPool(concurrency, orphans, async (row) => {
     try {
-      await cancelStripeSubscriptions(stripe, row.customerId)
+      if (isActionableStripeCustomerId(row.customerId))
+        await cancelStripeSubscriptions(stripe, row.customerId)
       const { error } = await supabase
         .from('stripe_info')
         .delete()
@@ -158,8 +213,10 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   })
 
   console.log(`Deleted ${orphans.length - failures.length} orphaned stripe_info rows`)
-  if (failures.length)
+  if (failures.length) {
     console.log(`Failures: ${failures.length}`)
+    process.exitCode = 1
+  }
 }
 
 if (import.meta.main)

@@ -20,7 +20,12 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'DELETE'), async (c)
   cloudlog({ requestId: c.get('requestId'), message: 'org delete', record })
 
   if (record.customer_id) {
-    await cancelSubscription(c, record.customer_id)
+    try {
+      await cancelSubscription(c, record.customer_id)
+    }
+    catch (error) {
+      cloudlog({ requestId: c.get('requestId'), message: 'failed to cancel Stripe subscriptions during org delete', error, customer_id: record.customer_id })
+    }
 
     const { error: stripeInfoDeleteError } = await supabaseAdmin(c)
       .from('stripe_info')
