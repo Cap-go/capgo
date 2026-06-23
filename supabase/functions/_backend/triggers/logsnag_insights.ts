@@ -15,6 +15,7 @@ import { countAllApps, countAllUpdates, countAllUpdatesExternal, getUpdateStats 
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { backgroundTask } from '../utils/utils.ts'
+const DAY_IN_MS = 24 * 60 * 60 * 1000
 
 interface PlanTotal { [key: string]: number }
 interface BuildStats {
@@ -35,6 +36,59 @@ interface BuildStats {
   build_count_day_android: number
   daily_metrics_available: boolean
 }
+type AppBuildOnboardingMetrics = Record<string, unknown> & {
+  apps_created: number
+  apps_with_cli_onboarding_builds_24h: number
+  apps_with_manual_builds_24h: number
+}
+type AppBuildOnboardingMetricRow = {
+  created_at: string | Date | null
+  created_from_onboarding: boolean | null
+  onboarding_completed_at: string | Date | null
+  build_count: number | string | null
+}
+
+function parseMetricDate(value: string | Date | null): number | null {
+  if (value instanceof Date) {
+    const time = value.getTime()
+    return Number.isFinite(time) ? time : null
+  }
+  if (!value)
+    return null
+  const time = new Date(value).getTime()
+  return Number.isFinite(time) ? time : null
+}
+
+function summarizeAppBuildOnboardingRows(rows: AppBuildOnboardingMetricRow[]): AppBuildOnboardingMetrics {
+  return rows.reduce<AppBuildOnboardingMetrics>((totals, row) => {
+    totals.apps_created += 1
+
+    const buildCount = Number(row.build_count) || 0
+    if (buildCount <= 2)
+      return totals
+
+    if (row.created_from_onboarding === true) {
+      const createdAt = parseMetricDate(row.created_at)
+      const completedAt = parseMetricDate(row.onboarding_completed_at)
+      const completedWithinFirstDay = createdAt !== null
+        && completedAt !== null
+        && completedAt >= createdAt
+        && completedAt < createdAt + DAY_IN_MS
+      if (completedWithinFirstDay)
+        totals.apps_with_cli_onboarding_builds_24h += 1
+    }
+    else {
+      totals.apps_with_manual_builds_24h += 1
+    }
+
+    return totals
+  }, {
+    apps_created: 0,
+    apps_with_cli_onboarding_builds_24h: 0,
+    apps_with_manual_builds_24h: 0,
+  })
+}
+
 interface DailyWindow {
   prevDayStart: Date
   prevDayEnd: Date
@@ -1294,6 +1348,48 @@ async function aggregateDailyBuildStats(
   return { totalSeconds: totalSecondsByPlatform, avgSeconds: avgSecondsByPlatform, counts: countsByPlatform }
 }
 
+async function getAppBuildOnboardingMetrics(c: Context, window: DailyWindow): Promise<AppBuildOnboardingMetrics> {
+  const pgClient = getPgClient(c, false)
+  const drizzleClient = getDrizzleClient(pgClient)
+  const dayStartIso = window.prevDayStart.toISOString()
+  const dayEndIso = window.prevDayEnd.toISOString()
+
+  try {
+    const result = await drizzleClient.execute<AppBuildOnboardingMetricRow>(sql`
+      WITH created_apps AS (
+        SELECT app_id, created_at, created_from_onboarding, onboarding_completed_at
+        FROM public.apps
+        WHERE created_at >= ${dayStartIso}::timestamptz
+          AND created_at < ${dayEndIso}::timestamptz
+      )
+      SELECT
+        ca.created_at,
+        ca.created_from_onboarding,
+        ca.onboarding_completed_at,
+        COUNT(br.id)::int AS build_count
+      FROM created_apps ca
+      LEFT JOIN public.build_requests br
+        ON br.app_id = ca.app_id
+        AND br.created_at >= ca.created_at
+        AND br.created_at < ca.created_at + INTERVAL '24 hours'
+      GROUP BY ca.app_id, ca.created_at, ca.created_from_onboarding, ca.onboarding_completed_at
+    `)
+
+    return summarizeAppBuildOnboardingRows(result.rows)
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getAppBuildOnboardingMetrics error', error })
+    return {
+      apps_created: 0,
+      apps_with_cli_onboarding_builds_24h: 0,
+      apps_with_manual_builds_24h: 0,
+    }
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
+}
+
 async function countDemoSeededApps(c: Context, createdAfterIso: string, createdBeforeIso: string): Promise<number> {
   const pgClient = getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
@@ -2051,6 +2147,7 @@ async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise
     billingSnapshot,
     coreSnapshot,
     actives,
+    appBuildOnboardingMetrics,
   ] = await Promise.all([
     countAllApps(c, window.prevDayEnd),
     countAllUpdates(c, window.prevDayEnd),
@@ -2068,6 +2165,7 @@ async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise
       apps: appIds.length,
       users: await countActiveUsersForSnapshot(c, appIds, window),
     })),
+    getAppBuildOnboardingMetrics(c, window),
   ])
 
   const { customers, payingOrgsForConversion, plans } = billingSnapshot
@@ -2078,6 +2176,9 @@ async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise
 
   await updateGlobalStatsSnapshot(c, window.prevDayDateId, {
     apps,
+    apps_created: appBuildOnboardingMetrics.apps_created,
+    apps_with_cli_onboarding_builds_24h: appBuildOnboardingMetrics.apps_with_cli_onboarding_builds_24h,
+    apps_with_manual_builds_24h: appBuildOnboardingMetrics.apps_with_manual_builds_24h,
     apps_active: actives.apps,
     need_upgrade,
     not_paying,
@@ -2674,6 +2775,7 @@ export const logsnagInsightsTestUtils = {
   getMissingGlobalStatsShards,
   hasCompletedGlobalStatsNotifications,
   shouldSkipCompletedGlobalStatsShardRetry,
+  summarizeAppBuildOnboardingRows,
   getGlobalStatsNotificationStepAction,
   normalizeCompletedGlobalStatsShards,
   getLogsnagInsightsShardFunctionName,
