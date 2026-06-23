@@ -57,12 +57,92 @@ INSERT INTO public.role_permissions (role_id, permission_id)
 SELECT roles.id, permissions.id
 FROM public.roles
 INNER JOIN public.permissions
+  ON permissions.key IN (
+    public.rbac_perm_org_manage_apikeys(),
+    public.rbac_perm_org_read()
+  )
+WHERE roles.name = public.rbac_role_apikey_manager()
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT roles.id, permissions.id
+FROM public.roles
+INNER JOIN public.permissions
   ON permissions.key = public.rbac_perm_org_manage_apikeys()
 WHERE roles.name IN (
-  public.rbac_role_apikey_manager(),
   public.rbac_role_org_admin(),
   public.rbac_role_org_super_admin()
 )
+ON CONFLICT DO NOTHING;
+
+CREATE OR REPLACE FUNCTION public.rbac_role_channel_developer() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'channel_developer'::text $$;
+
+ALTER FUNCTION public.rbac_role_channel_developer() OWNER TO postgres;
+
+CREATE OR REPLACE FUNCTION public.rbac_role_channel_uploader() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'channel_uploader'::text $$;
+
+ALTER FUNCTION public.rbac_role_channel_uploader() OWNER TO postgres;
+
+INSERT INTO public.roles (name, scope_type, description, priority_rank, is_assignable, created_by)
+VALUES
+  (
+    public.rbac_role_channel_developer(),
+    public.rbac_scope_channel(),
+    'Developer access to a channel: promote and rollback bundles without settings writes',
+    58,
+    true,
+    NULL
+  ),
+  (
+    public.rbac_role_channel_uploader(),
+    public.rbac_scope_channel(),
+    'Upload-only access to a channel: read metadata and promote bundles',
+    57,
+    true,
+    NULL
+  )
+ON CONFLICT (name) DO UPDATE
+SET
+  scope_type = EXCLUDED.scope_type,
+  description = EXCLUDED.description,
+  priority_rank = EXCLUDED.priority_rank,
+  is_assignable = EXCLUDED.is_assignable;
+
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT roles.id, permissions.id
+FROM public.roles
+INNER JOIN public.permissions
+  ON permissions.key IN (
+    public.rbac_perm_channel_read(),
+    public.rbac_perm_channel_read_history(),
+    public.rbac_perm_channel_promote_bundle(),
+    public.rbac_perm_channel_rollback_bundle(),
+    public.rbac_perm_channel_manage_forced_devices(),
+    public.rbac_perm_channel_read_forced_devices(),
+    public.rbac_perm_channel_read_audit()
+  )
+WHERE roles.name = public.rbac_role_channel_developer()
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT roles.id, permissions.id
+FROM public.roles
+INNER JOIN public.permissions
+  ON permissions.key IN (
+    public.rbac_perm_channel_read(),
+    public.rbac_perm_channel_promote_bundle()
+  )
+WHERE roles.name = public.rbac_role_channel_uploader()
 ON CONFLICT DO NOTHING;
 
 -- Direct channel table updates are intentionally admin/channel-admin only.
@@ -4393,10 +4473,10 @@ SET rbac_role_name = COALESCE(
         WHEN 'super_admin' THEN 'channel_admin'
         WHEN 'invite_admin' THEN 'channel_admin'
         WHEN 'admin' THEN 'channel_admin'
-        WHEN 'invite_write' THEN 'channel_admin'
-        WHEN 'write' THEN 'channel_admin'
-        WHEN 'invite_upload' THEN 'channel_admin'
-        WHEN 'upload' THEN 'channel_admin'
+        WHEN 'invite_write' THEN 'channel_developer'
+        WHEN 'write' THEN 'channel_developer'
+        WHEN 'invite_upload' THEN 'channel_uploader'
+        WHEN 'upload' THEN 'channel_uploader'
         ELSE 'channel_reader'
       END
     WHEN app_id IS NOT NULL THEN

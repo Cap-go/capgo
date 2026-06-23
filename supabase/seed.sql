@@ -1321,11 +1321,56 @@ BEGIN
     WHERE r.name = public.rbac_role_app_uploader()
     ON CONFLICT DO NOTHING;
 
-    -- apikey_manager: manage API keys without role assignment rights
+    -- apikey_manager: manage API keys and read org policy metadata without role assignment rights
     INSERT INTO public.role_permissions (role_id, permission_id)
     SELECT r.id, p.id FROM public.roles r
-    JOIN public.permissions p ON p.key = public.rbac_perm_org_manage_apikeys()
+    JOIN public.permissions p ON p.key IN (
+      public.rbac_perm_org_manage_apikeys(),
+      public.rbac_perm_org_read()
+    )
     WHERE r.name = public.rbac_role_apikey_manager()
+    ON CONFLICT DO NOTHING;
+
+    INSERT INTO public.roles (name, scope_type, description, priority_rank, is_assignable, created_by)
+    VALUES
+      (
+        public.rbac_role_channel_developer(),
+        public.rbac_scope_channel(),
+        'Developer access to a channel: promote and rollback bundles without settings writes',
+        58,
+        true,
+        NULL
+      ),
+      (
+        public.rbac_role_channel_uploader(),
+        public.rbac_scope_channel(),
+        'Upload-only access to a channel: read metadata and promote bundles',
+        57,
+        true,
+        NULL
+      )
+    ON CONFLICT (name) DO UPDATE
+    SET
+      scope_type = EXCLUDED.scope_type,
+      description = EXCLUDED.description,
+      priority_rank = EXCLUDED.priority_rank,
+      is_assignable = EXCLUDED.is_assignable;
+
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r
+    JOIN public.permissions p ON p.key IN (
+      public.rbac_perm_channel_read(), public.rbac_perm_channel_read_history(), public.rbac_perm_channel_promote_bundle(),
+      public.rbac_perm_channel_rollback_bundle(), public.rbac_perm_channel_manage_forced_devices(), public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
+    )
+    WHERE r.name = public.rbac_role_channel_developer()
+    ON CONFLICT DO NOTHING;
+
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r
+    JOIN public.permissions p ON p.key IN (
+      public.rbac_perm_channel_read(), public.rbac_perm_channel_promote_bundle()
+    )
+    WHERE r.name = public.rbac_role_channel_uploader()
     ON CONFLICT DO NOTHING;
 
     -- app_reader: read-only app access plus read-only access to every channel in the app

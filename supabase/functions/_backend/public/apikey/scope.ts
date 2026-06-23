@@ -100,6 +100,40 @@ function assertTargetOrgIdsAreManageable(
   return targetOrgIds.length > 0 && targetOrgIds.every(orgId => manageableOrgIds.has(orgId))
 }
 
+
+const APIKEY_MANAGER_DENIED_ASSIGNABLE_ROLES = new Set([
+  'org_super_admin',
+  'org_admin',
+  'app_admin',
+  'channel_admin',
+])
+
+export async function assertApiKeyManagerCanAssignBindings(
+  c: Parameters<typeof checkPermission>[0],
+  auth: AuthInfo,
+  bindings: Array<{ role_name: string, org_id: string, allowSystemRole?: boolean }>,
+) {
+  if (auth.authType !== 'apikey') {
+    return
+  }
+
+  const orgIds = [...new Set(bindings.filter(binding => binding.allowSystemRole !== true).map(binding => binding.org_id))]
+  for (const orgId of orgIds) {
+    if (await checkPermission(c, 'org.update_user_roles', { orgId })) {
+      continue
+    }
+
+    for (const binding of bindings) {
+      if (binding.allowSystemRole === true) {
+        continue
+      }
+      if (APIKEY_MANAGER_DENIED_ASSIGNABLE_ROLES.has(binding.role_name)) {
+        throw quickError(403, 'forbidden_binding', `Forbidden - API key managers cannot assign the ${binding.role_name} role`)
+      }
+    }
+  }
+}
+
 export async function ensureApiKeyManagementAllowed(
   c: Context<MiddlewareKeyVariables>,
   auth: AuthInfo,

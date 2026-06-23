@@ -523,6 +523,21 @@ describe('[POST] /apikey operations', () => {
       })
       expect(privilegedCreateResponse.status).toBe(403)
 
+      const appAdminCreateResponse = await fetch(`${BASE_URL}/apikey`, {
+        method: 'POST',
+        headers: managerKeyHeaders,
+        body: JSON.stringify({
+          name: 'apikey-manager-blocked-app-admin-create',
+          bindings: [{
+            role_name: 'app_admin',
+            scope_type: 'app',
+            org_id: ORG_ID_APIKEY_MANAGEMENT,
+            app_id: APPNAME,
+          }],
+        }),
+      })
+      expect(appAdminCreateResponse.status).toBe(403)
+
       const selfUpdateResponse = await fetch(`${BASE_URL}/apikey/${APIKEY_MANAGEMENT_APIKEY_MANAGER_ID}`, {
         method: 'PUT',
         headers: managerKeyHeaders,
