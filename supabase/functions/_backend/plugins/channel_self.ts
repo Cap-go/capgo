@@ -9,7 +9,7 @@ import { Hono } from 'hono/tiny'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { checkChannelSelfIPRateLimit, isChannelSelfRateLimited, recordChannelSelfIPRequest, recordChannelSelfRequest } from '../utils/channelSelfRateLimit.ts'
 import { deleteChannelSelfOverride, getChannelSelfOverride, isChannelSelfStoreEnabled, setChannelSelfOverride } from '../utils/channelSelfStore.ts'
-import { BRES, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
+import { BRES, parseBody, quickError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { invalidIpInfo } from '../utils/invalids_ip.ts'
 import { sendNotifOrgCached } from '../utils/notifications.ts'
@@ -49,7 +49,7 @@ async function blockProviderInfrastructure(c: Context, route: string, shouldBloc
     provider: providerInfo.provider,
     route,
   })
-  return c.json({ error: 'provider_infrastructure_request_blocked', message: 'Provider infrastructure requests are blocked' }, 429)
+  return quickError(429, 'provider_infrastructure_request_blocked', 'Provider infrastructure requests are blocked')
 }
 
 async function assertChannelSelfIPRateLimit(c: Context, appId: string) {

@@ -22,8 +22,8 @@ interface InvalidIpInfo {
 
 const PROVIDER_IP_CACHE_PATH = '/provider-ip-classifier'
 const PROVIDER_IP_CACHE_TTL_SECONDS = 60 * 60 * 24 // 24h
-const PROVIDER_IP_FALLBACK_TTL_SECONDS = 60 * 60 // 1h after unresolved/failure
-
+const PROVIDER_IP_FALLBACK_TTL_SECONDS = 60 * 60 * 24 // 24h after unresolved/failure
+const PROVIDER_IP_MEMORY_CACHE_MAX_ENTRIES = 10_000
 const GOOGLE_KEYWORDS = ['google cloud', 'google llc', 'google infrastructure', 'google data center']
 const GOOGLE_ASNS = new Set(['AS15169', 'AS16591'])
 const APPLE_KEYWORDS = ['apple inc', 'apple computer', 'apple cloud', 'apple data', 'apple internet']
@@ -61,6 +61,12 @@ function isCloudDatacenterIp(ipInfo: IpApiResponse) {
 }
 
 function classifyProvider(ipInfo: IpApiResponse): Provider | null {
+  const asn = parseAsn(ipInfo.as)
+  if (asn && GOOGLE_ASNS.has(asn))
+    return 'google'
+  if (asn && APPLE_ASNS.has(asn))
+    return 'apple'
+
   const text = normalize([ipInfo.isp, ipInfo.org, ipInfo.asname].join(' '))
   const isDatacenter = isCloudDatacenterIp(ipInfo)
 
@@ -141,10 +147,20 @@ function getCachedFromMemory(ip: string) {
 }
 
 function setCachedInMemory(ip: string, info: InvalidIpInfo, ttlSeconds = PROVIDER_IP_CACHE_TTL_SECONDS) {
+  if (inMemoryInvalidIpCache.has(ip))
+    inMemoryInvalidIpCache.delete(ip)
+
   inMemoryInvalidIpCache.set(ip, {
     ...info,
     cachedUntil: now() + ttlSeconds * 1000,
   })
+
+  while (inMemoryInvalidIpCache.size > PROVIDER_IP_MEMORY_CACHE_MAX_ENTRIES) {
+    const oldestIp = inMemoryInvalidIpCache.keys().next().value
+    if (!oldestIp)
+      break
+    inMemoryInvalidIpCache.delete(oldestIp)
+  }
 }
 
 async function cachedInvalidIpInfo(context: Context | undefined, ip: string) {

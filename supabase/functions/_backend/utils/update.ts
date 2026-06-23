@@ -581,13 +581,14 @@ export async function update(c: Context, body: AppInfos) {
       return providerBlockedResponse
   }
   const pgClient = getPgClient(c, true)
+  try {
+    await setReplicationLagHeader(c, pgClient)
 
-  await setReplicationLagHeader(c, pgClient)
-
-  const drizzlePg = pgClient ? getDrizzleClient(pgClient) : (null as any)
-  // Use the active DB client only when needed
-  const res = await updateWithPG(c, body, drizzlePg, appStatus)
-  if (pgClient)
+    const drizzlePg = getDrizzleClient(pgClient)
+    // Use the active DB client only when needed
+    return await updateWithPG(c, body, drizzlePg, appStatus)
+  }
+  finally {
     await closeClient(c, pgClient)
-  return res
+  }
 }
