@@ -1,92 +1,56 @@
 export const LOG_DEBUGGING_DOC_BASE = 'https://capgo.app/docs/plugins/updater/debugging/'
 
-// Anchors match Starlight heading slugs on the Debugging docs page.
-const ACTION_DOC_ANCHORS: Record<string, string> = {
-  ping: 'ping',
-  delete: 'delete',
-  reset: 'reset',
-  set: 'set',
-  get: 'get',
-  set_fail: 'set_fail',
-  update_fail: 'update_fail',
-  download_fail: 'download_fail',
-  windows_path_fail: 'windows_path_fail',
-  canonical_path_fail: 'canonical_path_fail',
-  directory_path_fail: 'directory_path_fail',
-  unzip_fail: 'unzip_fail',
-  low_mem_fail: 'low_mem_fail',
-  download_0: 'download_0-to-download_90',
-  download_10: 'download_0-to-download_90',
-  download_20: 'download_0-to-download_90',
-  download_30: 'download_0-to-download_90',
-  download_40: 'download_0-to-download_90',
-  download_50: 'download_0-to-download_90',
-  download_60: 'download_0-to-download_90',
-  download_70: 'download_0-to-download_90',
-  download_80: 'download_0-to-download_90',
-  download_90: 'download_0-to-download_90',
-  download_complete: 'download_complete',
-  download_manifest_start: 'download_manifest_start',
-  download_manifest_complete: 'download_manifest_complete',
-  download_zip_start: 'download_zip_start',
-  download_zip_complete: 'download_zip_complete',
-  download_manifest_file_fail: 'download_manifest_file_fail',
-  download_manifest_checksum_fail: 'download_manifest_checksum_fail',
-  download_manifest_brotli_fail: 'download_manifest_brotli_fail',
-  decrypt_fail: 'decrypt_fail',
-  app_moved_to_foreground: 'app_moved_to_foreground',
-  app_moved_to_background: 'app_moved_to_background',
-  app_crash: 'app_crash',
-  app_crash_native: 'app_crash_native',
-  app_anr: 'app_anr',
-  app_killed_low_memory: 'app_killed_low_memory',
-  app_killed_excessive_resource_usage: 'app_killed_excessive_resource_usage',
-  app_initialization_failure: 'app_initialization_failure',
-  app_memory_warning: 'app_memory_warning',
-  webview_javascript_error: 'webview_javascript_error',
-  webview_unhandled_rejection: 'webview_unhandled_rejection',
-  webview_resource_error: 'webview_resource_error',
-  webview_security_policy_violation: 'webview_security_policy_violation',
-  webview_unclean_restart: 'webview_unclean_restart',
-  webview_render_process_gone: 'webview_render_process_gone',
-  webview_content_process_terminated: 'webview_content_process_terminated',
-  os_version_changed: 'os_version_changed',
-  native_app_version_changed: 'native_app_version_changed',
-  uninstall: 'uninstall',
-  needPlanUpgrade: 'need_plan_upgrade-needplanupgrade-needupgrade',
-  missingBundle: 'missing_bundle-missingbundle',
-  noNew: 'no_new_version_available-nonew',
-  disablePlatformIos: 'disabled_platform_ios-disableplatformios',
-  disablePlatformAndroid: 'disabled_platform_android-disableplatformandroid',
-  disablePlatformElectron: 'disable_platform_electron-disableplatformelectron',
-  disableAutoUpdateToMajor: 'disable_auto_update_to_major-disableautoupdatetomajor',
-  cannotUpdateViaPrivateChannel: 'cannot_update_via_private_channel-cannotupdateviaprivatechannel',
-  disableAutoUpdateToMinor: 'disable_auto_update_to_minor-disableautoupdatetominor',
-  disableAutoUpdateToPatch: 'disable_auto_update_to_patch-disableautoupdatetopatch',
-  channelMisconfigured: 'misconfigured_channel-channelmisconfigured',
-  disableAutoUpdateMetadata: 'disable_auto_update_to_metadata-disableautoupdatemetadata',
-  disableAutoUpdateUnderNative: 'disable_auto_update_under_native-disableautoupdateundernative',
-  disableDevBuild: 'disable_dev_build-disabledevbuild',
-  disableProdBuild: 'disable_prod_build-disableprodbuild',
-  disableEmulator: 'disable_emulator-disableemulator',
-  disableDevice: 'disable_device-disabledevice',
-  cannotGetBundle: 'cannot_get_bundle-cannotgetbundle',
-  checksum_fail: 'checksum_fail',
-  keyMismatch: 'key_id_mismatch-keymismatch',
-  NoChannelOrOverride: 'no_channel-nochanneloroverride',
-  setChannel: 'set_channel-setchannel',
-  getChannel: 'get_channel-getchannel',
-  rateLimited: 'rate_limited-ratelimited',
-  disableAutoUpdate: 'disable_auto_update-disableautoupdate',
-  InvalidIp: 'invalid_ip-invalidip',
-  blocked_by_server_url: 'blocked_by_server_url',
-  backend_refusal: 'backend_refusal',
-  customIdBlocked: 'customidblocked',
+// Doc headings use snake_case labels with camelCase aliases in parentheses.
+// Only keep overrides where the published heading does not follow that pattern.
+const DOC_HEADING_PRIMARY_OVERRIDES: Record<string, string> = {
+  disablePlatformIos: 'disabled_platform_ios',
+  disablePlatformAndroid: 'disabled_platform_android',
+  channelMisconfigured: 'misconfigured_channel',
+  NoChannelOrOverride: 'no_channel',
+  keyMismatch: 'key_id_mismatch',
+  noNew: 'no_new_version_available',
+  InvalidIp: 'invalid_ip',
+  disableAutoUpdateMetadata: 'disable_auto_update_to_metadata',
+}
+
+const DOC_HEADING_LEGACY_ALIASES: Record<string, string[]> = {
+  needPlanUpgrade: ['needUpgrade'],
+}
+
+function camelToSnake(value: string): string {
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/([A-Z])([A-Z][a-z])/g, '$1_$2')
+    .toLowerCase()
+}
+
+function slugifyDocHeading(heading: string): string {
+  return heading
+    .toLowerCase()
+    .replace(/[(),]/g, '')
+    .trim()
+    .replace(/ +/g, '-')
+}
+
+function actionToDocHeading(action: string): string {
+  if (/^download_\d+$/.test(action))
+    return 'download_0 to download_90'
+
+  if (!/[A-Z]/.test(action) && action === action.toLowerCase())
+    return action
+
+  if (action === 'customIdBlocked')
+    return action
+
+  const primary = DOC_HEADING_PRIMARY_OVERRIDES[action] ?? camelToSnake(action)
+  const aliases = [action, ...(DOC_HEADING_LEGACY_ALIASES[action] ?? [])]
+  return `${primary} (${aliases.join(', ')})`
+}
+
+export function getLogDocAnchor(action: string): string {
+  return slugifyDocHeading(actionToDocHeading(action))
 }
 
 export function getLogDocUrl(action: string): string {
-  const anchor = ACTION_DOC_ANCHORS[action]
-  if (!anchor)
-    return LOG_DEBUGGING_DOC_BASE
-  return `${LOG_DEBUGGING_DOC_BASE}#${anchor}`
+  return `${LOG_DEBUGGING_DOC_BASE}#${getLogDocAnchor(action)}`
 }
