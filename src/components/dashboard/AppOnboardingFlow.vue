@@ -11,17 +11,17 @@ import IconAppWindow from '~icons/lucide/app-window'
 import IconArrowRight from '~icons/lucide/arrow-right'
 import IconCheck from '~icons/lucide/check'
 import IconCode from '~icons/lucide/code-2'
+import IconCompass from '~icons/lucide/compass'
 import IconGlobe from '~icons/lucide/globe-2'
+import IconLayers from '~icons/lucide/layers'
 import IconLoader from '~icons/lucide/loader-2'
 import IconPackage from '~icons/lucide/package'
+import IconPencil from '~icons/lucide/pencil-line'
+import IconRefresh from '~icons/lucide/refresh-cw'
 import IconSmartphone from '~icons/lucide/smartphone'
 import IconSparkles from '~icons/lucide/sparkles'
 import IconStore from '~icons/lucide/store'
 import IconTerminal from '~icons/lucide/terminal'
-import IconCompass from '~icons/lucide/compass'
-import IconLayers from '~icons/lucide/layers'
-import IconPencil from '~icons/lucide/pencil-line'
-import IconRefresh from '~icons/lucide/refresh-cw'
 import IconUsers from '~icons/lucide/users-round'
 import { createDefaultApiKey, findUsablePlainApiKey } from '~/services/apikeys'
 import { pushEvent } from '~/services/posthog'
@@ -30,11 +30,11 @@ import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
+import { isValidAppId } from '~/utils/appId'
 import {
   clearOnboardingAppDraft,
   loadOnboardingAppDraft,
 } from '~/utils/onboardingAppDraft'
-import { isValidAppId } from '~/utils/appId'
 import { slugifyOnboardingSegment } from '~/utils/onboardingSlug'
 
 const props = defineProps<{
@@ -108,14 +108,27 @@ const planNameOrder = ['Solo', 'Maker', 'Team', 'Enterprise'] as const
 const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ''
 const usesBuilderSetupCommand = computed(() => selectedIntent.value === 'builder')
 const cliSubcommand = computed(() => usesBuilderSetupCommand.value ? 'build init' : 'i')
-const cliCommand = computed(() => `npx @capgo/cli@latest ${cliSubcommand.value} ${apiKey.value ?? '[APIKEY]'}${localCommand}`)
-const redactedCliCommand = computed(() => `npx @capgo/cli@latest ${cliSubcommand.value} [YOUR_CAPGO_API_KEY]${localCommand}`)
+const cliCommand = computed(() => {
+  const key = apiKey.value ?? '[APIKEY]'
+  if (usesBuilderSetupCommand.value)
+    return `npx @capgo/cli@latest build init -a ${key}${localCommand}`
+
+  return `npx @capgo/cli@latest i ${key}${localCommand}`
+})
+const redactedCliCommand = computed(() => {
+  if (usesBuilderSetupCommand.value)
+    return `npx @capgo/cli@latest build init -a [YOUR_CAPGO_API_KEY]${localCommand}`
+
+  return `npx @capgo/cli@latest i [YOUR_CAPGO_API_KEY]${localCommand}`
+})
 const cliCommandArgs = computed(() => {
   const args: string[] = []
 
-  if (isLocal(config.supaHost)) {
+  if (usesBuilderSetupCommand.value)
+    args.push('-a', apiKey.value ?? '[APIKEY]')
+
+  if (isLocal(config.supaHost))
     args.push('--supa-host', config.supaHost, '--supa-anon', config.supaKey)
-  }
 
   return args
 })
@@ -188,18 +201,22 @@ const currentStepIndex = computed(() => Math.max(0, appOnboardingSteps.value.fin
 const stepProgress = computed(() => `${((currentStepIndex.value + 1) / appOnboardingSteps.value.length) * 100}%`)
 const userCountStops = computed<UserCountStop[]>(() => {
   const planStops = planNameOrder.map(planName => main.plans.find(plan => plan.name === planName)).flatMap((plan) => {
-    if (!plan?.mau) return []
+    if (!plan?.mau)
+      return []
     const mau = Number(plan.mau)
-    if (!Number.isFinite(mau) || mau <= 0) return []
+    if (!Number.isFinite(mau) || mau <= 0)
+      return []
     return [{ value: mau, label: formatUserCount(mau, plan.name === 'Enterprise'), planName: plan.name }]
   })
-  return planStops.length == planNameOrder.length ? planStops : fallbackUserCountStops
+  return planStops.length === planNameOrder.length ? planStops : fallbackUserCountStops
 })
 const selectedUserCountStop = computed<UserCountStop | null>(() => estimatedUsersIndex.value === null ? null : userCountStops.value[Math.min(estimatedUsersIndex.value, userCountStops.value.length - 1)] ?? null)
 const canShowOrgDetails = computed(() => orgMode.value !== null)
 const canCreatePreOrgOrganization = computed(() => {
-  if (!orgMode.value || !orgNameInput.value.trim()) return false
-  if (existingApp.value === true) return selectedUserCountStop.value !== null
+  if (!orgMode.value || !orgNameInput.value.trim())
+    return false
+  if (existingApp.value === true)
+    return selectedUserCountStop.value !== null
   return true
 })
 const setupTitle = computed(() => usesBuilderSetupCommand.value ? t('unified-onboarding-setup-builder-title') : t('unified-onboarding-setup-ota-title'))
@@ -220,16 +237,23 @@ function whiteCardPrimaryButtonClass() {
 }
 
 function formatUserCount(value: number, plus = false) {
-  if (value >= 1_000_000) return plus ? '1M+' : '1M'
-  if (value >= 1000) return `${value / 1000}K`
+  if (value >= 1_000_000)
+    return plus ? '1M+' : '1M'
+  if (value >= 1000)
+    return `${value / 1000}K`
   return String(value)
 }
 function getUserCountStopTitle(stop: UserCountStop) {
-  if (stop.value >= 1_000_000) return t('organization-onboarding-active-users-plus', { count: stop.label })
+  if (stop.value >= 1_000_000)
+    return t('organization-onboarding-active-users-plus', { count: stop.label })
   return t('organization-onboarding-active-users-up-to', { count: stop.label })
 }
-function isUserCountStopSelected(index: number) { return estimatedUsersIndex.value === index }
-function selectUserCountStop(index: number) { estimatedUsersIndex.value = index }
+function isUserCountStopSelected(index: number) {
+  return estimatedUsersIndex.value === index
+}
+function selectUserCountStop(index: number) {
+  estimatedUsersIndex.value = index
+}
 function extractAndroidAppId(url: string) {
   if (!url)
     return ''
@@ -363,11 +387,15 @@ async function loadResumeApp() {
   if (resumeStep.value === 'setup') {
     flowStep.value = 'setup'
     hydrateIntentFromCurrentOrg()
-    try { await ensureApiKey() } catch (error) {
+    try {
+      await ensureApiKey()
+    }
+    catch (error) {
       console.error('Cannot ensure API key', error)
       toast.error(t('app-onboarding-toast-apikey-error'))
     }
-  } else {
+  }
+  else {
     flowStep.value = resumeStep.value === 'choice' ? 'choice' : 'install'
   }
   return true
@@ -584,7 +612,6 @@ function restoreDraftState() {
     localIconPreview.value = draft.iconDataUrl
   return true
 }
-
 
 function hydrateIntentFromCurrentOrg() {
   const onboarding = (currentOrg.value as { onboarding?: unknown } | null | undefined)?.onboarding
@@ -1018,9 +1045,15 @@ watch(suggestedAppId, (value) => {
         <div v-if="props.preOrg && flowStep === 'intent'" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95">
           <div class="space-y-6">
             <div>
-              <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">{{ t('unified-onboarding-step-intent') }}</p>
-              <h2 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">{{ t('organization-onboarding-intent-question') }}</h2>
-              <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{{ t('organization-onboarding-intent-hint') }}</p>
+              <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
+                {{ t('unified-onboarding-step-intent') }}
+              </p>
+              <h2 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
+                {{ t('organization-onboarding-intent-question') }}
+              </h2>
+              <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                {{ t('organization-onboarding-intent-hint') }}
+              </p>
             </div>
             <div class="grid gap-3 sm:grid-cols-2">
               <button v-for="option in intentOptions" :key="option.value" type="button" class="group flex min-h-20 items-start gap-3 rounded-xl border p-3 text-left transition" :class="whiteCardToggleButtonClass(selectedIntent === option.value)" :data-test="`onboarding-intent-${option.value}`" @click="selectedIntent = option.value">
@@ -1032,7 +1065,9 @@ watch(suggestedAppId, (value) => {
               </button>
             </div>
             <div class="flex justify-end border-t border-slate-200 pt-6 dark:border-white/15">
-              <button type="button" class="d-btn min-h-12" :class="whiteCardPrimaryButtonClass()" data-test="app-onboarding-continue-intent" :disabled="!selectedIntent" @click="continueFromIntent()">{{ t('unified-onboarding-continue-intent') }}<IconArrowRight class="h-4 w-4" /></button>
+              <button type="button" class="d-btn min-h-12" :class="whiteCardPrimaryButtonClass()" data-test="app-onboarding-continue-intent" :disabled="!selectedIntent" @click="continueFromIntent()">
+                {{ t('unified-onboarding-continue-intent') }}<IconArrowRight class="h-4 w-4" />
+              </button>
             </div>
           </div>
         </div>

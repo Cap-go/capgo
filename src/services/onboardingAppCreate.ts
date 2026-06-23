@@ -85,7 +85,7 @@ async function uploadIconFromDraft(
         return
 
       const binary = atob(payload)
-      const bytes = Uint8Array.from(binary, char => char.codePointAt(0) ?? 0)
+      const bytes = Uint8Array.from(binary, char => char.charCodeAt(0))
       blob = new Blob([bytes], { type: contentType })
     }
     else {
