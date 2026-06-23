@@ -60,10 +60,13 @@ async function ascFetch(
   path: string,
   token: string,
   options: RequestInit = {},
+  signal?: AbortSignal,
 ): Promise<any> {
   const url = `${ASC_BASE_URL}${path}`
   const res = await fetch(url, {
     ...options,
+    // An explicit signal arg wins; otherwise honor any signal on options.
+    signal: signal ?? options.signal,
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
@@ -93,6 +96,51 @@ async function ascFetch(
 
 // ─── API Functions ─────────────────────────────────────────────────
 
+// Shared App Store Connect auth-failure copy. Exported so prescan's
+// assertAscAccess reuses the exact wording verifyApiKey shows during
+// onboarding (no drift between the two probes). These strings reach the
+// terminal and --json reports, so they NEVER contain credential material.
+export const ASC_AGREEMENTS_MESSAGE
+  = 'Apple is blocking App Store Connect API access because your developer account has a required agreement that is unsigned or has expired.\n'
+    + '  - Sign in as the Account Holder at https://appstoreconnect.apple.com\n'
+    + '  - Open "Business" (Agreements, Tax, and Banking) and accept the pending or updated agreement\n'
+    + '  - Then run this step again — your API key is valid, so no key changes are needed'
+
+export const ASC_KEY_REJECTED_MESSAGE
+  = 'API key verification failed. Please check:\n'
+    + '  - The .p8 file is correct and hasn\'t been modified\n'
+    + '  - The Key ID matches the key shown in App Store Connect\n'
+    + '  - The Issuer ID is correct (shown at the top of the API keys page)\n'
+    + '  - The key has "Admin" or "Developer" access'
+
+export interface AscAuthClassification {
+  is401or403: boolean
+  isAgreements: boolean
+  status?: number
+  code?: string
+  message: string
+}
+
+/**
+ * Classify a thrown App Store Connect error into the shared 401/403 + agreements
+ * buckets. Returns is401or403=false for anything else (network/5xx/etc) so
+ * callers route those to their own network/info handling.
+ */
+export function classifyAscAuthError(err: any): AscAuthClassification {
+  const status = typeof err?.status === 'number' ? err.status : undefined
+  const code = typeof err?.code === 'string' ? err.code : undefined
+  const is401 = status === 401 || err?.message?.includes('401')
+  const is403 = status === 403 || err?.message?.includes('403')
+  const isAgreements = Boolean(is403 && (code === 'FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED' || code === 'FORBIDDEN_ERROR.PLA_NOT_ACCEPTED' || /\bPLA_NOT_ACCEPTED\b|required agreement|program license agreement/i.test(err?.message ?? '')))
+  return {
+    is401or403: Boolean(is401 || is403),
+    isAgreements,
+    status: status ?? (is403 ? 403 : is401 ? 401 : undefined),
+    code,
+    message: isAgreements ? ASC_AGREEMENTS_MESSAGE : ASC_KEY_REJECTED_MESSAGE,
+  }
+}
+
 /**
  * Verify the API key works and try to detect the team ID from existing certificates.
  * Throws on 401/403 with a user-friendly message.
@@ -108,37 +156,18 @@ export async function verifyApiKey(token: string): Promise<{ valid: true, teamId
     return { valid: true, teamId }
   }
   catch (err: any) {
-    const status = typeof err?.status === 'number' ? err.status : undefined
-    const code = typeof err?.code === 'string' ? err.code : undefined
-    const is401 = status === 401 || err.message?.includes('401')
-    const is403 = status === 403 || err.message?.includes('403')
-
-    // Apple returns 403 FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED when the
-    // account holder hasn't signed (or must re-sign) a required agreement. The key
-    // itself is valid — point the user at the agreements page instead of sending
-    // them to re-check credentials that are fine. Preserve status/code so
+    // Apple returns 403 when the account holder must sign (or re-sign) a required
+    // agreement — FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED (paid-apps/tax) or
+    // FORBIDDEN_ERROR.PLA_NOT_ACCEPTED (updated Program License Agreement). The key
+    // itself is valid, so point the user at the agreements page instead of sending
+    // them to re-check credentials that are fine. classifyAscAuthError owns this
+    // detection (shared with assertAscAccess) and preserves status/code so
     // error-categories maps it to 'apple_agreements_missing' (not 'unknown').
-    if (is403 && (code === 'FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED' || /required agreement/i.test(err.message ?? ''))) {
-      throw new AppleApiHttpError(
-        403,
-        'Apple is blocking App Store Connect API access because your developer account has a required agreement that is unsigned or has expired.\n'
-        + '  - Sign in as the Account Holder at https://appstoreconnect.apple.com\n'
-        + '  - Open "Business" (Agreements, Tax, and Banking) and accept the pending or updated agreement\n'
-        + '  - Then run this step again — your API key is valid, so no key changes are needed',
-        code,
-      )
-    }
-    if (is401 || is403) {
-      throw new AppleApiHttpError(
-        status ?? (is403 ? 403 : 401),
-        'API key verification failed. Please check:\n'
-        + '  - The .p8 file is correct and hasn\'t been modified\n'
-        + '  - The Key ID matches the key shown in App Store Connect\n'
-        + '  - The Issuer ID is correct (shown at the top of the API keys page)\n'
-        + '  - The key has "Admin" or "Developer" access',
-        code,
-      )
-    }
+    const cls = classifyAscAuthError(err)
+    if (cls.isAgreements)
+      throw new AppleApiHttpError(403, cls.message, cls.code)
+    if (cls.is401or403)
+      throw new AppleApiHttpError(cls.status ?? 401, cls.message, cls.code)
     throw err
   }
 }

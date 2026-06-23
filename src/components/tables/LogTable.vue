@@ -7,6 +7,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { formatDate } from '~/services/date'
+import { getLogDocUrl } from '~/services/logDocLinks'
 import { actionToFilter, createActionFilterState, filterToAction } from '~/services/statsActions'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 
@@ -89,8 +90,6 @@ function initializeDateRange(): [Date, Date] {
 }
 
 const range = ref<[Date, Date]>(initializeDateRange())
-const DOC_LOGS = 'https://capgo.app/docs/plugin/debugging/#sent-from-the-backend'
-
 function normalizeMetadata(metadata: LogData['metadata']): Record<string, string> | null {
   if (!metadata)
     return null
@@ -349,7 +348,7 @@ columns.value = [
     sortable: true,
     head: true,
     displayFunction: (elem: Element) => formatAction(elem),
-    onClick: () => window.open(DOC_LOGS, '_blank', 'noopener,noreferrer'),
+    onClick: (elem: Element) => window.open(getLogDocUrl(elem.action), '_blank', 'noopener,noreferrer'),
   },
   {
     label: t('version'),

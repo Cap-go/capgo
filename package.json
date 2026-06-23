@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.178.1",
+  "version": "12.183.0",
   "private": true,
   "workspaces": [
     "cli"
@@ -68,6 +68,10 @@
     "files:prod": "wrangler dev -c cloudflare_workers/files/wrangler.jsonc --env=prod --env-file=internal/cloudflare/.env.prod",
     "stripe:emulator": "bun scripts/serve-stripe-emulator.ts",
     "init:playwright": "bunx playwright install",
+    "visual:capture:before": "bun scripts/visual-diff.ts capture --phase before",
+    "visual:capture:after": "bun scripts/visual-diff.ts capture --phase after",
+    "visual:diff": "bun scripts/visual-diff.ts diff",
+    "visual:run": "bun scripts/visual-diff.ts run",
     "test:front": "bun scripts/run-playwright-tests.ts",
     "test:local": "bun run test:all",
     "test:coverage:all": "bun run cli:build && bun run supabase:with-env -- bunx vitest run --coverage.enabled=true tests/*",
@@ -356,6 +360,8 @@
     "jose": "^6.2.3",
     "knip": "^6.17.1",
     "oxlint": "^1.70.0",
+    "pixelmatch": "^7.2.0",
+    "pngjs": "^7.0.0",
     "sass": "1.101.0",
     "simple-git-hooks": "^2.13.1",
     "supabase": "^2.106.0",

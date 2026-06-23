@@ -26,25 +26,25 @@ await mkdir(TEST_DIR, { recursive: true })
 process.env.CAPGO_AI_LOG_BASE_DIR = TEST_DIR
 
 // ---- decideAnalyzeBehavior matrix ----
-await test('matrix: interactive + flag set → show_menu', () => {
-  const r = decideAnalyzeBehavior({ isTTY: true, aiAnalyticsFlag: true })
-  if (r !== 'show_menu') throw new Error(`got ${r}`)
-})
+// Explicit opt-in (--ai-analytics OR --send-logs) always runs the action(s)
+// directly without prompting, in ANY terminal. No flags: interactive gets the
+// ask-then-menu flow, non-interactive stays silent (skip).
+function expectBehavior(name, input, want) {
+  return test(name, () => {
+    const r = decideAnalyzeBehavior(input)
+    if (r !== want) throw new Error(`got ${r}, want ${want}`)
+  })
+}
 
-await test('matrix: interactive + flag unset → ask_then_menu', () => {
-  const r = decideAnalyzeBehavior({ isTTY: true, aiAnalyticsFlag: false })
-  if (r !== 'ask_then_menu') throw new Error(`got ${r}`)
-})
-
-await test('matrix: non-interactive + flag set → auto_upload', () => {
-  const r = decideAnalyzeBehavior({ isTTY: false, aiAnalyticsFlag: true })
-  if (r !== 'auto_upload') throw new Error(`got ${r}`)
-})
-
-await test('matrix: non-interactive + flag unset → skip', () => {
-  const r = decideAnalyzeBehavior({ isTTY: false, aiAnalyticsFlag: false })
-  if (r !== 'skip') throw new Error(`got ${r}`)
-})
+// TTY + --ai-analytics: was 'show_menu' (the bug); now runs directly.
+await expectBehavior('matrix: TTY + ai-analytics → auto_upload', { isTTY: true, aiAnalyticsFlag: true, sendLogsFlag: false }, 'auto_upload')
+await expectBehavior('matrix: TTY + send-logs → auto_upload', { isTTY: true, aiAnalyticsFlag: false, sendLogsFlag: true }, 'auto_upload')
+await expectBehavior('matrix: TTY + both flags → auto_upload', { isTTY: true, aiAnalyticsFlag: true, sendLogsFlag: true }, 'auto_upload')
+await expectBehavior('matrix: non-TTY + ai-analytics → auto_upload', { isTTY: false, aiAnalyticsFlag: true, sendLogsFlag: false }, 'auto_upload')
+await expectBehavior('matrix: non-TTY + send-logs → auto_upload', { isTTY: false, aiAnalyticsFlag: false, sendLogsFlag: true }, 'auto_upload')
+await expectBehavior('matrix: non-TTY + both flags → auto_upload', { isTTY: false, aiAnalyticsFlag: true, sendLogsFlag: true }, 'auto_upload')
+await expectBehavior('matrix: TTY + no flags → ask_then_menu', { isTTY: true, aiAnalyticsFlag: false, sendLogsFlag: false }, 'ask_then_menu')
+await expectBehavior('matrix: non-TTY + no flags → skip', { isTTY: false, aiAnalyticsFlag: false, sendLogsFlag: false }, 'skip')
 
 // ---- writeLocalAiFile ----
 await test('writeLocalAiFile writes prompt + <BUILD_LOG> boundary + logs', async () => {

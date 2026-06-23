@@ -316,6 +316,7 @@ export type Database = {
           app_id: string
           build_timeout_seconds: number
           build_timeout_updated_at: string
+          block_provider_infra_requests: boolean
           channel_device_count: number
           created_at: string | null
           default_upload_channel: string
@@ -343,6 +344,7 @@ export type Database = {
           app_id: string
           build_timeout_seconds?: number
           build_timeout_updated_at?: string
+          block_provider_infra_requests?: boolean
           channel_device_count?: number
           created_at?: string | null
           default_upload_channel?: string
@@ -370,6 +372,7 @@ export type Database = {
           app_id?: string
           build_timeout_seconds?: number
           build_timeout_updated_at?: string
+          block_provider_infra_requests?: boolean
           channel_device_count?: number
           created_at?: string | null
           default_upload_channel?: string
@@ -1449,6 +1452,8 @@ export type Database = {
       }
       global_stats: {
         Row: {
+          active_canceled_orgs: number
+          active_past_due_orgs: number
           apps: number
           apps_active: number | null
           average_ltv: number
@@ -1629,6 +1634,8 @@ export type Database = {
           users_active?: number | null
         }
         Update: {
+          active_canceled_orgs?: number
+          active_past_due_orgs?: number
           apps?: number
           apps_active?: number | null
           average_ltv?: number
@@ -3822,6 +3829,7 @@ export type Database = {
           app_id: string
           build_timeout_seconds: number
           build_timeout_updated_at: string
+          block_provider_infra_requests: boolean
           channel_device_count: number
           created_at: string
           default_upload_channel: string

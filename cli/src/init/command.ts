@@ -30,7 +30,7 @@ import { copyToClipboard, revealInFinder } from '../support/clipboard'
 import { appendInternalLog, getInternalLogPath, startInternalLog } from '../support/internal-log'
 import { showReplicationProgress } from '../replicationProgress'
 import { formatRunnerCommand, splitRunnerCommand } from '../runner-command'
-import { createSupabaseClient, defaultApiHost, findBuildCommandForProjectType, findMainFile, findMainFileForProjectType, findProjectType, findRoot, findSavedKey, findSavedKeySilent, formatError, getAllPackagesDependencies, getAppId, getBundleVersion, getConfig, getLocalConfig, getNativeProjectResetAdvice, getOrganizationListWithPermission, getPackageScripts, getPMAndCommand, hasCliPermission, PACKNAME, projectIsMonorepo, resolveUserIdFromApiKey, updateConfigbyKey, updateConfigUpdater, validateIosUpdaterSync } from '../utils'
+import { consoleWebUrl, createSupabaseClient, defaultApiHost, findBuildCommandForProjectType, findMainFile, findMainFileForProjectType, findProjectType, findRoot, findSavedKey, findSavedKeySilent, formatError, getAllPackagesDependencies, getAppId, getBundleVersion, getConfig, getLocalConfig, getNativeProjectResetAdvice, getOrganizationListWithPermission, getPackageScripts, getPMAndCommand, hasCliPermission, PACKNAME, projectIsMonorepo, resolveUserIdFromApiKey, updateConfigbyKey, updateConfigUpdater, validateIosUpdaterSync } from '../utils'
 import { buildAppIdConflictSuggestions, isAppAlreadyExistsError } from './app-conflict'
 import { cancel as pCancel, confirm as pConfirm, intro as pIntro, isCancel as pIsCancel, log as pLog, outro as pOutro, select as pSelect, spinner as pSpinner, text as pText } from './prompts'
 import { appendInitStreamingLine, clearInitStreamingOutput, setInitCodeDiff, setInitEncryptionSummary, setInitVersionWarning, startInitStreamingOutput, stopInitInkSession, updateInitStreamingStatus } from './runtime'
@@ -1791,7 +1791,7 @@ async function selectOrganizationForInit(
 
   if (organization.enforcing_2fa && !organization['2fa_has_access']) {
     pLog.error(`The organization "${organization.name}" requires all members to have 2FA enabled.`)
-    pLog.error('Enable 2FA at https://web.capgo.app/settings/account and try again.')
+    pLog.error(`Enable 2FA at ${consoleWebUrl('/settings/account')} and try again.`)
     throw new Error('2FA required for selected organization')
   }
 
@@ -4748,7 +4748,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
         discardResumedState()
       }
       else if (blocked2fa) {
-        pLog.warn(`Organization "${savedOrg.name}" now requires 2FA. Enable it at https://web.capgo.app/settings/account`)
+        pLog.warn(`Organization "${savedOrg.name}" now requires 2FA. Enable it at ${consoleWebUrl('/settings/account')}`)
         pLog.warn('Please select a different organization or enable 2FA and try again.')
         organization = await selectOrganizationForInit(supabase, options.apikey)
         discardResumedState()

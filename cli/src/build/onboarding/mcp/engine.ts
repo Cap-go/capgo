@@ -7,6 +7,7 @@ import type { ChoiceOption, NextStepResult, Platform } from './contract.js'
 import type { IosCarried, TailParkedState } from './session-state.js'
 import type { BuildOutputRecord } from '../../output-record.js'
 import type { TailEffectProgress, TailStep, TailStepCtx } from '../tail/flow.js'
+import { consoleWebUrl } from '../../../utils.js'
 import { buildAppIdConflictSuggestions } from '../../../init/app-conflict.js'
 import { ONBOARDING_RULES } from './contract.js'
 import { explainForState } from './explanations.js'
@@ -168,7 +169,7 @@ export async function decideStart(
       roadmap: ROADMAP,
       context: { appId: facts.appId, platformsDetected: facts.platformsDetected },
       human: {
-        instruction: 'Ask the user to generate an API key for their AI assistant at https://app.capgo.app/connect and paste it into the chat, then call the capgo_login tool with that key to sign in.',
+        instruction: 'Ask the user to generate an API key for their AI assistant at https://console.capgo.app/connect and paste it into the chat, then call the capgo_login tool with that key to sign in.',
       },
       next: {
         tool: 'capgo_login',
@@ -3421,7 +3422,7 @@ async function enterTailAfterBuild(
   rec: BuildOutputRecord,
 ): Promise<NextStepResult | null> {
   try {
-    const buildUrl = `https://capgo.app/app/${appId}/builds`
+    const buildUrl = consoleWebUrl(`/app/${appId}/builds`)
     if (platform === 'ios') {
       if (!deps.iosEffectDeps?.detectCiSecretTargets || !deps.iosEffectDeps.saveProgress)
         return null
