@@ -41,7 +41,8 @@
         "playwright/e2e/**/*.ts!",
         "playwright/support/**/*.ts!",
         "formkit.config.ts!",
-        "formkit.theme.ts!"
+        "formkit.theme.ts!",
+        "playwright/visual-diff.config.ts!"
       ],
       "project": [
         "src/**/*.{ts,vue}!",
