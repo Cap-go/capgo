@@ -117,6 +117,8 @@ CREATE TABLE public.apps (
     stats_refresh_requested_at timestamp without time zone,
     build_timeout_seconds bigint DEFAULT 900 NOT NULL,
     build_timeout_updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_from_onboarding boolean DEFAULT false NOT NULL,
+    onboarding_completed_at timestamp with time zone,
     CONSTRAINT apps_build_timeout_seconds_check CHECK (((build_timeout_seconds >= 300) AND (build_timeout_seconds <= 21600)))
 );
 
@@ -786,6 +788,13 @@ CREATE INDEX idx_app_versions_owner_org_not_deleted ON public.app_versions USING
 --
 
 CREATE INDEX idx_app_versions_retention_cleanup ON public.app_versions USING btree (deleted, created_at, app_id) WHERE (deleted = false);
+
+
+--
+-- Name: idx_apps_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_apps_created_at ON public.apps USING btree (created_at);
 
 
 --

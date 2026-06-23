@@ -1134,6 +1134,9 @@ export async function getAdminDeploymentsTrend(
 export interface AdminGlobalStatsTrend {
   date: string
   apps: number
+  apps_created: number
+  apps_with_cli_onboarding_builds_24h: number
+  apps_with_manual_builds_24h: number
   apps_active: number
   users: number
   users_active: number
@@ -1248,6 +1251,9 @@ export async function getAdminGlobalStatsTrend(
         SELECT
         gs.date_id AS date,
         gs.apps::int AS apps,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'apps_created', '')::int, 0)::int AS apps_created,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'apps_with_cli_onboarding_builds_24h', '')::int, 0)::int AS apps_with_cli_onboarding_builds_24h,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'apps_with_manual_builds_24h', '')::int, 0)::int AS apps_with_manual_builds_24h,
         gs.apps_active::int AS apps_active,
         gs.users::int AS users,
         gs.users_active::int AS users_active,
@@ -1382,10 +1388,12 @@ export async function getAdminGlobalStatsTrend(
     `
 
     const result = await drizzleClient.execute(query)
-
     const data: AdminGlobalStatsTrend[] = result.rows.map((row: any) => ({
       date: normalizeAdminStatsDate(row.date),
       apps: Number(row.apps) || 0,
+      apps_created: Number(row.apps_created) || 0,
+      apps_with_cli_onboarding_builds_24h: Number(row.apps_with_cli_onboarding_builds_24h) || 0,
+      apps_with_manual_builds_24h: Number(row.apps_with_manual_builds_24h) || 0,
       apps_active: Number(row.apps_active) || 0,
       users: Number(row.users) || 0,
       users_active: Number(row.users_active) || 0,

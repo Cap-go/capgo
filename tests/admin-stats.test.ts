@@ -90,6 +90,9 @@ beforeAll(async () => {
     {
       date_id: GLOBAL_STATS_TREND_DATES[0],
       apps: 10,
+      apps_created: 2,
+      apps_with_cli_onboarding_builds_24h: 1,
+      apps_with_manual_builds_24h: 0,
       apps_active: 7,
       users: 20,
       users_active: 8,
@@ -128,6 +131,9 @@ beforeAll(async () => {
     {
       date_id: GLOBAL_STATS_TREND_DATES[1],
       apps: 11,
+      apps_created: 3,
+      apps_with_cli_onboarding_builds_24h: 2,
+      apps_with_manual_builds_24h: 1,
       apps_active: 8,
       users: 22,
       users_active: 9,
@@ -510,6 +516,9 @@ describe('/private/admin_stats', () => {
       data: Array<{
         date: string
         apps: number
+        apps_created: number
+        apps_with_cli_onboarding_builds_24h: number
+        apps_with_manual_builds_24h: number
         updates: number
         updates_external: number
         previous_mrr: number
@@ -526,6 +535,9 @@ describe('/private/admin_stats', () => {
     const latest = payload.data.find(row => row.date === GLOBAL_STATS_TREND_DATES[1])
     expect(latest).toBeTruthy()
     expect(latest?.apps).toBe(11)
+    expect(latest?.apps_created).toBe(3)
+    expect(latest?.apps_with_cli_onboarding_builds_24h).toBe(2)
+    expect(latest?.apps_with_manual_builds_24h).toBe(1)
     expect(latest?.updates).toBe(150)
     expect(latest?.past_due_orgs).toBe(2)
     expect(latest?.past_due_orgs_average_days).toBe(3.75)

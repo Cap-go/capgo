@@ -318,6 +318,7 @@ export type Database = {
           build_timeout_updated_at: string
           channel_device_count: number
           created_at: string | null
+          created_from_onboarding: boolean
           default_upload_channel: string
           existing_app: boolean
           expose_metadata: boolean
@@ -328,6 +329,7 @@ export type Database = {
           manifest_bundle_count: number
           name: string | null
           need_onboarding: boolean
+          onboarding_completed_at: string | null
           owner_org: string
           retention: number
           stats_refresh_requested_at: string | null
@@ -345,6 +347,7 @@ export type Database = {
           build_timeout_updated_at?: string
           channel_device_count?: number
           created_at?: string | null
+          created_from_onboarding?: boolean
           default_upload_channel?: string
           existing_app?: boolean
           expose_metadata?: boolean
@@ -355,6 +358,7 @@ export type Database = {
           manifest_bundle_count?: number
           name?: string | null
           need_onboarding?: boolean
+          onboarding_completed_at?: string | null
           owner_org: string
           retention?: number
           stats_refresh_requested_at?: string | null
@@ -372,6 +376,7 @@ export type Database = {
           build_timeout_updated_at?: string
           channel_device_count?: number
           created_at?: string | null
+          created_from_onboarding?: boolean
           default_upload_channel?: string
           existing_app?: boolean
           expose_metadata?: boolean
@@ -382,6 +387,7 @@ export type Database = {
           manifest_bundle_count?: number
           name?: string | null
           need_onboarding?: boolean
+          onboarding_completed_at?: string | null
           owner_org?: string
           retention?: number
           stats_refresh_requested_at?: string | null
@@ -1450,6 +1456,9 @@ export type Database = {
       global_stats: {
         Row: {
           apps: number
+          apps_created: number
+          apps_with_cli_onboarding_builds_24h: number
+          apps_with_manual_builds_24h: number
           apps_active: number | null
           average_ltv: number
           build_avg_seconds_day_android: number
@@ -1538,6 +1547,9 @@ export type Database = {
         }
         Insert: {
           apps: number
+          apps_created?: number
+          apps_with_cli_onboarding_builds_24h?: number
+          apps_with_manual_builds_24h?: number
           apps_active?: number | null
           average_ltv?: number
           build_avg_seconds_day_android?: number
@@ -1626,6 +1638,9 @@ export type Database = {
         }
         Update: {
           apps?: number
+          apps_created?: number
+          apps_with_cli_onboarding_builds_24h?: number
+          apps_with_manual_builds_24h?: number
           apps_active?: number | null
           average_ltv?: number
           build_avg_seconds_day_android?: number
@@ -3581,6 +3596,7 @@ export type Database = {
           build_timeout_updated_at: string
           channel_device_count: number
           created_at: string | null
+          created_from_onboarding: boolean
           default_upload_channel: string
           existing_app: boolean
           expose_metadata: boolean
@@ -3591,6 +3607,7 @@ export type Database = {
           manifest_bundle_count: number
           name: string | null
           need_onboarding: boolean
+          onboarding_completed_at: string | null
           owner_org: string
           retention: number
           stats_refresh_requested_at: string | null
