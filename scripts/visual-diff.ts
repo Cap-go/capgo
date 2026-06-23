@@ -2,14 +2,16 @@ import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 import { spawn, spawnSync } from 'node:child_process'
 import { createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import net from 'node:net'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import process from 'node:process'
+import { pathToFileURL } from 'node:url'
 import type { Page } from '@playwright/test'
 import { chromium } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
 import pixelmatch from 'pixelmatch'
 import { PNG } from 'pngjs'
-import { visualDiffRoutes, visualDiffViewport } from '../playwright/visual-diff.config'
+import type { VisualDiffRoute } from '../playwright/visual-diff.config'
+import { getSupabaseStatus } from './supabase-worktree-status'
 import { getPlaywrightStripeApiBaseUrl, getStripeEmulatorPort } from './playwright-stripe'
 import { getSupabaseWorktreeConfig } from './supabase-worktree-config'
 
@@ -43,6 +45,21 @@ interface CliOptions {
 }
 
 const repoRoot = process.cwd()
+
+interface LoadedVisualDiffConfig {
+  visualDiffRoutes: VisualDiffRoute[]
+  visualDiffViewport: { width: number, height: number }
+}
+
+async function loadVisualDiffConfig(): Promise<LoadedVisualDiffConfig> {
+  const configPath = resolve(repoRoot, 'playwright/visual-diff.config.ts')
+  const module = await import(`${pathToFileURL(configPath).href}?t=${Date.now()}`)
+  return {
+    visualDiffRoutes: module.visualDiffRoutes as VisualDiffRoute[],
+    visualDiffViewport: module.visualDiffViewport as LoadedVisualDiffConfig['visualDiffViewport'],
+  }
+}
+
 const outputRoot = resolve(repoRoot, '.context/visual-diff')
 const logRoot = resolve(outputRoot, 'logs')
 const frontendBaseUrl = process.env.VISUAL_DIFF_BASE_URL || 'http://127.0.0.1:5173'
@@ -116,17 +133,17 @@ function parseArgs(argv: string[]): CliOptions {
   }
 }
 
-function selectedRoutes(routeFilter: string[]) {
+function selectedRoutes(routes: VisualDiffRoute[], routeFilter: string[]) {
   if (routeFilter.length === 0)
-    return visualDiffRoutes
+    return routes
 
-  const known = new Set(visualDiffRoutes.map(route => route.slug))
+  const known = new Set(routes.map(route => route.slug))
   for (const slug of routeFilter) {
     if (!known.has(slug))
       throw new Error(`Unknown visual diff route "${slug}"`)
   }
 
-  return visualDiffRoutes.filter(route => routeFilter.includes(route.slug))
+  return routes.filter(route => routeFilter.includes(route.slug))
 }
 
 function phaseDir(phase: Phase) {
@@ -273,30 +290,6 @@ async function stopAllProcesses() {
   managedProcesses.length = 0
 }
 
-function parseSupabaseStatus(stdout: string): { API_URL?: string, ANON_KEY?: string, PUBLISHABLE_KEY?: string } | null {
-  const jsonStart = stdout.indexOf('{')
-  if (jsonStart < 0)
-    return null
-
-  try {
-    return JSON.parse(stdout.slice(jsonStart))
-  }
-  catch {
-    return null
-  }
-}
-
-function getSupabaseStatus() {
-  const result = spawnSync('bun', ['scripts/supabase-worktree.ts', 'status', '-o', 'json'], {
-    cwd: repoRoot,
-    encoding: 'utf8',
-    env: process.env,
-  })
-  if ((result.status ?? 1) !== 0)
-    return null
-  return parseSupabaseStatus(result.stdout || '')
-}
-
 function git(args: string[]) {
   const result = spawnSync('git', args, {
     cwd: repoRoot,
@@ -440,7 +433,8 @@ async function settlePage(page: Page) {
 }
 
 async function captureScreenshots(phase: Phase, routeFilter: string[], options: { forceFrontend?: boolean } = {}) {
-  const routes = selectedRoutes(routeFilter)
+  const { visualDiffRoutes, visualDiffViewport } = await loadVisualDiffConfig()
+  const routes = selectedRoutes(visualDiffRoutes, routeFilter)
   const targetDir = phaseDir(phase)
   mkdirSync(targetDir, { recursive: true })
 
@@ -516,18 +510,24 @@ function writeDiffImage(beforePath: string, afterPath: string, diffPath: string)
   }
 }
 
-function compareScreenshots(thresholdPercent: number): DiffResult[] {
+async function compareScreenshots(thresholdPercent: number, routeFilter: string[]): Promise<DiffResult[]> {
   const beforeRoot = phaseDir('before')
   const afterRoot = phaseDir('after')
+  const { visualDiffRoutes } = await loadVisualDiffConfig()
+  const routes = selectedRoutes(visualDiffRoutes, routeFilter)
   const results: DiffResult[] = []
 
-  for (const route of visualDiffRoutes) {
+  for (const route of routes) {
     const beforePath = resolve(beforeRoot, `${route.slug}.png`)
     const afterPath = resolve(afterRoot, `${route.slug}.png`)
     const diffPath = resolve(diffDir(), `${route.slug}-diff.png`)
 
     if (!existsSync(beforePath) || !existsSync(afterPath)) {
-      throw new Error(`Missing screenshot pair for ${route.slug}. Capture before and after first.`)
+      if (routeFilter.length > 0) {
+        throw new Error(`Missing screenshot pair for ${route.slug}. Capture before and after first.`)
+      }
+      console.warn(`[visual-diff] skipping ${route.slug}: missing before/after screenshot pair`)
+      continue
     }
 
     const comparison = writeDiffImage(beforePath, afterPath, diffPath)
@@ -653,27 +653,38 @@ async function runPipeline(options: CliOptions) {
   const baseSha = resolveGitRef(options.baseRef, git(['merge-base', 'HEAD', 'origin/main']))
   const headSha = resolveGitRef(options.headRef, originalRef)
 
-  if (!options.skipGitCheckout) {
-    await stopFrontendStack()
-    await checkoutRef(baseSha)
-    await captureScreenshots('before', options.routes, { forceFrontend: true })
-    await stopFrontendStack()
-    await checkoutRef(headSha)
+  try {
+    if (!options.skipGitCheckout) {
+      await stopFrontendStack()
+      await checkoutRef(baseSha)
+      await captureScreenshots('before', options.routes, { forceFrontend: true })
+      await stopFrontendStack()
+      await checkoutRef(headSha)
+    }
+
+    await captureScreenshots('after', options.routes, { forceFrontend: !options.skipGitCheckout })
+    const results = await compareScreenshots(options.thresholdPercent, options.routes)
+    const summary = generateReport(results, options.thresholdPercent)
+
+    if (summary.changedCount > 0) {
+      console.log(`[visual-diff] ${summary.changedCount} route(s) changed`)
+      process.exitCode = 0
+    }
+    else {
+      console.log('[visual-diff] no visual differences detected')
+    }
   }
-
-  await captureScreenshots('after', options.routes, { forceFrontend: !options.skipGitCheckout })
-  const results = compareScreenshots(options.thresholdPercent)
-  const summary = generateReport(results, options.thresholdPercent)
-
-  if (!options.skipGitCheckout)
-    git(['checkout', '--force', originalRef])
-
-  if (summary.changedCount > 0) {
-    console.log(`[visual-diff] ${summary.changedCount} route(s) changed`)
-    process.exitCode = 0
-  }
-  else {
-    console.log('[visual-diff] no visual differences detected')
+  finally {
+    if (!options.skipGitCheckout) {
+      try {
+        const currentRef = git(['rev-parse', 'HEAD'])
+        if (currentRef !== originalRef)
+          git(['checkout', '--force', originalRef])
+      }
+      catch (error) {
+        console.error(`[visual-diff] failed to restore git ref ${originalRef}:`, error)
+      }
+    }
   }
 }
 
@@ -688,7 +699,7 @@ async function main() {
     }
 
     if (options.command === 'diff') {
-      const results = compareScreenshots(options.thresholdPercent)
+      const results = await compareScreenshots(options.thresholdPercent, options.routes)
       generateReport(results, options.thresholdPercent)
       return
     }
