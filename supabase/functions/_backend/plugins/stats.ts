@@ -104,15 +104,15 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, planActions)
   const allowDeviceCustomId = appOwner?.allow_device_custom_id
   const device = makeDevice(body, allowDeviceCustomId)
+  const blockProviderInfraRequests = appOwner?.block_provider_infra_requests ?? cachedAppStatus.block_provider_infra_requests
+  const blocked = await blockProviderInfrastructure(c, blockProviderInfraRequests)
+  if (blocked)
+    return { success: false, response: blocked }
+
   if (!appOwner) {
     await setAppStatus(c, app_id, 'onprem', true, cachedAppStatus.block_provider_infra_requests)
     await onPremStats(c, app_id, action, device, metadata)
     return { success: true, isOnprem: true }
-  }
-  if (!cachedAppStatus.cacheHit) {
-    const blocked = await blockProviderInfrastructure(c, appOwner.block_provider_infra_requests)
-    if (blocked)
-      return { success: false, response: blocked }
   }
   if (!appOwner.plan_valid) {
     await setAppStatus(c, app_id, 'cancelled', appOwner.allow_device_custom_id, appOwner.block_provider_infra_requests)

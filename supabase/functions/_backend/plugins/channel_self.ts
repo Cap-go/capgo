@@ -249,12 +249,11 @@ async function prepareChannelSelfDeviceRequest(
 
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
   const device = makeDevice(body, appOwner?.allow_device_custom_id)
-  if (appOwner && !cachedAppStatus.cacheHit) {
-    const blocked = await blockProviderInfrastructure(c, operationLabel, appOwner.block_provider_infra_requests)
-    if (blocked)
-      return { response: blocked }
-  }
   const blockProviderInfraRequests = appOwner?.block_provider_infra_requests ?? cachedAppStatus.block_provider_infra_requests
+  const blocked = await blockProviderInfrastructure(c, operationLabel, blockProviderInfraRequests)
+  if (blocked)
+    return { response: blocked }
+
   const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, operationLabel, blockProviderInfraRequests, device_id)
   if ('response' in ownerRes) {
     return { response: ownerRes.response }
@@ -540,19 +539,20 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
   const appExists = await getAppByIdPg(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
   if (!appExists) {
+    const blocked = await blockProviderInfrastructure(c, 'GET', true)
+    if (blocked)
+      return blocked
+
     // App doesn't exist in database - normalize response to avoid oracle
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
-
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
   const device = makeDevice(body, appOwner?.allow_device_custom_id)
-  if (appOwner && !cachedAppStatus.cacheHit) {
-    const blocked = await blockProviderInfrastructure(c, 'GET', appOwner.block_provider_infra_requests)
-    if (blocked)
-      return blocked
-  }
-
   const blockProviderInfraRequests = appOwner?.block_provider_infra_requests ?? cachedAppStatus.block_provider_infra_requests
+  const blocked = await blockProviderInfrastructure(c, 'GET', blockProviderInfraRequests)
+  if (blocked)
+    return blocked
+
   const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, 'GET', blockProviderInfraRequests)
   if ('response' in ownerRes) {
     return ownerRes.response

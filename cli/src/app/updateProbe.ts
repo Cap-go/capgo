@@ -478,7 +478,7 @@ const errorHints: Record<string, { cause: string, fix: string, docsUrl?: string 
   provider_infrastructure_request_blocked: {
     cause: 'Update requests from known provider infrastructure networks are intentionally blocked.',
     fix: 'Retry from a normal client device network or test through the same updater path used by users.',
-    docsUrl: `${commonProblemsDocsUrl}#provider_infrastructure_request_blocked`,
+    docsUrl: commonProblemsDocsUrl,
   },
   on_premise_app: {
     cause: 'App is either flagged as on-premise or does not exist in Capgo Cloud.',
