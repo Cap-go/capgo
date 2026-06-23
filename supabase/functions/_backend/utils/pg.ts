@@ -673,6 +673,7 @@ export interface AppOwnerPostgresResult {
   manifest_bundle_count: number
   expose_metadata: boolean
   allow_device_custom_id: boolean
+  block_provider_infra_requests: boolean
 }
 
 export async function getAppOwnerPostgres(
@@ -695,6 +696,7 @@ export async function getAppOwnerPostgres(
         manifest_bundle_count: schema.apps.manifest_bundle_count,
         expose_metadata: schema.apps.expose_metadata,
         allow_device_custom_id: schema.apps.allow_device_custom_id,
+        block_provider_infra_requests: schema.apps.block_provider_infra_requests,
         orgs: {
           created_by: orgAlias.created_by,
           id: orgAlias.id,
@@ -732,6 +734,37 @@ export async function getAppOwnerPostgres(
   catch (e: unknown) {
     logPgError(c, 'getAppOwnerPostgres', e)
     return null
+  }
+}
+
+export type AppBlockProviderInfraRequestsLookup =
+  | { status: 'found', blockProviderInfraRequests: boolean }
+  | { status: 'missing' }
+  | { status: 'error' }
+
+export async function getAppBlockProviderInfraRequestsPostgres(
+  c: Context,
+  appId: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<AppBlockProviderInfraRequestsLookup> {
+  try {
+    const app = await drizzleClient
+      .select({
+        block_provider_infra_requests: schema.apps.block_provider_infra_requests,
+      })
+      .from(schema.apps)
+      .where(eq(schema.apps.app_id, appId))
+      .limit(1)
+      .then(data => data[0])
+
+    if (!app)
+      return { status: 'missing' }
+
+    return { status: 'found', blockProviderInfraRequests: app.block_provider_infra_requests }
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAppBlockProviderInfraRequestsPostgres', e)
+    return { status: 'error' }
   }
 }
 

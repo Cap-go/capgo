@@ -117,6 +117,7 @@ CREATE TABLE public.apps (
     stats_refresh_requested_at timestamp without time zone,
     build_timeout_seconds bigint DEFAULT 900 NOT NULL,
     build_timeout_updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    block_provider_infra_requests boolean DEFAULT true NOT NULL,
     CONSTRAINT apps_build_timeout_seconds_check CHECK (((build_timeout_seconds >= 300) AND (build_timeout_seconds <= 21600)))
 );
 
