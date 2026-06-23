@@ -195,6 +195,10 @@ export function loadCredentialsFromEnv(): Partial<BuildCredentials> {
   const appleIssuerId = readRuntimeEnv('APPLE_ISSUER_ID')
   const appleKeyContent = readRuntimeEnv('APPLE_KEY_CONTENT')
   const appStoreConnectTeamId = readRuntimeEnv('APP_STORE_CONNECT_TEAM_ID')
+  // iOS app-specific password upload (alternative to the App Store Connect API key)
+  const fastlaneUser = readRuntimeEnv('FASTLANE_USER')
+  const appSpecificPassword = readRuntimeEnv('FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD')
+  const appleAppId = readRuntimeEnv('APPLE_APP_ID')
   const capgoIosScheme = readRuntimeEnv('CAPGO_IOS_SCHEME')
   const capgoIosTarget = readRuntimeEnv('CAPGO_IOS_TARGET')
   // Provisioning map can be supplied as raw JSON (CAPGO_IOS_PROVISIONING_MAP) or
@@ -232,6 +236,12 @@ export function loadCredentialsFromEnv(): Partial<BuildCredentials> {
     credentials.APPLE_KEY_CONTENT = appleKeyContent
   if (appStoreConnectTeamId)
     credentials.APP_STORE_CONNECT_TEAM_ID = appStoreConnectTeamId
+  if (fastlaneUser)
+    credentials.FASTLANE_USER = fastlaneUser
+  if (appSpecificPassword)
+    credentials.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD = appSpecificPassword
+  if (appleAppId)
+    credentials.APPLE_APP_ID = appleAppId
   if (capgoIosScheme)
     credentials.CAPGO_IOS_SCHEME = capgoIosScheme
   if (capgoIosTarget)

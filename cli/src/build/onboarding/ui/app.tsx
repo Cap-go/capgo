@@ -37,6 +37,7 @@ import { contactSupport } from '../../../support/contact-support.js'
 import { appendInternalLog, getInternalLogPath } from '../../../support/internal-log.js'
 import { redactSecrets } from '../../../support/redact.js'
 import { uploadSupportLogs } from '../../../support/support-upload.js'
+import { offerSupportUploadBeforeAi } from '../../../support/support-upload-prompt.js'
 import { createSupabaseClient, findBuildCommandForProjectType, findProjectType, findSavedKeySilent, getOrganizationId, getPackageScripts, getPMAndCommand } from '../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.js'
 import { writeReleaseBundleId } from '../../pbxproj-parser.js'
@@ -823,6 +824,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // reachable whether the user proceeds or cancels.
   const [supportConfirmMessage, setSupportConfirmMessage] = useState<string>('')
   const supportConfirmResolveRef = useRef<((proceed: boolean) => void) | null>(null)
+  // The 'support-confirm' gate is reused for two questions: the full email-support
+  // flow ('email' — yes / view logs / cancel) and the additive AI-upload gate
+  // ('ai-upload' — a plain yes / no asking whether to ALSO upload logs to support
+  // before AI analysis runs). The mode switches the title + options + semantics.
+  const [supportConfirmMode, setSupportConfirmMode] = useState<'email' | 'ai-upload'>('email')
   // The exact bundle that will be sent — shown in a scrollable viewer when the
   // user picks "View logs first" from the confirm step.
   const [supportLogLines, setSupportLogLines] = useState<string[]>([])
@@ -1584,8 +1590,21 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // the user picks Yes/Cancel. Returns a promise so contactSupport() can await
   // the user's decision before doing anything (writing logs / opening mail).
   const askSupportConfirm = useCallback((message: string, logPath: string): Promise<boolean> => {
+    setSupportConfirmMode('email')
     setSupportConfirmMessage(message)
     supportLogPathRef.current = logPath
+    setStep('support-confirm')
+    return new Promise<boolean>((resolve) => {
+      supportConfirmResolveRef.current = resolve
+    })
+  }, [])
+
+  // The additive AI-upload gate: a plain yes/no reusing the 'support-confirm'
+  // step (in 'ai-upload' mode). Resolves true/false so offerSupportUploadBeforeAi
+  // can decide whether to upload the logs before the AI analysis runs.
+  const askAiUploadConfirm = useCallback((message: string): Promise<boolean> => {
+    setSupportConfirmMode('ai-upload')
+    setSupportConfirmMessage(message)
     setStep('support-confirm')
     return new Promise<boolean>((resolve) => {
       supportConfirmResolveRef.current = resolve
@@ -1662,6 +1681,42 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     setStep(returnTo)
   }, [appId, apikey, aiJobId, error, log, buildOutput, aiAnalysisText, askSupportConfirm, readInternalLogLines, addLog])
 
+  // Additive support-log upload offered right after the user picks "Debug with
+  // AI" and BEFORE the analysis runs. Upload-only — no mailto: we just push the
+  // bundle to Capgo support and tell the user they'll be contacted by email.
+  // Best-effort; whatever happens, the caller proceeds to ai-analysis-running.
+  const offerAiSupportUpload = useCallback(async (): Promise<void> => {
+    await offerSupportUploadBeforeAi({
+      confirm: msg => askAiUploadConfirm(msg),
+      buildFiles: async () => {
+        setSupportBusyText('Preparing your logs to send…')
+        setStep('support-uploading')
+        await new Promise<void>((resolve) => { setTimeout(resolve, 0) })
+        return writeSupportBundleFiles({
+          kind: 'build-init',
+          appId,
+          error: error ?? 'unknown error',
+          logs: log.map(entry => entry.text),
+          sections: [
+            { title: 'Build output (full)', lines: buildOutput },
+            { title: 'Internal log', lines: readInternalLogLines() },
+          ],
+        })
+      },
+      upload: (gzPath) => {
+        setSupportBusyText('Uploading your logs to Capgo support…')
+        setStep('support-uploading')
+        return uploadSupportLogs({
+          apiHost: supaHost ?? 'https://api.capgo.app',
+          apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+          appId,
+          jobId: aiJobId ?? undefined,
+          gzPath,
+        })
+      },
+      print: msg => addLog(msg, 'cyan'),
+    })
+  }, [appId, apikey, aiJobId, error, log, buildOutput, askAiUploadConfirm, readInternalLogLines, addLog, supaHost])
   // ── Async step handlers ──
 
   useEffect(() => {
@@ -5036,6 +5091,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                 return
               }
               if (value === 'debug') {
+                // Additive: offer to ALSO upload the logs to Capgo support
+                // (upload-only, no mailto) BEFORE the AI analysis runs. This
+                // awaits the user's yes/no and any upload, then proceeds.
+                await offerAiSupportUpload().catch((err) => { try { appendInternalLog(`[support-flow] ${String(err)}`) } catch {} })
                 setStep('ai-analysis-running')
               }
               else {
@@ -5129,10 +5188,29 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
 
         {/* (ai-analysis-result-scroll renders as a fullscreen early return above.) */}
 
-        {/* Contact-support confirmation gate — tells the user everything that's
-          about to happen (logs saved, revealed in Finder on macOS, email
-          opened) and waits for an explicit Yes before the mail client opens. */}
-        {step === 'support-confirm' && (
+        {/* Contact-support confirmation gate. In 'email' mode it tells the user
+          everything that's about to happen (logs saved, revealed in Finder on
+          macOS, email opened) and waits for an explicit Yes before the mail
+          client opens. In 'ai-upload' mode it's the ADDITIVE upload gate shown
+          before AI analysis: a plain yes/no, upload-only (no mailto). */}
+        {step === 'support-confirm' && supportConfirmMode === 'ai-upload' && (
+          <Box flexDirection="column" marginTop={1} gap={1}>
+            <Text bold>Upload logs to Capgo support?</Text>
+            <Text>{supportConfirmMessage}</Text>
+            <Select
+              options={[
+                { label: '📤  Yes, upload my logs', value: 'yes' },
+                { label: '✖  No, just run AI', value: 'no' },
+              ]}
+              onChange={(value) => {
+                const resolve = supportConfirmResolveRef.current
+                supportConfirmResolveRef.current = null
+                resolve?.(value === 'yes')
+              }}
+            />
+          </Box>
+        )}
+        {step === 'support-confirm' && supportConfirmMode === 'email' && (
           <Box flexDirection="column" marginTop={1} gap={1}>
             <Text bold>Email Capgo support</Text>
             <Text>{supportConfirmMessage}</Text>

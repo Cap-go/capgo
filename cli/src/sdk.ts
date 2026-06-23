@@ -717,6 +717,9 @@ export class CapgoSDK {
         appleIssuerId: creds?.APPLE_ISSUER_ID,
         appleKeyContent: creds?.APPLE_KEY_CONTENT,
         appStoreConnectTeamId: creds?.APP_STORE_CONNECT_TEAM_ID,
+        appleId: creds?.FASTLANE_USER,
+        appleAppSpecificPassword: creds?.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD,
+        appleAppId: creds?.APPLE_APP_ID,
         iosScheme: creds?.CAPGO_IOS_SCHEME,
         iosTarget: creds?.CAPGO_IOS_TARGET,
         iosDistribution: creds?.CAPGO_IOS_DISTRIBUTION as 'app_store' | 'ad_hoc' | undefined,
@@ -726,6 +729,10 @@ export class CapgoSDK {
         keystoreKeyPassword: creds?.KEYSTORE_KEY_PASSWORD,
         keystoreStorePassword: creds?.KEYSTORE_STORE_PASSWORD,
         playConfigJson: creds?.PLAY_CONFIG_JSON,
+        // Prescan escape hatch: SDK callers own their output channel and cannot
+        // pass CLI flags, so expose the gate controls directly.
+        prescan: options.prescan,
+        prescanIgnoreFatal: options.prescanIgnoreFatal,
       }
 
       const result = await requestBuildInternal(options.appId, internalOptions, true)

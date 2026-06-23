@@ -2262,5 +2262,11 @@
   "unified-onboarding-setup-ota-title": "Finish setup in your app",
   "unified-onboarding-setup-ota-subtitle": "Run the init command in your app project to connect Capgo live updates.",
   "unified-onboarding-continue-intent": "Continue",
-  "unified-onboarding-continue-organization": "Create organization and app"
+  "unified-onboarding-continue-organization": "Create organization and app",
+  "active-canceled-orgs": "Active Canceled Orgs",
+  "active-canceled-organizations": "Active Canceled (Paid Period)",
+  "active-canceled-orgs-description": "Canceled in Stripe but still inside the paid subscription period",
+  "active-past-due-orgs": "Active Past Due Orgs",
+  "active-past-due-organizations": "Active Past Due (Still Access)",
+  "active-past-due-orgs-description": "Past due in Stripe but still retain Capgo access until cancel or period end"
 }
