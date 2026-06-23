@@ -254,7 +254,8 @@ async function prepareChannelSelfDeviceRequest(
     if (blocked)
       return { response: blocked }
   }
-  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, operationLabel, cachedAppStatus.block_provider_infra_requests, device_id)
+  const blockProviderInfraRequests = appOwner?.block_provider_infra_requests ?? cachedAppStatus.block_provider_infra_requests
+  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, operationLabel, blockProviderInfraRequests, device_id)
   if ('response' in ownerRes) {
     return { response: ownerRes.response }
   }
@@ -551,8 +552,8 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
       return blocked
   }
 
-  // Check if app has valid org association (not on-premise) - Read operation can use v2 flag
-  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, 'GET', cachedAppStatus.block_provider_infra_requests)
+  const blockProviderInfraRequests = appOwner?.block_provider_infra_requests ?? cachedAppStatus.block_provider_infra_requests
+  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, 'GET', blockProviderInfraRequests)
   if ('response' in ownerRes) {
     return ownerRes.response
   }

@@ -737,11 +737,16 @@ export async function getAppOwnerPostgres(
   }
 }
 
+export type AppBlockProviderInfraRequestsLookup =
+  | { status: 'found', blockProviderInfraRequests: boolean }
+  | { status: 'missing' }
+  | { status: 'error' }
+
 export async function getAppBlockProviderInfraRequestsPostgres(
   c: Context,
   appId: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
-): Promise<boolean | null> {
+): Promise<AppBlockProviderInfraRequestsLookup> {
   try {
     const app = await drizzleClient
       .select({
@@ -752,11 +757,14 @@ export async function getAppBlockProviderInfraRequestsPostgres(
       .limit(1)
       .then(data => data[0])
 
-    return app?.block_provider_infra_requests ?? null
+    if (!app)
+      return { status: 'missing' }
+
+    return { status: 'found', blockProviderInfraRequests: app.block_provider_infra_requests }
   }
   catch (e: unknown) {
     logPgError(c, 'getAppBlockProviderInfraRequestsPostgres', e)
-    return false
+    return { status: 'error' }
   }
 }
 

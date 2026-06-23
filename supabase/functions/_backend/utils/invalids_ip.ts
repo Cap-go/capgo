@@ -50,29 +50,25 @@ function hasKeywordMatch(value: string, terms: string[]) {
 }
 
 function isCloudDatacenterIp(ipInfo: IpApiResponse) {
-  if (ipInfo.proxy === true || ipInfo.hosting === true)
-    return true
-
-  const asn = parseAsn(ipInfo.as)
-  if (!asn)
-    return false
-
-  return GOOGLE_ASNS.has(asn) || APPLE_ASNS.has(asn)
+  return ipInfo.proxy === true || ipInfo.hosting === true
 }
 
 function classifyProvider(ipInfo: IpApiResponse): Provider | null {
   const asn = parseAsn(ipInfo.as)
+  const text = normalize([ipInfo.isp, ipInfo.org, ipInfo.asname].join(' '))
+  const isDatacenter = isCloudDatacenterIp(ipInfo)
+
+  if (!isDatacenter)
+    return null
+
   if (asn && GOOGLE_ASNS.has(asn))
     return 'google'
   if (asn && APPLE_ASNS.has(asn))
     return 'apple'
 
-  const text = normalize([ipInfo.isp, ipInfo.org, ipInfo.asname].join(' '))
-  const isDatacenter = isCloudDatacenterIp(ipInfo)
-
-  if (isDatacenter && hasKeywordMatch(text, GOOGLE_KEYWORDS))
+  if (hasKeywordMatch(text, GOOGLE_KEYWORDS))
     return 'google'
-  if (isDatacenter && hasKeywordMatch(text, APPLE_KEYWORDS))
+  if (hasKeywordMatch(text, APPLE_KEYWORDS))
     return 'apple'
 
   return null

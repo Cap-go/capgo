@@ -315,6 +315,11 @@ app.post('/', async (c) => {
         if (!eventAppStatus) {
           eventAppStatus = await getAppStatus(c, bodyParsed.app_id)
           appStatusByAppId.set(bodyParsed.app_id, eventAppStatus)
+          if (eventAppStatus.cacheHit && requestIp !== 'unknown') {
+            const blocked = await blockProviderInfrastructure(c, eventAppStatus.block_provider_infra_requests)
+            if (blocked)
+              return blocked
+          }
         }
         const result = await post(c, drizzleClient, bodyParsed, eventAppStatus)
         if (result.response) {

@@ -123,7 +123,9 @@ async function providerInfrastructureColdCacheBlockResponse(c: Context, appId: s
     return null
 
   const blockProviderInfraRequests = await getAppBlockProviderInfraRequestsPostgres(c, appId, drizzleClient)
-  if (blockProviderInfraRequests === false)
+  if (blockProviderInfraRequests.status === 'found' && !blockProviderInfraRequests.blockProviderInfraRequests)
+    return null
+  if (blockProviderInfraRequests.status === 'error')
     return null
 
   return providerInfrastructureBlockedResponse(c, providerInfo.requestIp, providerInfo.providerInfo)
