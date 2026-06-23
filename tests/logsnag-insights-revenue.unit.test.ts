@@ -75,6 +75,48 @@ describe('logsnag revenue metric helpers', () => {
     expect(dayDateId).toBe('2026-03-24')
   })
 
+  it.concurrent('delays app build onboarding metrics until the full 24h cohort can complete', () => {
+    const coreWindow = logsnagInsightsTestUtils.getCompletedDayWindowForDateId('2026-03-24')
+    const finalizedWindow = logsnagInsightsTestUtils.getCompletedAppBuildOnboardingWindow(coreWindow)
+
+    expect(finalizedWindow.prevDayStart.toISOString()).toBe('2026-03-23T00:00:00.000Z')
+    expect(finalizedWindow.prevDayEnd.toISOString()).toBe('2026-03-24T00:00:00.000Z')
+    expect(finalizedWindow.prevDayDateId).toBe('2026-03-23')
+  })
+
+  it.concurrent('summarizes app build onboarding daily cohorts', () => {
+    expect(logsnagInsightsTestUtils.summarizeAppBuildOnboardingRows([
+      {
+        created_at: '2026-03-24T10:00:00.000Z',
+        created_from_onboarding: true,
+        onboarding_completed_at: '2026-03-25T09:59:59.999Z',
+        build_count: 3,
+      },
+      {
+        created_at: '2026-03-24T10:00:00.000Z',
+        created_from_onboarding: true,
+        onboarding_completed_at: '2026-03-25T10:00:00.000Z',
+        build_count: 4,
+      },
+      {
+        created_at: '2026-03-24T10:00:00.000Z',
+        created_from_onboarding: true,
+        onboarding_completed_at: '2026-03-24T11:00:00.000Z',
+        build_count: 2,
+      },
+      {
+        created_at: '2026-03-24T10:00:00.000Z',
+        created_from_onboarding: false,
+        onboarding_completed_at: null,
+        build_count: '3',
+      },
+    ])).toEqual({
+      apps_created: 4,
+      apps_with_cli_onboarding_builds_24h: 1,
+      apps_with_manual_builds_24h: 1,
+    })
+  })
+
   it.concurrent('detects missing global stats shards before notifications', () => {
     expect(logsnagInsightsTestUtils.getMissingGlobalStatsRequiredShards(new Set())).toEqual([
       'core',

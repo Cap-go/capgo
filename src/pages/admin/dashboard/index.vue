@@ -26,6 +26,9 @@ const isLoading = ref(true)
 const globalStatsTrendData = ref<Array<{
   date: string
   apps: number
+  apps_created: number
+  apps_with_cli_onboarding_builds_24h: number
+  apps_with_manual_builds_24h: number
   apps_active: number
   users: number
   users_active: number
@@ -108,6 +111,38 @@ const appsTrendSeries = computed(() => {
         value: item.apps_active,
       })),
       color: '#ec4899', // pink
+    },
+  ]
+})
+
+const appBuildOnboardingSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: t('admin-app-build-onboarding-total-apps-created'),
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.apps_created,
+      })),
+      color: '#119eff',
+    },
+    {
+      label: t('admin-app-build-onboarding-cli-builds'),
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.apps_with_cli_onboarding_builds_24h,
+      })),
+      color: '#10b981',
+    },
+    {
+      label: t('admin-app-build-onboarding-manual-builds'),
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.apps_with_manual_builds_24h,
+      })),
+      color: '#f59e0b',
     },
   ]
 })
@@ -337,6 +372,19 @@ displayStore.defaultBack = '/dashboard'
                 </p>
               </div>
             </div>
+          </div>
+
+          <div class="grid grid-cols-1 gap-6">
+            <ChartCard
+              :title="t('admin-app-build-onboarding-chart-title')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="appBuildOnboardingSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="appBuildOnboardingSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
           </div>
 
           <!-- Trend Charts - 2 per row -->
