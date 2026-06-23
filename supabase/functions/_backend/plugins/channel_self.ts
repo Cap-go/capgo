@@ -118,11 +118,12 @@ async function assertChannelSelfAppOwnerPlanValid(
   appId: string,
   device: ReturnType<typeof makeDevice>,
   operationLabel: string,
+  cachedBlockProviderInfraRequests: boolean,
   deviceId?: string,
 ): Promise<{ response: Response } | { appOwner: NonNullable<AppOwnerResult> }> {
   if (!appOwner) {
     cloudlog({ requestId: c.get('requestId'), message: `On-premise app detected in channel_self ${operationLabel}, returning 429`, app_id: appId })
-    await setAppStatus(c, appId, 'onprem', true)
+    await setAppStatus(c, appId, 'onprem', true, cachedBlockProviderInfraRequests)
     return { response: c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429) }
   }
 
@@ -247,7 +248,7 @@ async function prepareChannelSelfDeviceRequest(
 
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
   const device = makeDevice(body, appOwner?.allow_device_custom_id)
-  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, operationLabel, device_id)
+  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, operationLabel, cachedAppStatus.block_provider_infra_requests, device_id)
   if ('response' in ownerRes) {
     return { response: ownerRes.response }
   }
@@ -542,7 +543,7 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
   const device = makeDevice(body, appOwner?.allow_device_custom_id)
 
   // Check if app has valid org association (not on-premise) - Read operation can use v2 flag
-  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, 'GET')
+  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, 'GET', cachedAppStatus.block_provider_infra_requests)
   if ('response' in ownerRes) {
     return ownerRes.response
   }

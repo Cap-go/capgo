@@ -19,6 +19,7 @@ interface UpdateApp {
   allow_device_custom_id?: boolean
   need_onboarding?: boolean
   existing_app?: boolean
+  block_provider_infra_requests?: boolean
   ios_store_url?: string | null
   android_store_url?: string | null
 }
@@ -70,6 +71,7 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
           allow_device_custom_id: body.allow_device_custom_id,
           need_onboarding: body.need_onboarding,
           existing_app: body.existing_app,
+          block_provider_infra_requests: body.block_provider_infra_requests,
           ios_store_url: body.ios_store_url,
           android_store_url: body.android_store_url,
         })

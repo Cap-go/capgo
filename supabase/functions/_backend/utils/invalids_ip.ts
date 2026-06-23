@@ -2,7 +2,6 @@ import type { Context } from 'hono'
 
 import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
-import { backgroundTask } from './utils.ts'
 
 interface IpApiResponse {
   status: 'success' | 'fail'
@@ -212,9 +211,10 @@ async function fetchProviderIpInfo(ip: string, context?: Context) {
   }
 }
 
-function scheduleProviderIpLookup(context: Context | undefined, ip: string) {
-  if (inflightLookups.has(ip))
-    return
+function lookupProviderIpInfo(context: Context | undefined, ip: string) {
+  const existing = inflightLookups.get(ip)
+  if (existing)
+    return existing
 
   const lookup = (async () => {
     const cached = await cachedInvalidIpInfo(context, ip)
@@ -232,8 +232,7 @@ function scheduleProviderIpLookup(context: Context | undefined, ip: string) {
     inflightLookups.delete(ip)
   })
 
-  if (context)
-    void backgroundTask(context, lookup)
+  return lookup
 }
 
 export async function invalidIpInfo(ip: string, context?: Context): Promise<InvalidIpInfo> {
@@ -243,27 +242,7 @@ export async function invalidIpInfo(ip: string, context?: Context): Promise<Inva
   if (isInternalOrPrivateIp(ip))
     return { blocked: false, provider: null }
 
-  const inFlight = inflightLookups.get(ip)
-
-  if (context) {
-    const memoryCached = getCachedFromMemory(ip)
-    if (memoryCached)
-      return { blocked: memoryCached.blocked, provider: memoryCached.provider }
-
-    if (inFlight)
-      return { blocked: false, provider: null }
-
-    scheduleProviderIpLookup(context, ip)
-    return { blocked: false, provider: null }
-  }
-
-  if (inFlight)
-    return inFlight.catch(() => ({ blocked: false, provider: null }))
-
-  const result = await fetchProviderIpInfo(ip)
-  const ttlSeconds = result.provider ? PROVIDER_IP_CACHE_TTL_SECONDS : PROVIDER_IP_FALLBACK_TTL_SECONDS
-  await storeInvalidIpInfo(context, ip, result, ttlSeconds)
-  return result
+  return lookupProviderIpInfo(context, ip).catch(() => ({ blocked: false, provider: null }))
 }
 
 export async function invalidIp(ip: string, context?: Context) {

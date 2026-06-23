@@ -25,9 +25,10 @@ export async function getAppStatus(c: Context, appId: string): Promise<{ status:
   const payload = await cacheEntry.helper.matchJson<AppStatusCachePayload>(cacheEntry.request)
   if (!payload)
     return { status: null, allow_device_custom_id: true, block_provider_infra_requests: true }
+  const blockProviderInfraRequests = payload.block_provider_infra_requests ?? true
   if (payload.status === 'cancelled' && !isStripeConfigured(c))
-    return { status: 'cloud', allow_device_custom_id: payload.allow_device_custom_id, block_provider_infra_requests: payload.block_provider_infra_requests }
-  return { status: payload.status, allow_device_custom_id: payload.allow_device_custom_id, block_provider_infra_requests: payload.block_provider_infra_requests }
+    return { status: 'cloud', allow_device_custom_id: payload.allow_device_custom_id, block_provider_infra_requests: blockProviderInfraRequests }
+  return { status: payload.status, allow_device_custom_id: payload.allow_device_custom_id, block_provider_infra_requests: blockProviderInfraRequests }
 }
 
 export function setAppStatus(c: Context, appId: string, status: AppStatus, allowDeviceCustomId: boolean, blockProviderInfraRequests = true) {

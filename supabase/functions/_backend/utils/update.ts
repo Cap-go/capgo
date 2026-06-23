@@ -171,7 +171,7 @@ export async function updateWithPG(
     if (updateEnumerationLimit.limited)
       return updateEnumerationLimitedResponse(c)
 
-    await setAppStatus(c, app_id, 'onprem', true)
+    await setAppStatus(c, app_id, 'onprem', true, cachedAppStatus.block_provider_infra_requests)
     return onPremStats(c, app_id, 'get', device)
   }
   if (!appOwner.plan_valid) {
