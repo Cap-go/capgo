@@ -59,6 +59,13 @@ describe('plugin notification flush', () => {
       process.env.CLOUDFLARE_FUNCTION_URL = originalCloudflareFunctionUrl
   })
 
+  it('fails when the KV queue binding is missing', async () => {
+    await expect(flushQueuedPluginNotifications({
+      env: {},
+      get: () => 'request-id',
+    } as any)).rejects.toThrow('Plugin notification KV queue missing')
+  })
+
   it('deletes delivered queue items and keeps failed items for retry', async () => {
     const successKey = `${PLUGIN_NOTIFICATION_QUEUE_PREFIX}org:org-1:success:hash`
     const failedKey = `${PLUGIN_NOTIFICATION_QUEUE_PREFIX}org:org-1:failed:hash`

@@ -810,7 +810,7 @@ async function aggregateDailyBuildStats(
   return { totalSeconds: totalSecondsByPlatform, avgSeconds: avgSecondsByPlatform, counts: countsByPlatform }
 }
 
-async function countDemoSeededApps(c: Context, createdAfterIso: string): Promise<number> {
+async function countDemoSeededApps(c: Context, createdAfterIso: string, createdBeforeIso: string): Promise<number> {
   const pgClient = getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
 
@@ -819,6 +819,7 @@ async function countDemoSeededApps(c: Context, createdAfterIso: string): Promise
       SELECT COUNT(*)::int AS count
       FROM public.apps AS apps
       WHERE apps.created_at >= ${new Date(createdAfterIso)}
+        AND apps.created_at < ${new Date(createdBeforeIso)}
         AND EXISTS (
           SELECT 1
           FROM public.app_versions AS app_versions
@@ -843,7 +844,6 @@ async function countDemoSeededApps(c: Context, createdAfterIso: string): Promise
 
 function getStats(c: Context, window?: DailyWindow): GlobalStats {
   const supabase = supabaseAdmin(c)
-  const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   const metricWindow = window
     ? {
         dayStart: window.prevDayStart,
@@ -928,7 +928,8 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
       const filtered = await supabase
         .from('users')
         .select('id', { count: 'exact', head: true })
-        .gte('created_at', last24h)
+        .gte('created_at', dayStartIso)
+        .lt('created_at', nextDayStartIso)
         .eq('created_via_invite', false)
 
       const filteredCode = String((filtered.error as any)?.code ?? '').toUpperCase()
@@ -941,7 +942,8 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
         const legacy = await supabase
           .from('users')
           .select('id', { count: 'exact', head: true })
-          .gte('created_at', last24h)
+          .gte('created_at', dayStartIso)
+          .lt('created_at', nextDayStartIso)
         if (legacy.error)
           cloudlog({ requestId: c.get('requestId'), message: 'registers_today legacy error', error: legacy.error })
         return legacy.count ?? 0
@@ -1021,7 +1023,8 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
     credits_bought: supabase
       .from('usage_credit_grants')
       .select('credits_total')
-      .gte('granted_at', last24h)
+      .gte('granted_at', dayStartIso)
+      .lt('granted_at', nextDayStartIso)
       .then((res) => {
         if (res.error) {
           cloudlog({ requestId: c.get('requestId'), message: 'credits_bought error', error: res.error })
@@ -1032,7 +1035,8 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
     credits_consumed: supabase
       .from('usage_credit_consumptions')
       .select('credits_used')
-      .gte('applied_at', last24h)
+      .gte('applied_at', dayStartIso)
+      .lt('applied_at', nextDayStartIso)
       .then((res) => {
         if (res.error) {
           cloudlog({ requestId: c.get('requestId'), message: 'credits_consumed error', error: res.error })
@@ -1040,7 +1044,7 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
         }
         return (res.data || []).reduce((sum, row) => sum + (Number(row.credits_used) || 0), 0)
       }),
-    demo_apps_created: countDemoSeededApps(c, last24h),
+    demo_apps_created: countDemoSeededApps(c, dayStartIso, nextDayStartIso),
     plugin_breakdown: getPluginBreakdownCF(c),
     build_stats: getBuildStats(c, window),
     retention_metrics: getRevenueRetentionMetrics(c, metricWindow.dayDateId),

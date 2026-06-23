@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { closeClientMock, sendNotifOrgMock, sendNotifToOrgMembersMock } = vi.hoisted(() => ({
+const { closeClientMock, sendNotifOrgMock, sendNotifToOrgMembersOnceMock } = vi.hoisted(() => ({
   closeClientMock: vi.fn(),
   sendNotifOrgMock: vi.fn(),
-  sendNotifToOrgMembersMock: vi.fn(),
+  sendNotifToOrgMembersOnceMock: vi.fn(),
 }))
 
 vi.mock('../supabase/functions/_backend/utils/logging.ts', () => ({
@@ -17,7 +17,7 @@ vi.mock('../supabase/functions/_backend/utils/notifications.ts', () => ({
 }))
 
 vi.mock('../supabase/functions/_backend/utils/org_email_notifications.ts', () => ({
-  sendNotifToOrgMembers: sendNotifToOrgMembersMock,
+  sendNotifToOrgMembersOnce: sendNotifToOrgMembersOnceMock,
 }))
 
 vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
@@ -73,7 +73,7 @@ describe('plugin notification trigger', () => {
     process.env.API_SECRET = API_SECRET
     closeClientMock.mockResolvedValue(undefined)
     sendNotifOrgMock.mockReset()
-    sendNotifToOrgMembersMock.mockReset()
+    sendNotifToOrgMembersOnceMock.mockReset()
   })
 
   afterEach(() => {
@@ -108,19 +108,29 @@ describe('plugin notification trigger', () => {
     expect(body.results).toEqual([{ status: 'throttled', lastSendAt }])
   })
 
-  it('accepts delivered org member notifications', async () => {
-    sendNotifToOrgMembersMock.mockResolvedValue(true)
+  it('accepts delivered org member notifications after durable per-recipient delivery', async () => {
+    sendNotifToOrgMembersOnceMock.mockResolvedValue(true)
 
     const response = await requestPluginNotifications([orgMembersQueueItem()])
     const body = await response.json() as { processed: number, failed: number }
 
     expect(response.status).toBe(200)
     expect(body).toMatchObject({ processed: 1, failed: 0 })
-    expect(sendNotifToOrgMembersMock).toHaveBeenCalledTimes(1)
+    expect(sendNotifToOrgMembersOnceMock).toHaveBeenCalledTimes(1)
+    expect(sendNotifToOrgMembersOnceMock).toHaveBeenCalledWith(
+      expect.anything(),
+      'device:channel_self_set_rejected',
+      'channel_self_rejected',
+      { app_id: 'com.test.app' },
+      'org-1',
+      'com.test.app',
+      expect.objectContaining({ pgClient: { id: 'pg-client' } }),
+      'admins',
+    )
   })
 
-  it('returns non-2xx when org member notification processing throws', async () => {
-    sendNotifToOrgMembersMock.mockRejectedValue(new Error('bento unavailable'))
+  it('returns non-2xx when durable org member notification processing throws', async () => {
+    sendNotifToOrgMembersOnceMock.mockRejectedValue(new Error('bento unavailable'))
 
     const response = await requestPluginNotifications([orgMembersQueueItem()])
     const body = await response.text()

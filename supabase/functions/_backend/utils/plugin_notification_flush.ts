@@ -162,7 +162,7 @@ export async function flushQueuedPluginNotifications(c: Context, limit = PLUGIN_
   const store = c.env.PLUGIN_NOTIFICATION_QUEUE
   if (!store) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Plugin notification KV queue missing during flush' })
-    return { status: 'ok', scanned: 0, transferred: 0, deleted: 0, failed: 0 }
+    throw new Error('Plugin notification KV queue missing during flush')
   }
 
   let scanned = 0

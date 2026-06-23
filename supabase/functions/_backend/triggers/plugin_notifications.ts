@@ -5,7 +5,7 @@ import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, parseBody, quickError, simpleError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
-import { sendNotifToOrgMembers } from '../utils/org_email_notifications.ts'
+import { sendNotifToOrgMembersOnce } from '../utils/org_email_notifications.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 
 const MAX_PLUGIN_NOTIFICATION_BATCH = 100
@@ -43,7 +43,7 @@ async function sendQueuedPluginNotification(c: Context, item: PluginNotification
   if (item.type === 'org')
     return await sendNotifOrg(c, item.eventName, item.eventData, item.orgId, item.uniqId, item.cron, item.managementEmail, drizzleClient)
 
-  return await sendNotifToOrgMembers(c, item.eventName, item.preferenceKey, item.eventData, item.orgId, item.uniqId, item.cron, drizzleClient, item.audience)
+  return await sendNotifToOrgMembersOnce(c, item.eventName, item.preferenceKey, item.eventData, item.orgId, item.uniqId, drizzleClient, item.audience)
 }
 
 async function processPluginNotifications(c: Context, items: PluginNotificationQueueItem[]) {

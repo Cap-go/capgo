@@ -5,7 +5,7 @@ import { isBentoConfigured, trackBentoEvent } from './bento.ts'
 import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
 import { claimNotifOrgOnce, hasNotifOrgClaim, sendNotifOrg, sendNotifOrgOnce } from './notifications.ts'
-import { getDrizzleClient, getPgClient, logPgError } from './pg.ts'
+import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
 import { logSkippedSupabaseWrite, shouldQueuePluginNotifications, shouldSkipSupabaseNotificationWrites } from './supabase_write_guard.ts'
 import { backgroundTask } from './utils.ts'
@@ -590,132 +590,139 @@ export async function sendNotifToOrgMembersOnce(
   if (!isBentoConfigured(c))
     return false
 
-  const writeClient = getDrizzleClient(getPgClient(c))
-  const alreadySentForOrg = await hasNotifOrgClaim(c, writeClient, eventName, orgId, uniqId)
-  if (alreadySentForOrg === null) {
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'sendNotifToOrgMembersOnce: org claim lookup failed',
-      eventName,
-      preferenceKey,
-      orgId,
-      uniqId,
-    })
-    return false
-  }
-  if (alreadySentForOrg) {
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'sendNotifToOrgMembersOnce: org already claimed',
-      eventName,
-      preferenceKey,
-      orgId,
-      uniqId,
-    })
-    return false
-  }
+  const pgClient = getPgClient(c)
+  const writeClient = getDrizzleClient(pgClient)
 
-  const { recipients, resolutionFailed } = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, writeClient, audience)
-  if (!recipients) {
-    cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembersOnce: org not found', orgId })
-    return false
-  }
-  if (resolutionFailed) {
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'sendNotifToOrgMembersOnce: recipient resolution failed',
-      eventName,
-      preferenceKey,
-      orgId,
-    })
-    return false
-  }
-
-  const { managementEmail, allEmails, primaryEmail, additionalEmails } = recipients
-  if (allEmails.length === 0 || !primaryEmail) {
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'sendNotifToOrgMembersOnce: no eligible recipients',
-      eventName,
-      preferenceKey,
-      orgId,
-    })
-    return false
-  }
-
-  const recipientEmails = [primaryEmail, ...additionalEmails]
-  const recipientEntries: { email: string, recipientUniqId: string, wasAlreadyClaimedBeforeRun: boolean }[] = []
-  for (const email of recipientEmails) {
-    const recipientUniqId = await buildOneTimeRecipientNotifUniqId(uniqId, email)
-    const wasAlreadyClaimedBeforeRun = await hasNotifOrgClaim(c, writeClient, eventName, orgId, recipientUniqId)
-    if (wasAlreadyClaimedBeforeRun === null) {
+  try {
+    const alreadySentForOrg = await hasNotifOrgClaim(c, writeClient, eventName, orgId, uniqId)
+    if (alreadySentForOrg === null) {
       cloudlog({
         requestId: c.get('requestId'),
-        message: 'sendNotifToOrgMembersOnce: recipient claim lookup failed',
+        message: 'sendNotifToOrgMembersOnce: org claim lookup failed',
         eventName,
         preferenceKey,
         orgId,
-        recipientUniqId,
+        uniqId,
       })
       return false
     }
-    recipientEntries.push({ email, recipientUniqId, wasAlreadyClaimedBeforeRun })
-  }
-
-  const sendResults: { cleanupFailed: boolean, email: string, recipientUniqId: string, sent: boolean, wasAlreadyClaimedBeforeRun: boolean }[] = []
-  for (const recipient of recipientEntries) {
-    if (recipient.wasAlreadyClaimedBeforeRun) {
-      sendResults.push({ ...recipient, sent: false, cleanupFailed: false })
-      continue
+    if (alreadySentForOrg) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'sendNotifToOrgMembersOnce: org already claimed',
+        eventName,
+        preferenceKey,
+        orgId,
+        uniqId,
+      })
+      return true
     }
 
-    const sendResult = await sendNotifOrgOnce(c, eventName, eventData, orgId, recipient.recipientUniqId, recipient.email, drizzleClient, writeClient)
-    sendResults.push({ ...recipient, ...sendResult })
-  }
+    const { recipients, resolutionFailed } = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, writeClient, audience)
+    if (!recipients) {
+      cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembersOnce: org not found', orgId })
+      return false
+    }
+    if (resolutionFailed) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'sendNotifToOrgMembersOnce: recipient resolution failed',
+        eventName,
+        preferenceKey,
+        orgId,
+      })
+      return false
+    }
 
-  const sentEmails = sendResults
-    .filter(result => result.sent)
-    .map(result => result.email)
-  const cleanupFailedEmails = sendResults
-    .filter(result => result.cleanupFailed)
-    .map(result => result.email)
-  const alreadyClaimedBeforeRunEmails = sendResults
-    .filter(result => result.wasAlreadyClaimedBeforeRun)
-    .map(result => result.email)
+    const { managementEmail, allEmails, primaryEmail, additionalEmails } = recipients
+    if (allEmails.length === 0 || !primaryEmail) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'sendNotifToOrgMembersOnce: no eligible recipients',
+        eventName,
+        preferenceKey,
+        orgId,
+      })
+      return false
+    }
 
-  if (cleanupFailedEmails.length > 0) {
+    const recipientEmails = [primaryEmail, ...additionalEmails]
+    const recipientEntries: { email: string, recipientUniqId: string, wasAlreadyClaimedBeforeRun: boolean }[] = []
+    for (const email of recipientEmails) {
+      const recipientUniqId = await buildOneTimeRecipientNotifUniqId(uniqId, email)
+      const wasAlreadyClaimedBeforeRun = await hasNotifOrgClaim(c, writeClient, eventName, orgId, recipientUniqId)
+      if (wasAlreadyClaimedBeforeRun === null) {
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'sendNotifToOrgMembersOnce: recipient claim lookup failed',
+          eventName,
+          preferenceKey,
+          orgId,
+          recipientUniqId,
+        })
+        return false
+      }
+      recipientEntries.push({ email, recipientUniqId, wasAlreadyClaimedBeforeRun })
+    }
+
+    const sendResults: { cleanupFailed: boolean, email: string, recipientUniqId: string, sent: boolean, wasAlreadyClaimedBeforeRun: boolean }[] = []
+    for (const recipient of recipientEntries) {
+      if (recipient.wasAlreadyClaimedBeforeRun) {
+        sendResults.push({ ...recipient, sent: false, cleanupFailed: false })
+        continue
+      }
+
+      const sendResult = await sendNotifOrgOnce(c, eventName, eventData, orgId, recipient.recipientUniqId, recipient.email, drizzleClient, writeClient)
+      sendResults.push({ ...recipient, ...sendResult })
+    }
+
+    const sentEmails = sendResults
+      .filter(result => result.sent)
+      .map(result => result.email)
+    const cleanupFailedEmails = sendResults
+      .filter(result => result.cleanupFailed)
+      .map(result => result.email)
+    const alreadyClaimedBeforeRunEmails = sendResults
+      .filter(result => result.wasAlreadyClaimedBeforeRun)
+      .map(result => result.email)
+
+    if (cleanupFailedEmails.length > 0) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'sendNotifToOrgMembersOnce: recipient cleanup failed',
+        eventName,
+        preferenceKey,
+        orgId,
+        cleanupFailedRecipients: cleanupFailedEmails,
+      })
+      return false
+    }
+
+    const unresolvedResults = sendResults.filter(result => !result.sent && !result.wasAlreadyClaimedBeforeRun)
+    if (unresolvedResults.length > 0)
+      return false
+
+    const firstOrgSend = await claimNotifOrgOnce(c, eventName, orgId, uniqId, writeClient)
+
     cloudlog({
       requestId: c.get('requestId'),
-      message: 'sendNotifToOrgMembersOnce: recipient cleanup failed',
+      message: 'sendNotifToOrgMembersOnce: delivered',
       eventName,
       preferenceKey,
       orgId,
-      cleanupFailedRecipients: cleanupFailedEmails,
+      primaryEmail,
+      additionalRecipients: additionalEmails.length,
+      deliveredRecipients: sentEmails.length,
+      alreadyClaimedRecipients: alreadyClaimedBeforeRunEmails.length,
+      firstOrgSend,
+      managementEmailIncluded: !!managementEmail,
     })
-    return false
+
+    return firstOrgSend
   }
-
-  const unresolvedResults = sendResults.filter(result => !result.sent && !result.wasAlreadyClaimedBeforeRun)
-  if (unresolvedResults.length > 0)
-    return false
-
-  const firstOrgSend = await claimNotifOrgOnce(c, eventName, orgId, uniqId, writeClient)
-
-  cloudlog({
-    requestId: c.get('requestId'),
-    message: 'sendNotifToOrgMembersOnce: delivered',
-    eventName,
-    preferenceKey,
-    orgId,
-    primaryEmail,
-    additionalRecipients: additionalEmails.length,
-    deliveredRecipients: sentEmails.length,
-    alreadyClaimedRecipients: alreadyClaimedBeforeRunEmails.length,
-    firstOrgSend,
-    managementEmailIncluded: !!managementEmail,
-  })
-
-  return firstOrgSend
+  finally {
+    await closeClient(c, pgClient)
+  }
 }
 
 /**

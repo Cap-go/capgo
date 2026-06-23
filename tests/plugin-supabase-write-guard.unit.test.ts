@@ -49,6 +49,7 @@ interface WranglerConfig {
   env: Record<string, {
     triggers?: { crons: string[] }
     kv_namespaces?: { binding: string, id: string }[]
+    hyperdrive?: { binding: string, id: string }[]
   }>
 }
 
@@ -129,6 +130,10 @@ function getKvNamespaceId(config: WranglerConfig, envName: string, binding: stri
   return config.env[envName]?.kv_namespaces?.find(namespace => namespace.binding === binding)?.id
 }
 
+function getHyperdriveId(config: WranglerConfig, envName: string, binding: string) {
+  return config.env[envName]?.hyperdrive?.find(hyperdrive => hyperdrive.binding === binding)?.id
+}
+
 describe('plugin Supabase write policy', () => {
   it.concurrent('keeps notification queue KV separate and cron owned by the API worker', () => {
     const pluginWrangler = readJsoncConfig('../cloudflare_workers/plugin/wrangler.jsonc')
@@ -139,6 +144,9 @@ describe('plugin Supabase write policy', () => {
 
     for (const envName of ['prod', 'preprod', 'alpha', 'local'])
       expect(apiWrangler.env[envName]?.triggers).toEqual({ crons: ['* * * * *'] })
+
+    for (const envName of ['prod', 'preprod', 'alpha'])
+      expect(getHyperdriveId(apiWrangler, envName, 'HYPERDRIVE_CAPGO_DIRECT_EU')).toBe('ae1fe6178b564adc9fc9a71ccc769a35')
 
     const envPairs = [
       ['prod', 'prod_eu'],

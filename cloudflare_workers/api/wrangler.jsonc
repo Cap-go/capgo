@@ -74,7 +74,13 @@
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
       ],
-      "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "655e307469ba496f9131556709b5a765" }]
+      "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "655e307469ba496f9131556709b5a765" }],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
+        }
+      ]
     },
     "preprod": {
       "name": "capgo_api-preprod",
@@ -133,7 +139,13 @@
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
       ],
-      "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "9c405a5248604951a2a12125799bc21b" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "f14b6c6872c14415abee26a09112ab80" }]
+      "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "9c405a5248604951a2a12125799bc21b" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "f14b6c6872c14415abee26a09112ab80" }],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
+        }
+      ]
     },
     "alpha": {
       "name": "capgo_api-alpha",
@@ -192,7 +204,13 @@
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
       ],
-      "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "16a85350d8a246ff857a645c8f51d6ae" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "d4442a6f6da448dda2fdcce3b7db8d5a" }]
+      "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "16a85350d8a246ff857a645c8f51d6ae" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "d4442a6f6da448dda2fdcce3b7db8d5a" }],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
+        }
+      ]
     },
     "local": {
       "name": "capgo_api-local",
