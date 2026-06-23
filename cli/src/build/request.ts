@@ -69,7 +69,7 @@ import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseInAppUpdatePriorit
 import { buildProvisioningMap } from './credentials-command'
 import { withCwd } from './cwd'
 import { writeBuildOutputRecord } from './output-record'
-import { getPlatformDirFromCapacitorConfig } from './platform-paths'
+import { getPlatformDirFromCapacitorConfig, normalizeNativeDependencyPathsInText } from './platform-paths'
 import { handleCustomMsg } from './qr.js'
 import { trackBuilderUpload } from './telemetry.js'
 
@@ -742,9 +742,9 @@ async function extractNativeDependencies(
       const spmContent = await readFileAsync(spmPackagePath, 'utf-8')
       // Match lines like: .package(name: "CapacitorApp", path: "../../../node_modules/@capacitor/app")
       // The path can have varying numbers of ../ depending on project structure
-      const spmMatches = spmContent.matchAll(/\.package\s*\([^)]*path:\s*["'](?:\.\.\/)*node_modules\/([^"']+)["']\s*\)/g)
+      const spmMatches = spmContent.matchAll(/\.package\s*\([^)]*path:\s*["'](?:\.\.[\\/])*node_modules[\\/]([^"']+)["']\s*\)/g)
       for (const match of spmMatches) {
-        let pkgPath = match[1]
+        let pkgPath = match[1].replace(/\\/g, '/')
         const lastNmIdx = pkgPath.lastIndexOf('node_modules/')
         if (lastNmIdx !== -1)
           pkgPath = pkgPath.substring(lastNmIdx + 'node_modules/'.length)
@@ -773,7 +773,7 @@ async function extractNativeDependencies(
       for (const podfilePath of uniqPodfiles) {
         const podfileContent = await readFileAsync(podfilePath, 'utf-8')
         // Match lines like: pod 'CapacitorApp', :path => '../../node_modules/@capacitor/app'
-        const podMatches = podfileContent.matchAll(/pod\s+['"][^'"]+['"],\s*:path\s*=>\s*['"](?:\.\.\/)+node_modules\/([^'"]+)['"]/g)
+        const podMatches = podfileContent.matchAll(/pod\s+['"][^'"]+['"],\s*:path\s*=>\s*['"](?:\.\.[\\/])+node_modules[\\/]([^'"]+)['"]/g)
         for (const match of podMatches) {
           let pkgPath = match[1]
           const lastNmIdx = pkgPath.lastIndexOf('node_modules/')
@@ -791,9 +791,9 @@ async function extractNativeDependencies(
       const settingsContent = await readFileAsync(settingsGradlePath, 'utf-8')
       // Match lines like: project(':capacitor-app').projectDir = new File('../node_modules/@capacitor/app/android')
       // Also matches pnpm paths: new File('../node_modules/.pnpm/@pkg@ver/node_modules/@scope/pkg/android')
-      const gradleMatches = settingsContent.matchAll(/new\s+File\s*\(\s*['"]\.\.\/node_modules\/([^'"]+)['"]\s*\)/g)
+      const gradleMatches = settingsContent.matchAll(/new\s+File\s*\(\s*['"]\.\.[\\/]node_modules[\\/]([^'"]+)['"]\s*\)/g)
       for (const match of gradleMatches) {
-        let fullPath = match[1]
+        let fullPath = match[1].replace(/\\/g, '/')
 
         // Normalize pnpm paths: .pnpm/@pkg+name@ver/node_modules/@scope/pkg/android → @scope/pkg
         const lastNodeModulesIdx = fullPath.lastIndexOf('node_modules/')
@@ -1130,7 +1130,8 @@ export async function zipDirectory(projectDir: string, outputPath: string, platf
     if (!textExtensions.has(ext) && basename !== 'Podfile')
       continue
     const original = entry.getData().toString('utf-8')
-    let rewritten = original.replace(pnpmPathPattern, 'node_modules/').replace(bunPathPattern, 'node_modules/')
+    let rewritten = normalizeNativeDependencyPathsInText(original)
+    rewritten = rewritten.replace(pnpmPathPattern, 'node_modules/').replace(bunPathPattern, 'node_modules/')
 
     // pnpm can leave deep relative paths in iOS files like Package.swift and Pods output.
     // Collapse any excessive ../ before project-root ios/ or node_modules/ paths back to
