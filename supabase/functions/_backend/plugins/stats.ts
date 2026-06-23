@@ -265,6 +265,7 @@ app.post('/', async (c) => {
   }
 
   const appStatus = await getAppStatus(c, firstAppId)
+  const appStatusByAppId = new Map<string, AppStatusResult>([[firstAppId, appStatus]])
   if (appStatus.cacheHit && requestIp !== 'unknown') {
     const blocked = await blockProviderInfrastructure(c, appStatus.block_provider_infra_requests)
     if (blocked)
@@ -310,7 +311,12 @@ app.post('/', async (c) => {
       const event = events[i]
       try {
         const bodyParsed = parsePluginBody<AppStats>(c, event, statsRequestSchema)
-        const result = await post(c, drizzleClient, bodyParsed, appStatus)
+        let eventAppStatus = appStatusByAppId.get(bodyParsed.app_id)
+        if (!eventAppStatus) {
+          eventAppStatus = await getAppStatus(c, bodyParsed.app_id)
+          appStatusByAppId.set(bodyParsed.app_id, eventAppStatus)
+        }
+        const result = await post(c, drizzleClient, bodyParsed, eventAppStatus)
         if (result.response) {
           return result.response
         }

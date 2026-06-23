@@ -90,7 +90,12 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
   if (dbError || !data) {
     throw simpleError('cannot_update_app', 'Cannot update app', { supabaseError: dbError })
   }
-  await deleteAppStatus(c, appId)
+  try {
+    await deleteAppStatus(c, appId)
+  }
+  catch (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Failed to delete app status cache after app update', error, app_id: appId })
+  }
 
   if (data.icon_url) {
     const signedIcon = await createSignedImageUrl(c, data.icon_url)

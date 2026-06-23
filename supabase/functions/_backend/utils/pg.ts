@@ -756,7 +756,7 @@ export async function getAppBlockProviderInfraRequestsPostgres(
   }
   catch (e: unknown) {
     logPgError(c, 'getAppBlockProviderInfraRequestsPostgres', e)
-    return null
+    return false
   }
 }
 
