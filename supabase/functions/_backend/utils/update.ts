@@ -84,6 +84,30 @@ function updateError200(c: Context, errorCode: string, message: string, moreInfo
   })
 }
 
+async function providerInfrastructureBlockResponse(c: Context, blockProviderInfraRequests: boolean) {
+  if (!blockProviderInfraRequests)
+    return null
+
+  const requestIp = getClientIP(c)
+  if (requestIp === 'unknown')
+    return null
+
+  const invalidIpInfo = await getInvalidIpInfo()
+  const providerInfo = await invalidIpInfo(requestIp, c)
+  if (!providerInfo.blocked)
+    return null
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Blocking update request from provider infrastructure IP',
+    ip: requestIp,
+    provider: providerInfo.provider,
+  })
+  return updateError200(c, 'provider_infrastructure_request_blocked', 'Update requests from known provider infrastructure are blocked', {
+    provider: providerInfo.provider,
+  })
+}
+
 export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[], expose_metadata: boolean = false) {
   const pluginVersion = parse(plugin_version)
   const res: {
@@ -174,6 +198,10 @@ export async function updateWithPG(
     await setAppStatus(c, app_id, 'onprem', true, cachedAppStatus.block_provider_infra_requests)
     return onPremStats(c, app_id, 'get', device)
   }
+  const providerBlockedResponse = await providerInfrastructureBlockResponse(c, appOwner.block_provider_infra_requests)
+  if (providerBlockedResponse)
+    return providerBlockedResponse
+
   if (!appOwner.plan_valid) {
     await setAppStatus(c, app_id, 'cancelled', appOwner.allow_device_custom_id, appOwner.block_provider_infra_requests)
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
@@ -520,21 +548,10 @@ export async function updateWithPG(
 
 export async function update(c: Context, body: AppInfos) {
   const appStatus = await getAppStatus(c, body.app_id)
-  const requestIp = getClientIP(c)
-  if (appStatus.block_provider_infra_requests && requestIp !== 'unknown') {
-    const invalidIpInfo = await getInvalidIpInfo()
-    const providerInfo = await invalidIpInfo(requestIp, c)
-    if (providerInfo.blocked) {
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: 'Blocking update request from provider infrastructure IP',
-        ip: requestIp,
-        provider: providerInfo.provider,
-      })
-      return updateError200(c, 'provider_infrastructure_request_blocked', 'Update requests from known provider infrastructure are blocked', {
-        provider: providerInfo.provider,
-      })
-    }
+  if (appStatus.status !== null) {
+    const providerBlockedResponse = await providerInfrastructureBlockResponse(c, appStatus.block_provider_infra_requests)
+    if (providerBlockedResponse)
+      return providerBlockedResponse
   }
   const pgClient = getPgClient(c, true)
 
