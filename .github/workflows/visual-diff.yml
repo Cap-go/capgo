@@ -31,7 +31,7 @@ jobs:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           requested=false
-          if printf '%s' "$PR_LABELS" | grep -q '"name": "visual-change"'; then
+          if printf '%s' "$PR_LABELS" | grep -Eq '"name"[[:space:]]*:[[:space:]]*"visual-change"'; then
             requested=true
           elif printf '%s' "$PR_BODY" | grep -q '<!-- visual-diff:required -->'; then
             requested=true
