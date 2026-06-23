@@ -573,10 +573,16 @@ BEGIN
     -- Dedicated user and API key for CLI hashed apikey tests (isolated to prevent interference)
     (110, NOW(), 'e5f6a7b8-c9d0-4e1f-8a2b-3c4d5e6f7a81', 'a7b8c9d0-e1f2-4a3b-8c4d-5e6f7a8b9c03', NOW(), 'cli hashed test org super admin'),
     -- Dedicated user and API key for encrypted bundles tests (isolated to prevent interference)
-    (111, NOW(), 'f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f708193', 'b8c9d0e1-f2a3-4b4c-9d5e-6f7a8b9c0d14', NOW(), 'encrypted test org super admin'),
-    -- Dedicated user and API key for apikeys.test.ts API-key compatibility management
+    (111, NOW(), 'f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f708193', 'b8c9d0e1-f2a3-4b4c-9d5e-6f7a8b9c0d14', NOW(), 'encrypted test org super admin');
+
+    PERFORM set_config('capgo.skip_apikey_trigger', 'true', true);
+
+    INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "updated_at", "name") VALUES
+    -- Dedicated user and API keys for apikeys.test.ts API-key compatibility management
     (112, NOW(), 'd0f1a2b3-c4d5-4e6f-8a90-b1c2d3e4f506', 'c9d0e1f2-a3b4-4c5d-8e6f-7a8b9c0d1e25', NOW(), 'apikey management test org super admin'),
     (113, NOW(), 'd0f1a2b3-c4d5-4e6f-8a90-b1c2d3e4f506', 'd1e2f3a4-b5c6-4d7e-8f90-a1b2c3d4e5f6', NOW(), 'apikey management test apikey_manager');
+
+    PERFORM set_config('capgo.skip_apikey_trigger', 'false', true);
 
     -- Hashed API key for testing (hash of 'test-hashed-apikey-for-auth-test')
     -- Used by 07_auth_functions.sql tests
@@ -1427,10 +1433,7 @@ BEGIN
     WHERE rb.principal_type = public.rbac_principal_apikey()
       AND rb.principal_id = ak.rbac_id
       AND rb.scope_type = public.rbac_scope_org()
-      AND ak.key IN (
-        'c9d0e1f2-a3b4-4c5d-8e6f-7a8b9c0d1e25',
-        'd1e2f3a4-b5c6-4d7e-8f90-a1b2c3d4e5f6'
-      );
+      AND ak.id IN (112, 113);
 
     INSERT INTO public.role_bindings (
       principal_type,
@@ -1452,18 +1455,16 @@ BEGIN
       'Seeded apikey management test binding',
       true
     FROM public.apikeys ak
+    JOIN (
+      VALUES
+        (112::bigint, public.rbac_role_org_super_admin()),
+        (113::bigint, public.rbac_role_apikey_manager())
+    ) AS management_keys (apikey_id, role_name)
+      ON management_keys.apikey_id = ak.id
     JOIN public.roles roles
       ON roles.scope_type = public.rbac_scope_org()
-      AND roles.name = CASE ak.key
-        WHEN 'c9d0e1f2-a3b4-4c5d-8e6f-7a8b9c0d1e25' THEN public.rbac_role_org_super_admin()
-        WHEN 'd1e2f3a4-b5c6-4d7e-8f90-a1b2c3d4e5f6' THEN public.rbac_role_apikey_manager()
-      END
-    WHERE ak.key IN (
-      'c9d0e1f2-a3b4-4c5d-8e6f-7a8b9c0d1e25',
-      'd1e2f3a4-b5c6-4d7e-8f90-a1b2c3d4e5f6'
-    )
-    AND roles.id IS NOT NULL
-    AND ak.rbac_id IS NOT NULL;
+      AND roles.name = management_keys.role_name
+    WHERE ak.rbac_id IS NOT NULL;
 
     RAISE NOTICE 'RBAC permissions populated: % permissions, % role_permissions',
       (SELECT COUNT(*) FROM public.permissions),

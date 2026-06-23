@@ -153,7 +153,7 @@ SELECT ok(
       ON rb.principal_type = public.rbac_principal_apikey()
       AND rb.principal_id = ak.rbac_id
     JOIN public.roles r ON r.id = rb.role_id
-    WHERE ak.key = 'd1e2f3a4-b5c6-4d7e-8f90-a1b2c3d4e5f6'
+    WHERE ak.id = 113
       AND r.name = public.rbac_role_apikey_manager()
   ),
   'seed apikey 113 is bound to apikey_manager'
@@ -169,7 +169,7 @@ SELECT ok(
     JOIN public.roles r ON r.id = rb.role_id
     JOIN public.role_permissions rp ON rp.role_id = r.id
     JOIN public.permissions p ON p.id = rp.permission_id
-    WHERE ak.key = 'd1e2f3a4-b5c6-4d7e-8f90-a1b2c3d4e5f6'
+    WHERE ak.id = 113
       AND p.key = public.rbac_perm_org_update_user_roles()
   ),
   'seed apikey 113 does not inherit org.update_user_roles'
