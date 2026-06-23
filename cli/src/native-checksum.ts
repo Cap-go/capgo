@@ -3,9 +3,9 @@ import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { basename, join, posix } from 'node:path'
 
-// eslint-disable-next-line regexp/no-unused-capturing-group
+/** Matches native source files in standard Capacitor plugin layouts. */
 export const NATIVE_PLUGIN_SOURCE_REGEX = /([A-Za-z0-9]+)\.(java|swift|kt|scala)$/
-// eslint-disable-next-line regexp/no-unused-capturing-group
+/** Matches native source files in @capacitor/ios and @capacitor/android layouts. */
 export const NATIVE_PLATFORM_SOURCE_REGEX = /([A-Za-z0-9]+)\.(java|swift|kt|scala|m|mm|h)$/
 
 const EXCLUDED_DIR_NAMES = new Set([
@@ -57,6 +57,7 @@ function usesPlatformSourceRegex(scanRootName: string): boolean {
     || scanRootName === ANDROID_ALTERNATE_ROOT
 }
 
+/** Returns whether a file path is a native source file for the given scan root layout. */
 export function isNativeSourceFilePath(filePath: string, scanRootName: string): boolean {
   const regex = usesPlatformSourceRegex(scanRootName)
     ? NATIVE_PLATFORM_SOURCE_REGEX
@@ -64,6 +65,7 @@ export function isNativeSourceFilePath(filePath: string, scanRootName: string): 
   return regex.test(filePath)
 }
 
+/** Returns whether file content should be normalized to LF before checksum hashing. */
 export function shouldNormalizeNativeFileContent(filePath: string): boolean {
   const lower = filePath.toLowerCase()
   if (lower.endsWith('package.swift'))
@@ -75,6 +77,7 @@ export function shouldNormalizeNativeFileContent(filePath: string): boolean {
   return false
 }
 
+/** Normalizes native text file content to LF for deterministic cross-OS checksums. */
 export function normalizeNativeFileContentForChecksum(content: Buffer, filePath: string): Buffer {
   if (!shouldNormalizeNativeFileContent(filePath))
     return content
@@ -83,11 +86,13 @@ export function normalizeNativeFileContentForChecksum(content: Buffer, filePath:
   return Buffer.from(normalized, 'utf8')
 }
 
+/** Converts an absolute file path to a POSIX relative path from the dependency root. */
 export function normalizeChecksumRelativePath(dependencyFolderPath: string, filePath: string): string {
   const toPosixPath = (input: string) => input.replace(/\\/g, posix.sep)
   return posix.relative(toPosixPath(dependencyFolderPath), toPosixPath(filePath))
 }
 
+/** Resolves iOS or Android native scan roots, including platform package layouts. */
 export function getNativeScanRoots(dependencyFolderPath: string, platform: 'ios' | 'android'): string[] {
   const roots: string[] = []
   const primary = findChildDirectory(dependencyFolderPath, platform)
@@ -183,13 +188,27 @@ function getPlatformConfigFiles(dependencyFolderPath: string, platform: 'ios' | 
   return files
 }
 
+function updateLengthPrefixedHash(hash: ReturnType<typeof createHash>, data: Buffer | string): void {
+  const buffer = typeof data === 'string' ? Buffer.from(data, 'utf8') : data
+  const length = Buffer.alloc(4)
+  length.writeUInt32BE(buffer.length, 0)
+  hash.update(length)
+  hash.update(buffer)
+}
+
+/** Returns true when a dependency contains native sources or platform config files. */
 export function dependencyHasNativeFiles(dependencyFolderPath: string): boolean {
   const iosRoots = getNativeScanRoots(dependencyFolderPath, 'ios')
   const androidRoots = getNativeScanRoots(dependencyFolderPath, 'android')
+  const iosConfigFiles = getPlatformConfigFiles(dependencyFolderPath, 'ios')
+  const androidConfigFiles = getPlatformConfigFiles(dependencyFolderPath, 'android')
   return collectNativeFilesFromRoots(iosRoots).length > 0
     || collectNativeFilesFromRoots(androidRoots).length > 0
+    || iosConfigFiles.length > 0
+    || androidConfigFiles.length > 0
 }
 
+/** Computes deterministic SHA-256 checksums for iOS and Android native dependency content. */
 export async function calculatePlatformChecksums(dependencyFolderPath: string): Promise<{ ios_checksum?: string, android_checksum?: string }> {
   const calculatePlatformChecksum = async (platform: 'ios' | 'android'): Promise<string | undefined> => {
     const roots = getNativeScanRoots(dependencyFolderPath, platform)
@@ -204,10 +223,11 @@ export async function calculatePlatformChecksums(dependencyFolderPath: string): 
 
     for (const file of allFiles) {
       try {
-        const relativePath = normalizeChecksumRelativePath(dependencyFolderPath, file)
-        hash.update(relativePath)
         const content = readFileSync(file)
-        hash.update(normalizeNativeFileContentForChecksum(content, file))
+        const relativePath = normalizeChecksumRelativePath(dependencyFolderPath, file)
+        const normalizedContent = normalizeNativeFileContentForChecksum(content, file)
+        updateLengthPrefixedHash(hash, relativePath)
+        updateLengthPrefixedHash(hash, normalizedContent)
       }
       catch {
         // Skip files that can't be read

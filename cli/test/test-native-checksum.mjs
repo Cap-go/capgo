@@ -79,6 +79,15 @@ await test('detects native files in platform package layouts', () => {
   assert.equal(dependencyHasNativeFiles(join(fixtureRoot, 'capacitor-ios')), true)
 })
 
+await test('detects config-only native packages without source files', async () => {
+  const configOnlyPath = join(fixtureRoot, 'plugin-config-only')
+  assert.equal(dependencyHasNativeFiles(configOnlyPath), true)
+
+  const checksums = await calculatePlatformChecksums(configOnlyPath)
+  assert.ok(checksums.ios_checksum, 'expected ios checksum from podspec')
+  assert.ok(checksums.android_checksum, 'expected android checksum from build.gradle')
+})
+
 await test('discovers alternate native scan roots for platform packages', () => {
   const androidRoots = getNativeScanRoots(join(fixtureRoot, 'capacitor-android'), 'android')
   const iosRoots = getNativeScanRoots(join(fixtureRoot, 'capacitor-ios'), 'ios')
