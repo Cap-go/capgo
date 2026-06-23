@@ -134,6 +134,24 @@ interface PastDueOrgRow extends CustomerIdRow {
   past_due_at?: string | null
   updated_at?: string | null
 }
+interface SubscriptionAccessSnapshotCounts {
+  active_canceled_orgs: number
+  active_past_due_orgs: number
+}
+interface SubscriptionAccessRow extends CustomerIdRow {
+  created_at?: string | null
+  paid_at?: string | null
+  canceled_at?: string | null
+  past_due_at?: string | null
+  subscription_anchor_end?: string | null
+  status?: string | null
+  is_good_plan?: boolean | null
+}
+interface SubscriptionAccessSnapshotSqlRow {
+  [key: string]: unknown
+  active_canceled_orgs: number | string | null
+  active_past_due_orgs: number | string | null
+}
 const REVENUE_ACTIVE_STRIPE_STATUSES: Database['public']['Enums']['stripe_status'][] = ['succeeded']
 
 function getDateId(targetDate = new Date()): string {
@@ -554,14 +572,102 @@ function calculatePastDueOrgStats(rows: PastDueOrgRow[], snapshotAt: Date): Past
   }
 }
 
-function hasPersistedPastDueStats(snapshot: Pick<GlobalStatsSnapshotRow, 'past_due_orgs' | 'past_due_orgs_average_days'> | null | undefined): boolean {
-  return (Number(snapshot?.past_due_orgs) || 0) > 0 || (Number(snapshot?.past_due_orgs_average_days) || 0) > 0
+function getEmptySubscriptionAccessSnapshotCounts(): SubscriptionAccessSnapshotCounts {
+  return {
+    active_canceled_orgs: 0,
+    active_past_due_orgs: 0,
+  }
+}
+
+function normalizeSubscriptionAccessSnapshotCounts(
+  row: SubscriptionAccessSnapshotSqlRow | null | undefined,
+): SubscriptionAccessSnapshotCounts {
+  return {
+    active_canceled_orgs: Number(row?.active_canceled_orgs) || 0,
+    active_past_due_orgs: Number(row?.active_past_due_orgs) || 0,
+  }
+}
+
+function isActiveCanceledAtSnapshot(row: SubscriptionAccessRow, snapshotExclusiveEnd: Date): boolean {
+  if (!row.customer_id || row.is_good_plan !== true)
+    return false
+
+  if (!row.paid_at || new Date(row.paid_at).getTime() >= snapshotExclusiveEnd.getTime())
+    return false
+
+  if (!row.canceled_at || new Date(row.canceled_at).getTime() >= snapshotExclusiveEnd.getTime())
+    return false
+
+  if (!row.subscription_anchor_end || new Date(row.subscription_anchor_end).getTime() <= snapshotExclusiveEnd.getTime())
+    return false
+
+  if (row.created_at && new Date(row.created_at).getTime() >= snapshotExclusiveEnd.getTime())
+    return false
+
+  return true
+}
+
+function isActivePastDueAtSnapshot(row: SubscriptionAccessRow, snapshotExclusiveEnd: Date): boolean {
+  if (!row.customer_id || row.is_good_plan !== true)
+    return false
+
+  if (!row.paid_at || new Date(row.paid_at).getTime() >= snapshotExclusiveEnd.getTime())
+    return false
+
+  if (!row.past_due_at || new Date(row.past_due_at).getTime() >= snapshotExclusiveEnd.getTime())
+    return false
+
+  if (!row.subscription_anchor_end || new Date(row.subscription_anchor_end).getTime() <= snapshotExclusiveEnd.getTime())
+    return false
+
+  if (row.canceled_at && new Date(row.canceled_at).getTime() < snapshotExclusiveEnd.getTime())
+    return false
+
+  if (row.status !== 'succeeded')
+    return false
+
+  if (row.created_at && new Date(row.created_at).getTime() >= snapshotExclusiveEnd.getTime())
+    return false
+
+  return true
+}
+
+function calculateSubscriptionAccessSnapshotCounts(
+  rows: SubscriptionAccessRow[],
+  snapshotExclusiveEnd: Date,
+): SubscriptionAccessSnapshotCounts {
+  const activeCanceled = new Set<string>()
+  const activePastDue = new Set<string>()
+
+  for (const row of rows) {
+    if (isActiveCanceledAtSnapshot(row, snapshotExclusiveEnd))
+      activeCanceled.add(row.customer_id)
+    if (isActivePastDueAtSnapshot(row, snapshotExclusiveEnd))
+      activePastDue.add(row.customer_id)
+  }
+
+  return {
+    active_canceled_orgs: activeCanceled.size,
+    active_past_due_orgs: activePastDue.size,
+  }
+}
+
+type MutableSubscriptionHealthSnapshot = Pick<
+  GlobalStatsSnapshotRow,
+  'past_due_orgs' | 'past_due_orgs_average_days' | 'active_canceled_orgs' | 'active_past_due_orgs'
+>
+
+function hasPersistedPastDueStats(snapshot: MutableSubscriptionHealthSnapshot | null | undefined): boolean {
+  return (Number(snapshot?.past_due_orgs) || 0) > 0
+    || (Number(snapshot?.past_due_orgs_average_days) || 0) > 0
+    || (Number(snapshot?.active_canceled_orgs) || 0) > 0
+    || (Number(snapshot?.active_past_due_orgs) || 0) > 0
 }
 
 function shouldRefreshMutablePastDueStats(
   window: DailyWindow,
   referenceDate = new Date(),
-  snapshot?: Pick<GlobalStatsSnapshotRow, 'past_due_orgs' | 'past_due_orgs_average_days'> | null,
+  snapshot?: MutableSubscriptionHealthSnapshot | null,
 ) {
   if (window.prevDayDateId === getDailyWindow(referenceDate).prevDayDateId)
     return true
@@ -1706,6 +1812,57 @@ async function getBillingSnapshotCounts(c: Context, snapshotExclusiveEnd: Date):
     await closeClient(c, pgClient)
   }
 }
+
+async function getSubscriptionAccessSnapshotCounts(c: Context, snapshotExclusiveEnd: Date): Promise<SubscriptionAccessSnapshotCounts> {
+  const pgClient = getPgClient(c, false)
+  const drizzleClient = getDrizzleClient(pgClient)
+  const snapshotExclusiveEndIso = snapshotExclusiveEnd.toISOString()
+
+  try {
+    const result = await drizzleClient.execute<SubscriptionAccessSnapshotSqlRow>(sql`
+      WITH active_canceled AS (
+        SELECT DISTINCT ON (si.customer_id)
+          si.customer_id
+        FROM public.stripe_info si
+        WHERE si.is_good_plan = true
+          AND si.created_at < ${snapshotExclusiveEndIso}::timestamptz
+          AND si.paid_at IS NOT NULL
+          AND si.paid_at < ${snapshotExclusiveEndIso}::timestamptz
+          AND si.canceled_at IS NOT NULL
+          AND si.canceled_at < ${snapshotExclusiveEndIso}::timestamptz
+          AND si.subscription_anchor_end > ${snapshotExclusiveEndIso}::timestamptz
+        ORDER BY si.customer_id, si.created_at DESC
+      ),
+      active_past_due AS (
+        SELECT DISTINCT ON (si.customer_id)
+          si.customer_id
+        FROM public.stripe_info si
+        WHERE si.is_good_plan = true
+          AND si.created_at < ${snapshotExclusiveEndIso}::timestamptz
+          AND si.paid_at IS NOT NULL
+          AND si.paid_at < ${snapshotExclusiveEndIso}::timestamptz
+          AND si.past_due_at IS NOT NULL
+          AND si.past_due_at < ${snapshotExclusiveEndIso}::timestamptz
+          AND si.subscription_anchor_end > ${snapshotExclusiveEndIso}::timestamptz
+          AND (si.canceled_at IS NULL OR si.canceled_at >= ${snapshotExclusiveEndIso}::timestamptz)
+          AND si.status = 'succeeded'::public.stripe_status
+        ORDER BY si.customer_id, si.created_at DESC
+      )
+      SELECT
+        (SELECT COUNT(*)::int FROM active_canceled) AS active_canceled_orgs,
+        (SELECT COUNT(*)::int FROM active_past_due) AS active_past_due_orgs
+    `)
+
+    return normalizeSubscriptionAccessSnapshotCounts(result.rows[0])
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'subscription access snapshot counts error', error })
+    return getEmptySubscriptionAccessSnapshotCounts()
+  }
+  finally {
+    await closeClient(c, pgClient)
+  }
+}
 async function getCoreSnapshotCounts(c: Context, snapshotExclusiveEnd: Date): Promise<CoreSnapshotCounts> {
   const pgClient = getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
@@ -1787,6 +1944,29 @@ async function getCoreSnapshotCounts(c: Context, snapshotExclusiveEnd: Date): Pr
   }
   finally {
     await closeClient(c, pgClient)
+  }
+}
+
+async function countRegisteredUsersForSnapshot(c: Context, snapshotExclusiveEnd: Date): Promise<number> {
+  const db = getPgClient(c, false)
+  const snapshotExclusiveEndIso = snapshotExclusiveEnd.toISOString()
+
+  try {
+    const result = await db.query<{ count: number | string | null }>(`
+      SELECT COUNT(*)::int AS count
+      FROM public.users u
+      WHERE u.created_at < $1::timestamptz
+        AND u.created_via_invite = false
+    `, [snapshotExclusiveEndIso])
+
+    return Number(result.rows[0]?.count) || 0
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'count registered users for snapshot error', error })
+    return 0
+  }
+  finally {
+    await closeClient(c, db)
   }
 }
 
@@ -1875,11 +2055,7 @@ async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise
     countAllApps(c, window.prevDayEnd),
     countAllUpdates(c, window.prevDayEnd),
     countAllUpdatesExternal(c, window.prevDayEnd),
-    supabase
-      .from('users')
-      .select('id', { count: 'exact', head: true })
-      .lt('created_at', snapshotEndIso)
-      .then(res => res.count ?? 0),
+    countRegisteredUsersForSnapshot(c, window.prevDayEnd),
     supabase
       .from('orgs')
       .select('id', { count: 'exact', head: true })
@@ -2034,6 +2210,7 @@ async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Prom
     upgraded_orgs,
     trialExtensionStats,
     pastDueOrgStats,
+    subscriptionAccessCounts,
     credits_bought,
     credits_consumed,
   ] = await Promise.all([
@@ -2107,6 +2284,9 @@ async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Prom
           return calculatePastDueOrgStats((res.data || []) as PastDueOrgRow[], nextDayStart)
         })()
       : Promise.resolve({ past_due_orgs: 0, past_due_orgs_average_days: 0 }),
+    refreshPastDueStats
+      ? getSubscriptionAccessSnapshotCounts(c, nextDayStart)
+      : Promise.resolve(getEmptySubscriptionAccessSnapshotCounts()),
     supabase
       .from('usage_credit_grants')
       .select('credits_total')
@@ -2161,6 +2341,8 @@ async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Prom
   if (refreshPastDueStats) {
     snapshotPatch.past_due_orgs = pastDueOrgStats.past_due_orgs
     snapshotPatch.past_due_orgs_average_days = pastDueOrgStats.past_due_orgs_average_days
+    snapshotPatch.active_canceled_orgs = subscriptionAccessCounts.active_canceled_orgs
+    snapshotPatch.active_past_due_orgs = subscriptionAccessCounts.active_past_due_orgs
   }
 
   await updateGlobalStatsSnapshot(c, window.prevDayDateId, snapshotPatch)
@@ -2286,17 +2468,17 @@ async function readGlobalStatsSnapshot(c: Context, dateId: string): Promise<Glob
   return data as GlobalStatsSnapshotRow
 }
 
-async function readGlobalStatsPastDueSnapshot(c: Context, dateId: string): Promise<Pick<GlobalStatsSnapshotRow, 'past_due_orgs' | 'past_due_orgs_average_days'> | null> {
+async function readGlobalStatsPastDueSnapshot(c: Context, dateId: string): Promise<MutableSubscriptionHealthSnapshot | null> {
   const { data, error } = await supabaseAdmin(c)
     .from('global_stats')
-    .select('past_due_orgs, past_due_orgs_average_days')
+    .select('past_due_orgs, past_due_orgs_average_days, active_canceled_orgs, active_past_due_orgs')
     .eq('date_id', dateId)
     .maybeSingle()
 
   if (error)
     throw error
 
-  return data as Pick<GlobalStatsSnapshotRow, 'past_due_orgs' | 'past_due_orgs_average_days'> | null
+  return data as MutableSubscriptionHealthSnapshot | null
 }
 
 function getNumber(value: number | null | undefined): number {
@@ -2478,6 +2660,10 @@ export const logsnagInsightsTestUtils = {
   REVENUE_ACTIVE_STRIPE_STATUSES,
   LOGSNAG_INSIGHTS_BACKGROUND_MAX_RETRIES,
   calculatePastDueOrgStats,
+  calculateSubscriptionAccessSnapshotCounts,
+  isActiveCanceledAtSnapshot,
+  isActivePastDueAtSnapshot,
+  normalizeSubscriptionAccessSnapshotCounts,
   shouldRefreshMutablePastDueStats,
   calculateChurnRevenue,
   calculateNrr,

@@ -270,6 +270,65 @@ describe('logsnag revenue metric helpers', () => {
     })
   })
 
+  it.concurrent('counts active canceled and active past due orgs at a snapshot boundary', () => {
+    const snapshotEnd = new Date('2026-03-25T00:00:00.000Z')
+
+    expect(logsnagInsightsTestUtils.calculateSubscriptionAccessSnapshotCounts([
+      {
+        customer_id: 'cus_canceled_active',
+        is_good_plan: true,
+        paid_at: '2026-01-01T00:00:00.000Z',
+        canceled_at: '2026-03-20T00:00:00.000Z',
+        subscription_anchor_end: '2026-04-01T00:00:00.000Z',
+      },
+      {
+        customer_id: 'cus_canceled_expired',
+        is_good_plan: true,
+        paid_at: '2026-01-01T00:00:00.000Z',
+        canceled_at: '2026-03-20T00:00:00.000Z',
+        subscription_anchor_end: '2026-03-24T00:00:00.000Z',
+      },
+      {
+        customer_id: 'cus_past_due_active',
+        is_good_plan: true,
+        status: 'succeeded',
+        paid_at: '2026-01-01T00:00:00.000Z',
+        past_due_at: '2026-03-22T00:00:00.000Z',
+        subscription_anchor_end: '2026-04-01T00:00:00.000Z',
+      },
+      {
+        customer_id: 'cus_past_due_canceled',
+        is_good_plan: true,
+        status: 'succeeded',
+        paid_at: '2026-01-01T00:00:00.000Z',
+        past_due_at: '2026-03-22T00:00:00.000Z',
+        canceled_at: '2026-03-23T00:00:00.000Z',
+        subscription_anchor_end: '2026-04-01T00:00:00.000Z',
+      },
+      {
+        customer_id: 'cus_past_due_stale_status',
+        is_good_plan: true,
+        status: 'canceled',
+        paid_at: '2026-01-01T00:00:00.000Z',
+        past_due_at: '2026-03-22T00:00:00.000Z',
+        subscription_anchor_end: '2026-04-01T00:00:00.000Z',
+      },
+    ], snapshotEnd)).toEqual({
+      active_canceled_orgs: 2,
+      active_past_due_orgs: 1,
+    })
+  })
+
+  it.concurrent('normalizes subscription access snapshot SQL rows', () => {
+    expect(logsnagInsightsTestUtils.normalizeSubscriptionAccessSnapshotCounts({
+      active_canceled_orgs: '3',
+      active_past_due_orgs: null,
+    })).toEqual({
+      active_canceled_orgs: 3,
+      active_past_due_orgs: 0,
+    })
+  })
+
   it.concurrent('only refreshes mutable past-due stats for the current daily snapshot or an empty first fill', () => {
     const currentWindow = logsnagInsightsTestUtils.getCompletedDayWindowForDateId('2026-03-24')
     const replayReferenceDate = new Date('2026-03-26T00:00:00.000Z')
@@ -285,12 +344,12 @@ describe('logsnag revenue metric helpers', () => {
     expect(logsnagInsightsTestUtils.shouldRefreshMutablePastDueStats(
       currentWindow,
       replayReferenceDate,
-      { past_due_orgs: 0, past_due_orgs_average_days: 0 },
+      { past_due_orgs: 0, past_due_orgs_average_days: 0, active_canceled_orgs: 0, active_past_due_orgs: 0 },
     )).toBe(true)
     expect(logsnagInsightsTestUtils.shouldRefreshMutablePastDueStats(
       currentWindow,
       replayReferenceDate,
-      { past_due_orgs: 2, past_due_orgs_average_days: 3.8 },
+      { past_due_orgs: 2, past_due_orgs_average_days: 3.8, active_canceled_orgs: 0, active_past_due_orgs: 0 },
     )).toBe(false)
   })
 
