@@ -18,6 +18,13 @@ function getStatus(error: unknown): number | undefined {
   return typeof candidate === 'number' ? candidate : undefined
 }
 
+function getCode(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object')
+    return undefined
+  const candidate = (error as { code?: unknown }).code
+  return typeof candidate === 'string' ? candidate : undefined
+}
+
 function getPhase(error: unknown): string | undefined {
   if (!error || typeof error !== 'object')
     return undefined
@@ -37,8 +44,27 @@ export function mapIosOnboardingError(
     return 'cert_limit_reached'
 
   const status = getStatus(error)
+  const code = getCode(error)
+  const message = error instanceof Error ? error.message : ''
+  // A required-agreement block is a VALID key gated by an unsigned/expired Apple
+  // agreement — keep it distinct from a genuine auth failure so the UI tells the
+  // user to sign the agreement, not re-check the key. Detect by Apple's error code
+  // when present, OR by a SPECIFIC message phrase. The phrase match is load-bearing
+  // (not just a fallback): the iOS TUI engine collapses the error to its message
+  // string before this maps it, so the reconstructed Error carries no status/code —
+  // the message is the only signal that survives. The phrase requires "agreement"
+  // adjacent to a signing/expiry word, so it can't match an unrelated 403.
+  const isAgreement = code === 'FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED'
+    || code === 'FORBIDDEN_ERROR.PLA_NOT_ACCEPTED'
+    || /required agreement[^.]{0,60}\b(unsigned|expired|missing|not been signed)\b/i.test(message)
+    || /\b(unsigned|expired)\b[^.]{0,40}\bagreement\b/i.test(message)
+    || /program license agreement/i.test(message)
+  if (isAgreement)
+    return 'apple_agreements_missing'
   if (status === 401)
     return 'apple_api_unauthorized'
+  if (status === 403)
+    return 'apple_api_forbidden'
   if (status === 429)
     return 'apple_api_rate_limited'
 

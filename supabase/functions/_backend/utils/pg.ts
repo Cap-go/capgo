@@ -10,6 +10,7 @@ import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { CacheHelper } from './cache.ts'
 import { DISPOSABLE_EMAIL_DOMAINS, PERSONAL_EMAIL_DOMAINS } from './emailClassification.ts'
 import { getClientDbRegionSB } from './geolocation.ts'
+import { REQUIRED_GLOBAL_STATS_SHARDS } from './global_stats.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import * as schema from './postgres_schema.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
@@ -1171,6 +1172,8 @@ export interface AdminGlobalStatsTrend {
   trial_extended_subscribed_orgs: number
   past_due_orgs: number
   past_due_orgs_average_days: number
+  active_canceled_orgs: number
+  active_past_due_orgs: number
   mrr: number
   previous_mrr: number
   previous_mrr_solo: number
@@ -1214,6 +1217,9 @@ export interface AdminGlobalStatsTrend {
   build_count_day_android: number
   builder_active_paying_clients_60d: number
   live_updates_active_paying_clients_60d: number
+  paying_orgs_subscription: number
+  paying_orgs_credits: number
+  paying_orgs_total: number
 }
 
 export async function getAdminGlobalStatsTrend(
@@ -1231,11 +1237,16 @@ export async function getAdminGlobalStatsTrend(
     // Extract just the date portion (YYYY-MM-DD) from ISO timestamps
     const startDateOnly = start_date.split('T')[0]
     const endDateOnly = end_date.split('T')[0]
+    const requiredCompletedShardsJson = JSON.stringify(REQUIRED_GLOBAL_STATS_SHARDS)
 
-    // Simple query - just SELECT all columns from global_stats
-    // Revenue metrics are already calculated and stored by logsnag_insights cron job
+    // Keep in-progress placeholder snapshots hidden until all core shards complete.
     const query = sql`
-      WITH stats AS (
+      WITH completed_stats AS (
+        SELECT *
+        FROM global_stats
+        WHERE completed_shards @> ${requiredCompletedShardsJson}::jsonb
+      ),
+      stats AS (
         SELECT
         gs.date_id AS date,
         gs.apps::int AS apps,
@@ -1271,6 +1282,8 @@ export async function getAdminGlobalStatsTrend(
         gs.new_paying_orgs::int AS new_paying_orgs,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'past_due_orgs', '')::int, 0)::int AS past_due_orgs,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'past_due_orgs_average_days', '')::float, 0)::float AS past_due_orgs_average_days,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'active_canceled_orgs', '')::int, 0)::int AS active_canceled_orgs,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'active_past_due_orgs', '')::int, 0)::int AS active_past_due_orgs,
         gs.canceled_orgs::int AS canceled_orgs,
         COALESCE(gs.upgraded_orgs, 0)::int AS upgraded_orgs,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'trial_extended_orgs', '')::int, 0)::int AS trial_extended_orgs,
@@ -1341,9 +1354,12 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(NULLIF(to_jsonb(gs) ->> 'build_count_day_ios', '')::int, NULLIF(to_jsonb(gs) ->> 'builds_day_ios', '')::int, 0)::int AS build_count_day_ios,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'build_count_day_android', '')::int, NULLIF(to_jsonb(gs) ->> 'builds_day_android', '')::int, 0)::int AS build_count_day_android,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'builder_active_paying_clients_60d', '')::int, 0)::int AS builder_active_paying_clients_60d,
-        COALESCE(NULLIF(to_jsonb(gs) ->> 'live_updates_active_paying_clients_60d', '')::int, 0)::int AS live_updates_active_paying_clients_60d
-      FROM global_stats gs
-      LEFT JOIN global_stats prev ON prev.date_id = (
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'live_updates_active_paying_clients_60d', '')::int, 0)::int AS live_updates_active_paying_clients_60d,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'paying_orgs_subscription', '')::int, gs.paying::int, 0)::int AS paying_orgs_subscription,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'paying_orgs_credits', '')::int, 0)::int AS paying_orgs_credits,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'paying_orgs_total', '')::int, gs.paying::int, 0)::int AS paying_orgs_total
+      FROM completed_stats gs
+      LEFT JOIN completed_stats prev ON prev.date_id = (
         CASE
           WHEN gs.date_id ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN
             CASE
@@ -1370,7 +1386,7 @@ export async function getAdminGlobalStatsTrend(
     const result = await drizzleClient.execute(query)
 
     const data: AdminGlobalStatsTrend[] = result.rows.map((row: any) => ({
-      date: row.date,
+      date: normalizeAdminStatsDate(row.date),
       apps: Number(row.apps) || 0,
       apps_active: Number(row.apps_active) || 0,
       users: Number(row.users) || 0,
@@ -1402,6 +1418,8 @@ export async function getAdminGlobalStatsTrend(
       paying_yearly: Number(row.paying_yearly) || 0,
       past_due_orgs: Number(row.past_due_orgs) || 0,
       past_due_orgs_average_days: Number(row.past_due_orgs_average_days) || 0,
+      active_canceled_orgs: Number(row.active_canceled_orgs) || 0,
+      active_past_due_orgs: Number(row.active_past_due_orgs) || 0,
       paying_monthly: Number(row.paying_monthly) || 0,
       new_paying_orgs: Number(row.new_paying_orgs) || 0,
       canceled_orgs: Number(row.canceled_orgs) || 0,
@@ -1451,7 +1469,27 @@ export async function getAdminGlobalStatsTrend(
       build_count_day_android: Number(row.build_count_day_android) || 0,
       builder_active_paying_clients_60d: Number(row.builder_active_paying_clients_60d) || 0,
       live_updates_active_paying_clients_60d: Number(row.live_updates_active_paying_clients_60d) || 0,
+      paying_orgs_subscription: Number(row.paying_orgs_subscription) || 0,
+      paying_orgs_credits: Number(row.paying_orgs_credits) || 0,
+      paying_orgs_total: Number(row.paying_orgs_total) || 0,
     }))
+
+    if (data.length > 0) {
+      const latestIndex = data.length - 1
+      if (data[latestIndex].users <= 0) {
+        const liveRegisteredUsers = await getLiveRegisteredUsersCount(c)
+        if (liveRegisteredUsers > 0)
+          data[latestIndex].users = liveRegisteredUsers
+      }
+
+      const livePayingBreakdown = await getAdminPayingOrgBreakdown(c)
+      data[latestIndex] = {
+        ...data[latestIndex],
+        paying_orgs_subscription: livePayingBreakdown.paying_orgs_subscription || data[latestIndex].paying_orgs_subscription,
+        paying_orgs_credits: livePayingBreakdown.paying_orgs_credits || data[latestIndex].paying_orgs_credits,
+        paying_orgs_total: livePayingBreakdown.paying_orgs_total || data[latestIndex].paying_orgs_total,
+      }
+    }
 
     cloudlog({ requestId: c.get('requestId'), message: 'getAdminGlobalStatsTrend result', resultCount: data.length })
 
@@ -1483,6 +1521,123 @@ interface AdminUtcDateRange {
   startDay: Date
   seriesEndDay: Date
   endExclusive: Date
+}
+
+export function normalizeAdminStatsDate(value: unknown): string {
+  if (value instanceof Date)
+    return value.toISOString().split('T')[0]
+
+  const rawValue = String(value ?? '').trim()
+  if (!rawValue)
+    return ''
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(rawValue))
+    return rawValue
+
+  const parsed = new Date(rawValue)
+  if (!Number.isNaN(parsed.getTime()))
+    return parsed.toISOString().split('T')[0]
+
+  return rawValue.slice(0, 10)
+}
+
+async function getLiveRegisteredUsersCount(c: Context): Promise<number> {
+  const pgClient = getPgClient(c)
+  const drizzleClient = getDrizzleClient(pgClient)
+
+  try {
+    const result = await drizzleClient.execute(sql`
+      SELECT COUNT(*)::int AS count
+      FROM public.users u
+      WHERE u.created_via_invite = false
+    `)
+
+    return Number((result.rows[0] as { count?: number | string | null } | undefined)?.count) || 0
+  }
+  catch (error) {
+    logPgError(c, 'getLiveRegisteredUsersCount', error)
+    return 0
+  }
+  finally {
+    await closeClient(c, pgClient)
+  }
+}
+
+export interface AdminPayingOrgBreakdown {
+  paying_orgs_subscription: number
+  paying_orgs_credits: number
+  paying_orgs_total: number
+}
+
+export async function getAdminPayingOrgBreakdown(c: Context): Promise<AdminPayingOrgBreakdown> {
+  const emptyResult: AdminPayingOrgBreakdown = {
+    paying_orgs_subscription: 0,
+    paying_orgs_credits: 0,
+    paying_orgs_total: 0,
+  }
+
+  const pgClient = getPgClient(c)
+  const drizzleClient = getDrizzleClient(pgClient)
+
+  try {
+    const result = await drizzleClient.execute(sql`
+      WITH active_subscriptions AS (
+        SELECT DISTINCT ON (si.customer_id)
+          si.customer_id
+        FROM public.stripe_info si
+        INNER JOIN public.plans p ON p.stripe_id = si.product_id
+        WHERE si.is_good_plan = true
+          AND si.status IN (
+            'succeeded'::public.stripe_status,
+            'canceled'::public.stripe_status,
+            'deleted'::public.stripe_status
+          )
+          AND (si.canceled_at IS NULL OR si.canceled_at > NOW())
+          AND si.subscription_anchor_end > NOW()
+        ORDER BY si.customer_id, si.created_at DESC
+      ),
+      subscription_orgs AS (
+        SELECT DISTINCT o.id AS org_id
+        FROM public.orgs o
+        INNER JOIN active_subscriptions active ON active.customer_id = o.customer_id
+      ),
+      credit_orgs AS (
+        SELECT DISTINCT ucb.org_id
+        FROM public.usage_credit_balances ucb
+        WHERE COALESCE(ucb.available_credits, 0) > 0
+      )
+      SELECT
+        (SELECT COUNT(*)::int FROM subscription_orgs) AS paying_orgs_subscription,
+        (SELECT COUNT(*)::int FROM credit_orgs) AS paying_orgs_credits,
+        (
+          SELECT COUNT(*)::int
+          FROM (
+            SELECT org_id FROM subscription_orgs
+            UNION
+            SELECT org_id FROM credit_orgs
+          ) paid_orgs
+        ) AS paying_orgs_total
+    `)
+
+    const row = result.rows[0] as {
+      paying_orgs_subscription?: number | string | null
+      paying_orgs_credits?: number | string | null
+      paying_orgs_total?: number | string | null
+    } | undefined
+
+    return {
+      paying_orgs_subscription: Number(row?.paying_orgs_subscription) || 0,
+      paying_orgs_credits: Number(row?.paying_orgs_credits) || 0,
+      paying_orgs_total: Number(row?.paying_orgs_total) || 0,
+    }
+  }
+  catch (error) {
+    logPgError(c, 'getAdminPayingOrgBreakdown', error)
+    return emptyResult
+  }
+  finally {
+    await closeClient(c, pgClient)
+  }
 }
 
 function getAdminUtcDateRange(start_date: string, end_date: string): AdminUtcDateRange {
@@ -1636,8 +1791,9 @@ export async function getAdminCustomerCountryBreakdown(
   }
 
   try {
-    const pgClient = getPgClient(c, true)
+    const pgClient = getPgClient(c, false)
     const drizzleClient = getDrizzleClient(pgClient)
+    const { startDay, endExclusive } = getAdminUtcDateRange(start_date, end_date)
 
     const query = sql`
       WITH country_counts AS (
@@ -1646,8 +1802,8 @@ export async function getAdminCustomerCountryBreakdown(
           COUNT(*)::int AS organizations
         FROM orgs o
         INNER JOIN stripe_info si ON si.customer_id = o.customer_id
-        WHERE o.created_at >= ${start_date}::timestamptz
-          AND o.created_at < ${end_date}::timestamptz
+        WHERE o.created_at >= ${startDay.toISOString()}::timestamptz
+          AND o.created_at < ${endExclusive.toISOString()}::timestamptz
           AND si.customer_country IS NOT NULL
           AND UPPER(BTRIM(si.customer_country)) ~ '^[A-Z]{2}$'
         GROUP BY UPPER(BTRIM(si.customer_country))

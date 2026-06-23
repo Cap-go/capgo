@@ -11,6 +11,7 @@ import process from 'node:process'
 import { render } from 'ink'
 import React from 'react'
 import OnboardingShell from '../src/build/onboarding/ui/shell.tsx'
+import { exitAfterOnboardingBeforeExit } from '../src/build/onboarding/ui/exit.ts'
 
 const watchdog = setTimeout(() => {
   console.error('WATCHDOG 30s')
@@ -45,18 +46,28 @@ function makeStdin() {
   return s
 }
 
-async function renderShell(props) {
-  const stdout = makeStdout(100, 50)
-  const instance = render(
-    React.createElement(OnboardingShell, { appId: 'com.test.app', iosDir: 'ios', androidDir: 'android', journeyId: 'bj_test', ...props }),
-    { stdout, stderr: makeStdout(100, 50), stdin: makeStdin(), debug: true, exitOnCtrlC: false, patchConsole: false },
-  )
+async function waitForFirstFrame(stdout) {
   // Poll for the first painted (non-empty) frame instead of a fixed sleep, so a
   // slow CI box can't read before Ink has rendered. Bounded so a genuine
   // empty-render bug still fails fast rather than hanging.
   const deadline = Date.now() + 2000
   while ((stdout.lastFrame ?? '') === '' && Date.now() < deadline)
     await new Promise(r => setTimeout(r, 10))
+}
+
+async function renderShellInstance(props) {
+  const stdout = makeStdout(100, 50)
+  const stdin = makeStdin()
+  const instance = render(
+    React.createElement(OnboardingShell, { appId: 'com.test.app', iosDir: 'ios', androidDir: 'android', journeyId: 'bj_test', ...props }),
+    { stdout, stderr: makeStdout(100, 50), stdin, debug: true, exitOnCtrlC: false, patchConsole: false },
+  )
+  await waitForFirstFrame(stdout)
+  return { instance, stdin, stdout }
+}
+
+async function renderShell(props) {
+  const { instance, stdout } = await renderShellInstance(props)
   const out = stdout.lastFrame ?? ''
   instance.unmount()
   return out
@@ -95,6 +106,31 @@ const updateInfo = { currentVersion: '8.0.6', latestVersion: '8.0.7' }
   const out = await renderShell({ updateInfo, initialPlatform: 'ios' })
   const flat = out.replace(/\s+/g, ' ')
   check('update prompt precedes the --platform auto-load', /new version of @capgo\/cli is available/i.test(flat))
+}
+
+// The update decision exits Ink; this helper must wait for the replay flush hook
+// before unmounting so the alt-screen frame is still visible when captured.
+{
+  const order = []
+  let releaseBeforeExit
+  let resolveExited
+  const beforeExit = new Promise(resolve => (releaseBeforeExit = resolve))
+  const exited = new Promise(resolve => (resolveExited = resolve))
+
+  exitAfterOnboardingBeforeExit(async () => {
+    order.push('before')
+    await beforeExit
+    order.push('before-done')
+  }, () => {
+    order.push('exit')
+    resolveExited()
+  })
+
+  await new Promise(r => setTimeout(r, 10))
+  check('pre-exit hook starts before exit', order.join(',') === 'before')
+  releaseBeforeExit()
+  await exited
+  check('exit runs after pre-exit hook resolves', order.join(',') === 'before,before-done,exit')
 }
 
 // No updateInfo → no prompt, straight to the platform picker.

@@ -146,3 +146,13 @@ describe('buildPluginBreakdownResult', () => {
     ])
   })
 })
+
+import { normalizeAdminStatsDate } from '../supabase/functions/_backend/utils/pg.ts'
+
+describe('normalizeAdminStatsDate', () => {
+  it.concurrent('normalizes Date objects and ISO timestamps to YYYY-MM-DD', () => {
+    expect(normalizeAdminStatsDate(new Date('2026-06-20T15:30:00.000Z'))).toBe('2026-06-20')
+    expect(normalizeAdminStatsDate('2026-06-20T00:00:00.000Z')).toBe('2026-06-20')
+    expect(normalizeAdminStatsDate('2026-06-20')).toBe('2026-06-20')
+  })
+})

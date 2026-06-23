@@ -14,6 +14,13 @@ export const buildCredentialsSchema = z.object({
   APPLE_ISSUER_ID: z.string().optional(),
   APPLE_KEY_CONTENT: z.string().optional(),
   APP_STORE_CONNECT_TEAM_ID: z.string().optional(),
+  // iOS app-specific password upload (alternative to the App Store Connect API key;
+  // used by migrated Ionic Appflow apps). fastlane reads FASTLANE_USER and
+  // FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD from the env automatically;
+  // APPLE_APP_ID is the app's numeric App Store Connect id (required for this path).
+  FASTLANE_USER: z.string().optional(),
+  FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: z.string().optional(),
+  APPLE_APP_ID: z.string().optional(),
   CAPGO_IOS_PROVISIONING_MAP: z.string().optional(),
   // Android credentials
   ANDROID_KEYSTORE_FILE: z.string().optional(),
@@ -45,6 +52,10 @@ export const buildRequestOptionsSchema = optionsBaseSchema.extend({
   appleIssuerId: z.string().optional(),
   appleKeyContent: z.string().optional(),
   appStoreConnectTeamId: z.string().optional(),
+  // iOS app-specific password upload (alternative to the App Store Connect API key)
+  appleId: z.string().optional(),
+  appleAppSpecificPassword: z.string().optional(),
+  appleAppId: z.string().optional(),
   iosScheme: z.string().optional(),
   iosTarget: z.string().optional(),
   iosDistribution: z.enum(['app_store', 'ad_hoc']).optional(),
@@ -66,6 +77,14 @@ export const buildRequestOptionsSchema = optionsBaseSchema.extend({
   playstoreUpload: z.boolean().optional(),
   verbose: z.boolean().optional(),
   aiAnalytics: z.boolean().optional(),
+  // On a CI/CD (non-interactive) build failure, upload the captured build logs
+  // to Capgo support via uploadSupportLogs. Additive to aiAnalytics — both can
+  // be passed and both run. Requires log capture, which this flag also enables.
+  // Derived from --send-logs-to-support (primary) or --send-logs (deprecated alias).
+  sendLogsToSupport: z.boolean().optional(),
+  // Deprecated alias for sendLogsToSupport, kept so the original --send-logs flag
+  // (shipped in 8.16.0) keeps parsing. Callers honor either field.
+  sendLogs: z.boolean().optional(),
   // Controls the on-failure AI-analysis flow inside requestBuildInternal:
   //   - 'auto-prompt' (default) — current behavior: clack-driven menu when
   //     interactive, decideAnalyzeBehavior matrix in CI.
@@ -76,6 +95,12 @@ export const buildRequestOptionsSchema = optionsBaseSchema.extend({
   //   - 'skip'                  — skip the AI block entirely; normal cleanup
   //     runs (log file deleted on exit).
   aiAnalysisMode: z.enum(['auto-prompt', 'caller-handled', 'skip']).optional(),
+  // Prescan gate (see src/build/prescan/). `prescan: false` (--no-prescan) skips the
+  // automatic pre-build scan; `prescanIgnoreFatal` reports but never blocks;
+  // `failOnWarnings` treats prescan warnings as fatal.
+  prescan: z.boolean().optional(),
+  prescanIgnoreFatal: z.boolean().optional(),
+  failOnWarnings: z.boolean().optional(),
   // Correlation id for the Builder onboarding journey, set ONLY when the build
   // is requested from the onboarding wizard. Threaded onto the `Build requested`
   // / `Build succeeded` / `Build failed` events so the journey's funnel reaches

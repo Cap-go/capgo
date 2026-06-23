@@ -8,7 +8,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import CreditsCta from '~/components/CreditsCta.vue'
-import Spinner from '~/components/Spinner.vue'
+import PageLoader from '~/components/PageLoader.vue'
 import { bytesToGb } from '~/services/conversion'
 import { formatLocalDate, formatLocalDateTime, formatUtcDateTimeAsLocal } from '~/services/date'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
@@ -555,14 +555,7 @@ function nextRunDate() {
     </div>
 
     <!-- Loading State -->
-    <div v-else class="flex items-center justify-center h-full">
-      <div class="mb-4 text-center">
-        <Spinner size="w-12 h-12" class="mx-auto" />
-        <p class="text-gray-600 dark:text-gray-400">
-          {{ t('loading') }}...
-        </p>
-      </div>
-    </div>
+    <PageLoader v-else :label="t('loading')" />
 
     <!-- Teleport for Detailed Usage Plan Dialog -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('detailed-usage-plan')" defer to="#dialog-v2-content">

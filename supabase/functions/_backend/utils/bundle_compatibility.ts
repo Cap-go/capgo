@@ -3,6 +3,7 @@ import { parseRange, rangeIntersects } from '@std/semver'
 export interface NativePackage {
   name: string
   version: string
+  requested_version?: string
   ios_checksum?: string
   android_checksum?: string
 }
@@ -11,6 +12,7 @@ export type IncompatibilityReason
   = | 'new_plugin'
     | 'removed_plugin'
     | 'version_mismatch'
+    | 'requested_version_changed'
     | 'ios_code_changed'
     | 'android_code_changed'
     | 'both_platforms_changed'
@@ -21,6 +23,8 @@ export interface PackageComparison {
   name: string
   candidateVersion?: string
   baselineVersion?: string
+  candidateRequestedVersion?: string
+  baselineRequestedVersion?: string
   candidateIosChecksum?: string
   baselineIosChecksum?: string
   candidateAndroidChecksum?: string
@@ -79,6 +83,9 @@ function getIncompatibilityReasons(
   if (!versionsIntersect(candidate.version, baseline.version))
     reasons.push('version_mismatch')
 
+  if (candidate.requested_version && baseline.requested_version && candidate.requested_version.trim() !== baseline.requested_version.trim())
+    reasons.push('requested_version_changed')
+
   const iosChanged = candidate.ios_checksum != null && baseline.ios_checksum != null && candidate.ios_checksum !== baseline.ios_checksum
   const androidChanged = candidate.android_checksum != null && baseline.android_checksum != null && candidate.android_checksum !== baseline.android_checksum
 
@@ -106,6 +113,10 @@ function statusFor(
   return 'unchanged'
 }
 
+function isIncompatibleReason(reason: IncompatibilityReason) {
+  return reason !== 'requested_version_changed'
+}
+
 export function compareNativePackages(
   candidatePackages: readonly NativePackage[],
   baselinePackages: readonly NativePackage[],
@@ -122,12 +133,14 @@ export function compareNativePackages(
       name,
       candidateVersion: candidate?.version,
       baselineVersion: baseline?.version,
+      candidateRequestedVersion: candidate?.requested_version,
+      baselineRequestedVersion: baseline?.requested_version,
       candidateIosChecksum: candidate?.ios_checksum,
       baselineIosChecksum: baseline?.ios_checksum,
       candidateAndroidChecksum: candidate?.android_checksum,
       baselineAndroidChecksum: baseline?.android_checksum,
       status: statusFor(candidate, baseline, reasons),
-      compatible: reasons.length === 0,
+      compatible: !reasons.some(isIncompatibleReason),
       reasons,
     }
   }).sort((a, b) => {

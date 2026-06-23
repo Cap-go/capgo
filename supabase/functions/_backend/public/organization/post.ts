@@ -6,6 +6,7 @@ import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { closeClient, getPgClient } from '../../utils/pg.ts'
 import { supabaseAdmin, supabaseWithAuth } from '../../utils/supabase.ts'
+import { parseOrgOnboardingIntent } from '../../utils/org_onboarding_intent.ts'
 import { normalizeWebsiteUrl } from './website.ts'
 
 const MAX_ESTIMATED_MAU = 1_000_000
@@ -28,6 +29,7 @@ const bodySchema = type({
   'website?': 'string',
   'intent?': "'ota' | 'builder' | 'both' | 'exploring' | 'unknown'",
 })
+
 
 interface PgTransactionClient {
   query: <T = unknown>(text: string, params?: unknown[]) => Promise<{ rows: T[], rowCount?: number | null }>
@@ -148,6 +150,7 @@ async function insertOrgForApiKey(
     management_email: string
     customer_id: string
     website: string | null
+    onboarding: { intent: string }
   },
 ) {
   const apikeyRbacId = auth.apikey?.rbac_id
@@ -196,10 +199,11 @@ async function insertOrgForApiKey(
          created_by,
          management_email,
          customer_id,
-         website
+         website,
+         onboarding
        )
-       VALUES ($1::uuid, $2::varchar, $3::uuid, $4::varchar, $5::varchar, $6::varchar)`,
-      [org.id, org.name, org.created_by, org.management_email, org.customer_id, org.website],
+       VALUES ($1::uuid, $2::varchar, $3::uuid, $4::varchar, $5::varchar, $6::varchar, $7::jsonb)`,
+      [org.id, org.name, org.created_by, org.management_email, org.customer_id, org.website, JSON.stringify(org.onboarding)],
     )
 
     await dbClient.query(
@@ -272,6 +276,7 @@ export async function post(
   const ownerEmail = await getOwnerEmail(c, auth)
   const orgId = crypto.randomUUID()
   const pendingCustomerId = await createPendingStripeInfo(c, orgId, estimatedMau)
+  const onboarding = { intent: parseOrgOnboardingIntent({ intent: body.intent }) }
   const newOrg = {
     id: orgId,
     name: body.name,
@@ -279,6 +284,7 @@ export async function post(
     management_email: body.email ?? ownerEmail,
     customer_id: pendingCustomerId,
     website,
+    onboarding,
   }
 
   try {
@@ -288,7 +294,10 @@ export async function post(
     else {
       const { error: errorOrg } = await supabaseWithAuth(c, auth)
         .from('orgs')
-        .insert(newOrg)
+        .insert({
+          ...newOrg,
+          onboarding,
+        })
 
       if (errorOrg) {
         throw simpleError('cannot_create_org', 'Cannot create org', { error: errorOrg.message })

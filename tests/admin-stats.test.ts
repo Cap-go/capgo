@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, fetchWithRetry, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, PRODUCT_ID, TEST_EMAIL, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
+import { REQUIRED_GLOBAL_STATS_SHARDS } from '../supabase/functions/_backend/utils/global_stats.ts'
+import { BASE_URL, executeSQL, fetchWithRetry, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, PRODUCT_ID, TEST_EMAIL, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000
 const NOW = Date.now()
@@ -165,6 +166,11 @@ beforeAll(async () => {
   ], { onConflict: 'date_id' })
   if (globalStatsError)
     throw globalStatsError
+
+  await executeSQL(
+    'UPDATE public.global_stats SET completed_shards = $1::jsonb WHERE date_id = ANY($2::varchar[])',
+    [JSON.stringify(REQUIRED_GLOBAL_STATS_SHARDS), [...GLOBAL_STATS_TREND_DATES]],
+  )
 
   const { error: stripeError } = await supabase.from('stripe_info').insert([
     {

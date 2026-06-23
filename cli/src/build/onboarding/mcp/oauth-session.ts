@@ -12,7 +12,7 @@
 //     → clears any prior entry
 //     → calls start() to get the PendingOAuthSession
 //     → stores { session, status:'pending' }
-//     → attaches .then/.catch so status advances to 'done'/'error'
+//     → a detached async task awaits the result so status advances to 'done'/'error'
 //
 //   pollOAuthSession(appId)
 //     → returns { status, tokens?, error? }  or  { status: 'absent' }
@@ -67,16 +67,19 @@ export async function beginOAuthSession(
   const entry: OAuthSessionEntry = { session, status: 'pending' }
   registry.set(appId, entry)
 
-  // Advance the status when the result settles (this does NOT block the caller).
-  session.result
-    .then((tokens: GoogleOAuthTokens) => {
+  // Advance the status when the result settles (this does NOT block the caller —
+  // a detached async task per the repo's async/await-over-.then() convention).
+  void (async () => {
+    try {
+      const tokens = await session.result
       entry.status = 'done'
       entry.tokens = tokens
-    })
-    .catch((err: unknown) => {
+    }
+    catch (err: unknown) {
       entry.status = 'error'
       entry.error = err instanceof Error ? err : new Error(String(err))
-    })
+    }
+  })()
 }
 
 /**

@@ -1,4 +1,5 @@
 import type { SDKResult } from '../schemas/sdk'
+import process from 'node:process'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
@@ -6,8 +7,13 @@ import pack from '../../package.json'
 import { enableSupabaseInstrumentation, setInvocationSource, trackMcpServerStarted, withMcpToolTracking } from '../analytics/track'
 import { addAppOptionsSchema, cleanupOptionsSchema, getStatsOptionsSchema, requestBuildOptionsSchema, starAllRepositoriesOptionsSchema, starRepoOptionsSchema, updateAppOptionsSchema, updateChannelOptionsSchema, uploadOptionsSchema } from '../schemas/sdk'
 import { CapgoSDK } from '../sdk'
-import { findSavedKey } from '../utils'
+import { clearSavedKey, getLoginState, loginSuccessMessage, logoutMessage, validateAndSaveKey, whoamiMessage } from '../auth/session'
+import { mcpLoginInputSchema, mcpLogoutInputSchema } from '../schemas/auth'
+import { findSavedKeySilent, formatError } from '../utils'
 import { registerOnboardingTools } from '../build/onboarding/mcp/onboarding-tools'
+import { registerLiveUpdateTools } from '../init/mcp/live-update-tools'
+import { buildServerInstructions } from './instructions'
+import { installMcpStdoutGuard } from './stdout-guard'
 
 /**
  * Format an SDK result error for MCP response.
@@ -32,10 +38,22 @@ function formatMcpError<T>(result: SDKResult<T>): { content: Array<{ type: 'text
  * This allows AI agents to interact with Capgo Cloud programmatically.
  */
 export async function startMcpServer(): Promise<void> {
-  const server = new McpServer({
-    name: 'capgo',
-    version: pack.version,
-  })
+  // Install the stdout guard FIRST, before any startup code (saved-key lookup, SDK init,
+  // lazily imported deps) can emit a stray clack/console line. It reroutes ambient stdout
+  // to stderr and returns the ONLY writer allowed to reach the real stdout for JSON-RPC
+  // frames. Installing it late (after this code ran) let a no-key "please login" clack
+  // line land on stdout and corrupt the initialize handshake.
+  const transportStdout = installMcpStdoutGuard()
+
+  // Computed once: gates BOTH the onboarding-tool registration (below) and the
+  // onboarding steer appended to the server instructions, so we never advertise a
+  // start_capgo_builder_onboarding tool we didn't actually register.
+  const onboardingEnabled = Boolean(globalThis.__CAPGO_MCP_ONBOARDING__)
+  const liveUpdateEnabled = Boolean(globalThis.__CAPGO_MCP_LIVE_UPDATE__)
+  const server = new McpServer(
+    { name: 'capgo', version: pack.version },
+    { instructions: buildServerInstructions({ onboardingEnabled, liveUpdateEnabled }) },
+  )
 
   setInvocationSource('mcp')
   enableSupabaseInstrumentation()
@@ -49,15 +67,14 @@ export async function startMcpServer(): Promise<void> {
     return (originalTool as (...a: any[]) => unknown)(...args)
   }
 
-  // Initialize SDK - will use saved API key or require it per-call
-  let savedApiKey: string | undefined
-  try {
-    savedApiKey = findSavedKey(true)
-  }
-  catch {
-    savedApiKey = undefined
-  }
-  const sdk = new CapgoSDK({ apikey: savedApiKey })
+  // Initialize the SDK from any saved key. Silent lookup (env -> ~/.capgo -> ./.capgo):
+  // it never logs or throws when no key exists, so a no-key startup stays clean. The
+  // throwing/logging findSavedKey() variant wrote a clack "please login" line to stdout,
+  // which corrupted the handshake. capgo_login fills this in later without a restart.
+  const savedApiKey = findSavedKeySilent()
+  // `let` (not `const`): capgo_login/capgo_logout reassign this so the running session
+  // re-authenticates without a restart. Tool handlers close over the binding, not the value.
+  let sdk = new CapgoSDK({ apikey: savedApiKey })
 
   // ============================================================================
   // App Management Tools
@@ -605,14 +622,89 @@ export async function startMcpServer(): Promise<void> {
     },
   )
 
-  // MCP-conducted Builder onboarding (2-tool spine). Build-time gated OFF until the
-  // flow is finished (PR 2) — DCE strips it (and the MCP-only deciders) from the
-  // release bundle. The shared engine still ships (the ink TUI uses it).
-  if (globalThis.__CAPGO_MCP_ONBOARDING__)
-    registerOnboardingTools(server, sdk)
+  // ============================================================================
+  // Authentication Tools
+  // ============================================================================
 
-  // Start the server with stdio transport
-  const transport = new StdioServerTransport()
+  server.tool(
+    'capgo_login',
+    'Sign in to Capgo by saving an API key. Generate a key for your AI at https://console.capgo.app/connect, then call this with it. Authenticates the current MCP session immediately — no restart needed.',
+    mcpLoginInputSchema.shape,
+    async ({ apikey, scope }) => {
+      try {
+        const { userId } = await validateAndSaveKey(apikey, { local: scope === 'local' })
+        // Re-init from call-time resolution (env → global → local) — the SAME source of
+        // truth whoami/logout/onboarding use — so the SDK never authenticates as a
+        // different identity than the one we report.
+        sdk = new CapgoSDK({})
+        let text = loginSuccessMessage(userId, scope === 'local')
+        // If a higher-precedence credential overrides the key we just saved, say so:
+        // tools will run as THAT credential, not the one just pasted.
+        const active = await getLoginState()
+        const savedSource = scope === 'local' ? 'local' : 'global'
+        if (active.source && active.source !== savedSource)
+          text += ` Note: a ${active.source} credential takes precedence over the ${savedSource} key you just saved, so tools will use it until it is removed.`
+        return {
+          content: [{ type: 'text' as const, text }],
+        }
+      }
+      catch (error) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: `Login failed: ${formatError(error)}. Generate a fresh key at https://console.capgo.app/connect and try again.`,
+          }],
+          isError: true as const,
+        }
+      }
+    },
+  )
+
+  server.tool(
+    'capgo_whoami',
+    'Report whether the Capgo MCP is signed in, and if so which user and where the key is stored. Validates the saved key against Capgo.',
+    {},
+    async () => {
+      const state = await getLoginState({ validate: true })
+      return { content: [{ type: 'text' as const, text: whoamiMessage(state) }] }
+    },
+  )
+
+  server.tool(
+    'capgo_logout',
+    'Sign out by deleting the saved Capgo API key. Clears the global key (~/.capgo) by default, or the project-local key (./.capgo) with scope "local". Does not unset the CAPGO_TOKEN env var.',
+    mcpLogoutInputSchema.shape,
+    async ({ scope }) => {
+      const { cleared } = await clearSavedKey({ local: scope === 'local' })
+      // Drop the in-memory key so the main tools de-authenticate immediately.
+      sdk = new CapgoSDK({})
+      // Be honest: if a credential is still reachable (CAPGO_TOKEN, or the other
+      // on-disk scope), say so rather than falsely claiming a full sign-out.
+      const remaining = await getLoginState()
+      return {
+        content: [{ type: 'text' as const, text: logoutMessage(cleared, scope === 'local', remaining) }],
+      }
+    },
+  )
+
+  // MCP-conducted Builder onboarding (2-tool spine + explain). Build-time gated:
+  // OFF in PR 1 while the flow was under construction, flipped ON in PR 2 now that
+  // the full journey (android + iOS + tail) ships through the shared engine.
+  // `bun run dev` keeps the flag undefined-safe; release builds define it to true.
+  if (onboardingEnabled)
+    registerOnboardingTools(server, () => sdk) // live accessor: honors capgo_login/logout reassignment
+
+  // MCP-conducted live-update (OTA) onboarding (3-tool spine: start, next, explain).
+  // Build-time gated: ships enabled in this release. The flag enables dead-code
+  // elimination when the feature is disabled; release builds define it to true.
+  if (liveUpdateEnabled)
+    registerLiveUpdateTools(server, sdk)
+
+  // Start the server with stdio transport. The stdout guard installed at the top of this
+  // function already routed ambient stdout (stray clack/console output from any tool or
+  // dependency) to stderr, so only JSON-RPC frames reach the real stdout a strict client
+  // reads; otherwise the transport drops ("Transport closed").
+  const transport = new StdioServerTransport(process.stdin, transportStdout)
   await server.connect(transport)
   trackMcpServerStarted(Boolean(savedApiKey))
 }
