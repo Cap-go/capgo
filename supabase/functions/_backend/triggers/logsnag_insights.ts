@@ -1702,14 +1702,20 @@ async function queueLogsnagInsightsShard(c: Context, shard: GlobalStatsShard, da
   }
 }
 
-async function dispatchLogsnagInsightsShards(c: Context, dateId: string): Promise<void> {
-  await ensureGlobalStatsSnapshotRow(c, dateId)
-  await resetGlobalStatsCompletedShards(c, dateId)
+async function queueMissingLogsnagInsightsShards(
+  c: Context,
+  dateId: string,
+  completedShards: ReadonlySet<GlobalStatsCompletionMarker>,
+): Promise<Array<{ shard: GlobalStatsShard, msgId: number, delaySeconds: number }>> {
+  const missingShards = getMissingGlobalStatsShards(completedShards)
+  if (missingShards.length === 0)
+    return []
+
   const db = getPgClient(c)
   const queued: Array<{ shard: GlobalStatsShard, msgId: number, delaySeconds: number }> = []
 
   try {
-    for (const shard of GLOBAL_STATS_SHARDS) {
+    for (const shard of missingShards) {
       const delaySeconds = getLogsnagInsightsShardDelaySeconds(shard)
       const msgId = await queueLogsnagInsightsMessage(db, buildLogsnagInsightsShardMessage(shard, dateId), delaySeconds)
       queued.push({ shard, msgId, delaySeconds })
@@ -1718,6 +1724,37 @@ async function dispatchLogsnagInsightsShards(c: Context, dateId: string): Promis
   finally {
     await closeClient(c, db)
   }
+
+  return queued
+}
+
+async function dispatchMissingLogsnagInsightsShards(c: Context, dateId: string): Promise<void> {
+  await ensureGlobalStatsSnapshotRow(c, dateId)
+  const completedShards = await readCompletedGlobalStatsShards(c, dateId)
+  const queued = await queueMissingLogsnagInsightsShards(c, dateId, completedShards)
+  if (queued.length === 0) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'No missing logsnag insights global stats shards to queue',
+      dateId,
+      completedShards: Array.from(completedShards).sort((a, b) => a.localeCompare(b)),
+    })
+    return
+  }
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Queued missing logsnag insights global stats shards',
+    dateId,
+    queued,
+    completedShards: Array.from(completedShards).sort((a, b) => a.localeCompare(b)),
+  })
+}
+
+async function dispatchLogsnagInsightsShards(c: Context, dateId: string): Promise<void> {
+  await ensureGlobalStatsSnapshotRow(c, dateId)
+  await resetGlobalStatsCompletedShards(c, dateId)
+  const queued = await queueMissingLogsnagInsightsShards(c, dateId, new Set())
 
   cloudlog({ requestId: c.get('requestId'), message: 'Queued logsnag insights global stats shards', dateId, queued })
 }
@@ -2690,6 +2727,7 @@ export const logsnagInsightsTestUtils = {
   normalizeCoreSnapshotCounts,
   reserveLogsnagInsightsRetry,
   reserveLogsnagInsightsShardRetry,
+  dispatchMissingLogsnagInsightsShards,
   scheduleLogsnagInsightsUpdate,
   scheduleLogsnagInsightsShardUpdate,
 }
@@ -2789,6 +2827,11 @@ function scheduleLogsnagInsightsShardUpdate(
 async function runLogsnagInsightsUpdate(c: Context, dateId = getDailyWindow().prevDayDateId, retryCount = 0): Promise<void> {
   if (await shouldSkipCompletedLogsnagInsightsRetryDispatch(c, dateId, retryCount))
     return
+
+  if (retryCount > 0) {
+    await dispatchMissingLogsnagInsightsShards(c, dateId)
+    return
+  }
 
   await dispatchLogsnagInsightsShards(c, dateId)
 }
