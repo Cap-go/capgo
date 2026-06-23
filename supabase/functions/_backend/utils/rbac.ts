@@ -36,6 +36,7 @@ export type Permission
     | 'org.delete'
     | 'org.read_members'
     | 'org.invite_user'
+    | 'org.manage_apikeys'
     | 'org.update_user_roles'
     | 'org.read_billing'
     | 'org.update_billing'
