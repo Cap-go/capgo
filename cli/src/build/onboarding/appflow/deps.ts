@@ -76,6 +76,17 @@ function openBrowser(url: string): void {
 }
 
 /**
+ * PLAY_CONFIG_JSON is stored base64-encoded (the same convention the native
+ * android flow uses — see android/types.ts). Decode it to the raw service-account
+ * JSON bytes for validation; if the value is already raw JSON (starts with '{'),
+ * pass it through as utf8. Exported for unit testing the encoding contract.
+ */
+export function serviceAccountJsonBytes(value: string): Buffer {
+  const decoded = Buffer.from(value, 'base64')
+  return decoded.toString('utf8').trimStart().startsWith('{') ? decoded : Buffer.from(value, 'utf8')
+}
+
+/**
  * Adapter: the flow asks for `(json, packageName?) => { ok, reason? }`; the
  * existing validator takes `{ jsonBytes, packageName }` and returns a tagged
  * union. We pass the migrated service-account JSON (decoded) + the migrated
@@ -86,7 +97,7 @@ function makeValidateServiceAccountJson(packageName?: string): NonNullable<Appfl
     const effectivePkg = pkg ?? packageName
     if (!effectivePkg)
       return { ok: false, reason: 'no package name available to probe Play access' }
-    const result = await androidValidateServiceAccountJson({ jsonBytes: Buffer.from(json, 'utf8'), packageName: effectivePkg })
+    const result = await androidValidateServiceAccountJson({ jsonBytes: serviceAccountJsonBytes(json), packageName: effectivePkg })
     if (result.ok)
       return { ok: true }
     return { ok: false, reason: result.message }

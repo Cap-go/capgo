@@ -1,38 +1,44 @@
 // src/build/onboarding/ui/appflow-app.tsx
 //
-// Interactive Ink renderer for the Appflow migration flow. Unlike the bespoke
-// iOS / Android wizard apps, this is a GENERIC neutral-StepView renderer: it
-// drives the platform-agnostic appflowFlow (flow/contract.ts StepView) and maps
-// each kind to an Ink primitive —
-//   'choice'              -> @inkjs/ui Select(options)
-//   'input'               -> FilteredTextInput per StepView.collect field
-//   'info' / 'human_gate' -> message + a single "Continue" Select
-//   'auto'                -> runs the flow effect in a bounded loop (spinner)
-//   'done' / 'error'      -> terminal line + exit
+// Interactive Ink renderer for the Appflow migration flow. It drives the
+// platform-agnostic appflowFlow (flow/contract.ts StepView) and maps each kind
+// to an Ink primitive, but wraps them in the SAME wizard chrome the native
+// iOS/Android apps use so the migration looks first-class:
+//   - a "Step N of M · <title>" header + progress bar + divider,
+//   - an accumulating "Imported from Appflow" summary so the user sees exactly
+//     which credentials were pulled in (org, app, signing, profiles, upload),
+//   - the step prompt in a rounded info box,
+//   - validation results as a colored ✓ / ⚠ / · list (advisory, never blocks).
+//
+// StepView kinds map to: 'choice' -> Select, 'input' -> FilteredTextInput,
+// 'info'/'human_gate' -> message + Continue, 'auto' -> bounded effect loop
+// (spinner), 'done'/'error' -> terminal line + exit.
 //
 // Build + finish: when the user picks 'build' at handoff-build the flow REUSES
 // the shared onboarding tail inline (saving-credentials → ask-build →
 // requesting-build → CI/CD secrets → build-complete) for the chosen platform —
-// the SAME generic StepView renderer drives the tail's choice/input/info/auto
-// steps, with ONE bespoke takeover: the fullscreen streaming build-output pane
-// (FullscreenBuildOutput) at requesting-build, mirroring the native app.tsx.
+// the SAME renderer drives the tail's choice/input/info/auto steps, with ONE
+// bespoke takeover: the fullscreen streaming build-output pane at requesting-build.
 // 'skip' finishes with creds persisted (build later via `capgo build request`).
 import type { FC } from 'react'
 import { Box, Text, useApp } from 'ink'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Select } from '@inkjs/ui'
+import { ProgressBar, Select } from '@inkjs/ui'
 import type { OnboardingResult } from '../types.js'
 import type { StepView } from '../flow/contract.js'
-import type { AppflowEffectResult } from '../appflow/flow.js'
+import type { AppflowEffectResult, AppflowValidationResult } from '../appflow/flow.js'
 import type { AppflowProgress, AppflowStep, MigrationScope } from '../appflow/types.js'
 import { appflowFlow, isAppflowTailStep, markTailRunComplete, nextTailStep } from '../appflow/flow.js'
 import type { TailStep } from '../tail/flow.js'
 import { buildAppflowEffectDeps, persistAppflowCredentials } from '../appflow/deps.js'
 import { sanitizeBuildLogLines } from '../build-log.js'
-import { Header, ErrorLine, SpinnerLine, SuccessLine, FilteredTextInput, FullscreenBuildOutput } from './components.js'
+import { Divider, Header, ErrorLine, SpinnerLine, SuccessLine, FilteredTextInput, FullscreenBuildOutput } from './components.js'
 import { useTerminalSize } from './shell.js'
 import { exitAfterOnboardingBeforeExit } from './exit.js'
 import type { OnboardingBeforeExit } from './exit.js'
+
+const CHROME_WIDTH = 64
+const TOTAL_STAGES = 8
 
 export interface AppflowAppProps {
   appId: string
@@ -211,8 +217,11 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
     return (
       <Box flexDirection="column" padding={1}>
         <Header />
-        <Box marginTop={1}>
-          {finished.kind === 'done' ? <SuccessLine text={finished.message} /> : <ErrorLine text={finished.message} />}
+        <Box marginTop={1} flexDirection="column">
+          <ImportedSummary progress={progress} />
+          <Box marginTop={1}>
+            {finished.kind === 'done' ? <SuccessLine text={finished.message} /> : <ErrorLine text={finished.message} />}
+          </Box>
         </Box>
       </Box>
     )
@@ -225,28 +234,178 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
     return <FullscreenBuildOutput title="Building..." lines={buildOutput} terminalRows={terminalRows} />
   }
 
+  const stage = stageFor(step)
+  const isValidateResults = step === 'validate-results'
+
   return (
     <Box flexDirection="column" padding={1}>
       <Header />
       <Box marginTop={1} flexDirection="column">
-        <Text>{view.prompt}</Text>
+        <ImportedSummary progress={progress} />
+
+        <Box flexDirection="column" marginTop={1}>
+          <Text>
+            <Text color="cyan">{`Step ${stage.n} of ${TOTAL_STAGES}`}</Text>
+            <Text dimColor>{`  ·  ${stage.title}`}</Text>
+          </Text>
+          <Box width={CHROME_WIDTH} marginTop={1}>
+            <ProgressBar value={Math.round((stage.n / TOTAL_STAGES) * 100)} />
+          </Box>
+          <Box marginTop={1}><Divider width={CHROME_WIDTH} /></Box>
+        </Box>
+
+        {isValidateResults
+          ? <ValidationResults results={(ctx.results as AppflowValidationResult[]) ?? []} />
+          : (
+              <Box marginTop={1} flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
+                <Text>{view.prompt}</Text>
+              </Box>
+            )}
+
         {error && <Box marginTop={1}><ErrorLine text={error} /></Box>}
+
         <Box marginTop={1}>
-          {renderBody(view, busy, advance)}
+          {renderBody(view, busy, advance, step)}
         </Box>
       </Box>
     </Box>
   )
 }
 
-/** Render the interactive body for the current StepView kind. */
-function renderBody(view: StepView, busy: boolean, advance: (value?: string, text?: string) => void): React.ReactNode {
+// ── credential summary ───────────────────────────────────────────────────────
+/** Human-readable bullets for the credentials pulled from Appflow so far. */
+function importedLines(p: AppflowProgress): string[] {
+  const out: string[] = []
+  if (p.orgSlug)
+    out.push(`Organization · ${p.orgSlug}`)
+  if (p.appSlug || p.appId)
+    out.push(`App · ${p.appSlug ?? p.appId}`)
+  const ios = p.ios ?? {}
+  if (ios.BUILD_CERTIFICATE_BASE64)
+    out.push('iOS signing certificate')
+  if (ios.CAPGO_IOS_PROVISIONING_MAP) {
+    try {
+      const ids = Object.keys(JSON.parse(ios.CAPGO_IOS_PROVISIONING_MAP) as Record<string, unknown>)
+      if (ids.length)
+        out.push(`iOS provisioning profile${ids.length > 1 ? 's' : ''} · ${ids.join(', ')}`)
+    }
+    catch {
+      // map not yet parseable — skip the detail line
+    }
+  }
+  if (ios.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD)
+    out.push(`iOS upload · app-specific password${ios.FASTLANE_USER ? ` (${ios.FASTLANE_USER})` : ''}`)
+  if (ios.APPLE_KEY_ID)
+    out.push(`iOS upload · App Store Connect API key (${ios.APPLE_KEY_ID})`)
+  const android = p.android ?? {}
+  if (android.ANDROID_KEYSTORE_FILE)
+    out.push(`Android keystore${android.KEYSTORE_KEY_ALIAS ? ` · alias ${android.KEYSTORE_KEY_ALIAS}` : ''}`)
+  if (android.PLAY_CONFIG_JSON)
+    out.push('Android upload · Google Play service account')
+  return out
+}
+
+const ImportedSummary: FC<{ progress: AppflowProgress }> = ({ progress }) => {
+  const lines = importedLines(progress)
+  if (lines.length === 0)
+    return null
+  return (
+    <Box flexDirection="column" borderStyle="round" borderColor="green" paddingX={1}>
+      <Text color="green" bold>Imported from Appflow</Text>
+      {lines.map(line => (
+        <Text key={line}>
+          <Text color="green">{'✔ '}</Text>
+          {line}
+        </Text>
+      ))}
+    </Box>
+  )
+}
+
+// ── validation results ───────────────────────────────────────────────────────
+const ValidationResults: FC<{ results: AppflowValidationResult[] }> = ({ results }) => {
+  if (results.length === 0) {
+    return (
+      <Box marginTop={1}><Text dimColor>No credentials to validate. Continuing.</Text></Box>
+    )
+  }
+  return (
+    <Box marginTop={1} flexDirection="column">
+      <Text bold>Validation results <Text dimColor>(advisory — never blocks)</Text></Text>
+      {results.map((r, i) => (
+        <Text key={`${r.id}-${i}`}>
+          {r.status === 'pass'
+            ? <Text color="green">{'  ✓  '}</Text>
+            : r.status === 'warn'
+              ? <Text color="yellow">{'  ⚠  '}</Text>
+              : <Text dimColor>{'  ·  '}</Text>}
+          <Text color={r.status === 'warn' ? 'yellow' : undefined} dimColor={r.status === 'skipped'}>{r.message}</Text>
+        </Text>
+      ))}
+      <Box marginTop={1}><Text dimColor>A warning never stops the migration — you can continue and fix it later.</Text></Box>
+    </Box>
+  )
+}
+
+// ── step → stage label (for the progress chrome) ─────────────────────────────
+function stageFor(step: AppflowStep): { n: number, title: string } {
+  if (isAppflowTailStep(step)) {
+    if (step === 'build-complete')
+      return { n: 8, title: 'Done' }
+    if (step.startsWith('ci-') || step === 'ask-github-actions-setup' || step.includes('workflow') || step.includes('secret') || step.includes('env'))
+      return { n: 8, title: 'CI/CD setup' }
+    return { n: 8, title: 'Build' }
+  }
+  switch (step) {
+    case 'explain':
+      return { n: 1, title: 'Connect to Appflow' }
+    case 'authenticating':
+      return { n: 1, title: 'Signing in to Appflow' }
+    case 'fetch-orgs':
+    case 'select-org':
+      return { n: 2, title: 'Choose organization' }
+    case 'fetch-apps':
+    case 'select-app':
+      return { n: 3, title: 'Choose app' }
+    case 'fetch-signing':
+    case 'select-ios-cert':
+    case 'select-android-cert':
+    case 'no-signing-submenu':
+      return { n: 4, title: 'Import signing credentials' }
+    case 'fetch-distribution':
+    case 'select-ios-dist':
+    case 'select-android-dist':
+    case 'ios-dist-gapfill':
+    case 'android-dist-gapfill':
+    case 'ios-p8-generate':
+    case 'android-sa-generate':
+      return { n: 5, title: 'Import upload credentials' }
+    case 'validate':
+    case 'validate-results':
+      return { n: 6, title: 'Validate credentials' }
+    case 'p8-upgrade-prompt':
+      return { n: 7, title: 'Upgrade iOS upload auth' }
+    case 'build-platform-pick':
+    case 'handoff-build':
+      return { n: 8, title: 'Build' }
+    default:
+      return { n: 8, title: 'Build' }
+  }
+}
+
+/** Render the interactive body for the current StepView kind. The `step` keys the
+ *  Select so it REMOUNTS per step — Ink's Select otherwise re-fires onChange while
+ *  it stays mounted across a step change, which makes options feel "unselectable". */
+function renderBody(view: StepView, busy: boolean, advance: (value?: string, text?: string) => void, step: string): React.ReactNode {
   if (busy || view.kind === 'auto')
     return <SpinnerLine text="Working…" />
   if (view.kind === 'choice') {
+    const options = (view.options ?? []).map(o => ({ label: o.note ? `${o.label}  (${o.note})` : o.label, value: o.value }))
     return (
       <Select
-        options={(view.options ?? []).map(o => ({ label: o.note ? `${o.label}  (${o.note})` : o.label, value: o.value }))}
+        key={step}
+        options={options}
+        visibleOptionCount={Math.min(Math.max(options.length, 1), 10)}
         onChange={value => advance(value)}
       />
     )
@@ -257,6 +416,7 @@ function renderBody(view: StepView, busy: boolean, advance: (value?: string, tex
     const field = view.collect?.[0]
     return (
       <FilteredTextInput
+        key={step}
         placeholder={field?.desc ?? ''}
         mask={Boolean(field?.secret)}
         onSubmit={text => advance(undefined, text)}
@@ -266,6 +426,7 @@ function renderBody(view: StepView, busy: boolean, advance: (value?: string, tex
   // 'info' / 'human_gate' / 'done' / 'error': a single continue.
   return (
     <Select
+      key={step}
       options={[{ label: 'Continue', value: 'continue' }]}
       onChange={() => advance('continue')}
     />
