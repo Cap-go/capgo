@@ -1,10 +1,13 @@
 -- Add app-level toggle to block provider infrastructure IP traffic on plugin endpoints.
--- Default is enabled to keep existing behavior for existing apps.
+-- Existing apps stay disabled; new app rows default to enabled.
 ALTER TABLE public.apps
-ADD COLUMN IF NOT EXISTS block_provider_infra_requests boolean NOT NULL DEFAULT true;
+ADD COLUMN IF NOT EXISTS block_provider_infra_requests boolean NOT NULL DEFAULT false;
+
+ALTER TABLE public.apps
+ALTER COLUMN block_provider_infra_requests SET DEFAULT true;
 
 COMMENT ON COLUMN public.apps.block_provider_infra_requests IS
-  'When true (default), /updates, /stats, and /channel_self block known Google/Apple infrastructure IPs.';
+  'When true, /updates, /stats, and /channel_self block known Google/Apple infrastructure IPs. Existing apps default to false; newly created apps default to true.';
 
 -- Keep get_org_apps_with_last_upload aligned with the apps table after adding
 -- apps.block_provider_infra_requests. The function returns a TABLE type, so the
