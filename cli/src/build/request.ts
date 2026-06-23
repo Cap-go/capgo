@@ -1633,6 +1633,9 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       app_id: appId,
       platform,
       build_mode: options.buildMode || 'release',
+      build_config: {
+        request_source: options.builderJourneyId ? 'cli_onboarding' : 'manual',
+      },
       build_options: buildOptionsPayload,
       build_credentials: buildCredentialsPayload,
     }

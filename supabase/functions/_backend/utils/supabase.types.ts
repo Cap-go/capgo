@@ -1452,6 +1452,9 @@ export type Database = {
           active_canceled_orgs: number
           active_past_due_orgs: number
           apps: number
+          apps_created: number
+          apps_with_cli_onboarding_builds_24h: number
+          apps_with_manual_builds_24h: number
           apps_active: number | null
           average_ltv: number
           build_avg_seconds_day_android: number
@@ -1542,6 +1545,9 @@ export type Database = {
         }
         Insert: {
           apps: number
+          apps_created?: number
+          apps_with_cli_onboarding_builds_24h?: number
+          apps_with_manual_builds_24h?: number
           apps_active?: number | null
           average_ltv?: number
           build_avg_seconds_day_android?: number
@@ -1634,6 +1640,9 @@ export type Database = {
           active_canceled_orgs?: number
           active_past_due_orgs?: number
           apps?: number
+          apps_created?: number
+          apps_with_cli_onboarding_builds_24h?: number
+          apps_with_manual_builds_24h?: number
           apps_active?: number | null
           average_ltv?: number
           build_avg_seconds_day_android?: number

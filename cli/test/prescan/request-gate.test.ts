@@ -118,6 +118,7 @@ describe('play-sa-access probe is gated by PLAY_CONFIG_JSON presence in the thre
 // fake URL whose RPC/select calls the spy answers.
 interface GateProbe {
   postedBuildRequest: boolean
+  buildRequestBodies: unknown[]
   urls: string[]
 }
 
@@ -130,17 +131,20 @@ const realFetch = globalThis.fetch
  * else (getRemoteConfig, apps select) gets a benign empty 200.
  */
 function installGateFetchSpy(permission: boolean): GateProbe {
-  const probe: GateProbe = { postedBuildRequest: false, urls: [] }
+  const probe: GateProbe = { postedBuildRequest: false, buildRequestBodies: [], urls: [] }
   const json = (body: unknown, status = 200): Response =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
-  globalThis.fetch = (async (input: RequestInfo | URL) => {
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
     probe.urls.push(url)
     if (url.includes('cli_check_permission'))
       return json(permission)
     if (url.includes('/build/request')) {
       probe.postedBuildRequest = true
-      return json({ jobId: 'should-never-be-reached' })
+      const body = typeof init?.body === 'string' ? init.body : undefined
+      if (body)
+        probe.buildRequestBodies.push(JSON.parse(body))
+      return json({ job_id: 'test-job', status: 'queued' })
     }
     // apps select (getOrganizationId), getRemoteConfig, and any other supabase
     // call: a benign empty payload. getOrganizationId's empty result is
@@ -227,5 +231,31 @@ describe('permission backstop fires before the POST on the prescan-skipped and -
     expect(result.success).toBe(false)
     expect(result.error).toMatch(/insufficient permissions to request a native build/i)
     expect(probe.postedBuildRequest).toBe(false)
+  })
+
+  it('marks normal CLI build requests as manual', async () => {
+    const probe = installGateFetchSpy(true)
+    await requestBuildInternal(
+      'com.demo.app',
+      gateOptions({ prescan: false, path: gateProject({ withApplicationId: true }) }),
+      true,
+    )
+
+    const body = probe.buildRequestBodies[0] as { build_config?: { request_source?: string } }
+    expect(probe.postedBuildRequest).toBe(true)
+    expect(body.build_config?.request_source).toBe('manual')
+  })
+
+  it('marks builder onboarding build requests from the journey id', async () => {
+    const probe = installGateFetchSpy(true)
+    await requestBuildInternal(
+      'com.demo.app',
+      gateOptions({ builderJourneyId: 'journey-test', prescan: false, path: gateProject({ withApplicationId: true }) }),
+      true,
+    )
+
+    const body = probe.buildRequestBodies[0] as { build_config?: { request_source?: string } }
+    expect(probe.postedBuildRequest).toBe(true)
+    expect(body.build_config?.request_source).toBe('cli_onboarding')
   })
 })

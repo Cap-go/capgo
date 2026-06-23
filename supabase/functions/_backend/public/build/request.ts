@@ -43,6 +43,12 @@ interface ValidBuildRequestBody {
   build_credentials: Record<string, string>
 }
 
+type BuildRequestSource = 'cli_onboarding' | 'manual'
+
+function normalizeBuildRequestSource(value: unknown): BuildRequestSource {
+  return value === 'cli_onboarding' ? 'cli_onboarding' : 'manual'
+}
+
 function throwBuilderUnavailable(message: string, moreInfo: Record<string, unknown> = {}, cause?: unknown): never {
   throw quickError(503, 'service_unavailable', message, moreInfo, cause, { alert: false })
 }
@@ -141,11 +147,16 @@ function validateBuildRequestBody(c: Context, body: RequestBuildBody, userId: st
     throw simpleError('invalid_parameter', 'build_config must be an object')
   }
 
+  const normalizedBuildConfig = (build_config ?? {}) as Record<string, any>
+
   return {
     app_id,
     platform: platform as 'ios' | 'android',
     build_mode: build_mode as 'release' | 'debug',
-    build_config: build_config as Record<string, any>,
+    build_config: {
+      ...normalizedBuildConfig,
+      request_source: normalizeBuildRequestSource(normalizedBuildConfig.request_source),
+    },
     build_options,
     build_credentials,
   }
