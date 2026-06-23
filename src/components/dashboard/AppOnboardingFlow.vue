@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
 import { FormKit } from '@formkit/vue'
-import { FunctionsHttpError } from '@supabase/supabase-js'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -31,6 +30,10 @@ import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 import { isValidAppId } from '~/utils/appId'
+import {
+  buildAlternativeAppIds,
+  createOnboardingAppWithFallbackIds,
+} from '~/utils/onboardingAppCreateHelpers'
 import {
   clearOnboardingAppDraft,
   loadOnboardingAppDraft,
@@ -477,59 +480,6 @@ function applyAppIdSuggestion(suggestion: string) {
   appIdFeedback.value = ''
 }
 
-function isAppIdConflict(error: { status?: number, message?: string } | null | undefined) {
-  if (!error)
-    return false
-
-  if (error.status === 409)
-    return true
-
-  const message = error.message?.toLowerCase() || ''
-  return ['duplicate', 'already exists', 'unique constraint', 'apps_pkey', 'app_id_key', 'app_id_already_exists'].some(fragment => message.includes(fragment))
-}
-
-function buildAlternativeAppIds(baseId: string) {
-  const normalized = baseId.trim().replace(/\.+$/g, '') || suggestedAppId.value
-  const proposals = [
-    `${normalized}.app`,
-    `${normalized}.mobile`,
-    `${normalized}.capgo`,
-    `${normalized}.${currentOrg.value?.name ? slugifyOnboardingSegment(currentOrg.value.name) : 'prod'}`,
-    `${normalized}.${crypto.randomUUID().slice(0, 4)}`,
-  ]
-
-  return [...new Set(proposals.filter(candidate => candidate !== normalized))]
-}
-
-async function readFunctionError(error: unknown) {
-  if (!(error instanceof FunctionsHttpError) || !(error.context instanceof Response))
-    return null
-
-  try {
-    const json = await error.context.clone().json() as {
-      error?: string
-      message?: string
-      app_id?: string
-      moreInfo?: { app_id?: string, error?: string }
-    }
-
-    return {
-      status: error.context.status,
-      code: json.error ?? '',
-      message: json.message ?? t('app-onboarding-toast-create-error'),
-      appId: json.app_id ?? json.moreInfo?.app_id ?? '',
-    }
-  }
-  catch {
-    return {
-      status: error.context.status,
-      code: '',
-      message: t('app-onboarding-toast-create-error-status', { status: error.context.status }),
-      appId: '',
-    }
-  }
-}
-
 async function uploadIcon(appId: string, iconSourceUrl?: string) {
   if (!currentOrg.value?.gid)
     return
@@ -771,63 +721,52 @@ async function createAppRecord(options?: { nextStep?: StandardFlowStep | PreOrgF
       : { iosStoreUrl: null, androidStoreUrl: null }
 
     let appId = generatedAppId.value
-    let responseData: AppRow | null = null
-    const candidateIds = [appId, ...buildAlternativeAppIds(appId)]
+    const createResult = await createOnboardingAppWithFallbackIds(supabase, {
+      ownerOrgId: currentOrg.value.gid,
+      baseAppId: appId,
+      appName: appName.value.trim(),
+      existingApp: existingApp.value,
+      iosStoreUrl: normalizedStoreUrls.iosStoreUrl,
+      androidStoreUrl: normalizedStoreUrls.androidStoreUrl,
+      orgName: currentOrg.value?.name,
+      fallbackBaseId: suggestedAppId.value,
+    }, {
+      defaultMessage: t('app-onboarding-toast-create-error'),
+      statusMessage: status => t('app-onboarding-toast-create-error-status', { status }),
+    })
 
-    for (const candidateId of candidateIds) {
-      const { data, error } = await supabase.functions.invoke('app', {
-        method: 'POST',
-        body: {
-          owner_org: currentOrg.value.gid,
-          app_id: candidateId,
-          name: appName.value.trim(),
-          need_onboarding: true,
-          existing_app: existingApp.value,
-          ios_store_url: normalizedStoreUrls.iosStoreUrl,
-          android_store_url: normalizedStoreUrls.androidStoreUrl,
-        },
-      })
-
-      if (!error && data?.app_id) {
-        responseData = data as AppRow
-        appId = candidateId
-        manualAppId.value = candidateId
-        if (candidateId !== candidateIds[0]) {
-          appIdFeedback.value = t('app-onboarding-appid-taken-switched', {
-            original: candidateIds[0],
-            replacement: candidateId,
-          })
-          appIdSuggestions.value = buildAlternativeAppIds(candidateIds[0])
-          toast.info(appIdFeedback.value)
-        }
-        else {
-          appIdFeedback.value = ''
-          appIdSuggestions.value = []
-        }
-        break
+    if (createResult.ok === false) {
+      if (createResult.reason === 'all_conflicts') {
+        appIdSuggestions.value = createResult.suggestions
+        appIdFeedback.value = t('app-onboarding-appid-taken-pick-another', {
+          appId: createResult.originalAppId,
+        })
+        toast.error(appIdFeedback.value)
+        return
       }
 
-      const functionError = await readFunctionError(error)
-      const isConflict = isAppIdConflict({
-        status: functionError?.status ?? (error as { status?: number } | null | undefined)?.status,
-        message: `${functionError?.code ?? ''} ${functionError?.message ?? (error as { message?: string } | null | undefined)?.message ?? ''}`,
-      })
-
-      if (isConflict)
-        continue
-
-      appIdFeedback.value = functionError?.message ?? t('app-onboarding-toast-create-error')
+      appIdFeedback.value = createResult.message
       toast.error(appIdFeedback.value)
-      throw error ?? new Error(appIdFeedback.value)
+      throw createResult.error
     }
 
-    if (!responseData) {
-      appIdSuggestions.value = buildAlternativeAppIds(candidateIds[0])
-      appIdFeedback.value = t('app-onboarding-appid-taken-pick-another', {
-        appId: candidateIds[0],
+    const responseData = createResult.app
+    appId = createResult.usedAppId
+    manualAppId.value = createResult.usedAppId
+    if (createResult.wasRetried) {
+      appIdFeedback.value = t('app-onboarding-appid-taken-switched', {
+        original: createResult.originalAppId,
+        replacement: createResult.usedAppId,
       })
-      toast.error(appIdFeedback.value)
-      return
+      appIdSuggestions.value = buildAlternativeAppIds(createResult.originalAppId, {
+        orgName: currentOrg.value?.name,
+        fallbackBaseId: suggestedAppId.value,
+      })
+      toast.info(appIdFeedback.value)
+    }
+    else {
+      appIdFeedback.value = ''
+      appIdSuggestions.value = []
     }
 
     const importedIconSource = canUseStoreImportPreview.value ? storeIconPreview.value : ''

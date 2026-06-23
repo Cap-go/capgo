@@ -4,9 +4,9 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconLoader from '~icons/lucide/loader-2'
 import AppOnboardingFlow from '~/components/dashboard/AppOnboardingFlow.vue'
-import { clearOnboardingAppDraft } from '~/utils/onboardingAppDraft'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
+import { clearOnboardingAppDraft } from '~/utils/onboardingAppDraft'
 
 const router = useRouter()
 const { t } = useI18n()

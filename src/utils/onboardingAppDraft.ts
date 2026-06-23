@@ -62,17 +62,6 @@ export function loadOnboardingAppDraft(userId?: string | null): OnboardingAppDra
   }
 }
 
-export function saveOnboardingAppDraft(draft: OnboardingAppDraft, userId?: string | null) {
-  if (typeof sessionStorage === 'undefined')
-    return
-
-  const storageKey = getDraftStorageKey(userId)
-  if (!storageKey)
-    return
-
-  sessionStorage.setItem(storageKey, JSON.stringify(draft))
-}
-
 export function clearOnboardingAppDraft(userId?: string | null) {
   if (typeof sessionStorage === 'undefined')
     return
@@ -82,33 +71,4 @@ export function clearOnboardingAppDraft(userId?: string | null) {
     sessionStorage.removeItem(storageKey)
 
   sessionStorage.removeItem(LEGACY_STORAGE_KEY)
-}
-
-export async function fileToDataUrl(file: File): Promise<string> {
-  return await new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      resolve(typeof reader.result === 'string' ? reader.result : '')
-    }
-    reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'))
-    reader.readAsDataURL(file)
-  })
-}
-
-export async function remoteImageToDataUrl(url: string): Promise<string | null> {
-  if (!url || url.startsWith('data:'))
-    return url || null
-
-  try {
-    const response = await fetch(url)
-    const contentType = response.headers.get('content-type')?.split(';')[0]?.trim() ?? ''
-    if (!response.ok || !contentType.startsWith('image/'))
-      return null
-
-    const blob = await response.blob()
-    return await fileToDataUrl(new File([blob], 'icon.png', { type: blob.type || contentType }))
-  }
-  catch {
-    return null
-  }
 }

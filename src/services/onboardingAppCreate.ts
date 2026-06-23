@@ -1,69 +1,15 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '~/types/supabase.types'
 import type { OnboardingAppDraft } from '~/utils/onboardingAppDraft'
-import { FunctionsHttpError } from '@supabase/supabase-js'
-import { slugifyOnboardingSegment, trimTrailingDots } from '~/utils/onboardingSlug'
+import {
+  createOnboardingAppWithFallbackIds,
+} from '~/utils/onboardingAppCreateHelpers'
 
 type AppRow = Database['public']['Tables']['apps']['Row']
 
 interface CreateOnboardingAppResult {
   app: AppRow
   appIdFeedback?: string
-}
-
-function isAppIdConflict(error: { status?: number, message?: string } | null | undefined) {
-  if (!error)
-    return false
-
-  if (error.status === 409)
-    return true
-
-  const message = error.message?.toLowerCase() || ''
-  return ['duplicate', 'already exists', 'unique constraint', 'apps_pkey', 'app_id_key', 'app_id_already_exists'].some(fragment => message.includes(fragment))
-}
-
-function buildAlternativeAppIds(baseId: string, orgName?: string) {
-  const normalized = trimTrailingDots(baseId) || baseId
-  const orgSlug = orgName ? slugifyOnboardingSegment(orgName, 'prod') : 'prod'
-
-  const proposals = [
-    `${normalized}.app`,
-    `${normalized}.mobile`,
-    `${normalized}.capgo`,
-    `${normalized}.${orgSlug}`,
-    `${normalized}.${crypto.randomUUID().slice(0, 4)}`,
-  ]
-
-  return [...new Set(proposals.filter(candidate => candidate !== normalized))]
-}
-
-async function readFunctionError(error: unknown) {
-  if (!(error instanceof FunctionsHttpError) || !(error.context instanceof Response))
-    return null
-
-  try {
-    const json = await error.context.clone().json() as {
-      error?: string
-      message?: string
-      app_id?: string
-      moreInfo?: { app_id?: string, error?: string }
-    }
-
-    return {
-      status: error.context.status,
-      code: json.error ?? '',
-      message: json.message ?? 'Failed to create app',
-      appId: json.app_id ?? json.moreInfo?.app_id ?? '',
-    }
-  }
-  catch {
-    return {
-      status: error.context.status,
-      code: '',
-      message: `Failed to create app (${error.context.status})`,
-      appId: '',
-    }
-  }
 }
 
 async function uploadIconFromDraft(
@@ -125,46 +71,27 @@ export async function createOnboardingAppFromDraft(
   draft: OnboardingAppDraft,
   orgName?: string,
 ): Promise<CreateOnboardingAppResult> {
-  const candidateIds = [draft.appId, ...buildAlternativeAppIds(draft.appId, orgName)]
-  let responseData: AppRow | null = null
-  let appIdFeedback: string | undefined
+  const createResult = await createOnboardingAppWithFallbackIds(supabase, {
+    ownerOrgId,
+    baseAppId: draft.appId,
+    appName: draft.appName,
+    existingApp: draft.existingApp,
+    iosStoreUrl: draft.iosStoreUrl,
+    androidStoreUrl: draft.androidStoreUrl,
+    orgName,
+  })
 
-  for (const candidateId of candidateIds) {
-    const { data, error } = await supabase.functions.invoke('app', {
-      method: 'POST',
-      body: {
-        owner_org: ownerOrgId,
-        app_id: candidateId,
-        name: draft.appName,
-        need_onboarding: true,
-        existing_app: draft.existingApp,
-        ios_store_url: draft.iosStoreUrl,
-        android_store_url: draft.androidStoreUrl,
-      },
-    })
+  if (createResult.ok === false) {
+    if (createResult.reason === 'all_conflicts')
+      throw new Error(`App ID ${createResult.originalAppId} is already used.`)
 
-    if (!error && data?.app_id) {
-      responseData = data as AppRow
-      if (candidateId !== candidateIds[0]) {
-        appIdFeedback = `App ID ${candidateIds[0]} was already taken, so Capgo switched to ${candidateId}.`
-      }
-      break
-    }
-
-    const functionError = await readFunctionError(error)
-    const isConflict = isAppIdConflict({
-      status: functionError?.status ?? (error as { status?: number } | null | undefined)?.status,
-      message: `${functionError?.code ?? ''} ${functionError?.message ?? (error as { message?: string } | null | undefined)?.message ?? ''}`,
-    })
-
-    if (isConflict)
-      continue
-
-    throw new Error(functionError?.message ?? 'Failed to create app')
+    throw new Error(createResult.message)
   }
 
-  if (!responseData)
-    throw new Error(`App ID ${candidateIds[0]} is already used.`)
+  const { app: responseData, usedAppId, originalAppId, wasRetried } = createResult
+  const appIdFeedback = wasRetried
+    ? `App ID ${originalAppId} was already taken, so Capgo switched to ${usedAppId}.`
+    : undefined
 
   await uploadIconFromDraft(supabase, ownerOrgId, responseData.app_id, draft)
 
