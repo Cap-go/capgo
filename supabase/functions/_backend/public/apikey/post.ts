@@ -9,7 +9,7 @@ import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { parseApiKeyGlobalPermissions, replaceApiKeyGlobalPermissions, validateApiKeyGlobalPermissionsForBindings } from './global_permissions.ts'
-import { ensureApiKeyManagementAllowed, requireApiKeyManagementAuth } from './scope.ts'
+import { assertApiKeyManagerCanAssignBindings, ensureApiKeyManagementAllowed, requireApiKeyManagementAuth } from './scope.ts'
 
 interface BindingInput {
   role_name: string
@@ -124,6 +124,7 @@ app.post('/', middlewareAuth(), async (c) => {
   // Validate expiration against org policies (throws if invalid)
   const allOrgIds = [...new Set(resolvedBindings.map(binding => binding.org_id))]
   await validateExpirationAgainstOrgPolicies(allOrgIds, expiresAt, supabase)
+  await assertApiKeyManagerCanAssignBindings(c, auth, resolvedBindings)
 
   let apikeyData: ApiKeyRow | null = null
 

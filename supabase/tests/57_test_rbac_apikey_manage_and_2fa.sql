@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(8);
+SELECT plan(9);
 
 -- org.manage_apikeys permission and apikey_manager role exist
 SELECT ok(
@@ -113,12 +113,35 @@ SELECT ok(
 );
 
 SELECT ok(
-  NOT EXISTS (
+  EXISTS (
     SELECT 1
-    FROM public.roles
-    WHERE name IN ('channel_developer', 'channel_uploader')
+    FROM public.roles r
+    INNER JOIN public.role_permissions rp ON rp.role_id = r.id
+    INNER JOIN public.permissions p ON p.id = rp.permission_id
+    WHERE r.name = 'channel_developer'
+      AND p.key = public.rbac_perm_channel_promote_bundle()
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM public.roles r
+    INNER JOIN public.role_permissions rp ON rp.role_id = r.id
+    INNER JOIN public.permissions p ON p.id = rp.permission_id
+    WHERE r.name = 'channel_developer'
+      AND p.key = public.rbac_perm_channel_update_settings()
   ),
-  'legacy channel_developer and channel_uploader roles are not seeded'
+  'channel_developer can promote bundles without channel settings writes'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM public.roles r
+    INNER JOIN public.role_permissions rp ON rp.role_id = r.id
+    INNER JOIN public.permissions p ON p.id = rp.permission_id
+    WHERE r.name = public.rbac_role_apikey_manager()
+      AND p.key = public.rbac_perm_org_read()
+  ),
+  'apikey_manager inherits org.read for expiration policy enforcement'
 );
 
 
