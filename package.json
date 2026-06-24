@@ -103,6 +103,7 @@
     "stripe:backfill-revenue-trends": "bun scripts/fix_stripe_admin_revenue_dashboard_metrics.ts",
     "stripe:backfill-admin-revenue-dashboard": "bun scripts/fix_stripe_admin_revenue_dashboard_metrics.ts",
     "stripe:export-six-month-org-emails": "bun scripts/export_stripe_six_month_org_emails.ts",
+    "stripe:cleanup-orphaned-stripe-info": "bun scripts/cleanup_orphaned_stripe_info.ts",
     "stripe:sync-org-names": "bun scripts/sync_stripe_org_names.ts",
     "lint": "bun run lint:ox && eslint \"src/**/*.{vue,ts,js}\"",
     "lint:ox": "oxlint src",
