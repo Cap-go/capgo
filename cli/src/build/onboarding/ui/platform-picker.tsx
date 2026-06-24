@@ -5,8 +5,9 @@ import type { PlatformPickerLayout } from './frame-fit.js'
 //
 // The "Which platform do you want to set up?" picker, rendered INSIDE the
 // alt-screen wizard (by OnboardingShell). Responsive:
-//   • `cards` — bordered cards side-by-side; ←/→ (or 1/2) move the
-//     selection, Enter confirms. Used when the terminal has room.
+//   • `cards` — bordered cards side-by-side; ←/→ (or h/l) MOVE the selection
+//     across ALL cards (iOS ↔ Android ↔ Appflow), 1/2/3 jump, a jumps to
+//     Appflow, Enter confirms. Used when the terminal has room.
 //   • `list` — the same @inkjs/ui Select used everywhere else; used on narrow
 //     or short terminals. The layout is chosen by the shell via
 //     `pickPlatformLayout` so this component stays pure (props in → JSX out).
@@ -19,11 +20,16 @@ import { Select } from '@inkjs/ui'
 import { Box, Text, useInput } from 'ink'
 import React, { useState } from 'react'
 
+// The card order (left → right) for the cards layout; arrow movement walks it.
+const PLATFORM_ORDER: Platform[] = ['ios', 'android', 'appflow']
+
 // Pure mapping from a keypress to a picker action (extracted so the
-// arrow/Enter logic is unit-testable without rendering). ←/h/1 → iOS,
-// →/l/2 → Android, Enter → confirm the current selection.
+// arrow/Enter logic is unit-testable without rendering). ←/h MOVE left, →/l
+// MOVE right (so arrows can reach EVERY card, incl. Appflow), 1/2/3 jump to a
+// specific card, a jumps to Appflow, Enter confirms the current selection.
 export type PlatformKeyAction
-  = | { type: 'select', platform: Platform }
+  = | { type: 'move', delta: number }
+    | { type: 'jump', platform: Platform }
     | { type: 'confirm' }
     | null
 
@@ -33,12 +39,16 @@ export function platformKeyAction(
 ): PlatformKeyAction {
   if (key.return)
     return { type: 'confirm' }
-  if (key.leftArrow || input === 'h' || input === '1')
-    return { type: 'select', platform: 'ios' }
-  if (key.rightArrow || input === 'l' || input === '2')
-    return { type: 'select', platform: 'android' }
-  if (input === 'a' || input === '3')
-    return { type: 'select', platform: 'appflow' }
+  if (key.leftArrow || input === 'h')
+    return { type: 'move', delta: -1 }
+  if (key.rightArrow || input === 'l')
+    return { type: 'move', delta: 1 }
+  if (input === '1')
+    return { type: 'jump', platform: 'ios' }
+  if (input === '2')
+    return { type: 'jump', platform: 'android' }
+  if (input === '3' || input === 'a')
+    return { type: 'jump', platform: 'appflow' }
   return null
 }
 
@@ -67,7 +77,8 @@ export interface PlatformPickerProps {
 }
 
 export const PlatformPicker: FC<PlatformPickerProps> = ({ layout, onSelect }) => {
-  const [selected, setSelected] = useState<Platform>('ios')
+  const [index, setIndex] = useState(0)
+  const clamp = (i: number): number => Math.max(0, Math.min(PLATFORM_ORDER.length - 1, i))
 
   // Arrow/Enter driving for the cards layout. In list layout the @inkjs/ui
   // Select owns input, so this handler no-ops (it stays registered to satisfy
@@ -78,11 +89,15 @@ export const PlatformPicker: FC<PlatformPickerProps> = ({ layout, onSelect }) =>
     const action = platformKeyAction(input, key)
     if (!action)
       return
-    if (action.type === 'select')
-      setSelected(action.platform)
+    if (action.type === 'confirm')
+      onSelect(PLATFORM_ORDER[index])
+    else if (action.type === 'jump')
+      setIndex(clamp(PLATFORM_ORDER.indexOf(action.platform)))
     else
-      onSelect(selected)
+      setIndex(i => clamp(i + action.delta))
   })
+
+  const selected = PLATFORM_ORDER[index]
 
   if (layout === 'list') {
     return (
@@ -127,8 +142,8 @@ export interface CardChoice {
   hint: string
 }
 
-// Pure keypress → action mapping for CardChooser (unit-testable). ←/h → previous,
-// →/l → next, a number 1..count → that card, Enter → confirm.
+// Pure keypress → action mapping for CardChooser (unit-testable). ←/h → move
+// left, →/l → move right, a number 1..count → that card, Enter → confirm.
 export type CardKeyAction
   = | { type: 'move', delta: number }
     | { type: 'jump', index: number }
@@ -157,13 +172,16 @@ export interface CardChooserProps {
   question: string
   subtitle?: string
   options: CardChoice[]
+  /** Index of the card highlighted on first render (default 0 = leftmost). */
+  defaultIndex?: number
   onSelect: (value: string) => void
 }
 
 /** A heading + bordered cards (←/→/Enter) — or a Select on narrow terminals —
  *  for any small choice. Reuses PlatformCard so the boxes match the platform picker. */
-export const CardChooser: FC<CardChooserProps> = ({ layout, question, subtitle, options, onSelect }) => {
-  const [index, setIndex] = useState(0)
+export const CardChooser: FC<CardChooserProps> = ({ layout, question, subtitle, options, defaultIndex = 0, onSelect }) => {
+  const [index, setIndex] = useState(Math.max(0, Math.min(options.length - 1, defaultIndex)))
+  const clamp = (i: number): number => Math.max(0, Math.min(options.length - 1, i))
 
   useInput((input, key) => {
     if (layout !== 'cards' || options.length === 0)
@@ -174,9 +192,9 @@ export const CardChooser: FC<CardChooserProps> = ({ layout, question, subtitle, 
     if (action.type === 'confirm')
       onSelect((options[index] ?? options[0]).value)
     else if (action.type === 'jump')
-      setIndex(action.index)
+      setIndex(clamp(action.index))
     else
-      setIndex(i => (i + action.delta + options.length) % options.length)
+      setIndex(i => clamp(i + action.delta))
   })
 
   if (layout === 'list') {

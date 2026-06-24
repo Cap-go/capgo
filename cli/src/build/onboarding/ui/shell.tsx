@@ -259,7 +259,6 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
     return (
       <Box flexDirection="column" minHeight={rows} padding={1}>
         <Header />
-        {analyticsNotice && <AnalyticsNotice />}
         <UpdatePrompt
           layout={pickPlatformLayout(cols, rows)}
           currentVersion={updateInfo.currentVersion}
@@ -274,6 +273,8 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
             }
           }}
         />
+        <Box flexGrow={1} />
+        {analyticsNotice && <AnalyticsNotice />}
       </Box>
     )
   }
@@ -288,17 +289,17 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
     return (
       <Box flexDirection="column" minHeight={rows} padding={1}>
         <Header />
-        {analyticsNotice && <AnalyticsNotice />}
         <CardChooser
           layout={pickPlatformLayout(cols, rows)}
           question={`Are you migrating ${label} from Ionic Appflow?`}
           subtitle={`We can import your existing ${label} signing and store credentials instead of creating new ones.`}
           options={[
-            { value: 'yes', emoji: '🔄', name: `Yes, migrate`, hint: `Import ${label} from Appflow` },
             { value: 'no', emoji: '🆕', name: `No, set up ${label} fresh`, hint: `Set up new credentials` },
+            { value: 'yes', emoji: '🔄', name: `Yes, migrate`, hint: `Import ${label} from Appflow` },
           ]}
           onSelect={value => answerMigrationGate(value === 'yes')}
         />
+        {analyticsNotice && <AnalyticsNotice />}
       </Box>
     )
   }
@@ -306,8 +307,8 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
   return (
     <Box flexDirection="column" minHeight={rows} padding={1}>
       <Header />
-      {analyticsNotice && <AnalyticsNotice />}
       {!initialPlatform && <PlatformPicker layout={pickPlatformLayout(cols, rows)} onSelect={onPick} />}
+      {analyticsNotice && <AnalyticsNotice />}
     </Box>
   )
 }
