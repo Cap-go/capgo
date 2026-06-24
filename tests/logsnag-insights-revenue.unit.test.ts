@@ -160,6 +160,30 @@ describe('logsnag revenue metric helpers', () => {
     expect(logsnagInsightsTestUtils.shouldSkipCompletedGlobalStatsShardRetry(completed, 'notifications')).toBe(false)
   })
 
+  it.concurrent('derives only missing global stats shards for partial dispatcher retries', () => {
+    const partial = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
+      'core',
+      'usage',
+      'revenue',
+    ])
+
+    expect(logsnagInsightsTestUtils.getMissingGlobalStatsRequiredShards(partial)).toEqual([
+      'plugins',
+      'builds',
+      'retention',
+      'paid_products',
+      'ltv',
+    ])
+    expect(logsnagInsightsTestUtils.getMissingGlobalStatsShards(partial)).toEqual([
+      'plugins',
+      'builds',
+      'retention',
+      'paid_products',
+      'ltv',
+      'notifications',
+    ])
+  })
+
   it.concurrent('uses notification claim markers to avoid replaying claimed sends', () => {
     const ready = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
       'core',
