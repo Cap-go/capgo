@@ -19,6 +19,9 @@
     ],
     "cli/src/build/onboarding/mcp/session-state.ts": [
       "exports"
+    ],
+    "playwright/visual-diff.config.ts": [
+      "exports"
     ]
   },
   "ignoreUnresolved": [

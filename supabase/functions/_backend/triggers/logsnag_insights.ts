@@ -2727,7 +2727,6 @@ export const logsnagInsightsTestUtils = {
   normalizeCoreSnapshotCounts,
   reserveLogsnagInsightsRetry,
   reserveLogsnagInsightsShardRetry,
-  dispatchMissingLogsnagInsightsShards,
   scheduleLogsnagInsightsUpdate,
   scheduleLogsnagInsightsShardUpdate,
 }
