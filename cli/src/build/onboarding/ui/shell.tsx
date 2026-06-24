@@ -19,7 +19,6 @@ import type { OnboardingResult, Platform } from '../types.js'
 // `command.ts` passes `initialPlatform` to skip the picker, and
 // `onResolvePlatform` so it can print the post-exit completion breadcrumb.
 import { Box, Text, useApp, useStdout } from 'ink'
-import { Select } from '@inkjs/ui'
 import React, { useCallback, useEffect, useState } from 'react'
 import { loadAndroidProgress } from '../android/progress.js'
 import AndroidOnboardingApp from '../android/ui/app.js'
@@ -30,7 +29,7 @@ import { PICKER_MIN_COLS, PICKER_MIN_ROWS, terminalFitsPicker } from '../min-ter
 import { Header } from './components.js'
 import { pickPlatformLayout } from './frame-fit.js'
 import { TerminalTooSmallPrompt } from './min-size-gate.js'
-import { PlatformPicker } from './platform-picker.js'
+import { CardChooser, PlatformPicker } from './platform-picker.js'
 import { exitAfterOnboardingBeforeExit } from './exit.js'
 import { UpdatePrompt } from './update-prompt.js'
 import type { OnboardingBeforeExit } from './exit.js'
@@ -290,18 +289,16 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
       <Box flexDirection="column" minHeight={rows} padding={1}>
         <Header />
         {analyticsNotice && <AnalyticsNotice />}
-        <Box marginTop={1} flexDirection="column">
-          <Text>{`Are you migrating ${label} from Ionic Appflow? We can import your existing ${label} signing and store credentials instead of creating new ones.`}</Text>
-          <Box marginTop={1}>
-            <Select
-              options={[
-                { label: `Yes, import my ${label} credentials from Appflow`, value: 'yes' },
-                { label: `No, set up ${label} fresh`, value: 'no' },
-              ]}
-              onChange={value => answerMigrationGate(value === 'yes')}
-            />
-          </Box>
-        </Box>
+        <CardChooser
+          layout={pickPlatformLayout(cols, rows)}
+          question={`Are you migrating ${label} from Ionic Appflow?`}
+          subtitle={`We can import your existing ${label} signing and store credentials instead of creating new ones.`}
+          options={[
+            { value: 'yes', emoji: '🔄', name: `Yes, migrate`, hint: `Import ${label} from Appflow` },
+            { value: 'no', emoji: '🆕', name: `No, set up ${label} fresh`, hint: `Set up new credentials` },
+          ]}
+          onSelect={value => answerMigrationGate(value === 'yes')}
+        />
       </Box>
     )
   }
