@@ -58,6 +58,33 @@ describe('backend bundle compatibility helpers', () => {
     })
   })
 
+
+  it.concurrent('flags @capacitor/android checksum changes even when versions match', () => {
+    const comparisons = compareNativePackages(
+      [pkg('@capacitor/android', '8.4.0', { android_checksum: 'new-android' })],
+      [pkg('@capacitor/android', '8.4.0', { android_checksum: 'old-android' })],
+    )
+
+    expect(comparisons[0]).toMatchObject({
+      status: 'changed',
+      compatible: false,
+      reasons: ['android_code_changed'],
+    })
+  })
+
+  it.concurrent('flags @capacitor/ios checksum changes even when versions match', () => {
+    const comparisons = compareNativePackages(
+      [pkg('@capacitor/ios', '8.4.0', { ios_checksum: 'new-ios' })],
+      [pkg('@capacitor/ios', '8.4.0', { ios_checksum: 'old-ios' })],
+    )
+
+    expect(comparisons[0]).toMatchObject({
+      status: 'changed',
+      compatible: false,
+      reasons: ['ios_code_changed'],
+    })
+  })
+
   it.concurrent('flags requested version constraint changes as metadata when resolved versions match', () => {
     const comparisons = compareNativePackages(
       [pkg('@capgo/native', '1.2.0', { requested_version: '^1.2.0' })],

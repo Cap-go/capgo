@@ -27,6 +27,7 @@ import { markSnag } from './app/debug'
 import { findMonorepoRoot, findNXMonorepoRoot, isMonorepo, isNXMonorepo } from './capacitor-cli'
 import { getChecksum } from './checksum'
 import { loadConfig, writeConfig } from './config'
+import { calculatePlatformChecksums, dependencyHasNativeFiles } from './native-checksum'
 import { isTruthyEnvValue } from './posthog'
 import { nativePackageSchema } from './schemas/common'
 import { formatApiErrorForCli, parseSecurityPolicyError } from './utils/security_policy_errors'
@@ -608,9 +609,6 @@ export async function getLocalConfig(silent = false) {
     }
   }
 }
-// eslint-disable-next-line regexp/no-unused-capturing-group
-const nativeFileRegex = /([A-Za-z0-9]+)\.(java|swift|kt|scala)$/
-
 interface CapgoConfig {
   supaHost?: string
   supaKey?: string
@@ -1842,142 +1840,6 @@ export function getNativeProjectResetAdvice(platformRunner: string, nativePlatfo
   }
 }
 
-function readDirRecursively(dir: string): string[] {
-  const entries = readdirSync(dir, { withFileTypes: true })
-  const files = entries.flatMap((entry) => {
-    const fullPath = join(dir, entry.name)
-    if (entry.isDirectory()) {
-      return readDirRecursively(fullPath)
-    }
-    else {
-      // Use relative path to avoid issues with long paths on Windows
-      return fullPath.split(`node_modules${sep}`)[1] || fullPath
-    }
-  })
-  return files
-}
-
-/**
- * Read directory recursively and return full paths for all files
- */
-function readDirRecursivelyFullPaths(dir: string): string[] {
-  if (!existsSync(dir))
-    return []
-
-  try {
-    const entries = readdirSync(dir, { withFileTypes: true })
-    const files = entries.flatMap((entry) => {
-      const fullPath = join(dir, entry.name)
-      if (entry.isDirectory()) {
-        return readDirRecursivelyFullPaths(fullPath)
-      }
-      else {
-        return fullPath
-      }
-    })
-    return files
-  }
-  catch {
-    return []
-  }
-}
-
-/**
- * Get additional platform-specific files that should be included in checksum.
- * These files contain platform dependency versions and configurations.
- */
-function getPlatformConfigFiles(dependencyFolderPath: string, platform: 'ios' | 'android'): string[] {
-  const files: string[] = []
-
-  if (platform === 'ios') {
-    // Include .podspec files (CocoaPods dependency versions)
-    try {
-      const rootFiles = readdirSync(dependencyFolderPath)
-      for (const file of rootFiles) {
-        if (file.endsWith('.podspec')) {
-          files.push(join(dependencyFolderPath, file))
-        }
-      }
-    }
-    catch {
-      // Ignore errors reading directory
-    }
-
-    // Include Package.swift (SPM dependency versions) - can be at root or in ios folder
-    const packageSwiftRoot = join(dependencyFolderPath, 'Package.swift')
-    const packageSwiftIos = join(dependencyFolderPath, 'ios', 'Package.swift')
-    if (existsSync(packageSwiftRoot))
-      files.push(packageSwiftRoot)
-    if (existsSync(packageSwiftIos))
-      files.push(packageSwiftIos)
-  }
-  else if (platform === 'android') {
-    // Include build.gradle files (Android dependency versions)
-    const androidDir = join(dependencyFolderPath, 'android')
-    const buildGradle = join(androidDir, 'build.gradle')
-    const buildGradleKts = join(androidDir, 'build.gradle.kts')
-
-    if (existsSync(buildGradle))
-      files.push(buildGradle)
-    if (existsSync(buildGradleKts))
-      files.push(buildGradleKts)
-  }
-
-  return files
-}
-
-/**
- * Calculate checksums for iOS and Android native code in a dependency folder.
- * Includes both native source files and platform configuration files
- * (podspec, Package.swift, build.gradle) that define platform dependencies.
- */
-async function calculatePlatformChecksums(dependencyFolderPath: string): Promise<{ ios_checksum?: string, android_checksum?: string }> {
-  const iosDir = join(dependencyFolderPath, 'ios')
-  const androidDir = join(dependencyFolderPath, 'android')
-
-  const calculatePlatformChecksum = async (platformDir: string, platform: 'ios' | 'android'): Promise<string | undefined> => {
-    // Get native code files
-    const nativeFiles = existsSync(platformDir)
-      ? readDirRecursivelyFullPaths(platformDir).filter(f => nativeFileRegex.test(f))
-      : []
-
-    // Get platform config files (podspec, Package.swift, build.gradle)
-    const configFiles = getPlatformConfigFiles(dependencyFolderPath, platform)
-
-    // Combine and sort all files for consistent checksumming
-    const allFiles = [...nativeFiles, ...configFiles].sort((a, b) => a.localeCompare(b))
-
-    if (allFiles.length === 0)
-      return undefined
-
-    const { createHash } = await import('node:crypto')
-    const hash = createHash('sha256')
-
-    for (const file of allFiles) {
-      try {
-        // Include relative path in hash to detect file renames/moves
-        const relativePath = relative(dependencyFolderPath, file)
-        hash.update(relativePath)
-        // Include file content
-        const content = readFileSync(file)
-        hash.update(content)
-      }
-      catch {
-        // Skip files that can't be read
-      }
-    }
-
-    return hash.digest('hex')
-  }
-
-  const [ios_checksum, android_checksum] = await Promise.all([
-    calculatePlatformChecksum(iosDir, 'ios'),
-    calculatePlatformChecksum(androidDir, 'android'),
-  ])
-
-  return { ios_checksum, android_checksum }
-}
-
 export async function getLocalDependencies(packageJsonPath: string | undefined, nodeModulesString: string | undefined) {
   const nodeModules = nodeModulesString
     ? nodeModulesString
@@ -2052,8 +1914,7 @@ export async function getLocalDependencies(packageJsonPath: string | undefined, 
             // If we can't read the package.json, fall back to declared version
           }
           try {
-            const files = readDirRecursively(dependencyFolderPath)
-            if (files.some(fileName => nativeFileRegex.test(fileName))) {
+            if (dependencyHasNativeFiles(dependencyFolderPath)) {
               hasNativeFiles = true
               break
             }

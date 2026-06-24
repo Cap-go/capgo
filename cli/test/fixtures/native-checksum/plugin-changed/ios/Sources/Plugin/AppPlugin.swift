@@ -1,0 +1,3 @@
+class AppPlugin {
+  func changed() {}
+}
