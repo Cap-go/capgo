@@ -1922,11 +1922,15 @@ function androidEffectError(
 // existing build/CI tail treats them like natively-set-up creds.
 const APPFLOW_PHASE = 'credentials' as const
 
-/** Map a neutral StepView.kind to the MCP StepKind (the neutral 'input' kind is unused by the appflow flow). */
+/** Map a neutral StepView.kind to the MCP StepKind. The neutral 'input' kind (the
+ * step-8 provide chain: .p8 path / key id / issuer id) has no MCP equivalent, so
+ * it renders as a 'human_gate' that collects one text field via next_step. */
 function appflowKind(kind: StepView['kind']): StepKind {
   if (kind === 'choice' || kind === 'human_gate' || kind === 'info' || kind === 'done' || kind === 'error')
     return kind
-  // 'auto' renders as an auto step; 'input' is never produced by appflowViewForStep.
+  if (kind === 'input')
+    return 'human_gate'
+  // 'auto' renders as an auto step.
   return 'auto'
 }
 
@@ -1936,7 +1940,8 @@ function appflowProgressFor(step: AppflowStep): number {
     'explain', 'authenticating', 'select-org', 'select-app', 'fetch-signing',
     'select-ios-cert', 'select-android-cert', 'no-signing-submenu', 'fetch-distribution',
     'ios-dist-gapfill', 'android-dist-gapfill', 'ios-p8-generate', 'android-sa-generate',
-    'validate', 'p8-upgrade-prompt', 'handoff-build', 'done',
+    'validate', 'p8-upgrade-prompt', 'p8-source-select', 'input-p8-path', 'input-p8-key-id',
+    'input-p8-issuer-id', 'load-provided-p8', 'handoff-build', 'done',
   ]
   const idx = order.indexOf(step)
   if (idx < 0)
@@ -2024,6 +2029,23 @@ function renderAppflowView(step: AppflowStep, view: StepView): NextStepResult {
       },
     }
   }
+  if (view.kind === 'input') {
+    // The step-8 provide chain collects ONE text field per step. Map the
+    // collected field to the next_step input key decideAppflow threads back
+    // (p8Path -> input.p8Path, p8KeyId -> input.keyId, p8IssuerId -> input.issuerId).
+    const field = view.collect?.[0]?.field
+    const inputKey = field === 'p8Path' ? 'p8Path' : field === 'p8KeyId' ? 'keyId' : 'issuerId'
+    return {
+      ...base,
+      human: { instruction: view.prompt },
+      next: {
+        tool: NEXT_STEP_TOOL,
+        with: { [inputKey]: `<${field}>` },
+        instruction: `Ask the user for the value, then call next_step with { ${inputKey} }.`,
+        call: `${NEXT_STEP_TOOL}({ ${inputKey}: "..." })`,
+      },
+    }
+  }
   return base
 }
 
@@ -2080,7 +2102,7 @@ export async function decideAppflow(
     }
     // Thread any text answer (custom build command / .env export path) so a tail
     // text-input step answered over MCP is not silently dropped (C31).
-    const inputText = input.buildScriptCustom ?? input.envExportPath ?? input.profilePath
+    const inputText = input.buildScriptCustom ?? input.envExportPath ?? input.profilePath ?? input.p8Path ?? input.keyId ?? input.issuerId
     progress = appflowFlow.applyInput(step, progress, { value: input.value, text: inputText })
     // 'abandon' on the no-signing submenu leaves the migration and starts native
     // onboarding for the affected platform (the spec's "come back later" exit).

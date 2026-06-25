@@ -61,11 +61,35 @@ assert.strictEqual(valRes.kind, 'info')
 assert.ok(/cert opens/.test(valRes.prompt))
 assert.ok(/never blocks/i.test(valRes.prompt))
 
-// ── p8 upgrade view ──
+// ── p8 upgrade view: sells advantages + states the cost, no caps/em-dashes ──
 const g = f.appflowFlow.viewForStep('p8-upgrade-prompt', { scope: 'ios', ios: { FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: 'w' }, migratable: { ios: true, android: false }, completedSteps: [] })
-assert.ok(/recommended|api key|\.p8/i.test(g.prompt))
+assert.ok(/app store connect api key|\.p8/i.test(g.prompt))
+assert.ok(/pre-scan|certificates and provisioning/i.test(g.prompt), 'mentions the pre-scan advantage')
+assert.ok(/more secure|scoped, revocable/i.test(g.prompt), 'mentions security advantage')
+assert.ok(/5 minutes|few manual steps/i.test(g.prompt), 'states the cost')
+assert.ok(!g.prompt.includes('—'), 'no em-dashes in the copy')
 assert.ok((g.options || []).map(o => o.value).includes('convert'))
 assert.ok((g.options || []).map(o => o.value).includes('skip'))
+
+// ── p8-source-select view: generate vs. provide ──
+const ss = f.appflowFlow.viewForStep('p8-source-select', { scope: 'ios', ios: { FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: 'w' }, migratable: { ios: true, android: false }, completedSteps: [] })
+assert.strictEqual(ss.kind, 'choice')
+assert.deepStrictEqual((ss.options || []).map(o => o.value).sort(), ['generate', 'provide'])
+assert.ok(/already have a \.p8/i.test((ss.options || []).find(o => o.value === 'provide').label))
+
+// ── provide-chain input views render as 'input' with a collect field + placeholder ──
+const pathView = f.appflowFlow.viewForStep('input-p8-path', { scope: 'ios', migratable: { ios: true, android: false }, completedSteps: [] })
+assert.strictEqual(pathView.kind, 'input')
+assert.strictEqual(pathView.collect?.[0]?.field, 'p8Path')
+assert.strictEqual(pathView.collect?.[0]?.secret, false)
+const keyIdView = f.appflowFlow.viewForStep('input-p8-key-id', { scope: 'ios', migratable: { ios: true, android: false }, completedSteps: [] })
+assert.strictEqual(keyIdView.kind, 'input')
+assert.strictEqual(keyIdView.collect?.[0]?.field, 'p8KeyId')
+const issuerView = f.appflowFlow.viewForStep('input-p8-issuer-id', { scope: 'ios', migratable: { ios: true, android: false }, completedSteps: [] })
+assert.strictEqual(issuerView.kind, 'input')
+assert.strictEqual(issuerView.collect?.[0]?.field, 'p8IssuerId')
+const loadView = f.appflowFlow.viewForStep('load-provided-p8', { scope: 'ios', migratable: { ios: true, android: false }, completedSteps: [] })
+assert.strictEqual(loadView.kind, 'auto')
 
 // ── step-6 gap-fill routing: iOS creds present but no upload destination -> ios-dist-gapfill (once) ──
 const distDone = { scope: 'ios', token: { access_token: 't' }, orgSlug: 'o', appId: 'a', ios: { BUILD_CERTIFICATE_BASE64: 'x', P12_PASSWORD: 'p' }, migratable: { ios: true, android: false }, completedSteps: ['explain', 'fetch-signing', 'fetch-distribution'] }
@@ -83,7 +107,33 @@ const appPwDone = { scope: 'ios', token: { access_token: 't' }, orgSlug: 'o', ap
 assert.strictEqual(f.getAppflowResumeStep(appPwDone), 'p8-upgrade-prompt')
 const afterP8 = f.appflowFlow.applyInput('p8-upgrade-prompt', appPwDone, { value: 'convert' })
 assert.strictEqual(afterP8.p8Upgrade, 'convert')
-assert.strictEqual(f.getAppflowResumeStep(afterP8), 'ios-p8-generate') // 'convert' drives the shared .p8 generate sub-flow
+assert.strictEqual(f.getAppflowResumeStep(afterP8), 'p8-source-select') // 'convert' first asks how to obtain the .p8
+
+// ── p8-source-select routing: 'generate' -> guided helper; 'provide' -> input chain ──
+const genChoice = f.appflowFlow.applyInput('p8-source-select', afterP8, { value: 'generate' })
+assert.strictEqual(genChoice.p8Source, 'generate')
+assert.strictEqual(f.getAppflowResumeStep(genChoice), 'ios-p8-generate')
+const provChoice = f.appflowFlow.applyInput('p8-source-select', afterP8, { value: 'provide' })
+assert.strictEqual(provChoice.p8Source, 'provide')
+assert.strictEqual(f.getAppflowResumeStep(provChoice), 'input-p8-path')
+
+// ── provide chain records each field; key id auto-extracts from AuthKey_*.p8 filename ──
+const withPath = f.appflowFlow.applyInput('input-p8-path', provChoice, { text: '/Users/me/Downloads/AuthKey_ABC123XYZ.p8' })
+assert.strictEqual(withPath.p8Path, '/Users/me/Downloads/AuthKey_ABC123XYZ.p8')
+assert.strictEqual(withPath.p8KeyId, 'ABC123XYZ', 'key id auto-extracted from the filename')
+// auto-extracted key id -> skip the key-id prompt, go straight to issuer id
+assert.strictEqual(f.getAppflowResumeStep(withPath), 'input-p8-issuer-id')
+
+// a non-AuthKey filename leaves p8KeyId unset -> the key-id prompt is shown
+const plainPath = f.appflowFlow.applyInput('input-p8-path', provChoice, { text: '/tmp/mykey.p8' })
+assert.strictEqual(plainPath.p8KeyId, undefined)
+assert.strictEqual(f.getAppflowResumeStep(plainPath), 'input-p8-key-id')
+const withKeyId = f.appflowFlow.applyInput('input-p8-key-id', plainPath, { text: 'MANUALKEY' })
+assert.strictEqual(withKeyId.p8KeyId, 'MANUALKEY')
+assert.strictEqual(f.getAppflowResumeStep(withKeyId), 'input-p8-issuer-id')
+const withIssuer = f.appflowFlow.applyInput('input-p8-issuer-id', withKeyId, { text: 'issuer-uuid-1' })
+assert.strictEqual(withIssuer.p8IssuerId, 'issuer-uuid-1')
+assert.strictEqual(f.getAppflowResumeStep(withIssuer), 'load-provided-p8')
 
 // ── platformsToBuild (single-platform) ──
 assert.deepStrictEqual(f.platformsToBuild({ scope: 'ios', ios: { x: '1' }, android: {}, migratable: { ios: true, android: false }, completedSteps: [] }), ['ios'])

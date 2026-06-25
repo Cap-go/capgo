@@ -189,6 +189,25 @@ function generateAndroidServiceAccount(_opts: { packageName?: string }): Promise
 }
 
 /**
+ * Reader: load a user-provided App Store Connect API key (.p8) file and return
+ * its base64-encoded bytes, ready to store as APPLE_KEY_CONTENT (the same
+ * encoding the native iOS flow and the generate path use). Reads the raw bytes
+ * (a .p8 is PEM text, but we base64 the file as-is to match the generate path).
+ * Advisory: returns null on any error (missing / unreadable file), never throws.
+ */
+export async function readP8File(path: string): Promise<string | null> {
+  try {
+    if (!path || !existsSync(path))
+      return null
+    const bytes = readFileSync(path)
+    return Buffer.from(bytes).toString('base64')
+  }
+  catch {
+    return null
+  }
+}
+
+/**
  * Build the production AppflowEffectDeps for a given app id. The `packageName`
  * (the Play package, when known) sharpens the service-account probe; pass the
  * appId as a fallback. Token cache, browser, logger, and validators are all
@@ -207,6 +226,7 @@ export function buildAppflowEffectDeps(opts: { appId?: string, packageName?: str
     validateP12,
     generateIosP8Key,
     generateAndroidServiceAccount,
+    readP8File,
   }
 }
 

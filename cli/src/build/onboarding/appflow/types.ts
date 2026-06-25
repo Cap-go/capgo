@@ -22,6 +22,11 @@ export type AppflowOwnStep =
   | 'select-android-dist' // step 6 prompt (2+ android distribution credentials)
   | 'ios-dist-gapfill' // step 6: no iOS dist -> offer p8 generate/provide
   | 'android-dist-gapfill' // step 6: no Android dist -> offer SA generate/provide
+  | 'p8-source-select' // step 8: convert chosen -> generate guided, or provide an existing .p8
+  | 'input-p8-path' // step 8 provide: collect the .p8 file path (auto-extract key id from filename)
+  | 'input-p8-key-id' // step 8 provide: collect the ASC Key ID (only if not auto-extracted)
+  | 'input-p8-issuer-id' // step 8 provide: collect the ASC Issuer ID
+  | 'load-provided-p8' // step 8 provide (auto): read+base64 the .p8, merge APPLE_KEY_* into ios
   | 'ios-p8-generate' // step 6/8 (auto): drive the shared asc-key .p8 generate/provide, capture APPLE_KEY_* into ios
   | 'android-sa-generate' // step 6 (auto): drive the shared Google Play service-account flow, capture PLAY_CONFIG_JSON into android
   | 'validate' // step 7 (auto): run advisory checks, then show results
@@ -65,6 +70,14 @@ export interface AppflowProgress {
   androidDistGapfill?: 'generate' | 'skip'
   // step-8 iOS app-specific-password -> .p8 API key upgrade decision.
   p8Upgrade?: 'convert' | 'skip'
+  // step-8 .p8 source after 'convert': 'generate' drives the guided helper,
+  // 'provide' collects an existing .p8 (path -> key id -> issuer id -> load).
+  p8Source?: 'generate' | 'provide'
+  // step-8 provide chain: the .p8 file path, the ASC Key ID (auto-extracted
+  // from an AuthKey_<id>.p8 filename when possible), and the ASC Issuer ID.
+  p8Path?: string
+  p8KeyId?: string
+  p8IssuerId?: string
   // Advisory notes accumulated by auto effects (e.g. a p8/SA generate that could
   // not complete here). Surfaced in validate-results so the feedback isn't lost
   // when the next auto effect overwrites the transient ctx.

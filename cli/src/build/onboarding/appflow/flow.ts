@@ -23,6 +23,7 @@ import type { AppflowInput, AppflowProgress, AppflowStep } from './types'
 import type { AppflowToken } from './auth'
 import { isExpired, loginWithBrowser, refresh } from './auth'
 import { createAppflowApi } from './api'
+import { extractKeyIdFromP8Path } from '../progress.js'
 import type { TailInput, TailStep, TailStepCtx, TailStepView } from '../tail/flow.js'
 import { applyTailInput, runTailEffect, tailViewForStep } from '../tail/flow.js'
 import type { AppflowTailDepsOptions, AppflowTailProgress } from './tail.js'
@@ -67,6 +68,10 @@ export interface AppflowEffectDeps {
   // generation NEVER blocks the migration. `creds` is undefined unless ok.
   generateIosP8Key?: () => Promise<AppflowGenerateResult>
   generateAndroidServiceAccount?: (opts: { packageName?: string }) => Promise<AppflowGenerateResult>
+  // Reader for the step-8 'provide' path: load a user-supplied .p8 file and
+  // return its base64 bytes (-> APPLE_KEY_CONTENT). Advisory: a missing or
+  // unreadable file resolves to null and the flow records a note (never blocks).
+  readP8File?: (path: string) => Promise<string | null>
   carried?: Record<string, unknown>
   // Build/CI tail wiring (consumed only when the flow delegates a shared tail
   // step). The driver supplies the API key / gateway / journey + the build-output
@@ -396,13 +401,50 @@ export function appflowViewForStep(step: AppflowStep, progress: AppflowProgress,
       return {
         kind: 'choice',
         prompt:
-          'You imported an app-specific password for iOS uploads. An App Store Connect API key (.p8) is the '
-          + 'recommended, more capable, and more secure option. Convert now?',
+          "You're set up with an app-specific password, which works for uploads.\n\n"
+          + 'An App Store Connect API key (a .p8 file) unlocks more:\n'
+          + '- Before each build, Capgo can inspect your certificates and provisioning profiles and flag signing '
+          + 'problems early (the pre-scan), instead of a build failing partway through.\n'
+          + '- It is more secure (a scoped, revocable key), so your Apple ID password is never involved.\n'
+          + '- It does more than upload (it is the key Apple\'s own tools use for the full App Store Connect API).\n\n'
+          + 'Setting one up takes a few manual steps in the Apple Developer portal and can take up to about 5 minutes. '
+          + 'You can also do this later.',
         options: [
-          { value: 'convert', label: 'Convert to a .p8 API key (recommended)' },
+          { value: 'convert', label: 'Set up an App Store Connect API key (.p8)' },
           { value: 'skip', label: 'Keep the app-specific password' },
         ],
       }
+    case 'p8-source-select':
+      return {
+        kind: 'choice',
+        prompt: 'How would you like to set up your App Store Connect API key (.p8)?',
+        options: [
+          { value: 'generate', label: 'Generate one for me (guided, opens the Apple Developer portal, ~5 min)' },
+          { value: 'provide', label: 'I already have a .p8 file' },
+        ],
+      }
+    case 'input-p8-path':
+      return {
+        kind: 'input',
+        prompt: 'Path to your .p8 file (AuthKey_XXXXXX.p8):',
+        collect: [{ field: 'p8Path', desc: 'Path to your .p8 file', secret: false }],
+      }
+    case 'input-p8-key-id':
+      return {
+        kind: 'input',
+        prompt: 'Key ID (shown next to the key name in App Store Connect):',
+        collect: [{ field: 'p8KeyId', desc: 'Key ID', secret: false }],
+      }
+    case 'input-p8-issuer-id':
+      return {
+        kind: 'input',
+        prompt: 'Issuer ID (UUID at the very top of the API keys page, above the key list):',
+        collect: [{ field: 'p8IssuerId', desc: 'Issuer ID', secret: false }],
+      }
+    case 'load-provided-p8':
+      // AUTO: runAppflowEffect reads the .p8 at progress.p8Path, base64-encodes it,
+      // and merges APPLE_KEY_* into ios (dropping the app-specific password).
+      return { kind: 'auto', prompt: 'Reading your App Store Connect API key (.p8)…' }
     case 'validate':
       // AUTO: runValidations runs in runEffect, then transitions to validate-results.
       return { kind: 'auto', prompt: 'Validating imported credentials…' }
@@ -511,6 +553,20 @@ export function applyAppflowInput(step: AppflowStep, progress: AppflowProgress, 
       return { ...base, androidDistGapfill: input.value === 'generate' ? 'generate' : 'skip' }
     case 'p8-upgrade-prompt':
       return { ...base, p8Upgrade: input.value === 'convert' ? 'convert' : 'skip' }
+    case 'p8-source-select':
+      return { ...base, p8Source: input.value === 'provide' ? 'provide' : 'generate' }
+    case 'input-p8-path': {
+      // Store the path and auto-extract the ASC Key ID from an AuthKey_<id>.p8
+      // filename (mirrors the native iOS provide path). A non-matching filename
+      // leaves p8KeyId unset so the next step prompts for it.
+      const p8Path = (input.text ?? input.value ?? '').trim()
+      const extracted = extractKeyIdFromP8Path(p8Path)
+      return { ...base, p8Path, ...(extracted ? { p8KeyId: extracted } : {}) }
+    }
+    case 'input-p8-key-id':
+      return { ...base, p8KeyId: (input.text ?? input.value ?? '').trim() }
+    case 'input-p8-issuer-id':
+      return { ...base, p8IssuerId: (input.text ?? input.value ?? '').trim() }
     case 'handoff-build':
       return { ...base, handoffChoice: input.value === 'build' ? 'build' : 'skip' }
     default:
@@ -560,9 +616,24 @@ export function getAppflowResumeStep(progress: AppflowProgress | null): AppflowS
   if (iosHasAppPassword(progress) && progress.p8Upgrade === undefined)
     return 'p8-upgrade-prompt'
   // step-8 'convert' chose to upgrade the app-specific password to a .p8 API
-  // key: drive the SAME shared asc-key generate sub-flow, capture APPLE_KEY_*.
-  if (progress.p8Upgrade === 'convert' && !done('ios-p8-generate'))
+  // key: first ask how to obtain the .p8 (generate guided vs. provide existing).
+  if (progress.p8Upgrade === 'convert' && progress.p8Source === undefined)
+    return 'p8-source-select'
+  // 'generate' drives the SAME shared asc-key generate sub-flow (captures
+  // APPLE_KEY_* and drops the app-specific password). Runs at most once.
+  if (progress.p8Upgrade === 'convert' && progress.p8Source === 'generate' && !done('ios-p8-generate'))
     return 'ios-p8-generate'
+  // 'provide' collects an existing .p8: path -> key id (only if not auto-extracted
+  // from the filename) -> issuer id -> load (auto reads + base64s the file).
+  if (progress.p8Upgrade === 'convert' && progress.p8Source === 'provide' && !done('load-provided-p8')) {
+    if (!progress.p8Path)
+      return 'input-p8-path'
+    if (!progress.p8KeyId)
+      return 'input-p8-key-id'
+    if (!progress.p8IssuerId)
+      return 'input-p8-issuer-id'
+    return 'load-provided-p8'
+  }
   // converge: the build hand-off choice (build now / skip).
   if (progress.handoffChoice === undefined)
     return 'handoff-build'
@@ -782,6 +853,40 @@ export async function runAppflowEffect(step: AppflowStep, progress: AppflowProgr
         note = `App Store Connect API key setup skipped: ${e instanceof Error ? e.message : String(e)}.`
       }
       p = mark(p, 'ios-p8-generate')
+      if (note)
+        p = { ...p, notes: [...(p.notes ?? []), note] }
+      return { progress: p, next: getAppflowResumeStep(p), transient: note ? { note } : undefined }
+    }
+    case 'load-provided-p8': {
+      // Step-8 'provide' path: read the user-supplied .p8 at progress.p8Path,
+      // base64-encode it, and merge APPLE_KEY_* into ios — the SAME contract the
+      // generate path and native iOS flow use (APPLE_KEY_CONTENT = base64 of the
+      // .p8 bytes; APPLE_KEY_ID / APPLE_ISSUER_ID from the collected inputs). The
+      // app-specific password is dropped (the .p8 supersedes it). Advisory: a
+      // missing/unreadable file records a note and continues (never blocks).
+      let p: AppflowProgress = { ...progress }
+      let note: string | undefined
+      try {
+        const content = await deps.readP8File?.(p.p8Path ?? '')
+        if (!content)
+          note = `App Store Connect API key file could not be read (${p.p8Path ?? 'no path'}). You can set it up later.`
+        else {
+          const { FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: _drop, ...keepIos } = { ...p.ios }
+          p = {
+            ...p,
+            ios: {
+              ...keepIos,
+              APPLE_KEY_CONTENT: content,
+              ...(p.p8KeyId ? { APPLE_KEY_ID: p.p8KeyId } : {}),
+              ...(p.p8IssuerId ? { APPLE_ISSUER_ID: p.p8IssuerId } : {}),
+            },
+          }
+        }
+      }
+      catch (e) {
+        note = `App Store Connect API key file could not be read: ${e instanceof Error ? e.message : String(e)}. You can set it up later.`
+      }
+      p = mark(p, 'load-provided-p8')
       if (note)
         p = { ...p, notes: [...(p.notes ?? []), note] }
       return { progress: p, next: getAppflowResumeStep(p), transient: note ? { note } : undefined }

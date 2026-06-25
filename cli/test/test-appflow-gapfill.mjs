@@ -44,17 +44,48 @@ assert.strictEqual(iosRes.next, 'validate') // captured -> proceed
 // runs at most once: a re-resolve of the same progress does NOT loop back
 assert.notStrictEqual(f.getAppflowResumeStep(iosRes.progress), 'ios-p8-generate')
 
-// ── step-8 'convert' drives the SAME generate step and drops the app-specific password ──
+// ── step-8 'convert' asks the source first, then 'generate' drives the SAME generate step ──
 const appPw = base({ scope: 'ios', migratable: { ios: true, android: false }, ios: { FASTLANE_USER: 'u', FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: 'w' }, completedSteps: ['explain', 'fetch-signing', 'fetch-distribution', 'validate'] })
 assert.strictEqual(f.getAppflowResumeStep(appPw), 'p8-upgrade-prompt')
 const converted = f.appflowFlow.applyInput('p8-upgrade-prompt', appPw, { value: 'convert' })
-assert.strictEqual(f.getAppflowResumeStep(converted), 'ios-p8-generate')
-const convRes = await f.appflowFlow.runEffect('ios-p8-generate', converted, iosGenDeps)
+assert.strictEqual(f.getAppflowResumeStep(converted), 'p8-source-select')
+const convGen = f.appflowFlow.applyInput('p8-source-select', converted, { value: 'generate' })
+assert.strictEqual(f.getAppflowResumeStep(convGen), 'ios-p8-generate')
+const convRes = await f.appflowFlow.runEffect('ios-p8-generate', convGen, iosGenDeps)
 assert.strictEqual(convRes.progress.ios.APPLE_KEY_ID, 'K')
 // the imported app-specific password is removed (the .p8 supersedes it)
 assert.strictEqual(convRes.progress.ios.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD, undefined)
 // no longer eligible for the upgrade prompt -> proceeds to handoff
 assert.strictEqual(f.getAppflowResumeStep(convRes.progress), 'handoff-build')
+
+// ── step-8 'convert' -> 'provide' collects an existing .p8 and load-provided-p8 merges APPLE_KEY_* ──
+const convProvide = f.appflowFlow.applyInput('p8-source-select', converted, { value: 'provide' })
+assert.strictEqual(convProvide.p8Source, 'provide')
+assert.strictEqual(f.getAppflowResumeStep(convProvide), 'input-p8-path')
+let prov = f.appflowFlow.applyInput('input-p8-path', convProvide, { text: '/tmp/AuthKey_PROVIDED1.p8' })
+assert.strictEqual(prov.p8KeyId, 'PROVIDED1') // auto-extracted
+assert.strictEqual(f.getAppflowResumeStep(prov), 'input-p8-issuer-id')
+prov = f.appflowFlow.applyInput('input-p8-issuer-id', prov, { text: 'issuer-1' })
+assert.strictEqual(f.getAppflowResumeStep(prov), 'load-provided-p8')
+// effect: readP8File returns base64 -> APPLE_KEY_CONTENT + APPLE_KEY_ID/ISSUER_ID, app-pw dropped
+const loadRes = await f.appflowFlow.runEffect('load-provided-p8', prov, { readP8File: async () => 'QkFTRTY0UDg=' })
+assert.strictEqual(loadRes.progress.ios.APPLE_KEY_CONTENT, 'QkFTRTY0UDg=')
+assert.strictEqual(loadRes.progress.ios.APPLE_KEY_ID, 'PROVIDED1')
+assert.strictEqual(loadRes.progress.ios.APPLE_ISSUER_ID, 'issuer-1')
+assert.strictEqual(loadRes.progress.ios.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD, undefined)
+assert.ok(loadRes.progress.completedSteps.includes('load-provided-p8'))
+assert.strictEqual(f.getAppflowResumeStep(loadRes.progress), 'handoff-build')
+
+// ── load-provided-p8 advisory: an unreadable file records a note and still advances ──
+const loadFail = await f.appflowFlow.runEffect('load-provided-p8', prov, { readP8File: async () => null })
+assert.ok(loadFail.progress.completedSteps.includes('load-provided-p8'))
+assert.strictEqual(loadFail.progress.ios?.APPLE_KEY_CONTENT, undefined)
+assert.ok((loadFail.transient?.note ?? '').length > 0)
+assert.strictEqual(f.getAppflowResumeStep(loadFail.progress), 'handoff-build') // never blocks
+// absent dep -> note, still advances
+const loadAbsent = await f.appflowFlow.runEffect('load-provided-p8', prov, {})
+assert.ok(loadAbsent.progress.completedSteps.includes('load-provided-p8'))
+assert.ok((loadAbsent.transient?.note ?? '').length > 0)
 
 // ── Android gap-fill 'generate' routes to android-sa-generate, captures PLAY_CONFIG_JSON ──
 const andOnly = base({ scope: 'android', migratable: { ios: false, android: true }, android: { ANDROID_KEYSTORE_FILE: 'x', KEYSTORE_STORE_PASSWORD: 'p', KEYSTORE_KEY_ALIAS: 'a' } })
