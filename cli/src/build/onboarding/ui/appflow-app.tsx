@@ -92,7 +92,7 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
     onResult?.({ outcome: 'completed' })
     const built = finalProgress.builtPlatforms ?? []
     const message = built.length > 0
-      ? `Appflow migration complete. Build requested for: ${built.join(', ')}. Track it at https://capgo.app.`
+      ? `Appflow migration complete. Build attempted for: ${built.join(', ')} — if it queued you'll see it at https://capgo.app/app, otherwise re-run \`capgo build request\`.`
       : 'Appflow migration complete. Your imported credentials are saved — run `capgo build request` to build.'
     setFinished({ kind: 'done', message })
     setTimeout(exitNow, 50)
@@ -192,6 +192,7 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
           void finishMigration(marked)
           return
         }
+        setBuildOutput([]) // fresh build pane for the next platform
         setCtx({})
         setStep(after)
         return
@@ -256,11 +257,13 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
 
         {isValidateResults
           ? <ValidationResults results={(ctx.results as AppflowValidationResult[]) ?? []} />
-          : (
-              <Box marginTop={1} flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
-                <Text>{view.prompt}</Text>
-              </Box>
-            )}
+          : step === 'build-complete'
+            ? <BuildOutcome lines={buildOutput} />
+            : (
+                <Box marginTop={1} flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
+                  <Text>{view.prompt}</Text>
+                </Box>
+              )}
 
         {error && <Box marginTop={1}><ErrorLine text={error} /></Box>}
 
@@ -343,6 +346,40 @@ const ValidationResults: FC<{ results: AppflowValidationResult[] }> = ({ results
         </Text>
       ))}
       <Box marginTop={1}><Text dimColor>A warning never stops the migration — you can continue and fix it later.</Text></Box>
+    </Box>
+  )
+}
+
+// ── build outcome ────────────────────────────────────────────────────────────
+// What `requesting-build` actually reported (it writes to the build pane then
+// routes here): a queued build + URL, a "no API key" skip, or a failure reason.
+// Without this the screen just said "Build complete" — misleading when the build
+// never ran. We surface the captured lines so the user sees the real result.
+const BuildOutcome: FC<{ lines: string[] }> = ({ lines }) => {
+  const queued = lines.some(l => l.includes('Build queued'))
+  const skipped = lines.length === 0 // build-complete reached without a build attempt (user declined)
+  const tail = lines.slice(-12)
+  const heading = queued ? '✓  Build queued' : skipped ? '•  Build skipped' : '⚠  Build did not start'
+  const color = queued ? 'green' : skipped ? 'cyan' : 'yellow'
+  return (
+    <Box marginTop={1} flexDirection="column">
+      <Text bold color={color}>{heading}</Text>
+      {!skipped && (
+        <Box marginTop={1} flexDirection="column" borderStyle="round" borderColor={color} paddingX={1}>
+          {tail.map((l, i) => (
+            <Text key={i} color={l.startsWith('⚠') ? 'yellow' : l.startsWith('✔') || l.startsWith('✓') ? 'green' : undefined} dimColor={!l.startsWith('⚠') && !l.startsWith('✔') && !l.startsWith('✓')}>{l}</Text>
+          ))}
+        </Box>
+      )}
+      <Box marginTop={1}>
+        <Text dimColor>
+          {queued
+            ? 'Track the build at https://capgo.app/app.'
+            : skipped
+              ? 'Your imported credentials are saved. Run `capgo build request` whenever you want to build.'
+              : 'Your imported credentials are saved. Fix the issue above, then run `capgo build request` to try again.'}
+        </Text>
+      </Box>
     </Box>
   )
 }
