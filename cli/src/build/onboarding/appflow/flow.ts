@@ -443,11 +443,15 @@ export function appflowViewForStep(step: AppflowStep, progress: AppflowProgress,
       // sub-flow, merges PLAY_CONFIG_JSON into android, then continues.
       return { kind: 'auto', prompt: 'Setting up a Google Play service account…' }
     case 'authenticating':
+      return { kind: 'auto', prompt: 'Opening your browser to sign in to Appflow…' }
     case 'fetch-orgs':
+      return { kind: 'auto', prompt: 'Loading your Appflow organizations…' }
     case 'fetch-apps':
+      return { kind: 'auto', prompt: 'Loading your Appflow apps…' }
     case 'fetch-signing':
+      return { kind: 'auto', prompt: 'Importing your signing credentials from Appflow…' }
     case 'fetch-distribution':
-      return { kind: 'auto', prompt: 'Working...' }
+      return { kind: 'auto', prompt: 'Importing your upload credentials from Appflow…' }
     case 'done':
       return { kind: 'done', prompt: 'Appflow migration complete.' }
     case 'error':

@@ -254,11 +254,13 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
           ? <ValidationResults results={(ctx.results as AppflowValidationResult[]) ?? []} />
           : step === 'build-complete'
             ? <BuildOutcome lines={buildOutput} />
-            : (
-                <Box marginTop={1} flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
-                  <Text>{view.prompt}</Text>
-                </Box>
-              )}
+            : busy || view.kind === 'auto'
+              ? null
+              : (
+                  <Box marginTop={1} flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
+                    <Text>{view.prompt}</Text>
+                  </Box>
+                )}
 
         {error && <Box marginTop={1}><ErrorLine text={error} /></Box>}
 
@@ -429,7 +431,7 @@ function stageFor(step: AppflowStep): { n: number, title: string } {
  *  it stays mounted across a step change, which makes options feel "unselectable". */
 function renderBody(view: StepView, busy: boolean, advance: (value?: string, text?: string) => void, step: string): React.ReactNode {
   if (busy || view.kind === 'auto')
-    return <SpinnerLine text="Working…" />
+    return <SpinnerLine text={view.prompt || 'Working…'} />
   if (view.kind === 'choice') {
     const options = (view.options ?? []).map(o => ({ label: o.note ? `${o.label}  (${o.note})` : o.label, value: o.value }))
     return (
