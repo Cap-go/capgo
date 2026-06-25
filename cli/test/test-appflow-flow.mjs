@@ -16,7 +16,7 @@ assert.strictEqual(f.decideAfterFetchSigning({ scope: 'android', migratable: { i
 // ── explain view mentions support + Ionic CLI ──
 const v = f.appflowFlow.viewForStep('explain', { scope: 'ios', migratable: { ios: false, android: false }, completedSteps: [] })
 assert.ok(/support@capgo\.app/.test(v.prompt))
-assert.ok(/Ionic CLI|same/i.test(v.prompt))
+assert.ok(/Ionic Appflow|sign in to Appflow/i.test(v.prompt))
 
 // ── no-signing submenu: four options ──
 const sub = f.appflowFlow.viewForStep('no-signing-submenu', { scope: 'ios', migratable: { ios: false, android: false }, noSigningScope: 'ios', completedSteps: [] })

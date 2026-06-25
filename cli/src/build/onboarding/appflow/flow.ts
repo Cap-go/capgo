@@ -338,9 +338,12 @@ export function appflowViewForStep(step: AppflowStep, progress: AppflowProgress,
       return {
         kind: 'human_gate',
         prompt:
-          'Migrate from Ionic Appflow. We will sign you in to Appflow using the SAME secure browser '
-          + 'login the Ionic CLI uses (OAuth + PKCE on a local loopback); only your session token is read '
-          + `and it stays on this machine. If you hit ANY problem during the migration, email ${SUPPORT}.`,
+          `Let's bring your project over from Ionic Appflow.\n\n`
+          + `Your browser will open so you can sign in to Appflow with your own account. `
+          + `You enter your password on Appflow's own login page, so it never reaches Capgo. `
+          + `Once you're signed in, we'll copy your existing credentials into Capgo for you. `
+          + `They're saved locally on your machine, never on our servers.\n\n`
+          + `If you encounter any problems or have any questions, please email us at ${SUPPORT}.`,
       }
     case 'select-org':
       return { kind: 'choice', prompt: 'Which Appflow organization?', options: (ctx.options as StepView['options']) ?? [] }
