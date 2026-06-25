@@ -832,6 +832,13 @@ async function cannotDeleteOwner() {
 // Other: another super admin acted on the owner; point them at the owner and at support.
 function openOwnerProtectedDialog(member: OrganizationMemberRow, keys: { title: string, selfBody: string, otherBody: string }) {
   const isSelf = member.uid === main.user?.id
+  const orgName = currentOrganization.value?.name ?? ''
+  const orgId = currentOrganization.value?.gid ?? ''
+
+  // Pre-fill the mailto bodies: support gets the request context, the owner gets
+  // a nudge to email Capgo support (only they/support can change ownership).
+  const supportHref = `mailto:support@capgo.app?subject=${encodeURIComponent(t('owner-support-mailto-subject', { orgName }))}&body=${encodeURIComponent(t('owner-support-mailto-body', { orgName, orgId, ownerEmail: member.email }))}`
+  const ownerHref = `mailto:${member.email}?subject=${encodeURIComponent(t('owner-email-mailto-subject', { orgName }))}&body=${encodeURIComponent(t('owner-email-mailto-body', { orgName }))}`
 
   if (isSelf) {
     dialogStore.openDialog({
@@ -846,7 +853,7 @@ function openOwnerProtectedDialog(member: OrganizationMemberRow, keys: { title: 
         {
           text: t('email-support'),
           role: 'primary',
-          href: 'mailto:support@capgo.app',
+          href: supportHref,
         },
       ],
     })
@@ -865,12 +872,12 @@ function openOwnerProtectedDialog(member: OrganizationMemberRow, keys: { title: 
       {
         text: t('email-owner'),
         role: 'secondary',
-        href: `mailto:${member.email}`,
+        href: ownerHref,
       },
       {
         text: t('email-support'),
         role: 'primary',
-        href: 'mailto:support@capgo.app',
+        href: supportHref,
       },
     ],
   })
