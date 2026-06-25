@@ -4,8 +4,7 @@ import type { TailStep } from '../tail/flow.js'
 import type { BuildScriptChoice, PackageManager } from '../workflow-generator.js'
 import type { CiSecretTarget } from '../ci-secrets.js'
 
-// The migration's own interactive steps, plus a converge step that picks which
-// platform to build first (both-platform migrations), plus the shared tail steps
+// The migration's own interactive steps, plus the shared tail steps
 // (build + CI/CD) the flow REUSES inline after `handoff-build` → 'build'.
 export type AppflowOwnStep =
   | 'explain' // step 1: secure-auth explanation + support note
@@ -29,7 +28,6 @@ export type AppflowOwnStep =
   | 'validate-results' // step 7 (info): surface the advisory results, never block
   | 'p8-upgrade-prompt' // step 8 (iOS only)
   | 'handoff-build' // converge: hand to the build/tail steps
-  | 'build-platform-pick' // converge: which platform to build first (both migrated)
   | 'done'
   | 'error'
 
@@ -38,11 +36,11 @@ export type AppflowOwnStep =
 // pattern the iOS engine uses to widen OnboardingStep with the tail ids.
 export type AppflowStep = AppflowOwnStep | TailStep
 
-export type MigrationScope = 'both' | 'ios' | 'android'
-export type NoSigningScope = 'ios' | 'android' | 'all'
+export type MigrationScope = 'ios' | 'android'
+export type NoSigningScope = 'ios' | 'android'
 
 export interface AppflowProgress {
-  scope: MigrationScope // intent: which platform(s) the user chose to migrate
+  scope: MigrationScope // intent: which platform the user chose to migrate
   token?: AppflowToken
   orgSlug?: string
   appId?: string
@@ -76,12 +74,9 @@ export interface AppflowProgress {
   // ── build hand-off + inline tail state ──────────────────────────────────────
   // handoff-build choice ('build' routes into the shared tail; 'skip' finishes).
   handoffChoice?: 'build' | 'skip'
-  // The platform the tail is CURRENTLY building (set at build-platform-pick on a
-  // both-platform migration, or auto-selected when only one platform migrated).
-  buildPlatform?: 'ios' | 'android'
-  // Platforms whose inline build/tail run has finished (so a both-platform
-  // migration can offer the second platform after the first completes).
-  builtPlatforms?: ('ios' | 'android')[]
+  // True once the single platform's inline build/tail run has finished (reached
+  // build-complete via any path — built, skipped, or failed) → migration done.
+  built?: boolean
 
   // ── tail-input fields (mirror OnboardingProgress's tail fields the shared tail
   // reads — TailEffectProgress). Recorded by applyTailInput as the user answers

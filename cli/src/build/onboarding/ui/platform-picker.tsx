@@ -6,8 +6,8 @@ import type { PlatformPickerLayout } from './frame-fit.js'
 // The "Which platform do you want to set up?" picker, rendered INSIDE the
 // alt-screen wizard (by OnboardingShell). Responsive:
 //   • `cards` — bordered cards side-by-side; ←/→ (or h/l) MOVE the selection
-//     across ALL cards (iOS ↔ Android ↔ Appflow), 1/2/3 jump, a jumps to
-//     Appflow, Enter confirms. Used when the terminal has room.
+//     across the cards (iOS ↔ Android), 1/2 jump, Enter confirms. Used when the
+//     terminal has room.
 //   • `list` — the same @inkjs/ui Select used everywhere else; used on narrow
 //     or short terminals. The layout is chosen by the shell via
 //     `pickPlatformLayout` so this component stays pure (props in → JSX out).
@@ -27,12 +27,12 @@ import { Box, Text, useInput } from 'ink'
 import React, { useState } from 'react'
 
 // The card order (left → right) for the cards layout; arrow movement walks it.
-const PLATFORM_ORDER: Platform[] = ['ios', 'android', 'appflow']
+const PLATFORM_ORDER: Platform[] = ['ios', 'android']
 
 // Pure mapping from a keypress to a picker action (extracted so the
 // arrow/Enter logic is unit-testable without rendering). ←/h MOVE left, →/l
-// MOVE right (so arrows can reach EVERY card, incl. Appflow), 1/2/3 jump to a
-// specific card, a jumps to Appflow, Enter confirms the current selection.
+// MOVE right (so arrows can reach every card), 1/2 jump to a specific card,
+// Enter confirms the current selection.
 export type PlatformKeyAction
   = | { type: 'move', delta: number }
     | { type: 'jump', platform: Platform }
@@ -53,8 +53,6 @@ export function platformKeyAction(
     return { type: 'jump', platform: 'ios' }
   if (input === '2')
     return { type: 'jump', platform: 'android' }
-  if (input === '3' || input === 'a')
-    return { type: 'jump', platform: 'appflow' }
   return null
 }
 
@@ -115,7 +113,6 @@ export const PlatformPicker: FC<PlatformPickerProps> = ({ layout, onSelect, foot
           options={[
             { label: '🍎  iOS', value: 'ios' },
             { label: '🤖  Android', value: 'android' },
-            { label: '🔄  Both, I\'m migrating from Ionic Appflow', value: 'appflow' },
           ]}
           onChange={value => onSelect(value as Platform)}
         />
@@ -135,7 +132,6 @@ export const PlatformPicker: FC<PlatformPickerProps> = ({ layout, onSelect, foot
       <Box flexDirection="row" gap={3} marginTop={1}>
         <PlatformCard emoji="🍎" name="iOS" hint="Apple App Store" selected={selected === 'ios'} />
         <PlatformCard emoji="🤖" name="Android" hint="Google Play" selected={selected === 'android'} />
-        <PlatformCard emoji="🔄" name="Appflow" hint="Migrate from Ionic Appflow" selected={selected === 'appflow'} />
       </Box>
       <Box flexGrow={1} />
       <Text dimColor>←  →  choose   ·   Enter  confirm</Text>

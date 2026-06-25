@@ -28,7 +28,7 @@ function mockFetch(router) {
 }
 function restore() { globalThis.fetch = realFetch }
 
-const baseProgress = (over = {}) => ({ scope: 'both', token: { access_token: 't' }, migratable: { ios: false, android: false }, completedSteps: ['explain', 'authenticating'], ...over })
+const baseProgress = (over = {}) => ({ scope: 'ios', token: { access_token: 't' }, migratable: { ios: false, android: false }, completedSteps: ['explain', 'authenticating'], ...over })
 
 // ── fetch-orgs: 0 orgs -> THROWS (no orgs is a loud, surfaced error) ──
 mockFetch(({ op }) => op === 'BootstrapApp' ? { body: { data: { viewer: { organizations: { edges: [] } } } } } : { body: { data: {} } })
@@ -119,33 +119,18 @@ mockFetch(({ op, url }) => {
 }
 restore()
 
-// ── both-scope, only iOS has signing -> Android dropped WITH a surfaced note (C32) ──
-mockFetch(({ op }) => op === 'GetDataForPackageCerts'
-  ? { body: { data: { app: { certificates: { edges: [{ node: { tag: 'i-only', credentials: { ios: {} } } }] } } } } }
-  : { body: { data: {} } })
-{
-  const start = baseProgress({ scope: 'both', orgSlug: 'o', appId: 'app-1', completedSteps: ['explain', 'authenticating', 'fetch-orgs', 'fetch-apps'] })
-  const r = await f.appflowFlow.runEffect('fetch-signing', start, { log() {} })
-  assert.ok(r.progress.migratable.ios && !r.progress.migratable.android, 'iOS migratable, Android not')
-  assert.ok((r.progress.notes ?? []).some(n => /Android was not migrated/i.test(n)), 'dropped Android is surfaced as a note (not silent)')
-  // the note is rendered in validate-results
-  const view = f.appflowFlow.viewForStep('validate-results', r.progress, { results: [] })
-  assert.ok(/Android was not migrated/i.test(view.prompt), 'note surfaced in validate-results view')
-}
-restore()
-
-// ── fetch-signing scope:both with 2+ iOS certs still processes android (no early-return abandon) ──
-const bothCerts = { data: { app: { certificates: { edges: [
+// ── single iOS scope: 2+ iOS certs -> prompt; android certs ignored (out of scope) ──
+const iosCerts = { data: { app: { certificates: { edges: [
   { node: { tag: 'i-A', credentials: { ios: {} } } },
   { node: { tag: 'i-B', credentials: { ios: {} } } },
   { node: { tag: 'a-1', credentials: { android: {} } } },
 ] } } } }
-mockFetch(({ op }) => op === 'GetDataForPackageCerts' ? { body: bothCerts } : { body: { data: {} } })
+mockFetch(({ op }) => op === 'GetDataForPackageCerts' ? { body: iosCerts } : { body: { data: {} } })
 {
-  // iOS chosen already (i-B), android single -> android auto-selected, both fetched
-  const start = baseProgress({ scope: 'both', orgSlug: 'o', appId: 'app-1', iosCertTag: 'i-B', completedSteps: ['explain', 'authenticating', 'fetch-orgs', 'fetch-apps'] })
+  // iOS chosen already (i-B); android certs are out of scope and never migratable.
+  const start = baseProgress({ scope: 'ios', orgSlug: 'o', appId: 'app-1', iosCertTag: 'i-B', completedSteps: ['explain', 'authenticating', 'fetch-orgs', 'fetch-apps'] })
   const r = await f.appflowFlow.runEffect('fetch-signing', start, { log() {} })
-  assert.ok(r.progress.migratable.ios && r.progress.migratable.android, 'both platforms migratable')
+  assert.ok(r.progress.migratable.ios && !r.progress.migratable.android, 'iOS migratable, Android out of scope')
   assert.notStrictEqual(r.next, 'select-ios-cert')
 }
 restore()

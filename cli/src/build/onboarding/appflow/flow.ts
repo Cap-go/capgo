@@ -12,13 +12,12 @@
 // runs the advisory checks and then transitions to the 'validate-results' info view.
 //
 // Build + finish (spec "Build + finish"): on `handoff-build` → 'build' the flow
-// REUSES the shared onboarding tail (../tail/flow.ts) inline for the chosen
+// REUSES the shared onboarding tail (../tail/flow.ts) inline for the migrated
 // platform — saving-credentials → ask-build → requesting-build → CI/CD secrets →
-// build-complete — exactly as the iOS/Android drivers do. Both-platform
-// migrations FIRST pick which platform to build (build-platform-pick), build it,
-// then offer the second. 'skip' finishes with creds persisted (build later via
-// `capgo build request`). The tail's effect/view/input steps are delegated to the
-// shared module via runTailEffect / tailViewForStep / applyTailInput.
+// build-complete — exactly as the iOS/Android drivers do. 'skip' finishes with
+// creds persisted (build later via `capgo build request`). The tail's
+// effect/view/input steps are delegated to the shared module via runTailEffect /
+// tailViewForStep / applyTailInput.
 import type { PlatformFlow, StepView } from '../flow/contract'
 import type { AppflowInput, AppflowProgress, AppflowStep } from './types'
 import type { AppflowToken } from './auth'
@@ -226,7 +225,7 @@ function distOptions(creds: AppflowDistCred[]): StepView['options'] {
     .map(c => ({ value: String(c.id), label: c.name ?? `${c.type ?? 'credential'} ${c.id}`, note: c.type }))
 }
 
-const inScope = (scope: AppflowProgress['scope'], p: 'ios' | 'android'): boolean => scope === 'both' || scope === p
+const inScope = (scope: AppflowProgress['scope'], p: 'ios' | 'android'): boolean => scope === p
 
 const hasCreds = (rec?: Record<string, string>): boolean => !!rec && Object.keys(rec).length > 0
 
@@ -248,25 +247,13 @@ function iosHasAppPassword(p: AppflowProgress): boolean {
 }
 
 export function decideAfterFetchSigning(progress: Pick<AppflowProgress, 'scope' | 'migratable'>): AppflowStep {
-  const scope = progress.scope ?? 'both'
-  const any = (inScope(scope, 'ios') && progress.migratable.ios) || (inScope(scope, 'android') && progress.migratable.android)
-  return any ? 'fetch-distribution' : 'no-signing-submenu'
+  const migratable = progress.scope === 'android' ? progress.migratable.android : progress.migratable.ios
+  return migratable ? 'fetch-distribution' : 'no-signing-submenu'
 }
 
 export function platformsToBuild(progress: Pick<AppflowProgress, 'scope' | 'ios' | 'android'>): ('ios' | 'android')[] {
-  const scope = progress.scope ?? 'both'
-  const out: ('ios' | 'android')[] = []
-  if (inScope(scope, 'ios') && progress.ios && Object.keys(progress.ios).length > 0)
-    out.push('ios')
-  if (inScope(scope, 'android') && progress.android && Object.keys(progress.android).length > 0)
-    out.push('android')
-  return out
-}
-
-/** Platforms still awaiting an inline build (migrated, not yet built). */
-export function platformsRemainingToBuild(progress: AppflowProgress): ('ios' | 'android')[] {
-  const built = new Set(progress.builtPlatforms ?? [])
-  return platformsToBuild(progress).filter(p => !built.has(p))
+  const creds = progress.scope === 'android' ? progress.android : progress.ios
+  return creds && Object.keys(creds).length > 0 ? [progress.scope] : []
 }
 
 // Advisory, surfaced, NON-blocking. Failures -> 'warn'; thrown/absent -> 'skipped'.
@@ -338,7 +325,7 @@ export async function runValidations(progress: AppflowProgress, deps: AppflowEff
 
 // ── views ────────────────────────────────────────────────────────────────────
 function noSigningPlatformLabel(progress: AppflowProgress): string {
-  return progress.noSigningScope === 'ios' ? 'iOS' : progress.noSigningScope === 'android' ? 'Android' : 'this app'
+  return progress.noSigningScope === 'android' ? 'Android' : 'iOS'
 }
 
 export function appflowViewForStep(step: AppflowStep, progress: AppflowProgress, ctx: Record<string, unknown> = {}): StepView {
@@ -444,19 +431,6 @@ export function appflowViewForStep(step: AppflowStep, progress: AppflowProgress,
         ],
       }
     }
-    case 'build-platform-pick': {
-      // Both platforms migrated — ask which to build first (the other is offered
-      // after the first build completes). Only the not-yet-built platforms appear.
-      const remaining = platformsRemainingToBuild(progress)
-      return {
-        kind: 'choice',
-        prompt: 'Which platform should we build first?',
-        options: [
-          ...remaining.map(p => ({ value: p, label: p === 'ios' ? 'iOS' : 'Android' })),
-          { value: 'skip', label: 'Skip build (finish; build later with `build request`)' },
-        ],
-      }
-    }
     case 'ios-p8-generate':
       // AUTO: runAppflowEffect drives the shared asc-key .p8 generate/provide
       // sub-flow, merges APPLE_KEY_* into ios, then continues via the graph.
@@ -523,7 +497,7 @@ export function applyAppflowInput(step: AppflowStep, progress: AppflowProgress, 
           completedSteps: completed.filter(s => s !== 'fetch-signing' && s !== 'select-app' && s !== 'fetch-apps'),
         }
       }
-      return { ...base, ...(input.value === 'skip' && progress.noSigningScope && progress.noSigningScope !== 'all' ? { migratable: { ...progress.migratable, [progress.noSigningScope]: false } } : {}) }
+      return { ...base, ...(input.value === 'skip' && progress.noSigningScope ? { migratable: { ...progress.migratable, [progress.noSigningScope]: false } } : {}) }
     case 'ios-dist-gapfill':
       return { ...base, iosDistGapfill: input.value === 'generate' ? 'generate' : 'skip' }
     case 'android-dist-gapfill':
@@ -532,11 +506,6 @@ export function applyAppflowInput(step: AppflowStep, progress: AppflowProgress, 
       return { ...base, p8Upgrade: input.value === 'convert' ? 'convert' : 'skip' }
     case 'handoff-build':
       return { ...base, handoffChoice: input.value === 'build' ? 'build' : 'skip' }
-    case 'build-platform-pick':
-      // 'skip' ends the build hand-off; a platform value commits the next build.
-      return input.value === 'skip'
-        ? { ...base, handoffChoice: 'skip' }
-        : { ...base, buildPlatform: input.value === 'android' ? 'android' : 'ios' }
     default:
       return base
   }
@@ -598,23 +567,14 @@ export function getAppflowResumeStep(progress: AppflowProgress | null): AppflowS
 }
 
 /**
- * Resume the inline build phase after the user chose 'build'. Picks the platform
- * to build (asking first when BOTH migrated and none/one is chosen), then enters
- * the shared tail at saving-credentials. After a platform's build completes
- * (recorded in builtPlatforms) it offers the next remaining platform, then done.
+ * Resume the inline build phase after the user chose 'build'. The migration is
+ * single-platform, so the build enters the shared tail at saving-credentials for
+ * the migrated platform and finishes ('done') once that build run completes.
  */
 export function getAppflowBuildResumeStep(progress: AppflowProgress): AppflowStep {
-  const remaining = platformsRemainingToBuild(progress)
-  if (remaining.length === 0)
+  if (progress.built || platformsToBuild(progress).length === 0)
     return 'done'
-  // A platform is committed for the current build run.
-  if (progress.buildPlatform && remaining.includes(progress.buildPlatform))
-    return 'saving-credentials'
-  // Single remaining platform → build it directly (no pick needed).
-  if (remaining.length === 1)
-    return 'saving-credentials'
-  // 2+ remaining and none committed → ask which to build first.
-  return 'build-platform-pick'
+  return 'saving-credentials'
 }
 
 // ── shared-tail interactive transitions ──────────────────────────────────────
@@ -666,18 +626,12 @@ export function nextTailStep(step: TailStep, value: string | undefined, progress
 }
 
 /**
- * Record the just-finished platform's inline tail run as complete (reached at
- * build-complete via any path — built, skipped, or failed) so a both-platform
- * migration can offer the next platform. Returns the next overall appflow step
- * (the second platform's tail entry, or 'done').
+ * Record the migration's single inline tail run as complete (reached at
+ * build-complete via any path — built, skipped, or failed). Returns the next
+ * overall appflow step, which is always 'done' for a single-platform migration.
  */
 export function markTailRunComplete(progress: AppflowProgress): { progress: AppflowProgress, next: AppflowStep } {
-  const remaining = platformsRemainingToBuild(progress)
-  const platform = progress.buildPlatform ?? remaining[0]
-  const built = new Set(progress.builtPlatforms ?? [])
-  if (platform)
-    built.add(platform)
-  const nextProgress: AppflowProgress = { ...progress, builtPlatforms: [...built], buildPlatform: undefined }
+  const nextProgress: AppflowProgress = { ...progress, built: true }
   return { progress: nextProgress, next: getAppflowBuildResumeStep(nextProgress) }
 }
 
@@ -685,21 +639,18 @@ export function markTailRunComplete(progress: AppflowProgress): { progress: Appf
 export async function runAppflowEffect(step: AppflowStep, progress: AppflowProgress, deps: AppflowEffectDeps): Promise<AppflowEffectResult> {
   const mark = (p: AppflowProgress, s: AppflowStep): AppflowProgress => ({ ...p, completedSteps: p.completedSteps.includes(s) ? p.completedSteps : [...p.completedSteps, s] })
 
-  // Shared tail EFFECT steps: build the tail deps for the committed platform and
-  // delegate to runTailEffect. The committed platform is buildPlatform, or the
-  // single remaining platform when only one migrated.
+  // Shared tail EFFECT steps: build the tail deps for the migrated platform
+  // (progress.scope) and delegate to runTailEffect.
   if (APPFLOW_TAIL_EFFECT_STEPS.has(step as TailStep)) {
-    const remaining = platformsRemainingToBuild(progress)
-    const platform = progress.buildPlatform ?? remaining[0] ?? 'ios'
+    // Single-platform migration: the tail always builds the migrated platform.
+    const platform = progress.scope
     const tailDeps = toAppflowTailDeps(platform, {
       ...deps.tailOptions,
       carried: { ...(deps.tailOptions?.carried ?? {}), ...((deps.carried as AppflowTailDepsOptions['carried']) ?? {}) },
     })
     const result = await runTailEffect(step as TailStep, toTailProgress(progress), tailDeps)
-    // Keep buildPlatform committed through the whole tail run — the build-complete
-    // ADVANCE (markTailRunComplete) records the built platform and re-picks. Merge
-    // the tail's returned progress (it threads ciSecretTarget / envExportTargetPath).
-    const nextProgress: AppflowProgress = { ...progress, ...result.progress, buildPlatform: platform }
+    // Merge the tail's returned progress (it threads ciSecretTarget / envExportTargetPath).
+    const nextProgress: AppflowProgress = { ...progress, ...result.progress }
     return { progress: nextProgress, next: result.next as AppflowStep | undefined, transient: result.transient as Record<string, unknown> | undefined }
   }
 
@@ -761,8 +712,6 @@ export async function runAppflowEffect(step: AppflowStep, progress: AppflowProgr
         if (tag)
           p = { ...p, ios: { ...p.ios, ...(await api.fetchIosSigning(progress.appId!, tag)) } }
       }
-      // Process Android REGARDLESS of the iOS outcome above (no early-return that
-      // abandons the second platform on a scope:'both' app).
       if (migratable.android) {
         const tag = resolveCertTag(androidCerts, progress.androidCertTag)
         if (tag === 'prompt')
@@ -770,15 +719,8 @@ export async function runAppflowEffect(step: AppflowStep, progress: AppflowProgr
         if (tag)
           p = { ...p, android: { ...p.android, ...(await api.fetchAndroidSigning(progress.appId!, tag)) } }
       }
-      // On a BOTH-scope migration where exactly one platform has signing, the
-      if (progress.scope === 'both' && (migratable.ios !== migratable.android)) {
-        const dropped = migratable.ios ? 'Android' : 'iOS'
-        const note = `No ${dropped} signing configuration was found in Appflow, so ${dropped} was not migrated. You can set it up later via \`capgo build init\` ${dropped === 'Android' ? '(Android)' : '(iOS)'} onboarding.`
-        if (!(p.notes ?? []).includes(note))
-          p = { ...p, notes: [...(p.notes ?? []), note] }
-      }
       const next = decideAfterFetchSigning(p)
-      return { progress: next === 'no-signing-submenu' ? { ...p, noSigningScope: progress.scope === 'both' ? 'all' : progress.scope } : p, next }
+      return { progress: next === 'no-signing-submenu' ? { ...p, noSigningScope: progress.scope } : p, next }
     }
     case 'fetch-distribution': {
       const api = createAppflowApi(progress.token!.access_token, deps.log)

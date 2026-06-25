@@ -40,22 +40,22 @@ test('tiny terminal → list', () => {
   eq(pickPlatformLayout(20, 8), 'list')
 })
 
-// ── platformKeyAction (arrows MOVE across all 3 cards; reaches Appflow) ───────
+// ── platformKeyAction (arrows MOVE across the iOS + Android cards) ────────────
 test('left / h → move -1', () => {
   eq(platformKeyAction('', { leftArrow: true }), { type: 'move', delta: -1 })
   eq(platformKeyAction('h', {}), { type: 'move', delta: -1 })
 })
-test('right / l → move +1 (so arrows can reach the Appflow card)', () => {
+test('right / l → move +1', () => {
   eq(platformKeyAction('', { rightArrow: true }), { type: 'move', delta: 1 })
   eq(platformKeyAction('l', {}), { type: 'move', delta: 1 })
 })
 test('number keys jump to a specific card', () => {
   eq(platformKeyAction('1', {}), { type: 'jump', platform: 'ios' })
   eq(platformKeyAction('2', {}), { type: 'jump', platform: 'android' })
-  eq(platformKeyAction('3', {}), { type: 'jump', platform: 'appflow' })
 })
-test('a jumps to Appflow', () => {
-  eq(platformKeyAction('a', {}), { type: 'jump', platform: 'appflow' })
+test('3 / a (former Appflow jumps) are no longer recognized → null', () => {
+  eq(platformKeyAction('3', {}), null)
+  eq(platformKeyAction('a', {}), null)
 })
 test('Enter → confirm (wins over arrows)', () => {
   eq(platformKeyAction('', { return: true }), { type: 'confirm' })

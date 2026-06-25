@@ -42,7 +42,7 @@ const TOTAL_STAGES = 8
 
 export interface AppflowAppProps {
   appId: string
-  /** Migration scope: 'both' (picker) or 'ios' / 'android' (single-platform gate). */
+  /** Migration scope ('ios' | 'android') from the single-platform "migrating from Appflow?" gate. */
   scope: MigrationScope
   apikey?: string
   supaHost?: string
@@ -90,9 +90,8 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
       return
     }
     onResult?.({ outcome: 'completed' })
-    const built = finalProgress.builtPlatforms ?? []
-    const message = built.length > 0
-      ? `Appflow migration complete. Build attempted for: ${built.join(', ')} — if it queued you'll see it at https://capgo.app/app, otherwise re-run \`capgo build request\`.`
+    const message = finalProgress.built
+      ? `Appflow migration complete. Build attempted for ${finalProgress.scope} — if it queued you'll see it at https://capgo.app/app, otherwise re-run \`capgo build request\`.`
       : 'Appflow migration complete. Your imported credentials are saved — run `capgo build request` to build.'
     setFinished({ kind: 'done', message })
     setTimeout(exitNow, 50)
@@ -186,15 +185,11 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
     // route to the next platform's tail entry or finish.
     if (isAppflowTailStep(step)) {
       if (step === 'build-complete') {
-        const { progress: marked, next: after } = markTailRunComplete(next)
+        // The migration is single-platform: build-complete is terminal — record
+        // the run and finish (persist creds + report completed).
+        const { progress: marked } = markTailRunComplete(next)
         setProgress(marked)
-        if (after === 'done') {
-          void finishMigration(marked)
-          return
-        }
-        setBuildOutput([]) // fresh build pane for the next platform
-        setCtx({})
-        setStep(after)
+        void finishMigration(marked)
         return
       }
       setCtx({})
@@ -204,7 +199,7 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
 
     const resumed = appflowFlow.resumeStep(next)
     // 'done' is terminal — finish (persist creds + report completed). Reached on a
-    // 'skip' hand-off, a build-platform-pick 'skip', or after all builds complete.
+    // 'skip' hand-off, or after the single platform's build completes.
     if (resumed === 'done') {
       void finishMigration(next)
       return
@@ -422,7 +417,6 @@ function stageFor(step: AppflowStep): { n: number, title: string } {
       return { n: 6, title: 'Validate credentials' }
     case 'p8-upgrade-prompt':
       return { n: 7, title: 'Upgrade iOS upload auth' }
-    case 'build-platform-pick':
     case 'handoff-build':
       return { n: 8, title: 'Build' }
     default:

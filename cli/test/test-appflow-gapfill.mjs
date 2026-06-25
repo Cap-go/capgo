@@ -7,7 +7,7 @@ import assert from 'node:assert'
 const f = await import('../src/build/onboarding/appflow/flow.ts')
 
 const base = (over = {}) => ({
-  scope: 'both',
+  scope: 'ios',
   token: { access_token: 't' },
   orgSlug: 'o',
   appId: 'a',

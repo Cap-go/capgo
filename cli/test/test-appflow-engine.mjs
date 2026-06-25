@@ -42,20 +42,22 @@ function fakeDeps(o = {}) {
   }
 }
 
-await test('platform-select offers the Appflow migration option', async () => {
+await test('platform-select offers only iOS + Android (no Appflow card)', async () => {
   const r = await decideStart(facts(), null, fakeDeps())
   eq(r.state, 'platform-select')
-  ok(r.options.some(o => o.value === 'appflow'), 'picker should include the appflow option')
+  const values = r.options.map(o => o.value).sort()
+  ok(JSON.stringify(values) === JSON.stringify(['android', 'ios']), `picker should offer only ios + android, got ${JSON.stringify(values)}`)
+  ok(!r.options.some(o => o.value === 'appflow'), 'picker must NOT include an appflow option')
 })
 
-await test('picking appflow enters the migration at the explain gate (scope both)', async () => {
-  const r = await decideAdvance(facts(), null, { platform: 'appflow' }, fakeDeps())
+await test('the migration is reachable only via the per-platform gate (scope ios)', async () => {
+  const r = await decideAdvance(facts({ platformsDetected: ['ios'] }), null, { platform: 'ios', migratingFromAppflow: 'yes' }, fakeDeps({ detectPlatforms: async () => ['ios'] }))
   eq(r.kind, 'human_gate')
   eq(r.state, 'appflow-explain')
   ok(/Appflow/i.test(r.summary), 'explain step mentions Appflow')
   ok(/support@capgo\.app/.test(r.human.instruction), 'explain step surfaces the support email')
-  // The in-flight migration progress is now parked process-local with scope 'both'.
-  eq(getAppflowProgress('com.acme.app')?.scope, 'both')
+  // The in-flight migration progress is parked process-local scoped to the platform.
+  eq(getAppflowProgress('com.acme.app')?.scope, 'ios')
 })
 
 await test('a bare next_step resumes the in-flight Appflow migration (no platform needed)', async () => {

@@ -43,17 +43,11 @@ type AndroidProgress = Awaited<ReturnType<typeof loadAndroidProgress>>
 type ReadyApp
   = | { kind: 'ios', progress: IosProgress }
     | { kind: 'android', progress: AndroidProgress }
-    | { kind: 'appflow', scope: 'both' | 'ios' | 'android' }
+    | { kind: 'appflow', scope: 'ios' | 'android' }
 
 async function loadReady(platform: Platform, appId: string): Promise<ReadyApp> {
   if (platform === 'android')
     return { kind: 'android', progress: await loadAndroidProgress(appId) }
-  // The Appflow migration imports BOTH platforms by default (the picker's
-  // "migrating from Appflow" option). It has no on-disk progress loader — its
-  // cross-step state lives in the running Ink process (AppflowApp), so there is
-  // nothing to read here.
-  if (platform === 'appflow')
-    return { kind: 'appflow', scope: 'both' }
   return { kind: 'ios', progress: await loadProgress(appId) }
 }
 
@@ -151,8 +145,7 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
   // When the user picks iOS or Android from the picker we first ask whether they
   // are migrating from Ionic Appflow (the spec's single-platform migration gate).
   // Holds the pending native platform while that yes/no is on screen; null when
-  // no gate is showing. The picker's appflow option skips the gate (it IS the
-  // migration). Pre-resolved --platform also skips it (the user already decided).
+  // no gate is showing. Pre-resolved --platform skips it (the user already decided).
   const [migrationGate, setMigrationGate] = useState<'ios' | 'android' | null>(null)
   const exitAfterBeforeExit = useCallback(() => {
     exitAfterOnboardingBeforeExit(onBeforeExit, exit)
@@ -176,15 +169,12 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
       })
   }, [appId, onResolvePlatform, onResult, exitAfterBeforeExit])
 
-  // Picker answer. iOS / Android first pass through the "migrating from Appflow?"
-  // gate; the appflow option enters the (both-platform) migration directly.
+  // Picker answer. The picker only yields iOS / Android now; both pass through
+  // the "migrating from Appflow?" gate before committing to native onboarding.
   const onPick = useCallback((platform: Platform) => {
-    if (platform === 'ios' || platform === 'android') {
+    if (platform === 'ios' || platform === 'android')
       setMigrationGate(platform)
-      return
-    }
-    choose(platform)
-  }, [choose])
+  }, [])
 
   // Answer to the migration gate: YES enters the Appflow migration scoped to the
   // pending platform (no disk progress to load — the AppflowApp owns its state);
