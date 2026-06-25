@@ -827,15 +827,44 @@ async function cannotDeleteOwner() {
   })
 }
 
-async function ownerCannotBeRemoved() {
+async function ownerCannotBeRemoved(member: OrganizationMemberRow) {
+  const isSelf = member.uid === main.user?.id
+
+  // Self: the owner is trying to remove their own account and must contact support to transfer the org.
+  if (isSelf) {
+    dialogStore.openDialog({
+      title: t('alert-cannot-remove-owner-title'),
+      description: `${t('alert-cannot-remove-owner-self-body')}`,
+      size: 'xl',
+      buttons: [
+        {
+          text: t('button-cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('email-support'),
+          role: 'primary',
+          href: 'mailto:support@capgo.app',
+        },
+      ],
+    })
+    return
+  }
+
+  // Another super admin is trying to remove the owner: point them at the owner and at support.
   dialogStore.openDialog({
     title: t('alert-cannot-remove-owner-title'),
-    description: `${t('alert-cannot-remove-owner-body')}`,
+    description: `${t('alert-cannot-remove-owner-other-body', { email: member.email })}`,
     size: 'xl',
     buttons: [
       {
         text: t('button-cancel'),
         role: 'cancel',
+      },
+      {
+        text: t('email-owner'),
+        role: 'secondary',
+        href: `mailto:${member.email}`,
       },
       {
         text: t('email-support'),
@@ -873,7 +902,7 @@ async function _deleteMember(member: OrganizationMemberRow) {
             toast.error(t('cannot-remove-last-super-admin'))
           }
           else if (error.message.includes('CANNOT_CHANGE_OWNER_ROLE')) {
-            ownerCannotBeRemoved()
+            ownerCannotBeRemoved(member)
           }
           else if (error.message.includes('NO_PERMISSION_TO_UPDATE_ROLES')) {
             toast.error(t('no-permission'))
@@ -930,25 +959,26 @@ async function _deleteMember(member: OrganizationMemberRow) {
 }
 
 async function deleteMember(member: OrganizationMemberRow) {
+  // The org creator (owner) is protected server-side and can never be removed.
+  // Show the owner-specific dialog up front (self: email support to transfer;
+  // others: point at the owner + support) instead of the generic delete flows.
+  if (!isInviteMember(member) && member.uid === currentOrganization.value?.created_by) {
+    await ownerCannotBeRemoved(member)
+    return
+  }
+
   const numberOfSuperAdmins = members.value.filter(m => !isInviteMember(m) && isSuperAdminRole(m.role)).length
   if (numberOfSuperAdmins === 1 && !isInviteMember(member) && isSuperAdminRole(member.role)) {
     await cannotDeleteOwner()
     return
   }
 
-  // The org creator (owner) is protected server-side and can never be removed.
-  // Surface that immediately instead of asking to confirm a delete that will fail.
-  else if (!isInviteMember(member) && member.uid === currentOrganization.value?.created_by) {
-    await ownerCannotBeRemoved()
-    return
-  }
-
-  else if (await didCancel()) {
+  if (await didCancel()) {
     console.log('Member deletion cancelled.')
     return
   }
 
-  else if (member.aid === 0) {
+  if (member.aid === 0) {
     toast.error(t('cannot-delete-owner'))
     return
   }
