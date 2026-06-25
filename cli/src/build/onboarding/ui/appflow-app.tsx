@@ -32,7 +32,7 @@ import { appflowFlow, isAppflowTailStep, markTailRunComplete, nextTailStep } fro
 import type { TailStep } from '../tail/flow.js'
 import { buildAppflowEffectDeps, persistAppflowCredentials } from '../appflow/deps.js'
 import { sanitizeBuildLogLines } from '../build-log.js'
-import { Divider, Header, ErrorLine, SpinnerLine, SuccessLine, FilteredTextInput, FullscreenBuildOutput } from './components.js'
+import { Divider, Header, ErrorLine, SpinnerLine, SuccessLine, FilteredTextInput, FullscreenBuildOutput, Table } from './components.js'
 import { useTerminalSize } from './shell.js'
 import { exitAfterOnboardingBeforeExit } from './exit.js'
 import type { OnboardingBeforeExit } from './exit.js'
@@ -294,14 +294,14 @@ function importedLines(p: AppflowProgress): string[] {
     }
   }
   if (ios.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD)
-    out.push(`iOS upload · app-specific password${ios.FASTLANE_USER ? ` (${ios.FASTLANE_USER})` : ''}`)
+    out.push(`iOS upload credentials · app-specific password${ios.FASTLANE_USER ? ` (${ios.FASTLANE_USER})` : ''}`)
   if (ios.APPLE_KEY_ID)
-    out.push(`iOS upload · App Store Connect API key (${ios.APPLE_KEY_ID})`)
+    out.push(`iOS upload credentials · App Store Connect API key (${ios.APPLE_KEY_ID})`)
   const android = p.android ?? {}
   if (android.ANDROID_KEYSTORE_FILE)
     out.push(`Android keystore${android.KEYSTORE_KEY_ALIAS ? ` · alias ${android.KEYSTORE_KEY_ALIAS}` : ''}`)
   if (android.PLAY_CONFIG_JSON)
-    out.push('Android upload · Google Play service account')
+    out.push('Android upload credentials · Google Play service account')
   return out
 }
 
@@ -323,26 +323,66 @@ const ImportedSummary: FC<{ progress: AppflowProgress }> = ({ progress }) => {
 }
 
 // ── validation results ───────────────────────────────────────────────────────
+const CHECK_LABEL: Record<string, string> = {
+  p12: 'iOS signing certificate',
+  'app-password': 'iOS upload password',
+  sa: 'Google Play access',
+  keystore: 'Android keystore',
+}
+
+// Short, friendly per-check outcome for the table's Details column (kept brief so
+// it does not truncate). The reassuring explanation lives in the box above it.
+function checkDetail(r: AppflowValidationResult): string {
+  if (r.status === 'skipped')
+    return 'Not checked this time'
+  const ok = r.status === 'pass'
+  switch (r.id) {
+    case 'p12':
+      return ok ? 'Opens with its password' : "Won't open with the saved password"
+    case 'app-password':
+      return ok ? 'Apple accepted it' : "Apple didn't confirm it (rate-limit?)"
+    case 'sa':
+      return ok ? 'Can upload to Google Play' : "Couldn't confirm Play access"
+    case 'keystore':
+      return ok ? 'Opens locally (password + alias ok)' : "Won't open locally (password/alias?)"
+    default:
+      return r.message
+  }
+}
+
 const ValidationResults: FC<{ results: AppflowValidationResult[] }> = ({ results }) => {
   if (results.length === 0) {
     return (
       <Box marginTop={1}><Text dimColor>No credentials to validate. Continuing.</Text></Box>
     )
   }
+  const anyWarn = results.some(r => r.status === 'warn')
+  const data = results.map(r => ({
+    Check: CHECK_LABEL[r.id] ?? r.id,
+    Result: r.status === 'pass' ? 'OK' : r.status === 'warn' ? 'Warning' : 'Skipped',
+    Details: checkDetail(r),
+  }))
+  const cellColor = (col: string, _v: string, i: number): string | undefined =>
+    col === 'Result' ? (results[i].status === 'pass' ? 'green' : results[i].status === 'warn' ? 'yellow' : undefined) : undefined
+  const cellDim = (col: string, _v: string, i: number): boolean =>
+    col === 'Result' && results[i].status === 'skipped'
+
   return (
     <Box marginTop={1} flexDirection="column">
-      <Text bold>Validation results <Text dimColor>(advisory — never blocks)</Text></Text>
-      {results.map((r, i) => (
-        <Text key={`${r.id}-${i}`}>
-          {r.status === 'pass'
-            ? <Text color="green">{'  ✓  '}</Text>
-            : r.status === 'warn'
-              ? <Text color="yellow">{'  ⚠  '}</Text>
-              : <Text dimColor>{'  ·  '}</Text>}
-          <Text color={r.status === 'warn' ? 'yellow' : undefined} dimColor={r.status === 'skipped'}>{r.message}</Text>
+      <Text bold>Credential check</Text>
+      <Box marginTop={1} flexDirection="column" borderStyle="round" borderColor={anyWarn ? 'yellow' : 'green'} paddingX={1}>
+        <Text>
+          {anyWarn
+            ? `Capgo double-checked the credentials we just imported, and a few came back with a warning. A warning here does not mean the migration failed, and it does not mean your builds will fail. Your credentials are imported and ready to use. Checks like these can flag harmless things, such as an Apple or Google rate-limit, a credential that needs a moment to activate, or a check we simply could not run right now.`
+            : `Capgo double-checked the credentials we just imported, and everything looks good.`}
         </Text>
-      ))}
-      <Box marginTop={1}><Text dimColor>A warning never stops the migration — you can continue and fix it later.</Text></Box>
+        <Box marginTop={1}>
+          <Text dimColor>If a result looks wrong to you, email support@capgo.app and we will take a look. Either way, you can continue.</Text>
+        </Box>
+      </Box>
+      <Box marginTop={1}>
+        <Table data={data} maxColumnWidth={42} cellColor={cellColor} cellDim={cellDim} />
+      </Box>
     </Box>
   )
 }
