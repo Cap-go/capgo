@@ -1,4 +1,4 @@
-import type { FC } from 'react'
+import type { FC, ReactNode } from 'react'
 import type { Platform } from '../types.js'
 import type { PlatformPickerLayout } from './frame-fit.js'
 // src/build/onboarding/ui/platform-picker.tsx
@@ -11,6 +11,12 @@ import type { PlatformPickerLayout } from './frame-fit.js'
 //   • `list` — the same @inkjs/ui Select used everywhere else; used on narrow
 //     or short terminals. The layout is chosen by the shell via
 //     `pickPlatformLayout` so this component stays pure (props in → JSX out).
+//
+// Both layouts accept an optional `footer` rendered DIRECTLY below the legend
+// (inside the same flex column), so a caller-supplied note — e.g. the analytics
+// opt-out line — sits flush under "← → choose · Enter confirm" instead of
+// floating mid-screen with a gap (which happens if it is a sibling competing
+// with the picker's own bottom-pinning flexGrow spacer).
 //
 // `CardChooser` generalizes the cards-vs-list pattern (heading + bordered cards
 // driven by ←/→/Enter, or a Select fallback) so other yes/no-style questions —
@@ -74,9 +80,11 @@ export const PlatformCard: FC<PlatformCardProps> = ({ emoji, name, hint, selecte
 export interface PlatformPickerProps {
   layout: PlatformPickerLayout
   onSelect: (platform: Platform) => void
+  /** Rendered directly below the legend (flush, no gap). */
+  footer?: ReactNode
 }
 
-export const PlatformPicker: FC<PlatformPickerProps> = ({ layout, onSelect }) => {
+export const PlatformPicker: FC<PlatformPickerProps> = ({ layout, onSelect, footer }) => {
   const [index, setIndex] = useState(0)
   const clamp = (i: number): number => Math.max(0, Math.min(PLATFORM_ORDER.length - 1, i))
 
@@ -101,7 +109,7 @@ export const PlatformPicker: FC<PlatformPickerProps> = ({ layout, onSelect }) =>
 
   if (layout === 'list') {
     return (
-      <Box flexDirection="column" marginTop={1}>
+      <Box flexDirection="column" flexGrow={1} marginTop={1}>
         <Text bold>Which platform do you want to set up?</Text>
         <Select
           options={[
@@ -111,6 +119,8 @@ export const PlatformPicker: FC<PlatformPickerProps> = ({ layout, onSelect }) =>
           ]}
           onChange={value => onSelect(value as Platform)}
         />
+        <Box flexGrow={1} />
+        {footer}
       </Box>
     )
   }
@@ -118,8 +128,7 @@ export const PlatformPicker: FC<PlatformPickerProps> = ({ layout, onSelect }) =>
   // `alignItems="center"` centers the heading and cards horizontally within the
   // full terminal width (the shell renders this in a full-width column).
   // `flexGrow={1}` makes the picker fill the frame, and the flex spacer pushes
-  // the key legend to the BOTTOM — the heading + cards sit at the top, the hint
-  // sits at the bottom (it's not tied to the buttons).
+  // the legend (and the optional footer flush beneath it) to the BOTTOM.
   return (
     <Box flexDirection="column" alignItems="center" flexGrow={1} marginTop={1}>
       <Text bold>Which platform do you want to set up?</Text>
@@ -130,6 +139,7 @@ export const PlatformPicker: FC<PlatformPickerProps> = ({ layout, onSelect }) =>
       </Box>
       <Box flexGrow={1} />
       <Text dimColor>←  →  choose   ·   a  Appflow   ·   Enter  confirm</Text>
+      {footer}
     </Box>
   )
 }
@@ -174,12 +184,14 @@ export interface CardChooserProps {
   options: CardChoice[]
   /** Index of the card highlighted on first render (default 0 = leftmost). */
   defaultIndex?: number
+  /** Rendered directly below the legend (flush, no gap). */
+  footer?: ReactNode
   onSelect: (value: string) => void
 }
 
 /** A heading + bordered cards (←/→/Enter) — or a Select on narrow terminals —
  *  for any small choice. Reuses PlatformCard so the boxes match the platform picker. */
-export const CardChooser: FC<CardChooserProps> = ({ layout, question, subtitle, options, defaultIndex = 0, onSelect }) => {
+export const CardChooser: FC<CardChooserProps> = ({ layout, question, subtitle, options, defaultIndex = 0, footer, onSelect }) => {
   const [index, setIndex] = useState(Math.max(0, Math.min(options.length - 1, defaultIndex)))
   const clamp = (i: number): number => Math.max(0, Math.min(options.length - 1, i))
 
@@ -199,7 +211,7 @@ export const CardChooser: FC<CardChooserProps> = ({ layout, question, subtitle, 
 
   if (layout === 'list') {
     return (
-      <Box flexDirection="column" marginTop={1}>
+      <Box flexDirection="column" flexGrow={1} marginTop={1}>
         <Text bold>{question}</Text>
         {subtitle ? <Text dimColor>{subtitle}</Text> : null}
         <Box marginTop={1}>
@@ -208,6 +220,8 @@ export const CardChooser: FC<CardChooserProps> = ({ layout, question, subtitle, 
             onChange={onSelect}
           />
         </Box>
+        <Box flexGrow={1} />
+        {footer}
       </Box>
     )
   }
@@ -223,6 +237,7 @@ export const CardChooser: FC<CardChooserProps> = ({ layout, question, subtitle, 
       </Box>
       <Box flexGrow={1} />
       <Text dimColor>←  →  choose   ·   Enter  confirm</Text>
+      {footer}
     </Box>
   )
 }

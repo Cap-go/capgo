@@ -132,7 +132,7 @@ export interface OnboardingShellProps {
 }
 
 const AnalyticsNotice: FC = () => (
-  <Box marginTop={1}>
+  <Box width="100%" marginTop={1}>
     <Text dimColor>Analytics: this onboarding records usage and terminal replay to improve Capgo. Opt out with --no-analytics.</Text>
   </Box>
 )
@@ -298,8 +298,8 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
             { value: 'yes', emoji: '🔄', name: `Yes, migrate`, hint: `Import ${label} from Appflow` },
           ]}
           onSelect={value => answerMigrationGate(value === 'yes')}
+          footer={analyticsNotice ? <AnalyticsNotice /> : undefined}
         />
-        {analyticsNotice && <AnalyticsNotice />}
       </Box>
     )
   }
@@ -307,8 +307,7 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
   return (
     <Box flexDirection="column" minHeight={rows} padding={1}>
       <Header />
-      {!initialPlatform && <PlatformPicker layout={pickPlatformLayout(cols, rows)} onSelect={onPick} />}
-      {analyticsNotice && <AnalyticsNotice />}
+      {!initialPlatform && <PlatformPicker layout={pickPlatformLayout(cols, rows)} onSelect={onPick} footer={analyticsNotice ? <AnalyticsNotice /> : undefined} />}
     </Box>
   )
 }
