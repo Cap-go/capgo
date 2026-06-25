@@ -372,7 +372,7 @@ columns.value = [
       {
         icon: IconWrench,
         title: t('edit-role'),
-        visible: (member: OrganizationMemberRow) => canUpdateUserRoles.value && member.uid !== currentOrganization?.value?.created_by,
+        visible: () => canUpdateUserRoles.value,
         onClick: (member: OrganizationMemberRow) => {
           changeMemberPermission(member)
         },
@@ -827,14 +827,16 @@ async function cannotDeleteOwner() {
   })
 }
 
-async function ownerCannotBeRemoved(member: OrganizationMemberRow) {
+// Shared dialog for actions blocked because the member is the org owner (created_by).
+// Self: the owner acted on their own account and must contact support to transfer the org.
+// Other: another super admin acted on the owner; point them at the owner and at support.
+function openOwnerProtectedDialog(member: OrganizationMemberRow, keys: { title: string, selfBody: string, otherBody: string }) {
   const isSelf = member.uid === main.user?.id
 
-  // Self: the owner is trying to remove their own account and must contact support to transfer the org.
   if (isSelf) {
     dialogStore.openDialog({
-      title: t('alert-cannot-remove-owner-title'),
-      description: `${t('alert-cannot-remove-owner-self-body')}`,
+      title: t(keys.title),
+      description: `${t(keys.selfBody)}`,
       size: 'xl',
       buttons: [
         {
@@ -851,10 +853,9 @@ async function ownerCannotBeRemoved(member: OrganizationMemberRow) {
     return
   }
 
-  // Another super admin is trying to remove the owner: point them at the owner and at support.
   dialogStore.openDialog({
-    title: t('alert-cannot-remove-owner-title'),
-    description: `${t('alert-cannot-remove-owner-other-body', { email: member.email })}`,
+    title: t(keys.title),
+    description: `${t(keys.otherBody, { email: member.email })}`,
     size: 'xl',
     buttons: [
       {
@@ -872,6 +873,22 @@ async function ownerCannotBeRemoved(member: OrganizationMemberRow) {
         href: 'mailto:support@capgo.app',
       },
     ],
+  })
+}
+
+async function ownerCannotBeRemoved(member: OrganizationMemberRow) {
+  openOwnerProtectedDialog(member, {
+    title: 'alert-cannot-remove-owner-title',
+    selfBody: 'alert-cannot-remove-owner-self-body',
+    otherBody: 'alert-cannot-remove-owner-other-body',
+  })
+}
+
+async function ownerRoleCannotBeChanged(member: OrganizationMemberRow) {
+  openOwnerProtectedDialog(member, {
+    title: 'alert-cannot-change-owner-role-title',
+    selfBody: 'alert-cannot-change-owner-role-self-body',
+    otherBody: 'alert-cannot-change-owner-role-other-body',
   })
 }
 
@@ -986,12 +1003,15 @@ async function deleteMember(member: OrganizationMemberRow) {
   _deleteMember(member)
 }
 
-function handleRbacRoleUpdateError(error: { message?: string }) {
+function handleRbacRoleUpdateError(error: { message?: string }, member?: OrganizationMemberRow) {
   if (error.message?.includes('CANNOT_REMOVE_LAST_SUPER_ADMIN')) {
     toast.error(t('cannot-remove-last-super-admin'))
   }
   else if (error.message?.includes('CANNOT_CHANGE_OWNER_ROLE')) {
-    toast.error(t('cannot-change-owner-role'))
+    if (member)
+      ownerRoleCannotBeChanged(member)
+    else
+      toast.error(t('cannot-change-owner-role'))
   }
   else if (error.message?.includes('NO_PERMISSION_TO_UPDATE_ROLES')) {
     toast.error(t('no-permission'))
@@ -1034,7 +1054,7 @@ async function updateRbacMemberRole(member: OrganizationMemberRow, perm: string)
 
   if (error) {
     console.error('Error updating RBAC role:', error)
-    handleRbacRoleUpdateError(error)
+    handleRbacRoleUpdateError(error, member)
     return
   }
 
@@ -1108,6 +1128,13 @@ async function _changeMemberPermission(member: OrganizationMemberRow, perm: Data
 }
 
 async function changeMemberPermission(member: OrganizationMemberRow) {
+  // The org creator (owner) is protected server-side and their role can't be changed.
+  // Explain it up front instead of opening a role picker that will be rejected.
+  if (!isInviteMember(member) && member.uid === currentOrganization.value?.created_by) {
+    await ownerRoleCannotBeChanged(member)
+    return
+  }
+
   const isInvite = isInviteMember(member)
   const perm = await showPermModal(isInvite, undefined, member.role)
 
