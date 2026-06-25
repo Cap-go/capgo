@@ -262,9 +262,8 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosBundleIdInitial, 
               setUpdateAnswered(true)
             }
           }}
+          footer={analyticsNotice ? <AnalyticsNotice /> : undefined}
         />
-        <Box flexGrow={1} />
-        {analyticsNotice && <AnalyticsNotice />}
       </Box>
     )
   }
