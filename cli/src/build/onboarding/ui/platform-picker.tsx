@@ -138,7 +138,7 @@ export const PlatformPicker: FC<PlatformPickerProps> = ({ layout, onSelect, foot
         <PlatformCard emoji="🔄" name="Appflow" hint="Migrate from Ionic Appflow" selected={selected === 'appflow'} />
       </Box>
       <Box flexGrow={1} />
-      <Text dimColor>←  →  choose   ·   a  Appflow   ·   Enter  confirm</Text>
+      <Text dimColor>←  →  choose   ·   Enter  confirm</Text>
       {footer}
     </Box>
   )
