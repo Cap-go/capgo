@@ -827,6 +827,25 @@ async function cannotDeleteOwner() {
   })
 }
 
+async function ownerCannotBeRemoved() {
+  dialogStore.openDialog({
+    title: t('alert-cannot-remove-owner-title'),
+    description: `${t('alert-cannot-remove-owner-body')}`,
+    size: 'xl',
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('email-support'),
+        role: 'primary',
+        href: 'mailto:support@capgo.app',
+      },
+    ],
+  })
+}
+
 async function _deleteMember(member: OrganizationMemberRow) {
   isLoading.value = true
 
@@ -854,7 +873,7 @@ async function _deleteMember(member: OrganizationMemberRow) {
             toast.error(t('cannot-remove-last-super-admin'))
           }
           else if (error.message.includes('CANNOT_CHANGE_OWNER_ROLE')) {
-            toast.error(t('cannot-change-owner-role'))
+            ownerCannotBeRemoved()
           }
           else if (error.message.includes('NO_PERMISSION_TO_UPDATE_ROLES')) {
             toast.error(t('no-permission'))
