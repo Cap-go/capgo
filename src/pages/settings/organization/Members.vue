@@ -936,6 +936,13 @@ async function deleteMember(member: OrganizationMemberRow) {
     return
   }
 
+  // The org creator (owner) is protected server-side and can never be removed.
+  // Surface that immediately instead of asking to confirm a delete that will fail.
+  else if (!isInviteMember(member) && member.uid === currentOrganization.value?.created_by) {
+    await ownerCannotBeRemoved()
+    return
+  }
+
   else if (await didCancel()) {
     console.log('Member deletion cancelled.')
     return
