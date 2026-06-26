@@ -11,7 +11,7 @@ export function normalizeStoreUrl(rawUrl: string | undefined, expectedHost: 'app
     throw new Error(`Invalid store URL: ${trimmedUrl}`)
   }
 
-  if (!parsedUrl.hostname.endsWith(expectedHost))
+  if (parsedUrl.hostname !== expectedHost)
     throw new Error(`Store URL must use ${expectedHost}`)
 
   return parsedUrl.toString()

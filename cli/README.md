@@ -246,7 +246,7 @@ Examples:
 | **--bundle** | <code>string</code> | Bundle name or id to preview |
 | **--channel** | <code>string</code> | Channel name or id to preview |
 | **--type** | <code>string</code> | Type for positional target |
-| **--png** | <code>string</code> | Write the preview QR code as a PNG image to <path> |
+| **--png** | <code>string</code> | Write the preview QR code as a PNG image to the given file path |
 | **--url** | <code>boolean</code> | Print preview URLs only (web and deep link), without a terminal QR code |
 | **--web-url** | <code>boolean</code> | Encode the web preview URL in the QR code and PNG instead of the capgo:// deep link |
 | **--preview-env** | <code>string</code> | Preview web URL environment |

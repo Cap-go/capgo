@@ -3,8 +3,8 @@ import type { OptionsBase } from '../schemas/base'
 import type { Database } from '../types/supabase.types'
 import { stdout } from 'node:process'
 import { intro, log, outro } from '@clack/prompts'
-import { chmod } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { chmod, mkdir } from 'node:fs/promises'
+import { dirname, resolve } from 'node:path'
 import QRCode from 'qrcode'
 import { buildPreviewWebUrl, type PreviewWebEnv } from './web-url'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
@@ -70,6 +70,7 @@ export async function renderTerminalQrCode(value: string) {
 
 export async function renderQrCodePng(value: string, outputPath: string) {
   const absolutePath = resolve(outputPath)
+  await mkdir(dirname(absolutePath), { recursive: true })
   await QRCode.toFile(absolutePath, value, { errorCorrectionLevel: 'L', width: 512 })
   await chmod(absolutePath, 0o600)
   return absolutePath

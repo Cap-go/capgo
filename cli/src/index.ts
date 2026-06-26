@@ -182,7 +182,7 @@ Examples:
   .option('--bundle <bundle>', `Bundle name or id to preview`)
   .option('--channel <channel>', `Channel name or id to preview`)
   .addOption(new Option('--type <type>', `Type for positional target`).choices(['bundle', 'channel']))
-  .option('--png <path>', `Write the preview QR code as a PNG image to <path>`)
+  .option('--png <path>', `Write the preview QR code as a PNG image to the given file path`)
   .option('--url', `Print preview URLs only (web and deep link), without a terminal QR code`)
   .option('--web-url', `Encode the web preview URL in the QR code and PNG instead of the capgo:// deep link`)
   .addOption(new Option('--preview-env <env>', `Preview web URL environment`).choices(['prod', 'preprod', 'dev']).default('prod'))
