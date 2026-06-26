@@ -332,6 +332,74 @@ describe('tests CLI channel commands', () => {
       }
     })
 
+    it.concurrent('should set channel bundle with app developer promotion permission only', async () => {
+      const channelName = generateChannelName()
+      await createChannel(channelName, APPNAME)
+
+      const bundle = `1.0.${Math.floor(Math.random() * 10000)}`
+      await getSupabaseClient()
+        .from('app_versions')
+        .insert({
+          app_id: APPNAME,
+          name: bundle,
+          owner_org: ORG_ID,
+          user_id: USER_ID,
+          storage_provider: 'r2-direct',
+        })
+        .throwOnError()
+
+      const apiKey = await createDirectApiKeyWithBindings({
+        key: `channel-promote-${randomUUID()}`,
+        name: `Channel promote developer ${channelName}`,
+        orgId: ORG_ID,
+        roleName: 'org_member',
+        appId: APPNAME,
+        appRoleName: 'app_developer',
+      })
+      const resolvedKey = apiKey.key ?? ''
+
+      try {
+        const supabase = getSupabaseClient()
+        const { data: channel, error: channelError } = await supabase
+          .from('channels')
+          .select('id')
+          .eq('name', channelName)
+          .eq('app_id', APPNAME)
+          .single()
+        expect(channelError).toBeNull()
+        expect(channel?.id).toBeTruthy()
+
+        const { data: canPromote, error: promoteError } = await supabase.rpc('rbac_check_permission_direct' as any, {
+          p_permission_key: 'channel.promote_bundle',
+          p_user_id: apiKey.user_id,
+          p_org_id: ORG_ID,
+          p_app_id: APPNAME,
+          p_channel_id: channel!.id,
+          p_apikey: resolvedKey,
+        })
+        expect(promoteError).toBeNull()
+        expect(canPromote).toBe(true)
+
+        const { data: canUpdateSettings, error: settingsError } = await supabase.rpc('rbac_check_permission_direct' as any, {
+          p_permission_key: 'channel.update_settings',
+          p_user_id: apiKey.user_id,
+          p_org_id: ORG_ID,
+          p_app_id: APPNAME,
+          p_channel_id: channel!.id,
+          p_apikey: resolvedKey,
+        })
+        expect(settingsError).toBeNull()
+        expect(canUpdateSettings).toBe(false)
+
+        const result = await createTestSDK(resolvedKey).updateChannel({ channelId: channelName, appId: APPNAME, bundle })
+        expect(result.success, result.error).toBe(true)
+      }
+      finally {
+        await getSupabaseClient().from('role_bindings').delete().eq('principal_id', apiKey.rbac_id)
+        await getSupabaseClient().from('apikeys').delete().eq('id', apiKey.id)
+      }
+    })
+
     it.concurrent('should fail to set bundle for invalid channel name', async () => {
       const bundle = '1.0.0'
       const testInvalidChannel = generateChannelName()

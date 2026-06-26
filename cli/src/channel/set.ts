@@ -130,6 +130,18 @@ export async function setChannelInternal(channel: string, appId: string, options
     throw new Error('No channel option provided')
   }
 
+  const hasBundlePromotion = bundle != null || latest === true || latestRemote === true
+  const hasSettingsUpdate = state != null
+    || downgrade != null
+    || ios != null
+    || android != null
+    || selfAssign != null
+    || disableAutoUpdate != null
+    || dev != null
+    || emulator != null
+    || device != null
+    || prod != null
+
   const { data: existingChannel, error: channelError } = await findChannel(supabase, appId, channel)
   if (channelError || !existingChannel) {
     if (!silent)
@@ -137,7 +149,11 @@ export async function setChannelInternal(channel: string, appId: string, options
     throw new Error(`Cannot find channel ${channel}`)
   }
 
-  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'channel.update_settings', silent, true, existingChannel.id)
+  if (hasSettingsUpdate)
+    await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'channel.update_settings', silent, true, existingChannel.id)
+  if (hasBundlePromotion)
+    await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'channel.promote_bundle', silent, true, existingChannel.id)
+
   const orgId = existingChannel.owner_org
   if (!orgId) {
     if (!silent)
@@ -333,11 +349,28 @@ export async function setChannelInternal(channel: string, appId: string, options
       log.info(`Set ${appId} channel: ${channel} to ${finalDisableAutoUpdate} disable update strategy to this channel`)
   }
 
-  const { error: dbError } = await updateOrCreateChannel(supabase, channelPayload)
-  if (dbError) {
-    if (!silent)
-      log.error('Cannot set channel because this API key does not have the required RBAC permission.')
-    throw new Error('API key is not allowed to set this channel')
+  if (hasBundlePromotion && !hasSettingsUpdate) {
+    const { error } = await supabase.functions.invoke('bundle', {
+      method: 'PUT',
+      body: JSON.stringify({
+        app_id: appId,
+        version_id: channelPayload.version,
+        channel_id: existingChannel.id,
+      }),
+    })
+    if (error) {
+      if (!silent)
+        log.error('Cannot set channel because this API key does not have the required RBAC permission.')
+      throw new Error('API key is not allowed to set this channel')
+    }
+  }
+  else {
+    const { error: dbError } = await updateOrCreateChannel(supabase, channelPayload)
+    if (dbError) {
+      if (!silent)
+        log.error('Cannot set channel because this API key does not have the required RBAC permission.')
+      throw new Error('API key is not allowed to set this channel')
+    }
   }
 
   if (options.qrPreview && !silent) {

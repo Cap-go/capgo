@@ -716,7 +716,21 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ORG_SUPER_ADMIN) {
     if (!existingChannel)
       return { success: false, error: 'Cannot find channel' }
 
-    if (!(await apiKeyHasAnyChannelPermission(apikey, apiKey, app, existingChannel.id, ['channel.update_settings'])))
+    const hasBundlePromotion = bundle != null
+    const hasSettingsUpdate = state != null
+      || downgrade != null
+      || ios != null
+      || android != null
+      || selfAssign != null
+      || disableAutoUpdate != null
+      || dev != null
+      || emulator != null
+      || device != null
+      || prod != null
+
+    if (hasSettingsUpdate && !(await apiKeyHasAnyChannelPermission(apikey, apiKey, app, existingChannel.id, ['channel.update_settings'])))
+      return { success: false, error: 'Invalid API key or insufficient permissions.' }
+    if (hasBundlePromotion && !(await apiKeyHasAnyChannelPermission(apikey, apiKey, app, existingChannel.id, ['channel.promote_bundle'])))
       return { success: false, error: 'Invalid API key or insufficient permissions.' }
 
     if (state && !['default', 'normal'].includes(state))
