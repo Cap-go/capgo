@@ -886,10 +886,11 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ORG_SUPER_ADMIN) {
       if ('error' in uploadPayload)
         return { success: false, error: uploadPayload.error }
 
-      const targetChannels = parseUploadChannels(options.channel)
-      if (options.channel !== undefined && targetChannels.length === 0)
+      const requestedChannels = parseUploadChannels(options.channel)
+      if (options.channel !== undefined && requestedChannels.length === 0)
         return { success: false, error: 'Missing channel name' }
 
+      const targetChannels = requestedChannels.length > 0 ? requestedChannels : parseUploadChannels('production')
       const remoteChecksums = new Map<string, string | null>()
       for (const targetChannel of targetChannels) {
         const currentChannelVersion = await getChannelVersionRecord(options.appId, targetChannel)
@@ -897,31 +898,29 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ORG_SUPER_ADMIN) {
       }
       const { channelsToAssign } = getChannelsToAssignByChecksum(targetChannels, uploadPayload.checksum, remoteChecksums)
 
-      if (targetChannels.length > 0 && channelsToAssign.length === 0) {
+      if (channelsToAssign.length === 0) {
         return {
           success: false,
           error: 'Cannot upload the same bundle content',
         }
       }
-      if (targetChannels.length > 0) {
-        for (const targetChannel of channelsToAssign) {
-          const channelRecord = await getChannelRecord(options.appId, targetChannel)
-          if (channelRecord) {
-            const canPromote = await apiKeyHasAnyChannelPermission(resolvedApiKey, apiKey, app, channelRecord.id, ['channel.promote_bundle'])
-            if (!canPromote)
-              return { success: false, error: 'Cannot set channel because this API key lacks channel.promote_bundle for the target channel' }
-            if (options.selfAssign && !(await apiKeyHasAnyChannelPermission(resolvedApiKey, apiKey, app, channelRecord.id, ['channel.update_settings'])))
-              return { success: false, error: 'Cannot enable device self-assign because this API key lacks channel.update_settings' }
-            continue
-          }
-
-          if (!app.owner_org)
-            return { success: false, error: `App ${options.appId} does not have an owner organization` }
-          if (!(await apiKeyHasAnyAppPermission(resolvedApiKey, apiKey, app, ['app.create_channel'])))
-            return { success: false, error: 'Cannot create target channel because this API key lacks app.create_channel' }
-          if (!(await apiKeyHasAnyAppPermission(resolvedApiKey, apiKey, app, ['channel.promote_bundle'])))
-            return { success: false, error: 'Cannot create target channel with a bundle because this API key lacks channel.promote_bundle' }
+      for (const targetChannel of channelsToAssign) {
+        const channelRecord = await getChannelRecord(options.appId, targetChannel)
+        if (channelRecord) {
+          const canPromote = await apiKeyHasAnyChannelPermission(resolvedApiKey, apiKey, app, channelRecord.id, ['channel.promote_bundle'])
+          if (!canPromote)
+            return { success: false, error: 'Cannot set channel because this API key lacks channel.promote_bundle for the target channel' }
+          if (options.selfAssign && !(await apiKeyHasAnyChannelPermission(resolvedApiKey, apiKey, app, channelRecord.id, ['channel.update_settings'])))
+            return { success: false, error: 'Cannot enable device self-assign because this API key lacks channel.update_settings' }
+          continue
         }
+
+        if (!app.owner_org)
+          return { success: false, error: 'App does not have an owner organization' }
+        if (!(await apiKeyHasAnyAppPermission(resolvedApiKey, apiKey, app, ['app.create_channel'])))
+          return { success: false, error: 'Cannot create target channel because this API key lacks app.create_channel' }
+        if (!(await apiKeyHasAnyAppPermission(resolvedApiKey, apiKey, app, ['channel.promote_bundle'])))
+          return { success: false, error: 'Cannot create target channel with a bundle because this API key lacks channel.promote_bundle' }
       }
 
       const minUpdateVersion = await resolveUploadMinUpdateVersion(

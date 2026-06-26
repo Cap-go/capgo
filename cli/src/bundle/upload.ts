@@ -1065,7 +1065,6 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   if (options.channel !== undefined && requestedChannels.length === 0)
     uploadFail('Missing channel name, pass one channel or a comma-separated list with --channel')
 
-  const channelAssignmentRequired = requestedChannels.length > 0
   const defaultUploadChannel = requestedChannels.length > 0 ? null : await getDefaultUploadChannel(appid, supabase, localConfig.hostWeb)
   const channels = requestedChannels.length > 0 ? requestedChannels : parseUploadChannels(defaultUploadChannel || 'production')
   if (channels.length === 0)
@@ -1240,10 +1239,10 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     log.warn('Please make sure you want to do this, if you are not sure, please do not use this option.')
   }
 
+  const channelAssignmentRequired = channelsToAssign.length > 0
   const uploadTargetChannels = channelAssignmentRequired
     ? await preflightRequiredChannelAssignments(supabase, apikey, appid, channelsToAssign, !!options.selfAssign)
     : new Map<string, UploadTargetChannel | null>()
-
   const versionData = {
     name: bundle,
     app_id: appid,
