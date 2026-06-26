@@ -145,6 +145,60 @@ SELECT ok(
 );
 
 
+
+-- Re-assert seeded apikey 113 binding inside this test transaction.
+DO $$
+DECLARE
+  v_rbac_id uuid;
+  v_role_id uuid;
+BEGIN
+  SELECT ak.rbac_id
+  INTO v_rbac_id
+  FROM public.apikeys ak
+  WHERE ak.id = 113;
+
+  IF v_rbac_id IS NULL THEN
+    RAISE EXCEPTION 'test setup: seeded apikey 113 is missing';
+  END IF;
+
+  SELECT roles.id
+  INTO v_role_id
+  FROM public.roles roles
+  WHERE roles.name = public.rbac_role_apikey_manager()
+    AND roles.scope_type = public.rbac_scope_org();
+
+  IF v_role_id IS NULL THEN
+    RAISE EXCEPTION 'test setup: apikey_manager role is missing';
+  END IF;
+
+  DELETE FROM public.role_bindings rb
+  WHERE rb.principal_type = public.rbac_principal_apikey()
+    AND rb.principal_id = v_rbac_id
+    AND rb.scope_type = public.rbac_scope_org()
+    AND rb.org_id = 'f1a2b3c4-d5e6-4f70-8a9b-0c1d2e3f4a50'::uuid;
+
+  INSERT INTO public.role_bindings (
+    principal_type,
+    principal_id,
+    role_id,
+    scope_type,
+    org_id,
+    granted_by,
+    reason,
+    is_direct
+  )
+  VALUES (
+    public.rbac_principal_apikey(),
+    v_rbac_id,
+    v_role_id,
+    public.rbac_scope_org(),
+    'f1a2b3c4-d5e6-4f70-8a9b-0c1d2e3f4a50'::uuid,
+    'd0f1a2b3-c4d5-4e6f-8a90-b1c2d3e4f506'::uuid,
+    'test setup apikey management binding',
+    true
+  );
+END $$;
+
 SELECT ok(
   EXISTS (
     SELECT 1
