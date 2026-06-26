@@ -1,6 +1,7 @@
 import { sValidator } from '@hono/standard-validator'
+import { HTTPException } from 'hono/http-exception'
 import { and, eq } from 'drizzle-orm'
-import { createHono, middlewareAuth, useCors } from '../utils/hono.ts'
+import { createHono, middlewareAuth, quickError, useCors } from '../utils/hono.ts'
 import { cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { schema } from '../utils/postgres_schema.ts'
@@ -313,7 +314,7 @@ app.get('/:group_id/members', sValidator('param', groupIdParamSchema, invalidGro
         .limit(1)
 
       if (!membership) {
-        return c.json({ error: 'Forbidden' }, 403)
+        throw quickError(403, 'forbidden', 'Forbidden')
       }
     }
 
@@ -332,6 +333,9 @@ app.get('/:group_id/members', sValidator('param', groupIdParamSchema, invalidGro
     return c.json(members)
   }
   catch (error) {
+    if (error instanceof HTTPException) {
+      throw error
+    }
     cloudlogErr({
       requestId: c.get('requestId'),
       message: 'group_members_fetch_failed',

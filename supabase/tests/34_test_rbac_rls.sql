@@ -1,7 +1,7 @@
 -- Test RLS policies for RBAC tables
 BEGIN;
 
-SELECT plan(7);
+SELECT plan(8);
 
 -- Test admin user: 'test_admin' maps to c591b04e-cf29-4945-b9a0-776d0672061a (admin@capgo.app)
 -- Test regular user: 'test_user' maps to 6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5 (test@capgo.app)
@@ -32,8 +32,7 @@ SELECT
         'Regular user can read permissions'
     );
 
--- 3) Regular user can read their org's groups
--- First create a test group as admin
+-- 3) Regular user cannot read org groups they do not belong to
 SELECT tests.authenticate_as('test_admin');
 
 INSERT INTO
@@ -45,7 +44,36 @@ VALUES
     'Test group for RLS'
 );
 
--- Now check regular user can see it (they're member of Demo org)
+SELECT tests.authenticate_as('test_user');
+
+SELECT
+    ok(
+        NOT EXISTS (
+            SELECT 1
+            FROM
+                public.groups
+            WHERE
+                org_id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'
+                AND name = 'Test Group RLS'
+        ),
+    'Regular user cannot read org groups they do not belong to'
+    );
+
+-- 4) Regular user can read groups after joining
+SET LOCAL ROLE service_role;
+
+INSERT INTO public.group_members (group_id, user_id, added_by)
+SELECT
+    groups.id,
+    '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5',
+    'c591b04e-cf29-4945-b9a0-776d0672061a'
+FROM public.groups
+WHERE
+    org_id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'
+    AND name = 'Test Group RLS';
+
+RESET ROLE;
+
 SELECT tests.authenticate_as('test_user');
 
 SELECT
@@ -58,10 +86,10 @@ SELECT
                 org_id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'
                 AND name = 'Test Group RLS'
         ),
-    'Regular user can read their org groups'
+    'Regular user can read groups they belong to'
     );
 
--- 4) Regular user cannot see groups from other orgs
+-- 5) Regular user cannot see groups from other orgs
 -- Create a group in Admin org
 SELECT tests.authenticate_as('test_admin');
 
@@ -89,7 +117,7 @@ SELECT
     'Regular user cannot see groups from other orgs'
     );
 
--- 5) Admin can see role_bindings for their org
+-- 6) Admin can see role_bindings for their org
 SELECT tests.authenticate_as('test_admin');
 
 -- Seed a deterministic binding outside RLS; this test is about SELECT visibility.
@@ -142,7 +170,7 @@ SELECT
     'Admin can see role bindings for their org'
     );
 
--- 6) User cannot see role_bindings from other orgs
+-- 7) User cannot see role_bindings from other orgs
 -- Note: We don't delete/recreate bindings because of super_admin protection trigger
 -- Instead, we verify test_user (different org) cannot see test_admin's bindings
 SELECT tests.authenticate_as('test_user');
@@ -160,7 +188,7 @@ SELECT
     'User cannot see role bindings from other orgs'
     );
 
--- 7) Test admin cannot create roles
+-- 8) Test admin cannot create roles
 SELECT tests.authenticate_as('test_admin');
 
 SELECT
