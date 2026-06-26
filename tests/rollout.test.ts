@@ -317,11 +317,16 @@ describe('rollout auto-pause channel loading', () => {
     const rangeCalls: Array<[number, number]> = []
     const pages = [pageOne, pageTwo]
 
+    const gtCalls: Array<[string, number]> = []
     const supabase = {
       from: () => {
         const query = {
           select: () => query,
           eq: () => query,
+          gt: (column: string, value: number) => {
+            gtCalls.push([column, value])
+            return query
+          },
           not: () => query,
           is: () => query,
           order: () => query,
@@ -338,6 +343,10 @@ describe('rollout auto-pause channel loading', () => {
 
     expect(result.error).toBeNull()
     expect(result.data).toHaveLength(1002)
+    expect(gtCalls).toEqual([
+      ['rollout_percentage_bps', 0],
+      ['rollout_percentage_bps', 0],
+    ])
     expect(rangeCalls).toEqual([[0, 999], [1000, 1999]])
   })
 })
