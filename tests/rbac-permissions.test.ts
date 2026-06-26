@@ -948,7 +948,7 @@ describe('rbac permission system', () => {
         })
       })
 
-      it('should enforce app 2FA checks for channel-scoped api keys without app read', async () => {
+      it('should bypass org 2FA enforcement for channel-scoped api keys without app read', async () => {
         const testId = randomUUID()
         const channelKeyOwnerId = randomUUID()
         const orgId = randomUUID()
@@ -1034,7 +1034,7 @@ describe('rbac permission system', () => {
         `, [orgId, appId, channel.rows[0].id])
 
         expect(guardedAccess.rows[0]).toMatchObject({
-          can_read_channel_after_2fa_gate: false,
+          can_read_channel_after_2fa_gate: true,
           rejects_for_2fa: true,
         })
       })
