@@ -196,10 +196,9 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
       throw simpleError('cannot_promote_bundle', 'You can\'t promote bundles on this channel', { app_id: body.app_id, channel: body.channel, channelId: existingChannelId })
     }
   }
-  if (body.rolloutVersion && body.version === undefined && existingChannelVersion === null) {
-    throw simpleError('missing_stable_version', 'Cannot set rollout target without a stable bundle', { app_id: body.app_id, channel: body.channel })
-  }
-  if (body.rolloutVersion && body.version === 'unknown') {
+  if (body.rolloutVersion && (
+    (body.version === undefined && existingChannelVersion === null) || body.version === null || body.version === 'unknown'
+  )) {
     throw simpleError('missing_stable_version', 'Cannot set rollout target without a stable bundle', { app_id: body.app_id, channel: body.channel })
   }
   const rolloutPausedAt = body.rolloutPausedAt !== undefined

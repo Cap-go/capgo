@@ -366,6 +366,9 @@ export async function setChannelInternal(channel: string, appId: string, options
       }
     }
 
+    if (existingChannel.version == null && channelPayload.version == null)
+      throw new Error('Cannot set rollout target without a stable bundle')
+
     channelPayload.rollout_version = data.id
     if (rolloutEnable == null)
       channelPayload.rollout_enabled = true
