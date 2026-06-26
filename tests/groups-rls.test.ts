@@ -90,7 +90,7 @@ afterAll(async () => {
 })
 
 describe('groups RLS', () => {
-  it.concurrent('denies org members from listing groups they do not belong to', async () => {
+  it('denies org members from listing groups they do not belong to', async () => {
     const rows = await withAuthenticatedUser(USER_ID_2, async (client) => {
       const result = await client.query(`
         SELECT id, org_id, name, description, created_at
@@ -104,7 +104,7 @@ describe('groups RLS', () => {
     expect(rows).toEqual([])
   })
 
-  it.concurrent('denies org members from reading group metadata by id', async () => {
+  it('denies org members from reading group metadata by id', async () => {
     const rows = await withAuthenticatedUser(USER_ID_2, async (client) => {
       const result = await client.query(`
         SELECT id, org_id, name, description, created_at
@@ -117,7 +117,7 @@ describe('groups RLS', () => {
     expect(rows).toEqual([])
   })
 
-  it.concurrent('denies org members from reading group membership lists', async () => {
+  it('denies org members from reading group membership lists', async () => {
     const rows = await withAuthenticatedUser(USER_ID_2, async (client) => {
       const result = await client.query(`
         SELECT user_id
@@ -130,7 +130,7 @@ describe('groups RLS', () => {
     expect(rows).toEqual([])
   })
 
-  it.concurrent('allows org admins to list groups in their org', async () => {
+  it('allows org admins to list groups in their org', async () => {
     const rows = await withAuthenticatedUser(USER_ID, async (client) => {
       const result = await client.query(`
         SELECT id
@@ -143,7 +143,7 @@ describe('groups RLS', () => {
     expect(rows.some(row => row.id === groupId)).toBe(true)
   })
 
-  it.concurrent('allows org admins to read group membership lists', async () => {
+  it('allows org admins to read group membership lists', async () => {
     const rows = await withAuthenticatedUser(USER_ID, async (client) => {
       const result = await client.query(`
         SELECT user_id
@@ -156,7 +156,7 @@ describe('groups RLS', () => {
     expect(rows.some(row => row.user_id === USER_ID)).toBe(true)
   })
 
-  it.concurrent('allows group members to read their group metadata and members after joining', async () => {
+  it('allows group members to read their group metadata and members after joining', async () => {
     const client = await pool.connect()
     try {
       await client.query(`
