@@ -1105,7 +1105,8 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
       log.info(`  - Key ID: ${preparedBundle.keyId || 'none'}`)
     }
 
-    if (!options.ignoreChecksumCheck) {
+    const shouldCheckChecksum = !options.ignoreChecksumCheck && rolloutPercentageBps == null
+    if (shouldCheckChecksum) {
       if (options.verbose)
         log.info(`[Verbose] Checking for duplicate checksum...`)
       channelsToAssign = await getChannelsToAssignAfterChecksumCheck(supabase, appid, channels, preparedBundle.checksum)
