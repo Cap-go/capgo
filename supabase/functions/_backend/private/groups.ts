@@ -36,7 +36,7 @@ app.get('/:org_id', sValidator('param', orgIdParamSchema, invalidOrgIdHook), asy
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
-  if (!(await checkPermission(c, 'org.read_members', { orgId }))) {
+  if (!(await checkPermission(c, 'org.update_user_roles', { orgId }))) {
     return c.json({ error: 'Forbidden' }, 403)
   }
 
@@ -299,8 +299,22 @@ app.get('/:group_id/members', sValidator('param', groupIdParamSchema, invalidGro
       return c.json({ error: 'Group not found' }, 404)
     }
 
-    if (!(await checkPermission(c, 'org.read_members', { orgId: group.org_id }))) {
-      return c.json({ error: 'Forbidden' }, 403)
+    const canManageGroup = await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id })
+    if (!canManageGroup) {
+      const [membership] = await drizzle
+        .select({ userId: schema.group_members.user_id })
+        .from(schema.group_members)
+        .where(
+          and(
+            eq(schema.group_members.group_id, groupId),
+            eq(schema.group_members.user_id, userId),
+          ),
+        )
+        .limit(1)
+
+      if (!membership) {
+        return c.json({ error: 'Forbidden' }, 403)
+      }
     }
 
     // Fetch members with details
