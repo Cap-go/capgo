@@ -35,63 +35,6 @@ SELECT ok(
   'org_super_admin inherits org.manage_apikeys'
 );
 
--- API keys must not be blocked by org 2FA enforcement in direct RBAC checks
-DO $$
-DECLARE
-  org_id uuid := gen_random_uuid();
-  user_id uuid := tests.get_supabase_uid('test_admin');
-  apikey_rbac_id uuid;
-  apikey_value text := 'test-apikey-2fa-bypass-' || gen_random_uuid()::text;
-BEGIN
-  INSERT INTO public.orgs (id, created_by, name, management_email, enforcing_2fa)
-  VALUES (org_id, user_id, 'API Key 2FA Bypass Org', 'apikey-2fa-bypass@capgo.app', true);
-
-  INSERT INTO public.apikeys (user_id, key, name)
-  VALUES (user_id, apikey_value, '2FA bypass test key')
-  RETURNING rbac_id INTO apikey_rbac_id;
-
-  INSERT INTO public.role_bindings (
-    principal_type,
-    principal_id,
-    role_id,
-    scope_type,
-    org_id,
-    granted_by,
-    reason,
-    is_direct
-  )
-  SELECT
-    public.rbac_principal_apikey(),
-    apikey_rbac_id,
-    roles.id,
-    public.rbac_scope_org(),
-    org_id,
-    user_id,
-    'test apikey org.read binding',
-    true
-  FROM public.roles
-  WHERE roles.name = public.rbac_role_org_member()
-  LIMIT 1;
-
-  PERFORM set_config('test.apikey_2fa_bypass_org', org_id::text, true);
-  PERFORM set_config('test.apikey_2fa_bypass_key', apikey_value, true);
-END $$;
-
-SELECT tests.authenticate_as('test_admin');
-
-SELECT ok(
-  public.rbac_check_permission_direct(
-    public.rbac_perm_org_read(),
-    tests.get_supabase_uid('test_admin'),
-    current_setting('test.apikey_2fa_bypass_org')::uuid,
-    NULL::character varying,
-    NULL::bigint,
-    current_setting('test.apikey_2fa_bypass_key')
-  ),
-  'API key direct RBAC check ignores org 2FA enforcement'
-);
-
--- app_uploader can promote bundles without channel.update_settings
 SELECT ok(
   EXISTS (
     SELECT 1
@@ -144,9 +87,7 @@ SELECT ok(
   'apikey_manager inherits org.read for expiration policy enforcement'
 );
 
-
-
--- Re-assert seeded apikey 113 binding inside this test transaction.
+-- Re-assert seeded apikey 113 binding before switching to an authenticated role.
 DO $$
 DECLARE
   v_rbac_id uuid;
@@ -227,6 +168,62 @@ SELECT ok(
       AND p.key = public.rbac_perm_org_update_user_roles()
   ),
   'seed apikey 113 does not inherit org.update_user_roles'
+);
+
+-- API keys must not be blocked by org 2FA enforcement in direct RBAC checks
+DO $$
+DECLARE
+  org_id uuid := gen_random_uuid();
+  user_id uuid := tests.get_supabase_uid('test_admin');
+  apikey_rbac_id uuid;
+  apikey_value text := 'test-apikey-2fa-bypass-' || gen_random_uuid()::text;
+BEGIN
+  INSERT INTO public.orgs (id, created_by, name, management_email, enforcing_2fa)
+  VALUES (org_id, user_id, 'API Key 2FA Bypass Org', 'apikey-2fa-bypass@capgo.app', true);
+
+  INSERT INTO public.apikeys (user_id, key, name)
+  VALUES (user_id, apikey_value, '2FA bypass test key')
+  RETURNING rbac_id INTO apikey_rbac_id;
+
+  INSERT INTO public.role_bindings (
+    principal_type,
+    principal_id,
+    role_id,
+    scope_type,
+    org_id,
+    granted_by,
+    reason,
+    is_direct
+  )
+  SELECT
+    public.rbac_principal_apikey(),
+    apikey_rbac_id,
+    roles.id,
+    public.rbac_scope_org(),
+    org_id,
+    user_id,
+    'test apikey org.read binding',
+    true
+  FROM public.roles
+  WHERE roles.name = public.rbac_role_org_member()
+  LIMIT 1;
+
+  PERFORM set_config('test.apikey_2fa_bypass_org', org_id::text, true);
+  PERFORM set_config('test.apikey_2fa_bypass_key', apikey_value, true);
+END $$;
+
+SELECT tests.authenticate_as('test_admin');
+
+SELECT ok(
+  public.rbac_check_permission_direct(
+    public.rbac_perm_org_read(),
+    tests.get_supabase_uid('test_admin'),
+    current_setting('test.apikey_2fa_bypass_org')::uuid,
+    NULL::character varying,
+    NULL::bigint,
+    current_setting('test.apikey_2fa_bypass_key')
+  ),
+  'API key direct RBAC check ignores org 2FA enforcement'
 );
 
 SELECT * FROM finish();
