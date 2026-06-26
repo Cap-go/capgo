@@ -141,7 +141,7 @@ describe.skipIf(USE_CLOUDFLARE_WORKERS)('plan usage org RPC authorization', () =
     const { error: orgUserError } = await serviceRoleSupabase.from('org_users').insert({
       org_id: orgId,
       user_id: ownerUserId,
-      user_right: 'super_admin',
+      rbac_role_name: 'org_super_admin',
     })
     if (orgUserError)
       throw orgUserError

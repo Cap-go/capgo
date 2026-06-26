@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { type } from 'arktype'
 import { safeParseSchema } from '../utils/ark_validation.ts'
 import { createHono, parseBody, simpleError, useCors } from '../utils/hono.ts'
-import { middlewareV2 } from '../utils/hono_middleware.ts'
+import { middlewareAuth } from '../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 import { version } from '../utils/version.ts'
@@ -54,7 +54,7 @@ export const app = createHono('', version)
 app.use('*', useCors)
 
 // Grant credits to an organization (admin only)
-app.post('/grant', middlewareV2(['all']), async (c) => {
+app.post('/grant', middlewareAuth(), async (c) => {
   const { isAdmin, userId } = await verifyAdmin(c)
 
   if (!isAdmin) {
@@ -148,7 +148,7 @@ app.post('/grant', middlewareV2(['all']), async (c) => {
 })
 
 // Search organizations (admin only)
-app.get('/search-orgs', middlewareV2(['all']), async (c) => {
+app.get('/search-orgs', middlewareAuth(), async (c) => {
   const { isAdmin } = await verifyAdmin(c)
 
   if (!isAdmin) {
@@ -203,7 +203,7 @@ app.get('/search-orgs', middlewareV2(['all']), async (c) => {
 })
 
 // Get org credit balance (admin only)
-app.get('/org-balance/:orgId', middlewareV2(['all']), async (c) => {
+app.get('/org-balance/:orgId', middlewareAuth(), async (c) => {
   const { isAdmin } = await verifyAdmin(c)
 
   if (!isAdmin) {
@@ -240,7 +240,7 @@ app.get('/org-balance/:orgId', middlewareV2(['all']), async (c) => {
 })
 
 // Get recent admin grants (admin only)
-app.get('/grants-history', middlewareV2(['all']), async (c) => {
+app.get('/grants-history', middlewareAuth(), async (c) => {
   const { isAdmin } = await verifyAdmin(c)
 
   if (!isAdmin) {

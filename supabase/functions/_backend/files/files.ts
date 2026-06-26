@@ -1036,7 +1036,7 @@ async function checkWriteAppAccess(c: Context, next: Next) {
 }
 
 app.options(`/upload/${ATTACHMENT_PREFIX}`, optionsHandler)
-app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload'], true, false), setKeyFromMetadata, checkWriteAppAccess, (c) => {
+app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey({ usePostgres: true, readOnly: false }), setKeyFromMetadata, checkWriteAppAccess, (c) => {
   if (getRuntimeKey() !== 'workerd') {
     return supabaseTusCreateHandler(c)
   }
@@ -1047,7 +1047,7 @@ app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, optionsHandler)
 // Combined GET/HEAD handler for TUS uploads - Hono tiny routes HEAD to GET
 app.get(
   `/upload/${ATTACHMENT_PREFIX}/:id{.+}`,
-  middlewareKey(['all', 'write', 'upload'], true, false),
+  middlewareKey({ usePostgres: true, readOnly: false }),
   setKeyFromIdParam,
   checkWriteAppAccess,
   (c) => {
@@ -1069,7 +1069,7 @@ app.get(
   },
 )
 app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, getHandler)
-app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload'], true, false), setKeyFromIdParam, checkWriteAppAccess, (c) => {
+app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey({ usePostgres: true, readOnly: false }), setKeyFromIdParam, checkWriteAppAccess, (c) => {
   if (getRuntimeKey() !== 'workerd') {
     return supabaseTusPatchHandler(c)
   }

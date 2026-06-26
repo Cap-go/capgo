@@ -49,16 +49,27 @@ async function seedStaleCreatedByOrg() {
       created_by: USER_ID,
       name: 'Log as stale created_by org',
       management_email: 'log-as-stale-owner@capgo.app',
-      use_new_rbac: true,
     })
   expect(orgError).toBeNull()
 
+  const { data: superAdminRole, error: roleError } = await supabase
+    .from('roles')
+    .select('id')
+    .eq('name', 'org_super_admin')
+    .eq('scope_type', 'org')
+    .single()
+  expect(roleError).toBeNull()
+  expect(superAdminRole?.id).toBeTruthy()
+
   const { error: currentAdminError } = await supabase
-    .from('org_users')
+    .from('role_bindings')
     .insert({
+      principal_type: 'user',
+      principal_id: USER_ID_2,
+      role_id: superAdminRole!.id,
+      scope_type: 'org',
       org_id: STALE_CREATED_BY_ORG_ID,
-      user_id: USER_ID_2,
-      user_right: 'super_admin',
+      granted_by: USER_ID_2,
     })
   expect(currentAdminError).toBeNull()
 

@@ -23,7 +23,7 @@ import { confirmWithRememberedChoice } from '../promptPreferences'
 import { showReplicationProgress } from '../replicationProgress'
 import { formatTable } from '../terminal-table'
 import { usesAlwaysDirectUpdate } from '../updaterConfig'
-import { baseKeyV2, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, canPromptInteractively, checkCompatibilityCloud, checkPlanValidUpload, checkRemoteCliMessages, createSupabaseClient, deletedFailedVersion, findRoot, findSavedKey, formatError, getAppId, getBundleVersion, getCompatibilityDetails, getConfig, getInstalledVersion, getLocalConfig, getLocalDependencies, getOrganizationId, getPMAndCommand, getRemoteChecksums, getRemoteFileConfig, hasCliPermission, hasOrganizationPerm, isCompatible, isDeprecatedPluginVersion, OrganizationPerm, regexSemver, resolveUserIdFromApiKey, sendEvent, updateConfigUpdater, updateOrCreateChannel, updateOrCreateVersion, UPLOAD_TIMEOUT, uploadTUS, uploadUrl, zipFile } from '../utils'
+import { baseKeyV2, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, canPromptInteractively, checkCompatibilityCloud, checkPlanValidUpload, checkRemoteCliMessages, createSupabaseClient, deletedFailedVersion, findRoot, findSavedKey, formatError, getAppId, getBundleVersion, getCompatibilityDetails, getConfig, getInstalledVersion, getLocalConfig, getLocalDependencies, getOrganizationId, getPMAndCommand, getRemoteChecksums, getRemoteFileConfig, hasCliPermission, isCompatible, isDeprecatedPluginVersion, regexSemver, resolveUserIdFromApiKey, sendEvent, updateConfigUpdater, updateOrCreateChannel, updateOrCreateVersion, UPLOAD_TIMEOUT, uploadTUS, uploadUrl, zipFile } from '../utils'
 import { getVersionSuggestions, interactiveVersionBump } from '../versionHelpers'
 import { maybePromptBuilderCta, shouldBlockIncompatibleUpload } from './builder-cta'
 import { checkIndexPosition, searchInDirectory } from './check'
@@ -34,6 +34,7 @@ import { formatUploadChannels, getChannelsToAssignByChecksum, parseUploadChannel
 type SupabaseType = Awaited<ReturnType<typeof createSupabaseClient>>
 type pmType = ReturnType<typeof getPMAndCommand>
 type localConfigType = Awaited<ReturnType<typeof getLocalConfig>>
+type UploadTargetChannel = Pick<Database['public']['Tables']['channels']['Row'], 'id' | 'public'>
 
 export type { UploadBundleResult }
 
@@ -763,6 +764,104 @@ async function deleteLinkedBundleOnUpload(supabase: SupabaseType, version: Linke
   log.info(`Linked bundle ${version.name} deleted`)
 }
 
+async function findUploadTargetChannel(supabase: SupabaseType, appid: string, channel: string): Promise<UploadTargetChannel | null> {
+  const { data, error } = await supabase
+    .from('channels')
+    .select('id, public')
+    .eq('app_id', appid)
+    .eq('name', channel)
+    .maybeSingle()
+
+  if (error)
+    uploadFail(`Cannot check channel ${channel}: ${formatError(error)}`)
+
+  return data
+}
+
+async function preflightRequiredChannelAssignments(
+  supabase: SupabaseType,
+  apikey: string,
+  appid: string,
+  channels: string[],
+  selfAssign = false,
+): Promise<Map<string, UploadTargetChannel | null>> {
+  const uploadTargetChannels = new Map<string, UploadTargetChannel | null>()
+
+  for (const channel of new Set(channels)) {
+    const targetChannel = await findUploadTargetChannel(supabase, appid, channel)
+
+    if (targetChannel) {
+      uploadTargetChannels.set(channel, targetChannel)
+      const canPromoteTargetChannel = await hasCliPermission(supabase, apikey, 'channel.promote_bundle', { appId: appid, channelId: targetChannel.id })
+      if (!canPromoteTargetChannel)
+        uploadFail('Cannot set channel because this API key lacks channel.promote_bundle for the target channel')
+      if (selfAssign) {
+        const canUpdateChannelSettings = await hasCliPermission(supabase, apikey, 'channel.update_settings', { appId: appid, channelId: targetChannel.id })
+        if (!canUpdateChannelSettings)
+          uploadFail('Cannot enable device self-assign because this API key lacks channel.update_settings')
+      }
+      continue
+    }
+
+    const canCreateChannel = await hasCliPermission(supabase, apikey, 'app.create_channel', { appId: appid })
+    if (!canCreateChannel)
+      uploadFail('Cannot create target channel because this API key lacks app.create_channel')
+
+    const canPromoteCreatedChannel = await hasCliPermission(supabase, apikey, 'channel.promote_bundle', { appId: appid })
+    if (!canPromoteCreatedChannel)
+      uploadFail('Cannot create target channel with a bundle because this API key lacks channel.promote_bundle')
+
+    uploadTargetChannels.set(channel, null)
+  }
+
+  return uploadTargetChannels
+}
+
+async function formatFunctionInvokeError(error: unknown): Promise<string> {
+  const context = (error as { context?: { json?: () => Promise<unknown> } } | null)?.context
+  if (context?.json) {
+    try {
+      return JSON.stringify(await context.json())
+    }
+    catch {
+      // Fall back to the generic formatter when the error body cannot be read.
+    }
+  }
+
+  return formatError(error)
+}
+
+async function promoteExistingChannel(
+  supabase: SupabaseType,
+  appid: string,
+  versionId: number,
+  targetChannel: UploadTargetChannel,
+  localConfig: localConfigType,
+  displayBundleUrl: boolean,
+): Promise<boolean> {
+  const { error } = await supabase.functions.invoke('bundle', {
+    method: 'PUT',
+    body: JSON.stringify({
+      app_id: appid,
+      version_id: versionId,
+      channel_id: targetChannel.id,
+    }),
+  })
+
+  if (error)
+    uploadFail(`Cannot set channel because this API key does not have the required RBAC permission. ${await formatFunctionInvokeError(error)}`)
+
+  const bundleUrl = `${localConfig.hostWeb}/app/${appid}/channel/${targetChannel.id}`
+  if (targetChannel.public)
+    log.info('Your update is now available in your public channel 🎉')
+  else
+    log.info(`Link device to this bundle to try it: ${bundleUrl}`)
+
+  if (displayBundleUrl)
+    log.info(`Bundle url: ${bundleUrl}`)
+  return true
+}
+
 async function setVersionInChannel(
   supabase: SupabaseType,
   apikey: string,
@@ -773,6 +872,8 @@ async function setVersionInChannel(
   orgId: string,
   appid: string,
   localConfig: localConfigType,
+  targetChannel: UploadTargetChannel | null,
+  requireChannelAssignment = false,
   selfAssign?: boolean,
 ): Promise<boolean> {
   const { data: versionId } = await supabase
@@ -782,9 +883,31 @@ async function setVersionInChannel(
   if (!versionId)
     uploadFail('Cannot get version id, cannot set channel')
 
-  const apiAccess = await hasCliPermission(supabase, apikey, 'app.create_channel', { appId: appid })
+  const canPromoteTargetChannel = targetChannel !== null
+    && await hasCliPermission(supabase, apikey, 'channel.promote_bundle', { appId: appid, channelId: targetChannel.id })
+  const canCreateChannel = targetChannel === null
+    && await hasCliPermission(supabase, apikey, 'app.create_channel', { appId: appid })
 
-  if (apiAccess) {
+  if (targetChannel && !canPromoteTargetChannel) {
+    const message = 'Cannot set channel because this API key lacks channel.promote_bundle for the target channel'
+    if (requireChannelAssignment)
+      uploadFail(message)
+    log.warn(message)
+    return false
+  }
+
+  if (targetChannel && canPromoteTargetChannel && selfAssign) {
+    const canUpdateChannelSettings = await hasCliPermission(supabase, apikey, 'channel.update_settings', { appId: appid, channelId: targetChannel.id })
+    if (!canUpdateChannelSettings) {
+      log.warn('Cannot enable device self-assign because this API key lacks channel.update_settings')
+      return promoteExistingChannel(supabase, appid, versionId, targetChannel, localConfig, displayBundleUrl)
+    }
+  }
+
+  if (targetChannel && canPromoteTargetChannel && !selfAssign)
+    return promoteExistingChannel(supabase, appid, versionId, targetChannel, localConfig, displayBundleUrl)
+
+  if ((targetChannel && canPromoteTargetChannel) || canCreateChannel) {
     const { error: dbError3, data } = await updateOrCreateChannel(supabase, {
       name: channel,
       app_id: appid,
@@ -794,7 +917,7 @@ async function setVersionInChannel(
       ...(selfAssign ? { allow_device_self_set: true } : {}),
     })
     if (dbError3)
-      uploadFail(`Cannot set channel, the upload key is not allowed to do that, use the "all" for this. ${formatError(dbError3)}`)
+      uploadFail(`Cannot set channel because this API key does not have the required RBAC permission. ${formatError(dbError3)}`)
     const bundleUrl = `${localConfig.hostWeb}/app/${appid}/channel/${data.id}`
     if (data?.public)
       log.info('Your update is now available in your public channel 🎉')
@@ -806,10 +929,12 @@ async function setVersionInChannel(
     return true
   }
 
-  log.warn('The upload key is not allowed to set the version in the channel')
+  const message = 'Cannot create target channel because this API key lacks app.create_channel'
+  if (requireChannelAssignment)
+    uploadFail(message)
+  log.warn(message)
   return false
 }
-
 export async function getDefaultUploadChannel(appId: string, supabase: SupabaseType, hostWeb: string) {
   const { error, data } = await supabase.from('apps')
     .select('default_upload_channel')
@@ -1114,6 +1239,10 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     log.warn('Please make sure you want to do this, if you are not sure, please do not use this option.')
   }
 
+  const channelAssignmentRequired = channelsToAssign.length > 0
+  const uploadTargetChannels = channelAssignmentRequired
+    ? await preflightRequiredChannelAssignments(supabase, apikey, appid, channelsToAssign, !!options.selfAssign)
+    : new Map<string, UploadTargetChannel | null>()
   const versionData = {
     name: bundle,
     app_id: appid,
@@ -1399,16 +1528,17 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   if (options.verbose)
     log.info(`[Verbose] Checking app permissions...`)
 
-  const permissions = await checkAppExistsAndHasPermissionOrgErr(supabase, apikey, appid, OrganizationPerm.upload, false, true)
+  await checkAppExistsAndHasPermissionOrgErr(supabase, apikey, appid, 'app.upload_bundle', false, true)
+  const canDeleteBundle = await hasCliPermission(supabase, apikey, 'bundle.delete', { appId: appid })
 
   if (options.verbose) {
     log.info(`[Verbose] Permissions:`)
-    log.info(`  - Upload: ${hasOrganizationPerm(permissions, OrganizationPerm.upload) ? 'yes' : 'no'}`)
-    log.info(`  - Write: ${hasOrganizationPerm(permissions, OrganizationPerm.write) ? 'yes' : 'no'}`)
-    log.info(`  - Admin: ${hasOrganizationPerm(permissions, OrganizationPerm.admin) ? 'yes' : 'no'}`)
+    log.info(`  - app.upload_bundle: yes`)
+    log.info(`  - bundle.delete: ${canDeleteBundle ? 'yes' : 'no'}`)
+    log.info(`  - channel permissions: checked per target channel`)
   }
 
-  const shouldDeleteLinkedBundle = options.deleteLinkedBundleOnUpload && hasOrganizationPerm(permissions, OrganizationPerm.write)
+  const shouldDeleteLinkedBundle = options.deleteLinkedBundleOnUpload && canDeleteBundle
   const linkedBundlesToDelete = shouldDeleteLinkedBundle
     ? await Promise.all(channelsToAssign.map(async targetChannel => ({
         channel: targetChannel,
@@ -1416,37 +1546,43 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
       })))
     : []
   if (options.deleteLinkedBundleOnUpload && !shouldDeleteLinkedBundle) {
-    log.warn('Cannot delete linked bundle on upload as a upload organization member')
+    log.warn('Cannot delete linked bundle on upload because this API key lacks bundle.delete')
   }
 
+  const expectedChannelAssignments = new Set(channelsToAssign).size
   const channelVersionSet = new Set<string>()
-  if (hasOrganizationPerm(permissions, OrganizationPerm.write)) {
-    for (const targetChannel of channelsToAssign) {
-      if (options.verbose)
-        log.info(`[Verbose] Setting bundle ${bundle} to channel ${targetChannel}...`)
-      const targetChannelVersionSet = await setVersionInChannel(supabase, apikey, !!options.bundleUrl, bundle, targetChannel, userId, orgId, appid, localConfig, options.selfAssign)
-      if (targetChannelVersionSet)
-        channelVersionSet.add(targetChannel)
-      if (options.verbose)
-        log.info(`[Verbose] Channel ${targetChannel} updated successfully`)
-    }
+  for (const targetChannel of channelsToAssign) {
+    if (options.verbose)
+      log.info(`[Verbose] Setting bundle ${bundle} to channel ${targetChannel}...`)
 
-    if (shouldDeleteLinkedBundle) {
-      const deletedVersionIds = new Set<number>()
-      for (const linkedBundle of linkedBundlesToDelete) {
-        if (!linkedBundle.version || deletedVersionIds.has(linkedBundle.version.id))
-          continue
-        if (options.verbose)
-          log.info(`[Verbose] Deleting previously linked bundle in channel ${linkedBundle.channel}...`)
-        await deleteLinkedBundleOnUpload(supabase, linkedBundle.version)
-        deletedVersionIds.add(linkedBundle.version.id)
-      }
-    }
-  }
-  else {
-    log.warn('Cannot set channel as a upload organization member')
+    const uploadTargetChannel = uploadTargetChannels.has(targetChannel)
+      ? uploadTargetChannels.get(targetChannel) ?? null
+      : await findUploadTargetChannel(supabase, appid, targetChannel)
+    const targetChannelVersionSet = await setVersionInChannel(supabase, apikey, !!options.bundleUrl, bundle, targetChannel, userId, orgId, appid, localConfig, uploadTargetChannel, channelAssignmentRequired, options.selfAssign)
+    if (targetChannelVersionSet)
+      channelVersionSet.add(targetChannel)
+    if (options.verbose)
+      log.info(`[Verbose] Channel ${targetChannel} ${targetChannelVersionSet ? 'updated successfully' : 'was not updated'}`)
   }
 
+  if (shouldDeleteLinkedBundle) {
+    const deletedVersionIds = new Set<number>()
+    for (const linkedBundle of linkedBundlesToDelete) {
+      if (!channelVersionSet.has(linkedBundle.channel))
+        continue
+      if (!linkedBundle.version || deletedVersionIds.has(linkedBundle.version.id))
+        continue
+      if (options.verbose)
+        log.info(`[Verbose] Deleting previously linked bundle in channel ${linkedBundle.channel}...`)
+      await deleteLinkedBundleOnUpload(supabase, linkedBundle.version)
+      deletedVersionIds.add(linkedBundle.version.id)
+    }
+  }
+
+  if (channelVersionSet.size === 0)
+    log.warn('Cannot set channel because this API key lacks the required RBAC permission')
+  if (channelAssignmentRequired && channelVersionSet.size !== expectedChannelAssignments)
+    uploadFail('Cannot complete upload because one or more target channels were not updated')
   if (options.verbose)
     log.info(`[Verbose] Sending upload event...`)
 

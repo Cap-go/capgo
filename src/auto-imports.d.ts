@@ -99,7 +99,7 @@ declare global {
   const resolveComponent: typeof import('vue').resolveComponent
   const resolveRef: typeof import('@vueuse/core').resolveRef
   const resolveUnref: typeof import('@vueuse/core').resolveUnref
-  const roleHasLegacyMinRight: typeof import('./stores/organization').roleHasLegacyMinRight
+  const roleHasOrgRank: typeof import('./stores/organization').roleHasOrgRank
   const shallowReactive: typeof import('vue').shallowReactive
   const shallowReadonly: typeof import('vue').shallowReadonly
   const shallowRef: typeof import('vue').shallowRef
@@ -447,7 +447,7 @@ declare module 'vue' {
     readonly refThrottled: UnwrapRef<typeof import('@vueuse/core')['refThrottled']>
     readonly refWithControl: UnwrapRef<typeof import('@vueuse/core')['refWithControl']>
     readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
-    readonly roleHasLegacyMinRight: UnwrapRef<typeof import('./stores/organization')['roleHasLegacyMinRight']>
+    readonly roleHasOrgRank: UnwrapRef<typeof import('./stores/organization')['roleHasOrgRank']>
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
     readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>

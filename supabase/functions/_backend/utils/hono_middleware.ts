@@ -9,140 +9,17 @@ import { isAPIKeyRateLimited, isIPRateLimited, recordAPIKeyUsage, recordFailedAu
 import { buildRateLimitInfo } from './rateLimitInfo.ts'
 import { checkKey, checkKeyById, supabaseAdmin } from './supabase.ts'
 
-// =============================================================================
-// RBAC Context Middleware
-// =============================================================================
-
-interface RbacContextOptions {
-  orgIdResolver?: (c: Context) => string | null | Promise<string | null>
-}
-
-async function getAppIdFromRequest(c: Context) {
-  const queryAppId = c.req.query('app_id')
-  if (queryAppId) {
-    return queryAppId
-  }
-  const body = await c.req.raw.clone().json().catch(() => ({ app_id: null })) as { app_id: string | null }
-  return body.app_id ?? null
-}
-
-async function fetchOrgIdFromAppId(c: Context, appId: string) {
-  let pgClient
-  try {
-    pgClient = getPgClient(c, true)
-    const drizzleClient = getDrizzleClient(pgClient)
-    const appResult = await drizzleClient
-      .select({ ownerOrg: schema.apps.owner_org })
-      .from(schema.apps)
-      .where(eq(schema.apps.app_id, appId))
-      .limit(1)
-    if (appResult.length > 0 && appResult[0].ownerOrg) {
-      return appResult[0].ownerOrg
-    }
-  }
-  catch (e) {
-    logPgError(c, 'middlewareRbacContext:resolveAppOrg', e)
-  }
-  finally {
-    if (pgClient) {
-      await closeClient(c, pgClient)
-    }
-  }
-  return null
-}
-
-async function resolveOrgIdForRbac(c: Context, options?: RbacContextOptions) {
-  if (options?.orgIdResolver) {
-    const orgId = await Promise.resolve(options.orgIdResolver(c))
-    if (orgId) {
-      return orgId
-    }
-  }
-
-  const appId = await getAppIdFromRequest(c)
-  if (!appId) {
-    return null
-  }
-
-  return fetchOrgIdFromAppId(c, appId)
-}
-
-async function setRbacContextForOrg(c: Context, orgId: string) {
-  c.set('resolvedOrgId', orgId)
-  let pgClient
-  try {
-    pgClient = getPgClient(c, true)
-    const drizzleClient = getDrizzleClient(pgClient)
-    const result = await drizzleClient.execute(
-      sql`SELECT public.rbac_is_enabled_for_org(${orgId}::uuid) as enabled`,
-    )
-    const enabled = (result.rows[0] as any)?.enabled === true
-    c.set('rbacEnabled', enabled)
-
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'middlewareRbacContext: resolved',
-      orgId,
-      rbacEnabled: enabled,
-    })
-  }
-  catch (e) {
-    logPgError(c, 'middlewareRbacContext:checkRbacEnabled', e)
-    c.set('rbacEnabled', false)
-  }
-  finally {
-    if (pgClient) {
-      await closeClient(c, pgClient)
-    }
-  }
-}
-
-function setRbacContextLegacy(c: Context) {
-  c.set('rbacEnabled', false)
-  cloudlog({
-    requestId: c.get('requestId'),
-    message: 'middlewareRbacContext: no orgId resolved, defaulting to legacy',
-  })
-}
-
-/**
- * Middleware that resolves and caches the RBAC feature flag for the current org.
- * Should be used after authentication middleware and when orgId is known.
- *
- * Usage:
- *   app.use('/app/*', middlewareV2(['all']), middlewareRbacContext())
- *
- * After this middleware runs:
- *   - c.get('rbacEnabled') - boolean indicating if RBAC is enabled for the org
- *   - c.get('resolvedOrgId') - the resolved org ID (if provided)
- */
-export function middlewareRbacContext(options?: RbacContextOptions) {
-  return honoFactory.createMiddleware(async (c, next) => {
-    const orgId = await resolveOrgIdForRbac(c, options)
-    if (orgId) {
-      await setRbacContextForOrg(c, orgId)
-    }
-    else {
-      setRbacContextLegacy(c)
-    }
-
-    await next()
-  })
-}
-
 // TODO: make universal middleware who
 //  Accept authorization header (JWT)
 //  Accept capgkey header (legacy apikey header name for CLI)
 //  Accept x-api-key header (new apikey header name for CLI + public api)
 //  Accept x-limited-key-id header (subkey id, for whitelabel api, only work in combination with x-api-key)
-// It takes rights as an argument, so it can be used in public and private api
 // It sets apikey, capgkey, subkey to the context
 // It throws an error if the apikey is invalid
 // It throws an error if the subkey is invalid
 // It throws an error if the apikey is invalid and the subkey is invalid
 // It throws an error if the apikey is invalid and the subkey is invalid
 // It throws an error if no apikey or subkey is provided
-// It throws an error if the rights are invalid
 
 function isUUID(str: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
@@ -183,7 +60,6 @@ type FindApikeyByValueResult = {
 async function checkKeyPg(
   _c: Context,
   keyString: string,
-  rights: Database['public']['Enums']['key_mode'][],
   drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   try {
@@ -194,7 +70,7 @@ async function checkKeyPg(
 
     const apiKey = result.rows[0]
     if (!apiKey) {
-      cloudlog({ requestId: _c.get('requestId'), message: 'Invalid apikey (pg)', keyStringPrefix: keyString?.substring(0, 8), rights })
+      cloudlog({ requestId: _c.get('requestId'), message: 'Invalid apikey (pg)', keyStringPrefix: keyString?.substring(0, 8) })
       return null
     }
 
@@ -230,7 +106,6 @@ async function checkKeyPg(
 async function checkKeyByIdPg(
   _c: Context,
   id: number,
-  _rights: Database['public']['Enums']['key_mode'][],
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   expectedUserId?: string,
 ): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
@@ -517,19 +392,18 @@ function resolveKeyHeaders(c: Context) {
 async function resolveApiKey(
   c: Context,
   key: string,
-  rights: Database['public']['Enums']['key_mode'][],
   usePostgres: boolean,
   readOnly = true,
 ) {
   if (!usePostgres) {
-    return checkKey(c, key, supabaseAdmin(c), rights)
+    return checkKey(c, key, supabaseAdmin(c))
   }
 
   let pgClient: ReturnType<typeof getPgClient> | null = null
   try {
     pgClient = getPgClient(c, readOnly)
     const drizzleClient = getDrizzleClient(pgClient)
-    return await checkKeyPg(c, key, rights, drizzleClient)
+    return await checkKeyPg(c, key, drizzleClient)
   }
   finally {
     if (pgClient) {
@@ -541,20 +415,19 @@ async function resolveApiKey(
 async function resolveSubkey(
   c: Context,
   subkeyId: number,
-  rights: Database['public']['Enums']['key_mode'][],
   usePostgres: boolean,
   expectedUserId?: string,
   readOnly = true,
 ) {
   if (!usePostgres) {
-    return checkKeyById(c, subkeyId, supabaseAdmin(c), rights, expectedUserId)
+    return checkKeyById(c, subkeyId, supabaseAdmin(c), expectedUserId)
   }
 
   let subkeyPgClient: ReturnType<typeof getPgClient> | null = null
   try {
     subkeyPgClient = getPgClient(c, readOnly)
     const drizzleClient = getDrizzleClient(subkeyPgClient)
-    return await checkKeyByIdPg(c, subkeyId, rights, drizzleClient, expectedUserId)
+    return await checkKeyByIdPg(c, subkeyId, drizzleClient, expectedUserId)
   }
   finally {
     if (subkeyPgClient) {
@@ -568,16 +441,15 @@ async function resolveSubkey(
  *
  * @param c - Hono context used for logging and auth storage.
  * @param capgkeyString - The key string provided in capgkey or authorization headers.
- * @param rights - Required key modes for the request.
  * @returns quickError when authentication fails or undefined when authentication succeeds.
  */
-async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['public']['Enums']['key_mode'][]) {
+async function foundAPIKey(c: Context, capgkeyString: string) {
   const subkey_id = await getSubkeyId(c)
 
   cloudlog({ requestId: c.get('requestId'), message: 'Capgkey provided', capgkeyPrefix: maskSecret(capgkeyString) })
-  const apikey = await resolveApiKey(c, capgkeyString, rights, false)
+  const apikey = await resolveApiKey(c, capgkeyString, false)
   if (!apikey) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', capgkeyPrefix: maskSecret(capgkeyString), rights })
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', capgkeyPrefix: maskSecret(capgkeyString) })
     // Record failed auth attempt - await to ensure accurate counting
     await recordFailedAuth(c)
     return quickError(401, 'invalid_apikey', 'Invalid apikey')
@@ -597,7 +469,7 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
   setApiKeyAuthContext(c, apikey, capgkeyString)
   if (subkey_id !== null) {
     cloudlog({ requestId: c.get('requestId'), message: 'Subkey id provided', subkey_id })
-    const subkey = await resolveSubkey(c, subkey_id, rights, false, apikey.user_id)
+    const subkey = await resolveSubkey(c, subkey_id, false, apikey.user_id)
     if (!subkey) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
       return quickError(401, 'invalid_subkey', 'Invalid subkey')
@@ -641,7 +513,7 @@ async function foundJWT(c: Context, jwt: string) {
   })
 }
 
-export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) {
+export function middlewareAuth() {
   return honoFactory.createMiddleware(async (c, next) => {
     // Check if IP is rate limited due to failed auth attempts
     const ipRateLimited = await isIPRateLimited(c)
@@ -657,7 +529,7 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
       }
     }
     else if (capgkey) {
-      const res = await foundAPIKey(c, capgkey, rights)
+      const res = await foundAPIKey(c, capgkey)
       if (res) {
         return res
       }
@@ -672,14 +544,25 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
   })
 }
 
+interface MiddlewareKeyOptions {
+  usePostgres?: boolean
+  readOnly?: boolean
+}
+
+function resolveMiddlewareKeyOptions(options: MiddlewareKeyOptions = {}) {
+  return {
+    usePostgres: options.usePostgres ?? false,
+    readOnly: options.readOnly ?? true,
+  }
+}
+
 /**
- * Middleware factory that validates API keys and optional subkeys, enforcing rate limits and expected rights.
+ * Middleware factory that validates API keys and optional subkeys.
  *
- * @param rights - Required key modes for the route.
- * @param usePostgres - When true, performs key lookups via Postgres instead of Supabase client.
- * @param readOnly - When using Postgres, choose replica-safe read-only connections by default; latency-sensitive write flows can force primary auth.
+ * Route handlers and RLS authorize with RBAC after authentication succeeds.
  */
-export function middlewareKey(rights: Database['public']['Enums']['key_mode'][], usePostgres = false, readOnly = true) {
+export function middlewareKey(options?: MiddlewareKeyOptions) {
+  const { usePostgres, readOnly } = resolveMiddlewareKeyOptions(options)
   const subMiddlewareKey = honoFactory.createMiddleware(async (c, next) => {
     // Check if IP is rate limited due to failed auth attempts
     const ipRateLimited = await isIPRateLimited(c)
@@ -707,7 +590,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
       return quickError(401, 'no_key_provided', 'No key provided')
     }
 
-    const apikey = await resolveApiKey(c, key, rights, usePostgres, readOnly)
+    const apikey = await resolveApiKey(c, key, usePostgres, readOnly)
 
     if (!apikey) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', keyPrefix: maskSecret(key), method: c.req.method, url: c.req.url })
@@ -729,7 +612,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
     setApiKeyAuthContext(c, apikey, key)
 
     if (subkey_id !== null) {
-      const subkey = await resolveSubkey(c, subkey_id, rights, usePostgres, apikey.user_id, readOnly)
+      const subkey = await resolveSubkey(c, subkey_id, usePostgres, apikey.user_id, readOnly)
 
       if (!subkey) {
         cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })

@@ -470,7 +470,7 @@ beforeAll(async () => {
   const { error: orgUserError } = await supabase.from('org_users').insert({
     org_id: TRIAL_ORG_ID,
     user_id: USER_ID,
-    user_right: 'admin',
+    rbac_role_name: 'org_admin',
   })
   if (orgUserError)
     throw orgUserError

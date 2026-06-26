@@ -3,7 +3,7 @@ BEGIN;
 DROP TABLE IF EXISTS public.channel_devices, public.manifest, public.onboarding_demo_data, public.app_versions, public.channels, public.apps, public.notifications, public.org_users, public.orgs, public.stripe_info CASCADE;
 DROP SEQUENCE IF EXISTS public.app_versions_id_seq, public.channel_devices_id_seq, public.channel_id_seq, public.manifest_id_seq, public.org_users_id_seq, public.stripe_info_id_seq CASCADE;
 DROP FUNCTION IF EXISTS public.one_month_ahead();
-DROP TYPE IF EXISTS public.manifest_entry, public.disable_update, public.user_min_right, public.stripe_status;
+DROP TYPE IF EXISTS public.manifest_entry, public.disable_update, public.stripe_status;
 
 --
 --
@@ -44,24 +44,6 @@ CREATE TYPE public.stripe_status AS ENUM (
     'failed',
     'deleted',
     'canceled'
-);
-
-
---
--- Name: user_min_right; Type: TYPE; Schema: public; Owner: -
---
-
-CREATE TYPE public.user_min_right AS ENUM (
-    'invite_read',
-    'invite_upload',
-    'invite_write',
-    'invite_admin',
-    'invite_super_admin',
-    'read',
-    'upload',
-    'write',
-    'admin',
-    'super_admin'
 );
 
 
@@ -316,8 +298,8 @@ CREATE TABLE public.org_users (
     org_id uuid NOT NULL,
     app_id character varying,
     channel_id bigint,
-    user_right public.user_min_right,
-    rbac_role_name text
+    rbac_role_name text DEFAULT 'org_member'::text,
+    is_invite boolean DEFAULT false NOT NULL
 );
 
 
@@ -350,7 +332,6 @@ CREATE TABLE public.orgs (
     customer_id character varying,
     stats_updated_at timestamp without time zone,
     last_stats_updated_at timestamp without time zone,
-    use_new_rbac boolean DEFAULT true NOT NULL,
     enforcing_2fa boolean DEFAULT false NOT NULL,
     email_preferences jsonb DEFAULT '{"onboarding": true, "usage_limit": true, "credit_usage": true, "device_error": true, "weekly_stats": true, "monthly_stats": true, "bundle_created": true, "bundle_deployed": true, "deploy_stats_24h": true, "billing_period_stats": true, "channel_self_rejected": true}'::jsonb NOT NULL,
     enforce_hashed_api_keys boolean DEFAULT false NOT NULL,

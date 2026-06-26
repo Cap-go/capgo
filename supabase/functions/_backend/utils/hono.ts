@@ -95,9 +95,6 @@ export interface MiddlewareKeyVariables {
     subkey?: Database['public']['Tables']['apikeys']['Row']
     webhookBody?: any
     oldRecord?: any
-    // RBAC context variables
-    rbacEnabled?: boolean
-    resolvedOrgId?: string
   }
 }
 

@@ -670,7 +670,7 @@ export async function getRemoteFileConfig() {
   }
 }
 
-function normalizeSupabaseHost(host: string): string {
+export function normalizeSupabaseHost(host: string): string {
   const parsed = new URL(host)
   if (!['http:', 'https:'].includes(parsed.protocol))
     throw new Error('Invalid Supabase host protocol')
@@ -740,102 +740,6 @@ export async function isAllowedActionAppIdApiKey(supabase: SupabaseClient<Databa
   return !!data
 }
 
-export enum OrganizationPerm {
-  none = 0,
-  read = 1,
-  upload = 2,
-  write = 3,
-  admin = 4,
-  super_admin = 5,
-}
-
-export const hasOrganizationPerm = (perm: OrganizationPerm, required: OrganizationPerm): boolean => (perm as number) >= (required as number)
-
-export async function isAllowedAppOrg(supabase: SupabaseClient<Database>, apikey: string, appId: string): Promise<{ okay: true, data: OrganizationPerm } | { okay: false, error: 'INVALID_APIKEY' | 'NO_APP' | 'NO_ORG' }> {
-  const { data, error } = await supabase
-    .rpc('get_org_perm_for_apikey', { apikey, app_id: appId })
-    .single()
-
-  if (error) {
-    log.error('Cannot get permissions for organization!')
-    log.error(formatError(error))
-    throw new Error('Cannot get permissions for organization')
-  }
-
-  const ok = (data as string).includes('perm')
-  if (ok) {
-    let perm = null as (OrganizationPerm | null)
-
-    switch (data as string) {
-      case 'perm_none': {
-        perm = OrganizationPerm.none
-        break
-      }
-      case 'perm_read': {
-        perm = OrganizationPerm.read
-        break
-      }
-      case 'perm_upload': {
-        perm = OrganizationPerm.upload
-        break
-      }
-      case 'perm_write': {
-        perm = OrganizationPerm.write
-        break
-      }
-      case 'perm_admin': {
-        perm = OrganizationPerm.admin
-        break
-      }
-      case 'perm_owner': {
-        perm = OrganizationPerm.super_admin
-        break
-      }
-      default: {
-        if ((data as string).includes('invite')) {
-          log.info('Please accept/deny the organization invitation before trying to access the app')
-          throw new Error('Organization invitation pending')
-        }
-
-        log.error(`Invalid output when fetching organization permission. Response: ${data}`)
-        throw new Error(`Invalid output when fetching organization permission. Response: ${data}`)
-      }
-    }
-
-    return {
-      okay: true,
-      data: perm,
-    }
-  }
-
-  // This means that something went wrong here
-  let functionError = null as 'INVALID_APIKEY' | 'NO_APP' | 'NO_ORG' | null
-
-  switch (data as string) {
-    case 'INVALID_APIKEY': {
-      functionError = 'INVALID_APIKEY'
-      break
-    }
-    case 'NO_APP': {
-      functionError = 'NO_APP'
-      break
-    }
-    case 'NO_ORG': {
-      functionError = 'NO_ORG'
-      break
-    }
-    default: {
-      log.error(`Invalid error when fetching organization permission. Response: ${data}`)
-      throw new Error(`Invalid error when fetching organization permission. Response: ${data}`)
-    }
-  }
-
-  return {
-    okay: false,
-    error: functionError,
-  }
-}
-
 export async function checkRemoteCliMessages(supabase: SupabaseClient<Database>, orgId: string, cliVersion: string) {
   const { data: messages, error } = await supabase.rpc('get_organization_cli_warnings', { orgid: orgId, cli_version: cliVersion })
   if (error) {
@@ -893,8 +797,8 @@ export async function checkPlanValid(supabase: SupabaseClient<Database>, orgId: 
 export async function checkPlanValidUpload(supabase: SupabaseClient<Database>, orgId: string, apikey: string, appId?: string, warning = true) {
   const config = await getRemoteConfig()
 
-  // Pass appid so check_min_rights gets the app context. Without it,
-  // RBAC denies API keys with limited_to_apps set and the org-scope
+  // Pass appid so RBAC evaluates the app scope. Without it,
+  // API keys with app-scoped bindings can be rejected and the org-scope
   // plan check returns false even when the plan is healthy. PostgREST
   // routes to the 3-arg overload at runtime; the `as never` cast bypasses
   // a `supabase gen types` quirk that collapses overloads sharing the

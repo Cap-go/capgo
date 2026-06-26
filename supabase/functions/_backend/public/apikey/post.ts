@@ -1,15 +1,15 @@
 import type { CreateBindingParams } from '../../private/role_bindings.ts'
-import type { AuthInfo } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { sql } from 'drizzle-orm'
 import { createRoleBindingForPrincipal } from '../../private/role_bindings.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
-import { middlewareV2 } from '../../utils/hono_middleware.ts'
+import { middlewareAuth } from '../../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { parseApiKeyGlobalPermissions, replaceApiKeyGlobalPermissions, validateApiKeyGlobalPermissionsForBindings } from './global_permissions.ts'
+import { requireApiKeyManagementAuth } from './scope.ts'
 
 interface BindingInput {
   role_name: string
@@ -66,8 +66,8 @@ async function createApiKeyRecord(
   return apiKey
 }
 
-app.post('/', middlewareV2(['all']), async (c) => {
-  const auth = c.get('auth') as AuthInfo
+app.post('/', middlewareAuth(), async (c) => {
+  const auth = requireApiKeyManagementAuth(c, 'not_authorized', 'API key management requires authentication')
 
   const body = await parseBody<any>(c)
 
@@ -114,7 +114,7 @@ app.post('/', middlewareV2(['all']), async (c) => {
   // Validate expiration date format (throws if invalid)
   validateExpirationDate(expiresAt)
 
-  // Use supabaseWithAuth which handles both JWT and API key authentication
+  // Preserve caller RLS context; the route guard above keeps management JWT-only.
   const supabase = supabaseWithAuth(c, auth)
 
   const resolvedBindings = bindings

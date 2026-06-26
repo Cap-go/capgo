@@ -74,8 +74,8 @@ const roleDefaultChannelPermissions: Record<string, Record<ChannelPermissionKey,
     'channel.promote_bundle': false,
   },
   app_reader: {
-    'channel.read': false,
-    'channel.read_history': false,
+    'channel.read': true,
+    'channel.read_history': true,
     'channel.promote_bundle': false,
   },
   channel_admin: {
@@ -108,7 +108,7 @@ function getOverrideKey(channelId: number, permission: ChannelPermissionKey) {
 
 function hasOverride(channelId: number, permission: ChannelPermissionKey) {
   const key = getOverrideKey(channelId, permission)
-  return Object.prototype.hasOwnProperty.call(channelOverrides.value, key)
+  return Object.hasOwn(channelOverrides.value, key)
 }
 
 function getOverrideValue(channelId: number, permission: ChannelPermissionKey) {
@@ -223,14 +223,10 @@ async function updateChannelPermission(channelId: number, permission: ChannelPer
 
   channelOverridesSaving.value = { ...channelOverridesSaving.value, [key]: true }
 
-  let nextOverride: boolean | null = null
-  if (value === 'default') {
-    nextOverride = null
-  }
-  else {
-    const isAllowed = value === 'allow'
-    nextOverride = isAllowed === defaultAllowed ? null : isAllowed
-  }
+  const isAllowed = value === 'allow'
+  const nextOverride = value === 'default' || isAllowed === defaultAllowed
+    ? null
+    : isAllowed
 
   if (nextOverride === null) {
     const updated = { ...channelOverrides.value }
@@ -308,7 +304,11 @@ watch(
     </div>
 
     <div>
+      <label for="channel-permissions-search" class="sr-only">
+        {{ t('search-channels') }}
+      </label>
       <input
+        id="channel-permissions-search"
         v-model="channelOverridesSearch"
         type="text"
         class="w-full d-input d-input-bordered"
@@ -357,7 +357,11 @@ watch(
               :key="perm.key"
               class="px-3 py-2"
             >
+              <label :for="`channel-permission-${channel.id}-${perm.key}`" class="sr-only">
+                {{ channel.name }} {{ perm.label }}
+              </label>
               <select
+                :id="`channel-permission-${channel.id}-${perm.key}`"
                 class="w-full d-select d-select-sm d-select-bordered"
                 :value="getSelectValue(channel.id, perm.key)"
                 :disabled="!editable || isSavingOverride(channel.id, perm.key)"

@@ -1,8 +1,8 @@
 /**
- * Tests for hashed API key support in RLS functions (get_identity, etc.)
+ * Tests for hashed API key support in RBAC-backed request identity and RLS functions.
  *
- * These tests verify that the PostgreSQL RLS identity functions properly
- * support both plain and hashed API keys. This is critical for CLI usage
+ * These tests verify that the PostgreSQL RBAC request helpers properly support
+ * both plain and hashed API keys. This is critical for CLI usage
  * where the Supabase SDK is used directly with the capgkey header.
  *
  * IMPORTANT: This test uses a completely isolated user (USER_ID_RLS) with its own
@@ -290,8 +290,8 @@ async function createEnforcedMemberOrgForUser(userId: string, enforceHashedApiKe
       [orgId, USER_ID_2, `hashed-enforcement-org-${orgId}`, `hashed-enforcement-${orgId}@capgo.test`, enforceHashedApiKeys],
     )
     await client.query(
-      `INSERT INTO public.org_users (org_id, user_id, user_right)
-       VALUES ($1, $2, 'super_admin')`,
+      `INSERT INTO public.org_users (org_id, user_id, rbac_role_name, is_invite)
+       VALUES ($1, $2, public.rbac_role_org_super_admin(), false)`,
       [orgId, userId],
     )
     return orgId
@@ -322,8 +322,8 @@ async function createPendingInviteOrgForUser(userId: string): Promise<string> {
       [orgId, USER_ID_2, `pending-invite-org-${orgId}`, `pending-invite-${orgId}@capgo.test`],
     )
     await client.query(
-      `INSERT INTO public.org_users (org_id, user_id, user_right)
-       VALUES ($1, $2, 'invite_read')`,
+      `INSERT INTO public.org_users (org_id, user_id, rbac_role_name, is_invite)
+       VALUES ($1, $2, public.rbac_role_org_member(), true)`,
       [orgId, userId],
     )
     return orgId
@@ -349,8 +349,8 @@ async function createEnforcedRbacOnlyOrgForUser(userId: string): Promise<string>
   const orgId = randomUUID()
   try {
     await client.query(
-      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys, use_new_rbac)
-       VALUES ($1, $2, $3, $4, true, true)`,
+      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys)
+       VALUES ($1, $2, $3, $4, true)`,
       [orgId, USER_ID_2, `rbac-only-org-${orgId}`, `rbac-only-${orgId}@capgo.test`],
     )
     await client.query(
@@ -397,8 +397,8 @@ async function createEnforcedApikeyPrincipalOrgForKey(apikeyId: number): Promise
   const orgId = randomUUID()
   try {
     await client.query(
-      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys, use_new_rbac)
-       VALUES ($1, $2, $3, $4, true, true)`,
+      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys)
+       VALUES ($1, $2, $3, $4, true)`,
       [orgId, USER_ID_2, `apikey-rbac-org-${orgId}`, `apikey-rbac-${orgId}@capgo.test`],
     )
     await client.query(
@@ -445,8 +445,8 @@ async function createStandaloneOrg(enforceHashedApiKeys = true): Promise<string>
   const orgId = randomUUID()
   try {
     await client.query(
-      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys, use_new_rbac)
-       VALUES ($1, $2, $3, $4, $5, true)`,
+      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys)
+       VALUES ($1, $2, $3, $4, $5)`,
       [orgId, USER_ID_2, `standalone-org-${orgId}`, `standalone-${orgId}@capgo.test`, enforceHashedApiKeys],
     )
     return orgId
@@ -509,36 +509,6 @@ async function deleteStaleAppScopedBindingForUser(userId: string, staleOrgId: st
   }
 }
 
-async function createStaleAppScopedOrgUserForUser(userId: string, staleOrgId: string): Promise<void> {
-  const client = await pool.connect()
-  try {
-    await client.query(
-      `INSERT INTO public.org_users (org_id, user_id, user_right, app_id)
-       VALUES ($1, $2, 'read', $3)`,
-      [staleOrgId, userId, APP_NAME_RLS],
-    )
-  }
-  finally {
-    client.release()
-  }
-}
-
-async function deleteStaleAppScopedOrgUserForUser(userId: string, staleOrgId: string): Promise<void> {
-  const client = await pool.connect()
-  try {
-    await client.query(
-      `DELETE FROM public.org_users
-       WHERE org_id = $1
-         AND user_id = $2
-         AND app_id = $3`,
-      [staleOrgId, userId, APP_NAME_RLS],
-    )
-  }
-  finally {
-    client.release()
-  }
-}
-
 beforeAll(async () => {
   pool = new Pool({ connectionString: POSTGRES_URL })
   const client = await pool.connect()
@@ -574,7 +544,7 @@ afterAll(async () => {
   await pool.end()
 })
 
-describe('get_identity() with hashed API keys', () => {
+describe('request_actor_user_id() with hashed API keys', () => {
   let hashedKey: { id: number, key: string, key_hash: string }
   let plainKey: { id: number, key: string }
 
@@ -590,7 +560,7 @@ describe('get_identity() with hashed API keys', () => {
 
   it('returns user_id for plain API key', async () => {
     const rows = await execWithCapgkey(
-      `SELECT get_identity('{all,write,read,upload}'::key_mode[]) as user_id`,
+      `SELECT public.request_actor_user_id() AS user_id`,
       plainKey.key,
     )
     expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
@@ -598,7 +568,7 @@ describe('get_identity() with hashed API keys', () => {
 
   it('returns user_id for hashed API key', async () => {
     const rows = await execWithCapgkey(
-      `SELECT get_identity('{all,write,read,upload}'::key_mode[]) as user_id`,
+      `SELECT public.request_actor_user_id() AS user_id`,
       hashedKey.key, // The plain key value - DB should hash and match
     )
     expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
@@ -606,7 +576,7 @@ describe('get_identity() with hashed API keys', () => {
 
   it('returns NULL for invalid API key', async () => {
     const rows = await execWithCapgkey(
-      `SELECT get_identity('{all,write,read,upload}'::key_mode[]) as user_id`,
+      `SELECT public.request_actor_user_id() AS user_id`,
       'invalid-key-that-does-not-exist',
     )
     expect(rows[0].user_id).toBeNull()
@@ -618,7 +588,7 @@ describe('get_identity() with hashed API keys', () => {
     await setApiKeyExpiration(expiredKey.id, new Date(Date.now() - 24 * 60 * 60 * 1000))
 
     const rows = await execWithCapgkey(
-      `SELECT get_identity('{all,write,read,upload}'::key_mode[]) as user_id`,
+      `SELECT public.request_actor_user_id() AS user_id`,
       expiredKey.key,
     )
     expect(rows[0].user_id).toBeNull()
@@ -632,7 +602,7 @@ describe('get_identity() with hashed API keys', () => {
     await setApiKeyExpiration(futureKey.id, new Date(Date.now() + 24 * 60 * 60 * 1000))
 
     const rows = await execWithCapgkey(
-      `SELECT get_identity('{all,write,read,upload}'::key_mode[]) as user_id`,
+      `SELECT public.request_actor_user_id() AS user_id`,
       futureKey.key,
     )
     expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
@@ -672,17 +642,17 @@ describe('enforce_hashed_api_keys blocks plaintext capgkey auth on the RLS plane
     }
   })
 
-  it('get_identity rejects a plain API key after hashed enforcement is enabled', async () => {
+  it('request_actor_user_id rejects a plain API key after hashed enforcement is enabled', async () => {
     const rows = await execWithCapgkey(
-      `SELECT get_identity('{all,write,read,upload}'::key_mode[]) AS user_id`,
+      `SELECT public.request_actor_user_id() AS user_id`,
       plainKey.key,
     )
     expect(rows[0].user_id).toBeNull()
   })
 
-  it('get_identity still accepts a hashed API key after hashed enforcement is enabled', async () => {
+  it('request_actor_user_id still accepts a hashed API key after hashed enforcement is enabled', async () => {
     const rows = await execWithCapgkey(
-      `SELECT get_identity('{all,write,read,upload}'::key_mode[]) AS user_id`,
+      `SELECT public.request_actor_user_id() AS user_id`,
       hashedKey.key,
     )
     expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
@@ -695,7 +665,7 @@ describe('enforce_hashed_api_keys blocks plaintext capgkey auth on the RLS plane
       await setOrgHashedApiKeyEnforcement(suiteOrgId, false)
 
       const rows = await execWithCapgkey(
-        `SELECT get_identity('{all,write,read,upload}'::key_mode[]) AS user_id`,
+        `SELECT public.request_actor_user_id() AS user_id`,
         plainKey.key,
       )
       expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
@@ -713,7 +683,7 @@ describe('enforce_hashed_api_keys blocks plaintext capgkey auth on the RLS plane
       await setOrgHashedApiKeyEnforcement(suiteOrgId, false)
 
       const rows = await execWithCapgkey(
-        `SELECT get_identity('{all,write,read,upload}'::key_mode[]) AS user_id`,
+        `SELECT public.request_actor_user_id() AS user_id`,
         plainKey.key,
       )
       expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
@@ -731,7 +701,7 @@ describe('enforce_hashed_api_keys blocks plaintext capgkey auth on the RLS plane
       await setOrgHashedApiKeyEnforcement(suiteOrgId, false)
 
       const rows = await execWithCapgkey(
-        `SELECT get_identity('{all,write,read,upload}'::key_mode[]) AS user_id`,
+        `SELECT public.request_actor_user_id() AS user_id`,
         plainKey.key,
       )
       expect(rows[0].user_id).toBeNull()
@@ -750,33 +720,13 @@ describe('enforce_hashed_api_keys blocks plaintext capgkey auth on the RLS plane
       await createStaleAppScopedBindingForUser(RLS_TEST_USER_ID, staleEnforcedOrgId)
 
       const rows = await execWithCapgkey(
-        `SELECT get_identity('{all,write,read,upload}'::key_mode[]) AS user_id`,
+        `SELECT public.request_actor_user_id() AS user_id`,
         plainKey.key,
       )
       expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
     }
     finally {
       await deleteStaleAppScopedBindingForUser(RLS_TEST_USER_ID, staleEnforcedOrgId)
-      await setOrgHashedApiKeyEnforcement(suiteOrgId, true)
-      await deleteStandaloneOrg(staleEnforcedOrgId)
-    }
-  })
-
-  it('ignores stale org_id values on app-scoped legacy org_users rows when deriving org enforcement', async () => {
-    const staleEnforcedOrgId = await createStandaloneOrg(true)
-
-    try {
-      await setOrgHashedApiKeyEnforcement(suiteOrgId, false)
-      await createStaleAppScopedOrgUserForUser(RLS_TEST_USER_ID, staleEnforcedOrgId)
-
-      const rows = await execWithCapgkey(
-        `SELECT get_identity('{all,write,read,upload}'::key_mode[]) AS user_id`,
-        plainKey.key,
-      )
-      expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
-    }
-    finally {
-      await deleteStaleAppScopedOrgUserForUser(RLS_TEST_USER_ID, staleEnforcedOrgId)
       await setOrgHashedApiKeyEnforcement(suiteOrgId, true)
       await deleteStandaloneOrg(staleEnforcedOrgId)
     }
@@ -801,7 +751,7 @@ describe('enforce_hashed_api_keys blocks plaintext capgkey auth on the RLS plane
   })
 })
 
-describe('get_identity_apikey_only() with hashed API keys', () => {
+describe('request_actor_user_id() API-key-only behavior with hashed API keys', () => {
   let hashedKey: { id: number, key: string, key_hash: string }
 
   beforeAll(async () => {
@@ -814,7 +764,7 @@ describe('get_identity_apikey_only() with hashed API keys', () => {
 
   it('returns user_id for hashed API key', async () => {
     const rows = await execWithCapgkey(
-      `SELECT get_identity_apikey_only('{all,write,read,upload}'::key_mode[]) as user_id`,
+      `SELECT public.request_actor_user_id() AS user_id`,
       hashedKey.key,
     )
     expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
@@ -822,14 +772,14 @@ describe('get_identity_apikey_only() with hashed API keys', () => {
 
   it('returns NULL for invalid API key', async () => {
     const rows = await execWithCapgkey(
-      `SELECT get_identity_apikey_only('{all,write,read,upload}'::key_mode[]) as user_id`,
+      `SELECT public.request_actor_user_id() AS user_id`,
       'invalid-key',
     )
     expect(rows[0].user_id).toBeNull()
   })
 })
 
-describe('get_identity_org_allowed() with hashed API keys', () => {
+describe('rbac_check_permission_request() with org-scoped hashed API keys', () => {
   let hashedKey: { id: number, key: string, key_hash: string }
   let otherOrgKey: { id: number, key: string, key_hash: string }
 
@@ -843,32 +793,32 @@ describe('get_identity_org_allowed() with hashed API keys', () => {
     await deleteApiKey(otherOrgKey.id)
   }, 60000)
 
-  it('returns user_id for hashed API key with matching org', async () => {
+  it('allows a hashed API key with matching org permission', async () => {
     const rows = await execWithCapgkey(
-      `SELECT get_identity_org_allowed('{all,write,read,upload}'::key_mode[], '${ORG_ID_RLS}'::uuid) as user_id`,
+      `SELECT public.rbac_check_permission_request(public.rbac_perm_org_read(), '${ORG_ID_RLS}'::uuid, NULL::character varying, NULL::bigint) AS allowed`,
       hashedKey.key,
     )
-    expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
+    expect(rows[0].allowed).toBe(true)
   })
 
-  it('returns NULL for hashed API key bound to different org', async () => {
+  it('denies a hashed API key bound to a different org', async () => {
     const rows = await execWithCapgkey(
-      `SELECT get_identity_org_allowed('{all,write,read,upload}'::key_mode[], '${ORG_ID_RLS}'::uuid) as user_id`,
+      `SELECT public.rbac_check_permission_request(public.rbac_perm_org_read(), '${ORG_ID_RLS}'::uuid, NULL::character varying, NULL::bigint) AS allowed`,
       otherOrgKey.key,
     )
-    expect(rows[0].user_id).toBeNull()
+    expect(rows[0].allowed).toBe(false)
   })
 
-  it('returns NULL for invalid API key', async () => {
+  it('denies an invalid API key', async () => {
     const rows = await execWithCapgkey(
-      `SELECT get_identity_org_allowed('{all,write,read,upload}'::key_mode[], '${ORG_ID_RLS}'::uuid) as user_id`,
+      `SELECT public.rbac_check_permission_request(public.rbac_perm_org_read(), '${ORG_ID_RLS}'::uuid, NULL::character varying, NULL::bigint) AS allowed`,
       'invalid-key',
     )
-    expect(rows[0].user_id).toBeNull()
+    expect(rows[0].allowed).toBe(false)
   })
 })
 
-describe('get_identity_org_appid() with hashed API keys', () => {
+describe('rbac_check_permission_request() with app-scoped hashed API keys', () => {
   let hashedKey: { id: number, key: string, key_hash: string }
   let otherOrgKey: { id: number, key: string, key_hash: string }
 
@@ -882,28 +832,28 @@ describe('get_identity_org_appid() with hashed API keys', () => {
     await deleteApiKey(otherOrgKey.id)
   })
 
-  it('returns user_id for hashed API key with matching app', async () => {
+  it('allows a hashed API key with matching app permission', async () => {
     const rows = await execWithCapgkey(
-      `SELECT get_identity_org_appid('{all,write,read,upload}'::key_mode[], '${ORG_ID_RLS}'::uuid, '${APP_NAME_RLS}') as user_id`,
+      `SELECT public.rbac_check_permission_request(public.rbac_perm_app_read(), '${ORG_ID_RLS}'::uuid, '${APP_NAME_RLS}', NULL::bigint) AS allowed`,
       hashedKey.key,
     )
-    expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
+    expect(rows[0].allowed).toBe(true)
   })
 
-  it('returns NULL for hashed API key without requested app permission', async () => {
+  it('denies a hashed API key without requested app permission', async () => {
     const rows = await execWithCapgkey(
-      `SELECT get_identity_org_appid('{all,write,read,upload}'::key_mode[], '${ORG_ID_RLS}'::uuid, '${APP_NAME_RLS}') as user_id`,
+      `SELECT public.rbac_check_permission_request(public.rbac_perm_app_read(), '${ORG_ID_RLS}'::uuid, '${APP_NAME_RLS}', NULL::bigint) AS allowed`,
       otherOrgKey.key,
     )
-    expect(rows[0].user_id).toBeNull()
+    expect(rows[0].allowed).toBe(false)
   })
 
-  it('returns NULL for invalid API key', async () => {
+  it('denies an invalid API key', async () => {
     const rows = await execWithCapgkey(
-      `SELECT get_identity_org_appid('{all,write,read,upload}'::key_mode[], '${ORG_ID_RLS}'::uuid, '${APP_NAME_RLS}') as user_id`,
+      `SELECT public.rbac_check_permission_request(public.rbac_perm_app_read(), '${ORG_ID_RLS}'::uuid, '${APP_NAME_RLS}', NULL::bigint) AS allowed`,
       'invalid-key',
     )
-    expect(rows[0].user_id).toBeNull()
+    expect(rows[0].allowed).toBe(false)
   })
 })
 
@@ -1037,6 +987,51 @@ describe('rls policies with hashed api keys (via supabase sdk)', () => {
     expect(error).toBeNull()
     expect(Array.isArray(data)).toBe(true)
     expect(data.length).toBeGreaterThan(0)
+  })
+
+  it('can regenerate a hashed API key through the public RPC despite direct apikey update denial', async () => {
+    const keyToRotate = await createHashedApiKey('test-rls-sdk-public-regenerate')
+
+    try {
+      const supabase = createClient(
+        process.env.SUPABASE_URL!,
+        process.env.SUPABASE_ANON_KEY!,
+        {
+          global: {
+            headers: { capgkey: keyToRotate.key },
+          },
+        },
+      )
+
+      const { data, error } = await supabase.rpc('regenerate_hashed_apikey' as any, {
+        p_apikey_id: keyToRotate.id,
+      })
+
+      expect(error).toBeNull()
+      const regenerated = data as { id: number, key: string, key_hash: string } | null
+      expect(regenerated?.id).toBe(keyToRotate.id)
+      expect(regenerated?.key).toBeTruthy()
+      expect(regenerated?.key).not.toBe(keyToRotate.key)
+      expect(regenerated?.key_hash).not.toBe(keyToRotate.key_hash)
+
+      const rotatedSupabase = createClient(
+        process.env.SUPABASE_URL!,
+        process.env.SUPABASE_ANON_KEY!,
+        {
+          global: {
+            headers: { capgkey: regenerated!.key },
+          },
+        },
+      )
+
+      const { data: orgs, error: orgError } = await rotatedSupabase.rpc('get_orgs_v7')
+      expect(orgError).toBeNull()
+      expect(Array.isArray(orgs)).toBe(true)
+      expect(orgs.length).toBeGreaterThan(0)
+    }
+    finally {
+      await deleteApiKey(keyToRotate.id)
+    }
   })
 
   it('cannot access data with invalid API key', async () => {

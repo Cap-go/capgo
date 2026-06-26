@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { sValidator } from '@hono/standard-validator'
 import { and, eq, sql } from 'drizzle-orm'
 import { createHono, useCors } from '../utils/hono.ts'
-import { middlewareV2 } from '../utils/hono_middleware.ts'
+import { middlewareAuth } from '../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { schema } from '../utils/postgres_schema.ts'
@@ -53,7 +53,7 @@ const APIKEY_ORG_READER_ROLE = 'apikey_org_reader'
 export const app = createHono('', version)
 
 app.use('*', useCors)
-app.use('*', middlewareV2(['all']))
+app.use('*', middlewareAuth())
 
 async function requireAuthAndGuardLimitedKeys(c: Context<MiddlewareKeyVariables>, next: () => Promise<void>) {
   const auth = c.get('auth')
@@ -197,13 +197,13 @@ async function validateUserPrincipalAccess(
   }
 
   const pendingInvite = await drizzle
-    .select({ user_right: schema.org_users.user_right })
+    .select({ id: schema.org_users.id })
     .from(schema.org_users)
     .where(
       and(
         eq(schema.org_users.user_id, principalId),
         eq(schema.org_users.org_id, orgId),
-        sql`${schema.org_users.user_right}::text LIKE 'invite_%'`,
+        eq(schema.org_users.is_invite, true),
       ),
     )
     .limit(1)
@@ -284,7 +284,7 @@ async function validateApiKeyPrincipalAccess(
       and(
         eq(schema.org_users.user_id, apiKey.user_id),
         eq(schema.org_users.org_id, orgId),
-        sql`${schema.org_users.user_right}::text LIKE 'invite_%'`,
+        eq(schema.org_users.is_invite, true),
       ),
     )
     .limit(1)
@@ -1219,8 +1219,8 @@ app.delete('/:binding_id', requireAuthAndGuardLimitedKeys, sValidator('param', b
         await tx
           .update(schema.org_users)
           .set({
-            user_right: null,
             rbac_role_name: null,
+            is_invite: false,
             updated_at: sql`now()`,
           })
           .where(
@@ -1229,7 +1229,7 @@ app.delete('/:binding_id', requireAuthAndGuardLimitedKeys, sValidator('param', b
               eq(schema.org_users.org_id, binding.org_id),
               sql`${schema.org_users.app_id} IS NULL`,
               sql`${schema.org_users.channel_id} IS NULL`,
-              sql`(${schema.org_users.user_right} IS NULL OR ${schema.org_users.user_right}::text NOT LIKE 'invite_%')`,
+              eq(schema.org_users.is_invite, false),
             ),
           )
       }

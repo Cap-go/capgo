@@ -11,6 +11,25 @@ import { getStripeCustomerName, isDeterministicStripeCustomerUpdateError, update
 import { apikeyHasOrgRightWithPolicy, supabaseAdmin, supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
 import { normalizeWebsiteUrl } from './website.ts'
 
+const passwordPolicyMinLengthSchema = type('number.integer >= 6').narrow((value, ctx) => {
+  if (value > 72) {
+    return ctx.reject({
+      expected: 'a value <= 72',
+      actual: JSON.stringify(value),
+    })
+  }
+
+  return true
+})
+
+const passwordPolicyConfigSchema = type({
+  'enabled': 'boolean',
+  'min_length': passwordPolicyMinLengthSchema,
+  'require_uppercase': 'boolean',
+  'require_number': 'boolean',
+  'require_special': 'boolean',
+})
+
 const bodySchema = type({
   'orgId': 'string',
   'logo?': 'string',
@@ -23,10 +42,12 @@ const bodySchema = type({
   'enforce_encrypted_bundles?': 'boolean',
   'required_encryption_key?': 'string | null',
   'enforcing_2fa?': 'boolean',
+  'password_policy_config?': passwordPolicyConfigSchema.or(type('null')),
 })
 
 type OrgRow = Database['public']['Tables']['orgs']['Row']
 type OrgUpdateFields = Partial<Database['public']['Tables']['orgs']['Update']>
+type PasswordPolicyConfig = typeof passwordPolicyConfigSchema.infer
 
 interface OrganizationPutBody {
   orgId: string
@@ -40,6 +61,7 @@ interface OrganizationPutBody {
   enforce_encrypted_bundles?: boolean
   required_encryption_key?: string | null
   enforcing_2fa?: boolean
+  password_policy_config?: PasswordPolicyConfig | null
 }
 
 function parseOrganizationBody(bodyRaw: unknown): OrganizationPutBody {
@@ -124,6 +146,8 @@ function buildUpdateFields(body: OrganizationPutBody, sanitizedName?: string) {
     updateFields.required_encryption_key = validateRequiredEncryptionKey(body.required_encryption_key)
   if (body.enforcing_2fa !== undefined)
     updateFields.enforcing_2fa = body.enforcing_2fa
+  if (body.password_policy_config !== undefined)
+    updateFields.password_policy_config = body.password_policy_config
   return updateFields
 }
 
@@ -268,12 +292,13 @@ export async function put(
     throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
   }
 
+  const rawApiKey = apikey?.key ?? c.get('capgkey')
   const supabase = auth.authType === 'jwt' && auth.jwt
     ? supabaseClient(c, auth.jwt)
-    : supabaseApikey(c, apikey?.key)
+    : supabaseApikey(c, rawApiKey)
   const authUserId = auth.userId
 
-  // Auth context is already set by middlewareV2
+  // Auth context is already set by middlewareAuth
   await ensureOrgAccess(c, apikey, body.orgId, supabase)
 
   if (body.enforcing_2fa) {

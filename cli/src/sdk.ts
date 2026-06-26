@@ -73,7 +73,7 @@ import { deleteOrganizationInternal } from './organization/delete'
 import { listOrganizationsInternal } from './organization/list'
 import { setOrganizationInternal } from './organization/set'
 import { getUserIdInternal } from './user/account'
-import { createSupabaseClient, findSavedKey, getConfig, getLocalConfig, OrganizationPerm } from './utils'
+import { createSupabaseClient, findSavedKey, getConfig, getLocalConfig } from './utils'
 import { parseSecurityPolicyError } from './utils/security_policy_errors'
 
 export type DoctorInfo = Awaited<ReturnType<typeof getInfoInternal>>
@@ -335,7 +335,7 @@ export class CapgoSDK {
       const supabase = await createSupabaseClient(apikey, this.supaHost, this.supaAnon)
       // silent: no UI output (this runs over a stdio MCP channel). skip2FACheck: this
       // is a read-only "is it registered" probe — the real credential ops enforce 2FA.
-      await checkAppExistsAndHasPermissionOrgErr(supabase, apikey, appId, OrganizationPerm.read, true, true)
+      await checkAppExistsAndHasPermissionOrgErr(supabase, apikey, appId, 'app.read', true, true)
       return { success: true, data: true }
     }
     catch {
