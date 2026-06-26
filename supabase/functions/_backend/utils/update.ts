@@ -252,6 +252,8 @@ export async function updateWithPG(
   const channelDeviceCount = appOwner.channel_device_count ?? 0
   const effectiveChannelDeviceCount = channelDeviceCount
   const manifestBundleCount = appOwner.manifest_bundle_count ?? 0
+  const rolloutChannelCount = appOwner.rollout_channel_count ?? 0
+  const rolloutPausedVersionNames = appOwner.rollout_paused_version_names ?? []
   const bypassChannelOverrides = !channelSelfOverride && effectiveChannelDeviceCount <= 0
   // v5 is deprecated if < 5.10.0, v6 is deprecated if < 6.25.0, v7 is deprecated if < 7.25.0
   const isDeprecated = isDeprecatedPluginVersion(pluginVersion)
@@ -265,6 +267,8 @@ export async function updateWithPG(
     effectiveChannelDeviceCount,
     bypassChannelOverrides,
     manifestBundleCount,
+    rolloutChannelCount,
+    rolloutPausedVersionCount: rolloutPausedVersionNames.length,
     fetchManifestEntries,
   })
   if (body.version_build === 'unknown') {
@@ -323,6 +327,9 @@ export async function updateWithPG(
     drizzleClient,
     channelDeviceCount: effectiveChannelDeviceCount,
     manifestBundleCount,
+    rolloutChannelCount,
+    rolloutPausedVersionNames,
+    currentVersionName: version_name,
     includeMetadata: needsMetadata,
     channelSelfOverrideChannelId: channelSelfOverride?.channel_id.id,
   })

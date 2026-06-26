@@ -47,6 +47,24 @@ export type { OptionsSetChannel } from '../schemas/channel'
 
 const disableAutoUpdatesPossibleOptions = ['major', 'minor', 'metadata', 'patch', 'none']
 
+function assertIntegerInRange(value: number, label: string, min: number, max: number) {
+  if (!Number.isFinite(value) || !Number.isInteger(value) || value < min || value > max)
+    throw new Error(`${label} must be an integer between ${min} and ${max}`)
+}
+
+function assertOptionalIntegerInRange(value: number | null | undefined, label: string, min: number, max: number) {
+  if (value == null)
+    return
+  assertIntegerInRange(value, label, min, max)
+}
+
+function assertOptionalConfidence(value: number | undefined) {
+  if (value == null)
+    return
+  if (!Number.isFinite(value) || value <= 0 || value >= 1)
+    throw new Error('Auto-pause confidence must be a number greater than 0 and less than 1')
+}
+
 export async function setChannelInternal(channel: string, appId: string, options: OptionsSetChannel, silent = false) {
   if (!silent)
     intro('Set channel')
@@ -97,6 +115,25 @@ export async function setChannelInternal(channel: string, appId: string, options
     emulator,
     device,
     prod,
+    rolloutBundle,
+    rolloutPercentage,
+    rolloutPercentageBps,
+    rolloutEnable,
+    rolloutDisable,
+    rolloutPause,
+    rolloutResume,
+    rolloutRollback,
+    rolloutPromote,
+    rolloutCacheTtlSeconds,
+    autoPauseEnabled,
+    autoPauseDisabled,
+    autoPauseWindowMinutes,
+    autoPauseFailureRateBps,
+    autoPauseConfidence,
+    autoPauseMinAttempts,
+    autoPauseMinFailures,
+    autoPauseAction,
+    autoPauseCooldownMinutes,
   } = options
 
   if (latest && bundle) {
@@ -131,6 +168,25 @@ export async function setChannelInternal(channel: string, appId: string, options
     && device == null
     && prod == null
     && disableAutoUpdate == null
+    && rolloutBundle == null
+    && rolloutPercentage == null
+    && rolloutPercentageBps == null
+    && rolloutEnable == null
+    && rolloutDisable == null
+    && rolloutPause == null
+    && rolloutResume == null
+    && rolloutRollback == null
+    && rolloutPromote == null
+    && rolloutCacheTtlSeconds == null
+    && autoPauseEnabled == null
+    && autoPauseDisabled == null
+    && autoPauseWindowMinutes == null
+    && autoPauseFailureRateBps === undefined
+    && autoPauseConfidence == null
+    && autoPauseMinAttempts === undefined
+    && autoPauseMinFailures === undefined
+    && autoPauseAction == null
+    && autoPauseCooldownMinutes == null
   ) {
     if (!silent)
       log.error('Missing argument, you need to provide a option to set')
@@ -147,7 +203,7 @@ export async function setChannelInternal(channel: string, appId: string, options
     version: undefined as any,
   }
 
-  const { error: channelError } = await supabase
+  const { data: existingChannel, error: channelError } = await supabase
     .from('channels')
     .select()
     .eq('app_id', appId)
@@ -163,6 +219,25 @@ export async function setChannelInternal(channel: string, appId: string, options
   const resolvedBundleVersion = latest
     ? (extConfig?.config?.plugins?.CapacitorUpdater?.version || getBundleVersion('', options.packageJson))
     : bundle
+
+  async function findRemoteBundle(versionName: string) {
+    const { data, error: vError } = await supabase
+      .from('app_versions')
+      .select()
+      .eq('app_id', appId)
+      .eq('name', versionName)
+      .eq('user_id', userId)
+      .eq('deleted', false)
+      .single()
+
+    if (vError || !data) {
+      if (!silent)
+        log.error(`Cannot find version ${versionName}`)
+      throw new Error(`Cannot find version ${versionName}`)
+    }
+
+    return data
+  }
 
   if (resolvedBundleVersion != null) {
     const { data, error: vError } = await supabase
@@ -258,6 +333,154 @@ export async function setChannelInternal(channel: string, appId: string, options
 
     channelPayload.version = data.id
   }
+
+  if (rolloutBundle != null) {
+    const data = await findRemoteBundle(rolloutBundle)
+
+    if (!options.ignoreMetadataCheck) {
+      const { finalCompatibility, localDependencies } = await checkCompatibilityNativePackages(
+        supabase,
+        appId,
+        channel,
+        (data.native_packages as any) ?? [],
+      )
+
+      const incompatiblePackages = finalCompatibility.filter(item => !isCompatible(item))
+
+      if (localDependencies.length > 0 && incompatiblePackages.length > 0) {
+        if (!silent) {
+          log.warn(`Rollout bundle NOT compatible with ${channel} channel`)
+          log.warn('')
+          displayCompatibilityTable(finalCompatibility)
+          log.warn('')
+          log.warn('An app store update may be required for these changes to take effect.')
+        }
+        throw new Error(`Rollout bundle is not compatible with ${channel} channel`)
+      }
+
+      if (!silent) {
+        if (localDependencies.length === 0 && finalCompatibility.length > 0)
+          log.info(`Ignoring check compatibility with ${channel} channel because the rollout bundle does not contain any native packages`)
+        else
+          log.info(`Rollout bundle is compatible with ${channel} channel`)
+      }
+    }
+
+    channelPayload.rollout_version = data.id
+    if (rolloutEnable == null)
+      channelPayload.rollout_enabled = true
+    if (!silent)
+      log.info(`Set ${appId} channel: ${channel} rollout target to @${rolloutBundle}`)
+  }
+
+  if (rolloutPercentage != null) {
+    if (!Number.isFinite(rolloutPercentage) || rolloutPercentage < 0 || rolloutPercentage > 100)
+      throw new Error('Rollout percentage must be between 0 and 100')
+  }
+  const finalRolloutPercentageBps = rolloutPercentageBps ?? (rolloutPercentage == null ? undefined : Math.round(rolloutPercentage * 100))
+  if (finalRolloutPercentageBps != null) {
+    assertIntegerInRange(finalRolloutPercentageBps, 'Rollout percentage basis points', 0, 10000)
+    channelPayload.rollout_percentage_bps = finalRolloutPercentageBps
+  }
+
+  if (rolloutEnable != null)
+    channelPayload.rollout_enabled = !!rolloutEnable
+  if (rolloutDisable)
+    channelPayload.rollout_enabled = false
+
+  if (rolloutPause) {
+    channelPayload.rollout_paused_at = new Date().toISOString()
+    channelPayload.rollout_pause_reason = 'Paused from CLI'
+  }
+
+  if (rolloutResume) {
+    channelPayload.rollout_paused_at = null
+    channelPayload.rollout_pause_reason = null
+  }
+
+  if (rolloutRollback) {
+    channelPayload.rollout_version = null
+    channelPayload.rollout_enabled = false
+    channelPayload.rollout_percentage_bps = 0
+    channelPayload.rollout_paused_at = null
+    channelPayload.rollout_pause_reason = null
+  }
+
+  if (rolloutPromote) {
+    const rolloutVersion = channelPayload.rollout_version ?? existingChannel?.rollout_version
+    if (!rolloutVersion)
+      throw new Error('Cannot promote rollout without a rollout target')
+
+    if (channelPayload.rollout_version == null && !options.ignoreMetadataCheck) {
+      const { data, error: vError } = await supabase
+        .from('app_versions')
+        .select()
+        .eq('app_id', appId)
+        .eq('id', rolloutVersion)
+        .eq('deleted', false)
+        .single()
+
+      if (vError || !data)
+        throw new Error('Cannot find rollout version to promote')
+
+      const { finalCompatibility, localDependencies } = await checkCompatibilityNativePackages(
+        supabase,
+        appId,
+        channel,
+        (data.native_packages as any) ?? [],
+      )
+
+      const incompatiblePackages = finalCompatibility.filter(item => !isCompatible(item))
+
+      if (localDependencies.length > 0 && incompatiblePackages.length > 0) {
+        if (!silent) {
+          log.warn(`Rollout bundle NOT compatible with ${channel} channel`)
+          log.warn('')
+          displayCompatibilityTable(finalCompatibility)
+          log.warn('')
+          log.warn('An app store update may be required for these changes to take effect.')
+        }
+        throw new Error(`Rollout bundle is not compatible with ${channel} channel`)
+      }
+    }
+
+    channelPayload.version = rolloutVersion
+    channelPayload.rollout_version = null
+    channelPayload.rollout_enabled = false
+    channelPayload.rollout_percentage_bps = 0
+    channelPayload.rollout_paused_at = null
+    channelPayload.rollout_pause_reason = null
+  }
+
+  assertOptionalIntegerInRange(rolloutCacheTtlSeconds, 'Rollout cache TTL seconds', 60, 31536000)
+  assertOptionalIntegerInRange(autoPauseWindowMinutes, 'Auto-pause window minutes', 1, 10080)
+  assertOptionalIntegerInRange(autoPauseFailureRateBps, 'Auto-pause failure rate basis points', 0, 10000)
+  assertOptionalConfidence(autoPauseConfidence)
+  assertOptionalIntegerInRange(autoPauseMinAttempts, 'Auto-pause minimum attempts', 0, Number.MAX_SAFE_INTEGER)
+  assertOptionalIntegerInRange(autoPauseMinFailures, 'Auto-pause minimum failures', 0, Number.MAX_SAFE_INTEGER)
+  assertOptionalIntegerInRange(autoPauseCooldownMinutes, 'Auto-pause cooldown minutes', 0, 10080)
+
+  if (rolloutCacheTtlSeconds != null)
+    channelPayload.rollout_cache_ttl_seconds = rolloutCacheTtlSeconds
+
+  if (autoPauseEnabled != null)
+    channelPayload.auto_pause_enabled = !!autoPauseEnabled
+  if (autoPauseDisabled)
+    channelPayload.auto_pause_enabled = false
+  if (autoPauseWindowMinutes != null)
+    channelPayload.auto_pause_window_minutes = autoPauseWindowMinutes
+  if (autoPauseFailureRateBps !== undefined)
+    channelPayload.auto_pause_failure_rate_bps = autoPauseFailureRateBps
+  if (autoPauseConfidence != null)
+    channelPayload.auto_pause_confidence = autoPauseConfidence as any
+  if (autoPauseMinAttempts !== undefined)
+    channelPayload.auto_pause_min_attempts = autoPauseMinAttempts
+  if (autoPauseMinFailures !== undefined)
+    channelPayload.auto_pause_min_failures = autoPauseMinFailures
+  if (autoPauseAction != null)
+    channelPayload.auto_pause_action = autoPauseAction
+  if (autoPauseCooldownMinutes != null)
+    channelPayload.auto_pause_cooldown_minutes = autoPauseCooldownMinutes
 
   if (state != null) {
     if (state !== 'normal' && state !== 'default') {

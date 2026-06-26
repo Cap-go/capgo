@@ -273,6 +273,12 @@ Capgo never inspects external content. Add encryption for trustless security.
 npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production,beta
 ```
 
+Upload directly as a progressive rollout target while keeping the channel's stable bundle as fallback:
+
+```bash
+npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production --rollout 10
+```
+
 **Options:**
 
 | Param          | Type          | Description          |
@@ -280,6 +286,9 @@ npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel prod
 | **-a** | <code>string</code> | API key to link to your account |
 | **-p** | <code>string</code> | Path of the folder to upload, if not provided it will use the webDir set in capacitor.config |
 | **-c** | <code>string</code> | Channel to link to. Use commas for multiple channels, for example production,beta |
+| **--rollout** | <code>string</code> | Set the uploaded bundle as this channel's rollout target at a percentage from 0 to 100 |
+| **--rollout-percentage-bps** | <code>string</code> | Set the uploaded bundle rollout percentage in basis points from 0 to 10000 |
+| **--rollout-cache-ttl-seconds** | <code>string</code> | Cloudflare rollout decision cache TTL in seconds |
 | **-e** | <code>string</code> | Link to external URL instead of upload to Capgo Cloud |
 | **--iv-session-key** | <code>string</code> | Set the IV and session key for bundle URL external |
 | **--s3-region** | <code>string</code> | Region for your S3 bucket |

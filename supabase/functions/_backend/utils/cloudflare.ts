@@ -2,7 +2,7 @@ import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive, KVNamespace } fr
 import type { Context } from 'hono'
 import type { DeviceComparable } from './deviceComparison.ts'
 import type { Database } from './supabase.types.ts'
-import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadStatsParams, StatsMetadata, VersionUsage } from './types.ts'
+import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadStatsParams, StatsMetadata, VersionUsage, VersionUsageChannel } from './types.ts'
 import dayjs from 'dayjs'
 import { CacheHelper } from './cache.ts'
 import { hasComparableDeviceChanged, toComparableDevice } from './deviceComparison.ts'
@@ -160,12 +160,15 @@ export function trackBandwidthUsageCF(c: Context, device_id: string, app_id: str
   return Promise.resolve()
 }
 
-export function trackVersionUsageCF(c: Context, version_name: string, app_id: string, action: string) {
+export function trackVersionUsageCF(c: Context, version_name: string, app_id: string, action: string, channel?: VersionUsageChannel | string | null) {
   if (!c.env.VERSION_USAGE)
     return Promise.resolve()
 
+  const channelName = typeof channel === 'string' ? channel : channel?.name
+  const channelId = typeof channel === 'object' && channel?.id ? String(channel.id) : ''
+
   c.env.VERSION_USAGE.writeDataPoint({
-    blobs: [app_id, version_name, action],
+    blobs: [app_id, version_name, action, channelName ?? '', channelId],
     indexes: [app_id],
   })
 
@@ -518,11 +521,18 @@ interface StoreApp {
   developer_id?: string // Optional as it's not NOT NULL
 }
 
-export async function readStatsVersionCF(c: Context, app_id: string, period_start: string, period_end: string): Promise<VersionUsage[]> {
+export async function readStatsVersionCF(c: Context, app_id: string, period_start: string, period_end: string, channel?: VersionUsageChannel | string): Promise<VersionUsage[]> {
   if (!c.env.VERSION_USAGE)
     return []
-  // Note: blob2 contains version_name for new data and version_id (numeric) for old data
-  // The cron job handles backwards compatibility by detecting numeric values
+  // Note: blob2 contains version_name for new data and version_id (numeric) for old data.
+  // blob4 contains channel_name and blob5 contains channel_id only for newer data.
+  const channelId = typeof channel === 'object' && channel?.id ? String(channel.id) : ''
+  const channelName = typeof channel === 'string' ? channel : channelId ? null : channel?.name
+  const safeChannelName = channelName ? escapeSqlString(channelName) : ''
+  const safeChannelId = channelId ? escapeSqlString(channelId) : ''
+  const channelFilter = safeChannelId
+    ? `AND blob5 = '${safeChannelId}'`
+    : safeChannelName ? `AND blob4 = '${safeChannelName}'` : ''
   const query = `SELECT
   blob1 as app_id,
   blob2 as version_name,
@@ -536,6 +546,7 @@ WHERE
   app_id = '${escapeSqlString(app_id)}'
   AND timestamp >= toDateTime('${formatDateCF(period_start)}')
   AND timestamp < toDateTime('${formatDateCF(period_end)}')
+  ${channelFilter}
 GROUP BY date, app_id, version_name
 ORDER BY date`
 
