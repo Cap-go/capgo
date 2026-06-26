@@ -34,7 +34,7 @@ export interface RolloutDecisionInput {
 
 export interface RolloutDecisionResult {
   payload: RolloutDecisionCachePayload | null
-  reason: 'already_on_rollout' | 'cached_selected' | 'cached_unselected' | 'disabled' | 'paused' | 'cache_miss' | 'delta_reroll' | 'percentage_zero'
+  reason: 'already_on_rollout' | 'cached_selected' | 'cached_unselected' | 'disabled' | 'paused' | 'cache_miss' | 'delta_reroll' | 'percentage_decrease_reroll' | 'percentage_zero'
   selected: boolean
   shouldWriteCache: boolean
   ttlSeconds: number
@@ -166,18 +166,28 @@ export function resolveRolloutDecision(input: RolloutDecisionInput): RolloutDeci
       ttlSeconds,
     }
   }
+  const randomBps = input.randomBps ?? randomPercentageBps
 
   if (cached?.selected) {
+    if (percentageBps >= cached.percentage_bps) {
+      return {
+        selected: true,
+        shouldWriteCache: false,
+        payload: cached,
+        reason: 'cached_selected',
+        ttlSeconds,
+      }
+    }
+
+    const selected = randomBps() < Math.ceil((percentageBps * MAX_BPS) / cached.percentage_bps)
     return {
-      selected: true,
-      shouldWriteCache: false,
-      payload: cached,
-      reason: 'cached_selected',
+      selected,
+      shouldWriteCache: true,
+      payload: updatePayload(input, cached, selected, percentageBps),
+      reason: 'percentage_decrease_reroll',
       ttlSeconds,
     }
   }
-
-  const randomBps = input.randomBps ?? randomPercentageBps
 
   if (cached) {
     if (percentageBps <= cached.percentage_bps) {

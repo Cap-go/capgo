@@ -82,6 +82,42 @@ describe('rollout decisions', () => {
     expect(decision.shouldWriteCache).toBe(false)
   })
 
+  it.concurrent('re-samples cached selected devices when percentage decreases', () => {
+    const selected = resolveRolloutDecision({
+      ...baseDecision,
+      rolloutPercentageBps: 2500,
+      cachePayload: {
+        selected: true,
+        percentage_bps: 5000,
+        rollout_id: baseDecision.rolloutId,
+        rollout_version: baseDecision.rolloutVersionId,
+        created_at: '2026-05-06T11:00:00.000Z',
+        updated_at: '2026-05-06T11:00:00.000Z',
+      },
+      randomBps: () => 4999,
+    })
+
+    const notSelected = resolveRolloutDecision({
+      ...baseDecision,
+      rolloutPercentageBps: 2500,
+      cachePayload: {
+        selected: true,
+        percentage_bps: 5000,
+        rollout_id: baseDecision.rolloutId,
+        rollout_version: baseDecision.rolloutVersionId,
+        created_at: '2026-05-06T11:00:00.000Z',
+        updated_at: '2026-05-06T11:00:00.000Z',
+      },
+      randomBps: () => 5000,
+    })
+
+    expect(selected.selected).toBe(true)
+    expect(selected.reason).toBe('percentage_decrease_reroll')
+    expect(selected.shouldWriteCache).toBe(true)
+    expect(notSelected.selected).toBe(false)
+    expect(notSelected.payload?.selected).toBe(false)
+  })
+
   it.concurrent('re-rolls only the delta probability after percentage increases', () => {
     expect(getDeltaProbabilityBps(2000, 5000)).toBe(3750)
 
