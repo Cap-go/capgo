@@ -472,7 +472,7 @@ async function getNotificationSettings(c: Context<MiddlewareKeyVariables>, appId
 
 async function upsertNotificationSettings(c: Context<MiddlewareKeyVariables>, body: SettingsBody) {
   const appId = assertString(body.appId, 'appId', 128)
-  await assertAppPermission(c, 'app.update_settings', appId)
+  await assertAppPermission(c, NOTIFICATION_MANAGE_PERMISSION, appId)
   const ownerOrg = await getAppOwnerOrg(c, appId)
   const pushUpdateEnabled = body.pushUpdateEnabled === true
   const pushUpdateInstallMode = body.pushUpdateInstallMode === 'set' ? 'set' : 'next'
@@ -836,7 +836,7 @@ app.get('/stats', middlewareV2(['read', 'write', 'all']), async (c) => {
 
 app.get('/providers', middlewareV2(['read', 'write', 'all']), async (c) => {
   const appId = assertString(c.req.query('app_id'), 'app_id', 128)
-  await assertAppPermission(c, 'app.update_settings', appId)
+  await assertAppPermission(c, NOTIFICATION_MANAGE_PERMISSION, appId)
   let pgClient: ReturnType<typeof getPgClient> | undefined
   try {
     pgClient = getPgClient(c)
@@ -858,7 +858,7 @@ app.get('/providers', middlewareV2(['read', 'write', 'all']), async (c) => {
 app.put('/providers', middlewareV2(['write', 'all']), async (c) => {
   const body = await parseBody<ProviderBody>(c)
   const appId = assertString(body.appId, 'appId', 128)
-  await assertAppPermission(c, 'app.update_settings', appId)
+  await assertAppPermission(c, NOTIFICATION_MANAGE_PERMISSION, appId)
   const provider = resolveProviderConfigProvider(body)
   const status = body.status && ['draft', 'configured', 'disabled', 'error'].includes(body.status) ? body.status : 'draft'
   const ownerOrg = await getAppOwnerOrg(c, appId)
