@@ -862,8 +862,6 @@ async function setRolloutVersionInChannel(
     rollout_version: versionId,
     rollout_percentage_bps: rolloutPercentageBps,
     rollout_enabled: rolloutPercentageBps > 0,
-    rollout_paused_at: null,
-    rollout_pause_reason: null,
     ...(selfAssign ? { allow_device_self_set: true } : {}),
   }
   if (rolloutCacheTtlSeconds != null)
