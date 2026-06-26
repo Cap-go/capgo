@@ -15,7 +15,7 @@
  */
 
 import type { BuildCredentials } from '../../schemas/build.js'
-import { chmodSync, existsSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, lstatSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { cwd } from 'node:process'
 import { renderEnvFile } from '../env-render.js'
@@ -75,6 +75,17 @@ export function exportCredentialsToEnv(opts: EnvExportOpts): EnvExportResult {
     platform: opts.platform,
     creds: opts.credentials,
   })
+
+  // Refuse to write THROUGH a symbolic link (symlink-based path traversal / clobber):
+  // lstat the path itself — ENOENT (no such path) is fine, a symlink is not.
+  try {
+    if (lstatSync(targetPath).isSymbolicLink())
+      throw new Error(`Refusing to write to a symbolic link path: ${targetPath}`)
+  }
+  catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT')
+      throw e
+  }
 
   // writeFileSync's mode option only applies when creating a new file — an
   // existing file keeps its old permission bits. chmod after the write so

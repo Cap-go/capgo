@@ -19,6 +19,7 @@ export const apps = pgTable('apps', {
   channel_device_count: bigint('channel_device_count', { mode: 'number' }).notNull().default(0),
   manifest_bundle_count: bigint('manifest_bundle_count', { mode: 'number' }).notNull().default(0),
   expose_metadata: boolean('expose_metadata').notNull().default(false),
+  block_provider_infra_requests: boolean('block_provider_infra_requests').notNull().default(true),
   allow_device_custom_id: boolean('allow_device_custom_id').notNull().default(true),
   need_onboarding: boolean('need_onboarding').notNull().default(false),
   existing_app: boolean('existing_app').notNull().default(false),
@@ -150,6 +151,8 @@ export const stripe_info = pgTable('stripe_info', {
   trial_at: text('trial_at'),
   is_good_plan: boolean('is_good_plan'),
   mau_exceeded: boolean('mau_exceeded'),
+  past_due_at: timestamp('past_due_at', { withTimezone: true }),
+  churn_reason: text('churn_reason'),
   storage_exceeded: boolean('storage_exceeded'),
   bandwidth_exceeded: boolean('bandwidth_exceeded'),
 })

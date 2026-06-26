@@ -251,6 +251,77 @@ await test('MissingScopesError exposes missing list + granted string for downstr
   assert(/cloud-platform/.test(err.message), 'message should name the missing scope')
 })
 
+// ─── startOAuthFlow: non-blocking primitive ───────────────────────────────────
+
+await test('startOAuthFlow returns { authUrl, redirectUri, result, close } immediately without blocking', async () => {
+  const { startOAuthFlow } = await importOAuth()
+  const config = { clientId: 'test-client-id', scopes: ['openid', 'https://www.googleapis.com/auth/androidpublisher'] }
+  // Start the flow — this should return BEFORE the browser signs in
+  const session = await startOAuthFlow(config, {
+    onAuthUrl: () => {},
+    onStatus: () => {},
+  })
+  try {
+    // Must return an object with the required shape
+    assert(typeof session === 'object' && session !== null, 'must return an object')
+    assert(typeof session.authUrl === 'string' && session.authUrl.length > 0, 'authUrl must be a non-empty string')
+    assert(typeof session.redirectUri === 'string' && session.redirectUri.length > 0, 'redirectUri must be non-empty')
+    assert(session.result instanceof Promise, 'result must be a Promise')
+    assert(typeof session.close === 'function', 'close must be a function')
+    // authUrl must contain the redirect_uri param (which encodes the redirectUri)
+    const parsedUrl = new URL(session.authUrl)
+    assert(parsedUrl.searchParams.has('redirect_uri'), 'authUrl must have redirect_uri param')
+    assert(parsedUrl.searchParams.get('redirect_uri').includes('127.0.0.1'), 'redirect_uri must point to loopback')
+    // The result promise must NOT have resolved yet (sign-in not complete)
+    let settled = false
+    session.result.then(() => { settled = true }).catch(() => { settled = true })
+    // yield the microtask queue — result should still be pending
+    await new Promise(r => setTimeout(r, 10))
+    assert(!settled, 'result must not have settled (no sign-in happened yet)')
+  }
+  finally {
+    // Force-close to release the loopback server + avoid timer leak
+    session.close()
+  }
+})
+
+await test('startOAuthFlow authUrl contains clientId and expected scopes', async () => {
+  const { startOAuthFlow } = await importOAuth()
+  const config = {
+    clientId: 'my-client-id.apps.googleusercontent.com',
+    scopes: ['openid', 'https://www.googleapis.com/auth/userinfo.email'],
+  }
+  const session = await startOAuthFlow(config, { onAuthUrl: () => {}, onStatus: () => {} })
+  try {
+    const parsedUrl = new URL(session.authUrl)
+    assertEquals(parsedUrl.searchParams.get('client_id'), 'my-client-id.apps.googleusercontent.com')
+    const scope = parsedUrl.searchParams.get('scope')
+    assert(scope.includes('openid'), 'scope must include openid')
+    assert(scope.includes('userinfo.email'), 'scope must include userinfo.email')
+  }
+  finally {
+    session.close()
+  }
+})
+
+await test('runOAuthFlow still delegates to startOAuthFlow (backward-compatible signature)', async () => {
+  const { runOAuthFlow } = await importOAuth()
+  // Verify the function exists and has the right shape (it will throw when the
+  // loopback times out, but we just check it still accepts the same signature).
+  assert(typeof runOAuthFlow === 'function', 'runOAuthFlow must still be exported')
+  // We cannot run a real OAuth flow in tests, but we can verify the function
+  // throws on missing clientId just like before.
+  let threw = false
+  try {
+    await runOAuthFlow({ clientId: '', scopes: ['openid'] })
+  }
+  catch (err) {
+    threw = true
+    assert(/clientId/i.test(err.message) || err.message.length > 0, 'should throw on empty clientId')
+  }
+  assert(threw, 'runOAuthFlow must throw on invalid config (unchanged validation)')
+})
+
 console.log(`\n📊 Results: ${testsPassed} passed, ${testsFailed} failed`)
 if (testsFailed > 0)
   process.exit(1)

@@ -34,6 +34,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      apikey_global_permissions: {
+        Row: {
+          apikey_rbac_id: string
+          created_at: string
+          granted_by: string | null
+          id: number
+          permission_key: string
+          reason: string | null
+        }
+        Insert: {
+          apikey_rbac_id: string
+          created_at?: string
+          granted_by?: string | null
+          id?: number
+          permission_key: string
+          reason?: string | null
+        }
+        Update: {
+          apikey_rbac_id?: string
+          created_at?: string
+          granted_by?: string | null
+          id?: number
+          permission_key?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apikey_global_permissions_apikey_rbac_id_fkey"
+            columns: ["apikey_rbac_id"]
+            isOneToOne: false
+            referencedRelation: "apikeys"
+            referencedColumns: ["rbac_id"]
+          },
+          {
+            foreignKeyName: "apikey_global_permissions_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apikeys: {
         Row: {
           created_at: string | null
@@ -267,6 +309,7 @@ export type Database = {
           allow_preview: boolean
           android_store_url: string | null
           app_id: string
+          block_provider_infra_requests: boolean
           build_timeout_seconds: number
           build_timeout_updated_at: string
           channel_device_count: number
@@ -294,6 +337,7 @@ export type Database = {
           allow_preview?: boolean
           android_store_url?: string | null
           app_id: string
+          block_provider_infra_requests?: boolean
           build_timeout_seconds?: number
           build_timeout_updated_at?: string
           channel_device_count?: number
@@ -321,6 +365,7 @@ export type Database = {
           allow_preview?: boolean
           android_store_url?: string | null
           app_id?: string
+          block_provider_infra_requests?: boolean
           build_timeout_seconds?: number
           build_timeout_updated_at?: string
           channel_device_count?: number
@@ -413,6 +458,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      backfill_progress: {
+        Row: {
+          created_at: string
+          cutover_at: string
+          job_name: string
+          last_processed_id: number | null
+          last_processed_occurred_at: string | null
+          scope_key: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cutover_at: string
+          job_name: string
+          last_processed_id?: number | null
+          last_processed_occurred_at?: string | null
+          scope_key: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cutover_at?: string
+          job_name?: string
+          last_processed_id?: number | null
+          last_processed_occurred_at?: string | null
+          scope_key?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       bandwidth_usage: {
         Row: {
@@ -792,6 +867,84 @@ export type Database = {
           },
         ]
       }
+      compatibility_events: {
+        Row: {
+          app_id: string
+          change_occurred_at: string
+          channel_id: number | null
+          channel_name: string
+          created_at: string
+          current_version_id: number | null
+          current_version_name: string
+          id: number
+          offenders: Json
+          org_id: string
+          platform: string
+          previous_version_id: number | null
+          previous_version_name: string
+          resolution_kind: string | null
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          source: string
+        }
+        Insert: {
+          app_id: string
+          change_occurred_at?: string
+          channel_id?: number | null
+          channel_name: string
+          created_at?: string
+          current_version_id?: number | null
+          current_version_name: string
+          id?: never
+          offenders?: Json
+          org_id: string
+          platform: string
+          previous_version_id?: number | null
+          previous_version_name: string
+          resolution_kind?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          source: string
+        }
+        Update: {
+          app_id?: string
+          change_occurred_at?: string
+          channel_id?: number | null
+          channel_name?: string
+          created_at?: string
+          current_version_id?: number | null
+          current_version_name?: string
+          id?: never
+          offenders?: Json
+          org_id?: string
+          platform?: string
+          previous_version_id?: number | null
+          previous_version_name?: string
+          resolution_kind?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compatibility_events_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "compatibility_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cron_tasks: {
         Row: {
           batch_size: number | null
@@ -936,6 +1089,7 @@ export type Database = {
           churn_mrr_maker: number
           churn_mrr_solo: number
           churn_mrr_team: number
+          churn_reason: string | null
           contraction_mrr: number
           contraction_mrr_enterprise: number
           contraction_mrr_maker: number
@@ -955,6 +1109,7 @@ export type Database = {
           churn_mrr_maker?: number
           churn_mrr_solo?: number
           churn_mrr_team?: number
+          churn_reason?: string | null
           contraction_mrr?: number
           contraction_mrr_enterprise?: number
           contraction_mrr_maker?: number
@@ -974,6 +1129,7 @@ export type Database = {
           churn_mrr_maker?: number
           churn_mrr_solo?: number
           churn_mrr_team?: number
+          churn_reason?: string | null
           contraction_mrr?: number
           contraction_mrr_enterprise?: number
           contraction_mrr_maker?: number
@@ -1110,6 +1266,7 @@ export type Database = {
           deleted_at: string | null
           id: number
           owner_org: string
+          transfer_history: Json[] | null
         }
         Insert: {
           app_id: string
@@ -1117,6 +1274,7 @@ export type Database = {
           deleted_at?: string | null
           id?: number
           owner_org: string
+          transfer_history?: Json[] | null
         }
         Update: {
           app_id?: string
@@ -1124,6 +1282,7 @@ export type Database = {
           deleted_at?: string | null
           id?: number
           owner_org?: string
+          transfer_history?: Json[] | null
         }
         Relationships: []
       }
@@ -1281,6 +1440,8 @@ export type Database = {
       }
       global_stats: {
         Row: {
+          active_canceled_orgs: number
+          active_past_due_orgs: number
           apps: number
           apps_active: number | null
           average_ltv: number
@@ -1307,6 +1468,7 @@ export type Database = {
           churn_revenue_maker: number
           churn_revenue_solo: number
           churn_revenue_team: number
+          completed_shards: Json
           created_at: string | null
           credits_bought: number
           credits_consumed: number
@@ -1324,6 +1486,9 @@ export type Database = {
           nrr: number
           onboarded: number | null
           org_conversion_rate: number
+          orgs: number
+          past_due_orgs: number
+          past_due_orgs_average_days: number
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
@@ -1357,6 +1522,8 @@ export type Database = {
           success_rate: number | null
           total_revenue: number
           trial: number | null
+          trial_extended_orgs: number
+          trial_extended_subscribed_orgs: number
           updates: number
           updates_external: number | null
           updates_last_month: number | null
@@ -1365,6 +1532,8 @@ export type Database = {
           users_active: number | null
         }
         Insert: {
+          active_canceled_orgs?: number
+          active_past_due_orgs?: number
           apps: number
           apps_active?: number | null
           average_ltv?: number
@@ -1391,6 +1560,7 @@ export type Database = {
           churn_revenue_maker?: number
           churn_revenue_solo?: number
           churn_revenue_team?: number
+          completed_shards?: Json
           created_at?: string | null
           credits_bought?: number
           credits_consumed?: number
@@ -1408,6 +1578,9 @@ export type Database = {
           nrr?: number
           onboarded?: number | null
           org_conversion_rate?: number
+          orgs?: number
+          past_due_orgs?: number
+          past_due_orgs_average_days?: number
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
@@ -1441,6 +1614,8 @@ export type Database = {
           success_rate?: number | null
           total_revenue?: number
           trial?: number | null
+          trial_extended_orgs?: number
+          trial_extended_subscribed_orgs?: number
           updates: number
           updates_external?: number | null
           updates_last_month?: number | null
@@ -1449,6 +1624,8 @@ export type Database = {
           users_active?: number | null
         }
         Update: {
+          active_canceled_orgs?: number
+          active_past_due_orgs?: number
           apps?: number
           apps_active?: number | null
           average_ltv?: number
@@ -1475,6 +1652,7 @@ export type Database = {
           churn_revenue_maker?: number
           churn_revenue_solo?: number
           churn_revenue_team?: number
+          completed_shards?: Json
           created_at?: string | null
           credits_bought?: number
           credits_consumed?: number
@@ -1492,6 +1670,9 @@ export type Database = {
           nrr?: number
           onboarded?: number | null
           org_conversion_rate?: number
+          orgs?: number
+          past_due_orgs?: number
+          past_due_orgs_average_days?: number
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
@@ -1525,6 +1706,8 @@ export type Database = {
           success_rate?: number | null
           total_revenue?: number
           trial?: number | null
+          trial_extended_orgs?: number
+          trial_extended_subscribed_orgs?: number
           updates?: number
           updates_external?: number | null
           updates_last_month?: number | null
@@ -2342,6 +2525,7 @@ export type Database = {
           bandwidth_exceeded: boolean | null
           build_time_exceeded: boolean | null
           canceled_at: string | null
+          churn_reason: string | null
           created_at: string
           customer_country: string | null
           customer_id: string
@@ -2350,6 +2534,7 @@ export type Database = {
           last_stripe_event_at: string | null
           mau_exceeded: boolean | null
           paid_at: string | null
+          past_due_at: string | null
           plan_calculated_at: string | null
           plan_usage: number | null
           price_id: string | null
@@ -2367,6 +2552,7 @@ export type Database = {
           bandwidth_exceeded?: boolean | null
           build_time_exceeded?: boolean | null
           canceled_at?: string | null
+          churn_reason?: string | null
           created_at?: string
           customer_country?: string | null
           customer_id: string
@@ -2375,6 +2561,7 @@ export type Database = {
           last_stripe_event_at?: string | null
           mau_exceeded?: boolean | null
           paid_at?: string | null
+          past_due_at?: string | null
           plan_calculated_at?: string | null
           plan_usage?: number | null
           price_id?: string | null
@@ -2392,6 +2579,7 @@ export type Database = {
           bandwidth_exceeded?: boolean | null
           build_time_exceeded?: boolean | null
           canceled_at?: string | null
+          churn_reason?: string | null
           created_at?: string
           customer_country?: string | null
           customer_id?: string
@@ -2400,6 +2588,7 @@ export type Database = {
           last_stripe_event_at?: string | null
           mau_exceeded?: boolean | null
           paid_at?: string | null
+          past_due_at?: string | null
           plan_calculated_at?: string | null
           plan_usage?: number | null
           price_id?: string | null
@@ -2501,6 +2690,51 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trial_extension_events: {
+        Row: {
+          created_at: string
+          customer_id: string
+          extension_days: number
+          id: number
+          new_trial_at: string
+          org_id: string
+          previous_trial_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          extension_days: number
+          id?: number
+          new_trial_at: string
+          org_id: string
+          previous_trial_at: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          extension_days?: number
+          id?: number
+          new_trial_at?: string
+          org_id?: string
+          previous_trial_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trial_extension_events_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "stripe_info"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "trial_extension_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
             referencedColumns: ["id"]
           },
         ]
@@ -3037,6 +3271,19 @@ export type Database = {
     }
     Functions: {
       accept_invitation_to_org: { Args: { org_id: string }; Returns: string }
+      acknowledge_compatibility_event: {
+        Args: { event_id: number; note: string }
+        Returns: undefined
+      }
+      apikey_has_current_org_create_capability: {
+        Args: { p_apikey_rbac_id: string }
+        Returns: boolean
+      }
+      apikey_has_global_permission: {
+        Args: { p_apikey: string; p_permission_key: string }
+        Returns: boolean
+      }
+      app_has_real_bundle: { Args: { p_app_id: string }; Returns: boolean }
       app_versions_readable_app_ids: { Args: never; Returns: string[] }
       apply_usage_overage: {
         Args: {
@@ -3141,6 +3388,7 @@ export type Database = {
         Args: { p_app_uuid: string }
         Returns: undefined
       }
+      cleanup_completed_onboarding_apps: { Args: never; Returns: undefined }
       cleanup_expired_apikeys: { Args: never; Returns: undefined }
       cleanup_expired_demo_apps: { Args: never; Returns: undefined }
       cleanup_frequent_job_details: { Args: never; Returns: undefined }
@@ -3271,6 +3519,7 @@ export type Database = {
           allow_preview: boolean
           android_store_url: string | null
           app_id: string
+          block_provider_infra_requests: boolean
           build_timeout_seconds: number
           build_timeout_updated_at: string
           channel_device_count: number
@@ -3473,6 +3722,7 @@ export type Database = {
           allow_preview: boolean
           android_store_url: string
           app_id: string
+          block_provider_infra_requests: boolean
           build_timeout_seconds: number
           build_timeout_updated_at: string
           channel_device_count: number
@@ -4074,6 +4324,7 @@ export type Database = {
       rbac_perm_channel_read_history: { Args: never; Returns: string }
       rbac_perm_channel_rollback_bundle: { Args: never; Returns: string }
       rbac_perm_channel_update_settings: { Args: never; Returns: string }
+      rbac_perm_org_create: { Args: never; Returns: string }
       rbac_perm_org_create_app: { Args: never; Returns: string }
       rbac_perm_org_delete: { Args: never; Returns: string }
       rbac_perm_org_invite_user: { Args: never; Returns: string }
@@ -4495,6 +4746,8 @@ export type Database = {
         | "webview_unclean_restart"
         | "webview_render_process_gone"
         | "webview_content_process_terminated"
+        | "os_version_changed"
+        | "native_app_version_changed"
       stripe_status:
         | "created"
         | "succeeded"
@@ -4755,6 +5008,8 @@ export const Constants = {
         "webview_unclean_restart",
         "webview_render_process_gone",
         "webview_content_process_terminated",
+        "os_version_changed",
+        "native_app_version_changed",
       ],
       stripe_status: [
         "created",

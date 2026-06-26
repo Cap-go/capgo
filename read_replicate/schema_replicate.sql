@@ -99,6 +99,7 @@ CREATE TABLE public.apps (
     stats_refresh_requested_at timestamp without time zone,
     build_timeout_seconds bigint DEFAULT 900 NOT NULL,
     build_timeout_updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    block_provider_infra_requests boolean DEFAULT true NOT NULL,
     CONSTRAINT apps_build_timeout_seconds_check CHECK (((build_timeout_seconds >= 300) AND (build_timeout_seconds <= 21600)))
 );
 
@@ -377,7 +378,9 @@ CREATE TABLE public.stripe_info (
     upgraded_at timestamp with time zone,
     paid_at timestamp with time zone,
     customer_country character varying(2),
-    last_stripe_event_at timestamp with time zone
+    last_stripe_event_at timestamp with time zone,
+    past_due_at timestamp with time zone,
+    churn_reason text
 );
 
 
@@ -842,6 +845,13 @@ CREATE INDEX idx_orgs_email_preferences ON public.orgs USING gin (email_preferen
 --
 
 CREATE INDEX idx_stripe_info_customer_covering ON public.stripe_info USING btree (customer_id) INCLUDE (product_id, subscription_anchor_start, subscription_anchor_end);
+
+
+--
+-- Name: idx_stripe_info_past_due_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_stripe_info_past_due_at ON public.stripe_info USING btree (past_due_at) WHERE (past_due_at IS NOT NULL);
 
 
 --

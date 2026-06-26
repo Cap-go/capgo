@@ -9,8 +9,9 @@ import { Hono } from 'hono/tiny'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { checkChannelSelfIPRateLimit, isChannelSelfRateLimited, recordChannelSelfIPRequest, recordChannelSelfRequest } from '../utils/channelSelfRateLimit.ts'
 import { deleteChannelSelfOverride, getChannelSelfOverride, isChannelSelfStoreEnabled, setChannelSelfOverride } from '../utils/channelSelfStore.ts'
-import { BRES, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
+import { BRES, parseBody, quickError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { invalidIpInfo } from '../utils/invalids_ip.ts'
 import { sendNotifOrgCached } from '../utils/notifications.ts'
 import { sendNotifToOrgMembersCached } from '../utils/org_email_notifications.ts'
 import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getChannelByIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, setReplicationLagHeader, upsertChannelDevicePg } from '../utils/pg.ts'
@@ -18,6 +19,7 @@ import { convertQueryToBody, makeDevice, parsePluginBody } from '../utils/plugin
 import { channelSelfGetRequestSchema, channelSelfRequestSchema, isDevicePlatform } from '../utils/plugin_validation.ts'
 import { buildRateLimitInfo } from '../utils/rateLimitInfo.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
+import { getClientIP } from '../utils/rate_limit.ts'
 import { backgroundTask, isDeprecatedPluginVersion, isLimited } from '../utils/utils.ts'
 
 // Minimum versions for local channel storage behavior
@@ -27,6 +29,28 @@ const CHANNEL_SELF_MIN_V7 = '7.34.0'
 const CHANNEL_SELF_MIN_V8 = '8.0.0'
 
 const PLAN_MAU_ACTIONS: Array<'mau'> = ['mau']
+
+async function blockProviderInfrastructure(c: Context, route: string, shouldBlockProviderInfrastructure: boolean) {
+  if (!shouldBlockProviderInfrastructure)
+    return null
+
+  const requestIp = getClientIP(c)
+  if (requestIp === 'unknown')
+    return null
+
+  const providerInfo = await invalidIpInfo(requestIp, c)
+  if (!providerInfo.blocked)
+    return null
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Blocking /channel_self request from provider infrastructure IP',
+    ip: requestIp,
+    provider: providerInfo.provider,
+    route,
+  })
+  return quickError(429, 'provider_infrastructure_request_blocked', 'Provider infrastructure requests are blocked')
+}
 
 async function assertChannelSelfIPRateLimit(c: Context, appId: string) {
   // IP rate limit: per-minute cap (default 1000/min via RATE_LIMIT_CHANNEL_SELF_IP) to mitigate device_id spoofing
@@ -67,21 +91,22 @@ async function recordChannelSelfRequestSafely(
 }
 
 type AppOwnerResult = Awaited<ReturnType<typeof getAppOwnerPostgres>>
+type AppStatusResult = Awaited<ReturnType<typeof getAppStatus>>
 type ChannelSelfOverrideResult = Awaited<ReturnType<typeof getChannelDeviceOverridePg>>
 type ChannelSelfDeviceOperation = 'set' | 'get' | 'delete'
 
 async function assertChannelSelfCachedStatus(
   c: Context,
-  cachedStatus: Awaited<ReturnType<typeof getAppStatus>>['status'],
+  cachedAppStatus: AppStatusResult,
   appId: string,
   device: ReturnType<typeof makeDevice>,
   operationLabel: string,
 ) {
-  if (cachedStatus === 'onprem') {
+  if (cachedAppStatus.status === 'onprem') {
     cloudlog({ requestId: c.get('requestId'), message: `Channel_self cache hit (${operationLabel}), app marked onprem`, app_id: appId })
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
-  if (cachedStatus === 'cancelled') {
+  if (cachedAppStatus.status === 'cancelled') {
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
@@ -94,16 +119,17 @@ async function assertChannelSelfAppOwnerPlanValid(
   appId: string,
   device: ReturnType<typeof makeDevice>,
   operationLabel: string,
+  cachedBlockProviderInfraRequests: boolean,
   deviceId?: string,
 ): Promise<{ response: Response } | { appOwner: NonNullable<AppOwnerResult> }> {
   if (!appOwner) {
     cloudlog({ requestId: c.get('requestId'), message: `On-premise app detected in channel_self ${operationLabel}, returning 429`, app_id: appId })
-    await setAppStatus(c, appId, 'onprem', true)
+    await setAppStatus(c, appId, 'onprem', true, cachedBlockProviderInfraRequests)
     return { response: c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429) }
   }
 
   if (!appOwner.plan_valid) {
-    await setAppStatus(c, appId, 'cancelled', appOwner.allow_device_custom_id)
+    await setAppStatus(c, appId, 'cancelled', appOwner.allow_device_custom_id, appOwner.block_provider_infra_requests)
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: appId })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
 
@@ -125,7 +151,7 @@ async function assertChannelSelfAppOwnerPlanValid(
     return { response: c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429) }
   }
 
-  await setAppStatus(c, appId, 'cloud', appOwner.allow_device_custom_id)
+  await setAppStatus(c, appId, 'cloud', appOwner.allow_device_custom_id, appOwner.block_provider_infra_requests)
   return { appOwner }
 }
 
@@ -213,29 +239,33 @@ async function prepareChannelSelfDeviceRequest(
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   body: DeviceLink,
   operationLabel: string,
+  cachedAppStatus: AppStatusResult,
 ): Promise<{ response: Response } | { appOwner: NonNullable<AppOwnerResult>, device: ReturnType<typeof makeDevice> }> {
   const { app_id, device_id } = body
-  const cachedAppStatus = await getAppStatus(c, app_id)
-  const cachedLimit = await assertChannelSelfCachedStatus(c, cachedAppStatus.status, app_id, makeDevice(body, cachedAppStatus.allow_device_custom_id), operationLabel.toLowerCase())
+  const cachedLimit = await assertChannelSelfCachedStatus(c, cachedAppStatus, app_id, makeDevice(body, cachedAppStatus.allow_device_custom_id), operationLabel.toLowerCase())
   if (cachedLimit) {
     return { response: cachedLimit }
   }
 
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
   const device = makeDevice(body, appOwner?.allow_device_custom_id)
-  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, operationLabel, device_id)
+  const blockProviderInfraRequests = appOwner?.block_provider_infra_requests ?? cachedAppStatus.block_provider_infra_requests
+  const blocked = await blockProviderInfrastructure(c, operationLabel, blockProviderInfraRequests)
+  if (blocked)
+    return { response: blocked }
+
+  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, operationLabel, blockProviderInfraRequests, device_id)
   if ('response' in ownerRes) {
     return { response: ownerRes.response }
   }
 
   return { appOwner: ownerRes.appOwner, device }
 }
-
-async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink): Promise<Response> {
+async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink, cachedAppStatus: AppStatusResult): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'post channel self body', body })
   const { app_id, device_id, channel } = body
 
-  const requestContext = await prepareChannelSelfDeviceRequest(c, drizzleClient, body, 'POST')
+  const requestContext = await prepareChannelSelfDeviceRequest(c, drizzleClient, body, 'POST', cachedAppStatus)
   if ('response' in requestContext) {
     return requestContext.response
   }
@@ -366,11 +396,11 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   return c.json(BRES)
 }
 
-async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink): Promise<Response> {
+async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink, cachedAppStatus: AppStatusResult): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'put channel self body', body })
   const { app_id, defaultChannel, device_id } = body
 
-  const requestContext = await prepareChannelSelfDeviceRequest(c, drizzleClient, body, 'PUT')
+  const requestContext = await prepareChannelSelfDeviceRequest(c, drizzleClient, body, 'PUT', cachedAppStatus)
   if ('response' in requestContext) {
     return requestContext.response
   }
@@ -439,7 +469,7 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
   })
 }
 
-async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink): Promise<Response> {
+async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink, cachedAppStatus: AppStatusResult): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'delete channel self body', body })
   const {
     app_id,
@@ -448,7 +478,7 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
   } = body
   cloudlog({ requestId: c.get('requestId'), message: 'delete override', version_build })
 
-  const requestContext = await prepareChannelSelfDeviceRequest(c, drizzleClient, body, 'DELETE')
+  const requestContext = await prepareChannelSelfDeviceRequest(c, drizzleClient, body, 'DELETE', cachedAppStatus)
   if ('response' in requestContext) {
     return requestContext.response
   }
@@ -498,10 +528,9 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
   return c.json(BRES)
 }
 
-async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink): Promise<Response> {
+async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink, cachedAppStatus: AppStatusResult): Promise<Response> {
   const { app_id, platform, is_emulator, is_prod } = body
-  const cachedAppStatus = await getAppStatus(c, app_id)
-  const cachedLimit = await assertChannelSelfCachedStatus(c, cachedAppStatus.status, app_id, makeDevice(body, cachedAppStatus.allow_device_custom_id), 'list')
+  const cachedLimit = await assertChannelSelfCachedStatus(c, cachedAppStatus, app_id, makeDevice(body, cachedAppStatus.allow_device_custom_id), 'list')
   if (cachedLimit) {
     return cachedLimit
   }
@@ -510,15 +539,21 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
   const appExists = await getAppByIdPg(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
   if (!appExists) {
+    const blocked = await blockProviderInfrastructure(c, 'GET', true)
+    if (blocked)
+      return blocked
+
     // App doesn't exist in database - normalize response to avoid oracle
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
-
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
   const device = makeDevice(body, appOwner?.allow_device_custom_id)
+  const blockProviderInfraRequests = appOwner?.block_provider_infra_requests ?? cachedAppStatus.block_provider_infra_requests
+  const blocked = await blockProviderInfrastructure(c, 'GET', blockProviderInfraRequests)
+  if (blocked)
+    return blocked
 
-  // Check if app has valid org association (not on-premise) - Read operation can use v2 flag
-  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, 'GET')
+  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, 'GET', blockProviderInfraRequests)
   if ('response' in ownerRes) {
     return ownerRes.response
   }
@@ -630,13 +665,18 @@ app.post('/', async (c) => {
     return simpleError200(c, 'missing_channel', 'Cannot find channel in body')
   }
 
+  const appStatus = await getAppStatus(c, bodyParsed.app_id)
+  const blocked = appStatus.cacheHit ? await blockProviderInfrastructure(c, 'POST', appStatus.block_provider_infra_requests) : null
+  if (blocked)
+    return blocked
+
   // Rate limit: max 5 set per second per device+app, and same set max once per 60 seconds
   return await runChannelSelfDeviceOperation(
     c,
     bodyParsed,
     'set',
     'POST',
-    drizzleClient => post(c, drizzleClient, bodyParsed),
+    drizzleClient => post(c, drizzleClient, bodyParsed, appStatus),
     bodyParsed.channel,
   )
 })
@@ -649,6 +689,10 @@ app.put('/', async (c) => {
     return parsed.response
   }
   const { bodyParsed } = parsed
+  const appStatus = await getAppStatus(c, bodyParsed.app_id)
+  const blocked = appStatus.cacheHit ? await blockProviderInfrastructure(c, 'PUT', appStatus.block_provider_infra_requests) : null
+  if (blocked)
+    return blocked
 
   // Rate limit: max 5 get per second per device+app
   return await runChannelSelfDeviceOperation(
@@ -656,7 +700,7 @@ app.put('/', async (c) => {
     bodyParsed,
     'get',
     'PUT',
-    drizzleClient => put(c, drizzleClient, bodyParsed),
+    drizzleClient => put(c, drizzleClient, bodyParsed, appStatus),
   )
 })
 
@@ -667,6 +711,10 @@ app.delete('/', async (c) => {
     return parsed.response
   }
   const { bodyParsed } = parsed
+  const appStatus = await getAppStatus(c, bodyParsed.app_id)
+  const blocked = appStatus.cacheHit ? await blockProviderInfrastructure(c, 'DELETE', appStatus.block_provider_infra_requests) : null
+  if (blocked)
+    return blocked
 
   // Rate limit: max 5 delete per second per device+app
   return await runChannelSelfDeviceOperation(
@@ -674,7 +722,7 @@ app.delete('/', async (c) => {
     bodyParsed,
     'delete',
     'DELETE',
-    drizzleClient => deleteOverride(c, drizzleClient, bodyParsed),
+    drizzleClient => deleteOverride(c, drizzleClient, bodyParsed, appStatus),
   )
 })
 
@@ -685,6 +733,10 @@ app.get('/', async (c) => {
     return parsed.response
   }
   const { body: bodyRaw, bodyParsed } = parsed
+  const appStatus = await getAppStatus(c, bodyParsed.app_id)
+  const blocked = appStatus.cacheHit ? await blockProviderInfrastructure(c, 'GET', appStatus.block_provider_infra_requests) : null
+  if (blocked)
+    return blocked
 
   // Rate limit: max 5 list per second per device+app (if device_id is provided)
   if (bodyRaw.device_id) {
@@ -700,7 +752,7 @@ app.get('/', async (c) => {
   return await runChannelSelfWithPgClient(
     c,
     pgClient,
-    drizzleClient => listCompatibleChannels(c, drizzleClient, bodyParsed),
+    drizzleClient => listCompatibleChannels(c, drizzleClient, bodyParsed, appStatus),
     async () => {
       // Record the request for rate limiting (all requests to prevent abuse, if device_id is provided)
       if (bodyRaw.device_id) {

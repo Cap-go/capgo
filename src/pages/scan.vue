@@ -10,11 +10,12 @@ import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import IconDownload from '~icons/heroicons/arrow-down-tray-20-solid'
 import IconArrowLeft from '~icons/heroicons/arrow-left-20-solid'
 import IconArrowPath from '~icons/heroicons/arrow-path-20-solid'
 import IconArrowUturnLeft from '~icons/heroicons/arrow-uturn-left-20-solid'
+import IconChevronDown from '~icons/heroicons/chevron-down-20-solid'
 import IconClipboard from '~icons/heroicons/clipboard-document-20-solid'
+import IconEllipsisHorizontal from '~icons/heroicons/ellipsis-horizontal-20-solid'
 import IconLink from '~icons/heroicons/link-20-solid'
 import IconPlay from '~icons/heroicons/play-20-solid'
 import IconQrCode from '~icons/heroicons/qr-code-20-solid'
@@ -45,6 +46,7 @@ const previewManagerAvailable = ref(isNativePlatform)
 const isLoadingPreviews = ref(false)
 const previewActionId = ref('')
 const previewActionName = ref('')
+const showOptions = ref(false)
 
 let downloadListener: Awaited<ReturnType<typeof CapacitorUpdater.addListener>> | null = null
 let barcodeScannedListener: PluginListenerHandle | null = null
@@ -241,19 +243,16 @@ const manualActionLabel = computed(() => {
     return 'Start preview'
   return isNativePlatform ? 'Download update' : 'Open update URL'
 })
-const scannerStatusLabel = computed(() => {
+const scannerHint = computed(() => {
   if (isLoading.value)
-    return 'Applying update'
+    return 'Downloading preview…'
+  if (statusMessage.value)
+    return statusMessage.value
   if (isScanning.value)
-    return 'Camera active'
-  return 'Ready'
-})
-const scannerTitle = computed(() => {
-  if (isLoading.value)
-    return 'Applying preview'
-  if (isScanning.value)
-    return 'Camera active'
-  return 'Ready to scan'
+    return 'Align the QR code within the frame'
+  if (errorMessage.value)
+    return 'Tap scan to try again or paste a link below'
+  return isNativePlatform ? 'Tap scan to open the camera' : 'Paste a preview link to get started'
 })
 const downloadHost = computed(() => {
   if (!scannedUrl.value || !isHttpUrl(scannedUrl.value))
@@ -314,7 +313,7 @@ function previewNameFromUrl(value: string) {
 }
 
 onMounted(async () => {
-  displayStore.NavTitle = 'Test preview'
+  displayStore.NavTitle = 'Scan QR'
   displayStore.defaultBack = '/login'
   debugLog('scan page mounted', { isNativePlatform, previewQuery: route.query.preview })
 
@@ -329,6 +328,7 @@ onMounted(async () => {
   if (!isNativePlatform) {
     debugLog('native scanner unavailable on web platform')
     statusMessage.value = 'Live camera scanning is available in the iOS and Android app. Paste a preview link or bundle URL below.'
+    showOptions.value = true
     return
   }
   await refreshSavedPreviews(true)
@@ -1202,246 +1202,248 @@ async function goBack() {
     :class="isScanning ? 'bg-transparent' : 'bg-slate-950'"
   >
     <div v-if="!isScanning" class="absolute inset-0 bg-slate-950" />
+    <div
+      v-else
+      class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_42%,rgba(2,6,23,0.72)_100%)]"
+    />
 
-    <div class="relative z-10 mx-auto flex h-dvh w-full max-w-md flex-col px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]">
-      <header class="flex shrink-0 items-center gap-3">
+    <div class="relative z-10 mx-auto flex h-dvh w-full max-w-md flex-col px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <header class="grid shrink-0 grid-cols-[2.75rem_1fr_2.75rem] items-center">
         <button
-          class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-slate-950/70 text-white shadow-lg shadow-black/20 backdrop-blur transition-colors hover:bg-slate-900"
+          class="inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-sm transition-opacity active:opacity-70"
           aria-label="Go back"
           @click="goBack"
         >
           <IconArrowLeft class="h-5 w-5" />
         </button>
-        <div class="min-w-0 flex-1">
-          <p class="text-xs font-semibold uppercase tracking-wide text-cyan-200">
-            Preview test
-          </p>
-          <h1 class="truncate text-xl font-semibold text-white">
-            Scan QR
-          </h1>
-        </div>
-        <span class="shrink-0 rounded-full border border-emerald-300/30 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold text-emerald-100 shadow-lg shadow-black/20 backdrop-blur">
-          {{ scannerStatusLabel }}
-        </span>
+        <h1 class="truncate text-center text-base font-semibold text-white">
+          Scan QR Code
+        </h1>
       </header>
 
-      <section class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 py-3">
-        <div class="inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-slate-950/70 px-3 py-2 text-sm font-semibold text-white shadow-lg shadow-black/20 backdrop-blur">
-          <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cyan-300 text-slate-950">
-            <IconQrCode class="h-5 w-5" />
-          </span>
-          <span class="truncate">{{ scannerTitle }}</span>
-        </div>
-
+      <section class="flex min-h-0 flex-1 flex-col items-center justify-center py-4">
         <div
           ref="scannerFrameRef"
-          class="scan-camera-frame relative mx-auto aspect-[3/4] shrink-0 overflow-hidden rounded-[2rem] border border-cyan-200/30 shadow-2xl shadow-black/40"
-          :class="isScanning ? 'bg-transparent ring-2 ring-cyan-300/70' : 'bg-slate-950 ring-1 ring-white/10'"
-          style="width: min(74vw, 17rem, 34dvh);"
+          class="scan-camera-frame relative aspect-square w-full max-w-[min(88vw,19rem,46dvh)] shrink-0 overflow-hidden rounded-3xl"
+          :class="isScanning ? 'bg-transparent' : 'bg-slate-900/80 ring-1 ring-white/10'"
         >
-          <div v-if="!isScanning" class="absolute inset-0 bg-slate-950" />
+          <div v-if="!isScanning" class="absolute inset-0 flex items-center justify-center bg-slate-900/90">
+            <IconQrCode class="h-16 w-16 text-slate-600" aria-hidden="true" />
+          </div>
           <div
             v-if="isScanning"
-            class="scanner-sweep absolute left-8 right-8 top-10 h-px bg-cyan-300 shadow-[0_0_18px_rgba(103,232,249,0.95)]"
+            class="scanner-sweep absolute inset-x-8 top-8 h-px bg-azure-400/90 shadow-[0_0_16px_rgba(17,158,255,0.85)]"
           />
-          <div class="absolute left-4 top-4 h-12 w-12 rounded-tl-2xl border-l-4 border-t-4 border-cyan-300" />
-          <div class="absolute right-4 top-4 h-12 w-12 rounded-tr-2xl border-r-4 border-t-4 border-cyan-300" />
-          <div class="absolute bottom-4 left-4 h-12 w-12 rounded-bl-2xl border-b-4 border-l-4 border-cyan-300" />
-          <div class="absolute bottom-4 right-4 h-12 w-12 rounded-br-2xl border-b-4 border-r-4 border-cyan-300" />
+          <div class="pointer-events-none absolute inset-5">
+            <div class="absolute left-0 top-0 h-8 w-8 rounded-tl-xl border-l-[3px] border-t-[3px] border-white/90" />
+            <div class="absolute right-0 top-0 h-8 w-8 rounded-tr-xl border-r-[3px] border-t-[3px] border-white/90" />
+            <div class="absolute bottom-0 left-0 h-8 w-8 rounded-bl-xl border-b-[3px] border-l-[3px] border-white/90" />
+            <div class="absolute bottom-0 right-0 h-8 w-8 rounded-br-xl border-b-[3px] border-r-[3px] border-white/90" />
+          </div>
         </div>
 
-        <div class="min-h-[4.25rem] w-full max-w-sm">
-          <div v-if="isLoading" class="rounded-2xl border border-white/10 bg-slate-950/80 px-3 py-3 shadow-lg shadow-black/20 backdrop-blur" aria-live="polite">
-            <div class="flex items-center justify-between gap-3">
-              <span class="inline-flex items-center gap-2 text-sm font-semibold text-white">
-                <IconDownload class="h-5 w-5 animate-bounce text-cyan-200" />
-                Applying preview
-              </span>
-              <span class="text-sm font-semibold text-cyan-100">
-                {{ progressPercentage }}%
-              </span>
+        <div class="mt-5 w-full max-w-sm space-y-3 text-center" aria-live="polite">
+          <p
+            v-if="!errorMessage"
+            class="text-sm leading-6 text-white/75"
+          >
+            {{ scannerHint }}
+          </p>
+
+          <div v-if="isLoading" class="space-y-2 px-1">
+            <div class="flex items-center justify-between text-xs font-medium text-white/70">
+              <span>Downloading preview</span>
+              <span>{{ progressPercentage }}%</span>
             </div>
-            <div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
+            <div class="h-1.5 overflow-hidden rounded-full bg-white/10">
               <div
-                class="h-full rounded-full bg-cyan-300 transition-all duration-300 ease-out"
+                class="h-full rounded-full bg-azure-500 transition-all duration-300 ease-out"
                 :style="{ width: `${downloadProgress}%` }"
               />
             </div>
-            <p v-if="downloadHost" class="mt-2 truncate text-xs text-slate-400">
-              Source: {{ downloadHost }}
+            <p v-if="downloadHost" class="truncate text-xs text-white/45">
+              {{ downloadHost }}
             </p>
           </div>
 
-          <p v-else-if="statusMessage" class="rounded-2xl border border-cyan-300/20 bg-slate-950/80 px-3 py-3 text-sm leading-6 text-cyan-100 shadow-lg shadow-black/20 backdrop-blur" aria-live="polite">
-            {{ statusMessage }}
-          </p>
-          <p v-else-if="!errorMessage" class="rounded-2xl border border-white/10 bg-slate-950/70 px-3 py-3 text-center text-sm font-semibold leading-6 text-slate-100 shadow-lg shadow-black/20 backdrop-blur" aria-live="polite">
-            {{ isScanning ? 'Hold QR in frame' : 'Camera opens when you scan' }}
-          </p>
-          <p v-if="errorMessage" class="mt-2 rounded-2xl border border-amber-300/25 bg-slate-950/80 px-3 py-3 text-sm leading-6 text-amber-100 shadow-lg shadow-black/20 backdrop-blur" aria-live="polite">
+          <p
+            v-if="errorMessage"
+            class="rounded-2xl bg-amber-400/10 px-4 py-3 text-left text-sm leading-6 text-amber-100"
+            role="alert"
+          >
             {{ errorMessage }}
           </p>
         </div>
       </section>
 
-      <section class="shrink-0">
-        <div class="mx-auto max-w-md space-y-2">
-          <div class="max-h-[20dvh] space-y-2 overflow-y-auto pr-1">
-            <details v-if="hasSavedPreviewPanel" class="rounded-2xl border border-white/10 bg-slate-950/80 p-3 shadow-lg shadow-black/20 backdrop-blur" open>
-              <summary class="flex cursor-pointer list-none items-center gap-3 text-sm font-semibold text-white">
-                <IconRectangleStack class="h-5 w-5 text-cyan-200" />
-                Saved previews
-                <span v-if="savedPreviews.length" class="ml-auto rounded-full bg-cyan-300/10 px-2 py-0.5 text-xs text-cyan-100">
-                  {{ savedPreviews.length }}
-                </span>
-              </summary>
+      <section class="shrink-0 space-y-3">
+        <button
+          v-if="isNativePlatform"
+          class="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-azure-500 px-4 py-3 text-sm font-semibold text-white transition-opacity active:opacity-80 disabled:cursor-not-allowed disabled:opacity-45"
+          :disabled="isScanning || isLoading"
+          @click="retryScanning"
+        >
+          <IconArrowPath v-if="errorMessage || statusMessage" class="h-5 w-5" />
+          <IconQrCode v-else class="h-5 w-5" />
+          {{ isScanning ? 'Camera open' : errorMessage || statusMessage ? 'Scan again' : 'Scan QR code' }}
+        </button>
 
-              <div class="mt-3 space-y-2">
-                <div v-if="savedPreviewCurrent || savedPreviewLiveBundle" class="flex items-center justify-between gap-2 rounded-xl border border-cyan-300/15 bg-cyan-300/10 px-3 py-2">
-                  <div class="min-w-0">
-                    <p class="truncate text-xs font-semibold text-cyan-100">
-                      {{ savedPreviewCurrent ? previewLabel(savedPreviewCurrent) : 'Main app' }}
-                    </p>
-                    <p class="truncate text-[11px] text-slate-300">
-                      {{ savedPreviewCurrent ? 'Current preview' : `Main ${bundleVersion(savedPreviewLiveBundle)}` }}
-                    </p>
-                  </div>
-                  <button
-                    v-if="savedPreviewCurrent"
-                    type="button"
-                    aria-label="Return to main app"
-                    class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-cyan-300/25 bg-slate-950/80 px-2.5 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-300/10 disabled:cursor-not-allowed disabled:opacity-50"
-                    :disabled="!!previewActionId || isLoading"
-                    @click="resetToMainApp"
-                  >
-                    <IconArrowUturnLeft class="h-4 w-4" />
-                  </button>
+        <button
+          type="button"
+          class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white/90 transition-colors active:bg-white/10"
+          :aria-expanded="showOptions"
+          @click="showOptions = !showOptions"
+        >
+          <IconEllipsisHorizontal class="h-5 w-5 text-white/70" />
+          More options
+          <IconChevronDown
+            class="h-4 w-4 text-white/50 transition-transform duration-200"
+            :class="showOptions ? 'rotate-180' : ''"
+          />
+        </button>
+
+        <div
+          v-show="showOptions"
+          class="max-h-[34dvh] space-y-3 overflow-y-auto overscroll-contain pr-0.5"
+        >
+          <div class="rounded-2xl border border-white/10 bg-black/25 p-4 backdrop-blur-sm">
+            <label class="block text-sm font-medium text-white/90" for="manual-url">
+              Paste preview link
+            </label>
+            <input
+              id="manual-url"
+              v-model="manualUrl"
+              type="url"
+              inputmode="url"
+              autocomplete="off"
+              placeholder="https://preview.capgo.app/..."
+              class="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2.5 text-sm text-white outline-hidden transition-colors placeholder:text-slate-500 focus:border-azure-500/60"
+            >
+            <button
+              class="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold text-white transition-colors active:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
+              :disabled="!canSubmitManualUrl"
+              @click="submitManualUrl"
+            >
+              <IconLink class="h-4 w-4" />
+              {{ manualActionLabel }}
+            </button>
+          </div>
+
+          <details v-if="hasSavedPreviewPanel" class="rounded-2xl border border-white/10 bg-black/25 backdrop-blur-sm">
+            <summary class="flex cursor-pointer list-none items-center gap-3 px-4 py-3 text-sm font-medium text-white/90 [&::-webkit-details-marker]:hidden">
+              <IconRectangleStack class="h-5 w-5 text-azure-400" />
+              Saved previews
+              <span v-if="savedPreviews.length" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/70">
+                {{ savedPreviews.length }}
+              </span>
+              <IconChevronDown class="h-4 w-4 text-white/45" />
+            </summary>
+
+            <div class="space-y-2 border-t border-white/10 px-4 pb-4 pt-3">
+              <div v-if="savedPreviewCurrent || savedPreviewLiveBundle" class="flex items-center justify-between gap-2 rounded-xl bg-white/5 px-3 py-2.5">
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-medium text-white">
+                    {{ savedPreviewCurrent ? previewLabel(savedPreviewCurrent) : 'Main app' }}
+                  </p>
+                  <p class="truncate text-xs text-white/50">
+                    {{ savedPreviewCurrent ? 'Current preview' : `Main ${bundleVersion(savedPreviewLiveBundle)}` }}
+                  </p>
                 </div>
-
-                <div v-if="isLoadingPreviews" class="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-xs text-slate-300">
-                  Loading previews...
-                </div>
-
-                <ol v-else-if="savedPreviews.length" class="space-y-2">
-                  <li
-                    v-for="preview in savedPreviews"
-                    :key="preview.id"
-                    class="rounded-xl border border-white/10 bg-slate-950 px-3 py-2"
-                  >
-                    <div class="flex items-center gap-2">
-                      <div class="min-w-0 flex-1">
-                        <p class="truncate text-sm font-semibold text-white">
-                          {{ previewLabel(preview) }}
-                        </p>
-                        <p class="truncate text-xs text-slate-400">
-                          {{ previewSubtitle(preview) }}
-                        </p>
-                      </div>
-                      <span v-if="preview.isActive" class="rounded-full bg-emerald-300/10 px-2 py-1 text-[11px] font-semibold text-emerald-100">
-                        Active
-                      </span>
-                    </div>
-
-                    <div class="mt-2 grid grid-cols-3 gap-2">
-                      <button
-                        type="button"
-                        class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-2 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-300/20 disabled:cursor-not-allowed disabled:opacity-50"
-                        :disabled="preview.isActive || !!previewActionId || isLoading"
-                        @click="switchSavedPreview(preview)"
-                      >
-                        <IconPlay class="h-4 w-4" />
-                        Open
-                      </button>
-                      <button
-                        type="button"
-                        class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2 text-xs font-semibold text-slate-100 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
-                        :disabled="!preview.payloadUrl || !!previewActionId || isLoading"
-                        @click="updateSavedPreview(preview)"
-                      >
-                        <IconArrowPath class="h-4 w-4" :class="previewActionId === preview.id && previewActionName === 'update' ? 'animate-spin' : ''" />
-                        Update
-                      </button>
-                      <button
-                        type="button"
-                        class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-rose-300/20 bg-rose-300/10 px-2 text-xs font-semibold text-rose-100 transition-colors hover:bg-rose-300/20 disabled:cursor-not-allowed disabled:opacity-50"
-                        :disabled="preview.isActive || !!previewActionId || isLoading"
-                        @click="deleteSavedPreview(preview)"
-                      >
-                        <IconTrash class="h-4 w-4" />
-                        Delete
-                      </button>
-                    </div>
-                  </li>
-                </ol>
-              </div>
-            </details>
-
-            <details class="rounded-2xl border border-white/10 bg-slate-950/80 p-3 shadow-lg shadow-black/20 backdrop-blur">
-              <summary class="flex cursor-pointer list-none items-center gap-3 text-sm font-semibold text-white">
-                <IconLink class="h-5 w-5 text-cyan-200" />
-                Paste preview link
-              </summary>
-
-              <label class="mt-3 block text-sm font-medium text-slate-200" for="manual-url">
-                Preview link or bundle URL
-              </label>
-              <input
-                id="manual-url"
-                v-model="manualUrl"
-                type="url"
-                inputmode="url"
-                placeholder="https://preview.capgo.app/..."
-                class="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-3 text-sm text-white outline-hidden transition-colors placeholder:text-slate-500 focus:border-cyan-300/70"
-              >
-
-              <button
-                class="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
-                :disabled="!canSubmitManualUrl"
-                @click="submitManualUrl"
-              >
-                <IconDownload class="h-5 w-5" />
-                {{ manualActionLabel }}
-              </button>
-            </details>
-
-            <details v-if="debugMessages.length" class="rounded-2xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-slate-300 shadow-lg shadow-black/20 backdrop-blur" open>
-              <summary class="cursor-pointer select-none font-semibold text-slate-100">
-                Debug
-              </summary>
-              <div class="mt-2 flex items-center justify-between gap-3">
-                <span class="min-w-0 text-[11px] font-medium text-slate-400">
-                  {{ debugMessages.length }} entries
-                </span>
                 <button
+                  v-if="savedPreviewCurrent"
                   type="button"
-                  class="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-2.5 text-[11px] font-semibold text-cyan-100 transition-colors hover:bg-cyan-300/20"
-                  @click="copyDebugLogs"
+                  aria-label="Return to main app"
+                  class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white transition-colors active:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
+                  :disabled="!!previewActionId || isLoading"
+                  @click="resetToMainApp"
                 >
-                  <IconClipboard class="h-4 w-4" />
-                  Copy logs
+                  <IconArrowUturnLeft class="h-4 w-4" />
                 </button>
               </div>
-              <ol class="mt-2 max-h-36 space-y-1 overflow-y-auto font-mono leading-5">
+
+              <div v-if="isLoadingPreviews" class="rounded-xl px-3 py-2 text-xs text-white/50">
+                Loading previews...
+              </div>
+
+              <ol v-else-if="savedPreviews.length" class="space-y-2">
+                <li
+                  v-for="preview in savedPreviews"
+                  :key="preview.id"
+                  class="rounded-xl bg-white/5 px-3 py-2.5"
+                >
+                  <div class="flex items-center gap-2">
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate text-sm font-medium text-white">
+                        {{ previewLabel(preview) }}
+                      </p>
+                      <p class="truncate text-xs text-white/50">
+                        {{ previewSubtitle(preview) }}
+                      </p>
+                    </div>
+                    <span v-if="preview.isActive" class="rounded-full bg-emerald-400/15 px-2 py-0.5 text-[11px] font-medium text-emerald-200">
+                      Active
+                    </span>
+                  </div>
+
+                  <div class="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      aria-label="Open preview"
+                      class="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl bg-azure-500/20 text-xs font-semibold text-azure-200 transition-colors active:bg-azure-500/30 disabled:cursor-not-allowed disabled:opacity-45"
+                      :disabled="preview.isActive || !!previewActionId || isLoading"
+                      @click="switchSavedPreview(preview)"
+                    >
+                      <IconPlay class="h-4 w-4" />
+                      Open
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Update preview"
+                      class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white transition-colors active:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
+                      :disabled="!preview.payloadUrl || !!previewActionId || isLoading"
+                      @click="updateSavedPreview(preview)"
+                    >
+                      <IconArrowPath class="h-4 w-4" :class="previewActionId === preview.id && previewActionName === 'update' ? 'animate-spin' : ''" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Delete preview"
+                      class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-rose-400/10 text-rose-200 transition-colors active:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-45"
+                      :disabled="preview.isActive || !!previewActionId || isLoading"
+                      @click="deleteSavedPreview(preview)"
+                    >
+                      <IconTrash class="h-4 w-4" />
+                    </button>
+                  </div>
+                </li>
+              </ol>
+            </div>
+          </details>
+
+          <details v-if="debugMessages.length" class="rounded-2xl border border-white/10 bg-black/25 backdrop-blur-sm">
+            <summary class="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-medium text-white/70 [&::-webkit-details-marker]:hidden">
+              Debug logs
+              <span class="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/50">
+                {{ debugMessages.length }}
+              </span>
+              <IconChevronDown class="ml-auto h-4 w-4 text-white/45" />
+            </summary>
+            <div class="border-t border-white/10 px-4 pb-4 pt-3">
+              <button
+                type="button"
+                class="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-white/10 px-3 text-xs font-medium text-white transition-colors active:bg-white/15"
+                @click="copyDebugLogs"
+              >
+                <IconClipboard class="h-4 w-4" />
+                Copy logs
+              </button>
+              <ol class="mt-3 max-h-32 space-y-1 overflow-y-auto font-mono text-[11px] leading-5 text-white/45">
                 <li v-for="message in debugMessages" :key="message">
                   {{ message }}
                 </li>
               </ol>
-            </details>
-          </div>
-
-          <button
-            v-if="isNativePlatform"
-            class="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-cyan-300 px-4 py-3 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
-            :disabled="isScanning || isLoading"
-            @click="retryScanning"
-          >
-            <IconArrowPath v-if="errorMessage || statusMessage" class="h-5 w-5" />
-            <IconQrCode v-else class="h-5 w-5" />
-            {{ isScanning ? 'Camera open' : errorMessage || statusMessage ? 'Scan again' : 'Scan QR code' }}
-          </button>
-          <p v-else class="rounded-xl border border-white/10 bg-slate-900 px-3 py-3 text-center text-sm leading-6 text-slate-300">
-            Paste a preview link below to test from this browser.
-          </p>
+            </div>
+          </details>
         </div>
       </section>
     </div>
@@ -1449,7 +1451,7 @@ async function goBack() {
 </template>
 
 <style scoped>
-.camera-preview-page {
+<style scoped > .camera-preview-page {
   overscroll-behavior: none;
   touch-action: manipulation;
 }
@@ -1461,12 +1463,21 @@ async function goBack() {
 @keyframes scanner-sweep {
   0%,
   100% {
-    transform: translateY(0);
-    opacity: 0.4;
+    top: 1.75rem;
+    opacity: 0.35;
   }
+
   50% {
-    transform: translateY(16rem);
+    top: calc(100% - 1.75rem);
     opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scanner-sweep {
+    animation: none;
+    opacity: 0.75;
+    top: 50%;
   }
 }
 </style>

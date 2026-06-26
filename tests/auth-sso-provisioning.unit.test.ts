@@ -210,7 +210,7 @@ async function getGuard() {
 }
 
 describe('auth guard SSO provisioning', () => {
-  it.concurrent('provisions an SSO session before redirecting to org onboarding and keeps the user on the target route', async () => {
+  it.concurrent('provisions an SSO session before redirecting to app onboarding and keeps the user on the target route', async () => {
     await withTestContext(async (context) => {
       const guard = await getGuard()
       const next = vi.fn()
@@ -229,11 +229,11 @@ describe('auth guard SSO provisioning', () => {
       }))
       expect(context.organizationStore.fetchOrganizations).toHaveBeenCalled()
       expect(next).toHaveBeenCalledWith()
-      expect(next).not.toHaveBeenCalledWith('/onboarding/organization')
+      expect(next).not.toHaveBeenCalledWith('/onboarding/app')
     })
   })
 
-  it.concurrent('keeps redirecting non-SSO users without organizations to org onboarding', async () => {
+  it.concurrent('keeps redirecting non-SSO users without organizations to app onboarding', async () => {
     await withTestContext(async (context) => {
       context.mockGetSession.mockResolvedValue({
         data: {
@@ -268,7 +268,7 @@ describe('auth guard SSO provisioning', () => {
 
       expect(context.mockFetch).not.toHaveBeenCalled()
       expect(next).toHaveBeenCalledWith({
-        path: '/onboarding/organization',
+        path: '/onboarding/app',
         query: {
           to: '/dashboard',
         },
@@ -276,7 +276,7 @@ describe('auth guard SSO provisioning', () => {
     })
   })
 
-  it.concurrent('redirects accounts pending deletion to the recovery page instead of org onboarding', async () => {
+  it.concurrent('redirects accounts pending deletion to the recovery page instead of app onboarding', async () => {
     await withTestContext(async (context) => {
       context.mockRpc.mockResolvedValueOnce({
         data: true,
@@ -407,7 +407,7 @@ describe('auth guard SSO provisioning', () => {
     })
   })
 
-  it.concurrent('aborts navigation for managed SSO users when provisioning fails instead of redirecting to org onboarding', async () => {
+  it.concurrent('aborts navigation for managed SSO users when provisioning fails instead of redirecting to app onboarding', async () => {
     await withTestContext(async (context) => {
       context.mockFetch.mockResolvedValueOnce({
         ok: false,
@@ -431,7 +431,7 @@ describe('auth guard SSO provisioning', () => {
       expect(context.mockFetch).toHaveBeenCalled()
       expect(next).toHaveBeenCalledWith(false)
       expect(next).not.toHaveBeenCalledWith({
-        path: '/onboarding/organization',
+        path: '/onboarding/app',
         query: {
           to: '/dashboard',
         },

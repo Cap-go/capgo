@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, ORG_ID_2, USER_ADMIN_EMAIL, USER_ID, USER_ID_2, USER_ID_STATS } from './test-utils.ts'
 
@@ -35,11 +36,11 @@ async function seedStaleCreatedByOrg() {
     .eq('id', STALE_CREATED_BY_ORG_ID)
   expect(cleanupError).toBeNull()
 
-  const { error: stripeCleanupError } = await supabase
+  const { error: stripeInfoCleanupError } = await supabase
     .from('stripe_info')
     .delete()
-    .eq('customer_id', 'pending_' + STALE_CREATED_BY_ORG_ID)
-  expect(stripeCleanupError).toBeNull()
+    .eq('customer_id', `pending_${STALE_CREATED_BY_ORG_ID}`)
+  expect(stripeInfoCleanupError).toBeNull()
 
   const { error: orgError } = await supabase
     .from('orgs')

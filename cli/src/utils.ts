@@ -21,14 +21,15 @@ import { isCI } from 'ci-info'
 // Native fetch is available in Node.js >= 18
 import prettyjson from 'prettyjson'
 import * as tus from 'tus-js-client'
+import { getGlobalAnalyticsProps } from './analytics/global-props'
+import { createTimedFetch, isSupabaseInstrumentationEnabled } from './analytics/supabase-perf'
 import { markSnag } from './app/debug'
 import { findMonorepoRoot, findNXMonorepoRoot, isMonorepo, isNXMonorepo } from './capacitor-cli'
 import { getChecksum } from './checksum'
 import { loadConfig, writeConfig } from './config'
+import { isTruthyEnvValue } from './posthog'
 import { nativePackageSchema } from './schemas/common'
 import { formatApiErrorForCli, parseSecurityPolicyError } from './utils/security_policy_errors'
-import { createTimedFetch, isSupabaseInstrumentationEnabled } from './analytics/supabase-perf'
-import { getGlobalAnalyticsProps } from './analytics/global-props'
 
 export const baseKey = '.capgo_key'
 export const baseKeyV2 = '.capgo_key_v2'
@@ -38,6 +39,13 @@ export const defaultHost = 'https://capgo.app'
 export const defaultFileHost = 'https://files.capgo.app'
 export const defaultApiHost = 'https://api.capgo.app'
 export const defaultHostWeb = 'https://console.capgo.app'
+
+/** Build a console web-app URL (settings, builds, connect, etc.). */
+export function consoleWebUrl(path = ''): string {
+  if (!path)
+    return defaultHostWeb
+  return `${defaultHostWeb}${path.startsWith('/') ? path : `/${path}`}`
+}
 export const UPLOAD_TIMEOUT = 120000
 export const ALERT_UPLOAD_SIZE_BYTES = 1024 * 1024 * 20 // 20MB
 export const MAX_UPLOAD_LENGTH_BYTES = 1024 * 1024 * 1024 // 1GB
@@ -128,7 +136,7 @@ export async function check2FAAccessForOrg(supabase: SupabaseClient<Database>, o
   }
   if (reject2fa) {
     if (!silent)
-      log.error(`🔐 Access Denied: 2FA Required. Enable 2FA at https://web.capgo.app/settings/account`)
+      log.error(`🔐 Access Denied: 2FA Required. Enable 2FA at ${consoleWebUrl('/settings/account')}`)
     throw new Error('2FA required for this organization')
   }
 }
@@ -499,6 +507,39 @@ export async function getAllPackagesDependencies(f: string = findRoot(cwd()), fi
   return dependencies
 }
 
+export async function getDeclaredPackageVersionMap(f: string = findRoot(cwd()), file: string | undefined = undefined) {
+  // if file contain , split by comma and return the array
+  let files = file?.split(',').map(file => file.trim()).filter(Boolean)
+  files ??= [join(f, PACKNAME)]
+  if (files) {
+    for (const file of files) {
+      if (!existsSync(file)) {
+        const message = `Package.json at ${file} does not exist`
+        log.error(message)
+        throw new Error(message)
+      }
+    }
+  }
+
+  const dependencies = new Map<string, string>()
+
+  for (const file of files) {
+    const packageJson = readFileSync(file)
+    const pkg = JSON.parse(packageJson as any)
+
+    for (const dependency in (pkg.dependencies ?? {})) {
+      if (typeof pkg.dependencies[dependency] === 'string')
+        dependencies.set(dependency, pkg.dependencies[dependency])
+    }
+    for (const dependency in (pkg.devDependencies ?? {})) {
+      if (typeof pkg.devDependencies[dependency] === 'string')
+        dependencies.set(dependency, pkg.devDependencies[dependency])
+    }
+  }
+
+  return dependencies
+}
+
 export async function getConfig(silent = false) {
   try {
     const extConfig = await loadConfig()
@@ -642,8 +683,8 @@ export function normalizeSupabaseHost(host: string): string {
   return `${parsed.origin}${normalizedPath}`
 }
 
-export async function createSupabaseClient(apikey: string, supaHost?: string, supaKey?: string, silent = false, instrument = true) {
-  const config = await getRemoteConfig(silent)
+export async function createSupabaseClient(apikey: string, supaHost?: string, supaKey?: string, silent = false, instrument = true, signal?: AbortSignal) {
+  const config = await getRemoteConfig(silent, signal)
   if (supaHost && supaKey) {
     if (!silent)
       log.info('Using custom supabase instance from provided options')
@@ -911,69 +952,150 @@ export function getContentType(filename: string): string {
   return mimeTypes[ext] || 'application/octet-stream'
 }
 
-export async function findProjectType(options?: { quiet?: boolean }) {
-  // for nuxtjs check if nuxt.config.js exists
-  // for nextjs check if next.config.js exists
-  // for angular check if angular.json exists
-  // for sveltekit check if svelte.config.js exists or svelte is in package.json dependencies
-  // for vue check if vue.config.js exists or vue is in package.json dependencies
-  // for react check if package.json exists and react is in dependencies
+type ProjectFramework = 'angular' | 'nuxtjs' | 'nextjs' | 'sveltekit' | 'svelte' | 'vue' | 'react'
+
+function getProjectTypeWithLanguage(framework: ProjectFramework, isTypeScript: boolean) {
+  return `${framework}-${isTypeScript ? 'ts' : 'js'}`
+}
+
+function logFoundProject(framework: ProjectFramework, quiet: boolean) {
+  if (!quiet)
+    log.info(`Found ${framework} project`)
+}
+
+function detectProjectFrameworkFromConfig(projectDir: string): ProjectFramework | undefined {
+  if (existsSync(resolve(projectDir, 'angular.json')))
+    return 'angular'
+  if (existsSync(resolve(projectDir, 'nuxt.config.js')) || existsSync(resolve(projectDir, 'nuxt.config.ts')))
+    return 'nuxtjs'
+  if (existsSync(resolve(projectDir, 'next.config.js')) || existsSync(resolve(projectDir, 'next.config.mjs')) || existsSync(resolve(projectDir, 'next.config.ts')))
+    return 'nextjs'
+  if (existsSync(resolve(projectDir, 'svelte.config.js')) || existsSync(resolve(projectDir, 'svelte.config.ts')))
+    return 'sveltekit'
+  if (existsSync(resolve(projectDir, 'vue.config.js')) || existsSync(resolve(projectDir, 'vue.config.ts')))
+    return 'vue'
+}
+
+function detectProjectFrameworkFromDependencies(dependencies: Map<string, string>): ProjectFramework | undefined {
+  if (dependencies.get('@angular/core'))
+    return 'angular'
+  if (dependencies.get('nuxt'))
+    return 'nuxtjs'
+  if (dependencies.get('next'))
+    return 'nextjs'
+  if (dependencies.get('@sveltejs/kit'))
+    return 'sveltekit'
+  if (dependencies.get('svelte'))
+    return 'svelte'
+  if (dependencies.get('vue'))
+    return 'vue'
+  if (dependencies.get('react'))
+    return 'react'
+}
+
+async function detectProjectTypeInDir(projectDir: string, quiet: boolean): Promise<string | undefined> {
+  const isTypeScript = existsSync(resolve(projectDir, 'tsconfig.json'))
+  const frameworkFromConfig = detectProjectFrameworkFromConfig(projectDir)
+  if (frameworkFromConfig) {
+    logFoundProject(frameworkFromConfig, quiet)
+    return getProjectTypeWithLanguage(frameworkFromConfig, isTypeScript)
+  }
+
+  const packageJsonPath = resolve(projectDir, PACKNAME)
+  if (!existsSync(packageJsonPath))
+    return undefined
+
+  const dependencies = await getAllPackagesDependencies(undefined, packageJsonPath)
+  const frameworkFromDependencies = detectProjectFrameworkFromDependencies(dependencies)
+  if (!frameworkFromDependencies)
+    return undefined
+
+  logFoundProject(frameworkFromDependencies, quiet)
+  return getProjectTypeWithLanguage(frameworkFromDependencies, isTypeScript)
+}
+
+function addProjectTypeCandidateDir(dirs: string[], dir: string | undefined) {
+  if (!dir)
+    return
+  const normalized = resolve(dir)
+  if (!dirs.includes(normalized))
+    dirs.push(normalized)
+}
+
+function getNearestPackageDir(startDir: string) {
+  let currentDir = startDir
+  const rootDir = path.parse(currentDir).root
+
+  while (true) {
+    if (existsSync(resolve(currentDir, PACKNAME)))
+      return currentDir
+    if (currentDir === rootDir)
+      return undefined
+    const parentDir = dirname(currentDir)
+    if (parentDir === currentDir)
+      return undefined
+    currentDir = parentDir
+  }
+}
+
+function getProjectTypeCandidateDirs(packageJsonPath?: string) {
+  const dirs: string[] = []
+  const firstPackageJsonPath = packageJsonPath
+    ?.split(',')
+    .map(path => path.trim())
+    .filter(Boolean)[0]
+
+  if (firstPackageJsonPath)
+    addProjectTypeCandidateDir(dirs, dirname(resolve(firstPackageJsonPath)))
+
+  addProjectTypeCandidateDir(dirs, getNearestPackageDir(cwd()))
+  addProjectTypeCandidateDir(dirs, findRoot(cwd()))
+  return dirs
+}
+
+export async function findProjectType(options?: { quiet?: boolean, packageJsonPath?: string }) {
   const pwd = cwd()
   let isTypeScript = false
   const quiet = options?.quiet ?? false
 
-  // Check for TypeScript configuration file
-  const tsConfigPath = resolve(pwd, 'tsconfig.json')
-  if (existsSync(tsConfigPath)) {
-    isTypeScript = true
+  for (const candidateDir of getProjectTypeCandidateDirs(options?.packageJsonPath)) {
+    const detected = await detectProjectTypeInDir(candidateDir, quiet)
+    if (detected)
+      return detected
   }
 
+  const tsConfigPath = resolve(pwd, 'tsconfig.json')
+  if (existsSync(tsConfigPath))
+    isTypeScript = true
+
   for await (const f of getFiles(pwd)) {
-    // find number of folder in path after pwd
     if (f.includes('angular.json')) {
-      if (!quiet)
-        log.info('Found angular project')
-      return isTypeScript ? 'angular-ts' : 'angular-js'
+      logFoundProject('angular', quiet)
+      return getProjectTypeWithLanguage('angular', isTypeScript)
     }
     if (f.includes('nuxt.config.js') || f.includes('nuxt.config.ts')) {
-      if (!quiet)
-        log.info('Found nuxtjs project')
-      return isTypeScript ? 'nuxtjs-ts' : 'nuxtjs-js'
+      logFoundProject('nuxtjs', quiet)
+      return getProjectTypeWithLanguage('nuxtjs', isTypeScript)
     }
-    if (f.includes('next.config.js') || f.includes('next.config.mjs')) {
-      if (!quiet)
-        log.info('Found nextjs project')
-      return isTypeScript ? 'nextjs-ts' : 'nextjs-js'
+    if (f.includes('next.config.js') || f.includes('next.config.mjs') || f.includes('next.config.ts')) {
+      logFoundProject('nextjs', quiet)
+      return getProjectTypeWithLanguage('nextjs', isTypeScript)
     }
-    if (f.includes('svelte.config.js')) {
-      if (!quiet)
-        log.info('Found sveltekit project')
-      return isTypeScript ? 'sveltekit-ts' : 'sveltekit-js'
+    if (f.includes('svelte.config.js') || f.includes('svelte.config.ts')) {
+      logFoundProject('sveltekit', quiet)
+      return getProjectTypeWithLanguage('sveltekit', isTypeScript)
     }
-    if (f.includes('rolluconfig.js')) {
-      if (!quiet)
-        log.info('Found svelte project')
-      return isTypeScript ? 'svelte-ts' : 'svelte-js'
-    }
-    if (f.includes('vue.config.js')) {
-      if (!quiet)
-        log.info('Found vue project')
-      return isTypeScript ? 'vue-ts' : 'vue-js'
+    if (f.includes('vue.config.js') || f.includes('vue.config.ts')) {
+      logFoundProject('vue', quiet)
+      return getProjectTypeWithLanguage('vue', isTypeScript)
     }
     if (f.includes(PACKNAME)) {
       const folder = dirname(f)
       const dependencies = await getAllPackagesDependencies(folder)
-      if (dependencies) {
-        if (dependencies.get('react')) {
-          if (!quiet)
-            log.info('Found react project')
-          return isTypeScript ? 'react-ts' : 'react-js'
-        }
-        if (dependencies.get('vue')) {
-          if (!quiet)
-            log.info('Found vue project')
-          return isTypeScript ? 'vue-ts' : 'vue-js'
-        }
+      const frameworkFromDependencies = detectProjectFrameworkFromDependencies(dependencies)
+      if (frameworkFromDependencies) {
+        logFoundProject(frameworkFromDependencies, quiet)
+        return getProjectTypeWithLanguage(frameworkFromDependencies, isTypeScript)
       }
     }
   }
@@ -981,7 +1103,7 @@ export async function findProjectType(options?: { quiet?: boolean }) {
   return 'unknown'
 }
 
-export function findMainFileForProjectType(projectType: string, isTypeScript: boolean): string | null {
+export function findMainFileForProjectType(projectType: string, isTypeScript: boolean, rootDir: string = cwd()): string | null {
   if (projectType === 'angular-js' || projectType === 'angular-ts') {
     return isTypeScript ? 'src/main.ts' : 'src/main.js'
   }
@@ -999,7 +1121,7 @@ export function findMainFileForProjectType(projectType: string, isTypeScript: bo
     // Check for main first, then fall back to index
     const mainExt = isTypeScript ? 'src/main.tsx' : 'src/main.js'
     const indexExt = isTypeScript ? 'src/index.tsx' : 'src/index.js'
-    if (existsSync(resolve(cwd(), mainExt))) {
+    if (existsSync(resolve(rootDir, mainExt))) {
       return mainExt
     }
     return indexExt
@@ -1009,17 +1131,18 @@ export function findMainFileForProjectType(projectType: string, isTypeScript: bo
 // create a function to find the right command to build the project in static mode depending on the project type
 
 export async function findBuildCommandForProjectType(projectType: string) {
-  if (projectType === 'angular') {
+  const framework = projectType.replace(/-(?:ts|js)$/, '')
+  if (framework === 'angular') {
     log.info('Angular project detected')
     return 'build'
   }
 
-  if (projectType === 'nuxtjs') {
+  if (framework === 'nuxtjs') {
     log.info('Nuxtjs project detected')
     return 'generate'
   }
 
-  if (projectType === 'nextjs') {
+  if (framework === 'nextjs') {
     log.info('Nextjs project detected')
     log.warn('Please make sure you have configured static export in your next.config.js: https://nextjs.org/docs/pages/building-your-application/deploying/static-exports')
     log.warn('Please make sure you have the output: \'export\' and distDir: \'dist\' in your next.config.js')
@@ -1032,7 +1155,7 @@ export async function findBuildCommandForProjectType(projectType: string) {
     return 'build'
   }
 
-  if (projectType === 'sveltekit') {
+  if (framework === 'sveltekit') {
     log.info('Sveltekit project detected')
     log.warn('Please make sure you have the adapter-static installed: https://kit.svelte.dev/docs/adapter-static')
     log.warn('Please make sure you have the pages: \'dist\' and assets: \'dest\', in your svelte.config.js adapter')
@@ -1048,12 +1171,12 @@ export async function findBuildCommandForProjectType(projectType: string) {
   return 'build'
 }
 
-export async function findMainFile(silent = false) {
+export async function findMainFile(silent = false, rootDir: string = cwd()) {
   // eslint-disable-next-line regexp/no-unused-capturing-group
   const mainRegex = /(main|index)\.(ts|tsx|js|jsx)$/
   // search for main.ts or main.js in local dir and subdirs
   let mainFile = ''
-  const pwd = cwd()
+  const pwd = resolve(rootDir)
   const pwdL = pwd.split('/').length
   for await (const f of getFiles(pwd)) {
     // find number of folder in path after pwd
@@ -1338,6 +1461,9 @@ export async function updateOrCreateChannel(supabase: SupabaseClient<Database>, 
 }
 
 export async function sendEvent(capgkey: string, payload: TrackOptions & { notifyConsole?: boolean, nonPersonTags?: Record<string, string | number | boolean> }, verbose?: boolean, signal?: AbortSignal): Promise<void> {
+  if (isTruthyEnvValue(env.CAPGO_DISABLE_TELEMETRY) || isTruthyEnvValue(env.CAPGO_DISABLE_POSTHOG))
+    return
+
   try {
     // Attach the global analytics props as nonPersonTags — event properties the
     // backend never writes as PostHog person properties ($set) — built
@@ -1419,7 +1545,7 @@ export function show2FADeniedError(organizationName?: string): never {
     log.error(`\nThis organization requires all members to have 2FA enabled.`)
   }
   log.error(`\nTo regain access:`)
-  log.error(`  1. Go to https://web.capgo.app/settings/account`)
+  log.error(`  1. Go to ${consoleWebUrl('/settings/account')}`)
   log.error(`  2. Enable Two-Factor Authentication on your account`)
   log.error(`  3. Try your command again`)
   log.error(`\nFor more information, visit: https://capgo.app/docs/webapp/2fa-enforcement/\n`)
@@ -1801,11 +1927,13 @@ export async function getLocalDependencies(packageJsonPath: string | undefined, 
   }
 
   let anyInvalid = false
+  const declaredDependencies = await getDeclaredPackageVersionMap(findRoot(cwd()), packageJsonPath)
   const dependenciesObject = await Promise.all(Array.from(dependencies.entries())
     .map(async ([key, value]) => {
       let dependencyFound = false
       let hasNativeFiles = false
       let actualVersion = value
+      const requestedVersion = declaredDependencies.get(key) ?? value
       let foundDependencyPath: string | undefined
 
       for (const modulePath of nodeModulesPaths) {
@@ -1847,7 +1975,7 @@ export async function getLocalDependencies(packageJsonPath: string | undefined, 
         const pm = findPackageManagerType(dir, 'npm')
         const installCmd = findInstallCommand(pm)
         log.error(`Missing dependency ${key}, please run ${pm} ${installCmd}`)
-        return { name: key, version: value }
+        return { name: key, version: actualVersion, requested_version: requestedVersion }
       }
 
       // Calculate platform checksums for native packages
@@ -1862,6 +1990,7 @@ export async function getLocalDependencies(packageJsonPath: string | undefined, 
       return {
         name: key,
         version: actualVersion,
+        requested_version: requestedVersion,
         native: hasNativeFiles,
         ios_checksum,
         android_checksum,
@@ -1874,7 +2003,7 @@ export async function getLocalDependencies(packageJsonPath: string | undefined, 
     throw new Error('Missing dependencies or invalid dependencies')
   }
 
-  return dependenciesObject as { name: string, version: string, native: boolean, ios_checksum?: string, android_checksum?: string }[]
+  return dependenciesObject as { name: string, version: string, requested_version?: string, native: boolean, ios_checksum?: string, android_checksum?: string }[]
 }
 
 interface ChannelChecksum {
@@ -1943,7 +2072,6 @@ export async function getRemoteDependencies(supabase: SupabaseClient<Database>, 
   return convertNativePackages(((remoteNativePackages.version as any)?.native_packages as any) ?? [])
 }
 
-
 export type { Compatibility, CompatibilityDetails, IncompatibilityReason } from './schemas/common'
 
 export function getAppId(appId: string | undefined, config: CapacitorConfig | undefined) {
@@ -1991,6 +2119,10 @@ export function getCompatibilityDetails(pkg: Compatibility): CompatibilityDetail
     reasons.push('version_mismatch')
   }
 
+  if (pkg.localRequestedVersion && pkg.remoteRequestedVersion && pkg.localRequestedVersion.trim() !== pkg.remoteRequestedVersion.trim()) {
+    reasons.push('requested_version_changed')
+  }
+
   // Check checksum changes (even if versions match, native code could have changed)
   const iosChanged = pkg.localIosChecksum && pkg.remoteIosChecksum && pkg.localIosChecksum !== pkg.remoteIosChecksum
   const androidChanged = pkg.localAndroidChecksum && pkg.remoteAndroidChecksum && pkg.localAndroidChecksum !== pkg.remoteAndroidChecksum
@@ -2005,20 +2137,15 @@ export function getCompatibilityDetails(pkg: Compatibility): CompatibilityDetail
     reasons.push('android_code_changed')
   }
 
-  // Build message
-  if (reasons.length === 0) {
-    return {
-      compatible: true,
-      reasons: [],
-      message: 'Compatible',
-    }
-  }
-
   const messages: string[] = []
+  const isIncompatibleReason = (reason: IncompatibilityReason) => reason !== 'requested_version_changed'
   for (const reason of reasons) {
     switch (reason) {
       case 'version_mismatch':
         messages.push(`version changed: ${pkg.remoteVersion} → ${pkg.localVersion}`)
+        break
+      case 'requested_version_changed':
+        messages.push(`requested version changed: ${pkg.remoteRequestedVersion ?? 'unknown'} → ${pkg.localRequestedVersion ?? 'unknown'}`)
         break
       case 'ios_code_changed':
         messages.push('iOS native code changed')
@@ -2035,6 +2162,15 @@ export function getCompatibilityDetails(pkg: Compatibility): CompatibilityDetail
       case 'removed_plugin':
         messages.push('plugin removed')
         break
+    }
+  }
+
+  const isCompatible = !reasons.some(isIncompatibleReason)
+  if (isCompatible) {
+    return {
+      compatible: true,
+      reasons,
+      message: messages.length > 0 ? messages.join(', ') : 'Compatible',
     }
   }
 
@@ -2064,7 +2200,9 @@ export async function checkCompatibilityCloud(supabase: SupabaseClient<Database>
         return {
           name: local.name,
           localVersion: local.version,
+          localRequestedVersion: local.requested_version,
           remoteVersion: remotePackage.version,
+          remoteRequestedVersion: remotePackage.requested_version,
           localIosChecksum: local.ios_checksum,
           remoteIosChecksum: remotePackage.ios_checksum,
           localAndroidChecksum: local.android_checksum,
@@ -2075,6 +2213,7 @@ export async function checkCompatibilityCloud(supabase: SupabaseClient<Database>
       return {
         name: local.name,
         localVersion: local.version,
+        localRequestedVersion: local.requested_version,
         remoteVersion: undefined,
         localIosChecksum: local.ios_checksum,
         localAndroidChecksum: local.android_checksum,
@@ -2089,6 +2228,7 @@ export async function checkCompatibilityCloud(supabase: SupabaseClient<Database>
       name,
       localVersion: undefined,
       remoteVersion: pkg.version,
+      remoteRequestedVersion: pkg.requested_version,
       remoteIosChecksum: pkg.ios_checksum,
       remoteAndroidChecksum: pkg.android_checksum,
     }))
@@ -2111,7 +2251,9 @@ export async function checkCompatibilityNativePackages(supabase: SupabaseClient<
         return {
           name: local.name,
           localVersion: local.version,
+          localRequestedVersion: local.requested_version,
           remoteVersion: remotePackage.version,
+          remoteRequestedVersion: remotePackage.requested_version,
           localIosChecksum: local.ios_checksum,
           remoteIosChecksum: remotePackage.ios_checksum,
           localAndroidChecksum: local.android_checksum,
@@ -2122,6 +2264,7 @@ export async function checkCompatibilityNativePackages(supabase: SupabaseClient<
       return {
         name: local.name,
         localVersion: local.version,
+        localRequestedVersion: local.requested_version,
         remoteVersion: undefined,
         localIosChecksum: local.ios_checksum,
         localAndroidChecksum: local.android_checksum,
@@ -2136,6 +2279,7 @@ export async function checkCompatibilityNativePackages(supabase: SupabaseClient<
       name,
       localVersion: undefined,
       remoteVersion: pkg.version,
+      remoteRequestedVersion: pkg.requested_version,
       remoteIosChecksum: pkg.ios_checksum,
       remoteAndroidChecksum: pkg.android_checksum,
     }))
@@ -2287,7 +2431,7 @@ export async function promptAndSyncCapacitor(
   if (isCancel(shouldSync)) {
     // For init flow, mark the cancellation
     if (isInit && orgId && apikey) {
-      await markSnag('onboarding-v2', orgId, apikey, 'canceled', '🤷')
+      await markSnag('onboarding-v2', orgId, apikey, 'canceled', undefined, '🤷')
     }
     log.error('Canceled Capacitor sync')
     throw new Error('Capacitor sync cancelled')

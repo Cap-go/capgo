@@ -72,7 +72,7 @@ describe.skipIf(USE_CLOUDFLARE_WORKERS)('plan-check appid passthrough (RBAC bind
     if (userError)
       throw userError
 
-    // 2. Healthy stripe_info. status = 'succeeded', no *_exceeded flags,
+    // 2. Active stripe_info. status = 'succeeded', no *_exceeded flags,
     //    so is_paying_and_good_plan_org_action's billing branch returns true
     //    once auth passes.
     const { data: planRow, error: planError } = await serviceRoleSupabase

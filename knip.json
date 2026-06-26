@@ -13,6 +13,15 @@
     ],
     "cli/src/schemas/sdk.ts": [
       "duplicates"
+    ],
+    "cli/src/build/onboarding/mcp/engine.ts": [
+      "exports"
+    ],
+    "cli/src/build/onboarding/mcp/session-state.ts": [
+      "exports"
+    ],
+    "playwright/visual-diff.config.ts": [
+      "exports"
     ]
   },
   "ignoreUnresolved": [
@@ -34,6 +43,7 @@
         "benches/**/*.ts!",
         "playwright/e2e/**/*.ts!",
         "playwright/support/**/*.ts!",
+        "playwright/visual-diff.config.ts!",
         "formkit.config.ts!",
         "formkit.theme.ts!"
       ],

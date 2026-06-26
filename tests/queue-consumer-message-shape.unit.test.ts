@@ -1,6 +1,8 @@
 import { HTTPException } from 'hono/http-exception'
 import { describe, expect, it, vi } from 'vitest'
 import { __queueConsumerTestUtils__, MAX_QUEUE_READS, messagesArraySchema } from '../supabase/functions/_backend/triggers/queue_consumer.ts'
+import { onManifestCreateTestUtils } from '../supabase/functions/_backend/triggers/on_manifest_create.ts'
+import { s3TestUtils } from '../supabase/functions/_backend/utils/s3.ts'
 import { parseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
 
 describe('queue_consumer legacy message compatibility', () => {
@@ -119,6 +121,15 @@ describe('queue_consumer legacy message compatibility', () => {
     ])).toEqual([])
   })
 
+  it.concurrent('keeps a 950-row manifest batch under Cloudflare subrequest limits', () => {
+    expect(onManifestCreateTestUtils.sizeRetryAttempts).toBe(1)
+    expect(s3TestUtils.shouldUseSizeRangeFallback(0, { status: 404 })).toBe(false)
+    expect(s3TestUtils.shouldUseSizeRangeFallback(0, { statusCode: 404 })).toBe(false)
+    expect(s3TestUtils.shouldUseSizeRangeFallback(0, { code: 'NoSuchKey' })).toBe(false)
+    expect(s3TestUtils.shouldUseSizeRangeFallback(0, null)).toBe(true)
+    expect(s3TestUtils.shouldUseSizeRangeFallback(0, { status: 500 })).toBe(true)
+  })
+
   it.concurrent('keeps manifest size lookup failures retrying until the queue budget is exhausted', () => {
     expect(__queueConsumerTestUtils__.getActionableQueueFailures([
       {
@@ -135,11 +146,15 @@ describe('queue_consumer legacy message compatibility', () => {
     ])).toEqual([])
   })
 
-  it.concurrent('caps manifest queue batches and concurrency to avoid storage bursts', () => {
-    expect(__queueConsumerTestUtils__.getQueueBatchSize('on_manifest_create', 950)).toBe(100)
+  it.concurrent('keeps manifest queue batches out of Cloudflare waitUntil', () => {
+    expect(__queueConsumerTestUtils__.getQueueBatchSize('on_manifest_create', 950)).toBe(950)
     expect(__queueConsumerTestUtils__.getQueueBatchSize('cron_email', 950)).toBe(950)
-    expect(__queueConsumerTestUtils__.getQueueHttpConcurrency('on_manifest_create')).toBe(10)
+    expect(__queueConsumerTestUtils__.getQueueHttpConcurrency('on_manifest_create')).toBe(100)
     expect(__queueConsumerTestUtils__.getQueueHttpConcurrency('cron_email')).toBe(25)
+    expect(__queueConsumerTestUtils__.getQueueVisibilityTimeout('on_manifest_create')).toBe(900)
+    expect(__queueConsumerTestUtils__.getQueueVisibilityTimeout('cron_email')).toBe(120)
+    expect(__queueConsumerTestUtils__.shouldRunQueueSyncInBackground('on_manifest_create')).toBe(false)
+    expect(__queueConsumerTestUtils__.shouldRunQueueSyncInBackground('cron_email')).toBe(true)
   })
 
   it.concurrent('alerts Discord after retry budget is exhausted', () => {

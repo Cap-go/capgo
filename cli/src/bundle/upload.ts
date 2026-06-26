@@ -259,11 +259,11 @@ async function verifyCompatibility(supabase: SupabaseType, pm: pmType, options: 
         .map(a => [a.name, a]))
     : new Map()
 
-  // Include platform checksums in native_packages for precise change detection
   const nativePackages = (hashedLocalDependencies.size > 0 || !options.ignoreMetadataCheck)
     ? Array.from(hashedLocalDependencies, ([name, value]) => ({
         name,
         version: value.version,
+        requested_version: value.requested_version,
         ...(value.ios_checksum && { ios_checksum: value.ios_checksum }),
         ...(value.android_checksum && { android_checksum: value.android_checksum }),
       }))

@@ -10,7 +10,7 @@ import { useRouter } from 'vue-router'
 import AdminFilterBar from '~/components/admin/AdminFilterBar.vue'
 import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
-import Spinner from '~/components/Spinner.vue'
+import PageLoader from '~/components/PageLoader.vue'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -118,7 +118,7 @@ const totalUsersTrendSeries = computed(() => {
 
   return [
     {
-      label: 'Total Users',
+      label: 'Registered Users',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
         value: item.users,
@@ -228,9 +228,7 @@ displayStore.defaultBack = '/dashboard'
         <AdminFilterBar />
 
         <!-- Loading State -->
-        <div v-if="isLoading" class="flex items-center justify-center min-h-screen">
-          <Spinner size="w-24 h-24" />
-        </div>
+        <PageLoader v-if="isLoading" />
 
         <!-- Dashboard Content -->
         <div v-else class="space-y-6">
@@ -262,7 +260,7 @@ displayStore.defaultBack = '/dashboard'
               </div>
             </div>
 
-            <!-- Total Users Card -->
+            <!-- Registered Users Card -->
             <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
               <div class="flex items-start justify-between mb-4">
                 <div class="p-3 rounded-lg bg-secondary/10">
@@ -271,7 +269,7 @@ displayStore.defaultBack = '/dashboard'
               </div>
               <div>
                 <p class="text-sm text-slate-600 dark:text-slate-400">
-                  Total Users
+                  Registered Users
                 </p>
                 <div v-if="isLoadingGlobalStatsTrend" class="my-2">
                   <span class="loading loading-spinner loading-lg text-secondary" />
