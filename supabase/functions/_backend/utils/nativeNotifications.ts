@@ -365,6 +365,16 @@ export async function verifyNotificationDeliveryEventProof(c: Context, params: {
   return secureCompare(params.proof, await createNotificationDeliveryEventProof(c, params))
 }
 
+export function getNotificationDeliveryEventId(params: {
+  appId: string
+  event: NativeNotificationEvent
+  campaignId: string
+  notificationId: string
+  deviceKey: string
+}): string {
+  return `${params.event}:${params.appId}:${params.campaignId}:${params.notificationId}:${params.deviceKey}`
+}
+
 export async function encryptNotificationToken(c: Context, token: string): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const key = await aesKeyFromSecret(getNotificationTokenSecret(c))
@@ -383,8 +393,8 @@ export async function decryptNotificationToken(c: Context, encryptedToken: strin
 
 export async function trackNotificationRegistrationCF(c: Context<MiddlewareKeyVariables>, input: NativeNotificationRegisterInput) {
   if (!c.env.NOTIFICATION_REGISTRY) {
-    cloudlog({ requestId: c.get('requestId'), message: 'NOTIFICATION_REGISTRY not available, skipping native notification registration' })
-    return await deriveNativeNotificationIdentity(c, input.appId, input.externalId, input.nativeInstallId)
+    cloudlog({ requestId: c.get('requestId'), message: 'NOTIFICATION_REGISTRY not available, native notification registration rejected' })
+    throw simpleError('notification_registry_not_configured', 'Notification registry is not configured')
   }
 
   const identity = await deriveNativeNotificationIdentity(c, input.appId, input.externalId, input.nativeInstallId)

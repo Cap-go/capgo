@@ -9,16 +9,18 @@ import {
   enqueueNativeNotificationFanout,
   getAllNotificationBuckets,
   getNotificationBucket,
+  getNotificationDeliveryEventId,
   getNotificationEventIndex,
   getNotificationIndex,
   normalizeNotificationTag,
   shouldTrackNotificationPermissionChanged,
   trackNotificationEventCF,
+  trackNotificationRegistrationCF,
   verifyNotificationDeliveryEventProof,
   verifyNotificationEventProof,
   verifyNotificationIdentityProof,
 } from '../supabase/functions/_backend/utils/nativeNotifications'
-import { processNativeNotificationQueueMessage } from '../supabase/functions/_backend/utils/nativeNotificationSender'
+import { processNativeNotificationQueueBatch, processNativeNotificationQueueMessage } from '../supabase/functions/_backend/utils/nativeNotificationSender'
 
 const textEncoder = new TextEncoder()
 
@@ -217,6 +219,20 @@ describe('native notification AE registry', () => {
     expect(shouldTrackNotificationPermissionChanged('denied', 'denied')).toBe(false)
   })
 
+  it.concurrent('rejects registration when the AE registry binding is missing', async () => {
+    await expect(trackNotificationRegistrationCF({
+      env: {},
+      get: () => 'test-request',
+    } as any, {
+      appId: 'com.demo.app',
+      externalId: 'user-1',
+      nativeInstallId: 'install-1',
+      pushToken: 'push-token',
+      provider: 'fcm',
+      platform: 'android',
+    })).rejects.toThrow('Notification registry is not configured')
+  })
+
   it.concurrent('normalizes notification event indexes consistently for long IDs', () => {
     const appId = 'com.demo.'.concat('a'.repeat(120))
     const campaignId = 'campaign-'.concat('b'.repeat(120))
@@ -298,6 +314,22 @@ describe('native notification AE registry', () => {
         event: 'received',
         proof: deliveryProof,
       })).toBe(false)
+      expect(await verifyNotificationDeliveryEventProof(context, {
+        appId: 'com.demo.app',
+        recipientKey: 'recipient-key',
+        deviceKey: 'device-key',
+        campaignId: 'campaign-1',
+        notificationId: 'notification-1',
+        event: 'opened',
+        proof: deliveryProof,
+      })).toBe(false)
+      expect(getNotificationDeliveryEventId({
+        appId: 'com.demo.app',
+        event: 'received',
+        campaignId: 'campaign-1',
+        notificationId: 'notification-1',
+        deviceKey: 'device-key',
+      })).toBe('received:com.demo.app:campaign-1:notification-1:device-key')
     }
     finally {
       if (previousSecret === undefined)
@@ -627,5 +659,48 @@ describe('native notification queue sender', () => {
     expect(requestsFor(secondToken)).toHaveLength(0)
     expect(result.retryDevices).toHaveLength(0)
     expect(result.remainingDevices).toHaveLength(1)
+  })
+
+  it('retries the original queue message before any provider send when continuation enqueue fails', async () => {
+    const firstToken = 'push-token-continuation-1'
+    const secondToken = 'push-token-continuation-2'
+    const ack = vi.fn()
+    const retry = vi.fn()
+    const queueSend = vi.fn().mockRejectedValue(new Error('queue unavailable'))
+
+    await processNativeNotificationQueueBatch({
+      messages: [{
+        body: {
+          kind: 'send',
+          appId: 'com.demo.app',
+          campaignId: 'campaign-continuation',
+          payload: { title: 'Batch' },
+          sendBatchSize: 1,
+          providerConfigs: [{
+            provider: 'fcm',
+            status: 'configured',
+            secretRef: 'FCM_SECRET',
+            config: { projectId: 'demo-project' },
+          }],
+          devices: [
+            fcmDevice(await encryptToken('secret', firstToken)),
+            fcmDevice(await encryptToken('secret', secondToken)),
+          ],
+        },
+        ack,
+        retry,
+      }],
+    } as any, {
+      API_SECRET: 'secret',
+      FCM_SECRET: JSON.stringify({ access_token: 'token', project_id: 'demo-project' }),
+      NOTIFICATION_EVENTS: { writeDataPoint: () => undefined },
+      NOTIFICATION_QUEUE: { send: queueSend },
+    })
+
+    expect(queueSend).toHaveBeenCalledTimes(1)
+    expect(requestsFor(firstToken)).toHaveLength(0)
+    expect(requestsFor(secondToken)).toHaveLength(0)
+    expect(ack).not.toHaveBeenCalled()
+    expect(retry).toHaveBeenCalledWith({ delaySeconds: 30 })
   })
 })

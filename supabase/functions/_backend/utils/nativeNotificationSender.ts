@@ -39,6 +39,7 @@ interface AnalyticsApiResponse {
 interface NativeNotificationProcessResult {
   retryDevices: NativeNotificationRegistryRow[]
   remainingDevices: NativeNotificationRegistryRow[]
+  sentCount: number
   continuationMessage?: NativeNotificationQueueMessage
 }
 
@@ -728,13 +729,12 @@ function shouldRetryOutcome(env: NotificationEnv, message: NativeNotificationQue
   return shouldRetry && outcome.transient
 }
 
-export async function processNativeNotificationQueueMessage(message: NativeNotificationQueueMessage, env: NotificationEnv): Promise<NativeNotificationProcessResult> {
+async function sendNativeNotificationDevices(message: NativeNotificationQueueMessage, env: NotificationEnv, devices: NativeNotificationRegistryRow[]): Promise<{ retryDevices: NativeNotificationRegistryRow[], sentCount: number }> {
   const retryDevices: NativeNotificationRegistryRow[] = []
   const shouldRetry = canRetry(message)
-  const batchSize = resolveSendBatchSize(env, message)
-  const { devices, remainingDevices, continuationMessage } = await resolveMessageDevicesPage(env, message, batchSize)
   const shouldWriteQueuedEvents = !message.skipQueuedEvents
   const credentialCache = createSendCredentialCache()
+  let sentCount = 0
 
   for (const device of devices) {
     const notificationId = crypto.randomUUID()
@@ -744,6 +744,8 @@ export async function processNativeNotificationQueueMessage(message: NativeNotif
     try {
       const outcome = await sendToDevice(env, message, device, notificationId, credentialCache)
       outcome.notificationId = notificationId
+      if (outcome.ok)
+        sentCount++
       if (shouldRetryOutcome(env, message, device, outcome, shouldRetry))
         retryDevices.push(device)
     }
@@ -754,41 +756,52 @@ export async function processNativeNotificationQueueMessage(message: NativeNotif
     }
   }
 
-  return { retryDevices, remainingDevices, continuationMessage }
+  return { retryDevices, sentCount }
+}
+
+export async function processNativeNotificationQueueMessage(message: NativeNotificationQueueMessage, env: NotificationEnv): Promise<NativeNotificationProcessResult> {
+  const batchSize = resolveSendBatchSize(env, message)
+  const { devices, remainingDevices, continuationMessage } = await resolveMessageDevicesPage(env, message, batchSize)
+  const { retryDevices, sentCount } = await sendNativeNotificationDevices(message, env, devices)
+  return { retryDevices, remainingDevices, sentCount, continuationMessage }
+}
+
+async function enqueueContinuationWork(queue: NotificationQueueBinding, env: NotificationEnv, message: NativeNotificationQueueMessage, remainingDevices: NativeNotificationRegistryRow[], continuationMessage?: NativeNotificationQueueMessage) {
+  const send = queue.send?.bind(queue)
+  if (!send)
+    throw new Error('Notification continuation queue is not configured')
+  if (continuationMessage) {
+    await send(continuationMessage)
+    return
+  }
+  await Promise.all(chunkDeviceRows(remainingDevices, resolveSendBatchSize(env, message)).map(devices =>
+    send({ ...message, devices }),
+  ))
 }
 
 export async function processNativeNotificationQueueBatch(batch: MessageBatch<NativeNotificationQueueMessage>, env: NotificationEnv) {
   await Promise.all(batch.messages.map(async (queueMessage) => {
     try {
-      const { retryDevices, remainingDevices, continuationMessage } = await processNativeNotificationQueueMessage(queueMessage.body, env)
-      try {
-        if (continuationMessage || remainingDevices.length) {
-          const queue = env.NOTIFICATION_QUEUE as NotificationQueueBinding | undefined
-          if (!queue?.send)
-            throw new Error('Notification continuation queue is not configured')
-          const send = queue.send.bind(queue)
-          if (continuationMessage) {
-            await send(continuationMessage)
-          }
-          else {
-            await Promise.all(chunkDeviceRows(remainingDevices, resolveSendBatchSize(env, queueMessage.body)).map(devices =>
-              send({ ...queueMessage.body, devices }),
-            ))
-          }
-        }
-        if (retryDevices.length) {
-          const queue = env.NOTIFICATION_QUEUE as NotificationQueueBinding | undefined
-          if (!queue?.send)
-            throw new Error('Notification retry queue is not configured')
+      const batchSize = resolveSendBatchSize(env, queueMessage.body)
+      const { devices, remainingDevices, continuationMessage } = await resolveMessageDevicesPage(env, queueMessage.body, batchSize)
+      const queue = env.NOTIFICATION_QUEUE as NotificationQueueBinding | undefined
+      if (continuationMessage || remainingDevices.length)
+        await enqueueContinuationWork(queue ?? {}, env, queueMessage.body, remainingDevices, continuationMessage)
+
+      const { retryDevices, sentCount } = await sendNativeNotificationDevices(queueMessage.body, env, devices)
+      if (retryDevices.length) {
+        if (!queue?.send)
+          throw new Error('Notification retry queue is not configured')
+        try {
           await queue.send(
             { ...queueMessage.body, attempt: retryAttempt(queueMessage.body) + 1, devices: retryDevices, skipQueuedEvents: true },
             { delaySeconds: retryDelaySeconds(env, queueMessage.body) },
           )
         }
-      }
-      catch {
-        queueMessage.ack()
-        return
+        catch (error) {
+          if (sentCount === 0)
+            throw error
+        }
       }
       queueMessage.ack()
     }

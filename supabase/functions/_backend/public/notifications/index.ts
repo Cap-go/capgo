@@ -13,6 +13,7 @@ import {
   enqueueNativeNotificationFanout,
   getAllNotificationBuckets,
   getNotificationBucket,
+  getNotificationDeliveryEventId,
   normalizeNotificationTag,
   readNotificationBadgeStateCF,
   readNotificationRegistrationsCF,
@@ -604,7 +605,9 @@ app.post('/events', async (c) => {
   const eventProof = assertString(body.eventProof, 'eventProof', 256)
   const campaignId = typeof body.campaignId === 'string' ? body.campaignId.trim() : ''
   const notificationId = typeof body.notificationId === 'string' ? body.notificationId.trim() : ''
-  const eventId = typeof body.eventId === 'string' ? body.eventId.trim().slice(0, 256) : ''
+  const eventId = CLIENT_NOTIFICATION_DELIVERY_EVENTS.has(body.event) && campaignId && notificationId
+    ? getNotificationDeliveryEventId({ appId, event: body.event, campaignId, notificationId, deviceKey })
+    : typeof body.eventId === 'string' ? body.eventId.trim().slice(0, 256) : ''
   const occurredAt = typeof body.occurredAt === 'string' ? body.occurredAt.trim().slice(0, 64) : ''
   const validProof = CLIENT_NOTIFICATION_DELIVERY_EVENTS.has(body.event)
     ? campaignId && notificationId && await verifyNotificationDeliveryEventProof(c, {
