@@ -286,6 +286,13 @@ public class CapgoNotificationsPlugin extends Plugin {
         call.resolve();
     }
 
+    @PluginMethod
+    public void completeBackgroundNotification(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("completed", false);
+        call.resolve(result);
+    }
+
     public void sendToken(String token) {
         JSObject data = new JSObject();
         data.put("value", token);

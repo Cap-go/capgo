@@ -5,6 +5,7 @@ export type CapgoNotificationPlatform = 'ios' | 'android'
 export type CapgoNotificationInstallMode = 'next' | 'set'
 export type CapgoNotificationImportance = 1 | 2 | 3 | 4 | 5
 export type CapgoNotificationVisibility = -1 | 0 | 1
+export type CapgoBackgroundNotificationResult = 'newData' | 'noData' | 'failed'
 
 export interface CapgoNotificationsConfig {
   appId: string
@@ -58,6 +59,7 @@ export interface CapgoPushNotificationSchema {
   subtitle?: string
   body?: string
   id: string
+  backgroundTaskId?: string
   tag?: string
   badge?: number
   data: Record<string, unknown>
@@ -75,7 +77,7 @@ export interface CapgoNotificationOpenedEvent {
 
 export interface CapgoBackgroundNotificationEvent {
   notification: CapgoPushNotificationSchema
-  finish: () => Promise<void>
+  finish: (result?: CapgoBackgroundNotificationResult) => Promise<void>
 }
 
 export interface CapgoNotificationToken {
@@ -146,6 +148,15 @@ export interface CapgoNotificationSyncResult {
   pendingEvents?: number
 }
 
+export interface CapgoBackgroundNotificationCompletion {
+  backgroundTaskId?: string
+  result?: CapgoBackgroundNotificationResult
+}
+
+export interface CapgoBackgroundNotificationCompletionResult {
+  completed?: boolean
+}
+
 export interface CapgoNotificationsNativePlugin {
   checkPermissions: () => Promise<CapgoNotificationPermissionStatus>
   requestPermissions: () => Promise<CapgoNotificationPermissionStatus>
@@ -163,6 +174,7 @@ export interface CapgoNotificationsNativePlugin {
   getDeliveredNotifications: () => Promise<CapgoDeliveredNotifications>
   removeDeliveredNotifications: (delivered: CapgoDeliveredNotifications) => Promise<void>
   removeAllDeliveredNotifications: () => Promise<void>
+  completeBackgroundNotification: (options: CapgoBackgroundNotificationCompletion) => Promise<CapgoBackgroundNotificationCompletionResult>
   addListener: {
     (eventName: 'registration', listenerFunc: (token: CapgoNotificationToken) => void): Promise<PluginListenerHandle>
     (eventName: 'registrationError', listenerFunc: (error: CapgoNotificationRegistrationError) => void): Promise<PluginListenerHandle>

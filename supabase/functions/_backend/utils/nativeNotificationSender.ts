@@ -39,7 +39,6 @@ interface AnalyticsApiResponse {
 interface NativeNotificationProcessResult {
   retryDevices: NativeNotificationRegistryRow[]
   remainingDevices: NativeNotificationRegistryRow[]
-  sentCount: number
   continuationMessage?: NativeNotificationQueueMessage
 }
 
@@ -729,12 +728,11 @@ function shouldRetryOutcome(env: NotificationEnv, message: NativeNotificationQue
   return shouldRetry && outcome.transient
 }
 
-async function sendNativeNotificationDevices(message: NativeNotificationQueueMessage, env: NotificationEnv, devices: NativeNotificationRegistryRow[]): Promise<{ retryDevices: NativeNotificationRegistryRow[], sentCount: number }> {
+async function sendNativeNotificationDevices(message: NativeNotificationQueueMessage, env: NotificationEnv, devices: NativeNotificationRegistryRow[]): Promise<{ retryDevices: NativeNotificationRegistryRow[] }> {
   const retryDevices: NativeNotificationRegistryRow[] = []
   const shouldRetry = canRetry(message)
   const shouldWriteQueuedEvents = !message.skipQueuedEvents
   const credentialCache = createSendCredentialCache()
-  let sentCount = 0
 
   for (const device of devices) {
     const notificationId = crypto.randomUUID()
@@ -744,8 +742,6 @@ async function sendNativeNotificationDevices(message: NativeNotificationQueueMes
     try {
       const outcome = await sendToDevice(env, message, device, notificationId, credentialCache)
       outcome.notificationId = notificationId
-      if (outcome.ok)
-        sentCount++
       if (shouldRetryOutcome(env, message, device, outcome, shouldRetry))
         retryDevices.push(device)
     }
@@ -756,14 +752,14 @@ async function sendNativeNotificationDevices(message: NativeNotificationQueueMes
     }
   }
 
-  return { retryDevices, sentCount }
+  return { retryDevices }
 }
 
 export async function processNativeNotificationQueueMessage(message: NativeNotificationQueueMessage, env: NotificationEnv): Promise<NativeNotificationProcessResult> {
   const batchSize = resolveSendBatchSize(env, message)
   const { devices, remainingDevices, continuationMessage } = await resolveMessageDevicesPage(env, message, batchSize)
-  const { retryDevices, sentCount } = await sendNativeNotificationDevices(message, env, devices)
-  return { retryDevices, remainingDevices, sentCount, continuationMessage }
+  const { retryDevices } = await sendNativeNotificationDevices(message, env, devices)
+  return { retryDevices, remainingDevices, continuationMessage }
 }
 
 async function enqueueContinuationWork(queue: NotificationQueueBinding, env: NotificationEnv, message: NativeNotificationQueueMessage, remainingDevices: NativeNotificationRegistryRow[], continuationMessage?: NativeNotificationQueueMessage) {
@@ -785,23 +781,20 @@ export async function processNativeNotificationQueueBatch(batch: MessageBatch<Na
       const batchSize = resolveSendBatchSize(env, queueMessage.body)
       const { devices, remainingDevices, continuationMessage } = await resolveMessageDevicesPage(env, queueMessage.body, batchSize)
       const queue = env.NOTIFICATION_QUEUE as NotificationQueueBinding | undefined
-      if (continuationMessage || remainingDevices.length)
-        await enqueueContinuationWork(queue ?? {}, env, queueMessage.body, remainingDevices, continuationMessage)
+      const { retryDevices } = await sendNativeNotificationDevices(queueMessage.body, env, devices)
 
-      const { retryDevices, sentCount } = await sendNativeNotificationDevices(queueMessage.body, env, devices)
+      if (continuationMessage || remainingDevices.length) {
+        // Queue continuation after this page is attempted so a crash cannot advance the cursor before sending it.
+        await enqueueContinuationWork(queue ?? {}, env, queueMessage.body, remainingDevices, continuationMessage)
+      }
+
       if (retryDevices.length) {
         if (!queue?.send)
           throw new Error('Notification retry queue is not configured')
-        try {
-          await queue.send(
-            { ...queueMessage.body, attempt: retryAttempt(queueMessage.body) + 1, devices: retryDevices, skipQueuedEvents: true },
-            { delaySeconds: retryDelaySeconds(env, queueMessage.body) },
-          )
-        }
-        catch (error) {
-          if (sentCount === 0)
-            throw error
-        }
+        await queue.send(
+          { ...queueMessage.body, attempt: retryAttempt(queueMessage.body) + 1, devices: retryDevices, skipQueuedEvents: true },
+          { delaySeconds: retryDelaySeconds(env, queueMessage.body) },
+        )
       }
       queueMessage.ack()
     }

@@ -37,7 +37,8 @@ public class CapgoNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "deleteChannel", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getDeliveredNotifications", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "removeDeliveredNotifications", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "removeAllDeliveredNotifications", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "removeAllDeliveredNotifications", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "completeBackgroundNotification", returnType: CAPPluginReturnPromise)
     ]
 
     private let notificationDelegateHandler = CapgoNotificationsHandler()
@@ -180,6 +181,21 @@ public class CapgoNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
         setBadgeCount(0) { _ in
             call.resolve()
         }
+    }
+
+    @objc func completeBackgroundNotification(_ call: CAPPluginCall) {
+        let resultValue = call.getString("result") ?? "newData"
+        let result: UIBackgroundFetchResult
+        switch resultValue {
+        case "failed":
+            result = .failed
+        case "noData":
+            result = .noData
+        default:
+            result = .newData
+        }
+        let completed = self.notificationDelegateHandler.completeBackgroundNotification(call.getString("backgroundTaskId"), result: result)
+        call.resolve(["completed": completed])
     }
 
     @objc func createDefaultChannel(_ call: CAPPluginCall) {

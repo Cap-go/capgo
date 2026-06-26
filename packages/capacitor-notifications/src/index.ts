@@ -2,6 +2,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core'
 import type { PluginListenerHandle } from '@capacitor/core'
 import type {
   CapgoBackgroundNotificationEvent,
+  CapgoBackgroundNotificationResult,
   CapgoNotificationEvent,
   CapgoNotificationInstallMode,
   CapgoNotificationOpenedEvent,
@@ -91,6 +92,7 @@ interface RuntimeState {
   eventFlushPromise?: Promise<void>
   lastRegistration?: StoredNotificationRegistration
   handledUpdateNotifications: Set<string>
+  updateNotificationChecks: Map<string, Promise<void>>
   listeners: ListenerState
   updater: Required<Pick<CapgoUpdaterIntegrationOptions, 'enabled'>> & {
     installMode: CapgoNotificationInstallMode
@@ -105,6 +107,7 @@ const state: RuntimeState = {
   badge: 0,
   badgeRevision: 0,
   bridgeListenersReady: false,
+  updateNotificationChecks: new Map(),
   handledUpdateNotifications: new Set(),
   listeners: {
     notificationReceived: new Set(),
@@ -783,6 +786,9 @@ async function maybeRunUpdateCheck(notification?: CapgoPushNotificationSchema) {
     return
   const key = updateNotificationKey(notification)
   if (key) {
+    const runningCheck = state.updateNotificationChecks.get(key)
+    if (runningCheck)
+      return runningCheck
     if (state.handledUpdateNotifications.has(key))
       return
     state.handledUpdateNotifications.add(key)
@@ -792,13 +798,25 @@ async function maybeRunUpdateCheck(notification?: CapgoPushNotificationSchema) {
         state.handledUpdateNotifications.delete(oldest)
     }
   }
-  const startedEvent = eventFromNotification(notification, 'background_started')
-  await trackEvent('background_started', startedEvent)
-  const result = await CapgoNotifications.runUpdateCheck(updateOptionsFromNotification(notification))
-  await trackEvent('background_finished', {
-    ...eventFromNotification(notification, 'background_finished'),
-    error: result.error,
-  })
+
+  const updateCheck = (async () => {
+    const startedEvent = eventFromNotification(notification, 'background_started')
+    await trackEvent('background_started', startedEvent)
+    const result = await CapgoNotifications.runUpdateCheck(updateOptionsFromNotification(notification))
+    await trackEvent('background_finished', {
+      ...eventFromNotification(notification, 'background_finished'),
+      error: result.error,
+    })
+    if (result.status === 'failed')
+      throw new Error(result.error || 'Update check failed')
+  })()
+
+  if (key) {
+    state.updateNotificationChecks.set(key, updateCheck)
+    void updateCheck.finally(() => state.updateNotificationChecks.delete(key)).catch(() => undefined)
+  }
+
+  return updateCheck
 }
 
 async function addBridgeHandle(handles: PluginListenerHandle[], listenerHandle: Promise<PluginListenerHandle>) {
@@ -846,18 +864,41 @@ async function ensureBridgeListeners() {
         notifyListeners(state.listeners.notificationOpened, event)
       }))
       await addBridgeHandle(handles, NativeCapgoNotifications.addListener('backgroundNotification', (notification) => {
-        void applyBadgeFromNotification(notification).catch(() => undefined)
-        if (!isUpdateCheckNotification(notification))
-          void trackEvent('background_started', eventFromNotification(notification, 'background_started')).catch(() => undefined)
-        void maybeRunUpdateCheck(notification).catch(() => undefined)
+        const isUpdateCheck = isUpdateCheckNotification(notification)
+        const hasBackgroundListeners = state.listeners.backgroundNotification.size > 0
+        const backgroundWork = Promise.allSettled([
+          applyBadgeFromNotification(notification),
+          isUpdateCheck ? maybeRunUpdateCheck(notification) : trackEvent('background_started', eventFromNotification(notification, 'background_started')),
+        ])
         let finished = false
-        const finish = async () => {
+        const finish = async (result: CapgoBackgroundNotificationResult = 'newData') => {
           if (finished)
             return
           finished = true
-          await trackEvent('background_finished', eventFromNotification(notification, 'background_finished'))
+          let completionResult = result
+          try {
+            const workResults = await backgroundWork
+            if (completionResult === 'newData' && workResults.some(workResult => workResult.status === 'rejected'))
+              completionResult = 'failed'
+            if (!isUpdateCheck)
+              await trackEvent('background_finished', eventFromNotification(notification, 'background_finished'))
+          }
+          catch {
+            if (completionResult === 'newData')
+              completionResult = 'failed'
+          }
+          finally {
+            if (notification.backgroundTaskId) {
+              await NativeCapgoNotifications.completeBackgroundNotification({
+                backgroundTaskId: notification.backgroundTaskId,
+                result: completionResult,
+              }).catch(() => undefined)
+            }
+          }
         }
         notifyListeners(state.listeners.backgroundNotification, { notification, finish })
+        if (!hasBackgroundListeners)
+          void finish()
       }))
       state.bridgeListenersReady = true
     }

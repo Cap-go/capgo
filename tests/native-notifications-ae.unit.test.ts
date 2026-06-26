@@ -661,7 +661,7 @@ describe('native notification queue sender', () => {
     expect(result.remainingDevices).toHaveLength(1)
   })
 
-  it('retries the original queue message before any provider send when continuation enqueue fails', async () => {
+  it('retries the original queue message when continuation enqueue fails after sending the current page', async () => {
     const firstToken = 'push-token-continuation-1'
     const secondToken = 'push-token-continuation-2'
     const ack = vi.fn()
@@ -698,7 +698,7 @@ describe('native notification queue sender', () => {
     })
 
     expect(queueSend).toHaveBeenCalledTimes(1)
-    expect(requestsFor(firstToken)).toHaveLength(0)
+    expect(requestsFor(firstToken)).toHaveLength(1)
     expect(requestsFor(secondToken)).toHaveLength(0)
     expect(ack).not.toHaveBeenCalled()
     expect(retry).toHaveBeenCalledWith({ delaySeconds: 30 })

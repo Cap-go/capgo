@@ -4,6 +4,10 @@ import UserNotifications
 public class CapgoNotificationsHandler: NSObject, NotificationHandlerProtocol {
     public weak var plugin: CAPPlugin?
 
+    private let backgroundCompletionQueue = DispatchQueue(label: "app.capgo.notifications.backgroundCompletion")
+    private var backgroundCompletions: [String: (UIBackgroundFetchResult) -> Void] = [:]
+    private let backgroundCompletionTimeout: TimeInterval = 25.0
+
     public func requestPermissions(with completion: ((Bool, Error?) -> Void)? = nil) {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
             completion?(granted, error)
@@ -14,6 +18,18 @@ public class CapgoNotificationsHandler: NSObject, NotificationHandlerProtocol {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             completion?(settings.authorizationStatus)
         }
+    }
+
+    public func completeBackgroundNotification(_ taskId: String?, result: UIBackgroundFetchResult = .newData) -> Bool {
+        guard let taskId = taskId else { return false }
+        let completion = backgroundCompletionQueue.sync { () -> ((UIBackgroundFetchResult) -> Void)? in
+            return self.backgroundCompletions.removeValue(forKey: taskId)
+        }
+        guard let completion = completion else { return false }
+        DispatchQueue.main.async {
+            completion(result)
+        }
+        return true
     }
 
     public func willPresent(notification: UNNotification) -> UNNotificationPresentationOptions {
@@ -67,18 +83,30 @@ public class CapgoNotificationsHandler: NSObject, NotificationHandlerProtocol {
     }
 
     public func handleRemoteNotification(_ userInfo: [AnyHashable: Any], completionHandler: ((UIBackgroundFetchResult) -> Void)? = nil) {
-        let notificationData = makeRemoteNotificationJSObject(userInfo)
+        let isBackground = isCapgoBackgroundPayload(userInfo)
+        var notificationData = makeRemoteNotificationJSObject(userInfo)
+
+        if isBackground, let completionHandler = completionHandler {
+            let taskId = UUID().uuidString
+            backgroundCompletionQueue.sync {
+                self.backgroundCompletions[taskId] = completionHandler
+            }
+            notificationData["backgroundTaskId"] = taskId
+            DispatchQueue.main.asyncAfter(deadline: .now() + backgroundCompletionTimeout) { [weak self] in
+                _ = self?.completeBackgroundNotification(taskId, result: .newData)
+            }
+        }
+
         self.plugin?.notifyListeners("notificationReceived", data: notificationData, retainUntilConsumed: true)
 
-        let isBackground = isCapgoBackgroundPayload(userInfo)
         if isBackground {
             self.plugin?.notifyListeners("backgroundNotification", data: notificationData, retainUntilConsumed: true)
+            return
         }
 
         guard let completionHandler = completionHandler else { return }
-        let delay = isBackground ? 25.0 : 1.0
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            completionHandler(isBackground ? .newData : .noData)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            completionHandler(.noData)
         }
     }
 
