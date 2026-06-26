@@ -325,7 +325,7 @@ const ImportedSummary: FC<{ progress: AppflowProgress }> = ({ progress }) => {
 // ── validation results ───────────────────────────────────────────────────────
 const CHECK_LABEL: Record<string, string> = {
   p12: 'iOS signing certificate',
-  'app-password': 'iOS upload password',
+  'app-password': 'iOS app-specific password',
   sa: 'Google Play access',
   keystore: 'Android keystore',
 }
