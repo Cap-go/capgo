@@ -19,8 +19,8 @@ async function test(name, fn) {
 
 await test('normalizes ios store urls', () => {
   assert.equal(
-    normalizeStoreUrl('https://apps.apple.com/app/id123', 'apps.apple.com'),
-    'https://apps.apple.com/app/id123',
+    normalizeStoreUrl('https://apps\.apple\.com/app/id123', 'apps.apple.com'),
+    'https://apps\.apple\.com/app/id123',
   )
 })
 
@@ -34,7 +34,7 @@ await test('normalizes android store urls', () => {
 await test('rejects invalid store hosts', () => {
   assert.throws(
     () => normalizeStoreUrl('https://example.com/app', 'apps.apple.com'),
-    /apps.apple.com/,
+    /apps\.apple\.com/,
   )
 })
 
