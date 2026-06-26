@@ -1515,10 +1515,14 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
       const targetChannelVersionSet = rolloutPercentageBps != null
         ? await setRolloutVersionInChannel(supabase, apikey, !!options.bundleUrl, bundle, targetChannel, appid, localConfig, rolloutPercentageBps, options.rolloutCacheTtlSeconds, options.selfAssign)
         : await setVersionInChannel(supabase, apikey, !!options.bundleUrl, bundle, targetChannel, userId, orgId, appid, localConfig, options.selfAssign)
-      if (targetChannelVersionSet)
+      if (targetChannelVersionSet) {
         channelVersionSet.add(targetChannel)
-      if (options.verbose)
-        log.info(`[Verbose] Channel ${targetChannel} updated successfully`)
+        if (options.verbose)
+          log.info(`[Verbose] Channel ${targetChannel} updated successfully`)
+      }
+      else if (options.verbose) {
+        log.info(`[Verbose] Channel ${targetChannel} was not updated`)
+      }
     }
 
     if (shouldDeleteLinkedBundle) {
