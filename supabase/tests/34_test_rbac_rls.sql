@@ -4,7 +4,7 @@ BEGIN;
 SELECT plan(8);
 
 -- Test admin user: 'test_admin' maps to c591b04e-cf29-4945-b9a0-776d0672061a (admin@capgo.app)
--- Test regular user: 'test_user' maps to 6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5 (test@capgo.app)
+-- Test regular org member: 'test_user2' maps to 6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5 (test2@capgo.app)
 -- Demo org: 046a36ac-e03c-4590-9257-bd6c9dba9ee8
 -- 1) Regular user can read roles
 SELECT tests.authenticate_as('test_user');
@@ -44,7 +44,7 @@ VALUES
     'Test group for RLS'
 );
 
-SELECT tests.authenticate_as('test_user');
+SELECT tests.authenticate_as('test_user2');
 
 SELECT
     ok(
@@ -56,7 +56,7 @@ SELECT
                 org_id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'
                 AND name = 'Test Group RLS'
         ),
-    'Regular user cannot read org groups they do not belong to'
+    'Regular org member cannot read org groups they do not belong to'
     );
 
 -- 4) Regular user can read groups after joining
@@ -74,7 +74,7 @@ WHERE
 
 RESET ROLE;
 
-SELECT tests.authenticate_as('test_user');
+SELECT tests.authenticate_as('test_user2');
 
 SELECT
     ok(
