@@ -238,6 +238,7 @@ async function submit(form: {
   expose_metadata: boolean
   allow_preview: boolean
   allow_device_custom_id: boolean
+  block_provider_infra_requests: boolean
   build_timeout_minutes?: number | string
 }) {
   isLoading.value = true
@@ -293,6 +294,14 @@ async function submit(form: {
     // Defensive: avoid flipping the flag if the value is missing/invalid.
     if (typeof form.allow_device_custom_id === 'boolean')
       await updateAllowDeviceCustomId(form.allow_device_custom_id)
+  }
+  catch (error) {
+    toast.error(error as string)
+  }
+
+  try {
+    if (typeof form.block_provider_infra_requests === 'boolean')
+      await updateBlockProviderInfraRequests(form.block_provider_infra_requests)
   }
   catch (error) {
     toast.error(error as string)
@@ -536,6 +545,20 @@ async function updateAllowDeviceCustomId(newAllowDeviceCustomId: boolean) {
   toast.success(t('changed-allow-device-custom-id'))
   if (appRef.value)
     appRef.value.allow_device_custom_id = newAllowDeviceCustomId
+}
+
+async function updateBlockProviderInfraRequests(enabled: boolean) {
+  const current = appRef.value?.block_provider_infra_requests ?? false
+  if (enabled === current)
+    return Promise.resolve()
+
+  const { error } = await supabase.from('apps').update({ block_provider_infra_requests: enabled }).eq('app_id', props.appId)
+  if (error)
+    return Promise.reject(t('cannot-change-block-provider-infra-requests'))
+
+  toast.success(t('changed-block-provider-infra-requests'))
+  if (appRef.value)
+    appRef.value.block_provider_infra_requests = enabled
 }
 
 async function loadChannels() {
@@ -1490,6 +1513,13 @@ async function transferAppOwnership() {
                 :value="appRef?.allow_device_custom_id ?? false"
                 :label="t('allow-device-custom-id')"
                 :help="t('allow-device-custom-id-help')"
+              />
+              <FormKit
+                type="checkbox"
+                name="block_provider_infra_requests"
+                :value="appRef?.block_provider_infra_requests ?? false"
+                :label="t('block-provider-infra-requests')"
+                :help="t('block-provider-infra-requests-help')"
               />
               <FormKit
                 type="button"

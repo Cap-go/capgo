@@ -234,6 +234,13 @@ declare module 'vue-router/auto-routes' {
       { app: ParamValue<false> },
       | never
     >,
+    '/app/[app].compatibility': RouteRecordInfo<
+      '/app/[app].compatibility',
+      '/app/:app/compatibility',
+      { app: ParamValue<true> },
+      { app: ParamValue<false> },
+      | never
+    >,
     '/app/[app].device.[device]': RouteRecordInfo<
       '/app/[app].device.[device]',
       '/app/:app/device/:device',
@@ -318,6 +325,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/connect': RouteRecordInfo<
+      '/connect',
+      '/connect',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/dashboard': RouteRecordInfo<
       '/dashboard',
       '/dashboard',
@@ -363,6 +377,13 @@ declare module 'vue-router/auto-routes' {
     '/login': RouteRecordInfo<
       '/login',
       '/login',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/onboarding/app': RouteRecordInfo<
+      '/onboarding/app',
+      '/onboarding/app',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -811,6 +832,14 @@ declare module 'vue-router/auto-routes' {
       pathParamNames:
         | 'app'
     }
+    'src/pages/app/[app].compatibility.vue': {
+      routes:
+        | '/app/[app].compatibility'
+      views:
+        | never
+      pathParamNames:
+        | 'app'
+    }
     'src/pages/app/[app].device.[device].vue': {
       routes:
         | '/app/[app].device.[device]'
@@ -908,6 +937,14 @@ declare module 'vue-router/auto-routes' {
       pathParamNames:
         | never
     }
+    'src/pages/connect.vue': {
+      routes:
+        | '/connect'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
     'src/pages/dashboard.vue': {
       routes:
         | '/dashboard'
@@ -959,6 +996,14 @@ declare module 'vue-router/auto-routes' {
     'src/pages/login.vue': {
       routes:
         | '/login'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/onboarding/app.vue': {
+      routes:
+        | '/onboarding/app'
       views:
         | never
       pathParamNames:

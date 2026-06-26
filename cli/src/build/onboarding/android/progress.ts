@@ -129,6 +129,7 @@ export function hasAnyOAuthProgress(progress: AndroidOnboardingProgress): boolea
     || progress.completedSteps.gcpProjectChosen
     || progress.completedSteps.androidPackageChosen
     || progress._oauthRefreshToken
+    || progress._oauthAccessToken
   )
 }
 
@@ -182,10 +183,32 @@ function tailResumeStep(progress: AndroidOnboardingProgress): AndroidOnboardingS
       return progress.envExportTargetPath ? 'exporting-env' : 'ask-export-env'
 
     // A destination is already chosen (single-target auto-pick, the
-    // target-select screen, or a decided setupMode) → the remote check is the
-    // next read-only step before the confirm gate + upload.
-    if (progress.ciSecretTarget)
+    // target-select screen, or a decided setupMode) → normally the remote
+    // check is the next read-only step before the confirm gate + upload.
+    if (progress.ciSecretTarget) {
+      // EXCEPT: a GitHub target whose 3-way ask-github-actions-setup consent
+      // gate is still UNANSWERED — no setupMode decision was ever persisted.
+      // The MCP slim progress persists the auto-picked target at tail ENTRY
+      // (before the user answers the gate), so a server restart parked on the
+      // unanswered gate used to collapse onto 'checking-ci-secrets', routing
+      // PAST the gate: the pending githubActionsSetup answer was then rejected
+      // off-step and the with-workflow arm became unreachable — the user's
+      // decision was silently lost (found by the live MCP e2e, S14). Re-ask
+      // the unanswered gate instead — the same principle as the S9-S11
+      // checkBuild re-poll park. Strictly `undefined`: the TUI's SYNTHETIC
+      // in-memory progress (ui/app.tsx tailEngineNext) carries setupMode
+      // 'undecided' pre-answer (its in-session router must keep its routing),
+      // and the TUI never persists ciSecretTarget — the undefined shape is
+      // MCP-slim-progress-only.
+      // ASYMMETRY (GitLab, deliberate): its consent gate is ask-ci-secrets,
+      // whose yes/no is purely navigational and never persisted — resume
+      // cannot distinguish answered from unanswered, so 'checking-ci-secrets'
+      // stays its correct idempotent re-entry (the confirm-ci-secret-overwrite
+      // gate re-derives from the remote).
+      if (progress.ciSecretTarget.provider === 'github' && progress.setupMode === undefined)
+        return 'ask-github-actions-setup'
       return 'checking-ci-secrets'
+    }
 
     // Credentials saved + build queued but no CI work started yet → re-run the
     // read-only detection. Idempotent: it only inspects the repo and routes.
@@ -244,22 +267,27 @@ export function getAndroidResumeStep(progress: AndroidOnboardingProgress | null)
   if (progress._credentialsExistGate === 'backup')
     return 'backing-up'
 
-  // Phase 1 — Keystore: marker + 3 ephemeral fields
-  if (!keystoreFullyValid(progress))
-    return keystoreResumeStep(progress)
-
-  // Phase 6 — Post-save "tail" (shared with iOS). `credentialsSaved` is the
-  // unambiguous "save already happened" marker: it means the whole provisioning
-  // sequence (OAuth or imported-SA) finished and credentials.json was written,
-  // so we route THROUGH the tail (build-request → CI-secrets → env/workflow)
-  // instead of past the service-account fork below. Checking it here — before
-  // the fork — keeps both the OAuth and import paths converging on one tail
-  // router. When the marker is absent (every legacy/in-flight progress file),
-  // `tailResumeStep` returns null and we fall through to the unchanged
-  // provisioning routing below.
+  // Phase 6 — Post-save "tail" (shared with iOS), checked BEFORE the keystore
+  // phase. `credentialsSaved` is the unambiguous "save already happened"
+  // marker: it means the whole provisioning sequence (OAuth or imported-SA)
+  // finished and credentials.json was written, so we route THROUGH the tail
+  // (build-request → CI-secrets → env/workflow). The MCP driver's post-save
+  // progress is SLIM (markers + non-secret tail prefs ONLY — no keystore
+  // fields; see mcp/tail-progress.ts), so the keystore validation below would
+  // misroute it back to keystore-method-select (and re-trigger the
+  // credentials-exist gate against the credentials the save itself just
+  // wrote). Routing the marker first keeps the OAuth, import AND slim-MCP
+  // paths converging on one tail router. When the marker is absent (every
+  // legacy/in-flight progress file — the Ink TUI never persists post-save),
+  // `tailResumeStep` returns null and the routing below is byte-for-byte
+  // unchanged.
   const tailStep = tailResumeStep(progress)
   if (tailStep)
     return tailStep
+
+  // Phase 1 — Keystore: marker + 3 ephemeral fields
+  if (!keystoreFullyValid(progress))
+    return keystoreResumeStep(progress)
 
   // Phase 2 — Service-account fork. Routes onto the import path or the OAuth
   // path. Legacy progress files don't have `serviceAccountMethod` — treat
@@ -299,10 +327,11 @@ export function getAndroidResumeStep(progress: AndroidOnboardingProgress | null)
     return 'service-account-method-select'
   }
 
-  // Phase 2b — Google sign-in: marker + refresh token. We need the refresh
-  // token to mint access tokens for the rest of the flow on subsequent
-  // resumes; if it's missing we must re-auth.
-  if (!completedSteps.googleSignInComplete || !progress._oauthRefreshToken)
+  // Phase 2b — Google sign-in: marker + a USABLE token. The MCP broker stores a short-lived access token
+  // (re-sign-in on expiry); the TUI loopback stores a refresh token. A missing or expired token re-auths.
+  const oauthTokenUsable = !!progress._oauthRefreshToken
+    || (!!progress._oauthAccessToken && (!progress._oauthAccessTokenExpiresAt || progress._oauthAccessTokenExpiresAt > Date.now()))
+  if (!completedSteps.googleSignInComplete || !oauthTokenUsable)
     return 'google-sign-in'
 
   // Phase 3 — Play developer account ID (paste).

@@ -3,6 +3,7 @@ import { log } from '@clack/prompts'
 import { Option, program } from 'commander'
 import pack from '../package.json'
 import { categorizeCliError } from './analytics/error-category'
+import { applyCommandAnalyticsOptOut, applyRawCommandAnalyticsOptOut } from './analytics/opt-out'
 import { enableSupabaseInstrumentation } from './analytics/supabase-perf'
 import { extractCommandContext, flushAnalytics, trackCommandFailed, trackCommandInvoked, trackCommandSucceeded } from './analytics/track'
 import { addApp } from './app/add'
@@ -18,6 +19,7 @@ import { lastOutputCommand } from './build/last-output-command'
 import { checkBuildNeeded } from './build/needed'
 import type { OnboardingBuilderOptions } from './build/onboarding/command'
 import { onboardingBuilderCommand } from './build/onboarding/command'
+import { prescanCommand } from './build/prescan/command'
 import type { CreateAppleKeyOptions } from './build/onboarding/asc-key/command'
 import { createAppleKeyCommand } from './build/onboarding/asc-key/command'
 import { requestBuildCommand } from './build/request'
@@ -39,6 +41,7 @@ import { generateDocs } from './docs'
 import { defaultStarRepo } from './github'
 import { starAllRepositoriesCommand, starRepositoryCommand } from './github-command'
 import { initApp } from './init'
+import { finishActiveCliReplay } from './init/replay'
 import { createKey, deleteOldKey, saveKeyCommand } from './key'
 import { login } from './login'
 import { startMcpServer } from './mcp/server'
@@ -79,6 +82,7 @@ let currentCommandPath = 'unknown'
 
 program.hook('preAction', (_thisCommand, actionCommand) => {
   currentCommandPath = getCommandPath(actionCommand)
+  applyCommandAnalyticsOptOut(currentCommandPath, actionCommand.opts())
   trackCommandInvoked(currentCommandPath, extractCommandContext(actionCommand))
 })
 
@@ -101,6 +105,7 @@ Example: npx @capgo/cli@latest init YOUR_API_KEY com.example.app`)
   .option('-i, --icon <icon>', `App icon path for display in Capgo Cloud`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+  .option('--no-analytics', 'Disable init analytics and terminal replay for this run')
 
 const run = program
   .command('run')
@@ -825,6 +830,7 @@ build
   .option('-a, --apikey <apikey>', 'API key to link to your account')
   .option('-p, --platform <platform>', 'Platform to onboard (ios or android). If omitted, auto-detects when only one native folder exists; prompts otherwise.')
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  .option('--no-analytics', 'Disable build onboarding analytics and terminal replay for this run')
   // enableSelfUpdate is set ONLY here (the genuine `build init` entrypoint) so
   // the self-update prompt's re-exec replays `build init`, never a wrapper
   // command that reached onboarding as a sub-step (bundle upload / credentials).
@@ -852,8 +858,9 @@ Example: npx @capgo/cli@latest build request com.example.app --platform ios --pa
   // iOS credential CLI options (can also be set via env vars or saved credentials)
   .option('--build-certificate-base64 <cert>', 'iOS: Base64-encoded .p12 certificate')
   .option('--p12-password <password>', 'iOS: Certificate password (optional if cert has no password)')
-  .option('--apple-id <email>', 'iOS: Apple ID email')
-  .option('--apple-app-specific-password <password>', 'iOS: App-specific password')
+  .option('--apple-id <email>', 'iOS: Apple ID email for app-specific password uploads (alternative to App Store Connect API key)')
+  .option('--apple-app-specific-password <password>', 'iOS: App-specific password (xxxx-xxxx-xxxx-xxxx) for TestFlight uploads')
+  .option('--apple-app-id <id>', 'iOS: Numeric App Store Connect app id (required together with --apple-id and --apple-app-specific-password)')
   .option('--apple-key-id <id>', 'iOS: App Store Connect API Key ID')
   .option('--apple-issuer-id <id>', 'iOS: App Store Connect Issuer ID')
   .option('--apple-key-content <content>', 'iOS: Base64-encoded App Store Connect API key (.p8)')
@@ -878,10 +885,33 @@ Example: npx @capgo/cli@latest build request com.example.app --platform ios --pa
   .option('--skip-build-number-bump', 'Skip automatic build number/version code incrementing. Uses whatever version is already in the project files.')
   .option('--no-skip-build-number-bump', 'Override saved credentials to re-enable automatic build number incrementing for this build only.')
   .option('--ai-analytics', 'On build failure, send logs to Capgo AI for diagnosis. In interactive terminals this skips the upfront confirmation; in CI this auto-uploads and prints the analysis to stderr.')
+  .option('--no-prescan', 'Skip the automatic pre-build scan')
+  .option('--prescan-ignore-fatal', 'Run the pre-build scan but never block the build (report only)')
+  .option('--fail-on-warnings', 'Treat prescan warnings as fatal')
+  .option('--send-logs-to-support', 'On a CI/CD build failure, automatically upload the build logs to Capgo support (no email required). Capgo support is notified and will follow up by email. Additive to --ai-analytics.')
+  .addOption(new Option('--send-logs', 'Deprecated alias for --send-logs-to-support').hideHelp())
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
   .option('--verbose', optionDescriptions.verbose)
+
+build
+  .command('prescan [appId]')
+  .description(`Scan your project and saved credentials for problems that would fail a cloud build — before uploading anything.
+
+Checks credentials (expiry, passwords, profile pairing), project state (cap sync, node_modules layout), and platform config. Runs automatically inside \`build request\`; this command runs it standalone (e.g. in CI).`)
+  .option('--platform <platform>', 'Target platform: ios or android (required)')
+  .option('--path <path>', 'Path to the project directory (default: current directory)')
+  .option('-a, --apikey <apikey>', optionDescriptions.apikey)
+  .option('--android-flavor <flavor>', 'Android: product flavor the build will use')
+  .addOption(new Option('--ios-dist <mode>', 'iOS: distribution mode to validate against').choices(['app_store', 'ad_hoc']))
+  .option('--json', 'Output a machine-readable JSON report')
+  .option('--fail-on-warnings', 'Exit non-zero when warnings are found (CI)')
+  .option('--ignore-fatal', 'Diagnostic mode: report everything but always exit 0')
+  .option('--verbose', optionDescriptions.verbose)
+  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+  .action(prescanCommand)
 
 build
   .command('last-output')
@@ -982,8 +1012,9 @@ Local storage (per-project):
   .option('--apple-issuer-id <id>', 'iOS: App Store Connect Issuer ID')
   .option('--apple-team-id <id>', 'iOS: App Store Connect Team ID')
   .addOption(new Option('--ios-distribution <mode>', 'iOS: Distribution mode').choices(['app_store', 'ad_hoc']).default('app_store'))
-  .option('--apple-id <email>', 'iOS: Apple ID email (optional)')
-  .option('--apple-app-password <password>', 'iOS: App-specific password (optional)')
+  .option('--apple-id <email>', 'iOS: Apple ID email for app-specific password uploads (alternative to App Store Connect API key)')
+  .option('--apple-app-specific-password <password>', 'iOS: App-specific password (xxxx-xxxx-xxxx-xxxx) for TestFlight uploads')
+  .option('--apple-app-id <id>', 'iOS: Numeric App Store Connect app id (required together with --apple-id and --apple-app-specific-password)')
   // Android options
   .option('--keystore <path>', 'Android: Path to keystore file (.keystore or .jks)')
   .option('--keystore-alias <alias>', 'Android: Keystore key alias')
@@ -1052,6 +1083,9 @@ Examples:
   .option('--apple-key-id <id>', 'App Store Connect API Key ID')
   .option('--apple-issuer-id <id>', 'App Store Connect Issuer ID')
   .option('--apple-team-id <id>', 'App Store Connect Team ID')
+  .option('--apple-id <email>', 'iOS: Apple ID email for app-specific password uploads (alternative to App Store Connect API key)')
+  .option('--apple-app-specific-password <password>', 'iOS: App-specific password (xxxx-xxxx-xxxx-xxxx) for TestFlight uploads')
+  .option('--apple-app-id <id>', 'iOS: Numeric App Store Connect app id (required together with --apple-id and --apple-app-specific-password)')
   .addOption(new Option('--ios-distribution <mode>', 'iOS: Distribution mode').choices(['app_store', 'ad_hoc']).default('app_store'))
   // Android options
   .option('--keystore <path>', 'Path to keystore file (.keystore or .jks)')
@@ -1173,6 +1207,7 @@ program.configureOutput({
     // Suppress Commander's default error output since we handle it in catch
   },
 })
+applyRawCommandAnalyticsOptOut(process.argv)
 
 void (async () => {
   try {
@@ -1203,7 +1238,7 @@ void (async () => {
       // Track the failure for usage analytics regardless of exception-capture
       // policy (commander usage errors are real failures, categorized 'commander').
       trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode })
-      await Promise.all([capturePromise, flushAnalytics()])
+      await Promise.all([capturePromise, flushAnalytics(), finishActiveCliReplay().catch(() => {})])
       exit(exitCode)
     }
     const capturePromise = capturePosthogException({
@@ -1215,7 +1250,7 @@ void (async () => {
     // For non-Commander errors, show full error details
     log.error(`Error: ${formatError(error)}`)
     trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode: 1 })
-    await Promise.all([capturePromise, flushAnalytics()])
+    await Promise.all([capturePromise, flushAnalytics(), finishActiveCliReplay().catch(() => {})])
     exit(1)
   }
 })()

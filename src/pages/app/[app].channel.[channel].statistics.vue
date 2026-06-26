@@ -382,7 +382,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
       },
     },
   },
-}))
+} as unknown as ChartOptions<'line'>))
 
 async function getChannel() {
   if (!id.value)
@@ -509,9 +509,7 @@ watchEffect(async () => {
 
 <template>
   <div>
-    <div v-if="loading" class="flex flex-col justify-center items-center min-h-[50vh]">
-      <Spinner size="w-40 h-40" />
-    </div>
+    <PageLoader v-if="loading" />
     <div v-else-if="channel" class="w-full h-full px-4 pt-0 mx-auto mb-8 sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
       <div class="flex flex-col gap-6">
         <!-- Status Banner -->

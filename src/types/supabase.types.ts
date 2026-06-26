@@ -314,6 +314,7 @@ export type Database = {
           allow_preview: boolean
           android_store_url: string | null
           app_id: string
+          block_provider_infra_requests: boolean
           build_timeout_seconds: number
           build_timeout_updated_at: string
           channel_device_count: number
@@ -341,6 +342,7 @@ export type Database = {
           allow_preview?: boolean
           android_store_url?: string | null
           app_id: string
+          block_provider_infra_requests?: boolean
           build_timeout_seconds?: number
           build_timeout_updated_at?: string
           channel_device_count?: number
@@ -368,6 +370,7 @@ export type Database = {
           allow_preview?: boolean
           android_store_url?: string | null
           app_id?: string
+          block_provider_infra_requests?: boolean
           build_timeout_seconds?: number
           build_timeout_updated_at?: string
           channel_device_count?: number
@@ -1098,6 +1101,7 @@ export type Database = {
           churn_mrr_maker: number
           churn_mrr_solo: number
           churn_mrr_team: number
+          churn_reason: string | null
           contraction_mrr: number
           contraction_mrr_enterprise: number
           contraction_mrr_maker: number
@@ -1117,6 +1121,7 @@ export type Database = {
           churn_mrr_maker?: number
           churn_mrr_solo?: number
           churn_mrr_team?: number
+          churn_reason?: string | null
           contraction_mrr?: number
           contraction_mrr_enterprise?: number
           contraction_mrr_maker?: number
@@ -1136,6 +1141,7 @@ export type Database = {
           churn_mrr_maker?: number
           churn_mrr_solo?: number
           churn_mrr_team?: number
+          churn_reason?: string | null
           contraction_mrr?: number
           contraction_mrr_enterprise?: number
           contraction_mrr_maker?: number
@@ -1272,6 +1278,7 @@ export type Database = {
           deleted_at: string | null
           id: number
           owner_org: string
+          transfer_history: Json[] | null
         }
         Insert: {
           app_id: string
@@ -1279,6 +1286,7 @@ export type Database = {
           deleted_at?: string | null
           id?: number
           owner_org: string
+          transfer_history?: Json[] | null
         }
         Update: {
           app_id?: string
@@ -1286,6 +1294,7 @@ export type Database = {
           deleted_at?: string | null
           id?: number
           owner_org?: string
+          transfer_history?: Json[] | null
         }
         Relationships: []
       }
@@ -1443,6 +1452,8 @@ export type Database = {
       }
       global_stats: {
         Row: {
+          active_canceled_orgs: number
+          active_past_due_orgs: number
           apps: number
           apps_active: number | null
           average_ltv: number
@@ -1469,6 +1480,7 @@ export type Database = {
           churn_revenue_maker: number
           churn_revenue_solo: number
           churn_revenue_team: number
+          completed_shards: Json
           created_at: string | null
           credits_bought: number
           credits_consumed: number
@@ -1486,6 +1498,9 @@ export type Database = {
           nrr: number
           onboarded: number | null
           org_conversion_rate: number
+          orgs: number
+          past_due_orgs: number
+          past_due_orgs_average_days: number
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
@@ -1519,16 +1534,18 @@ export type Database = {
           success_rate: number | null
           total_revenue: number
           trial: number | null
+          trial_extended_orgs: number
+          trial_extended_subscribed_orgs: number
           updates: number
           updates_external: number | null
           updates_last_month: number | null
           upgraded_orgs: number
-          trial_extended_orgs: number
-          trial_extended_subscribed_orgs: number
           users: number | null
           users_active: number | null
         }
         Insert: {
+          active_canceled_orgs?: number
+          active_past_due_orgs?: number
           apps: number
           apps_active?: number | null
           average_ltv?: number
@@ -1555,6 +1572,7 @@ export type Database = {
           churn_revenue_maker?: number
           churn_revenue_solo?: number
           churn_revenue_team?: number
+          completed_shards?: Json
           created_at?: string | null
           credits_bought?: number
           credits_consumed?: number
@@ -1572,6 +1590,9 @@ export type Database = {
           nrr?: number
           onboarded?: number | null
           org_conversion_rate?: number
+          orgs?: number
+          past_due_orgs?: number
+          past_due_orgs_average_days?: number
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
@@ -1605,16 +1626,18 @@ export type Database = {
           success_rate?: number | null
           total_revenue?: number
           trial?: number | null
+          trial_extended_orgs?: number
+          trial_extended_subscribed_orgs?: number
           updates: number
           updates_external?: number | null
           updates_last_month?: number | null
           upgraded_orgs?: number
-          trial_extended_orgs?: number
-          trial_extended_subscribed_orgs?: number
           users?: number | null
           users_active?: number | null
         }
         Update: {
+          active_canceled_orgs?: number
+          active_past_due_orgs?: number
           apps?: number
           apps_active?: number | null
           average_ltv?: number
@@ -1641,6 +1664,7 @@ export type Database = {
           churn_revenue_maker?: number
           churn_revenue_solo?: number
           churn_revenue_team?: number
+          completed_shards?: Json
           created_at?: string | null
           credits_bought?: number
           credits_consumed?: number
@@ -1658,6 +1682,9 @@ export type Database = {
           nrr?: number
           onboarded?: number | null
           org_conversion_rate?: number
+          orgs?: number
+          past_due_orgs?: number
+          past_due_orgs_average_days?: number
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
@@ -1691,12 +1718,12 @@ export type Database = {
           success_rate?: number | null
           total_revenue?: number
           trial?: number | null
+          trial_extended_orgs?: number
+          trial_extended_subscribed_orgs?: number
           updates?: number
           updates_external?: number | null
           updates_last_month?: number | null
           upgraded_orgs?: number
-          trial_extended_orgs?: number
-          trial_extended_subscribed_orgs?: number
           users?: number | null
           users_active?: number | null
         }
@@ -2513,6 +2540,7 @@ export type Database = {
           bandwidth_exceeded: boolean | null
           build_time_exceeded: boolean | null
           canceled_at: string | null
+          churn_reason: string | null
           created_at: string
           customer_country: string | null
           customer_id: string
@@ -2521,6 +2549,7 @@ export type Database = {
           last_stripe_event_at: string | null
           mau_exceeded: boolean | null
           paid_at: string | null
+          past_due_at: string | null
           plan_calculated_at: string | null
           plan_usage: number | null
           price_id: string | null
@@ -2538,6 +2567,7 @@ export type Database = {
           bandwidth_exceeded?: boolean | null
           build_time_exceeded?: boolean | null
           canceled_at?: string | null
+          churn_reason?: string | null
           created_at?: string
           customer_country?: string | null
           customer_id: string
@@ -2546,6 +2576,7 @@ export type Database = {
           last_stripe_event_at?: string | null
           mau_exceeded?: boolean | null
           paid_at?: string | null
+          past_due_at?: string | null
           plan_calculated_at?: string | null
           plan_usage?: number | null
           price_id?: string | null
@@ -2563,6 +2594,7 @@ export type Database = {
           bandwidth_exceeded?: boolean | null
           build_time_exceeded?: boolean | null
           canceled_at?: string | null
+          churn_reason?: string | null
           created_at?: string
           customer_country?: string | null
           customer_id?: string
@@ -2571,6 +2603,7 @@ export type Database = {
           last_stripe_event_at?: string | null
           mau_exceeded?: boolean | null
           paid_at?: string | null
+          past_due_at?: string | null
           plan_calculated_at?: string | null
           plan_usage?: number | null
           price_id?: string | null
@@ -2591,51 +2624,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "plans"
             referencedColumns: ["stripe_id"]
-          },
-        ]
-      }
-      trial_extension_events: {
-        Row: {
-          created_at: string
-          customer_id: string
-          extension_days: number
-          id: number
-          new_trial_at: string
-          org_id: string
-          previous_trial_at: string
-        }
-        Insert: {
-          created_at?: string
-          customer_id: string
-          extension_days: number
-          id?: number
-          new_trial_at: string
-          org_id: string
-          previous_trial_at: string
-        }
-        Update: {
-          created_at?: string
-          customer_id?: string
-          extension_days?: number
-          id?: number
-          new_trial_at?: string
-          org_id?: string
-          previous_trial_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "trial_extension_events_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "stripe_info"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "trial_extension_events_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
           },
         ]
       }
@@ -2720,6 +2708,51 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trial_extension_events: {
+        Row: {
+          created_at: string
+          customer_id: string
+          extension_days: number
+          id: number
+          new_trial_at: string
+          org_id: string
+          previous_trial_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          extension_days: number
+          id?: number
+          new_trial_at: string
+          org_id: string
+          previous_trial_at: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          extension_days?: number
+          id?: number
+          new_trial_at?: string
+          org_id?: string
+          previous_trial_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trial_extension_events_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "stripe_info"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "trial_extension_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
             referencedColumns: ["id"]
           },
         ]
@@ -3275,6 +3308,7 @@ export type Database = {
         }
         Returns: string
       }
+      app_has_real_bundle: { Args: { p_app_id: string }; Returns: boolean }
       app_versions_has_app_permission: {
         Args: {
           p_apikey: string
@@ -3429,6 +3463,7 @@ export type Database = {
         Args: { p_app_uuid: string }
         Returns: undefined
       }
+      cleanup_completed_onboarding_apps: { Args: never; Returns: undefined }
       cleanup_expired_apikeys: { Args: never; Returns: undefined }
       cleanup_expired_demo_apps: { Args: never; Returns: undefined }
       cleanup_frequent_job_details: { Args: never; Returns: undefined }
@@ -3559,6 +3594,7 @@ export type Database = {
           allow_preview: boolean
           android_store_url: string | null
           app_id: string
+          block_provider_infra_requests: boolean
           build_timeout_seconds: number
           build_timeout_updated_at: string
           channel_device_count: number
@@ -3794,6 +3830,7 @@ export type Database = {
           allow_preview: boolean
           android_store_url: string
           app_id: string
+          block_provider_infra_requests: boolean
           build_timeout_seconds: number
           build_timeout_updated_at: string
           channel_device_count: number

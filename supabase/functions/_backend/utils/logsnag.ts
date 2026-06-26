@@ -21,12 +21,21 @@ function logsnag(c: Context) {
   return ls as LogSnag
 }
 
-async function logsnagInsights(c: Context, data: { title: string, value: string | boolean | number, icon: string }[]) {
+interface LogsnagInsightsOptions {
+  strict?: boolean
+}
+
+async function logsnagInsights(c: Context, data: { title: string, value: string | boolean | number, icon: string }[], options: LogsnagInsightsOptions = {}) {
   cloudlog({ requestId: c.get('requestId'), message: 'logsnagInsights', data })
   const ls = getEnv(c, 'LOGSNAG_TOKEN')
   const project = getEnv(c, 'LOGSNAG_PROJECT')
-  if (!ls || !project)
+  if (!ls || !project) {
+    const error = new Error('LogSnag insights is not configured')
+    cloudlogErr({ requestId: c.get('requestId'), message: 'logsnagInsights error', error: serializeError(error) })
+    if (options.strict)
+      throw error
     return Promise.resolve(false)
+  }
 
   // Send all insights in parallel
   const promises = data.map(async (d) => {
@@ -50,6 +59,8 @@ async function logsnagInsights(c: Context, data: { title: string, value: string 
       if (!response.ok) {
         const error = await response.text()
         cloudlogErr({ requestId: c.get('requestId'), message: 'logsnagInsights error', status: response.status, error, payload })
+        if (options.strict)
+          throw new Error(`LogSnag insight failed with HTTP ${response.status}`)
         return false
       }
 
@@ -57,6 +68,8 @@ async function logsnagInsights(c: Context, data: { title: string, value: string 
     }
     catch (e) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'logsnagInsights error', error: serializeError(e), payload })
+      if (options.strict)
+        throw e
       return false
     }
   })

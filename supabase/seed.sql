@@ -81,10 +81,10 @@ BEGIN
     (NOW(), encode(extensions.digest('deleted@capgo.app'::bytea, 'sha256'::text)::bytea, 'hex'::text), '00000000-0000-0000-0000-000000000001');
 
     INSERT INTO "public"."plans" ("created_at", "updated_at", "name", "description", "price_m", "price_y", "stripe_id", "credit_id", "id", "price_m_id", "price_y_id", "storage", "bandwidth", "mau", "market_desc", "build_time_unit", "native_build_concurrency") VALUES
-    (NOW(), NOW(), 'Maker', 'plan.maker.desc', 39, 396, 'prod_LQIs1Yucml9ChU', 'prod_TJRd2hFHZsBIPK', '440cfd69-0cfd-486e-b59b-cb99f7ae76a0', 'price_1KjSGyGH46eYKnWwL4h14DsK', 'price_1KjSKIGH46eYKnWwFG9u4tNi', 3221225472, 268435456000, 10000, 'Best for small business owners', 3600, 3),
-    (NOW(), NOW(), 'Enterprise', 'plan.payasyougo.desc', 239, 4799, 'prod_MH5Jh6ajC9e7ZH', 'prod_TJRd2hFHZsBIPK', '745d7ab3-6cd6-4d65-b257-de6782d5ba50', 'price_1LYX8yGH46eYKnWwzeBjISvW', 'price_1LYX8yGH46eYKnWwzeBjISvW', 12884901888, 3221225472000, 1000000, 'Best for scalling enterprises', 600000, 6),
-    (NOW(), NOW(), 'Solo', 'plan.solo.desc', 14, 146, 'prod_LQIregjtNduh4q', 'prod_TJRd2hFHZsBIPK', '526e11d8-3c51-4581-ac92-4770c602f47c', 'price_1LVvuZGH46eYKnWwuGKOf4DK', 'price_1LVvuIGH46eYKnWwHMDCrxcH', 1073741824, 13958643712, 2000, 'Best for independent developers', 1800, 2),
-    (NOW(), NOW(), 'Team', 'plan.team.desc', 99, 998, 'prod_LQIugvJcPrxhda', 'prod_TJRd2hFHZsBIPK', 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77', 'price_1KjSIUGH46eYKnWwWHvg8XYs', 'price_1KjSLlGH46eYKnWwAwMW2wiW', 6442450944, 536870912000, 100000, 'Best for medium enterprises', 18000, 4);
+    (NOW(), NOW(), 'Maker', 'plan.maker.desc', 39, 396, 'prod_LQIs1Yucml9ChU', 'prod_TJRd2hFHZsBIPK', '440cfd69-0cfd-486e-b59b-cb99f7ae76a0', 'price_1KjSGyGH46eYKnWwL4h14DsK', 'price_1KjSKIGH46eYKnWwFG9u4tNi', 3221225472, 268435456000, 10000, 'Best for small business owners', 7200, 3),
+    (NOW(), NOW(), 'Enterprise', 'plan.payasyougo.desc', 239, 4799, 'prod_MH5Jh6ajC9e7ZH', 'prod_TJRd2hFHZsBIPK', '745d7ab3-6cd6-4d65-b257-de6782d5ba50', 'price_1LYX8yGH46eYKnWwzeBjISvW', 'price_1LYX8yGH46eYKnWwzeBjISvW', 12884901888, 3221225472000, 1000000, 'Best for scalling enterprises', 1200000, 6),
+    (NOW(), NOW(), 'Solo', 'plan.solo.desc', 14, 146, 'prod_LQIregjtNduh4q', 'prod_TJRd2hFHZsBIPK', '526e11d8-3c51-4581-ac92-4770c602f47c', 'price_1LVvuZGH46eYKnWwuGKOf4DK', 'price_1LVvuIGH46eYKnWwHMDCrxcH', 1073741824, 13958643712, 2000, 'Best for independent developers', 3600, 2),
+    (NOW(), NOW(), 'Team', 'plan.team.desc', 99, 998, 'prod_LQIugvJcPrxhda', 'prod_TJRd2hFHZsBIPK', 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77', 'price_1KjSIUGH46eYKnWwWHvg8XYs', 'price_1KjSLlGH46eYKnWwAwMW2wiW', 6442450944, 536870912000, 100000, 'Best for medium enterprises', 36000, 4);
 
     INSERT INTO
       "public"."capgo_credits_steps" (
@@ -104,12 +104,12 @@ BEGIN
       ('mau', 25000000, 40000000, 0.001, 1, NULL),
       ('mau', 40000000, 100000000, 0.0009, 1, NULL),
       ('mau', 100000000, 9223372036854775807, 0.0007, 1, NULL),
-      ('bandwidth', 0, 1099511627776, 0.12, 1073741824, NULL), -- 0–1 TB
+      ('bandwidth', 0, 1099511627776, 0.06, 1073741824, NULL), -- 0–1 TB
       (
         'bandwidth',
         1099511627776,
         2199023255552,
-        0.10,
+        0.05,
         1073741824,
         NULL
       ), -- 1–2 TB
@@ -117,7 +117,7 @@ BEGIN
         'bandwidth',
         2199023255552,
         6597069766656,
-        0.085,
+        0.0425,
         1073741824,
         NULL
       ), -- 2–6 TB
@@ -125,7 +125,7 @@ BEGIN
         'bandwidth',
         6597069766656,
         13194139533312,
-        0.07,
+        0.035,
         1073741824,
         NULL
       ), -- 6–12 TB
@@ -133,7 +133,7 @@ BEGIN
         'bandwidth',
         13194139533312,
         27487790694400,
-        0.055,
+        0.0275,
         1073741824,
         NULL
       ), -- 12–25 TB
@@ -141,7 +141,7 @@ BEGIN
         'bandwidth',
         27487790694400,
         69269232549888,
-        0.04,
+        0.02,
         1073741824,
         NULL
       ), -- 25–63 TB
@@ -149,7 +149,7 @@ BEGIN
         'bandwidth',
         69269232549888,
         139637976727552,
-        0.03,
+        0.015,
         1073741824,
         NULL
       ), -- 63–127 TB
@@ -157,7 +157,7 @@ BEGIN
         'bandwidth',
         139637976727552,
         9223372036854775807,
-        0.02,
+        0.01,
         1073741824,
         NULL
       ), -- 127+ TB
@@ -218,12 +218,12 @@ BEGIN
         1073741824,
         NULL
       ), -- 1280+ GiB
-      ('build_time', 0, 6000, 0.16, 60, NULL), -- 0-100 minutes (in seconds, displayed as minutes)
-      ('build_time', 6000, 30000, 0.14, 60, NULL), -- 100-500 minutes (in seconds, displayed as minutes)
-      ('build_time', 30000, 60000, 0.12, 60, NULL), -- 500-1000 minutes (in seconds, displayed as minutes)
-      ('build_time', 60000, 300000, 0.10, 60, NULL), -- 1000-5000 minutes (in seconds, displayed as minutes)
-      ('build_time', 300000, 600000, 0.09, 60, NULL), -- 5000-10000 minutes (in seconds, displayed as minutes)
-      ('build_time', 600000, 9223372036854775807, 0.08, 60, NULL); -- 10000+ minutes (in seconds, displayed as minutes)
+      ('build_time', 0, 6000, 0.08, 60, NULL), -- 0-100 minutes (in seconds, displayed as minutes)
+      ('build_time', 6000, 30000, 0.07, 60, NULL), -- 100-500 minutes (in seconds, displayed as minutes)
+      ('build_time', 30000, 60000, 0.06, 60, NULL), -- 500-1000 minutes (in seconds, displayed as minutes)
+      ('build_time', 60000, 300000, 0.05, 60, NULL), -- 1000-5000 minutes (in seconds, displayed as minutes)
+      ('build_time', 300000, 600000, 0.045, 60, NULL), -- 5000-10000 minutes (in seconds, displayed as minutes)
+      ('build_time', 600000, 9223372036854775807, 0.04, 60, NULL); -- 10000+ minutes (in seconds, displayed as minutes)
 
     INSERT INTO "storage"."buckets" ("id", "name", "owner", "created_at", "updated_at", "public") VALUES
     ('capgo', 'capgo', NULL, NOW(), NOW(), 't'),

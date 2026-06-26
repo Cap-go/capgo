@@ -8,8 +8,12 @@ export {}
 declare global {
   // eslint-disable-next-line no-var, vars-on-top
   var __CAPGO_DEV__: boolean | undefined
-  // false in the NPM release (DCE strips registerOnboardingTools + MCP-only
-  // deciders); flipped true when the MCP onboarding is release-ready (PR 2).
+  // Defined `true` in the NPM release since PR 2 (the MCP onboarding is
+  // release-ready); was `false` in PR 1, where DCE stripped
+  // registerOnboardingTools + the MCP-only deciders out of dist.
   // eslint-disable-next-line no-var, vars-on-top
   var __CAPGO_MCP_ONBOARDING__: boolean | undefined
+  // MCP live-update onboarding tools (OTA setup spine).
+  // eslint-disable-next-line no-var, vars-on-top
+  var __CAPGO_MCP_LIVE_UPDATE__: boolean | undefined
 }
