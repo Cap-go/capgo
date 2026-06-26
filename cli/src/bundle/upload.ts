@@ -778,6 +778,28 @@ async function findUploadTargetChannel(supabase: SupabaseType, appid: string, ch
   return data
 }
 
+async function preflightRequiredChannelAssignments(supabase: SupabaseType, apikey: string, appid: string, channels: string[]): Promise<Map<string, UploadTargetChannel | null>> {
+  const uploadTargetChannels = new Map<string, UploadTargetChannel | null>()
+
+  for (const channel of new Set(channels)) {
+    const targetChannel = await findUploadTargetChannel(supabase, appid, channel)
+    uploadTargetChannels.set(channel, targetChannel)
+
+    if (targetChannel) {
+      const canPromoteTargetChannel = await hasCliPermission(supabase, apikey, 'channel.promote_bundle', { appId: appid, channelId: targetChannel.id })
+      if (!canPromoteTargetChannel)
+        uploadFail('Cannot set channel because this API key lacks channel.promote_bundle for the target channel')
+      continue
+    }
+
+    const canCreateChannel = await hasCliPermission(supabase, apikey, 'app.create_channel', { appId: appid })
+    if (!canCreateChannel)
+      uploadFail('Cannot create target channel because this API key lacks app.create_channel')
+  }
+
+  return uploadTargetChannels
+}
+
 async function formatFunctionInvokeError(error: unknown): Promise<string> {
   const context = (error as { context?: { json?: () => Promise<unknown> } } | null)?.context
   if (context?.json) {
@@ -1201,6 +1223,10 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     log.warn('Please make sure you want to do this, if you are not sure, please do not use this option.')
   }
 
+  const uploadTargetChannels = channelAssignmentRequired
+    ? await preflightRequiredChannelAssignments(supabase, apikey, appid, channelsToAssign)
+    : new Map<string, UploadTargetChannel | null>()
+
   const versionData = {
     name: bundle,
     app_id: appid,
@@ -1513,7 +1539,9 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     if (options.verbose)
       log.info(`[Verbose] Setting bundle ${bundle} to channel ${targetChannel}...`)
 
-    const uploadTargetChannel = await findUploadTargetChannel(supabase, appid, targetChannel)
+    const uploadTargetChannel = uploadTargetChannels.has(targetChannel)
+      ? uploadTargetChannels.get(targetChannel) ?? null
+      : await findUploadTargetChannel(supabase, appid, targetChannel)
     const targetChannelVersionSet = await setVersionInChannel(supabase, apikey, !!options.bundleUrl, bundle, targetChannel, userId, orgId, appid, localConfig, uploadTargetChannel, channelAssignmentRequired, options.selfAssign)
     if (targetChannelVersionSet)
       channelVersionSet.add(targetChannel)

@@ -889,6 +889,17 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ORG_SUPER_ADMIN) {
           error: 'Cannot upload the same bundle content',
         }
       }
+      if (targetChannels.length > 0) {
+        for (const targetChannel of channelsToAssign) {
+          const channelRecord = await getChannelRecord(options.appId, targetChannel)
+          if (!channelRecord)
+            return { success: false, error: `Channel ${targetChannel} not found for app ${options.appId}` }
+
+          const canPromote = await apiKeyHasAnyChannelPermission(resolvedApiKey, apiKey, app, channelRecord.id, ['channel.promote_bundle'])
+          if (!canPromote)
+            return { success: false, error: 'Cannot set channel because this API key lacks channel.promote_bundle for the target channel' }
+        }
+      }
 
       const minUpdateVersion = await resolveUploadMinUpdateVersion(
         options.appId,
