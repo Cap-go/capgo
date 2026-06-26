@@ -405,7 +405,7 @@ export function appflowViewForStep(step: AppflowStep, progress: AppflowProgress,
           + 'An App Store Connect API key (a .p8 file) unlocks more:\n'
           + '- Before each build, Capgo can inspect your certificates and provisioning profiles and flag signing '
           + 'problems early (the pre-scan), instead of a build failing partway through.\n'
-          + '- It is more secure (a scoped, revocable key), so your Apple ID password is never involved.\n'
+          + '- It is more secure (a scoped, revocable key), so your app-specific password is never involved.\n'
           + '- It does more than upload (it is the key Apple\'s own tools use for the full App Store Connect API).\n\n'
           + 'Setting one up takes a few manual steps in the Apple Developer portal and can take up to about 5 minutes. '
           + 'You can also do this later.',
