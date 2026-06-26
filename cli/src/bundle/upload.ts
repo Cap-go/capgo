@@ -844,9 +844,15 @@ async function setRolloutVersionInChannel(
 ): Promise<boolean> {
   const versionId = await getVersionIdForChannelUpdate(supabase, apikey, appid, bundle)
 
+  const apiAccess = await hasCliPermission(supabase, apikey, 'app.create_channel', { appId: appid })
+  if (!apiAccess) {
+    log.warn('The upload key is not allowed to set the rollout version in the channel')
+    return false
+  }
+
   const { data: existingChannel, error: channelError } = await supabase
     .from('channels')
-    .select('id, version')
+    .select('id, version, rollout_version')
     .eq('app_id', appid)
     .eq('name', channel)
     .single()
@@ -858,10 +864,12 @@ async function setRolloutVersionInChannel(
     uploadFail(`Cannot set rollout, channel ${channel} needs a stable bundle before using progressive rollout`)
   }
 
+  const shouldResumeSameRollout = existingChannel.rollout_version === versionId && rolloutPercentageBps > 0
   const channelPayload: Database['public']['Tables']['channels']['Update'] = {
     rollout_version: versionId,
     rollout_percentage_bps: rolloutPercentageBps,
     rollout_enabled: rolloutPercentageBps > 0,
+    ...(shouldResumeSameRollout ? { rollout_paused_at: null, rollout_pause_reason: null } : {}),
     ...(selfAssign ? { allow_device_self_set: true } : {}),
   }
   if (rolloutCacheTtlSeconds != null)
