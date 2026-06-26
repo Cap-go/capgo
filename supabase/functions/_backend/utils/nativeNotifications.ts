@@ -337,8 +337,9 @@ export async function createNotificationDeliveryEventProofFromSecret(secret: str
   deviceKey: string
   campaignId: string
   notificationId: string
+  event: NativeNotificationEvent
 }): Promise<string> {
-  return hmacHex(secret, `${DELIVERY_EVENT_PROOF_PREFIX}:${params.appId}:${params.recipientKey}:${params.deviceKey}:${params.campaignId}:${params.notificationId}`)
+  return hmacHex(secret, `${DELIVERY_EVENT_PROOF_PREFIX}:${params.appId}:${params.recipientKey}:${params.deviceKey}:${params.campaignId}:${params.notificationId}:${params.event}`)
 }
 
 export async function createNotificationDeliveryEventProof(c: Context, params: {
@@ -347,6 +348,7 @@ export async function createNotificationDeliveryEventProof(c: Context, params: {
   deviceKey: string
   campaignId: string
   notificationId: string
+  event: NativeNotificationEvent
 }): Promise<string> {
   return createNotificationDeliveryEventProofFromSecret(getNotificationHashSecret(c), params)
 }
@@ -357,6 +359,7 @@ export async function verifyNotificationDeliveryEventProof(c: Context, params: {
   deviceKey: string
   campaignId: string
   notificationId: string
+  event: NativeNotificationEvent
   proof: string
 }): Promise<boolean> {
   return secureCompare(params.proof, await createNotificationDeliveryEventProof(c, params))
@@ -560,7 +563,7 @@ export async function readNotificationRegistrationsCF(c: Context<MiddlewareKeyVa
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'readNotificationRegistrationsCF error', error: serializeError(error) })
-    return [] as NativeNotificationRegistryRow[]
+    throw simpleError('notification_registry_query_failed', 'Notification registry lookup failed')
   }
 }
 

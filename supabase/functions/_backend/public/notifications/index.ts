@@ -54,7 +54,6 @@ const CLIENT_NOTIFICATION_DELIVERY_EVENTS = new Set<NativeNotificationEvent>([
   'background_finished',
 ])
 const CLIENT_NOTIFICATION_DEVICE_EVENTS = new Set<NativeNotificationEvent>([
-  'permission_changed',
   'badge_applied',
 ])
 const NOTIFICATION_PLATFORMS = new Set<NativeNotificationPlatform>(['ios', 'android'])
@@ -614,6 +613,7 @@ app.post('/events', async (c) => {
         deviceKey,
         campaignId,
         notificationId,
+        event: body.event,
         proof: eventProof,
       })
     : await verifyNotificationEventProof(c, appId, recipientKey, deviceKey, eventProof)

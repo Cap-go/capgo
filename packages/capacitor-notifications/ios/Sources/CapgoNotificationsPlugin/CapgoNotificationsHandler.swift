@@ -1,6 +1,6 @@
 import Capacitor
+import UIKit
 import UserNotifications
-
 public class CapgoNotificationsHandler: NSObject, NotificationHandlerProtocol {
     public weak var plugin: CAPPlugin?
 
@@ -66,12 +66,19 @@ public class CapgoNotificationsHandler: NSObject, NotificationHandlerProtocol {
         self.plugin?.notifyListeners("notificationOpened", data: data, retainUntilConsumed: true)
     }
 
-    public func handleRemoteNotification(_ userInfo: [AnyHashable: Any]) {
+    public func handleRemoteNotification(_ userInfo: [AnyHashable: Any], completionHandler: ((UIBackgroundFetchResult) -> Void)? = nil) {
         let notificationData = makeRemoteNotificationJSObject(userInfo)
         self.plugin?.notifyListeners("notificationReceived", data: notificationData, retainUntilConsumed: true)
 
-        if isCapgoBackgroundPayload(userInfo) {
+        let isBackground = isCapgoBackgroundPayload(userInfo)
+        if isBackground {
             self.plugin?.notifyListeners("backgroundNotification", data: notificationData, retainUntilConsumed: true)
+        }
+
+        guard let completionHandler = completionHandler else { return }
+        let delay = isBackground ? 25.0 : 1.0
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            completionHandler(isBackground ? .newData : .noData)
         }
     }
 

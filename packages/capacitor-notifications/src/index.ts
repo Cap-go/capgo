@@ -49,6 +49,7 @@ interface UpdaterPlugin {
 interface StoredNotificationRegistration extends CapgoNotificationRegistration {
   appId: string
   externalId: string
+  identityProof?: string
 }
 
 interface StoredBadgeState {
@@ -58,6 +59,7 @@ interface StoredBadgeState {
 }
 
 type QueuedNotificationEventName = 'received' | 'opened' | 'background_started' | 'background_finished' | 'badge_applied'
+type DeliveryTrackedEventName = Exclude<QueuedNotificationEventName, 'badge_applied'>
 
 interface QueuedNotificationEvent extends CapgoNotificationEvent {
   event: QueuedNotificationEventName
@@ -225,8 +227,12 @@ function hydrateStoredRegistration(appId?: string): StoredNotificationRegistrati
   if (state.lastRegistration?.appId === appId)
     return state.lastRegistration
   const storedRegistration = readStoredRegistration(appId)
-  if (storedRegistration)
+  if (storedRegistration) {
     state.lastRegistration = storedRegistration
+    state.externalId = state.externalId || storedRegistration.externalId
+    if (storedRegistration.identityProof)
+      state.identityProof = state.identityProof || storedRegistration.identityProof
+  }
   return storedRegistration
 }
 
@@ -385,14 +391,26 @@ function getStringData(data: Record<string, unknown>, ...keys: string[]) {
   return ''
 }
 
-function eventFromNotification(notification?: CapgoPushNotificationSchema): CapgoNotificationEvent {
+function eventProofFromNotificationData(data: Record<string, unknown>, event?: DeliveryTrackedEventName) {
+  if (event === 'received')
+    return getStringData(data, 'capgoReceivedEventProof', 'capgo_received_event_proof') || undefined
+  if (event === 'opened')
+    return getStringData(data, 'capgoOpenedEventProof', 'capgo_opened_event_proof') || undefined
+  if (event === 'background_started')
+    return getStringData(data, 'capgoBackgroundStartedEventProof', 'capgo_background_started_event_proof') || undefined
+  if (event === 'background_finished')
+    return getStringData(data, 'capgoBackgroundFinishedEventProof', 'capgo_background_finished_event_proof') || undefined
+  return getStringData(data, 'capgoEventProof', 'capgo_event_proof') || undefined
+}
+
+function eventFromNotification(notification?: CapgoPushNotificationSchema, event?: DeliveryTrackedEventName): CapgoNotificationEvent {
   const data = notificationData(notification)
   return {
     campaignId: getStringData(data, 'capgoCampaignId', 'capgo_campaign_id') || undefined,
     notificationId: getStringData(data, 'capgoNotificationId', 'capgo_notification_id') || notification?.id,
     recipientKey: getStringData(data, 'capgoRecipientKey', 'capgo_recipient_key') || undefined,
     deviceKey: getStringData(data, 'capgoDeviceKey', 'capgo_device_key') || undefined,
-    eventProof: getStringData(data, 'capgoEventProof', 'capgo_event_proof') || undefined,
+    eventProof: eventProofFromNotificationData(data, event),
   }
 }
 
@@ -533,7 +551,7 @@ async function registerToken(options: CapgoNotificationRegisterOptions, token: C
   }
   if (typeof registration.badgeRevision === 'number')
     state.badgeRevision = Math.max(state.badgeRevision, Math.trunc(registration.badgeRevision))
-  state.lastRegistration = { ...registration, appId, externalId: options.externalId }
+  state.lastRegistration = { ...registration, appId, externalId: options.externalId, identityProof }
   writeStoredRegistration(state.lastRegistration)
   writeStoredBadgeState(appId)
   await flushEventQueue(appId)
@@ -774,11 +792,11 @@ async function maybeRunUpdateCheck(notification?: CapgoPushNotificationSchema) {
         state.handledUpdateNotifications.delete(oldest)
     }
   }
-  const baseEvent = eventFromNotification(notification)
-  await trackEvent('background_started', baseEvent)
+  const startedEvent = eventFromNotification(notification, 'background_started')
+  await trackEvent('background_started', startedEvent)
   const result = await CapgoNotifications.runUpdateCheck(updateOptionsFromNotification(notification))
   await trackEvent('background_finished', {
-    ...baseEvent,
+    ...eventFromNotification(notification, 'background_finished'),
     error: result.error,
   })
 }
@@ -799,7 +817,7 @@ async function ensureBridgeListeners() {
     try {
       await addBridgeHandle(handles, NativeCapgoNotifications.addListener('registration', (token) => {
         state.token = token
-        if (state.externalId) {
+        if (state.externalId && state.identityProof) {
           void registerToken({
             appId: state.config?.appId,
             serverUrl: state.config?.serverUrl,
@@ -815,7 +833,7 @@ async function ensureBridgeListeners() {
       await addBridgeHandle(handles, NativeCapgoNotifications.addListener('notificationReceived', (notification) => {
         void Promise.allSettled([
           applyBadgeFromNotification(notification),
-          trackEvent('received', eventFromNotification(notification)),
+          trackEvent('received', eventFromNotification(notification, 'received')),
           maybeRunUpdateCheck(notification),
         ])
         notifyListeners(state.listeners.notificationReceived, notification)
@@ -823,21 +841,21 @@ async function ensureBridgeListeners() {
       await addBridgeHandle(handles, NativeCapgoNotifications.addListener('notificationOpened', (event) => {
         void Promise.allSettled([
           applyBadgeFromNotification(event.notification),
-          trackEvent('opened', eventFromNotification(event.notification)),
+          trackEvent('opened', eventFromNotification(event.notification, 'opened')),
         ])
         notifyListeners(state.listeners.notificationOpened, event)
       }))
       await addBridgeHandle(handles, NativeCapgoNotifications.addListener('backgroundNotification', (notification) => {
         void applyBadgeFromNotification(notification).catch(() => undefined)
         if (!isUpdateCheckNotification(notification))
-          void trackEvent('background_started', eventFromNotification(notification)).catch(() => undefined)
+          void trackEvent('background_started', eventFromNotification(notification, 'background_started')).catch(() => undefined)
         void maybeRunUpdateCheck(notification).catch(() => undefined)
         let finished = false
         const finish = async () => {
           if (finished)
             return
           finished = true
-          await trackEvent('background_finished', eventFromNotification(notification))
+          await trackEvent('background_finished', eventFromNotification(notification, 'background_finished'))
         }
         notifyListeners(state.listeners.backgroundNotification, { notification, finish })
       }))

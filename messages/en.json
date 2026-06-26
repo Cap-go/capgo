@@ -1487,6 +1487,7 @@
   "notification-provider-secret-ref-help": "Capgo reads the private platform key from this secret name. Store the secret before marking the platform configured.",
   "notification-provider-setup": "Platform credentials",
   "notification-quick-send": "Test send",
+  "notification-queue-unavailable": "Notification queue is not configured",
   "notification-recipient-external-id": "Customer external ID",
   "notification-recipient-lookup": "Recipient lookup",
   "notification-save-provider": "Save credentials",

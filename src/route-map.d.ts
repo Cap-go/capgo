@@ -896,6 +896,8 @@ declare module 'vue-router/auto-routes' {
         | '/app/[app].notifications'
       views:
         | never
+      pathParamNames:
+        | 'app'
     }
     'src/pages/app/modules.vue': {
       routes:

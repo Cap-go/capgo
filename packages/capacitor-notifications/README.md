@@ -24,8 +24,10 @@ For iOS silent/background notifications, forward remote notifications from `ios/
 
 ```swift
 func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
-    NotificationCenter.default.post(name: Notification.Name("CapgoNotificationsRemoteNotification"), object: userInfo)
-    completionHandler(.newData)
+    NotificationCenter.default.post(name: Notification.Name("CapgoNotificationsRemoteNotification"), object: nil, userInfo: [
+        "userInfo": userInfo,
+        "completionHandler": completionHandler,
+    ])
 }
 ```
 

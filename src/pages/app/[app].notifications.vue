@@ -59,6 +59,10 @@ interface NotificationSettings {
   pushUpdateChannel: string | null
 }
 
+interface NotificationQueueResponse {
+  queued?: boolean
+}
+
 const { t } = useI18n()
 const route = useRoute()
 const supabase = useSupabase()
@@ -371,7 +375,7 @@ async function saveNotificationSettings() {
 async function pushUpdateNow() {
   isSaving.value = true
   try {
-    await notificationFetch('/update-check', {
+    const response = await notificationFetch<NotificationQueueResponse>('/update-check', {
       method: 'POST',
       body: JSON.stringify({
         appId: id.value,
@@ -380,6 +384,8 @@ async function pushUpdateNow() {
         channel: pushUpdateChannel.value.trim() || null,
       }),
     })
+    if (!response.queued)
+      throw new Error(t('notification-queue-unavailable'))
     toast.success(t('notification-update-push-success'))
     await reloadNotifications()
   }
@@ -397,7 +403,7 @@ async function sendTest() {
     return
   isSaving.value = true
   try {
-    await notificationFetch('/send', {
+    const response = await notificationFetch<NotificationQueueResponse>('/send', {
       method: 'POST',
       body: JSON.stringify({
         appId: id.value,
@@ -406,6 +412,8 @@ async function sendTest() {
         limit: 10,
       }),
     })
+    if (!response.queued)
+      throw new Error(t('notification-queue-unavailable'))
     toast.success(t('notification-send-success'))
     await reloadNotifications()
   }

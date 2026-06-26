@@ -273,6 +273,7 @@ describe('native notification AE registry', () => {
         deviceKey: 'device-key',
         campaignId: 'campaign-1',
         notificationId: 'notification-1',
+        event: 'received',
       })
 
       expect(await verifyNotificationIdentityProof(context, 'com.demo.app', 'user-1', identityProof)).toBe(true)
@@ -285,6 +286,7 @@ describe('native notification AE registry', () => {
         deviceKey: 'device-key',
         campaignId: 'campaign-1',
         notificationId: 'notification-1',
+        event: 'received',
         proof: deliveryProof,
       })).toBe(true)
       expect(await verifyNotificationDeliveryEventProof(context, {
@@ -293,6 +295,7 @@ describe('native notification AE registry', () => {
         deviceKey: 'device-key',
         campaignId: 'campaign-2',
         notificationId: 'notification-1',
+        event: 'received',
         proof: deliveryProof,
       })).toBe(false)
     }
@@ -451,7 +454,10 @@ describe('native notification queue sender', () => {
     expect(requests[0].message.data.capgoAction).toBe('update_check')
     expect(requests[0].message.data.capgoCampaignId).toBe('campaign-update')
     expect(requests[0].message.data.capgoNotificationId).toEqual(expect.any(String))
-    expect(requests[0].message.data.capgoEventProof).toEqual(expect.any(String))
+    expect(requests[0].message.data.capgoReceivedEventProof).toEqual(expect.any(String))
+    expect(requests[0].message.data.capgoOpenedEventProof).toEqual(expect.any(String))
+    expect(requests[0].message.data.capgoBackgroundStartedEventProof).toEqual(expect.any(String))
+    expect(requests[0].message.data.capgoBackgroundFinishedEventProof).toEqual(expect.any(String))
     expect(requests[0].message.data.capgoUpdateInstallMode).toBe('next')
     expect(requests[0].message.android.priority).toBe('high')
     expect(requests[0].message.apns.payload.aps['content-available']).toBe(1)

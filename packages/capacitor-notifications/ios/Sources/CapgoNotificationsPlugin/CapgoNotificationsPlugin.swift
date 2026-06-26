@@ -215,8 +215,11 @@ public class CapgoNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc public func didReceiveRemoteNotification(notification: NSNotification) {
-        guard let userInfo = notification.object as? [AnyHashable: Any] else { return }
-        self.notificationDelegateHandler.handleRemoteNotification(userInfo)
+        let payload = notification.userInfo?["userInfo"] as? [AnyHashable: Any]
+        let directPayload = notification.object as? [AnyHashable: Any]
+        guard let userInfo = payload ?? directPayload else { return }
+        let completionHandler = notification.userInfo?["completionHandler"] as? ((UIBackgroundFetchResult) -> Void)
+        self.notificationDelegateHandler.handleRemoteNotification(userInfo, completionHandler: completionHandler)
     }
 
     private func setBadgeCount(_ count: Int, completion: @escaping (Error?) -> Void) {

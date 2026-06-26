@@ -16,6 +16,7 @@ const DEFAULT_NOTIFICATION_REGISTRY_DATASET = 'notification_registry'
 type NotificationQueueBinding = {
   send?: (body: NativeNotificationQueueMessage, options?: { delaySeconds?: number }) => Promise<unknown>
 }
+type DeliveryTrackedEvent = 'received' | 'opened' | 'background_started' | 'background_finished'
 
 interface SendOutcome {
   ok: boolean
@@ -283,13 +284,19 @@ function getNotificationHashSecret(env: NotificationEnv): string {
 
 async function withDeliveryMetadata(env: NotificationEnv, message: NativeNotificationQueueMessage, device: NativeNotificationRegistryRow, notificationId: string): Promise<NativeNotificationQueueMessage> {
   const campaignId = message.campaignId
-  const eventProof = await createNotificationDeliveryEventProofFromSecret(getNotificationHashSecret(env), {
-    appId: message.appId,
-    recipientKey: device.recipient_key,
-    deviceKey: device.device_key,
-    campaignId,
-    notificationId,
-  })
+  const deliveryEvents: DeliveryTrackedEvent[] = ['received', 'opened', 'background_started', 'background_finished']
+  const eventProofEntries = await Promise.all(deliveryEvents.map(async event => [
+    event,
+    await createNotificationDeliveryEventProofFromSecret(getNotificationHashSecret(env), {
+      appId: message.appId,
+      recipientKey: device.recipient_key,
+      deviceKey: device.device_key,
+      campaignId,
+      notificationId,
+      event,
+    }),
+  ] as const))
+  const eventProofs = Object.fromEntries(eventProofEntries) as Record<DeliveryTrackedEvent, string>
   return {
     ...message,
     payload: {
@@ -300,7 +307,10 @@ async function withDeliveryMetadata(env: NotificationEnv, message: NativeNotific
         capgoNotificationId: notificationId,
         capgoRecipientKey: device.recipient_key,
         capgoDeviceKey: device.device_key,
-        capgoEventProof: eventProof,
+        capgoReceivedEventProof: eventProofs.received,
+        capgoOpenedEventProof: eventProofs.opened,
+        capgoBackgroundStartedEventProof: eventProofs.background_started,
+        capgoBackgroundFinishedEventProof: eventProofs.background_finished,
         ...(Number.isFinite(message.badge) ? { capgoBadge: String(Math.max(0, Math.trunc(message.badge ?? 0))) } : {}),
         ...(Number.isFinite(message.badgeRevision) ? { capgoBadgeRevision: String(Math.max(0, Math.trunc(message.badgeRevision ?? 0))) } : {}),
       },
@@ -751,28 +761,34 @@ export async function processNativeNotificationQueueBatch(batch: MessageBatch<Na
   await Promise.all(batch.messages.map(async (queueMessage) => {
     try {
       const { retryDevices, remainingDevices, continuationMessage } = await processNativeNotificationQueueMessage(queueMessage.body, env)
-      if (continuationMessage || remainingDevices.length) {
-        const queue = env.NOTIFICATION_QUEUE as NotificationQueueBinding | undefined
-        if (!queue?.send)
-          throw new Error('Notification continuation queue is not configured')
-        const send = queue.send.bind(queue)
-        if (continuationMessage) {
-          await send(continuationMessage)
+      try {
+        if (continuationMessage || remainingDevices.length) {
+          const queue = env.NOTIFICATION_QUEUE as NotificationQueueBinding | undefined
+          if (!queue?.send)
+            throw new Error('Notification continuation queue is not configured')
+          const send = queue.send.bind(queue)
+          if (continuationMessage) {
+            await send(continuationMessage)
+          }
+          else {
+            await Promise.all(chunkDeviceRows(remainingDevices, resolveSendBatchSize(env, queueMessage.body)).map(devices =>
+              send({ ...queueMessage.body, devices }),
+            ))
+          }
         }
-        else {
-          await Promise.all(chunkDeviceRows(remainingDevices, resolveSendBatchSize(env, queueMessage.body)).map(devices =>
-            send({ ...queueMessage.body, devices }),
-          ))
+        if (retryDevices.length) {
+          const queue = env.NOTIFICATION_QUEUE as NotificationQueueBinding | undefined
+          if (!queue?.send)
+            throw new Error('Notification retry queue is not configured')
+          await queue.send(
+            { ...queueMessage.body, attempt: retryAttempt(queueMessage.body) + 1, devices: retryDevices, skipQueuedEvents: true },
+            { delaySeconds: retryDelaySeconds(env, queueMessage.body) },
+          )
         }
       }
-      if (retryDevices.length) {
-        const queue = env.NOTIFICATION_QUEUE as NotificationQueueBinding | undefined
-        if (!queue?.send)
-          throw new Error('Notification retry queue is not configured')
-        await queue.send(
-          { ...queueMessage.body, attempt: retryAttempt(queueMessage.body) + 1, devices: retryDevices, skipQueuedEvents: true },
-          { delaySeconds: retryDelaySeconds(env, queueMessage.body) },
-        )
+      catch {
+        queueMessage.ack()
+        return
       }
       queueMessage.ack()
     }
