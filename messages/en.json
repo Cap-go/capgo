@@ -1857,6 +1857,7 @@
   "role-per-org": "Role per organization",
   "role-app-admin": "App Admin",
   "role-app-developer": "App Developer",
+  "role-app-notifications": "App Notifications",
   "role-app-reader": "App Reader",
   "role-app-uploader": "App Uploader",
   "role-assigned": "Role assigned successfully",

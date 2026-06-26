@@ -1,6 +1,115 @@
 CREATE UNIQUE INDEX IF NOT EXISTS idx_apps_owner_org_app_id
 ON public.apps (owner_org, app_id);
 
+INSERT INTO public.permissions (key, scope_type, description)
+VALUES (
+  'app.manage_notifications',
+  public.rbac_scope_app(),
+  'Manage notification campaigns, badge updates, recipient lookup, and delivery stats for an app'
+)
+ON CONFLICT (key) DO UPDATE
+SET scope_type = EXCLUDED.scope_type,
+    description = EXCLUDED.description;
+
+INSERT INTO public.roles (name, scope_type, description, priority_rank, is_assignable, created_by)
+VALUES (
+  'app_notifications',
+  public.rbac_scope_app(),
+  'Send and inspect notifications for an app without device or update settings access',
+  64,
+  true,
+  NULL
+)
+ON CONFLICT (name) DO UPDATE
+SET scope_type = EXCLUDED.scope_type,
+    description = EXCLUDED.description,
+    priority_rank = EXCLUDED.priority_rank,
+    is_assignable = EXCLUDED.is_assignable;
+
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM public.roles r
+JOIN public.permissions p ON p.key = 'app.manage_notifications'
+WHERE r.name IN (
+  public.rbac_role_platform_super_admin(),
+  public.rbac_role_org_super_admin(),
+  public.rbac_role_org_admin(),
+  public.rbac_role_app_admin(),
+  public.rbac_role_app_developer(),
+  'app_notifications'
+)
+ON CONFLICT DO NOTHING;
+
+CREATE OR REPLACE FUNCTION public.rbac_legacy_right_for_permission(
+  p_permission_key text
+) RETURNS public.user_min_right
+LANGUAGE plpgsql
+SET search_path = ''
+IMMUTABLE AS $$
+BEGIN
+  CASE p_permission_key
+    WHEN public.rbac_perm_org_read() THEN RETURN public.rbac_right_read();
+    WHEN public.rbac_perm_org_read_members() THEN RETURN public.rbac_right_read();
+    WHEN public.rbac_perm_app_read() THEN RETURN public.rbac_right_read();
+    WHEN public.rbac_perm_app_read_bundles() THEN RETURN public.rbac_right_read();
+    WHEN public.rbac_perm_app_read_channels() THEN RETURN public.rbac_right_read();
+    WHEN public.rbac_perm_app_read_logs() THEN RETURN public.rbac_right_read();
+    WHEN public.rbac_perm_app_read_devices() THEN RETURN public.rbac_right_read();
+    WHEN public.rbac_perm_channel_read() THEN RETURN public.rbac_right_read();
+    WHEN public.rbac_perm_channel_read_history() THEN RETURN public.rbac_right_read();
+    WHEN public.rbac_perm_channel_read_forced_devices() THEN RETURN public.rbac_right_read();
+
+    WHEN public.rbac_perm_app_upload_bundle() THEN RETURN public.rbac_right_upload();
+
+    WHEN public.rbac_perm_app_update_settings() THEN RETURN public.rbac_right_write();
+    WHEN public.rbac_perm_app_create_channel() THEN RETURN public.rbac_right_write();
+    WHEN 'app.manage_notifications' THEN RETURN public.rbac_right_write();
+    WHEN public.rbac_perm_app_manage_devices() THEN RETURN public.rbac_right_write();
+    WHEN public.rbac_perm_app_build_native() THEN RETURN public.rbac_right_write();
+    WHEN public.rbac_perm_channel_update_settings() THEN RETURN public.rbac_right_write();
+    WHEN public.rbac_perm_channel_promote_bundle() THEN RETURN public.rbac_right_write();
+    WHEN public.rbac_perm_channel_rollback_bundle() THEN RETURN public.rbac_right_write();
+    WHEN public.rbac_perm_channel_manage_forced_devices() THEN RETURN public.rbac_right_write();
+
+    WHEN public.rbac_perm_org_update_settings() THEN RETURN public.rbac_right_admin();
+    WHEN public.rbac_perm_org_invite_user() THEN RETURN public.rbac_right_admin();
+    WHEN public.rbac_perm_org_read_billing() THEN RETURN public.rbac_right_admin();
+    WHEN public.rbac_perm_org_read_invoices() THEN RETURN public.rbac_right_admin();
+    WHEN public.rbac_perm_org_read_audit() THEN RETURN public.rbac_right_admin();
+    WHEN public.rbac_perm_app_delete() THEN RETURN public.rbac_right_admin();
+    WHEN public.rbac_perm_app_read_audit() THEN RETURN public.rbac_right_admin();
+    WHEN public.rbac_perm_bundle_delete() THEN RETURN public.rbac_right_admin();
+    WHEN public.rbac_perm_channel_delete() THEN RETURN public.rbac_right_admin();
+    WHEN public.rbac_perm_channel_read_audit() THEN RETURN public.rbac_right_admin();
+
+    WHEN public.rbac_perm_org_update_user_roles() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_org_update_billing() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_org_read_billing_audit() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_org_delete() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_app_transfer() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_platform_impersonate_user() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_platform_manage_orgs_any() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_platform_manage_apps_any() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_platform_manage_channels_any() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_platform_run_maintenance_jobs() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_platform_delete_orphan_users() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_platform_read_all_audit() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_platform_db_break_glass() THEN RETURN public.rbac_right_super_admin();
+
+    ELSE RETURN NULL;
+  END CASE;
+END;
+$$;
+
+COMMENT ON FUNCTION public.rbac_legacy_right_for_permission(text) IS
+  'Maps RBAC permission keys to legacy user_min_right values for fallback checks.';
+
+ALTER FUNCTION public.rbac_legacy_right_for_permission(text) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION public.rbac_legacy_right_for_permission(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.rbac_legacy_right_for_permission(text) FROM anon;
+GRANT EXECUTE ON FUNCTION public.rbac_legacy_right_for_permission(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rbac_legacy_right_for_permission(text) TO service_role;
+
 CREATE TABLE IF NOT EXISTS public.notification_provider_configs (
   id uuid DEFAULT gen_random_uuid() NOT NULL,
   created_at timestamp with time zone DEFAULT now() NOT NULL,

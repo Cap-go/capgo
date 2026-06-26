@@ -61,6 +61,7 @@ const NOTIFICATION_PLATFORMS = new Set<NativeNotificationPlatform>(['ios', 'andr
 const NOTIFICATION_PROVIDERS = new Set<NativeNotificationProvider>(['fcm', 'apns'])
 const CAMPAIGN_KINDS = new Set(['alert', 'background', 'badge', 'update_check'])
 const CAMPAIGN_STATUSES = new Set(['draft', 'scheduled', 'queued', 'sending', 'sent', 'paused', 'failed', 'cancelled'])
+const NOTIFICATION_MANAGE_PERMISSION: Permission = 'app.manage_notifications'
 
 interface RegisterBody {
   appId: string
@@ -498,7 +499,7 @@ async function upsertNotificationSettings(c: Context<MiddlewareKeyVariables>, bo
 
 async function createCampaignRecord(c: Context<MiddlewareKeyVariables>, body: CampaignBody) {
   const appId = assertString(body.appId, 'appId', 128)
-  await assertAppPermission(c, 'app.manage_devices', appId)
+  await assertAppPermission(c, NOTIFICATION_MANAGE_PERMISSION, appId)
   const ownerOrg = await getAppOwnerOrg(c, appId)
   const name = assertString(body.name, 'name', 180)
   const kind = body.kind && CAMPAIGN_KINDS.has(body.kind) ? body.kind : 'alert'
@@ -665,14 +666,14 @@ app.post('/recipients/proof', middlewareV2(['write', 'all']), async (c) => {
   const body = await parseBody<RecipientProofBody>(c)
   const appId = assertString(body.appId, 'appId', 128)
   const externalId = assertString(body.externalId, 'externalId', 512)
-  await assertAppPermission(c, 'app.manage_devices', appId)
+  await assertAppPermission(c, NOTIFICATION_MANAGE_PERMISSION, appId)
   return c.json({ identityProof: await createNotificationIdentityProof(c, appId, externalId) })
 })
 
 app.post('/recipients/lookup', middlewareV2(['read', 'write', 'all']), async (c) => {
   const body = await parseBody<{ appId: string, externalId?: string, recipientKey?: string, limit?: number }>(c)
   const appId = assertString(body.appId, 'appId', 128)
-  await assertAppPermission(c, 'app.read_devices', appId)
+  await assertAppPermission(c, NOTIFICATION_MANAGE_PERMISSION, appId)
   const recipientKey = body.recipientKey ?? (body.externalId ? await deriveRecipientKey(c, appId, body.externalId) : undefined)
   if (!recipientKey)
     throw simpleError('missing_recipient', 'Missing recipient')
@@ -682,7 +683,7 @@ app.post('/recipients/lookup', middlewareV2(['read', 'write', 'all']), async (c)
 
 app.get('/settings', middlewareV2(['read', 'write', 'all']), async (c) => {
   const appId = assertString(c.req.query('app_id'), 'app_id', 128)
-  await assertAppPermission(c, 'app.read_logs', appId)
+  await assertAppPermission(c, NOTIFICATION_MANAGE_PERMISSION, appId)
   return c.json(await getNotificationSettings(c, appId))
 })
 
@@ -694,7 +695,7 @@ app.put('/settings', middlewareV2(['write', 'all']), async (c) => {
 app.post('/badge', middlewareV2(['write', 'all']), async (c) => {
   const body = await parseBody<BadgeBody>(c)
   const appId = assertString(body.appId, 'appId', 128)
-  await assertAppPermission(c, 'app.manage_devices', appId)
+  await assertAppPermission(c, NOTIFICATION_MANAGE_PERMISSION, appId)
   const badge = Math.max(0, Math.trunc(Number(body.badge)))
   if (!Number.isFinite(badge))
     throw simpleError('invalid_badge', 'Invalid badge')
@@ -722,7 +723,7 @@ app.post('/badge', middlewareV2(['write', 'all']), async (c) => {
 app.post('/update-check', middlewareV2(['write', 'all']), async (c) => {
   const body = await parseBody<UpdateCheckBody>(c)
   const appId = assertString(body.appId, 'appId', 128)
-  await assertAppPermission(c, 'app.manage_devices', appId)
+  await assertAppPermission(c, NOTIFICATION_MANAGE_PERMISSION, appId)
   const settings = await getNotificationSettings(c, appId)
   if (!settings.pushUpdateEnabled)
     throw simpleError('push_update_disabled', 'Push update is disabled for this app')
@@ -774,7 +775,7 @@ app.post('/update-check', middlewareV2(['write', 'all']), async (c) => {
 app.post('/send', middlewareV2(['write', 'all']), async (c) => {
   const body = await parseBody<SendBody>(c)
   const appId = assertString(body.appId, 'appId', 128)
-  await assertAppPermission(c, 'app.manage_devices', appId)
+  await assertAppPermission(c, NOTIFICATION_MANAGE_PERMISSION, appId)
   const campaignId = body.campaignId || crypto.randomUUID()
   const payload = assertOptionalRecord(body.payload, 'payload')
   const plan = await resolveTargetPlan(c, { ...body, appId })
@@ -796,7 +797,7 @@ app.post('/send', middlewareV2(['write', 'all']), async (c) => {
 
 app.get('/campaigns', middlewareV2(['read', 'write', 'all']), async (c) => {
   const appId = assertString(c.req.query('app_id'), 'app_id', 128)
-  await assertAppPermission(c, 'app.read_logs', appId)
+  await assertAppPermission(c, NOTIFICATION_MANAGE_PERMISSION, appId)
   let pgClient: ReturnType<typeof getPgClient> | undefined
   try {
     pgClient = getPgClient(c)
@@ -823,7 +824,7 @@ app.post('/campaigns', middlewareV2(['write', 'all']), async (c) => {
 
 app.get('/stats', middlewareV2(['read', 'write', 'all']), async (c) => {
   const appId = assertString(c.req.query('app_id'), 'app_id', 128)
-  await assertAppPermission(c, 'app.read_logs', appId)
+  await assertAppPermission(c, NOTIFICATION_MANAGE_PERMISSION, appId)
   const days = Number(c.req.query('days') ?? 30)
   const campaignId = c.req.query('campaign_id') || undefined
   const data = await readNotificationStatsCF(c, { appId, campaignId, days })
