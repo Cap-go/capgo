@@ -84,6 +84,9 @@ describe.skipIf(USE_CLOUDFLARE)('/private/groups access', () => {
     })
 
     expect(response.status).toBe(403)
+    const body = await response.json() as { error: string, message: string }
+    expect(body.error).toBe('forbidden')
+    expect(body.message).toBe('Forbidden')
   })
 
   it('allows org admins to read group members', async () => {
@@ -93,6 +96,7 @@ describe.skipIf(USE_CLOUDFLARE)('/private/groups access', () => {
 
     expect(response.status).toBe(200)
     const data = await response.json() as Array<{ user_id: string }>
-    expect(data.some(row => row.user_id === USER_ID)).toBe(true)
+    expect(data.every(row => row.user_id === USER_ID)).toBe(true)
+    expect(data).toHaveLength(1)
   })
 })

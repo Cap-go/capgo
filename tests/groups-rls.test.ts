@@ -174,11 +174,15 @@ describe('groups RLS', () => {
       expect(rows.some(row => row.user_id === USER_ID)).toBe(false)
     }
     finally {
-      await client.query(`
-        DELETE FROM public.group_members
-        WHERE group_id = $1::uuid AND user_id = $2::uuid
-      `, [adminOnlyGroupId, USER_ID_2])
-      client.release()
+      try {
+        await client.query(`
+          DELETE FROM public.group_members
+          WHERE group_id = $1::uuid AND user_id = $2::uuid
+        `, [adminOnlyGroupId, USER_ID_2])
+      }
+      finally {
+        client.release()
+      }
     }
   })
 
@@ -212,11 +216,15 @@ describe('groups RLS', () => {
       expect(memberRows.some(row => row.user_id === USER_ID_2)).toBe(true)
     }
     finally {
-      await client.query(`
-        DELETE FROM public.group_members
-        WHERE group_id = $1::uuid AND user_id = $2::uuid
-      `, [memberGroupId, USER_ID_2])
-      client.release()
+      try {
+        await client.query(`
+          DELETE FROM public.group_members
+          WHERE group_id = $1::uuid AND user_id = $2::uuid
+        `, [memberGroupId, USER_ID_2])
+      }
+      finally {
+        client.release()
+      }
     }
   })
 })
