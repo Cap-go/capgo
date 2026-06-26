@@ -270,6 +270,12 @@ export async function setChannelInternal(channel: string, appId: string, options
     channelPayload.version = data.id
   }
 
+  if (hasBundlePromotion && channelPayload.version == null) {
+    if (!silent)
+      log.error('Cannot set channel because no bundle version could be resolved')
+    throw new Error('Cannot set channel without a bundle version')
+  }
+
   if (state != null) {
     if (state !== 'normal' && state !== 'default') {
       if (!silent)

@@ -166,6 +166,40 @@ describe('tests CLI upload', () => {
     }
   }, 60000)
 
+  it('creates a missing explicit channel before assigning the uploaded bundle', async () => {
+    const appName = `com.cli_new_channel_upload_${randomUUID()}`
+    const targetChannel = `upload-target-${randomUUID().slice(0, 8)}`
+    await Promise.all([
+      resetAndSeedAppData(appName),
+      prepareCli(appName),
+    ])
+
+    try {
+      const { result, version } = await uploadWithFreshVersionRetry(appName, targetChannel, {
+        ignoreCompatibilityCheck: true,
+      })
+      expect(result.success).toBe(true)
+
+      const { data: channel, error } = await getSupabaseClient()
+        .from('channels')
+        .select('name, version(name)')
+        .eq('app_id', appName)
+        .eq('name', targetChannel)
+        .single()
+
+      expect(error).toBeNull()
+      expect(channel?.name).toBe(targetChannel)
+      expect((channel?.version as any)?.name).toBe(version)
+    }
+    finally {
+      await Promise.all([
+        cleanupCli(appName),
+        resetAppData(appName),
+        resetAppDataStats(appName),
+      ])
+    }
+  }, 60000)
+
   it('fails explicit channel upload before creating a bundle when channel promotion is missing', async () => {
     const appName = `com.cli_channel_preflight_${randomUUID()}`
     await Promise.all([

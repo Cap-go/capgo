@@ -778,14 +778,21 @@ async function findUploadTargetChannel(supabase: SupabaseType, appid: string, ch
   return data
 }
 
-async function preflightRequiredChannelAssignments(supabase: SupabaseType, apikey: string, appid: string, channels: string[]): Promise<Map<string, UploadTargetChannel | null>> {
+async function preflightRequiredChannelAssignments(
+  supabase: SupabaseType,
+  apikey: string,
+  appid: string,
+  channels: string[],
+  userId: string,
+  orgId: string,
+): Promise<Map<string, UploadTargetChannel | null>> {
   const uploadTargetChannels = new Map<string, UploadTargetChannel | null>()
 
   for (const channel of new Set(channels)) {
     const targetChannel = await findUploadTargetChannel(supabase, appid, channel)
-    uploadTargetChannels.set(channel, targetChannel)
 
     if (targetChannel) {
+      uploadTargetChannels.set(channel, targetChannel)
       const canPromoteTargetChannel = await hasCliPermission(supabase, apikey, 'channel.promote_bundle', { appId: appid, channelId: targetChannel.id })
       if (!canPromoteTargetChannel)
         uploadFail('Cannot set channel because this API key lacks channel.promote_bundle for the target channel')
@@ -795,6 +802,21 @@ async function preflightRequiredChannelAssignments(supabase: SupabaseType, apike
     const canCreateChannel = await hasCliPermission(supabase, apikey, 'app.create_channel', { appId: appid })
     if (!canCreateChannel)
       uploadFail('Cannot create target channel because this API key lacks app.create_channel')
+
+    const canPromoteCreatedChannel = await hasCliPermission(supabase, apikey, 'channel.promote_bundle', { appId: appid })
+    if (!canPromoteCreatedChannel)
+      uploadFail('Cannot create target channel with a bundle because this API key lacks channel.promote_bundle')
+
+    const { error, data } = await updateOrCreateChannel(supabase, {
+      name: channel,
+      app_id: appid,
+      created_by: userId,
+      owner_org: orgId,
+    })
+    if (error || !data)
+      uploadFail(`Cannot create target channel ${channel}: ${error ? formatError(error) : 'missing created channel'}`)
+
+    uploadTargetChannels.set(channel, { id: data.id, public: data.public })
   }
 
   return uploadTargetChannels
@@ -1224,7 +1246,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   }
 
   const uploadTargetChannels = channelAssignmentRequired
-    ? await preflightRequiredChannelAssignments(supabase, apikey, appid, channelsToAssign)
+    ? await preflightRequiredChannelAssignments(supabase, apikey, appid, channelsToAssign, userId, orgId)
     : new Map<string, UploadTargetChannel | null>()
 
   const versionData = {

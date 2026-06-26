@@ -50,6 +50,8 @@ export async function deleteChannelInternal(channelId: string, appId: string, op
   }
 
   await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'channel.delete', silent, true, channel.id)
+  if (options.deleteBundle)
+    await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'bundle.delete', silent, true)
 
   const orgId = channel.owner_org
   if (!orgId) {

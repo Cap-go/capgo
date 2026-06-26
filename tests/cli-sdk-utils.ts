@@ -906,12 +906,30 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ORG_SUPER_ADMIN) {
       if (targetChannels.length > 0) {
         for (const targetChannel of channelsToAssign) {
           const channelRecord = await getChannelRecord(options.appId, targetChannel)
-          if (!channelRecord)
-            return { success: false, error: `Channel ${targetChannel} not found for app ${options.appId}` }
+          if (channelRecord) {
+            const canPromote = await apiKeyHasAnyChannelPermission(resolvedApiKey, apiKey, app, channelRecord.id, ['channel.promote_bundle'])
+            if (!canPromote)
+              return { success: false, error: 'Cannot set channel because this API key lacks channel.promote_bundle for the target channel' }
+            continue
+          }
 
-          const canPromote = await apiKeyHasAnyChannelPermission(resolvedApiKey, apiKey, app, channelRecord.id, ['channel.promote_bundle'])
-          if (!canPromote)
-            return { success: false, error: 'Cannot set channel because this API key lacks channel.promote_bundle for the target channel' }
+          if (!app.owner_org)
+            return { success: false, error: `App ${options.appId} does not have an owner organization` }
+          if (!(await apiKeyHasAnyAppPermission(resolvedApiKey, apiKey, app, ['app.create_channel'])))
+            return { success: false, error: 'Cannot create target channel because this API key lacks app.create_channel' }
+          if (!(await apiKeyHasAnyAppPermission(resolvedApiKey, apiKey, app, ['channel.promote_bundle'])))
+            return { success: false, error: 'Cannot create target channel with a bundle because this API key lacks channel.promote_bundle' }
+
+          const { error } = await getSupabaseClient()
+            .from('channels')
+            .insert({
+              name: targetChannel,
+              app_id: options.appId,
+              owner_org: app.owner_org,
+              created_by: app.user_id ?? USER_ID,
+            })
+          if (error)
+            return { success: false, error: error.message }
         }
       }
 
