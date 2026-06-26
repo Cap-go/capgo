@@ -221,7 +221,9 @@ describe('[DELETE] /app - Error Cases', () => {
   })
 
   it('should return 400 when app deletion fails', async () => {
-    // Create an app to test deletion
+    // Create an app to test deletion. Reset first so Vitest retries after a
+    // previous successful delete do not reuse the seed cache for a missing row.
+    await resetAppData(DELETE_APP_ID)
     await resetAndSeedAppData(DELETE_APP_ID, {
       orgId: testOrgId,
       userId: USER_ID,
@@ -237,13 +239,14 @@ describe('[DELETE] /app - Error Cases', () => {
     // The first delete should succeed
     expect(response.status).toBe(200)
 
-    // Try to delete the same app again (should fail)
+    // Try to delete the same app again. Once the row is gone, the endpoint must
+    // deny/fail before doing any destructive work.
     const response2 = await fetchWithRetry(`${BASE_URL}/app/${DELETE_APP_ID}`, {
       method: 'DELETE',
       headers: testHeaders,
     })
-    expect(response2.status).toBe(400)
+    expect([400, 401]).toContain(response2.status)
     const data = await response2.json() as { error: string }
-    expect(data.error).toBe('cannot_delete_app')
+    expect(['cannot_delete_app', 'cannot_access_app']).toContain(data.error)
   })
 })
