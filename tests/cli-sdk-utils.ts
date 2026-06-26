@@ -910,6 +910,8 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ORG_SUPER_ADMIN) {
             const canPromote = await apiKeyHasAnyChannelPermission(resolvedApiKey, apiKey, app, channelRecord.id, ['channel.promote_bundle'])
             if (!canPromote)
               return { success: false, error: 'Cannot set channel because this API key lacks channel.promote_bundle for the target channel' }
+            if (options.selfAssign && !(await apiKeyHasAnyChannelPermission(resolvedApiKey, apiKey, app, channelRecord.id, ['channel.update_settings'])))
+              return { success: false, error: 'Cannot enable device self-assign because this API key lacks channel.update_settings' }
             continue
           }
 
@@ -919,17 +921,6 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ORG_SUPER_ADMIN) {
             return { success: false, error: 'Cannot create target channel because this API key lacks app.create_channel' }
           if (!(await apiKeyHasAnyAppPermission(resolvedApiKey, apiKey, app, ['channel.promote_bundle'])))
             return { success: false, error: 'Cannot create target channel with a bundle because this API key lacks channel.promote_bundle' }
-
-          const { error } = await getSupabaseClient()
-            .from('channels')
-            .insert({
-              name: targetChannel,
-              app_id: options.appId,
-              owner_org: app.owner_org,
-              created_by: app.user_id ?? USER_ID,
-            })
-          if (error)
-            return { success: false, error: error.message }
         }
       }
 
@@ -969,13 +960,24 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ORG_SUPER_ADMIN) {
 
       for (const targetChannel of channelsToAssign) {
         const channelRecord = await getChannelRecord(options.appId, targetChannel)
-        if (!channelRecord)
-          return { success: false, error: `Channel ${targetChannel} not found for app ${options.appId}` }
-
-        const { error } = await getSupabaseClient()
-          .from('channels')
-          .update({ version: versionId })
-          .eq('id', channelRecord.id)
+        const { error } = channelRecord
+          ? await getSupabaseClient()
+              .from('channels')
+              .update({
+                version: versionId,
+                ...(typeof options.selfAssign === 'boolean' ? { allow_device_self_set: options.selfAssign } : {}),
+              })
+              .eq('id', channelRecord.id)
+          : await getSupabaseClient()
+              .from('channels')
+              .insert({
+                name: targetChannel,
+                app_id: options.appId,
+                owner_org: app.owner_org,
+                created_by: app.user_id ?? USER_ID,
+                version: versionId,
+                allow_device_self_set: options.selfAssign ?? false,
+              })
 
         if (error)
           return { success: false, error: error.message }
