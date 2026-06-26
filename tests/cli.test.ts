@@ -216,7 +216,7 @@ describe('tests CLI upload', () => {
         orgId: ORG_ID,
         roleName: 'apikey_org_reader',
         appId: appName,
-        appRoleName: 'app_uploader',
+        appRoleName: 'app_reader',
       })
       createdApikeyId = createdApikey.id
 
@@ -264,7 +264,7 @@ describe('tests CLI upload', () => {
         orgId: ORG_ID,
         roleName: 'apikey_org_reader',
         appId: appName,
-        appRoleName: 'app_uploader',
+        appRoleName: 'app_reader',
       })
       createdApikeyId = createdApikey.id
 

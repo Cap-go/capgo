@@ -1475,3 +1475,57 @@ EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'Seeding failed: %', SQLERRM;
     RAISE;
 END $$;
+-- Repair dedicated apikey management test bindings after seed DO block completes.
+DELETE FROM public.role_bindings rb
+USING public.apikeys ak
+WHERE rb.principal_type = public.rbac_principal_apikey()
+  AND rb.principal_id = ak.rbac_id
+  AND rb.scope_type = public.rbac_scope_org()
+  AND ak.id IN (112, 113);
+
+INSERT INTO public.role_bindings (
+  principal_type,
+  principal_id,
+  role_id,
+  scope_type,
+  org_id,
+  granted_by,
+  reason,
+  is_direct
+)
+SELECT
+  public.rbac_principal_apikey(),
+  ak.rbac_id,
+  roles.id,
+  public.rbac_scope_org(),
+  'f1a2b3c4-d5e6-4f70-8a9b-0c1d2e3f4a50'::uuid,
+  ak.user_id,
+  'Seeded apikey management test binding',
+  true
+FROM public.apikeys ak
+JOIN (
+  VALUES
+    (112::bigint, public.rbac_role_org_super_admin()),
+    (113::bigint, public.rbac_role_apikey_manager())
+) AS management_keys (apikey_id, role_name)
+  ON management_keys.apikey_id = ak.id
+JOIN public.roles roles
+  ON roles.scope_type = public.rbac_scope_org()
+  AND roles.name = management_keys.role_name
+WHERE ak.rbac_id IS NOT NULL;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.apikeys ak
+    JOIN public.role_bindings rb
+      ON rb.principal_type = public.rbac_principal_apikey()
+      AND rb.principal_id = ak.rbac_id
+    JOIN public.roles r ON r.id = rb.role_id
+    WHERE ak.id = 113
+      AND r.name = public.rbac_role_apikey_manager()
+  ) THEN
+    RAISE EXCEPTION 'seed verification failed: apikey 113 missing apikey_manager binding';
+  END IF;
+END $$;
