@@ -4933,6 +4933,7 @@ export type Database = {
         Args: { plain_key: string; stored_hash: string }
         Returns: boolean
       }
+      verify_email_otp_auth: { Args: never; Returns: boolean }
       verify_mfa: { Args: never; Returns: boolean }
     }
     Enums: {

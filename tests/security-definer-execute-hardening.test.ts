@@ -95,6 +95,7 @@ const AUTHENTICATED_ONLY_PROCS = [
   'public.update_org_invite_role_rbac(uuid, uuid, text)',
   'public.update_org_member_role(uuid, uuid, text)',
   'public.update_tmp_invite_role_rbac(uuid, text, text)',
+  'public.verify_email_otp_auth()',
 ] as const
 
 describe('security definer execute hardening', () => {
