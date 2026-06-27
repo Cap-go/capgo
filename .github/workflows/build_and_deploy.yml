@@ -96,6 +96,10 @@ jobs:
         run: supabase link --project-ref ${{ env.SUPABASE_PROJECT_ID }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+      - name: Repair squashed Supabase migration history
+        run: bash scripts/repair-supabase-squashed-baseline.sh --linked
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
       - name: Apply Supabase Migrations
         run: supabase db push
       - name: Update functions

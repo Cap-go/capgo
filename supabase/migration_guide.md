@@ -71,3 +71,42 @@ This command will clear all data and revert schema changes made to the local dat
 
 
 By following these steps, you can safely add and deploy Supabase migration changes to your project's database schema.
+
+### Squashed Baseline Repair
+
+The `20260608143906` migration is a squashed schema baseline. Fresh databases
+should apply it normally. Existing databases that already applied the deleted
+historical migrations must not run that baseline against an existing schema.
+
+If an existing database has the old migration history, run this repair flow
+before the normal deployment that contains the squashed migration. Run it even
+when `20260608143906` is already marked as applied so the deleted historical
+versions are removed from the migration history:
+
+```bash
+bash scripts/repair-supabase-squashed-baseline.sh --linked
+```
+
+For a database reached by connection string instead of a linked project, replace
+`--linked` with `--db-url "$SUPABASE_DB_URL"`.
+
+On a database that already has `20260608143906` marked as applied, this command
+does not apply schema SQL. It only removes the deleted historical versions from
+the migration history and keeps `20260608143906` marked as applied.
+
+On a fresh database, or on a database that no longer has any deleted pre-squash
+migration history rows, the script exits without changing schema or migration
+history. The normal `supabase db push` flow then applies the squashed baseline
+for fresh projects.
+
+If the script finds only part of the deleted pre-squash migration history, it
+aborts instead of marking the squashed baseline as applied. That protects
+databases that are not yet at the final pre-squash schema from skipping the
+baseline by mistake.
+
+The repair marks the squashed baseline as applied before deleting old migration
+history rows. If a retry ever sees an existing Capgo schema with both the old
+history rows and the squashed baseline marker missing, it aborts instead of
+letting `supabase db push` apply the baseline to that existing schema.
+If the baseline marker is present and some old rows remain, rerunning the script
+continues removing the remaining old rows.
