@@ -83,7 +83,6 @@ function createOrgRow(overrides: Partial<OrgRow> & Pick<OrgRow, 'id' | 'name' | 
     stats_refresh_requested_at: null,
     stats_updated_at: null,
     updated_at: null,
-    use_new_rbac: false,
     website: 'https://old.example',
     onboarding: { intent: 'unknown' },
   }

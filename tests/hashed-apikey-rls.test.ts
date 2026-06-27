@@ -349,8 +349,8 @@ async function createEnforcedRbacOnlyOrgForUser(userId: string): Promise<string>
   const orgId = randomUUID()
   try {
     await client.query(
-      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys, use_new_rbac)
-       VALUES ($1, $2, $3, $4, true, true)`,
+      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys)
+       VALUES ($1, $2, $3, $4, true)`,
       [orgId, USER_ID_2, `rbac-only-org-${orgId}`, `rbac-only-${orgId}@capgo.test`],
     )
     await client.query(
@@ -397,8 +397,8 @@ async function createEnforcedApikeyPrincipalOrgForKey(apikeyId: number): Promise
   const orgId = randomUUID()
   try {
     await client.query(
-      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys, use_new_rbac)
-       VALUES ($1, $2, $3, $4, true, true)`,
+      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys)
+       VALUES ($1, $2, $3, $4, true)`,
       [orgId, USER_ID_2, `apikey-rbac-org-${orgId}`, `apikey-rbac-${orgId}@capgo.test`],
     )
     await client.query(
@@ -445,8 +445,8 @@ async function createStandaloneOrg(enforceHashedApiKeys = true): Promise<string>
   const orgId = randomUUID()
   try {
     await client.query(
-      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys, use_new_rbac)
-       VALUES ($1, $2, $3, $4, $5, true)`,
+      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys)
+       VALUES ($1, $2, $3, $4, $5)`,
       [orgId, USER_ID_2, `standalone-org-${orgId}`, `standalone-${orgId}@capgo.test`, enforceHashedApiKeys],
     )
     return orgId
@@ -1061,11 +1061,12 @@ describe('rls policies with hashed api keys (via supabase sdk)', () => {
   })
 })
 
-describe('channels rls blocks direct api-key updates', () => {
+describe('channels rls supports exact api-key channel permissions', () => {
   let allKey: { id: number, key: string, key_hash: string } | null = null
   let writeKey: { id: number, key: string, key_hash: string } | null = null
   let versionId: number | null = null
   let channelId: number | null = null
+  let createdChannelId: number | null = null
   const versionName = `rls-direct-version-${randomUUID().slice(0, 8)}`
   const channelName = `rls-direct-channel-${randomUUID().slice(0, 8)}`
 
@@ -1115,6 +1116,10 @@ describe('channels rls blocks direct api-key updates', () => {
   }, 60000)
 
   afterAll(async () => {
+    if (createdChannelId) {
+      await pool.query('DELETE FROM public.channels WHERE id = $1', [createdChannelId])
+    }
+
     if (channelId) {
       await pool.query('DELETE FROM public.channels WHERE id = $1', [channelId])
     }
@@ -1130,7 +1135,36 @@ describe('channels rls blocks direct api-key updates', () => {
       await deleteApiKey(writeKey.id)
   })
 
-  it('does not let a developer API key mutate protected channel fields via anon role access', async () => {
+  it('lets a developer API key create channels via anon role access', async () => {
+    if (!writeKey || !versionId)
+      throw new Error('RLS channel test setup did not complete')
+
+    const result = await execWithRoleClaims(
+      `INSERT INTO public.channels (app_id, name, version, owner_org, created_by, public)
+       VALUES ($1, $2, $3, $4, $5, false)
+       RETURNING id`,
+      {
+        role: 'anon',
+        claims: {
+          role: 'anon',
+          aud: 'anon',
+        },
+        headers: { capgkey: writeKey.key },
+        params: [
+          APP_NAME_RLS,
+          `rls-created-${randomUUID().slice(0, 8)}`,
+          versionId,
+          ORG_ID_RLS,
+          USER_ID_RLS,
+        ],
+      },
+    )
+
+    expect(result.rowCount).toBe(1)
+    createdChannelId = Number(result.rows[0].id)
+  })
+
+  it('lets a developer API key mutate supported channel fields via anon role access', async () => {
     if (!writeKey || !channelId)
       throw new Error('RLS channel test setup did not complete')
 
@@ -1147,14 +1181,40 @@ describe('channels rls blocks direct api-key updates', () => {
       },
     )
 
-    expect(result.rowCount).toBe(0)
+    expect(result.rowCount).toBe(1)
+    expect(result.rows[0].allow_emulator).toBe(true)
 
     const { rows } = await pool.query(
       'SELECT allow_emulator FROM public.channels WHERE id = $1',
       [channelId],
     )
 
-    expect(rows[0].allow_emulator).toBe(false)
+    expect(rows[0].allow_emulator).toBe(true)
+
+    await pool.query(
+      'UPDATE public.channels SET allow_emulator = false WHERE id = $1',
+      [channelId],
+    )
+  })
+
+  it('does not let a developer API key delete channels via anon role access', async () => {
+    if (!writeKey || !channelId)
+      throw new Error('RLS channel test setup did not complete')
+
+    const result = await execWithRoleClaims(
+      'DELETE FROM public.channels WHERE id = $1 RETURNING id',
+      {
+        role: 'anon',
+        claims: {
+          role: 'anon',
+          aud: 'anon',
+        },
+        headers: { capgkey: writeKey.key },
+        params: [channelId],
+      },
+    )
+
+    expect(result.rowCount).toBe(0)
   })
 
   it('still lets an admin API key mutate supported channel fields via anon role access', async () => {

@@ -19,32 +19,25 @@ This document explains in detail the Capgo RBAC (Role-Based Access Control) perm
 
 ## Overview
 
-Capgo uses a **hybrid** system that supports two permission management modes:
+Capgo uses RBAC (Role-Based Access Control) as the single authorization system.
+Legacy `org_users` rows still exist as compatibility data for older clients and
+invite flows, but authorization is resolved through `role_bindings` and
+permission checks.
 
-### Legacy System (old)
-- **Main table**: `org_users`
-- **Simple roles**: `super_admin`, `admin`, `write`, `upload`, `read`
-- **Limitation**: one role per user per organization
-- **Granularity**: limited, no control at individual app/channel level
-
-### RBAC System (new)
+### RBAC System
 - **Main tables**: `roles`, `permissions`, `role_bindings`, `role_permissions`
 - **Multiple roles**: a user can have multiple roles at different scopes
 - **Fine granularity**: permissions at org, app, channel, and bundle level
 - **Flexibility**: add/modify permissions without code changes
 
-### Automatic Switching
+### Compatibility
 
-The system automatically switches between legacy and RBAC via:
-- **Org-level flag**: `use_new_rbac` column in the `orgs` table
-- **Global flag**: `rbac_settings` table (singleton) to enable RBAC for all orgs
-- **Auto-detection**: the `rbac_is_enabled_for_org()` function checks both flags
+The old RBAC rollout switches have been removed. `rbac_is_enabled_for_org()`
+is retained only for old code paths and always returns `true`.
 
 ```sql
--- The org uses RBAC if:
--- 1. orgs.use_new_rbac = true OR
--- 2. rbac_settings.use_new_rbac = true
 SELECT rbac_is_enabled_for_org('123e4567-e89b-12d3-a456-426614174000');
+-- true
 ```
 
 ---
@@ -345,31 +338,7 @@ CREATE TABLE public.group_members (
 );
 ```
 
-### 8. `rbac_settings` - Global Configuration
-
-Singleton table to globally enable RBAC.
-
-```sql
-CREATE TABLE public.rbac_settings (
-  id integer PRIMARY KEY DEFAULT 1 CHECK (id = 1),
-  use_new_rbac boolean NOT NULL DEFAULT false,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-```
-
-**Usage**:
-- Single row with `id = 1`
-- If `use_new_rbac = true`, RBAC enabled for ALL orgs (unless overridden at org level)
-
-### 9. Auxiliary Tables
-
-#### `orgs.use_new_rbac`
-```sql
-ALTER TABLE public.orgs
-ADD COLUMN use_new_rbac boolean NOT NULL DEFAULT false;
-```
-- Org-level flag to enable RBAC for a specific org
+### 8. Auxiliary Tables
 
 #### `apikeys.rbac_id`
 ```sql
@@ -647,9 +616,9 @@ The system defines **40+ atomic permissions** organized by scope.
 
 ## SQL Functions
 
-### 1. `rbac_is_enabled_for_org()` - RBAC Flag Check
+### 1. `rbac_is_enabled_for_org()` - Compatibility Check
 
-Determines if RBAC is enabled for a given organization.
+Compatibility helper for old callers. RBAC is always enabled for organizations.
 
 ```sql
 CREATE OR REPLACE FUNCTION public.rbac_is_enabled_for_org(p_org_id uuid)
@@ -657,26 +626,20 @@ RETURNS boolean
 LANGUAGE plpgsql
 SET search_path = ''
 AS $$
-DECLARE
-  v_org_enabled boolean;
-  v_global_enabled boolean;
 BEGIN
-  SELECT use_new_rbac INTO v_org_enabled FROM public.orgs WHERE id = p_org_id;
-  SELECT use_new_rbac INTO v_global_enabled FROM public.rbac_settings WHERE id = 1;
-
-  RETURN COALESCE(v_org_enabled, false) OR COALESCE(v_global_enabled, false);
+  PERFORM p_org_id;
+  RETURN true;
 END;
 $$;
 ```
 
 **Behavior**:
-- Returns `true` if `orgs.use_new_rbac = true` OR `rbac_settings.use_new_rbac = true`
-- Returns `false` by default (legacy mode)
+- Returns `true` for compatibility.
 
 **Usage**:
 ```sql
 SELECT rbac_is_enabled_for_org('550e8400-e29b-41d4-a716-446655440000');
--- true if RBAC enabled, false otherwise
+-- true
 ```
 
 ### 2. `rbac_permission_for_legacy()` - Legacy → RBAC Mapping
@@ -887,77 +850,15 @@ BEGIN
     LIMIT 1;
   END IF;
 
-  -- Check if RBAC is enabled
-  IF rbac_is_enabled_for_org(v_org_id) THEN
-    -- New RBAC system
-    RETURN rbac_has_permission(
-      v_principal_type,
-      v_principal_id,
-      p_permission_key,
-      v_org_id,
-      p_app_id,
-      p_bundle_id,
-      p_channel_id
-    );
-  ELSE
-    -- Legacy system via check_min_rights
-    DECLARE
-      v_min_right public.user_min_right;
-      v_scope text;
-    BEGIN
-      -- Derive scope from parameters
-      IF p_channel_id IS NOT NULL THEN
-        v_scope := 'channel';
-      ELSIF p_bundle_id IS NOT NULL THEN
-        v_scope := 'bundle';
-      ELSIF p_app_id IS NOT NULL THEN
-        v_scope := 'app';
-      ELSE
-        v_scope := 'org';
-      END IF;
-
-      -- Map permission → legacy min_right
-      -- (inverse logic of rbac_permission_for_legacy)
-      IF p_permission_key LIKE 'org.%' THEN
-        IF p_permission_key IN ('org.update_user_roles', 'org.update_settings') THEN
-          v_min_right := 'admin';
-        ELSE
-          v_min_right := 'read';
-        END IF;
-      ELSIF p_permission_key LIKE 'app.%' THEN
-        IF p_permission_key IN ('app.delete', 'app.update_user_roles') THEN
-          v_min_right := 'admin';
-        ELSIF p_permission_key IN ('app.update_settings', 'app.create_channel') THEN
-          v_min_right := 'write';
-        ELSIF p_permission_key = 'app.upload_bundle' THEN
-          v_min_right := 'upload';
-        ELSE
-          v_min_right := 'read';
-        END IF;
-      ELSIF p_permission_key LIKE 'channel.%' THEN
-        IF p_permission_key IN ('channel.delete') THEN
-          v_min_right := 'admin';
-        ELSIF p_permission_key IN ('channel.update_settings') THEN
-          v_min_right := 'write';
-        ELSIF p_permission_key = 'channel.promote_bundle' THEN
-          v_min_right := 'upload';
-        ELSE
-          v_min_right := 'read';
-        END IF;
-      ELSE
-        v_min_right := 'admin'; -- Default, requires admin
-      END IF;
-
-      -- Call legacy function
-      RETURN check_min_rights_legacy(
-        v_min_right,
-        p_user_id,
-        v_org_id,
-        p_app_id,
-        p_apikey
-      );
-    END;
-  END IF;
+  RETURN rbac_has_permission(
+    v_principal_type,
+    v_principal_id,
+    p_permission_key,
+    v_org_id,
+    p_app_id,
+    p_bundle_id,
+    p_channel_id
+  );
 END;
 $$;
 ```
@@ -994,10 +895,10 @@ $$;
 
 **Advantages**:
 - ✅ Single source of truth for permission checking
-- ✅ Automatic legacy/RBAC routing based on org flag
+- ✅ RBAC-only authorization path
 - ✅ Automatic `org_id` derivation from app/channel/bundle
 - ✅ Support for API keys and users
-- ✅ Graceful fallback to legacy if RBAC not enabled
+- ✅ Compatibility wrappers for old CLI RPC signatures
 
 **Recommended usage**:
 ```sql
@@ -1187,7 +1088,7 @@ app.post('/channel/:channelId/promote', middlewareKey(['all', 'upload']), async 
 
 **Advantages**:
 - ✅ **Type-safe**: Strict `Permission` type with autocomplete
-- ✅ **Auto-routing**: Legacy/RBAC based on org flag (transparent)
+- ✅ **RBAC-only**: Same authorization model for every org
 - ✅ **Logging**: Automatic logs in CloudFlare/Supabase
 - ✅ **Fail-closed**: Returns `false` on error (secure)
 - ✅ **Context-aware**: Automatically uses `c.get('auth')` and `c.get('apikey')`
@@ -1273,8 +1174,7 @@ if (orgStore.hasPermissionsInRole('write', ['app_developer', 'org_admin'], orgId
 ```
 
 **Behavior**:
-- If `use_new_rbac` enabled: checks cached `role_bindings`
-- If legacy: checks `org_users.user_right`
+- Checks cached RBAC role bindings.
 
 **Limitations**:
 - ❌ Checks **role names**, not granular permissions
@@ -1407,7 +1307,7 @@ export async function checkPermissionsBatch(
 
 **Benefits**:
 - ✅ **Single source of truth**: calls the backend directly
-- ✅ **Auto-routing**: legacy/RBAC handled server-side (transparent)
+- ✅ **RBAC-only**: one authorization model for UI and API keys
 - ✅ **Type-safe**: strict `Permission` type with autocomplete
 - ✅ **Flexible**: permission changes in DB, no frontend deploy needed
 - ✅ **Always up to date**: no stale cache
@@ -1592,7 +1492,7 @@ To facilitate migration, here's the mapping between current role checks and equi
 
 ```sql
 SELECT rbac_is_enabled_for_org('123e4567-e89b-12d3-a456-426614174000');
--- true if RBAC enabled, false if legacy
+-- true
 ```
 
 #### 2. View all role_bindings for a user
@@ -1825,7 +1725,7 @@ const allowed = await check_min_rights_legacy('upload', userId, orgId, appId)
 const allowed = await checkPermission(c, 'app.upload_bundle', { appId })
 ```
 
-**Reason**: Automatic legacy/RBAC routing, structured logs, type-safety
+**Reason**: one RBAC permission path, structured logs, type-safety
 
 #### ✅ Specify the most precise permission possible
 

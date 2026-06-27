@@ -59,7 +59,6 @@ async function createStaleLegacySuperAdminFixture() {
     created_by: USER_ID,
     name: `Encrypted RBAC Stale Org ${id}`,
     management_email: `encrypted-rbac-stale-${id}@capgo.app`,
-    use_new_rbac: true,
   })
   if (orgError)
     throw orgError

@@ -2050,7 +2050,6 @@ export type Database = {
           stats_refresh_requested_at: string | null
           stats_updated_at: string | null
           updated_at: string | null
-          use_new_rbac: boolean
           website: string | null
         }
         Insert: {
@@ -2075,7 +2074,6 @@ export type Database = {
           stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
           updated_at?: string | null
-          use_new_rbac?: boolean
           website?: string | null
         }
         Update: {
@@ -2100,7 +2098,6 @@ export type Database = {
           stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
           updated_at?: string | null
-          use_new_rbac?: boolean
           website?: string | null
         }
         Relationships: [

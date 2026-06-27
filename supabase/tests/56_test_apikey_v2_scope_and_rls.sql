@@ -28,21 +28,19 @@ VALUES (
 )
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.orgs (id, created_by, name, management_email, use_new_rbac)
+INSERT INTO public.orgs (id, created_by, name, management_email)
 VALUES
   (
     '71000000-0000-4000-8000-000000000056',
     tests.get_supabase_uid('apikey_v2_scope_owner'),
     'API key V2 scope org A',
-    'apikey-v2-scope-a@test.local',
-    true
+    'apikey-v2-scope-a@test.local'
   ),
   (
     '72000000-0000-4000-8000-000000000056',
     tests.get_supabase_uid('apikey_v2_scope_owner'),
     'API key V2 scope org B',
-    'apikey-v2-scope-b@test.local',
-    true
+    'apikey-v2-scope-b@test.local'
   )
 ON CONFLICT (id) DO NOTHING;
 

@@ -4,7 +4,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { BRES, simpleError } from '../../utils/hono.ts'
 import { cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
-import { supabaseApikey, updateOrCreateChannel } from '../../utils/supabase.ts'
+import { supabaseApikey } from '../../utils/supabase.ts'
 import { isInternalVersionName, isValidAppId } from '../../utils/utils.ts'
 
 interface ChannelSet {
@@ -47,14 +47,40 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
   if (!isValidAppId(body.app_id)) {
     throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
   }
-  // Auth context is already set by middlewareKey
-  if (!(await checkPermission(c, 'app.create_channel', { appId: body.app_id }))) {
+  const apiClient = supabaseApikey(c, apikey.key)
+  const { data: existingChannel } = await apiClient
+    .from('channels')
+    .select('*')
+    .eq('app_id', body.app_id)
+    .eq('name', body.channel)
+    .maybeSingle()
+
+  if (existingChannel) {
+    const canUpdateChannel = await checkPermission(c, 'channel.update_settings', { appId: body.app_id, channelId: existingChannel.id })
+    if (!canUpdateChannel)
+      throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel: body.channel })
+  }
+  else if (!(await checkPermission(c, 'app.create_channel', { appId: body.app_id }))) {
     throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id })
   }
-  const { data: org, error } = await supabaseApikey(c, apikey.key).from('apps').select('owner_org').eq('app_id', body.app_id).single()
+
+  const { data: org, error } = await apiClient.from('apps').select('owner_org').eq('app_id', body.app_id).single()
   if (error || !org) {
     throw simpleError('invalid_app_id', 'You can\'t access this app', { app_id: body.app_id })
   }
+
+  const nextVersion = body.version && !isInternalVersionName(body.version)
+    ? await findVersion(c, body.app_id, body.version, org.owner_org, apikey)
+    : null
+
+  if (existingChannel) {
+    if (nextVersion !== existingChannel.version && !(await checkPermission(c, 'channel.promote_bundle', { appId: body.app_id, channelId: existingChannel.id })))
+      throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel: body.channel })
+  }
+  else if (nextVersion !== null && !(await checkPermission(c, 'channel.promote_bundle', { appId: body.app_id }))) {
+    throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel: body.channel })
+  }
+
   const inferredElectron = body.electron ?? (body.public && body.ios !== body.android ? false : undefined)
   const channel: Database['public']['Tables']['channels']['Insert'] = {
     created_by: apikey.user_id,
@@ -71,13 +97,26 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
     ...(body.ios == null ? {} : { ios: body.ios }),
     ...(body.android == null ? {} : { android: body.android }),
     ...(inferredElectron == null ? {} : { electron: inferredElectron }),
-    version: null,
+    version: nextVersion,
     owner_org: org.owner_org,
   }
 
-  if (body.version && !isInternalVersionName(body.version))
-    channel.version = await findVersion(c, body.app_id, body.version, org.owner_org, apikey)
+  const upsertPayload = {
+    ...channel,
+    created_by: existingChannel?.created_by ?? channel.created_by,
+  }
+  if (existingChannel) {
+    const fieldsDiffer = Object.keys(upsertPayload).some(key =>
+      (upsertPayload as any)[key] !== (existingChannel as any)[key] && key !== 'created_at' && key !== 'updated_at',
+    )
+    if (!fieldsDiffer)
+      return c.json(BRES)
+  }
 
-  await updateOrCreateChannel(c, channel)
+  await apiClient
+    .from('channels')
+    .upsert(upsertPayload, { onConflict: 'app_id, name' })
+    .throwOnError()
+
   return c.json(BRES)
 }

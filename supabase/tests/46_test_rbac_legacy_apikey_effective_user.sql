@@ -11,13 +11,12 @@ VALUES
   (tests.get_supabase_uid('legacy_apikey_effective_member'), 'legacy_apikey_effective_member@test.local', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.orgs (id, created_by, name, management_email, use_new_rbac)
+INSERT INTO public.orgs (id, created_by, name, management_email)
 VALUES (
   '70000000-0000-4000-8000-000000000046',
   tests.get_supabase_uid('legacy_apikey_effective_admin'),
   'Legacy API key effective user org',
-  'legacy-apikey-effective@test.local',
-  false
+  'legacy-apikey-effective@test.local'
 )
 ON CONFLICT (id) DO NOTHING;
 

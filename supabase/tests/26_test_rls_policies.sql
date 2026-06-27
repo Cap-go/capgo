@@ -246,10 +246,10 @@ SELECT
         'public',
         'channels',
         ARRAY[
-            'Allow delete for auth (admin+) (all apikey)',
-            'Allow insert for auth, api keys (write, all) (admin+)',
+            'Allow delete for auth, api keys (channel.delete)',
+            'Allow insert for auth, api keys (create_channel)',
             'Allow select for auth, api keys (read+)',
-            'Allow update for auth, api keys (write, all) (write+)',
+            'Allow update for auth, api keys (channel write)',
             'Prevent non 2FA access'
         ],
         'channels should have correct policies'
