@@ -10,7 +10,7 @@ BEGIN;
 -- Org: 046a36ac-e03c-4590-9257-bd6c9dba9ee8
 -- App: com.demo.app
 
-SELECT plan(11);
+SELECT plan(16);
 
 -- Test 1: audit_logs_allowed_orgs should fail fast when no auth and no
 -- API key header is set
@@ -335,6 +335,98 @@ BEGIN
 END $$;
 
 SELECT ok(TRUE, 'audit log contains correct old_record and new_record data');
+
+-- Tests 12-16: org ids stay safe for retained audit-log lookup
+SELECT ok(
+    EXISTS (
+        SELECT 1
+        FROM pg_trigger AS t
+        INNER JOIN pg_class AS c ON c.oid = t.tgrelid
+        INNER JOIN pg_namespace AS n ON n.oid = c.relnamespace
+        WHERE
+            n.nspname = 'public'
+            AND c.relname = 'orgs'
+            AND t.tgname = 'lock_org_tombstone_guard'
+            AND NOT t.tgisinternal
+            AND (t.tgtype & 1) = 0
+            AND (t.tgtype & 2) = 2
+            AND (t.tgtype & 4) = 4
+            AND (t.tgtype & 8) = 8
+            AND (t.tgtype & 16) = 16
+    ),
+    'org tombstone guard serializes insert/delete/id-update statements'
+);
+
+INSERT INTO public.orgs (
+    id,
+    created_by,
+    name,
+    management_email,
+    use_new_rbac
+) VALUES (
+    '0e5b4c90-f3fa-49d8-a9f7-1f83b57ec2a1'::uuid,
+    '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
+    'Audit Tombstone Test Org',
+    'audit-tombstone@test.com',
+    false
+);
+
+SELECT throws_ok(
+    $q$
+        UPDATE public.orgs
+        SET id = '18a04286-8f89-4e8b-825f-d045e4c823b4'::uuid
+        WHERE id = '0e5b4c90-f3fa-49d8-a9f7-1f83b57ec2a1'::uuid;
+    $q$,
+    'P0001',
+    'org_id_update_forbidden',
+    'org id cannot be changed after creation'
+);
+
+DELETE FROM public.orgs
+WHERE id = '0e5b4c90-f3fa-49d8-a9f7-1f83b57ec2a1'::uuid;
+
+SELECT ok(
+    EXISTS (
+        SELECT 1
+        FROM public.org_id_tombstones
+        WHERE
+            org_id = '0e5b4c90-f3fa-49d8-a9f7-1f83b57ec2a1'::uuid
+    ),
+    'deleted org id is tombstoned'
+);
+
+SELECT ok(
+    EXISTS (
+        SELECT 1
+        FROM public.audit_logs
+        WHERE
+            org_id = '0e5b4c90-f3fa-49d8-a9f7-1f83b57ec2a1'::uuid
+            AND table_name = 'orgs'
+            AND operation = 'DELETE'
+    ),
+    'deleted org audit log remains retained'
+);
+
+SELECT throws_ok(
+    $q$
+        INSERT INTO public.orgs (
+            id,
+            created_by,
+            name,
+            management_email,
+            use_new_rbac
+        ) VALUES (
+            '0e5b4c90-f3fa-49d8-a9f7-1f83b57ec2a1'::uuid,
+            '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
+            'Reused Audit Tombstone Test Org',
+            'audit-tombstone-reuse@test.com',
+            false
+        );
+    $q$,
+    'P0001',
+    'org_id_reuse_forbidden',
+    'deleted org id cannot be reused'
+);
 
 -- Finish
 SELECT * FROM finish(); -- noqa: AM04
