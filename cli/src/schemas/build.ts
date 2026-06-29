@@ -75,6 +75,10 @@ export const buildRequestOptionsSchema = optionsBaseSchema.extend({
   outputRecord: z.string().optional(),
   skipBuildNumberBump: z.boolean().optional(),
   playstoreUpload: z.boolean().optional(),
+  submitToStoreReview: z.boolean().optional(),
+  storeReleaseName: z.string().trim().min(1).optional(),
+  storeReleaseNotes: z.string().trim().min(1).optional(),
+  iosTestflightGroups: z.string().trim().min(1).optional(),
   verbose: z.boolean().optional(),
   aiAnalytics: z.boolean().optional(),
   // On a CI/CD (non-interactive) build failure, upload the captured build logs
@@ -165,6 +169,10 @@ export const buildOptionsPayloadSchema = z.object({
   outputUploadEnabled: z.boolean(),
   outputRetentionSeconds: z.number(),
   skipBuildNumberBump: z.boolean(),
+  submitToStoreReview: z.boolean(),
+  storeReleaseName: z.string().optional(),
+  storeReleaseNotes: z.string().optional(),
+  iosTestflightGroups: z.string().optional(),
 })
 
 export type BuildOptionsPayload = z.infer<typeof buildOptionsPayloadSchema>
