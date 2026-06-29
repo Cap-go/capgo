@@ -66,52 +66,32 @@ function getHoursSinceRelease(releasedAt: string | null | undefined): number | n
   return elapsedMs / (1000 * 60 * 60)
 }
 
+function getThresholdStatus(
+  percentOnCurrent: number,
+  healthyThreshold: number,
+  warningThreshold: number,
+  lowStatus: ChannelAdoptionStatus = 'critical',
+): ChannelAdoptionStatus {
+  if (percentOnCurrent >= healthyThreshold)
+    return 'healthy'
+  if (percentOnCurrent >= warningThreshold)
+    return 'warning'
+  return lowStatus
+}
+
 function getAdoptionStatus(percentOnCurrent: number, totalDevices: number, hoursSinceRelease: number | null): ChannelAdoptionStatus {
   if (totalDevices <= 0)
     return 'no-devices'
 
-  // Fall back to legacy thresholds when release timestamp is not available.
-  if (hoursSinceRelease === null) {
-    if (percentOnCurrent >= 90)
-      return 'healthy'
-    if (percentOnCurrent >= 50)
-      return 'warning'
-    return 'critical'
-  }
-
-  // First 24h: low percentage is expected, keep this neutral unless it ramps quickly.
-  if (hoursSinceRelease < 24) {
-    if (percentOnCurrent >= 50)
-      return 'healthy'
-    if (percentOnCurrent >= 10)
-      return 'warning'
-    return 'ramping'
-  }
-
-  // 24h-72h: now low adoption is concerning.
-  if (hoursSinceRelease < 72) {
-    if (percentOnCurrent >= 75)
-      return 'healthy'
-    if (percentOnCurrent >= 25)
-      return 'warning'
-    return 'critical'
-  }
-
-  // 3-7 days: should be significantly rolled out.
-  if (hoursSinceRelease < 168) {
-    if (percentOnCurrent >= 85)
-      return 'healthy'
-    if (percentOnCurrent >= 45)
-      return 'warning'
-    return 'critical'
-  }
-
-  // After a week: expect strong adoption.
-  if (percentOnCurrent >= 90)
-    return 'healthy'
-  if (percentOnCurrent >= 60)
-    return 'warning'
-  return 'critical'
+  if (hoursSinceRelease === null)
+    return getThresholdStatus(percentOnCurrent, 90, 50)
+  if (hoursSinceRelease < 24)
+    return getThresholdStatus(percentOnCurrent, 50, 10, 'ramping')
+  if (hoursSinceRelease < 72)
+    return getThresholdStatus(percentOnCurrent, 75, 25)
+  if (hoursSinceRelease < 168)
+    return getThresholdStatus(percentOnCurrent, 85, 45)
+  return getThresholdStatus(percentOnCurrent, 90, 60)
 }
 
 const route = useRoute('/app/[app].channel.[channel].statistics')
@@ -402,7 +382,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
       },
     },
   },
-}))
+} as unknown as ChartOptions<'line'>))
 
 async function getChannel() {
   if (!id.value)
@@ -529,10 +509,8 @@ watchEffect(async () => {
 
 <template>
   <div>
-    <div v-if="loading" class="flex flex-col justify-center items-center min-h-[50vh]">
-      <Spinner size="w-40 h-40" />
-    </div>
-    <div v-else-if="channel" class="w-full h-full px-0 pt-0 mx-auto mb-8 sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+    <PageLoader v-if="loading" />
+    <div v-else-if="channel" class="w-full h-full px-4 pt-0 mx-auto mb-8 sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
       <div class="flex flex-col gap-6">
         <!-- Status Banner -->
         <div

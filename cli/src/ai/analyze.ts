@@ -3,21 +3,78 @@ import { cleanupCapturedJobFiles, getAiPromptPath, getLogCapturePath } from './l
 import { SYSTEM_PROMPT } from './prompt'
 import { createSseParser } from './sse'
 
-export type AnalyzeBehavior = 'show_menu' | 'ask_then_menu' | 'auto_upload' | 'skip'
+export type AnalyzeBehavior = 'ask_then_menu' | 'auto_upload' | 'skip'
 
 export interface DecideInput {
   isTTY: boolean
   aiAnalyticsFlag: boolean
+  sendLogsFlag: boolean
 }
 
 export function decideAnalyzeBehavior(input: DecideInput): AnalyzeBehavior {
-  if (input.isTTY && input.aiAnalyticsFlag)
-    return 'show_menu'
-  if (input.isTTY && !input.aiAnalyticsFlag)
-    return 'ask_then_menu'
-  if (!input.isTTY && input.aiAnalyticsFlag)
+  // Explicit opt-in via --ai-analytics or --send-logs means the user has
+  // already chosen - run the action(s) directly, never prompt (any terminal).
+  if (input.aiAnalyticsFlag || input.sendLogsFlag)
     return 'auto_upload'
+  // No flags + interactive terminal: ask, then show the help menu.
+  if (input.isTTY)
+    return 'ask_then_menu'
+  // No flags + non-interactive (CI/CD): stay silent (+ existing CI tip).
   return 'skip'
+}
+
+// Tip printed to stderr when a build fails non-interactively and the user opted
+// into NEITHER AI analysis nor log upload — so CI users discover both options
+// instead of getting a silent failure.
+export const CI_FAILURE_TIP = 'Build failed. Tip: re-run with --ai-analytics for an AI-powered diagnosis, or --send-logs-to-support to upload the build logs to Capgo support.'
+
+export interface CiFailureActionsInput {
+  // --ai-analytics passed?
+  aiAnalyticsFlag: boolean
+  // --send-logs passed?
+  sendLogsFlag: boolean
+}
+
+export interface CiFailureActions {
+  // Run the existing Capgo AI auto-upload analysis path.
+  runAiAnalysis: boolean
+  // Upload the captured build logs to Capgo support via uploadSupportLogs.
+  sendLogs: boolean
+  // Neither flag set — print CI_FAILURE_TIP so the user learns both options exist.
+  tip: string | null
+}
+
+// Pure decision for the direct-action build-failure path (CI/CD, or any terminal
+// when --ai-analytics/--send-logs is passed). Both flags are independent and
+// additive: --ai-analytics and --send-logs can both be passed and both run.
+// When neither is passed we surface a one-line tip instead of failing silently.
+// No-flag interactive terminals never reach this; they use the
+// decideAnalyzeBehavior ask_then_menu flow instead.
+export function decideCiFailureActions(input: CiFailureActionsInput): CiFailureActions {
+  return {
+    runAiAnalysis: input.aiAnalyticsFlag,
+    sendLogs: input.sendLogsFlag,
+    tip: (!input.aiAnalyticsFlag && !input.sendLogsFlag) ? CI_FAILURE_TIP : null,
+  }
+}
+
+export interface ShouldPrintCiTipInput {
+  // Is the current stdout an interactive terminal?
+  isTTY: boolean
+  // --ai-analytics passed?
+  aiAnalytics: boolean
+  // --send-logs passed?
+  sendLogs: boolean
+}
+
+// Whether to print CI_FAILURE_TIP at the build-failure point. This is the ONLY
+// case where the tip should appear: a non-interactive (CI/CD) build that failed
+// while the user opted into NEITHER --ai-analytics NOR --send-logs. Interactive
+// terminals use the clack menu instead; if either flag is set the corresponding
+// action runs and no tip is wanted. Pure + unit-tested so the emit site stays
+// trivial and self-documenting.
+export function shouldPrintCiTip(input: ShouldPrintCiTipInput): boolean {
+  return !input.isTTY && !input.aiAnalytics && !input.sendLogs
 }
 
 export async function writeLocalAiFile(jobId: string): Promise<string> {

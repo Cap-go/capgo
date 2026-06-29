@@ -6,6 +6,8 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import IconArrowRight from '~icons/lucide/arrow-right'
+import IconCheckCircle from '~icons/lucide/check-circle'
 import CreditsCta from '~/components/CreditsCta.vue'
 import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { formatIncludedThenPrice } from '~/services/creditPricing'
@@ -181,6 +183,31 @@ async function prefetchStripeCheckoutUrl(plan: Database['public']['Tables']['pla
   }
 }
 
+function trackPlanCheckoutStarted(plan: Database['public']['Tables']['plans']['Row'], isYear: boolean, checkoutSource: string) {
+  const orgId = currentOrganization.value?.gid
+  if (!orgId || !plan.stripe_id)
+    return
+
+  sendEvent({
+    channel: 'usage',
+    event: 'Checkout Started',
+    icon: '💳',
+    org_id: orgId,
+    tracking_version: 2,
+    notify: false,
+    tags: {
+      product_id: plan.stripe_id,
+      plan_name: plan.name,
+      recurrence: isYear ? 'year' : 'month',
+      checkout_source: checkoutSource,
+      current_plan_name: currentPlan.value?.name ?? '',
+      plan_price: isYear ? plan.price_y : plan.price_m,
+      plan_price_monthly: plan.price_m,
+      plan_price_yearly: plan.price_y,
+    },
+  }).catch()
+}
+
 async function openSafariStripeCheckout(plan: Database['public']['Tables']['plans']['Row'], isYear: boolean) {
   const url = await prefetchStripeCheckoutUrl(plan, isYear)
   if (!url) {
@@ -203,6 +230,7 @@ async function openSafariStripeCheckout(plan: Database['public']['Tables']['plan
         href: url,
         target: '_blank',
         rel: 'noopener noreferrer',
+        handler: () => trackPlanCheckoutStarted(plan, isYear, 'safari_confirm'),
       },
     ],
   })
@@ -222,15 +250,18 @@ async function openChangePlan(plan: Database['public']['Tables']['plans']['Row']
   // get the current url
   isSubscribeLoading.value[index] = true
   if (plan.stripe_id) {
+    const checkoutIsYearly = plan.price_y === plan.price_m ? false : isYearly.value
     if (isSafariBrowser()) {
-      const shouldContinue = await openSafariStripeCheckout(plan, plan.price_y !== plan.price_m ? isYearly.value : false)
+      const shouldContinue = await openSafariStripeCheckout(plan, checkoutIsYearly)
       if (!shouldContinue) {
         isSubscribeLoading.value[index] = false
         return
       }
     }
     else {
-      await openCheckout(plan.stripe_id, `${window.location.href}?success=1`, `${window.location.href}?cancel=1`, plan.price_y !== plan.price_m ? isYearly.value : false, currentOrganization?.value?.gid ?? '')
+      const didOpenCheckout = await openCheckout(plan.stripe_id, `${globalThis.location.href}?success=1`, `${globalThis.location.href}?cancel=1`, checkoutIsYearly, currentOrganization?.value?.gid ?? '')
+      if (didOpenCheckout)
+        trackPlanCheckoutStarted(plan, checkoutIsYearly, 'direct')
     }
   }
   isSubscribeLoading.value[index] = false
@@ -417,7 +448,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
 </script>
 
 <template>
-  <div class="flex flex-col pb-8 bg-white border shadow-lg md:p-8 md:pb-0 md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+  <div class="flex flex-col bg-white border shadow-lg md:p-8 md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900" :class="thankYouPage ? 'pb-0' : 'pb-8 md:pb-0'">
     <div v-if="!thankYouPage" class="flex flex-col w-full h-full">
       <!-- Header Section -->
       <div class="flex flex-col items-center justify-between gap-4 mb-6 sm:flex-row shrink-0">
@@ -590,19 +621,31 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
     </div>
 
     <!-- Thank You Page -->
-    <div v-else class="flex items-center justify-center w-full h-full bg-gray-50 dark:bg-base-300">
-      <div class="text-center">
-        <img src="/capgo.webp" alt="logo" class="w-20 h-20 mx-auto mb-8 animate-bounce">
-        <h2 class="mb-4 text-3xl font-bold text-gray-900 dark:text-white">
+    <div v-else class="flex w-full min-h-[calc(100dvh-10rem)] items-center justify-center overflow-hidden rounded-lg bg-linear-to-br from-slate-50 via-white to-blue-50 px-4 py-8 dark:from-base-300 dark:via-gray-900 dark:to-slate-950 sm:min-h-[560px] sm:px-6 md:px-8">
+      <section aria-live="polite" class="mx-auto flex w-full max-w-2xl flex-col items-center text-center">
+        <div class="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-blue-100 text-blue-600 ring-8 ring-blue-50 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500/10 sm:h-24 sm:w-24">
+          <IconCheckCircle class="h-11 w-11 sm:h-12 sm:w-12" aria-hidden="true" />
+        </div>
+
+        <h2 class="max-w-xl text-2xl font-bold leading-tight text-gray-900 dark:text-white sm:text-3xl">
           {{ t('thank-you-for-sub') }}
         </h2>
-        <div class="mb-8 text-6xl">
-          🎉
+
+        <p class="mt-4 max-w-xl text-base leading-7 text-gray-600 dark:text-gray-300">
+          {{ t('usage-success') }}
+        </p>
+
+        <div class="mt-8 flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center sm:justify-center">
+          <router-link to="/apps" class="d-btn d-btn-primary min-h-12 w-full rounded-lg px-5 text-base font-semibold sm:w-auto">
+            <span>{{ t('use-capgo') }}</span>
+            <IconArrowRight class="h-4 w-4" aria-hidden="true" />
+          </router-link>
+
+          <router-link to="/settings/organization/usage" class="d-btn d-btn-ghost min-h-12 w-full rounded-lg px-5 text-base font-semibold text-gray-700 dark:text-gray-200 sm:w-auto">
+            {{ t('usage') }}
+          </router-link>
         </div>
-        <router-link to="/apps" class="inline-flex items-center px-6 py-3 text-base font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700">
-          {{ t('use-capgo') }} 🚀
-        </router-link>
-      </div>
+      </section>
     </div>
 
     <!-- Permission modal shown when the user can't manage billing -->

@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path'
 import process, { env } from 'node:process'
 import { getPlaywrightStripeApiBaseUrl } from './playwright-stripe'
 import { getSupabaseWorktreeConfig } from './supabase-worktree-config'
+import { getSupabaseStatus, type SupabaseStatus } from './supabase-worktree-status'
 
 const repoRoot = process.cwd()
 const sourceEnvPath = resolve(repoRoot, 'supabase/functions/.env')
@@ -13,14 +14,6 @@ const supabaseConfig = getSupabaseWorktreeConfig(repoRoot)
 const stripeApiBaseUrl = getPlaywrightStripeApiBaseUrl(env)
 const webAppUrl = env.WEBAPP_URL || 'http://localhost:5173'
 const functionsReadyTimeoutMs = Number(env.PLAYWRIGHT_BACKEND_TIMEOUT_MS || '360000')
-
-interface SupabaseStatus {
-  API_URL?: string
-  ANON_KEY?: string
-  PUBLISHABLE_KEY?: string
-  SERVICE_ROLE_KEY?: string
-  SECRET_KEY?: string
-}
 
 function upsertEnvValue(content: string, key: string, value: string): string {
   const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -45,33 +38,6 @@ const overriddenEnv = [
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
-}
-
-function parseSupabaseStatus(stdout: string): SupabaseStatus | null {
-  const jsonStart = stdout.indexOf('{')
-  if (jsonStart < 0)
-    return null
-
-  try {
-    return JSON.parse(stdout.slice(jsonStart)) as SupabaseStatus
-  }
-  catch {
-    return null
-  }
-}
-
-function getSupabaseStatus(): SupabaseStatus | null {
-  const statusResult = spawnSync('bun', ['scripts/supabase-worktree.ts', 'status', '-o', 'json'], {
-    cwd: repoRoot,
-    stdio: 'pipe',
-    encoding: 'utf8',
-    env: process.env,
-  })
-
-  if ((statusResult.status ?? 1) !== 0)
-    return null
-
-  return parseSupabaseStatus(statusResult.stdout || '')
 }
 
 function hasHealthySupabaseApi(status: SupabaseStatus | null) {

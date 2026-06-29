@@ -25,7 +25,9 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'DELETE'), async (c)
     .from('deleted_apps')
     .insert({
       app_id: record.app_id,
+      created_at: record.created_at,
       owner_org: record.owner_org,
+      transfer_history: record.transfer_history ?? [],
     })
 
   // Delete app icon from storage

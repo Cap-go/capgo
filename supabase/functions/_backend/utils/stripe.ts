@@ -6,6 +6,7 @@ import { cloudlog, cloudlogErr } from './logging.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { getEnv, isStripeConfigured } from './utils.ts'
 
+const TRACKED_STRIPE_SUBSCRIPTION_STATUSES = ['active', 'trialing', 'past_due'] as const
 const ISO_COUNTRY_CODE_REGEX = /^[A-Z]{2}$/
 const TRAILING_SLASHES_REGEX = /\/+$/g
 
@@ -206,34 +207,23 @@ export async function getCancellationDetails(c: Context, subscriptionId: string 
 }
 
 async function getActiveSubscription(c: Context, customerId: string, subscriptionId: string | null) {
-  cloudlog({ requestId: c.get('requestId'), message: 'Stored subscription not active or not found, checking for others.', customerId, storedSubscriptionId: subscriptionId })
+  cloudlog({ requestId: c.get('requestId'), message: 'Stored subscription not tracked or not found, checking for others.', customerId, storedSubscriptionId: subscriptionId })
 
-  // Try to find active subscriptions first
-  let activeSubscriptions = await getStripe(c).subscriptions.list({
-    customer: customerId,
-    status: 'active',
-    limit: 1,
-  })
-
-  // If no active subscriptions, check for trialing subscriptions
-  if (activeSubscriptions.data.length === 0) {
-    activeSubscriptions = await getStripe(c).subscriptions.list({
+  for (const status of TRACKED_STRIPE_SUBSCRIPTION_STATUSES) {
+    const subscriptions = await getStripe(c).subscriptions.list({
       customer: customerId,
-      status: 'trialing', // Check for trial subscriptions
+      status,
       limit: 1,
     })
+
+    if (subscriptions.data.length > 0) {
+      const activeSub = subscriptions.data[0]
+      cloudlog({ requestId: c.get('requestId'), message: 'Found a tracked subscription, fetching its data.', activeSubscriptionId: activeSub.id, status: activeSub.status })
+      return getSubscriptionData(c, customerId, activeSub.id)
+    }
   }
 
-  if (activeSubscriptions.data.length > 0) {
-    const activeSub = activeSubscriptions.data[0]
-    cloudlog({ requestId: c.get('requestId'), message: 'Found an active or trialing subscription, fetching its data.', activeSubscriptionId: activeSub.id, status: activeSub.status })
-    // Fetch data for the newly found active subscription
-    return getSubscriptionData(c, customerId, activeSub.id)
-  }
-  else {
-    cloudlog({ requestId: c.get('requestId'), message: 'No other active or trialing subscriptions found for customer.', customerId })
-    // Keep subscriptionData as null or the inactive one, it will be handled below
-  }
+  cloudlog({ requestId: c.get('requestId'), message: 'No other tracked subscriptions found for customer.', customerId })
   return null
 }
 
@@ -244,30 +234,52 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
     // Get subscription data from Stripe using the ID stored in our DB
     let subscriptionData = await getSubscriptionData(c, customerId, subscriptionId)
 
-    // If the stored subscription is not active or doesn't exist, check for any other active subscriptions
-    if (!subscriptionData || (subscriptionData.status !== 'active' && subscriptionData.status !== 'trialing')) {
+    if (!subscriptionData) {
       subscriptionData = await getActiveSubscription(c, customerId, subscriptionId)
     }
+    else if (!TRACKED_STRIPE_SUBSCRIPTION_STATUSES.includes(subscriptionData.status as typeof TRACKED_STRIPE_SUBSCRIPTION_STATUSES[number])) {
+      const replacementSubscriptionData = await getActiveSubscription(c, customerId, subscriptionId)
+      if (replacementSubscriptionData || subscriptionData.status !== 'canceled')
+        subscriptionData = replacementSubscriptionData
+    }
 
-    let dbStatus: 'succeeded' | 'canceled' | undefined = 'canceled'
+    let dbStatus: Database['public']['Enums']['stripe_status'] = 'canceled'
 
     if (subscriptionData) {
-      // Determine DB status based on the potentially updated subscription data
       if (subscriptionData.status === 'canceled') {
-        // Only apply 'active until period end' logic if Stripe status is 'canceled'
-        if (subscriptionData.cycleEnd && new Date(subscriptionData.cycleEnd) > new Date()) {
-          dbStatus = 'succeeded' // Still active until period end because cycleEnd is future
-        }
+        if (subscriptionData.cycleEnd && new Date(subscriptionData.cycleEnd) > new Date())
+          dbStatus = 'succeeded'
       }
-      else if (subscriptionData.status === 'active' || subscriptionData.status === 'trialing') {
-        // Active and trialing subscriptions are always considered succeeded
+      else if (subscriptionData.status === 'active' || subscriptionData.status === 'trialing' || subscriptionData.status === 'past_due') {
         dbStatus = 'succeeded'
       }
     }
 
+    const { data: currentStripeInfo, error: currentStripeInfoError } = await supabaseAdmin(c)
+      .from('stripe_info')
+      .select('status, past_due_at')
+      .eq('customer_id', customerId)
+      .maybeSingle()
+
+    if (currentStripeInfoError) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'syncSubscriptionData current stripe_info', error: currentStripeInfoError })
+      return
+    }
+
+    const hadPastDueState = !!currentStripeInfo?.past_due_at
+
     // Update stripe_info table with latest data, even if no subscription exists
     const updateData: any = {
       status: dbStatus,
+    }
+
+    if (subscriptionData?.status === 'past_due') {
+      updateData.past_due_at = currentStripeInfo?.past_due_at ?? new Date().toISOString()
+      updateData.churn_reason = null
+    }
+    else if (hadPastDueState) {
+      updateData.past_due_at = null
+      updateData.churn_reason = dbStatus === 'canceled' ? 'past_due_unresolved' : null
     }
 
     // Only include fields if they have valid values to avoid foreign key constraint violations
@@ -400,15 +412,19 @@ export async function syncStripeCustomerCountry(c: Context, customerId: string |
 
 export async function cancelSubscription(c: Context, customerId: string) {
   if (!isStripeConfigured(c))
-    return Promise.resolve()
-  const allSubscriptions = await getStripe(c).subscriptions.list({
-    customer: customerId,
-  })
-  return Promise.all(
-    allSubscriptions.data.map(sub => getStripe(c).subscriptions.cancel(sub.id)),
-  ).catch((err) => {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'cancelSubscription', error: err })
-  })
+    return
+
+  for await (const subscription of getStripe(c).subscriptions.list({ customer: customerId, status: 'all' })) {
+    if (subscription.status === 'canceled' || subscription.status === 'incomplete_expired')
+      continue
+
+    try {
+      await getStripe(c).subscriptions.cancel(subscription.id)
+    }
+    catch (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'cancelSubscription item', error, subscriptionId: subscription.id, customerId })
+    }
+  }
 }
 
 async function getStoredPlanPriceId(c: Context, planId: string, recurrence: string): Promise<string | null> {
@@ -476,8 +492,13 @@ export interface DatafastAttribution {
   sessionId?: string | null
 }
 
+export type StripeWebhookStatus = Database['public']['Enums']['stripe_status'] | 'past_due'
+export type StripeDataPayload = Omit<Database['public']['Tables']['stripe_info']['Insert'], 'status'> & {
+  status?: StripeWebhookStatus | null
+}
+
 export interface StripeData {
-  data: Database['public']['Tables']['stripe_info']['Insert']
+  data: StripeDataPayload
   isUpgrade: boolean
   previousPriceId: string | undefined
   previousProductId: string | undefined

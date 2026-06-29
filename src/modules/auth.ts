@@ -205,6 +205,8 @@ async function guard(
   }
 
   function shouldRedirectToOrgOnboarding() {
+    if (to.path.startsWith('/onboarding/app'))
+      return false
     if (to.path.startsWith('/onboarding/organization'))
       return false
     if (to.path.startsWith('/onboarding/invitation'))
@@ -307,7 +309,7 @@ async function guard(
     if (organizationsLoaded && !organizationStore.hasOrganizations && shouldRedirectToOrgOnboarding()) {
       if (!isAdminRoute || !main.isAdmin) {
         return next({
-          path: '/onboarding/organization',
+          path: '/onboarding/app',
           query: {
             to: to.fullPath,
           },
@@ -385,7 +387,12 @@ async function guard(
     }
 
     if (organizationsLoaded && !organizationStore.hasOrganizations && shouldRedirectToOrgOnboarding()) {
-      return next('/onboarding/organization')
+      return next({
+        path: '/onboarding/app',
+        query: {
+          to: to.fullPath,
+        },
+      })
     }
 
     // Check if user is trying to access admin routes

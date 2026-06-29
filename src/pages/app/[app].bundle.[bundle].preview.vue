@@ -121,9 +121,7 @@ watchEffect(async () => {
 <template>
   <div>
     <!-- Loading State -->
-    <div v-if="loading" class="flex flex-col justify-center items-center min-h-[50vh]">
-      <Spinner size="w-40 h-40" />
-    </div>
+    <PageLoader v-if="loading" />
 
     <!-- Version Not Found -->
     <div v-else-if="!version" class="flex flex-col justify-center items-center min-h-[50vh]">

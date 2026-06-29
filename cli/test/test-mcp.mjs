@@ -68,6 +68,12 @@ try {
     'capgo_upload_bundle',
     'capgo_update_channel',
     'capgo_get_stats',
+    'capgo_login',
+    'capgo_whoami',
+    'capgo_logout',
+    'start_capgo_builder_onboarding',
+    'capgo_builder_onboarding_next_step',
+    'start_capgo_live_update_onboarding',
   ]
   const missing = requiredTools.filter(name => !toolNames.has(name))
   if (missing.length > 0) {

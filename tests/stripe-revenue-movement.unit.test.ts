@@ -181,6 +181,34 @@ describe('stripe revenue movement classification', () => {
     })
   })
 
+  it.concurrent('records unresolved past due cancellations as churned MRR from the stored active status', () => {
+    expect(stripeEventTestUtils.classifyRevenueMovement(
+      {
+        is_good_plan: true,
+        paid_at: '2026-04-01T00:00:00.000Z',
+        price_id: 'price_team_yearly',
+        product_id: 'prod_team',
+        status: 'succeeded',
+      },
+      {
+        is_good_plan: true,
+        paid_at: '2026-04-01T00:00:00.000Z',
+        price_id: 'price_team_yearly',
+        product_id: 'prod_team',
+        status: 'canceled',
+      },
+      plans as any,
+    )).toMatchObject({
+      currentMrr: 39,
+      nextMrr: 0,
+      churnMrr: 39,
+      newBusinessMrr: 0,
+      expansionMrr: 0,
+      contractionMrr: 0,
+      lostPlan: 'team',
+    })
+  })
+
   it.concurrent('treats already-persisted newer subscription state as stale', () => {
     expect(stripeEventTestUtils.isStaleStripeEvent(
       {

@@ -76,8 +76,11 @@ export async function setChannelInternal(channel: string, appId: string, options
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
   await check2FAComplianceForApp(supabase, appId, silent)
   const userId = await resolveUserIdFromApiKey(supabase, options.apikey)
-
-  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.admin, silent, true)
+  // Setting an existing channel (bundle promotion / settings) needs app_admin tier, which
+  // get_org_perm_for_apikey reports as perm_write; org_super_admin's app.delete is NOT required.
+  // Gating on admin here was a false-negative that blocked app_admin/org_admin keys. The backend
+  // (POST /channel/) and the channels RLS already authorize this at write/app_admin level.
+  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.write, silent, true)
   const orgId = await getOrganizationId(supabase, appId)
 
   const {

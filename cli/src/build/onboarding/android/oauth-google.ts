@@ -496,16 +496,37 @@ function startLoopbackServer(args: {
 }
 
 /**
- * Run the full browser-based OAuth flow and return tokens.
- *
- * Side effects:
- *  - Opens a browser window at Google's consent screen.
- *  - Starts (and later stops) a loopback HTTP server on 127.0.0.1.
+ * The shape returned by `startOAuthFlow`. The loopback server is already
+ * running and the browser has been opened; the caller awaits `result` at a
+ * later point (fire-and-poll pattern for MCP).
  */
-export async function runOAuthFlow(
+export interface PendingOAuthSession {
+  /** Full Google authorization URL that was opened in the browser. */
+  authUrl: string
+  /** The loopback redirect URI embedded in the authUrl. */
+  redirectUri: string
+  /**
+   * Resolves with validated tokens once the browser callback lands,
+   * code is exchanged and scopes pass. Rejects on error/timeout/missing-scopes.
+   */
+  result: Promise<GoogleOAuthTokens>
+  /** Force-close the loopback server (safe after result settles). */
+  close: () => void
+}
+
+/**
+ * Non-blocking OAuth starter: opens the browser and starts the loopback
+ * listener, then returns IMMEDIATELY without waiting for the sign-in to
+ * complete. The caller can `await session.result` later to collect tokens.
+ *
+ * This is the foundation for the MCP fire-and-poll sign-in model. The Ink
+ * wizard uses `runOAuthFlow` (which internally calls this and then awaits
+ * `result`) to preserve its blocking behavior.
+ */
+export async function startOAuthFlow(
   config: GoogleOAuthConfig,
   options: RunOAuthFlowOptions = {},
-): Promise<GoogleOAuthTokens> {
+): Promise<PendingOAuthSession> {
   if (!config.clientId)
     throw new Error('Google OAuth clientId is required')
   if (!config.scopes.length)
@@ -521,59 +542,82 @@ export async function runOAuthFlow(
     signal: options.signal,
   })
 
+  const authUrl = buildAuthUrl({
+    clientId: config.clientId,
+    redirectUri: server.redirectUri,
+    scopes: config.scopes,
+    state,
+    codeChallenge: pkce.challenge,
+    extra: config.extraAuthParams,
+  })
+
+  options.onAuthUrl?.(authUrl)
+  options.onStatus?.('Opening browser for Google sign-in...')
   try {
-    const authUrl = buildAuthUrl({
-      clientId: config.clientId,
-      redirectUri: server.redirectUri,
-      scopes: config.scopes,
-      state,
-      codeChallenge: pkce.challenge,
-      extra: config.extraAuthParams,
-    })
-
-    options.onAuthUrl?.(authUrl)
-    options.onStatus?.('Opening browser for Google sign-in...')
-    try {
-      await open(authUrl)
-    }
-    catch (err) {
-      appendInternalLog(`google sign-in: could not auto-open browser: ${err instanceof Error ? err.message : String(err)}`)
-      options.onStatus?.('Could not open browser automatically — open the URL above manually.')
-    }
-    options.onStatus?.('Waiting for browser redirect...')
-
-    const { code, finishResponse } = await server.code
-
-    options.onStatus?.('Exchanging code for tokens...')
-    let tokens: GoogleOAuthTokens
-    try {
-      tokens = await exchangeAuthCode({
-        config,
-        code,
-        codeVerifier: pkce.verifier,
-        redirectUri: server.redirectUri,
-      })
-    }
-    catch (err) {
-      finishResponse(errorHtml(err instanceof Error ? err.message : String(err)), 500)
-      throw err
-    }
-
-    // Scope validation — Google lets users deselect scopes on the consent
-    // screen, and grants whatever subset they approved. Detect that here so
-    // the user gets a clear "please grant all permissions" message in BOTH
-    // the browser tab and the CLI, instead of failing several API calls
-    // later with confusing 403s.
-    const missing = findMissingScopes(tokens.scope, config.scopes)
-    if (missing.length > 0) {
-      finishResponse(scopeMissingHtml(missing), 400)
-      throw new MissingScopesError(missing, tokens.scope)
-    }
-
-    finishResponse(successHtml())
-    return tokens
+    await open(authUrl)
   }
-  finally {
-    server.close()
+  catch (err) {
+    appendInternalLog(`google sign-in: could not auto-open browser: ${err instanceof Error ? err.message : String(err)}`)
+    options.onStatus?.('Could not open browser automatically — open the URL above manually.')
   }
+
+  // Build `result` as an async IIFE that awaits the callback, exchanges the
+  // code, validates scopes and delivers tokens. The server is closed in finally
+  // regardless of outcome.
+  const result: Promise<GoogleOAuthTokens> = (async () => {
+    try {
+      const { code, finishResponse } = await server.code
+      options.onStatus?.('Exchanging code for tokens...')
+
+      let tokens: GoogleOAuthTokens
+      try {
+        tokens = await exchangeAuthCode({
+          config,
+          code,
+          codeVerifier: pkce.verifier,
+          redirectUri: server.redirectUri,
+        })
+      }
+      catch (err) {
+        finishResponse(errorHtml(err instanceof Error ? err.message : String(err)), 500)
+        throw err
+      }
+
+      // Scope validation — Google lets users deselect scopes on the consent
+      // screen, and grants whatever subset they approved.
+      const missing = findMissingScopes(tokens.scope, config.scopes)
+      if (missing.length > 0) {
+        finishResponse(scopeMissingHtml(missing), 400)
+        throw new MissingScopesError(missing, tokens.scope)
+      }
+
+      finishResponse(successHtml())
+      return tokens
+    }
+    finally {
+      server.close()
+    }
+  })()
+
+  // Return immediately — do NOT await result.
+  return { authUrl, redirectUri: server.redirectUri, result, close: server.close }
+}
+
+/**
+ * Run the full browser-based OAuth flow and return tokens.
+ *
+ * Side effects:
+ *  - Opens a browser window at Google's consent screen.
+ *  - Starts (and later stops) a loopback HTTP server on 127.0.0.1.
+ *
+ * Delegates to `startOAuthFlow` and awaits the result — preserving the
+ * original blocking behavior Ink depends on.
+ */
+export async function runOAuthFlow(
+  config: GoogleOAuthConfig,
+  options: RunOAuthFlowOptions = {},
+): Promise<GoogleOAuthTokens> {
+  const session = await startOAuthFlow(config, options)
+  options.onStatus?.('Waiting for browser redirect...')
+  return await session.result
 }

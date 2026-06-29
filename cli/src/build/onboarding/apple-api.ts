@@ -45,10 +45,14 @@ interface AppleApiError {
 // falling through to 'unknown'.
 export class AppleApiHttpError extends Error {
   readonly status: number
-  constructor(status: number, message: string) {
+  // The Apple error code (e.g. 'FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED')
+  // when present, so callers can distinguish error sub-types within one status.
+  readonly code?: string
+  constructor(status: number, message: string, code?: string) {
     super(message)
     this.name = 'AppleApiHttpError'
     this.status = status
+    this.code = code
   }
 }
 
@@ -56,10 +60,13 @@ async function ascFetch(
   path: string,
   token: string,
   options: RequestInit = {},
+  signal?: AbortSignal,
 ): Promise<any> {
   const url = `${ASC_BASE_URL}${path}`
   const res = await fetch(url, {
     ...options,
+    // An explicit signal arg wins; otherwise honor any signal on options.
+    signal: signal ?? options.signal,
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
@@ -76,7 +83,7 @@ async function ascFetch(
     // (secret-redacted on write) so non-build failures are diagnosable.
     appendInternalLog(`apple-api ${options.method ?? 'GET'} ${path}: HTTP ${res.status} ${res.statusText} ${JSON.stringify(body?.errors ?? body ?? null)} | ${safeHeaders(res.headers)}`)
     if (first) {
-      throw new AppleApiHttpError(res.status, `Apple API error (${res.status}): ${first.title} — ${first.detail} (${first.code})`)
+      throw new AppleApiHttpError(res.status, `Apple API error (${res.status}): ${first.title} — ${first.detail} (${first.code})`, first.code)
     }
     throw new AppleApiHttpError(res.status, `Apple API error: HTTP ${res.status} ${res.statusText}`)
   }
@@ -88,6 +95,51 @@ async function ascFetch(
 }
 
 // ─── API Functions ─────────────────────────────────────────────────
+
+// Shared App Store Connect auth-failure copy. Exported so prescan's
+// assertAscAccess reuses the exact wording verifyApiKey shows during
+// onboarding (no drift between the two probes). These strings reach the
+// terminal and --json reports, so they NEVER contain credential material.
+export const ASC_AGREEMENTS_MESSAGE
+  = 'Apple is blocking App Store Connect API access because your developer account has a required agreement that is unsigned or has expired.\n'
+    + '  - Sign in as the Account Holder at https://appstoreconnect.apple.com\n'
+    + '  - Open "Business" (Agreements, Tax, and Banking) and accept the pending or updated agreement\n'
+    + '  - Then run this step again — your API key is valid, so no key changes are needed'
+
+export const ASC_KEY_REJECTED_MESSAGE
+  = 'API key verification failed. Please check:\n'
+    + '  - The .p8 file is correct and hasn\'t been modified\n'
+    + '  - The Key ID matches the key shown in App Store Connect\n'
+    + '  - The Issuer ID is correct (shown at the top of the API keys page)\n'
+    + '  - The key has "Admin" or "Developer" access'
+
+export interface AscAuthClassification {
+  is401or403: boolean
+  isAgreements: boolean
+  status?: number
+  code?: string
+  message: string
+}
+
+/**
+ * Classify a thrown App Store Connect error into the shared 401/403 + agreements
+ * buckets. Returns is401or403=false for anything else (network/5xx/etc) so
+ * callers route those to their own network/info handling.
+ */
+export function classifyAscAuthError(err: any): AscAuthClassification {
+  const status = typeof err?.status === 'number' ? err.status : undefined
+  const code = typeof err?.code === 'string' ? err.code : undefined
+  const is401 = status === 401 || err?.message?.includes('401')
+  const is403 = status === 403 || err?.message?.includes('403')
+  const isAgreements = Boolean(is403 && (code === 'FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED' || code === 'FORBIDDEN_ERROR.PLA_NOT_ACCEPTED' || /\bPLA_NOT_ACCEPTED\b|required agreement|program license agreement/i.test(err?.message ?? '')))
+  return {
+    is401or403: Boolean(is401 || is403),
+    isAgreements,
+    status: status ?? (is403 ? 403 : is401 ? 401 : undefined),
+    code,
+    message: isAgreements ? ASC_AGREEMENTS_MESSAGE : ASC_KEY_REJECTED_MESSAGE,
+  }
+}
 
 /**
  * Verify the API key works and try to detect the team ID from existing certificates.
@@ -104,15 +156,18 @@ export async function verifyApiKey(token: string): Promise<{ valid: true, teamId
     return { valid: true, teamId }
   }
   catch (err: any) {
-    if (err.message?.includes('401') || err.message?.includes('403')) {
-      throw new Error(
-        'API key verification failed. Please check:\n'
-        + '  - The .p8 file is correct and hasn\'t been modified\n'
-        + '  - The Key ID matches the key shown in App Store Connect\n'
-        + '  - The Issuer ID is correct (shown at the top of the API keys page)\n'
-        + '  - The key has "Admin" or "Developer" access',
-      )
-    }
+    // Apple returns 403 when the account holder must sign (or re-sign) a required
+    // agreement — FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED (paid-apps/tax) or
+    // FORBIDDEN_ERROR.PLA_NOT_ACCEPTED (updated Program License Agreement). The key
+    // itself is valid, so point the user at the agreements page instead of sending
+    // them to re-check credentials that are fine. classifyAscAuthError owns this
+    // detection (shared with assertAscAccess) and preserves status/code so
+    // error-categories maps it to 'apple_agreements_missing' (not 'unknown').
+    const cls = classifyAscAuthError(err)
+    if (cls.isAgreements)
+      throw new AppleApiHttpError(403, cls.message, cls.code)
+    if (cls.is401or403)
+      throw new AppleApiHttpError(cls.status ?? 401, cls.message, cls.code)
     throw err
   }
 }
@@ -230,7 +285,7 @@ export function classifyCertAvailability(args: {
  */
 export async function listDistributionCerts(
   token: string,
-  options: { includeContent?: boolean } = {},
+  options: { includeContent?: boolean, types?: ('DISTRIBUTION' | 'IOS_DISTRIBUTION')[] } = {},
 ): Promise<AscDistributionCert[]> {
   // Query BOTH cert types — the legacy iOS-specific and the newer cross-
   // platform "Apple Distribution" — because Apple deprecated
@@ -251,8 +306,12 @@ export async function listDistributionCerts(
   // Capgo. Including them would surface unusable identities in the
   // picker. They'll still appear in the Available/Unavailable table view
   // (Phase 2) marked "Apple-managed — can't sign locally".
+  // `types` narrows the filter for callers that care about ONE pool — e.g.
+  // createCertificate's limit recovery, where only same-type revocations free
+  // a slot. Default stays both types for the import-matching reasons above.
+  const typeFilter = (options.types ?? ['DISTRIBUTION', 'IOS_DISTRIBUTION']).join(',')
   const body = await ascFetch(
-    '/certificates?filter[certificateType]=DISTRIBUTION,IOS_DISTRIBUTION&limit=200',
+    `/certificates?filter[certificateType]=${typeFilter}&limit=200`,
     token,
   )
   return (body.data || []).map((c: any): AscDistributionCert => ({
@@ -422,13 +481,16 @@ export class CertificateLimitError extends Error {
   constructor(
     public readonly certificates: AscDistributionCert[],
   ) {
-    super(`Certificate limit reached. Found ${certificates.length} existing iOS distribution certificate(s).`)
+    super(`Certificate limit reached. Found ${certificates.length} existing Apple Distribution certificate(s).`)
     this.name = 'CertificateLimitError'
   }
 }
 
 /**
- * Create a distribution certificate using a CSR.
+ * Create an Apple Distribution certificate (type DISTRIBUTION — the modern
+ * cross-platform type Xcode 11+ uses; the legacy IOS_DISTRIBUTION type is
+ * deprecated and its separate per-team pool tends to be full of old certs)
+ * using a CSR.
  * Returns the certificate ID, base64 DER content, expiration date, and team ID.
  *
  * Throws CertificateLimitError if the limit is reached, so the UI can ask
@@ -450,7 +512,7 @@ export async function createCertificate(
         data: {
           type: 'certificates',
           attributes: {
-            certificateType: 'IOS_DISTRIBUTION',
+            certificateType: 'DISTRIBUTION',
             csrContent: csrPem,
           },
         },
@@ -472,8 +534,20 @@ export async function createCertificate(
     if (err.message?.includes('ENTITY_ERROR.ATTRIBUTE.INVALID')
       || err.message?.includes('There is a problem with the request entity')
       || err.message?.includes('maximum number of certificates')) {
-      // Fetch existing certs so the UI can let the user choose which to revoke
-      const existing = await listDistributionCerts(token)
+      // Fetch the existing certs of the SAME type we tried to create so the
+      // UI can let the user choose which to revoke. Scoped to DISTRIBUTION on
+      // purpose: revoking a cert from another pool (legacy IOS_DISTRIBUTION)
+      // would not free a slot here — offering it would send the user in a
+      // circle (and tempt them to revoke a production cert for nothing).
+      // The list is diagnostics only — if it ALSO fails it must not REPLACE
+      // the original create error (hostile-review, 2026-06-12).
+      let existing: AscDistributionCert[]
+      try {
+        existing = await listDistributionCerts(token, { types: ['DISTRIBUTION'] })
+      }
+      catch {
+        throw err
+      }
       if (existing.length > 0) {
         throw new CertificateLimitError(existing)
       }
@@ -711,7 +785,16 @@ export async function createProfile(
     // Detect duplicate profile error
     if (err.message?.includes('Multiple profiles found')
       || err.message?.includes('duplicate')) {
-      const existing = await findCapgoProfiles(token, appId)
+      // The follow-up list is diagnostics for the delete-and-retry prompt — if
+      // it ALSO fails it must not REPLACE the original duplicate error
+      // (hostile-review, 2026-06-12): rethrow the ORIGINAL.
+      let existing: Array<{ id: string, name: string, profileType: string }>
+      try {
+        existing = await findCapgoProfiles(token, appId)
+      }
+      catch {
+        throw err
+      }
       if (existing.length > 0) {
         throw new DuplicateProfileError(existing)
       }

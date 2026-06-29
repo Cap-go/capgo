@@ -23,7 +23,7 @@ const displayStore = useDisplayStore()
 const isLoading = ref(false)
 const step = ref(0)
 const clicked = ref(0)
-const appId = ref<string>()
+const latestBundleId = ref<string>()
 const realtimeListener = ref(false)
 const pollTimer = ref<number | null>(null)
 const initialCount = ref<number | null>(null)
@@ -248,7 +248,7 @@ watchEffect(async () => {
         if (initialCount.value !== null && current > initialCount.value) {
           const latestId = await getLatestVersionId()
           step.value += 1
-          appId.value = latestId ?? ''
+          latestBundleId.value = latestId ?? ''
           realtimeListener.value = false
           clearWatchers()
           setLog()
