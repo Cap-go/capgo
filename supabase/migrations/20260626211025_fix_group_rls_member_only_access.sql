@@ -30,18 +30,12 @@ CREATE POLICY groups_select ON public.groups
 FOR SELECT
 TO authenticated
 USING (
-    EXISTS (
-        SELECT 1 FROM (SELECT auth.uid() AS current_uid) AS actor_ref
-        WHERE (
-            public.is_current_user_group_member(groups.id)
-            OR public.check_min_rights(
-                public.rbac_right_admin()::public.user_min_right,
-                actor_ref.current_uid,
-                groups.org_id,
-                NULL::varchar,
-                NULL::bigint
-            )
-        )
+    public.is_current_user_group_member(groups.id)
+    OR public.rbac_check_permission_request(
+        public.rbac_perm_org_update_user_roles(),
+        groups.org_id,
+        NULL::character varying,
+        NULL::bigint
     )
 );
 
@@ -51,21 +45,16 @@ CREATE POLICY group_members_select ON public.group_members
 FOR SELECT
 TO authenticated
 USING (
-    EXISTS (
-        SELECT 1 FROM (SELECT auth.uid() AS current_uid) AS actor_ref
-        WHERE (
-            public.is_current_user_group_member(group_members.group_id)
-            OR EXISTS (
-                SELECT 1 FROM public.groups g
-                WHERE g.id = group_members.group_id
-                    AND public.check_min_rights(
-                        public.rbac_right_admin()::public.user_min_right,
-                        actor_ref.current_uid,
-                        g.org_id,
-                        NULL::varchar,
-                        NULL::bigint
-                    )
-            )
-        )
+    public.is_current_user_group_member(group_members.group_id)
+    OR EXISTS (
+        SELECT 1
+        FROM public.groups g
+        WHERE g.id = group_members.group_id
+          AND public.rbac_check_permission_request(
+            public.rbac_perm_org_update_user_roles(),
+            g.org_id,
+            NULL::character varying,
+            NULL::bigint
+          )
     )
 );
