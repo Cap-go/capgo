@@ -210,6 +210,22 @@ export const middlewareAPISecret = honoFactory.createMiddleware(async (c, next) 
 })
 
 export const BRES = { status: 'ok' }
+export const API_CONTENT_SECURITY_POLICY = [
+  'default-src \'none\'',
+  'base-uri \'none\'',
+  'form-action \'none\'',
+  'frame-ancestors \'none\'',
+  'object-src \'none\'',
+  'script-src \'none\'',
+  'style-src \'none\'',
+  'img-src \'none\'',
+  'connect-src \'none\'',
+  'upgrade-insecure-requests',
+].join('; ')
+
+function isPreviewHost(hostname: string) {
+  return /^[^.]+\.preview(?:\.[^.]+)?\.(?:capgo\.app|usecapgo\.com)$/i.test(hostname)
+}
 
 export function createHono(functionName: string, _version: string) {
   let appGlobal
@@ -223,6 +239,9 @@ export function createHono(functionName: string, _version: string) {
     // ADD HEADER TO IDENTIFY WORKER SOURCE
     const name = `${getEnv(c, 'ENV_NAME') || functionName}-${CapgoVersion}`
     c.header('X-Worker-Source', name)
+    const hostname = c.req.header('host') || new URL(c.req.url).hostname
+    if (!isPreviewHost(hostname))
+      c.header('Content-Security-Policy', API_CONTENT_SECURITY_POLICY)
     return next()
   })
 
