@@ -239,7 +239,7 @@ export function createHono(functionName: string, _version: string) {
     // ADD HEADER TO IDENTIFY WORKER SOURCE
     const name = `${getEnv(c, 'ENV_NAME') || functionName}-${CapgoVersion}`
     c.header('X-Worker-Source', name)
-    const hostname = c.req.header('host') || new URL(c.req.url).hostname
+    const hostname = new URL(c.req.url).hostname
     if (!isPreviewHost(hostname))
       c.header('Content-Security-Policy', API_CONTENT_SECURITY_POLICY)
     return next()

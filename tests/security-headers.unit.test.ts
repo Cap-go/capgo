@@ -33,11 +33,14 @@ describe('security response headers', () => {
     expect(response.headers.get('content-security-policy')).toBe(API_CONTENT_SECURITY_POLICY)
   })
 
-  it.concurrent('does not apply the API CSP to preview subdomains', async () => {
+  it.concurrent.each([
+    'https://123-com-example-app.preview.preprod.capgo.app/',
+    'https://123-com-example-app.preview.preprod.capgo.app:8443/',
+  ])('does not apply the API CSP to preview subdomain %s', async (url) => {
     const app = createHono('files', 'test')
     app.get('/', c => c.html('<!DOCTYPE html><html><body>preview</body></html>'))
 
-    const response = await app.fetch(new Request('https://123-com-example-app.preview.preprod.capgo.app/'))
+    const response = await app.fetch(new Request(url))
 
     expect(response.status).toBe(200)
     expect(response.headers.get('content-security-policy')).toBeNull()
