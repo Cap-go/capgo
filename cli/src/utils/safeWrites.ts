@@ -69,3 +69,12 @@ export async function readSafeFile(filePath: string): Promise<string> {
   await ensureNotSymlink(filePath)
   return await readFile(filePath, 'utf-8')
 }
+
+/**
+ * Read file BYTES while rejecting symbolic-link targets (binary-safe twin of
+ * readSafeFile — for credential files like keystores / .p12 / .p8 that are not utf-8).
+ */
+export async function readSafeFileBytes(filePath: string): Promise<Buffer> {
+  await ensureNotSymlink(filePath)
+  return await readFile(filePath)
+}

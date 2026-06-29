@@ -155,8 +155,10 @@ Join the [discord](https://discord.gg/VnYRvBfgA6) to get help.
   - [Needed](#build-needed)
   - [Init](#build-init)
   - [Request](#build-request)
+  - [Prescan](#build-prescan)
   - [Last-output](#build-last-output)
   - [Credentials](#build-credentials)
+    - [Apple-key](#build-credentials-apple-key)
     - [Save](#build-credentials-save)
     - [List](#build-credentials-list)
     - [Clear](#build-credentials-clear)
@@ -194,6 +196,7 @@ npx @capgo/cli@latest init YOUR_API_KEY com.example.app
 | **-i** | <code>string</code> | App icon path for display in Capgo Cloud |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+| **--no-analytics** | <code>boolean</code> | Disable init analytics and terminal replay for this run |
 
 
 ## <a id="run"></a> 📱 **Run**
@@ -323,6 +326,10 @@ Examples:
 | **--bundle** | <code>string</code> | Bundle name or id to preview |
 | **--channel** | <code>string</code> | Channel name or id to preview |
 | **--type** | <code>string</code> | Type for positional target |
+| **--png** | <code>string</code> | Write the preview QR code as a PNG image to the given file path |
+| **--url** | <code>boolean</code> | Print preview URLs only (web and deep link), without a terminal QR code |
+| **--web-url** | <code>boolean</code> | Encode the web preview URL in the QR code and PNG instead of the capgo:// deep link |
+| **--preview-env** | <code>string</code> | Preview web URL environment |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 
@@ -347,7 +354,7 @@ Capgo never inspects external content. Add encryption for trustless security.
 **Example:**
 
 ```bash
-npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production
+npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production,beta
 ```
 
 **Options:**
@@ -356,7 +363,7 @@ npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel prod
 | -------------- | ------------- | -------------------- |
 | **-a** | <code>string</code> | API key to link to your account |
 | **-p** | <code>string</code> | Path of the folder to upload, if not provided it will use the webDir set in capacitor.config |
-| **-c** | <code>string</code> | Channel to link to |
+| **-c** | <code>string</code> | Channel to link to. Use commas for multiple channels, for example production,beta |
 | **-e** | <code>string</code> | Link to external URL instead of upload to Capgo Cloud |
 | **--iv-session-key** | <code>string</code> | Set the IV and session key for bundle URL external |
 | **--s3-region** | <code>string</code> | Region for your S3 bucket |
@@ -762,6 +769,16 @@ npx @capgo/cli@latest app set com.example.app --name "Updated App" --retention 3
 | **--expose-metadata** | <code>string</code> | Expose bundle metadata (link and comment) to the plugin (true/false, default: false) |
 | **--preview** | <code>boolean</code> | Enable bundle and channel preview QR codes for this app |
 | **--no-preview** | <code>boolean</code> | Disable bundle and channel preview QR codes for this app |
+| **--allow-device-custom-id** | <code>boolean</code> | Allow devices to set a custom device ID for this app |
+| **--no-allow-device-custom-id** | <code>boolean</code> | Disallow custom device IDs for this app |
+| **--block-provider-infra-requests** | <code>boolean</code> | Block provider infrastructure requests for this app |
+| **--no-block-provider-infra-requests** | <code>boolean</code> | Allow provider infrastructure requests for this app |
+| **--build-timeout-minutes** | <code>string</code> | Native build timeout in minutes (5-360, default: 15) |
+| **--ios-store-url** | <code>string</code> | iOS App Store URL for this app |
+| **--android-store-url** | <code>string</code> | Google Play Store URL for this app |
+| **--default-upload-channel** | <code>string</code> | Default upload channel name for this app |
+| **--default-download-channel** | <code>string</code> | Default download channel name for this app (sets channel public=true) |
+| **--disable-download-channels** | <code>boolean</code> | Disable Capgo download channels for this app (sets all channels public=false) |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 
@@ -1319,6 +1336,7 @@ Set up build credentials interactively (iOS: certificates + profiles automated; 
 | **-a** | <code>string</code> | API key to link to your account |
 | **-p** | <code>string</code> | Platform to onboard (ios or android). If omitted, auto-detects when only one native folder exists; prompts otherwise. |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--no-analytics** | <code>boolean</code> | Disable build onboarding analytics and terminal replay for this run |
 
 ### <a id="build-request"></a> 🔹 **Request**
 
@@ -1350,8 +1368,9 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | **--build-mode** | <code>string</code> | Build mode: debug or release (default: release) |
 | **--build-certificate-base64** | <code>string</code> | iOS: Base64-encoded .p12 certificate |
 | **--p12-password** | <code>string</code> | iOS: Certificate password (optional if cert has no password) |
-| **--apple-id** | <code>string</code> | iOS: Apple ID email |
-| **--apple-app-specific-password** | <code>string</code> | iOS: App-specific password |
+| **--apple-id** | <code>string</code> | iOS: Apple ID email for app-specific password uploads (alternative to App Store Connect API key) |
+| **--apple-app-specific-password** | <code>string</code> | iOS: App-specific password (xxxx-xxxx-xxxx-xxxx) for TestFlight uploads |
+| **--apple-app-id** | <code>string</code> | iOS: Numeric App Store Connect app id (required together with --apple-id and --apple-app-specific-password) |
 | **--apple-key-id** | <code>string</code> | iOS: App Store Connect API Key ID |
 | **--apple-issuer-id** | <code>string</code> | iOS: App Store Connect Issuer ID |
 | **--apple-key-content** | <code>string</code> | iOS: Base64-encoded App Store Connect API key (.p8) |
@@ -1368,6 +1387,10 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | **--android-flavor** | <code>string</code> | Android: Product flavor to build (e.g. production). Required if your project has multiple flavors. |
 | **--in-app-update-priority** | <code>string</code> | Android: Google Play in-app update priority for this release (integer 0–5; higher = more urgent). See https://developer.android.com/guide/playcore/in-app-updates. Precedence: CLI > env > saved credentials |
 | **--no-playstore-upload** | <code>boolean</code> | Skip Play Store upload for this build (nulls out saved play config). Requires --output-upload. |
+| **--submit-to-store-review** | <code>boolean</code> | After upload, submit the store release for review instead of leaving it as a draft/inactive build. Android marks the Play release completed; iOS submits to TestFlight external review and requires --ios-testflight-groups. |
+| **--store-release-name** | <code>string</code> | Store release name/version label. Android sends this as the Google Play version_name. |
+| **--store-release-notes** | <code>string</code> | Store release notes. Android sends this as the Play changelog; iOS sends it as the TestFlight What to Test text. |
+| **--ios-testflight-groups** | <code>string</code> | iOS: comma-separated TestFlight external group names or IDs required with --submit-to-store-review. |
 | **--output-upload** | <code>boolean</code> | Override output upload behavior for this build only (enable). Precedence: CLI > env > saved credentials |
 | **--no-output-upload** | <code>boolean</code> | Override output upload behavior for this build only (disable). Precedence: CLI > env > saved credentials |
 | **--output-retention** | <code>string</code> | Override output link TTL for this build only (1h to 7d). Examples: 1h, 6h, 2d. Precedence: CLI > env > saved credentials |
@@ -1375,10 +1398,40 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | **--skip-build-number-bump** | <code>boolean</code> | Skip automatic build number/version code incrementing. Uses whatever version is already in the project files. |
 | **--no-skip-build-number-bump** | <code>boolean</code> | Override saved credentials to re-enable automatic build number incrementing for this build only. |
 | **--ai-analytics** | <code>boolean</code> | On build failure, send logs to Capgo AI for diagnosis. In interactive terminals this skips the upfront confirmation; in CI this auto-uploads and prints the analysis to stderr. |
+| **--no-prescan** | <code>boolean</code> | Skip the automatic pre-build scan |
+| **--prescan-ignore-fatal** | <code>boolean</code> | Run the pre-build scan but never block the build (report only) |
+| **--fail-on-warnings** | <code>boolean</code> | Treat prescan warnings as fatal |
+| **--send-logs-to-support** | <code>boolean</code> | On a CI/CD build failure, automatically upload the build logs to Capgo support (no email required). Capgo support is notified and will follow up by email. Additive to --ai-analytics. |
+| **--send-logs** | <code>boolean</code> | Deprecated alias for --send-logs-to-support |
 | **-a** | <code>string</code> | API key to link to your account |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 | **--verbose** | <code>boolean</code> | Enable verbose output with detailed logging |
+
+### <a id="build-prescan"></a> 🔹 **Prescan**
+
+```bash
+npx @capgo/cli@latest build prescan
+```
+
+Scan your project and saved credentials for problems that would fail a cloud build — before uploading anything.
+Checks credentials (expiry, passwords, profile pairing), project state (cap sync, node_modules layout), and platform config. Runs automatically inside `build request`; this command runs it standalone (e.g. in CI).
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **--platform** | <code>string</code> | Target platform: ios or android (required) |
+| **--path** | <code>string</code> | Path to the project directory (default: current directory) |
+| **-a** | <code>string</code> | API key to link to your account |
+| **--android-flavor** | <code>string</code> | Android: product flavor the build will use |
+| **--ios-dist** | <code>string</code> | iOS: distribution mode to validate against |
+| **--json** | <code>boolean</code> | Output a machine-readable JSON report |
+| **--fail-on-warnings** | <code>boolean</code> | Exit non-zero when warnings are found (CI) |
+| **--ignore-fatal** | <code>boolean</code> | Diagnostic mode: report everything but always exit 0 |
+| **--verbose** | <code>boolean</code> | Enable verbose output with detailed logging |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 
 ### <a id="build-last-output"></a> 🔹 **Last-output**
 
@@ -1414,6 +1467,36 @@ Manage build credentials stored locally on your machine.
 📚 DOCUMENTATION:
    iOS setup: https://capgo.app/docs/cli/cloud-build/ios/
    Android setup: https://capgo.app/docs/cli/cloud-build/android/
+
+#### <a id="build-credentials-apple-key"></a> 🔹 **Apple-key**
+
+**Alias:** `asc-key`
+
+```bash
+npx @capgo/cli@latest build credentials apple-key
+```
+
+Create an App Store Connect team API key with a guided macOS helper (macOS only).
+Opens a native window that walks you through Apple's App Store Connect UI in an
+embedded browser, auto-captures the Issuer ID + Key ID, intercepts the one-time
+.p8, validates it against Apple, and saves it to ~/.appstoreconnect/private_keys.
+Progress statistics are forwarded to Capgo analytics (disable with CAPGO_DISABLE_TELEMETRY).
+  npx @capgo/cli build credentials apple-key --appId com.example.app
+
+**Example:**
+
+```bash
+Example:
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-a** | <code>string</code> | API key to link to your account |
+| **--appId** | <code>string</code> | Save the captured key into this app iOS build credentials |
+| **--local** | <code>boolean</code> | Save into the per-project .capgo-credentials.json instead of the global file |
+| **--json** | <code>boolean</code> | Print the captured Key ID / Issuer ID / .p8 path as JSON |
 
 #### <a id="build-credentials-save"></a> 🔹 **Save**
 
@@ -1468,8 +1551,9 @@ iOS Example:
 | **--apple-issuer-id** | <code>string</code> | iOS: App Store Connect Issuer ID |
 | **--apple-team-id** | <code>string</code> | iOS: App Store Connect Team ID |
 | **--ios-distribution** | <code>string</code> | iOS: Distribution mode |
-| **--apple-id** | <code>string</code> | iOS: Apple ID email (optional) |
-| **--apple-app-password** | <code>string</code> | iOS: App-specific password (optional) |
+| **--apple-id** | <code>string</code> | iOS: Apple ID email for app-specific password uploads (alternative to App Store Connect API key) |
+| **--apple-app-specific-password** | <code>string</code> | iOS: App-specific password (xxxx-xxxx-xxxx-xxxx) for TestFlight uploads |
+| **--apple-app-id** | <code>string</code> | iOS: Numeric App Store Connect app id (required together with --apple-id and --apple-app-specific-password) |
 | **--keystore** | <code>string</code> | Android: Path to keystore file (.keystore or .jks) |
 | **--keystore-alias** | <code>string</code> | Android: Keystore key alias |
 | **--keystore-key-password** | <code>string</code> | Android: Keystore key password |
@@ -1553,6 +1637,9 @@ Examples:
 | **--apple-key-id** | <code>string</code> | App Store Connect API Key ID |
 | **--apple-issuer-id** | <code>string</code> | App Store Connect Issuer ID |
 | **--apple-team-id** | <code>string</code> | App Store Connect Team ID |
+| **--apple-id** | <code>string</code> | iOS: Apple ID email for app-specific password uploads (alternative to App Store Connect API key) |
+| **--apple-app-specific-password** | <code>string</code> | iOS: App-specific password (xxxx-xxxx-xxxx-xxxx) for TestFlight uploads |
+| **--apple-app-id** | <code>string</code> | iOS: Numeric App Store Connect app id (required together with --apple-id and --apple-app-specific-password) |
 | **--ios-distribution** | <code>string</code> | iOS: Distribution mode |
 | **--keystore** | <code>string</code> | Path to keystore file (.keystore or .jks) |
 | **--keystore-alias** | <code>string</code> | Keystore key alias |

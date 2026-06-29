@@ -205,14 +205,14 @@ describe('build Time Tracking System', () => {
     const supabase = getSupabaseClient()
 
     // Insert high build time usage directly into daily_build_time
-    // Solo plan limit is 1800 seconds (30 min), so we insert way over that
+    // Solo plan limit is 3600 seconds (60 min), so we insert way over that
     const today = new Date().toISOString().split('T')[0]
     const { error: buildTimeInsertError } = await supabase
       .from('daily_build_time')
       .insert({
         app_id: APPNAME,
         date: today,
-        build_time_unit: 36000, // 10 hours in seconds (way over Solo plan limit of 1800 seconds)
+        build_time_unit: 36000, // 10 hours in seconds (way over Solo plan limit of 3600 seconds)
         build_count: 10,
       })
     expect(buildTimeInsertError).toBeFalsy()

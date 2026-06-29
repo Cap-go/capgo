@@ -1,8 +1,22 @@
 import type { Router } from 'vue-router'
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import { toast } from 'vue-sonner'
-import { isSpoofed, saveSpoof, unspoofUser, useSupabase } from './supabase'
+import { getSpoofedAdminJwt, isSpoofed, saveSpoof, useSupabase } from './supabase'
 
-function getErrorMessage(error: unknown) {
+async function getErrorMessage(error: unknown) {
+  if (error instanceof FunctionsHttpError && error.context instanceof Response) {
+    try {
+      const json = await error.context.clone().json() as { error?: string, message?: string }
+      if (json.message)
+        return json.message
+      if (json.error)
+        return json.error
+    }
+    catch {
+      // Fall back to the SDK error message below.
+    }
+  }
+
   if (error instanceof Error)
     return error.message
   if (typeof error === 'string')
@@ -18,33 +32,45 @@ export async function logAsUser(identifier: string, router: Router) {
     if (!identifier)
       throw new Error('Missing user id, email, or org id')
 
-    if (isSpoofed())
-      unspoofUser()
+    const wasSpoofed = isSpoofed()
+    const spoofedAdminJwt = wasSpoofed ? await getSpoofedAdminJwt() : null
+    if (wasSpoofed && !spoofedAdminJwt)
+      throw new Error('Cannot restore admin session, please sign in again')
 
     const supabase = useSupabase()
-    const { data, error } = await supabase.functions.invoke('private/log_as', {
+    const invokeOptions: { body: { identifier: string }, headers?: Record<string, string> } = {
       body: { identifier },
-    })
+    }
+    if (spoofedAdminJwt)
+      invokeOptions.headers = { Authorization: `Bearer ${spoofedAdminJwt}` }
+
+    const { data, error } = await supabase.functions.invoke('private/log_as', invokeOptions)
 
     if (error)
-      throw new Error(getErrorMessage(error))
+      throw new Error(await getErrorMessage(error))
 
     const { jwt: newJwt, refreshToken: newRefreshToken } = data ?? {}
 
     if (!newJwt || !newRefreshToken)
       throw new Error('Cannot log in, see console')
 
-    const { data: currentSession, error: sessionError } = await supabase.auth.getSession()
-    if (sessionError || !currentSession?.session)
-      throw new Error('No current session')
+    let adminSession: { jwt: string, refreshToken: string } | null = null
+    if (!wasSpoofed) {
+      const { data: currentSession, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError || !currentSession?.session)
+        throw new Error('No current session')
 
-    const { access_token: currentJwt, refresh_token: currentRefreshToken } = currentSession.session
+      const { access_token: currentJwt, refresh_token: currentRefreshToken } = currentSession.session
+      adminSession = { jwt: currentJwt, refreshToken: currentRefreshToken }
+    }
 
     const { error: authError } = await supabase.auth.setSession({ access_token: newJwt, refresh_token: newRefreshToken })
     if (authError)
       throw authError
 
-    saveSpoof(currentJwt, currentRefreshToken)
+    if (adminSession)
+      saveSpoof(adminSession.jwt, adminSession.refreshToken)
+
     toast.dismiss(toastId)
     toast.success('Spoofed, will reload')
     setTimeout(() => {
@@ -55,7 +81,7 @@ export async function logAsUser(identifier: string, router: Router) {
   }
   catch (error) {
     toast.dismiss(toastId)
-    const message = getErrorMessage(error)
+    const message = await getErrorMessage(error)
     toast.error(message)
     console.error(error)
     throw error

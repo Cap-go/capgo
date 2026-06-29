@@ -19,6 +19,7 @@ import { app as latency } from '../../supabase/functions/_backend/private/latenc
 import { app as log_as } from '../../supabase/functions/_backend/private/log_as.ts'
 import { app as plans } from '../../supabase/functions/_backend/private/plans.ts'
 import { app as publicStats } from '../../supabase/functions/_backend/private/public_stats.ts'
+import { app as replay } from '../../supabase/functions/_backend/private/replay.ts'
 import { app as set_org_email } from '../../supabase/functions/_backend/private/set_org_email.ts'
 import { app as sso_check_domain } from '../../supabase/functions/_backend/private/sso/check-domain.ts'
 import { app as sso_check_enforcement } from '../../supabase/functions/_backend/private/sso/check-enforcement.ts'
@@ -56,7 +57,7 @@ import { app as cron_reconcile_build_status } from '../../supabase/functions/_ba
 import { app as cron_stat_app } from '../../supabase/functions/_backend/triggers/cron_stat_app.ts'
 import { app as cron_stat_org } from '../../supabase/functions/_backend/triggers/cron_stat_org.ts'
 import { app as cron_sync_sub } from '../../supabase/functions/_backend/triggers/cron_sync_sub.ts'
-import { app as logsnag_insights } from '../../supabase/functions/_backend/triggers/logsnag_insights.ts'
+import { app as logsnag_insights, logsnagInsightsShardApps } from '../../supabase/functions/_backend/triggers/logsnag_insights.ts'
 import { app as on_app_create } from '../../supabase/functions/_backend/triggers/on_app_create.ts'
 import { app as on_app_delete } from '../../supabase/functions/_backend/triggers/on_app_delete.ts'
 import { app as on_app_update } from '../../supabase/functions/_backend/triggers/on_app_update.ts'
@@ -128,6 +129,7 @@ appPrivate.route('/verify_email_otp', verify_email_otp)
 appPrivate.route('/delete_failed_version', deleted_failed_version)
 appPrivate.route('/create_device', create_device)
 appPrivate.route('/latency', latency)
+appPrivate.route('/replay', replay)
 appPrivate.route('/events', events)
 appPrivate.route('/groups', groups)
 appPrivate.route('/sso/check-domain', sso_check_domain)
@@ -149,6 +151,15 @@ appTriggers.route('/cron_clean_orphan_images', cron_clean_orphan_images)
 appTriggers.route('/cron_reconcile_build_status', cron_reconcile_build_status)
 appTriggers.route('/credit_usage_alerts', credit_usage_alerts)
 appTriggers.route('/logsnag_insights', logsnag_insights)
+appTriggers.route('/logsnag_insights_core', logsnagInsightsShardApps.core)
+appTriggers.route('/logsnag_insights_usage', logsnagInsightsShardApps.usage)
+appTriggers.route('/logsnag_insights_revenue', logsnagInsightsShardApps.revenue)
+appTriggers.route('/logsnag_insights_plugins', logsnagInsightsShardApps.plugins)
+appTriggers.route('/logsnag_insights_builds', logsnagInsightsShardApps.builds)
+appTriggers.route('/logsnag_insights_retention', logsnagInsightsShardApps.retention)
+appTriggers.route('/logsnag_insights_paid_products', logsnagInsightsShardApps.paid_products)
+appTriggers.route('/logsnag_insights_ltv', logsnagInsightsShardApps.ltv)
+appTriggers.route('/logsnag_insights_notifications', logsnagInsightsShardApps.notifications)
 appTriggers.route('/on_channel_update', on_channel_update)
 appTriggers.route('/on_app_create', on_app_create)
 appTriggers.route('/on_app_delete', on_app_delete)

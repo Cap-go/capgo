@@ -8,9 +8,10 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import CreditsCta from '~/components/CreditsCta.vue'
-import Spinner from '~/components/Spinner.vue'
+import PageLoader from '~/components/PageLoader.vue'
 import { bytesToGb } from '~/services/conversion'
 import { formatLocalDate, formatLocalDateTime, formatUtcDateTimeAsLocal } from '~/services/date'
+import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { calculateCreditCost, getCurrentPlanNameOrg, getPlans, getPlanUsagePercent, getTotalStorage, getUsageCreditDeductions } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -29,6 +30,7 @@ const router = useRouter()
 const dialogStore = useDialogV2Store()
 const displayStore = useDisplayStore()
 displayStore.NavTitle = t('usage')
+const hideExternalPurchaseFlows = isNativeAppStoreContext()
 
 const { currentOrganization } = storeToRefs(organizationStore)
 
@@ -285,6 +287,9 @@ function formatBuildTime(seconds: number): string {
 }
 
 const shouldShowUpgrade = computed(() => {
+  if (hideExternalPurchaseFlows)
+    return false
+
   if (!currentPlanSuggest.value || !currentPlan.value) {
     return false
   }
@@ -385,7 +390,7 @@ function nextRunDate() {
                 {{ currentPlan?.name || t('loading') }}
               </div>
             </div>
-            <div class="flex flex-col">
+            <div v-if="!hideExternalPurchaseFlows" class="flex flex-col">
               <div class="mb-1 text-sm text-gray-500 dark:text-gray-400">
                 {{ t('base') }}
               </div>
@@ -393,7 +398,7 @@ function nextRunDate() {
                 {{ formatMonthlyPrice(currentPlan?.price_m) }}
               </div>
             </div>
-            <div class="flex flex-col">
+            <div v-if="!hideExternalPurchaseFlows" class="flex flex-col">
               <div class="mb-1 text-sm text-gray-500 dark:text-gray-400">
                 {{ t('credits-used-in-period') }}
               </div>
@@ -402,7 +407,7 @@ function nextRunDate() {
               </div>
             </div>
           </div>
-          <div class="flex items-end justify-between pt-4 mt-4 border-t border-gray-100 dark:border-gray-700">
+          <div v-if="!hideExternalPurchaseFlows" class="flex items-end justify-between pt-4 mt-4 border-t border-gray-100 dark:border-gray-700">
             <div class="text-sm text-gray-500 dark:text-gray-400">
               {{ t('total') }}
             </div>
@@ -440,7 +445,7 @@ function nextRunDate() {
       </div>
 
       <!-- Credits CTA -->
-      <CreditsCta class="mb-8 shrink-0" />
+      <CreditsCta v-if="!hideExternalPurchaseFlows" class="mb-8 shrink-0" />
 
       <!-- Usage Metrics Grid -->
       <h2 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white shrink-0">
@@ -550,14 +555,7 @@ function nextRunDate() {
     </div>
 
     <!-- Loading State -->
-    <div v-else class="flex items-center justify-center h-full">
-      <div class="mb-4 text-center">
-        <Spinner size="w-12 h-12" class="mx-auto" />
-        <p class="text-gray-600 dark:text-gray-400">
-          {{ t('loading') }}...
-        </p>
-      </div>
-    </div>
+    <PageLoader v-else :label="t('loading')" />
 
     <!-- Teleport for Detailed Usage Plan Dialog -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('detailed-usage-plan')" defer to="#dialog-v2-content">

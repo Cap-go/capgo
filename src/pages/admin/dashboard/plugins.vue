@@ -13,7 +13,7 @@ import AdminFilterBar from '~/components/admin/AdminFilterBar.vue'
 import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
 import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
-import Spinner from '~/components/Spinner.vue'
+import PageLoader from '~/components/PageLoader.vue'
 import { formatLocalDate } from '~/services/date'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 import { useDisplayStore } from '~/stores/display'
@@ -231,9 +231,7 @@ displayStore.defaultBack = '/dashboard'
       <div class="w-full h-full px-4 pt-2 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
         <AdminFilterBar />
 
-        <div v-if="isLoading" class="flex items-center justify-center min-h-screen">
-          <Spinner size="w-24 h-24" />
-        </div>
+        <PageLoader v-if="isLoading" />
 
         <div v-else class="space-y-6">
           <div class="grid grid-cols-1 gap-6 md:grid-cols-3">

@@ -9,6 +9,7 @@ import IconCheck from '~icons/lucide/check'
 import IconLoader from '~icons/lucide/loader-2'
 import IconUserPlus from '~icons/lucide/user-plus'
 import IconX from '~icons/lucide/x'
+import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -60,6 +61,11 @@ async function continueAfterInvitationsResolved() {
 
   if (organizationStore.hasOrganizations) {
     await router.replace(targetPath.value)
+    return
+  }
+
+  if (isNativeAppStoreContext()) {
+    await router.replace('/scan')
     return
   }
 

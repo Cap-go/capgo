@@ -17,6 +17,7 @@ import UserGroupIcon from '~icons/heroicons/user-group'
 import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { creditPricingMetricOrder, formatCreditPricingPrice, formatCreditPricingTierLabel } from '~/services/creditPricing'
 import { formatLocalDate } from '~/services/date'
+import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { checkPermissions } from '~/services/permissions'
 import { completeCreditTopUp, startCreditTopUp } from '~/services/stripe'
 import { getCreditPricingSteps, useSupabase } from '~/services/supabase'
@@ -64,6 +65,7 @@ const supabase = useSupabase()
 const organizationStore = useOrganizationStore()
 const { currentOrganization } = storeToRefs(organizationStore)
 const displayStore = useDisplayStore()
+const isMobile = isNativeAppStoreContext()
 
 // Modal state for non-admin access
 const showAdminModal = ref(false)
@@ -483,6 +485,11 @@ watch(() => route.hash, (hash) => {
 })
 
 onMounted(async () => {
+  if (isMobile) {
+    await router.replace('/settings/organization/usage')
+    return
+  }
+
   displayStore.NavTitle = t('credits')
   await organizationStore.awaitInitialLoad()
   if (!(await ensureBillingAccess()))
@@ -492,6 +499,9 @@ onMounted(async () => {
 })
 
 watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined, oldOrgId: string | undefined) => {
+  if (isMobile)
+    return
+
   if (!newOrgId || newOrgId === oldOrgId)
     return
   if (!(await ensureBillingAccess()))

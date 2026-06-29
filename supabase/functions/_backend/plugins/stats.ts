@@ -7,9 +7,11 @@ import { Hono } from 'hono/tiny'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { BRES, simpleError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { invalidIpInfo } from '../utils/invalids_ip.ts'
 import { sendNotifOrgCached } from '../utils/notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
+import { getClientIP } from '../utils/rate_limit.ts'
 import { statsRequestSchema } from '../utils/plugin_validation.ts'
 import { createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/stats.ts'
 import { backgroundTask, INVALID_STRING_APP_ID, isLimited, MISSING_STRING_APP_ID, reverseDomainRegex } from '../utils/utils.ts'
@@ -17,6 +19,30 @@ import { backgroundTask, INVALID_STRING_APP_ID, isLimited, MISSING_STRING_APP_ID
 const PLAN_ERROR = 'Cannot send stats, upgrade plan to continue to update'
 const DOWNLOAD_FAIL_FIXED_PLUGIN_VERSION = parse('7.17.0')
 const DOWNLOAD_FAIL_FIXED_PLUGIN_VERSION_V6 = parse('6.14.25')
+
+type AppStatusResult = Awaited<ReturnType<typeof getAppStatus>>
+
+async function blockProviderInfrastructure(c: Context, shouldBlockProviderInfrastructure = true) {
+  if (!shouldBlockProviderInfrastructure)
+    return null
+
+  const requestIp = getClientIP(c)
+  if (requestIp === 'unknown')
+    return null
+
+  const providerInfo = await invalidIpInfo(requestIp, c)
+  if (!providerInfo.blocked)
+    return null
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Blocking /stats request from provider infrastructure IP',
+    ip: requestIp,
+    provider: providerInfo.provider,
+  })
+  return c.json({ error: 'provider_infrastructure_request_blocked', message: 'Provider infrastructure requests are blocked' }, 429)
+}
+
 
 export interface BatchStatsResult {
   status: 'ok' | 'error'
@@ -28,6 +54,7 @@ export interface BatchStatsResult {
 
 interface PostResult {
   success: boolean
+  response?: Response
   error?: string
   message?: string
   isOnprem?: boolean
@@ -50,11 +77,11 @@ function shouldRecordStatsAction(action: string, pluginVersion: string) {
     || (pluginVersion.startsWith('6.') && greaterOrEqual(parsedPluginVersion, DOWNLOAD_FAIL_FIXED_PLUGIN_VERSION_V6))
 }
 
-async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: AppStats): Promise<PostResult> {
+async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: AppStats, appStatus?: AppStatusResult): Promise<PostResult> {
   const { app_id, action, version_name, old_version_name, plugin_version, metadata } = body
 
   const planActions: Array<'mau' | 'bandwidth'> = ['mau', 'bandwidth']
-  const cachedAppStatus = await getAppStatus(c, app_id)
+  const cachedAppStatus = appStatus ?? await getAppStatus(c, app_id)
   const cachedStatus = cachedAppStatus.status
   if (cachedStatus === 'onprem') {
     const device = makeDevice(body, cachedAppStatus.allow_device_custom_id)
@@ -77,13 +104,18 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, planActions)
   const allowDeviceCustomId = appOwner?.allow_device_custom_id
   const device = makeDevice(body, allowDeviceCustomId)
+  const blockProviderInfraRequests = appOwner?.block_provider_infra_requests ?? cachedAppStatus.block_provider_infra_requests
+  const blocked = await blockProviderInfrastructure(c, blockProviderInfraRequests)
+  if (blocked)
+    return { success: false, response: blocked }
+
   if (!appOwner) {
-    await setAppStatus(c, app_id, 'onprem', true)
+    await setAppStatus(c, app_id, 'onprem', true, cachedAppStatus.block_provider_infra_requests)
     await onPremStats(c, app_id, action, device, metadata)
     return { success: true, isOnprem: true }
   }
   if (!appOwner.plan_valid) {
-    await setAppStatus(c, app_id, 'cancelled', appOwner.allow_device_custom_id)
+    await setAppStatus(c, app_id, 'cancelled', appOwner.allow_device_custom_id, appOwner.block_provider_infra_requests)
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     const upgradeActions: StatsActions[] = [{ action: 'needPlanUpgrade' }]
     if (allowDeviceCustomId === false && typeof body.custom_id === 'string' && body.custom_id.trim() !== '') {
@@ -98,7 +130,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
     return { success: false, error: 'need_plan_upgrade', message: 'Cannot update, upgrade plan to continue to update' }
   }
-  await setAppStatus(c, app_id, 'cloud', appOwner.allow_device_custom_id)
+  await setAppStatus(c, app_id, 'cloud', appOwner.allow_device_custom_id, appOwner.block_provider_infra_requests)
   const statsActions: StatsActions[] = []
   if (allowDeviceCustomId === false && typeof body.custom_id === 'string' && body.custom_id.trim() !== '') {
     statsActions.push({ action: 'customIdBlocked' })
@@ -190,6 +222,7 @@ app.post('/', async (c) => {
   const body = await parseBodyRaw(c)
   const isBatch = Array.isArray(body)
   const events = isBatch ? body : [body]
+  const requestIp = getClientIP(c)
 
   // Handle empty batch early - no need to acquire DB connection
   if (isBatch && events.length === 0) {
@@ -231,16 +264,34 @@ app.post('/', async (c) => {
     return simpleRateLimit({ app_id: firstAppId })
   }
 
-  // Plugin endpoints must not open a write-capable primary connection.
-  // Custom-id policy reads may lag until the replica catches up.
-  const pgClient = getPgClient(c, true)
+  const appStatus = await getAppStatus(c, firstAppId)
+  const appStatusByAppId = new Map<string, AppStatusResult>([[firstAppId, appStatus]])
+  if (appStatus.cacheHit && requestIp !== 'unknown') {
+    const blocked = await blockProviderInfrastructure(c, appStatus.block_provider_infra_requests)
+    if (blocked)
+      return blocked
+  }
+  // When clients send a custom_id, the app-level allow flag should take effect
+  // immediately. Use a read-write (primary) connection in that case to avoid
+  // replica staleness.
+  const hasCustomId = events.some((event) => {
+    if (!event || typeof event !== 'object')
+      return false
+    const v = (event as AppStats).custom_id
+    return typeof v === 'string' && v.trim() !== ''
+  })
+
+  const pgClient = getPgClient(c, !hasCustomId)
   const drizzleClient = getDrizzleClient(pgClient!)
 
   try {
     // For single event, process directly and let errors propagate for proper status codes
     if (!isBatch) {
       const bodyParsed = parsePluginBody<AppStats>(c, events[0], statsRequestSchema)
-      const result = await post(c, drizzleClient, bodyParsed)
+      const result = await post(c, drizzleClient, bodyParsed, appStatus)
+      if (result.response) {
+        return result.response
+      }
       if (result.isOnprem) {
         return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
       }
@@ -260,7 +311,20 @@ app.post('/', async (c) => {
       const event = events[i]
       try {
         const bodyParsed = parsePluginBody<AppStats>(c, event, statsRequestSchema)
-        const result = await post(c, drizzleClient, bodyParsed)
+        let eventAppStatus = appStatusByAppId.get(bodyParsed.app_id)
+        if (!eventAppStatus) {
+          eventAppStatus = await getAppStatus(c, bodyParsed.app_id)
+          appStatusByAppId.set(bodyParsed.app_id, eventAppStatus)
+          if (eventAppStatus.cacheHit && requestIp !== 'unknown') {
+            const blocked = await blockProviderInfrastructure(c, eventAppStatus.block_provider_infra_requests)
+            if (blocked)
+              return blocked
+          }
+        }
+        const result = await post(c, drizzleClient, bodyParsed, eventAppStatus)
+        if (result.response) {
+          return result.response
+        }
 
         if (result.isOnprem) {
           results.push({

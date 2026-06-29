@@ -18,7 +18,7 @@ describe('credits pricing API', () => {
       .filter(step => step.type === 'build_time')
       .sort((a, b) => a.step_min - b.step_min)
 
-    expect(buildSteps.map(step => step.price_per_unit)).toEqual([0.16, 0.14, 0.12, 0.10, 0.09, 0.08])
+    expect(buildSteps.map(step => step.price_per_unit)).toEqual([0.08, 0.07, 0.06, 0.05, 0.045, 0.04])
   })
 
   it.concurrent('preserves not_authorized for org-scoped pricing queries without auth', async () => {
@@ -76,8 +76,8 @@ describe('credits pricing API', () => {
     }
 
     expect(data.usage.build_time).toBe(6000)
-    expect(data.breakdown.build_time.cost).toBe(16)
-    expect(data.total_cost).toBe(16)
+    expect(data.breakdown.build_time.cost).toBe(8)
+    expect(data.total_cost).toBe(8)
   })
 
   it.concurrent('rejects negative build_time input', async () => {
@@ -212,11 +212,11 @@ describe('credits pricing API', () => {
         price_per_unit: tier.price_per_unit,
       }))).toEqual([
         { step_min: 0, step_max: 5000, price_per_unit: 0.05 },
-        { step_min: 5000, step_max: 6000, price_per_unit: 0.16 },
-        { step_min: 6000, step_max: 30000, price_per_unit: 0.14 },
+        { step_min: 5000, step_max: 6000, price_per_unit: 0.08 },
+        { step_min: 6000, step_max: 30000, price_per_unit: 0.07 },
       ])
-      expect(data.breakdown.build_time.cost).toBeCloseTo(11.68, 5)
-      expect(data.total_cost).toBeCloseTo(11.68, 5)
+      expect(data.breakdown.build_time.cost).toBeCloseTo(7.94, 5)
+      expect(data.total_cost).toBeCloseTo(7.94, 5)
     }
     finally {
       await executeSQL('DELETE FROM public.capgo_credits_steps WHERE org_id = $1 AND type = $2', [ORG_ID, 'build_time'])

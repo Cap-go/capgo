@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { NavigationGuardNext, RouteLocationNormalized } from 'vue-router'
 import type { UserModule } from '~/types'
 import { hideLoader } from '~/services/loader'
+import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { setUser } from '~/services/posthog'
 import { isSsoUser, provisionSsoUser } from '~/services/ssoProvisioning'
 import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
@@ -204,6 +205,8 @@ async function guard(
   }
 
   function shouldRedirectToOrgOnboarding() {
+    if (to.path.startsWith('/onboarding/app'))
+      return false
     if (to.path.startsWith('/onboarding/organization'))
       return false
     if (to.path.startsWith('/onboarding/invitation'))
@@ -215,6 +218,8 @@ async function guard(
 
   function shouldRedirectToPendingInviteOnboarding(organizationsLoaded: boolean) {
     if (!organizationsLoaded)
+      return false
+    if (isNativeAppStoreContext())
       return false
     if (to.path.startsWith('/onboarding/invitation'))
       return false
@@ -304,7 +309,7 @@ async function guard(
     if (organizationsLoaded && !organizationStore.hasOrganizations && shouldRedirectToOrgOnboarding()) {
       if (!isAdminRoute || !main.isAdmin) {
         return next({
-          path: '/onboarding/organization',
+          path: '/onboarding/app',
           query: {
             to: to.fullPath,
           },
@@ -382,7 +387,12 @@ async function guard(
     }
 
     if (organizationsLoaded && !organizationStore.hasOrganizations && shouldRedirectToOrgOnboarding()) {
-      return next('/onboarding/organization')
+      return next({
+        path: '/onboarding/app',
+        query: {
+          to: to.fullPath,
+        },
+      })
     }
 
     // Check if user is trying to access admin routes

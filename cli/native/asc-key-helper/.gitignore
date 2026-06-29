@@ -1,0 +1,4 @@
+.build/
+dist-helper/
+*.xcodeproj
+.DS_Store

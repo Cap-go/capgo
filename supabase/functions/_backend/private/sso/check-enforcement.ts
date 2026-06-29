@@ -1,7 +1,13 @@
 import { createHono, getClaimsFromJWT, middlewareAuth, parseBody, quickError, useCors } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
-import { supabaseWithAuth } from '../../utils/supabase.ts'
+import { supabaseClient, supabaseWithAuth } from '../../utils/supabase.ts'
 import { version } from '../../utils/version.ts'
+
+const SPOOF_ADMIN_AUTHORIZATION_HEADER = 'x-capgo-spoof-admin-authorization'
+
+function toBearerAuthorization(authorization: string) {
+  return authorization.startsWith('Bearer ') ? authorization : `Bearer ${authorization}`
+}
 
 export const app = createHono('', version)
 
@@ -86,6 +92,33 @@ app.post('/', middlewareAuth, async (c) => {
     if (!enforcementRow.enforce_sso) {
       cloudlog({ requestId, context: 'check_enforcement - SSO not enforced', domain })
       return c.json({ allowed: true })
+    }
+    // Support impersonation may bypass SSO only when a separate non-target JWT still validates as a platform admin.
+
+    const spoofAdminAuthorization = c.req.header(SPOOF_ADMIN_AUTHORIZATION_HEADER)
+    if (spoofAdminAuthorization) {
+      const adminAuthorization = toBearerAuthorization(spoofAdminAuthorization)
+      const adminClaims = await getClaimsFromJWT(c, adminAuthorization)
+      const adminUserId = adminClaims?.sub
+
+      if (!adminUserId) {
+        cloudlog({ requestId, context: 'check_enforcement - invalid spoof admin token', orgId, userId })
+      }
+      else if (adminUserId === userId) {
+        cloudlog({ requestId, context: 'check_enforcement - spoof admin token matches target user', orgId, userId })
+      }
+      else {
+        const adminSupabase = supabaseClient(c, adminAuthorization)
+        const { data: isPlatformAdmin, error: platformAdminError } = await (adminSupabase.rpc as any)('is_platform_admin')
+
+        if (platformAdminError) {
+          cloudlog({ requestId, context: 'check_enforcement - spoof admin check error', error: platformAdminError.message, orgId, userId, adminUserId })
+        }
+        else if (isPlatformAdmin) {
+          cloudlog({ requestId, context: 'check_enforcement - platform admin impersonation bypass', email, orgId, adminUserId })
+          return c.json({ allowed: true })
+        }
+      }
     }
 
     // SSO is enforced - check RBAC super-admin-only permission for break-glass bypass

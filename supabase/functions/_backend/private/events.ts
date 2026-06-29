@@ -5,6 +5,7 @@ import type { BentoTrackingPayload } from '../utils/tracking.ts'
 import { Hono } from 'hono/tiny'
 import { BUILDER_RECOVERY_MILESTONES, buildBuilderOnboardingBentoEvent } from '../utils/builder_onboarding_recovery.ts'
 import { BUNDLE_INCOMPATIBLE_EVENT, buildBundleCompatibilityBentoEvent } from '../utils/bundle_compatibility_recovery.ts'
+import { buildPlanCheckoutStartedBentoEvent, PLAN_CHECKOUT_STARTED_EVENT } from '../utils/checkout_tracking.ts'
 import { BRES, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
@@ -36,6 +37,7 @@ interface TrackEventBody extends TrackOptions {
   notifyConsole?: boolean
   org_id?: string
   tracking_version?: number | string
+  nonPersonTags?: Record<string, string | number | boolean>
 }
 
 function isTrackingV2(version: unknown) {
@@ -50,6 +52,16 @@ function toIdString(value: unknown): string | undefined {
   if (typeof value === 'number' || typeof value === 'bigint')
     return String(value)
   return undefined
+}
+
+function tagString(tags: Record<string, unknown> | undefined, key: string) {
+  const value = tags?.[key]
+  return typeof value === 'string' ? value : undefined
+}
+
+function tagNumber(tags: Record<string, unknown> | undefined, key: string) {
+  const value = tags?.[key]
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
 async function resolveTrackingUserId(
@@ -269,6 +281,41 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     }
   }
 
+  // Plan checkout start: the frontend emits this only when the user accepts the
+  // Stripe navigation, not when the checkout URL is prefetched.
+  let planCheckoutBentoEvent: BentoTrackingPayload | undefined
+  if (onboardingOrgId && trackedBody.event === PLAN_CHECKOUT_STARTED_EVENT) {
+    if (!(await checkPermission(c, 'org.update_billing', { orgId: onboardingOrgId }))) {
+      throw quickError(403, 'no_permission', 'You cannot send checkout events for this organization')
+    }
+
+    const { data: orgData, error: orgError } = await supabase
+      .from('orgs')
+      .select('id, name')
+      .eq('id', onboardingOrgId)
+      .single()
+
+    if (orgError || !orgData) {
+      cloudlog({ requestId: c.get('requestId'), message: 'plan checkout bento lookup failed; skipping signal', org: orgError })
+    }
+    else {
+      const tags = trackedBody.tags ?? {}
+      planCheckoutBentoEvent = buildPlanCheckoutStartedBentoEvent({
+        event: trackedBody.event,
+        orgId: onboardingOrgId,
+        orgName: orgData.name,
+        productId: tagString(tags, 'product_id'),
+        planName: tagString(tags, 'plan_name'),
+        recurrence: tagString(tags, 'recurrence'),
+        checkoutSource: tagString(tags, 'checkout_source'),
+        currentPlanName: tagString(tags, 'current_plan_name'),
+        planPrice: tagNumber(tags, 'plan_price'),
+        planPriceMonthly: tagNumber(tags, 'plan_price_monthly'),
+        planPriceYearly: tagNumber(tags, 'plan_price_yearly'),
+      })
+    }
+  }
+
   // Bundle compatibility failure (capgo bundle upload / bundle compatibility):
   // when the CLI reports an incompatible bundle, emit a Bento signal so a
   // lifecycle automation can react. Mirrors the builder block above; resolves
@@ -365,7 +412,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   }
 
   // Exactly one of these is ever set (distinct event names); `??` picks the active one.
-  const bentoEvent = onboardingBentoEvent ?? builderBentoEvent ?? bundleIncompatibleBentoEvent
+  const bentoEvent = onboardingBentoEvent ?? builderBentoEvent ?? planCheckoutBentoEvent ?? bundleIncompatibleBentoEvent
   await sendEventToTracking(c, {
     ...trackedBody,
     bento: bentoEvent,

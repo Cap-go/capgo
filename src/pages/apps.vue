@@ -214,8 +214,6 @@ displayStore.defaultBack = '/apps'
         </div>
       </div>
     </div>
-    <div v-else class="flex flex-col items-center justify-center h-full">
-      <Spinner size="w-40 h-40" />
-    </div>
+    <PageLoader v-else />
   </div>
 </template>

@@ -109,8 +109,8 @@ const organizationStore = useOrganizationStore()
 const supabase = useSupabase()
 const rawChartData = ref<ChartApiData | null>(null)
 
-const appId = ref('')
-const activeAppId = computed(() => props.appId || appId.value)
+const detectedAppId = ref('')
+const activeAppId = computed(() => props.appId || detectedAppId.value)
 const isNativeUsage = computed(() => props.usageKind === 'native')
 const titleKey = computed(() => isNativeUsage.value ? 'active_users_by_native_version' : 'active_users_by_version')
 
@@ -682,7 +682,7 @@ watch(
     // Check for app route pattern
     if (path.includes('/app/') && packageId) {
       const packageChanged = packageId !== oldPackageId
-      appId.value = packageId
+      detectedAppId.value = packageId
       if (packageChanged) {
         // Clear cache when switching apps
         cachedBillingData.value = null
@@ -695,7 +695,7 @@ watch(
       }
     }
     else {
-      appId.value = ''
+      detectedAppId.value = ''
       requestToken++
       rawChartData.value = null
       isLoading.value = true
@@ -715,7 +715,7 @@ watch(
       return
 
     if (packageId)
-      appId.value = packageId
+      detectedAppId.value = packageId
 
     if (!activeAppId.value)
       return

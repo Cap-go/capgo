@@ -37,20 +37,78 @@ async function resolveOwnerOrg(c: Context, record: Database['public']['Tables'][
   return data?.owner_org ?? null
 }
 
+function getManifestEntryCount(value: unknown): number {
+  if (Array.isArray(value))
+    return value.length
+  return value ? 1 : 0
+}
+
+function versionUpdateLogFields(
+  record: Database['public']['Tables']['app_versions']['Row'],
+  oldRecord?: Database['public']['Tables']['app_versions']['Row'] | null,
+) {
+  return {
+    app_id: record.app_id,
+    deleted_at: record.deleted_at,
+    id: record.id,
+    manifest_count: record.manifest_count,
+    manifest_entries: getManifestEntryCount(record.manifest),
+    old_deleted_at: oldRecord?.deleted_at ?? null,
+    old_r2_path: oldRecord?.r2_path ?? null,
+    old_storage_provider: oldRecord?.storage_provider ?? null,
+    old_updated_at: oldRecord?.updated_at ?? null,
+    r2_path: record.r2_path,
+    storage_provider: record.storage_provider,
+    updated_at: record.updated_at,
+    version_name: record.name,
+  }
+}
+
+function getMetadataBranch(storageProvider: string | null, resolvedR2Path: string | null) {
+  if (storageProvider === 'r2' && resolvedR2Path)
+    return 'r2_bundle_size'
+  if (storageProvider === 'r2')
+    return 'zero_metadata_r2_path_unavailable'
+  if (storageProvider === 'r2-direct')
+    return 'zero_metadata_r2_direct_not_finalized'
+  return 'zero_metadata_non_r2_storage'
+}
+
 /**
  * Handles v2 storage metadata updates (size/checksum/stats) for R2-backed bundles.
  *
  * Returns `false` only when processing must stop (e.g. missing owner org).
  */
 async function v2PathSize(c: Context, record: Database['public']['Tables']['app_versions']['Row'], v2Path: string): Promise<boolean> {
-  // pdate size and checksum
-  cloudlog({ requestId: c.get('requestId'), message: 'V2', r2_path: record.r2_path })
-  // set checksum in s3
-  const size = await s3.getSize(c, v2Path)
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'on_version_update reading bundle size',
+    ...versionUpdateLogFields(record),
+    resolved_r2_path: v2Path,
+  })
+
+  const diagnostics = await s3.getSizeDiagnostics(c, v2Path)
+  const size = diagnostics.size
   if (!size) {
-    cloudlog({ requestId: c.get('requestId'), message: 'no size found for r2_path', r2_path: record.r2_path })
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'no size found for r2_path',
+      ...versionUpdateLogFields(record),
+      resolved_r2_path: v2Path,
+      size,
+      storageDiagnostics: diagnostics,
+    })
     return true
   }
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'on_version_update resolved bundle size',
+    ...versionUpdateLogFields(record),
+    resolved_r2_path: v2Path,
+    selectedCandidateKey: diagnostics.selectedCandidateKey,
+    size,
+  })
 
   const ownerOrg = await resolveOwnerOrg(c, record)
   if (!ownerOrg) {
@@ -71,8 +129,12 @@ async function v2PathSize(c: Context, record: Database['public']['Tables']['app_
       onConflict: 'id',
     })
     .eq('id', record.id)
-  if (errorUpdate)
-    cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate })
+  if (errorUpdate) {
+    cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate, ...versionUpdateLogFields(record), size })
+  }
+  else {
+    cloudlog({ requestId: c.get('requestId'), message: 'app_versions_meta size upserted', ...versionUpdateLogFields(record), owner_org: ownerOrg, size })
+  }
   const { error } = await createStatsMeta(c, record.app_id, record.id, size)
   if (error)
     cloudlog({ requestId: c.get('requestId'), message: 'error createStatsMeta', error })
@@ -155,14 +217,22 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
  */
 async function updateIt(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
   const v2Path = await getPath(c, record)
+  const metadataBranch = getMetadataBranch(record.storage_provider, v2Path)
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'on_version_update metadata branch selected',
+    ...versionUpdateLogFields(record),
+    metadataBranch,
+    resolved_r2_path: v2Path,
+  })
 
-  if (v2Path && record.storage_provider === 'r2') {
+  if (metadataBranch === 'r2_bundle_size' && v2Path) {
     const shouldContinue = await v2PathSize(c, record, v2Path)
     if (!shouldContinue)
       return c.json(BRES)
   }
   else {
-    cloudlog({ requestId: c.get('requestId'), message: 'no v2 path' })
+    cloudlog({ requestId: c.get('requestId'), message: 'on_version_update zero metadata branch selected', ...versionUpdateLogFields(record), metadataBranch, resolved_r2_path: v2Path })
     const ownerOrg = await resolveOwnerOrg(c, record)
     if (!ownerOrg) {
       cloudlog({ requestId: c.get('requestId'), message: 'missing owner_org for app_versions_meta upsert', id: record.id, app_id: record.app_id })
@@ -180,8 +250,12 @@ async function updateIt(c: Context, record: Database['public']['Tables']['app_ve
         onConflict: 'id',
       })
       .eq('id', record.id)
-    if (errorUpdate)
-      cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate })
+    if (errorUpdate) {
+      cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate, ...versionUpdateLogFields(record), metadataBranch, size: 0 })
+    }
+    else {
+      cloudlog({ requestId: c.get('requestId'), message: 'app_versions_meta zero size upserted', ...versionUpdateLogFields(record), metadataBranch, owner_org: ownerOrg, size: 0 })
+    }
   }
 
   // Handle manifest entries
@@ -347,6 +421,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'UPDATE'), (c) => {
   const record = c.get('webhookBody') as Database['public']['Tables']['app_versions']['Row']
   const oldRecord = c.get('oldRecord') as Database['public']['Tables']['app_versions']['Row']
+  cloudlog({ requestId: c.get('requestId'), message: 'on_version_update received', ...versionUpdateLogFields(record, oldRecord) })
   cloudlog({ requestId: c.get('requestId'), message: 'record', record })
 
   if (!record.app_id) {
@@ -358,10 +433,10 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'UPDATE'), (
     return deleteIt(c, record)
 
   if (!record.r2_path && !record.manifest) {
-    cloudlog({ requestId: c.get('requestId'), message: 'no r2_path and no manifest, skipping update', record })
+    cloudlog({ requestId: c.get('requestId'), message: 'no r2_path and no manifest, skipping update', ...versionUpdateLogFields(record, oldRecord) })
     return c.json(BRES)
   }
 
-  cloudlog({ requestId: c.get('requestId'), message: 'Update but not deleted' })
+  cloudlog({ requestId: c.get('requestId'), message: 'Update but not deleted', ...versionUpdateLogFields(record, oldRecord) })
   return updateIt(c, record)
 })

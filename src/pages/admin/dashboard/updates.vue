@@ -10,7 +10,7 @@ import { useRouter } from 'vue-router'
 import AdminFilterBar from '~/components/admin/AdminFilterBar.vue'
 import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
-import Spinner from '~/components/Spinner.vue'
+import PageLoader from '~/components/PageLoader.vue'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -42,6 +42,8 @@ const globalStatsTrendData = ref<Array<{
   plan_enterprise: number
   registers_today: number
   devices_last_month: number
+  devices_last_month_ios: number
+  devices_last_month_android: number
 }>>([])
 
 const isLoadingGlobalStatsTrend = ref(false)
@@ -124,6 +126,22 @@ const devicesTrendSeries = computed(() => {
       })),
       color: '#06b6d4', // cyan
     },
+    {
+      label: 'iOS Devices',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.devices_last_month_ios || 0,
+      })),
+      color: '#000000', // black (Apple)
+    },
+    {
+      label: 'Android Devices',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.devices_last_month_android || 0,
+      })),
+      color: '#3ddc84', // Android green
+    },
   ]
 })
 
@@ -166,9 +184,7 @@ displayStore.defaultBack = '/dashboard'
       <div class="w-full h-full px-4 pt-2 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
         <AdminFilterBar />
 
-        <div v-if="isLoading" class="flex items-center justify-center min-h-screen">
-          <Spinner size="w-24 h-24" />
-        </div>
+        <PageLoader v-if="isLoading" />
 
         <div v-else class="space-y-6">
           <!-- Key Metrics Cards -->
