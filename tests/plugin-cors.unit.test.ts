@@ -13,7 +13,7 @@ describe('cloudflare plugin CORS', () => {
     }))
 
     expect(response.status).toBe(204)
-    expect(response.headers.get('access-control-allow-origin')).toBe('*')
+    expect(response.headers.get('access-control-allow-origin')).toBe('https://web.capgo.app')
     const allowMethods = response.headers.get('access-control-allow-methods')?.toLowerCase()
     const allowHeaders = response.headers.get('access-control-allow-headers')?.toLowerCase()
     expect(allowMethods).toContain('options')

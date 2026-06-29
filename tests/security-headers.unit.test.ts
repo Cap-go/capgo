@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import apiWorker from '../cloudflare_workers/api/index.ts'
 import pluginWorker from '../cloudflare_workers/plugin/index.ts'
-import { API_CONTENT_SECURITY_POLICY, createAllCatch, createHono } from '../supabase/functions/_backend/utils/hono.ts'
+import { API_CONTENT_SECURITY_POLICY, createAllCatch, createHono, getAllowedCorsOrigin, useCors } from '../supabase/functions/_backend/utils/hono.ts'
 
 const consoleHeaders = readFileSync(new URL('../public/_headers', import.meta.url), 'utf8')
 
@@ -44,5 +44,77 @@ describe('security response headers', () => {
 
     expect(response.status).toBe(200)
     expect(response.headers.get('content-security-policy')).toBeNull()
+  })
+
+  it.concurrent.each([
+    'https://console.capgo.app',
+    'https://console.preprod.capgo.app',
+    'capacitor://localhost',
+    'ionic://localhost',
+    'localhost://localhost',
+    'https://localhost',
+    'http://localhost:5173',
+  ])('allows trusted CORS origin %s without using wildcard', async (origin) => {
+    const app = createHono('api', 'test')
+    app.use('/cors-test', useCors)
+    app.get('/cors-test', c => c.json({ status: 'ok' }))
+
+    const response = await app.fetch(new Request('https://api.preprod.capgo.app/cors-test', {
+      headers: { origin },
+    }))
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('access-control-allow-origin')).toBe(origin)
+  })
+
+  it('allows the runtime WEBAPP_URL CORS origin', () => {
+    vi.stubEnv('WEBAPP_URL', 'https://console.selfhost.example')
+    try {
+      expect(getAllowedCorsOrigin('https://console.selfhost.example', {} as Parameters<typeof getAllowedCorsOrigin>[1])).toBe('https://console.selfhost.example')
+    }
+    finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('allows runtime CORS_ALLOWED_ORIGINS custom native origins', () => {
+    vi.stubEnv('CORS_ALLOWED_ORIGINS', 'myapp://localhost')
+    try {
+      expect(getAllowedCorsOrigin('myapp://localhost', {} as Parameters<typeof getAllowedCorsOrigin>[1])).toBe('myapp://localhost')
+    }
+    finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it.concurrent('does not emit wildcard CORS for untrusted origins', async () => {
+    const app = createHono('api', 'test')
+    app.use('/cors-test', useCors)
+    app.get('/cors-test', c => c.json({ status: 'ok' }))
+
+    const response = await app.fetch(new Request('https://api.preprod.capgo.app/cors-test', {
+      headers: { origin: 'https://evil.example' },
+    }))
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('access-control-allow-origin')).toBeNull()
+  })
+
+  it.concurrent('does not emit wildcard CORS on rejected preflight requests', async () => {
+    const app = createHono('api', 'test')
+    app.use('/cors-test', useCors)
+    app.get('/cors-test', c => c.json({ status: 'ok' }))
+
+    const response = await app.fetch(new Request('https://api.preprod.capgo.app/cors-test', {
+      method: 'OPTIONS',
+      headers: {
+        'origin': 'https://evil.example',
+        'access-control-request-method': 'GET',
+      },
+    }))
+
+    expect(response.status).toBe(204)
+    expect(response.headers.get('access-control-allow-origin')).toBeNull()
+    expect(response.headers.get('access-control-allow-methods')).toContain('GET')
   })
 })
