@@ -1190,6 +1190,8 @@ export const NON_CREDENTIAL_KEYS = new Set([
   'CAPGO_STORE_SUBMIT_REVIEW',
   'CAPGO_STORE_RELEASE_NAME',
   'CAPGO_STORE_RELEASE_NOTES',
+  'CAPGO_STORE_RELEASE_NOTES_LOCALIZED',
+  'CAPGO_IOS_AUTOMATIC_RELEASE',
   'CAPGO_IOS_TESTFLIGHT_GROUPS',
   'CAPGO_IOS_SOURCE_DIR',
   'CAPGO_IOS_APP_DIR',
@@ -1202,6 +1204,63 @@ export const NON_CREDENTIAL_KEYS = new Set([
   'CAPGO_ANDROID_FLAVOR',
 ])
 
+type LocalizedReleaseNotes = Record<string, string>
+
+export function parseStoreReleaseNotesLocaleEntries(entries?: string[]): LocalizedReleaseNotes | undefined {
+  if (!entries || entries.length === 0)
+    return undefined
+
+  const localized: LocalizedReleaseNotes = {}
+  for (const entry of entries) {
+    const separatorIndex = entry.indexOf('=')
+    if (separatorIndex <= 0) {
+      throw new Error('--store-release-notes-locale must use locale=notes format, for example: --store-release-notes-locale en-US="Bug fixes"')
+    }
+
+    const locale = entry.slice(0, separatorIndex).trim()
+    const notes = entry.slice(separatorIndex + 1).trim()
+    if (!locale || !notes) {
+      throw new Error('--store-release-notes-locale requires both a locale and non-empty release notes')
+    }
+
+    localized[locale] = notes
+  }
+
+  return Object.keys(localized).length > 0 ? localized : undefined
+}
+
+export function parseStoreReleaseNotesLocalizedJson(value?: string): LocalizedReleaseNotes | undefined {
+  const raw = value?.trim()
+  if (!raw)
+    return undefined
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  }
+  catch (error) {
+    throw new Error(`CAPGO_STORE_RELEASE_NOTES_LOCALIZED must be valid JSON: ${error instanceof Error ? error.message : String(error)}`)
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('CAPGO_STORE_RELEASE_NOTES_LOCALIZED must be a JSON object like {"en-US":"Bug fixes"}')
+  }
+
+  const localized: LocalizedReleaseNotes = {}
+  for (const [locale, notes] of Object.entries(parsed)) {
+    const cleanLocale = locale.trim()
+    if (typeof notes !== 'string' || !notes.trim()) {
+      throw new Error(`CAPGO_STORE_RELEASE_NOTES_LOCALIZED.${cleanLocale || locale} must be a non-empty string`)
+    }
+    if (!cleanLocale) {
+      throw new Error('CAPGO_STORE_RELEASE_NOTES_LOCALIZED cannot contain an empty locale key')
+    }
+    localized[cleanLocale] = notes.trim()
+  }
+
+  return Object.keys(localized).length > 0 ? localized : undefined
+}
+
 /**
  * Split merged credentials into a build options payload and a credentials-only payload.
  * Non-secret configuration keys (schemes, directories, output control) go into buildOptions.
@@ -1213,6 +1272,11 @@ export function splitPayload(
   buildMode: string,
   cliVersion: string,
 ): { buildOptions: BuildOptionsPayload, buildCredentials: Record<string, string> } {
+  const storeReleaseNotesLocalized = parseStoreReleaseNotesLocalizedJson(mergedCredentials.CAPGO_STORE_RELEASE_NOTES_LOCALIZED)
+  const iosAutomaticRelease = mergedCredentials.CAPGO_IOS_AUTOMATIC_RELEASE === undefined
+    ? undefined
+    : mergedCredentials.CAPGO_IOS_AUTOMATIC_RELEASE === 'true'
+
   const buildOptions: BuildOptionsPayload = {
     platform,
     buildMode: buildMode as 'debug' | 'release',
@@ -1235,7 +1299,9 @@ export function splitPayload(
     submitToStoreReview: mergedCredentials.CAPGO_STORE_SUBMIT_REVIEW === 'true',
     storeReleaseName: mergedCredentials.CAPGO_STORE_RELEASE_NAME,
     storeReleaseNotes: mergedCredentials.CAPGO_STORE_RELEASE_NOTES,
+    storeReleaseNotesLocalized,
     iosTestflightGroups: mergedCredentials.CAPGO_IOS_TESTFLIGHT_GROUPS,
+    iosAutomaticRelease,
   }
 
   const buildCredentials: Record<string, string> = {}
@@ -1327,6 +1393,11 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
     // Collect credentials from CLI args (if provided)
     const cliCredentials: Partial<BuildCredentials> = {}
+    const cliStoreReleaseNotesLocalized = {
+      ...(options.storeReleaseNotesLocalized ?? {}),
+      ...(parseStoreReleaseNotesLocaleEntries(options.storeReleaseNotesLocale) ?? {}),
+    }
+    const hasCliStoreReleaseNotesLocalized = Object.keys(cliStoreReleaseNotesLocalized).length > 0
     if (options.buildCertificateBase64)
       cliCredentials.BUILD_CERTIFICATE_BASE64 = options.buildCertificateBase64
     if (options.p12Password)
@@ -1409,6 +1480,9 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     if (typeof options.iosTestflightGroups === 'string' && options.iosTestflightGroups.trim()) {
       cliCredentials.CAPGO_IOS_TESTFLIGHT_GROUPS = options.iosTestflightGroups.trim()
     }
+    if (options.iosAutomaticRelease !== undefined) {
+      cliCredentials.CAPGO_IOS_AUTOMATIC_RELEASE = parseOptionalBoolean(options.iosAutomaticRelease) ? 'true' : 'false'
+    }
 
     // Merge credentials from all three sources:
     // 1. CLI args (highest priority)
@@ -1420,6 +1494,13 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       Object.keys(cliCredentials).length > 0 ? cliCredentials : undefined,
     )
 
+    if (mergedCredentials && hasCliStoreReleaseNotesLocalized) {
+      const existingLocalized = parseStoreReleaseNotesLocalizedJson(mergedCredentials.CAPGO_STORE_RELEASE_NOTES_LOCALIZED) ?? {}
+      mergedCredentials.CAPGO_STORE_RELEASE_NOTES_LOCALIZED = JSON.stringify({
+        ...existingLocalized,
+        ...cliStoreReleaseNotesLocalized,
+      })
+    }
     // --no-playstore-upload: null out PLAY_CONFIG_JSON so it never reaches the builder
     if (options.playstoreUpload === false && mergedCredentials) {
       delete mergedCredentials.PLAY_CONFIG_JSON
@@ -1459,10 +1540,6 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       log.error('  https://capgo.app/docs/cli/cloud-build/credentials/')
       throw new Error('No credentials found. Please provide credentials before building.')
     }
-    if (platform === 'ios' && mergedCredentials.CAPGO_STORE_SUBMIT_REVIEW === 'true' && !mergedCredentials.CAPGO_IOS_TESTFLIGHT_GROUPS?.trim()) {
-      throw new Error('--submit-to-store-review on iOS requires --ios-testflight-groups <groups> so TestFlight can submit the build for external review.')
-    }
-
     // Validate platform-specific required credentials
     const missingCreds: string[] = []
 

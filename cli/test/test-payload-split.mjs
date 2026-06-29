@@ -50,7 +50,7 @@ function assertDeepEquals(actual, expected, message) {
 function testVal(/** @type {string} */ v) { return String(v) }
 
 // Import from TypeScript source (requires bun)
-const { splitPayload, NON_CREDENTIAL_KEYS } = await import('../src/build/request.ts')
+const { splitPayload, NON_CREDENTIAL_KEYS, parseStoreReleaseNotesLocaleEntries } = await import('../src/build/request.ts')
 const { MIN_OUTPUT_RETENTION_SECONDS } = await import('../src/build/credentials.ts')
 
 // ─── Test: iOS secrets stay in credentials ─────────────────────────────────────
@@ -136,7 +136,9 @@ await test('Output and store release fields go to buildOptions, not buildCredent
     CAPGO_STORE_SUBMIT_REVIEW: 'true',
     CAPGO_STORE_RELEASE_NAME: '1.2.3',
     CAPGO_STORE_RELEASE_NOTES: 'Fix login and improve onboarding',
+    CAPGO_STORE_RELEASE_NOTES_LOCALIZED: '{"en-US":"Bug fixes","fr-FR":"Corrections"}',
     CAPGO_IOS_TESTFLIGHT_GROUPS: 'External Testers',
+    CAPGO_IOS_AUTOMATIC_RELEASE: 'false',
     P12_PASSWORD: testVal('p12-test-val'),
   }
 
@@ -149,7 +151,9 @@ await test('Output and store release fields go to buildOptions, not buildCredent
   assertEquals(buildOptions.submitToStoreReview, true, 'submitToStoreReview should be true')
   assertEquals(buildOptions.storeReleaseName, '1.2.3', 'storeReleaseName should be in options')
   assertEquals(buildOptions.storeReleaseNotes, 'Fix login and improve onboarding', 'storeReleaseNotes should be in options')
+  assertDeepEquals(buildOptions.storeReleaseNotesLocalized, { 'en-US': 'Bug fixes', 'fr-FR': 'Corrections' }, 'localized release notes should be in options')
   assertEquals(buildOptions.iosTestflightGroups, 'External Testers', 'iosTestflightGroups should be in options')
+  assertEquals(buildOptions.iosAutomaticRelease, false, 'iosAutomaticRelease should be in options')
 
   // Output and store release control NOT in credentials
   assert(!('BUILD_OUTPUT_UPLOAD_ENABLED' in buildCredentials), 'Output upload should not be in credentials')
@@ -158,10 +162,24 @@ await test('Output and store release fields go to buildOptions, not buildCredent
   assert(!('CAPGO_STORE_SUBMIT_REVIEW' in buildCredentials), 'Store review flag should not be in credentials')
   assert(!('CAPGO_STORE_RELEASE_NAME' in buildCredentials), 'Store release name should not be in credentials')
   assert(!('CAPGO_STORE_RELEASE_NOTES' in buildCredentials), 'Store release notes should not be in credentials')
+  assert(!('CAPGO_STORE_RELEASE_NOTES_LOCALIZED' in buildCredentials), 'Localized store release notes should not be in credentials')
   assert(!('CAPGO_IOS_TESTFLIGHT_GROUPS' in buildCredentials), 'TestFlight groups should not be in credentials')
+  assert(!('CAPGO_IOS_AUTOMATIC_RELEASE' in buildCredentials), 'iOS automatic release should not be in credentials')
 
   // Secret still in credentials
   assertEquals(buildCredentials.P12_PASSWORD, testVal('p12-test-val'), 'P12 password should still be in credentials')
+})
+
+await test('Store release notes locale entries parse as a locale map', async () => {
+  const localized = parseStoreReleaseNotesLocaleEntries([
+    'en-US=Bug fixes and performance improvements',
+    'fr-FR=Corrections et ameliorations',
+  ])
+
+  assertDeepEquals(localized, {
+    'en-US': 'Bug fixes and performance improvements',
+    'fr-FR': 'Corrections et ameliorations',
+  })
 })
 
 // ─── Test: cliVersion is populated ──────────────────────────────────────────────
@@ -254,7 +272,9 @@ await test('NON_CREDENTIAL_KEYS covers all non-secret fields', async () => {
     'CAPGO_STORE_SUBMIT_REVIEW',
     'CAPGO_STORE_RELEASE_NAME',
     'CAPGO_STORE_RELEASE_NOTES',
+    'CAPGO_STORE_RELEASE_NOTES_LOCALIZED',
     'CAPGO_IOS_TESTFLIGHT_GROUPS',
+    'CAPGO_IOS_AUTOMATIC_RELEASE',
     'CAPGO_IOS_SOURCE_DIR',
     'CAPGO_IOS_APP_DIR',
     'CAPGO_IOS_PROJECT_DIR',
