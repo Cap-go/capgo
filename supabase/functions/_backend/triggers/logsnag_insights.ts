@@ -1678,7 +1678,7 @@ async function queueLogsnagInsightsMessage(
   message: ReturnType<typeof buildLogsnagInsightsRetryMessage> | ReturnType<typeof buildLogsnagInsightsShardMessage>,
   delaySeconds: number,
 ): Promise<number> {
-  const result = await db.query<{ msg_id: number | string }>('SELECT pgmq.send($1, $2::jsonb, $3) AS msg_id', [
+  const result = await db.query<{ msg_id: number | string }>('SELECT pgmq.send($1::text, $2::jsonb, $3::integer) AS msg_id', [
     LOGSNAG_INSIGHTS_QUEUE_NAME,
     JSON.stringify(message),
     delaySeconds,

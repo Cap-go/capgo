@@ -100,7 +100,7 @@ describe('queue Load Test', () => {
     }
 
     const result = await pool.query<{ msg_id: number | string }>(
-      'SELECT pgmq.send($1, $2::jsonb, $3) AS msg_id',
+      'SELECT pgmq.send($1::text, $2::jsonb, $3::integer) AS msg_id',
       [queueName, JSON.stringify(retryMessage), 60],
     )
 
