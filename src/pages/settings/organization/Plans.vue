@@ -250,7 +250,7 @@ async function openChangePlan(plan: Database['public']['Tables']['plans']['Row']
   // get the current url
   isSubscribeLoading.value[index] = true
   if (plan.stripe_id) {
-    const checkoutIsYearly = plan.price_y !== plan.price_m ? isYearly.value : false
+    const checkoutIsYearly = plan.price_y === plan.price_m ? false : isYearly.value
     if (isSafariBrowser()) {
       const shouldContinue = await openSafariStripeCheckout(plan, checkoutIsYearly)
       if (!shouldContinue) {
@@ -259,7 +259,7 @@ async function openChangePlan(plan: Database['public']['Tables']['plans']['Row']
       }
     }
     else {
-      const didOpenCheckout = await openCheckout(plan.stripe_id, `${window.location.href}?success=1`, `${window.location.href}?cancel=1`, checkoutIsYearly, currentOrganization?.value?.gid ?? '')
+      const didOpenCheckout = await openCheckout(plan.stripe_id, `${globalThis.location.href}?success=1`, `${globalThis.location.href}?cancel=1`, checkoutIsYearly, currentOrganization?.value?.gid ?? '')
       if (didOpenCheckout)
         trackPlanCheckoutStarted(plan, checkoutIsYearly, 'direct')
     }

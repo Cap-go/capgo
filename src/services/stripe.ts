@@ -33,7 +33,7 @@ export function openBlank(link: string) {
     presentActionSheetOpen(link)
     return true
   }
-  return Boolean(window.open(link, '_blank'))
+  return Boolean(globalThis.open(link, '_blank'))
 }
 export async function openPortal(orgId: string, t: ComposerTranslation) {
   let url = ''
@@ -47,7 +47,7 @@ export async function openPortal(orgId: string, t: ComposerTranslation) {
   // datafast_visitor_id
 
   const prem = supabase.functions.invoke('private/stripe_portal', {
-    body: JSON.stringify({ callbackUrl: window.location.href, orgId }),
+    body: JSON.stringify({ callbackUrl: globalThis.location.href, orgId }),
   }).then(({ data }) => {
     if (data?.url) {
       url = data.url
@@ -147,7 +147,7 @@ export async function startCreditTopUp(orgId: string, quantity = 100) {
       console.error('Failed to start credit top-up', error ?? data)
       throw error ?? new Error('Missing checkout URL')
     }
-    window.location.href = data.url
+    globalThis.location.href = data.url
   }
   catch (error) {
     console.error('Cannot start credit top-up checkout', error)
