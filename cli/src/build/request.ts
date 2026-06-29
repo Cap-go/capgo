@@ -1187,6 +1187,10 @@ export const NON_CREDENTIAL_KEYS = new Set([
   'BUILD_OUTPUT_UPLOAD_ENABLED',
   'BUILD_OUTPUT_RETENTION_SECONDS',
   'SKIP_BUILD_NUMBER_BUMP',
+  'CAPGO_STORE_SUBMIT_REVIEW',
+  'CAPGO_STORE_RELEASE_NAME',
+  'CAPGO_STORE_RELEASE_NOTES',
+  'CAPGO_IOS_TESTFLIGHT_GROUPS',
   'CAPGO_IOS_SOURCE_DIR',
   'CAPGO_IOS_APP_DIR',
   'CAPGO_IOS_PROJECT_DIR',
@@ -1228,6 +1232,10 @@ export function splitPayload(
       ? Number.parseInt(mergedCredentials.BUILD_OUTPUT_RETENTION_SECONDS, 10) || MIN_OUTPUT_RETENTION_SECONDS
       : MIN_OUTPUT_RETENTION_SECONDS,
     skipBuildNumberBump: mergedCredentials.SKIP_BUILD_NUMBER_BUMP === 'true',
+    submitToStoreReview: mergedCredentials.CAPGO_STORE_SUBMIT_REVIEW === 'true',
+    storeReleaseName: mergedCredentials.CAPGO_STORE_RELEASE_NAME,
+    storeReleaseNotes: mergedCredentials.CAPGO_STORE_RELEASE_NOTES,
+    iosTestflightGroups: mergedCredentials.CAPGO_IOS_TESTFLIGHT_GROUPS,
   }
 
   const buildCredentials: Record<string, string> = {}
@@ -1389,6 +1397,18 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     if (options.skipBuildNumberBump !== undefined) {
       cliCredentials.SKIP_BUILD_NUMBER_BUMP = parseOptionalBoolean(options.skipBuildNumberBump) ? 'true' : 'false'
     }
+    if (options.submitToStoreReview !== undefined) {
+      cliCredentials.CAPGO_STORE_SUBMIT_REVIEW = parseOptionalBoolean(options.submitToStoreReview) ? 'true' : 'false'
+    }
+    if (typeof options.storeReleaseName === 'string' && options.storeReleaseName.trim()) {
+      cliCredentials.CAPGO_STORE_RELEASE_NAME = options.storeReleaseName.trim()
+    }
+    if (typeof options.storeReleaseNotes === 'string' && options.storeReleaseNotes.trim()) {
+      cliCredentials.CAPGO_STORE_RELEASE_NOTES = options.storeReleaseNotes.trim()
+    }
+    if (typeof options.iosTestflightGroups === 'string' && options.iosTestflightGroups.trim()) {
+      cliCredentials.CAPGO_IOS_TESTFLIGHT_GROUPS = options.iosTestflightGroups.trim()
+    }
 
     // Merge credentials from all three sources:
     // 1. CLI args (highest priority)
@@ -1439,6 +1459,9 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       log.error('  https://capgo.app/docs/cli/cloud-build/credentials/')
       throw new Error('No credentials found. Please provide credentials before building.')
     }
+    if (platform === 'ios' && mergedCredentials.CAPGO_STORE_SUBMIT_REVIEW === 'true' && !mergedCredentials.CAPGO_IOS_TESTFLIGHT_GROUPS?.trim()) {
+      throw new Error('--submit-to-store-review on iOS requires --ios-testflight-groups <groups> so TestFlight can submit the build for external review.')
+    }
 
     // Validate platform-specific required credentials
     const missingCreds: string[] = []
@@ -1457,6 +1480,9 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       }
       // Write normalized value back so splitPayload picks it up
       mergedCredentials.CAPGO_IOS_DISTRIBUTION = distributionMode
+      if (mergedCredentials.CAPGO_STORE_SUBMIT_REVIEW === 'true' && distributionMode !== 'app_store') {
+        missingCreds.push('--submit-to-store-review on iOS requires --ios-distribution app_store')
+      }
 
       // iOS minimum requirements (all modes)
       if (!mergedCredentials.BUILD_CERTIFICATE_BASE64)
@@ -1498,6 +1524,10 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         const hasAppleAppId = !!mergedCredentials.APPLE_APP_ID
         const anyAppSpecificField = hasFastlaneUser || hasAppSpecificPassword || hasAppleAppId
         const hasCompleteAppSpecificPassword = hasFastlaneUser && hasAppSpecificPassword && hasAppleAppId
+
+        if (mergedCredentials.CAPGO_STORE_SUBMIT_REVIEW === 'true' && !hasCompleteAppleApiKey) {
+          missingCreds.push('App Store Connect API key (APPLE_KEY_ID/APPLE_ISSUER_ID/APPLE_KEY_CONTENT) is required for --submit-to-store-review on iOS')
+        }
 
         // APPLE_APP_ID is the app's numeric App Store Connect id; a non-numeric
         // value would make the headless TestFlight upload fail with a cryptic
@@ -1577,7 +1607,10 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
       // PLAY_CONFIG_JSON is optional for build, but required for upload to Play Store
       if (!mergedCredentials.PLAY_CONFIG_JSON) {
-        if (mergedCredentials.BUILD_OUTPUT_UPLOAD_ENABLED !== 'true') {
+        if (mergedCredentials.CAPGO_STORE_SUBMIT_REVIEW === 'true') {
+          missingCreds.push('PLAY_CONFIG_JSON is required for --submit-to-store-review on Android')
+        }
+        else if (mergedCredentials.BUILD_OUTPUT_UPLOAD_ENABLED !== 'true') {
           missingCreds.push('PLAY_CONFIG_JSON or BUILD_OUTPUT_UPLOAD_ENABLED=true (build has no output destination - enable either Play Store upload or Capgo download link)')
         }
         else {

@@ -246,6 +246,10 @@ Examples:
 | **--bundle** | <code>string</code> | Bundle name or id to preview |
 | **--channel** | <code>string</code> | Channel name or id to preview |
 | **--type** | <code>string</code> | Type for positional target |
+| **--png** | <code>string</code> | Write the preview QR code as a PNG image to the given file path |
+| **--url** | <code>boolean</code> | Print preview URLs only (web and deep link), without a terminal QR code |
+| **--web-url** | <code>boolean</code> | Encode the web preview URL in the QR code and PNG instead of the capgo:// deep link |
+| **--preview-env** | <code>string</code> | Preview web URL environment |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 
@@ -694,6 +698,16 @@ npx @capgo/cli@latest app set com.example.app --name "Updated App" --retention 3
 | **--expose-metadata** | <code>string</code> | Expose bundle metadata (link and comment) to the plugin (true/false, default: false) |
 | **--preview** | <code>boolean</code> | Enable bundle and channel preview QR codes for this app |
 | **--no-preview** | <code>boolean</code> | Disable bundle and channel preview QR codes for this app |
+| **--allow-device-custom-id** | <code>boolean</code> | Allow devices to set a custom device ID for this app |
+| **--no-allow-device-custom-id** | <code>boolean</code> | Disallow custom device IDs for this app |
+| **--block-provider-infra-requests** | <code>boolean</code> | Block provider infrastructure requests for this app |
+| **--no-block-provider-infra-requests** | <code>boolean</code> | Allow provider infrastructure requests for this app |
+| **--build-timeout-minutes** | <code>string</code> | Native build timeout in minutes (5-360, default: 15) |
+| **--ios-store-url** | <code>string</code> | iOS App Store URL for this app |
+| **--android-store-url** | <code>string</code> | Google Play Store URL for this app |
+| **--default-upload-channel** | <code>string</code> | Default upload channel name for this app |
+| **--default-download-channel** | <code>string</code> | Default download channel name for this app (sets channel public=true) |
+| **--disable-download-channels** | <code>boolean</code> | Disable Capgo download channels for this app (sets all channels public=false) |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 
@@ -1302,6 +1316,10 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | **--android-flavor** | <code>string</code> | Android: Product flavor to build (e.g. production). Required if your project has multiple flavors. |
 | **--in-app-update-priority** | <code>string</code> | Android: Google Play in-app update priority for this release (integer 0–5; higher = more urgent). See https://developer.android.com/guide/playcore/in-app-updates. Precedence: CLI > env > saved credentials |
 | **--no-playstore-upload** | <code>boolean</code> | Skip Play Store upload for this build (nulls out saved play config). Requires --output-upload. |
+| **--submit-to-store-review** | <code>boolean</code> | After upload, submit the store release for review instead of leaving it as a draft/inactive build. Android marks the Play release completed; iOS submits to TestFlight external review and requires --ios-testflight-groups. |
+| **--store-release-name** | <code>string</code> | Store release name/version label. Android sends this as the Google Play version_name. |
+| **--store-release-notes** | <code>string</code> | Store release notes. Android sends this as the Play changelog; iOS sends it as the TestFlight What to Test text. |
+| **--ios-testflight-groups** | <code>string</code> | iOS: comma-separated TestFlight external group names or IDs required with --submit-to-store-review. |
 | **--output-upload** | <code>boolean</code> | Override output upload behavior for this build only (enable). Precedence: CLI > env > saved credentials |
 | **--no-output-upload** | <code>boolean</code> | Override output upload behavior for this build only (disable). Precedence: CLI > env > saved credentials |
 | **--output-retention** | <code>string</code> | Override output link TTL for this build only (1h to 7d). Examples: 1h, 6h, 2d. Precedence: CLI > env > saved credentials |
