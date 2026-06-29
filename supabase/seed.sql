@@ -573,9 +573,16 @@ BEGIN
     -- Dedicated user and API key for CLI hashed apikey tests (isolated to prevent interference)
     (110, NOW(), 'e5f6a7b8-c9d0-4e1f-8a2b-3c4d5e6f7a81', 'a7b8c9d0-e1f2-4a3b-8c4d-5e6f7a8b9c03', NOW(), 'cli hashed test org super admin'),
     -- Dedicated user and API key for encrypted bundles tests (isolated to prevent interference)
-    (111, NOW(), 'f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f708193', 'b8c9d0e1-f2a3-4b4c-9d5e-6f7a8b9c0d14', NOW(), 'encrypted test org super admin'),
-    -- Dedicated user and API key for apikeys.test.ts API-key compatibility management
-    (112, NOW(), 'd0f1a2b3-c4d5-4e6f-8a90-b1c2d3e4f506', 'c9d0e1f2-a3b4-4c5d-8e6f-7a8b9c0d1e25', NOW(), 'apikey management test org super admin');
+    (111, NOW(), 'f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f708193', 'b8c9d0e1-f2a3-4b4c-9d5e-6f7a8b9c0d14', NOW(), 'encrypted test org super admin');
+
+    PERFORM set_config('capgo.skip_apikey_trigger', 'true', true);
+
+    INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "updated_at", "name") VALUES
+    -- Dedicated user and API keys for apikeys.test.ts API-key compatibility management
+    (112, NOW(), 'd0f1a2b3-c4d5-4e6f-8a90-b1c2d3e4f506', 'c9d0e1f2-a3b4-4c5d-8e6f-7a8b9c0d1e25', NOW(), 'apikey management test org super admin'),
+    (113, NOW(), 'd0f1a2b3-c4d5-4e6f-8a90-b1c2d3e4f506', 'd1e2f3a4-b5c6-4d7e-8f90-a1b2c3d4e5f6', NOW(), 'apikey management test apikey_manager');
+
+    PERFORM set_config('capgo.skip_apikey_trigger', 'false', true);
 
     -- Hashed API key for testing (hash of 'test-hashed-apikey-for-auth-test')
     -- Used by 07_auth_functions.sql tests
@@ -620,7 +627,8 @@ BEGIN
         (102, public.rbac_role_org_super_admin()),
         (110, public.rbac_role_org_super_admin()),
         (111, public.rbac_role_org_super_admin()),
-        (112, public.rbac_role_org_super_admin())
+        (112, public.rbac_role_org_super_admin()),
+        (113, public.rbac_role_apikey_manager())
     )
     INSERT INTO public.role_bindings (
       principal_type,
@@ -738,7 +746,7 @@ BEGIN
 
     -- Drop replicated orgs but keet the the seed ones
     DELETE from "public"."orgs" where POSITION('organization' in orgs.name)=1;
-    PERFORM setval('public.apikeys_id_seq', 112, true);
+    PERFORM setval('public.apikeys_id_seq', 113, true);
     PERFORM setval('public.app_versions_id_seq', 16, true);
     PERFORM setval('public.channel_id_seq', 6, false);
     PERFORM setval('public.deploy_history_id_seq', 5, false);
@@ -1196,6 +1204,7 @@ BEGIN
       (public.rbac_perm_org_read_members(), public.rbac_scope_org(), 'Read org membership list'),
       (public.rbac_perm_org_invite_user(), public.rbac_scope_org(), 'Invite or add members to org'),
       (public.rbac_perm_org_update_user_roles(), public.rbac_scope_org(), 'Change org/member roles'),
+      (public.rbac_perm_org_manage_apikeys(), public.rbac_scope_org(), 'Manage API keys for the org without assigning user roles'),
       (public.rbac_perm_org_read_billing(), public.rbac_scope_org(), 'Read org billing settings'),
       (public.rbac_perm_org_update_billing(), public.rbac_scope_org(), 'Update org billing settings'),
       (public.rbac_perm_org_read_invoices(), public.rbac_scope_org(), 'Read invoices'),
@@ -1232,7 +1241,7 @@ BEGIN
     INSERT INTO public.role_permissions (role_id, permission_id)
     SELECT r.id, p.id FROM public.roles r
     JOIN public.permissions p ON p.key IN (
-      public.rbac_perm_org_read(), public.rbac_perm_org_create_app(), public.rbac_perm_org_update_settings(), public.rbac_perm_org_delete(), public.rbac_perm_org_read_members(), public.rbac_perm_org_invite_user(), public.rbac_perm_org_update_user_roles(),
+      public.rbac_perm_org_read(), public.rbac_perm_org_create_app(), public.rbac_perm_org_update_settings(), public.rbac_perm_org_delete(), public.rbac_perm_org_read_members(), public.rbac_perm_org_invite_user(), public.rbac_perm_org_update_user_roles(), public.rbac_perm_org_manage_apikeys(),
       public.rbac_perm_org_read_billing(), public.rbac_perm_org_update_billing(), public.rbac_perm_org_read_invoices(), public.rbac_perm_org_read_audit(), public.rbac_perm_org_read_billing_audit(),
       public.rbac_perm_app_read(), public.rbac_perm_app_update_settings(), public.rbac_perm_app_delete(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(),
       public.rbac_perm_app_create_channel(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_manage_devices(), public.rbac_perm_app_read_devices(),
@@ -1247,7 +1256,7 @@ BEGIN
     INSERT INTO public.role_permissions (role_id, permission_id)
     SELECT r.id, p.id FROM public.roles r
     JOIN public.permissions p ON p.key IN (
-      public.rbac_perm_org_read(), public.rbac_perm_org_create_app(), public.rbac_perm_org_update_settings(), public.rbac_perm_org_read_members(), public.rbac_perm_org_invite_user(), public.rbac_perm_org_update_user_roles(),
+      public.rbac_perm_org_read(), public.rbac_perm_org_create_app(), public.rbac_perm_org_update_settings(), public.rbac_perm_org_read_members(), public.rbac_perm_org_invite_user(), public.rbac_perm_org_update_user_roles(), public.rbac_perm_org_manage_apikeys(),
       public.rbac_perm_org_read_billing(), public.rbac_perm_org_read_invoices(), public.rbac_perm_org_read_audit(), public.rbac_perm_org_read_billing_audit(),
       public.rbac_perm_app_read(), public.rbac_perm_app_update_settings(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(),
       public.rbac_perm_app_create_channel(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_manage_devices(), public.rbac_perm_app_read_devices(),
@@ -1308,13 +1317,82 @@ BEGIN
     WHERE r.name = public.rbac_role_app_developer()
     ON CONFLICT DO NOTHING;
 
-    -- app_uploader: upload only
+    -- app_uploader: upload only plus channel promote without settings writes
     INSERT INTO public.role_permissions (role_id, permission_id)
     SELECT r.id, p.id FROM public.roles r
     JOIN public.permissions p ON p.key IN (
-      public.rbac_perm_app_read(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_read_devices(), public.rbac_perm_app_read_audit()
+      public.rbac_perm_app_read(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_read_devices(), public.rbac_perm_app_read_audit(),
+      public.rbac_perm_channel_read(), public.rbac_perm_channel_promote_bundle()
     )
     WHERE r.name = public.rbac_role_app_uploader()
+    ON CONFLICT DO NOTHING;
+
+    INSERT INTO public.roles (name, scope_type, description, priority_rank, is_assignable, created_by)
+    VALUES (
+      public.rbac_role_apikey_manager(),
+      public.rbac_scope_org(),
+      'Manage API keys for CI/CD without org role assignment rights',
+      78,
+      true,
+      NULL
+    )
+    ON CONFLICT (name) DO UPDATE
+    SET
+      scope_type = EXCLUDED.scope_type,
+      description = EXCLUDED.description,
+      priority_rank = EXCLUDED.priority_rank,
+      is_assignable = EXCLUDED.is_assignable;
+
+    -- apikey_manager: manage API keys and read org policy metadata without role assignment rights
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r
+    JOIN public.permissions p ON p.key IN (
+      public.rbac_perm_org_manage_apikeys(),
+      public.rbac_perm_org_read()
+    )
+    WHERE r.name = public.rbac_role_apikey_manager()
+    ON CONFLICT DO NOTHING;
+
+    INSERT INTO public.roles (name, scope_type, description, priority_rank, is_assignable, created_by)
+    VALUES
+      (
+        public.rbac_role_channel_developer(),
+        public.rbac_scope_channel(),
+        'Developer access to a channel: promote and rollback bundles without settings writes',
+        58,
+        true,
+        NULL
+      ),
+      (
+        public.rbac_role_channel_uploader(),
+        public.rbac_scope_channel(),
+        'Upload-only access to a channel: read metadata and promote bundles',
+        57,
+        true,
+        NULL
+      )
+    ON CONFLICT (name) DO UPDATE
+    SET
+      scope_type = EXCLUDED.scope_type,
+      description = EXCLUDED.description,
+      priority_rank = EXCLUDED.priority_rank,
+      is_assignable = EXCLUDED.is_assignable;
+
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r
+    JOIN public.permissions p ON p.key IN (
+      public.rbac_perm_channel_read(), public.rbac_perm_channel_read_history(), public.rbac_perm_channel_promote_bundle(),
+      public.rbac_perm_channel_rollback_bundle(), public.rbac_perm_channel_manage_forced_devices(), public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
+    )
+    WHERE r.name = public.rbac_role_channel_developer()
+    ON CONFLICT DO NOTHING;
+
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r
+    JOIN public.permissions p ON p.key IN (
+      public.rbac_perm_channel_read(), public.rbac_perm_channel_promote_bundle()
+    )
+    WHERE r.name = public.rbac_role_channel_uploader()
     ON CONFLICT DO NOTHING;
 
     -- app_reader: read-only app access plus read-only access to every channel in the app
@@ -1347,6 +1425,47 @@ BEGIN
     WHERE r.name = public.rbac_role_channel_reader()
     ON CONFLICT DO NOTHING;
 
+
+    -- Ensure dedicated apikey management test keys retain explicit RBAC bindings
+    -- after permission repopulation (seed_key_roles insert can be skipped silently).
+    DELETE FROM public.role_bindings rb
+    USING public.apikeys ak
+    WHERE rb.principal_type = public.rbac_principal_apikey()
+      AND rb.principal_id = ak.rbac_id
+      AND rb.scope_type = public.rbac_scope_org()
+      AND ak.id IN (112, 113);
+
+    INSERT INTO public.role_bindings (
+      principal_type,
+      principal_id,
+      role_id,
+      scope_type,
+      org_id,
+      granted_by,
+      reason,
+      is_direct
+    )
+    SELECT
+      public.rbac_principal_apikey(),
+      ak.rbac_id,
+      roles.id,
+      public.rbac_scope_org(),
+      'f1a2b3c4-d5e6-4f70-8a9b-0c1d2e3f4a50'::uuid,
+      ak.user_id,
+      'Seeded apikey management test binding',
+      true
+    FROM public.apikeys ak
+    JOIN (
+      VALUES
+        (112::bigint, public.rbac_role_org_super_admin()),
+        (113::bigint, public.rbac_role_apikey_manager())
+    ) AS management_keys (apikey_id, role_name)
+      ON management_keys.apikey_id = ak.id
+    JOIN public.roles roles
+      ON roles.scope_type = public.rbac_scope_org()
+      AND roles.name = management_keys.role_name
+    WHERE ak.rbac_id IS NOT NULL;
+
     RAISE NOTICE 'RBAC permissions populated: % permissions, % role_permissions',
       (SELECT COUNT(*) FROM public.permissions),
       (SELECT COUNT(*) FROM public.role_permissions);
@@ -1355,4 +1474,58 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'Seeding failed: %', SQLERRM;
     RAISE;
+END $$;
+-- Repair dedicated apikey management test bindings after seed DO block completes.
+DELETE FROM public.role_bindings rb
+USING public.apikeys ak
+WHERE rb.principal_type = public.rbac_principal_apikey()
+  AND rb.principal_id = ak.rbac_id
+  AND rb.scope_type = public.rbac_scope_org()
+  AND ak.id IN (112, 113);
+
+INSERT INTO public.role_bindings (
+  principal_type,
+  principal_id,
+  role_id,
+  scope_type,
+  org_id,
+  granted_by,
+  reason,
+  is_direct
+)
+SELECT
+  public.rbac_principal_apikey(),
+  ak.rbac_id,
+  roles.id,
+  public.rbac_scope_org(),
+  'f1a2b3c4-d5e6-4f70-8a9b-0c1d2e3f4a50'::uuid,
+  ak.user_id,
+  'Seeded apikey management test binding',
+  true
+FROM public.apikeys ak
+JOIN (
+  VALUES
+    (112::bigint, public.rbac_role_org_super_admin()),
+    (113::bigint, public.rbac_role_apikey_manager())
+) AS management_keys (apikey_id, role_name)
+  ON management_keys.apikey_id = ak.id
+JOIN public.roles roles
+  ON roles.scope_type = public.rbac_scope_org()
+  AND roles.name = management_keys.role_name
+WHERE ak.rbac_id IS NOT NULL;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.apikeys ak
+    JOIN public.role_bindings rb
+      ON rb.principal_type = public.rbac_principal_apikey()
+      AND rb.principal_id = ak.rbac_id
+    JOIN public.roles r ON r.id = rb.role_id
+    WHERE ak.id = 113
+      AND r.name = public.rbac_role_apikey_manager()
+  ) THEN
+    RAISE EXCEPTION 'seed verification failed: apikey 113 missing apikey_manager binding';
+  END IF;
 END $$;

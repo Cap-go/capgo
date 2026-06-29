@@ -200,7 +200,7 @@ describe('tests CLI upload', () => {
     }
   }, 60000)
 
-  it('fails explicit channel upload before creating a bundle when channel promotion is missing', async () => {
+  it('allows app_uploader to pass explicit channel upload preflight', async () => {
     const appName = `com.cli_channel_preflight_${randomUUID()}`
     await Promise.all([
       resetAndSeedAppData(appName),
@@ -225,8 +225,7 @@ describe('tests CLI upload', () => {
         ignoreCompatibilityCheck: true,
         apikey: createdApikey.key ?? undefined,
       })
-      expect(result.success).toBe(false)
-      expect(result.error).toContain('channel.promote_bundle')
+      expect(result.success).toBe(true)
 
       const { count, error } = await getSupabaseClient()
         .from('app_versions')
@@ -235,7 +234,7 @@ describe('tests CLI upload', () => {
         .eq('name', version)
 
       expect(error).toBeNull()
-      expect(count).toBe(0)
+      expect(count).toBe(1)
     }
     finally {
       if (createdApikeyId !== null)
@@ -248,7 +247,7 @@ describe('tests CLI upload', () => {
     }
   }, 60000)
 
-  it('fails default channel upload before creating a bundle when channel promotion is missing', async () => {
+  it('allows app_uploader to pass default channel upload preflight', async () => {
     const appName = `com.cli_default_channel_preflight_${randomUUID()}`
     await Promise.all([
       resetAndSeedAppData(appName),
@@ -273,8 +272,7 @@ describe('tests CLI upload', () => {
         ignoreCompatibilityCheck: true,
         apikey: createdApikey.key ?? undefined,
       })
-      expect(result.success).toBe(false)
-      expect(result.error).toContain('channel.promote_bundle')
+      expect(result.success).toBe(true)
 
       const { count, error } = await getSupabaseClient()
         .from('app_versions')
@@ -283,7 +281,7 @@ describe('tests CLI upload', () => {
         .eq('name', version)
 
       expect(error).toBeNull()
-      expect(count).toBe(0)
+      expect(count).toBe(1)
     }
     finally {
       if (createdApikeyId !== null)

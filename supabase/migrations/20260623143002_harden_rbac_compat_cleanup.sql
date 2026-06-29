@@ -11,6 +11,140 @@ DROP FUNCTION IF EXISTS public.rbac_rollback_org(uuid);
 ALTER TABLE public.orgs
   DROP COLUMN IF EXISTS use_new_rbac;
 
+CREATE OR REPLACE FUNCTION public.rbac_perm_org_manage_apikeys() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'org.manage_apikeys'::text $$;
+
+ALTER FUNCTION public.rbac_perm_org_manage_apikeys() OWNER TO postgres;
+
+INSERT INTO public.permissions (key, scope_type, description)
+VALUES (
+  public.rbac_perm_org_manage_apikeys(),
+  public.rbac_scope_org(),
+  'Create, list, update metadata, rotate, and delete API keys for the org without assigning user roles'
+)
+ON CONFLICT (key) DO NOTHING;
+
+CREATE OR REPLACE FUNCTION public.rbac_role_apikey_manager() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'apikey_manager'::text $$;
+
+ALTER FUNCTION public.rbac_role_apikey_manager() OWNER TO postgres;
+
+INSERT INTO public.roles (name, scope_type, description, priority_rank, is_assignable, created_by)
+VALUES (
+  public.rbac_role_apikey_manager(),
+  public.rbac_scope_org(),
+  'Manage API keys for CI/CD without org role assignment rights',
+  78,
+  true,
+  NULL
+)
+ON CONFLICT (name) DO UPDATE
+SET
+  scope_type = EXCLUDED.scope_type,
+  description = EXCLUDED.description,
+  priority_rank = EXCLUDED.priority_rank,
+  is_assignable = EXCLUDED.is_assignable;
+
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT roles.id, permissions.id
+FROM public.roles
+INNER JOIN public.permissions
+  ON permissions.key IN (
+    public.rbac_perm_org_manage_apikeys(),
+    public.rbac_perm_org_read()
+  )
+WHERE roles.name = public.rbac_role_apikey_manager()
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT roles.id, permissions.id
+FROM public.roles
+INNER JOIN public.permissions
+  ON permissions.key = public.rbac_perm_org_manage_apikeys()
+WHERE roles.name IN (
+  public.rbac_role_org_admin(),
+  public.rbac_role_org_super_admin()
+)
+ON CONFLICT DO NOTHING;
+
+CREATE OR REPLACE FUNCTION public.rbac_role_channel_developer() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'channel_developer'::text $$;
+
+ALTER FUNCTION public.rbac_role_channel_developer() OWNER TO postgres;
+
+CREATE OR REPLACE FUNCTION public.rbac_role_channel_uploader() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'channel_uploader'::text $$;
+
+ALTER FUNCTION public.rbac_role_channel_uploader() OWNER TO postgres;
+
+INSERT INTO public.roles (name, scope_type, description, priority_rank, is_assignable, created_by)
+VALUES
+  (
+    public.rbac_role_channel_developer(),
+    public.rbac_scope_channel(),
+    'Developer access to a channel: promote and rollback bundles without settings writes',
+    58,
+    true,
+    NULL
+  ),
+  (
+    public.rbac_role_channel_uploader(),
+    public.rbac_scope_channel(),
+    'Upload-only access to a channel: read metadata and promote bundles',
+    57,
+    true,
+    NULL
+  )
+ON CONFLICT (name) DO UPDATE
+SET
+  scope_type = EXCLUDED.scope_type,
+  description = EXCLUDED.description,
+  priority_rank = EXCLUDED.priority_rank,
+  is_assignable = EXCLUDED.is_assignable;
+
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT roles.id, permissions.id
+FROM public.roles
+INNER JOIN public.permissions
+  ON permissions.key IN (
+    public.rbac_perm_channel_read(),
+    public.rbac_perm_channel_read_history(),
+    public.rbac_perm_channel_promote_bundle(),
+    public.rbac_perm_channel_rollback_bundle(),
+    public.rbac_perm_channel_manage_forced_devices(),
+    public.rbac_perm_channel_read_forced_devices(),
+    public.rbac_perm_channel_read_audit()
+  )
+WHERE roles.name = public.rbac_role_channel_developer()
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT roles.id, permissions.id
+FROM public.roles
+INNER JOIN public.permissions
+  ON permissions.key IN (
+    public.rbac_perm_channel_read(),
+    public.rbac_perm_channel_promote_bundle()
+  )
+WHERE roles.name = public.rbac_role_channel_uploader()
+ON CONFLICT DO NOTHING;
+
 -- Direct channel table updates are intentionally admin/channel-admin only.
 -- App developers can upload/promote bundles, but must not mutate channel settings
 -- through the anon API-key RLS path.
@@ -34,6 +168,18 @@ INNER JOIN public.permissions
     public.rbac_perm_channel_read_audit()
   )
 WHERE roles.name = public.rbac_role_app_reader()
+ON CONFLICT DO NOTHING;
+
+-- Upload-only principals can promote bundles to channels without channel settings writes.
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT roles.id, permissions.id
+FROM public.roles
+INNER JOIN public.permissions
+  ON permissions.key IN (
+    public.rbac_perm_channel_read(),
+    public.rbac_perm_channel_promote_bundle()
+  )
+WHERE roles.name = public.rbac_role_app_uploader()
 ON CONFLICT DO NOTHING;
 
 DROP POLICY IF EXISTS "Allow update for auth (admin+)" ON public.orgs;
@@ -145,16 +291,6 @@ BEGIN
     END IF;
 
     v_effective_user_id := v_api_key.user_id;
-
-    IF (SELECT enforcing_2fa FROM public.orgs WHERE id = v_effective_org_id)
-      AND NOT public.has_2fa_enabled(v_effective_user_id)
-    THEN
-      RETURN false;
-    END IF;
-
-    IF public.user_meets_password_policy(v_effective_user_id, v_effective_org_id) = false THEN
-      RETURN false;
-    END IF;
 
     v_allowed := public.rbac_has_permission(
       public.rbac_principal_apikey(),
@@ -311,12 +447,6 @@ BEGIN
     END IF;
 
     v_effective_user_id := v_api_key.user_id;
-
-    IF (SELECT enforcing_2fa FROM public.orgs WHERE id = v_effective_org_id)
-      AND NOT public.has_2fa_enabled(v_effective_user_id)
-    THEN
-      RETURN false;
-    END IF;
 
     RETURN public.rbac_has_permission(
       public.rbac_principal_apikey(),
@@ -640,11 +770,8 @@ ON public.app_versions
 FOR SELECT
 TO anon, authenticated
 USING (
-  public.rbac_check_permission_request(
-    public.rbac_perm_app_read_bundles(),
-    owner_org,
-    app_id,
-    NULL::bigint
+  app_id = ANY(
+    COALESCE((SELECT public.app_versions_readable_app_ids()), '{}'::character varying[])
   )
 );
 
@@ -1249,11 +1376,8 @@ USING (
     SELECT 1
     FROM public.app_versions av
     WHERE av.id = manifest.app_version_id
-      AND public.rbac_check_permission_request(
-        public.rbac_perm_app_read_bundles(),
-        av.owner_org,
-        av.app_id,
-        NULL::bigint
+      AND av.app_id = ANY(
+        COALESCE((SELECT public.app_versions_readable_app_ids()), '{}'::character varying[])
       )
   )
 );
@@ -5658,7 +5782,10 @@ BEGIN
     FROM public.find_apikey_by_value(v_api_key_text)
     LIMIT 1;
 
-    IF v_api_key.id IS NULL OR public.is_apikey_expired(v_api_key.expires_at) THEN
+    IF v_api_key.id IS NULL
+      OR public.is_apikey_expired(v_api_key.expires_at)
+      OR (v_user_id IS NOT NULL AND v_user_id IS DISTINCT FROM v_api_key.user_id)
+    THEN
       RETURN v_allowed;
     END IF;
 
@@ -5731,7 +5858,7 @@ BEGIN
       ON role_permissions.role_id = role_closure.effective_role_id
     INNER JOIN public.permissions
       ON permissions.id = role_permissions.permission_id
-    WHERE permissions.key = public.rbac_perm_app_read()
+    WHERE permissions.key = public.rbac_perm_app_read_bundles()
   ),
   scoped_apps AS (
     SELECT apps.app_id, apps.owner_org
@@ -5758,11 +5885,11 @@ BEGIN
     SELECT orgs.id
     FROM candidate_orgs
     INNER JOIN public.orgs ON orgs.id = candidate_orgs.owner_org
-    WHERE (
-        orgs.enforcing_2fa IS NOT TRUE
-        OR (v_user_id IS NOT NULL AND public.has_2fa_enabled(v_user_id))
+    WHERE v_principal_type = public.rbac_principal_apikey()
+      OR (
+        (orgs.enforcing_2fa IS NOT TRUE OR (v_user_id IS NOT NULL AND public.has_2fa_enabled(v_user_id)))
+        AND public.user_meets_password_policy(v_user_id, orgs.id) IS DISTINCT FROM false
       )
-      AND public.user_meets_password_policy(v_user_id, orgs.id) IS DISTINCT FROM false
   )
   SELECT COALESCE(array_agg(DISTINCT scoped_apps.app_id), '{}'::character varying[])
   INTO v_allowed

@@ -12,7 +12,7 @@ import { schema } from '../../utils/postgres_schema.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseAdmin, supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { apiKeyBindingsAllowOrgCreate, assertApiKeyCanKeepOrgCreateGrant, parseApiKeyGlobalPermissions, replaceApiKeyGlobalPermissions, validateApiKeyGlobalPermissionsForBindings } from './global_permissions.ts'
-import { ensureApiKeyCanManageTargetOrgIds, ensureApiKeyManagementAllowed, getApiKeyBindingOrgIds, isValidApiKeyIdFormat, requireApiKeyManagementAuth, selectOwnedApiKeyByIdentifier } from './scope.ts'
+import { assertApiKeyManagerCanAssignBindings, ensureApiKeyCanManageTargetOrgIds, ensureApiKeyManagementAllowed, getApiKeyBindingOrgIds, isValidApiKeyIdFormat, requireApiKeyManagementAuth, sanitizeClientBindings, selectOwnedApiKeyByIdentifier, type ClientBindingInput } from './scope.ts'
 
 const app = honoFactory.createApp()
 const APIKEY_ORG_READER_ROLE = 'apikey_org_reader'
@@ -32,15 +32,6 @@ interface ApiKeyPut {
   global_permissions?: unknown
 }
 
-interface BindingInput {
-  role_name: string
-  scope_type: 'org' | 'app' | 'channel'
-  org_id: string
-  app_id?: string | null
-  channel_id?: string | number | null
-  reason?: string
-}
-
 function toApiKeyPublicRow(apikey: ApiKeyPublicSelectRow): ApiKeyPublicRow {
   const { key_hash, ...publicApiKey } = apikey
   return {
@@ -48,6 +39,8 @@ function toApiKeyPublicRow(apikey: ApiKeyPublicSelectRow): ApiKeyPublicRow {
     is_hashed_key: key_hash !== null,
   }
 }
+
+type BindingInput = ClientBindingInput
 
 function parseBindingsForUpdate(body: ApiKeyPut, requestId: string): BindingInput[] | undefined {
   if (body.bindings === undefined) {
@@ -62,22 +55,7 @@ function parseBindingsForUpdate(body: ApiKeyPut, requestId: string): BindingInpu
     throw simpleError('bindings_required', 'API key bindings are required', { requestId })
   }
 
-  for (const binding of body.bindings) {
-    if (!binding || typeof binding !== 'object') {
-      throw simpleError('invalid_bindings', 'Each binding must be an object', { requestId })
-    }
-    if (typeof binding.role_name !== 'string' || !binding.role_name) {
-      throw simpleError('invalid_bindings', 'Each binding must have a role_name', { requestId })
-    }
-    if (!['org', 'app', 'channel'].includes(binding.scope_type)) {
-      throw simpleError('invalid_bindings', 'Each binding must have a valid scope_type (org, app, channel)', { requestId })
-    }
-    if (typeof binding.org_id !== 'string' || !binding.org_id) {
-      throw simpleError('invalid_bindings', 'Each binding must have an org_id', { requestId })
-    }
-  }
-
-  return body.bindings
+  return sanitizeClientBindings(body.bindings)
 }
 
 function enrichApiKeyBindings(bindings: BindingInput[]): Array<BindingInput & { allowSystemRole?: boolean }> {
@@ -143,6 +121,8 @@ async function replaceApiKeyBindings(
   try {
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
+    await assertApiKeyManagerCanAssignBindings(c, auth, bindings)
+
     const enrichedBindings = enrichApiKeyBindings(bindings)
     if (globalPermissions !== undefined) {
       validateApiKeyGlobalPermissionsForBindings(globalPermissions, bindings, c.get('requestId'))

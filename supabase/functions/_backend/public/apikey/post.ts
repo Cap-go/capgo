@@ -9,17 +9,9 @@ import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { parseApiKeyGlobalPermissions, replaceApiKeyGlobalPermissions, validateApiKeyGlobalPermissionsForBindings } from './global_permissions.ts'
-import { requireApiKeyManagementAuth } from './scope.ts'
+import { assertApiKeyManagerCanAssignBindings, ensureApiKeyManagementAllowed, requireApiKeyManagementAuth, sanitizeClientBindings, type ClientBindingInput } from './scope.ts'
 
-interface BindingInput {
-  role_name: string
-  scope_type: 'org' | 'app' | 'channel'
-  org_id: string
-  app_id?: string | null
-  channel_id?: string | number | null
-  reason?: string
-}
-
+type BindingInput = ClientBindingInput
 type EnrichedBindingInput = BindingInput & { allowSystemRole?: boolean }
 type ApiKeyRow = Database['public']['Tables']['apikeys']['Row']
 
@@ -68,39 +60,25 @@ async function createApiKeyRecord(
 
 app.post('/', middlewareAuth(), async (c) => {
   const auth = requireApiKeyManagementAuth(c, 'not_authorized', 'API key management requires authentication')
+  const authApikey = c.get('apikey') as ApiKeyRow | undefined
+
+  await ensureApiKeyManagementAllowed(c, auth, authApikey, 'cannot_create_apikey')
 
   const body = await parseBody<any>(c)
 
   const name = body.name ?? ''
 
-  if (auth.authType !== 'jwt' || !auth.userId) {
-    if (auth.authType === 'apikey') {
-      throw simpleError('cannot_create_apikey', 'API keys cannot create other API keys')
-    }
-    throw simpleError('not_authorized', 'Only user sessions can create API keys')
+  if (!auth.userId) {
+    throw simpleError('not_authorized', 'API key management requires authentication')
   }
   const expiresAt = body.expires_at ?? null
   const isHashed = body.hashed === true
 
   // Validate and parse bindings array
-  const bindings: BindingInput[] = Array.isArray(body.bindings) ? body.bindings : []
   if (body.bindings !== undefined && !Array.isArray(body.bindings)) {
     throw simpleError('invalid_bindings', 'bindings must be an array')
   }
-  for (const binding of bindings) {
-    if (!binding || typeof binding !== 'object') {
-      throw simpleError('invalid_bindings', 'Each binding must be an object')
-    }
-    if (typeof binding.role_name !== 'string' || !binding.role_name) {
-      throw simpleError('invalid_bindings', 'Each binding must have a role_name')
-    }
-    if (!['org', 'app', 'channel'].includes(binding.scope_type)) {
-      throw simpleError('invalid_bindings', 'Each binding must have a valid scope_type (org, app, channel)')
-    }
-    if (typeof binding.org_id !== 'string' || !binding.org_id) {
-      throw simpleError('invalid_bindings', 'Each binding must have an org_id')
-    }
-  }
+  const bindings: BindingInput[] = Array.isArray(body.bindings) ? sanitizeClientBindings(body.bindings) : []
 
   const hasBindings = bindings.length > 0
 
@@ -124,6 +102,7 @@ app.post('/', middlewareAuth(), async (c) => {
   // Validate expiration against org policies (throws if invalid)
   const allOrgIds = [...new Set(resolvedBindings.map(binding => binding.org_id))]
   await validateExpirationAgainstOrgPolicies(allOrgIds, expiresAt, supabase)
+  await assertApiKeyManagerCanAssignBindings(c, auth, resolvedBindings)
 
   let apikeyData: ApiKeyRow | null = null
 
@@ -131,8 +110,8 @@ app.post('/', middlewareAuth(), async (c) => {
   try {
     // Check RBAC permission for each unique org in the bindings before creating anything.
     for (const bindingOrgId of allOrgIds) {
-      if (!(await checkPermission(c, 'org.update_user_roles', { orgId: bindingOrgId }))) {
-        throw quickError(403, 'forbidden_binding', `Forbidden - Admin rights required for org ${bindingOrgId}`)
+      if (!(await checkPermission(c, 'org.manage_apikeys', { orgId: bindingOrgId }))) {
+        throw quickError(403, 'forbidden_binding', `Forbidden - API key management rights required for org ${bindingOrgId}`)
       }
     }
 
@@ -140,6 +119,8 @@ app.post('/', middlewareAuth(), async (c) => {
     const drizzle = getDrizzleClient(pgClient)
     const createdBindings: unknown[] = []
     const callerPrincipalId = auth.userId
+    const bindingAuthType = auth.authType === 'apikey' ? 'apikey' : 'jwt'
+    const callerApikeyRbacId = auth.authType === 'apikey' ? auth.apikey?.rbac_id : undefined
 
     await drizzle.transaction(async (tx) => {
       apikeyData = await createApiKeyRecord(tx, {
@@ -189,8 +170,8 @@ app.post('/', middlewareAuth(), async (c) => {
           tx as unknown as ReturnType<typeof getDrizzleClient>,
           bindingParams,
           auth.userId,
-          'jwt',
-          callerPrincipalId,
+          bindingAuthType,
+          bindingAuthType === 'apikey' && callerApikeyRbacId ? callerApikeyRbacId : callerPrincipalId,
         )
 
         if (!result.ok) {
