@@ -29,10 +29,11 @@ async function presentActionSheetOpen(url: string) {
 }
 export function openBlank(link: string) {
   console.log('openBlank', link)
-  if (Capacitor.getPlatform() === 'ios')
+  if (Capacitor.getPlatform() === 'ios') {
     presentActionSheetOpen(link)
-  else
-    window.open(link, '_blank')
+    return true
+  }
+  return Boolean(window.open(link, '_blank'))
 }
 export async function openPortal(orgId: string, t: ComposerTranslation) {
   let url = ''
@@ -102,7 +103,7 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
   const supabase = useSupabase()
   const session = await supabase.auth.getSession()
   if (!session)
-    return
+    return false
   const datafastAttribution = await getDatafastAttribution()
   try {
     const resp = await supabase.functions.invoke('private/stripe_checkout', {
@@ -118,11 +119,13 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
       }),
     })
     if (!resp.error && resp.data?.url)
-      openBlank(resp.data.url)
+      return openBlank(resp.data.url)
+    return false
   }
   catch (error) {
     console.error(error)
     toast.error('Cannot get your checkout')
+    return false
   }
 }
 
