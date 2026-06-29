@@ -296,14 +296,14 @@ test.describe('API Key Management', () => {
 
     await createRbacApiKey(page, keyName)
 
-    const keyRow = page.locator('tr', { hasText: keyName })
-    await expect(keyRow).toHaveCount(1)
+    const keyCell = page.getByText(keyName, { exact: true })
+    await expect(keyCell).toBeVisible()
+    const keyRow = keyCell.locator('xpath=ancestor::tr[1]')
 
     await keyRow.locator('[data-test^="delete-key-"]').click()
     await page.getByRole('button', { name: 'Delete' }).click()
 
-    const toast = page.locator('[data-test="toast"]')
-    await expect(toast).toContainText('API key has been successfully deleted')
-    await expect(page.locator('tr', { hasText: keyName })).toHaveCount(0)
+    await expect(page.getByText('API key has been successfully deleted', { exact: true })).toBeVisible()
+    await expect(page.getByText(keyName, { exact: true })).toHaveCount(0)
   })
 })

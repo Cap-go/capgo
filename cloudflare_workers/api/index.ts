@@ -40,6 +40,7 @@ import { app as bundle } from '../../supabase/functions/_backend/public/bundle/i
 import { app as channel } from '../../supabase/functions/_backend/public/channel/index.ts'
 import { app as check_cpu_usage } from '../../supabase/functions/_backend/public/check_cpu_usage.ts'
 import { app as device } from '../../supabase/functions/_backend/public/device/index.ts'
+import { app as notifications } from '../../supabase/functions/_backend/public/notifications/index.ts'
 import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
 import { app as pluginRegions } from '../../supabase/functions/_backend/public/plugin_regions.ts'
 import { app as organization } from '../../supabase/functions/_backend/public/organization/index.ts'
@@ -76,6 +77,7 @@ import { app as stripe_event } from '../../supabase/functions/_backend/triggers/
 import { app as webhook_delivery } from '../../supabase/functions/_backend/triggers/webhook_delivery.ts'
 import { app as webhook_dispatcher } from '../../supabase/functions/_backend/triggers/webhook_dispatcher.ts'
 import { createAllCatch, createHono } from '../../supabase/functions/_backend/utils/hono.ts'
+import { processNativeNotificationQueueBatch } from '../../supabase/functions/_backend/utils/nativeNotificationSender.ts'
 import { version } from '../../supabase/functions/_backend/utils/version.ts'
 
 // Public API
@@ -87,6 +89,7 @@ app.route('/bundle', bundle)
 app.route('/channel', channel)
 app.route('/device', device)
 app.route('/organization', organization)
+app.route('/notifications', notifications)
 app.route('/statistics', statistics)
 app.route('/webhooks', webhooks)
 app.route('/app', appEndpoint)
@@ -186,4 +189,5 @@ createAllCatch(appTriggers, functionNameTriggers)
 
 export default {
   fetch: app.fetch,
+  queue: processNativeNotificationQueueBatch,
 }

@@ -62,6 +62,14 @@
         {
           "binding": "DEVICE_INFO",
           "dataset": "device_info"
+        },
+        {
+          "binding": "NOTIFICATION_REGISTRY",
+          "dataset": "notification_registry"
+        },
+        {
+          "binding": "NOTIFICATION_EVENTS",
+          "dataset": "notification_events"
         }
       ],
       "d1_databases": [
@@ -71,6 +79,24 @@
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
       ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "NOTIFICATION_QUEUE",
+            "queue": "capgo-native-notifications-prod"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "capgo-native-notifications-prod",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_concurrency": 2,
+            "max_retries": 5,
+            "dead_letter_queue": "capgo-native-notifications-prod-dlq"
+          }
+        ]
+      },
       "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }],
       "hyperdrive": [
         {
@@ -124,6 +150,14 @@
         {
           "binding": "DEVICE_INFO",
           "dataset": "device_info"
+        },
+        {
+          "binding": "NOTIFICATION_REGISTRY",
+          "dataset": "notification_registry"
+        },
+        {
+          "binding": "NOTIFICATION_EVENTS",
+          "dataset": "notification_events"
         }
       ],
       "d1_databases": [
@@ -133,6 +167,24 @@
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
       ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "NOTIFICATION_QUEUE",
+            "queue": "capgo-native-notifications-preprod"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "capgo-native-notifications-preprod",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_concurrency": 2,
+            "max_retries": 5,
+            "dead_letter_queue": "capgo-native-notifications-preprod-dlq"
+          }
+        ]
+      },
       "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "9c405a5248604951a2a12125799bc21b" }],
       "hyperdrive": [
         {
@@ -186,6 +238,14 @@
         {
           "binding": "DEVICE_INFO",
           "dataset": "device_info_alpha"
+        },
+        {
+          "binding": "NOTIFICATION_REGISTRY",
+          "dataset": "notification_registry_alpha"
+        },
+        {
+          "binding": "NOTIFICATION_EVENTS",
+          "dataset": "notification_events_alpha"
         }
       ],
       "d1_databases": [
@@ -195,6 +255,24 @@
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
       ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "NOTIFICATION_QUEUE",
+            "queue": "capgo-native-notifications-alpha"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "capgo-native-notifications-alpha",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_concurrency": 2,
+            "max_retries": 5,
+            "dead_letter_queue": "capgo-native-notifications-alpha-dlq"
+          }
+        ]
+      },
       "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "16a85350d8a246ff857a645c8f51d6ae" }],
       "hyperdrive": [
         {
