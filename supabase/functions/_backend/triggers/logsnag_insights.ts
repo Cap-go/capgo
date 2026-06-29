@@ -6,7 +6,7 @@ import { sql } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 
 import { getLastMonthAnalyticsWindowStart, getPluginBreakdownCF, readActiveAppsCF, readLastMonthDevicesByPlatformCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
-import { GLOBAL_STATS_SHARDS, REQUIRED_GLOBAL_STATS_SHARDS } from '../utils/global_stats.ts'
+import { GLOBAL_STATS_SHARDS, REQUIRED_GLOBAL_STATS_SHARDS, USAGE_GLOBAL_STATS_SHARDS } from '../utils/global_stats.ts'
 import { BRES, middlewareAPISecret, quickError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { logsnagInsights } from '../utils/logsnag.ts'
@@ -1391,23 +1391,6 @@ async function ensureGlobalStatsSnapshotRow(c: Context, dateId: string): Promise
   }
 }
 
-async function resetGlobalStatsCompletedShards(c: Context, dateId: string): Promise<void> {
-  const db = getPgClient(c)
-
-  try {
-    const result = await db.query(
-      `UPDATE public.global_stats
-      SET completed_shards = '[]'::jsonb
-      WHERE date_id = $1`,
-      [dateId],
-    )
-    if (result.rowCount !== 1)
-      throw new Error(`Expected one global_stats row for ${dateId}, reset ${result.rowCount ?? 0}`)
-  }
-  finally {
-    await closeClient(c, db)
-  }
-}
 
 async function updateGlobalStatsSnapshot(c: Context, dateId: string, patch: GlobalStatsSnapshotPatch): Promise<void> {
   await ensureGlobalStatsSnapshotRow(c, dateId)
@@ -1702,20 +1685,19 @@ async function queueLogsnagInsightsShard(c: Context, shard: GlobalStatsShard, da
   }
 }
 
-async function queueMissingLogsnagInsightsShards(
+async function queueLogsnagInsightsShards(
   c: Context,
   dateId: string,
-  completedShards: ReadonlySet<GlobalStatsCompletionMarker>,
+  shards: readonly GlobalStatsShard[],
 ): Promise<Array<{ shard: GlobalStatsShard, msgId: number, delaySeconds: number }>> {
-  const missingShards = getMissingGlobalStatsShards(completedShards)
-  if (missingShards.length === 0)
+  if (shards.length === 0)
     return []
 
   const db = getPgClient(c)
   const queued: Array<{ shard: GlobalStatsShard, msgId: number, delaySeconds: number }> = []
 
   try {
-    for (const shard of missingShards) {
+    for (const shard of shards) {
       const delaySeconds = getLogsnagInsightsShardDelaySeconds(shard)
       const msgId = await queueLogsnagInsightsMessage(db, buildLogsnagInsightsShardMessage(shard, dateId), delaySeconds)
       queued.push({ shard, msgId, delaySeconds })
@@ -1728,35 +1710,79 @@ async function queueMissingLogsnagInsightsShards(
   return queued
 }
 
-async function dispatchMissingLogsnagInsightsShards(c: Context, dateId: string): Promise<void> {
+async function queueMissingLogsnagInsightsShards(
+  c: Context,
+  dateId: string,
+  completedShards: ReadonlySet<GlobalStatsCompletionMarker>,
+  candidateShards: readonly GlobalStatsShard[] = GLOBAL_STATS_SHARDS,
+): Promise<Array<{ shard: GlobalStatsShard, msgId: number, delaySeconds: number }>> {
+  const missingShards = candidateShards.filter(shard => !completedShards.has(shard))
+  return queueLogsnagInsightsShards(c, dateId, missingShards)
+}
+
+async function dispatchMissingLogsnagInsightsShardsFor(
+  c: Context,
+  dateId: string,
+  candidateShards: readonly GlobalStatsShard[],
+  noMissingMessage: string,
+  queuedMessage: string,
+): Promise<void> {
   await ensureGlobalStatsSnapshotRow(c, dateId)
   const completedShards = await readCompletedGlobalStatsShards(c, dateId)
-  const queued = await queueMissingLogsnagInsightsShards(c, dateId, completedShards)
+  const queued = await queueMissingLogsnagInsightsShards(c, dateId, completedShards, candidateShards)
+  const completedShardNames = Array.from(completedShards).sort((a, b) => a.localeCompare(b))
+
   if (queued.length === 0) {
     cloudlog({
       requestId: c.get('requestId'),
-      message: 'No missing logsnag insights global stats shards to queue',
+      message: noMissingMessage,
       dateId,
-      completedShards: Array.from(completedShards).sort((a, b) => a.localeCompare(b)),
+      completedShards: completedShardNames,
     })
     return
   }
 
   cloudlog({
     requestId: c.get('requestId'),
-    message: 'Queued missing logsnag insights global stats shards',
+    message: queuedMessage,
     dateId,
     queued,
-    completedShards: Array.from(completedShards).sort((a, b) => a.localeCompare(b)),
+    completedShards: completedShardNames,
   })
+}
+
+async function dispatchMissingLogsnagInsightsShards(c: Context, dateId: string): Promise<void> {
+  await dispatchMissingLogsnagInsightsShardsFor(
+    c,
+    dateId,
+    GLOBAL_STATS_SHARDS,
+    'No missing logsnag insights global stats shards to queue',
+    'Queued missing logsnag insights global stats shards',
+  )
+}
+
+async function dispatchMissingLogsnagInsightsUsageShards(c: Context, dateId: string): Promise<void> {
+  await dispatchMissingLogsnagInsightsShardsFor(
+    c,
+    dateId,
+    USAGE_GLOBAL_STATS_SHARDS,
+    'No missing logsnag insights usage shards to queue',
+    'Queued missing logsnag insights usage shards',
+  )
 }
 
 async function dispatchLogsnagInsightsShards(c: Context, dateId: string): Promise<void> {
   await ensureGlobalStatsSnapshotRow(c, dateId)
-  await resetGlobalStatsCompletedShards(c, dateId)
-  const queued = await queueMissingLogsnagInsightsShards(c, dateId, new Set())
+  const completedShards = await readCompletedGlobalStatsShards(c, dateId)
+  const queued = await queueMissingLogsnagInsightsShards(c, dateId, completedShards)
 
-  cloudlog({ requestId: c.get('requestId'), message: 'Queued logsnag insights global stats shards', dateId, queued })
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Queued logsnag insights global stats shards',
+    dateId,
+    queued,
+    completedShards: Array.from(completedShards).sort((a, b) => a.localeCompare(b)),
+  })
 }
 async function getBillingSnapshotCounts(c: Context, snapshotExclusiveEnd: Date): Promise<BillingSnapshotCounts> {
   const pgClient = getPgClient(c, false)
@@ -2186,50 +2212,61 @@ async function getBundleStorageGb(c: Context): Promise<number> {
   return Number.isFinite(gigabytes) ? Number(gigabytes.toFixed(2)) : 0
 }
 
-async function runUsageGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
-  const metricWindow = getMetricWindowFromDailyWindow(window)
-  const dayStartIso = metricWindow.dayStart.toISOString()
-  const nextDayStartIso = metricWindow.nextDayStart.toISOString()
-  const currentUsageMetricsPromise = (async () => {
-    const [bundleStorageGb, successRate] = await Promise.all([
-      getBundleStorageGb(c),
-      (async () => {
-        const res = await getUpdateStats(c)
-        cloudlog({ requestId: c.get('requestId'), message: 'success_rate', successRate: res.total.success_rate })
-        return res.total.success_rate
-      })(),
-    ])
-    return { bundleStorageGb, successRate }
-  })()
-  const [
-    updatesLastMonth,
-    devicesLastMonth,
-    devicesByPlatform,
-    registersToday,
-    currentUsageMetrics,
-    demoAppsCreated,
-  ] = await Promise.all([
-    readLastMonthUpdatesCF(c, window.prevDayEnd),
-    readLastMonthDevicesCF(c, window.prevDayEnd),
-    readLastMonthDevicesByPlatformCF(c, window.prevDayEnd),
-    getRegistersToday(c, dayStartIso, nextDayStartIso),
-    currentUsageMetricsPromise,
-    countDemoSeededApps(c, dayStartIso, nextDayStartIso),
-  ])
+async function updateUsageGlobalStatsSnapshot(
+  c: Context,
+  window: DailyWindow,
+  message: string,
+  patch: GlobalStatsSnapshotPatch,
+  logContext: Record<string, unknown>,
+): Promise<void> {
+  await updateGlobalStatsSnapshot(c, window.prevDayDateId, patch)
+  cloudlog({
+    requestId: c.get('requestId'),
+    message,
+    dateId: window.prevDayDateId,
+    ...logContext,
+  })
+}
 
-  const snapshotPatch: GlobalStatsSnapshotPatch = {
-    demo_apps_created: demoAppsCreated,
-    devices_last_month: devicesLastMonth,
+async function runUsageUpdatesGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
+  const updatesLastMonth = await readLastMonthUpdatesCF(c, window.prevDayEnd)
+  await updateUsageGlobalStatsSnapshot(c, window, 'Updated global stats usage updates shard', { updates_last_month: updatesLastMonth }, { updatesLastMonth })
+}
+
+async function runUsageDevicesGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
+  const devicesLastMonth = await readLastMonthDevicesCF(c, window.prevDayEnd)
+  await updateUsageGlobalStatsSnapshot(c, window, 'Updated global stats usage devices shard', { devices_last_month: devicesLastMonth }, { devicesLastMonth })
+}
+
+async function runUsageDevicePlatformsGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
+  const devicesByPlatform = await readLastMonthDevicesByPlatformCF(c, window.prevDayEnd)
+  await updateUsageGlobalStatsSnapshot(c, window, 'Updated global stats usage device platforms shard', {
     devices_last_month_android: devicesByPlatform.android,
     devices_last_month_ios: devicesByPlatform.ios,
-    registers_today: registersToday,
-    updates_last_month: updatesLastMonth,
-    bundle_storage_gb: currentUsageMetrics.bundleStorageGb,
-    success_rate: currentUsageMetrics.successRate,
-  }
+  }, { devicesByPlatform })
+}
 
-  await updateGlobalStatsSnapshot(c, window.prevDayDateId, snapshotPatch)
-  cloudlog({ requestId: c.get('requestId'), message: 'Updated global stats usage shard', dateId: window.prevDayDateId, updatesLastMonth, devicesLastMonth, registersToday })
+async function runUsageRegistrationsGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
+  const metricWindow = getMetricWindowFromDailyWindow(window)
+  const registersToday = await getRegistersToday(c, metricWindow.dayStart.toISOString(), metricWindow.nextDayStart.toISOString())
+  await updateUsageGlobalStatsSnapshot(c, window, 'Updated global stats usage registrations shard', { registers_today: registersToday }, { registersToday })
+}
+
+async function runUsageStorageGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
+  const bundleStorageGb = await getBundleStorageGb(c)
+  await updateUsageGlobalStatsSnapshot(c, window, 'Updated global stats usage storage shard', { bundle_storage_gb: bundleStorageGb }, { bundleStorageGb })
+}
+
+async function runUsageSuccessRateGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
+  const res = await getUpdateStats(c)
+  const successRate = res.total.success_rate
+  await updateUsageGlobalStatsSnapshot(c, window, 'Updated global stats usage success rate shard', { success_rate: successRate }, { successRate })
+}
+
+async function runUsageDemoAppsGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
+  const metricWindow = getMetricWindowFromDailyWindow(window)
+  const demoAppsCreated = await countDemoSeededApps(c, metricWindow.dayStart.toISOString(), metricWindow.nextDayStart.toISOString())
+  await updateUsageGlobalStatsSnapshot(c, window, 'Updated global stats usage demo apps shard', { demo_apps_created: demoAppsCreated }, { demoAppsCreated })
 }
 
 async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
@@ -2696,6 +2733,7 @@ export const logsnagInsightsTestUtils = {
   readLogsnagInsightsPayload,
   REVENUE_ACTIVE_STRIPE_STATUSES,
   LOGSNAG_INSIGHTS_BACKGROUND_MAX_RETRIES,
+  USAGE_GLOBAL_STATS_SHARDS,
   calculatePastDueOrgStats,
   calculateSubscriptionAccessSnapshotCounts,
   isActiveCanceledAtSnapshot,
@@ -2752,8 +2790,32 @@ async function runLogsnagInsightsShard(c: Context, shard: GlobalStatsShard, date
       await runCoreGlobalStatsShard(c, window)
       await markGlobalStatsShardComplete(c, dateId, shard)
       return
-    case 'usage':
-      await runUsageGlobalStatsShard(c, window)
+    case 'usage_updates':
+      await runUsageUpdatesGlobalStatsShard(c, window)
+      await markGlobalStatsShardComplete(c, dateId, shard)
+      return
+    case 'usage_devices':
+      await runUsageDevicesGlobalStatsShard(c, window)
+      await markGlobalStatsShardComplete(c, dateId, shard)
+      return
+    case 'usage_device_platforms':
+      await runUsageDevicePlatformsGlobalStatsShard(c, window)
+      await markGlobalStatsShardComplete(c, dateId, shard)
+      return
+    case 'usage_registrations':
+      await runUsageRegistrationsGlobalStatsShard(c, window)
+      await markGlobalStatsShardComplete(c, dateId, shard)
+      return
+    case 'usage_storage':
+      await runUsageStorageGlobalStatsShard(c, window)
+      await markGlobalStatsShardComplete(c, dateId, shard)
+      return
+    case 'usage_success_rate':
+      await runUsageSuccessRateGlobalStatsShard(c, window)
+      await markGlobalStatsShardComplete(c, dateId, shard)
+      return
+    case 'usage_demo_apps':
+      await runUsageDemoAppsGlobalStatsShard(c, window)
       await markGlobalStatsShardComplete(c, dateId, shard)
       return
     case 'revenue':
@@ -2881,9 +2943,24 @@ function createLogsnagInsightsShardApp(shard: GlobalStatsShard): Hono<Middleware
   return shardApp
 }
 
+export const logsnagInsightsLegacyUsageApp = new Hono<MiddlewareKeyVariables>()
+
+logsnagInsightsLegacyUsageApp.post('/', middlewareAPISecret, async (c) => {
+  const payload = await readLogsnagInsightsPayload(c)
+  const snapshotDateId = resolveLogsnagInsightsSnapshotDateId(payload)
+  await dispatchMissingLogsnagInsightsUsageShards(c, snapshotDateId)
+  return c.json(BRES, 202)
+})
+
 export const logsnagInsightsShardApps: Record<GlobalStatsShard, Hono<MiddlewareKeyVariables>> = {
   core: createLogsnagInsightsShardApp('core'),
-  usage: createLogsnagInsightsShardApp('usage'),
+  usage_updates: createLogsnagInsightsShardApp('usage_updates'),
+  usage_devices: createLogsnagInsightsShardApp('usage_devices'),
+  usage_device_platforms: createLogsnagInsightsShardApp('usage_device_platforms'),
+  usage_registrations: createLogsnagInsightsShardApp('usage_registrations'),
+  usage_storage: createLogsnagInsightsShardApp('usage_storage'),
+  usage_success_rate: createLogsnagInsightsShardApp('usage_success_rate'),
+  usage_demo_apps: createLogsnagInsightsShardApp('usage_demo_apps'),
   revenue: createLogsnagInsightsShardApp('revenue'),
   plugins: createLogsnagInsightsShardApp('plugins'),
   builds: createLogsnagInsightsShardApp('builds'),
