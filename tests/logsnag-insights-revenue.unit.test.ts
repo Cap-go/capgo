@@ -78,7 +78,7 @@ describe('logsnag revenue metric helpers', () => {
   it.concurrent('detects missing global stats shards before notifications', () => {
     expect(logsnagInsightsTestUtils.getMissingGlobalStatsRequiredShards(new Set())).toEqual([
       'core',
-      'usage',
+      ...logsnagInsightsTestUtils.USAGE_GLOBAL_STATS_SHARDS,
       'revenue',
       'plugins',
       'builds',
@@ -89,7 +89,7 @@ describe('logsnag revenue metric helpers', () => {
 
     const completed = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
       'core',
-      'usage',
+      ...logsnagInsightsTestUtils.USAGE_GLOBAL_STATS_SHARDS,
       'plugins',
       'builds',
       'retention',
@@ -103,7 +103,7 @@ describe('logsnag revenue metric helpers', () => {
 
     const ready = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
       'core',
-      'usage',
+      ...logsnagInsightsTestUtils.USAGE_GLOBAL_STATS_SHARDS,
       'revenue',
       'plugins',
       'builds',
@@ -113,6 +113,20 @@ describe('logsnag revenue metric helpers', () => {
     ])
     expect(logsnagInsightsTestUtils.getMissingGlobalStatsRequiredShards(ready)).toEqual([])
     expect(logsnagInsightsTestUtils.getMissingGlobalStatsShards(ready)).toEqual(['notifications'])
+
+    const legacyUsage = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
+      'core',
+      'usage',
+      'revenue',
+      'plugins',
+      'builds',
+      'retention',
+      'paid_products',
+      'ltv',
+    ])
+    expect(logsnagInsightsTestUtils.getMissingGlobalStatsRequiredShards(legacyUsage)).toEqual([
+      ...logsnagInsightsTestUtils.USAGE_GLOBAL_STATS_SHARDS,
+    ])
 
     const sent = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
       ...ready,
@@ -124,7 +138,7 @@ describe('logsnag revenue metric helpers', () => {
   it.concurrent('detects completed global stats notifications for idempotent retries', () => {
     const ready = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
       'core',
-      'usage',
+      ...logsnagInsightsTestUtils.USAGE_GLOBAL_STATS_SHARDS,
       'revenue',
       'plugins',
       'builds',
@@ -156,14 +170,14 @@ describe('logsnag revenue metric helpers', () => {
     ])
 
     expect(logsnagInsightsTestUtils.shouldSkipCompletedGlobalStatsShardRetry(completed, 'core')).toBe(true)
-    expect(logsnagInsightsTestUtils.shouldSkipCompletedGlobalStatsShardRetry(completed, 'usage')).toBe(false)
+    expect(logsnagInsightsTestUtils.shouldSkipCompletedGlobalStatsShardRetry(completed, 'usage_updates')).toBe(false)
     expect(logsnagInsightsTestUtils.shouldSkipCompletedGlobalStatsShardRetry(completed, 'notifications')).toBe(false)
   })
 
   it.concurrent('derives only missing global stats shards for partial dispatcher retries', () => {
     const partial = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
       'core',
-      'usage',
+      ...logsnagInsightsTestUtils.USAGE_GLOBAL_STATS_SHARDS,
       'revenue',
     ])
 
@@ -187,7 +201,7 @@ describe('logsnag revenue metric helpers', () => {
   it.concurrent('uses notification claim markers to avoid replaying claimed sends', () => {
     const ready = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
       'core',
-      'usage',
+      ...logsnagInsightsTestUtils.USAGE_GLOBAL_STATS_SHARDS,
       'revenue',
       'plugins',
       'builds',
@@ -490,6 +504,7 @@ describe('logsnag revenue metric helpers', () => {
 
   it.concurrent('builds shard messages as distinct queue HTTP calls', () => {
     expect(logsnagInsightsTestUtils.getLogsnagInsightsShardFunctionName('revenue')).toBe('logsnag_insights_revenue')
+    expect(logsnagInsightsTestUtils.getLogsnagInsightsShardFunctionName('usage_updates')).toBe('logsnag_insights_usage_updates')
     expect(logsnagInsightsTestUtils.buildLogsnagInsightsShardMessage('revenue', '2026-03-24')).toEqual({
       function_name: 'logsnag_insights_revenue',
       function_type: 'cloudflare',
@@ -509,6 +524,8 @@ describe('logsnag revenue metric helpers', () => {
 
   it.concurrent('normalizes global stats shard and date payloads', () => {
     expect(logsnagInsightsTestUtils.normalizeLogsnagInsightsShard('core')).toBe('core')
+    expect(logsnagInsightsTestUtils.normalizeLogsnagInsightsShard('usage_updates')).toBe('usage_updates')
+    expect(logsnagInsightsTestUtils.normalizeLogsnagInsightsShard('usage')).toBeNull()
     expect(logsnagInsightsTestUtils.normalizeLogsnagInsightsShard('bad')).toBeNull()
     expect(logsnagInsightsTestUtils.normalizeGlobalStatsDateId('2026-03-24')).toBe('2026-03-24')
     expect(logsnagInsightsTestUtils.normalizeGlobalStatsDateId('2026-02-30')).toBeNull()

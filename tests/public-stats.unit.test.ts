@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { REQUIRED_GLOBAL_STATS_SHARDS } from '../supabase/functions/_backend/utils/global_stats.ts'
 
 const mocks = vi.hoisted(() => {
   const maybeSingle = vi.fn()
@@ -68,16 +69,7 @@ describe('public stats endpoint', () => {
     })
     expect(mocks.from).toHaveBeenCalledWith('global_stats')
     expect(mocks.lte).toHaveBeenCalledWith('date_id', '2026-05-10')
-    expect(mocks.contains).toHaveBeenCalledWith('completed_shards', [
-      'core',
-      'usage',
-      'revenue',
-      'plugins',
-      'builds',
-      'retention',
-      'paid_products',
-      'ltv',
-    ])
+    expect(mocks.contains).toHaveBeenCalledWith('completed_shards', [...REQUIRED_GLOBAL_STATS_SHARDS])
     expect(mocks.order).toHaveBeenCalledWith('date_id', { ascending: false })
     expect(mocks.limit).toHaveBeenCalledWith(1)
   })
