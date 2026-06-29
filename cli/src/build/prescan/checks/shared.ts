@@ -1,7 +1,7 @@
-// src/build/prescan/checks/shared.ts
 import type { Finding, PrescanCheck, ScanContext } from '../types'
+import { createRequire } from 'node:module'
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { getPlatformDirFromCapacitorConfig } from '../../platform-paths'
 import { gradleApplicationId, readTextIfExists } from '../gradle'
 
@@ -26,6 +26,19 @@ function gradleModuleName(dep: string): string {
   return dep.replace(/^@/, '').replace(/\//g, '-')
 }
 
+
+/** Web-only Capacitor plugins (e.g. @capacitor/motion) ship JS only — cap sync never adds them to Gradle. */
+function hasNativeAndroidPlugin(projectDir: string, dep: string): boolean {
+  try {
+    const require = createRequire(join(projectDir, 'package.json'))
+    const pkgPath = require.resolve(`${dep}/package.json`)
+    return existsSync(join(dirname(pkgPath), 'android'))
+  }
+  catch {
+    return false
+  }
+}
+
 export const capSyncStale: PrescanCheck = {
   id: 'shared/cap-sync-stale',
   platforms: ['ios', 'android'],
@@ -41,9 +54,10 @@ export const capSyncStale: PrescanCheck = {
       })
       return findings
     }
-    const plugins = capacitorPluginDeps(ctx.projectDir)
+    const pluginDeps = capacitorPluginDeps(ctx.projectDir)
+    const nativeAndroidPlugins = pluginDeps.filter(dep => hasNativeAndroidPlugin(ctx.projectDir, dep))
     const platformDir = getPlatformDirFromCapacitorConfig(ctx.config, ctx.platform)
-    if (ctx.platform === 'android' && plugins.length > 0) {
+    if (ctx.platform === 'android' && nativeAndroidPlugins.length > 0) {
       const settings = readTextIfExists(join(ctx.projectDir, platformDir, 'capacitor.settings.gradle'))
       if (settings === null) {
         findings.push({
@@ -54,7 +68,7 @@ export const capSyncStale: PrescanCheck = {
         })
       }
       else {
-        const missing = plugins.filter(p => !settings.includes(`:${gradleModuleName(p)}`))
+        const missing = nativeAndroidPlugins.filter(p => !settings.includes(`:${gradleModuleName(p)}`))
         if (missing.length > 0) {
           findings.push({
             id: 'shared/cap-sync-stale',
@@ -66,7 +80,7 @@ export const capSyncStale: PrescanCheck = {
         }
       }
     }
-    if (ctx.platform === 'ios' && plugins.length > 0) {
+    if (ctx.platform === 'ios' && pluginDeps.length > 0) {
       const hasCocoaPodsSync = existsSync(join(ctx.projectDir, platformDir, 'App', 'Podfile'))
       const hasSpmSync = existsSync(join(ctx.projectDir, platformDir, 'App', 'CapApp-SPM', 'Package.swift'))
       if (!hasCocoaPodsSync && !hasSpmSync) {
