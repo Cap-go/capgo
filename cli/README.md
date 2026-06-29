@@ -1307,6 +1307,10 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | **--android-flavor** | <code>string</code> | Android: Product flavor to build (e.g. production). Required if your project has multiple flavors. |
 | **--in-app-update-priority** | <code>string</code> | Android: Google Play in-app update priority for this release (integer 0–5; higher = more urgent). See https://developer.android.com/guide/playcore/in-app-updates. Precedence: CLI > env > saved credentials |
 | **--no-playstore-upload** | <code>boolean</code> | Skip Play Store upload for this build (nulls out saved play config). Requires --output-upload. |
+| **--submit-to-store-review** | <code>boolean</code> | After upload, submit the store release for review instead of leaving it as a draft/inactive build. Android marks the Play release completed; iOS submits to TestFlight external review and requires --ios-testflight-groups. |
+| **--store-release-name** | <code>string</code> | Store release name/version label. Android sends this as the Google Play version_name. |
+| **--store-release-notes** | <code>string</code> | Store release notes. Android sends this as the Play changelog; iOS sends it as the TestFlight What to Test text. |
+| **--ios-testflight-groups** | <code>string</code> | iOS: comma-separated TestFlight external group names or IDs required with --submit-to-store-review. |
 | **--output-upload** | <code>boolean</code> | Override output upload behavior for this build only (enable). Precedence: CLI > env > saved credentials |
 | **--no-output-upload** | <code>boolean</code> | Override output upload behavior for this build only (disable). Precedence: CLI > env > saved credentials |
 | **--output-retention** | <code>string</code> | Override output link TTL for this build only (1h to 7d). Examples: 1h, 6h, 2d. Precedence: CLI > env > saved credentials |
