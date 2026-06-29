@@ -22,6 +22,7 @@ function normalizeLocalhostUrl(raw: string | undefined): string {
 const SUPABASE_URL = normalizeLocalhostUrl(env.SUPABASE_URL)
 const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY as string
 const SUPABASE_SERVICE_KEY = (env.SUPABASE_SERVICE_KEY || env.SUPABASE_SERVICE_ROLE_KEY || env.SERVICE_ROLE_KEY) as string
+const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
 
 const keyModes: Database['public']['Enums']['key_mode'][] = ['all', 'read', 'write']
 
@@ -59,7 +60,7 @@ async function createAuthenticatedClient() {
   })
 }
 
-describe('get_identity_apikey_only RPC permissions', () => {
+describe.skipIf(USE_CLOUDFLARE)('get_identity_apikey_only RPC permissions', () => {
   it.concurrent('denies anonymous RPC access', async () => {
     const supabaseAnon = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { capgkey: APIKEY_TEST_ALL } },

@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
-import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadDevicesResponse, ReadStatsParams, StatsActions, StatsMetadata, VersionUsage } from './types.ts'
+import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadDevicesResponse, ReadStatsParams, StatsActions, StatsMetadata, VersionUsage, VersionUsageChannel } from './types.ts'
 import { getRuntimeKey } from 'hono/adapter'
 import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readDeviceVersionCountsCF, readNativeVersionUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
 import { isDemoApp } from './demo.ts'
@@ -59,12 +59,12 @@ export function createStatsBandwidth(c: Context, device_id: string, app_id: stri
 }
 
 export type VersionAction = 'get' | 'fail' | 'install' | 'uninstall'
-export function createStatsVersion(c: Context, version_name: string, app_id: string, action: VersionAction) {
+export function createStatsVersion(c: Context, version_name: string, app_id: string, action: VersionAction, channel?: VersionUsageChannel | string | null) {
   if (isInternalVersionName(version_name))
     return Promise.resolve()
   if (!c.env.VERSION_USAGE)
-    return backgroundTask(c, trackVersionUsageSB(c, version_name, app_id, action))
-  return trackVersionUsageCF(c, version_name, app_id, action)
+    return backgroundTask(c, trackVersionUsageSB(c, version_name, app_id, action, channel))
+  return trackVersionUsageCF(c, version_name, app_id, action, channel)
 }
 
 export function normalizeStatsMetadata(metadata?: StatsMetadata): StatsMetadata | undefined {
@@ -151,10 +151,10 @@ export function readStatsStorage(c: Context, app_id: string, start_date: string,
   return readStatsStorageSB(c, app_id, start_date, end_date)
 }
 
-export function readStatsVersion(c: Context, app_id: string, start_date: string, end_date: string): Promise<VersionUsage[]> {
+export function readStatsVersion(c: Context, app_id: string, start_date: string, end_date: string, channel?: VersionUsageChannel | string): Promise<VersionUsage[]> {
   if (!c.env.VERSION_USAGE)
-    return readStatsVersionSB(c, app_id, start_date, end_date)
-  return readStatsVersionCF(c, app_id, start_date, end_date)
+    return readStatsVersionSB(c, app_id, start_date, end_date, channel)
+  return readStatsVersionCF(c, app_id, start_date, end_date, channel)
 }
 
 export function readNativeVersionUsage(c: Context, app_id: string, start_date: string, end_date: string, supabase: SupabaseClient<Database>): Promise<NativeVersionUsage[]> {
@@ -264,7 +264,7 @@ async function generateDemoLogs(c: Context, params: ReadStatsParams): Promise<De
     const device = devices[i % devices.length]
     const sequence = actionSequences[i % actionSequences.length]
     // Use the device's current version or pick from demo versions
-    const versionName = (device.version as any)?.name || demoVersions[Math.floor(Math.random() * demoVersions.length)]
+    const versionName = (device.version as any)?.name || demoVersions[i % demoVersions.length]
 
     // Calculate base time for this sequence
     const sequenceStartTime = rangeStart + (timeSpan * i / numSequences)

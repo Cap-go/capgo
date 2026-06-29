@@ -60,6 +60,11 @@ export interface VersionUsage {
   uninstall: number
 }
 
+export interface VersionUsageChannel {
+  id?: number | null
+  name?: string | null
+}
+
 export interface NativeVersionUsage {
   date: string
   platform: string
