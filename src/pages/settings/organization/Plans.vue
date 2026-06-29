@@ -183,6 +183,31 @@ async function prefetchStripeCheckoutUrl(plan: Database['public']['Tables']['pla
   }
 }
 
+function trackPlanCheckoutStarted(plan: Database['public']['Tables']['plans']['Row'], isYear: boolean, checkoutSource: string) {
+  const orgId = currentOrganization.value?.gid
+  if (!orgId || !plan.stripe_id)
+    return
+
+  sendEvent({
+    channel: 'usage',
+    event: 'Checkout Started',
+    icon: '💳',
+    org_id: orgId,
+    tracking_version: 2,
+    notify: false,
+    tags: {
+      product_id: plan.stripe_id,
+      plan_name: plan.name,
+      recurrence: isYear ? 'year' : 'month',
+      checkout_source: checkoutSource,
+      current_plan_name: currentPlan.value?.name ?? '',
+      plan_price: isYear ? plan.price_y : plan.price_m,
+      plan_price_monthly: plan.price_m,
+      plan_price_yearly: plan.price_y,
+    },
+  }).catch()
+}
+
 async function openSafariStripeCheckout(plan: Database['public']['Tables']['plans']['Row'], isYear: boolean) {
   const url = await prefetchStripeCheckoutUrl(plan, isYear)
   if (!url) {
@@ -205,6 +230,7 @@ async function openSafariStripeCheckout(plan: Database['public']['Tables']['plan
         href: url,
         target: '_blank',
         rel: 'noopener noreferrer',
+        handler: () => trackPlanCheckoutStarted(plan, isYear, 'safari_confirm'),
       },
     ],
   })
@@ -224,15 +250,18 @@ async function openChangePlan(plan: Database['public']['Tables']['plans']['Row']
   // get the current url
   isSubscribeLoading.value[index] = true
   if (plan.stripe_id) {
+    const checkoutIsYearly = plan.price_y === plan.price_m ? false : isYearly.value
     if (isSafariBrowser()) {
-      const shouldContinue = await openSafariStripeCheckout(plan, plan.price_y !== plan.price_m ? isYearly.value : false)
+      const shouldContinue = await openSafariStripeCheckout(plan, checkoutIsYearly)
       if (!shouldContinue) {
         isSubscribeLoading.value[index] = false
         return
       }
     }
     else {
-      await openCheckout(plan.stripe_id, `${window.location.href}?success=1`, `${window.location.href}?cancel=1`, plan.price_y !== plan.price_m ? isYearly.value : false, currentOrganization?.value?.gid ?? '')
+      const didOpenCheckout = await openCheckout(plan.stripe_id, `${globalThis.location.href}?success=1`, `${globalThis.location.href}?cancel=1`, checkoutIsYearly, currentOrganization?.value?.gid ?? '')
+      if (didOpenCheckout)
+        trackPlanCheckoutStarted(plan, checkoutIsYearly, 'direct')
     }
   }
   isSubscribeLoading.value[index] = false

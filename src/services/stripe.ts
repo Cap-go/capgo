@@ -29,10 +29,11 @@ async function presentActionSheetOpen(url: string) {
 }
 export function openBlank(link: string) {
   console.log('openBlank', link)
-  if (Capacitor.getPlatform() === 'ios')
+  if (Capacitor.getPlatform() === 'ios') {
     presentActionSheetOpen(link)
-  else
-    window.open(link, '_blank')
+    return true
+  }
+  return Boolean(globalThis.open(link, '_blank'))
 }
 export async function openPortal(orgId: string, t: ComposerTranslation) {
   let url = ''
@@ -46,7 +47,7 @@ export async function openPortal(orgId: string, t: ComposerTranslation) {
   // datafast_visitor_id
 
   const prem = supabase.functions.invoke('private/stripe_portal', {
-    body: JSON.stringify({ callbackUrl: window.location.href, orgId }),
+    body: JSON.stringify({ callbackUrl: globalThis.location.href, orgId }),
   }).then(({ data }) => {
     if (data?.url) {
       url = data.url
@@ -102,7 +103,7 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
   const supabase = useSupabase()
   const session = await supabase.auth.getSession()
   if (!session)
-    return
+    return false
   const datafastAttribution = await getDatafastAttribution()
   try {
     const resp = await supabase.functions.invoke('private/stripe_checkout', {
@@ -118,11 +119,13 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
       }),
     })
     if (!resp.error && resp.data?.url)
-      openBlank(resp.data.url)
+      return openBlank(resp.data.url)
+    return false
   }
   catch (error) {
     console.error(error)
     toast.error('Cannot get your checkout')
+    return false
   }
 }
 
@@ -144,7 +147,7 @@ export async function startCreditTopUp(orgId: string, quantity = 100) {
       console.error('Failed to start credit top-up', error ?? data)
       throw error ?? new Error('Missing checkout URL')
     }
-    window.location.href = data.url
+    globalThis.location.href = data.url
   }
   catch (error) {
     console.error('Cannot start credit top-up checkout', error)
