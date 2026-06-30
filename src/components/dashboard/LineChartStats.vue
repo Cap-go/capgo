@@ -496,8 +496,8 @@ const barPlugins = sharedPlugins as unknown as Plugin<'bar'>[]
       <Line v-if="accumulated" :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="linePlugins" />
       <Bar v-else :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="barPlugins" />
     </div>
-    <ul v-if="legendItems.length" class="mt-3 max-h-24 shrink-0 space-y-2 overflow-y-auto pr-1 [scrollbar-gutter:stable]">
-      <li v-for="item in legendItems" :key="item.id" class="flex min-w-0 items-center gap-2 text-sm text-slate-700 dark:text-white">
+    <ul v-if="legendItems.length" class="mt-3 flex max-w-full shrink-0 gap-4 overflow-x-auto overflow-y-hidden whitespace-nowrap pb-1 pr-1 [scrollbar-gutter:stable]">
+      <li v-for="item in legendItems" :key="item.id" class="flex shrink-0 items-center gap-2 text-sm text-slate-700 dark:text-white">
         <span
           class="h-3 w-9 shrink-0 rounded-sm border"
           :style="{ backgroundColor: item.backgroundColor, borderColor: item.borderColor }"
