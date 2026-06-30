@@ -8,11 +8,12 @@ import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { appIdSchema, cursorSchema, deviceIdSchema, hasInvalidQueryLimitInput, hasUnsafeDevicesQueryText, queryLimitSchema, safeQueryTextSchema } from '../utils/privateAnalyticsValidation.ts'
 import { checkPermission } from '../utils/rbac.ts'
-import { countDevices, readDevices } from '../utils/stats.ts'
+import { countDevices, countInstallSources, readDevices } from '../utils/stats.ts'
 
 interface DataDevice {
   appId: string
   count?: boolean
+  installSourceCounts?: boolean
   versionName?: string
   devicesId?: string[]
   deviceIds?: string[] // TODO: remove when migration is done
@@ -30,10 +31,10 @@ const orderItemSchema = type({
   'key': 'string <= 64',
   'sortable?': literalUnion(['asc', 'desc']),
 })
-
 const devicesBodySchema = type({
   'appId': appIdSchema,
   'count?': 'boolean',
+  'installSourceCounts?': 'boolean',
   'versionName?': safeQueryTextSchema,
   'devicesId?': deviceIdSchema.array(),
   'deviceIds?': deviceIdSchema.array(),
@@ -65,9 +66,12 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   if (!(await checkPermission(c, 'app.read_devices', { appId: body.appId }))) {
     throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.appId })
   }
+
   const devicesIds = body.devicesId ?? body.deviceIds ?? []
+  if (body.installSourceCounts)
+    return c.json({ installSources: await countInstallSources(c, body.appId) })
   if (body.count)
-    return c.json({ count: await countDevices(c, body.appId, body.customIdMode ?? false, devicesIds, body.versionName, body.search?.trim(), body.installSources) })
+    return c.json({ count: await countDevices(c, body.appId, body.customIdMode ?? false, devicesIds, body.versionName, body.search?.trim()) })
   return c.json(await readDevices(c, {
     app_id: body.appId,
     version_name: body.versionName,

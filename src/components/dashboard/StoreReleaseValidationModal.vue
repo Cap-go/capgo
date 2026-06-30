@@ -23,8 +23,11 @@ const TRACK_UNKNOWN_INSTALL_SOURCES = ['google_play', 'amazon_appstore', 'samsun
 const REMINDER_EVENT = 'store-release-validation-needed'
 const DOWNLOAD_PLATFORMS = ['ios', 'android', 'electron'] as const
 const DEVICE_COUNT_RETRY_MS = 30_000
+const INSTALL_SOURCE_COUNTS_CACHE_MS = 1000 * 60 * 60 * 24 * 30
+const INSTALL_SOURCE_COUNTS_CACHE_PREFIX = 'capgo-store-release-install-source-counts'
 
 type DownloadPlatform = typeof DOWNLOAD_PLATFORMS[number]
+type InstallSourceCounts = Record<string, number>
 type ChannelRow = Database['public']['Tables']['channels']['Row']
 type ReleaseChannelKey = 'allow_dev' | 'allow_device' | 'allow_emulator' | 'allow_prod' | 'android' | 'app_id' | 'electron' | 'id' | 'ios' | 'name' | 'public'
 type ReleaseChannel = Pick<ChannelRow, ReleaseChannelKey>
@@ -91,11 +94,49 @@ function scheduleStatusRetry(appId: string, requestId: number) {
   }, DEVICE_COUNT_RETRY_MS)
 }
 
-async function countDevicesByInstallSource(appId: string, installSources: string[]) {
+function getInstallSourceCountsCacheKey(appId: string) {
+  return `${INSTALL_SOURCE_COUNTS_CACHE_PREFIX}:${appId}`
+}
+
+function readCachedInstallSourceCounts(appId: string): InstallSourceCounts | null {
+  if (typeof localStorage === 'undefined')
+    return null
+
+  const raw = localStorage.getItem(getInstallSourceCountsCacheKey(appId))
+  if (!raw)
+    return null
+
+  try {
+    const cached = JSON.parse(raw) as { expiresAt?: number, counts?: InstallSourceCounts }
+    if (!cached.expiresAt || cached.expiresAt <= Date.now() || !cached.counts)
+      return null
+    return cached.counts
+  }
+  catch {
+    localStorage.removeItem(getInstallSourceCountsCacheKey(appId))
+    return null
+  }
+}
+
+function writeCachedInstallSourceCounts(appId: string, counts: InstallSourceCounts) {
+  if (typeof localStorage === 'undefined')
+    return
+
+  localStorage.setItem(getInstallSourceCountsCacheKey(appId), JSON.stringify({
+    expiresAt: Date.now() + INSTALL_SOURCE_COUNTS_CACHE_MS,
+    counts,
+  }))
+}
+
+async function getInstallSourceCounts(appId: string) {
+  const cached = readCachedInstallSourceCounts(appId)
+  if (cached)
+    return cached
+
   const { data: currentSession } = await supabase.auth.getSession()
   const currentJwt = currentSession.session?.access_token
   if (!currentJwt)
-    throw new Error('Cannot count devices by install source without a session')
+    throw new Error('Cannot count install sources without a session')
 
   const response = await fetch(`${defaultApiHost}/private/devices`, {
     method: 'POST',
@@ -104,17 +145,22 @@ async function countDevicesByInstallSource(appId: string, installSources: string
       'authorization': `Bearer ${currentJwt}`,
     },
     body: JSON.stringify({
-      count: true,
+      installSourceCounts: true,
       appId,
-      installSources,
     }),
   })
 
   if (!response.ok)
-    throw new Error(`Cannot count devices by install source: ${response.status}`)
+    throw new Error(`Cannot count install sources: ${response.status}`)
 
-  const data = await response.json() as { count: number }
-  return data.count
+  const data = await response.json() as { installSources: InstallSourceCounts }
+  const counts = data.installSources ?? {}
+  writeCachedInstallSourceCounts(appId, counts)
+  return counts
+}
+
+function countInstallSources(counts: InstallSourceCounts, installSources: string[]) {
+  return installSources.reduce((total, source) => total + (counts[source] ?? 0), 0)
 }
 const shouldPrompt = computed(() => {
   return !isLoading.value && hasLiveUpdateBundle.value && !hasStoreInstalledDevice.value && !hasDeviceCountError.value && !hasDismissedPrompt.value
@@ -276,47 +322,28 @@ async function loadStatus() {
       hasTrackUnknownDevice.value = false
       return
     }
-    let releaseDeviceCount = 0
-    let testDeviceCount = 0
-    let trackUnknownDeviceCount = 0
+
+    let installSourceCounts: InstallSourceCounts
     hasDeviceCountError.value = false
     try {
-      releaseDeviceCount = await countDevicesByInstallSource(appId, RELEASE_INSTALL_SOURCES)
+      installSourceCounts = await getInstallSourceCounts(appId)
     }
     catch (error) {
       if (requestId !== loadStatusRequestId)
         return
-      console.error('Cannot count production store release validation devices', error)
+      console.error('Cannot count store release validation install sources', error)
       hasDeviceCountError.value = true
       scheduleStatusRetry(appId, requestId)
       return
     }
 
-    const [testDeviceResult, trackUnknownDeviceResult] = await Promise.allSettled([
-      countDevicesByInstallSource(appId, TEST_INSTALL_SOURCES),
-      countDevicesByInstallSource(appId, TRACK_UNKNOWN_INSTALL_SOURCES),
-    ])
-
     if (requestId !== loadStatusRequestId)
       return
-
-    if (testDeviceResult.status === 'fulfilled')
-      testDeviceCount = testDeviceResult.value
-    else
-      console.error('Cannot count TestFlight release validation devices', testDeviceResult.reason)
-
-    if (trackUnknownDeviceResult.status === 'fulfilled')
-      trackUnknownDeviceCount = trackUnknownDeviceResult.value
-    else
-      console.error('Cannot count Android store release validation devices', trackUnknownDeviceResult.reason)
 
     clearStatusRetry()
-    if (requestId !== loadStatusRequestId)
-      return
-
-    hasStoreInstalledDevice.value = releaseDeviceCount > 0
-    hasTestFlightDevice.value = testDeviceCount > 0
-    hasTrackUnknownDevice.value = trackUnknownDeviceCount > 0
+    hasStoreInstalledDevice.value = countInstallSources(installSourceCounts, RELEASE_INSTALL_SOURCES) > 0
+    hasTestFlightDevice.value = countInstallSources(installSourceCounts, TEST_INSTALL_SOURCES) > 0
+    hasTrackUnknownDevice.value = countInstallSources(installSourceCounts, TRACK_UNKNOWN_INSTALL_SOURCES) > 0
   }
   catch (error) {
     if (requestId !== loadStatusRequestId)

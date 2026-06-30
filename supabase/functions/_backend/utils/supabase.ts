@@ -1552,6 +1552,32 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
   return data ?? []
 }
 
+export async function countInstallSourcesSB(c: Context, app_id: string): Promise<Record<string, number>> {
+  const pgClient = await getPgClient(c)
+  try {
+    const result = await pgClient.query<{ install_source: string, total: string }>(`
+      SELECT install_source, COUNT(*)::text AS total
+      FROM public.devices
+      WHERE app_id = $1
+        AND install_source IS NOT NULL
+        AND install_source != ''
+      GROUP BY install_source
+    `, [app_id])
+
+    return result.rows.reduce<Record<string, number>>((acc, row) => {
+      acc[row.install_source] = Number(row.total)
+      return acc
+    }, {})
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error counting install sources', error })
+    return {}
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
+}
+
 /**
  * Count how many devices match the supplied filters so pagination totals stay accurate.
  */
@@ -1562,7 +1588,6 @@ export async function countDevicesSB(
   deviceIds: string[] = [],
   versionName?: string,
   search?: string,
-  installSources?: string[],
 ) {
   let req = supabaseAdmin(c)
     .from('devices')
@@ -1593,15 +1618,10 @@ export async function countDevicesSB(
   if (versionName)
     req = req.eq('version_name', versionName)
 
-  if (installSources?.length)
-    req = req.in('install_source', installSources)
-
   const { count, error } = await req
 
   if (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error counting devices', error })
-    if (installSources?.length)
-      throw new Error(error.message)
     return 0
   }
   return count ?? 0
