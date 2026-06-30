@@ -5,6 +5,7 @@ import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../uti
 import { cloudlog } from '../utils/logging.ts'
 import { groupIdentifyPosthog } from '../utils/posthog.ts'
 import { createStripeCustomer, finalizePendingStripeCustomer } from '../utils/supabase.ts'
+import { buildOnboardingIntentBentoEventData, parseOrgOnboardingIntent, syncOrgOnboardingIntentForOrg } from '../utils/org_onboarding_intent.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
@@ -39,13 +40,19 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c)
     },
   }))
 
+  const onboardingIntent = parseOrgOnboardingIntent(record.onboarding)
+  const onboardingBentoData = buildOnboardingIntentBentoEventData(c, onboardingIntent, {
+    id: record.id,
+    name: record.name,
+    website: record.website,
+  })
+
+  await syncOrgOnboardingIntentForOrg(c, record)
+
   await sendEventToTracking(c, {
     bento: {
       cron: '* * * * *',
-      data: {
-        org_id: record.id,
-        org_name: record.name,
-      },
+      data: onboardingBentoData,
       event: 'org:created',
       preferenceKey: 'onboarding',
       uniqId: `org:created:${record.id}`,

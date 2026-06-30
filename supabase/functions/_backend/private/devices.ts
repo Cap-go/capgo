@@ -16,6 +16,7 @@ interface DataDevice {
   versionName?: string
   devicesId?: string[]
   deviceIds?: string[] // TODO: remove when migration is done
+  installSources?: string[]
   search?: string
   customIdMode?: boolean
   order?: Order[]
@@ -36,6 +37,7 @@ const devicesBodySchema = type({
   'versionName?': safeQueryTextSchema,
   'devicesId?': deviceIdSchema.array(),
   'deviceIds?': deviceIdSchema.array(),
+  'installSources?': safeQueryTextSchema.array(),
   'search?': safeQueryTextSchema,
   'customIdMode?': 'boolean',
   'order?': orderItemSchema.array(),
@@ -65,11 +67,12 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   }
   const devicesIds = body.devicesId ?? body.deviceIds ?? []
   if (body.count)
-    return c.json({ count: await countDevices(c, body.appId, body.customIdMode ?? false, devicesIds, body.versionName, body.search?.trim()) })
+    return c.json({ count: await countDevices(c, body.appId, body.customIdMode ?? false, devicesIds, body.versionName, body.search?.trim(), body.installSources) })
   return c.json(await readDevices(c, {
     app_id: body.appId,
     version_name: body.versionName,
     deviceIds: devicesIds,
+    installSources: body.installSources,
     search: body.search,
     order: body.order,
     cursor: body.cursor,

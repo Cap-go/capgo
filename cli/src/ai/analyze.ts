@@ -26,7 +26,7 @@ export function decideAnalyzeBehavior(input: DecideInput): AnalyzeBehavior {
 // Tip printed to stderr when a build fails non-interactively and the user opted
 // into NEITHER AI analysis nor log upload — so CI users discover both options
 // instead of getting a silent failure.
-export const CI_FAILURE_TIP = 'Build failed. Tip: re-run with --ai-analytics for an AI-powered diagnosis, or --send-logs to upload the build logs to Capgo support.'
+export const CI_FAILURE_TIP = 'Build failed. Tip: re-run with --ai-analytics for an AI-powered diagnosis, or --send-logs-to-support to upload the build logs to Capgo support.'
 
 export interface CiFailureActionsInput {
   // --ai-analytics passed?

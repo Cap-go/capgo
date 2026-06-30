@@ -412,15 +412,19 @@ export async function syncStripeCustomerCountry(c: Context, customerId: string |
 
 export async function cancelSubscription(c: Context, customerId: string) {
   if (!isStripeConfigured(c))
-    return Promise.resolve()
-  const allSubscriptions = await getStripe(c).subscriptions.list({
-    customer: customerId,
-  })
-  return Promise.all(
-    allSubscriptions.data.map(sub => getStripe(c).subscriptions.cancel(sub.id)),
-  ).catch((err) => {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'cancelSubscription', error: err })
-  })
+    return
+
+  for await (const subscription of getStripe(c).subscriptions.list({ customer: customerId, status: 'all' })) {
+    if (subscription.status === 'canceled' || subscription.status === 'incomplete_expired')
+      continue
+
+    try {
+      await getStripe(c).subscriptions.cancel(subscription.id)
+    }
+    catch (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'cancelSubscription item', error, subscriptionId: subscription.id, customerId })
+    }
+  }
 }
 
 async function getStoredPlanPriceId(c: Context, planId: string, recurrence: string): Promise<string | null> {

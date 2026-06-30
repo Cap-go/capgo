@@ -7,6 +7,7 @@ import type { ChoiceOption, NextStepResult, Platform, StepKind } from './contrac
 import type { IosCarried, TailParkedState } from './session-state.js'
 import type { BuildOutputRecord } from '../../output-record.js'
 import type { TailEffectProgress, TailStep, TailStepCtx } from '../tail/flow.js'
+import { consoleWebUrl } from '../../../utils.js'
 import { buildAppIdConflictSuggestions } from '../../../init/app-conflict.js'
 import { ONBOARDING_RULES } from './contract.js'
 import { explainForState } from './explanations.js'
@@ -3780,7 +3781,7 @@ async function enterTailAfterBuild(
   rec: BuildOutputRecord,
 ): Promise<NextStepResult | null> {
   try {
-    const buildUrl = `https://capgo.app/app/${appId}/builds`
+    const buildUrl = consoleWebUrl(`/app/${appId}/builds`)
     if (platform === 'ios') {
       if (!deps.iosEffectDeps?.detectCiSecretTargets || !deps.iosEffectDeps.saveProgress)
         return null

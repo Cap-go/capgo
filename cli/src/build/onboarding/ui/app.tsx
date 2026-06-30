@@ -5199,8 +5199,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             <Text>{supportConfirmMessage}</Text>
             <Select
               options={[
-                { label: '✖  No, just run AI', value: 'no' },
                 { label: '📤  Yes, upload my logs', value: 'yes' },
+                { label: '✖  No, just run AI', value: 'no' },
               ]}
               onChange={(value) => {
                 const resolve = supportConfirmResolveRef.current

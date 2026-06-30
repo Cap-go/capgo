@@ -54,6 +54,7 @@ app.put('/:id', middlewareKey(['all', 'write']), async (c) => {
     allow_device_custom_id?: boolean
     need_onboarding?: boolean
     existing_app?: boolean
+    block_provider_infra_requests?: boolean
     ios_store_url?: string | null
     android_store_url?: string | null
   }>(c)

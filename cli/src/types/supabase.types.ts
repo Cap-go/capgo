@@ -316,6 +316,7 @@ export type Database = {
           app_id: string
           build_timeout_seconds: number
           build_timeout_updated_at: string
+          block_provider_infra_requests: boolean
           channel_device_count: number
           created_at: string | null
           default_upload_channel: string
@@ -343,6 +344,7 @@ export type Database = {
           app_id: string
           build_timeout_seconds?: number
           build_timeout_updated_at?: string
+          block_provider_infra_requests?: boolean
           channel_device_count?: number
           created_at?: string | null
           default_upload_channel?: string
@@ -370,6 +372,7 @@ export type Database = {
           app_id?: string
           build_timeout_seconds?: number
           build_timeout_updated_at?: string
+          block_provider_infra_requests?: boolean
           channel_device_count?: number
           created_at?: string | null
           default_upload_channel?: string
@@ -3814,6 +3817,7 @@ export type Database = {
           app_id: string
           build_timeout_seconds: number
           build_timeout_updated_at: string
+          block_provider_infra_requests: boolean
           channel_device_count: number
           created_at: string
           default_upload_channel: string

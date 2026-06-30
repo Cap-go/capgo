@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { trackBentoEvent } from '../../utils/bento.ts'
+import { deleteAppStatus } from '../../utils/appStatus.ts'
 import { createIfNotExistStoreInfo } from '../../utils/cloudflare.ts'
 import { lockOnboardingApp, unlockOnboardingApp } from '../../utils/demo.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
@@ -19,6 +20,7 @@ interface UpdateApp {
   allow_device_custom_id?: boolean
   need_onboarding?: boolean
   existing_app?: boolean
+  block_provider_infra_requests?: boolean
   ios_store_url?: string | null
   android_store_url?: string | null
 }
@@ -70,6 +72,7 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
           allow_device_custom_id: body.allow_device_custom_id,
           need_onboarding: body.need_onboarding,
           existing_app: body.existing_app,
+          block_provider_infra_requests: body.block_provider_infra_requests,
           ios_store_url: body.ios_store_url,
           android_store_url: body.android_store_url,
         })
@@ -86,6 +89,12 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
 
   if (dbError || !data) {
     throw simpleError('cannot_update_app', 'Cannot update app', { supabaseError: dbError })
+  }
+  try {
+    await deleteAppStatus(c, appId)
+  }
+  catch (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Failed to delete app status cache after app update', error, app_id: appId })
   }
 
   if (data.icon_url) {

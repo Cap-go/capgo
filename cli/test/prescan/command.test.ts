@@ -55,24 +55,24 @@ describe('runPrescanGate', () => {
   }
   it('returns proceed when scan disabled', async () => {
     const r = await runPrescanGate({ enabled: false }, async () => fakeReport(9, 9))
-    expect(r).toBe('proceed')
+    expect(r.decision).toBe('proceed')
   })
   it('blocks on errors', async () => {
     const r = await runPrescanGate({ enabled: true, silent: true }, async () => fakeReport(1, 0))
-    expect(r).toBe('block')
+    expect(r.decision).toBe('block')
   })
   it('proceeds on errors with ignoreFatal', async () => {
     const r = await runPrescanGate({ enabled: true, ignoreFatal: true, silent: true }, async () => fakeReport(1, 0))
-    expect(r).toBe('proceed')
+    expect(r.decision).toBe('proceed')
   })
   it('proceeds (non-interactive) on warnings', async () => {
     const r = await runPrescanGate({ enabled: true, interactive: false, silent: true }, async () => fakeReport(0, 1))
-    expect(r).toBe('proceed')
+    expect(r.decision).toBe('proceed')
   })
   it('never throws when the scan itself crashes — proceeds with a notice', async () => {
     const warned: string[] = []
     const r = await runPrescanGate({ enabled: true, warn: m => warned.push(m) }, async () => { throw new Error('scanner bug') })
-    expect(r).toBe('proceed')
+    expect(r.decision).toBe('proceed')
     expect(warned.join('\n')).toContain('scanner bug')
   })
   it('renders the report through the caller-provided print sink', async () => {
@@ -84,15 +84,32 @@ describe('runPrescanGate', () => {
   it('silent gate writes NOTHING to stdout (Ink/MCP callers own the channel)', async () => {
     const out = await captureStdout(async () => {
       const r = await runPrescanGate({ enabled: true, silent: true, interactive: false }, async () => fakeReport(2, 1))
-      expect(r).toBe('block')
+      expect(r.decision).toBe('block')
     })
     expect(out).toBe('')
   })
   it('silent gate writes NOTHING to stdout when the scan crashes', async () => {
     const out = await captureStdout(async () => {
       const r = await runPrescanGate({ enabled: true, silent: true }, async () => { throw new Error('boom') })
-      expect(r).toBe('proceed')
+      expect(r.decision).toBe('proceed')
     })
     expect(out).toBe('')
+  })
+  // The build-request gate telemetry reads result.report (counts + finding ids) and
+  // result.crashed, so lock that contract.
+  it('surfaces the report on a normal run (for telemetry)', async () => {
+    const r = await runPrescanGate({ enabled: true, silent: true, interactive: false }, async () => fakeReport(1, 2))
+    expect(r.report?.counts).toEqual({ error: 1, warning: 2, info: 0 })
+    expect(r.crashed).toBe(false)
+  })
+  it('reports null + crashed=true when the scan throws', async () => {
+    const r = await runPrescanGate({ enabled: true, silent: true }, async () => { throw new Error('boom') })
+    expect(r.report).toBeNull()
+    expect(r.crashed).toBe(true)
+  })
+  it('reports null when the gate is disabled', async () => {
+    const r = await runPrescanGate({ enabled: false }, async () => fakeReport(9, 9))
+    expect(r.report).toBeNull()
+    expect(r.crashed).toBe(false)
   })
 })
