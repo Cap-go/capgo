@@ -32,8 +32,18 @@ interface DeploymentHistoryEntry {
 }
 
 type StatsPeriodStartReason = 'requested_days' | 'current_version_release'
+const supportedPeriodDays = [1, 3, 7, 30] as const
+type StatsPeriodDays = typeof supportedPeriodDays[number]
 
-function getStatsPeriod(requestedDays: number, endDate: Date, currentVersionReleasedAt: string | null | undefined) {
+function normalizeStatsPeriodDays(days: number | undefined): StatsPeriodDays | null {
+  const requestedDays = days ?? 30
+  if (!Number.isInteger(requestedDays) || !supportedPeriodDays.includes(requestedDays as StatsPeriodDays))
+    return null
+
+  return requestedDays as StatsPeriodDays
+}
+
+function getStatsPeriod(requestedDays: StatsPeriodDays, endDate: Date, currentVersionReleasedAt: string | null | undefined) {
   const end = dayjs(endDate).utc().startOf('day')
   const requestedStart = end.subtract(requestedDays - 1, 'day')
   let start = requestedStart
@@ -157,8 +167,9 @@ app.post('/', middlewareAuth, async (c) => {
   if (!body.channel_id || !body.app_id) {
     throw simpleError('missing_params', 'channel_id and app_id are required')
   }
-
-  const days = Math.min(Math.max(body.days ?? 30, 1), 30)
+  const days = normalizeStatsPeriodDays(body.days)
+  if (!days)
+    throw simpleError('invalid_days', 'days must be one of 1, 3, 7, or 30')
 
   if (!(await checkPermission(c, 'app.read', { appId: body.app_id }))) {
     throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.app_id })
@@ -174,7 +185,7 @@ app.post('/', middlewareAuth, async (c) => {
 
     const { data: channelData, error: channelError } = await supabase
       .from('channels')
-      .select('id, name, version, updated_at, version (name, created_at)')
+      .select('id, name, version, version (name, created_at)')
       .eq('id', body.channel_id)
       .eq('app_id', body.app_id)
       .single()
@@ -225,7 +236,6 @@ app.post('/', middlewareAuth, async (c) => {
     const currentVersionCreatedAt = (channelData.version as any)?.created_at
     const currentVersionReleasedAt = currentVersionRelease?.deployed_at
       ?? (currentVersionCreatedAt ? dayjs(currentVersionCreatedAt).utc().toISOString() : null)
-      ?? (channelData.updated_at ? dayjs(channelData.updated_at).utc().toISOString() : null)
     const period = getStatsPeriod(days, endDate, currentVersionReleasedAt)
     const { labels, startDate } = period
     const usageRows = await readStatsVersion(
@@ -312,4 +322,5 @@ export const channelStatsTestUtils = {
   selectRecentChannelVersions,
   getLatestCounts,
   getStatsPeriod,
+  normalizeStatsPeriodDays,
 }

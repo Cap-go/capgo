@@ -363,7 +363,9 @@ function applyFilterShortcut(shortcut: { label: string, filters: string[] }) {
   if (!props.filters)
     return
 
-  const nextFilters = { ...props.filters }
+  const nextFilters = Object.fromEntries(
+    Object.keys(props.filters).map(key => [key, false]),
+  ) as Record<string, boolean>
   shortcut.filters.forEach((filter) => {
     if (filter in nextFilters)
       nextFilters[filter] = true
@@ -520,7 +522,7 @@ onMounted(async () => {
           <template #trigger>
             <button
               type="button"
-              class="inline-flex gap-2 items-center justify-between py-1.5 px-3 h-10 min-w-32 text-sm font-medium text-gray-600 bg-white rounded-md border border-gray-300 transition-colors dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden whitespace-nowrap"
+              class="d-btn d-btn-sm h-10 min-h-10 min-w-32 justify-between gap-2 whitespace-nowrap border-gray-300 bg-white px-3 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
             >
               <IconCalendar class="w-4 h-4 shrink-0" />
               <span class="hidden truncate md:block">
@@ -637,7 +639,7 @@ onMounted(async () => {
         <button
           type="button"
           :aria-label="filterButtonLabel"
-          class="relative inline-flex items-center py-1.5 px-3 h-full text-sm font-medium text-gray-500 bg-white rounded-md border border-gray-300 cursor-pointer dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
+          class="d-btn d-btn-sm relative h-full min-h-10 border-gray-300 bg-white px-3 text-sm font-medium text-gray-500 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:hover:border-gray-600 dark:hover:bg-gray-700"
           @click="toggleFilterDropdown"
         >
           <div
@@ -662,7 +664,7 @@ onMounted(async () => {
                 v-for="shortcut in filterShortcuts"
                 :key="shortcut.label"
                 type="button"
-                class="px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-md border border-blue-200 hover:bg-blue-100 dark:text-blue-200 dark:bg-blue-950/40 dark:border-blue-800 dark:hover:bg-blue-900/50"
+                class="d-btn d-btn-xs border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/50"
                 @click="applyFilterShortcut(shortcut)"
               >
                 {{ t(shortcut.label) }}

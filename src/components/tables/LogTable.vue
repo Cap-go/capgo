@@ -436,8 +436,8 @@ onMounted(async () => {
 watch(columns, async () => {
   await refreshData()
 }, { deep: true })
-watch(search, () => {
-  debouncedRefreshData()
+watch(search, async () => {
+  await refreshData()
 })
 watch(() => props.appId, async () => {
   await refreshData()

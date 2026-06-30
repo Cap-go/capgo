@@ -39,6 +39,16 @@ describe('channel stats helpers', () => {
     expect(period.actualDays).toBe(30)
   })
 
+  it('normalizeStatsPeriodDays only accepts supported presets', () => {
+    expect(channelStatsTestUtils.normalizeStatsPeriodDays(undefined)).toBe(30)
+    expect(channelStatsTestUtils.normalizeStatsPeriodDays(1)).toBe(1)
+    expect(channelStatsTestUtils.normalizeStatsPeriodDays(3)).toBe(3)
+    expect(channelStatsTestUtils.normalizeStatsPeriodDays(7)).toBe(7)
+    expect(channelStatsTestUtils.normalizeStatsPeriodDays(30)).toBe(30)
+    expect(channelStatsTestUtils.normalizeStatsPeriodDays(29)).toBeNull()
+    expect(channelStatsTestUtils.normalizeStatsPeriodDays(1.5)).toBeNull()
+  })
+
   it('fillMissingDailyCounts carries forward historical zero days', () => {
     const versions = ['1.0.0', '1.1.0']
     const labels = ['2024-12-01', '2024-12-02', '2024-12-03']

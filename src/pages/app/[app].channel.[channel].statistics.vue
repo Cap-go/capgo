@@ -113,6 +113,7 @@ const days = ref<PeriodDayOption>(30)
 const periodDayOptions: PeriodDayOption[] = [1, 3, 7, 30]
 const stats = ref<ChannelStatsResponse | null>(null)
 const bundleIdCache = ref<Record<string, number>>({})
+let latestStatsRequest = 0
 const versionByLabel = computed(() => {
   const mapping: Record<string, string> = {}
   const datasets = stats.value?.datasets ?? []
@@ -223,21 +224,26 @@ const currentVersionDataset = computed(() => {
   return stats.value.datasets.find(dataset => dataset.label === stats.value?.currentVersion) ?? null
 })
 
-const requestedDays = computed(() => days.value)
 function periodButtonLabel(option: PeriodDayOption) {
   if (option === 1)
     return t('one-day')
+  if (option === 3)
+    return t('three-days')
+  if (option === 7)
+    return t('seven-days')
   if (option === 30)
     return t('max-period')
-  return `${option} ${t('days')}`
+  return t('max-period')
 }
 const selectedPeriodLabel = computed(() => {
   if (days.value === 1)
     return t('last-one-day')
 
   const period = stats.value?.period
-  if (period?.start_reason === 'current_version_release')
-    return t('since-current-release-days', { days: period.actual_days })
+  if (period?.start_reason === 'current_version_release') {
+    const key = period.actual_days === 1 ? 'since-current-release-one-day' : 'since-current-release-days'
+    return t(key, { days: period.actual_days })
+  }
 
   return t('last-n-days', { days: days.value })
 })
@@ -487,11 +493,13 @@ async function fetchStats() {
   if (!id.value || !channel.value)
     return
 
+  const requestId = ++latestStatsRequest
   statsLoading.value = true
   try {
     const { data: sessionData } = await supabase.auth.getSession()
     if (!sessionData.session) {
-      toast.error(t('not-authenticated'))
+      if (requestId === latestStatsRequest)
+        toast.error(t('not-authenticated'))
       return
     }
 
@@ -504,9 +512,12 @@ async function fetchStats() {
       body: JSON.stringify({
         channel_id: id.value,
         app_id: packageId.value,
-        days: requestedDays.value,
+        days: days.value,
       }),
     })
+
+    if (requestId !== latestStatsRequest)
+      return
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
@@ -516,14 +527,19 @@ async function fetchStats() {
     }
 
     const result: ChannelStatsResponse = await response.json()
+    if (requestId !== latestStatsRequest)
+      return
     stats.value = result
   }
   catch (error) {
+    if (requestId !== latestStatsRequest)
+      return
     console.error('Error fetching channel stats:', error)
     toast.error(t('failed-to-fetch-statistics'))
   }
   finally {
-    statsLoading.value = false
+    if (requestId === latestStatsRequest)
+      statsLoading.value = false
   }
 }
 
@@ -628,10 +644,10 @@ watchEffect(async () => {
               :key="d"
               type="button"
               :aria-pressed="days === d"
-              class="px-3 py-1 text-sm transition-colors rounded-md"
+              class="d-btn d-btn-sm h-8 min-h-8 px-3"
               :class="days === d
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'"
+                ? 'd-btn-primary'
+                : 'd-btn-ghost bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'"
               @click="selectPeriod(d)"
             >
               {{ periodButtonLabel(d) }}
