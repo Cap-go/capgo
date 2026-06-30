@@ -1,8 +1,8 @@
 import type { Context } from 'hono'
 import { createClient } from '@supabase/supabase-js'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { buildReadDevicesCFQuery, countDevicesCF } from '../supabase/functions/_backend/utils/cloudflare.ts'
-import { countDevicesSB, readDevicesSB } from '../supabase/functions/_backend/utils/supabase.ts'
+import { buildReadDevicesCFQuery, countDevicesCF, countInstallSourcesCF } from '../supabase/functions/_backend/utils/cloudflare.ts'
+import { readDevicesSB } from '../supabase/functions/_backend/utils/supabase.ts'
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(),
@@ -33,6 +33,7 @@ function createContextMock() {
       CF_ANALYTICS_TOKEN: 'cf-analytics-token',
       CF_ACCOUNT_ANALYTICS_ID: 'cf-account-id',
     },
+    req: { url: 'http://localhost/private/devices' },
     get: vi.fn((key: string) => key === 'requestId' ? 'test-request' : undefined),
   }
 }
@@ -56,6 +57,16 @@ describe('buildReadDevicesCFQuery', () => {
     expect(groupByIndex).toBeGreaterThan(-1)
     expect(cursorIndex).toBeGreaterThan(groupByIndex)
     expect(query).toContain('ORDER BY device_id ASC')
+  })
+
+  it.concurrent('does not read install source blob on default device listing', () => {
+    const query = buildReadDevicesCFQuery({
+      app_id: 'com.example.app',
+      limit: 1,
+    }, false)
+
+    expect(query).not.toContain('blob9')
+    expect(query).not.toContain('install_source')
   })
 
   it.concurrent('applies descending cursor pagination after device grouping', () => {
@@ -110,15 +121,14 @@ describe('buildReadDevicesCFQuery', () => {
     expect(query).toContain(`WHERE device_id > '11111111-1111-4111-8111-111111111111' AND install_source IN ('app_store', 'amazon_appstore')`)
   })
 })
-
 describe('countDevicesCF', () => {
-  it('filters install sources after device grouping', async () => {
+  it('does not read install source blob on default device counts', async () => {
     let query = ''
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
       query = String(init?.body ?? '')
       return new Response(JSON.stringify({
         meta: [{ name: 'total', type: 'UInt64' }],
-        data: [{ total: 7 }],
+        data: [{ total: 12 }],
       }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -130,36 +140,70 @@ describe('countDevicesCF', () => {
       createContextMock() as unknown as Context,
       'com.example.app',
       false,
-      [],
-      undefined,
-      undefined,
-      ['app_store', 'testflight'],
     )
 
-    const groupByIndex = query.indexOf('GROUP BY blob1')
-    const installSourceFilterIndex = query.indexOf(`install_source IN ('app_store', 'testflight')`)
-
-    expect(count).toBe(7)
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(query).toContain("argMax(blob9, CASE WHEN blob9 != '' THEN timestamp ELSE toDateTime('1970-01-01 00:00:00') END) AS install_source")
-    expect(installSourceFilterIndex).toBeGreaterThan(groupByIndex)
+    expect(count).toBe(12)
+    expect(query).toContain('COUNT(DISTINCT blob1) AS total')
+    expect(query).not.toContain('blob9')
+    expect(query).not.toContain('install_source')
   })
+})
 
-  it('throws install source count failures instead of returning zero', async () => {
-    const fetchMock = vi.fn(async () => {
-      throw new Error('analytics unavailable')
+describe('countInstallSourcesCF', () => {
+  it('counts latest install sources in a dedicated aggregate query', async () => {
+    let query = ''
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      query = String(init?.body ?? '')
+      return new Response(JSON.stringify({
+        meta: [
+          { name: 'install_source', type: 'String' },
+          { name: 'total', type: 'UInt64' },
+        ],
+        data: [
+          { install_source: 'app_store', total: 3 },
+          { install_source: 'testflight', total: 2 },
+        ],
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(countDevicesCF(
-      createContextMock() as unknown as Context,
-      'com.example.app',
-      false,
-      [],
-      undefined,
-      undefined,
-      ['app_store'],
-    )).rejects.toThrow('runQueryToCFA encountered an error')
+    const counts = await countInstallSourcesCF(createContextMock() as unknown as Context, 'com.example.app')
+
+    expect(counts).toEqual({ app_store: 3, testflight: 2 })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(query).toContain('GROUP BY install_source')
+    expect(query).toContain('argMax(blob9')
+    expect(query).not.toContain('COUNT(DISTINCT blob1) AS total')
+  })
+
+  it('reuses cached install source counts for the same app', async () => {
+    const cachedResponses = new Map<string, Response>()
+    vi.stubGlobal('caches', {
+      open: vi.fn(async () => ({
+        match: vi.fn(async (request: Request) => cachedResponses.get(request.url)),
+        put: vi.fn(async (request: Request, response: Response) => {
+          cachedResponses.set(request.url, response)
+        }),
+      })),
+    })
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      meta: [
+        { name: 'install_source', type: 'String' },
+        { name: 'total', type: 'UInt64' },
+      ],
+      data: [{ install_source: 'app_store', total: 3 }],
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const context = createContextMock() as unknown as Context
+    await expect(countInstallSourcesCF(context, 'com.example.app')).resolves.toEqual({ app_store: 3 })
+    await expect(countInstallSourcesCF(context, 'com.example.app')).resolves.toEqual({ app_store: 3 })
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
@@ -196,46 +240,4 @@ describe('readDevicesSB', () => {
     expect(query.in).toHaveBeenCalledWith('install_source', ['app_store', 'testflight'])
   })
 
-  it('applies install source filters to counts', async () => {
-    const { client, query } = createReadDevicesQueryMock()
-    vi.mocked(createClient).mockReturnValue(client as unknown as ReturnType<typeof createClient>)
-
-    const count = await countDevicesSB(
-      createContextMock() as unknown as Context,
-      'com.example.app',
-      false,
-      [],
-      undefined,
-      undefined,
-      ['app_store', 'testflight'],
-    )
-
-    expect(count).toBe(12)
-    expect(query.in).toHaveBeenCalledWith('install_source', ['app_store', 'testflight'])
-  })
-
-  it('throws Supabase install source count failures instead of returning zero', async () => {
-    const query = {
-      select: vi.fn(() => query),
-      eq: vi.fn(() => query),
-      in: vi.fn(() => query),
-      then: vi.fn((resolve, reject) => Promise.resolve({ count: null, error: { message: 'database unavailable' } }).then(resolve, reject)),
-    }
-    const client = {
-      from: vi.fn(() => query),
-    }
-    vi.mocked(createClient).mockReturnValue(client as unknown as ReturnType<typeof createClient>)
-
-    await expect(countDevicesSB(
-      createContextMock() as unknown as Context,
-      'com.example.app',
-      false,
-      [],
-      undefined,
-      undefined,
-      ['app_store'],
-    )).rejects.toThrow('database unavailable')
-
-    expect(query.in).toHaveBeenCalledWith('install_source', ['app_store'])
-  })
 })
