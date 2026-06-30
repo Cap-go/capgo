@@ -324,7 +324,12 @@ const statusDetail = computed(() => {
   if (!stats.value || totalDevices.value <= 0)
     return ''
 
-  const base = `${Math.round(devicesOnCurrent.value)} / ${Math.round(totalDevices.value)} ${t('devices-on-current-version-status')}`
+  const base = t('current-version-check-ins-in-period', {
+    current: formatCount(devicesOnCurrent.value),
+    total: formatCount(totalDevices.value),
+    period: selectedPeriodLabel.value,
+    range: periodTimespanLabel.value,
+  })
   if (statusType.value !== 'ramping')
     return base
 
@@ -570,7 +575,44 @@ watchEffect(async () => {
     <PageLoader v-if="loading" />
     <div v-else-if="channel" class="w-full h-full px-4 pt-0 mx-auto mb-8 sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
       <div class="flex flex-col gap-6">
-        <!-- Status Banner -->
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div class="min-w-0">
+            <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              {{ t('selected-period') }}
+            </h3>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              {{ selectedPeriodLabel }} · {{ periodTimespanLabel }}
+            </p>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {{ t('selected-period-applies-to-stats') }}
+            </p>
+          </div>
+          <div class="d-join shrink-0" role="group" :aria-label="t('selected-period')">
+            <button
+              v-for="d in periodDayOptions"
+              :key="d"
+              type="button"
+              :aria-describedby="d === 30 ? 'max-period-tooltip' : undefined"
+              :aria-pressed="days === d"
+              class="relative overflow-visible d-btn d-btn-sm d-join-item min-w-12 group"
+              :class="days === d ? 'd-btn-primary' : 'd-btn-outline'"
+              @click="selectPeriod(d)"
+            >
+              {{ periodButtonLabel(d) }}
+              <span
+                v-if="d === 30"
+                id="max-period-tooltip"
+                role="tooltip"
+                class="invisible absolute right-0 z-50 w-64 px-3 py-2 mb-2 text-xs font-normal leading-relaxed text-left text-white normal-case transition-opacity bg-gray-900 rounded-lg shadow-lg opacity-0 pointer-events-none bottom-full dark:bg-gray-700 group-hover:visible group-hover:opacity-100 group-focus-visible:visible group-focus-visible:opacity-100"
+              >
+                {{ t('max-period-tooltip') }}
+                <span class="absolute w-0 h-0 border-4 border-transparent right-4 top-full border-t-gray-900 dark:border-t-gray-700" />
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Selected Period Adoption Status -->
         <div
           class="p-4 border rounded-lg shadow-sm"
           :class="{
@@ -632,43 +674,6 @@ watchEffect(async () => {
                 {{ statusDetail }}
               </p>
             </div>
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div class="min-w-0">
-            <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-              {{ t('selected-period') }}
-            </h3>
-            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              {{ selectedPeriodLabel }} · {{ periodTimespanLabel }}
-            </p>
-            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {{ t('selected-period-applies-to-stats') }}
-            </p>
-          </div>
-          <div class="d-join shrink-0" role="group" :aria-label="t('selected-period')">
-            <button
-              v-for="d in periodDayOptions"
-              :key="d"
-              type="button"
-              :aria-describedby="d === 30 ? 'max-period-tooltip' : undefined"
-              :aria-pressed="days === d"
-              class="relative overflow-visible d-btn d-btn-sm d-join-item min-w-12 group"
-              :class="days === d ? 'd-btn-primary' : 'd-btn-outline'"
-              @click="selectPeriod(d)"
-            >
-              {{ periodButtonLabel(d) }}
-              <span
-                v-if="d === 30"
-                id="max-period-tooltip"
-                role="tooltip"
-                class="invisible absolute right-0 z-50 w-64 px-3 py-2 mb-2 text-xs font-normal leading-relaxed text-left text-white normal-case transition-opacity bg-gray-900 rounded-lg shadow-lg opacity-0 pointer-events-none bottom-full dark:bg-gray-700 group-hover:visible group-hover:opacity-100 group-focus-visible:visible group-focus-visible:opacity-100"
-              >
-                {{ t('max-period-tooltip') }}
-                <span class="absolute w-0 h-0 border-4 border-transparent right-4 top-full border-t-gray-900 dark:border-t-gray-700" />
-              </span>
-            </button>
           </div>
         </div>
 
