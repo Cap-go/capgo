@@ -143,7 +143,8 @@ export function readStatsMau(c: Context, app_id: string, start_date: string, end
 export function readStatsBandwidth(c: Context, app_id: string, start_date: string, end_date: string) {
   if (!c.env.BANDWIDTH_USAGE)
     return readBandwidthUsageSB(c, app_id, start_date, end_date)
-  return readBandwidthUsageCF(c, app_id, start_date, end_date)
+  assertAnalyticsEngineReadConfig(c, 'bandwidth usage')
+  return readBandwidthUsageCF(c, app_id, start_date, end_date, { throwOnError: true })
 }
 
 export function readStatsStorage(c: Context, app_id: string, start_date: string, end_date: string) {
@@ -162,14 +163,23 @@ export function readNativeVersionUsage(c: Context, app_id: string, start_date: s
     return readNativeVersionUsageSB(c, app_id, start_date, end_date, supabase)
   return readNativeVersionUsageCF(c, app_id, start_date, end_date)
 }
+function hasAnalyticsEngineReadConfig(c: Context): boolean {
+  const token = getEnv(c, 'CF_ANALYTICS_TOKEN')
+  const accountId = getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')
+  return Boolean(token && accountId)
+}
 
 function shouldUseAnalyticsEngine(c: Context): boolean {
   if (getRuntimeKey() !== 'workerd' || !c.env.DEVICE_INFO)
     return false
   // Analytics reads require API access; fall back to Supabase when tokens are missing.
-  const token = getEnv(c, 'CF_ANALYTICS_TOKEN')
-  const accountId = getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')
-  return Boolean(token && accountId)
+  return hasAnalyticsEngineReadConfig(c)
+}
+
+function assertAnalyticsEngineReadConfig(c: Context, metricName: string): void {
+  if (!hasAnalyticsEngineReadConfig(c)) {
+    throw simpleError('analytics_engine_unavailable', `Cannot read ${metricName} without Analytics Engine read configuration`)
+  }
 }
 
 export function readDeviceVersionCounts(c: Context, app_id: string, channelName?: string): Promise<Record<string, number>> {

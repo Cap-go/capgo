@@ -465,7 +465,7 @@ export async function rawAnalyticsQuery(c: Context, query: string) {
   return []
 }
 
-export async function readBandwidthUsageCF(c: Context, app_id: string, period_start: string, period_end: string) {
+export async function readBandwidthUsageCF(c: Context, app_id: string, period_start: string, period_end: string, options: { throwOnError?: boolean } = {}) {
   if (!c.env.BANDWIDTH_USAGE)
     return [] as BandwidthUsageCF[]
   const query = `SELECT
@@ -486,6 +486,8 @@ ORDER BY date, app_id`
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading bandwidth usage', error: serializeError(e), query })
+    if (options.throwOnError)
+      throw e
   }
   return [] as BandwidthUsageCF[]
 }
