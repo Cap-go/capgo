@@ -2036,7 +2036,7 @@ function renderAppflowView(step: AppflowStep, view: StepView): NextStepResult {
     const field = view.collect?.[0]?.field
     const inputKey = field === 'p8Path' ? 'p8Path' : field === 'p8KeyId' ? 'keyId' : field === 'p8IssuerId' ? 'issuerId' : undefined
     // An unknown/absent input field would otherwise be silently coerced to
-    // 'issuerId' — surface it as an error instead of mis-threading the value.
+    // 'issuerId' — surface it as an error instead of routing the value to the wrong field.
     if (!field || !inputKey) {
       return {
         ...base,
