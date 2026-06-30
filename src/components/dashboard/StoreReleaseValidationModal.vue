@@ -2,10 +2,10 @@
 import type { Database } from '~/types/supabase.types'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import IconArrowRight from '~icons/lucide/arrow-right'
 import IconBell from '~icons/lucide/bell'
 import IconCheck from '~icons/lucide/check'
 import IconCircleDot from '~icons/lucide/circle-dot'
-import IconRocket from '~icons/lucide/rocket'
 import IconSettings from '~icons/lucide/settings-2'
 import IconSmartphone from '~icons/lucide/smartphone'
 import IconStore from '~icons/lucide/store'
@@ -490,38 +490,43 @@ onUnmounted(() => {
   <div
     v-if="shouldPrompt && !isOpen"
     data-test="store-release-validation-alert"
-    class="mb-4 overflow-hidden rounded-lg border border-azure-200 bg-azure-50 dark:border-azure-800 dark:bg-azure-900/20"
+    class="mb-4 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950"
   >
-    <div class="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex flex-col gap-4 border-l-4 border-azure-500 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5">
       <div class="flex min-w-0 gap-3">
-        <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-azure-100 dark:bg-azure-900/50">
-          <IconStore class="h-5 w-5 text-azure-600 dark:text-azure-300" />
-        </div>
+        <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-200">
+          <IconStore class="h-4 w-4" />
+        </span>
 
         <div class="min-w-0">
-          <p class="font-semibold text-azure-950 dark:text-azure-100">
-            {{ t('store-release-validation-badge') }}
-          </p>
-          <p class="mt-1 text-sm leading-6 text-azure-800 dark:text-azure-200">
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p class="text-sm font-semibold text-slate-950 dark:text-white">
+              {{ t('store-release-validation-badge') }}
+            </p>
+            <span class="rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200 dark:bg-amber-400/10 dark:text-amber-200 dark:ring-amber-400/20">
+              {{ t('store-release-validation-signal-reminder') }}
+            </span>
+          </div>
+          <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
             {{ body }}
           </p>
-          <div class="mt-3 flex flex-wrap gap-2 text-xs font-medium text-azure-900 dark:text-azure-100">
-            <span class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 ring-1 ring-azure-200 dark:bg-azure-950/40 dark:ring-azure-700">
-              <IconCheck class="h-3.5 w-3.5" />
+          <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+            <span class="inline-flex items-center gap-1.5">
+              <IconCheck class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-300" />
               {{ t('store-release-validation-signal-live-update') }}
             </span>
-            <span class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 ring-1 ring-azure-200 dark:bg-azure-950/40 dark:ring-azure-700">
-              <IconSmartphone class="h-3.5 w-3.5" />
+            <span class="inline-flex items-center gap-1.5">
+              <IconSmartphone class="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
               {{ storeSignal }}
             </span>
           </div>
         </div>
       </div>
 
-      <div class="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:self-start">
+      <div class="flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:items-center">
         <button
           type="button"
-          class="d-btn d-btn-ghost min-h-11 whitespace-nowrap"
+          class="d-btn d-btn-ghost d-btn-sm min-h-11 px-3 text-slate-600 dark:text-slate-300"
           data-test="store-release-validation-dismiss"
           @click="dismissPrompt"
         >
@@ -529,12 +534,12 @@ onUnmounted(() => {
         </button>
         <button
           type="button"
-          class="d-btn d-btn-primary min-h-11 whitespace-nowrap"
+          class="d-btn d-btn-primary d-btn-sm min-h-11 px-4"
           data-test="store-release-validation-open"
           @click="openModal"
         >
-          <IconRocket class="h-4 w-4" />
           {{ t('store-release-validation-open') }}
+          <IconArrowRight class="h-4 w-4" />
         </button>
       </div>
     </div>
@@ -549,25 +554,25 @@ onUnmounted(() => {
     >
       <div class="d-modal-box w-[calc(100vw-2rem)] max-w-2xl rounded-lg border border-slate-200 bg-white p-0 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
         <div class="border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:px-6">
-          <div class="flex items-start gap-4">
-            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-azure-50 text-azure-600 ring-1 ring-azure-100 dark:bg-azure-400/15 dark:text-azure-200 dark:ring-azure-400/30">
+          <div class="flex items-start gap-3">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-700 ring-1 ring-slate-200 dark:bg-slate-950 dark:text-slate-200 dark:ring-slate-700">
               <IconStore class="h-5 w-5" />
             </span>
             <div class="min-w-0">
-              <p class="text-sm font-semibold uppercase text-azure-600 dark:text-azure-200">
+              <p class="text-xs font-semibold uppercase tracking-normal text-slate-500 dark:text-slate-400">
                 {{ t('store-release-validation-badge') }}
               </p>
               <h2
                 v-if="!hasConfirmedPublished"
                 id="store-release-validation-title"
-                class="mt-1 text-xl font-semibold leading-snug text-slate-950 dark:text-white"
+                class="mt-1 text-lg font-semibold leading-7 text-slate-950 dark:text-white"
               >
                 {{ title }}
               </h2>
               <h2
                 v-else
                 id="store-release-validation-checklist-title"
-                class="mt-1 text-xl font-semibold leading-snug text-slate-950 dark:text-white"
+                class="mt-1 text-lg font-semibold leading-7 text-slate-950 dark:text-white"
               >
                 {{ t('store-release-validation-checklist-title') }}
               </h2>
@@ -580,19 +585,24 @@ onUnmounted(() => {
             {{ body }}
           </p>
 
-          <div class="mt-4 grid gap-3 sm:grid-cols-3">
-            <div class="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100">
-              <IconCheck class="mb-2 h-4 w-4" />
-              {{ t('store-release-validation-signal-live-update') }}
-            </div>
-            <div class="rounded-lg border border-sky-100 bg-sky-50 p-3 text-sm text-sky-900 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-100">
-              <IconSmartphone class="mb-2 h-4 w-4" />
-              {{ storeSignal }}
-            </div>
-            <div class="rounded-lg border border-amber-100 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100">
-              <IconBell class="mb-2 h-4 w-4" />
-              {{ t('store-release-validation-signal-reminder') }}
-            </div>
+          <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
+            <p class="text-sm font-medium text-slate-900 dark:text-white">
+              {{ t('store-release-validation-checklist-title') }}
+            </p>
+            <ul class="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+              <li class="flex gap-2">
+                <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-300" />
+                <span>{{ t('store-release-validation-signal-live-update') }}</span>
+              </li>
+              <li class="flex gap-2">
+                <IconSmartphone class="mt-0.5 h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" />
+                <span>{{ storeSignal }}</span>
+              </li>
+              <li class="flex gap-2">
+                <IconBell class="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" />
+                <span>{{ t('store-release-validation-signal-reminder') }}</span>
+              </li>
+            </ul>
           </div>
         </div>
 
@@ -685,8 +695,8 @@ onUnmounted(() => {
               {{ t('store-release-validation-later') }}
             </button>
             <button class="d-btn d-btn-primary min-h-11" type="button" @click="confirmPublished">
-              <IconRocket class="h-4 w-4" />
               {{ t('store-release-validation-confirm') }}
+              <IconArrowRight class="h-4 w-4" />
             </button>
           </template>
           <template v-else>
