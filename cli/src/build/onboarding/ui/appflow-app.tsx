@@ -33,6 +33,7 @@ import type { TailStep } from '../tail/flow.js'
 import type { CiSecretTarget } from '../ci-secrets.js'
 import { buildAppflowEffectDeps, persistAppflowCredentials } from '../appflow/deps.js'
 import { sanitizeBuildLogLines } from '../build-log.js'
+import { consoleWebUrl } from '../../../utils.js'
 import { Divider, Header, ErrorLine, SpinnerLine, SuccessLine, FilteredTextInput, FullscreenBuildOutput, Table } from './components.js'
 import { useTerminalSize } from './shell.js'
 import { exitAfterOnboardingBeforeExit } from './exit.js'
@@ -96,7 +97,7 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
     }
     onResult?.({ outcome: 'completed' })
     const message = finalProgress.built
-      ? `Appflow migration complete. Build attempted for ${finalProgress.scope} — if it queued you'll see it at https://capgo.app/app, otherwise re-run \`capgo build request\`.`
+      ? `Appflow migration complete. Build attempted for ${finalProgress.scope}. If it queued you'll see it at ${consoleWebUrl('/app')}, otherwise re-run \`capgo build request\`.`
       : 'Appflow migration complete. Your imported credentials are saved — run `capgo build request` to build.'
     setFinished({ kind: 'done', message })
     setTimeout(exitNow, 50)
@@ -425,7 +426,7 @@ const BuildOutcome: FC<{ lines: string[] }> = ({ lines }) => {
       <Box marginTop={1}>
         <Text dimColor>
           {queued
-            ? 'Track the build at https://capgo.app/app.'
+            ? `Track the build at ${consoleWebUrl('/app')}.`
             : skipped
               ? 'Your imported credentials are saved. Run `capgo build request` whenever you want to build.'
               : 'Your imported credentials are saved. Fix the issue above, then run `capgo build request` to try again.'}
