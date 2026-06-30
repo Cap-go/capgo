@@ -1,3 +1,11 @@
+-- EXECUTION MODEL (PostgREST RPC delete_org_member_role):
+-- - Callers: authenticated console users via PostgREST RPC; at most once per member-removal action.
+-- - Frequency: low-volume org admin UI traffic, not a hot path.
+-- - Cardinality: one org row (orgs.pk on id), one successor lookup (role_bindings scoped by
+--   org_id + principal_type + scope_type, roles.pk), optional super-admin count, then deletes
+--   role_bindings for a single principal_id/org_id pair.
+-- - Expected indexes: orgs(id), role_bindings(org_id, principal_type, scope_type, principal_id),
+--   roles(id), roles(name).
 CREATE OR REPLACE FUNCTION public.delete_org_member_role(
     p_org_id uuid,
     p_user_id uuid

@@ -1,4 +1,4 @@
-import type { Database } from '../src/types/supabase.types'
+import type { Database } from '~/types/supabase.types'
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -74,19 +74,20 @@ describe('organization ownership transfer', () => {
       .from('orgs')
       .select('customer_id')
       .in('id', orgIds)
+      .throwOnError()
 
-    await supabase.from('role_bindings').delete().in('org_id', orgIds)
-    await supabase.from('org_users').delete().in('org_id', orgIds)
-    await supabase.from('orgs').delete().in('id', orgIds)
+    await supabase.from('role_bindings').delete().in('org_id', orgIds).throwOnError()
+    await supabase.from('org_users').delete().in('org_id', orgIds).throwOnError()
+    await supabase.from('orgs').delete().in('id', orgIds).throwOnError()
 
     for (const org of orgs ?? []) {
       if (org.customer_id?.startsWith('pending_')) {
-        await supabase.from('stripe_info').delete().eq('customer_id', org.customer_id)
+        await supabase.from('stripe_info').delete().eq('customer_id', org.customer_id).throwOnError()
       }
     }
   })
 
-  it('lets an owner delegate super admin and leave the org', async () => {
+  it.concurrent('lets an owner delegate super admin and leave the org', async () => {
     const promoteResult = await ownerClient.rpc('update_org_member_role', {
       p_org_id: transferOrgId,
       p_user_id: USER_ID_2,
@@ -114,7 +115,7 @@ describe('organization ownership transfer', () => {
     expect(org?.created_by).toBe(USER_ID_2)
   })
 
-  it('does not let another super admin remove the owner', async () => {
+  it.concurrent('does not let another super admin remove the owner', async () => {
     const promoteResult = await ownerClient.rpc('update_org_member_role', {
       p_org_id: protectedOrgId,
       p_user_id: USER_ID_2,
