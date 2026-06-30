@@ -76,8 +76,8 @@ describe('organization ownership transfer', () => {
       .in('id', orgIds)
       .throwOnError()
 
-    await supabase.from('role_bindings').delete().in('org_id', orgIds).throwOnError()
-    await supabase.from('org_users').delete().in('org_id', orgIds).throwOnError()
+    // Delete orgs first so role_bindings cascade without hitting
+    // prevent_last_super_admin_binding_delete on direct binding deletes.
     await supabase.from('orgs').delete().in('id', orgIds).throwOnError()
 
     for (const org of orgs ?? []) {
