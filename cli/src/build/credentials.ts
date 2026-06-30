@@ -222,6 +222,12 @@ export function loadCredentialsFromEnv(): Partial<BuildCredentials> {
   const buildOutputRetentionSeconds = readRuntimeEnv('BUILD_OUTPUT_RETENTION_SECONDS')
   const skipBuildNumberBump = readRuntimeEnv('SKIP_BUILD_NUMBER_BUMP')
   const capgoIosDistribution = readRuntimeEnv('CAPGO_IOS_DISTRIBUTION')
+  const capgoStoreSubmitReview = readRuntimeEnv('CAPGO_STORE_SUBMIT_REVIEW')
+  const capgoStoreReleaseName = readRuntimeEnv('CAPGO_STORE_RELEASE_NAME')
+  const capgoStoreReleaseNotes = readRuntimeEnv('CAPGO_STORE_RELEASE_NOTES')
+  const capgoStoreReleaseNotesLocalized = readRuntimeEnv('CAPGO_STORE_RELEASE_NOTES_LOCALIZED')
+  const capgoIosTestflightGroups = readRuntimeEnv('CAPGO_IOS_TESTFLIGHT_GROUPS')
+  const capgoIosAutomaticRelease = readRuntimeEnv('CAPGO_IOS_AUTOMATIC_RELEASE')
 
   // iOS credentials
   if (buildCertificateBase64)
@@ -244,6 +250,18 @@ export function loadCredentialsFromEnv(): Partial<BuildCredentials> {
     credentials.APPLE_APP_ID = appleAppId
   if (capgoIosScheme)
     credentials.CAPGO_IOS_SCHEME = capgoIosScheme
+  if (capgoStoreSubmitReview)
+    credentials.CAPGO_STORE_SUBMIT_REVIEW = parseOptionalBoolean(capgoStoreSubmitReview) ? 'true' : 'false'
+  if (capgoStoreReleaseName?.trim())
+    credentials.CAPGO_STORE_RELEASE_NAME = capgoStoreReleaseName.trim()
+  if (capgoStoreReleaseNotes?.trim())
+    credentials.CAPGO_STORE_RELEASE_NOTES = capgoStoreReleaseNotes.trim()
+  if (capgoStoreReleaseNotesLocalized?.trim())
+    credentials.CAPGO_STORE_RELEASE_NOTES_LOCALIZED = capgoStoreReleaseNotesLocalized.trim()
+  if (capgoIosTestflightGroups?.trim())
+    credentials.CAPGO_IOS_TESTFLIGHT_GROUPS = capgoIosTestflightGroups.trim()
+  if (capgoIosAutomaticRelease)
+    credentials.CAPGO_IOS_AUTOMATIC_RELEASE = parseOptionalBoolean(capgoIosAutomaticRelease) ? 'true' : 'false'
   if (capgoIosTarget)
     credentials.CAPGO_IOS_TARGET = capgoIosTarget
   if (capgoIosDistribution)

@@ -61,6 +61,7 @@ interface OnboardingInput {
   gcpProjectId?: string
   gcpProjectName?: string
   androidPackage?: string
+  androidVerifyAction?: 'open' | 'recheck' | 'cancel' | 'proceed'
   saMethodChoice?: 'retry' | 'save-anyway' | 'oauth'
   /** Set true at google-sign-in to (re)open the browser for a fresh OAuth — recovery when the browser didn't open, was closed, or the sign-in stalled. */
   reopenSignIn?: boolean
@@ -1600,6 +1601,24 @@ export function mapAndroidView(
         },
       }
     }
+
+    case 'android-app-verify':
+      // Only reached as a choice when the chosen package isn't a real Play app
+      // (the effect auto-advances on exact-match or a degraded/un-verifiable
+      // check). The view message + options differ by outcome (no-app vs
+      // wrong-build-id); surface them verbatim and let the user choose.
+      return {
+        ...base,
+        kind: 'choice',
+        summary: view.message ?? 'Your build package does not match an app in Play Console yet.',
+        options: (view.options ?? []).map(o => ({ value: o.value, label: o.label, note: o.note })),
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { androidVerifyAction: '<open|recheck|cancel|proceed>' },
+          instruction: 'Show the message verbatim and let the user choose. After they create the app, call next_step with androidVerifyAction: "recheck". If apps:search still does not list a just-created app, "proceed" advances anyway (the provisioning invite is the real check). If the package was simply wrong, call next_step again with a corrected androidPackage instead. "cancel" stops onboarding.',
+          call: `${NEXT_STEP_TOOL}({ androidVerifyAction: "recheck" })`,
+        },
+      }
 
     case 'sa-json-existing-path':
       return {
@@ -3147,6 +3166,16 @@ async function persistAndroidInput(deps: EngineDeps, appId: string, input: Onboa
     })
   }
 
+  // android-app-verify gate answer. 'recheck'/'open' leave progress unchanged so
+  // the next drive() re-runs the verify effect (transient isn't persisted → the
+  // apps:search check runs again). 'cancel' is surfaced by the engine's halt path.
+  if (input.androidVerifyAction) {
+    updated = applyAndroidInput('android-app-verify', updated, {
+      step: 'android-app-verify',
+      verifyAction: input.androidVerifyAction,
+    })
+  }
+
   if (input.serviceAccountJsonPath) {
     updated = applyAndroidInput('sa-json-existing-path', updated, {
       step: 'sa-json-existing-path',
@@ -3895,6 +3924,7 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
     || input.keystoreNewAlias !== undefined
     || input.keystorePasswordMethod !== undefined
     || input.keystoreCommonName !== undefined
+    || input.androidVerifyAction !== undefined
   )
   // Strict step-by-step gate: only the CURRENT android step's single expected
   // field may be applied. Runs BEFORE persistAndroidInput so a mega-call
@@ -3975,6 +4005,18 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
     }
   }
 
+  // Android verify-app gate: 'cancel' halts onboarding (mirrors the TUI's
+  // exitOnboarding at this gate). Runs BEFORE persist/decide so it does not fall
+  // through to decideAndroid and silently re-render the same gate forever.
+  if (androidInputPresent && input?.androidVerifyAction === 'cancel') {
+    const cancelAppId = await deps.getAppId()
+    return {
+      onboarding: 'capgo-builder', phase: 'credentials', state: 'android-app-verify', platform: 'android',
+      progress: ANDROID_STEP_PROGRESS['android-app-verify'], kind: 'done',
+      summary: `Onboarding cancelled at the Play Store app check${cancelAppId ? ` for "${cancelAppId}"` : ''}. Nothing was provisioned. Re-run onboarding once the app exists in Play Console (or pick the package it is published under).`,
+      rules: ONBOARDING_RULES,
+    }
+  }
   if (androidInputPresent) {
     const inputAppId = await deps.getAppId()
     if (inputAppId)

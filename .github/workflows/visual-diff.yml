@@ -8,11 +8,11 @@ on:
   pull_request:
     types:
       - opened
-      synchronize
-      reopened
-      labeled
-      unlabeled
-      edited
+      - synchronize
+      - reopened
+      - labeled
+      - unlabeled
+      - edited
 
 permissions:
   contents: read

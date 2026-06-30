@@ -246,6 +246,10 @@ Examples:
 | **--bundle** | <code>string</code> | Bundle name or id to preview |
 | **--channel** | <code>string</code> | Channel name or id to preview |
 | **--type** | <code>string</code> | Type for positional target |
+| **--png** | <code>string</code> | Write the preview QR code as a PNG image to the given file path |
+| **--url** | <code>boolean</code> | Print preview URLs only (web and deep link), without a terminal QR code |
+| **--web-url** | <code>boolean</code> | Encode the web preview URL in the QR code and PNG instead of the capgo:// deep link |
+| **--preview-env** | <code>string</code> | Preview web URL environment |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 
@@ -685,6 +689,16 @@ npx @capgo/cli@latest app set com.example.app --name "Updated App" --retention 3
 | **--expose-metadata** | <code>string</code> | Expose bundle metadata (link and comment) to the plugin (true/false, default: false) |
 | **--preview** | <code>boolean</code> | Enable bundle and channel preview QR codes for this app |
 | **--no-preview** | <code>boolean</code> | Disable bundle and channel preview QR codes for this app |
+| **--allow-device-custom-id** | <code>boolean</code> | Allow devices to set a custom device ID for this app |
+| **--no-allow-device-custom-id** | <code>boolean</code> | Disallow custom device IDs for this app |
+| **--block-provider-infra-requests** | <code>boolean</code> | Block provider infrastructure requests for this app |
+| **--no-block-provider-infra-requests** | <code>boolean</code> | Allow provider infrastructure requests for this app |
+| **--build-timeout-minutes** | <code>string</code> | Native build timeout in minutes (5-360, default: 15) |
+| **--ios-store-url** | <code>string</code> | iOS App Store URL for this app |
+| **--android-store-url** | <code>string</code> | Google Play Store URL for this app |
+| **--default-upload-channel** | <code>string</code> | Default upload channel name for this app |
+| **--default-download-channel** | <code>string</code> | Default download channel name for this app (sets channel public=true) |
+| **--disable-download-channels** | <code>boolean</code> | Disable Capgo download channels for this app (sets all channels public=false) |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 
@@ -1293,6 +1307,13 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | **--android-flavor** | <code>string</code> | Android: Product flavor to build (e.g. production). Required if your project has multiple flavors. |
 | **--in-app-update-priority** | <code>string</code> | Android: Google Play in-app update priority for this release (integer 0–5; higher = more urgent). See https://developer.android.com/guide/playcore/in-app-updates. Precedence: CLI > env > saved credentials |
 | **--no-playstore-upload** | <code>boolean</code> | Skip Play Store upload for this build (nulls out saved play config). Requires --output-upload. |
+| **--submit-to-store-review** | <code>boolean</code> | After upload, submit the store release for review instead of leaving it as a draft/inactive build. Android marks the Play release completed; iOS submits the processed TestFlight build to App Store review. |
+| **--store-release-name** | <code>string</code> | Store release name/version label. Android sends this as the Google Play version_name; iOS uses it as the App Store version when creating or reusing the editable version. |
+| **--store-release-notes** | <code>string</code> | Default store release notes. Android uses this as the Play changelog; iOS uses it as the fallback App Store What's New text. |
+| **--store-release-notes-locale** | <code>string</code> | Localized store release notes (repeatable), for example --store-release-notes-locale en-US="Bug fixes" --store-release-notes-locale fr-FR="Corrections". |
+| **--ios-testflight-groups** | <code>string</code> | iOS: optional comma-separated TestFlight external group names or IDs for external beta distribution. |
+| **--ios-automatic-release** | <code>boolean</code> | iOS: automatically release the App Store version after Apple approval. Default is manual release. |
+| **--no-ios-automatic-release** | <code>boolean</code> | iOS: keep the App Store version waiting for manual release after Apple approval. |
 | **--output-upload** | <code>boolean</code> | Override output upload behavior for this build only (enable). Precedence: CLI > env > saved credentials |
 | **--no-output-upload** | <code>boolean</code> | Override output upload behavior for this build only (disable). Precedence: CLI > env > saved credentials |
 | **--output-retention** | <code>string</code> | Override output link TTL for this build only (1h to 7d). Examples: 1h, 6h, 2d. Precedence: CLI > env > saved credentials |

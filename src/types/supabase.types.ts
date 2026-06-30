@@ -314,9 +314,9 @@ export type Database = {
           allow_preview: boolean
           android_store_url: string | null
           app_id: string
+          block_provider_infra_requests: boolean
           build_timeout_seconds: number
           build_timeout_updated_at: string
-          block_provider_infra_requests: boolean
           channel_device_count: number
           created_at: string | null
           default_upload_channel: string
@@ -342,9 +342,9 @@ export type Database = {
           allow_preview?: boolean
           android_store_url?: string | null
           app_id: string
+          block_provider_infra_requests?: boolean
           build_timeout_seconds?: number
           build_timeout_updated_at?: string
-          block_provider_infra_requests?: boolean
           channel_device_count?: number
           created_at?: string | null
           default_upload_channel?: string
@@ -370,9 +370,9 @@ export type Database = {
           allow_preview?: boolean
           android_store_url?: string | null
           app_id?: string
+          block_provider_infra_requests?: boolean
           build_timeout_seconds?: number
           build_timeout_updated_at?: string
-          block_provider_infra_requests?: boolean
           channel_device_count?: number
           created_at?: string | null
           default_upload_channel?: string
@@ -1403,6 +1403,7 @@ export type Database = {
           default_channel: string | null
           device_id: string
           id: number
+          install_source: string | null
           is_emulator: boolean | null
           is_prod: boolean | null
           key_id: string | null
@@ -1420,6 +1421,7 @@ export type Database = {
           default_channel?: string | null
           device_id: string
           id?: never
+          install_source?: string | null
           is_emulator?: boolean | null
           is_prod?: boolean | null
           key_id?: string | null
@@ -1437,6 +1439,7 @@ export type Database = {
           default_channel?: string | null
           device_id?: string
           id?: never
+          install_source?: string | null
           is_emulator?: boolean | null
           is_prod?: boolean | null
           key_id?: string | null
@@ -1452,6 +1455,8 @@ export type Database = {
       }
       global_stats: {
         Row: {
+          active_canceled_orgs: number
+          active_past_due_orgs: number
           apps: number
           apps_active: number | null
           average_ltv: number
@@ -1542,6 +1547,8 @@ export type Database = {
           users_active: number | null
         }
         Insert: {
+          active_canceled_orgs?: number
+          active_past_due_orgs?: number
           apps: number
           apps_active?: number | null
           average_ltv?: number
@@ -1632,6 +1639,8 @@ export type Database = {
           users_active?: number | null
         }
         Update: {
+          active_canceled_orgs?: number
+          active_past_due_orgs?: number
           apps?: number
           apps_active?: number | null
           average_ltv?: number
@@ -3588,6 +3597,7 @@ export type Database = {
           allow_preview: boolean
           android_store_url: string | null
           app_id: string
+          block_provider_infra_requests: boolean
           build_timeout_seconds: number
           build_timeout_updated_at: string
           channel_device_count: number
@@ -3823,9 +3833,9 @@ export type Database = {
           allow_preview: boolean
           android_store_url: string
           app_id: string
+          block_provider_infra_requests: boolean
           build_timeout_seconds: number
           build_timeout_updated_at: string
-          block_provider_infra_requests: boolean
           channel_device_count: number
           created_at: string
           default_upload_channel: string
@@ -4315,6 +4325,10 @@ export type Database = {
       }
       is_bundle_encrypted: { Args: { session_key: string }; Returns: boolean }
       is_canceled_org: { Args: { orgid: string }; Returns: boolean }
+      is_current_user_group_member: {
+        Args: { p_group_id: string }
+        Returns: boolean
+      }
       is_good_plan_v5_org: { Args: { orgid: string }; Returns: boolean }
       is_internal_request_role: {
         Args: { caller_role: string }
