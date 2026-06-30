@@ -17,6 +17,10 @@ export interface AppPasswordResult { valid: boolean, kind: AppPasswordResultKind
 // very large or control-character-laden Apple response cannot blow up that
 // response (defense-in-depth: HTTPS already prevents network-layer injection).
 const MAX_ADVISORY_MESSAGE = 200
+// This validation is ADVISORY and must never block migration. Bound the Apple
+// endpoint fetch so a stalled network call returns an `unreachable` result instead
+// of hanging the flow forever.
+const VALIDATION_TIMEOUT_MS = 15_000
 function capAdvisoryMessage(raw: string): string {
   const stripped = Array.from(raw, ch => ((ch.codePointAt(0) ?? 0) < 0x20 || ch.codePointAt(0) === 0x7F ? ' ' : ch)).join('')
   const flat = stripped.replace(/\s+/g, ' ').trim()
@@ -25,10 +29,13 @@ function capAdvisoryMessage(raw: string): string {
 
 export async function validateAppleAppPassword(username: string, appPassword: string, fetchImpl: typeof fetch = fetch): Promise<AppPasswordResult> {
   let res: Response
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), VALIDATION_TIMEOUT_MS)
   try {
     res = await fetchImpl(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'User-Agent': 'iTMSTransporter/2.0.0' },
+      signal: controller.signal,
       body: JSON.stringify({
         jsonrpc: '2.0',
         method: 'authenticateForSession',
@@ -38,9 +45,12 @@ export async function validateAppleAppPassword(username: string, appPassword: st
     })
   }
   catch (e) {
-    // Network/DNS/TLS failure — we could not reach Apple, so we cannot judge the
-    // credential. Distinct from a rejection.
+    // Network/DNS/TLS failure OR our own timeout abort — we could not reach Apple,
+    // so we cannot judge the credential. Distinct from a rejection; never blocks.
     return { valid: false, kind: 'unreachable', message: capAdvisoryMessage(`could not reach Apple to verify (${e instanceof Error ? e.message : String(e)})`) }
+  }
+  finally {
+    clearTimeout(timeout)
   }
 
   // Read the body once. Prefer text() (lets us treat an unparseable body as a

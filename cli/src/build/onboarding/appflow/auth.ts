@@ -74,10 +74,12 @@ export function sanitizeOauthError(raw: string | null | undefined): string {
 /**
  * Listen on the loopback redirect for the authorization code. VALIDATES the
  * redirect's `state` against the expected value (RFC 6749 §10.12) before
- * resolving — a mismatch (or a crafted ?code= with the wrong/no state) is
- * rejected, defeating login-CSRF / code injection. The server is ALWAYS closed
- * (success, error, timeout, or external abort) and the timeout timer is always
- * cleared, so no listener or timer leaks past the login attempt.
+ * honoring it — a mismatch (or a crafted ?code= with the wrong/no state) is
+ * IGNORED (answered 400, listener kept open) so a stray loopback hit cannot
+ * abort an in-flight login; only the matching-state redirect resolves. This
+ * defeats login-CSRF / code injection. The server is ALWAYS closed on the
+ * resolving outcome (success, valid error, timeout, or external abort) and the
+ * timeout timer is always cleared, so no listener or timer leaks past the login.
  *
  * `signal` lets a caller (e.g. a TUI unmount) abort the wait and free the port.
  */
@@ -95,16 +97,21 @@ function waitForCode(expectedState: string, signal?: AbortSignal): Promise<{ cod
         res.end()
         return
       }
+      // Validate state BEFORE honoring either `code` or `error`. A local process can
+      // hit the loopback first with a wrong/absent state (a stray probe, or a
+      // CSRF/code-injection attempt). Such a redirect must be IGNORED — answer 400
+      // and KEEP LISTENING for the genuine redirect, rather than tearing down a login
+      // that is still in flight. Only a matching-state redirect proceeds.
+      if (!state || state !== expectedState) {
+        res.writeHead(400, { 'Content-Type': 'text/plain' })
+        res.end('Ignored Appflow redirect with invalid state.')
+        return
+      }
       res.writeHead(200, { 'Content-Type': 'text/html' })
       res.end('<html><body style="font-family:system-ui;padding:3rem"><h2>You can close this tab and return to your terminal.</h2></body></html>')
       req.socket.destroy()
       if (error) {
         finish(undefined, new Error(`Appflow authorize returned error=${sanitizeOauthError(error)}`))
-        return
-      }
-      // Validate state BEFORE trusting the code. Reject mismatches.
-      if (!state || state !== expectedState) {
-        finish(undefined, new Error('Appflow authorize state mismatch — ignoring the redirect (possible CSRF/code injection).'))
         return
       }
       if (!code) {
@@ -152,12 +159,35 @@ function asAppflowToken(j: unknown): Omit<AppflowToken, 'capturedAtMs'> {
   return o as unknown as Omit<AppflowToken, 'capturedAtMs'>
 }
 
-async function exchange(body: Record<string, string>): Promise<AppflowToken> {
-  const res = await fetch(TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
-    body: new URLSearchParams(body),
-  })
+// The post-redirect token request must also be cancellable + bounded: thread the
+// caller's AbortSignal (e.g. a TUI unmount) into the fetch AND apply our own
+// timeout so a stalled token endpoint cannot hang the login forever. Both the
+// timer and the parent-signal listener are always cleaned up.
+const TOKEN_EXCHANGE_TIMEOUT_MS = 20_000
+async function exchange(body: Record<string, string>, signal?: AbortSignal): Promise<AppflowToken> {
+  const controller = new AbortController()
+  const onParentAbort = (): void => controller.abort()
+  const timer = setTimeout(() => controller.abort(), TOKEN_EXCHANGE_TIMEOUT_MS)
+  if (signal) {
+    if (signal.aborted)
+      controller.abort()
+    else
+      signal.addEventListener('abort', onParentAbort, { once: true })
+  }
+  let res: Response
+  try {
+    res = await fetch(TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+      body: new URLSearchParams(body),
+      signal: controller.signal,
+    })
+  }
+  finally {
+    clearTimeout(timer)
+    if (signal)
+      signal.removeEventListener('abort', onParentAbort)
+  }
   const text = await res.text().catch(() => '')
   let parsed: unknown = null
   try {
@@ -181,7 +211,7 @@ export async function loginWithBrowser(opts: { openBrowser?: (url: string) => vo
   const codeP = waitForCode(state, opts.signal)
   ;(opts.openBrowser ?? defaultOpen)(url)
   const { code } = await codeP
-  return exchange({ grant_type: 'authorization_code', client_id: CLIENT_ID, code_verifier: verifier, code, redirect_uri: REDIRECT_URI })
+  return exchange({ grant_type: 'authorization_code', client_id: CLIENT_ID, code_verifier: verifier, code, redirect_uri: REDIRECT_URI }, opts.signal)
 }
 
 export async function refresh(token: AppflowToken): Promise<AppflowToken> {

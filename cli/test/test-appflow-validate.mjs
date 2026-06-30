@@ -28,4 +28,15 @@ const noisy = await validateAppleAppPassword('a@b.com', 'bad', async () => ({ ok
 assert.ok(!/[\n\t\u0007]/.test(noisy.message), 'newlines/control chars stripped to single line')
 assert.strictEqual(noisy.message, 'line1 line2 col bell')
 
+// Timeout wiring: an AbortSignal is threaded into the fetch (so a stalled call can
+// be aborted), and an abort/transport failure stays advisory (kind 'unreachable').
+let sawSignal = false
+const aborted = await validateAppleAppPassword('a@b.com', 'x', async (_url, opts) => {
+  sawSignal = !!(opts && opts.signal instanceof AbortSignal)
+  throw new Error('aborted')
+})
+assert.strictEqual(sawSignal, true, 'an AbortSignal is threaded into the validation fetch')
+assert.strictEqual(aborted.valid, false)
+assert.strictEqual(aborted.kind, 'unreachable')
+
 console.log('validate app-specific password OK')

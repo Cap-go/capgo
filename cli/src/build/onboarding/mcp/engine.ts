@@ -2034,10 +2034,22 @@ function renderAppflowView(step: AppflowStep, view: StepView): NextStepResult {
     // collected field to the next_step input key decideAppflow threads back
     // (p8Path -> input.p8Path, p8KeyId -> input.keyId, p8IssuerId -> input.issuerId).
     const field = view.collect?.[0]?.field
-    const inputKey = field === 'p8Path' ? 'p8Path' : field === 'p8KeyId' ? 'keyId' : 'issuerId'
+    const inputKey = field === 'p8Path' ? 'p8Path' : field === 'p8KeyId' ? 'keyId' : field === 'p8IssuerId' ? 'issuerId' : undefined
+    // An unknown/absent input field would otherwise be silently coerced to
+    // 'issuerId' — surface it as an error instead of mis-threading the value.
+    if (!field || !inputKey) {
+      return {
+        ...base,
+        kind: 'error',
+        summary: `Unsupported Appflow input field for step "${step}".`,
+      }
+    }
     return {
       ...base,
       human: { instruction: view.prompt },
+      // Expose the field metadata so an agent following the structured `collect`
+      // contract knows what to gather (mirrors how other input steps surface it).
+      collect: [{ field: inputKey, desc: view.collect?.[0]?.desc ?? field }],
       next: {
         tool: NEXT_STEP_TOOL,
         with: { [inputKey]: `<${field}>` },
@@ -2186,6 +2198,13 @@ async function appflowHandoff(
   const appId = facts.appId!
   const targets = platformsToBuild(progress)
   if (!input || input.value === undefined) {
+    setAppflowProgress(appId, progress)
+    return renderAppflowView('handoff-build', appflowFlow.viewForStep('handoff-build', progress))
+  }
+  // Only 'build' or 'skip' are valid choices. Re-present the gate for any other
+  // value rather than silently falling through to the build path (which would
+  // persist credentials + advance as if the user picked 'build').
+  if (input.value !== 'build' && input.value !== 'skip') {
     setAppflowProgress(appId, progress)
     return renderAppflowView('handoff-build', appflowFlow.viewForStep('handoff-build', progress))
   }

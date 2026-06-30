@@ -29,9 +29,12 @@ assert.strictEqual(auth.sanitizeOauthError(null), 'unknown')
 assert.strictEqual(auth.sanitizeOauthError(''), 'unknown')
 
 // ── OAuth STATE validation (C10/C15/C29): a redirect carrying the WRONG state is
-// rejected, defeating login-CSRF / code injection. We drive loginWithBrowser and,
-// from the openBrowser callback, hit the real loopback with a bad state. The
-// promise MUST reject (and never exchange the injected code).
+// IGNORED (not honored, not terminal) so a stray loopback hit cannot abort an
+// in-flight login. We drive loginWithBrowser, hit the real loopback with a bad
+// state from the openBrowser callback, then abort. The promise must reject with
+// "cancelled" (the abort) — NOT "state mismatch" — proving the bad-state redirect
+// was ignored and the listener kept waiting, and that the injected code was never
+// exchanged.
 {
   const http = await import('node:http')
   const hitLoopback = (query) => new Promise((resolve) => {
@@ -42,12 +45,18 @@ assert.strictEqual(auth.sanitizeOauthError(''), 'unknown')
     req.on('error', resolve)
     req.end()
   })
-  // wrong state -> reject
-  await assert.rejects(
-    () => auth.loginWithBrowser({ openBrowser: () => { setTimeout(() => void hitLoopback('code=INJECTED&state=not-the-expected-state'), 20) } }),
-    /state mismatch/i,
-    'mismatched state is rejected',
-  )
+  const ac = new AbortController()
+  const p = auth.loginWithBrowser({
+    openBrowser: () => { setTimeout(() => void hitLoopback('code=INJECTED&state=not-the-expected-state'), 20) },
+    signal: ac.signal,
+  })
+  setTimeout(() => ac.abort(), 200)
+  await assert.rejects(() => p, /cancelled/i, 'mismatched state is ignored; login keeps waiting until cancelled')
+  // If the bad-state redirect had been honored, this would reject with /state mismatch/.
+  await assert.doesNotReject(async () => {
+    try { await p }
+    catch (e) { assert.ok(!/state mismatch/i.test(String(e?.message)), 'must not reject with state mismatch') }
+  })
 }
 
 // ── abort signal frees the loopback (no leak): aborting rejects with "cancelled" ──

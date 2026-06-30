@@ -148,8 +148,13 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
         if (cancelled)
           return
         const message = err instanceof Error ? err.message : String(err)
+        // Mirror the other terminal paths: report the failure and SCHEDULE EXIT so
+        // waitUntilExit() resolves. Without this an auto-step failure leaves a dead
+        // static error frame and the wizard hangs forever.
+        onResult?.({ outcome: 'cancelled' })
         setError(message)
         setFinished({ kind: 'error', message: `Appflow migration error at "${step}": ${message}. Email support@capgo.app if this persists.` })
+        setTimeout(exitNow, 50)
       }
       finally {
         if (!cancelled)

@@ -103,6 +103,31 @@ const Q_BOOTSTRAP = `query BootstrapApp { viewer { organizations { edges { node 
 const Q_ORG_APPS = `query OrganizationApps($slug: String!, $first: Int) { organization(slug: $slug) { apps(first: $first) { edges { node { id name slug nativeType } } totalCount } } }`
 const Q_CERTS = `query GetDataForPackageCerts($appId: String!) { app(id: $appId) { id name nativeType certificates { edges { node { id name tag type credentials { ios { filename fingerprint notValidAfter subjectCommonName provisioningProfiles { id applicationIdentifier filename } } android { filename fingerprint keyAlias notValidAfter subjectCommonName } } } } } } }`
 
+// Bound every Appflow REST/GraphQL request: a stalled endpoint must fail through
+// the existing AppflowApiError path rather than hang the migration forever. The
+// timer is always cleared after the request settles. On timeout the abort surfaces
+// as a clear "timed out" message, wrapped by rest()/gql() into AppflowApiError.
+const APPFLOW_REQUEST_TIMEOUT_MS = 20_000
+async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController()
+  let timedOut = false
+  const timer = setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, APPFLOW_REQUEST_TIMEOUT_MS)
+  try {
+    return await fetch(url, { ...init, signal: controller.signal })
+  }
+  catch (e) {
+    if (timedOut)
+      throw new Error(`request timed out after ${APPFLOW_REQUEST_TIMEOUT_MS}ms`)
+    throw e
+  }
+  finally {
+    clearTimeout(timer)
+  }
+}
+
 export interface AppflowOrg { id?: string, name?: string, slug: string }
 export interface AppflowApp { id: string, name?: string, slug?: string, nativeType?: string }
 
@@ -119,7 +144,7 @@ export function createAppflowApi(token: string, log: (s: string) => void = () =>
   async function rest(path: string): Promise<any> {
     let res: Response
     try {
-      res = await fetch(`${API}${path}`, { headers })
+      res = await fetchWithTimeout(`${API}${path}`, { headers })
     }
     catch (e) {
       log(redactTrace('GET', path, 'network-error', []))
@@ -144,7 +169,7 @@ export function createAppflowApi(token: string, log: (s: string) => void = () =>
   async function gql(operationName: string, query: string, variables?: Record<string, unknown>): Promise<any> {
     let res: Response
     try {
-      res = await fetch(`${API}/graphql`, { method: 'POST', headers, body: JSON.stringify({ query, variables, operationName }) })
+      res = await fetchWithTimeout(`${API}/graphql`, { method: 'POST', headers, body: JSON.stringify({ query, variables, operationName }) })
     }
     catch (e) {
       log(redactTrace('POST', `/graphql ${operationName}`, 'network-error', []))
@@ -172,8 +197,17 @@ export function createAppflowApi(token: string, log: (s: string) => void = () =>
       return (d?.viewer?.organizations?.edges || []).map((e: any) => e.node)
     },
     async listApps(slug: string): Promise<AppflowApp[]> {
-      const d = await gql('OrganizationApps', Q_ORG_APPS, { slug, first: 100 })
-      return (d?.organization?.apps?.edges || []).map((e: any) => e.node)
+      // Lower-risk than cursor pagination (the query exposes no pageInfo/endCursor):
+      // raise the cap well past any realistic org size and LOG when totalCount shows
+      // the org has more apps than we fetched, so a truncation is visible in the
+      // support log instead of silently dropping apps.
+      const LIST_APPS_CAP = 500
+      const d = await gql('OrganizationApps', Q_ORG_APPS, { slug, first: LIST_APPS_CAP })
+      const edges = d?.organization?.apps?.edges || []
+      const totalCount = d?.organization?.apps?.totalCount
+      if (typeof totalCount === 'number' && totalCount > edges.length)
+        log(`appflow listApps: org ${slug} has ${totalCount} apps but only ${edges.length} were fetched (cap ${LIST_APPS_CAP}) — some apps are not shown`)
+      return edges.map((e: any) => e.node)
     },
     async listCertificates(appId: string): Promise<any[]> {
       const d = await gql('GetDataForPackageCerts', Q_CERTS, { appId })

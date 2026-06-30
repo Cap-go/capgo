@@ -13,7 +13,7 @@
 // the SAME credential store the native flows write (updateSavedCredentials), so
 // downstream build/CI steps cannot tell migrated creds from natively-set-up ones.
 import { Buffer } from 'node:buffer'
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, lstatSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -30,6 +30,10 @@ import type { AppflowToken } from './auth.js'
 
 const CREDENTIALS_DIR = join(homedir(), '.capgo-credentials')
 const APPFLOW_TOKEN_FILE = join(CREDENTIALS_DIR, 'appflow-token.json')
+// An App Store Connect API key (.p8) is a small PEM file (~250 bytes). Cap the
+// accepted size well above that so a symlink/regular-file masquerading as a huge
+// file can never be slurped into APPLE_KEY_CONTENT.
+const MAX_P8_BYTES = 64 * 1024
 
 /** Load a cached Appflow token, or null when absent/unreadable. Never throws. */
 export function loadAppflowToken(): AppflowToken | null {
@@ -38,7 +42,17 @@ export function loadAppflowToken(): AppflowToken | null {
       return null
     const raw = readFileSync(APPFLOW_TOKEN_FILE, 'utf8')
     const parsed = JSON.parse(raw) as AppflowToken
-    if (parsed && typeof parsed.access_token === 'string')
+    // A cache that carries only access_token but no numeric expiry fields would
+    // pass a naive check yet break isExpired() downstream (it would never refresh
+    // and later fail as an opaque Appflow API error). Require the full shape.
+    if (
+      parsed
+      && typeof parsed.access_token === 'string'
+      && typeof parsed.expires_in === 'number'
+      && Number.isFinite(parsed.expires_in)
+      && typeof parsed.capturedAtMs === 'number'
+      && Number.isFinite(parsed.capturedAtMs)
+    )
       return parsed
     return null
   }
@@ -227,7 +241,11 @@ export async function readP8File(path: string): Promise<string | null> {
     // exfiltration vector when an AI agent intermediates the p8Path input over MCP.
     if (!/\.p8$/i.test(path))
       return null
-    if (!statSync(path).isFile())
+    // Reject SYMLINKS (lstat, not stat — a `*.p8` symlink could point at any local
+    // file) and oversized files BEFORE reading, closing the file-content
+    // exfiltration vector when an AI agent intermediates p8Path over MCP.
+    const st = lstatSync(path)
+    if (!st.isFile() || st.isSymbolicLink() || st.size > MAX_P8_BYTES)
       return null
     const bytes = readFileSync(path)
     return Buffer.from(bytes).toString('base64')
