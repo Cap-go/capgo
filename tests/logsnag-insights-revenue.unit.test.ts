@@ -162,6 +162,77 @@ describe('logsnag revenue metric helpers', () => {
     expect(logsnagInsightsTestUtils.getMissingGlobalStatsShards(sent)).toEqual([])
   })
 
+  it.concurrent('requeues stale completed global stats shards before notifications', () => {
+    const ready = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
+      'core',
+      ...logsnagInsightsTestUtils.USAGE_GLOBAL_STATS_SHARDS,
+      'revenue',
+      'plugins',
+      'builds',
+      'retention',
+      'paid_products',
+      'ltv',
+    ])
+    const staleRow = {
+      dateId: '2026-06-17',
+      completedShards: ready,
+      orgs: 0,
+      bundleStorageGb: 0,
+      buildTotalSecondsDayIos: 1908,
+      buildTotalSecondsDayAndroid: 0,
+      buildAvgSecondsDayIos: 59.6,
+      buildAvgSecondsDayAndroid: 0,
+      buildCountDayIos: 32,
+      buildCountDayAndroid: 0,
+    }
+    const expectedBuildStats = {
+      totalSeconds: { ios: 3816, android: 0 },
+      avgSeconds: { ios: 119.3, android: 0 },
+      counts: { ios: 32, android: 0 },
+    }
+
+    const staleShards = logsnagInsightsTestUtils.getGlobalStatsStaleRepairShards(staleRow, expectedBuildStats)
+
+    expect(staleShards).toEqual(['core', 'usage_storage', 'builds'])
+    expect(logsnagInsightsTestUtils.getGlobalStatsRepairShardQueueCandidates(ready, staleShards)).toEqual(['core', 'usage_storage', 'builds'])
+    expect(logsnagInsightsTestUtils.getGlobalStatsRepairShardQueueCandidates(ready)).toEqual(['notifications'])
+  })
+
+  it.concurrent('keeps fresh completed global stats shards eligible for notifications', () => {
+    const ready = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
+      'core',
+      ...logsnagInsightsTestUtils.USAGE_GLOBAL_STATS_SHARDS,
+      'revenue',
+      'plugins',
+      'builds',
+      'retention',
+      'paid_products',
+      'ltv',
+    ])
+    const freshRow = {
+      dateId: '2026-06-17',
+      completedShards: ready,
+      orgs: 6639,
+      bundleStorageGb: 489.89,
+      buildTotalSecondsDayIos: 3816,
+      buildTotalSecondsDayAndroid: 0,
+      buildAvgSecondsDayIos: 119.3,
+      buildAvgSecondsDayAndroid: 0,
+      buildCountDayIos: 32,
+      buildCountDayAndroid: 0,
+    }
+    const expectedBuildStats = {
+      totalSeconds: { ios: 3816, android: 0 },
+      avgSeconds: { ios: 119.3, android: 0 },
+      counts: { ios: 32, android: 0 },
+    }
+
+    const staleShards = logsnagInsightsTestUtils.getGlobalStatsStaleRepairShards(freshRow, expectedBuildStats)
+
+    expect(staleShards).toEqual([])
+    expect(logsnagInsightsTestUtils.getGlobalStatsRepairShardQueueCandidates(ready, staleShards)).toEqual(['notifications'])
+  })
+
   it.concurrent('detects completed global stats notifications for idempotent retries', () => {
     const ready = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
       'core',
