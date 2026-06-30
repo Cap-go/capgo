@@ -4325,6 +4325,10 @@ export type Database = {
       }
       is_bundle_encrypted: { Args: { session_key: string }; Returns: boolean }
       is_canceled_org: { Args: { orgid: string }; Returns: boolean }
+      is_current_user_group_member: {
+        Args: { p_group_id: string }
+        Returns: boolean
+      }
       is_good_plan_v5_org: { Args: { orgid: string }; Returns: boolean }
       is_internal_request_role: {
         Args: { caller_role: string }
