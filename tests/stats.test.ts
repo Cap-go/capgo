@@ -22,6 +22,7 @@ type StatsAction = Database['public']['Enums']['stats_action']
 
 interface StatsPayload extends ReturnType<typeof getBaseData> {
   action: StatsAction
+  install_source?: string
   metadata?: Record<string, string>
 }
 
@@ -125,6 +126,7 @@ describe('[POST] /stats', () => {
     const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
     baseData.device_id = uuid
     baseData.action = 'set'
+    baseData.install_source = 'app_store'
     baseData.version_build = getVersionFromAction('set')
 
     const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
@@ -139,6 +141,7 @@ describe('[POST] /stats', () => {
     expect(deviceData).toBeTruthy()
     expect(deviceData?.app_id).toBe(baseData.app_id)
     expect(deviceData?.version_name).toBe(version.name)
+    expect(deviceData?.install_source).toBe('app_store')
 
     // Check stats log
     const { error: statsError, data: statsData } = await getSupabaseClient().from('stats').select().eq('device_id', uuid).eq('app_id', APP_NAME_STATS).single()

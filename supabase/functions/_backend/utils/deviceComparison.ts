@@ -12,6 +12,7 @@ export interface DeviceComparable {
   version_name: string | null // DB schema: text (NULLABLE)
   is_prod: boolean
   is_emulator: boolean
+  install_source?: string | null
   default_channel: string | null // DB schema: TEXT (NULLABLE)
   key_id: string | null
 }
@@ -26,6 +27,7 @@ export type DeviceExistingRowLike = {
   version_name?: string | null
   is_prod?: boolean | number | null
   is_emulator?: boolean | number | null
+  install_source?: string | null
   default_channel?: string | null
   key_id?: string | null
 } | null | undefined
@@ -40,8 +42,9 @@ export function toComparableDevice(device: DeviceWithoutCreatedAt): DeviceCompar
   const normalizedDefaultChannel = normalizeOptionalString(device.default_channel)
   const normalizedVersionBuild = normalizeOptionalString(device.version_build)
   const normalizedKeyId = normalizeOptionalString(device.key_id)
+  const normalizedInstallSource = normalizeOptionalString(device.install_source)
 
-  return {
+  const comparable: DeviceComparable = {
     // version: device.version ?? null,
     platform: device.platform ?? null,
     // DB schema: plugin_version NOT NULL (must provide empty string)
@@ -60,6 +63,9 @@ export function toComparableDevice(device: DeviceWithoutCreatedAt): DeviceCompar
     default_channel: normalizedDefaultChannel,
     key_id: normalizedKeyId,
   }
+  if (normalizedInstallSource !== null)
+    comparable.install_source = normalizedInstallSource
+  return comparable
 }
 
 export function toComparableExisting(existing: DeviceExistingRowLike): DeviceComparable {
@@ -71,8 +77,9 @@ export function toComparableExisting(existing: DeviceExistingRowLike): DeviceCom
   const normalizedDefaultChannel = normalizeOptionalString(existing?.default_channel as string | null | undefined)
   const normalizedVersionBuild = normalizeOptionalString(existing?.version_build as string | null | undefined)
   const normalizedKeyId = normalizeOptionalString(existing?.key_id as string | null | undefined)
+  const normalizedInstallSource = normalizeOptionalString(existing?.install_source)
 
-  return {
+  const comparable: DeviceComparable = {
     // version: existing?.version ?? null,
     platform: existing?.platform ?? null,
     // DB schema: plugin_version NOT NULL (no default, must provide empty string)
@@ -91,6 +98,9 @@ export function toComparableExisting(existing: DeviceExistingRowLike): DeviceCom
     default_channel: normalizedDefaultChannel,
     key_id: normalizedKeyId,
   }
+  if (normalizedInstallSource !== null)
+    comparable.install_source = normalizedInstallSource
+  return comparable
 }
 
 export function hasComparableDeviceChanged(existing: DeviceExistingRowLike, device: DeviceWithoutCreatedAt) {
@@ -115,6 +125,7 @@ export function buildNormalizedDeviceForWrite(device: DeviceWithoutCreatedAt) {
     custom_id: comparableDevice.custom_id,
     is_prod: comparableDevice.is_prod,
     is_emulator: comparableDevice.is_emulator,
+    install_source: comparableDevice.install_source,
     key_id: comparableDevice.key_id,
   }
 }
