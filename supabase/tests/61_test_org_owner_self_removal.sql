@@ -65,6 +65,9 @@ SELECT is(
   'owner can remove themselves after another org_super_admin exists'
 );
 
+SELECT tests.clear_authentication();
+SELECT tests.authenticate_as_service_role();
+
 SELECT is(
   (
     SELECT created_by
@@ -74,6 +77,9 @@ SELECT is(
   tests.get_supabase_uid('org_owner_self_successor'),
   'ownership transfers to the promoted successor'
 );
+
+SELECT tests.clear_authentication();
+SELECT tests.authenticate_as('org_owner_self_owner');
 
 SELECT is(
   public.update_org_member_role(
@@ -99,6 +105,9 @@ SELECT throws_like(
   'non-owner super admin cannot remove the org owner'
 );
 
+SELECT tests.clear_authentication();
+SELECT tests.authenticate_as_service_role();
+
 SELECT is(
   (
     SELECT created_by
@@ -108,6 +117,9 @@ SELECT is(
   tests.get_supabase_uid('org_owner_self_owner'),
   'org owner remains unchanged after blocked peer removal'
 );
+
+SELECT tests.clear_authentication();
+SELECT tests.authenticate_as('org_owner_self_peer');
 
 SELECT tests.clear_authentication();
 SELECT tests.authenticate_as('org_owner_self_owner');
