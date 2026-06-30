@@ -26,6 +26,7 @@ interface Props {
   exportLoading?: boolean
   filterText?: string
   filters?: { [key: string]: boolean }
+  filterShortcuts?: { label: string, filters: string[] }[]
   range?: [Date, Date]
   searchPlaceholder?: string
   search?: string
@@ -103,6 +104,12 @@ const filterActivated = computed(() => {
       acc += 1
     return acc
   }, 0)
+})
+const filterButtonLabel = computed(() => {
+  if (!props.filterText)
+    return ''
+  const label = t(props.filterText)
+  return filterActivated.value ? `${label} (${filterActivated.value})` : label
 })
 const currentSelected = ref<'general' | 'precise'>('general')
 type QuickHourOption = 1 | 3 | 6 | 12
@@ -212,7 +219,26 @@ async function fastBackward() {
   emit('reload')
 }
 
+function rangeMatchesQuick(range: [Date, Date] | undefined, option: QuickHourOption) {
+  if (!range)
+    return false
+
+  const start = dayjs(range[0])
+  const end = dayjs(range[1])
+  const diffMinutes = Math.abs(end.diff(start, 'minute'))
+  const nowDiffMinutes = Math.abs(end.diff(dayjs(), 'minute'))
+
+  return Math.abs(diffMinutes - option * 60) <= 2 && nowDiffMinutes <= 5
+}
+
 function clickRight() {
+  const matchedOption = quickOptions.find(option => rangeMatchesQuick(preciseDates.value, option))
+  if (matchedOption) {
+    currentSelected.value = 'general'
+    currentGeneralTime.value = matchedOption
+    return
+  }
+
   currentSelected.value = 'precise'
 }
 
@@ -333,6 +359,18 @@ function selectQuick(option: QuickHourOption) {
   setTime(option, true)
 }
 
+function applyFilterShortcut(shortcut: { label: string, filters: string[] }) {
+  if (!props.filters)
+    return
+
+  const nextFilters = { ...props.filters }
+  shortcut.filters.forEach((filter) => {
+    if (filter in nextFilters)
+      nextFilters[filter] = true
+  })
+  emit('update:filters', nextFilters)
+}
+
 function updateUrlParams() {
   const params = new URLSearchParams(window.location.search)
   if (searchVal.value)
@@ -443,7 +481,7 @@ onMounted(async () => {
 
 <template>
   <div class="pb-4 md:pb-0">
-    <div class="flex items-start justify-between p-3 pb-4 overflow-visible md:items-center">
+    <div class="flex flex-wrap items-start justify-between gap-2 p-3 pb-4 overflow-visible md:items-center md:flex-nowrap">
       <div class="flex h-10 md:mb-0">
         <button class="inline-flex items-center py-1.5 px-3 mr-2 text-sm font-medium text-gray-500 bg-white rounded-md border border-gray-300 dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden" type="button" @click="reloadData">
           <IconReload v-if="!isLoading" class="m-1 md:mr-2" />
@@ -482,7 +520,7 @@ onMounted(async () => {
           <template #trigger>
             <button
               type="button"
-              class="inline-flex gap-2 items-center py-1.5 px-3 h-10 text-sm font-medium text-gray-600 bg-white rounded-md border border-gray-300 transition-colors dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden whitespace-nowrap"
+              class="inline-flex gap-2 items-center justify-between py-1.5 px-3 h-10 min-w-32 text-sm font-medium text-gray-600 bg-white rounded-md border border-gray-300 transition-colors dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden whitespace-nowrap"
             >
               <IconCalendar class="w-4 h-4 shrink-0" />
               <span class="hidden truncate md:block">
@@ -598,6 +636,7 @@ onMounted(async () => {
       <div v-if="filterText && filterList.length" ref="filterDropdownRef" class="relative h-10 mr-2 md:mr-auto">
         <button
           type="button"
+          :aria-label="filterButtonLabel"
           class="relative inline-flex items-center py-1.5 px-3 h-full text-sm font-medium text-gray-500 bg-white rounded-md border border-gray-300 cursor-pointer dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
           @click="toggleFilterDropdown"
         >
@@ -608,7 +647,7 @@ onMounted(async () => {
             {{ filterActivated }}
           </div>
           <IconFilter class="mr-2 w-4 h-4" />
-          <span class="hidden md:block">{{ t(filterText) }}</span>
+          <span class="hidden md:block">{{ filterButtonLabel }}</span>
           <IconDown class="hidden ml-2 w-4 h-4 md:block" />
         </button>
         <Teleport to="body">
@@ -618,9 +657,22 @@ onMounted(async () => {
             :style="filterDropdownStyle"
             @click.stop
           >
+            <div v-if="filterShortcuts?.length" class="flex flex-wrap gap-2 mb-2">
+              <button
+                v-for="shortcut in filterShortcuts"
+                :key="shortcut.label"
+                type="button"
+                class="px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-md border border-blue-200 hover:bg-blue-100 dark:text-blue-200 dark:bg-blue-950/40 dark:border-blue-800 dark:hover:bg-blue-900/50"
+                @click="applyFilterShortcut(shortcut)"
+              >
+                {{ t(shortcut.label) }}
+              </button>
+            </div>
             <input
               v-model="filterSearchVal"
               type="text"
+              name="log-filter-search"
+              :aria-label="t('search')"
               :placeholder="t('search')"
               class="w-full px-3 py-2 mb-2 text-sm border border-gray-300 rounded-md dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               @click.stop
@@ -651,14 +703,14 @@ onMounted(async () => {
           </div>
         </Teleport>
       </div>
-      <div class="flex overflow-hidden md:w-auto">
+      <div class="flex min-w-0 overflow-hidden md:w-auto">
         <FormKit
           v-model="searchVal"
           :placeholder="searchPlaceholder"
-          :prefix-icon="IconSearch" :disabled="isLoading"
+          :prefix-icon="IconSearch"
           enterkeyhint="send"
           :classes="{
-            outer: 'mb-0! md:w-96',
+            outer: 'mb-0! w-48 sm:w-64 md:w-96',
           }"
         />
       </div>
@@ -679,7 +731,7 @@ onMounted(async () => {
             </th>
           </tr>
         </thead>
-        <tbody v-if="!isLoading && elementList.length !== 0">
+        <tbody v-if="elementList.length !== 0">
           <tr
             v-for="(elem, i) in elementList" :key="i"
             class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"

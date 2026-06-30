@@ -33,14 +33,16 @@ interface ChannelStatsResponse {
   }
   currentVersion: string
   currentVersionReleasedAt: string | null
+  period: {
+    requested_days: number
+    actual_days: number
+    start: string
+    end: string
+    start_reason: 'requested_days' | 'current_version_release'
+  }
   deploymentHistory: Array<{ version_name: string, deployed_at: string }>
   lastDeploymentAt: string | null
   totalDeployments: number
-  deploymentWindowCounts: {
-    h24: number
-    h72: number
-    d7: number
-  }
   totals: {
     total_devices: number
     devices_on_current: number
@@ -106,9 +108,10 @@ const id = ref<number>(0)
 const loading = ref(true)
 const statsLoading = ref(true)
 const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
+type PeriodDayOption = 1 | 3 | 30
+const days = ref<PeriodDayOption>(30)
+const periodDayOptions: PeriodDayOption[] = [1, 3, 30]
 const stats = ref<ChannelStatsResponse | null>(null)
-const days = ref(3)
-
 const bundleIdCache = ref<Record<string, number>>({})
 const versionByLabel = computed(() => {
   const mapping: Record<string, string> = {}
@@ -221,9 +224,34 @@ const currentVersionDataset = computed(() => {
 })
 
 const requestedDays = computed(() => days.value === 1 ? 2 : days.value)
-const selectedPeriodLabel = computed(() => days.value === 1
-  ? t('today-vs-yesterday')
-  : t('last-n-days', { days: days.value }))
+function periodButtonLabel(option: PeriodDayOption) {
+  if (option === 1)
+    return t('today-vs-yesterday')
+  if (option === 30)
+    return t('release-or-30-days')
+  return t('last-n-days', { days: option })
+}
+const selectedPeriodLabel = computed(() => {
+  if (days.value === 1)
+    return t('today-vs-yesterday')
+
+  const period = stats.value?.period
+  if (period?.start_reason === 'current_version_release')
+    return t('since-current-release-days', { days: period.actual_days })
+
+  return t('last-n-days', { days: days.value })
+})
+const periodTimespanLabel = computed(() => {
+  const period = stats.value?.period
+  if (period)
+    return `${formatShortDate(period.start)} - ${formatShortDate(period.end)}`
+
+  const labels = stats.value?.labels ?? []
+  if (labels.length > 0)
+    return `${formatShortDate(labels[0])} - ${formatShortDate(labels[labels.length - 1])}`
+
+  return '-'
+})
 
 const periodSummary = computed(() => {
   const dataset = currentVersionDataset.value
@@ -641,7 +669,10 @@ watchEffect(async () => {
                 {{ t('selected-period') }}: {{ selectedPeriodLabel }}
               </h3>
               <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                {{ t('channel-stats-period-help') }}
+                {{ t('channel-stats-period-window', { range: periodTimespanLabel }) }}
+              </p>
+              <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                {{ t('channel-stats-period-help', { period: selectedPeriodLabel }) }}
               </p>
             </div>
 
@@ -697,27 +728,28 @@ watchEffect(async () => {
 
         <!-- Chart -->
         <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-          <div class="flex items-center justify-between mb-4">
+          <div class="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
             <h3 class="text-lg font-semibold text-slate-900 dark:text-white">
               {{ t('device-version-adoption-over-time') }}
             </h3>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
               <button
-                v-for="d in [1, 3, 7]"
+                v-for="d in periodDayOptions"
                 :key="d"
+                type="button"
                 class="px-3 py-1 text-sm transition-colors rounded-md"
                 :class="days === d
                   ? 'bg-blue-600 text-white'
                   : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'"
                 @click="days = d; fetchStats()"
               >
-                {{ d }} {{ t('days') }}
+                {{ periodButtonLabel(d) }}
               </button>
             </div>
           </div>
 
           <p class="mb-4 text-sm text-slate-600 dark:text-slate-300">
-            {{ t('channel-stats-help') }}
+            {{ t('channel-stats-help', { period: selectedPeriodLabel, range: periodTimespanLabel }) }}
           </p>
 
           <div v-if="statsLoading" class="flex items-center justify-center h-64">

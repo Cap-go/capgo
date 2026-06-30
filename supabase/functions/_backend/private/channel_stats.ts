@@ -31,6 +31,34 @@ interface DeploymentHistoryEntry {
   deployed_at: string
 }
 
+type StatsPeriodStartReason = 'requested_days' | 'current_version_release'
+
+function getStatsPeriod(requestedDays: number, endDate: Date, currentVersionReleasedAt: string | null | undefined) {
+  const end = dayjs(endDate).utc().startOf('day')
+  const requestedStart = end.subtract(requestedDays - 1, 'day')
+  let start = requestedStart
+  let startReason: StatsPeriodStartReason = 'requested_days'
+
+  if (requestedDays >= 30 && currentVersionReleasedAt) {
+    const releaseStart = dayjs(currentVersionReleasedAt).utc().startOf('day')
+    if (releaseStart.isValid() && releaseStart.isAfter(requestedStart) && !releaseStart.isAfter(end)) {
+      start = releaseStart
+      startReason = 'current_version_release'
+    }
+  }
+
+  const labels = generateDateLabels(start.toDate(), end.toDate())
+
+  return {
+    startDate: start.toDate(),
+    endDate,
+    labels,
+    requestedDays,
+    actualDays: labels.length,
+    startReason,
+  }
+}
+
 function generateDateLabels(from: Date, to: Date) {
   const start = dayjs(from).utc().startOf('day')
   const end = dayjs(to).utc().startOf('day')
@@ -130,7 +158,7 @@ app.post('/', middlewareAuth, async (c) => {
     throw simpleError('missing_params', 'channel_id and app_id are required')
   }
 
-  const days = Math.min(Math.max(body.days ?? 3, 1), 7)
+  const days = Math.min(Math.max(body.days ?? 30, 1), 30)
 
   if (!(await checkPermission(c, 'app.read', { appId: body.app_id }))) {
     throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.app_id })
@@ -146,7 +174,7 @@ app.post('/', middlewareAuth, async (c) => {
 
     const { data: channelData, error: channelError } = await supabase
       .from('channels')
-      .select('id, name, version, updated_at, version (name)')
+      .select('id, name, version, updated_at, version (name, created_at)')
       .eq('id', body.channel_id)
       .eq('app_id', body.app_id)
       .single()
@@ -158,7 +186,6 @@ app.post('/', middlewareAuth, async (c) => {
     const currentVersionName = (channelData.version as any)?.name ?? ''
 
     const endDate = dayjs().utc().endOf('day').toDate()
-    const startDate = dayjs().utc().startOf('day').subtract(days - 1, 'day').toDate()
 
     const { data: deployHistory, error: deployError } = await supabase
       .from('deploy_history')
@@ -195,11 +222,12 @@ app.post('/', middlewareAuth, async (c) => {
     const currentVersionRelease = deploymentHistory
       .filter(entry => entry.version_name === currentVersionName)
       .sort((a, b) => dayjs(b.deployed_at).valueOf() - dayjs(a.deployed_at).valueOf())[0]
+    const currentVersionCreatedAt = (channelData.version as any)?.created_at
     const currentVersionReleasedAt = currentVersionRelease?.deployed_at
+      ?? (currentVersionCreatedAt ? dayjs(currentVersionCreatedAt).utc().toISOString() : null)
       ?? (channelData.updated_at ? dayjs(channelData.updated_at).utc().toISOString() : null)
-
-    const labels = generateDateLabels(startDate, endDate)
-
+    const period = getStatsPeriod(days, endDate, currentVersionReleasedAt)
+    const { labels, startDate } = period
     const usageRows = await readStatsVersion(
       c,
       body.app_id,
@@ -243,22 +271,6 @@ app.post('/', middlewareAuth, async (c) => {
     const percentOnCurrent = totalDevices > 0 ? Math.round((devicesOnCurrent / totalDevices) * 1000) / 10 : 0
     const deploymentHistorySorted = [...deploymentHistory].sort((a, b) => dayjs(b.deployed_at).valueOf() - dayjs(a.deployed_at).valueOf())
 
-    const deploymentWindowCounts = { h24: 0, h72: 0, d7: 0 }
-    if (currentVersionName && labels.length > 0) {
-      const lastIndex = labels.length - 1
-      const getCountAt = (index: number) => {
-        const label = labels[index]
-        return Math.round(countsByDate[label]?.[currentVersionName] ?? 0)
-      }
-      deploymentWindowCounts.h24 = getCountAt(lastIndex)
-      deploymentWindowCounts.h72 = Math.max(0, lastIndex - 2) <= lastIndex
-        ? labels.slice(Math.max(0, lastIndex - 2), lastIndex + 1).reduce((sum, label) => sum + Math.round(countsByDate[label]?.[currentVersionName] ?? 0), 0)
-        : 0
-      deploymentWindowCounts.d7 = Math.max(0, lastIndex - 6) <= lastIndex
-        ? labels.slice(Math.max(0, lastIndex - 6), lastIndex + 1).reduce((sum, label) => sum + Math.round(countsByDate[label]?.[currentVersionName] ?? 0), 0)
-        : 0
-    }
-
     return c.json({
       labels,
       datasets,
@@ -271,10 +283,12 @@ app.post('/', middlewareAuth, async (c) => {
       deploymentHistory: deploymentHistorySorted.slice(0, 10),
       lastDeploymentAt: deploymentHistorySorted[0]?.deployed_at ?? null,
       totalDeployments: deploymentHistorySorted.length,
-      deploymentWindowCounts: {
-        h24: deploymentWindowCounts.h24,
-        h72: deploymentWindowCounts.h72,
-        d7: deploymentWindowCounts.d7,
+      period: {
+        requested_days: period.requestedDays,
+        actual_days: period.actualDays,
+        start: dayjs(period.startDate).utc().startOf('day').toISOString(),
+        end: dayjs(period.endDate).utc().endOf('day').toISOString(),
+        start_reason: period.startReason,
       },
       totals: {
         total_devices: totalDevices,
@@ -297,4 +311,5 @@ export const channelStatsTestUtils = {
   convertCountsToPercentagesByName,
   selectRecentChannelVersions,
   getLatestCounts,
+  getStatsPeriod,
 }

@@ -15,6 +15,30 @@ describe('channel stats helpers', () => {
     ])
   })
 
+  it('getStatsPeriod starts at the current release when it is inside the 30-day window', () => {
+    const period = channelStatsTestUtils.getStatsPeriod(
+      30,
+      new Date('2024-12-30T22:00:00Z'),
+      '2024-12-25T10:00:00Z',
+    )
+
+    expect(period.startReason).toBe('current_version_release')
+    expect(period.labels[0]).toBe('2024-12-25')
+    expect(period.actualDays).toBe(6)
+  })
+
+  it('getStatsPeriod keeps the requested window when the current release is older than 30 days', () => {
+    const period = channelStatsTestUtils.getStatsPeriod(
+      30,
+      new Date('2024-12-30T22:00:00Z'),
+      '2024-10-01T10:00:00Z',
+    )
+
+    expect(period.startReason).toBe('requested_days')
+    expect(period.labels[0]).toBe('2024-12-01')
+    expect(period.actualDays).toBe(30)
+  })
+
   it('fillMissingDailyCounts carries forward historical zero days', () => {
     const versions = ['1.0.0', '1.1.0']
     const labels = ['2024-12-01', '2024-12-02', '2024-12-03']
