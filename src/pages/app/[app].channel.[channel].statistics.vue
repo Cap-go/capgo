@@ -629,25 +629,23 @@ watchEffect(async () => {
           </div>
         </div>
 
-        <div class="flex flex-col gap-3 p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 class="text-lg font-semibold text-slate-900 dark:text-white">
-              {{ t('selected-period') }}: {{ selectedPeriodLabel }}
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div class="min-w-0">
+            <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              {{ t('selected-period') }}
             </h3>
             <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              {{ t('channel-stats-help', { period: selectedPeriodLabel, range: periodTimespanLabel }) }}
+              {{ selectedPeriodLabel }} · {{ periodTimespanLabel }}
             </p>
           </div>
-          <div class="flex flex-wrap items-center gap-2" role="group" :aria-label="t('selected-period')">
+          <div class="d-join shrink-0" role="group" :aria-label="t('selected-period')">
             <button
               v-for="d in periodDayOptions"
               :key="d"
               type="button"
               :aria-pressed="days === d"
-              class="d-btn d-btn-sm h-8 min-h-8 px-3"
-              :class="days === d
-                ? 'd-btn-primary'
-                : 'd-btn-ghost bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'"
+              class="d-btn d-btn-sm d-join-item min-w-12"
+              :class="days === d ? 'd-btn-primary' : 'd-btn-outline'"
               @click="selectPeriod(d)"
             >
               {{ periodButtonLabel(d) }}

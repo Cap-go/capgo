@@ -659,12 +659,12 @@ onMounted(async () => {
             :style="filterDropdownStyle"
             @click.stop
           >
-            <div v-if="filterShortcuts?.length" class="flex flex-wrap gap-2 mb-2">
+            <div v-if="filterShortcuts?.length" class="mb-2 border-b border-gray-200 pb-2 dark:border-gray-700">
               <button
                 v-for="shortcut in filterShortcuts"
                 :key="shortcut.label"
                 type="button"
-                class="d-btn d-btn-xs border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/50"
+                class="d-btn d-btn-ghost d-btn-sm w-full justify-start px-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
                 @click="applyFilterShortcut(shortcut)"
               >
                 {{ t(shortcut.label) }}
