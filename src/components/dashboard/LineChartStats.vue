@@ -491,12 +491,12 @@ const barPlugins = sharedPlugins as unknown as Plugin<'bar'>[]
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col">
-    <div class="min-h-0 flex-1">
+  <div class="flex min-h-full flex-col">
+    <div class="min-h-[16rem] flex-1">
       <Line v-if="accumulated" :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="linePlugins" />
       <Bar v-else :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="barPlugins" />
     </div>
-    <ul v-if="legendItems.length" class="mt-3 grid max-h-20 shrink-0 grid-cols-1 gap-x-4 gap-y-2 overflow-y-auto pr-1 [scrollbar-gutter:stable] sm:grid-cols-2">
+    <ul v-if="legendItems.length" class="mt-3 max-h-24 shrink-0 space-y-2 overflow-y-auto pr-1 [scrollbar-gutter:stable]">
       <li v-for="item in legendItems" :key="item.id" class="flex min-w-0 items-center gap-2 text-sm text-slate-700 dark:text-white">
         <span
           class="h-3 w-9 shrink-0 rounded-sm border"
