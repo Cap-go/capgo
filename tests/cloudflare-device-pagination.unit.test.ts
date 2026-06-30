@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import { createClient } from '@supabase/supabase-js'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { buildReadDevicesCFQuery, countDevicesCF, countInstallSourcesCF } from '../supabase/functions/_backend/utils/cloudflare.ts'
+import { buildReadDevicesCFQuery, countDevicesCF, countInstallSourcesCF, readBandwidthUsageCF } from '../supabase/functions/_backend/utils/cloudflare.ts'
 import { readDevicesSB } from '../supabase/functions/_backend/utils/supabase.ts'
 
 vi.mock('@supabase/supabase-js', () => ({
@@ -32,6 +32,7 @@ function createContextMock() {
       SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
       CF_ANALYTICS_TOKEN: 'cf-analytics-token',
       CF_ACCOUNT_ANALYTICS_ID: 'cf-account-id',
+      BANDWIDTH_USAGE: {},
     },
     req: { url: 'http://localhost/private/devices' },
     get: vi.fn((key: string) => key === 'requestId' ? 'test-request' : undefined),
@@ -115,7 +116,7 @@ describe('buildReadDevicesCFQuery', () => {
     const groupByIndex = query.indexOf('GROUP BY blob1')
     const installSourceFilterIndex = query.indexOf(`install_source IN ('app_store', 'amazon_appstore')`)
 
-    expect(query).toContain("argMax(blob9, CASE WHEN blob9 != '' THEN timestamp ELSE toDateTime('1970-01-01 00:00:00') END) AS install_source")
+    expect(query).toContain(`argMax(blob9, CASE WHEN blob9 != '' THEN timestamp ELSE toDateTime('1970-01-01 00:00:00') END) AS install_source`)
     expect(installSourceFilterIndex).toBeGreaterThan(groupByIndex)
     expect(query).not.toContain(`WHERE index1 = 'com.example.app' AND blob9 IN`)
     expect(query).toContain(`WHERE device_id > '11111111-1111-4111-8111-111111111111' AND install_source IN ('app_store', 'amazon_appstore')`)
@@ -146,6 +147,25 @@ describe('countDevicesCF', () => {
     expect(query).toContain('COUNT(DISTINCT blob1) AS total')
     expect(query).not.toContain('blob9')
     expect(query).not.toContain('install_source')
+  })
+})
+
+describe('readBandwidthUsageCF', () => {
+  it('throws strict bandwidth read failures instead of returning empty usage', async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error('analytics unavailable')
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(readBandwidthUsageCF(
+      createContextMock() as unknown as Context,
+      'com.example.app',
+      '2026-06-01',
+      '2026-07-01',
+      { throwOnError: true },
+    )).rejects.toThrow('runQueryToCFA encountered an error')
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -239,5 +259,4 @@ describe('readDevicesSB', () => {
 
     expect(query.in).toHaveBeenCalledWith('install_source', ['app_store', 'testflight'])
   })
-
 })
