@@ -8,6 +8,7 @@ import {
   generateChartDayLabels,
   generateMonthDays,
   getDateLocale,
+  resolveDateLocale,
 } from '../src/services/date'
 
 describe('date helpers', () => {
@@ -18,6 +19,13 @@ describe('date helpers', () => {
     expect(formatLocalDate(date)).toBe(new Intl.DateTimeFormat('en-GB').format(date))
     expect(formatLocalDate(date)).not.toBe(new Intl.DateTimeFormat('en-US').format(date))
   })
+
+  it.concurrent('falls back to day/month/year for unsupported date locales', () => {
+    expect(resolveDateLocale('eo')).toBe('en-GB')
+    expect(resolveDateLocale('fr-CA')).toBe('fr-FR')
+    expect(resolveDateLocale('en-US')).toBe('en-GB')
+  })
+
   it.concurrent('treats zone-less UTC stats timestamps as UTC before local formatting', () => {
     const expected = formatLocalDateTime(new Date('2026-04-22T20:22:00Z'))
 

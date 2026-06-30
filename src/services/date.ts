@@ -50,12 +50,16 @@ function parseDatePreservingUtc(date: Date | string | undefined | null): Date | 
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
-export function getDateLocale(): string {
-  const language = String(i18n.global.locale.value || 'en').trim().toLowerCase()
-  return DATE_LOCALES_BY_LANGUAGE[language]
-    ?? DATE_LOCALES_BY_LANGUAGE[language.split('-')[0]]
-    ?? language
+export function resolveDateLocale(language?: string | null): string {
+  const normalizedLanguage = String(language || 'en').trim().toLowerCase()
+  const baseLanguage = normalizedLanguage.split('-')[0]
+  return DATE_LOCALES_BY_LANGUAGE[normalizedLanguage]
+    ?? DATE_LOCALES_BY_LANGUAGE[baseLanguage]
     ?? DATE_LOCALES_BY_LANGUAGE.en
+}
+
+export function getDateLocale(): string {
+  return resolveDateLocale(i18n.global.locale.value)
 }
 
 /**
