@@ -568,7 +568,14 @@ export function applyAppflowInput(step: AppflowStep, progress: AppflowProgress, 
     case 'input-p8-issuer-id':
       return { ...base, p8IssuerId: (input.text ?? input.value ?? '').trim() }
     case 'handoff-build':
-      return { ...base, handoffChoice: input.value === 'build' ? 'build' : 'skip' }
+      // On 'build', the Appflow API work is done — switch progress.appId from the
+      // Appflow hex id to the Capgo app id (the Capacitor config appId) so the
+      // build/credential tail targets the real Capgo app, not the Appflow id.
+      return {
+        ...base,
+        handoffChoice: input.value === 'build' ? 'build' : 'skip',
+        ...(input.value === 'build' && base.capgoAppId ? { appId: base.capgoAppId } : {}),
+      }
     default:
       return base
   }

@@ -116,19 +116,29 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
   let iosBundleIdInitial: string | undefined
   let iosDir = 'ios'
   let androidDir = 'android'
+  let extConfig: Awaited<ReturnType<typeof getConfig>> | undefined
   try {
-    const extConfig = await getConfig()
-    appId = getAppId(undefined, extConfig?.config)
-    iosBundleIdInitial = extConfig?.config?.appId
-    iosDir = getPlatformDirFromCapacitorConfig(extConfig?.config, 'ios')
-    androidDir = getPlatformDirFromCapacitorConfig(extConfig?.config, 'android')
+    extConfig = await getConfig()
   }
   catch {
-    // getConfig may throw if not in a Capacitor project
+    // getConfig throws when this is not a Capacitor project (no capacitor.config.*)
+    extConfig = undefined
   }
 
+  // Simple guard: `build init` only makes sense inside a Capacitor app. If there
+  // is no Capacitor config, say so plainly and stop.
+  if (!extConfig?.config) {
+    log.error('This does not look like a Capacitor project. Run `capgo build init` from your app root (the folder with capacitor.config.ts, .js, or .json).')
+    process.exit(1)
+  }
+
+  appId = getAppId(undefined, extConfig.config)
+  iosBundleIdInitial = extConfig.config.appId
+  iosDir = getPlatformDirFromCapacitorConfig(extConfig.config, 'ios')
+  androidDir = getPlatformDirFromCapacitorConfig(extConfig.config, 'android')
+
   if (!appId) {
-    log.error('Could not detect app ID from capacitor.config.ts. Make sure you are in a Capacitor project directory.')
+    log.error('Found a Capacitor config but could not detect the app id. Set "appId" in your capacitor.config.ts and re-run.')
     process.exit(1)
   }
 

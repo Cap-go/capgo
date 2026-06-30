@@ -200,4 +200,15 @@ assert.strictEqual(afterDistPick.iosDistId, '42')
 assert.ok(!afterDistPick.completedSteps.includes('fetch-distribution'), 'fetch-distribution must be un-marked so it re-runs')
 assert.strictEqual(f.getAppflowResumeStep(afterDistPick), 'fetch-distribution')
 
+// ── build hand-off targets the CAPGO app id, not the Appflow hex ──
+// progress.appId is the Appflow hex during the migration; on 'build' it must
+// switch to capgoAppId (the Capacitor config app id) so the build/tail targets
+// the real Capgo app (fixes "Insufficient permissions for app <hex>").
+const preBuild = { scope: 'ios', appId: '27b1aa64', capgoAppId: 'com.my.app', ios: { x: '1' }, migratable: { ios: true, android: false }, completedSteps: [] }
+const onBuild = f.appflowFlow.applyInput('handoff-build', preBuild, { value: 'build' })
+assert.strictEqual(onBuild.appId, 'com.my.app', 'build must target the Capgo app id, not the Appflow hex')
+assert.strictEqual(onBuild.handoffChoice, 'build')
+const onSkip = f.appflowFlow.applyInput('handoff-build', preBuild, { value: 'skip' })
+assert.strictEqual(onSkip.handoffChoice, 'skip')
+
 console.log('appflow flow OK')

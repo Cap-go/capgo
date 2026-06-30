@@ -55,7 +55,7 @@ export interface AppflowAppProps {
 const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journeyId, onStep, onResult, onBeforeExit }) => {
   const { exit } = useApp()
   const { rows: terminalRows } = useTerminalSize()
-  const [progress, setProgress] = useState<AppflowProgress>(() => ({ scope, migratable: { ios: false, android: false }, completedSteps: [] }))
+  const [progress, setProgress] = useState<AppflowProgress>(() => ({ scope, capgoAppId: appId, migratable: { ios: false, android: false }, completedSteps: [] }))
   const [step, setStep] = useState<AppflowStep>(() => appflowFlow.resumeStep(null))
   const [ctx, setCtx] = useState<Record<string, unknown>>({})
   const [busy, setBusy] = useState(false)
