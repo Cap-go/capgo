@@ -377,6 +377,28 @@ const chartData = computed<ChartData<'line' | 'bar'>>(() => {
   }
 })
 
+const hasAppData = computed(() => Object.keys(props.dataByApp || {}).length > 0)
+
+function getLegendColor(color: unknown) {
+  if (typeof color === 'string')
+    return color
+  if (Array.isArray(color))
+    return getLegendColor(color[0])
+  return '#64748b'
+}
+
+const legendItems = computed(() => {
+  if (!hasAppData.value)
+    return []
+
+  return chartData.value.datasets.map((dataset, index) => ({
+    id: `${dataset.label ?? index}`,
+    label: `${dataset.label ?? ''}`,
+    backgroundColor: getLegendColor(dataset.backgroundColor),
+    borderColor: getLegendColor(dataset.borderColor),
+  }))
+})
+
 const todayLineOptions = computed(() => {
   if (!props.useBillingPeriod)
     return { enabled: false }
@@ -438,8 +460,7 @@ const dataMax = computed(() => {
 })
 
 const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin: AnnotationOptions, todayLine?: any } }>(() => {
-  const hasAppData = Object.keys(props.dataByApp || {}).length > 0
-  const scales = createStackedChartScales(isDark.value, hasAppData)
+  const scales = createStackedChartScales(isDark.value, hasAppData.value)
 
   // If we have a calculated max, use it to ensure small values are visible
   if (dataMax.value !== undefined) {
@@ -451,11 +472,11 @@ const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin
     scales,
     plugins: {
       inlineAnnotationPlugin: generateAnnotations.value,
-      legend: createLegendConfig(isDark.value, hasAppData),
+      legend: createLegendConfig(isDark.value, false),
       title: {
         display: false,
       },
-      tooltip: createTooltipConfig(hasAppData, props.accumulated, props.useBillingPeriod ? cycleStart : false, hasAppData ? tooltipClickHandler.value : undefined),
+      tooltip: createTooltipConfig(hasAppData.value, props.accumulated, props.useBillingPeriod ? cycleStart : false, hasAppData.value ? tooltipClickHandler.value : undefined),
       filler: {
         propagate: false,
       },
@@ -470,6 +491,22 @@ const barPlugins = sharedPlugins as unknown as Plugin<'bar'>[]
 </script>
 
 <template>
-  <Line v-if="accumulated" :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="linePlugins" />
-  <Bar v-else :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="barPlugins" />
+  <div class="flex h-full min-h-0 flex-col">
+    <div class="min-h-0 flex-1">
+      <Line v-if="accumulated" :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="linePlugins" />
+      <Bar v-else :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="barPlugins" />
+    </div>
+    <div v-if="legendItems.length" class="mt-3 max-h-20 shrink-0 overflow-y-auto pr-1 [scrollbar-gutter:stable]" role="list">
+      <div class="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+        <div v-for="item in legendItems" :key="item.id" class="flex min-w-0 items-center gap-2 text-sm text-slate-700 dark:text-white" role="listitem">
+          <span
+            class="h-3 w-9 shrink-0 rounded-sm border"
+            :style="{ backgroundColor: item.backgroundColor, borderColor: item.borderColor }"
+            aria-hidden="true"
+          />
+          <span class="min-w-0 truncate">{{ item.label }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
