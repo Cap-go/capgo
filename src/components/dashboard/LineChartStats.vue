@@ -114,7 +114,7 @@ const evolution = computed(() => {
     const last = arrWithoutUndefined[i - 1] ?? 0
     return i > 0 ? val - last : 0
   })
-  const median = res.reduce((a, b) => a + b, 0.0) / accumulateData.value.length
+  const median = res.reduce((a, b) => a + b, 0) / accumulateData.value.length
   const min = Math.min(...res)
   const max = Math.max(...res)
   return [min, max, median]
@@ -145,7 +145,7 @@ const projectionData = computed(() => {
       newVal = last + randomizedEvolution
     return acc.concat([newVal as number])
   }, [])
-  res = res.filter(i => i)
+  res = res.filter(Boolean)
   for (let i = 0; i < arrWithoutUndefined.length - 1; i++)
     res.unshift(undefined)
 
@@ -496,17 +496,15 @@ const barPlugins = sharedPlugins as unknown as Plugin<'bar'>[]
       <Line v-if="accumulated" :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="linePlugins" />
       <Bar v-else :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="barPlugins" />
     </div>
-    <div v-if="legendItems.length" class="mt-3 max-h-20 shrink-0 overflow-y-auto pr-1 [scrollbar-gutter:stable]" role="list">
-      <div class="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
-        <div v-for="item in legendItems" :key="item.id" class="flex min-w-0 items-center gap-2 text-sm text-slate-700 dark:text-white" role="listitem">
-          <span
-            class="h-3 w-9 shrink-0 rounded-sm border"
-            :style="{ backgroundColor: item.backgroundColor, borderColor: item.borderColor }"
-            aria-hidden="true"
-          />
-          <span class="min-w-0 truncate">{{ item.label }}</span>
-        </div>
-      </div>
-    </div>
+    <ul v-if="legendItems.length" class="mt-3 grid max-h-20 shrink-0 grid-cols-1 gap-x-4 gap-y-2 overflow-y-auto pr-1 [scrollbar-gutter:stable] sm:grid-cols-2">
+      <li v-for="item in legendItems" :key="item.id" class="flex min-w-0 items-center gap-2 text-sm text-slate-700 dark:text-white">
+        <span
+          class="h-3 w-9 shrink-0 rounded-sm border"
+          :style="{ backgroundColor: item.backgroundColor, borderColor: item.borderColor }"
+          aria-hidden="true"
+        />
+        <span class="min-w-0 truncate">{{ item.label }}</span>
+      </li>
+    </ul>
   </div>
 </template>
