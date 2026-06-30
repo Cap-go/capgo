@@ -6,7 +6,7 @@ import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevices
 import { getRuntimeKey } from 'hono/adapter'
 import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readDeviceVersionCountsCF, readNativeVersionUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
 import { isDemoApp } from './demo.ts'
-import { simpleError200 } from './hono.ts'
+import { simpleError, simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readDeviceVersionCountsSB, readNativeVersionUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
 import { DEFAULT_LIMIT } from './types.ts'
@@ -329,14 +329,18 @@ export function countDevices(
   deviceIds: string[] = [],
   versionName?: string,
   search?: string,
+  installSources?: string[],
 ) {
-  // Use Analytics Engine DEVICE_INFO when available in Cloudflare Workers.
-  // In local Cloudflare testing these bindings are often absent, so fall back
-  // to the Postgres/Supabase path.
+  // Install-source device writes live in Analytics Engine on Workers. Returning
+  // Postgres counts here would make store validation think no release exists.
+  if (installSources?.length && getRuntimeKey() === 'workerd' && c.env.DEVICE_INFO && !shouldUseAnalyticsEngine(c)) {
+    throw simpleError('analytics_engine_unavailable', 'Cannot count devices by install source without Analytics Engine read configuration')
+  }
+
   const trimmedSearch = search?.trim()
   if (shouldUseAnalyticsEngine(c))
-    return countDevicesCF(c, app_id, customIdMode, deviceIds, versionName, trimmedSearch)
-  return countDevicesSB(c, app_id, customIdMode, deviceIds, versionName, trimmedSearch)
+    return countDevicesCF(c, app_id, customIdMode, deviceIds, versionName, trimmedSearch, installSources)
+  return countDevicesSB(c, app_id, customIdMode, deviceIds, versionName, trimmedSearch, installSources)
 }
 
 export async function readDevices(c: Context, params: ReadDevicesParams, customIdMode: boolean): Promise<ReadDevicesResponse> {

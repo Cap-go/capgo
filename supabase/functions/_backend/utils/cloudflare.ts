@@ -279,6 +279,7 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
         comparableDevice.version_build ?? '',
         comparableDevice.default_channel ?? '',
         comparableDevice.key_id ?? '',
+        comparableDevice.install_source ?? '',
       ],
       doubles: [
         platformValue,
@@ -619,6 +620,7 @@ export async function countDevicesCF(
   deviceIds: string[] = [],
   versionName?: string,
   search?: string,
+  installSources?: string[],
 ) {
   // Use Analytics Engine DEVICE_INFO for counting devices
   const conditions = [`index1 = '${escapeSqlString(app_id)}'`]
@@ -647,9 +649,19 @@ export async function countDevicesCF(
   if (versionName)
     conditions.push(`blob2 = '${escapeSqlString(versionName)}'`)
 
-  const query = `SELECT COUNT(DISTINCT blob1) AS total
+  const sourceFilter = installSources?.length
+    ? `WHERE install_source IN (${installSources.map(source => `'${escapeSqlString(source)}'`).join(', ')})`
+    : ''
+  const query = `SELECT COUNT(*) AS total
+FROM (
+  SELECT
+    blob1 AS device_id,
+    argMax(blob9, CASE WHEN blob9 != '' THEN timestamp ELSE toDateTime('1970-01-01 00:00:00') END) AS install_source
 FROM device_info
-WHERE ${conditions.join(' AND ')}`
+WHERE ${conditions.join(' AND ')}
+  GROUP BY blob1
+)
+${sourceFilter}`
 
   cloudlog({ requestId: c.get('requestId'), message: 'countDevicesCF query', query })
   try {
@@ -658,6 +670,8 @@ WHERE ${conditions.join(' AND ')}`
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device count from Analytics Engine', error: serializeError(e), query })
+    if (installSources?.length)
+      throw e
   }
   return 0
 }
@@ -671,6 +685,7 @@ interface DeviceInfoCF {
   version_build: string
   default_channel: string
   key_id: string
+  install_source: string
   platform: number // 0 = android, 1 = ios
   is_prod: number // 0 or 1
   is_emulator: number // 0 or 1
@@ -689,7 +704,7 @@ function getReadDevicesCFOrder(params: ReadDevicesParams): DevicesOrderCF | null
   return activeOrder ? { ascending: activeOrder.sortable === 'asc' } : null
 }
 
-function buildReadDevicesCFCursorFilter(cursor: string | undefined, devicesOrder: DevicesOrderCF | null) {
+function buildReadDevicesCFCursorCondition(cursor: string | undefined, devicesOrder: DevicesOrderCF | null) {
   if (!cursor)
     return ''
 
@@ -699,12 +714,12 @@ function buildReadDevicesCFCursorFilter(cursor: string | undefined, devicesOrder
 
   const safeCursorDeviceId = escapeSqlString(cursorDeviceId)
   if (!devicesOrder)
-    return `WHERE device_id > '${safeCursorDeviceId}'`
+    return `device_id > '${safeCursorDeviceId}'`
 
   const safeCursorTime = escapeSqlString(cursorTime)
   const comparison = devicesOrder.ascending ? '>' : '<'
 
-  return `WHERE (updated_at ${comparison} toDateTime('${safeCursorTime}') OR (updated_at = toDateTime('${safeCursorTime}') AND device_id > '${safeCursorDeviceId}'))`
+  return `(updated_at ${comparison} toDateTime('${safeCursorTime}') OR (updated_at = toDateTime('${safeCursorTime}') AND device_id > '${safeCursorDeviceId}'))`
 }
 
 export function buildReadDevicesCFQuery(params: ReadDevicesParams, customIdMode: boolean) {
@@ -740,7 +755,11 @@ export function buildReadDevicesCFQuery(params: ReadDevicesParams, customIdMode:
   }
 
   const devicesOrder = getReadDevicesCFOrder(params)
-  const cursorFilter = buildReadDevicesCFCursorFilter(params.cursor, devicesOrder)
+  const outerConditions = [
+    buildReadDevicesCFCursorCondition(params.cursor, devicesOrder),
+    params.installSources?.length ? `install_source IN (${params.installSources.map(source => `'${escapeSqlString(source)}'`).join(', ')})` : '',
+  ].filter(Boolean)
+  const outerFilter = outerConditions.length ? `WHERE ${outerConditions.join(' AND ')}` : ''
   let orderBy = 'device_id ASC'
   if (devicesOrder) {
     const updatedAtDirection = devicesOrder.ascending ? 'ASC' : 'DESC'
@@ -759,6 +778,7 @@ export function buildReadDevicesCFQuery(params: ReadDevicesParams, customIdMode:
     '    argMax(blob6, timestamp) AS version_build,',
     '    argMax(blob7, timestamp) AS default_channel,',
     '    argMax(blob8, timestamp) AS key_id,',
+    '    argMax(blob9, CASE WHEN blob9 != \'\' THEN timestamp ELSE toDateTime(\'1970-01-01 00:00:00\') END) AS install_source,',
     '    argMax(double1, timestamp) AS platform,',
     '    argMax(double2, timestamp) AS is_prod,',
     '    argMax(double3, timestamp) AS is_emulator,',
@@ -767,7 +787,7 @@ export function buildReadDevicesCFQuery(params: ReadDevicesParams, customIdMode:
     `  WHERE ${conditions.join(' AND ')}`,
     '  GROUP BY blob1',
     ')',
-    cursorFilter,
+    outerFilter,
     `ORDER BY ${orderBy}`,
     `LIMIT ${limit + 1}`,
   ].filter(Boolean).join('\n')
@@ -779,7 +799,7 @@ export function buildReadDevicesCFQuery(params: ReadDevicesParams, customIdMode:
 export async function readDevicesCF(c: Context, params: ReadDevicesParams, customIdMode: boolean): Promise<DeviceRes[]> {
   // Use Analytics Engine DEVICE_INFO for reading devices
   // Schema: blob1=device_id, blob2=version_name, blob3=plugin_version, blob4=os_version,
-  //         blob5=custom_id, blob6=version_build, blob7=default_channel, blob8=key_id
+  //         blob5=custom_id, blob6=version_build, blob7=default_channel, blob8=key_id, blob9=install_source
   //         double1=platform (0=android, 1=ios), double2=is_prod, double3=is_emulator
   //         index1=app_id, timestamp=updated_at
 
@@ -810,6 +830,7 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
       version_build: row.version_build,
       is_prod: Boolean(row.is_prod),
       is_emulator: Boolean(row.is_emulator),
+      install_source: row.install_source || null,
       custom_id: row.custom_id,
       updated_at: formatDateCF(row.updated_at),
       default_channel: row.default_channel || null,

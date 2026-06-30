@@ -19,6 +19,7 @@ import { lastOutputCommand } from './build/last-output-command'
 import { checkBuildNeeded } from './build/needed'
 import type { OnboardingBuilderOptions } from './build/onboarding/command'
 import { onboardingBuilderCommand } from './build/onboarding/command'
+import { prescanCommand } from './build/prescan/command'
 import type { CreateAppleKeyOptions } from './build/onboarding/asc-key/command'
 import { createAppleKeyCommand } from './build/onboarding/asc-key/command'
 import { requestBuildCommand } from './build/request'
@@ -181,6 +182,10 @@ Examples:
   .option('--bundle <bundle>', `Bundle name or id to preview`)
   .option('--channel <channel>', `Channel name or id to preview`)
   .addOption(new Option('--type <type>', `Type for positional target`).choices(['bundle', 'channel']))
+  .option('--png <path>', `Write the preview QR code as a PNG image to the given file path`)
+  .option('--url', `Print preview URLs only (web and deep link), without a terminal QR code`)
+  .option('--web-url', `Encode the web preview URL in the QR code and PNG instead of the capgo:// deep link`)
+  .addOption(new Option('--preview-env <env>', `Preview web URL environment`).choices(['prod', 'preprod', 'dev']).default('prod'))
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
@@ -456,6 +461,16 @@ Example: npx @capgo/cli@latest app set com.example.app --name "Updated App" --re
   .option('--expose-metadata <exposeMetadata>', `Expose bundle metadata (link and comment) to the plugin (true/false, default: false)`)
   .option('--preview', `Enable bundle and channel preview QR codes for this app`)
   .option('--no-preview', `Disable bundle and channel preview QR codes for this app`)
+  .option('--allow-device-custom-id', `Allow devices to set a custom device ID for this app`)
+  .option('--no-allow-device-custom-id', `Disallow custom device IDs for this app`)
+  .option('--block-provider-infra-requests', `Block provider infrastructure requests for this app`)
+  .option('--no-block-provider-infra-requests', `Allow provider infrastructure requests for this app`)
+  .option('--build-timeout-minutes <minutes>', `Native build timeout in minutes (5-360, default: 15)`)
+  .option('--ios-store-url <url>', `iOS App Store URL for this app`)
+  .option('--android-store-url <url>', `Google Play Store URL for this app`)
+  .option('--default-upload-channel <channel>', `Default upload channel name for this app`)
+  .option('--default-download-channel <channel>', `Default download channel name for this app (sets channel public=true)`)
+  .option('--disable-download-channels', `Disable Capgo download channels for this app (sets all channels public=false)`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
@@ -876,6 +891,13 @@ Example: npx @capgo/cli@latest build request com.example.app --platform ios --pa
   .option('--android-flavor <flavor>', 'Android: Product flavor to build (e.g. production). Required if your project has multiple flavors.')
   .option('--in-app-update-priority <priority>', 'Android: Google Play in-app update priority for this release (integer 0–5; higher = more urgent). See https://developer.android.com/guide/playcore/in-app-updates. Precedence: CLI > env > saved credentials')
   .option('--no-playstore-upload', 'Skip Play Store upload for this build (nulls out saved play config). Requires --output-upload.')
+  .option('--submit-to-store-review', 'After upload, submit the store release for review instead of leaving it as a draft/inactive build. Android marks the Play release completed; iOS submits the processed TestFlight build to App Store review.')
+  .option('--store-release-name <name>', 'Store release name/version label. Android sends this as the Google Play version_name; iOS uses it as the App Store version when creating or reusing the editable version.')
+  .option('--store-release-notes <notes>', 'Default store release notes. Android uses this as the Play changelog; iOS uses it as the fallback App Store What\'s New text.')
+  .option('--store-release-notes-locale <locale=notes>', 'Localized store release notes (repeatable), for example --store-release-notes-locale en-US="Bug fixes" --store-release-notes-locale fr-FR="Corrections".', collect, [])
+  .option('--ios-testflight-groups <groups>', 'iOS: optional comma-separated TestFlight external group names or IDs for external beta distribution.')
+  .option('--ios-automatic-release', 'iOS: automatically release the App Store version after Apple approval. Default is manual release.')
+  .option('--no-ios-automatic-release', 'iOS: keep the App Store version waiting for manual release after Apple approval.')
   .option('--output-upload', 'Override output upload behavior for this build only (enable). Precedence: CLI > env > saved credentials')
   .option('--no-output-upload', 'Override output upload behavior for this build only (disable). Precedence: CLI > env > saved credentials')
   .option('--output-retention <duration>', 'Override output link TTL for this build only (1h to 7d). Examples: 1h, 6h, 2d. Precedence: CLI > env > saved credentials')
@@ -883,11 +905,33 @@ Example: npx @capgo/cli@latest build request com.example.app --platform ios --pa
   .option('--skip-build-number-bump', 'Skip automatic build number/version code incrementing. Uses whatever version is already in the project files.')
   .option('--no-skip-build-number-bump', 'Override saved credentials to re-enable automatic build number incrementing for this build only.')
   .option('--ai-analytics', 'On build failure, send logs to Capgo AI for diagnosis. In interactive terminals this skips the upfront confirmation; in CI this auto-uploads and prints the analysis to stderr.')
-  .option('--send-logs', 'On a CI/CD build failure, automatically upload the build logs to Capgo support (no email required). Capgo support is notified and will follow up by email. Additive to --ai-analytics — both can be passed.')
+  .option('--no-prescan', 'Skip the automatic pre-build scan')
+  .option('--prescan-ignore-fatal', 'Run the pre-build scan but never block the build (report only)')
+  .option('--fail-on-warnings', 'Treat prescan warnings as fatal')
+  .option('--send-logs-to-support', 'On a CI/CD build failure, automatically upload the build logs to Capgo support (no email required). Capgo support is notified and will follow up by email. Additive to --ai-analytics.')
+  .addOption(new Option('--send-logs', 'Deprecated alias for --send-logs-to-support').hideHelp())
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
   .option('--verbose', optionDescriptions.verbose)
+
+build
+  .command('prescan [appId]')
+  .description(`Scan your project and saved credentials for problems that would fail a cloud build — before uploading anything.
+
+Checks credentials (expiry, passwords, profile pairing), project state (cap sync, node_modules layout), and platform config. Runs automatically inside \`build request\`; this command runs it standalone (e.g. in CI).`)
+  .option('--platform <platform>', 'Target platform: ios or android (required)')
+  .option('--path <path>', 'Path to the project directory (default: current directory)')
+  .option('-a, --apikey <apikey>', optionDescriptions.apikey)
+  .option('--android-flavor <flavor>', 'Android: product flavor the build will use')
+  .addOption(new Option('--ios-dist <mode>', 'iOS: distribution mode to validate against').choices(['app_store', 'ad_hoc']))
+  .option('--json', 'Output a machine-readable JSON report')
+  .option('--fail-on-warnings', 'Exit non-zero when warnings are found (CI)')
+  .option('--ignore-fatal', 'Diagnostic mode: report everything but always exit 0')
+  .option('--verbose', optionDescriptions.verbose)
+  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+  .action(prescanCommand)
 
 build
   .command('last-output')

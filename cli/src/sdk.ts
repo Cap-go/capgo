@@ -52,7 +52,7 @@ import { getInfoInternal } from './app/info'
 import { listAppInternal } from './app/list'
 import { setAppInternal } from './app/set'
 import { setSettingInternal } from './app/setting'
-import { requestBuildInternal } from './build/request'
+import { parseStoreReleaseNotesLocalizedJson, requestBuildInternal } from './build/request'
 import { cleanupBundleInternal } from './bundle/cleanup'
 import { checkCompatibilityInternal } from './bundle/compatibility'
 import { decryptZipInternal } from './bundle/decrypt'
@@ -729,6 +729,16 @@ export class CapgoSDK {
         keystoreKeyPassword: creds?.KEYSTORE_KEY_PASSWORD,
         keystoreStorePassword: creds?.KEYSTORE_STORE_PASSWORD,
         playConfigJson: creds?.PLAY_CONFIG_JSON,
+        submitToStoreReview: options.submitToStoreReview ?? (creds?.CAPGO_STORE_SUBMIT_REVIEW === undefined ? undefined : creds.CAPGO_STORE_SUBMIT_REVIEW === 'true'),
+        storeReleaseName: options.storeReleaseName ?? creds?.CAPGO_STORE_RELEASE_NAME,
+        storeReleaseNotes: options.storeReleaseNotes ?? creds?.CAPGO_STORE_RELEASE_NOTES,
+        storeReleaseNotesLocalized: options.storeReleaseNotesLocalized ?? parseStoreReleaseNotesLocalizedJson(creds?.CAPGO_STORE_RELEASE_NOTES_LOCALIZED),
+        iosTestflightGroups: options.iosTestflightGroups ?? creds?.CAPGO_IOS_TESTFLIGHT_GROUPS,
+        iosAutomaticRelease: options.iosAutomaticRelease ?? (creds?.CAPGO_IOS_AUTOMATIC_RELEASE === undefined ? undefined : creds.CAPGO_IOS_AUTOMATIC_RELEASE === 'true'),
+        // Prescan escape hatch: SDK callers own their output channel and cannot
+        // pass CLI flags, so expose the gate controls directly.
+        prescan: options.prescan,
+        prescanIgnoreFatal: options.prescanIgnoreFatal,
       }
 
       const result = await requestBuildInternal(options.appId, internalOptions, true)

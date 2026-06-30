@@ -42,7 +42,7 @@ await test('no flags -> tip produced, neither action runs', () => {
   assert.equal(a.tip, CI_FAILURE_TIP)
   // The tip must surface BOTH escape hatches so CI users can discover them.
   assert.ok(a.tip.includes('--ai-analytics'), 'tip mentions --ai-analytics')
-  assert.ok(a.tip.includes('--send-logs'), 'tip mentions --send-logs')
+  assert.ok(a.tip.includes('--send-logs-to-support'), 'tip mentions --send-logs-to-support')
 })
 
 // ---- (b) --send-logs -> only the upload action runs, no tip ----

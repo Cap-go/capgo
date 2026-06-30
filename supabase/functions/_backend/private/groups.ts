@@ -1,6 +1,7 @@
 import { sValidator } from '@hono/standard-validator'
+import { HTTPException } from 'hono/http-exception'
 import { and, eq } from 'drizzle-orm'
-import { createHono, middlewareAuth, useCors } from '../utils/hono.ts'
+import { createHono, middlewareAuth, quickError, useCors } from '../utils/hono.ts'
 import { cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { schema } from '../utils/postgres_schema.ts'
@@ -36,7 +37,7 @@ app.get('/:org_id', sValidator('param', orgIdParamSchema, invalidOrgIdHook), asy
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
-  if (!(await checkPermission(c, 'org.read_members', { orgId }))) {
+  if (!(await checkPermission(c, 'org.update_user_roles', { orgId }))) {
     return c.json({ error: 'Forbidden' }, 403)
   }
 
@@ -299,8 +300,22 @@ app.get('/:group_id/members', sValidator('param', groupIdParamSchema, invalidGro
       return c.json({ error: 'Group not found' }, 404)
     }
 
-    if (!(await checkPermission(c, 'org.read_members', { orgId: group.org_id }))) {
-      return c.json({ error: 'Forbidden' }, 403)
+    const canManageGroup = await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id })
+    if (!canManageGroup) {
+      const [membership] = await drizzle
+        .select({ userId: schema.group_members.user_id })
+        .from(schema.group_members)
+        .where(
+          and(
+            eq(schema.group_members.group_id, groupId),
+            eq(schema.group_members.user_id, userId),
+          ),
+        )
+        .limit(1)
+
+      if (!membership) {
+        throw quickError(403, 'forbidden', 'Forbidden')
+      }
     }
 
     // Fetch members with details
@@ -318,6 +333,9 @@ app.get('/:group_id/members', sValidator('param', groupIdParamSchema, invalidGro
     return c.json(members)
   }
   catch (error) {
+    if (error instanceof HTTPException) {
+      throw error
+    }
     cloudlogErr({
       requestId: c.get('requestId'),
       message: 'group_members_fetch_failed',

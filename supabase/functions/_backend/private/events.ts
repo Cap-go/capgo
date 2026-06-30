@@ -5,6 +5,7 @@ import type { BentoTrackingPayload } from '../utils/tracking.ts'
 import { Hono } from 'hono/tiny'
 import { BUILDER_RECOVERY_MILESTONES, buildBuilderOnboardingBentoEvent } from '../utils/builder_onboarding_recovery.ts'
 import { BUNDLE_INCOMPATIBLE_EVENT, buildBundleCompatibilityBentoEvent } from '../utils/bundle_compatibility_recovery.ts'
+import { buildPlanCheckoutStartedBentoEvent, PLAN_CHECKOUT_STARTED_EVENT } from '../utils/checkout_tracking.ts'
 import { BRES, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
@@ -18,6 +19,7 @@ import { backgroundTask } from '../utils/utils.ts'
 // PostHog event recording whether the org-member incompatibility email was sent
 // or skipped (and why). Powers the weekly sent-vs-skipped breakdown.
 const BUNDLE_INCOMPATIBLE_EMAIL_EVENT = 'Bundle Incompatible Email'
+const STORE_RELEASE_VALIDATION_EVENT = 'store-release-validation-needed'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
@@ -51,6 +53,16 @@ function toIdString(value: unknown): string | undefined {
   if (typeof value === 'number' || typeof value === 'bigint')
     return String(value)
   return undefined
+}
+
+function tagString(tags: Record<string, unknown> | undefined, key: string) {
+  const value = tags?.[key]
+  return typeof value === 'string' ? value : undefined
+}
+
+function tagNumber(tags: Record<string, unknown> | undefined, key: string) {
+  const value = tags?.[key]
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
 async function resolveTrackingUserId(
@@ -270,6 +282,41 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     }
   }
 
+  // Plan checkout start: the frontend emits this only when the user accepts the
+  // Stripe navigation, not when the checkout URL is prefetched.
+  let planCheckoutBentoEvent: BentoTrackingPayload | undefined
+  if (onboardingOrgId && trackedBody.event === PLAN_CHECKOUT_STARTED_EVENT) {
+    if (!(await checkPermission(c, 'org.update_billing', { orgId: onboardingOrgId }))) {
+      throw quickError(403, 'no_permission', 'You cannot send checkout events for this organization')
+    }
+
+    const { data: orgData, error: orgError } = await supabase
+      .from('orgs')
+      .select('id, name')
+      .eq('id', onboardingOrgId)
+      .single()
+
+    if (orgError || !orgData) {
+      cloudlog({ requestId: c.get('requestId'), message: 'plan checkout bento lookup failed; skipping signal', org: orgError })
+    }
+    else {
+      const tags = trackedBody.tags ?? {}
+      planCheckoutBentoEvent = buildPlanCheckoutStartedBentoEvent({
+        event: trackedBody.event,
+        orgId: onboardingOrgId,
+        orgName: orgData.name,
+        productId: tagString(tags, 'product_id'),
+        planName: tagString(tags, 'plan_name'),
+        recurrence: tagString(tags, 'recurrence'),
+        checkoutSource: tagString(tags, 'checkout_source'),
+        currentPlanName: tagString(tags, 'current_plan_name'),
+        planPrice: tagNumber(tags, 'plan_price'),
+        planPriceMonthly: tagNumber(tags, 'plan_price_monthly'),
+        planPriceYearly: tagNumber(tags, 'plan_price_yearly'),
+      })
+    }
+  }
+
   // Bundle compatibility failure (capgo bundle upload / bundle compatibility):
   // when the CLI reports an incompatible bundle, emit a Bento signal so a
   // lifecycle automation can react. Mirrors the builder block above; resolves
@@ -364,9 +411,35 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
       }
     }
   }
+  let storeReleaseValidationBentoEvent: BentoTrackingPayload | undefined
+  if (onboardingOrgId && appId && trackedBody.event === STORE_RELEASE_VALIDATION_EVENT) {
+    const [orgResult, appResult] = await Promise.all([
+      supabase.from('orgs').select('id, name').eq('id', onboardingOrgId).single(),
+      supabase.from('apps').select('name').eq('app_id', appId).single(),
+    ])
+    if (orgResult.error || appResult.error) {
+      cloudlog({ requestId: c.get('requestId'), message: 'store release validation bento lookup failed; skipping signal', org: orgResult.error, app: appResult.error })
+    }
+    else {
+      storeReleaseValidationBentoEvent = {
+        cron: '0 9 * * 1',
+        event: STORE_RELEASE_VALIDATION_EVENT,
+        preferenceKey: 'onboarding',
+        uniqId: `${STORE_RELEASE_VALIDATION_EVENT}:${appId}`,
+        data: {
+          org_id: orgResult.data.id,
+          org_name: orgResult.data.name,
+          app_id: appId,
+          app_name: appResult.data?.name ?? '',
+          has_testflight_device: trackedBody.tags?.has_testflight_device === true,
+          has_android_store_device: trackedBody.tags?.has_android_store_device === true,
+        },
+      }
+    }
+  }
 
   // Exactly one of these is ever set (distinct event names); `??` picks the active one.
-  const bentoEvent = onboardingBentoEvent ?? builderBentoEvent ?? bundleIncompatibleBentoEvent
+  const bentoEvent = onboardingBentoEvent ?? builderBentoEvent ?? planCheckoutBentoEvent ?? bundleIncompatibleBentoEvent ?? storeReleaseValidationBentoEvent
   await sendEventToTracking(c, {
     ...trackedBody,
     bento: bentoEvent,

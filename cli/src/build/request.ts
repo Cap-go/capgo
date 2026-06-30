@@ -33,7 +33,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { mkdir, readFile as readFileAsync, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
-import process, { chdir, cwd, exit } from 'node:process'
+import process, { cwd, exit } from 'node:process'
 import { isCancel as clackIsCancel, log as clackLog, select as clackSelect, confirm, select, spinner as spinnerC } from '@clack/prompts'
 import AdmZip from 'adm-zip'
 import { WebSocket as PartySocket } from 'partysocket'
@@ -63,11 +63,13 @@ import { copyToClipboard, revealInFinder } from '../support/clipboard.js'
 import { contactSupport } from '../support/contact-support.js'
 import { appendInternalLog, getInternalLogPath, startInternalLog } from '../support/internal-log.js'
 import { uploadSupportLogs } from '../support/support-upload.js'
+import { offerSupportUploadBeforeAi } from '../support/support-upload-prompt.js'
 import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent, TUS_UPLOAD_RETRY_DELAYS } from '../utils'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
+import { withCwd } from './cwd'
 import { writeBuildOutputRecord } from './output-record'
-import { getPlatformDirFromCapacitorConfig } from './platform-paths'
+import { getPlatformDirFromCapacitorConfig, normalizeNativeDependencyPathsInText } from './platform-paths'
 import { handleCustomMsg } from './qr.js'
 import { trackBuilderUpload } from './telemetry.js'
 
@@ -197,42 +199,8 @@ function createDefaultLogger(silent: boolean): BuildLogger {
   }
 }
 
-let cwdQueue: Promise<unknown> = Promise.resolve()
-
-/**
- * Run an async function with the process working directory temporarily set to `dir`.
- *
- * NOTE: `process.chdir()` is global, so this uses a simple in-process queue to avoid
- * concurrent calls interfering with each other.
- */
-async function withCwd<T>(dir: string, fn: () => Promise<T>): Promise<T> {
-  const run = async () => {
-    const previous = cwd()
-    try {
-      chdir(dir)
-    }
-    catch (error) {
-      throw new Error(`Failed to change working directory to "${dir}": ${(error as Error).message}`)
-    }
-
-    try {
-      return await fn()
-    }
-    finally {
-      try {
-        chdir(previous)
-      }
-      catch (err) {
-        appendInternalLog(`cwd restore failed (ignored): ${err instanceof Error ? err.message : String(err)}`)
-        // Best-effort restore; ignore to avoid masking original errors.
-      }
-    }
-  }
-
-  const p = cwdQueue.then(run, run)
-  cwdQueue = p.then(() => undefined, () => undefined)
-  return p
-}
+// `withCwd` (the global chdir queue) lives in ./cwd so the prescan context
+// builder shares the same queue — see src/build/cwd.ts.
 
 /**
  * Fetch with retry logic for build requests
@@ -774,9 +742,9 @@ async function extractNativeDependencies(
       const spmContent = await readFileAsync(spmPackagePath, 'utf-8')
       // Match lines like: .package(name: "CapacitorApp", path: "../../../node_modules/@capacitor/app")
       // The path can have varying numbers of ../ depending on project structure
-      const spmMatches = spmContent.matchAll(/\.package\s*\([^)]*path:\s*["'](?:\.\.\/)*node_modules\/([^"']+)["']\s*\)/g)
+      const spmMatches = spmContent.matchAll(/\.package\s*\([^)]*path:\s*["'](?:\.\.[\\/])*node_modules[\\/]([^"']+)["']\s*\)/g)
       for (const match of spmMatches) {
-        let pkgPath = match[1]
+        let pkgPath = match[1].replace(/\\/g, '/')
         const lastNmIdx = pkgPath.lastIndexOf('node_modules/')
         if (lastNmIdx !== -1)
           pkgPath = pkgPath.substring(lastNmIdx + 'node_modules/'.length)
@@ -805,7 +773,7 @@ async function extractNativeDependencies(
       for (const podfilePath of uniqPodfiles) {
         const podfileContent = await readFileAsync(podfilePath, 'utf-8')
         // Match lines like: pod 'CapacitorApp', :path => '../../node_modules/@capacitor/app'
-        const podMatches = podfileContent.matchAll(/pod\s+['"][^'"]+['"],\s*:path\s*=>\s*['"](?:\.\.\/)+node_modules\/([^'"]+)['"]/g)
+        const podMatches = podfileContent.matchAll(/pod\s+['"][^'"]+['"],\s*:path\s*=>\s*['"](?:\.\.[\\/])+node_modules[\\/]([^'"]+)['"]/g)
         for (const match of podMatches) {
           let pkgPath = match[1]
           const lastNmIdx = pkgPath.lastIndexOf('node_modules/')
@@ -823,9 +791,9 @@ async function extractNativeDependencies(
       const settingsContent = await readFileAsync(settingsGradlePath, 'utf-8')
       // Match lines like: project(':capacitor-app').projectDir = new File('../node_modules/@capacitor/app/android')
       // Also matches pnpm paths: new File('../node_modules/.pnpm/@pkg@ver/node_modules/@scope/pkg/android')
-      const gradleMatches = settingsContent.matchAll(/new\s+File\s*\(\s*['"]\.\.\/node_modules\/([^'"]+)['"]\s*\)/g)
+      const gradleMatches = settingsContent.matchAll(/new\s+File\s*\(\s*['"]\.\.[\\/]node_modules[\\/]([^'"]+)['"]\s*\)/g)
       for (const match of gradleMatches) {
-        let fullPath = match[1]
+        let fullPath = match[1].replace(/\\/g, '/')
 
         // Normalize pnpm paths: .pnpm/@pkg+name@ver/node_modules/@scope/pkg/android → @scope/pkg
         const lastNodeModulesIdx = fullPath.lastIndexOf('node_modules/')
@@ -1162,7 +1130,8 @@ export async function zipDirectory(projectDir: string, outputPath: string, platf
     if (!textExtensions.has(ext) && basename !== 'Podfile')
       continue
     const original = entry.getData().toString('utf-8')
-    let rewritten = original.replace(pnpmPathPattern, 'node_modules/').replace(bunPathPattern, 'node_modules/')
+    let rewritten = normalizeNativeDependencyPathsInText(original)
+    rewritten = rewritten.replace(pnpmPathPattern, 'node_modules/').replace(bunPathPattern, 'node_modules/')
 
     // pnpm can leave deep relative paths in iOS files like Package.swift and Pods output.
     // Collapse any excessive ../ before project-root ios/ or node_modules/ paths back to
@@ -1218,6 +1187,12 @@ export const NON_CREDENTIAL_KEYS = new Set([
   'BUILD_OUTPUT_UPLOAD_ENABLED',
   'BUILD_OUTPUT_RETENTION_SECONDS',
   'SKIP_BUILD_NUMBER_BUMP',
+  'CAPGO_STORE_SUBMIT_REVIEW',
+  'CAPGO_STORE_RELEASE_NAME',
+  'CAPGO_STORE_RELEASE_NOTES',
+  'CAPGO_STORE_RELEASE_NOTES_LOCALIZED',
+  'CAPGO_IOS_AUTOMATIC_RELEASE',
+  'CAPGO_IOS_TESTFLIGHT_GROUPS',
   'CAPGO_IOS_SOURCE_DIR',
   'CAPGO_IOS_APP_DIR',
   'CAPGO_IOS_PROJECT_DIR',
@@ -1228,6 +1203,63 @@ export const NON_CREDENTIAL_KEYS = new Set([
   'ANDROID_PROJECT_DIR',
   'CAPGO_ANDROID_FLAVOR',
 ])
+
+type LocalizedReleaseNotes = Record<string, string>
+
+export function parseStoreReleaseNotesLocaleEntries(entries?: string[]): LocalizedReleaseNotes | undefined {
+  if (!entries || entries.length === 0)
+    return undefined
+
+  const localized: LocalizedReleaseNotes = {}
+  for (const entry of entries) {
+    const separatorIndex = entry.indexOf('=')
+    if (separatorIndex <= 0) {
+      throw new Error('--store-release-notes-locale must use locale=notes format, for example: --store-release-notes-locale en-US="Bug fixes"')
+    }
+
+    const locale = entry.slice(0, separatorIndex).trim()
+    const notes = entry.slice(separatorIndex + 1).trim()
+    if (!locale || !notes) {
+      throw new Error('--store-release-notes-locale requires both a locale and non-empty release notes')
+    }
+
+    localized[locale] = notes
+  }
+
+  return Object.keys(localized).length > 0 ? localized : undefined
+}
+
+export function parseStoreReleaseNotesLocalizedJson(value?: string): LocalizedReleaseNotes | undefined {
+  const raw = value?.trim()
+  if (!raw)
+    return undefined
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  }
+  catch (error) {
+    throw new Error(`CAPGO_STORE_RELEASE_NOTES_LOCALIZED must be valid JSON: ${error instanceof Error ? error.message : String(error)}`)
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('CAPGO_STORE_RELEASE_NOTES_LOCALIZED must be a JSON object like {"en-US":"Bug fixes"}')
+  }
+
+  const localized: LocalizedReleaseNotes = {}
+  for (const [locale, notes] of Object.entries(parsed)) {
+    const cleanLocale = locale.trim()
+    if (typeof notes !== 'string' || !notes.trim()) {
+      throw new Error(`CAPGO_STORE_RELEASE_NOTES_LOCALIZED.${cleanLocale || locale} must be a non-empty string`)
+    }
+    if (!cleanLocale) {
+      throw new Error('CAPGO_STORE_RELEASE_NOTES_LOCALIZED cannot contain an empty locale key')
+    }
+    localized[cleanLocale] = notes.trim()
+  }
+
+  return Object.keys(localized).length > 0 ? localized : undefined
+}
 
 /**
  * Split merged credentials into a build options payload and a credentials-only payload.
@@ -1240,6 +1272,11 @@ export function splitPayload(
   buildMode: string,
   cliVersion: string,
 ): { buildOptions: BuildOptionsPayload, buildCredentials: Record<string, string> } {
+  const storeReleaseNotesLocalized = parseStoreReleaseNotesLocalizedJson(mergedCredentials.CAPGO_STORE_RELEASE_NOTES_LOCALIZED)
+  const iosAutomaticRelease = mergedCredentials.CAPGO_IOS_AUTOMATIC_RELEASE === undefined
+    ? undefined
+    : mergedCredentials.CAPGO_IOS_AUTOMATIC_RELEASE === 'true'
+
   const buildOptions: BuildOptionsPayload = {
     platform,
     buildMode: buildMode as 'debug' | 'release',
@@ -1259,6 +1296,12 @@ export function splitPayload(
       ? Number.parseInt(mergedCredentials.BUILD_OUTPUT_RETENTION_SECONDS, 10) || MIN_OUTPUT_RETENTION_SECONDS
       : MIN_OUTPUT_RETENTION_SECONDS,
     skipBuildNumberBump: mergedCredentials.SKIP_BUILD_NUMBER_BUMP === 'true',
+    submitToStoreReview: mergedCredentials.CAPGO_STORE_SUBMIT_REVIEW === 'true',
+    storeReleaseName: mergedCredentials.CAPGO_STORE_RELEASE_NAME,
+    storeReleaseNotes: mergedCredentials.CAPGO_STORE_RELEASE_NOTES,
+    storeReleaseNotesLocalized,
+    iosTestflightGroups: mergedCredentials.CAPGO_IOS_TESTFLIGHT_GROUPS,
+    iosAutomaticRelease,
   }
 
   const buildCredentials: Record<string, string> = {}
@@ -1299,6 +1342,14 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     : baseLogger
 
   try {
+    // --prescan-ignore-fatal + --fail-on-warnings is contradictory (the spec says the
+    // CLI rejects the combination on `build request` too, not just `build prescan`).
+    // Validated before any network call so nothing is ever created server-side.
+    if (options.prescan === true) {
+      const { validateFlags } = await import('./prescan/command')
+      validateFlags({ ignoreFatal: options.prescanIgnoreFatal, failOnWarnings: options.failOnWarnings })
+    }
+
     options.apikey = options.apikey || findSavedKey(silent)
     const projectDir = resolve(options.path || cwd())
 
@@ -1315,13 +1366,20 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     const host = options.supaHost || 'https://api.capgo.app'
 
     const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
-    await assertCliPermission(supabase, options.apikey, 'app.build_native', { appId }, {
-      message: `Insufficient permissions to request a native build for app ${appId}`,
-      silent,
-    })
+    // NOTE: the build-permission assert was moved below (after the prescan gate) so prescan's
+    // batched report — which includes shared/apikey-permission — is what users see first.
 
-    // Get organization ID for analytics
-    const orgId = await getOrganizationId(supabase, appId)
+    // Org id is best-effort, for analytics tags only. Don't hard-abort here when the app
+    // isn't visible to this key: prescan's shared/app-exists check explains *why* (and the
+    // permission backstop below still enforces access for --no-prescan), so letting the gate
+    // run first gives the batched report instead of a bare "Cannot get organization id".
+    let orgId = ''
+    try {
+      orgId = await getOrganizationId(supabase, appId)
+    }
+    catch {
+      // App not accessible / no org — surfaced by prescan (app-exists) and the permission backstop.
+    }
 
     log.info(`Requesting native build for ${appId}`)
     log.info(`Platform: ${platform}`)
@@ -1335,6 +1393,11 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
     // Collect credentials from CLI args (if provided)
     const cliCredentials: Partial<BuildCredentials> = {}
+    const cliStoreReleaseNotesLocalized = {
+      ...(options.storeReleaseNotesLocalized ?? {}),
+      ...(parseStoreReleaseNotesLocaleEntries(options.storeReleaseNotesLocale) ?? {}),
+    }
+    const hasCliStoreReleaseNotesLocalized = Object.keys(cliStoreReleaseNotesLocalized).length > 0
     if (options.buildCertificateBase64)
       cliCredentials.BUILD_CERTIFICATE_BASE64 = options.buildCertificateBase64
     if (options.p12Password)
@@ -1405,6 +1468,21 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     if (options.skipBuildNumberBump !== undefined) {
       cliCredentials.SKIP_BUILD_NUMBER_BUMP = parseOptionalBoolean(options.skipBuildNumberBump) ? 'true' : 'false'
     }
+    if (options.submitToStoreReview !== undefined) {
+      cliCredentials.CAPGO_STORE_SUBMIT_REVIEW = parseOptionalBoolean(options.submitToStoreReview) ? 'true' : 'false'
+    }
+    if (typeof options.storeReleaseName === 'string' && options.storeReleaseName.trim()) {
+      cliCredentials.CAPGO_STORE_RELEASE_NAME = options.storeReleaseName.trim()
+    }
+    if (typeof options.storeReleaseNotes === 'string' && options.storeReleaseNotes.trim()) {
+      cliCredentials.CAPGO_STORE_RELEASE_NOTES = options.storeReleaseNotes.trim()
+    }
+    if (typeof options.iosTestflightGroups === 'string' && options.iosTestflightGroups.trim()) {
+      cliCredentials.CAPGO_IOS_TESTFLIGHT_GROUPS = options.iosTestflightGroups.trim()
+    }
+    if (options.iosAutomaticRelease !== undefined) {
+      cliCredentials.CAPGO_IOS_AUTOMATIC_RELEASE = parseOptionalBoolean(options.iosAutomaticRelease) ? 'true' : 'false'
+    }
 
     // Merge credentials from all three sources:
     // 1. CLI args (highest priority)
@@ -1416,6 +1494,13 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       Object.keys(cliCredentials).length > 0 ? cliCredentials : undefined,
     )
 
+    if (mergedCredentials && hasCliStoreReleaseNotesLocalized) {
+      const existingLocalized = parseStoreReleaseNotesLocalizedJson(mergedCredentials.CAPGO_STORE_RELEASE_NOTES_LOCALIZED) ?? {}
+      mergedCredentials.CAPGO_STORE_RELEASE_NOTES_LOCALIZED = JSON.stringify({
+        ...existingLocalized,
+        ...cliStoreReleaseNotesLocalized,
+      })
+    }
     // --no-playstore-upload: null out PLAY_CONFIG_JSON so it never reaches the builder
     if (options.playstoreUpload === false && mergedCredentials) {
       delete mergedCredentials.PLAY_CONFIG_JSON
@@ -1455,7 +1540,6 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       log.error('  https://capgo.app/docs/cli/cloud-build/credentials/')
       throw new Error('No credentials found. Please provide credentials before building.')
     }
-
     // Validate platform-specific required credentials
     const missingCreds: string[] = []
 
@@ -1473,6 +1557,9 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       }
       // Write normalized value back so splitPayload picks it up
       mergedCredentials.CAPGO_IOS_DISTRIBUTION = distributionMode
+      if (mergedCredentials.CAPGO_STORE_SUBMIT_REVIEW === 'true' && distributionMode !== 'app_store') {
+        missingCreds.push('--submit-to-store-review on iOS requires --ios-distribution app_store')
+      }
 
       // iOS minimum requirements (all modes)
       if (!mergedCredentials.BUILD_CERTIFICATE_BASE64)
@@ -1514,6 +1601,10 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         const hasAppleAppId = !!mergedCredentials.APPLE_APP_ID
         const anyAppSpecificField = hasFastlaneUser || hasAppSpecificPassword || hasAppleAppId
         const hasCompleteAppSpecificPassword = hasFastlaneUser && hasAppSpecificPassword && hasAppleAppId
+
+        if (mergedCredentials.CAPGO_STORE_SUBMIT_REVIEW === 'true' && !hasCompleteAppleApiKey) {
+          missingCreds.push('App Store Connect API key (APPLE_KEY_ID/APPLE_ISSUER_ID/APPLE_KEY_CONTENT) is required for --submit-to-store-review on iOS')
+        }
 
         // APPLE_APP_ID is the app's numeric App Store Connect id; a non-numeric
         // value would make the headless TestFlight upload fail with a cryptic
@@ -1593,7 +1684,10 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
       // PLAY_CONFIG_JSON is optional for build, but required for upload to Play Store
       if (!mergedCredentials.PLAY_CONFIG_JSON) {
-        if (mergedCredentials.BUILD_OUTPUT_UPLOAD_ENABLED !== 'true') {
+        if (mergedCredentials.CAPGO_STORE_SUBMIT_REVIEW === 'true') {
+          missingCreds.push('PLAY_CONFIG_JSON is required for --submit-to-store-review on Android')
+        }
+        else if (mergedCredentials.BUILD_OUTPUT_UPLOAD_ENABLED !== 'true') {
           missingCreds.push('PLAY_CONFIG_JSON or BUILD_OUTPUT_UPLOAD_ENABLED=true (build has no output destination - enable either Play Store upload or Capgo download link)')
         }
         else {
@@ -1661,6 +1755,91 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       log.info(`Build options: platform=${buildOptionsPayload.platform}, mode=${buildOptionsPayload.buildMode}, cliVersion=${buildOptionsPayload.cliVersion}`)
     }
 
+    // ---- prescan gate (see src/build/prescan/) ----
+    // Opt-in: runs only when options.prescan === true, which ONLY the `build request` CLI
+    // command sets (requestBuildCommand). The onboarding wizard (build init), MCP build tools,
+    // and the SDK call requestBuildInternal without it, so prescan never runs on those paths.
+    // Runs BEFORE the POST /build/request: a blocked prescan must not orphan a
+    // created-but-never-uploaded build job server-side (stuck "pending" row in
+    // the dashboard + skewed "Build requested" telemetry).
+    if (options.prescan === true) {
+      const { executePrescan, runPrescanGate } = await import('./prescan/command')
+      const { decision: gateDecision, report: gateReport, crashed: gateCrashed } = await runPrescanGate(
+        {
+          enabled: true,
+          ignoreFatal: options.prescanIgnoreFatal,
+          failOnWarnings: options.failOnWarnings,
+          silent,
+          // Route output through the BuildLogger: Ink onboarding / SDK / MCP stdio
+          // callers own the terminal — raw clack writes would corrupt it.
+          print: msg => log.info(msg),
+          warn: msg => log.warn(msg),
+        },
+        // The gate only needs the report; the apikey in PrescanExecution is for
+        // the standalone command's telemetry (request.ts sends its own events).
+        // Pass mergedCredentials so the scan validates the exact credential set the
+        // build will use (CLI flags + env + saved file), not a fresh re-merge that
+        // would miss flag overrides; flavor/distribution fall back to the merged
+        // CAPGO_ANDROID_FLAVOR / CAPGO_IOS_DISTRIBUTION inside buildScanContext.
+        async () => (await executePrescan(appId, {
+          platform,
+          path: projectDir,
+          apikey: options.apikey,
+          credentials: mergedCredentials as Record<string, string>,
+          androidFlavor: options.androidFlavor,
+          iosDist: options.iosDistribution,
+          supaHost: options.supaHost,
+          supaAnon: options.supaAnon,
+        })).report,
+      )
+      // Telemetry: emit one `Prescan run` event for the build-request gate on EVERY
+      // outcome (clean / warned / blocked / bypassed / crashed) so PostHog sees the full
+      // funnel — run volume, block rate, and which checks fire — not just blocks.
+      {
+        const pc = gateReport?.counts
+        const prescanResult = gateCrashed
+          ? 'crashed'
+          : !pc
+              ? 'skipped'
+              : pc.error > 0
+                  ? (options.prescanIgnoreFatal ? 'bypassed' : 'blocked')
+                  : pc.warning > 0 ? (options.failOnWarnings ? 'blocked' : 'warned') : 'clean'
+        await sendEvent(options.apikey, {
+          channel: 'native-builder',
+          event: 'Prescan run',
+          icon: '🛡️',
+          org_id: orgId,
+          tracking_version: 2,
+          tags: {
+            'source': 'build-request',
+            'result': prescanResult,
+            'app-id': appId,
+            'platform': platform,
+            'errors': String(pc?.error ?? 0),
+            'warnings': String(pc?.warning ?? 0),
+            'finding-ids': gateReport ? gateReport.findings.filter(finding => finding.severity !== 'info').map(finding => finding.id).join(',').slice(0, 200) : '',
+            'bypassed': String(prescanResult === 'bypassed'),
+          },
+          notify: false,
+        }).catch(() => {})
+      }
+      if (gateDecision === 'block') {
+        // Thrown (not exit(1)) so requestBuildInternal keeps its no-exit contract for SDK
+        // callers: the outer catch logs the message and returns { success: false }, and
+        // requestBuildCommand turns that into exit code 1.
+        throw new Error('Prescan found blocking problems — the build was not requested and nothing was uploaded. Fix the errors above or re-run with --prescan-ignore-fatal / --no-prescan.')
+      }
+    }
+
+    // Permission backstop. Prescan's shared/apikey-permission check normally surfaces a
+    // missing build permission first — batched with every other problem — and blocks above.
+    // This hard assert still runs when prescan is skipped (--no-prescan) or bypassed
+    // (--prescan-ignore-fatal), so permission is always enforced before the POST.
+    await assertCliPermission(supabase, options.apikey, 'app.build_native', { appId }, {
+      message: `Insufficient permissions to request a native build for app ${appId}`,
+      silent,
+    })
+
     // Request build from Capgo backend (POST /build/request)
     log.info('Requesting build from Capgo...')
 
@@ -1704,10 +1883,15 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     // flag-OR, the CI auto_upload branch from decideAnalyzeBehavior would never
     // have a log file to read.
     const aiAnalysisMode: 'auto-prompt' | 'caller-handled' | 'skip' = options.aiAnalysisMode ?? 'auto-prompt'
+    // Effective "upload logs to support" intent: honor both the primary
+    // --send-logs-to-support flag and the deprecated --send-logs alias so the
+    // original 8.16.0 flag keeps working. Use this everywhere instead of reading
+    // options.sendLogs directly.
+    const wantsSendLogsToSupport = options.sendLogsToSupport === true || options.sendLogs === true
     // Capture when interactive, when the CI flag is set, OR when the caller asked
     // to drive the AI flow themselves (e.g. Ink onboarding) so the captured log
     // is available for runCapgoAiAnalysis.
-    const captureEnabled = (shouldCaptureLogs() || options.aiAnalytics === true || options.sendLogs === true || aiAnalysisMode === 'caller-handled')
+    const captureEnabled = (shouldCaptureLogs() || options.aiAnalytics === true || wantsSendLogsToSupport || aiAnalysisMode === 'caller-handled')
       && aiAnalysisMode !== 'skip'
     let capturedJobId: string | null = null
     let keepPromptFile = false // mutable so local-AI flow can set it true
@@ -2041,7 +2225,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         if (shouldPrintCiTip({
           isTTY: process.stdout.isTTY === true,
           aiAnalytics: options.aiAnalytics === true,
-          sendLogs: options.sendLogs === true,
+          sendLogs: wantsSendLogsToSupport,
         })) {
           process.stderr.write(`${CI_FAILURE_TIP}\n`)
         }
@@ -2103,7 +2287,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         const behavior = decideAnalyzeBehavior({
           isTTY: process.stdout.isTTY === true,
           aiAnalyticsFlag: options.aiAnalytics === true,
-          sendLogsFlag: options.sendLogs === true,
+          sendLogsFlag: wantsSendLogsToSupport,
         })
 
         const AI_WARNING = '⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.'
@@ -2119,6 +2303,59 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
             choice,
             triggeredBy,
           })
+
+          // Additive support-log upload: when the user opts into Capgo AI from
+          // the interactive menu, ALSO offer to upload their logs so support can
+          // follow up by email. This is UPLOAD-ONLY (no mailto) and runs BEFORE
+          // the analysis; it's best-effort and never blocks the AI step. CI /
+          // auto_upload paths skip it (no human to ask).
+          if (triggeredBy === 'menu') {
+            await offerSupportUploadBeforeAi({
+              confirm: async (message) => {
+                const answer = await confirm({ message, initialValue: true })
+                return answer === true
+              },
+              buildFiles: () => {
+                const s = spinnerC()
+                s.start('Preparing your logs to send to Capgo support…')
+                try {
+                  let internalLines: string[] = []
+                  const internalLogPath = getInternalLogPath()
+                  if (internalLogPath) {
+                    try { internalLines = readFileSync(internalLogPath, 'utf8').split('\n') }
+                    catch { /* best-effort */ }
+                  }
+                  let buildLogLines: string[] = []
+                  try {
+                    const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
+                    buildLogLines = readFileSync(logsPath, 'utf8').split('\n')
+                  }
+                  catch { /* best-effort */ }
+                  const built = writeSupportBundleFiles({
+                    kind: 'build-request',
+                    appId,
+                    error: `Cloud build ${capturedJobId} failed`,
+                    logs: buildLogLines,
+                    sections: internalLines.length > 0 ? [{ title: 'Internal log', lines: internalLines }] : [],
+                  })
+                  s.stop(built ? 'Logs ready.' : 'Couldn\'t prepare logs.')
+                  return built
+                }
+                catch {
+                  s.stop('Couldn\'t prepare logs.')
+                  return null
+                }
+              },
+              upload: async (gzPath) => {
+                const s = spinnerC()
+                s.start('Uploading your logs to Capgo support…')
+                const r = await uploadSupportLogs({ apiHost: host, apikey: options.apikey, appId, jobId: capturedJobId ?? undefined, gzPath })
+                s.stop(r ? 'Logs uploaded.' : 'Logs upload unavailable.')
+                return r
+              },
+              print: msg => clackLog.info(msg),
+            })
+          }
 
           const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
           let logs = ''
@@ -2314,10 +2551,13 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
               const s = spinnerC()
               s.start('Preparing your logs to send…')
               try {
-                return prepareSupportLogBundle({ capturedJobId, appId })
+                const built = prepareSupportLogBundle({ capturedJobId, appId })
+                s.stop(built ? 'Logs ready.' : 'Couldn\'t prepare logs.')
+                return built
               }
-              finally {
-                s.stop('Logs ready.')
+              catch {
+                s.stop('Couldn\'t prepare logs.')
+                return null
               }
             },
             copyPath: p => copyToClipboard(p).ok,
@@ -2400,7 +2640,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
             // for. decideCiFailureActions is the pure, unit-tested seam.
             const actions = decideCiFailureActions({
               aiAnalyticsFlag: options.aiAnalytics === true,
-              sendLogsFlag: options.sendLogs === true,
+              sendLogsFlag: wantsSendLogsToSupport,
             })
             if (actions.sendLogs)
               await runSendLogs()
@@ -2483,7 +2723,10 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 }
 
 export async function requestBuildCommand(appId: string, options: BuildRequestOptions): Promise<void> {
-  const result = await requestBuildInternal(appId, options, false)
+  // `build request` is the ONLY entrypoint that opts into prescan (default on; --no-prescan
+  // turns it off). requestBuildInternal keeps the gate opt-in (options.prescan === true) so the
+  // onboarding wizard (build init), MCP build tools, and the SDK never trigger it.
+  const result = await requestBuildInternal(appId, { ...options, prescan: options.prescan !== false }, false)
 
   if (!result.success) {
     exit(1)

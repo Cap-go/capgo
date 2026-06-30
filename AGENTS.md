@@ -753,6 +753,46 @@ Key points:
   `playwright/e2e` and run them locally with `bun run test:front` before
   shipping UI changes.
 
+### Visual diff for UI changes
+
+When a PR changes customer-facing UI (layout, spacing, colors, components, or
+copy placement), reviewers need a before/after screenshot diff.
+
+**Request the automated PR report** by either:
+
+- adding the `visual-change` label to the PR, or
+- including `<!-- visual-diff:required -->` anywhere in the PR description.
+
+On each push, the `Visual diff` GitHub Action captures screenshots from the PR
+base commit and head commit, generates a diff report, uploads it as a workflow
+artifact, and updates a sticky PR comment (`<!-- capgo-visual-diff -->`).
+
+**Local workflow before opening or updating the PR:**
+
+1. Capture the current UI baseline: `bun run visual:capture:before`
+2. Apply your UI edits and rebuild or refresh the local app as needed.
+3. Capture the updated UI: `bun run visual:capture:after`
+4. Generate the report: `bun run visual:diff`
+5. Paste `.context/visual-diff/report/summary.md` into the PR description under
+   `## Visual changes`.
+6. Add the `visual-change` label (or the HTML marker above) so CI refreshes the
+   report on every push.
+
+**Full local pipeline against `main`:**
+
+```bash
+bun run visual:run -- --base origin/main
+```
+
+**Route configuration:** edit `playwright/visual-diff.config.ts` when a PR
+introduces a new screen that should be part of the visual diff set.
+
+**Outputs:**
+
+- `.context/visual-diff/before/` and `after/` — raw PNG captures
+- `.context/visual-diff/report/index.html` — side-by-side before/after/diff view
+- `.context/visual-diff/report/summary.md` — markdown table for the PR body
+
 ## Mobile Development
 
 ### Capacitor Configuration

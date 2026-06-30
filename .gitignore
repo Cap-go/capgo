@@ -33,6 +33,7 @@ fastlane/metadata/review_information/phone_number.txt
 
 test-results
 playwright-report
+.context/visual-diff
 playwright/.cache
 playwright/.auth
 CHANGELOG.md

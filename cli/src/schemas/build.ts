@@ -22,6 +22,14 @@ export const buildCredentialsSchema = z.object({
   FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: z.string().optional(),
   APPLE_APP_ID: z.string().optional(),
   CAPGO_IOS_PROVISIONING_MAP: z.string().optional(),
+  // Non-secret per-build store submission options. They can be supplied from
+  // env for CI, then split into buildOptions before the request reaches Builder.
+  CAPGO_STORE_SUBMIT_REVIEW: z.string().optional(),
+  CAPGO_STORE_RELEASE_NAME: z.string().optional(),
+  CAPGO_STORE_RELEASE_NOTES: z.string().optional(),
+  CAPGO_STORE_RELEASE_NOTES_LOCALIZED: z.string().optional(),
+  CAPGO_IOS_TESTFLIGHT_GROUPS: z.string().optional(),
+  CAPGO_IOS_AUTOMATIC_RELEASE: z.string().optional(),
   // Android credentials
   ANDROID_KEYSTORE_FILE: z.string().optional(),
   KEYSTORE_KEY_ALIAS: z.string().optional(),
@@ -70,16 +78,27 @@ export const buildRequestOptionsSchema = optionsBaseSchema.extend({
   androidFlavor: z.string().trim().min(1).optional(),
   inAppUpdatePriority: z.coerce.number().int().min(0).max(5).optional(),
   // Output control
+  storeReleaseNotesLocale: z.array(z.string().trim().min(1)).optional(),
+  iosAutomaticRelease: z.boolean().optional(),
   outputUpload: z.boolean().optional(),
   outputRetention: z.string().optional(),
   outputRecord: z.string().optional(),
   skipBuildNumberBump: z.boolean().optional(),
   playstoreUpload: z.boolean().optional(),
+  submitToStoreReview: z.boolean().optional(),
+  storeReleaseName: z.string().trim().min(1).optional(),
+  storeReleaseNotes: z.string().trim().min(1).optional(),
+  storeReleaseNotesLocalized: z.record(z.string().trim().min(1), z.string().trim().min(1)).optional(),
+  iosTestflightGroups: z.string().trim().min(1).optional(),
   verbose: z.boolean().optional(),
   aiAnalytics: z.boolean().optional(),
   // On a CI/CD (non-interactive) build failure, upload the captured build logs
   // to Capgo support via uploadSupportLogs. Additive to aiAnalytics — both can
   // be passed and both run. Requires log capture, which this flag also enables.
+  // Derived from --send-logs-to-support (primary) or --send-logs (deprecated alias).
+  sendLogsToSupport: z.boolean().optional(),
+  // Deprecated alias for sendLogsToSupport, kept so the original --send-logs flag
+  // (shipped in 8.16.0) keeps parsing. Callers honor either field.
   sendLogs: z.boolean().optional(),
   // Controls the on-failure AI-analysis flow inside requestBuildInternal:
   //   - 'auto-prompt' (default) — current behavior: clack-driven menu when
@@ -91,6 +110,12 @@ export const buildRequestOptionsSchema = optionsBaseSchema.extend({
   //   - 'skip'                  — skip the AI block entirely; normal cleanup
   //     runs (log file deleted on exit).
   aiAnalysisMode: z.enum(['auto-prompt', 'caller-handled', 'skip']).optional(),
+  // Prescan gate (see src/build/prescan/). `prescan: false` (--no-prescan) skips the
+  // automatic pre-build scan; `prescanIgnoreFatal` reports but never blocks;
+  // `failOnWarnings` treats prescan warnings as fatal.
+  prescan: z.boolean().optional(),
+  prescanIgnoreFatal: z.boolean().optional(),
+  failOnWarnings: z.boolean().optional(),
   // Correlation id for the Builder onboarding journey, set ONLY when the build
   // is requested from the onboarding wizard. Threaded onto the `Build requested`
   // / `Build succeeded` / `Build failed` events so the journey's funnel reaches
@@ -148,6 +173,8 @@ export const buildOptionsPayloadSchema = z.object({
   iosSourceDir: z.string().optional(),
   iosAppDir: z.string().optional(),
   iosProjectDir: z.string().optional(),
+  storeReleaseNotesLocalized: z.record(z.string().trim().min(1), z.string().trim().min(1)).optional(),
+  iosAutomaticRelease: z.boolean().optional(),
   androidSourceDir: z.string().optional(),
   androidAppDir: z.string().optional(),
   androidProjectDir: z.string().optional(),
@@ -155,6 +182,10 @@ export const buildOptionsPayloadSchema = z.object({
   outputUploadEnabled: z.boolean(),
   outputRetentionSeconds: z.number(),
   skipBuildNumberBump: z.boolean(),
+  submitToStoreReview: z.boolean(),
+  storeReleaseName: z.string().optional(),
+  storeReleaseNotes: z.string().optional(),
+  iosTestflightGroups: z.string().optional(),
 })
 
 export type BuildOptionsPayload = z.infer<typeof buildOptionsPayloadSchema>

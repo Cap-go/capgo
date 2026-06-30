@@ -332,10 +332,20 @@ export const requestBuildOptionsSchema = z.object({
   nodeModules: z.string().optional(),
   platform: z.enum(['ios', 'android']),
   credentials: buildCredentialsSchema.optional(),
+  submitToStoreReview: z.boolean().optional(),
+  storeReleaseName: z.string().trim().min(1).optional(),
+  storeReleaseNotes: z.string().trim().min(1).optional(),
+  storeReleaseNotesLocalized: z.record(z.string().trim().min(1), z.string().trim().min(1)).optional(),
+  iosTestflightGroups: z.string().trim().min(1).optional(),
+  iosAutomaticRelease: z.boolean().optional(),
   userId: z.string().optional(),
   apikey: z.string().optional(),
   supaHost: z.string().optional(),
   supaAnon: z.string().optional(),
+  /** set false to skip the automatic pre-build prescan (equivalent to --no-prescan) */
+  prescan: z.boolean().optional(),
+  /** run the prescan in report-only mode: findings never block the build */
+  prescanIgnoreFatal: z.boolean().optional(),
 })
 
 export type RequestBuildOptions = z.infer<typeof requestBuildOptionsSchema>

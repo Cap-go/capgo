@@ -119,6 +119,9 @@ const globalStatsTrendData = ref<Array<{
   devices_last_month: number
   trial_extended_orgs: number
   trial_extended_subscribed_orgs: number
+  paying_orgs_subscription?: number
+  paying_orgs_credits?: number
+  paying_orgs_total?: number
 }>>([])
 
 const isLoadingGlobalStatsTrend = ref(false)
@@ -797,19 +800,23 @@ const onboardingFunnelStages = computed(() => {
 })
 
 // Onboarding funnel trend for multi-line chart
+function normalizeTrendDate(value: string) {
+  return value.includes('T') ? value.split('T')[0] : value
+}
+
 const onboardingFunnelTrendSeries = computed(() => {
   if (!onboardingFunnelData.value || !onboardingFunnelData.value.trend)
     return []
 
   const trend = onboardingFunnelData.value.trend
-  const demoAppsCreatedByDate = new Map(globalStatsTrendData.value.map(item => [item.date, item.demo_apps_created]))
-  const userRegistrationsByDate = new Map(globalStatsTrendData.value.map(item => [item.date, item.registers_today]))
+  const demoAppsCreatedByDate = new Map(globalStatsTrendData.value.map(item => [normalizeTrendDate(item.date), item.demo_apps_created]))
+  const userRegistrationsByDate = new Map(globalStatsTrendData.value.map(item => [normalizeTrendDate(item.date), item.registers_today]))
   return [
     {
       label: t('user-registrations'),
       data: trend.map(item => ({
         date: item.date,
-        value: userRegistrationsByDate.get(item.date) ?? 0,
+        value: userRegistrationsByDate.get(normalizeTrendDate(item.date)) ?? 0,
       })),
       color: '#3b82f6', // blue
     },
@@ -849,7 +856,7 @@ const onboardingFunnelTrendSeries = computed(() => {
       label: t('demo-apps-created'),
       data: trend.map(item => ({
         date: item.date,
-        value: demoAppsCreatedByDate.get(item.date) ?? 0,
+        value: demoAppsCreatedByDate.get(normalizeTrendDate(item.date)) ?? 0,
       })),
       color: '#ef4444', // red
     },
@@ -981,27 +988,29 @@ displayStore.defaultBack = '/dashboard'
           </ChartCard>
 
           <!-- Organization Metrics Cards -->
-          <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <!-- Paying Organizations -->
+          <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
             <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
-              <div class="flex items-start justify-between mb-4">
-                <div class="p-3 rounded-lg bg-success/10">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-success"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                </div>
-              </div>
               <div>
-                <p class="text-sm text-slate-600 dark:text-slate-400">
-                  Paying Organizations
-                </p>
-                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-success">
-                  {{ latestGlobalStats.paying.toLocaleString() }}
-                </p>
-                <p v-else class="mt-2 text-3xl font-bold text-success">
-                  0
-                </p>
-                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Active paying organizations
-                </p>
+                <p class="text-sm text-slate-600 dark:text-slate-400">Total Paid Organizations</p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-emerald-500">{{ (latestGlobalStats.paying_orgs_total || latestGlobalStats.paying || 0).toLocaleString() }}</p>
+                <p v-else class="mt-2 text-3xl font-bold text-emerald-500">0</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Subscription and/or available credits</p>
+              </div>
+            </div>
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">Paid via Subscription</p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-primary">{{ (latestGlobalStats.paying_orgs_subscription || latestGlobalStats.paying || 0).toLocaleString() }}</p>
+                <p v-else class="mt-2 text-3xl font-bold text-primary">0</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Active subscription organizations</p>
+              </div>
+            </div>
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">Paid via Credits</p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-accent">{{ (latestGlobalStats.paying_orgs_credits || 0).toLocaleString() }}</p>
+                <p v-else class="mt-2 text-3xl font-bold text-accent">0</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Organizations with available credits</p>
               </div>
             </div>
 

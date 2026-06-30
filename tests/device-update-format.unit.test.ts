@@ -1,6 +1,7 @@
 import type { Database } from '../src/types/supabase.types'
 import { describe, expect, it } from 'vitest'
 import { useDeviceUpdateFormat } from '../src/composables/useDeviceUpdateFormat'
+import { filterDeviceKeys } from '../supabase/functions/_backend/public/device/get.ts'
 
 type DeviceRow = Database['public']['Tables']['devices']['Row']
 
@@ -13,6 +14,7 @@ describe('device update format helpers', () => {
       default_channel: 'insiders',
       device_id: '31de6a5e-80a9-4348-9af1-31e1e9562583',
       id: 1,
+      install_source: null,
       is_emulator: false,
       is_prod: true,
       key_id: null,
@@ -40,6 +42,7 @@ describe('device update format helpers', () => {
       custom_id: '',
       default_channel: 'insiders',
       device_id: '31de6a5e-80a9-4348-9af1-31e1e9562583',
+      install_source: null,
       id: 1,
       is_emulator: false,
       is_prod: true,
@@ -57,5 +60,30 @@ describe('device update format helpers', () => {
       defaultChannel: 'insiders',
     })
     expect(transformDeviceToUpdateRequest(device, 'lgbt.vibes.application', device.default_channel ?? '')).not.toHaveProperty('channel')
+  })
+  it.concurrent('keeps install_source in public device responses', () => {
+    const [device] = filterDeviceKeys([{
+      app_id: 'lgbt.vibes.application',
+      custom_id: '',
+      default_channel: 'production',
+      device_id: '31de6a5e-80a9-4348-9af1-31e1e9562583',
+      id: 1,
+      install_source: 'app_store',
+      is_emulator: false,
+      is_prod: true,
+      key_id: null,
+      os_version: '17',
+      platform: 'ios',
+      plugin_version: '8.0.0',
+      updated_at: '2026-06-08T14:14:00.000Z',
+      version: null,
+      version_build: '3.1.0',
+      version_name: '3.1.0',
+    }])
+
+    expect(device).toMatchObject({
+      device_id: '31de6a5e-80a9-4348-9af1-31e1e9562583',
+      install_source: 'app_store',
+    })
   })
 })

@@ -39,6 +39,13 @@ export const defaultHost = 'https://capgo.app'
 export const defaultFileHost = 'https://files.capgo.app'
 export const defaultApiHost = 'https://api.capgo.app'
 export const defaultHostWeb = 'https://console.capgo.app'
+
+/** Build a console web-app URL (settings, builds, connect, etc.). */
+export function consoleWebUrl(path = ''): string {
+  if (!path)
+    return defaultHostWeb
+  return `${defaultHostWeb}${path.startsWith('/') ? path : `/${path}`}`
+}
 export const UPLOAD_TIMEOUT = 120000
 export const ALERT_UPLOAD_SIZE_BYTES = 1024 * 1024 * 20 // 20MB
 export const MAX_UPLOAD_LENGTH_BYTES = 1024 * 1024 * 1024 // 1GB
@@ -129,7 +136,7 @@ export async function check2FAAccessForOrg(supabase: SupabaseClient<Database>, o
   }
   if (reject2fa) {
     if (!silent)
-      log.error(`🔐 Access Denied: 2FA Required. Enable 2FA at https://web.capgo.app/settings/account`)
+      log.error(`🔐 Access Denied: 2FA Required. Enable 2FA at ${consoleWebUrl('/settings/account')}`)
     throw new Error('2FA required for this organization')
   }
 }
@@ -1634,7 +1641,7 @@ export function show2FADeniedError(organizationName?: string): never {
     log.error(`\nThis organization requires all members to have 2FA enabled.`)
   }
   log.error(`\nTo regain access:`)
-  log.error(`  1. Go to https://web.capgo.app/settings/account`)
+  log.error(`  1. Go to ${consoleWebUrl('/settings/account')}`)
   log.error(`  2. Enable Two-Factor Authentication on your account`)
   log.error(`  3. Try your command again`)
   log.error(`\nFor more information, visit: https://capgo.app/docs/webapp/2fa-enforcement/\n`)

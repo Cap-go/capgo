@@ -101,8 +101,106 @@ export interface MiddlewareKeyVariables {
   }
 }
 
+const CAPGO_CONSOLE_SUBDOMAIN = 'console'
+
+const DEFAULT_CORS_ALLOWED_ORIGINS = new Set([
+  ...['capgo.app', 'preprod.capgo.app', 'development.capgo.app'].map(domain => `https://${CAPGO_CONSOLE_SUBDOMAIN}.${domain}`),
+  'https://capgo.app',
+])
+
+function normalizeHttpOrigin(origin: string) {
+  try {
+    const parsed = new URL(origin)
+    if (!['http:', 'https:'].includes(parsed.protocol))
+      return ''
+    return parsed.origin
+  }
+  catch {
+    return ''
+  }
+}
+
+function normalizeCustomOrigin(origin: string) {
+  try {
+    const parsed = new URL(origin)
+    if (['http:', 'https:'].includes(parsed.protocol))
+      return ''
+    if (!parsed.hostname)
+      return ''
+    return `${parsed.protocol}//${parsed.host}`
+  }
+  catch {
+    return ''
+  }
+}
+
+function normalizeNativeOrigin(origin: string) {
+  try {
+    const parsed = new URL(origin)
+    if (!['capacitor:', 'ionic:', 'localhost:'].includes(parsed.protocol))
+      return ''
+    if (parsed.hostname !== 'localhost')
+      return ''
+    return normalizeCustomOrigin(origin)
+  }
+  catch {
+    return ''
+  }
+}
+
+function normalizeConfiguredCorsOrigin(origin: string) {
+  return normalizeHttpOrigin(origin) || normalizeCustomOrigin(origin)
+}
+
+function isLocalHttpOrigin(origin: string) {
+  try {
+    const parsed = new URL(origin)
+    if (!['http:', 'https:'].includes(parsed.protocol))
+      return false
+    return ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname)
+  }
+  catch {
+    return false
+  }
+}
+
+function getConfiguredCorsAllowedOrigins(c: Context) {
+  return [
+    getEnv(c, 'WEBAPP_URL'),
+    ...getEnv(c, 'CORS_ALLOWED_ORIGINS').split(','),
+  ]
+    .map(origin => normalizeConfiguredCorsOrigin(origin.trim()))
+    .filter(Boolean)
+}
+
+export function getAllowedCorsOrigin(origin: string, c: Context) {
+  const nativeOrigin = normalizeNativeOrigin(origin)
+  if (nativeOrigin)
+    return nativeOrigin
+
+  const httpOrigin = normalizeHttpOrigin(origin)
+  const configuredOrigins = getConfiguredCorsAllowedOrigins(c)
+
+  if (httpOrigin) {
+    if (isLocalHttpOrigin(origin))
+      return httpOrigin
+
+    if (DEFAULT_CORS_ALLOWED_ORIGINS.has(httpOrigin))
+      return httpOrigin
+
+    if (configuredOrigins.includes(httpOrigin))
+      return httpOrigin
+  }
+
+  const customOrigin = normalizeCustomOrigin(origin)
+  if (customOrigin && configuredOrigins.includes(customOrigin))
+    return customOrigin
+
+  return null
+}
+
 export const useCors = cors({
-  origin: '*',
+  origin: getAllowedCorsOrigin,
   allowHeaders: ['Content-Type', 'Authorization', 'X-Capgo-Spoof-Admin-Authorization', 'capgkey', 'capgo_api', 'x-api-key', 'x-limited-key-id', 'apisecret', 'apikey', 'x-client-info'],
   allowMethods: ['POST', 'GET', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 })
@@ -210,6 +308,22 @@ export const middlewareAPISecret = honoFactory.createMiddleware(async (c, next) 
 })
 
 export const BRES = { status: 'ok' }
+export const API_CONTENT_SECURITY_POLICY = [
+  'default-src \'none\'',
+  'base-uri \'none\'',
+  'form-action \'none\'',
+  'frame-ancestors \'none\'',
+  'object-src \'none\'',
+  'script-src \'none\'',
+  'style-src \'none\'',
+  'img-src \'none\'',
+  'connect-src \'none\'',
+  'upgrade-insecure-requests',
+].join('; ')
+
+function isPreviewHost(hostname: string) {
+  return /^[^.]+\.preview(?:\.[^.]+)?\.(?:capgo\.app|usecapgo\.com)$/i.test(hostname)
+}
 
 export function createHono(functionName: string, _version: string) {
   let appGlobal
@@ -223,6 +337,9 @@ export function createHono(functionName: string, _version: string) {
     // ADD HEADER TO IDENTIFY WORKER SOURCE
     const name = `${getEnv(c, 'ENV_NAME') || functionName}-${CapgoVersion}`
     c.header('X-Worker-Source', name)
+    const hostname = new URL(c.req.url).hostname
+    if (!isPreviewHost(hostname))
+      c.header('Content-Security-Policy', API_CONTENT_SECURITY_POLICY)
     return next()
   })
 
