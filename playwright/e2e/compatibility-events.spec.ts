@@ -80,6 +80,30 @@ async function mockCompatibilityEvents(page: Page, rows: () => Record<string, un
   })
 }
 
+async function mockStoreReleaseValidationStatus(page: Page) {
+  await page.route('**/rest/v1/app_versions*', async (route: Route) => {
+    const url = new URL(route.request().url())
+    if (url.search.includes('name=neq.unknown') && url.search.includes('name=neq.builtin')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([{ id: CURRENT_VERSION_ID }]),
+      })
+      return
+    }
+
+    await route.fallback()
+  })
+
+  await page.route('**/private/devices**', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ count: 0 }),
+    })
+  })
+}
+
 test.describe('Compatibility events', () => {
   test.beforeEach(async ({ page }) => {
     await page.login('test@capgo.app', 'testtest')
@@ -88,6 +112,7 @@ test.describe('Compatibility events', () => {
   test('shows the store release validation alert before opening the modal', async ({ page }) => {
     await mockCompatibilityEvents(page, () => [])
 
+    await mockStoreReleaseValidationStatus(page)
     await page.goto(`/app/${APP_ID}`)
 
     const alert = page.locator('[data-test="store-release-validation-alert"]')

@@ -492,25 +492,20 @@ onUnmounted(() => {
     data-test="store-release-validation-alert"
     class="mb-4 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950"
   >
-    <div class="flex flex-col gap-4 border-l-4 border-azure-500 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5">
-      <div class="flex min-w-0 gap-3">
-        <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-200">
+    <div class="flex flex-col gap-3 border-l-4 border-azure-500 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+      <div class="flex min-w-0 gap-2.5">
+        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-200">
           <IconStore class="h-4 w-4" />
         </span>
 
         <div class="min-w-0">
-          <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <p class="text-sm font-semibold text-slate-950 dark:text-white">
-              {{ t('store-release-validation-badge') }}
-            </p>
-            <span class="rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200 dark:bg-amber-400/10 dark:text-amber-200 dark:ring-amber-400/20">
-              {{ t('store-release-validation-signal-reminder') }}
-            </span>
-          </div>
-          <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+          <p class="text-sm font-semibold leading-5 text-slate-950 dark:text-white">
+            {{ t('store-release-validation-badge') }}
+          </p>
+          <p class="mt-0.5 max-w-3xl text-sm leading-5 text-slate-600 dark:text-slate-300">
             {{ body }}
           </p>
-          <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+          <div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs leading-4 text-slate-500 dark:text-slate-400">
             <span class="inline-flex items-center gap-1.5">
               <IconCheck class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-300" />
               {{ t('store-release-validation-signal-live-update') }}
@@ -519,6 +514,10 @@ onUnmounted(() => {
               <IconSmartphone class="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
               {{ storeSignal }}
             </span>
+            <span class="inline-flex items-center gap-1.5">
+              <IconBell class="h-3.5 w-3.5 text-amber-600 dark:text-amber-300" />
+              {{ t('store-release-validation-signal-reminder') }}
+            </span>
           </div>
         </div>
       </div>
@@ -526,7 +525,7 @@ onUnmounted(() => {
       <div class="flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:items-center">
         <button
           type="button"
-          class="d-btn d-btn-ghost d-btn-sm min-h-11 px-3 text-slate-600 dark:text-slate-300"
+          class="d-btn d-btn-ghost d-btn-sm h-9 min-h-9 px-3 text-slate-600 dark:text-slate-300"
           data-test="store-release-validation-dismiss"
           @click="dismissPrompt"
         >
@@ -534,7 +533,7 @@ onUnmounted(() => {
         </button>
         <button
           type="button"
-          class="d-btn d-btn-primary d-btn-sm min-h-11 px-4"
+          class="d-btn d-btn-primary d-btn-sm h-9 min-h-9 px-3"
           data-test="store-release-validation-open"
           @click="openModal"
         >
