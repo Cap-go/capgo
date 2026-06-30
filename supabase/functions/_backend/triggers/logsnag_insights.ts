@@ -241,6 +241,7 @@ const LOGSNAG_INSIGHTS_BACKGROUND_MAX_RETRIES = 4
 const LOGSNAG_INSIGHTS_RETRY_DELAY_SECONDS = 300
 const LOGSNAG_INSIGHTS_QUEUE_NAME = 'admin_stats'
 const LOGSNAG_INSIGHTS_NOTIFICATION_DELAY_SECONDS = 180
+const LOGSNAG_INSIGHTS_RECENT_REPAIR_LOOKBACK_DAYS = 30
 const GLOBAL_STATS_NOTIFICATION_LOCK_NAMESPACE = 'logsnag_insights_notifications'
 const GLOBAL_STATS_NOTIFICATION_LOGSNAG_STEP = 'notifications_logsnag'
 const GLOBAL_STATS_NOTIFICATION_TRACKING_STEP = 'notifications_tracking'
@@ -359,6 +360,20 @@ function getCompletedDayWindowForDateId(dateId: string): DailyWindow {
     prevDayEnd,
     prevDayDateId: dateId,
   }
+}
+
+function buildRecentGlobalStatsRepairDateIds(anchorDateId: string, lookbackDays = LOGSNAG_INSIGHTS_RECENT_REPAIR_LOOKBACK_DAYS): string[] {
+  const anchor = new Date(`${anchorDateId}T00:00:00.000Z`)
+  if (Number.isNaN(anchor.getTime()))
+    return []
+
+  const dateIds: string[] = []
+  for (let offset = Math.max(0, Math.floor(lookbackDays)); offset >= 0; offset--) {
+    const date = new Date(anchor)
+    date.setUTCDate(anchor.getUTCDate() - offset)
+    dateIds.push(getDateId(date))
+  }
+  return dateIds
 }
 
 function getMetricWindowFromDailyWindow(window: DailyWindow): CurrentDayWindow {
@@ -1265,8 +1280,8 @@ async function aggregateDailyBuildStats(
     const query = sql`
       SELECT
         platform,
-        SUM(build_time_unit)::bigint AS total_seconds,
-        COALESCE(ROUND(AVG(build_time_unit)::numeric, 1), 0)::float AS avg_seconds,
+        SUM(billable_seconds)::bigint AS total_seconds,
+        COALESCE(ROUND(AVG(billable_seconds)::numeric, 1), 0)::float AS avg_seconds,
         COUNT(*)::int AS total_builds
       FROM build_logs
       WHERE created_at >= ${start}
@@ -1378,19 +1393,28 @@ async function getTrialExtensionStats(c: Context, window: CurrentDayWindow): Pro
 }
 
 async function ensureGlobalStatsSnapshotRow(c: Context, dateId: string): Promise<void> {
+  await ensureGlobalStatsSnapshotRows(c, [dateId])
+}
+
+async function ensureGlobalStatsSnapshotRows(c: Context, dateIds: readonly string[]): Promise<void> {
+  if (dateIds.length === 0)
+    return
+
   const db = getPgClient(c)
 
   try {
     await db.query(
-      'INSERT INTO public.global_stats (date_id, apps, updates, stars) VALUES ($1, 0, 0, 0) ON CONFLICT (date_id) DO NOTHING',
-      [dateId],
+      `INSERT INTO public.global_stats (date_id, apps, updates, stars)
+      SELECT DISTINCT date_id, 0, 0, 0
+      FROM unnest($1::text[]) AS input(date_id)
+      ON CONFLICT (date_id) DO NOTHING`,
+      [dateIds],
     )
   }
   finally {
     await closeClient(c, db)
   }
 }
-
 
 async function updateGlobalStatsSnapshot(c: Context, dateId: string, patch: GlobalStatsSnapshotPatch): Promise<void> {
   await ensureGlobalStatsSnapshotRow(c, dateId)
@@ -1449,6 +1473,11 @@ function getMissingGlobalStatsRequiredShards(completedShards: ReadonlySet<Global
 
 function getMissingGlobalStatsShards(completedShards: ReadonlySet<GlobalStatsCompletionMarker>): GlobalStatsShard[] {
   return GLOBAL_STATS_SHARDS.filter(shard => !completedShards.has(shard))
+}
+
+function getGlobalStatsShardQueueCandidates(completedShards: ReadonlySet<GlobalStatsCompletionMarker>): GlobalStatsShard[] {
+  const missingRequiredShards = getMissingGlobalStatsRequiredShards(completedShards)
+  return missingRequiredShards.length > 0 ? missingRequiredShards : getMissingGlobalStatsShards(completedShards)
 }
 
 function hasCompletedGlobalStatsNotifications(completedShards: ReadonlySet<GlobalStatsCompletionMarker>): boolean {
@@ -1714,16 +1743,105 @@ async function queueMissingLogsnagInsightsShards(
   c: Context,
   dateId: string,
   completedShards: ReadonlySet<GlobalStatsCompletionMarker>,
-  candidateShards: readonly GlobalStatsShard[] = GLOBAL_STATS_SHARDS,
+  candidateShards: readonly GlobalStatsShard[] = getGlobalStatsShardQueueCandidates(completedShards),
 ): Promise<Array<{ shard: GlobalStatsShard, msgId: number, delaySeconds: number }>> {
   const missingShards = candidateShards.filter(shard => !completedShards.has(shard))
   return queueLogsnagInsightsShards(c, dateId, missingShards)
 }
 
+function getLogsnagInsightsShardQueueKey(shard: GlobalStatsShard, dateId: string): string {
+  return `${dateId}:${getLogsnagInsightsShardFunctionName(shard)}`
+}
+
+async function readQueuedLogsnagInsightsShardKeys(c: Context, dateIds: readonly string[]): Promise<Set<string>> {
+  if (dateIds.length === 0)
+    return new Set()
+
+  const db = getPgClient(c)
+  const functionNames = GLOBAL_STATS_SHARDS.map(shard => getLogsnagInsightsShardFunctionName(shard))
+
+  try {
+    const result = await db.query<{ function_name: string | null, date_id: string | null }>(
+      `SELECT
+        message->>'function_name' AS function_name,
+        message->'payload'->>'date_id' AS date_id
+      FROM pgmq.q_admin_stats
+      WHERE message->>'function_name' = ANY($1::text[])
+        AND message->'payload'->>'date_id' = ANY($2::text[])`,
+      [functionNames, dateIds],
+    )
+
+    return new Set(result.rows.flatMap((row) => {
+      if (!row.function_name || !row.date_id)
+        return []
+      return [`${row.date_id}:${row.function_name}`]
+    }))
+  }
+  finally {
+    await closeClient(c, db)
+  }
+}
+
+async function readGlobalStatsCompletionRows(c: Context, dateIds: readonly string[]): Promise<Map<string, Set<GlobalStatsCompletionMarker>>> {
+  if (dateIds.length === 0)
+    return new Map()
+
+  const db = getPgClient(c)
+
+  try {
+    const result = await db.query<{ date_id: string, completed_shards: unknown }>(
+      `SELECT date_id, completed_shards
+      FROM public.global_stats
+      WHERE date_id = ANY($1::text[])`,
+      [dateIds],
+    )
+
+    return new Map(result.rows.map(row => [row.date_id, normalizeCompletedGlobalStatsShards(row.completed_shards)]))
+  }
+  finally {
+    await closeClient(c, db)
+  }
+}
+
+async function repairRecentMissingGlobalStatsSnapshots(c: Context, anchorDateId: string): Promise<void> {
+  const dateIds = buildRecentGlobalStatsRepairDateIds(anchorDateId).filter(dateId => dateId !== anchorDateId)
+  if (dateIds.length === 0)
+    return
+
+  const [completionRows, queuedShardKeys] = await Promise.all([
+    readGlobalStatsCompletionRows(c, dateIds),
+    readQueuedLogsnagInsightsShardKeys(c, dateIds),
+  ])
+  const missingDateIds = dateIds.filter(dateId => !completionRows.has(dateId))
+  await ensureGlobalStatsSnapshotRows(c, missingDateIds)
+
+  const queuedByDate: Array<{ dateId: string, queued: Array<{ shard: GlobalStatsShard, msgId: number, delaySeconds: number }> }> = []
+  for (const dateId of dateIds) {
+    const completedShards = completionRows.get(dateId) ?? new Set<GlobalStatsCompletionMarker>()
+    const shardsToQueue = getGlobalStatsShardQueueCandidates(completedShards)
+      .filter(shard => !completedShards.has(shard))
+      .filter(shard => !queuedShardKeys.has(getLogsnagInsightsShardQueueKey(shard, dateId)))
+
+    const queued = await queueLogsnagInsightsShards(c, dateId, shardsToQueue)
+    if (queued.length > 0)
+      queuedByDate.push({ dateId, queued })
+  }
+
+  if (missingDateIds.length > 0 || queuedByDate.length > 0) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Repaired recent missing global stats snapshots',
+      anchorDateId,
+      missingDateIds,
+      queuedByDate,
+    })
+  }
+}
+
 async function dispatchMissingLogsnagInsightsShardsFor(
   c: Context,
   dateId: string,
-  candidateShards: readonly GlobalStatsShard[],
+  candidateShards: readonly GlobalStatsShard[] | undefined,
   noMissingMessage: string,
   queuedMessage: string,
 ): Promise<void> {
@@ -1755,7 +1873,7 @@ async function dispatchMissingLogsnagInsightsShards(c: Context, dateId: string):
   await dispatchMissingLogsnagInsightsShardsFor(
     c,
     dateId,
-    GLOBAL_STATS_SHARDS,
+    undefined,
     'No missing logsnag insights global stats shards to queue',
     'Queued missing logsnag insights global stats shards',
   )
@@ -2747,6 +2865,8 @@ export const logsnagInsightsTestUtils = {
   getMetricWindowFromDailyWindow,
   getMissingGlobalStatsRequiredShards,
   getMissingGlobalStatsShards,
+  getGlobalStatsShardQueueCandidates,
+  buildRecentGlobalStatsRepairDateIds,
   hasCompletedGlobalStatsNotifications,
   shouldSkipCompletedGlobalStatsShardRetry,
   getGlobalStatsNotificationStepAction,
@@ -2886,6 +3006,7 @@ function scheduleLogsnagInsightsShardUpdate(
 }
 
 async function runLogsnagInsightsUpdate(c: Context, dateId = getDailyWindow().prevDayDateId, retryCount = 0): Promise<void> {
+  await repairRecentMissingGlobalStatsSnapshots(c, dateId)
   if (await shouldSkipCompletedLogsnagInsightsRetryDispatch(c, dateId, retryCount))
     return
 

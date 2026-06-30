@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import { readFileSync } from 'node:fs'
 import { Hono } from 'hono/tiny'
 import { describe, expect, it, vi } from 'vitest'
 import { logsnagInsightsTestUtils } from '../supabase/functions/_backend/triggers/logsnag_insights.ts'
@@ -75,6 +76,30 @@ describe('logsnag revenue metric helpers', () => {
     expect(dayDateId).toBe('2026-03-24')
   })
 
+  it.concurrent('builds a bounded recent repair window for missing global stats days', () => {
+    expect(logsnagInsightsTestUtils.buildRecentGlobalStatsRepairDateIds('2026-06-29', 2)).toEqual([
+      '2026-06-27',
+      '2026-06-28',
+      '2026-06-29',
+    ])
+    expect(logsnagInsightsTestUtils.buildRecentGlobalStatsRepairDateIds('2026-03-01', 2)).toEqual([
+      '2026-02-27',
+      '2026-02-28',
+      '2026-03-01',
+    ])
+  })
+
+  it.concurrent('keeps total bundle storage on version metadata instead of manifest rows', () => {
+    const migration = readFileSync(new URL('../supabase/migrations/20260630010932_optimize_global_stats_storage_repair.sql', import.meta.url), 'utf8')
+    const definition = migration.match(/CREATE OR REPLACE FUNCTION "public"\."total_bundle_storage_bytes"\(\) RETURNS bigint[\s\S]*?GRANT EXECUTE ON FUNCTION "public"\."total_bundle_storage_bytes"\(\) TO "service_role";/)?.[0]
+
+    expect(definition).toBeDefined()
+    expect(definition!).toContain('public.app_versions_meta')
+    expect(definition!).toContain('public.app_versions')
+    expect(definition!).not.toContain('public.manifest')
+    expect(definition!).not.toContain('file_size')
+  })
+
   it.concurrent('detects missing global stats shards before notifications', () => {
     expect(logsnagInsightsTestUtils.getMissingGlobalStatsRequiredShards(new Set())).toEqual([
       'core',
@@ -100,6 +125,7 @@ describe('logsnag revenue metric helpers', () => {
     ])
 
     expect(logsnagInsightsTestUtils.getMissingGlobalStatsRequiredShards(completed)).toEqual(['revenue'])
+    expect(logsnagInsightsTestUtils.getGlobalStatsShardQueueCandidates(completed)).toEqual(['revenue'])
 
     const ready = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
       'core',
@@ -113,6 +139,7 @@ describe('logsnag revenue metric helpers', () => {
     ])
     expect(logsnagInsightsTestUtils.getMissingGlobalStatsRequiredShards(ready)).toEqual([])
     expect(logsnagInsightsTestUtils.getMissingGlobalStatsShards(ready)).toEqual(['notifications'])
+    expect(logsnagInsightsTestUtils.getGlobalStatsShardQueueCandidates(ready)).toEqual(['notifications'])
 
     const legacyUsage = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
       'core',
