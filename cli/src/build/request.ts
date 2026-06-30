@@ -1738,7 +1738,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       log.info('ℹ️  --skip-build-number-bump not specified, build number will be auto-incremented (default)')
     }
     if (!mergedCredentials.SKIP_MARKETING_VERSION_BUMP && platform === 'ios' && !iosWithoutApiKey) {
-      log.info('ℹ️  --skip-marketing-version-bump not specified, marketing version will be auto-bumped when already released (default)')
+      log.info('ℹ️  --skip-marketing-version-bump not specified, marketing version will be auto-bumped when already released…')
     }
 
     const { buildOptions: buildOptionsPayload, buildCredentials: buildCredentialsPayload } = splitPayload(

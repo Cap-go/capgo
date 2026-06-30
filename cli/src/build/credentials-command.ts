@@ -237,7 +237,7 @@ export async function saveCredentialsCommand(options: SaveCredentialsOptions): P
       credentials.SKIP_MARKETING_VERSION_BUMP = parseOptionalBoolean(options.skipMarketingVersionBump) ? 'true' : 'false'
     }
     else {
-      log.info('ℹ️  --skip-marketing-version-bump not specified, marketing version will be auto-bumped when already released (default)')
+      log.info('ℹ️  --skip-marketing-version-bump not specified, marketing version will be auto-bumped when already released…')
     }
 
     if (platform === 'ios') {
