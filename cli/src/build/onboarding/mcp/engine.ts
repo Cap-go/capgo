@@ -26,9 +26,8 @@ import { slimAndroidTailProgress, slimIosTailProgress } from './tail-progress.js
 import { brokerBegin, brokerClear, brokerPoll } from './broker-session.js'
 import type { GoogleUserInfo } from '../android/oauth-google.js'
 import { SUPPORT_EMAIL } from '../../../support/contact-support.js'
-import { appflowFlow } from '../appflow/flow.js'
+import { appflowFlow, platformsToBuild } from '../appflow/flow.js'
 import type { AppflowEffectResult } from '../appflow/flow.js'
-import { platformsToBuild } from '../appflow/flow.js'
 import type { AppflowProgress, AppflowStep } from '../appflow/types.js'
 import type { StepView } from '../flow/contract.js'
 import { buildAppflowEffectDeps, persistAppflowCredentials } from '../appflow/deps.js'
@@ -2069,10 +2068,17 @@ export async function decideAppflow(
   // Seed (or resume) the process-local progress. A fresh entry starts at the
   // explain gate with the chosen scope.
   let progress: AppflowProgress = getAppflowProgress(appId)
-    ?? { scope, migratable: { ios: false, android: false }, completedSteps: [] }
+    // Seed capgoAppId from the Capgo app id (facts.appId) the rest of the engine
+    // builds against, so the handoff-build app-id swap (Appflow hex → Capgo id)
+    // is NOT a no-op over MCP and the inline tail never targets the Appflow hex.
+    ?? { scope, capgoAppId: appId, migratable: { ios: false, android: false }, completedSteps: [] }
   // Keep the scope in sync with the entry point on a truly fresh entry.
   if (progress.scope !== scope && progress.completedSteps.length === 0)
     progress = { ...progress, scope }
+  // Backfill capgoAppId on any resumed progress that predates the seed, so the
+  // handoff-build app-id swap (Appflow hex → Capgo id) is always live over MCP.
+  if (!progress.capgoAppId)
+    progress = { ...progress, capgoAppId: appId }
 
   const flowDeps = buildAppflowEffectDeps({ appId, packageName: facts.appId })
 

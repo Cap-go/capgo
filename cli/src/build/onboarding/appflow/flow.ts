@@ -21,6 +21,7 @@
 import type { PlatformFlow, StepView } from '../flow/contract'
 import type { AppflowInput, AppflowProgress, AppflowStep } from './types'
 import type { AppflowToken } from './auth'
+import jwt from 'jsonwebtoken'
 import { isExpired, loginWithBrowser, refresh } from './auth'
 import { createAppflowApi } from './api'
 import { extractKeyIdFromP8Path } from '../progress.js'
@@ -59,7 +60,7 @@ export interface AppflowEffectDeps {
   // injected validators (reuse existing CLI code in production)
   validateServiceAccountJson?: (json: string, packageName?: string) => Promise<{ ok: boolean, reason?: string }>
   tryUnlockPrivateKey?: (keystoreB64: string, storePass: string, alias: string) => Promise<boolean>
-  validateAppleAppPassword?: (user: string, pw: string) => Promise<{ valid: boolean, message?: string }>
+  validateAppleAppPassword?: (user: string, pw: string) => Promise<{ valid: boolean, message?: string, kind?: 'authenticated' | 'rejected' | 'unreachable' }>
   validateP12?: (p12B64: string, password: string) => Promise<boolean>
   // injected credential generators (step-6 gap-fill / step-8 p8 upgrade). Each
   // DRIVES an existing standalone sub-flow (iOS asc-key helper / Android Google
@@ -148,12 +149,17 @@ function mapTailViewToStepView(v: TailStepView): StepView {
 /** Build the per-platform TailInput the shared reducer expects from a raw choice/text. */
 function toTailInput(step: TailStep, input: AppflowInput): TailInput {
   switch (step) {
-    case 'ci-secrets-target-select':
-      // 'skip' clears the target; otherwise the engine re-resolves the target
-      // object at checking-ci-secrets (the appflow flow keeps no target table),
-      // so we record null here and let detection drive it. Mirrors the contract
-      // where ci-secrets-target-select carries a CiSecretTarget | null.
-      return { step, ciSecretTarget: null }
+    case 'ci-secrets-target-select': {
+      // Resolve the user's chosen provider value ('github' | 'gitlab') to the FULL
+      // CiSecretTarget object using the detected targets threaded on the input
+      // (from the prior detecting-ci-secrets transient). 'skip'/empty clears it.
+      // Recording the real object (not null) is what lets the flow advance forward
+      // to checking-ci-secrets instead of looping back into detection forever.
+      if (input.value === 'skip' || !input.value)
+        return { step, ciSecretTarget: null }
+      const chosen = (input.ciSecretTargets ?? []).find(t => t.provider === input.value) ?? null
+      return { step, ciSecretTarget: chosen }
+    }
     case 'ask-github-actions-setup':
       return { step, value: (input.value as 'with-workflow' | 'secrets-only' | 'no') ?? 'no' }
     case 'ask-export-env':
@@ -302,7 +308,11 @@ export async function runValidations(progress: AppflowProgress, deps: AppflowEff
         ? { id: 'app-password', status: 'skipped', message: 'App-specific password not checked.' }
         : r.valid
           ? { id: 'app-password', status: 'pass', message: 'App-specific password authenticated with Apple.' }
-          : { id: 'app-password', status: 'warn', message: `App-specific password check failed: ${r.message ?? 'unknown'}.` })
+          : r.kind === 'unreachable'
+            // Transport/network failure — we could NOT reach Apple, so this is a
+            // check we could not run, NOT a wrong password. Report it as skipped.
+            ? { id: 'app-password', status: 'skipped', message: `Could not reach Apple to check the app-specific password, skipped${r.message ? ` (${r.message})` : ''}.` }
+            : { id: 'app-password', status: 'warn', message: `App-specific password check failed: ${r.message ?? 'unknown'}.` })
     }
     catch (e) {
       out.push({ id: 'app-password', status: 'skipped', message: `App-specific password check skipped: ${e instanceof Error ? e.message : String(e)}.` })
@@ -503,6 +513,26 @@ export function appflowViewForStep(step: AppflowStep, progress: AppflowProgress,
   }
 }
 
+/**
+ * Decode the `email` claim from an Appflow token's id_token JWT WITHOUT verifying
+ * the signature (jsonwebtoken.decode) — we only need the human-readable account
+ * identity to surface which Appflow account is being migrated, not to trust it.
+ * Returns undefined when there is no id_token or no string email claim.
+ */
+export function appflowAccountEmail(token: { id_token?: string } | null | undefined): string | undefined {
+  const idToken = token?.id_token
+  if (!idToken)
+    return undefined
+  try {
+    const claims = jwt.decode(idToken)
+    const email = claims && typeof claims === 'object' ? (claims as Record<string, unknown>).email : undefined
+    return typeof email === 'string' && email.length > 0 ? email : undefined
+  }
+  catch {
+    return undefined
+  }
+}
+
 // ── input reducer ────────────────────────────────────────────────────────────
 export function applyAppflowInput(step: AppflowStep, progress: AppflowProgress, input: AppflowInput): AppflowProgress {
   const completed = progress.completedSteps.includes(step) ? progress.completedSteps : [...progress.completedSteps, step]
@@ -674,9 +704,15 @@ export function nextTailStep(step: TailStep, value: string | undefined, progress
     case 'ci-secrets-setup':
       return value === 'retry' ? 'detecting-ci-secrets' : 'build-complete'
     case 'ci-secrets-target-select':
-      // The appflow flow keeps no target table, so a chosen provider re-enters
-      // detection (which re-resolves the target object), and skip finishes.
-      return value === 'skip' || !value ? 'build-complete' : 'detecting-ci-secrets'
+      // 'skip'/empty finishes. A chosen provider was resolved to a real
+      // CiSecretTarget by toTailInput (recorded on progress.ciSecretTarget), so we
+      // advance FORWARD to checking-ci-secrets — never back to detecting-ci-secrets
+      // (which, with 2+ targets, would re-render this picker forever). If the
+      // lookup somehow failed (e.g. the transient was lost), self-heal by
+      // re-detecting rather than entering checking-ci-secrets with no target.
+      if (value === 'skip' || !value)
+        return 'build-complete'
+      return progress.ciSecretTarget ? 'checking-ci-secrets' : 'detecting-ci-secrets'
     case 'ask-ci-secrets':
       return value === 'yes' ? 'checking-ci-secrets' : 'build-complete'
     case 'ask-github-actions-setup':
@@ -741,13 +777,33 @@ export async function runAppflowEffect(step: AppflowStep, progress: AppflowProgr
 
   switch (step) {
     case 'authenticating': {
-      let token = deps.loadToken?.() ?? progress.token ?? null
-      if (token && isExpired(token))
-        token = await refresh(token).catch(() => null)
-      if (!token)
+      // A cached (or in-progress) token short-circuits the browser login. When
+      // that happens the browser never opens, so we LOG the reuse (it must not be
+      // silent in the support log) and surface WHICH Appflow account it belongs to.
+      const cached = deps.loadToken?.() ?? progress.token ?? null
+      let token = cached
+      if (token && isExpired(token)) {
+        const refreshed = await refresh(token).catch((e) => {
+          // Don't swallow a refresh failure silently — record it, then fall back
+          // to a fresh browser login below.
+          deps.log?.(`Appflow: cached token expired and refresh failed (${e instanceof Error ? e.message : String(e)}); re-opening the browser to sign in.`)
+          return null
+        })
+        token = refreshed
+      }
+      if (!token) {
         token = await loginWithBrowser({ openBrowser: deps.openBrowser })
+      }
+      else if (cached) {
+        deps.log?.('Appflow: reusing a cached sign-in token — the browser was not opened.')
+      }
       deps.saveToken?.(token)
-      return { progress: mark({ ...progress, token }, 'authenticating'), next: 'fetch-orgs' }
+      // Decode the account email from the freshest token that carries an id_token
+      // (a refresh response may omit it — fall back to the cached token).
+      const account = appflowAccountEmail(token) ?? appflowAccountEmail(cached)
+      if (account)
+        deps.log?.(`Appflow: signed in as ${account}.`)
+      return { progress: mark({ ...progress, token, ...(account ? { appflowAccount: account } : {}) }, 'authenticating'), next: 'fetch-orgs' }
     }
     case 'fetch-orgs': {
       // List the Appflow organizations. 0 → loud error (the API call THROWS on

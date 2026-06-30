@@ -11,6 +11,18 @@ const ENDPOINT = 'https://contentdelivery.itunes.apple.com/WebObjects/MZLabelSer
 export type AppPasswordResultKind = 'authenticated' | 'rejected' | 'unreachable'
 export interface AppPasswordResult { valid: boolean, kind: AppPasswordResultKind, code?: unknown, message?: string }
 
+// Apple's iTMSTransporter ErrorMessage (and our own error strings) flow into the
+// migration's validate-results view and the MCP NextStepResult.summary. Cap them
+// to a single line of bounded length — stripping newlines/control chars — so a
+// very large or control-character-laden Apple response cannot blow up that
+// response (defense-in-depth: HTTPS already prevents network-layer injection).
+const MAX_ADVISORY_MESSAGE = 200
+function capAdvisoryMessage(raw: string): string {
+  const stripped = Array.from(raw, ch => ((ch.codePointAt(0) ?? 0) < 0x20 || ch.codePointAt(0) === 0x7F ? ' ' : ch)).join('')
+  const flat = stripped.replace(/\s+/g, ' ').trim()
+  return flat.length > MAX_ADVISORY_MESSAGE ? `${flat.slice(0, MAX_ADVISORY_MESSAGE - 1)}…` : flat
+}
+
 export async function validateAppleAppPassword(username: string, appPassword: string, fetchImpl: typeof fetch = fetch): Promise<AppPasswordResult> {
   let res: Response
   try {
@@ -28,7 +40,7 @@ export async function validateAppleAppPassword(username: string, appPassword: st
   catch (e) {
     // Network/DNS/TLS failure — we could not reach Apple, so we cannot judge the
     // credential. Distinct from a rejection.
-    return { valid: false, kind: 'unreachable', message: `could not reach Apple to verify (${e instanceof Error ? e.message : String(e)})` }
+    return { valid: false, kind: 'unreachable', message: capAdvisoryMessage(`could not reach Apple to verify (${e instanceof Error ? e.message : String(e)})`) }
   }
 
   // Read the body once. Prefer text() (lets us treat an unparseable body as a
@@ -56,7 +68,7 @@ export async function validateAppleAppPassword(username: string, appPassword: st
   // A non-2xx response or an unparseable body means the CHECK failed, not that
   // the password was rejected.
   if (!res.ok || !bodyParsed)
-    return { valid: false, kind: 'unreachable', message: `verification endpoint returned HTTP ${res.status}${!bodyParsed ? ' with no parseable body' : ''}` }
+    return { valid: false, kind: 'unreachable', message: capAdvisoryMessage(`verification endpoint returned HTTP ${res.status}${!bodyParsed ? ' with no parseable body' : ''}`) }
   if (j?.result?.Success === true)
     return { valid: true, kind: 'authenticated', message: 'authenticated with Apple' }
   // Apple replied but did not authenticate: a genuine rejection.
@@ -64,6 +76,6 @@ export async function validateAppleAppPassword(username: string, appPassword: st
     valid: false,
     kind: 'rejected',
     code: j?.result?.ErrorCode ?? j?.error?.code,
-    message: j?.result?.ErrorMessage ?? j?.error?.message ?? 'Apple rejected the credentials',
+    message: capAdvisoryMessage(String(j?.result?.ErrorMessage ?? j?.error?.message ?? 'Apple rejected the credentials')),
   }
 }

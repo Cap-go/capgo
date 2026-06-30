@@ -30,6 +30,7 @@ import type { AppflowEffectResult, AppflowValidationResult } from '../appflow/fl
 import type { AppflowProgress, AppflowStep, MigrationScope } from '../appflow/types.js'
 import { appflowFlow, isAppflowTailStep, markTailRunComplete, nextTailStep } from '../appflow/flow.js'
 import type { TailStep } from '../tail/flow.js'
+import type { CiSecretTarget } from '../ci-secrets.js'
 import { buildAppflowEffectDeps, persistAppflowCredentials } from '../appflow/deps.js'
 import { sanitizeBuildLogLines } from '../build-log.js'
 import { Divider, Header, ErrorLine, SpinnerLine, SuccessLine, FilteredTextInput, FullscreenBuildOutput, Table } from './components.js'
@@ -78,6 +79,10 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
 
   const finishMigration = useCallback(async (finalProgress: AppflowProgress) => {
     try {
+      // On the 'build' path the tail's saving-credentials step already persisted
+      // these creds; this finish-time persist is an intentional belt-and-suspenders
+      // re-write — idempotent under the same app id (same store/path), and the only
+      // persist on the 'skip' path where saving-credentials never ran. (C7)
       await persistAppflowCredentials(appId, finalProgress)
     }
     catch (err) {
@@ -177,7 +182,14 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
       }
     }
 
-    const next = appflowFlow.applyInput(step, progress, { value, text })
+    const next = appflowFlow.applyInput(step, progress, {
+      value,
+      text,
+      // ci-secrets-target-select needs the detected targets (carried on ctx) to
+      // resolve the picked provider to a real CiSecretTarget — without this the
+      // pick is discarded and the picker loops forever on 2+ targets.
+      ciSecretTargets: ctx.ciSecretTargets as CiSecretTarget[] | undefined,
+    })
     setProgress(next)
 
     // Shared tail interactive steps transition by the tail's driver table (NOT
@@ -276,6 +288,8 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
 /** Human-readable bullets for the credentials pulled from Appflow so far. */
 function importedLines(p: AppflowProgress): string[] {
   const out: string[] = []
+  if (p.appflowAccount)
+    out.push(`Signed in to Appflow as ${p.appflowAccount}`)
   if (p.orgSlug)
     out.push(`Organization · ${p.orgSlug}`)
   if (p.appSlug || p.appId)

@@ -47,6 +47,10 @@ export type NoSigningScope = 'ios' | 'android'
 export interface AppflowProgress {
   scope: MigrationScope // intent: which platform the user chose to migrate
   token?: AppflowToken
+  // The Appflow account email (from the cached/issued id_token's `email` claim),
+  // surfaced so the user can SEE which Appflow account is being migrated — even
+  // when a cached token is reused and the browser never opens.
+  appflowAccount?: string
   orgSlug?: string
   appId?: string // the SELECTED Appflow app id (hex), used for the Appflow API only
   capgoAppId?: string // the Capgo app id (Capacitor config appId), used for the build + credential store
@@ -102,4 +106,13 @@ export interface AppflowProgress {
   envExportTargetPath?: string
 }
 
-export type AppflowInput = { value?: string, field?: string, text?: string }
+export type AppflowInput = {
+  value?: string
+  field?: string
+  text?: string
+  // The CI secret destinations detected at `detecting-ci-secrets` (carried on the
+  // transient/ctx). Threaded back into `ci-secrets-target-select` so the chosen
+  // provider value can be resolved to the FULL CiSecretTarget object instead of
+  // being discarded — which would otherwise loop the picker forever (2+ targets).
+  ciSecretTargets?: CiSecretTarget[]
+}

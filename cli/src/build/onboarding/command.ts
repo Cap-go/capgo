@@ -120,9 +120,17 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
   try {
     extConfig = await getConfig()
   }
-  catch {
-    // getConfig throws when this is not a Capacitor project (no capacitor.config.*)
-    extConfig = undefined
+  catch (err) {
+    // A throw from getConfig means a capacitor.config.* IS present but FAILED to
+    // load (syntax/parse error, a throwing or ESM-only export, malformed JSON).
+    // The genuine "no Capacitor project" case does NOT throw — loadConfig returns
+    // an empty config and the guard below handles it — so reaching here means a
+    // real config exists but could not be read. Surface the underlying error so
+    // the user can fix THEIR config instead of being misdirected to "not a
+    // Capacitor project".
+    const message = err instanceof Error ? err.message : String(err)
+    log.error(`Found a Capacitor config but could not load it: ${message}`)
+    process.exit(1)
   }
 
   // Simple guard: `build init` only makes sense inside a Capacitor app. If there

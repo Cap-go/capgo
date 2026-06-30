@@ -11,6 +11,7 @@ const {
   isAppflowTailStep,
   nextTailStep,
   markTailRunComplete,
+  appflowAccountEmail,
 } = flow
 const { toAppflowTailDeps, buildAppflowSavedCredentials } = tail
 
@@ -158,6 +159,67 @@ test('ask-build renders as a shared-tail choice via the appflow view', () => {
   const view = appflowFlow.viewForStep('ask-build', p)
   assert.strictEqual(view.kind, 'choice')
   assert.ok((view.options ?? []).some(o => o.value === 'yes'))
+})
+
+// ── 6. ci-secrets-target-select: 2+ detected targets must NOT loop ─────────────
+// Regression: when 2+ CI targets are detected, picking a provider used to discard
+// the choice (recorded ciSecretTarget=null) and route back to detecting-ci-secrets,
+// which re-detected 2+ targets and re-rendered the picker forever. The fix resolves
+// the chosen provider to the FULL CiSecretTarget (via the threaded ciSecretTargets)
+// and advances FORWARD to checking-ci-secrets.
+const TWO_TARGETS = [
+  { provider: 'github', label: 'GitHub Actions repository secrets', cli: 'gh' },
+  { provider: 'gitlab', label: 'GitLab CI/CD variables', cli: 'glab' },
+]
+
+test('ci-secrets-target-select: picking a provider records the chosen CiSecretTarget (2 targets)', () => {
+  const p = singleMigrated('ios')
+  const after = applyAppflowInput('ci-secrets-target-select', p, { value: 'gitlab', ciSecretTargets: TWO_TARGETS })
+  assert.ok(after.ciSecretTarget, 'a target object is recorded (not null)')
+  assert.strictEqual(after.ciSecretTarget.provider, 'gitlab')
+  assert.strictEqual(after.ciSecretTarget.cli, 'glab')
+})
+
+test('ci-secrets-target-select: a recorded target advances FORWARD to checking-ci-secrets (no loop)', () => {
+  const p = singleMigrated('ios')
+  const after = applyAppflowInput('ci-secrets-target-select', p, { value: 'github', ciSecretTargets: TWO_TARGETS })
+  assert.strictEqual(nextTailStep('ci-secrets-target-select', 'github', after), 'checking-ci-secrets')
+  // Must NEVER route back into detection (that was the infinite loop).
+  assert.notStrictEqual(nextTailStep('ci-secrets-target-select', 'github', after), 'detecting-ci-secrets')
+})
+
+test('ci-secrets-target-select: skip clears the target and finishes at build-complete', () => {
+  const p = singleMigrated('ios')
+  const after = applyAppflowInput('ci-secrets-target-select', p, { value: 'skip', ciSecretTargets: TWO_TARGETS })
+  assert.strictEqual(after.ciSecretTarget, null)
+  assert.strictEqual(nextTailStep('ci-secrets-target-select', 'skip', after), 'build-complete')
+})
+
+test('ci-secrets-target-select: a lost transient self-heals via re-detection (no checking with null target)', () => {
+  const p = singleMigrated('ios')
+  // ctx/transient lost (no ciSecretTargets threaded): the lookup yields null...
+  const after = applyAppflowInput('ci-secrets-target-select', p, { value: 'github' })
+  assert.strictEqual(after.ciSecretTarget, null)
+  // ...so we re-detect rather than enter checking-ci-secrets with no target.
+  assert.strictEqual(nextTailStep('ci-secrets-target-select', 'github', after), 'detecting-ci-secrets')
+})
+
+// ── 7. C3: surface the Appflow account from the cached/issued id_token ─────────
+function makeIdToken(payloadObj) {
+  const b64 = obj => Buffer.from(JSON.stringify(obj)).toString('base64url')
+  return `${b64({ alg: 'none', typ: 'JWT' })}.${b64(payloadObj)}.`
+}
+
+test('appflowAccountEmail decodes the email claim from the id_token (no verification)', () => {
+  const token = { access_token: 't', id_token: makeIdToken({ email: 'dev@example.com', sub: '123' }) }
+  assert.strictEqual(appflowAccountEmail(token), 'dev@example.com')
+})
+
+test('appflowAccountEmail returns undefined when there is no id_token or no email claim', () => {
+  assert.strictEqual(appflowAccountEmail(null), undefined)
+  assert.strictEqual(appflowAccountEmail({ access_token: 't' }), undefined)
+  assert.strictEqual(appflowAccountEmail({ access_token: 't', id_token: makeIdToken({ sub: '123' }) }), undefined)
+  assert.strictEqual(appflowAccountEmail({ access_token: 't', id_token: 'not-a-jwt' }), undefined)
 })
 
 console.log(`\n📊 Results: ${passed} passed, ${failed} failed`)

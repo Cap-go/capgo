@@ -13,7 +13,7 @@
 // the SAME credential store the native flows write (updateSavedCredentials), so
 // downstream build/CI steps cannot tell migrated creds from natively-set-up ones.
 import { Buffer } from 'node:buffer'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -87,6 +87,19 @@ export function serviceAccountJsonBytes(value: string): Buffer {
 }
 
 /**
+ * Cap an advisory reason/message to a single line of bounded length, stripping
+ * newlines/control chars, so an unbounded upstream (Google) string cannot blow up
+ * the validate-results view or the MCP NextStepResult.summary it flows into.
+ */
+const MAX_ADVISORY_REASON = 200
+function capAdvisoryReason(raw: string | undefined): string {
+  const source = raw ?? 'unknown'
+  const stripped = Array.from(source, ch => ((ch.codePointAt(0) ?? 0) < 0x20 || ch.codePointAt(0) === 0x7F ? ' ' : ch)).join('')
+  const flat = stripped.replace(/\s+/g, ' ').trim()
+  return flat.length > MAX_ADVISORY_REASON ? `${flat.slice(0, MAX_ADVISORY_REASON - 1)}…` : flat
+}
+
+/**
  * Adapter: the flow asks for `(json, packageName?) => { ok, reason? }`; the
  * existing validator takes `{ jsonBytes, packageName }` and returns a tagged
  * union. We pass the migrated service-account JSON (decoded) + the migrated
@@ -100,7 +113,10 @@ function makeValidateServiceAccountJson(packageName?: string): NonNullable<Appfl
     const result = await androidValidateServiceAccountJson({ jsonBytes: serviceAccountJsonBytes(json), packageName: effectivePkg })
     if (result.ok)
       return { ok: true }
-    return { ok: false, reason: result.message }
+    // Cap the Google API reason (a single line, bounded length, no control chars)
+    // so an unbounded upstream string cannot blow up the validate-results view /
+    // MCP summary it flows into.
+    return { ok: false, reason: capAdvisoryReason(result.message) }
   }
 }
 
@@ -135,9 +151,15 @@ function validateP12(p12B64: string, password: string): Promise<boolean> {
   }
 }
 
-/** Adapter: the flow asks for `(user, pw) => { valid, message? }`; reuse the iTMSTransporter probe. */
-function validateAppleAppPassword(user: string, pw: string): Promise<{ valid: boolean, message?: string }> {
-  return iosValidateAppleAppPassword(user, pw).then(r => ({ valid: r.valid, message: r.message }))
+/**
+ * Adapter: the flow asks for `(user, pw) => { valid, message?, kind? }`; reuse
+ * the iTMSTransporter probe. We FORWARD `kind` ('authenticated' | 'rejected' |
+ * 'unreachable') so the flow can distinguish a transport failure (could not reach
+ * Apple) from a genuine credential rejection — a network problem must NOT be
+ * reported as a bad password.
+ */
+function validateAppleAppPassword(user: string, pw: string): Promise<{ valid: boolean, message?: string, kind?: 'authenticated' | 'rejected' | 'unreachable' }> {
+  return iosValidateAppleAppPassword(user, pw).then(r => ({ valid: r.valid, message: r.message, kind: r.kind }))
 }
 
 /**
@@ -198,6 +220,14 @@ function generateAndroidServiceAccount(_opts: { packageName?: string }): Promise
 export async function readP8File(path: string): Promise<string | null> {
   try {
     if (!path || !existsSync(path))
+      return null
+    // Only ever read an actual App Store Connect API key: the path MUST end with
+    // `.p8` (case-insensitive) and be a REGULAR file. This blocks reading arbitrary
+    // files (e.g. ~/.ssh/id_rsa, /etc/passwd) into APPLE_KEY_CONTENT — a file-content
+    // exfiltration vector when an AI agent intermediates the p8Path input over MCP.
+    if (!/\.p8$/i.test(path))
+      return null
+    if (!statSync(path).isFile())
       return null
     const bytes = readFileSync(path)
     return Buffer.from(bytes).toString('base64')

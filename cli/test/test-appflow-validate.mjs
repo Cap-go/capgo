@@ -12,4 +12,20 @@ assert.strictEqual(bad.message, 'nope')
 const net = await validateAppleAppPassword('a@b.com', 'x', async () => { throw new Error('offline') })
 assert.strictEqual(net.valid, false) // never throws
 
+// C9: the kind distinguishes authenticated / rejected / unreachable.
+assert.strictEqual(ok.kind, 'authenticated')
+assert.strictEqual(bad.kind, 'rejected')
+assert.strictEqual(net.kind, 'unreachable')
+
+// C4: a very large / control-character ErrorMessage is capped to a single line of
+// bounded length so it cannot blow up the validate-results view / MCP summary.
+const huge = 'A'.repeat(5000)
+const big = await validateAppleAppPassword('a@b.com', 'bad', async () => ({ ok: true, json: async () => ({ result: { Success: false, ErrorMessage: huge } }) }))
+assert.ok(big.message.length <= 200, `capped message length ${big.message.length} <= 200`)
+assert.ok(big.message.length < huge.length, 'message was actually capped')
+
+const noisy = await validateAppleAppPassword('a@b.com', 'bad', async () => ({ ok: true, json: async () => ({ result: { Success: false, ErrorMessage: 'line1\nline2\tcol\u0007bell' } }) }))
+assert.ok(!/[\n\t\u0007]/.test(noisy.message), 'newlines/control chars stripped to single line')
+assert.strictEqual(noisy.message, 'line1 line2 col bell')
+
 console.log('validate app-specific password OK')
