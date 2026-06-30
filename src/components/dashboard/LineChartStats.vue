@@ -114,7 +114,7 @@ const evolution = computed(() => {
     const last = arrWithoutUndefined[i - 1] ?? 0
     return i > 0 ? val - last : 0
   })
-  const median = res.reduce((a, b) => a + b, 0.0) / accumulateData.value.length
+  const median = res.reduce((a, b) => a + b, 0) / accumulateData.value.length
   const min = Math.min(...res)
   const max = Math.max(...res)
   return [min, max, median]
@@ -145,7 +145,7 @@ const projectionData = computed(() => {
       newVal = last + randomizedEvolution
     return acc.concat([newVal as number])
   }, [])
-  res = res.filter(i => i)
+  res = res.filter(Boolean)
   for (let i = 0; i < arrWithoutUndefined.length - 1; i++)
     res.unshift(undefined)
 
@@ -307,6 +307,7 @@ const chartData = computed<ChartData<'line' | 'bar'>>(() => {
 
         const baseDataset = {
           label: props.appNames[appId] || appId,
+          appId,
           data: processedData,
           borderColor,
           backgroundColor,
@@ -377,6 +378,32 @@ const chartData = computed<ChartData<'line' | 'bar'>>(() => {
   }
 })
 
+const hasAppData = computed(() => Object.keys(props.dataByApp || {}).length > 0)
+
+function getLegendColor(color: unknown) {
+  if (typeof color === 'string')
+    return color
+  if (Array.isArray(color))
+    return getLegendColor(color[0])
+  return '#64748b'
+}
+
+const legendItems = computed(() => {
+  if (!hasAppData.value)
+    return []
+
+  return chartData.value.datasets.map((dataset, index) => {
+    const appDataset = dataset as typeof dataset & { appId?: string }
+
+    return {
+      id: `${appDataset.appId ?? index}`,
+      label: `${dataset.label ?? ''}`,
+      backgroundColor: getLegendColor(dataset.backgroundColor),
+      borderColor: getLegendColor(dataset.borderColor),
+    }
+  })
+})
+
 const todayLineOptions = computed(() => {
   if (!props.useBillingPeriod)
     return { enabled: false }
@@ -438,8 +465,7 @@ const dataMax = computed(() => {
 })
 
 const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin: AnnotationOptions, todayLine?: any } }>(() => {
-  const hasAppData = Object.keys(props.dataByApp || {}).length > 0
-  const scales = createStackedChartScales(isDark.value, hasAppData)
+  const scales = createStackedChartScales(isDark.value, hasAppData.value)
 
   // If we have a calculated max, use it to ensure small values are visible
   if (dataMax.value !== undefined) {
@@ -451,11 +477,11 @@ const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin
     scales,
     plugins: {
       inlineAnnotationPlugin: generateAnnotations.value,
-      legend: createLegendConfig(isDark.value, hasAppData),
+      legend: createLegendConfig(isDark.value, !hasAppData.value),
       title: {
         display: false,
       },
-      tooltip: createTooltipConfig(hasAppData, props.accumulated, props.useBillingPeriod ? cycleStart : false, hasAppData ? tooltipClickHandler.value : undefined),
+      tooltip: createTooltipConfig(hasAppData.value, props.accumulated, props.useBillingPeriod ? cycleStart : false, hasAppData.value ? tooltipClickHandler.value : undefined),
       filler: {
         propagate: false,
       },
@@ -470,6 +496,24 @@ const barPlugins = sharedPlugins as unknown as Plugin<'bar'>[]
 </script>
 
 <template>
-  <Line v-if="accumulated" :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="linePlugins" />
-  <Bar v-else :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="barPlugins" />
+  <div class="flex min-h-full flex-col">
+    <div class="min-h-[16rem] flex-1">
+      <Line v-if="accumulated" :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="linePlugins" />
+      <Bar v-else :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="barPlugins" />
+    </div>
+    <ul
+      v-if="legendItems.length"
+      tabindex="0"
+      class="mt-3 flex max-w-full shrink-0 gap-4 overflow-x-auto overflow-y-hidden whitespace-nowrap pb-1 pr-1 [scrollbar-gutter:stable]"
+    >
+      <li v-for="item in legendItems" :key="item.id" class="flex max-w-[12rem] shrink-0 items-center gap-2 text-sm text-slate-700 dark:text-white">
+        <span
+          class="h-3 w-9 shrink-0 rounded-sm border"
+          :style="{ backgroundColor: item.backgroundColor, borderColor: item.borderColor }"
+          aria-hidden="true"
+        />
+        <span class="min-w-0 truncate">{{ item.label }}</span>
+      </li>
+    </ul>
+  </div>
 </template>
