@@ -506,22 +506,23 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
 
       <!-- Expert as a Service CTA -->
       <div v-if="!isMobile" class="mb-6 shrink-0">
-        <div class="flex flex-col gap-3 p-4 border border-amber-200 bg-amber-50 rounded-2xl text-amber-900 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p class="text-sm font-semibold">
+        <div class="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 sm:flex-row sm:items-center sm:justify-between">
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-semibold text-slate-900 dark:text-white">
               {{ t('expert-service-title') }}
             </p>
-            <p class="text-xs text-amber-800 dark:text-amber-200">
+            <p class="mt-1 max-w-3xl text-xs leading-5 text-slate-600 dark:text-slate-300">
               {{ t('expert-service-desc') }}
             </p>
           </div>
           <a
-            class="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold text-white rounded-full bg-amber-600 hover:bg-amber-700"
+            class="d-btn d-btn-sm h-auto min-h-10 w-full shrink-0 justify-center gap-2 whitespace-nowrap rounded-lg border-none bg-blue-600 px-4 text-xs font-semibold text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 sm:w-auto"
             href="https://capgo.app/premium-support/"
             rel="noopener noreferrer"
             target="_blank"
           >
             {{ t('expert-service-cta') }}
+            <IconArrowRight class="h-3.5 w-3.5" aria-hidden="true" />
           </a>
         </div>
       </div>

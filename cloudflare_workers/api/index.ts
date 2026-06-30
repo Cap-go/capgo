@@ -57,7 +57,7 @@ import { app as cron_reconcile_build_status } from '../../supabase/functions/_ba
 import { app as cron_stat_app } from '../../supabase/functions/_backend/triggers/cron_stat_app.ts'
 import { app as cron_stat_org } from '../../supabase/functions/_backend/triggers/cron_stat_org.ts'
 import { app as cron_sync_sub } from '../../supabase/functions/_backend/triggers/cron_sync_sub.ts'
-import { app as logsnag_insights, logsnagInsightsShardApps } from '../../supabase/functions/_backend/triggers/logsnag_insights.ts'
+import { app as logsnag_insights, logsnagInsightsLegacyUsageApp, logsnagInsightsShardApps } from '../../supabase/functions/_backend/triggers/logsnag_insights.ts'
 import { app as on_app_create } from '../../supabase/functions/_backend/triggers/on_app_create.ts'
 import { app as on_app_delete } from '../../supabase/functions/_backend/triggers/on_app_delete.ts'
 import { app as on_app_update } from '../../supabase/functions/_backend/triggers/on_app_update.ts'
@@ -152,7 +152,14 @@ appTriggers.route('/cron_reconcile_build_status', cron_reconcile_build_status)
 appTriggers.route('/credit_usage_alerts', credit_usage_alerts)
 appTriggers.route('/logsnag_insights', logsnag_insights)
 appTriggers.route('/logsnag_insights_core', logsnagInsightsShardApps.core)
-appTriggers.route('/logsnag_insights_usage', logsnagInsightsShardApps.usage)
+appTriggers.route('/logsnag_insights_usage', logsnagInsightsLegacyUsageApp)
+appTriggers.route('/logsnag_insights_usage_updates', logsnagInsightsShardApps.usage_updates)
+appTriggers.route('/logsnag_insights_usage_devices', logsnagInsightsShardApps.usage_devices)
+appTriggers.route('/logsnag_insights_usage_device_platforms', logsnagInsightsShardApps.usage_device_platforms)
+appTriggers.route('/logsnag_insights_usage_registrations', logsnagInsightsShardApps.usage_registrations)
+appTriggers.route('/logsnag_insights_usage_storage', logsnagInsightsShardApps.usage_storage)
+appTriggers.route('/logsnag_insights_usage_success_rate', logsnagInsightsShardApps.usage_success_rate)
+appTriggers.route('/logsnag_insights_usage_demo_apps', logsnagInsightsShardApps.usage_demo_apps)
 appTriggers.route('/logsnag_insights_revenue', logsnagInsightsShardApps.revenue)
 appTriggers.route('/logsnag_insights_plugins', logsnagInsightsShardApps.plugins)
 appTriggers.route('/logsnag_insights_builds', logsnagInsightsShardApps.builds)

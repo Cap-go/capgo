@@ -7,7 +7,7 @@ import { app as cron_reconcile_build_status } from '../_backend/triggers/cron_re
 import { app as cron_stat_app } from '../_backend/triggers/cron_stat_app.ts'
 import { app as cron_stat_org } from '../_backend/triggers/cron_stat_org.ts'
 import { app as cron_sync_sub } from '../_backend/triggers/cron_sync_sub.ts'
-import { app as logsnag_insights, logsnagInsightsShardApps } from '../_backend/triggers/logsnag_insights.ts'
+import { app as logsnag_insights, logsnagInsightsLegacyUsageApp, logsnagInsightsShardApps } from '../_backend/triggers/logsnag_insights.ts'
 import { app as on_app_create } from '../_backend/triggers/on_app_create.ts'
 import { app as on_app_delete } from '../_backend/triggers/on_app_delete.ts'
 import { app as on_app_update } from '../_backend/triggers/on_app_update.ts'
@@ -37,7 +37,14 @@ const appGlobal = createHono(functionName, version)
 appGlobal.route('/cron_email', cron_email)
 appGlobal.route('/logsnag_insights', logsnag_insights)
 appGlobal.route('/logsnag_insights_core', logsnagInsightsShardApps.core)
-appGlobal.route('/logsnag_insights_usage', logsnagInsightsShardApps.usage)
+appGlobal.route('/logsnag_insights_usage', logsnagInsightsLegacyUsageApp)
+appGlobal.route('/logsnag_insights_usage_updates', logsnagInsightsShardApps.usage_updates)
+appGlobal.route('/logsnag_insights_usage_devices', logsnagInsightsShardApps.usage_devices)
+appGlobal.route('/logsnag_insights_usage_device_platforms', logsnagInsightsShardApps.usage_device_platforms)
+appGlobal.route('/logsnag_insights_usage_registrations', logsnagInsightsShardApps.usage_registrations)
+appGlobal.route('/logsnag_insights_usage_storage', logsnagInsightsShardApps.usage_storage)
+appGlobal.route('/logsnag_insights_usage_success_rate', logsnagInsightsShardApps.usage_success_rate)
+appGlobal.route('/logsnag_insights_usage_demo_apps', logsnagInsightsShardApps.usage_demo_apps)
 appGlobal.route('/logsnag_insights_revenue', logsnagInsightsShardApps.revenue)
 appGlobal.route('/logsnag_insights_plugins', logsnagInsightsShardApps.plugins)
 appGlobal.route('/logsnag_insights_builds', logsnagInsightsShardApps.builds)

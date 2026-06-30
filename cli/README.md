@@ -1387,10 +1387,13 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | **--android-flavor** | <code>string</code> | Android: Product flavor to build (e.g. production). Required if your project has multiple flavors. |
 | **--in-app-update-priority** | <code>string</code> | Android: Google Play in-app update priority for this release (integer 0–5; higher = more urgent). See https://developer.android.com/guide/playcore/in-app-updates. Precedence: CLI > env > saved credentials |
 | **--no-playstore-upload** | <code>boolean</code> | Skip Play Store upload for this build (nulls out saved play config). Requires --output-upload. |
-| **--submit-to-store-review** | <code>boolean</code> | After upload, submit the store release for review instead of leaving it as a draft/inactive build. Android marks the Play release completed; iOS submits to TestFlight external review and requires --ios-testflight-groups. |
-| **--store-release-name** | <code>string</code> | Store release name/version label. Android sends this as the Google Play version_name. |
-| **--store-release-notes** | <code>string</code> | Store release notes. Android sends this as the Play changelog; iOS sends it as the TestFlight What to Test text. |
-| **--ios-testflight-groups** | <code>string</code> | iOS: comma-separated TestFlight external group names or IDs required with --submit-to-store-review. |
+| **--submit-to-store-review** | <code>boolean</code> | After upload, submit the store release for review instead of leaving it as a draft/inactive build. Android marks the Play release completed; iOS submits the processed TestFlight build to App Store review. |
+| **--store-release-name** | <code>string</code> | Store release name/version label. Android sends this as the Google Play version_name; iOS uses it as the App Store version when creating or reusing the editable version. |
+| **--store-release-notes** | <code>string</code> | Default store release notes. Android uses this as the Play changelog; iOS uses it as the fallback App Store What's New text. |
+| **--store-release-notes-locale** | <code>string</code> | Localized store release notes (repeatable), for example --store-release-notes-locale en-US="Bug fixes" --store-release-notes-locale fr-FR="Corrections". |
+| **--ios-testflight-groups** | <code>string</code> | iOS: optional comma-separated TestFlight external group names or IDs for external beta distribution. |
+| **--ios-automatic-release** | <code>boolean</code> | iOS: automatically release the App Store version after Apple approval. Default is manual release. |
+| **--no-ios-automatic-release** | <code>boolean</code> | iOS: keep the App Store version waiting for manual release after Apple approval. |
 | **--output-upload** | <code>boolean</code> | Override output upload behavior for this build only (enable). Precedence: CLI > env > saved credentials |
 | **--no-output-upload** | <code>boolean</code> | Override output upload behavior for this build only (disable). Precedence: CLI > env > saved credentials |
 | **--output-retention** | <code>string</code> | Override output link TTL for this build only (1h to 7d). Examples: 1h, 6h, 2d. Precedence: CLI > env > saved credentials |
