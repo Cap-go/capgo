@@ -108,9 +108,9 @@ const id = ref<number>(0)
 const loading = ref(true)
 const statsLoading = ref(true)
 const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
-type PeriodDayOption = 1 | 3 | 30
+type PeriodDayOption = 1 | 3 | 7 | 30
 const days = ref<PeriodDayOption>(30)
-const periodDayOptions: PeriodDayOption[] = [1, 3, 30]
+const periodDayOptions: PeriodDayOption[] = [1, 3, 7, 30]
 const stats = ref<ChannelStatsResponse | null>(null)
 const bundleIdCache = ref<Record<string, number>>({})
 const versionByLabel = computed(() => {
@@ -223,17 +223,17 @@ const currentVersionDataset = computed(() => {
   return stats.value.datasets.find(dataset => dataset.label === stats.value?.currentVersion) ?? null
 })
 
-const requestedDays = computed(() => days.value === 1 ? 2 : days.value)
+const requestedDays = computed(() => days.value)
 function periodButtonLabel(option: PeriodDayOption) {
   if (option === 1)
-    return t('today-vs-yesterday')
+    return t('one-day')
   if (option === 30)
-    return t('release-or-30-days')
-  return t('last-n-days', { days: option })
+    return t('max-period')
+  return `${option} ${t('days')}`
 }
 const selectedPeriodLabel = computed(() => {
   if (days.value === 1)
-    return t('today-vs-yesterday')
+    return t('last-one-day')
 
   const period = stats.value?.period
   if (period?.start_reason === 'current_version_release')
@@ -252,6 +252,14 @@ const periodTimespanLabel = computed(() => {
 
   return '-'
 })
+
+async function selectPeriod(option: PeriodDayOption) {
+  if (days.value === option)
+    return
+
+  days.value = option
+  await fetchStats()
+}
 
 const periodSummary = computed(() => {
   const dataset = currentVersionDataset.value
@@ -605,6 +613,32 @@ watchEffect(async () => {
           </div>
         </div>
 
+        <div class="flex flex-col gap-3 p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-slate-900 dark:text-white">
+              {{ t('selected-period') }}: {{ selectedPeriodLabel }}
+            </h3>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              {{ t('channel-stats-help', { period: selectedPeriodLabel, range: periodTimespanLabel }) }}
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2" role="group" :aria-label="t('selected-period')">
+            <button
+              v-for="d in periodDayOptions"
+              :key="d"
+              type="button"
+              :aria-pressed="days === d"
+              class="px-3 py-1 text-sm transition-colors rounded-md"
+              :class="days === d
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'"
+              @click="selectPeriod(d)"
+            >
+              {{ periodButtonLabel(d) }}
+            </button>
+          </div>
+        </div>
+
         <!-- Stats Overview Cards -->
         <div class="space-y-4">
           <div>
@@ -666,7 +700,7 @@ watchEffect(async () => {
           <div>
             <div class="mb-3">
               <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                {{ t('selected-period') }}: {{ selectedPeriodLabel }}
+                {{ t('adoption-over-selected-period') }}
               </h3>
               <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
                 {{ t('channel-stats-period-window', { range: periodTimespanLabel }) }}
@@ -728,24 +762,10 @@ watchEffect(async () => {
 
         <!-- Chart -->
         <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-          <div class="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div class="mb-4">
             <h3 class="text-lg font-semibold text-slate-900 dark:text-white">
               {{ t('device-version-adoption-over-time') }}
             </h3>
-            <div class="flex flex-wrap items-center gap-2">
-              <button
-                v-for="d in periodDayOptions"
-                :key="d"
-                type="button"
-                class="px-3 py-1 text-sm transition-colors rounded-md"
-                :class="days === d
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'"
-                @click="days = d; fetchStats()"
-              >
-                {{ periodButtonLabel(d) }}
-              </button>
-            </div>
           </div>
 
           <p class="mb-4 text-sm text-slate-600 dark:text-slate-300">
