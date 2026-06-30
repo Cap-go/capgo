@@ -307,6 +307,7 @@ const chartData = computed<ChartData<'line' | 'bar'>>(() => {
 
         const baseDataset = {
           label: props.appNames[appId] || appId,
+          appId,
           data: processedData,
           borderColor,
           backgroundColor,
@@ -391,12 +392,16 @@ const legendItems = computed(() => {
   if (!hasAppData.value)
     return []
 
-  return chartData.value.datasets.map((dataset, index) => ({
-    id: `${dataset.label ?? index}`,
-    label: `${dataset.label ?? ''}`,
-    backgroundColor: getLegendColor(dataset.backgroundColor),
-    borderColor: getLegendColor(dataset.borderColor),
-  }))
+  return chartData.value.datasets.map((dataset, index) => {
+    const appDataset = dataset as typeof dataset & { appId?: string }
+
+    return {
+      id: `${appDataset.appId ?? index}`,
+      label: `${dataset.label ?? ''}`,
+      backgroundColor: getLegendColor(dataset.backgroundColor),
+      borderColor: getLegendColor(dataset.borderColor),
+    }
+  })
 })
 
 const todayLineOptions = computed(() => {
@@ -472,7 +477,7 @@ const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin
     scales,
     plugins: {
       inlineAnnotationPlugin: generateAnnotations.value,
-      legend: createLegendConfig(isDark.value, false),
+      legend: createLegendConfig(isDark.value, !hasAppData.value),
       title: {
         display: false,
       },
@@ -496,8 +501,12 @@ const barPlugins = sharedPlugins as unknown as Plugin<'bar'>[]
       <Line v-if="accumulated" :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="linePlugins" />
       <Bar v-else :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="barPlugins" />
     </div>
-    <ul v-if="legendItems.length" class="mt-3 flex max-w-full shrink-0 gap-4 overflow-x-auto overflow-y-hidden whitespace-nowrap pb-1 pr-1 [scrollbar-gutter:stable]">
-      <li v-for="item in legendItems" :key="item.id" class="flex shrink-0 items-center gap-2 text-sm text-slate-700 dark:text-white">
+    <ul
+      v-if="legendItems.length"
+      tabindex="0"
+      class="mt-3 flex max-w-full shrink-0 gap-4 overflow-x-auto overflow-y-hidden whitespace-nowrap pb-1 pr-1 [scrollbar-gutter:stable]"
+    >
+      <li v-for="item in legendItems" :key="item.id" class="flex max-w-[12rem] shrink-0 items-center gap-2 text-sm text-slate-700 dark:text-white">
         <span
           class="h-3 w-9 shrink-0 rounded-sm border"
           :style="{ backgroundColor: item.backgroundColor, borderColor: item.borderColor }"
