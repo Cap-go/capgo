@@ -151,6 +151,51 @@ function selectRecentChannelVersions(
     .slice(0, limit)
     .map(([versionName]) => versionName)
 }
+const otherVersionsLabel = 'Other versions'
+
+function getDailyTotal(counts: Record<string, number> | undefined) {
+  return Object.values(counts ?? {}).reduce((sum, value) => sum + Math.round(value ?? 0), 0)
+}
+
+function getUniqueVersionNames(dailyVersion: AppUsageByVersion[], currentVersionName: string) {
+  const versionNames = new Set<string>()
+  if (currentVersionName)
+    versionNames.add(currentVersionName)
+
+  dailyVersion.forEach((row) => {
+    if (row.version_name)
+      versionNames.add(row.version_name)
+  })
+
+  return [...versionNames]
+}
+
+function createChartCountsByDate(
+  labels: string[],
+  countsByDate: Record<string, Record<string, number>>,
+  selectedVersions: string[],
+  allVersions: string[],
+) {
+  const visibleVersions = selectedVersions.filter((version, index, versions) => version && versions.indexOf(version) === index)
+  const hiddenVersions = allVersions.filter(version => !visibleVersions.includes(version))
+  const hasOtherVersions = hiddenVersions.some(version => labels.some(label => (countsByDate[label]?.[version] ?? 0) > 0))
+  const chartVersions = hasOtherVersions ? [...visibleVersions, otherVersionsLabel] : visibleVersions
+  const chartCountsByDate: Record<string, Record<string, number>> = {}
+
+  labels.forEach((label) => {
+    chartCountsByDate[label] = {}
+    visibleVersions.forEach((version) => {
+      chartCountsByDate[label][version] = Math.max(0, Math.round(countsByDate[label]?.[version] ?? 0))
+    })
+    if (hasOtherVersions) {
+      chartCountsByDate[label][otherVersionsLabel] = hiddenVersions.reduce((sum, version) => {
+        return sum + Math.max(0, Math.round(countsByDate[label]?.[version] ?? 0))
+      }, 0)
+    }
+  })
+
+  return { versions: chartVersions, countsByDate: chartCountsByDate }
+}
 
 function getLatestCounts(labels: string[], countsByDate: Record<string, Record<string, number>>) {
   if (labels.length === 0)
@@ -270,26 +315,28 @@ app.post('/', middlewareAuth, async (c) => {
       })
       .filter(row => row.version_name)
 
+    const allVersionNames = getUniqueVersionNames(dailyVersion, currentVersionName)
+    const rawAllCountsByDate = buildDailyReportedCountsByName(dailyVersion, period.labels, allVersionNames)
+    const labels = trimTrailingEmptyLabels(period.labels, rawAllCountsByDate)
+    const allCountsByDate = fillMissingDailyCounts(rawAllCountsByDate, labels, allVersionNames)
+
     const currentCounts = await readDeviceVersionCounts(c, body.app_id, channelData.name)
 
-    const versions = selectRecentChannelVersions(deploymentHistory, currentVersionName, currentCounts, 10)
+    const selectedVersions = selectRecentChannelVersions(deploymentHistory, currentVersionName, currentCounts, 10)
+    const chartCounts = createChartCountsByDate(labels, allCountsByDate, selectedVersions, allVersionNames)
 
-    const filteredDailyVersion = dailyVersion.filter(row => versions.includes(row.version_name))
-    const rawCountsByDate = buildDailyReportedCountsByName(filteredDailyVersion, period.labels, versions)
-    const labels = trimTrailingEmptyLabels(period.labels, rawCountsByDate)
-    const countsByDate = fillMissingDailyCounts(rawCountsByDate, labels, versions)
-
-    const activeVersions = versions.filter((version) => {
+    const activeVersions = chartCounts.versions.filter((version) => {
       if (version === currentVersionName)
         return true
-      return labels.some(label => (countsByDate[label]?.[version] ?? 0) > 0)
+      return labels.some(label => (chartCounts.countsByDate[label]?.[version] ?? 0) > 0)
     })
 
-    const percentagesByDate = convertCountsToPercentagesByName(countsByDate, labels, activeVersions)
-    const datasets = createPercentageDatasetsByName(activeVersions, labels, percentagesByDate, countsByDate)
+    const percentagesByDate = convertCountsToPercentagesByName(chartCounts.countsByDate, labels, activeVersions)
+    const datasets = createPercentageDatasetsByName(activeVersions, labels, percentagesByDate, chartCounts.countsByDate)
+    const dailyTotals = labels.map(label => getDailyTotal(allCountsByDate[label]))
 
-    const latestDailyCounts = getLatestCounts(labels, countsByDate)
-    const totalDevices = Object.values(latestDailyCounts).reduce((sum, val) => sum + Math.round(val ?? 0), 0)
+    const latestDailyCounts = getLatestCounts(labels, allCountsByDate)
+    const totalDevices = getDailyTotal(latestDailyCounts)
     const devicesOnCurrent = currentVersionName ? Math.round(latestDailyCounts[currentVersionName] ?? 0) : 0
     const percentOnCurrent = totalDevices > 0 ? Math.round((devicesOnCurrent / totalDevices) * 1000) / 10 : 0
     const deploymentHistorySorted = [...deploymentHistory].sort((a, b) => dayjs(b.deployed_at).valueOf() - dayjs(a.deployed_at).valueOf())
@@ -297,6 +344,7 @@ app.post('/', middlewareAuth, async (c) => {
     return c.json({
       labels,
       datasets,
+      dailyTotals,
       latestVersion: {
         name: currentVersionName,
         percentage: percentOnCurrent.toFixed(1),

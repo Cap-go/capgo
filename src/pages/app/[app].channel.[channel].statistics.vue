@@ -27,6 +27,7 @@ interface Channel {
 interface ChannelStatsResponse {
   labels: string[]
   datasets: Array<{ label: string, data: number[], metaCounts?: number[] }>
+  dailyTotals: number[]
   latestVersion: {
     name: string
     percentage: string
@@ -294,11 +295,18 @@ const periodSummary = computed(() => {
   if (normalizedShares.length === 0)
     return null
 
-  const dailyTotalAt = (index: number) => datasets.reduce((sum, currentDataset) => {
-    const rawValue = currentDataset.metaCounts?.[index]
-    const numeric = typeof rawValue === 'number' ? rawValue : Number(rawValue)
-    return sum + (Number.isFinite(numeric) ? Math.max(0, Math.round(numeric)) : 0)
-  }, 0)
+  const dailyTotalAt = (index: number) => {
+    const rawTotal = stats.value?.dailyTotals?.[index]
+    const backendTotal = typeof rawTotal === 'number' ? rawTotal : Number(rawTotal)
+    if (Number.isFinite(backendTotal))
+      return Math.max(0, Math.round(backendTotal))
+
+    return datasets.reduce((sum, currentDataset) => {
+      const rawValue = currentDataset.metaCounts?.[index]
+      const numeric = typeof rawValue === 'number' ? rawValue : Number(rawValue)
+      return sum + (Number.isFinite(numeric) ? Math.max(0, Math.round(numeric)) : 0)
+    }, 0)
+  }
 
   const latestIndex = normalizedShares.length - 1
   const startShare = normalizedShares[0] ?? 0

@@ -2279,7 +2279,7 @@
   "your-usage": "Your usage:",
   "zip-bundle": "Zip app bundle",
   "current-channel-version": "Current channel version",
-  "current-version-check-ins-in-period": "{current} / {total} daily check-ins on current version in {period} ({range}).",
+  "current-version-check-ins-in-period": "{current} / {total} daily check-ins on current version on the latest day in {period} ({range}).",
   "last-n-days": "Last {days} days",
   "last-one-day": "Last 1 day",
   "latest-snapshot": "Latest day",

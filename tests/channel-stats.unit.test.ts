@@ -39,7 +39,7 @@ describe('channel stats helpers', () => {
     expect(period.actualDays).toBe(30)
   })
 
-  it('normalizeStatsPeriodDays only accepts supported presets', () => {
+  it.concurrent('normalizeStatsPeriodDays only accepts supported presets', () => {
     expect(channelStatsTestUtils.normalizeStatsPeriodDays(undefined)).toBe(30)
     expect(channelStatsTestUtils.normalizeStatsPeriodDays(1)).toBe(1)
     expect(channelStatsTestUtils.normalizeStatsPeriodDays(3)).toBe(3)
@@ -49,7 +49,7 @@ describe('channel stats helpers', () => {
     expect(channelStatsTestUtils.normalizeStatsPeriodDays(1.5)).toBeNull()
   })
 
-  it('trimTrailingEmptyLabels removes trailing empty days from multi-day periods', () => {
+  it.concurrent('trimTrailingEmptyLabels removes trailing empty days from multi-day periods', () => {
     const labels = ['2024-12-01', '2024-12-02', '2024-12-03']
     const countsByDate = {
       '2024-12-01': { '1.0.0': 2 },
@@ -60,7 +60,7 @@ describe('channel stats helpers', () => {
     expect(channelStatsTestUtils.trimTrailingEmptyLabels(labels, countsByDate)).toEqual(['2024-12-01', '2024-12-02'])
   })
 
-  it('trimTrailingEmptyLabels keeps a one-day period even when it is empty', () => {
+  it.concurrent('trimTrailingEmptyLabels keeps a one-day period even when it is empty', () => {
     const labels = ['2024-12-03']
     const countsByDate = {
       '2024-12-03': { '1.0.0': 0 },
