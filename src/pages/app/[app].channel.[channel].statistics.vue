@@ -206,6 +206,10 @@ function formatPercentRange(start: number, end: number) {
   return `${formatPercent(start)} -> ${formatPercent(end)}`
 }
 
+function formatCount(value: number | null | undefined) {
+  return Math.round(value ?? 0).toLocaleString()
+}
+
 function formatShortDate(value: string | null | undefined) {
   if (!value)
     return '-'
@@ -248,13 +252,13 @@ const selectedPeriodLabel = computed(() => {
   return t('last-n-days', { days: days.value })
 })
 const periodTimespanLabel = computed(() => {
-  const period = stats.value?.period
-  if (period)
-    return `${formatShortDate(period.start)} - ${formatShortDate(period.end)}`
-
   const labels = stats.value?.labels ?? []
   if (labels.length > 0)
     return `${formatShortDate(labels[0])} - ${formatShortDate(labels[labels.length - 1])}`
+
+  const period = stats.value?.period
+  if (period)
+    return `${formatShortDate(period.start)} - ${formatShortDate(period.end)}`
 
   return '-'
 })
@@ -270,6 +274,7 @@ async function selectPeriod(option: PeriodDayOption) {
 const periodSummary = computed(() => {
   const dataset = currentVersionDataset.value
   const labels = stats.value?.labels ?? []
+  const datasets = stats.value?.datasets ?? []
 
   if (!dataset || labels.length === 0)
     return null
@@ -289,17 +294,28 @@ const periodSummary = computed(() => {
   if (normalizedShares.length === 0)
     return null
 
+  const dailyTotalAt = (index: number) => datasets.reduce((sum, currentDataset) => {
+    const rawValue = currentDataset.metaCounts?.[index]
+    const numeric = typeof rawValue === 'number' ? rawValue : Number(rawValue)
+    return sum + (Number.isFinite(numeric) ? Math.max(0, Math.round(numeric)) : 0)
+  }, 0)
+
+  const latestIndex = normalizedShares.length - 1
   const startShare = normalizedShares[0] ?? 0
-  const latestShare = normalizedShares[normalizedShares.length - 1] ?? 0
+  const latestShare = normalizedShares[latestIndex] ?? 0
   const changeShare = latestShare - startShare
+  const periodTotal = labels.reduce((sum, _, index) => sum + dailyTotalAt(index), 0)
 
   return {
     startShare,
     startCount: normalizedCounts[0] ?? 0,
+    startTotal: dailyTotalAt(0),
     latestShare,
-    latestCount: normalizedCounts[normalizedCounts.length - 1] ?? 0,
+    latestCount: normalizedCounts[latestIndex] ?? 0,
+    latestTotal: dailyTotalAt(latestIndex),
+    periodTotal,
     startDateLabel: formatShortDate(labels[0]),
-    latestDateLabel: formatShortDate(labels[labels.length - 1]),
+    latestDateLabel: formatShortDate(labels[latestIndex]),
     changeShare,
   }
 })
@@ -374,16 +390,6 @@ const chartData = computed<ChartData<'line'>>(() => {
       }
     }),
   }
-})
-
-const currentVersionColor = computed(() => {
-  const current = stats.value?.currentVersion
-  if (!current || !stats.value?.datasets?.length)
-    return null
-  const index = stats.value.datasets.findIndex(dataset => dataset.label === current)
-  if (index < 0)
-    return null
-  return chartPalette[index % chartPalette.length]
 })
 
 const chartOptions = computed<ChartOptions<'line'>>(() => ({
@@ -637,138 +643,103 @@ watchEffect(async () => {
             <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
               {{ selectedPeriodLabel }} · {{ periodTimespanLabel }}
             </p>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {{ t('selected-period-applies-to-stats') }}
+            </p>
           </div>
           <div class="d-join shrink-0" role="group" :aria-label="t('selected-period')">
             <button
               v-for="d in periodDayOptions"
               :key="d"
               type="button"
+              :aria-describedby="d === 30 ? 'max-period-tooltip' : undefined"
               :aria-pressed="days === d"
-              class="d-btn d-btn-sm d-join-item min-w-12"
+              class="relative overflow-visible d-btn d-btn-sm d-join-item min-w-12 group"
               :class="days === d ? 'd-btn-primary' : 'd-btn-outline'"
               @click="selectPeriod(d)"
             >
               {{ periodButtonLabel(d) }}
+              <span
+                v-if="d === 30"
+                id="max-period-tooltip"
+                role="tooltip"
+                class="invisible absolute right-0 z-50 w-64 px-3 py-2 mb-2 text-xs font-normal leading-relaxed text-left text-white normal-case transition-opacity bg-gray-900 rounded-lg shadow-lg opacity-0 pointer-events-none bottom-full dark:bg-gray-700 group-hover:visible group-hover:opacity-100 group-focus-visible:visible group-focus-visible:opacity-100"
+              >
+                {{ t('max-period-tooltip') }}
+                <span class="absolute w-0 h-0 border-4 border-transparent right-4 top-full border-t-gray-900 dark:border-t-gray-700" />
+              </span>
             </button>
           </div>
         </div>
 
-        <!-- Stats Overview Cards -->
-        <div class="space-y-4">
-          <div>
-            <div class="mb-3">
-              <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                {{ t('latest-snapshot') }}
-              </h3>
-              <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                {{ t('channel-stats-latest-snapshot-help') }}
-              </p>
-            </div>
-
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-                <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                  <span
-                    class="w-2.5 h-2.5 rounded-full"
-                    :style="currentVersionColor ? { backgroundColor: currentVersionColor.border } : undefined"
-                  />
-                  <IconTrendingUp class="w-4 h-4" />
-                  {{ t('current-channel-version') }}
-                </div>
-                <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
-                  {{ stats?.currentVersion || '-' }}
-                </div>
-                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ t('released') }}: {{ currentVersionDeployLabel }}
-                </div>
-              </div>
-
-              <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-                <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                  <IconCheckCircle class="w-4 h-4" />
-                  {{ t('adoption-in-latest-snapshot') }}
-                </div>
-                <div class="mt-2 text-lg font-semibold" :class="adoptionRateColorClass">
-                  {{ formatPercent(stats?.totals.percent_on_current ?? 0) }}
-                </div>
-                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ t('adoption-in-latest-snapshot-help', { version: stats?.currentVersion || '-', total: totalDevices.toLocaleString() }) }}
-                </div>
-              </div>
-
-              <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-                <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                  <IconAlertCircle class="w-4 h-4" />
-                  {{ t('devices-on-current-version') }}
-                </div>
-                <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
-                  {{ devicesOnCurrent.toLocaleString() }}
-                </div>
-                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ t('devices-on-current-version-help', { current: devicesOnCurrent.toLocaleString(), total: totalDevices.toLocaleString(), version: stats?.currentVersion || '-' }) }}
-                </div>
-              </div>
-            </div>
+        <!-- Selected Period Overview Cards -->
+        <div>
+          <div class="mb-3">
+            <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              {{ t('selected-period-overview') }}
+            </h3>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              {{ t('selected-period-overview-help', { period: selectedPeriodLabel, range: periodTimespanLabel, version: stats?.currentVersion || '-' }) }}
+            </p>
           </div>
 
-          <div>
-            <div class="mb-3">
-              <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                {{ t('adoption-over-selected-period') }}
-              </h3>
-              <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                {{ t('channel-stats-period-window', { range: periodTimespanLabel }) }}
-              </p>
-              <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                {{ t('channel-stats-period-help', { period: selectedPeriodLabel }) }}
-              </p>
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+              <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <IconAlertCircle class="w-4 h-4" />
+                {{ t('period-check-ins') }}
+              </div>
+              <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
+                {{ formatCount(periodSummary?.periodTotal) }}
+              </div>
+              <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                {{ t('period-check-ins-help', { count: formatCount(periodSummary?.periodTotal), period: selectedPeriodLabel }) }}
+              </div>
             </div>
 
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-                <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                  <IconCheckCircle class="w-4 h-4" />
-                  {{ t('start-of-selected-period') }}
-                </div>
-                <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
-                  {{ formatPercent(periodSummary?.startShare ?? 0) }}
-                </div>
-                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ t('start-of-selected-period-help', { date: periodSummary?.startDateLabel ?? '-', count: (periodSummary?.startCount ?? 0).toLocaleString(), version: stats?.currentVersion || '-' }) }}
-                </div>
+            <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+              <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <IconCheckCircle class="w-4 h-4" />
+                {{ t('start-of-selected-period') }}
               </div>
-
-              <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-                <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                  <IconCheckCircle class="w-4 h-4" />
-                  {{ t('latest-day-in-selected-period') }}
-                </div>
-                <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
-                  {{ formatPercent(periodSummary?.latestShare ?? 0) }}
-                </div>
-                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ t('latest-day-in-selected-period-help', { date: periodSummary?.latestDateLabel ?? '-', count: (periodSummary?.latestCount ?? 0).toLocaleString(), version: stats?.currentVersion || '-' }) }}
-                </div>
+              <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
+                {{ formatPercent(periodSummary?.startShare ?? 0) }}
               </div>
+              <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                {{ t('start-of-selected-period-help', { date: periodSummary?.startDateLabel ?? '-', count: formatCount(periodSummary?.startCount), total: formatCount(periodSummary?.startTotal), version: stats?.currentVersion || '-' }) }}
+              </div>
+            </div>
 
-              <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-                <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                  <IconTrendingUp class="w-4 h-4" />
-                  {{ t('adoption-over-selected-period') }}
-                </div>
-                <div
-                  class="mt-2 text-lg font-semibold"
-                  :class="{
-                    'text-emerald-600 dark:text-emerald-400': (periodSummary?.changeShare ?? 0) > 0,
-                    'text-rose-600 dark:text-rose-400': (periodSummary?.changeShare ?? 0) < 0,
-                    'text-slate-900 dark:text-white': (periodSummary?.changeShare ?? 0) === 0,
-                  }"
-                >
-                  {{ formatPercentRange(periodSummary?.startShare ?? 0, periodSummary?.latestShare ?? 0) }}
-                </div>
-                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ t('adoption-over-selected-period-help', { start: periodSummary?.startDateLabel ?? '-', end: periodSummary?.latestDateLabel ?? '-', version: stats?.currentVersion || '-' }) }}
-                </div>
+            <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+              <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <IconCheckCircle class="w-4 h-4" />
+                {{ t('latest-day-in-selected-period') }}
+              </div>
+              <div class="mt-2 text-lg font-semibold" :class="adoptionRateColorClass">
+                {{ formatPercent(periodSummary?.latestShare ?? 0) }}
+              </div>
+              <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                {{ t('latest-day-in-selected-period-help', { date: periodSummary?.latestDateLabel ?? '-', count: formatCount(periodSummary?.latestCount), total: formatCount(periodSummary?.latestTotal), version: stats?.currentVersion || '-' }) }}
+              </div>
+            </div>
+
+            <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+              <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <IconTrendingUp class="w-4 h-4" />
+                {{ t('period-change') }}
+              </div>
+              <div
+                class="mt-2 text-lg font-semibold"
+                :class="{
+                  'text-emerald-600 dark:text-emerald-400': (periodSummary?.changeShare ?? 0) > 0,
+                  'text-rose-600 dark:text-rose-400': (periodSummary?.changeShare ?? 0) < 0,
+                  'text-slate-900 dark:text-white': (periodSummary?.changeShare ?? 0) === 0,
+                }"
+              >
+                {{ formatPercentRange(periodSummary?.startShare ?? 0, periodSummary?.latestShare ?? 0) }}
+              </div>
+              <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                {{ t('period-change-help', { start: periodSummary?.startDateLabel ?? '-', end: periodSummary?.latestDateLabel ?? '-', version: stats?.currentVersion || '-' }) }}
               </div>
             </div>
           </div>

@@ -86,6 +86,20 @@ function generateDateLabels(from: Date, to: Date) {
   return labels
 }
 
+function trimTrailingEmptyLabels(labels: string[], countsByDate: Record<string, Record<string, number>>) {
+  if (labels.length <= 1)
+    return labels
+
+  for (let index = labels.length - 1; index >= 0; index--) {
+    const label = labels[index]
+    const total = Object.values(countsByDate[label] ?? {}).reduce((sum, value) => sum + Math.round(value ?? 0), 0)
+    if (total > 0)
+      return labels.slice(0, index + 1)
+  }
+
+  return labels
+}
+
 function createPercentageDatasetsByName(
   versions: string[],
   dates: string[],
@@ -237,7 +251,7 @@ app.post('/', middlewareAuth, async (c) => {
     const currentVersionReleasedAt = currentVersionRelease?.deployed_at
       ?? (currentVersionCreatedAt ? dayjs(currentVersionCreatedAt).utc().toISOString() : null)
     const period = getStatsPeriod(days, endDate, currentVersionReleasedAt)
-    const { labels, startDate } = period
+    const { startDate } = period
     const usageRows = await readStatsVersion(
       c,
       body.app_id,
@@ -261,7 +275,8 @@ app.post('/', middlewareAuth, async (c) => {
     const versions = selectRecentChannelVersions(deploymentHistory, currentVersionName, currentCounts, 10)
 
     const filteredDailyVersion = dailyVersion.filter(row => versions.includes(row.version_name))
-    const rawCountsByDate = buildDailyReportedCountsByName(filteredDailyVersion, labels, versions)
+    const rawCountsByDate = buildDailyReportedCountsByName(filteredDailyVersion, period.labels, versions)
+    const labels = trimTrailingEmptyLabels(period.labels, rawCountsByDate)
     const countsByDate = fillMissingDailyCounts(rawCountsByDate, labels, versions)
 
     const activeVersions = versions.filter((version) => {
@@ -274,10 +289,8 @@ app.post('/', middlewareAuth, async (c) => {
     const datasets = createPercentageDatasetsByName(activeVersions, labels, percentagesByDate, countsByDate)
 
     const latestDailyCounts = getLatestCounts(labels, countsByDate)
-    const currentCountTotal = Object.values(currentCounts).reduce((sum, val) => sum + Math.round(val ?? 0), 0)
-    const totalsSource = currentCountTotal > 0 ? currentCounts : latestDailyCounts
-    const totalDevices = Object.values(totalsSource).reduce((sum, val) => sum + Math.round(val ?? 0), 0)
-    const devicesOnCurrent = currentVersionName ? Math.round(totalsSource[currentVersionName] ?? 0) : 0
+    const totalDevices = Object.values(latestDailyCounts).reduce((sum, val) => sum + Math.round(val ?? 0), 0)
+    const devicesOnCurrent = currentVersionName ? Math.round(latestDailyCounts[currentVersionName] ?? 0) : 0
     const percentOnCurrent = totalDevices > 0 ? Math.round((devicesOnCurrent / totalDevices) * 1000) / 10 : 0
     const deploymentHistorySorted = [...deploymentHistory].sort((a, b) => dayjs(b.deployed_at).valueOf() - dayjs(a.deployed_at).valueOf())
 
@@ -295,9 +308,9 @@ app.post('/', middlewareAuth, async (c) => {
       totalDeployments: deploymentHistorySorted.length,
       period: {
         requested_days: period.requestedDays,
-        actual_days: period.actualDays,
-        start: dayjs(period.startDate).utc().startOf('day').toISOString(),
-        end: dayjs(period.endDate).utc().endOf('day').toISOString(),
+        actual_days: labels.length,
+        start: dayjs.utc(labels[0] ?? period.startDate).startOf('day').toISOString(),
+        end: dayjs.utc(labels[labels.length - 1] ?? period.endDate).endOf('day').toISOString(),
         start_reason: period.startReason,
       },
       totals: {
@@ -323,4 +336,5 @@ export const channelStatsTestUtils = {
   getLatestCounts,
   getStatsPeriod,
   normalizeStatsPeriodDays,
+  trimTrailingEmptyLabels,
 }

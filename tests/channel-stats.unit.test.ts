@@ -49,6 +49,26 @@ describe('channel stats helpers', () => {
     expect(channelStatsTestUtils.normalizeStatsPeriodDays(1.5)).toBeNull()
   })
 
+  it('trimTrailingEmptyLabels removes trailing empty days from multi-day periods', () => {
+    const labels = ['2024-12-01', '2024-12-02', '2024-12-03']
+    const countsByDate = {
+      '2024-12-01': { '1.0.0': 2 },
+      '2024-12-02': { '1.0.0': 5 },
+      '2024-12-03': { '1.0.0': 0 },
+    }
+
+    expect(channelStatsTestUtils.trimTrailingEmptyLabels(labels, countsByDate)).toEqual(['2024-12-01', '2024-12-02'])
+  })
+
+  it('trimTrailingEmptyLabels keeps a one-day period even when it is empty', () => {
+    const labels = ['2024-12-03']
+    const countsByDate = {
+      '2024-12-03': { '1.0.0': 0 },
+    }
+
+    expect(channelStatsTestUtils.trimTrailingEmptyLabels(labels, countsByDate)).toEqual(labels)
+  })
+
   it('fillMissingDailyCounts carries forward historical zero days', () => {
     const versions = ['1.0.0', '1.1.0']
     const labels = ['2024-12-01', '2024-12-02', '2024-12-03']
