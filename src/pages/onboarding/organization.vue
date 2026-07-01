@@ -696,10 +696,12 @@ onUnmounted(() => {
     <div class="relative mx-auto flex w-full max-w-3xl flex-col gap-4">
       <InviteTeammateModal ref="inviteModalRef" @success="onInviteSuccess" />
       <input
+        id="org-logo-input"
         ref="logoInput"
         type="file"
         accept="image/*"
         class="hidden"
+        :aria-label="t('change-org-picture')"
         @change="onLogoSelected"
       >
 

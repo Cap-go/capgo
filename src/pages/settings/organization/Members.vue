@@ -1470,10 +1470,13 @@ async function handleInviteNewUserSubmit() {
     <!-- Teleport for email input dialog -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('insert-invite-email')" defer to="#dialog-v2-content">
       <div class="w-full">
+        <label for="invite-email-input" class="sr-only">{{ t('email') }}</label>
         <input
+          id="invite-email-input"
           v-model="emailInput"
           type="email"
           :placeholder="t('email')"
+          :aria-label="t('email')"
           class="w-full p-3 border border-gray-300 rounded-lg dark:text-white dark:bg-gray-800 dark:border-gray-600"
           @keydown.enter="$event.preventDefault()"
         >
@@ -1486,50 +1489,58 @@ async function handleInviteNewUserSubmit() {
         <form @submit.prevent="handleInviteNewUserSubmit">
           <!-- Email (not editable) -->
           <div class="mb-4">
-            <label for="email" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="invite-user-email" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t('email') }}
             </label>
             <input
+              id="invite-user-email"
               v-model="inviteUserEmail"
               type="email"
               disabled
+              :aria-label="t('email')"
               class="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg cursor-not-allowed dark:bg-gray-700 dark:border-gray-600"
             >
           </div>
 
           <!-- Role (not editable) -->
           <div class="mb-4">
-            <label for="role" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="invite-user-role" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t('role') }}
             </label>
             <input
+              id="invite-user-role"
               v-model="inviteUserRole"
               type="text"
               disabled
+              :aria-label="t('role')"
               class="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg cursor-not-allowed dark:bg-gray-700 dark:border-gray-600"
             >
           </div>
 
           <!-- First Name -->
           <div class="mb-4">
-            <label for="first-name" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="invite-user-first-name" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t('first-name') }}
             </label>
             <input
+              id="invite-user-first-name"
               v-model="inviteUserFirstName"
               type="text"
+              :aria-label="t('first-name')"
               class="w-full px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-800 dark:border-gray-600"
             >
           </div>
 
           <!-- Last Name -->
           <div class="mb-4">
-            <label for="last-name" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="invite-user-last-name" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t('last-name') }}
             </label>
             <input
+              id="invite-user-last-name"
               v-model="inviteUserLastName"
               type="text"
+              :aria-label="t('last-name')"
               class="w-full px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-800 dark:border-gray-600"
             >
           </div>
@@ -1688,10 +1699,13 @@ async function handleInviteNewUserSubmit() {
       <div class="w-full">
         <div class="flex mb-5 overflow-hidden md:w-auto">
           <div class="relative w-full">
+            <label for="delegate-admin-search" class="sr-only">{{ t('search-by-name-or-email') }}</label>
             <input
+              id="delegate-admin-search"
               v-model="searchUserForAdminDelegation"
               type="text"
               :placeholder="t('search-by-name-or-email')"
+              :aria-label="t('search-by-name-or-email')"
               :disabled="isLoading"
               class="w-full pl-10 rounded-full input input-bordered"
             >
@@ -1721,7 +1735,6 @@ async function handleInviteNewUserSubmit() {
       </div>
     </Teleport>
 
-    <!-- offer possibility to directly delete organization when the last super admin want to delete himself -->
     <DeleteOrgDialog
       ref="dialogRef"
       :org="currentOrganization"
