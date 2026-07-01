@@ -1985,7 +1985,7 @@ getKeys()
                 >
                   <IconCalendar class="w-4 h-4 text-gray-500 dark:text-gray-400" />
                   <span :class="expirationDate ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'">
-                    {{ expirationDate ? dayjs(expirationDate).format('YYYY-MM-DD') : t('select-expiration-date') }}
+                    {{ expirationDate ? formatLocalDate(expirationDate) : t('select-expiration-date') }}
                   </span>
                 </button>
               </template>

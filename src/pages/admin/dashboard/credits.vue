@@ -18,6 +18,7 @@ import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
 import Spinner from '~/components/Spinner.vue'
 import { formatLocalDateTime } from '~/services/date'
+import { formatNumberValue } from '~/services/formatLocale'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 import { useDisplayStore } from '~/stores/display'
@@ -106,11 +107,12 @@ function getExpiresAt() {
 }
 
 function formatCredits(value: number) {
-  return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+  return formatNumberValue(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function toMonthKey(date: string) {
-  return dayjs(date).startOf('month').format('YYYY-MM-01')
+  const month = dayjs(date).startOf('month')
+  return `${month.year()}-${String(month.month() + 1).padStart(2, '0')}-01`
 }
 
 async function loadCreditAnalytics() {

@@ -16,6 +16,7 @@ function escapeSqlString(value: string): string {
 }
 
 const MAX_ANALYTICS_QUERY_LIMIT = 50_000
+const INSTALL_SOURCE_COUNT_CACHE_TTL_SECONDS = 60 * 60 * 24 * 30
 
 export function normalizeAnalyticsLimit(limit: unknown, fallback = DEFAULT_LIMIT): number {
   if (typeof limit !== 'number' || !Number.isFinite(limit))
@@ -464,7 +465,7 @@ export async function rawAnalyticsQuery(c: Context, query: string) {
   return []
 }
 
-export async function readBandwidthUsageCF(c: Context, app_id: string, period_start: string, period_end: string) {
+export async function readBandwidthUsageCF(c: Context, app_id: string, period_start: string, period_end: string, options: { throwOnError?: boolean } = {}) {
   if (!c.env.BANDWIDTH_USAGE)
     return [] as BandwidthUsageCF[]
   const query = `SELECT
@@ -485,6 +486,8 @@ ORDER BY date, app_id`
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading bandwidth usage', error: serializeError(e), query })
+    if (options.throwOnError)
+      throw e
   }
   return [] as BandwidthUsageCF[]
 }
@@ -613,6 +616,40 @@ GROUP BY version_name`
   return {}
 }
 
+function buildInstallSourceList(installSources: string[]) {
+  return installSources.map(source => `'${escapeSqlString(source)}'`).join(', ')
+}
+export async function countInstallSourcesCF(c: Context, app_id: string): Promise<Record<string, number>> {
+  const cache = new CacheHelper(c)
+  const cacheKey = cache.buildRequest('/internal/install-source-counts', { app_id })
+  const cached = await cache.matchJson<Record<string, number>>(cacheKey)
+  if (cached)
+    return cached
+
+  const query = `SELECT
+  install_source,
+  COUNT(*) AS total
+FROM (
+  SELECT
+    blob1 AS device_id,
+    argMax(blob9, CASE WHEN blob9 != '' THEN timestamp ELSE toDateTime('1970-01-01 00:00:00') END) AS install_source
+  FROM device_info
+  WHERE index1 = '${escapeSqlString(app_id)}'
+  GROUP BY blob1
+)
+WHERE install_source != ''
+GROUP BY install_source`
+
+  cloudlog({ requestId: c.get('requestId'), message: 'countInstallSourcesCF query', query })
+  const res = await runQueryToCFA<{ install_source: string, total: number }>(c, query)
+  const counts = res.reduce<Record<string, number>>((acc, row) => {
+    acc[row.install_source] = row.total
+    return acc
+  }, {})
+  await cache.putJson(cacheKey, counts, INSTALL_SOURCE_COUNT_CACHE_TTL_SECONDS)
+  return counts
+}
+
 export async function countDevicesCF(
   c: Context,
   app_id: string,
@@ -620,7 +657,6 @@ export async function countDevicesCF(
   deviceIds: string[] = [],
   versionName?: string,
   search?: string,
-  installSources?: string[],
 ) {
   // Use Analytics Engine DEVICE_INFO for counting devices
   const conditions = [`index1 = '${escapeSqlString(app_id)}'`]
@@ -649,19 +685,9 @@ export async function countDevicesCF(
   if (versionName)
     conditions.push(`blob2 = '${escapeSqlString(versionName)}'`)
 
-  const sourceFilter = installSources?.length
-    ? `WHERE install_source IN (${installSources.map(source => `'${escapeSqlString(source)}'`).join(', ')})`
-    : ''
-  const query = `SELECT COUNT(*) AS total
-FROM (
-  SELECT
-    blob1 AS device_id,
-    argMax(blob9, CASE WHEN blob9 != '' THEN timestamp ELSE toDateTime('1970-01-01 00:00:00') END) AS install_source
+  const query = `SELECT COUNT(DISTINCT blob1) AS total
 FROM device_info
-WHERE ${conditions.join(' AND ')}
-  GROUP BY blob1
-)
-${sourceFilter}`
+WHERE ${conditions.join(' AND ')}`
 
   cloudlog({ requestId: c.get('requestId'), message: 'countDevicesCF query', query })
   try {
@@ -670,8 +696,6 @@ ${sourceFilter}`
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device count from Analytics Engine', error: serializeError(e), query })
-    if (installSources?.length)
-      throw e
   }
   return 0
 }
@@ -722,6 +746,15 @@ function buildReadDevicesCFCursorCondition(cursor: string | undefined, devicesOr
   return `(updated_at ${comparison} toDateTime('${safeCursorTime}') OR (updated_at = toDateTime('${safeCursorTime}') AND device_id > '${safeCursorDeviceId}'))`
 }
 
+function buildReadDevicesCFOuterConditions(params: ReadDevicesParams, devicesOrder: DevicesOrderCF | null) {
+  const conditions = [buildReadDevicesCFCursorCondition(params.cursor, devicesOrder)]
+
+  if (params.installSources?.length)
+    conditions.push(`install_source IN (${buildInstallSourceList(params.installSources)})`)
+
+  return conditions.filter(Boolean)
+}
+
 export function buildReadDevicesCFQuery(params: ReadDevicesParams, customIdMode: boolean) {
   const limit = normalizeAnalyticsLimit(params.limit)
   const conditions: string[] = [`index1 = '${escapeSqlString(params.app_id)}'`]
@@ -755,10 +788,8 @@ export function buildReadDevicesCFQuery(params: ReadDevicesParams, customIdMode:
   }
 
   const devicesOrder = getReadDevicesCFOrder(params)
-  const outerConditions = [
-    buildReadDevicesCFCursorCondition(params.cursor, devicesOrder),
-    params.installSources?.length ? `install_source IN (${params.installSources.map(source => `'${escapeSqlString(source)}'`).join(', ')})` : '',
-  ].filter(Boolean)
+  const includeInstallSource = Boolean(params.installSources?.length)
+  const outerConditions = buildReadDevicesCFOuterConditions(params, devicesOrder)
   const outerFilter = outerConditions.length ? `WHERE ${outerConditions.join(' AND ')}` : ''
   let orderBy = 'device_id ASC'
   if (devicesOrder) {
@@ -778,7 +809,7 @@ export function buildReadDevicesCFQuery(params: ReadDevicesParams, customIdMode:
     '    argMax(blob6, timestamp) AS version_build,',
     '    argMax(blob7, timestamp) AS default_channel,',
     '    argMax(blob8, timestamp) AS key_id,',
-    '    argMax(blob9, CASE WHEN blob9 != \'\' THEN timestamp ELSE toDateTime(\'1970-01-01 00:00:00\') END) AS install_source,',
+    includeInstallSource ? '    argMax(blob9, CASE WHEN blob9 != \'\' THEN timestamp ELSE toDateTime(\'1970-01-01 00:00:00\') END) AS install_source,' : '',
     '    argMax(double1, timestamp) AS platform,',
     '    argMax(double2, timestamp) AS is_prod,',
     '    argMax(double3, timestamp) AS is_emulator,',

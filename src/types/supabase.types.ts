@@ -3033,6 +3033,7 @@ export type Database = {
           email_preferences: Json
           enable_notifications: boolean
           first_name: string | null
+          format_locale: string | null
           id: string
           image_url: string | null
           last_name: string | null
@@ -3048,6 +3049,7 @@ export type Database = {
           email_preferences?: Json
           enable_notifications?: boolean
           first_name?: string | null
+          format_locale?: string | null
           id: string
           image_url?: string | null
           last_name?: string | null
@@ -3063,6 +3065,7 @@ export type Database = {
           email_preferences?: Json
           enable_notifications?: boolean
           first_name?: string | null
+          format_locale?: string | null
           id?: string
           image_url?: string | null
           last_name?: string | null
