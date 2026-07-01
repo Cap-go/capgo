@@ -430,6 +430,7 @@
   "at-least-one-number": "At least one number",
   "at-least-one-special-character": "At least one special character",
   "at-least-one-uppercase-letter": "At least one uppercase letter",
+  "attempts-count": "Attempts: {current}/{max}",
   "audit-app_versions-delete": "Bundle Deleted",
   "audit-app_versions-insert": "Bundle Created",
   "audit-app_versions-update": "Bundle Updated",

@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import VueTurnstile from 'vue-turnstile'
+import { formatLocalDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
@@ -59,7 +60,7 @@ const stepLabels = computed(() => [
 const setupDateLabel = computed(() => {
   if (!mfaSetupDate.value)
     return ''
-  return dayjs(mfaSetupDate.value).format('MMMM D, YYYY')
+  return formatLocalDate(mfaSetupDate.value)
 })
 
 watch(captchaToken, (token) => {

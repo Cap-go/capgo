@@ -72,6 +72,16 @@ export function formatLocalDateShort(date: Date | string | undefined | null): st
 }
 
 /**
+ * Format a time using the account date and number convention.
+ */
+export function formatLocalTime(date: Date | string | undefined | null): string {
+  const d = parseDatePreservingUtc(date)
+  if (!d)
+    return ''
+  return d.toLocaleTimeString(getDateLocale(), { hour: 'numeric', minute: '2-digit' })
+}
+
+/**
  * Format a month/year bucket using the account date and number convention.
  */
 export function formatLocalMonthYear(date: Date | string | undefined | null): string {
@@ -89,6 +99,16 @@ export function formatLocalDateTime(date: Date | string | undefined | null): str
   if (!d)
     return ''
   return d.toLocaleString(getDateLocale(), { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+/**
+ * Format a date/time with seconds using the account date and number convention.
+ */
+export function formatLocalDateTimeWithSeconds(date: Date | string | undefined | null): string {
+  const d = parseDatePreservingUtc(date)
+  if (!d)
+    return ''
+  return d.toLocaleString(getDateLocale(), { dateStyle: 'medium', timeStyle: 'medium' })
 }
 
 export function formatUtcDateTimeAsLocal(date: Date | string | undefined | null): string {

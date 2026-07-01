@@ -14,6 +14,7 @@ import IconCheckCircle from '~icons/lucide/check-circle'
 import IconTrendingUp from '~icons/lucide/trending-up'
 import { createTooltipConfig } from '~/services/chartTooltip'
 import { formatDistanceToNow, formatLocalDate, formatLocalDateShort } from '~/services/date'
+import { formatNumberValue } from '~/services/formatLocale'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useAppDetailStore } from '~/stores/appDetail'
 import { useDisplayStore } from '~/stores/display'
@@ -165,7 +166,7 @@ const statusType = computed<ChannelAdoptionStatus>(() => {
 })
 
 const statusMessage = computed(() => {
-  const percent = percentOnCurrent.value.toFixed(1)
+  const percent = formatNumberValue(percentOnCurrent.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
   switch (statusType.value) {
     case 'loading':
       return t('loading-statistics')
@@ -198,9 +199,9 @@ const currentVersionDeployLabel = computed(() => {
 
 function formatPercent(value: number) {
   if (!Number.isFinite(value))
-    return '0.0%'
+    return `${formatNumberValue(0, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
 
-  return `${value.toFixed(1)}%`
+  return `${formatNumberValue(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
 }
 
 function formatPercentRange(start: number, end: number) {
@@ -208,7 +209,7 @@ function formatPercentRange(start: number, end: number) {
 }
 
 function formatCount(value: number | null | undefined) {
-  return Math.round(value ?? 0).toLocaleString()
+  return formatNumberValue(Math.round(value ?? 0))
 }
 
 function formatShortDate(value: string | null | undefined) {
