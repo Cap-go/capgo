@@ -5,6 +5,7 @@ import { CategoryScale, Chart, LinearScale, Tooltip } from 'chart.js'
 import { FunnelController, TrapezoidElement } from 'chartjs-chart-funnel'
 import { computed } from 'vue'
 import { Chart as ChartComponent } from 'vue-chartjs'
+import { formatNumberValue } from '~/services/formatLocale'
 
 interface FunnelStage {
   label: string
@@ -79,7 +80,7 @@ const chartOptions = computed<ChartOptions<'funnel'>>(() => ({
           const baseline = props.stages[0]?.value || 0
           const percent = baseline > 0 ? (value / baseline) * 100 : 0
           const label = context.label || ''
-          return `${label}: ${value.toLocaleString()} (${percent.toFixed(1)}%)`
+          return `${label}: ${formatNumberValue(value)} (${formatNumberValue(percent, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%)`
         },
       },
     },

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { i18n } from '../src/modules/i18n'
 import {
   formatLocalDate,
   formatLocalDateShort,
@@ -8,9 +7,25 @@ import {
   formatUtcDateTimeAsLocal,
   generateChartDayLabels,
   generateMonthDays,
+  getDateLocale,
+  resolveDateLocale,
 } from '../src/services/date'
 
 describe('date helpers', () => {
+  it.concurrent('uses day/month/year when no account format is selected', () => {
+    const date = new Date(2026, 6, 13)
+
+    expect(getDateLocale()).toBe('en-GB')
+    expect(formatLocalDate(date)).toBe(new Intl.DateTimeFormat('en-GB').format(date))
+    expect(formatLocalDate(date)).not.toBe(new Intl.DateTimeFormat('en-US').format(date))
+  })
+
+  it.concurrent('resolves explicit account date conventions before fallback', () => {
+    expect(resolveDateLocale('en-US')).toBe('en-US')
+    expect(resolveDateLocale('fr-FR')).toBe('fr-FR')
+    expect(resolveDateLocale('not-a-locale')).toBe('en-GB')
+  })
+
   it.concurrent('treats zone-less UTC stats timestamps as UTC before local formatting', () => {
     const expected = formatLocalDateTime(new Date('2026-04-22T20:22:00Z'))
 
@@ -35,7 +50,7 @@ describe('date helpers', () => {
 
   it.concurrent('formats month buckets with localized month names', () => {
     const date = new Date('2026-04-15T12:00:00Z')
-    const expected = new Intl.DateTimeFormat(i18n.global.locale.value || 'en', { month: 'short', year: 'numeric' }).format(date)
+    const expected = new Intl.DateTimeFormat(getDateLocale(), { month: 'short', year: 'numeric' }).format(date)
 
     expect(formatLocalMonthYear(date)).toBe(expected)
   })
