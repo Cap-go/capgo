@@ -11,6 +11,7 @@ import AdminFilterBar from '~/components/admin/AdminFilterBar.vue'
 import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
 import PageLoader from '~/components/PageLoader.vue'
+import { formatNumberValue } from '~/services/formatLocale'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -617,7 +618,7 @@ displayStore.defaultBack = '/dashboard'
                   MRR - Monthly Recurring Revenue
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-primary">
-                  ${{ latestGlobalStats.mrr.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                  ${{ formatNumberValue(latestGlobalStats.mrr, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-primary">
                   $0.00
@@ -640,7 +641,7 @@ displayStore.defaultBack = '/dashboard'
                   ARR - Annual Recurring Revenue Projection
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-success">
-                  ${{ latestGlobalStats.total_revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                  ${{ formatNumberValue(latestGlobalStats.total_revenue, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-success">
                   $0.00
@@ -657,7 +658,7 @@ displayStore.defaultBack = '/dashboard'
             <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
               <div>
                 <p class="text-sm text-slate-600 dark:text-slate-400">Total Paid Organizations</p>
-                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-success">{{ (latestGlobalStats.paying_orgs_total || latestGlobalStats.paying || 0).toLocaleString() }}</p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-success">{{ formatNumberValue(latestGlobalStats.paying_orgs_total || latestGlobalStats.paying || 0) }}</p>
                 <p v-else class="mt-2 text-3xl font-bold text-success">0</p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Subscription and/or available credits</p>
               </div>
@@ -665,7 +666,7 @@ displayStore.defaultBack = '/dashboard'
             <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
               <div>
                 <p class="text-sm text-slate-600 dark:text-slate-400">Paid via Subscription</p>
-                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-primary">{{ (latestGlobalStats.paying_orgs_subscription || latestGlobalStats.paying || 0).toLocaleString() }}</p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-primary">{{ formatNumberValue(latestGlobalStats.paying_orgs_subscription || latestGlobalStats.paying || 0) }}</p>
                 <p v-else class="mt-2 text-3xl font-bold text-primary">0</p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Active subscription organizations</p>
               </div>
@@ -673,7 +674,7 @@ displayStore.defaultBack = '/dashboard'
             <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
               <div>
                 <p class="text-sm text-slate-600 dark:text-slate-400">Paid via Credits</p>
-                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-accent">{{ (latestGlobalStats.paying_orgs_credits || 0).toLocaleString() }}</p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-accent">{{ formatNumberValue(latestGlobalStats.paying_orgs_credits || 0) }}</p>
                 <p v-else class="mt-2 text-3xl font-bold text-accent">0</p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Organizations with available credits</p>
               </div>
@@ -694,7 +695,7 @@ displayStore.defaultBack = '/dashboard'
                   Total Paying
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-success">
-                  {{ latestGlobalStats.paying.toLocaleString() }}
+                  {{ formatNumberValue(latestGlobalStats.paying) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-success">
                   0
@@ -717,7 +718,7 @@ displayStore.defaultBack = '/dashboard'
                   Yearly Subscriptions
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-primary">
-                  {{ (latestGlobalStats.paying_yearly || 0).toLocaleString() }}
+                  {{ formatNumberValue(latestGlobalStats.paying_yearly || 0) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-primary">
                   0
@@ -740,7 +741,7 @@ displayStore.defaultBack = '/dashboard'
                   Monthly Subscriptions
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-info">
-                  {{ (latestGlobalStats.paying_monthly || 0).toLocaleString() }}
+                  {{ formatNumberValue(latestGlobalStats.paying_monthly || 0) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-info">
                   0
@@ -766,7 +767,7 @@ displayStore.defaultBack = '/dashboard'
                   Orgs Need Upgrade
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-error">
-                  {{ latestGlobalStats.need_upgrade.toLocaleString() }}
+                  {{ formatNumberValue(latestGlobalStats.need_upgrade) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-error">
                   0
@@ -789,7 +790,7 @@ displayStore.defaultBack = '/dashboard'
                   {{ t('upgraded-organizations') }}
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-success">
-                  {{ (latestGlobalStats.upgraded_orgs || 0).toLocaleString() }}
+                  {{ formatNumberValue(latestGlobalStats.upgraded_orgs || 0) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-success">
                   0
@@ -812,7 +813,7 @@ displayStore.defaultBack = '/dashboard'
                   {{ t('past-due-orgs') }}
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-error">
-                  {{ (latestGlobalStats.past_due_orgs || 0).toLocaleString() }}
+                  {{ formatNumberValue(latestGlobalStats.past_due_orgs || 0) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-error">
                   0
@@ -835,7 +836,7 @@ displayStore.defaultBack = '/dashboard'
                   {{ t('avg-past-due-days') }}
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-warning">
-                  {{ (latestGlobalStats.past_due_orgs_average_days || 0).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }}
+                  {{ formatNumberValue(latestGlobalStats.past_due_orgs_average_days || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-warning">
                   0.0
@@ -858,7 +859,7 @@ displayStore.defaultBack = '/dashboard'
                   {{ t('active-canceled-orgs') }}
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-warning">
-                  {{ (latestGlobalStats.active_canceled_orgs || 0).toLocaleString() }}
+                  {{ formatNumberValue(latestGlobalStats.active_canceled_orgs || 0) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-warning">
                   0
@@ -881,7 +882,7 @@ displayStore.defaultBack = '/dashboard'
                   {{ t('active-past-due-orgs') }}
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-error">
-                  {{ (latestGlobalStats.active_past_due_orgs || 0).toLocaleString() }}
+                  {{ formatNumberValue(latestGlobalStats.active_past_due_orgs || 0) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-error">
                   0

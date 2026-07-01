@@ -12,7 +12,7 @@ import {
 } from '../src/services/date'
 
 describe('date helpers', () => {
-  it.concurrent('uses day/month/year for generic English dates', () => {
+  it.concurrent('uses day/month/year when no account format is selected', () => {
     const date = new Date(2026, 6, 13)
 
     expect(getDateLocale()).toBe('en-GB')
@@ -20,10 +20,10 @@ describe('date helpers', () => {
     expect(formatLocalDate(date)).not.toBe(new Intl.DateTimeFormat('en-US').format(date))
   })
 
-  it.concurrent('falls back to day/month/year for unsupported date locales', () => {
-    expect(resolveDateLocale('eo')).toBe('en-GB')
-    expect(resolveDateLocale('fr-CA')).toBe('fr-FR')
-    expect(resolveDateLocale('en-US')).toBe('en-GB')
+  it.concurrent('resolves explicit account date conventions before fallback', () => {
+    expect(resolveDateLocale('en-US')).toBe('en-US')
+    expect(resolveDateLocale('fr-FR')).toBe('fr-FR')
+    expect(resolveDateLocale('not-a-locale')).toBe('en-GB')
   })
 
   it.concurrent('treats zone-less UTC stats timestamps as UTC before local formatting', () => {

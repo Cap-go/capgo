@@ -900,6 +900,8 @@
   "dashboard-overview-thirty-day-copy": "Last 30 days gives you a faster operational read on recent adoption, delivery activity, and storage movement.",
   "dashboard-overview-title": "Keep releases, installs, and capacity in view",
   "date": "Date",
+  "date-number-format": "Date and number format",
+  "date-number-format-help": "Choose the country convention used for dates and number separators.",
   "day": "day",
   "days": "days",
   "days-ago": "{count} days ago",

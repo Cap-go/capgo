@@ -1,24 +1,8 @@
 import { i18n } from '~/modules/i18n'
+import { getFormatLocale, resolveFormatLocale } from '~/services/formatLocale'
 
 const ZONELESS_ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/
 const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/
-const DATE_LOCALES_BY_LANGUAGE: Record<string, string> = {
-  'de': 'de-DE',
-  'en': 'en-GB',
-  'es': 'es-ES',
-  'fr': 'fr-FR',
-  'hi': 'hi-IN',
-  'id': 'id-ID',
-  'it': 'it-IT',
-  'ja': 'ja-JP',
-  'ko': 'ko-KR',
-  'pl': 'pl-PL',
-  'pt-br': 'pt-BR',
-  'ru': 'ru-RU',
-  'tr': 'tr-TR',
-  'vi': 'vi-VN',
-  'zh-cn': 'zh-CN',
-}
 
 function parseDatePreservingUtc(date: Date | string | undefined | null): Date | null {
   if (!date)
@@ -50,20 +34,15 @@ function parseDatePreservingUtc(date: Date | string | undefined | null): Date | 
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
-export function resolveDateLocale(language?: string | null): string {
-  const normalizedLanguage = String(language || 'en').trim().toLowerCase()
-  const baseLanguage = normalizedLanguage.split('-')[0]
-  return DATE_LOCALES_BY_LANGUAGE[normalizedLanguage]
-    ?? DATE_LOCALES_BY_LANGUAGE[baseLanguage]
-    ?? DATE_LOCALES_BY_LANGUAGE.en
+export function resolveDateLocale(formatLocale?: string | null): string {
+  return resolveFormatLocale(formatLocale)
 }
 
 export function getDateLocale(): string {
-  return resolveDateLocale(i18n.global.locale.value)
+  return getFormatLocale()
 }
-
 /**
- * Format a date using the app language's date locale (English uses day/month/year).
+ * Format a date using the account date and number convention.
  */
 export function formatLocalDate(date: Date | string | undefined | null): string {
   const d = parseDatePreservingUtc(date)
@@ -73,7 +52,7 @@ export function formatLocalDate(date: Date | string | undefined | null): string 
 }
 
 /**
- * Format a date with month name and day using the app language's date locale.
+ * Format a date with month name and day using the account date and number convention.
  */
 export function formatLocalDateLong(date: Date | string | undefined | null): string {
   const d = parseDatePreservingUtc(date)
@@ -83,7 +62,7 @@ export function formatLocalDateLong(date: Date | string | undefined | null): str
 }
 
 /**
- * Format a compact date for dense chart axes using the app language's date locale.
+ * Format a compact date for dense chart axes using the account date and number convention.
  */
 export function formatLocalDateShort(date: Date | string | undefined | null): string {
   const d = parseDatePreservingUtc(date)
@@ -93,7 +72,7 @@ export function formatLocalDateShort(date: Date | string | undefined | null): st
 }
 
 /**
- * Format a month/year bucket using the app language's date locale.
+ * Format a month/year bucket using the account date and number convention.
  */
 export function formatLocalMonthYear(date: Date | string | undefined | null): string {
   const d = parseDatePreservingUtc(date)
@@ -103,7 +82,7 @@ export function formatLocalMonthYear(date: Date | string | undefined | null): st
 }
 
 /**
- * Format a date/time using the app language's date locale.
+ * Format a date/time using the account date and number convention.
  */
 export function formatLocalDateTime(date: Date | string | undefined | null): string {
   const d = parseDatePreservingUtc(date)

@@ -10,6 +10,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import AdminFilterBar from '~/components/admin/AdminFilterBar.vue'
 import { formatLocalDate, formatLocalDateTime } from '~/services/date'
+import { formatNumberValue } from '~/services/formatLocale'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 import { useDisplayStore } from '~/stores/display'
@@ -49,7 +50,7 @@ interface OrganizationInsightsResponse {
   }
 }
 
-const { locale, t } = useI18n()
+const { t } = useI18n()
 const displayStore = useDisplayStore()
 const mainStore = useMainStore()
 const adminStore = useAdminDashboardStore()
@@ -69,11 +70,11 @@ let loadOrganizationsSequence = 0
 let searchReloadTimer: ReturnType<typeof setTimeout> | undefined
 
 function formatNumber(value: number) {
-  return Number(value || 0).toLocaleString(locale.value || 'en')
+  return formatNumberValue(value)
 }
 
 function formatPercent(value: number) {
-  return `${Number(value || 0).toFixed(1)}%`
+  return `${formatNumberValue(Number(value || 0), { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
 }
 
 function formatBillingTypeLabel(billingType: OrganizationInsight['billing_type']) {
