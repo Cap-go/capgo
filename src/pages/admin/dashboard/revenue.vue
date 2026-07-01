@@ -92,7 +92,7 @@ const isLoadingGlobalStatsTrend = ref(false)
 function toChurnRate(lostRevenue: number, previousMrr: number) {
   if (!Number.isFinite(previousMrr) || previousMrr <= 0)
     return 0
-  return Number(((lostRevenue / previousMrr) * 100).toFixed(2))
+  return Math.round((lostRevenue / previousMrr) * 10000) / 100
 }
 
 async function loadGlobalStatsTrend() {

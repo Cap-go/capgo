@@ -19,6 +19,7 @@ import IconUserPlus from '~icons/lucide/user-plus'
 import IconUsers from '~icons/lucide/users-round'
 import IconBack from '~icons/material-symbols/arrow-back-ios-rounded'
 import InviteTeammateModal from '~/components/dashboard/InviteTeammateModal.vue'
+import { formatNumberValue } from '~/services/formatLocale'
 import { createOnboardingAppFromDraft } from '~/services/onboardingAppCreate'
 import { uploadOrgLogoFile } from '~/services/photos'
 import { pushEvent } from '~/services/posthog'
@@ -136,7 +137,7 @@ const userCountStops = computed<UserCountStop[]>(() => {
     return planStops
   }
 
-  return fallbackUserCountStops
+  return fallbackUserCountStops.map(stop => ({ ...stop, label: formatUserCount(stop.value, stop.planName === 'Enterprise') }))
 })
 const selectedUserCountStop = computed<UserCountStop | null>(() => {
   if (estimatedUsersIndex.value === null)
@@ -201,11 +202,12 @@ function whiteCardPrimaryButtonClass() {
 }
 
 function formatUserCount(value: number, plus = false) {
-  if (value >= 1_000_000)
-    return plus ? '1M+' : '1M'
-  if (value >= 1000)
-    return `${value / 1000}K`
-  return String(value)
+  const formatted = formatNumberValue(value, {
+    notation: 'compact',
+    compactDisplay: 'short',
+    maximumFractionDigits: 0,
+  })
+  return plus ? `${formatted}+` : formatted
 }
 
 function getUserCountStopTitle(stop: UserCountStop) {

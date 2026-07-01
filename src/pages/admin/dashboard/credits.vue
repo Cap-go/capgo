@@ -111,7 +111,8 @@ function formatCredits(value: number) {
 }
 
 function toMonthKey(date: string) {
-  return dayjs(date).startOf('month').format('YYYY-MM-01')
+  const month = dayjs(date).startOf('month')
+  return `${month.year()}-${String(month.month() + 1).padStart(2, '0')}-01`
 }
 
 async function loadCreditAnalytics() {

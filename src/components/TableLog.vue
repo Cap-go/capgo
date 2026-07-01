@@ -18,6 +18,8 @@ import IconSort from '~icons/lucide/chevrons-up-down'
 import IconDownload from '~icons/lucide/download'
 import IconFilter from '~icons/system-uicons/filtering'
 import IconReload from '~icons/tabler/reload'
+import { formatLocalDate, formatLocalDateShort, formatLocalTime } from '~/services/date'
+import { formatNumberValue } from '~/services/formatLocale'
 import '@vuepic/vue-datepicker/dist/main.css'
 
 interface Props {
@@ -258,42 +260,39 @@ async function setTime(time: QuickHourOption, shouldCloseMenu = false) {
 }
 
 function formatValue(previewValue: Date[] | undefined) {
-  // previewValue is an array of Date objects
-  // we want to return object { start: time, end: time} and handle if it's not an array or empty
-  // time should be in format HH:MM
   if (!previewValue)
-    return { start: dayjs().subtract(2, 'hour').format('HH:mm'), end: dayjs().format('HH:mm') }
+    return { start: formatLocalTime(dayjs().subtract(2, 'hour').toDate()), end: formatLocalTime(new Date()) }
   return {
-    start: dayjs(previewValue[0]).format('HH:mm'),
-    end: dayjs(previewValue[1]).format('HH:mm'),
+    start: formatLocalTime(previewValue[0]),
+    end: formatLocalTime(previewValue[1]),
   }
 }
 
 const calendarPreview = computed(() => {
   if (!preciseDates.value) {
     return {
-      start: dayjs().subtract(1, 'hour').format('YYYY-MM-DD'),
-      end: dayjs().format('YYYY-MM-DD'),
+      start: formatLocalDate(dayjs().subtract(1, 'hour').toDate()),
+      end: formatLocalDate(new Date()),
     }
   }
 
   return {
-    start: dayjs(preciseDates.value[0]).format('YYYY-MM-DD'),
-    end: dayjs(preciseDates.value[1]).format('YYYY-MM-DD'),
+    start: formatLocalDate(preciseDates.value[0]),
+    end: formatLocalDate(preciseDates.value[1]),
   }
 })
 
 const timePreview = computed(() => {
   if (!preciseDates.value) {
     return {
-      start: dayjs().subtract(1, 'hour').format('HH:mm'),
-      end: dayjs().format('HH:mm'),
+      start: formatLocalTime(dayjs().subtract(1, 'hour').toDate()),
+      end: formatLocalTime(new Date()),
     }
   }
 
   return {
-    start: dayjs(preciseDates.value[0]).format('HH:mm'),
-    end: dayjs(preciseDates.value[1]).format('HH:mm'),
+    start: formatLocalTime(preciseDates.value[0]),
+    end: formatLocalTime(preciseDates.value[1]),
   }
 })
 
@@ -317,11 +316,11 @@ function formatDurationLabel(totalMinutes: number) {
   const mins = minutes % 60
   const parts: string[] = []
   if (days)
-    parts.push(`${days}d`)
+    parts.push(`${formatNumberValue(days)}d`)
   if (hours)
-    parts.push(`${hours}h`)
+    parts.push(`${formatNumberValue(hours)}h`)
   if (mins || !parts.length)
-    parts.push(`${mins}m`)
+    parts.push(`${formatNumberValue(mins)}m`)
   return parts.join(' ')
 }
 
@@ -345,12 +344,12 @@ const buttonLabel = computed(() => {
   }
 
   if (start.isSame(now, 'day') && end.isSame(now, 'day'))
-    return `${start.format('HH:mm')} → ${end.format('HH:mm')}`
+    return `${formatLocalTime(startDate)} → ${formatLocalTime(endDate)}`
 
   if (start.isSame(end, 'day'))
-    return `${start.format('D MMM HH:mm')} → ${end.format('HH:mm')}`
+    return `${formatLocalDateShort(startDate)} ${formatLocalTime(startDate)} → ${formatLocalTime(endDate)}`
 
-  return `${start.format('D MMM HH:mm')} → ${end.format('D MMM HH:mm')}`
+  return `${formatLocalDateShort(startDate)} ${formatLocalTime(startDate)} → ${formatLocalDateShort(endDate)} ${formatLocalTime(endDate)}`
 })
 
 function selectQuick(option: QuickHourOption) {

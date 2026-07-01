@@ -11,7 +11,7 @@ import AdminFilterBar from '~/components/admin/AdminFilterBar.vue'
 import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
 import PageLoader from '~/components/PageLoader.vue'
-import { formatNumberValue } from '~/services/formatLocale'
+import { formatNumberValue, formatOneDecimal } from '~/services/formatLocale'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -302,7 +302,7 @@ displayStore.defaultBack = '/dashboard'
                   <span class="loading loading-spinner loading-lg text-accent" />
                 </div>
                 <p v-else-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-accent">
-                  {{ latestGlobalStats.bundle_storage_gb.toFixed(1) }} GB
+                  {{ formatOneDecimal(latestGlobalStats.bundle_storage_gb) }} GB
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-accent">
                   0 GB
@@ -328,7 +328,7 @@ displayStore.defaultBack = '/dashboard'
                   <span class="loading loading-spinner loading-lg text-success" />
                 </div>
                 <p v-else-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-success">
-                  {{ latestGlobalStats.success_rate.toFixed(1) }}%
+                  {{ formatOneDecimal(latestGlobalStats.success_rate) }}%
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-success">
                   0%
@@ -419,7 +419,7 @@ displayStore.defaultBack = '/dashboard'
                   0
                 </p>
                 <p v-if="latestGlobalStats && latestGlobalStats.devices_last_month" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ ((latestGlobalStats.devices_last_month_ios || 0) / latestGlobalStats.devices_last_month * 100).toFixed(1) }}% of total
+                  {{ formatOneDecimal((latestGlobalStats.devices_last_month_ios || 0) / latestGlobalStats.devices_last_month * 100) }}% of total
                 </p>
               </div>
             </div>
@@ -447,7 +447,7 @@ displayStore.defaultBack = '/dashboard'
                   0
                 </p>
                 <p v-if="latestGlobalStats && latestGlobalStats.devices_last_month" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ ((latestGlobalStats.devices_last_month_android || 0) / latestGlobalStats.devices_last_month * 100).toFixed(1) }}% of total
+                  {{ formatOneDecimal((latestGlobalStats.devices_last_month_android || 0) / latestGlobalStats.devices_last_month * 100) }}% of total
                 </p>
               </div>
             </div>

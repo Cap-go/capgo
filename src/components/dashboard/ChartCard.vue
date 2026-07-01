@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Spinner from '~/components/Spinner.vue'
+import { formatNumberValue } from '~/services/formatLocale'
 
 const props = defineProps({
   title: {
@@ -73,7 +74,7 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
               class="inline-flex justify-center items-center rounded-full px-3 py-1 text-xs font-bold text-white shadow-sm"
               :class="{ 'bg-cyan-500': (lastDayEvolution ?? 0) >= 0, 'bg-amber-500': (lastDayEvolution ?? 0) < 0 }"
             >
-              {{ (lastDayEvolution ?? 0) < 0 ? '-' : '+' }}{{ Math.abs(lastDayEvolution ?? 0).toFixed(2) }}%
+              {{ (lastDayEvolution ?? 0) < 0 ? '-' : '+' }}{{ formatNumberValue(Math.abs(lastDayEvolution ?? 0), { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}%
             </div>
             <div v-else class="inline-flex rounded-full px-3 py-1 text-xs font-semibold opacity-0" aria-hidden="true" />
           </div>
@@ -81,7 +82,7 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
 
         <div v-if="total !== undefined" class="flex items-end gap-2">
           <div class="max-w-full text-3xl font-semibold leading-none tracking-tight break-words text-slate-900 dark:text-white sm:text-4xl">
-            {{ total?.toLocaleString() }}
+            {{ formatNumberValue(total) }}
           </div>
           <span v-if="unit" class="pb-1 text-sm font-semibold tracking-[0.2em] text-slate-400 uppercase dark:text-slate-500">
             {{ unit }}

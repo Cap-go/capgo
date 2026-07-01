@@ -11,6 +11,7 @@ import IconCheckCircle from '~icons/lucide/check-circle'
 import CreditsCta from '~/components/CreditsCta.vue'
 import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { formatIncludedThenPrice } from '~/services/creditPricing'
+import { formatNumberValue } from '~/services/formatLocale'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { checkPermissions } from '~/services/permissions'
 import { getDatafastAttribution, openCheckout } from '~/services/stripe'
@@ -85,20 +86,20 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
   }
 
   const mauFeature = creditUnitPrices.value.mau !== undefined
-    ? `${plan.mau.toLocaleString()} ${t('mau')} · ${formatIncludedThenPrice('mau', creditUnitPrices.value.mau, t)}`
-    : `${plan.mau.toLocaleString()} ${t('mau')}`
+    ? `${formatNumberValue(plan.mau)} ${t('mau')} · ${formatIncludedThenPrice('mau', creditUnitPrices.value.mau, t)}`
+    : `${formatNumberValue(plan.mau)} ${t('mau')}`
 
   const storageFeature = creditUnitPrices.value.storage !== undefined
-    ? `${plan.storage.toLocaleString()} ${t('plan-storage')} · ${formatIncludedThenPrice('storage', creditUnitPrices.value.storage, t)}`
-    : `${plan.storage.toLocaleString()} ${t('plan-storage')}`
+    ? `${formatNumberValue(plan.storage)} ${t('plan-storage')} · ${formatIncludedThenPrice('storage', creditUnitPrices.value.storage, t)}`
+    : `${formatNumberValue(plan.storage)} ${t('plan-storage')}`
 
   const bandwidthFeature = creditUnitPrices.value.bandwidth !== undefined
-    ? `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')} · ${formatIncludedThenPrice('bandwidth', creditUnitPrices.value.bandwidth, t)}`
-    : `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')}`
+    ? `${formatNumberValue(plan.bandwidth)} ${t('plan-bandwidth')} · ${formatIncludedThenPrice('bandwidth', creditUnitPrices.value.bandwidth, t)}`
+    : `${formatNumberValue(plan.bandwidth)} ${t('plan-bandwidth')}`
 
   const buildTimeFeature = buildTimeDisplay ? planFeature(buildTimeDisplay, true) : null
   const nativeBuildConcurrencyFeature = plan.native_build_concurrency
-    ? planFeature(t('plan-native-build-concurrency', { count: plan.native_build_concurrency.toLocaleString() }))
+    ? planFeature(t('plan-native-build-concurrency', { count: formatNumberValue(plan.native_build_concurrency) }))
     : null
 
   const planName = plan.name?.toLowerCase() ?? ''
@@ -273,7 +274,7 @@ function getPrice(plan: Database['public']['Tables']['plans']['Row'], t: 'm' | '
   }
   else {
     const p = plan.price_y
-    return +(p / 12).toFixed(0)
+    return Math.round(p / 12)
   }
 }
 
