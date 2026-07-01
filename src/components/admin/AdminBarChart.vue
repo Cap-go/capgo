@@ -159,7 +159,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
       <span class="loading loading-spinner loading-lg text-primary" />
     </div>
     <div v-else class="w-full h-full">
-      <Bar :data="chartData" :options="chartOptions" />
+      <Bar class="h-full w-full" :data="chartData" :options="chartOptions" />
     </div>
   </div>
 </template>

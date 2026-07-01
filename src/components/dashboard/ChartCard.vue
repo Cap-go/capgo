@@ -91,33 +91,33 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
     </div>
 
     <!-- Chart content area -->
-    <div class="relative min-h-0 flex-1 px-5 pb-5 pt-4">
+    <div class="relative flex min-h-0 flex-1 flex-col px-5 pb-5 pt-4">
       <!-- Loading state -->
-      <div v-if="isLoading" class="flex justify-center items-center h-full">
+      <div v-if="isLoading" class="flex h-full items-center justify-center">
         <Spinner size="w-24 h-24" />
       </div>
 
       <!-- Error message -->
       <div
         v-else-if="errorMessage"
-        class="flex justify-center items-center px-4 h-full text-sm text-center text-slate-500 dark:text-slate-300"
+        class="flex h-full items-center justify-center px-4 text-center text-sm text-slate-500 dark:text-slate-300"
       >
         {{ errorMessage }}
       </div>
 
       <!-- Chart slot (renders for both real data and demo data) -->
-      <template v-else-if="hasData || isDemoData">
+      <div v-else-if="hasData || isDemoData" class="relative min-h-0 flex-1">
         <slot />
         <!-- Demo data overlay indicator -->
         <div
           v-if="isDemoData"
-          class="flex absolute inset-0 flex-col gap-2 justify-center items-center pointer-events-none"
+          class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2"
         >
-          <div class="py-2 px-4 text-sm font-medium rounded-lg border shadow-lg backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700">
+          <div class="rounded-lg border border-slate-200 bg-white/90 px-4 py-2 text-sm font-medium text-slate-600 shadow-lg backdrop-blur-sm dark:border-slate-700 dark:bg-gray-800/90 dark:text-slate-300">
             {{ t('demo-data-indicator') }}
           </div>
         </div>
-      </template>
+      </div>
 
       <!-- No data message (only when no real data AND not showing demo) -->
       <div
