@@ -6,6 +6,7 @@ import IconCopy from '~icons/heroicons/document-duplicate'
 import IconGlobeAlt from '~icons/heroicons/globe-alt'
 import IconTrash from '~icons/heroicons/trash'
 import Spinner from '~/components/Spinner.vue'
+import { formatLocalDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
@@ -352,11 +353,7 @@ function getStatusLabel(status: SsoProvider['status']): string {
 }
 
 function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
+  return formatLocalDate(dateString) || '-'
 }
 
 onMounted(async () => {
