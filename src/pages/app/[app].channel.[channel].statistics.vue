@@ -611,10 +611,10 @@ watchEffect(async () => {
                 v-if="d === 30"
                 id="max-period-tooltip"
                 role="tooltip"
-                class="invisible absolute right-0 z-50 w-64 px-3 py-2 mb-2 text-xs font-normal leading-relaxed text-left text-white normal-case transition-opacity bg-gray-900 rounded-lg shadow-lg opacity-0 pointer-events-none bottom-full dark:bg-gray-700 group-hover:visible group-hover:opacity-100 group-focus-visible:visible group-focus-visible:opacity-100"
+                class="invisible absolute right-0 top-full z-50 mt-2 w-64 px-3 py-2 text-xs font-normal leading-relaxed text-left text-white normal-case transition-opacity bg-gray-900 rounded-lg shadow-lg opacity-0 pointer-events-none dark:bg-gray-700 group-hover:visible group-hover:opacity-100 group-focus-visible:visible group-focus-visible:opacity-100"
               >
                 {{ t('max-period-tooltip') }}
-                <span class="absolute w-0 h-0 border-4 border-transparent right-4 top-full border-t-gray-900 dark:border-t-gray-700" />
+                <span class="absolute bottom-full w-0 h-0 border-4 border-transparent right-4 border-b-gray-900 dark:border-b-gray-700" />
               </span>
             </button>
           </div>
