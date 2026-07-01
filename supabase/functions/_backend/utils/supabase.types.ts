@@ -1403,6 +1403,7 @@ export type Database = {
           default_channel: string | null
           device_id: string
           id: number
+          install_source: string | null
           is_emulator: boolean | null
           is_prod: boolean | null
           key_id: string | null
@@ -1420,6 +1421,7 @@ export type Database = {
           default_channel?: string | null
           device_id: string
           id?: never
+          install_source?: string | null
           is_emulator?: boolean | null
           is_prod?: boolean | null
           key_id?: string | null
@@ -1437,6 +1439,7 @@ export type Database = {
           default_channel?: string | null
           device_id?: string
           id?: never
+          install_source?: string | null
           is_emulator?: boolean | null
           is_prod?: boolean | null
           key_id?: string | null
@@ -3030,6 +3033,7 @@ export type Database = {
           email_preferences: Json
           enable_notifications: boolean
           first_name: string | null
+          format_locale: string | null
           id: string
           image_url: string | null
           last_name: string | null
@@ -3045,6 +3049,7 @@ export type Database = {
           email_preferences?: Json
           enable_notifications?: boolean
           first_name?: string | null
+          format_locale?: string | null
           id: string
           image_url?: string | null
           last_name?: string | null
@@ -3060,6 +3065,7 @@ export type Database = {
           email_preferences?: Json
           enable_notifications?: boolean
           first_name?: string | null
+          format_locale?: string | null
           id?: string
           image_url?: string | null
           last_name?: string | null
@@ -4322,6 +4328,10 @@ export type Database = {
       }
       is_bundle_encrypted: { Args: { session_key: string }; Returns: boolean }
       is_canceled_org: { Args: { orgid: string }; Returns: boolean }
+      is_current_user_group_member: {
+        Args: { p_group_id: string }
+        Returns: boolean
+      }
       is_good_plan_v5_org: { Args: { orgid: string }; Returns: boolean }
       is_internal_request_role: {
         Args: { caller_role: string }

@@ -13,6 +13,7 @@ import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
 import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
 import PageLoader from '~/components/PageLoader.vue'
+import { formatNumberValue } from '~/services/formatLocale'
 import { logAsUser } from '~/services/logAs'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 import { useDisplayStore } from '~/stores/display'
@@ -234,10 +235,10 @@ function formatSeconds(value: number) {
   return `${value.toFixed(1)} sec`
 }
 function formatTotalSeconds(value: number) {
-  return `${Math.round(value).toLocaleString()} sec`
+  return `${formatNumberValue(Math.round(value))} sec`
 }
 function buildPeriodSubtitle(stats: { builds: number, days: number, totalSeconds: number }) {
-  return `${stats.builds.toLocaleString()} builds across ${stats.days.toLocaleString()} active days, ${formatTotalSeconds(stats.totalSeconds)} total in selected period`
+  return `${formatNumberValue(stats.builds)} builds across ${formatNumberValue(stats.days)} active days, ${formatTotalSeconds(stats.totalSeconds)} total in selected period`
 }
 
 // ---- builder onboarding analytics (builder_analytics) ----

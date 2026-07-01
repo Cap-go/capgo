@@ -241,6 +241,7 @@ const LOGSNAG_INSIGHTS_BACKGROUND_MAX_RETRIES = 4
 const LOGSNAG_INSIGHTS_RETRY_DELAY_SECONDS = 300
 const LOGSNAG_INSIGHTS_QUEUE_NAME = 'admin_stats'
 const LOGSNAG_INSIGHTS_NOTIFICATION_DELAY_SECONDS = 180
+const LOGSNAG_INSIGHTS_RECENT_REPAIR_LOOKBACK_DAYS = 30
 const GLOBAL_STATS_NOTIFICATION_LOCK_NAMESPACE = 'logsnag_insights_notifications'
 const GLOBAL_STATS_NOTIFICATION_LOGSNAG_STEP = 'notifications_logsnag'
 const GLOBAL_STATS_NOTIFICATION_TRACKING_STEP = 'notifications_tracking'
@@ -255,6 +256,7 @@ const GLOBAL_STATS_COMPLETION_MARKERS = [
 ] as const
 const GLOBAL_STATS_SHARD_SET = new Set<string>(GLOBAL_STATS_SHARDS)
 const GLOBAL_STATS_COMPLETION_MARKER_SET = new Set<string>(GLOBAL_STATS_COMPLETION_MARKERS)
+const GLOBAL_STATS_BUILD_AVG_EPSILON = 0.05
 
 type GlobalStatsShard = typeof GLOBAL_STATS_SHARDS[number]
 type GlobalStatsCompletionMarker = typeof GLOBAL_STATS_COMPLETION_MARKERS[number]
@@ -269,6 +271,38 @@ interface LogsnagInsightsPayload {
   retry_count?: unknown
   shard?: unknown
   date_id?: unknown
+}
+
+interface BuildShardStats {
+  totalSeconds: Record<'ios' | 'android', number>
+  avgSeconds: Record<'ios' | 'android', number>
+  counts: Record<'ios' | 'android', number>
+}
+
+interface GlobalStatsRepairRow {
+  dateId: string
+  completedShards: Set<GlobalStatsCompletionMarker>
+  orgs: number
+  bundleStorageGb: number
+  buildTotalSecondsDayIos: number
+  buildTotalSecondsDayAndroid: number
+  buildAvgSecondsDayIos: number
+  buildAvgSecondsDayAndroid: number
+  buildCountDayIos: number
+  buildCountDayAndroid: number
+}
+
+interface GlobalStatsRepairSqlRow {
+  date_id: string
+  completed_shards: unknown
+  orgs: number | string | null
+  bundle_storage_gb: number | string | null
+  build_total_seconds_day_ios: number | string | null
+  build_total_seconds_day_android: number | string | null
+  build_avg_seconds_day_ios: number | string | null
+  build_avg_seconds_day_android: number | string | null
+  build_count_day_ios: number | string | null
+  build_count_day_android: number | string | null
 }
 
 interface ScheduleLogsnagInsightsUpdateOptions {
@@ -359,6 +393,20 @@ function getCompletedDayWindowForDateId(dateId: string): DailyWindow {
     prevDayEnd,
     prevDayDateId: dateId,
   }
+}
+
+function buildRecentGlobalStatsRepairDateIds(anchorDateId: string, lookbackDays = LOGSNAG_INSIGHTS_RECENT_REPAIR_LOOKBACK_DAYS): string[] {
+  const anchor = new Date(`${anchorDateId}T00:00:00.000Z`)
+  if (Number.isNaN(anchor.getTime()))
+    return []
+
+  const dateIds: string[] = []
+  for (let offset = Math.max(0, Math.floor(lookbackDays)); offset >= 0; offset--) {
+    const date = new Date(anchor)
+    date.setUTCDate(anchor.getUTCDate() - offset)
+    dateIds.push(getDateId(date))
+  }
+  return dateIds
 }
 
 function getMetricWindowFromDailyWindow(window: DailyWindow): CurrentDayWindow {
@@ -1265,8 +1313,8 @@ async function aggregateDailyBuildStats(
     const query = sql`
       SELECT
         platform,
-        SUM(build_time_unit)::bigint AS total_seconds,
-        COALESCE(ROUND(AVG(build_time_unit)::numeric, 1), 0)::float AS avg_seconds,
+        SUM(billable_seconds)::bigint AS total_seconds,
+        COALESCE(ROUND(AVG(billable_seconds)::numeric, 1), 0)::float AS avg_seconds,
         COUNT(*)::int AS total_builds
       FROM build_logs
       WHERE created_at >= ${start}
@@ -1378,19 +1426,28 @@ async function getTrialExtensionStats(c: Context, window: CurrentDayWindow): Pro
 }
 
 async function ensureGlobalStatsSnapshotRow(c: Context, dateId: string): Promise<void> {
+  await ensureGlobalStatsSnapshotRows(c, [dateId])
+}
+
+async function ensureGlobalStatsSnapshotRows(c: Context, dateIds: readonly string[]): Promise<void> {
+  if (dateIds.length === 0)
+    return
+
   const db = getPgClient(c)
 
   try {
     await db.query(
-      'INSERT INTO public.global_stats (date_id, apps, updates, stars) VALUES ($1, 0, 0, 0) ON CONFLICT (date_id) DO NOTHING',
-      [dateId],
+      `INSERT INTO public.global_stats (date_id, apps, updates, stars)
+      SELECT DISTINCT date_id, 0, 0, 0
+      FROM unnest($1::text[]) AS input(date_id)
+      ON CONFLICT (date_id) DO NOTHING`,
+      [dateIds],
     )
   }
   finally {
     await closeClient(c, db)
   }
 }
-
 
 async function updateGlobalStatsSnapshot(c: Context, dateId: string, patch: GlobalStatsSnapshotPatch): Promise<void> {
   await ensureGlobalStatsSnapshotRow(c, dateId)
@@ -1443,12 +1500,97 @@ function normalizeCompletedGlobalStatsShards(value: unknown): Set<GlobalStatsCom
   return new Set(parsed.filter((shard): shard is GlobalStatsCompletionMarker => typeof shard === 'string' && GLOBAL_STATS_COMPLETION_MARKER_SET.has(shard)))
 }
 
+function getEmptyBuildShardStats(): BuildShardStats {
+  return {
+    totalSeconds: { ios: 0, android: 0 },
+    avgSeconds: { ios: 0, android: 0 },
+    counts: { ios: 0, android: 0 },
+  }
+}
+
+function normalizeGlobalStatsRepairNumber(value: number | string | null): number {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue : 0
+}
+
+function normalizeGlobalStatsRepairRow(row: GlobalStatsRepairSqlRow): GlobalStatsRepairRow {
+  return {
+    dateId: row.date_id,
+    completedShards: normalizeCompletedGlobalStatsShards(row.completed_shards),
+    orgs: normalizeGlobalStatsRepairNumber(row.orgs),
+    bundleStorageGb: normalizeGlobalStatsRepairNumber(row.bundle_storage_gb),
+    buildTotalSecondsDayIos: normalizeGlobalStatsRepairNumber(row.build_total_seconds_day_ios),
+    buildTotalSecondsDayAndroid: normalizeGlobalStatsRepairNumber(row.build_total_seconds_day_android),
+    buildAvgSecondsDayIos: normalizeGlobalStatsRepairNumber(row.build_avg_seconds_day_ios),
+    buildAvgSecondsDayAndroid: normalizeGlobalStatsRepairNumber(row.build_avg_seconds_day_android),
+    buildCountDayIos: normalizeGlobalStatsRepairNumber(row.build_count_day_ios),
+    buildCountDayAndroid: normalizeGlobalStatsRepairNumber(row.build_count_day_android),
+  }
+}
+
+function areGlobalStatsNumbersDifferent(actual: number, expected: number, epsilon = 0): boolean {
+  return Math.abs(actual - expected) > epsilon
+}
+
+function isGlobalStatsBuildShardStale(row: GlobalStatsRepairRow, expectedStats: BuildShardStats): boolean {
+  return areGlobalStatsNumbersDifferent(row.buildTotalSecondsDayIos, expectedStats.totalSeconds.ios)
+    || areGlobalStatsNumbersDifferent(row.buildTotalSecondsDayAndroid, expectedStats.totalSeconds.android)
+    || areGlobalStatsNumbersDifferent(row.buildAvgSecondsDayIos, expectedStats.avgSeconds.ios, GLOBAL_STATS_BUILD_AVG_EPSILON)
+    || areGlobalStatsNumbersDifferent(row.buildAvgSecondsDayAndroid, expectedStats.avgSeconds.android, GLOBAL_STATS_BUILD_AVG_EPSILON)
+    || areGlobalStatsNumbersDifferent(row.buildCountDayIos, expectedStats.counts.ios)
+    || areGlobalStatsNumbersDifferent(row.buildCountDayAndroid, expectedStats.counts.android)
+}
+
+function getGlobalStatsStaleRepairShards(row: GlobalStatsRepairRow, expectedBuildStats: BuildShardStats = getEmptyBuildShardStats()): GlobalStatsShard[] {
+  const staleShards: GlobalStatsShard[] = []
+
+  if (row.completedShards.has('core') && row.orgs <= 0)
+    staleShards.push('core')
+  if (row.completedShards.has('usage_storage') && row.bundleStorageGb <= 0)
+    staleShards.push('usage_storage')
+  if (row.completedShards.has('builds') && isGlobalStatsBuildShardStale(row, expectedBuildStats))
+    staleShards.push('builds')
+
+  return staleShards
+}
+
+function uniqueGlobalStatsShards(shards: readonly GlobalStatsShard[]): GlobalStatsShard[] {
+  return GLOBAL_STATS_SHARDS.filter(shard => shards.includes(shard))
+}
+
+function filterCandidateGlobalStatsShards(shards: readonly GlobalStatsShard[], candidateShards?: readonly GlobalStatsShard[]): GlobalStatsShard[] {
+  if (!candidateShards)
+    return uniqueGlobalStatsShards(shards)
+
+  const candidateShardSet = new Set(candidateShards)
+  return uniqueGlobalStatsShards(shards.filter(shard => candidateShardSet.has(shard)))
+}
+
+function getGlobalStatsRepairShardQueueCandidates(
+  completedShards: ReadonlySet<GlobalStatsCompletionMarker>,
+  staleShards: readonly GlobalStatsShard[] = [],
+  candidateShards?: readonly GlobalStatsShard[],
+): GlobalStatsShard[] {
+  const missingRequiredShards = filterCandidateGlobalStatsShards(getMissingGlobalStatsRequiredShards(completedShards), candidateShards)
+  const staleRequiredShards = filterCandidateGlobalStatsShards(staleShards, candidateShards)
+  if (missingRequiredShards.length > 0 || staleRequiredShards.length > 0)
+    return uniqueGlobalStatsShards([...missingRequiredShards, ...staleRequiredShards])
+
+  const missingShards = candidateShards ? candidateShards.filter(shard => !completedShards.has(shard)) : getMissingGlobalStatsShards(completedShards)
+  return filterCandidateGlobalStatsShards(missingShards, candidateShards)
+}
+
 function getMissingGlobalStatsRequiredShards(completedShards: ReadonlySet<GlobalStatsCompletionMarker>): RequiredGlobalStatsShard[] {
   return REQUIRED_GLOBAL_STATS_SHARDS.filter(shard => !completedShards.has(shard))
 }
 
 function getMissingGlobalStatsShards(completedShards: ReadonlySet<GlobalStatsCompletionMarker>): GlobalStatsShard[] {
   return GLOBAL_STATS_SHARDS.filter(shard => !completedShards.has(shard))
+}
+
+function getGlobalStatsShardQueueCandidates(completedShards: ReadonlySet<GlobalStatsCompletionMarker>): GlobalStatsShard[] {
+  const missingRequiredShards = getMissingGlobalStatsRequiredShards(completedShards)
+  return missingRequiredShards.length > 0 ? missingRequiredShards : getMissingGlobalStatsShards(completedShards)
 }
 
 function hasCompletedGlobalStatsNotifications(completedShards: ReadonlySet<GlobalStatsCompletionMarker>): boolean {
@@ -1460,6 +1602,21 @@ function shouldSkipCompletedGlobalStatsShardRetry(
   shard: GlobalStatsShard,
 ): boolean {
   return shard !== 'notifications' && completedShards.has(shard)
+}
+
+async function shouldSkipGlobalStatsShardUpdate(
+  c: Context,
+  dateId: string,
+  completedShards: ReadonlySet<GlobalStatsCompletionMarker>,
+  shard: GlobalStatsShard,
+): Promise<boolean> {
+  if (!shouldSkipCompletedGlobalStatsShardRetry(completedShards, shard))
+    return false
+
+  if (await readCompletedGlobalStatsRepairShardStale(c, dateId, shard))
+    return false
+
+  return true
 }
 
 function getGlobalStatsNotificationStepAction(
@@ -1714,22 +1871,198 @@ async function queueMissingLogsnagInsightsShards(
   c: Context,
   dateId: string,
   completedShards: ReadonlySet<GlobalStatsCompletionMarker>,
-  candidateShards: readonly GlobalStatsShard[] = GLOBAL_STATS_SHARDS,
+  candidateShards?: readonly GlobalStatsShard[],
+  staleShards: readonly GlobalStatsShard[] = [],
 ): Promise<Array<{ shard: GlobalStatsShard, msgId: number, delaySeconds: number }>> {
-  const missingShards = candidateShards.filter(shard => !completedShards.has(shard))
-  return queueLogsnagInsightsShards(c, dateId, missingShards)
+  const shardsToQueue = getGlobalStatsRepairShardQueueCandidates(completedShards, staleShards, candidateShards)
+  return queueLogsnagInsightsShards(c, dateId, shardsToQueue)
+}
+
+function getLogsnagInsightsShardQueueKey(shard: GlobalStatsShard, dateId: string): string {
+  return `${dateId}:${getLogsnagInsightsShardFunctionName(shard)}`
+}
+
+async function readQueuedLogsnagInsightsShardKeys(c: Context, dateIds: readonly string[]): Promise<Set<string>> {
+  if (dateIds.length === 0)
+    return new Set()
+
+  const db = getPgClient(c)
+  const functionNames = GLOBAL_STATS_SHARDS.map(shard => getLogsnagInsightsShardFunctionName(shard))
+
+  try {
+    const result = await db.query<{ function_name: string | null, date_id: string | null }>(
+      `SELECT
+        message->>'function_name' AS function_name,
+        message->'payload'->>'date_id' AS date_id
+      FROM pgmq.q_admin_stats
+      WHERE message->>'function_name' = ANY($1::text[])
+        AND message->'payload'->>'date_id' = ANY($2::text[])`,
+      [functionNames, dateIds],
+    )
+
+    return new Set(result.rows.flatMap((row) => {
+      if (!row.function_name || !row.date_id)
+        return []
+      return [`${row.date_id}:${row.function_name}`]
+    }))
+  }
+  finally {
+    await closeClient(c, db)
+  }
+}
+
+async function readGlobalStatsRepairRows(c: Context, dateIds: readonly string[]): Promise<Map<string, GlobalStatsRepairRow>> {
+  if (dateIds.length === 0)
+    return new Map()
+
+  const db = getPgClient(c)
+
+  try {
+    const result = await db.query<GlobalStatsRepairSqlRow>(
+      `SELECT
+        date_id,
+        completed_shards,
+        orgs,
+        bundle_storage_gb,
+        build_total_seconds_day_ios,
+        build_total_seconds_day_android,
+        build_avg_seconds_day_ios,
+        build_avg_seconds_day_android,
+        build_count_day_ios,
+        build_count_day_android
+      FROM public.global_stats
+      WHERE date_id = ANY($1::text[])`,
+      [dateIds],
+    )
+
+    return new Map(result.rows.map((row) => {
+      const repairRow = normalizeGlobalStatsRepairRow(row)
+      return [repairRow.dateId, repairRow]
+    }))
+  }
+  finally {
+    await closeClient(c, db)
+  }
+}
+
+async function readDailyBuildStatsByDate(c: Context, dateIds: readonly string[]): Promise<Map<string, BuildShardStats>> {
+  const uniqueDateIds = Array.from(new Set(dateIds)).sort((a, b) => a.localeCompare(b))
+  if (uniqueDateIds.length === 0)
+    return new Map()
+
+  const start = new Date(`${uniqueDateIds[0]}T00:00:00.000Z`)
+  const end = new Date(`${uniqueDateIds[uniqueDateIds.length - 1]}T00:00:00.000Z`)
+  end.setUTCDate(end.getUTCDate() + 1)
+
+  const db = getPgClient(c, false)
+
+  try {
+    const result = await db.query<{ date_id: string, platform: string, total_seconds: number | string | null, avg_seconds: number | string | null, total_builds: number | string | null }>(
+      `SELECT
+        to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date_id,
+        platform,
+        COALESCE(SUM(billable_seconds), 0)::bigint AS total_seconds,
+        COALESCE(ROUND(AVG(billable_seconds)::numeric, 1), 0)::float AS avg_seconds,
+        COUNT(*)::int AS total_builds
+      FROM public.build_logs
+      WHERE created_at >= $1
+        AND created_at < $2
+        AND platform IN ('ios', 'android')
+      GROUP BY date_id, platform`,
+      [start, end],
+    )
+
+    const statsByDate = new Map(uniqueDateIds.map(dateId => [dateId, getEmptyBuildShardStats()]))
+    for (const row of result.rows) {
+      if (row.platform !== 'ios' && row.platform !== 'android')
+        continue
+
+      const stats = statsByDate.get(row.date_id) ?? getEmptyBuildShardStats()
+      stats.totalSeconds[row.platform] = normalizeGlobalStatsRepairNumber(row.total_seconds)
+      stats.avgSeconds[row.platform] = normalizeGlobalStatsRepairNumber(row.avg_seconds)
+      stats.counts[row.platform] = normalizeGlobalStatsRepairNumber(row.total_builds)
+      statsByDate.set(row.date_id, stats)
+    }
+
+    return statsByDate
+  }
+  finally {
+    await closeClient(c, db)
+  }
+}
+
+async function readCompletedGlobalStatsRepairShardStale(c: Context, dateId: string, shard: GlobalStatsShard): Promise<boolean> {
+  if (shard !== 'core' && shard !== 'usage_storage' && shard !== 'builds')
+    return false
+
+  const repairRow = (await readGlobalStatsRepairRows(c, [dateId])).get(dateId)
+  if (!repairRow || !repairRow.completedShards.has(shard))
+    return false
+
+  const buildStats = shard === 'builds'
+    ? (await readDailyBuildStatsByDate(c, [dateId])).get(dateId) ?? getEmptyBuildShardStats()
+    : getEmptyBuildShardStats()
+
+  return getGlobalStatsStaleRepairShards(repairRow, buildStats).includes(shard)
+}
+
+async function repairRecentMissingGlobalStatsSnapshots(c: Context, anchorDateId: string): Promise<void> {
+  const dateIds = buildRecentGlobalStatsRepairDateIds(anchorDateId).filter(dateId => dateId !== anchorDateId)
+  if (dateIds.length === 0)
+    return
+
+  const [repairRows, queuedShardKeys] = await Promise.all([
+    readGlobalStatsRepairRows(c, dateIds),
+    readQueuedLogsnagInsightsShardKeys(c, dateIds),
+  ])
+  const missingDateIds = dateIds.filter(dateId => !repairRows.has(dateId))
+  await ensureGlobalStatsSnapshotRows(c, missingDateIds)
+
+  const buildStatsByDate = await readDailyBuildStatsByDate(c, Array.from(repairRows.values()).flatMap((row) => {
+    if (!row.completedShards.has('builds'))
+      return []
+    return [row.dateId]
+  }))
+
+  const queuedByDate: Array<{ dateId: string, staleShards: GlobalStatsShard[], queued: Array<{ shard: GlobalStatsShard, msgId: number, delaySeconds: number }> }> = []
+  for (const dateId of dateIds) {
+    const repairRow = repairRows.get(dateId)
+    const completedShards = repairRow?.completedShards ?? new Set<GlobalStatsCompletionMarker>()
+    const staleShards = repairRow ? getGlobalStatsStaleRepairShards(repairRow, buildStatsByDate.get(dateId) ?? getEmptyBuildShardStats()) : []
+    const shardsToQueue = getGlobalStatsRepairShardQueueCandidates(completedShards, staleShards)
+      .filter(shard => !queuedShardKeys.has(getLogsnagInsightsShardQueueKey(shard, dateId)))
+
+    const queued = await queueLogsnagInsightsShards(c, dateId, shardsToQueue)
+    if (queued.length > 0)
+      queuedByDate.push({ dateId, staleShards, queued })
+  }
+
+  if (missingDateIds.length > 0 || queuedByDate.length > 0) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Repaired recent missing or stale global stats snapshots',
+      anchorDateId,
+      missingDateIds,
+      queuedByDate,
+    })
+  }
 }
 
 async function dispatchMissingLogsnagInsightsShardsFor(
   c: Context,
   dateId: string,
-  candidateShards: readonly GlobalStatsShard[],
+  candidateShards: readonly GlobalStatsShard[] | undefined,
   noMissingMessage: string,
   queuedMessage: string,
 ): Promise<void> {
   await ensureGlobalStatsSnapshotRow(c, dateId)
-  const completedShards = await readCompletedGlobalStatsShards(c, dateId)
-  const queued = await queueMissingLogsnagInsightsShards(c, dateId, completedShards, candidateShards)
+  const repairRow = (await readGlobalStatsRepairRows(c, [dateId])).get(dateId)
+  const completedShards = repairRow?.completedShards ?? new Set<GlobalStatsCompletionMarker>()
+  const buildStats = repairRow?.completedShards.has('builds')
+    ? (await readDailyBuildStatsByDate(c, [dateId])).get(dateId) ?? getEmptyBuildShardStats()
+    : getEmptyBuildShardStats()
+  const staleShards = repairRow ? getGlobalStatsStaleRepairShards(repairRow, buildStats) : []
+  const queued = await queueMissingLogsnagInsightsShards(c, dateId, completedShards, candidateShards, staleShards)
   const completedShardNames = Array.from(completedShards).sort((a, b) => a.localeCompare(b))
 
   if (queued.length === 0) {
@@ -1738,6 +2071,7 @@ async function dispatchMissingLogsnagInsightsShardsFor(
       message: noMissingMessage,
       dateId,
       completedShards: completedShardNames,
+      staleShards,
     })
     return
   }
@@ -1748,6 +2082,7 @@ async function dispatchMissingLogsnagInsightsShardsFor(
     dateId,
     queued,
     completedShards: completedShardNames,
+    staleShards,
   })
 }
 
@@ -1755,7 +2090,7 @@ async function dispatchMissingLogsnagInsightsShards(c: Context, dateId: string):
   await dispatchMissingLogsnagInsightsShardsFor(
     c,
     dateId,
-    GLOBAL_STATS_SHARDS,
+    undefined,
     'No missing logsnag insights global stats shards to queue',
     'Queued missing logsnag insights global stats shards',
   )
@@ -2747,6 +3082,12 @@ export const logsnagInsightsTestUtils = {
   getMetricWindowFromDailyWindow,
   getMissingGlobalStatsRequiredShards,
   getMissingGlobalStatsShards,
+  getGlobalStatsShardQueueCandidates,
+  getGlobalStatsRepairShardQueueCandidates,
+  getGlobalStatsStaleRepairShards,
+  isGlobalStatsBuildShardStale,
+  getEmptyBuildShardStats,
+  buildRecentGlobalStatsRepairDateIds,
   hasCompletedGlobalStatsNotifications,
   shouldSkipCompletedGlobalStatsShardRetry,
   getGlobalStatsNotificationStepAction,
@@ -2773,7 +3114,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 async function runLogsnagInsightsShard(c: Context, shard: GlobalStatsShard, dateId: string): Promise<void> {
   const completedShards = await readCompletedGlobalStatsShards(c, dateId)
-  if (shouldSkipCompletedGlobalStatsShardRetry(completedShards, shard)) {
+  if (await shouldSkipGlobalStatsShardUpdate(c, dateId, completedShards, shard)) {
     cloudlog({
       requestId: c.get('requestId'),
       message: 'Skipping completed logsnag insights shard retry',
@@ -2886,6 +3227,7 @@ function scheduleLogsnagInsightsShardUpdate(
 }
 
 async function runLogsnagInsightsUpdate(c: Context, dateId = getDailyWindow().prevDayDateId, retryCount = 0): Promise<void> {
+  await repairRecentMissingGlobalStatsSnapshots(c, dateId)
   if (await shouldSkipCompletedLogsnagInsightsRetryDispatch(c, dateId, retryCount))
     return
 

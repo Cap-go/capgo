@@ -105,6 +105,15 @@ function validateOptionalStringMaxLength(
   return value
 }
 
+function validateInstallSourceValue(value: unknown, issues: ValidationIssue[]) {
+  if (typeof value !== 'string') {
+    issues.push(fieldIssue('install_source', 'install_source must be a string'))
+    return
+  }
+  if (value.length > 64)
+    issues.push(fieldIssue('install_source', 'String must contain at most 64 character(s)'))
+}
+
 function validateRequiredAppId(input: UnknownRecord, issues: ValidationIssue[]): string | undefined {
   const value = validateRequiredString(input, 'app_id', issues, MISSING_STRING_APP_ID, NON_STRING_APP_ID)
   if (value === undefined) {
@@ -249,6 +258,8 @@ function validateOptionalCommonStrings(input: UnknownRecord, issues: ValidationI
   validateOptionalString(input, 'old_version_name', issues)
   validateOptionalString(input, 'version_code', issues)
   validateOptionalString(input, 'plugin_version', issues)
+  if (input.install_source !== undefined)
+    validateInstallSourceValue(input.install_source, issues)
   validateOptionalStringMaxLength(input, 'custom_id', 36, issues)
   validateOptionalStringMaxLength(input, 'key_id', 20, issues)
 }
@@ -283,6 +294,8 @@ export const updateRequestSchema = createPluginSchema<AppInfos>((input, issues) 
   validateRequiredDevicePlatform(input, issues)
   validateRequiredPluginVersion(input, issues)
   validateOptionalString(input, 'defaultChannel', issues)
+  if (input.install_source !== undefined)
+    validateInstallSourceValue(input.install_source, issues)
   validateOptionalStringMaxLength(input, 'key_id', 20, issues)
 })
 
@@ -309,6 +322,8 @@ export const channelSelfRequestSchema = createPluginSchema<AppInfos>((input, iss
   validateOptionalString(input, 'defaultChannel', issues)
   validateOptionalString(input, 'channel', issues)
   validateOptionalString(input, 'plugin_version', issues)
+  if (input.install_source !== undefined)
+    validateInstallSourceValue(input.install_source, issues)
   validateOptionalStringMaxLength(input, 'key_id', 20, issues)
 })
 

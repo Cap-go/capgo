@@ -16,6 +16,7 @@ import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
 import PageLoader from '~/components/PageLoader.vue'
 import { formatLocalDate, formatLocalDateTime } from '~/services/date'
+import { formatNumberValue } from '~/services/formatLocale'
 import { getEmoji } from '~/services/i18n'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
@@ -569,7 +570,7 @@ const leadingCustomerCountrySubtitle = computed(() => {
 
   return t('admin-users-country-top-country-description', {
     country: getCountryLabel(leadingCustomerCountry.value.country_code),
-    count: leadingCustomerCountry.value.organizations.toLocaleString(),
+    count: formatNumberValue(leadingCustomerCountry.value.organizations),
     share: leadingCustomerCountry.value.percentage.toFixed(1),
   })
 })
@@ -992,7 +993,7 @@ displayStore.defaultBack = '/dashboard'
             <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
               <div>
                 <p class="text-sm text-slate-600 dark:text-slate-400">Total Paid Organizations</p>
-                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-emerald-500">{{ (latestGlobalStats.paying_orgs_total || latestGlobalStats.paying || 0).toLocaleString() }}</p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-emerald-500">{{ formatNumberValue(latestGlobalStats.paying_orgs_total || latestGlobalStats.paying || 0) }}</p>
                 <p v-else class="mt-2 text-3xl font-bold text-emerald-500">0</p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Subscription and/or available credits</p>
               </div>
@@ -1000,7 +1001,7 @@ displayStore.defaultBack = '/dashboard'
             <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
               <div>
                 <p class="text-sm text-slate-600 dark:text-slate-400">Paid via Subscription</p>
-                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-primary">{{ (latestGlobalStats.paying_orgs_subscription || latestGlobalStats.paying || 0).toLocaleString() }}</p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-primary">{{ formatNumberValue(latestGlobalStats.paying_orgs_subscription || latestGlobalStats.paying || 0) }}</p>
                 <p v-else class="mt-2 text-3xl font-bold text-primary">0</p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Active subscription organizations</p>
               </div>
@@ -1008,7 +1009,7 @@ displayStore.defaultBack = '/dashboard'
             <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
               <div>
                 <p class="text-sm text-slate-600 dark:text-slate-400">Paid via Credits</p>
-                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-accent">{{ (latestGlobalStats.paying_orgs_credits || 0).toLocaleString() }}</p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-accent">{{ formatNumberValue(latestGlobalStats.paying_orgs_credits || 0) }}</p>
                 <p v-else class="mt-2 text-3xl font-bold text-accent">0</p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Organizations with available credits</p>
               </div>
@@ -1026,7 +1027,7 @@ displayStore.defaultBack = '/dashboard'
                   Trial Organizations
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-warning">
-                  {{ latestGlobalStats.trial.toLocaleString() }}
+                  {{ formatNumberValue(latestGlobalStats.trial) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-warning">
                   0
@@ -1060,7 +1061,7 @@ displayStore.defaultBack = '/dashboard'
                     {{ t('admin-users-email-type-professional') }}
                   </p>
                   <p class="mt-2 text-3xl font-bold text-primary">
-                    {{ emailTypeTotals.professional.toLocaleString() }}
+                    {{ formatNumberValue(emailTypeTotals.professional) }}
                   </p>
                   <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     {{ t('admin-users-email-type-professional-description') }}
@@ -1079,7 +1080,7 @@ displayStore.defaultBack = '/dashboard'
                     {{ t('admin-users-email-type-personal') }}
                   </p>
                   <p class="mt-2 text-3xl font-bold text-success">
-                    {{ emailTypeTotals.personal.toLocaleString() }}
+                    {{ formatNumberValue(emailTypeTotals.personal) }}
                   </p>
                   <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     {{ t('admin-users-email-type-personal-description') }}
@@ -1098,7 +1099,7 @@ displayStore.defaultBack = '/dashboard'
                     {{ t('admin-users-email-type-disposable') }}
                   </p>
                   <p class="mt-2 text-3xl font-bold text-error">
-                    {{ emailTypeTotals.disposable.toLocaleString() }}
+                    {{ formatNumberValue(emailTypeTotals.disposable) }}
                   </p>
                   <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     {{ t('admin-users-email-type-disposable-description') }}
@@ -1239,7 +1240,7 @@ displayStore.defaultBack = '/dashboard'
               <div v-else-if="planDistributionData.length > 0" class="grid grid-cols-2 gap-4 md:grid-cols-4">
                 <div v-for="plan in planDistributionData" :key="plan.label" class="flex flex-col items-center p-4 bg-gray-100 rounded-lg dark:bg-gray-700">
                   <span class="text-sm font-medium text-gray-600 dark:text-gray-400">{{ plan.label }}</span>
-                  <span class="mt-2 text-2xl font-bold">{{ plan.value.toLocaleString() }}</span>
+                  <span class="mt-2 text-2xl font-bold">{{ formatNumberValue(plan.value) }}</span>
                   <span class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ plan.percentage }}%</span>
                 </div>
               </div>
