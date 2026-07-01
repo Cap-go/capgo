@@ -206,7 +206,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
       <span class="loading loading-spinner loading-lg text-primary" />
     </div>
     <div v-else class="w-full h-full">
-      <Line :data="chartData" :options="chartOptions" />
+      <Line class="h-full w-full" :data="chartData" :options="chartOptions" />
     </div>
   </div>
 </template>

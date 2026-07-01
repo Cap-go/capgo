@@ -24,6 +24,8 @@ import { generateMonthDays, getCurrentDayMonth, getDaysInCurrentMonth } from '~/
 import { useOrganizationStore } from '~/stores/organization'
 import { inlineAnnotationPlugin } from '../../services/chartAnnotations'
 import { createTooltipConfig, todayLinePlugin, verticalLinePlugin } from '../../services/chartTooltip'
+import { createChartLegendItems } from './chartLegend'
+import ChartLegend from './ChartLegend.vue'
 
 const props = defineProps({
   accumulated: {
@@ -380,29 +382,7 @@ const chartData = computed<ChartData<'line' | 'bar'>>(() => {
 
 const hasAppData = computed(() => Object.keys(props.dataByApp || {}).length > 0)
 
-function getLegendColor(color: unknown) {
-  if (typeof color === 'string')
-    return color
-  if (Array.isArray(color))
-    return getLegendColor(color[0])
-  return '#64748b'
-}
-
-const legendItems = computed(() => {
-  if (!hasAppData.value)
-    return []
-
-  return chartData.value.datasets.map((dataset, index) => {
-    const appDataset = dataset as typeof dataset & { appId?: string }
-
-    return {
-      id: `${appDataset.appId ?? index}`,
-      label: `${dataset.label ?? ''}`,
-      backgroundColor: getLegendColor(dataset.backgroundColor),
-      borderColor: getLegendColor(dataset.borderColor),
-    }
-  })
-})
+const legendItems = computed(() => hasAppData.value ? createChartLegendItems(chartData.value.datasets, 'appId') : [])
 
 const todayLineOptions = computed(() => {
   if (!props.useBillingPeriod)
@@ -501,19 +481,6 @@ const barPlugins = sharedPlugins as unknown as Plugin<'bar'>[]
       <Line v-if="accumulated" :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="linePlugins" />
       <Bar v-else :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="barPlugins" />
     </div>
-    <ul
-      v-if="legendItems.length"
-      tabindex="0"
-      class="mt-3 flex max-w-full shrink-0 gap-4 overflow-x-auto overflow-y-hidden whitespace-nowrap pb-1 pr-1 [scrollbar-gutter:stable]"
-    >
-      <li v-for="item in legendItems" :key="item.id" class="flex max-w-[12rem] shrink-0 items-center gap-2 text-sm text-slate-700 dark:text-white">
-        <span
-          class="h-3 w-9 shrink-0 rounded-sm border"
-          :style="{ backgroundColor: item.backgroundColor, borderColor: item.borderColor }"
-          aria-hidden="true"
-        />
-        <span class="min-w-0 truncate">{{ item.label }}</span>
-      </li>
-    </ul>
+    <ChartLegend :items="legendItems" />
   </div>
 </template>
