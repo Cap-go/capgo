@@ -15253,39 +15253,17 @@ CREATE OR REPLACE FUNCTION "public"."total_bundle_storage_bytes"() RETURNS bigin
     LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-  SELECT (
-    -- Sum bundle sizes only for active app versions.
-    COALESCE(
-      (
-        SELECT SUM(avm.size)
-        FROM public.app_versions_meta avm
-        INNER JOIN public.app_versions av ON av.id = avm.id
-        WHERE av.deleted = false
-      ),
-      0
-    ) +
-    -- Sum manifest file sizes only for active app versions.
-    COALESCE(
-      (
-        SELECT SUM(m.file_size)
-        FROM public.manifest m
-        WHERE EXISTS (
-          SELECT 1
-          FROM public.app_versions av
-          WHERE av.id = m.app_version_id
-            AND av.deleted = false
-        )
-      ),
-      0
-    )
-  )::bigint;
+  SELECT COALESCE(SUM(avm.size), 0)::bigint
+  FROM public.app_versions_meta avm
+  INNER JOIN public.app_versions av ON av.id = avm.id
+  WHERE av.deleted = false;
 $$;
 
 
 ALTER FUNCTION "public"."total_bundle_storage_bytes"() OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."total_bundle_storage_bytes"() IS 'Returns active bundle storage in bytes including bundle sizes (app_versions_meta.size) and manifest file sizes for non-deleted app versions.';
+COMMENT ON FUNCTION "public"."total_bundle_storage_bytes"() IS 'Returns active bundle storage in bytes from app_versions_meta.size for non-deleted app versions.';
 
 
 
@@ -18346,7 +18324,8 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
     "opt_for_newsletters" boolean DEFAULT true NOT NULL,
     "ban_time" timestamp with time zone,
     "email_preferences" "jsonb" DEFAULT '{"onboarding": true, "usage_limit": true, "credit_usage": true, "device_error": true, "weekly_stats": true, "monthly_stats": true, "bundle_created": true, "bundle_deployed": true, "deploy_stats_24h": true, "cli_realtime_feed": true, "builder_onboarding": true, "bundle_incompatible": true, "billing_period_stats": true, "channel_self_rejected": true}'::"jsonb" NOT NULL,
-    "created_via_invite" boolean DEFAULT false NOT NULL
+    "created_via_invite" boolean DEFAULT false NOT NULL,
+    "format_locale" character varying
 );
 
 
@@ -18358,6 +18337,10 @@ COMMENT ON COLUMN "public"."users"."email_preferences" IS 'Per-user email notifi
 
 
 COMMENT ON COLUMN "public"."users"."created_via_invite" IS 'True when the account was created through /private/accept_invitation (invited members), false for normal self-signups.';
+
+
+
+COMMENT ON COLUMN "public"."users"."format_locale" IS 'Optional BCP 47 locale tag used for date and number formatting. Language stays independent from formatting.';
 
 
 
