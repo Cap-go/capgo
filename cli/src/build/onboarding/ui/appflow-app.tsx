@@ -21,7 +21,7 @@
 // bespoke takeover: the fullscreen streaming build-output pane at requesting-build.
 // 'skip' finishes with creds persisted (build later via `capgo build request`).
 import type { FC } from 'react'
-import { Box, Text, useApp } from 'ink'
+import { Box, Text, useApp, useInput } from 'ink'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { ProgressBar, Select } from '@inkjs/ui'
 import type { OnboardingResult } from '../types.js'
@@ -34,7 +34,7 @@ import type { CiSecretTarget } from '../ci-secrets.js'
 import { buildAppflowEffectDeps, persistAppflowCredentials } from '../appflow/deps.js'
 import { sanitizeBuildLogLines } from '../build-log.js'
 import { consoleWebUrl } from '../../../utils.js'
-import { Divider, Header, ErrorLine, SpinnerLine, SuccessLine, FilteredTextInput, FullscreenBuildOutput, Table } from './components.js'
+import { Divider, Header, ErrorLine, SpinnerLine, FilteredTextInput, FullscreenBuildOutput, Table, isBuildCompleteDismissKey } from './components.js'
 import { useTerminalSize } from './shell.js'
 import { exitAfterOnboardingBeforeExit } from './exit.js'
 import type { OnboardingBeforeExit } from './exit.js'
@@ -68,6 +68,13 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
   // Guards a single deps build (the appflow-side validators/token) + a single
   // in-flight auto effect per step.
   const depsRef = useRef(buildAppflowEffectDeps({ appId, packageName: appId }))
+  // Mirror buildOutput into a ref so finishMigration can lift the queued build
+  // URL into the durable summary without taking buildOutput as a dependency
+  // (which would rebuild the callback on every streamed line).
+  const buildOutputRef = useRef<string[]>([])
+  useEffect(() => { buildOutputRef.current = buildOutput }, [buildOutput])
+  // One-shot guard so the build-complete auto-finalize effect can't re-enter.
+  const finalizingRef = useRef(false)
 
   const exitNow = useCallback(() => exitAfterOnboardingBeforeExit(onBeforeExit, exit), [onBeforeExit, exit])
 
@@ -95,13 +102,41 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
       setTimeout(exitNow, 50)
       return
     }
-    onResult?.({ outcome: 'completed' })
+    // Durable post-exit breadcrumb (mirrors the native flow's summary): the alt
+    // screen wipes the wizard on exit, so the build URL + next-step command must
+    // travel back to command.ts to be reprinted in the user's normal buffer.
+    const buildUrl = finalProgress.built ? extractBuildUrl(buildOutputRef.current) : undefined
+    onResult?.({ outcome: 'completed', summary: { buildUrl, buildRequestCommand: 'capgo build request' } })
     const message = finalProgress.built
       ? `Appflow migration complete. Build attempted for ${finalProgress.scope}. If it queued you'll see it at ${consoleWebUrl('/app')}, otherwise re-run \`capgo build request\`.`
       : 'Appflow migration complete. Your imported credentials are saved — run `capgo build request` to build.'
+    // DONE is a HELD celebration screen (like the native BuildCompleteStep): on
+    // the alt screen exit() wipes the final frame instantly, so we wait for the
+    // user to dismiss with Enter / Esc / q (see the useInput + render below)
+    // instead of auto-exiting. Only the error paths auto-exit — nothing to read.
     setFinished({ kind: 'done', message })
-    setTimeout(exitNow, 50)
   }, [appId, onResult, exitNow])
+
+  // Terminal celebration is HELD: dismiss the "You're all set" screen with
+  // Enter / Esc / q to exit (auto-exit would wipe it instantly on the alt screen).
+  useInput((input, key) => {
+    if (finished?.kind === 'done' && isBuildCompleteDismissKey(input, key))
+      exitNow()
+  }, { isActive: finished?.kind === 'done' })
+
+  // build-complete is the tail terminal on the 'build' path. Fold it straight
+  // into the held celebration (record the run + persist + report) instead of
+  // rendering a separate BuildOutcome screen with its own Continue — so the user
+  // gets ONE first-class "You're all set" screen, like native onboarding.
+  useEffect(() => {
+    if (step !== 'build-complete' || finalizingRef.current || finished)
+      return
+    finalizingRef.current = true
+    const { progress: marked } = markTailRunComplete(progress)
+    setProgress(marked)
+    void finishMigration(marked)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step])
 
   // ── auto steps: run the flow effect, then advance to `next` ──────────────────
   useEffect(() => {
@@ -202,14 +237,8 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
     // the resume router). build-complete is the tail terminal: record the run and
     // route to the next platform's tail entry or finish.
     if (isAppflowTailStep(step)) {
-      if (step === 'build-complete') {
-        // The migration is single-platform: build-complete is terminal — record
-        // the run and finish (persist creds + report completed).
-        const { progress: marked } = markTailRunComplete(next)
-        setProgress(marked)
-        void finishMigration(marked)
-        return
-      }
+      // build-complete is handled by the auto-finalize effect (it renders the
+      // held celebration, not an interactive step), so it never reaches advance.
       setCtx({})
       setStep(nextTailStep(step as TailStep, value, next))
       return
@@ -227,15 +256,32 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
     setStep(resumed)
   }, [step, progress, finishMigration, onResult, exitNow])
 
+  // Held "You're all set" celebration — shown on the DONE path and during the
+  // brief build-complete finalize (so there's no flash of the old step). Waits
+  // for Enter / Esc / q (see useInput above). Mirrors the native BuildCompleteStep.
+  if (finished?.kind === 'done' || step === 'build-complete') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Header />
+        <Box marginTop={1} flexDirection="column">
+          <Text bold color="green">🎉  You're all set!</Text>
+          <Box marginTop={1}><ImportedSummary progress={progress} /></Box>
+          <Box marginTop={1}><BuildOutcome lines={buildOutputRef.current} /></Box>
+          {finished?.message && <Box marginTop={1}><Text dimColor>{finished.message}</Text></Box>}
+          <Box marginTop={1}>
+            <Text color="yellow" bold>Press Enter to finish  →</Text>
+          </Box>
+        </Box>
+      </Box>
+    )
+  }
   if (finished) {
     return (
       <Box flexDirection="column" padding={1}>
         <Header />
         <Box marginTop={1} flexDirection="column">
           <ImportedSummary progress={progress} />
-          <Box marginTop={1}>
-            {finished.kind === 'done' ? <SuccessLine text={finished.message} /> : <ErrorLine text={finished.message} />}
-          </Box>
+          <Box marginTop={1}><ErrorLine text={finished.message} /></Box>
         </Box>
       </Box>
     )
@@ -270,15 +316,13 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
 
         {isValidateResults
           ? <ValidationResults results={(ctx.results as AppflowValidationResult[]) ?? []} />
-          : step === 'build-complete'
-            ? <BuildOutcome lines={buildOutput} />
-            : busy || view.kind === 'auto'
-              ? null
-              : (
-                  <Box marginTop={1} flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
-                    <Text>{view.prompt}</Text>
-                  </Box>
-                )}
+          : busy || view.kind === 'auto'
+            ? null
+            : (
+                <Box marginTop={1} flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
+                  <Text>{view.prompt}</Text>
+                </Box>
+              )}
 
         {error && <Box marginTop={1}><ErrorLine text={error} /></Box>}
 
@@ -288,6 +332,14 @@ const AppflowApp: FC<AppflowAppProps> = ({ appId, scope, apikey, supaHost, journ
       </Box>
     </Box>
   )
+}
+
+// Lift the queued build URL out of the streamed build-output lines (the tail
+// emits "✔ Build queued — <url>") so it can ride back in the completion summary.
+function extractBuildUrl(lines: string[]): string | undefined {
+  const line = lines.find(l => l.includes('Build queued'))
+  const m = line?.match(/https?:\/\/\S+/)
+  return m ? m[0] : undefined
 }
 
 // ── credential summary ───────────────────────────────────────────────────────
