@@ -54,7 +54,7 @@ export function makeDevice(devBody: AppInfos | DeviceLink | AppStats, allowCusto
 }
 
 export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: Context, body: T, schema: StandardSchema<T>, requireDevice = true) {
-  if (Object.keys(body ?? {}).length === 0) {
+  if (!body || (body.app_id === undefined && body.device_id === undefined && Object.keys(body).length === 0)) {
     throw simpleError(getInvalidCode(c), 'Cannot parse body', { body })
   }
   if (requireDevice && !body.device_id) {
