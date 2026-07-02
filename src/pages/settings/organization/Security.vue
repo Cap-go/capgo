@@ -1206,11 +1206,14 @@ onMounted(async () => {
                   </p>
                 </div>
                 <div class="flex flex-col gap-2 md:flex-row md:items-center">
+                  <label for="required-encryption-key" class="sr-only">{{ t('required-encryption-key') }}</label>
                   <input
+                    id="required-encryption-key"
                     v-model="requiredEncryptionKey"
                     type="text"
                     maxlength="21"
                     :placeholder="t('required-encryption-key-placeholder')"
+                    :aria-label="t('required-encryption-key')"
                     :disabled="isSaving"
                     class="flex-1 px-4 py-2 border rounded-lg font-mono text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white disabled:opacity-50"
                   >
@@ -1256,8 +1259,10 @@ onMounted(async () => {
               </div>
               <label class="relative inline-flex items-center cursor-pointer">
                 <input
+                  id="password-policy-enabled"
                   v-model="policyEnabled"
                   type="checkbox"
+                  :aria-label="t('enforce-password-policy')"
                   :disabled="!hasOrgPerm || isSaving"
                   class="sr-only peer"
                   @change="handlePolicyToggle"
@@ -1270,13 +1275,15 @@ onMounted(async () => {
             <div v-if="policyEnabled" class="pl-4 space-y-4 border-l-2 border-blue-500">
               <!-- Minimum Length -->
               <div class="flex items-center justify-between">
-                <label class="dark:text-white text-slate-800">{{ t('minimum-length') }}</label>
+                <label for="password-policy-min-length" class="dark:text-white text-slate-800">{{ t('minimum-length') }}</label>
                 <div class="flex items-center space-x-2">
                   <input
+                    id="password-policy-min-length"
                     v-model.number="minLength"
                     type="number"
                     min="6"
                     max="72"
+                    :aria-label="t('minimum-length')"
                     :disabled="!hasOrgPerm || isSaving"
                     class="w-20 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white disabled:opacity-50"
                     @change="handleSettingChange"
@@ -1473,8 +1480,10 @@ onMounted(async () => {
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer">
                   <input
+                    id="enforce-hashed-api-keys"
                     type="checkbox"
                     :checked="enforceHashedApiKeys"
+                    :aria-label="t('enforce-hashed-api-keys')"
                     :disabled="isSaving"
                     class="sr-only peer"
                     @change="toggleEnforceHashedApiKeys"
@@ -1493,8 +1502,10 @@ onMounted(async () => {
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer">
                   <input
+                    id="require-apikey-expiration"
                     v-model="requireApikeyExpiration"
                     type="checkbox"
+                    :aria-label="t('require-apikey-expiration')"
                     :disabled="isSaving"
                     class="sr-only peer"
                     @change="saveApikeyPolicy"
