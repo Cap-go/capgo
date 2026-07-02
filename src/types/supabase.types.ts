@@ -5018,15 +5018,8 @@ export type Database = {
         | "download_manifest_file_fail"
         | "download_manifest_checksum_fail"
         | "download_manifest_brotli_fail"
-        | "finish_download_fail"
-        | "manifest_path_fail"
         | "backend_refusal"
         | "download_0"
-        | "checksum_required"
-        | "insufficient_disk_space"
-        | "app_launch_start"
-        | "app_launch_ready"
-        | "app_launch_timeout"
         | "disableProdBuild"
         | "disableDevice"
         | "disablePlatformElectron"
@@ -5045,12 +5038,19 @@ export type Database = {
         | "webview_unclean_restart"
         | "webview_render_process_gone"
         | "webview_content_process_terminated"
-        | "webview_dom_content_loaded"
-        | "webview_page_loaded"
-        | "rate_limit_reached"
-        | "set_next"
         | "os_version_changed"
         | "native_app_version_changed"
+        | "finish_download_fail"
+        | "checksum_required"
+        | "manifest_path_fail"
+        | "rate_limit_reached"
+        | "set_next"
+        | "insufficient_disk_space"
+        | "app_launch_start"
+        | "app_launch_ready"
+        | "app_launch_timeout"
+        | "webview_dom_content_loaded"
+        | "webview_page_loaded"
       stripe_status:
         | "created"
         | "succeeded"
@@ -5303,15 +5303,8 @@ export const Constants = {
         "download_manifest_file_fail",
         "download_manifest_checksum_fail",
         "download_manifest_brotli_fail",
-        "finish_download_fail",
-        "manifest_path_fail",
         "backend_refusal",
         "download_0",
-        "checksum_required",
-        "insufficient_disk_space",
-        "app_launch_start",
-        "app_launch_ready",
-        "app_launch_timeout",
         "disableProdBuild",
         "disableDevice",
         "disablePlatformElectron",
@@ -5330,12 +5323,19 @@ export const Constants = {
         "webview_unclean_restart",
         "webview_render_process_gone",
         "webview_content_process_terminated",
-        "webview_dom_content_loaded",
-        "webview_page_loaded",
-        "rate_limit_reached",
-        "set_next",
         "os_version_changed",
         "native_app_version_changed",
+        "finish_download_fail",
+        "checksum_required",
+        "manifest_path_fail",
+        "rate_limit_reached",
+        "set_next",
+        "insufficient_disk_space",
+        "app_launch_start",
+        "app_launch_ready",
+        "app_launch_timeout",
+        "webview_dom_content_loaded",
+        "webview_page_loaded",
       ],
       stripe_status: [
         "created",
