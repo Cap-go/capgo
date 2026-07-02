@@ -448,13 +448,15 @@ defineExpose({
     </h4>
     <div class="space-y-4">
       <div>
-        <label class="block mb-1 text-sm font-medium dark:text-white text-slate-700">
+        <label for="sso-new-domain" class="block mb-1 text-sm font-medium dark:text-white text-slate-700">
           {{ t('sso-domain') }}
         </label>
         <input
+          id="sso-new-domain"
           v-model="newDomain"
           type="text"
           :placeholder="t('sso-domain-placeholder')"
+          :aria-label="t('sso-domain')"
           :disabled="isSubmitting"
           class="d-input d-input-bordered w-full"
         >
@@ -463,13 +465,15 @@ defineExpose({
         </p>
       </div>
       <div>
-        <label class="block mb-1 text-sm font-medium dark:text-white text-slate-700">
+        <label for="sso-new-metadata-url" class="block mb-1 text-sm font-medium dark:text-white text-slate-700">
           {{ t('sso-metadata-url') }}
         </label>
         <input
+          id="sso-new-metadata-url"
           v-model="newMetadataUrl"
           type="url"
           :placeholder="t('sso-metadata-url-placeholder')"
+          :aria-label="t('sso-metadata-url')"
           :disabled="isSubmitting"
           class="d-input d-input-bordered w-full"
         >
