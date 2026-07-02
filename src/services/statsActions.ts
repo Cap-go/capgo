@@ -56,6 +56,8 @@ export const statsActionFilters = [
   ['action-webview-content-process-terminated', 'webview_content_process_terminated'],
   ['action-webview-dom-content-loaded', 'webview_dom_content_loaded'],
   ['action-webview-page-loaded', 'webview_page_loaded'],
+  ['action-os-version-changed', 'os_version_changed'],
+  ['action-native-app-version-changed', 'native_app_version_changed'],
   ['action-uninstall', 'uninstall'],
   ['action-need-plan-upgrade', 'needPlanUpgrade'],
   ['action-missing-bundle', 'missingBundle'],
@@ -94,6 +96,42 @@ export const filterToAction: Record<string, string> = Object.fromEntries(statsAc
 export const actionToFilter: Record<string, string> = Object.fromEntries(
   statsActionFilters.map(([filterKey, actionValue]) => [actionValue, filterKey]),
 )
+
+const failureActions = new Set<string>([
+  'set_fail',
+  'update_fail',
+  'download_fail',
+  'windows_path_fail',
+  'canonical_path_fail',
+  'directory_path_fail',
+  'unzip_fail',
+  'low_mem_fail',
+  'download_manifest_file_fail',
+  'download_manifest_checksum_fail',
+  'download_manifest_brotli_fail',
+  'decrypt_fail',
+  'app_crash',
+  'app_crash_native',
+  'app_anr',
+  'app_killed_low_memory',
+  'app_killed_excessive_resource_usage',
+  'app_initialization_failure',
+  'webview_javascript_error',
+  'webview_unhandled_rejection',
+  'webview_resource_error',
+  'webview_security_policy_violation',
+  'webview_unclean_restart',
+  'webview_render_process_gone',
+  'webview_content_process_terminated',
+  'cannotGetBundle',
+  'checksum_fail',
+  'blocked_by_server_url',
+  'backend_refusal',
+])
+
+export const failureActionFilterKeys = statsActionFilters
+  .filter(([, actionValue]) => failureActions.has(actionValue))
+  .map(([filterKey]) => filterKey)
 
 export function createActionFilterState(): Record<string, boolean> {
   return Object.fromEntries(statsActionFilters.map(([filterKey]) => [filterKey, false]))

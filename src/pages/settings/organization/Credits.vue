@@ -2,7 +2,6 @@
 import type { CreditMetricType, CreditPricingStep } from '~/services/creditPricing'
 import type { Database } from '~/types/supabase.types'
 import { FormKit } from '@formkit/vue'
-import dayjs from 'dayjs'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -14,9 +13,12 @@ import ChevronDownIcon from '~icons/heroicons/chevron-down'
 import CloudIcon from '~icons/heroicons/cloud'
 import ScaleIcon from '~icons/heroicons/scale'
 import UserGroupIcon from '~icons/heroicons/user-group'
-import AdminOnlyModal from '~/components/AdminOnlyModal.vue'
+import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { creditPricingMetricOrder, formatCreditPricingPrice, formatCreditPricingTierLabel } from '~/services/creditPricing'
 import { formatLocalDate } from '~/services/date'
+import { formatNumber, formatNumberValue } from '~/services/formatLocale'
+import { isNativeAppStoreContext } from '~/services/nativeCompliance'
+import { checkPermissions } from '~/services/permissions'
 import { completeCreditTopUp, startCreditTopUp } from '~/services/stripe'
 import { getCreditPricingSteps, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
@@ -63,12 +65,7 @@ const supabase = useSupabase()
 const organizationStore = useOrganizationStore()
 const { currentOrganization } = storeToRefs(organizationStore)
 const displayStore = useDisplayStore()
-
-// Check if user is super_admin
-const isSuperAdmin = computed(() => {
-  const orgId = organizationStore.currentOrganization?.gid
-  return organizationStore.hasPermissionsInRole('super_admin', ['org_super_admin'], orgId)
-})
+const isMobile = isNativeAppStoreContext()
 
 // Modal state for non-admin access
 const showAdminModal = ref(false)
@@ -174,11 +171,11 @@ const creditPricingFootnote = computed(() => t('credits-pricing-footnote'))
 const creditPricingDisclaimer = computed(() => t('credits-pricing-disclaimer'))
 
 function formatCredits(value: number) {
-  return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+  return formatNumberValue(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function formatCurrency(value: number) {
-  return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+  return formatNumber(value, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function formatMetricAmount(metric: Database['public']['Enums']['credit_metric_type'], value: number) {
@@ -186,12 +183,12 @@ function formatMetricAmount(metric: Database['public']['Enums']['credit_metric_t
   const ceiledValue = Math.ceil(value)
   switch (metric) {
     case 'mau':
-      return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(ceiledValue)} ${t('users')}`
+      return `${formatNumberValue(ceiledValue, { maximumFractionDigits: 0 })} ${t('users')}`
     case 'bandwidth':
     case 'storage': {
       // Convert bytes to GiB (1 GiB = 1073741824 bytes) and round up to match pricing
       const gib = Math.ceil(ceiledValue / 1073741824)
-      return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(gib)} GiB`
+      return `${formatNumberValue(gib, { maximumFractionDigits: 0 })} GiB`
     }
     case 'build_time': {
       // ceiledValue is in seconds: computeUsageFromCredits inverts the SQL pricing
@@ -199,16 +196,14 @@ function formatMetricAmount(metric: Database['public']['Enums']['credit_metric_t
       // unit_factor = 60, so the inverse hands back raw seconds. Convert to hours
       // when >= 1h, otherwise show whole minutes (rounded up to match billing).
       if (ceiledValue >= 3600) {
-        const hours = new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-          .format(ceiledValue / 3600)
+        const hours = formatNumberValue(ceiledValue / 3600, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
         return t('x-hours-short', { hours })
       }
-      const minutes = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 })
-        .format(Math.ceil(ceiledValue / 60))
+      const minutes = formatNumberValue(Math.ceil(ceiledValue / 60), { maximumFractionDigits: 0 })
       return t('minutes-short', { minutes })
     }
     default:
-      return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(ceiledValue)
+      return formatNumberValue(ceiledValue, { maximumFractionDigits: 2 })
   }
 }
 
@@ -254,14 +249,14 @@ function summarizeTypes(typeCounts: Record<Database['public']['Enums']['credit_t
   const entries = Object.entries(typeCounts)
     .filter(([, count]) => count > 0)
     .sort((a, b) => b[1] - a[1])
-    .map(([type, count]) => `${transactionLabel(type as Database['public']['Enums']['credit_transaction_type'])} ×${count}`)
+    .map(([type, count]) => `${transactionLabel(type as Database['public']['Enums']['credit_transaction_type'])} ×${formatNumberValue(count)}`)
   return entries.join(' • ') || '—'
 }
 
 const dailyTransactions = computed<DailyLedgerRow[]>(() => {
   const groups = new Map<string, DailyLedgerRow>()
   for (const tx of transactions.value) {
-    const dateKey = dayjs(tx.occurred_at).format('YYYY-MM-DD')
+    const dateKey = tx.occurred_at.slice(0, 10)
     const dateLabel = formatLocalDate(tx.occurred_at) || dateKey
     const existing = groups.get(dateKey)
     if (!existing) {
@@ -400,13 +395,21 @@ async function loadPricingSteps() {
   pricingSteps.value = await getCreditPricingSteps(currentOrganization.value?.gid)
 }
 
+// Returns true when the current user can manage billing for the current org.
+// Otherwise shows the permission modal; used to gate both the page and the buy action.
+async function ensureBillingAccess() {
+  const orgId = currentOrganization.value?.gid
+  if (orgId && await checkPermissions('org.update_billing', { orgId }))
+    return true
+  showAdminModal.value = true
+  return false
+}
+
 async function handleBuyCredits() {
-  // Show admin modal for non-admins instead of blocking
-  if (!isSuperAdmin.value) {
-    showAdminModal.value = true
+  if (!(await ensureBillingAccess()))
     return
-  }
-  if (!currentOrganization.value?.gid)
+  const orgId = currentOrganization.value?.gid
+  if (!orgId)
     return
   if (!isTopUpQuantityValid.value || topUpQuantity.value === null) {
     toast.error(t('credits-top-up-quantity-invalid'))
@@ -414,7 +417,7 @@ async function handleBuyCredits() {
   }
   try {
     isStartingCheckout.value = true
-    await startCreditTopUp(currentOrganization.value.gid, topUpQuantity.value)
+    await startCreditTopUp(orgId, topUpQuantity.value)
   }
   catch (error) {
     console.error('Failed to initiate credit checkout', error)
@@ -480,14 +483,26 @@ watch(() => route.hash, (hash) => {
 })
 
 onMounted(async () => {
+  if (isMobile) {
+    await router.replace('/settings/organization/usage')
+    return
+  }
+
   displayStore.NavTitle = t('credits')
   await organizationStore.awaitInitialLoad()
+  if (!(await ensureBillingAccess()))
+    return
   await Promise.allSettled([loadTransactions(), loadPricingSteps()])
   await handleCreditCheckoutReturn()
 })
 
 watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined, oldOrgId: string | undefined) => {
+  if (isMobile)
+    return
+
   if (!newOrgId || newOrgId === oldOrgId)
+    return
+  if (!(await ensureBillingAccess()))
     return
   await Promise.allSettled([loadTransactions(), loadPricingSteps()])
   await handleCreditCheckoutReturn()
@@ -832,8 +847,13 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
         </div>
       </div>
     </div>
-    <!-- Admin-only modal for non-admin credit purchase attempts -->
-    <AdminOnlyModal v-if="showAdminModal" @click="showAdminModal = false" />
+    <!-- Permission modal shown when the user can't manage billing -->
+    <RbacPermissionOnlyModal
+      v-if="showAdminModal"
+      :title="t('billing-access-required')"
+      permission="org.update_billing"
+      @click="showAdminModal = false"
+    />
   </div>
 </template>
 

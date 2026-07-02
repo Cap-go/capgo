@@ -1,11 +1,10 @@
 import type { BuildCredentials, SavedCredentials } from '../schemas/build'
 import { Buffer } from 'node:buffer'
-import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, unlinkSync } from 'node:fs'
 import { chmod, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { cwd, exit, platform as osPlatform } from 'node:process'
+import { cwd, exit } from 'node:process'
 import {
   cancel as pCancel,
   confirm as pConfirm,
@@ -31,6 +30,7 @@ import {
 import { escapeDotenvValue, renderEnvFile } from './env-render'
 import { onboardingBuilderCommand } from './onboarding/command'
 import { canUseFilePicker, openSaveFilePicker } from './onboarding/file-picker'
+import { copyToClipboard } from '../support/clipboard'
 
 interface ManageCredentialsOptions {
   appId?: string
@@ -55,6 +55,7 @@ const SECRET_KEYS = new Set([
   'ANDROID_KEYSTORE_FILE',
   'PLAY_CONFIG_JSON',
   'GOOGLE_OAUTH_REFRESH_TOKEN',
+  'FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD',
 ])
 
 type FieldScope = 'ios' | 'android' | 'shared'
@@ -115,6 +116,24 @@ const CREDENTIAL_KNOWLEDGE: Record<string, FieldKnowledge> = {
     type: 'string',
     category: 'credential',
     explain: 'Apple Developer team ID (10-char alphanumeric). Found at developer.apple.com → Membership. Used by xcodebuild to scope the signing context.',
+  },
+  FASTLANE_USER: {
+    scope: 'ios',
+    type: 'string',
+    category: 'credential',
+    explain: 'Not recommended: app-specific password authentication is a discouraged Ionic Appflow migration fallback; prefer an App Store Connect API key (.p8). This is the Apple ID email for app-specific password uploads. Pairs with FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD and APPLE_APP_ID; fastlane reads it from the environment automatically.',
+  },
+  FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: {
+    scope: 'ios',
+    type: 'string',
+    category: 'credential',
+    explain: 'Not recommended: prefer an App Store Connect API key (.p8); this app-specific password path exists only as an Ionic Appflow migration fallback. App-specific password (format xxxx-xxxx-xxxx-xxxx) generated at appleid.apple.com. Lets fastlane upload to TestFlight without an App Store Connect API key. Requires FASTLANE_USER and APPLE_APP_ID to also be set. Capgo uses it server-side per build then discards it.',
+  },
+  APPLE_APP_ID: {
+    scope: 'ios',
+    type: 'string',
+    category: 'credential',
+    explain: 'Numeric App Store Connect app id (e.g. 1234567890), found in App Store Connect → your app → App Information → Apple ID. Required for the (not recommended) app-specific password upload path so fastlane can upload without an interactive 2FA login. Not used when an App Store Connect API key (.p8) is configured, which is the preferred option.',
   },
   CAPGO_IOS_PROVISIONING_MAP: {
     scope: 'ios',
@@ -286,7 +305,7 @@ function gatherFieldRows(entry: AppEntry): FieldRow[] {
 }
 
 function inferScope(key: string): FieldScope {
-  if (key.startsWith('APPLE_') || key.startsWith('CAPGO_IOS_') || key.startsWith('BUILD_CERTIFICATE') || key === 'P12_PASSWORD' || key === 'APP_STORE_CONNECT_TEAM_ID' || key === 'BUILD_PROVISION_PROFILE_BASE64')
+  if (key.startsWith('APPLE_') || key.startsWith('FASTLANE_') || key.startsWith('CAPGO_IOS_') || key.startsWith('BUILD_CERTIFICATE') || key === 'P12_PASSWORD' || key === 'APP_STORE_CONNECT_TEAM_ID' || key === 'BUILD_PROVISION_PROFILE_BASE64')
     return 'ios'
   if (key.startsWith('KEYSTORE_') || key.startsWith('ANDROID_') || key.startsWith('PLAY_') || key.startsWith('CAPGO_ANDROID_') || key.startsWith('GOOGLE_'))
     return 'android'
@@ -923,39 +942,6 @@ function actionCopyField(row: FieldRow): void {
     pLog.success(`✓ Copied ${row.key} (${row.value.length} chars) to clipboard via ${result.method}.`)
   else
     pLog.warn(`✗ Clipboard not available — could not copy ${row.key}. Use "Show value" and copy manually.`)
-}
-
-interface ClipboardCandidate {
-  cmd: string
-  args: string[]
-}
-
-function copyToClipboard(text: string): { ok: boolean, method?: string } {
-  const candidates: ClipboardCandidate[] = []
-  if (osPlatform === 'darwin') {
-    candidates.push({ cmd: 'pbcopy', args: [] })
-  }
-  else if (osPlatform === 'win32') {
-    candidates.push({ cmd: 'clip', args: [] })
-  }
-  else {
-    candidates.push({ cmd: 'wl-copy', args: [] })
-    candidates.push({ cmd: 'xclip', args: ['-selection', 'clipboard'] })
-    candidates.push({ cmd: 'xsel', args: ['--clipboard', '--input'] })
-  }
-  for (const candidate of candidates) {
-    try {
-      const result = spawnSync(candidate.cmd, candidate.args, { input: text })
-      if (result.error)
-        continue
-      if (result.status === 0)
-        return { ok: true, method: candidate.cmd }
-    }
-    catch {
-      // Try next candidate.
-    }
-  }
-  return { ok: false }
 }
 
 async function actionEditField(entry: AppEntry, row: FieldRow): Promise<boolean> {

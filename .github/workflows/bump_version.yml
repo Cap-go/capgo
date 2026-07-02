@@ -91,6 +91,8 @@ jobs:
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Install Graphify
+        run: python3 -m pip install --user graphifyy==0.8.31
       - name: Generate CLI docs
         if: ${{ needs.changes.outputs.run_cli == 'true' }}
         run: |
@@ -110,6 +112,20 @@ jobs:
         run: |
           set -e
 
+          refresh_graphify_graph() {
+            bun run graphify:generate
+            git add graphify-out
+
+            if ! git diff --cached --quiet; then
+              CURRENT_TAG=$(git describe --tags --exact-match 2>/dev/null || echo "")
+              git commit --amend --no-edit
+
+              if [ -n "$CURRENT_TAG" ]; then
+                git tag -f "$CURRENT_TAG"
+              fi
+            fi
+          }
+
           if [ "$RUN_CAPGO" = "true" ]; then
             if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
               bunx standard-version --skip.changelog --release-as "$CAPGO_RELEASE_AS" --tag-prefix capgo-
@@ -126,6 +142,8 @@ jobs:
                 git tag -f "$CURRENT_TAG"
               fi
             fi
+
+            refresh_graphify_graph
           fi
 
           if [ "$RUN_CLI" = "true" ]; then
@@ -134,6 +152,8 @@ jobs:
             else
               bunx standard-version --skip.changelog --release-as "$CLI_RELEASE_AS" --prerelease alpha --tag-prefix cli- --packageFiles cli/package.json --bumpFiles cli/package.json
             fi
+
+            refresh_graphify_graph
           fi
       - name: Push to origin
         run: |

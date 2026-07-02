@@ -86,7 +86,7 @@ export async function deleteProgress(
  * into the create-new path's `creating-certificate` step (which would trigger
  * the Apple 3-cert-limit error for users at the limit).
  */
-export function getResumeStep(progress: OnboardingProgress | null): OnboardingStep {
+export function getResumeStep(progress: OnboardingProgress | null, canAutomate = true): OnboardingStep {
   if (!progress)
     return 'welcome'
 
@@ -98,20 +98,31 @@ export function getResumeStep(progress: OnboardingProgress | null): OnboardingSt
   // Issuer ID are reused so they don't have to re-enter those.
   if (setupMethod === 'import-existing') {
     if (!completedSteps.apiKeyVerified) {
-      // For app_store mode the .p8 chain hadn't completed yet — resume there.
-      // For ad_hoc mode this branch is normally unreachable (.p8 isn't asked
-      // until no-match recovery), so we fall through to import-scanning,
-      // which is the safe default.
+      // For app_store mode the .p8 chain hadn't completed yet — resume at
+      // the furthest partial input step.
       if (progress.issuerId && progress.keyId && progress.p8Path)
         return 'verifying-key'
       if (progress.keyId && progress.p8Path)
         return 'input-issuer-id'
       if (progress.p8Path)
         return 'input-key-id'
-      // Distribution mode is gone from progress, so re-ask: jump back to the
-      // setup-method fork. The user will pick "Import existing" again and
-      // re-enter the (cheap) distribution-mode question.
-      return 'setup-method-select'
+      // No .p8 inputs yet. Branch on the saved importDistribution rather
+      // than falling back to setup-method-select (which would make the
+      // user re-pick a fork they already chose). Mirrors what
+      // getImportEntryStep does after a successful scan, but at mount
+      // time — so a user who quit right after picking Import + ad_hoc
+      // lands on import-scanning instead of being asked "how do you want
+      // to set up iOS credentials?" again.
+      //
+      //   ad_hoc   → scan straight away (no .p8 needed for non-TestFlight)
+      //   app_store → start the .p8 input chain at api-key-instructions
+      //   undefined → user picked Import but never the distribution mode;
+      //               re-ask just that question, not the setup fork
+      if (progress.importDistribution === 'ad_hoc')
+        return 'import-scanning'
+      if (progress.importDistribution === 'app_store')
+        return 'api-key-instructions'
+      return 'import-distribution-mode'
     }
     // .p8 verified, but no cert/profile completed yet — resume at scanning.
     return 'import-scanning'
@@ -126,10 +137,29 @@ export function getResumeStep(progress: OnboardingProgress | null): OnboardingSt
       return 'input-issuer-id'
     if (progress.p8Path)
       return 'input-key-id'
+    // No .p8 inputs yet. A user who chose the guided macOS helper
+    // (`p8CreateMethod === 'automated'`) deliberately opted out of the manual
+    // .p8 picker — resume them back on the helper (`asc-key-generating`
+    // re-launches the guided window), not the manual instructions. Manual
+    // choosers (and legacy/undefined) fall through to the .p8 instructions.
+    if (progress.p8CreateMethod === 'automated' && canAutomate)
+      return 'asc-key-generating'
+    // Automated chosen but the helper isn't available here (non-macOS, or the
+    // binary moved) — don't resume into a HELPER_NOT_FOUND; use the manual path.
     return 'api-key-instructions'
   }
-  if (!completedSteps.certificateCreated)
-    return 'creating-certificate'
+  if (!completedSteps.certificateCreated) {
+    // Create-new is always app_store, so before committing the bundle id to
+    // cert creation it must clear the remote App Store verification gate — the
+    // same step the live flow runs between verifying-key and creating-certificate
+    // (app.tsx, the verifying-key create-new branch). Resuming straight to
+    // creating-certificate would skip that gate, letting a user who quit while
+    // blocked on the App Store app check proceed with cert/profile creation for
+    // an unverified bundle id — defeating the invariant. We re-run verify-app
+    // (it re-checks via the ASC API and, on a fresh mount, has no
+    // pendingVerifyNext, so every exit path falls back to creating-certificate).
+    return 'verify-app'
+  }
   if (!completedSteps.profileCreated)
     return 'creating-profile'
 
@@ -191,5 +221,8 @@ export function getImportEntryStep(progress: OnboardingProgress | null): Onboard
 // when a prior session saved the path but quit before confirming the Key ID step.
 // Returns '' when the filename doesn't match (e.g. a manually-renamed file).
 export function extractKeyIdFromP8Path(filePath: string): string {
-  return filePath.match(/(?:Auth|Api)Key_([A-Z0-9]+)\.p8$/i)?.[1] ?? ''
+  // /i tolerates manually-renamed files, but the JWT `kid` claim is always
+  // upper-case (Apple registers keys that way). Normalize here so a renamed
+  // file like `authkey_abc123.p8` still produces a usable kid.
+  return filePath.match(/(?:Auth|Api)Key_([A-Z0-9]+)\.p8$/i)?.[1]?.toUpperCase() ?? ''
 }

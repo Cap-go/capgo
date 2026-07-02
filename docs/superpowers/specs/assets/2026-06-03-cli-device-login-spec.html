@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en" class="capgolight">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Capgo CLI Web Login — Spec (V4)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  :root{--primary:#515271;--secondary:#119eff;--accent:#1FB2A5;--pumpkin:#ff7211;}
+  body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#1e293b;}
+  .font-prompt{font-family:"Prompt",sans-serif;}
+  .font-mono,code,pre{font-family:"JetBrains Mono",ui-monospace,monospace;}
+  .chip{background:linear-gradient(135deg,#244366 0%,#0c6eb8 100%);}
+  .card{border-radius:1.1rem;border:1px solid rgba(226,232,240,.85);background:#fff;box-shadow:0 20px 50px -38px rgba(15,23,42,.38);}
+  h2{scroll-margin-top:5rem;}
+  code:not(pre code){background:#eef2f7;color:#334155;border-radius:.35rem;padding:.05rem .35rem;font-size:.86em;}
+  pre{background:#0f172a;color:#e2e8f0;border-radius:.75rem;padding:1rem 1.1rem;overflow:auto;font-size:.78rem;line-height:1.45;}
+  table{width:100%;border-collapse:collapse;font-size:.86rem;}
+  th{background:#f1f5f9;text-align:left;color:#475569;font-weight:600;padding:.5rem .7rem;}
+  td{border-top:1px solid #eef2f7;padding:.5rem .7rem;color:#334155;vertical-align:top;}
+  .tag{font-size:.7rem;font-weight:700;letter-spacing:.04em;border-radius:9999px;padding:.15rem .6rem;}
+  .ok{background:#e8f7f0;color:#0e8a5f;}
+  .warn{background:#fff4e8;color:#b8480a;}
+  .toc a{color:#0c6eb8;text-decoration:none;}
+  .toc a:hover{text-decoration:underline;}
+  ul.dash{list-style:none;padding-left:0;}
+  ul.dash li{position:relative;padding-left:1.1rem;margin:.35rem 0;line-height:1.55;}
+  ul.dash li::before{content:"";position:absolute;left:0;top:.62em;width:.45rem;height:.45rem;border-radius:9999px;background:var(--secondary);}
+</style>
+</head>
+<body style="background:linear-gradient(180deg,#f8fafc 0%,#eef4ff 55%,#f8fafc 100%);">
+<div class="mx-auto max-w-3xl px-5 py-12">
+
+  <header class="flex items-center gap-3">
+    <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl chip text-white font-prompt text-xl font-bold shadow-lg">C</span>
+    <div>
+      <p class="text-[0.72rem] font-bold tracking-[0.24em] text-slate-500 uppercase">Capgo · Design Spec</p>
+      <h1 class="text-2xl font-semibold text-slate-950 sm:text-3xl">CLI Web Login — Device Flow</h1>
+    </div>
+  </header>
+  <div class="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+    <span class="tag ok">Lifecycle V4</span>
+    <span class="tag warn">Draft for review</span>
+    <span>· 3 June 2026 · apikey v2 / RBAC only</span>
+  </div>
+
+  <nav class="card toc mt-6 p-5 text-sm">
+    <p class="mb-2 font-bold tracking-[0.14em] text-slate-500 uppercase text-[0.7rem]">Contents</p>
+    <ol class="grid gap-1 sm:grid-cols-2 list-decimal pl-5 text-slate-600">
+      <li><a href="#problem">Problem &amp; goal</a></li>
+      <li><a href="#lifecycle">Key lifecycle (V4)</a></li>
+      <li><a href="#arch">Architecture &amp; components</a></li>
+      <li><a href="#data">Data model</a></li>
+      <li><a href="#codes">user_code / device_code</a></li>
+      <li><a href="#security">Security checklist</a></li>
+      <li><a href="#reuse">Reuse &amp; testing</a></li>
+      <li><a href="#open">Open decisions</a></li>
+    </ol>
+  </nav>
+
+  <section id="problem" class="card mt-6 p-6">
+    <h2 class="text-lg font-semibold text-slate-900">Problem &amp; goal</h2>
+    <p class="mt-3 text-sm leading-7 text-slate-600">Today the CLI only authenticates by manually pasting an API key — there is no "log in from the browser" path. <strong>Goal:</strong> <code>capgo login</code> opens the browser, the user picks org/app <strong>RBAC roles</strong> and authorizes, and a fresh API key is delivered back to the terminal over HTTPS. It uses the shape of the OAuth 2.0 Device Authorization Grant (RFC&nbsp;8628) but hands back a normal Capgo API key — not an OAuth token.</p>
+    <p class="mt-3 text-sm leading-7 text-slate-600"><strong>Non-goals:</strong> no OAuth token server, no refresh tokens, no reuse of existing keys (always mint fresh), manual <code>capgo login &lt;key&gt;</code> kept as fallback. <strong>apikey v2 / RBAC only</strong> — permission is the <code>role_name</code> per binding; there is no <code>read/upload/write/all</code> mode.</p>
+  </section>
+
+  <section id="lifecycle" class="card mt-6 p-6">
+    <h2 class="text-lg font-semibold text-slate-900">Key lifecycle — V4 (create at authorize, hashed, deliver once)</h2>
+    <p class="mt-3 text-sm leading-7 text-slate-600">The key is <strong>created at authorize-time</strong> (under the user's JWT), stored <strong>hashed</strong> (<code>key = NULL</code>, only <code>key_hash</code>), and the plaintext is held <strong>transiently</strong> on the session for the CLI to fetch once, then burned. After delivery, only the hash remains — so the key is <strong>not viewable in the dashboard</strong>.</p>
+    <div class="mt-4 grid gap-3 sm:grid-cols-3">
+      <div class="rounded-xl bg-slate-50 p-4"><p class="font-semibold text-slate-800">① Authorize</p><p class="mt-1 text-xs leading-5 text-slate-500">JWT present. RBAC-check, create key now (hashed), store <code>apikey_id</code> + encrypted one-time <code>delivery_key</code>.</p></div>
+      <div class="rounded-xl bg-slate-50 p-4"><p class="font-semibold text-slate-800">② Poll</p><p class="mt-1 text-xs leading-5 text-slate-500">CLI polls with <code>device_code</code>; backend returns the plaintext once, then nulls it and burns the session.</p></div>
+      <div class="rounded-xl bg-slate-50 p-4"><p class="font-semibold text-slate-800">③ Rest</p><p class="mt-1 text-xs leading-5 text-slate-500">Only <code>key_hash</code> persists — identical to a hashed dashboard key.</p></div>
+    </div>
+    <p class="mt-4 rounded-xl bg-[#eef5ff] p-4 text-sm leading-6 text-slate-700"><strong>Why V4 over deferring creation to the poll (“V3”):</strong> deferring would store the <em>intent</em> (bindings) and build the key later — a bug in that stored scope could mint a <strong>wrong-scope</strong> key within the user's rights, which the RBAC check can't catch (it only blocks <em>escalation</em>). V4 creates atomically under the JWT, so nothing scope-bearing is stored between steps; the only transient state is the <strong>opaque secret string</strong>, whose worst-case bug is a <strong>dud key that fails login</strong> — never wrong scope. Creation errors also surface in the browser, not on a headless poll.</p>
+    <p class="mt-3 text-sm font-semibold text-slate-700">Security guards</p>
+    <ul class="dash text-sm text-slate-600">
+      <li><strong>Creation only under the JWT</strong> (authorize). The poll never creates — it only delivers. No unauthenticated key creation exists.</li>
+      <li>Shared creation function enforces <code>org.update_user_roles</code> per org <strong>intrinsically</strong> — escalation impossible regardless of caller. Service-role insert without the check is banned.</li>
+      <li><code>delivery_key</code> is <strong>encrypted at rest</strong> (Worker secret) + short TTL + burn-on-read; the only plaintext copy, and <strong>opaque</strong> (no scope meaning).</li>
+    </ul>
+  </section>
+
+  <section id="arch" class="card mt-6 p-6">
+    <h2 class="text-lg font-semibold text-slate-900">Architecture &amp; components</h2>
+    <pre class="mt-3">CLI                        Backend (CF Workers / Hono)       Browser (logged in → JWT)
+ | POST /cli-auth/start  -----> create session ---.                  |
+ | &lt;-- device_code, user_code, URIs               |                  |
+ | print user_code, open verify URL ----------------------------->  /cli-login?code=user_code
+ |                                                 |   show phrase + RBAC role picker
+ |                              POST /cli-auth/authorize  &lt;-- (JWT)
+ |                              RBAC-check + CREATE key now (hashed),
+ |                              store apikey_id + encrypted delivery_key
+ | POST /cli-auth/poll {device_code} (loop) -> status; when authorized:
+ | &lt;-- api_key (decrypt + return once), delivery_key nulled, session burned
+ | save to ~/.capgo</pre>
+
+    <p class="mt-4 text-sm font-semibold text-slate-700">CLI (<code>cli/src/login.ts</code> + new <code>loginWeb.ts</code>)</p>
+    <ul class="dash text-sm text-slate-600">
+      <li><code>capgo login</code> (no key) runs the web flow <strong>in interactive terminals</strong>. In <strong>CI / non-interactive</strong> (no TTY or <code>CI</code> set) it never opens a browser — it requires an explicit key (positional / <code>--apikey</code>) or <code>CAPGO_TOKEN</code>. <code>--web</code> forces web; <code>capgo login &lt;key&gt;</code> stays as manual fallback.</li>
+      <li>Calls <code>/cli-auth/start</code>, prints the <code>user_code</code>, opens <code>verification_uri_complete</code> (existing <code>open</code> dep), then polls honoring RFC 8628 (<code>authorization_pending</code> / <code>slow_down</code> / <code>access_denied</code> / <code>expired_token</code>). No local server.</li>
+      <li>On <code>authorized</code>, saves the key once via the existing <code>~/.capgo</code> / <code>./.capgo</code> writer (0o600).</li>
+    </ul>
+
+    <p class="mt-4 text-sm font-semibold text-slate-700">Backend endpoints (Hono, under <code>supabase/functions/_backend/public/cli-auth/*</code>)</p>
+    <ul class="dash text-sm text-slate-600">
+      <li><code>POST /cli-auth/start</code> — minimal auth; generates <code>device_code</code> (32 bytes) + <code>user_code</code>, stores the session (only the <em>hash</em> of <code>device_code</code>), returns the device-flow payload. Rate-limited per IP.</li>
+      <li><code>GET /cli-auth/session?user_code=…</code> — JWT-authed; returns display info only (device name, version, status). Never returns <code>device_code</code> or <code>delivery_key</code>.</li>
+      <li><code>POST /cli-auth/authorize</code> — JWT-authed. Body <code>{ user_code, name, bindings, expires_at, hashed }</code>. RBAC-check under JWT, <strong>create the key now (hashed)</strong> via the shared function, store <code>apikey_id</code> + encrypted <code>delivery_key</code>, mark authorized. Requires <code>org.update_user_roles</code> on every org — <strong>only org admins</strong> can authorize for that org.</li>
+      <li><code>POST /cli-auth/poll</code> — <strong>authenticated by the <code>device_code</code> bearer secret</strong> (<code>Authorization: Bearer</code>, not a JWT); backend hashes it and matches <code>device_code_hash</code> (constant-time). On first <code>authorized</code> poll returns the plaintext once, nulls <code>delivery_key</code>, burns the session. <strong>Never creates keys.</strong></li>
+    </ul>
+
+    <p class="mt-4 text-sm font-semibold text-slate-700">Frontend (<code>src/pages/cli-login.vue</code> + success)</p>
+    <ul class="dash text-sm text-slate-600">
+      <li>Auth-gated page; shows the verification phrase for the eyeball match + device info.</li>
+      <li>Reuses <code>ApiKeys.vue</code> <strong>org+role / app+role</strong> selectors (<code>selectedOrgRole</code>, <code>pendingAppBindings</code>) + expiration.</li>
+      <li>Authorize → <code>/cli-auth/authorize</code>; success shows "return to your terminal"; creation errors surface here. Styled like <code>login.vue</code>.</li>
+    </ul>
+  </section>
+
+  <section id="data" class="card mt-6 p-6">
+    <h2 class="text-lg font-semibold text-slate-900">Data model — <code>cli_login_sessions</code></h2>
+    <div class="mt-3 overflow-hidden rounded-xl border border-slate-200">
+      <table>
+        <thead><tr><th>column</th><th>type</th><th>notes</th></tr></thead>
+        <tbody>
+          <tr><td><code>id</code></td><td>uuid pk</td><td></td></tr>
+          <tr><td><code>device_code_hash</code></td><td>text</td><td>SHA-256 of <code>device_code</code>; poll matches by hashing input</td></tr>
+          <tr><td><code>user_code</code></td><td>text</td><td>5 EFF-short words, hyphenated; unique among active sessions</td></tr>
+          <tr><td><code>device_name</code> / <code>client_version</code></td><td>text</td><td>reported by CLI</td></tr>
+          <tr><td><code>status</code></td><td>enum</td><td>pending / authorized / consumed / denied / expired</td></tr>
+          <tr><td><code>user_id</code></td><td>uuid null</td><td>set on authorize (the approver)</td></tr>
+          <tr><td><code>apikey_id</code></td><td>uuid null</td><td>the key created at authorize (hashed)</td></tr>
+          <tr><td><code>delivery_key</code></td><td>text null</td><td><strong>encrypted JSON envelope</strong> <code>{ name, key }</code>; transient, nulled/burned on first poll</td></tr>
+          <tr><td><code>delivery_key_name</code></td><td>text null</td><td>KEK name/version used to encrypt <code>delivery_key</code> (enables rotation)</td></tr>
+          <tr><td><code>expires_at</code></td><td>timestamptz</td><td><code>created_at + 10 min</code> (session TTL)</td></tr>
+          <tr><td><code>last_poll_at</code></td><td>timestamptz null</td><td>for <code>slow_down</code> enforcement</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="mt-3 text-sm leading-6 text-slate-600">Stores <strong>no scope/intent</strong> — the key (hashed) and its bindings are real <code>apikeys</code> / <code>role_bindings</code> rows created at authorize. The session holds only the device-code hash and the encrypted one-time <code>delivery_key</code>. Not client-accessible (no RLS path); reached only via edge functions; scheduled cleanup of expired/consumed rows.</p>
+  </section>
+
+  <section id="codes" class="card mt-6 p-6">
+    <h2 class="text-lg font-semibold text-slate-900"><code>user_code</code> &amp; <code>device_code</code></h2>
+    <ul class="dash mt-2 text-sm text-slate-600">
+      <li><strong><code>device_code</code></strong> — 32 bytes, base64url. Only its SHA-256 hash is stored. The real high-entropy poll secret ("state" anchor).</li>
+      <li><strong><code>user_code</code></strong> — EFF short wordlist (1296 words), <strong>5 words</strong> hyphenated (~51 bits), server-generated &amp; stored (Stripe/GitHub model), unique among active sessions. A short-lived, rate-limited <em>handle</em> — not the secret — so ~51 bits + rate-limit + 10-min TTL is ample (GitHub uses ~35 bits). The <strong>two tokens have separated roles</strong>: <code>user_code</code> is the public browser handle; <code>device_code</code> is the secret that authenticates the poll, so knowing <code>user_code</code> alone can't poll.</li>
+    </ul>
+  </section>
+
+  <section id="security" class="card mt-6 p-6">
+    <h2 class="text-lg font-semibold text-slate-900">Security checklist</h2>
+    <ul class="dash mt-2 text-sm text-slate-600">
+      <li><code>device_code</code> 256-bit, stored hashed; poll matches by hash.</li>
+      <li><code>user_code</code> ~51 bits + unique-among-active + 10-min TTL + strict rate limit on authorize/poll — mitigates guess→planted-key.</li>
+      <li>Key created <strong>only under the user's JWT</strong> (authorize); poll only delivers. No unauthenticated creation.</li>
+      <li><strong>No scope-bearing state between steps</strong> → eliminates the wrong-scope bug class.</li>
+      <li>No privilege escalation: shared function enforces <code>org.update_user_roles</code> per org intrinsically; service-role insert without the check is banned.</li>
+      <li>Hashed at rest (<code>apikeys.key = NULL</code>); not viewable in dashboard. <code>delivery_key</code> = encrypted JSON envelope <code>{name,key}</code>, short-TTL, burn-on-read, opaque; <code>delivery_key_name</code> records the KEK version for rotation.</li>
+      <li>Single-use session burn; HTTPS-only + HSTS; optional CLI cert-pinning deferred.</li>
+      <li><em>Note:</em> V4 creates the credential at authorize rather than the poll/token step — a deliberate deviation from strict RFC 8628 to remove the wrong-scope surface; still device-flow-shaped.</li>
+    </ul>
+  </section>
+
+  <section id="reuse" class="card mt-6 p-6">
+    <h2 class="text-lg font-semibold text-slate-900">Reuse &amp; testing</h2>
+    <ul class="dash mt-2 text-sm text-slate-600">
+      <li><strong>Shared creation function</strong>: factor the core of <code>apikey/post.ts</code> (validation + RBAC + key gen + bindings) into one fn taking an explicit <code>actingUserId</code>, RBAC gate <em>inside</em>. Called by the public endpoint and <code>/cli-auth/authorize</code>. v2/RBAC only.</li>
+      <li><strong>UI</strong>: reuse <code>ApiKeys.vue</code> org+role / app+role selectors.</li>
+      <li><strong>Tests</strong>: unit (user_code gen, device_code hash, delivery_key encrypt/burn, RBAC gate, CLI poll state machine); integration (happy path, expired, denied, double-poll burns, rate-limit slow_down, wrong device_code, <strong>escalation attempt rejected</strong>); frontend (phrase + role pickers, unauth redirect). Target ≥80% on new modules.</li>
+    </ul>
+  </section>
+
+  <section id="open" class="card mt-6 p-6">
+    <h2 class="text-lg font-semibold text-slate-900">Open decisions</h2>
+    <ol class="mt-2 list-decimal pl-5 text-sm leading-7 text-slate-600">
+      <li><span class="line-through">Key-at-rest / when to create</span> — <strong>Resolved (V4)</strong>: create at authorize, hashed, deliver via encrypted transient <code>delivery_key</code>.</li>
+      <li><span class="line-through">Web default</span> — <strong>Resolved</strong>: default in interactive terminals; CI/non-interactive requires an explicit key (<code>--apikey</code> / <code>CAPGO_TOKEN</code>), never opens a browser.</li>
+      <li><span class="line-through">Route mount</span> — <strong>Resolved</strong>: under <code>public/cli-auth/*</code> (alongside <code>apikey</code>).</li>
+      <li><span class="line-through">delivery_key encryption</span> — <strong>Resolved (envelope)</strong>: encrypted JSON <code>{name,key}</code> + <code>delivery_key_name</code> KEK version for rotation. (Worker secret vs KMS = impl detail.)</li>
+      <li>CLI certificate pinning — now or follow-up.</li>
+    </ol>
+  </section>
+
+  <footer class="mt-8 text-center text-xs text-slate-400">Capgo · CLI Web Login · design spec V4 · branch worktree-cli-oauth-device-flow</footer>
+</div>
+</body>
+</html>

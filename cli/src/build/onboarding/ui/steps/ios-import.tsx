@@ -49,6 +49,37 @@ export interface SelectOption {
   value: string
 }
 
+/**
+ * Why the wizard ended up on the no-match recovery menu. Drives the Alert
+ * + hint copy in `ImportNoMatchRecoveryStep` so each route gets accurate
+ * context — previously the screen claimed "no profile linked to this cert"
+ * even when the parent had just logged "Apple linked them to X" (cases 3
+ * and 4 below). Set by the parent right before each setStep call; absent
+ * (undefined) is treated as the legacy `no-profile-on-disk` default for
+ * back-compat with call sites that haven't been audited yet.
+ *
+ *   - 'no-profile-on-disk'        : identity picked, no usable on-disk
+ *                                   profile, and no ASC key to query Apple.
+ *   - 'apple-no-cert-match'       : findCertIdBySha1 returned null — Apple
+ *                                   doesn't recognize this cert.
+ *   - 'apple-no-profiles-linked'  : Apple has the cert but zero profiles
+ *                                   linked to it.
+ *   - 'apple-bundle-mismatch'     : Apple has profiles but none target the
+ *                                   current app's bundle id.
+ *   - 'apple-distribution-mismatch': Apple has profiles for this bundle id
+ *                                   but none in the requested distribution
+ *                                   mode (app_store vs ad_hoc).
+ *   - 'apple-other'               : catch-all when none of the specific
+ *                                   filters above explain the empty result.
+ */
+export type NoMatchReason
+  = | 'no-profile-on-disk'
+    | 'apple-no-cert-match'
+    | 'apple-no-profiles-linked'
+    | 'apple-bundle-mismatch'
+    | 'apple-distribution-mismatch'
+    | 'apple-other'
+
 // `Select` only ever renders `visibleOptionCount` OPTIONS (it scrolls the
 // rest) — but each option can WRAP to multiple terminal rows at narrow widths.
 // The identity/profile labels here are long (full cert name + bundle id), so an
@@ -198,46 +229,100 @@ export const ImportPickProfileStep: FC<ImportPickProfileStepProps> = ({
 }
 
 // ── import-no-match-recovery ──────────────────────────────────────────────────
-// The cert is in the Keychain but no profile on disk matches it. The parent
-// builds the recovery `options` (browser / fetch / optionally create / back),
-// whose labels vary on whether an ASC key is already known and whether create
-// is allowed for the distribution mode. `identityName` is shown in the warning.
+// Routed in from up to six distinct conditions in the parent — see the
+// NoMatchReason union above. The Alert + hint copy switches on `reason` so
+// the screen tells the user the real cause instead of always saying "no
+// profile linked to this cert" (which contradicted the yellow log line for
+// the bundle-id-mismatch and distribution-mismatch routes). `appId` and
+// `importDistribution` carry the contextual nouns that the Apple-side
+// variants need to name.
 export interface ImportNoMatchRecoveryStepProps {
   identityName: string
   options: SelectOption[]
+  /**
+   * Why the wizard ended up here. Optional for back-compat — undefined
+   * renders the legacy `no-profile-on-disk` wording.
+   */
+  reason?: NoMatchReason
+  /** Concrete iOS bundle id; used by the bundle-mismatch + distribution-mismatch alerts. */
+  appId?: string
+  /** Active distribution mode; used by the distribution-mismatch alert. */
+  importDistribution?: 'app_store' | 'ad_hoc' | null
   dense?: boolean
   onChange: (value: string) => void
 }
 
-// Renders the full layout: the warning inside an `Alert variant="warning"` box
-// ("No provisioning profile on this Mac is linked to '{name}'."), a <Newline/>,
-// the full "The cert is in your Keychain but the matching profile isn't on disk.
-// Pick a recovery path:" line, another <Newline/>, then an UN-capped Select
-// listing every recovery option. (The old adaptive `dense` collapse was dropped
-// once the startup size gate began guaranteeing enough rows; `dense` is still on
-// the props for call-site compatibility but no longer alters the layout.)
-export const ImportNoMatchRecoveryStep: FC<ImportNoMatchRecoveryStepProps> = ({ identityName, options, onChange }) => {
+/**
+ * Pick the Alert sentence given a reason. The default branch covers both
+ * the explicit `no-profile-on-disk` reason AND the undefined/legacy case,
+ * preserving the original wording exactly so call sites that haven't been
+ * audited keep their current UX.
+ */
+function alertText(
+  reason: NoMatchReason | undefined,
+  identityName: string,
+  appId: string | undefined,
+  distribution: 'app_store' | 'ad_hoc' | null | undefined,
+): string {
+  switch (reason) {
+    case 'apple-no-cert-match':
+      return `Apple's records don't include the certificate "${identityName}". It may have been revoked, never uploaded, or belong to a different team.`
+    case 'apple-no-profiles-linked':
+      return `Apple has the certificate "${identityName}" but no provisioning profiles are linked to it yet.`
+    case 'apple-bundle-mismatch':
+      return `Apple has profiles for "${identityName}" but none target "${appId ?? 'this app'}".`
+    case 'apple-distribution-mismatch':
+      return `Apple has profiles for "${appId ?? 'this app'}" under "${identityName}" but none are ${distribution ?? 'the requested distribution'}.`
+    case 'apple-other':
+      return `Apple returned profiles for "${identityName}" but none match this app.`
+    case 'no-profile-on-disk':
+    case undefined:
+      return `No provisioning profile on this Mac is linked to "${identityName}".`
+  }
+}
+
+/**
+ * Pick the dim hint line below the alert. Each reason hints at the
+ * recovery option most likely to succeed, so the user has a steer before
+ * scanning the Select. The default keeps the original wording.
+ */
+function hintText(
+  reason: NoMatchReason | undefined,
+  appId: string | undefined,
+  distribution: 'app_store' | 'ad_hoc' | null | undefined,
+): string {
+  switch (reason) {
+    case 'apple-no-cert-match':
+      return 'Pick a recovery path — the certificate needs to be re-issued in the Apple Developer Portal first.'
+    case 'apple-no-profiles-linked':
+      return 'Pick a recovery path — "Create a new App Store profile" makes one for this cert via the Apple API.'
+    case 'apple-bundle-mismatch':
+      return `Pick a recovery path — "Create a new App Store profile" makes one for "${appId ?? 'this app'}".`
+    case 'apple-distribution-mismatch':
+      return `Pick a recovery path — re-run with the matching distribution mode${distribution ? ` (other than ${distribution})` : ''}, or create a new profile via the Apple API.`
+    case 'apple-other':
+      return 'Pick a recovery path:'
+    case 'no-profile-on-disk':
+    case undefined:
+      return `The cert is in your Keychain but the matching profile isn't on disk. Pick a recovery path:`
+  }
+}
+
+export const ImportNoMatchRecoveryStep: FC<ImportNoMatchRecoveryStepProps> = ({ identityName, options, reason, appId, importDistribution, onChange }) => {
   return (
     <Box flexDirection="column" marginTop={1}>
       <Alert variant="warning">
-        {`No provisioning profile on this Mac is linked to "${identityName}".`}
+        {alertText(reason, identityName, appId, importDistribution)}
       </Alert>
       <Newline />
       <Text dimColor>
-        The cert is in your Keychain but the matching profile isn't on disk. Pick a recovery path:
+        {hintText(reason, appId, importDistribution)}
       </Text>
       <Newline />
       <Select options={options} onChange={onChange} />
     </Box>
   )
 }
-
-// ── import-fetching-profile ───────────────────────────────────────────────────
-export const ImportFetchingProfileStep: FC = () => (
-  <Box flexDirection="column" marginTop={1}>
-    <SpinnerLine text="Looking up your cert on Apple and listing its profiles..." />
-  </Box>
-)
 
 // ── import-create-profile-only ────────────────────────────────────────────────
 // D2: create a new profile via Apple for the cert already in the Keychain
@@ -265,7 +350,7 @@ export interface ImportExportWarningStepProps {
   onChange: (value: string) => void
 }
 
-export const ImportExportWarningStep: FC<ImportExportWarningStepProps> = ({ identityName, onChange }) => {
+export const ImportExportWarningStep: FC<ImportExportWarningStepProps> = ({ identityName, dense = false, onChange }) => {
   const select = (
     <Select
       options={[
@@ -281,71 +366,44 @@ export const ImportExportWarningStep: FC<ImportExportWarningStepProps> = ({ iden
       <Alert variant="warning">
         macOS will now ask permission to access your private key.
       </Alert>
-      <Newline />
+      {!dense && <Newline />}
       <Box flexDirection="column" marginLeft={2}>
-        <Text>
-          <Text bold color="white">1.</Text>
-          {' '}
-          A Keychain dialog will pop up asking
-          {' '}
-          <Text bold>"security wants to use your confidential information"</Text>
-        </Text>
-        <Text>
-          <Text bold color="white">2.</Text>
-          {' '}
-          Click
-          {' '}
-          <Text bold color="green">"Always Allow"</Text>
-          {' '}
-          so it doesn't ask again on retry
-        </Text>
-        <Text>
-          <Text bold color="white">3.</Text>
-          {' '}
-          That's the only prompt — the export is otherwise non-interactive
-        </Text>
+        {dense
+          ? (
+              <>
+                <Text dimColor>1. macOS will pop up a Keychain permission dialog.</Text>
+                <Text dimColor>2. Click "Always Allow" so retries don't re-prompt.</Text>
+                <Text dimColor>3. That's the only prompt — the rest is non-interactive.</Text>
+              </>
+            )
+          : (
+              <>
+                <Text>
+                  <Text bold color="white">1.</Text>
+                  {' '}
+                  A Keychain dialog will pop up asking
+                  {' '}
+                  <Text bold>"security wants to use your confidential information"</Text>
+                </Text>
+                <Text>
+                  <Text bold color="white">2.</Text>
+                  {' '}
+                  Click
+                  {' '}
+                  <Text bold color="green">"Always Allow"</Text>
+                  {' '}
+                  so it doesn't ask again on retry
+                </Text>
+                <Text>
+                  <Text bold color="white">3.</Text>
+                  {' '}
+                  That's the only prompt — the export is otherwise non-interactive
+                </Text>
+              </>
+            )}
       </Box>
-      <Newline />
+      {!dense && <Newline />}
       {select}
-    </Box>
-  )
-}
-
-// ── import-compiling-helper ───────────────────────────────────────────────────
-// One-time-per-CLI-version compile of the Swift keychain-export helper.
-//
-// Comfortable: the original spinner, a <Newline/>, then the two full wrapping
-// paragraphs (the "~350 lines / wraps Apple's Security framework / compiles via
-// swiftc into your OS temp folder" explanation + the "cached for this CLI
-// version" note). Dense: the blank line drops and both paragraphs collapse to
-// terse single-line notes (the original wrapping paragraphs blew the budget at
-// 60 cols).
-export interface ImportCompilingHelperStepProps {
-  dense?: boolean
-}
-
-export const ImportCompilingHelperStep: FC<ImportCompilingHelperStepProps> = () => {
-  return (
-    <Box flexDirection="column" marginTop={1}>
-      <SpinnerLine text="Compiling keychain-export helper (one-time, ~2-3s)..." />
-      <Newline />
-      <Box flexDirection="column" marginLeft={2}>
-        <Text dimColor>
-          We ship a small Swift program (~350 lines) that wraps Apple's
-          Security framework. It compiles via
-          {' '}
-          <Text bold>swiftc</Text>
-          {' '}
-          into your OS temp folder.
-        </Text>
-        <Text dimColor>
-          The result is cached for this CLI version — future runs of
-          {' '}
-          <Text bold>build init</Text>
-          {' '}
-          skip this step.
-        </Text>
-      </Box>
     </Box>
   )
 }

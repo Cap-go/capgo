@@ -147,7 +147,7 @@ onUnmounted(() => {
         <div class="px-6" :class="{ 'pt-6': !dialogStore.dialogOptions?.title }">
           <!-- Default description -->
           <div v-if="dialogStore.dialogOptions?.description" class="pb-4">
-            <p class="text-base text-base-content/70 whitespace-pre-wrap break-all">
+            <p class="text-base text-base-content/70 whitespace-pre-wrap break-words">
               {{ dialogStore.dialogOptions.description }}
             </p>
           </div>

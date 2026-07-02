@@ -19,9 +19,10 @@ test.describe('Registration', () => {
     await page.goto('/register/')
   })
 
-  test('should redirect new users to org onboarding until the org is created', async ({ page }) => {
+  test('should redirect new users through app-first onboarding until the org is created', async ({ page }) => {
     const uniqueSuffix = Date.now()
     const email = `no-org-e2e-${uniqueSuffix}@example.com`
+    const appName = `No Org App ${uniqueSuffix}`
 
     await page.fill('[data-test="email"]', email)
     await page.fill('[data-test="first_name"]', 'No')
@@ -30,22 +31,22 @@ test.describe('Registration', () => {
     await page.fill('[data-test="confirm-password"]', 'Password123!')
     await page.click('[data-test="submit"]')
 
-    await page.waitForURL(/\/onboarding\/organization/)
-    await expect(page.locator('[data-test="onboarding-mode-name"]')).toBeVisible()
-    await expectProtectedRouteRedirect(page, '/apps', /\/onboarding\/organization/, '[data-test="onboarding-mode-name"]')
+    await page.waitForURL(/\/onboarding\/app/)
+    await page.click('[data-test="onboarding-intent-ota"]')
+    await page.click('[data-test="app-onboarding-continue-intent"]')
 
-    await page.click('[data-test="onboarding-mode-name"]')
-    await page.fill('[data-test="onboarding-org-name"]', `No Org E2E ${uniqueSuffix}`)
-    await page.locator('[data-test="onboarding-estimated-users-option"]').first().click()
+    await page.click('[data-test="app-onboarding-existing-no"]')
+    await page.fill('[data-test="app-onboarding-name"]', appName)
+    await page.click('[data-test="app-onboarding-continue"]')
+
+    await expectProtectedRouteRedirect(page, '/apps', /\/onboarding\/app/, '[data-test="onboarding-logout"]')
+
+    await page.click('[data-test="onboarding-mode-app-name"]')
     await expect(page.locator('[data-test="onboarding-create-org"]')).toBeEnabled()
     await page.click('[data-test="onboarding-create-org"]')
 
-    await page.waitForURL(/step=logo/)
-    await page.click('[data-test="onboarding-logo-action"]')
-
-    await page.waitForURL(/step=invite/)
-    await page.click('[data-test="onboarding-finish"]')
-    await page.waitForURL('/app/new')
+    await page.waitForSelector('[data-test="app-onboarding-command-copy"]', { timeout: 60000 })
+    await expect(page).toHaveURL(/\/onboarding\/app/)
   })
 
   test('should allow new users to log out from org onboarding', async ({ page }) => {
@@ -59,7 +60,7 @@ test.describe('Registration', () => {
     await page.fill('[data-test="confirm-password"]', 'Password123!')
     await page.click('[data-test="submit"]')
 
-    await page.waitForURL(/\/onboarding\/organization/)
+    await page.waitForURL(/\/onboarding\/app/)
     await page.click('[data-test="onboarding-logout"]')
 
     await page.waitForURL(/\/login\/?$/)

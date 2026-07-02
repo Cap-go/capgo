@@ -5,11 +5,12 @@ import { Capacitor } from '@capacitor/core'
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
 import dayjs from 'dayjs'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import VueTurnstile from 'vue-turnstile'
+import IconBack from '~icons/material-symbols/arrow-back-ios-rounded'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import mfaIcon from '~icons/simple-icons/2fas?raw'
@@ -88,6 +89,21 @@ const authSecondaryButtonClass = [
   'dark:border-slate-600/90 dark:bg-slate-950/85 dark:text-slate-200 dark:hover:bg-slate-800/95',
   'disabled:pointer-events-none disabled:opacity-60',
 ].join(' ')
+const authAccountContextClass = [
+  'flex min-w-0 flex-col items-start gap-2 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-2',
+  'dark:border-slate-700 dark:bg-slate-900/70',
+].join(' ')
+const authBackToEmailButtonClass = [
+  'inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-slate-700',
+  'transition duration-200 hover:bg-white hover:text-slate-950',
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--color-azure-500)]',
+  'dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white',
+  'disabled:pointer-events-none disabled:opacity-60',
+].join(' ')
+const authSelectedEmailClass = [
+  'w-full min-w-0 rounded-xl bg-white/75 px-3 py-2 text-sm font-medium leading-5 text-slate-700 [overflow-wrap:anywhere]',
+  'dark:bg-slate-950/55 dark:text-slate-100',
+].join(' ')
 const authInlineLinkClass = [
   'inline-flex min-h-6 items-center justify-center gap-1 border-none bg-transparent p-0 text-[0.95rem] font-semibold text-[rgb(255,114,17)]',
   'transition-colors duration-200 hover:text-[rgb(235,94,0)]',
@@ -99,7 +115,24 @@ const authGhostButtonClass = [
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--color-azure-500)]',
 ].join(' ')
 
-const registerUrl = window.location.host === 'console.capgo.app' ? 'https://capgo.app/register/' : `/register/`
+const registerUrl = globalThis.location.host === 'console.capgo.app' ? 'https://capgo.app/register/' : `/register/`
+
+function focusLoginEmailInput(attempt = 0) {
+  globalThis.setTimeout(() => {
+    const emailInput = document.querySelector<HTMLInputElement>('input#login-email, #login-email input, input[data-test="email"]')
+    if (!emailInput || emailInput.disabled) {
+      if (attempt < 8)
+        focusLoginEmailInput(attempt + 1)
+      return
+    }
+
+    emailInput.focus()
+    emailInput.select()
+
+    if (document.activeElement !== emailInput && attempt < 8)
+      focusLoginEmailInput(attempt + 1)
+  }, attempt === 0 ? 240 : 100)
+}
 
 function clearCaptchaInitTimeout() {
   if (captchaInitTimeout) {
@@ -116,7 +149,7 @@ function scheduleCaptchaInitTimeout() {
 
   clearCaptchaInitTimeout()
   captchaInitTimeout = setTimeout(() => {
-    if (!turnstileToken.value && !window.turnstile) {
+    if (!turnstileToken.value && !(globalThis as typeof globalThis & { turnstile?: unknown }).turnstile) {
       captchaStatus.value = 'unavailable'
       console.error('Turnstile failed to initialize')
     }
@@ -341,7 +374,7 @@ async function handleSsoLogin() {
   const domain = emailForLogin.value.split('@')[1]
 
   try {
-    const redirectUrl = new URL('/sso-callback', window.location.origin)
+    const redirectUrl = new URL('/sso-callback', globalThis.location.origin)
     if (route.query.to && typeof route.query.to === 'string') {
       redirectUrl.searchParams.set('to', route.query.to)
     }
@@ -369,7 +402,7 @@ async function handleSsoLogin() {
     }
 
     if (data?.url) {
-      window.location.href = data.url
+      globalThis.location.href = data.url
     }
   }
   catch (err) {
@@ -400,9 +433,17 @@ async function handleMfaSubmit(form: { code: string }) {
   }
 }
 
-function goBackToEmail() {
+async function goBackToEmail() {
+  if (isLoading.value) {
+    return
+  }
+
   statusAuth.value = 'email'
   hasSso.value = false
+  enforceSso.value = false
+
+  await nextTick()
+  focusLoginEmailInput()
 }
 
 async function checkAuthUser() {
@@ -444,7 +485,7 @@ async function checkAuthUser() {
 }
 
 async function checkMagicLink() {
-  const parsedUrl = new URL(route.fullPath, window.location.origin)
+  const parsedUrl = new URL(route.fullPath, globalThis.location.origin)
 
   const hash = parsedUrl.hash
   const params = new URLSearchParams(hash.slice(1))
@@ -496,12 +537,12 @@ async function openScan() {
 
 async function checkLogin() {
   try {
-    const parsedUrl = new URL(route.fullPath, window.location.origin)
+    const parsedUrl = new URL(route.fullPath, globalThis.location.origin)
     const params = new URLSearchParams(parsedUrl.search)
 
     if (params.get('message') === 'sso_account_linked') {
       parsedUrl.searchParams.delete('message')
-      window.history.replaceState({}, '', parsedUrl.toString())
+      globalThis.history.replaceState({}, '', parsedUrl.toString())
       toast.success(t('sso-account-linked'))
     }
 
@@ -511,7 +552,7 @@ async function checkLogin() {
     if (!!accessToken && !!refreshToken) {
       parsedUrl.searchParams.delete('access_token')
       parsedUrl.searchParams.delete('refresh_token')
-      window.history.replaceState({}, '', parsedUrl.toString())
+      globalThis.history.replaceState({}, '', parsedUrl.toString())
 
       querySessionAccessToken.value = accessToken
       querySessionRefreshToken.value = refreshToken
@@ -747,7 +788,7 @@ onMounted(checkLogin)
                   <FormKit id="email-step" type="form" :actions="false" @submit="handleEmailContinue">
                     <div class="space-y-5">
                       <FormKit
-                        type="email" name="email" :disabled="isEmailStepBusy" enterkeyhint="next" :placeholder="t('email')"
+                        id="login-email" type="email" name="email" :disabled="isEmailStepBusy" enterkeyhint="next" :placeholder="t('email')"
                         :prefix-icon="iconEmail" inputmode="email" :label="t('email')" autocomplete="email"
                         validation="required:trim" data-test="email"
                       />
@@ -778,6 +819,7 @@ onMounted(checkLogin)
                           {{ t('dont-have-an-account') }}
                         </span>
                         <a
+                          v-if="!isMobile"
                           :href="registerUrl"
                           data-test="register"
                           :class="authInlineLinkClass"
@@ -796,9 +838,22 @@ onMounted(checkLogin)
                   <!-- SSO path (enforce_sso=true: SSO only) -->
                   <div v-if="hasSso && enforceSso" class="space-y-5">
                     <!-- Show email context -->
-                    <p class="mb-4 truncate rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-sm text-slate-400 dark:border-slate-700 dark:bg-slate-900/70">
-                      {{ emailForLogin }}
-                    </p>
+                    <div :class="authAccountContextClass">
+                      <button
+                        type="button"
+                        data-test="back-to-email"
+                        :disabled="isLoading"
+                        :aria-label="t('go-back')"
+                        :class="authBackToEmailButtonClass"
+                        @click="goBackToEmail"
+                      >
+                        <IconBack class="h-4 w-4 fill-current" aria-hidden="true" />
+                        <span>{{ t('go-back') }}</span>
+                      </button>
+                      <p data-test="selected-email" :class="authSelectedEmailClass">
+                        {{ emailForLogin }}
+                      </p>
+                    </div>
                     <p class="text-sm text-slate-600 dark:text-slate-300">
                       {{ t('sso-detected') }}
                     </p>
@@ -833,11 +888,6 @@ onMounted(checkLogin)
                         </button>
                       </div>
                     </div>
-                    <div class="text-center">
-                      <button type="button" data-test="back-to-email" class="appearance-none" :class="authInlineLinkClass" @click="goBackToEmail">
-                        {{ t('go-back') }}
-                      </button>
-                    </div>
                   </div>
 
                   <!-- Password path (with optional SSO button when enforce_sso=false) -->
@@ -851,6 +901,7 @@ onMounted(checkLogin)
                       detect it for autofill purposes.
                     -->
                         <input
+                          id="login-username-hidden"
                           type="email"
                           :value="emailForLogin"
                           name="username"
@@ -858,12 +909,25 @@ onMounted(checkLogin)
                           readonly
                           tabindex="-1"
                           aria-hidden="true"
+                          :aria-label="t('email')"
                           style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none;"
                         >
-                        <!-- Show email context -->
-                        <p class="truncate rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-sm text-slate-400 dark:border-slate-700 dark:bg-slate-900/70">
-                          {{ emailForLogin }}
-                        </p>
+                        <div :class="authAccountContextClass">
+                          <button
+                            type="button"
+                            data-test="back-to-email"
+                            :disabled="isLoading"
+                            :aria-label="t('go-back')"
+                            :class="authBackToEmailButtonClass"
+                            @click="goBackToEmail"
+                          >
+                            <IconBack class="h-4 w-4 fill-current" aria-hidden="true" />
+                            <span>{{ t('go-back') }}</span>
+                          </button>
+                          <p data-test="selected-email" :class="authSelectedEmailClass">
+                            {{ emailForLogin }}
+                          </p>
+                        </div>
                         <!-- Optional SSO button when SSO exists but is not enforced -->
                         <div v-if="hasSso && !enforceSso">
                           <button
@@ -922,10 +986,8 @@ onMounted(checkLogin)
                         </div>
 
                         <div :class="authPanelClass">
-                          <button type="button" data-test="back-to-email" class="appearance-none" :class="authInlineLinkClass" @click="goBackToEmail">
-                            {{ t('go-back') }}
-                          </button>
                           <a
+                            v-if="!isMobile"
                             :href="registerUrl"
                             data-test="register"
                             :class="authInlineLinkClass"

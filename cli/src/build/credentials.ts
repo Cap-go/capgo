@@ -195,6 +195,10 @@ export function loadCredentialsFromEnv(): Partial<BuildCredentials> {
   const appleIssuerId = readRuntimeEnv('APPLE_ISSUER_ID')
   const appleKeyContent = readRuntimeEnv('APPLE_KEY_CONTENT')
   const appStoreConnectTeamId = readRuntimeEnv('APP_STORE_CONNECT_TEAM_ID')
+  // iOS app-specific password upload (alternative to the App Store Connect API key)
+  const fastlaneUser = readRuntimeEnv('FASTLANE_USER')
+  const appSpecificPassword = readRuntimeEnv('FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD')
+  const appleAppId = readRuntimeEnv('APPLE_APP_ID')
   const capgoIosScheme = readRuntimeEnv('CAPGO_IOS_SCHEME')
   const capgoIosTarget = readRuntimeEnv('CAPGO_IOS_TARGET')
   // Provisioning map can be supplied as raw JSON (CAPGO_IOS_PROVISIONING_MAP) or
@@ -218,6 +222,12 @@ export function loadCredentialsFromEnv(): Partial<BuildCredentials> {
   const buildOutputRetentionSeconds = readRuntimeEnv('BUILD_OUTPUT_RETENTION_SECONDS')
   const skipBuildNumberBump = readRuntimeEnv('SKIP_BUILD_NUMBER_BUMP')
   const capgoIosDistribution = readRuntimeEnv('CAPGO_IOS_DISTRIBUTION')
+  const capgoStoreSubmitReview = readRuntimeEnv('CAPGO_STORE_SUBMIT_REVIEW')
+  const capgoStoreReleaseName = readRuntimeEnv('CAPGO_STORE_RELEASE_NAME')
+  const capgoStoreReleaseNotes = readRuntimeEnv('CAPGO_STORE_RELEASE_NOTES')
+  const capgoStoreReleaseNotesLocalized = readRuntimeEnv('CAPGO_STORE_RELEASE_NOTES_LOCALIZED')
+  const capgoIosTestflightGroups = readRuntimeEnv('CAPGO_IOS_TESTFLIGHT_GROUPS')
+  const capgoIosAutomaticRelease = readRuntimeEnv('CAPGO_IOS_AUTOMATIC_RELEASE')
 
   // iOS credentials
   if (buildCertificateBase64)
@@ -232,8 +242,26 @@ export function loadCredentialsFromEnv(): Partial<BuildCredentials> {
     credentials.APPLE_KEY_CONTENT = appleKeyContent
   if (appStoreConnectTeamId)
     credentials.APP_STORE_CONNECT_TEAM_ID = appStoreConnectTeamId
+  if (fastlaneUser)
+    credentials.FASTLANE_USER = fastlaneUser
+  if (appSpecificPassword)
+    credentials.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD = appSpecificPassword
+  if (appleAppId)
+    credentials.APPLE_APP_ID = appleAppId
   if (capgoIosScheme)
     credentials.CAPGO_IOS_SCHEME = capgoIosScheme
+  if (capgoStoreSubmitReview)
+    credentials.CAPGO_STORE_SUBMIT_REVIEW = parseOptionalBoolean(capgoStoreSubmitReview) ? 'true' : 'false'
+  if (capgoStoreReleaseName?.trim())
+    credentials.CAPGO_STORE_RELEASE_NAME = capgoStoreReleaseName.trim()
+  if (capgoStoreReleaseNotes?.trim())
+    credentials.CAPGO_STORE_RELEASE_NOTES = capgoStoreReleaseNotes.trim()
+  if (capgoStoreReleaseNotesLocalized?.trim())
+    credentials.CAPGO_STORE_RELEASE_NOTES_LOCALIZED = capgoStoreReleaseNotesLocalized.trim()
+  if (capgoIosTestflightGroups?.trim())
+    credentials.CAPGO_IOS_TESTFLIGHT_GROUPS = capgoIosTestflightGroups.trim()
+  if (capgoIosAutomaticRelease)
+    credentials.CAPGO_IOS_AUTOMATIC_RELEASE = parseOptionalBoolean(capgoIosAutomaticRelease) ? 'true' : 'false'
   if (capgoIosTarget)
     credentials.CAPGO_IOS_TARGET = capgoIosTarget
   if (capgoIosDistribution)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildPreviewResponseHeaders } from '../supabase/functions/_backend/files/preview.ts'
+import { buildPreviewDownloadPayload, buildPreviewResponseHeaders } from '../supabase/functions/_backend/files/preview.ts'
 
 describe('preview response headers', () => {
   it.concurrent('keeps bundle preview responses immutable', () => {
@@ -25,5 +25,23 @@ describe('preview response headers', () => {
     expect(headers.get('etag')).toBeNull()
     expect(headers.get('pragma')).toBe('no-cache')
     expect(headers.get('expires')).toBe('0')
+  })
+
+  it.concurrent('builds a direct updater payload from an external bundle URL', async () => {
+    await expect(buildPreviewDownloadPayload({} as never, 'com.example.app', {
+      checksum: 'abc123',
+      external_url: 'https://example.com/app.zip',
+      id: 42,
+      manifest_count: 3,
+      name: '1.0.0',
+      r2_path: null,
+      session_key: null,
+    })).resolves.toEqual({
+      appId: 'com.example.app',
+      checksum: 'abc123',
+      sessionKey: undefined,
+      url: 'https://example.com/app.zip',
+      version: '1.0.0',
+    })
   })
 })

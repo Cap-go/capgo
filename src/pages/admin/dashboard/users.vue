@@ -14,8 +14,9 @@ import AdminFunnelChart from '~/components/admin/AdminFunnelChart.vue'
 import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
 import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
-import Spinner from '~/components/Spinner.vue'
+import PageLoader from '~/components/PageLoader.vue'
 import { formatLocalDate, formatLocalDateTime } from '~/services/date'
+import { formatNumberValue, formatOneDecimal } from '~/services/formatLocale'
 import { getEmoji } from '~/services/i18n'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
@@ -117,6 +118,11 @@ const globalStatsTrendData = ref<Array<{
   registers_today: number
   demo_apps_created: number
   devices_last_month: number
+  trial_extended_orgs: number
+  trial_extended_subscribed_orgs: number
+  paying_orgs_subscription?: number
+  paying_orgs_credits?: number
+  paying_orgs_total?: number
 }>>([])
 
 const isLoadingGlobalStatsTrend = ref(false)
@@ -211,7 +217,7 @@ const trialOrganizationsColumns = ref<TableColumn[]>([
         return t('expires-today')
       if (item.days_remaining === 1)
         return `1 ${t('day')}`
-      return `${item.days_remaining} ${t('days')}`
+      return `${formatNumberValue(item.days_remaining)} ${t('days')}`
     },
   },
   {
@@ -564,8 +570,8 @@ const leadingCustomerCountrySubtitle = computed(() => {
 
   return t('admin-users-country-top-country-description', {
     country: getCountryLabel(leadingCustomerCountry.value.country_code),
-    count: leadingCustomerCountry.value.organizations.toLocaleString(),
-    share: leadingCustomerCountry.value.percentage.toFixed(1),
+    count: formatNumberValue(leadingCustomerCountry.value.organizations),
+    share: formatOneDecimal(leadingCustomerCountry.value.percentage),
   })
 })
 
@@ -582,13 +588,17 @@ const trialPlanBreakdownPlanNames = computed(() => {
   return totals.map(plan => plan.plan_name)
 })
 
-function getTrialPlanChartColor(planName: string) {
-  const colors = ['#119eff', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#ef4444']
-  let hash = 0
-  for (let index = 0; index < planName.length; index++)
-    hash = (hash * 31 + planName.charCodeAt(index)) >>> 0
+const trialPlanChartColors: Record<string, string> = {
+  Solo: '#119eff',
+  Maker: '#d97706',
+  Team: '#8b5cf6',
+  Enterprise: '#059669',
+}
 
-  return colors[hash % colors.length]
+const fallbackTrialPlanChartColors = ['#119eff', '#d97706', '#8b5cf6', '#059669', '#db2777', '#0f766e', '#dc2626']
+
+function getTrialPlanChartColor(planName: string, index: number) {
+  return trialPlanChartColors[planName] ?? fallbackTrialPlanChartColors[index % fallbackTrialPlanChartColors.length]
 }
 
 const trialPlanBreakdownTrendSeries = computed(() => {
@@ -597,13 +607,13 @@ const trialPlanBreakdownTrendSeries = computed(() => {
     return []
 
   return trialPlanBreakdownPlanNames.value
-    .map(planName => ({
+    .map((planName, index) => ({
       label: planName,
       data: trend.map(item => ({
         date: item.date,
         value: item.plans[planName] ?? 0,
       })),
-      color: getTrialPlanChartColor(planName),
+      color: getTrialPlanChartColor(planName, index),
     }))
     .filter(series => series.data.some(item => item.value > 0))
 })
@@ -624,6 +634,30 @@ const registrationsTrendSeries = computed(() => {
   ]
 })
 
+const trialExtensionTrendSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: t('trial-extensions'),
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.trial_extended_orgs ?? 0,
+      })),
+      color: '#119eff',
+    },
+    {
+      label: t('extended-trial-subscriptions'),
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.trial_extended_subscribed_orgs ?? 0,
+      })),
+      color: '#10b981',
+    },
+  ]
+})
+
 const planDistributionData = computed(() => {
   if (globalStatsTrendData.value.length === 0)
     return []
@@ -635,22 +669,22 @@ const planDistributionData = computed(() => {
     {
       label: 'Solo',
       value: latest.plan_solo,
-      percentage: total > 0 ? ((latest.plan_solo / total) * 100).toFixed(1) : '0',
+      percentage: total > 0 ? formatOneDecimal((latest.plan_solo / total) * 100) : formatOneDecimal(0),
     },
     {
       label: 'Maker',
       value: latest.plan_maker,
-      percentage: total > 0 ? ((latest.plan_maker / total) * 100).toFixed(1) : '0',
+      percentage: total > 0 ? formatOneDecimal((latest.plan_maker / total) * 100) : formatOneDecimal(0),
     },
     {
       label: 'Team',
       value: latest.plan_team,
-      percentage: total > 0 ? ((latest.plan_team / total) * 100).toFixed(1) : '0',
+      percentage: total > 0 ? formatOneDecimal((latest.plan_team / total) * 100) : formatOneDecimal(0),
     },
     {
       label: 'Enterprise',
       value: latest.plan_enterprise,
-      percentage: total > 0 ? ((latest.plan_enterprise / total) * 100).toFixed(1) : '0',
+      percentage: total > 0 ? formatOneDecimal((latest.plan_enterprise / total) * 100) : formatOneDecimal(0),
     },
   ]
 })
@@ -767,19 +801,23 @@ const onboardingFunnelStages = computed(() => {
 })
 
 // Onboarding funnel trend for multi-line chart
+function normalizeTrendDate(value: string) {
+  return value.includes('T') ? value.split('T')[0] : value
+}
+
 const onboardingFunnelTrendSeries = computed(() => {
   if (!onboardingFunnelData.value || !onboardingFunnelData.value.trend)
     return []
 
   const trend = onboardingFunnelData.value.trend
-  const demoAppsCreatedByDate = new Map(globalStatsTrendData.value.map(item => [item.date, item.demo_apps_created]))
-  const userRegistrationsByDate = new Map(globalStatsTrendData.value.map(item => [item.date, item.registers_today]))
+  const demoAppsCreatedByDate = new Map(globalStatsTrendData.value.map(item => [normalizeTrendDate(item.date), item.demo_apps_created]))
+  const userRegistrationsByDate = new Map(globalStatsTrendData.value.map(item => [normalizeTrendDate(item.date), item.registers_today]))
   return [
     {
       label: t('user-registrations'),
       data: trend.map(item => ({
         date: item.date,
-        value: userRegistrationsByDate.get(item.date) ?? 0,
+        value: userRegistrationsByDate.get(normalizeTrendDate(item.date)) ?? 0,
       })),
       color: '#3b82f6', // blue
     },
@@ -819,7 +857,7 @@ const onboardingFunnelTrendSeries = computed(() => {
       label: t('demo-apps-created'),
       data: trend.map(item => ({
         date: item.date,
-        value: demoAppsCreatedByDate.get(item.date) ?? 0,
+        value: demoAppsCreatedByDate.get(normalizeTrendDate(item.date)) ?? 0,
       })),
       color: '#ef4444', // red
     },
@@ -878,9 +916,7 @@ displayStore.defaultBack = '/dashboard'
       <div class="w-full h-full px-4 pt-2 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
         <AdminFilterBar />
 
-        <div v-if="isLoading" class="flex items-center justify-center min-h-screen">
-          <Spinner size="w-24 h-24" />
-        </div>
+        <PageLoader v-if="isLoading" />
 
         <div v-else class="space-y-6">
           <!-- Onboarding Funnel Section -->
@@ -903,7 +939,7 @@ displayStore.defaultBack = '/dashboard'
               <div class="grid grid-cols-2 gap-4 pt-4 mt-4 border-t border-gray-200 sm:grid-cols-4 dark:border-gray-700">
                 <div class="text-center">
                   <p class="text-2xl font-bold text-purple-500">
-                    {{ onboardingFunnelRates.app.toFixed(1) }}%
+                    {{ formatOneDecimal(onboardingFunnelRates.app) }}%
                   </p>
                   <p class="text-xs text-gray-500 dark:text-gray-400">
                     Org → App
@@ -911,7 +947,7 @@ displayStore.defaultBack = '/dashboard'
                 </div>
                 <div class="text-center">
                   <p class="text-2xl font-bold text-amber-500">
-                    {{ onboardingFunnelRates.channel.toFixed(1) }}%
+                    {{ formatOneDecimal(onboardingFunnelRates.channel) }}%
                   </p>
                   <p class="text-xs text-gray-500 dark:text-gray-400">
                     {{ t('app-to-channel') }}
@@ -919,7 +955,7 @@ displayStore.defaultBack = '/dashboard'
                 </div>
                 <div class="text-center">
                   <p class="text-2xl font-bold text-emerald-500">
-                    {{ onboardingFunnelRates.bundle.toFixed(1) }}%
+                    {{ formatOneDecimal(onboardingFunnelRates.bundle) }}%
                   </p>
                   <p class="text-xs text-gray-500 dark:text-gray-400">
                     {{ t('channel-to-bundle') }}
@@ -927,7 +963,7 @@ displayStore.defaultBack = '/dashboard'
                 </div>
                 <div class="text-center">
                   <p class="text-2xl font-bold text-rose-500">
-                    {{ onboardingFunnelRates.subscribed.toFixed(1) }}%
+                    {{ formatOneDecimal(onboardingFunnelRates.subscribed) }}%
                   </p>
                   <p class="text-xs text-gray-500 dark:text-gray-400">
                     {{ t('bundle-to-subscribed') }}
@@ -953,27 +989,29 @@ displayStore.defaultBack = '/dashboard'
           </ChartCard>
 
           <!-- Organization Metrics Cards -->
-          <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <!-- Paying Organizations -->
+          <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
             <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
-              <div class="flex items-start justify-between mb-4">
-                <div class="p-3 rounded-lg bg-success/10">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-success"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                </div>
-              </div>
               <div>
-                <p class="text-sm text-slate-600 dark:text-slate-400">
-                  Paying Organizations
-                </p>
-                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-success">
-                  {{ latestGlobalStats.paying.toLocaleString() }}
-                </p>
-                <p v-else class="mt-2 text-3xl font-bold text-success">
-                  0
-                </p>
-                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Active paying organizations
-                </p>
+                <p class="text-sm text-slate-600 dark:text-slate-400">Total Paid Organizations</p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-emerald-500">{{ formatNumberValue(latestGlobalStats.paying_orgs_total || latestGlobalStats.paying || 0) }}</p>
+                <p v-else class="mt-2 text-3xl font-bold text-emerald-500">0</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Subscription and/or available credits</p>
+              </div>
+            </div>
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">Paid via Subscription</p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-primary">{{ formatNumberValue(latestGlobalStats.paying_orgs_subscription || latestGlobalStats.paying || 0) }}</p>
+                <p v-else class="mt-2 text-3xl font-bold text-primary">0</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Active subscription organizations</p>
+              </div>
+            </div>
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">Paid via Credits</p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-accent">{{ formatNumberValue(latestGlobalStats.paying_orgs_credits || 0) }}</p>
+                <p v-else class="mt-2 text-3xl font-bold text-accent">0</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Organizations with available credits</p>
               </div>
             </div>
 
@@ -989,7 +1027,7 @@ displayStore.defaultBack = '/dashboard'
                   Trial Organizations
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-warning">
-                  {{ latestGlobalStats.trial.toLocaleString() }}
+                  {{ formatNumberValue(latestGlobalStats.trial) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-warning">
                   0
@@ -1023,7 +1061,7 @@ displayStore.defaultBack = '/dashboard'
                     {{ t('admin-users-email-type-professional') }}
                   </p>
                   <p class="mt-2 text-3xl font-bold text-primary">
-                    {{ emailTypeTotals.professional.toLocaleString() }}
+                    {{ formatNumberValue(emailTypeTotals.professional) }}
                   </p>
                   <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     {{ t('admin-users-email-type-professional-description') }}
@@ -1042,7 +1080,7 @@ displayStore.defaultBack = '/dashboard'
                     {{ t('admin-users-email-type-personal') }}
                   </p>
                   <p class="mt-2 text-3xl font-bold text-success">
-                    {{ emailTypeTotals.personal.toLocaleString() }}
+                    {{ formatNumberValue(emailTypeTotals.personal) }}
                   </p>
                   <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     {{ t('admin-users-email-type-personal-description') }}
@@ -1061,7 +1099,7 @@ displayStore.defaultBack = '/dashboard'
                     {{ t('admin-users-email-type-disposable') }}
                   </p>
                   <p class="mt-2 text-3xl font-bold text-error">
-                    {{ emailTypeTotals.disposable.toLocaleString() }}
+                    {{ formatNumberValue(emailTypeTotals.disposable) }}
                   </p>
                   <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     {{ t('admin-users-email-type-disposable-description') }}
@@ -1116,74 +1154,19 @@ displayStore.defaultBack = '/dashboard'
               />
             </div>
 
-            <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
-              <ChartCard
-                :title="t('admin-users-country-chart')"
-                :is-loading="isLoadingCustomerCountryBreakdown"
-                :has-data="topCustomerCountryEntries.length > 0"
-              >
-                <AdminBarChart
-                  :labels="customerCountryChartLabels"
-                  :values="customerCountryChartValues"
-                  :label="t('organizations')"
-                  value-mode="count"
-                  :is-loading="isLoadingCustomerCountryBreakdown"
-                />
-              </ChartCard>
-
-              <div class="p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
-                <div class="flex flex-col gap-1">
-                  <h3 class="text-lg font-semibold">
-                    {{ t('admin-users-country-top-list') }}
-                  </h3>
-                  <p class="text-sm text-slate-600 dark:text-slate-400">
-                    {{ t('admin-users-country-top-list-description') }}
-                  </p>
-                </div>
-
-                <div v-if="isLoadingCustomerCountryBreakdown" class="flex items-center justify-center h-72">
-                  <span class="loading loading-spinner loading-lg" />
-                </div>
-
-                <div v-else-if="topCustomerCountryEntries.length > 0" class="mt-6 space-y-3">
-                  <div
-                    v-for="(country, index) in topCustomerCountryEntries"
-                    :key="country.country_code"
-                    class="flex items-center justify-between gap-4 p-4 border rounded-lg border-slate-200 dark:border-slate-700"
-                  >
-                    <div class="flex items-center gap-3 min-w-0">
-                      <div class="flex items-center justify-center w-9 h-9 text-sm font-semibold rounded-full bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-200 shrink-0">
-                        {{ index + 1 }}
-                      </div>
-                      <div class="text-2xl leading-none shrink-0">
-                        {{ getCountryFlag(country.country_code) }}
-                      </div>
-                      <div class="min-w-0">
-                        <p class="font-medium truncate">
-                          {{ getCountryLabel(country.country_code) }}
-                        </p>
-                        <p class="text-xs uppercase text-slate-500 dark:text-slate-400">
-                          {{ country.country_code }}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div class="text-right shrink-0">
-                      <p class="font-semibold">
-                        {{ country.organizations.toLocaleString() }}
-                      </p>
-                      <p class="text-xs text-slate-500 dark:text-slate-400">
-                        {{ country.percentage.toFixed(1) }}%
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div v-else class="flex items-center justify-center h-72 text-slate-400">
-                  {{ t('no-data-available') }}
-                </div>
-              </div>
-            </div>
+            <ChartCard
+              :title="t('admin-users-country-chart')"
+              :is-loading="isLoadingCustomerCountryBreakdown"
+              :has-data="topCustomerCountryEntries.length > 0"
+            >
+              <AdminBarChart
+                :key="customerCountryChartLabels.join('|')"
+                :labels="customerCountryChartLabels"
+                :values="customerCountryChartValues"
+                :label="t('organizations')"
+                value-mode="count"
+              />
+            </ChartCard>
           </div>
 
           <ChartCard
@@ -1257,7 +1240,7 @@ displayStore.defaultBack = '/dashboard'
               <div v-else-if="planDistributionData.length > 0" class="grid grid-cols-2 gap-4 md:grid-cols-4">
                 <div v-for="plan in planDistributionData" :key="plan.label" class="flex flex-col items-center p-4 bg-gray-100 rounded-lg dark:bg-gray-700">
                   <span class="text-sm font-medium text-gray-600 dark:text-gray-400">{{ plan.label }}</span>
-                  <span class="mt-2 text-2xl font-bold">{{ plan.value.toLocaleString() }}</span>
+                  <span class="mt-2 text-2xl font-bold">{{ formatNumberValue(plan.value) }}</span>
                   <span class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ plan.percentage }}%</span>
                 </div>
               </div>
@@ -1291,6 +1274,18 @@ displayStore.defaultBack = '/dashboard'
             >
               <AdminMultiLineChart
                 :series="usersTrendSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+
+            <!-- Trial Extension Conversions -->
+            <ChartCard
+              :title="t('trial-extension-conversion-trend')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="trialExtensionTrendSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="trialExtensionTrendSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
               />
             </ChartCard>

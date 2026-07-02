@@ -159,7 +159,7 @@ async function recoverUploadOffsetFromDurableObject(
 function retryableUploadUnavailableResponse(): Response {
   return new Response(JSON.stringify({
     error: 'upload_retryable',
-    message: 'Upload worker moved during this request. Retry the upload request.',
+    message: 'Upload temporarily unavailable. Retry the upload request.',
   }), {
     status: 503,
     headers: {
@@ -233,10 +233,12 @@ async function fetchUploadHandlerWithRetry(
       })
 
       if (!shouldRetry) {
-        if (!canRetryRequest && isRetryableDurableObjectError) {
+        if (isRetryableDurableObjectError) {
           cloudlog({
             requestId: c.get('requestId'),
-            message: 'upload handler - durable object fetch failed for streaming request, returning retryable response',
+            message: canRetryRequest
+              ? 'upload handler - exhausted retryable durable object fetch attempts, returning retryable response'
+              : 'upload handler - durable object fetch failed for streaming request, returning retryable response',
             attempt,
             fileId: c.get('fileId'),
           })
@@ -300,17 +302,33 @@ function getTransferredBytesFromResponse(response: Response): number | null {
   return null
 }
 
+function isPositiveFiniteNumber(value: number | null | undefined): value is number {
+  return value != null && Number.isFinite(value) && value > 0
+}
+
+function getAppIdFromAttachmentPath(r2Path: string | null | undefined): string | undefined {
+  if (!r2Path)
+    return undefined
+
+  const pathParts = r2Path.split('/')
+  const appsIndex = pathParts.indexOf('apps')
+  if (appsIndex === -1)
+    return undefined
+
+  return pathParts[appsIndex + 1]
+}
+
 async function saveBandwidthUsage(c: Context, fileSize: number | null | undefined) {
   cloudlog({ requestId: c.get('requestId'), message: 'saveBandwidthUsage', fileSize })
-  if (!fileSize || fileSize <= 0)
+  if (!isPositiveFiniteNumber(fileSize))
     return Promise.resolve()
 
   cloudlog({ requestId: c.get('requestId'), message: 'getHandler files track bandwidth', fileSize })
-  const r2Path = new URL(c.req.url).pathname.split(`/files/read/${ATTACHMENT_PREFIX}/`)[1]
-  const app_id = r2Path?.split('/')[3]
+  const r2Path = c.get('fileId') || getRawAttachmentRouteId(c)
+  const app_id = getAppIdFromAttachmentPath(r2Path)
   const device_id = c.req.query('device_id')
   if (app_id && device_id) {
-    await createStatsBandwidth(c, device_id, app_id, fileSize ?? 0)
+    await createStatsBandwidth(c, device_id, app_id, fileSize)
   }
   else {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cannot track bandwidth no app_id or device_id', r2Path, app_id, device_id })
@@ -405,6 +423,9 @@ async function getHandler(c: Context): Promise<Response> {
   if (response != null) {
     response = ensureNoTransformResponse(response)
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache hit' })
+    if (c.req.raw.method !== 'HEAD') {
+      await saveBandwidthUsage(c, getTransferredBytesFromResponse(response))
+    }
     // Best-effort restore: if file is cached but missing in R2, write it back.
     await backgroundTask(c, async () => {
       try {
@@ -475,6 +496,7 @@ async function getHandler(c: Context): Promise<Response> {
   const bytesTransferred = calculateBytesTransferred(object.size, object.range)
   await saveBandwidthUsage(c, bytesTransferred)
   const headers = objectHeaders(object)
+  headers.set('content-length', bytesTransferred.toString())
   if (object.range != null && c.req.header('range')) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files range request', range: rangeHeader(object.size, object.range) })
     headers.set('content-range', rangeHeader(object.size, object.range))
@@ -519,13 +541,13 @@ function rangeHeader(objLen: number, r2Range: R2Range): string {
   if ('length' in r2Range && r2Range.length != null) {
     endIndexInclusive = startIndexInclusive + r2Range.length - 1
   }
-  if ('suffix' in r2Range) {
+  if ('suffix' in r2Range && r2Range.suffix != null) {
     startIndexInclusive = objLen - r2Range.suffix
   }
   return `bytes ${startIndexInclusive}-${endIndexInclusive}/${objLen}`
 }
 
-function calculateBytesTransferred(objLen: number, r2Range: R2Range | undefined): number {
+export function calculateBytesTransferred(objLen: number, r2Range: R2Range | undefined): number {
   if (!r2Range)
     return objLen
   let startIndexInclusive = 0
@@ -536,10 +558,11 @@ function calculateBytesTransferred(objLen: number, r2Range: R2Range | undefined)
   if ('length' in r2Range && r2Range.length != null) {
     endIndexInclusive = startIndexInclusive + r2Range.length - 1
   }
-  if ('suffix' in r2Range) {
+  if ('suffix' in r2Range && r2Range.suffix != null) {
     startIndexInclusive = objLen - r2Range.suffix
   }
-  return endIndexInclusive - startIndexInclusive + 1
+  const bytesTransferred = endIndexInclusive - startIndexInclusive + 1
+  return isPositiveFiniteNumber(bytesTransferred) ? bytesTransferred : objLen
 }
 
 function optionsHandler(c: Context) {

@@ -7,12 +7,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   applyInitAutoTestChange,
+  getDirtyGitStatusActionOptions,
   getGitRepoStatus,
   getInitOtaVersionBase,
   getInitSuggestedOtaVersion,
   getInitUpdaterPluginConfig,
   isOnlyAllowedInitAutoTestChange,
   revertInitAutoTestChangeContent,
+  runInheritedCommand,
 } from '../src/init/command.ts'
 import { usesAlwaysDirectUpdate } from '../src/updaterConfig.ts'
 
@@ -65,6 +67,15 @@ t('git status helper detects clean and dirty repos', () => {
     assert.equal(dirtyStatus.clean, false)
     assert.ok(dirtyStatus.entries.some(entry => entry.includes('dirty.txt')))
   })
+})
+
+t('dirty git status prompt keeps clean repo as the recommended path', () => {
+  const options = getDirtyGitStatusActionOptions()
+
+  assert.equal(options[0]?.value, 'check-again')
+  assert.match(options[0]?.hint ?? '', /recommended/)
+  assert.equal(options[1]?.value, 'continue-dirty')
+  assert.match(options[1]?.hint ?? '', /not recommended/)
 })
 
 t('git status helper reports git status failures inside a repo', () => {
@@ -154,6 +165,9 @@ t('resume allowlist only accepts the exact cli-managed test diff', () => {
     execSync('git init', { cwd: root, stdio: 'ignore' })
     execSync('git config user.email "test@example.com"', { cwd: root, stdio: 'ignore' })
     execSync('git config user.name "Test User"', { cwd: root, stdio: 'ignore' })
+    // Hermetic against host gitconfig: a global commit.gpgsign=true would make
+    // the temp-repo commit below fail (no pinentry in non-interactive runs).
+    execSync('git config commit.gpgsign false', { cwd: root, stdio: 'ignore' })
 
     mkdirSync(join(root, 'src'), { recursive: true })
     const filePath = join(root, 'src', 'main.css')
@@ -182,6 +196,53 @@ t('resume allowlist only accepts the exact cli-managed test diff', () => {
       kind: applied.kind,
     }), false)
   })
+})
+
+async function tAsync(name, fn) {
+  try {
+    await fn()
+    console.log(`✓ ${name}`)
+  }
+  catch (error) {
+    failures += 1
+    console.error(`❌ ${name}`)
+    console.error(error)
+  }
+}
+
+await tAsync('inherited child output flows through parent streams for replay capture', async () => {
+  const originalStdoutWrite = process.stdout.write
+  const originalStderrWrite = process.stderr.write
+  let capturedStdout = ''
+  let capturedStderr = ''
+
+  process.stdout.write = ((chunk, encoding, callback) => {
+    capturedStdout += Buffer.isBuffer(chunk) ? chunk.toString(typeof encoding === 'string' ? encoding : 'utf8') : String(chunk)
+    if (typeof encoding === 'function')
+      encoding()
+    if (typeof callback === 'function')
+      callback()
+    return true
+  })
+  process.stderr.write = ((chunk, encoding, callback) => {
+    capturedStderr += Buffer.isBuffer(chunk) ? chunk.toString(typeof encoding === 'string' ? encoding : 'utf8') : String(chunk)
+    if (typeof encoding === 'function')
+      encoding()
+    if (typeof callback === 'function')
+      callback()
+    return true
+  })
+
+  try {
+    const result = await runInheritedCommand(process.execPath, ['-e', "process.stdout.write('child stdout'); process.stderr.write('child stderr')"])
+    assert.equal(result.status, 0)
+    assert.match(capturedStdout, /child stdout/)
+    assert.match(capturedStderr, /child stderr/)
+  }
+  finally {
+    process.stdout.write = originalStdoutWrite
+    process.stderr.write = originalStderrWrite
+  }
 })
 
 if (failures > 0) {

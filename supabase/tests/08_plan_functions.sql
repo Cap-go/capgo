@@ -29,7 +29,7 @@ SELECT
 SELECT
     results_eq(
         'SELECT (get_current_plan_max_org(''22dbad8a-b885-4309-9b3b-a09f8460fb6d'')).build_time_unit',
-        $$VALUES (1800::bigint)$$,
+        $$VALUES (3600::bigint)$$,
         'get_current_plan_max_org test - correct build_time_unit'
     );
 

@@ -1,7 +1,10 @@
 // src/build/onboarding/android/types.ts
 
+import type { TailProgress } from '../tail-types.js'
+
 export type AndroidOnboardingStep
   = | 'welcome'
+    | 'resume-prompt'
     | 'credentials-exist'
     | 'backing-up'
     | 'no-platform'
@@ -41,6 +44,10 @@ export type AndroidOnboardingStep
     | 'gcp-project-create-name'
   // Phase 4.5 — Pick the Android package name to grant SA access to
     | 'android-package-select'
+  // Phase 4.6 — Verify the chosen package actually exists in the user's Play
+  // Console (apps:search). Generate path only; gates provisioning because the
+  // per-package SA invite 400s on a package that doesn't exist yet.
+    | 'android-app-verify'
   // Phase 5 — Automated provisioning (create project if needed, enable API, SA, key, invite)
     | 'gcp-setup-running'
   // Phase 6 — Save + build
@@ -75,6 +82,12 @@ export type AndroidOnboardingStep
     | 'ai-analysis-result-scroll'
     | 'build-complete'
     | 'error'
+    // Contact-support confirmation gate (shown before we save logs + open mail)
+    | 'support-confirm'
+    // Scrollable viewer of the exact bundle, reached from the confirm's "View logs first"
+    | 'support-log-view'
+    // Spinner while the bundle uploads to Capgo support
+    | 'support-uploading'
 
 export type AndroidOnboardingErrorCategory
   = | 'keystore_invalid'
@@ -137,7 +150,29 @@ export interface AndroidPackageChoice {
   source: 'gradle' | 'capacitor-config' | 'user-input'
 }
 
-export interface AndroidOnboardingProgress {
+// ── Post-save "tail" completion markers ──────────────────────────────────────
+// One marker per irreversible tail side-effect. They mirror the provisioning
+// markers above (small, JSON-serializable proof-of-completion objects) so the
+// resume router can skip past a step that already ran without re-firing it.
+
+export interface CredentialsSaved {
+  /** ISO timestamp credentials.json was written — purely informational. */
+  savedAt: string
+}
+
+export interface BuildRequested {
+  /** The build dashboard URL surfaced after the queue request succeeded. */
+  buildUrl: string
+}
+
+export interface CiSecretsUploaded {
+  /** Provider the secrets were pushed to (matches the chosen ciSecretTarget). */
+  provider: 'github' | 'gitlab'
+  /** How many env vars were pushed — informational. */
+  count: number
+}
+
+export interface AndroidOnboardingProgress extends TailProgress {
   platform: 'android'
   appId: string
   startedAt: string
@@ -179,20 +214,73 @@ export interface AndroidOnboardingProgress {
     playAccountChosen?: PlayDeveloperAccountChoice
     gcpProjectChosen?: GcpProjectChoice
     androidPackageChosen?: AndroidPackageChoice
+    /** Set once the chosen package was verified to exist in the user's Play
+     *  Console (apps:search exact-match), or the user explicitly proceeded past
+     *  a degraded/un-verifiable check. Gates `gcp-setup-running` so the
+     *  per-package SA invite never 400s on a non-existent package. */
+    playAppVerified?: { packageName: string, verified: boolean }
     serviceAccountProvisioned?: ServiceAccountProvisioned
     playInviteProvisioned?: PlayInviteProvisioned
+    // ── Post-save "tail" milestones (additive — present only once the
+    // matching side-effecting tail step has finished). They let
+    // `getAndroidResumeStep` route a saved progress THROUGH the tail
+    // (CI-secrets → env-export → workflow-file → build-request) without
+    // re-running a side-effecting step. Each is a marker in the same
+    // self-healing style as the provisioning markers above: presence means
+    // "this irreversible step already happened — do NOT do it again".
+    //
+    // The headless engine deletes the on-disk progress file at
+    // `saving-credentials` today, so these markers are written by whichever
+    // driver chooses to persist the tail for resume (the Ink TUI migration in
+    // a later phase). When absent, resume falls through to `saving-credentials`
+    // exactly as before — so legacy/in-flight progress files are unaffected.
+
+    /** Set once `saving-credentials` wrote credentials.json. Gates tail entry. */
+    credentialsSaved?: CredentialsSaved
+    /** Set once `requesting-build` queued a build. Guards a double build-request. */
+    buildRequested?: BuildRequested
+    /** Set once `uploading-ci-secrets` pushed the secrets. Guards a re-upload. */
+    ciSecretsUploaded?: CiSecretsUploaded
   }
 
   // Ephemeral — wiped when onboarding finishes. Held on disk only so resume
   // across a crash doesn't force a full re-auth. NEVER written to credentials.
   _oauthRefreshToken?: string
+  // MCP broker OAuth (access-token model). The MCP process can't refresh a token issued to the broker's
+  // confidential Web client, so it stores the short-lived access token + its expiry and re-signs-in on expiry.
+  _oauthAccessToken?: string
+  _oauthAccessTokenExpiresAt?: number
+  // In-flight broker sign-in handle — persisted so polling survives the MCP process restarting between calls.
+  _brokerOAuth?: { pubId: string, pollSecret: string, signInUrl: string, expiresAt: number }
   _keystoreBase64?: string
   /** Base64 of the downloaded SA JSON key — saved as PLAY_CONFIG_JSON at end. */
   _serviceAccountKeyBase64?: string
+  // ── MCP markers (added by the shared engine; harmless to the ink TUI) ──
+  /** Platform whose onboarding is currently in-flight. */
+  activePlatform?: 'android'
+  /** True when the new-keystore password was auto-generated (random). Never logged. */
+  keystorePasswordGenerated?: boolean
+  /** True once the user chose the MANUAL password method (lets the stateless MCP advance). */
+  keystorePasswordManual?: boolean
+  /**
+   * Data-safety gate state for the shared engine (mirrors main's ink TUI
+   * `credentials-exist` → `backing-up` flow). The Ink driver does not read this
+   * field — it gates the same situation via React state — so it is harmless to
+   * the TUI. Lifecycle:
+   *   - undefined → gate not yet evaluated (or no saved credentials exist)
+   *   - 'pending' → saved android credentials exist; awaiting the user's
+   *                 backup-or-cancel choice (the `credentials-exist` step)
+   *   - 'backup'  → user chose backup; the `backing-up` effect must still run
+   *   - 'done'    → backup performed (or source absent); proceed to keystore
+   *   - 'cancel'  → user chose to stop; onboarding halts to protect the
+   *                 existing credentials (mirrors main's exitOnboarding())
+   */
+  _credentialsExistGate?: 'pending' | 'backup' | 'done' | 'cancel'
 }
 
 export const ANDROID_STEP_PROGRESS: Record<AndroidOnboardingStep, number> = {
   'welcome': 0,
+  'resume-prompt': 2,
   'credentials-exist': 0,
   'backing-up': 0,
   'no-platform': 0,
@@ -232,6 +320,7 @@ export const ANDROID_STEP_PROGRESS: Record<AndroidOnboardingStep, number> = {
   'gcp-project-create-name': 60,
 
   'android-package-select': 65,
+  'android-app-verify': 67,
 
   'gcp-setup-running': 70,
 
@@ -265,6 +354,9 @@ export const ANDROID_STEP_PROGRESS: Record<AndroidOnboardingStep, number> = {
   'ai-analysis-result': 99,
   'build-complete': 100,
   'error': 0,
+  'support-confirm': 0,
+  'support-log-view': 0,
+  'support-uploading': 0,
 }
 
 export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
@@ -274,6 +366,8 @@ export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
     case 'backing-up':
     case 'no-platform':
       return ''
+    case 'resume-prompt':
+      return 'Resume or restart?'
     case 'keystore-method-select':
     case 'keystore-explainer':
     case 'keystore-existing-path':
@@ -306,6 +400,7 @@ export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
     case 'gcp-projects-select':
     case 'gcp-project-create-name':
     case 'android-package-select':
+    case 'android-app-verify':
     case 'gcp-setup-running':
       return 'Step 3 of 4 · Google Cloud Project'
     case 'saving-credentials':
@@ -340,6 +435,9 @@ export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
     case 'build-complete':
       return 'Complete'
     case 'error':
+    case 'support-confirm':
+    case 'support-log-view':
+    case 'support-uploading':
       return ''
   }
 }

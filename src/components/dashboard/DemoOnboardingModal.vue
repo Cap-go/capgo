@@ -118,6 +118,12 @@ const onboardingSteps: StepMeta[] = [
   { id: 3, label: 'Test', caption: 'Verify on phone' },
 ]
 
+function randomUnit() {
+  const values = new Uint32Array(1)
+  globalThis.crypto.getRandomValues(values)
+  return values[0] / 0x100000000
+}
+
 const stepContentMap: Record<DemoStep, StepContent> = {
   1: {
     title: '1. Create an app',
@@ -336,7 +342,8 @@ function formatDemoAppId(name: string) {
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
+    .replace(/^-/g, '')
+    .replace(/-$/g, '')
 
   return `com.demo.${slug}`
 }
@@ -377,10 +384,10 @@ async function triggerConfetti(trackClickOrEvent: boolean | Event = true) {
   }
   confettiPieces.value = Array.from({ length: 48 }, (_, id) => ({
     id,
-    left: Math.random() * 100,
-    duration: 0.9 + Math.random() * 1.1,
-    delay: Math.random() * 0.22,
-    color: `hsl(${Math.floor(Math.random() * 360)}, 95%, 55%)`,
+    left: randomUnit() * 100,
+    duration: 0.9 + randomUnit() * 1.1,
+    delay: randomUnit() * 0.22,
+    color: `hsl(${Math.floor(randomUnit() * 360)}, 95%, 55%)`,
   }))
   showConfetti.value = false
   await nextTick()

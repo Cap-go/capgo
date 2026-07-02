@@ -2,8 +2,8 @@ import { acceptHMRUpdate, defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 
-export type MetricCategory = 'uploads' | 'distribution' | 'failures' | 'success_rate' | 'platform_overview' | 'org_metrics' | 'mau_trend' | 'success_rate_trend' | 'apps_trend' | 'bundles_trend' | 'deployments_trend' | 'storage_trend' | 'bandwidth_trend' | 'global_stats_trend' | 'plugin_breakdown' | 'trial_organizations' | 'trial_plan_breakdown' | 'onboarding_funnel' | 'cancelled_users' | 'email_type_breakdown' | 'customer_country_breakdown' | 'organization_insights'
-export type DateRangeMode = '30day' | '90day' | 'quarter' | '6month' | '12month' | 'custom'
+export type MetricCategory = 'uploads' | 'distribution' | 'failures' | 'success_rate' | 'platform_overview' | 'org_metrics' | 'mau_trend' | 'success_rate_trend' | 'apps_trend' | 'bundles_trend' | 'deployments_trend' | 'storage_trend' | 'bandwidth_trend' | 'global_stats_trend' | 'plugin_breakdown' | 'trial_organizations' | 'trial_plan_breakdown' | 'onboarding_funnel' | 'cancelled_users' | 'email_type_breakdown' | 'customer_country_breakdown' | 'organization_insights' | 'builder_analytics'
+export type DateRangeMode = '3day' | '7day' | '14day' | '30day' | '90day' | 'quarter' | '6month' | '12month' | 'custom'
 
 interface DateRange {
   start: Date
@@ -39,17 +39,32 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
   const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
   const cache = ref<Map<string, CachedData>>(new Map())
 
-  // Loading state
-  const isLoading = ref(false)
+  // Loading state — a counter (not a boolean) so concurrent fetchStats() calls (e.g. the
+  // builder page loads two categories at once) don't clobber each other's flag.
+  const loadingCount = ref(0)
+  const isLoading = computed(() => loadingCount.value > 0)
   const loadingCategory = ref<MetricCategory | null>(null)
 
   // Refresh trigger - increment this to force all watchers to refetch
   const refreshTrigger = ref(0)
 
-  // Computed date range based on mode
-  const activeDateRange = computed<DateRange>(() => {
-    const now = new Date()
+  function getRollingDateRange(now = new Date()): DateRange {
     switch (dateRangeMode.value) {
+      case '3day':
+        return {
+          start: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
+          end: now,
+        }
+      case '7day':
+        return {
+          start: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+          end: now,
+        }
+      case '14day':
+        return {
+          start: new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000),
+          end: now,
+        }
       case '30day':
         return {
           start: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000),
@@ -83,6 +98,11 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
           end: now,
         }
     }
+  }
+
+  const activeDateRange = computed<DateRange>(() => {
+    void refreshTrigger.value
+    return getRollingDateRange()
   })
 
   // Actions
@@ -112,11 +132,14 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
     dateRangeMode.value = '30day'
   }
 
-  function getCacheKey(category: MetricCategory): string {
-    const { start, end } = activeDateRange.value
+  function getCacheKey(category: MetricCategory, range = getRollingDateRange()): string {
+    const { start, end } = range
     const orgPart = selectedOrgId.value || 'global'
     const appPart = selectedAppId.value || 'all'
-    return `${category}-${orgPart}-${appPart}-${start.toISOString()}-${end.toISOString()}`
+    const isCustom = dateRangeMode.value === 'custom'
+    const startBucket = isCustom ? start.toISOString() : start.toISOString().slice(0, 16)
+    const endBucket = isCustom ? end.toISOString() : end.toISOString().slice(0, 16)
+    return `${category}-${orgPart}-${appPart}-${startBucket}-${endBucket}`
   }
 
   function isCacheValid(cacheKey: string): boolean {
@@ -127,19 +150,21 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
   }
 
   async function fetchStats(category: MetricCategory, forceRefresh = false): Promise<any> {
-    const cacheKey = getCacheKey(category)
+    const requestDateRange = getRollingDateRange()
+    const cacheKey = getCacheKey(category, requestDateRange)
+    const skipCache = category === 'customer_country_breakdown'
 
     // Check cache
-    if (!forceRefresh && isCacheValid(cacheKey)) {
+    if (!forceRefresh && !skipCache && isCacheValid(cacheKey)) {
       const cached = cache.value.get(cacheKey)
       return cached?.data
     }
 
-    isLoading.value = true
+    loadingCount.value++
     loadingCategory.value = category
 
     try {
-      const { start, end } = activeDateRange.value
+      const { start, end } = requestDateRange
       const supabase = useSupabase()
 
       const body: any = {
@@ -190,13 +215,10 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
 
       return data.data
     }
-    catch (error) {
-      console.error(`Error fetching ${category}:`, error)
-      throw error
-    }
     finally {
-      isLoading.value = false
-      loadingCategory.value = null
+      loadingCount.value = Math.max(0, loadingCount.value - 1)
+      if (loadingCount.value === 0)
+        loadingCategory.value = null
     }
   }
 
@@ -209,7 +231,7 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
   function $reset() {
     clearFilters()
     invalidateCache()
-    isLoading.value = false
+    loadingCount.value = 0
     loadingCategory.value = null
   }
 

@@ -85,6 +85,53 @@ testing against Cloudflare Workers.
   - `triggers/` - Database triggers and CRON functions
   - `utils/` - Shared utilities and database schemas
 
+### Production Scale Guardrails
+
+Capgo production data is large enough that "small queue" designs are
+incorrect by default. Before changing queue, storage, manifest, cron, or
+backfill code, design for this scale:
+
+- `manifest` has millions of rows, and operational scripts can need to scan or
+  repair millions of records.
+- Plugin endpoints serve roughly 2M to 50M device requests per day. Anything
+  used by `/updates`, `/stats`, `/channel_self`, or other plugin traffic must be
+  designed as a hot path first.
+- Plugin endpoints must never use the primary Supabase/Postgres database in the
+  request path. Design plugin-facing systems around replicated data, edge
+  caches, durable queues, or precomputed state that can survive this traffic
+  level without primary database fan-out.
+- The web console has a much smaller frontend audience, usually around 500 to
+  1k end users, so raw UI request scale is less often the bottleneck. Do not
+  apply console-scale assumptions to plugins, bundle processing, storage, or
+  automation systems.
+- A normal app bundle can contain thousands of files; 5k files in one bundle is
+  expected, not an edge case.
+- Bundles and automation paths must be solid at backend scale. Audit logs and
+  manifest-related datasets can each be multiple GB, so scripts, jobs, and
+  queries must be bounded and resumable.
+- R2 storage is at TB scale. Do not download objects locally for copy, repair,
+  size, or migration jobs when the provider supports server-side operations.
+- Manifest size work must handle large batches. A design that only processes
+  `100` files every `10` seconds is not acceptable for manifest-size backfills,
+  per-bundle processing, or upload finalization.
+- Queue consumers must be sized from measured throughput: batch size,
+  concurrency, visibility timeout, retry count, provider/API limits, and caller
+  timeout must all fit the same worst-case calculation.
+- Do not assume a `202` HTTP response means queue work finished. If the handler
+  uses background work, prove the work can finish inside the runtime limits and
+  that successful queue messages are deleted before visibility timeout expires.
+- For high-volume internal queue dispatch, avoid routing through unstable or
+  low-timeout paths. Use the production Cloudflare path when that is the runtime
+  intended to handle the traffic, and make database `pg_net` timeouts match the
+  real batch duration.
+- For data repair scripts, use indexed pagination over the owning table's key
+  path, keep DB writes batched, make work resumable, and write failed records to
+  a report file for later inspection.
+- GUESS IS NOT AN OPTION for production scale failures. Find the exact
+  production evidence in database state, queue/archive tables, provider logs, or
+  HTTP/runtime logs. If the current logs cannot identify the cause, first add
+  logging that will identify it in the next occurrence.
+
 ### AI Workflow Notes
 
 - **Hono v4 HEAD routing:** do not add HEAD routes with `app.on`. Hono v4 removed `app.head()` because `GET` handlers implicitly serve `HEAD`; keep shared GET/HEAD logic in the `app.get(...)` handler and branch on `c.req.raw.method` only when the behavior must differ.
@@ -692,6 +739,37 @@ Key points:
   `src/styles/style.css` (e.g., `--color-primary-500: #515271`) when introducing
   new UI.
 
+### Form accessibility (WCAG 2.0 A)
+
+SonarQube flags any `<input>`, `<select>`, or `<textarea>` without an associated
+label. Treat this as a default requirement for every new or touched form control —
+do not wait for the scanner to catch it later.
+
+Every form control must have **one** of these associations before shipping:
+
+1. **Visible label + `for`/`id`** — when label text is shown next to the field:
+   ```vue
+   <label for="field-id" class="label">...</label>
+   <input id="field-id" ...>
+   ```
+2. **Wrapping `<label>`** — for radios, checkboxes, and toggle rows where the
+   label already wraps the control.
+3. **`sr-only` label + matching `id`** — for search/icon-only fields that only
+   show a placeholder:
+   ```vue
+   <label for="search-id" class="sr-only">{{ t('search') }}</label>
+   <input id="search-id" :aria-label="t('search')" ...>
+   ```
+4. **`aria-label`** — acceptable alongside (1) or (3); required when the only
+   cue is placeholder text.
+
+Reusable components must generate stable ids (`useId()` or an `inputId` prop) and
+expose accessible names by default. Follow `SearchInput.vue` and `RoleSelect.vue`.
+
+Also applies to dialog/Teleport content, admin filters, and hidden utility inputs
+(e.g. file pickers): they still need `aria-label` or an associated label.
+
+
 ## Auth Redirect Guardrails
 
 - We intentionally route auth email links through `/confirm-signup` to avoid
@@ -705,6 +783,46 @@ Key points:
 - Cover customer-facing flows with the Playwright MCP suite. Add scenarios under
   `playwright/e2e` and run them locally with `bun run test:front` before
   shipping UI changes.
+
+### Visual diff for UI changes
+
+When a PR changes customer-facing UI (layout, spacing, colors, components, or
+copy placement), reviewers need a before/after screenshot diff.
+
+**Request the automated PR report** by either:
+
+- adding the `visual-change` label to the PR, or
+- including `<!-- visual-diff:required -->` anywhere in the PR description.
+
+On each push, the `Visual diff` GitHub Action captures screenshots from the PR
+base commit and head commit, generates a diff report, uploads it as a workflow
+artifact, and updates a sticky PR comment (`<!-- capgo-visual-diff -->`).
+
+**Local workflow before opening or updating the PR:**
+
+1. Capture the current UI baseline: `bun run visual:capture:before`
+2. Apply your UI edits and rebuild or refresh the local app as needed.
+3. Capture the updated UI: `bun run visual:capture:after`
+4. Generate the report: `bun run visual:diff`
+5. Paste `.context/visual-diff/report/summary.md` into the PR description under
+   `## Visual changes`.
+6. Add the `visual-change` label (or the HTML marker above) so CI refreshes the
+   report on every push.
+
+**Full local pipeline against `main`:**
+
+```bash
+bun run visual:run -- --base origin/main
+```
+
+**Route configuration:** edit `playwright/visual-diff.config.ts` when a PR
+introduces a new screen that should be part of the visual diff set.
+
+**Outputs:**
+
+- `.context/visual-diff/before/` and `after/` — raw PNG captures
+- `.context/visual-diff/report/index.html` — side-by-side before/after/diff view
+- `.context/visual-diff/report/summary.md` — markdown table for the PR body
 
 ## Mobile Development
 
@@ -869,3 +987,24 @@ The deployment happens automatically after GitHub CI/CD on main branch.
 You are not allowed to deploy on your own, unless if asked. Same for git you
 never git push on main branch, add or commit unless asked.
 You can do it in others branches
+
+## Graphify
+
+The project-scoped Graphify skill lives at `.agents/skills/graphify/SKILL.md`.
+Use it for questions about architecture, file relationships, dead code, used
+code, and where code is used.
+
+Rules:
+- When the user types `/graphify`, follow the project skill before doing
+  anything else.
+- `graphify-out/graph.json` is committed and refreshed during release version
+  bumps. Prefer `graphify query "<question>"`, `graphify affected "<node>"`,
+  `graphify path "<A>" "<B>"`, or `graphify explain "<concept>"` before broad
+  source searches.
+- Use `bun run graphify:generate` to refresh the committed code graph. The
+  generator is deterministic AST/code extraction and does not require LLM API
+  keys.
+- For deterministic unused export checks, keep using `bun run lint:deadcode`
+  alongside Graphify's graph queries.
+- After code changes that should update the repository graph, run
+  `bun run graphify:generate` and commit the resulting `graphify-out/` changes.

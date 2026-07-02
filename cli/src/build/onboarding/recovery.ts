@@ -34,7 +34,15 @@ export function getBuildOnboardingRecoveryAdvice(
     commands.add(syncIosCommand)
   }
 
-  if (lower.includes('api key verification failed') || lower.includes('401') || lower.includes('403')) {
+  if (lower.includes('required agreement') || lower.includes('agreements, tax, and banking')
+    || lower.includes('program license agreement') || lower.includes('pla_not_accepted') || lower.includes('pla update available')) {
+    summary.push(
+      'Apple is blocking App Store Connect API access because a required agreement is unsigned or has expired.',
+      'Your API key is fine — the Account Holder must accept the agreement in App Store Connect, then retry the saved step.',
+    )
+    docs.add('https://appstoreconnect.apple.com/agreements')
+  }
+  else if (lower.includes('api key verification failed') || lower.includes('401') || lower.includes('403')) {
     summary.push(
       'Apple rejected the App Store Connect credentials.',
       'Double-check the .p8 file, Key ID, Issuer ID, and that the key still has Admin or Developer access.',

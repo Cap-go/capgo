@@ -7,6 +7,7 @@ import { getAdminAppsTrend, getAdminBandwidthTrend, getAdminBundlesTrend, getAdm
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { getAdminCancelledOrganizations, getAdminCustomerCountryBreakdown, getAdminDeploymentsTrend, getAdminEmailTypeBreakdown, getAdminGlobalStatsTrend, getAdminOnboardingFunnel, getAdminOrganizationInsights, getAdminPluginBreakdown, getAdminTrialOrganizations, getAdminTrialPlanBreakdown } from '../utils/pg.ts'
+import { getAdminBuilderAnalytics } from '../utils/builder_analytics.ts'
 import { getCancellationDetails } from '../utils/stripe.ts'
 import { supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
@@ -38,6 +39,7 @@ const metricCategories = [
   'email_type_breakdown',
   'customer_country_breakdown',
   'organization_insights',
+  'builder_analytics',
 ] as const
 
 const isoUtcDatetimeSchema = type('string').narrow((value, ctx) => {
@@ -120,10 +122,25 @@ const cancellationReasonLabels: Record<string, string> = {
   payment_failed: 'Payment failed',
 }
 
+const churnReasonLabels: Record<string, string> = {
+  past_due_unresolved: 'Failed to resolve past due',
+}
+
+function formatStoredChurnReason(churnReason: string | null): string | null {
+  if (!churnReason)
+    return null
+
+  return churnReasonLabels[churnReason] ?? churnReason
+}
+
 /**
- * Formats Stripe cancellation details into a short, human-readable label.
+ * Formats stored churn reasons or Stripe cancellation details into a short label.
  */
-function formatCancellationReason(details: CancellationDetails | null): string | null {
+function formatCancellationReason(details: CancellationDetails | null, churnReason: string | null): string | null {
+  const storedReason = formatStoredChurnReason(churnReason)
+  if (storedReason)
+    return storedReason
+
   if (!details)
     return null
 
@@ -275,7 +292,7 @@ app.post('/', middlewareAuth, async (c) => {
               plan_name: org.plan_name,
               billing_type: org.billing_type,
               subscription_or_signup_date: org.subscription_or_signup_date,
-              cancellation_reason: formatCancellationReason(details),
+              cancellation_reason: formatCancellationReason(details, org.churn_reason),
             }
           }),
         )
@@ -309,6 +326,10 @@ app.post('/', middlewareAuth, async (c) => {
         })
         break
 
+      case 'builder_analytics':
+        result = await getAdminBuilderAnalytics(c, start_date, end_date)
+        break
+
       default:
         throw simpleError('invalid_metric_category', 'Invalid metric category', { metric_category })
     }
@@ -324,7 +345,8 @@ app.post('/', middlewareAuth, async (c) => {
     })
   }
   catch (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'admin_stats_error', error })
-    throw simpleError('admin_stats_error', 'Error fetching admin statistics', { error })
+    const message = error instanceof Error ? error.message : String(error)
+    cloudlog({ requestId: c.get('requestId'), message: 'admin_stats_error', error: message })
+    throw simpleError('admin_stats_error', 'Error fetching admin statistics', { error: message })
   }
 })

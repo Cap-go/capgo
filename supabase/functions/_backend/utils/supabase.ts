@@ -140,16 +140,22 @@ export function supabaseApikey(c: Context, apikey: string | null | undefined) {
   })
 }
 
-export async function getAppsFromSB(c: Context): Promise<string[]> {
+export async function getAppsFromSB(c: Context, referenceDate?: Date): Promise<string[]> {
   const limit = 1000
+  const createdBeforeIso = referenceDate?.toISOString()
   let page = 0
   let apps: string[] = []
 
   while (true) {
-    const { data, error } = await supabaseAdmin(c)
+    let query = supabaseAdmin(c)
       .from('apps')
       .select('app_id')
       .range(page * limit, (page + 1) * limit - 1)
+
+    if (createdBeforeIso)
+      query = query.lt('created_at', createdBeforeIso)
+
+    const { data, error } = await query
 
     if (error) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting apps from Supabase', error })
@@ -163,7 +169,42 @@ export async function getAppsFromSB(c: Context): Promise<string[]> {
     page++
   }
 
-  return apps
+  if (createdBeforeIso) {
+    const pgClient = getPgClient(c, false)
+
+    try {
+      page = 0
+      while (true) {
+        const { rows } = await pgClient.query<{ app_id: string }>(
+          `SELECT app_id
+          FROM public.deleted_apps
+          WHERE (
+            created_at < $1::timestamptz
+            -- Legacy rows used created_at=deleted_at before on_app_delete copied the original app timestamp.
+            OR created_at = deleted_at
+          )
+            AND deleted_at >= $1::timestamptz
+          ORDER BY app_id
+          LIMIT $2 OFFSET $3`,
+          [createdBeforeIso, limit, page * limit],
+        )
+
+        if (rows.length === 0)
+          break
+
+        apps = [...apps, ...rows.map(row => row.app_id)]
+        page++
+      }
+    }
+    catch (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting deleted apps from Supabase', error })
+    }
+    finally {
+      await closeClient(c, pgClient)
+    }
+  }
+
+  return Array.from(new Set(apps))
 }
 
 export async function updateOrCreateChannel(c: Context, update: Database['public']['Tables']['channels']['Insert']) {
@@ -1241,7 +1282,7 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
 
   const { data: existingRow, error } = await client
     .from('devices')
-    .select('version_name, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator, default_channel, key_id')
+    .select('version_name, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator, install_source, default_channel, key_id')
     .eq('app_id', device.app_id)
     .eq('device_id', device.device_id)
     .maybeSingle()
@@ -1254,8 +1295,13 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
   // This avoids accidental clearing, and lets higher-level callers strip custom_id
   // (e.g., when an app disables device self-setting) without overwriting owner-set values.
   const requestedCustomId = nullableString(device.custom_id)
-  const deviceForWrite: DeviceWithoutCreatedAt = requestedCustomId === null && existingRow
-    ? { ...device, custom_id: existingRow.custom_id ?? '' }
+  const requestedInstallSource = nullableString(device.install_source)
+  const deviceForWrite: DeviceWithoutCreatedAt = existingRow
+    ? {
+        ...device,
+        ...(requestedCustomId === null ? { custom_id: existingRow.custom_id ?? '' } : {}),
+        ...(requestedInstallSource === null ? { install_source: existingRow.install_source ?? undefined } : {}),
+      }
     : device
 
   if (existingRow && !hasComparableDeviceChanged(existingRow, deviceForWrite)) {
@@ -1279,6 +1325,7 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
     version_name: normalizedDevice.version_name ?? deviceForWrite.version_name,
     is_prod: normalizedDevice.is_prod,
     is_emulator: normalizedDevice.is_emulator,
+    ...(requestedInstallSource === null ? {} : { install_source: normalizedDevice.install_source ?? undefined }),
     default_channel: device.default_channel ?? null,
     key_id: normalizedDevice.key_id ?? undefined,
   } as Database['public']['Tables']['devices']['Insert']
@@ -1470,6 +1517,9 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
   if (params.version_name)
     query = query.eq('version_name', params.version_name)
 
+  if (params.installSources?.length)
+    query = query.in('install_source', params.installSources)
+
   const devicesOrder = getDevicesOrder(params.order)
 
   if (params.cursor) {
@@ -1500,6 +1550,32 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
   }
 
   return data ?? []
+}
+
+export async function countInstallSourcesSB(c: Context, app_id: string): Promise<Record<string, number>> {
+  const pgClient = await getPgClient(c)
+  try {
+    const result = await pgClient.query<{ install_source: string, total: string }>(`
+      SELECT install_source, COUNT(*)::text AS total
+      FROM public.devices
+      WHERE app_id = $1
+        AND install_source IS NOT NULL
+        AND install_source != ''
+      GROUP BY install_source
+    `, [app_id])
+
+    return result.rows.reduce<Record<string, number>>((acc, row) => {
+      acc[row.install_source] = Number(row.total)
+      return acc
+    }, {})
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error counting install sources', error })
+    return {}
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
 }
 
 /**

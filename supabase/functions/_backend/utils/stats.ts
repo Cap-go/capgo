@@ -4,11 +4,11 @@ import type { MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadDevicesResponse, ReadStatsParams, StatsActions, StatsMetadata, VersionUsage } from './types.ts'
 import { getRuntimeKey } from 'hono/adapter'
-import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readDeviceVersionCountsCF, readNativeVersionUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
+import { countDevicesCF, countInstallSourcesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readDeviceVersionCountsCF, readNativeVersionUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
 import { isDemoApp } from './demo.ts'
-import { simpleError200 } from './hono.ts'
+import { simpleError, simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
-import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readDeviceVersionCountsSB, readNativeVersionUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
+import { countDevicesSB, countInstallSourcesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readDeviceVersionCountsSB, readNativeVersionUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
 import { DEFAULT_LIMIT } from './types.ts'
 import { backgroundTask, getEnv, isInternalVersionName } from './utils.ts'
 
@@ -143,7 +143,8 @@ export function readStatsMau(c: Context, app_id: string, start_date: string, end
 export function readStatsBandwidth(c: Context, app_id: string, start_date: string, end_date: string) {
   if (!c.env.BANDWIDTH_USAGE)
     return readBandwidthUsageSB(c, app_id, start_date, end_date)
-  return readBandwidthUsageCF(c, app_id, start_date, end_date)
+  assertAnalyticsEngineReadConfig(c, 'bandwidth usage')
+  return readBandwidthUsageCF(c, app_id, start_date, end_date, { throwOnError: true })
 }
 
 export function readStatsStorage(c: Context, app_id: string, start_date: string, end_date: string) {
@@ -162,14 +163,23 @@ export function readNativeVersionUsage(c: Context, app_id: string, start_date: s
     return readNativeVersionUsageSB(c, app_id, start_date, end_date, supabase)
   return readNativeVersionUsageCF(c, app_id, start_date, end_date)
 }
+function hasAnalyticsEngineReadConfig(c: Context): boolean {
+  const token = getEnv(c, 'CF_ANALYTICS_TOKEN')
+  const accountId = getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')
+  return Boolean(token && accountId)
+}
 
 function shouldUseAnalyticsEngine(c: Context): boolean {
   if (getRuntimeKey() !== 'workerd' || !c.env.DEVICE_INFO)
     return false
   // Analytics reads require API access; fall back to Supabase when tokens are missing.
-  const token = getEnv(c, 'CF_ANALYTICS_TOKEN')
-  const accountId = getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')
-  return Boolean(token && accountId)
+  return hasAnalyticsEngineReadConfig(c)
+}
+
+function assertAnalyticsEngineReadConfig(c: Context, metricName: string): void {
+  if (!hasAnalyticsEngineReadConfig(c)) {
+    throw simpleError('analytics_engine_unavailable', `Cannot read ${metricName} without Analytics Engine read configuration`)
+  }
 }
 
 export function readDeviceVersionCounts(c: Context, app_id: string, channelName?: string): Promise<Record<string, number>> {
@@ -330,13 +340,20 @@ export function countDevices(
   versionName?: string,
   search?: string,
 ) {
-  // Use Analytics Engine DEVICE_INFO when available in Cloudflare Workers.
-  // In local Cloudflare testing these bindings are often absent, so fall back
-  // to the Postgres/Supabase path.
   const trimmedSearch = search?.trim()
   if (shouldUseAnalyticsEngine(c))
     return countDevicesCF(c, app_id, customIdMode, deviceIds, versionName, trimmedSearch)
   return countDevicesSB(c, app_id, customIdMode, deviceIds, versionName, trimmedSearch)
+}
+
+export function countInstallSources(c: Context, app_id: string) {
+  if (getRuntimeKey() === 'workerd' && c.env.DEVICE_INFO && !shouldUseAnalyticsEngine(c)) {
+    throw simpleError('analytics_engine_unavailable', 'Cannot count install sources without Analytics Engine read configuration')
+  }
+
+  if (shouldUseAnalyticsEngine(c))
+    return countInstallSourcesCF(c, app_id)
+  return countInstallSourcesSB(c, app_id)
 }
 
 export async function readDevices(c: Context, params: ReadDevicesParams, customIdMode: boolean): Promise<ReadDevicesResponse> {
@@ -363,24 +380,24 @@ export async function readDevices(c: Context, params: ReadDevicesParams, customI
   return { data, nextCursor, hasMore }
 }
 
-export async function countAllApps(c: Context): Promise<number> {
+export async function countAllApps(c: Context, referenceDate?: Date): Promise<number> {
   const [cloudflareApps, supabaseApps] = await Promise.all([
-    getAppsFromCF(c),
-    getAppsFromSB(c),
+    getAppsFromCF(c, referenceDate),
+    getAppsFromSB(c, referenceDate),
   ])
 
   const allApps = [...new Set([...cloudflareApps, ...supabaseApps])]
   return allApps.length
 }
 
-export async function countAllUpdates(c: Context): Promise<number> {
-  const logsCount = await countUpdatesFromLogsCF(c)
+export async function countAllUpdates(c: Context, referenceDate?: Date): Promise<number> {
+  const logsCount = await countUpdatesFromLogsCF(c, referenceDate)
 
   return logsCount
 }
 
-export async function countAllUpdatesExternal(c: Context): Promise<number> {
-  const externalCount = await countUpdatesFromLogsExternalCF(c)
+export async function countAllUpdatesExternal(c: Context, referenceDate?: Date): Promise<number> {
+  const externalCount = await countUpdatesFromLogsExternalCF(c, referenceDate)
   return externalCount
 }
 

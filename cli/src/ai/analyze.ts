@@ -1,22 +1,80 @@
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import { cleanupCapturedJobFiles, getAiPromptPath, getLogCapturePath } from './log-capture'
 import { SYSTEM_PROMPT } from './prompt'
+import { createSseParser } from './sse'
 
-export type AnalyzeBehavior = 'show_menu' | 'ask_then_menu' | 'auto_upload' | 'skip'
+export type AnalyzeBehavior = 'ask_then_menu' | 'auto_upload' | 'skip'
 
 export interface DecideInput {
   isTTY: boolean
   aiAnalyticsFlag: boolean
+  sendLogsFlag: boolean
 }
 
 export function decideAnalyzeBehavior(input: DecideInput): AnalyzeBehavior {
-  if (input.isTTY && input.aiAnalyticsFlag)
-    return 'show_menu'
-  if (input.isTTY && !input.aiAnalyticsFlag)
-    return 'ask_then_menu'
-  if (!input.isTTY && input.aiAnalyticsFlag)
+  // Explicit opt-in via --ai-analytics or --send-logs means the user has
+  // already chosen - run the action(s) directly, never prompt (any terminal).
+  if (input.aiAnalyticsFlag || input.sendLogsFlag)
     return 'auto_upload'
+  // No flags + interactive terminal: ask, then show the help menu.
+  if (input.isTTY)
+    return 'ask_then_menu'
+  // No flags + non-interactive (CI/CD): stay silent (+ existing CI tip).
   return 'skip'
+}
+
+// Tip printed to stderr when a build fails non-interactively and the user opted
+// into NEITHER AI analysis nor log upload — so CI users discover both options
+// instead of getting a silent failure.
+export const CI_FAILURE_TIP = 'Build failed. Tip: re-run with --ai-analytics for an AI-powered diagnosis, or --send-logs-to-support to upload the build logs to Capgo support.'
+
+export interface CiFailureActionsInput {
+  // --ai-analytics passed?
+  aiAnalyticsFlag: boolean
+  // --send-logs passed?
+  sendLogsFlag: boolean
+}
+
+export interface CiFailureActions {
+  // Run the existing Capgo AI auto-upload analysis path.
+  runAiAnalysis: boolean
+  // Upload the captured build logs to Capgo support via uploadSupportLogs.
+  sendLogs: boolean
+  // Neither flag set — print CI_FAILURE_TIP so the user learns both options exist.
+  tip: string | null
+}
+
+// Pure decision for the direct-action build-failure path (CI/CD, or any terminal
+// when --ai-analytics/--send-logs is passed). Both flags are independent and
+// additive: --ai-analytics and --send-logs can both be passed and both run.
+// When neither is passed we surface a one-line tip instead of failing silently.
+// No-flag interactive terminals never reach this; they use the
+// decideAnalyzeBehavior ask_then_menu flow instead.
+export function decideCiFailureActions(input: CiFailureActionsInput): CiFailureActions {
+  return {
+    runAiAnalysis: input.aiAnalyticsFlag,
+    sendLogs: input.sendLogsFlag,
+    tip: (!input.aiAnalyticsFlag && !input.sendLogsFlag) ? CI_FAILURE_TIP : null,
+  }
+}
+
+export interface ShouldPrintCiTipInput {
+  // Is the current stdout an interactive terminal?
+  isTTY: boolean
+  // --ai-analytics passed?
+  aiAnalytics: boolean
+  // --send-logs passed?
+  sendLogs: boolean
+}
+
+// Whether to print CI_FAILURE_TIP at the build-failure point. This is the ONLY
+// case where the tip should appear: a non-interactive (CI/CD) build that failed
+// while the user opted into NEITHER --ai-analytics NOR --send-logs. Interactive
+// terminals use the clack menu instead; if either flag is set the corresponding
+// action runs and no tip is wanted. Pure + unit-tested so the emit site stays
+// trivial and self-documenting.
+export function shouldPrintCiTip(input: ShouldPrintCiTipInput): boolean {
+  return !input.isTTY && !input.aiAnalytics && !input.sendLogs
 }
 
 export async function writeLocalAiFile(jobId: string): Promise<string> {
@@ -39,53 +97,128 @@ export interface PostAnalyzeInput {
   logs: string
 }
 
+// Watchdog values deliberately LARGER than the edge fn's (90s/30s) so the
+// server layer always times out first and can send an in-band error event.
+export const STREAM_FIRST_BYTE_TIMEOUT_MS = 120_000
+export const STREAM_IDLE_TIMEOUT_MS = 45_000
+export const STREAM_TOTAL_TIMEOUT_MS = 600_000
+
 export type PostAnalyzeResult
   = | { kind: 'ok', analysis: string }
     | { kind: 'already_analyzed' }
     | { kind: 'too_big' }
-    | { kind: 'error', status?: number, message?: string }
+    | { kind: 'upgrade_required', message?: string }
+    | { kind: 'error', status?: number, message?: string, partial?: string }
 
-export async function postAnalyzeRequest(input: PostAnalyzeInput): Promise<PostAnalyzeResult> {
-  // apiHost is the Capgo CF Workers API gateway (e.g. https://api.capgo.app),
-  // NOT a Supabase Edge Functions URL — so no '/functions/v1/' prefix. All other
-  // /build/* endpoints (start, cancel, status, logs) live directly under the host.
-  const url = `${input.apiHost}/build/ai_analyze`
+export interface PostAnalyzeStreamInput extends PostAnalyzeInput {
+  // Fired once per text delta as it arrives — used for progressive TTY rendering.
+  onChunk?: (text: string) => void
+}
+
+export async function postAnalyzeStreamRequest(input: PostAnalyzeStreamInput): Promise<PostAnalyzeResult> {
+  const url = `${input.apiHost}/build/ai_analyze_stream`
+  const controller = new AbortController()
+  let idleTimer = setTimeout(() => controller.abort(), STREAM_FIRST_BYTE_TIMEOUT_MS)
+  const totalTimer = setTimeout(() => controller.abort(), STREAM_TOTAL_TIMEOUT_MS)
+  let partial = ''
   try {
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'capgkey': input.apikey,
         'content-type': 'application/json',
+        'accept': 'text/event-stream',
       },
       body: JSON.stringify({ jobId: input.jobId, appId: input.appId, logs: input.logs }),
-      signal: AbortSignal.timeout(60_000),
+      signal: controller.signal,
     })
-    if (res.status === 200) {
-      const body = await res.json() as { analysis?: string }
-      if (typeof body.analysis !== 'string')
-        return { kind: 'error', status: 200, message: 'malformed_response' }
-      return { kind: 'ok', analysis: body.analysis }
-    }
-    if (res.status === 409) {
+    if (res.status === 409)
       return { kind: 'already_analyzed' }
-    }
-    if (res.status === 413) {
-      // Backend rejected the payload as too large (>10 MB). Surface this as
-      // the dedicated variant so callers can fall back to local AI cleanly.
+    if (res.status === 413)
       return { kind: 'too_big' }
+    if (res.status === 426) {
+      const body = await res.json().catch(() => ({})) as { error?: string, message?: string }
+      return { kind: 'upgrade_required', message: body.error || body.message }
     }
-    let message: string | undefined
+    if (res.status !== 200) {
+      let message: string | undefined
+      try {
+        const body = await res.json() as { error?: string, message?: string }
+        message = body.error || body.message
+      }
+      catch {
+        // ignore
+      }
+      return { kind: 'error', status: res.status, message }
+    }
+    if (!res.body)
+      return { kind: 'error', status: 200, message: 'no_body' }
+
+    let terminal: PostAnalyzeResult | undefined
+    const feed = createSseParser((e) => {
+      if (e.event === 'chunk') {
+        try {
+          const text = (JSON.parse(e.data) as { text?: string }).text
+          if (typeof text === 'string') {
+            partial += text
+            input.onChunk?.(text)
+          }
+        }
+        catch {
+          // malformed chunk frame — skip
+        }
+      }
+      else if (e.event === 'done') {
+        terminal = { kind: 'ok', analysis: partial }
+      }
+      else if (e.event === 'error') {
+        let code = 'ai_error'
+        try {
+          code = (JSON.parse(e.data) as { code?: string }).code ?? code
+        }
+        catch {
+          // keep default
+        }
+        terminal = { kind: 'error', message: code, partial }
+      }
+    })
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
     try {
-      const body = await res.json() as { error?: string, message?: string }
-      message = body.error || body.message
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) {
+          // Flush the decoder tail — a multibyte character split across the
+          // final network chunks would otherwise be silently dropped.
+          feed(decoder.decode())
+          break
+        }
+        clearTimeout(idleTimer)
+        idleTimer = setTimeout(() => controller.abort(), STREAM_IDLE_TIMEOUT_MS)
+        feed(decoder.decode(value, { stream: true }))
+        if (terminal) {
+          // A terminal frame (done/error) decides the outcome — stop reading
+          // so a server that keeps the connection open afterwards can't
+          // idle-abort and overwrite a valid result.
+          await reader.cancel().catch(() => { /* best-effort */ })
+          break
+        }
+      }
     }
-    catch {
-      // ignore
+    catch (err) {
+      // Late transport failures must not overwrite an already-decided outcome.
+      if (!terminal)
+        throw err
     }
-    return { kind: 'error', status: res.status, message }
+    return terminal ?? { kind: 'error', message: 'stream_ended_without_done', partial }
   }
   catch (err) {
-    return { kind: 'error', message: err instanceof Error ? err.message : String(err) }
+    return { kind: 'error', message: err instanceof Error ? err.message : String(err), partial: partial || undefined }
+  }
+  finally {
+    clearTimeout(idleTimer)
+    clearTimeout(totalTimer)
   }
 }
 
@@ -106,6 +239,9 @@ export interface RunCapgoAiAnalysisInput {
   apikey: string
   jobId: string
   appId: string
+  // Fired per streamed text delta — used by the onboarding TUI for a live
+  // preview while the analysis generates. Omit for buffered behavior.
+  onChunk?: (text: string) => void
 }
 
 // Reads the captured log file for a failed job, then sends it to the Capgo AI
@@ -125,12 +261,13 @@ export async function runCapgoAiAnalysis(input: RunCapgoAiAnalysisInput): Promis
     return { kind: 'error', message: err instanceof Error ? err.message : 'log_unavailable' }
   }
 
-  return postAnalyzeRequest({
+  return postAnalyzeStreamRequest({
     apiHost: input.apiHost,
     apikey: input.apikey,
     jobId: input.jobId,
     appId: input.appId,
     logs,
+    onChunk: input.onChunk,
   })
 }
 

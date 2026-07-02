@@ -99,7 +99,7 @@ check(`uses the space — ${diffRows} diff lines visible (>= ${ROWS - DIFF_CHROM
 const pureAContinuationRows = grid.filter(r => /^A{40,}$/.test(r)).length
 check('giant line does NOT wrap into continuation rows', pureAContinuationRows === 0)
 check('summary line is shown', grid.some(r => r.includes('Summary:')))
-check('exit hint is shown', grid.some(r => r.includes('Press Escape to exit diff viewer')))
+check('exit hint is shown', grid.some(r => r.includes('Press Escape or Enter to exit diff viewer')))
 
 console.log(`\n${passed} passed, ${failed} failed`)
 clearTimeout(watchdog)

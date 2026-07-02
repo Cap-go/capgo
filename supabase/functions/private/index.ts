@@ -2,6 +2,7 @@ import { app as accept_invitation } from '../_backend/private/accept_invitation.
 import { app as admin_credits } from '../_backend/private/admin_credits.ts'
 import { app as admin_stats } from '../_backend/private/admin_stats.ts'
 import { app as channel_stats } from '../_backend/private/channel_stats.ts'
+import { app as channel_device } from '../_backend/private/channel_device.ts'
 import { app as config } from '../_backend/private/config.ts'
 import { app as configBuilder } from '../_backend/private/config_builder.ts'
 import { app as create_device } from '../_backend/private/create_device.ts'
@@ -18,6 +19,7 @@ import { app as log_as } from '../_backend/private/log_as.ts'
 // Webapps API
 import { app as plans } from '../_backend/private/plans.ts'
 import { app as publicStats } from '../_backend/private/public_stats.ts'
+import { app as replay } from '../_backend/private/replay.ts'
 import { app as role_bindings } from '../_backend/private/role_bindings.ts'
 import { app as roles } from '../_backend/private/roles.ts'
 import { app as set_org_email } from '../_backend/private/set_org_email.ts'
@@ -52,6 +54,7 @@ appGlobal.route('/website_stats', publicStats)
 appGlobal.route('/config', config)
 appGlobal.route('/config/builder', configBuilder)
 appGlobal.route('/devices', devices_priv)
+appGlobal.route('/channel_device', channel_device)
 appGlobal.route('/create_device', create_device)
 appGlobal.route('/channel_stats', channel_stats)
 appGlobal.route('/download_link', download_link)
@@ -65,6 +68,7 @@ appGlobal.route('/upload_link', upload_link)
 appGlobal.route('/delete_failed_version', deleted_failed_version)
 appGlobal.route('/set_org_email', set_org_email)
 appGlobal.route('/latency', latency)
+appGlobal.route('/replay', replay)
 appGlobal.route('/events', events)
 appGlobal.route('/groups', groups)
 appGlobal.route('/role_bindings', role_bindings)

@@ -1,15 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { REQUIRED_GLOBAL_STATS_SHARDS } from '../supabase/functions/_backend/utils/global_stats.ts'
 
 const mocks = vi.hoisted(() => {
   const maybeSingle = vi.fn()
   const limit = vi.fn(() => ({ maybeSingle }))
   const order = vi.fn(() => ({ limit }))
-  const lte = vi.fn(() => ({ order }))
+  const contains = vi.fn(() => ({ order }))
+  const lte = vi.fn(() => ({ contains }))
   const select = vi.fn(() => ({ lte }))
   const from = vi.fn(() => ({ select }))
 
   return {
     cloudlog: vi.fn(),
+    contains,
     from,
     limit,
     lte,
@@ -66,6 +69,7 @@ describe('public stats endpoint', () => {
     })
     expect(mocks.from).toHaveBeenCalledWith('global_stats')
     expect(mocks.lte).toHaveBeenCalledWith('date_id', '2026-05-10')
+    expect(mocks.contains).toHaveBeenCalledWith('completed_shards', [...REQUIRED_GLOBAL_STATS_SHARDS])
     expect(mocks.order).toHaveBeenCalledWith('date_id', { ascending: false })
     expect(mocks.limit).toHaveBeenCalledWith(1)
   })

@@ -1,8 +1,11 @@
-import type { AuthInfo } from '../../utils/hono.ts'
+import type { Context } from 'hono'
+import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
+import { closeClient, getPgClient } from '../../utils/pg.ts'
 import { supabaseWithAuth } from '../../utils/supabase.ts'
+import { attachApiKeyGlobalPermissions } from './global_permissions.ts'
 import { apiKeyHasLimitedScope } from './scope.ts'
 
 const app = honoFactory.createApp()
@@ -13,6 +16,33 @@ function isValidIdFormat(id: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   const numericRegex = /^\d+$/
   return uuidRegex.test(id) || numericRegex.test(id)
+}
+
+async function withGlobalPermissions<T extends Database['public']['Tables']['apikeys']['Row']>(
+  c: Context<MiddlewareKeyVariables>,
+  apikeys: T[],
+) {
+  const rbacIds = apikeys.map(key => key.rbac_id).filter((rbacId): rbacId is string => !!rbacId)
+  if (rbacIds.length === 0) {
+    return attachApiKeyGlobalPermissions(apikeys, [])
+  }
+
+  let pgClient
+  try {
+    pgClient = getPgClient(c)
+    const { rows } = await pgClient.query<{ apikey_rbac_id: string, permission_key: string }>(
+      `SELECT apikey_rbac_id::text, permission_key
+       FROM public.apikey_global_permissions
+       WHERE apikey_rbac_id = ANY($1::uuid[])`,
+      [rbacIds],
+    )
+    return attachApiKeyGlobalPermissions(apikeys, rows)
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
+  }
 }
 
 app.get('/', middlewareV2(['all']), async (c) => {
@@ -35,7 +65,7 @@ app.get('/', middlewareV2(['all']), async (c) => {
     throw quickError(500, 'failed_to_list_apikeys', 'Failed to list API keys', { supabaseError: error })
   }
 
-  return c.json(apikeys)
+  return c.json(await withGlobalPermissions(c, apikeys ?? []))
 })
 
 app.get('/:id', middlewareV2(['all']), async (c) => {
@@ -72,7 +102,8 @@ app.get('/:id', middlewareV2(['all']), async (c) => {
   if (error) {
     throw quickError(404, 'failed_to_get_apikey', 'Failed to get API key', { supabaseError: error })
   }
-  return c.json(fetchedApikey)
+  const [apikeyWithPermissions] = await withGlobalPermissions(c, fetchedApikey ? [fetchedApikey] : [])
+  return c.json(apikeyWithPermissions)
 })
 
 export default app

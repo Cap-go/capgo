@@ -8,6 +8,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        resetUpdaterStateForDebugWebBundle()
+
         // Override point for customization after application launch.
         if #available(macOS 13.3, iOS 16.4, tvOS 16.4, *) {
             DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
@@ -17,6 +19,28 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             }
         }
         return true
+    }
+
+    private func resetUpdaterStateForDebugWebBundle() {
+        #if DEBUG
+        let defaults = UserDefaults.standard
+        let markerKey = "capgoDebugWebBundleMarker"
+        let indexURL = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "public")
+        let attributes = indexURL.flatMap { try? FileManager.default.attributesOfItem(atPath: $0.path) }
+        let modifiedAt = (attributes?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+        let size = attributes?[.size] as? NSNumber
+        let marker = "\(modifiedAt):\(size?.stringValue ?? "0")"
+
+        guard defaults.string(forKey: markerKey) != marker else {
+            return
+        }
+
+        for key in ["serverBasePath", "pastVersion", "nextVersion", "previewFallbackVersion"] {
+            defaults.removeObject(forKey: key)
+        }
+        defaults.set(marker, forKey: markerKey)
+        defaults.synchronize()
+        #endif
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {

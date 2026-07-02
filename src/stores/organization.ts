@@ -4,8 +4,8 @@ import type { Database } from '~/types/supabase.types'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { createSignedImageUrl, getImmediateImageUrl, resolveImagePath } from '~/services/storage'
-import { stripeEnabled, useSupabase } from '~/services/supabase'
-import { clearWebsitePaidUserCookie, syncWebsitePaidUserCookieFromOrganizations } from '~/services/websiteAuthCookie'
+import { isPlatformAdmin, stripeEnabled, useSupabase } from '~/services/supabase'
+import { clearWebsitePaidUserCookie, setWebsitePaidUserCookie, syncWebsitePaidUserCookieFromOrganizations } from '~/services/websiteAuthCookie'
 import { createDeferredPromise } from '../utils/promise'
 import { useDashboardAppsStore } from './dashboardApps'
 import { useDisplayStore } from './display'
@@ -53,6 +53,8 @@ export const RBAC_ORG_ROLE_I18N_KEYS: Record<string, string> = {
   app_developer: 'role-app-developer',
   app_uploader: 'role-app-uploader',
   app_reader: 'role-app-reader',
+  channel_admin: 'role-channel-admin',
+  channel_reader: 'role-channel-reader',
 }
 
 /**
@@ -499,6 +501,15 @@ export const useOrganizationStore = defineStore('organization', () => {
     })
 
     syncWebsitePaidUserCookieFromOrganizations(mappedData)
+    isPlatformAdmin()
+      .then((isAdmin) => {
+        main.isAdmin = isAdmin
+        if (isAdmin)
+          setWebsitePaidUserCookie(true)
+      })
+      .catch((error) => {
+        console.error('Failed to resolve platform admin status:', error)
+      })
     _organizations.value = new Map(mappedData.map(item => [item.gid, item as Organization]))
     loadOrganizationLogos(mappedData, logoLoadRun)
 

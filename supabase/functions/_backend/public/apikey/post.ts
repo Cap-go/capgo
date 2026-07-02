@@ -9,6 +9,7 @@ import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
+import { parseApiKeyGlobalPermissions, replaceApiKeyGlobalPermissions, validateApiKeyGlobalPermissionsForBindings } from './global_permissions.ts'
 
 interface BindingInput {
   role_name: string
@@ -117,6 +118,8 @@ app.post('/', middlewareV2(['all']), async (c) => {
   const supabase = supabaseWithAuth(c, auth)
 
   const resolvedBindings = bindings
+  const globalPermissions = parseApiKeyGlobalPermissions(body.global_permissions, c.get('requestId')) ?? []
+  validateApiKeyGlobalPermissionsForBindings(globalPermissions, resolvedBindings, c.get('requestId'))
 
   // Validate expiration against org policies (throws if invalid)
   const allOrgIds = [...new Set(resolvedBindings.map(binding => binding.org_id))]
@@ -202,6 +205,8 @@ app.post('/', middlewareV2(['all']), async (c) => {
 
         createdBindings.push(result.data)
       }
+
+      await replaceApiKeyGlobalPermissions(tx, apikeyData.rbac_id, globalPermissions, auth.userId)
     })
 
     cloudlog({
@@ -228,7 +233,14 @@ app.post('/', middlewareV2(['all']), async (c) => {
     }
   }
 
-  return c.json(apikeyData)
+  if (!apikeyData) {
+    throw simpleError('binding_creation_failed', 'Failed to create role bindings for the API key')
+  }
+
+  return c.json({
+    ...(apikeyData as ApiKeyRow as Record<string, unknown>),
+    global_permissions: globalPermissions,
+  })
 })
 
 export default app

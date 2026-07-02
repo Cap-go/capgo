@@ -48,6 +48,15 @@ function clearCredentialEnvVars() {
     'BUILD_OUTPUT_UPLOAD_ENABLED',
     'BUILD_OUTPUT_RETENTION_SECONDS',
     'CAPGO_ANDROID_FLAVOR',
+    'FASTLANE_USER',
+    'FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD',
+    'APPLE_APP_ID',
+    'CAPGO_STORE_SUBMIT_REVIEW',
+    'CAPGO_STORE_RELEASE_NAME',
+    'CAPGO_STORE_RELEASE_NOTES',
+    'CAPGO_STORE_RELEASE_NOTES_LOCALIZED',
+    'CAPGO_IOS_TESTFLIGHT_GROUPS',
+    'CAPGO_IOS_AUTOMATIC_RELEASE',
   ]
   for (const key of credKeys) {
     delete process.env[key]
@@ -114,6 +123,26 @@ await test('Load credentials from environment variables', async () => {
   assertEquals(creds.P12_PASSWORD, 'testpass123', 'P12_PASSWORD should be loaded from env')
   assertEquals(creds.ANDROID_KEYSTORE_FILE, 'base64keystore', 'ANDROID_KEYSTORE_FILE should be loaded from env')
   assert(!creds.APPLE_ISSUER_ID, 'Unset env vars should not be in result')
+
+  clearCredentialEnvVars()
+  await cleanupTestEnv()
+})
+
+// Test 1b: Load Apple ID + app-specific password credentials from environment
+await test('Load app-specific password credentials from environment variables', async () => {
+  await setupTestEnv()
+  clearCredentialEnvVars()
+
+  process.env.FASTLANE_USER = 'dev@example.com'
+  process.env.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD = 'abcd-efgh-ijkl-mnop'
+  process.env.APPLE_APP_ID = '1234567890'
+
+  const { loadCredentialsFromEnv } = await importCredentials()
+  const creds = loadCredentialsFromEnv()
+
+  assertEquals(creds.FASTLANE_USER, 'dev@example.com', 'FASTLANE_USER should be loaded from env')
+  assertEquals(creds.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD, 'abcd-efgh-ijkl-mnop', 'app-specific password should be loaded from env')
+  assertEquals(creds.APPLE_APP_ID, '1234567890', 'APPLE_APP_ID should be loaded from env')
 
   clearCredentialEnvVars()
   await cleanupTestEnv()

@@ -87,15 +87,52 @@ fi
 
 status=0
 
+# Allow content-preserving re-stamps: a pure rename (100% identical content) of a
+# migration to a timestamp NEWER than the latest on the base branch. This is the
+# sanctioned way to repair an out-of-order migration (one whose timestamp sorts
+# before a migration already applied on a remote, which `supabase db push`
+# rejects) without altering its SQL. Content edits and deletions stay blocked.
+restamped_files=''
+while IFS=$'\t' read -r similarity _old_path new_path; do
+  [[ -z "${new_path:-}" ]] && continue
+  [[ "$similarity" != "R100" ]] && continue
+  new_ts="$(extract_timestamp "$new_path" || true)"
+  [[ -z "$new_ts" ]] && continue
+  if (( 10#$new_ts > 10#$latest_base_timestamp )); then
+    restamped_files+="${new_path}"$'\n'
+  fi
+done < <(git diff --name-status -M100% --diff-filter=R "${base_ref}...HEAD" -- 'supabase/migrations/*.sql')
+
 modified_files="$(git diff --name-only --diff-filter=MR "${base_ref}...HEAD" -- 'supabase/migrations/*.sql')"
 if [[ -n "$modified_files" ]]; then
-  echo '❌ Existing Supabase migrations were modified in this change.'
-  echo '  Create a new migration instead of editing committed migration files.'
+  disallowed_modified_files=''
+
   while IFS= read -r file; do
     [[ -z "$file" ]] && continue
-    echo "  - $file"
+
+    ts="$(extract_timestamp "$file" || true)"
+    if [[ -n "$ts" && "$ts" == "$latest_base_timestamp" ]]; then
+      echo "⚠️  Allowing fix to latest Supabase migration: $file"
+      continue
+    fi
+
+    if [[ -n "$restamped_files" ]] && printf '%s' "$restamped_files" | grep -qxF "$file"; then
+      echo "⚠️  Allowing content-preserving re-stamp to a newer timestamp: $file"
+      continue
+    fi
+
+    disallowed_modified_files+="${file}"$'\n'
   done <<< "$modified_files"
-  status=1
+
+  if [[ -n "$disallowed_modified_files" ]]; then
+    echo '❌ Existing Supabase migrations were modified in this change.'
+    echo '  Create a new migration instead of editing committed migration files.'
+    while IFS= read -r file; do
+      [[ -z "$file" ]] && continue
+      echo "  - $file"
+    done <<< "$disallowed_modified_files"
+    status=1
+  fi
 fi
 
 deleted_files="$(git diff --name-only --diff-filter=D "${base_ref}...HEAD" -- 'supabase/migrations/*.sql')"

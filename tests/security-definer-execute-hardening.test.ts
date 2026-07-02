@@ -20,12 +20,15 @@ const INVOKER_PROCS = [
 ] as const
 
 const SERVICE_ONLY_PROCS = [
+  'public.apikey_has_current_org_create_capability(uuid)',
+  'public.apikey_has_global_permission(text, text)',
   'public.apikeys_force_server_key()',
   'public.apikeys_strip_plain_key_for_hashed()',
   'public.check_encrypted_bundle_on_insert()',
   'public.check_org_hashed_key_enforcement(uuid, public.apikeys)',
   'public.cleanup_onboarding_app_data_on_complete()',
   'public.delete_old_deleted_versions()',
+  'public.enqueue_credit_usage_posthog_event()',
   'public.generate_org_user_stripe_info_on_org_create()',
   'public.get_apikey()',
   'public.noupdate()',
@@ -72,6 +75,7 @@ const ANON_ALLOWED_PROCS = [
 
 const AUTHENTICATED_ONLY_PROCS = [
   'public.accept_invitation_to_org(uuid)',
+  'public.acknowledge_compatibility_event(bigint, text)',
   'public.check_org_members_2fa_enabled(uuid)',
   'public.check_org_members_password_policy(uuid)',
   'public.count_non_compliant_bundles(uuid, text)',

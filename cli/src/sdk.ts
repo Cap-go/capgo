@@ -44,6 +44,7 @@ import type {
   ZipBundleOptions,
 } from './schemas/sdk'
 import type { Organization } from './utils'
+import { checkAppExistsAndHasPermissionOrgErr } from './api/app'
 import { getActiveAppVersions } from './api/versions'
 import { addAppInternal } from './app/add'
 import { deleteAppInternal } from './app/delete'
@@ -51,7 +52,7 @@ import { getInfoInternal } from './app/info'
 import { listAppInternal } from './app/list'
 import { setAppInternal } from './app/set'
 import { setSettingInternal } from './app/setting'
-import { requestBuildInternal } from './build/request'
+import { parseStoreReleaseNotesLocalizedJson, requestBuildInternal } from './build/request'
 import { cleanupBundleInternal } from './bundle/cleanup'
 import { checkCompatibilityInternal } from './bundle/compatibility'
 import { decryptZipInternal } from './bundle/decrypt'
@@ -72,7 +73,7 @@ import { deleteOrganizationInternal } from './organization/delete'
 import { listOrganizationsInternal } from './organization/list'
 import { setOrganizationInternal } from './organization/set'
 import { getUserIdInternal } from './user/account'
-import { createSupabaseClient, findSavedKey, getConfig, getLocalConfig } from './utils'
+import { createSupabaseClient, findSavedKey, getConfig, getLocalConfig, OrganizationPerm } from './utils'
 import { parseSecurityPolicyError } from './utils/security_policy_errors'
 
 export type DoctorInfo = Awaited<ReturnType<typeof getInfoInternal>>
@@ -297,7 +298,10 @@ export class CapgoSDK {
         supaAnon: this.supaAnon,
       }
 
-      const apps = await listAppInternal(internalOptions, false)
+      // silent=true: the SDK is a programmatic API and (via the MCP server) runs over
+      // a stdio JSON-RPC channel — clack `intro`/`log` output on stdout corrupts the
+      // protocol framing and drops the transport. Every other SDK method is silent too.
+      const apps = await listAppInternal(internalOptions, true)
 
       const appInfos: AppInfo[] = apps.map(app => ({
         appId: app.app_id,
@@ -313,6 +317,29 @@ export class CapgoSDK {
     }
     catch (error) {
       return createErrorResult(error)
+    }
+  }
+
+  /**
+   * Whether `appId` exists in Capgo Cloud AND the configured key has at least read
+   * access to it. Uses the TARGETED existence+permission check (the same one
+   * `app set` / `channel` / `bundle` use) — NOT listApps — so it never triggers the
+   * full-table RBAC RLS scan that times out on large databases and falsely reports an
+   * owned app as missing. Returns false for a missing app or one the key can't access.
+   */
+  async appHasAccess(appId: string): Promise<SDKResult<boolean>> {
+    try {
+      const apikey = this.apikey || findSavedKey(true)
+      if (!apikey)
+        return { success: true, data: false }
+      const supabase = await createSupabaseClient(apikey, this.supaHost, this.supaAnon)
+      // silent: no UI output (this runs over a stdio MCP channel). skip2FACheck: this
+      // is a read-only "is it registered" probe — the real credential ops enforce 2FA.
+      await checkAppExistsAndHasPermissionOrgErr(supabase, apikey, appId, OrganizationPerm.read, true, true)
+      return { success: true, data: true }
+    }
+    catch {
+      return { success: true, data: false }
     }
   }
 
@@ -690,6 +717,9 @@ export class CapgoSDK {
         appleIssuerId: creds?.APPLE_ISSUER_ID,
         appleKeyContent: creds?.APPLE_KEY_CONTENT,
         appStoreConnectTeamId: creds?.APP_STORE_CONNECT_TEAM_ID,
+        appleId: creds?.FASTLANE_USER,
+        appleAppSpecificPassword: creds?.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD,
+        appleAppId: creds?.APPLE_APP_ID,
         iosScheme: creds?.CAPGO_IOS_SCHEME,
         iosTarget: creds?.CAPGO_IOS_TARGET,
         iosDistribution: creds?.CAPGO_IOS_DISTRIBUTION as 'app_store' | 'ad_hoc' | undefined,
@@ -699,6 +729,16 @@ export class CapgoSDK {
         keystoreKeyPassword: creds?.KEYSTORE_KEY_PASSWORD,
         keystoreStorePassword: creds?.KEYSTORE_STORE_PASSWORD,
         playConfigJson: creds?.PLAY_CONFIG_JSON,
+        submitToStoreReview: options.submitToStoreReview ?? (creds?.CAPGO_STORE_SUBMIT_REVIEW === undefined ? undefined : creds.CAPGO_STORE_SUBMIT_REVIEW === 'true'),
+        storeReleaseName: options.storeReleaseName ?? creds?.CAPGO_STORE_RELEASE_NAME,
+        storeReleaseNotes: options.storeReleaseNotes ?? creds?.CAPGO_STORE_RELEASE_NOTES,
+        storeReleaseNotesLocalized: options.storeReleaseNotesLocalized ?? parseStoreReleaseNotesLocalizedJson(creds?.CAPGO_STORE_RELEASE_NOTES_LOCALIZED),
+        iosTestflightGroups: options.iosTestflightGroups ?? creds?.CAPGO_IOS_TESTFLIGHT_GROUPS,
+        iosAutomaticRelease: options.iosAutomaticRelease ?? (creds?.CAPGO_IOS_AUTOMATIC_RELEASE === undefined ? undefined : creds.CAPGO_IOS_AUTOMATIC_RELEASE === 'true'),
+        // Prescan escape hatch: SDK callers own their output channel and cannot
+        // pass CLI flags, so expose the gate controls directly.
+        prescan: options.prescan,
+        prescanIgnoreFatal: options.prescanIgnoreFatal,
       }
 
       const result = await requestBuildInternal(options.appId, internalOptions, true)

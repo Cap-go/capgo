@@ -91,4 +91,6 @@ export const ALLOWED_STATS_ACTIONS = [
   'webview_dom_content_loaded',
   'webview_page_loaded',
   'set_next',
+  'os_version_changed',
+  'native_app_version_changed',
 ] as const satisfies readonly Database['public']['Enums']['stats_action'][]

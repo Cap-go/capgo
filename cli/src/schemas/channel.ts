@@ -64,6 +64,7 @@ export const optionsSetChannelSchema = optionsBaseSchema.extend({
   prod: z.boolean().optional(),
   packageJson: z.string().optional(),
   ignoreMetadataCheck: z.boolean().optional(),
+  qrPreview: z.boolean().optional(),
 })
 
 export type OptionsSetChannel = z.infer<typeof optionsSetChannelSchema>

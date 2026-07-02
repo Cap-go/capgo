@@ -70,6 +70,13 @@
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
+      ],
+      "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
+        }
       ]
     },
     "preprod": {
@@ -124,6 +131,13 @@
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+        }
+      ],
+      "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "9c405a5248604951a2a12125799bc21b" }],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         }
       ]
     },
@@ -180,6 +194,13 @@
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
+      ],
+      "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "16a85350d8a246ff857a645c8f51d6ae" }],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
+        }
       ]
     },
     "local": {
@@ -189,7 +210,8 @@
       },
       "vars": {
         "ENV_NAME": "capgo_api-local"
-      }
+      },
+      "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "00000000000000000000000000000001" }]
     }
   }
 }
