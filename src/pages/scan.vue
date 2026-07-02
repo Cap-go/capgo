@@ -1414,7 +1414,7 @@ async function goBack() {
 </template>
 
 <style scoped>
-<style scoped > .camera-preview-page {
+.camera-preview-page {
   overscroll-behavior: none;
   touch-action: manipulation;
 }

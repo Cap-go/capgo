@@ -476,11 +476,14 @@ onBeforeUnmount(async () => {
               <p class="text-sm text-slate-500 dark:text-slate-400">
                 {{ t('email-otp-sent') }}
               </p>
+              <label for="mfa-otp-verification-code" class="sr-only">{{ t('verification-code') }}</label>
               <input
+                id="mfa-otp-verification-code"
                 v-model="otpVerificationCode"
                 type="text"
                 inputmode="numeric"
                 :placeholder="t('verification-code')"
+                :aria-label="t('verification-code')"
                 class="d-input w-full"
                 autocomplete="one-time-code"
                 @keydown.enter.prevent="verifyOtpForMfa"
@@ -538,11 +541,14 @@ onBeforeUnmount(async () => {
               <p class="text-sm text-slate-500 dark:text-slate-400">
                 {{ t('mfa-enable-instruction-2') }}
               </p>
+              <label for="mfa-totp-verification-code" class="sr-only">{{ t('verification-code') }}</label>
               <input
+                id="mfa-totp-verification-code"
                 v-model="mfaVerificationCode"
                 type="text"
                 inputmode="numeric"
                 :placeholder="t('verification-code')"
+                :aria-label="t('verification-code')"
                 class="d-input w-full"
                 maxlength="6"
                 autocomplete="one-time-code"

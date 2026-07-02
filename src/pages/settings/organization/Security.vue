@@ -1287,10 +1287,12 @@ onMounted(async () => {
 
               <!-- Require Uppercase -->
               <div class="flex items-center justify-between">
-                <label class="dark:text-white text-slate-800">{{ t('require-uppercase') }}</label>
+                <label for="password-policy-require-uppercase" class="dark:text-white text-slate-800">{{ t('require-uppercase') }}</label>
                 <input
+                  id="password-policy-require-uppercase"
                   v-model="requireUppercase"
                   type="checkbox"
+                  :aria-label="t('require-uppercase')"
                   :disabled="!hasOrgPerm || isSaving"
                   class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50"
                   @change="handleSettingChange"
@@ -1299,10 +1301,12 @@ onMounted(async () => {
 
               <!-- Require Number -->
               <div class="flex items-center justify-between">
-                <label class="dark:text-white text-slate-800">{{ t('require-number') }}</label>
+                <label for="password-policy-require-number" class="dark:text-white text-slate-800">{{ t('require-number') }}</label>
                 <input
+                  id="password-policy-require-number"
                   v-model="requireNumber"
                   type="checkbox"
+                  :aria-label="t('require-number')"
                   :disabled="!hasOrgPerm || isSaving"
                   class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50"
                   @change="handleSettingChange"
@@ -1311,10 +1315,12 @@ onMounted(async () => {
 
               <!-- Require Special Character -->
               <div class="flex items-center justify-between">
-                <label class="dark:text-white text-slate-800">{{ t('require-special-character') }}</label>
+                <label for="password-policy-require-special" class="dark:text-white text-slate-800">{{ t('require-special-character') }}</label>
                 <input
+                  id="password-policy-require-special"
                   v-model="requireSpecial"
                   type="checkbox"
+                  :aria-label="t('require-special-character')"
                   :disabled="!hasOrgPerm || isSaving"
                   class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50"
                   @change="handleSettingChange"
@@ -1501,17 +1507,19 @@ onMounted(async () => {
               <div v-if="requireApikeyExpiration" class="pl-4 border-l-2 border-blue-500">
                 <div class="flex items-center justify-between">
                   <div>
-                    <label class="dark:text-white text-slate-800">{{ t('max-apikey-expiration-days') }}</label>
+                    <label for="max-apikey-expiration-days" class="dark:text-white text-slate-800">{{ t('max-apikey-expiration-days') }}</label>
                     <p class="text-sm text-gray-500 dark:text-gray-400">
                       {{ t('max-apikey-expiration-days-help') }}
                     </p>
                   </div>
                   <input
+                    id="max-apikey-expiration-days"
                     v-model.number="maxApikeyExpirationDays"
                     type="number"
                     min="1"
                     max="365"
                     :placeholder="t('max-apikey-expiration-days-placeholder')"
+                    :aria-label="t('max-apikey-expiration-days')"
                     :disabled="isSaving"
                     class="w-24 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white disabled:opacity-50"
                     @change="saveApikeyPolicy"

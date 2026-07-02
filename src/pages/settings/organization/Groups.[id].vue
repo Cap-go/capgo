@@ -747,26 +747,30 @@ async function removeMemberFromGroup(userId: string) {
             </h2>
             <div class="space-y-4 max-w-lg">
               <div>
-                <label class="block mb-1 text-sm font-medium dark:text-white text-slate-800">
+                <label for="group-edit-name" class="block mb-1 text-sm font-medium dark:text-white text-slate-800">
                   {{ t('name') }} *
                 </label>
                 <input
+                  id="group-edit-name"
                   v-model="editName"
                   type="text"
                   class="w-full d-input d-input-bordered"
                   :placeholder="t('group-name')"
+                  :aria-label="t('name')"
                   :disabled="isSubmitting"
                 >
               </div>
               <div>
-                <label class="block mb-1 text-sm font-medium dark:text-white text-slate-800">
+                <label for="group-edit-description" class="block mb-1 text-sm font-medium dark:text-white text-slate-800">
                   {{ t('description') }}
                 </label>
                 <input
+                  id="group-edit-description"
                   v-model="editDescription"
                   type="text"
                   class="w-full d-input d-input-bordered"
                   :placeholder="t('description')"
+                  :aria-label="t('description')"
                   :disabled="isSubmitting"
                 >
               </div>
@@ -892,8 +896,10 @@ async function removeMemberFromGroup(userId: string) {
                     {{ getAppName(appId) }}
                   </span>
                   <select
+                    :id="`group-app-role-${appId}`"
                     class="d-select d-select-sm d-select-bordered"
                     :value="pendingAppBindings[appId] || ''"
+                    :aria-label="t('select-role')"
                     :disabled="isSubmitting"
                     @change="onAppRoleChange(appId, $event)"
                   >

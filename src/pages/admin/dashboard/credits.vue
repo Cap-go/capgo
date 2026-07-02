@@ -565,11 +565,14 @@ onMounted(async () => {
 
               <div v-else class="relative">
                 <div class="relative">
+                  <label for="admin-credits-search" class="sr-only">{{ t('admin-credits-search-placeholder') }}</label>
                   <MagnifyingGlassIcon class="absolute w-5 h-5 text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
                   <input
+                    id="admin-credits-search"
                     v-model="searchQuery"
                     type="text"
                     :placeholder="t('admin-credits-search-placeholder')"
+                    :aria-label="t('admin-credits-search-placeholder')"
                     class="w-full py-3 pl-10 pr-4 border rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
                   >
                   <Spinner v-if="isSearching" size="w-5 h-5" class="absolute text-blue-500 transform -translate-y-1/2 right-3 top-1/2" />
