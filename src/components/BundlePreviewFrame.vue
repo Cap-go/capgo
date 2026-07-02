@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { Capacitor } from '@capacitor/core'
-import { toSvg } from 'better-qr'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -9,6 +8,8 @@ import IconInfo from '~icons/lucide/info'
 import IconPlay from '~icons/lucide/play'
 import IconSmartphone from '~icons/lucide/smartphone'
 import { buildBundlePreviewDeepLink, buildChannelPreviewDeepLink } from '~/services/previewLinks'
+import { routePreviewScan } from '~/services/previewNavigation'
+import { buildPreviewQrCodeDataUrl } from '~/services/previewQrCode'
 import { buildChannelPreviewSubdomain, buildPreviewSubdomain } from '../../shared/preview-subdomain.ts'
 
 const props = withDefaults(defineProps<{
@@ -132,12 +133,14 @@ const qrCodeUrl = computed<string | null>(() => {
       appId: props.appId,
       channelId: props.channelId,
       channelName: props.channelName,
+      origin: globalThis.location.origin,
     })
   }
 
   if (typeof props.versionId === 'number') {
     return buildBundlePreviewDeepLink({
       appId: props.appId,
+      origin: globalThis.location.origin,
       versionId: props.versionId,
     })
   }
@@ -149,11 +152,6 @@ const startPreviewDisabled = computed(() => {
     return !qrCodeUrl.value
   return !previewUrl.value || !!browserPreviewHelp.value
 })
-
-function svgToDataUrl(svg: string): string {
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
-}
-
 // Generate QR code linking to the preview URL
 function generateQRCode() {
   if (!qrCodeUrl.value) {
@@ -162,12 +160,7 @@ function generateQRCode() {
   }
 
   try {
-    qrCodeDataUrl.value = svgToDataUrl(toSvg(qrCodeUrl.value, {
-      margin: 2,
-      moduleSize: 4,
-      foreground: '#000000',
-      background: '#ffffff',
-    }))
+    qrCodeDataUrl.value = buildPreviewQrCodeDataUrl(qrCodeUrl.value)
   }
   catch (error) {
     console.error('Failed to generate QR code:', error)
@@ -187,10 +180,7 @@ async function startNativePreview() {
   if (!qrCodeUrl.value)
     return
 
-  await router.push({
-    path: '/scan',
-    query: { preview: qrCodeUrl.value },
-  })
+  await routePreviewScan(router, qrCodeUrl.value)
 }
 
 async function startPreview() {

@@ -170,6 +170,82 @@ export function parsePreviewDeepLink(value: string): PreviewDeepLink | null {
   }
 }
 
+export function buildDeferredPreviewInstallReferrerUrl(value: string) {
+  const previewLink = parsePreviewDeepLink(value)
+  const url = parseUrl(value)
+  if (!previewLink || !url || (url.protocol !== 'https:' && url.protocol !== 'http:'))
+    return undefined
+
+  const referrerUrl = new URL(getPreviewPath(url), url.origin)
+  if (previewLink.type === 'channel') {
+    referrerUrl.searchParams.set('appId', previewLink.appId)
+    referrerUrl.searchParams.set('channel', previewLink.channelName)
+    if (typeof previewLink.channelId === 'number')
+      referrerUrl.searchParams.set('channelId', String(previewLink.channelId))
+    return referrerUrl.toString()
+  }
+
+  if (!previewLink.appId || typeof previewLink.versionId !== 'number')
+    return undefined
+
+  referrerUrl.searchParams.set('appId', previewLink.appId)
+  referrerUrl.searchParams.set('versionId', String(previewLink.versionId))
+  return referrerUrl.toString()
+}
+
+const DEFERRED_PREVIEW_REFERRER_KEYS = ['capgo_preview', 'preview']
+
+function tryDecodeURIComponent(value: string) {
+  try {
+    return decodeURIComponent(value)
+  }
+  catch {
+    return undefined
+  }
+}
+
+function getReferrerCandidates(referrer?: string) {
+  const trimmedReferrer = referrer?.trim()
+  if (!trimmedReferrer)
+    return []
+
+  const referrerCandidates = new Set<string>([trimmedReferrer])
+  const decodedReferrer = tryDecodeURIComponent(trimmedReferrer)
+  if (decodedReferrer)
+    referrerCandidates.add(decodedReferrer)
+  return [...referrerCandidates]
+}
+
+function validatedPreviewLink(value: string | null) {
+  const trimmedValue = value?.trim()
+  if (!trimmedValue)
+    return undefined
+
+  return [trimmedValue, tryDecodeURIComponent(trimmedValue)]
+    .find((candidate): candidate is string => !!candidate && !!parsePreviewDeepLink(candidate))
+}
+
+function previewLinkFromReferrerParams(candidate: string) {
+  const params = new URLSearchParams(candidate)
+  for (const key of DEFERRED_PREVIEW_REFERRER_KEYS) {
+    const previewLink = validatedPreviewLink(params.get(key))
+    if (previewLink)
+      return previewLink
+  }
+
+  return undefined
+}
+
+export function previewLinkFromInstallReferrer(referrer?: string) {
+  for (const candidate of getReferrerCandidates(referrer)) {
+    const previewLink = validatedPreviewLink(candidate) ?? previewLinkFromReferrerParams(candidate)
+    if (previewLink)
+      return previewLink
+  }
+
+  return undefined
+}
+
 export function parseChannelPreviewDeepLink(value: string): ChannelPreviewLink | null {
   const previewLink = parsePreviewDeepLink(value)
   return previewLink?.type === 'channel' ? previewLink : null
