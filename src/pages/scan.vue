@@ -95,6 +95,10 @@ interface PendingPreviewLoad {
   url: string
 }
 
+interface HandleBarcodeScanOptions {
+  nativeConfirmed?: boolean
+}
+
 const PREVIEW_PAYLOAD_PATH = '/.capgo/preview.json'
 
 function formatDebugData(data: unknown) {
@@ -380,9 +384,10 @@ onMounted(async () => {
   debugLog('scan page mounted', { isNativePlatform, previewQuery: route.query.preview })
 
   const previewLink = Array.isArray(route.query.preview) ? route.query.preview[0] : route.query.preview
+  const nativeConfirmedPreview = route.query.nativeConfirmedPreview === '1'
   if (previewLink) {
-    debugLog('handling preview query parameter', previewLink)
-    await handleBarcodeScan(previewLink, 'link')
+    debugLog('handling preview query parameter', { nativeConfirmedPreview, previewLink })
+    await handleBarcodeScan(previewLink, 'link', { nativeConfirmed: nativeConfirmedPreview })
     await refreshSavedPreviews(true)
     return
   }
@@ -757,14 +762,20 @@ async function startScanner() {
   }
 }
 
-async function handleBarcodeScan(scannedValue: string, source: PreviewLoadSource = 'link') {
+async function handleBarcodeScan(scannedValue: string, source: PreviewLoadSource = 'link', options: HandleBarcodeScanOptions = {}) {
   const value = scannedValue.trim()
-  debugLog('handleBarcodeScan called', { source, value })
+  const shouldStartNativeConfirmedPreview = isNativePlatform && source === 'link' && options.nativeConfirmed === true
+  debugLog('handleBarcodeScan called', { nativeConfirmed: shouldStartNativeConfirmedPreview, source, value })
   const previewLink = parsePreviewDeepLink(value)
   if (previewLink) {
     debugLog('scan parsed as preview deep link', previewLink)
     scannedUrl.value = value
     manualUrl.value = ''
+    if (shouldStartNativeConfirmedPreview) {
+      await startPreviewLink(previewLink)
+      return
+    }
+
     queuePreviewLoad({
       appLabel: previewLinkAppLabel(previewLink),
       detail: previewLinkDetail(previewLink),
@@ -781,6 +792,11 @@ async function handleBarcodeScan(scannedValue: string, source: PreviewLoadSource
     debugLog('scan parsed as preview host', { previewPayloadUrl, value })
     scannedUrl.value = value
     manualUrl.value = value
+    if (shouldStartNativeConfirmedPreview) {
+      await startPreviewPayload(previewPayloadUrl)
+      return
+    }
+
     queuePreviewLoad({
       appLabel: target?.appId || hostFromUrl(value) || 'Unknown app',
       detail: previewHostDetail(target),

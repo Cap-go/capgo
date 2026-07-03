@@ -20,6 +20,7 @@ const BUNDLE_PREVIEW_PATH = '/preview/bundle'
 const CHANNEL_PREVIEW_SCHEME_URL = 'capgo://preview/channel'
 const BUNDLE_PREVIEW_SCHEME_URL = 'capgo://preview/bundle'
 const LOCAL_PREVIEW_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
+export const NATIVE_CONFIRMED_PREVIEW_PARAM = 'nativeConfirmedPreview'
 
 function parseUrl(value: string): URL | null {
   try {
@@ -168,6 +169,11 @@ export function parsePreviewDeepLink(value: string): PreviewDeepLink | null {
     channelName,
     payloadUrl,
   }
+}
+
+export function hasNativeConfirmedPreview(value: string) {
+  const url = parseUrl(value)
+  return url?.searchParams.get(NATIVE_CONFIRMED_PREVIEW_PARAM) === '1'
 }
 
 export function buildDeferredPreviewInstallReferrerUrl(value: string) {

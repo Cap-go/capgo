@@ -4,6 +4,7 @@ import {
   buildChannelPreviewDeepLink,
   buildChannelPreviewLatestOptions,
   buildDeferredPreviewInstallReferrerUrl,
+  hasNativeConfirmedPreview,
   parseChannelPreviewDeepLink,
   parsePreviewDeepLink,
   previewLinkFromInstallReferrer,
@@ -147,6 +148,19 @@ describe('channel preview deep links', () => {
     })
 
     expect(previewUrl).toBe('capgo://preview/bundle?appId=com.example.other-user-app&versionId=42')
+    expect(parsePreviewDeepLink(previewUrl)).toEqual({
+      type: 'bundle',
+      appId: 'com.example.other-user-app',
+      payloadUrl: undefined,
+      versionId: 42,
+    })
+  })
+
+  it.concurrent('detects native-confirmed preview links without changing parsing', () => {
+    const previewUrl = 'capgo://preview/bundle?appId=com.example.other-user-app&versionId=42&nativeConfirmedPreview=1'
+
+    expect(hasNativeConfirmedPreview(previewUrl)).toBe(true)
+    expect(hasNativeConfirmedPreview('capgo://preview/bundle?appId=com.example.other-user-app&versionId=42')).toBe(false)
     expect(parsePreviewDeepLink(previewUrl)).toEqual({
       type: 'bundle',
       appId: 'com.example.other-user-app',
