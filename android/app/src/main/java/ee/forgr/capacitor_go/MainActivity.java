@@ -16,6 +16,7 @@ public class MainActivity extends BridgeActivity {
 
     private boolean previewConfirmationVisible = false;
     private Intent pendingPreviewIntent;
+    private AlertDialog previewConfirmationDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,12 +36,22 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onNewIntent(Intent intent) {
         if (isPreviewDeepLinkIntent(intent)) {
+            if (previewConfirmationVisible) {
+                return;
+            }
+
             pendingPreviewIntent = new Intent(intent);
             showPreviewConfirmation(pendingPreviewIntent);
             return;
         }
 
         super.onNewIntent(intent);
+    }
+
+    @Override
+    public void onDestroy() {
+        dismissPreviewConfirmationDialog();
+        super.onDestroy();
     }
 
     private void showPreviewConfirmation(Intent intent) {
@@ -51,37 +62,46 @@ public class MainActivity extends BridgeActivity {
         previewConfirmationVisible = true;
         runOnUiThread(() -> {
             Uri previewUri = intent.getData();
-            AlertDialog dialog = new AlertDialog.Builder(this)
+            previewConfirmationDialog = new AlertDialog.Builder(this)
                 .setTitle("Load preview?")
                 .setMessage(previewConfirmationMessage(previewUri))
                 .setNegativeButton("No", (currentDialog, which) -> {
-                    if (which == DialogInterface.BUTTON_NEGATIVE) {
-                        currentDialog.dismiss();
+                    if (currentDialog == previewConfirmationDialog && which == DialogInterface.BUTTON_NEGATIVE) {
                         cancelPreviewConfirmation();
                     }
                 })
                 .setPositiveButton("Load preview", (currentDialog, which) -> {
-                    if (which == DialogInterface.BUTTON_POSITIVE) {
-                        currentDialog.dismiss();
+                    if (currentDialog == previewConfirmationDialog && which == DialogInterface.BUTTON_POSITIVE) {
                         confirmPreviewIntent();
                     }
                 })
                 .setOnCancelListener(currentDialog -> {
-                    currentDialog.dismiss();
-                    cancelPreviewConfirmation();
+                    if (currentDialog == previewConfirmationDialog) {
+                        cancelPreviewConfirmation();
+                    }
                 })
                 .create();
-            dialog.show();
+            previewConfirmationDialog.show();
         });
     }
 
+    private void dismissPreviewConfirmationDialog() {
+        AlertDialog dialog = previewConfirmationDialog;
+        previewConfirmationDialog = null;
+        if (dialog != null && dialog.isShowing()) {
+            dialog.dismiss();
+        }
+    }
+
     private void cancelPreviewConfirmation() {
+        dismissPreviewConfirmationDialog();
         pendingPreviewIntent = null;
         previewConfirmationVisible = false;
     }
 
     private void confirmPreviewIntent() {
         Intent intent = pendingPreviewIntent;
+        dismissPreviewConfirmationDialog();
         pendingPreviewIntent = null;
         previewConfirmationVisible = false;
         if (intent == null) {

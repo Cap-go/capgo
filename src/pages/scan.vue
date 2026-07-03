@@ -317,7 +317,7 @@ function previewLinkAppLabel(previewLink: PreviewDeepLink) {
 
 function previewLinkDetail(previewLink: PreviewDeepLink) {
   if (previewLink.type === 'channel')
-    return `Channel ${previewLink.channelName}`
+    return previewLink.channelName ? `Channel ${previewLink.channelName}` : `Channel ${previewLink.channelId}`
   if (typeof previewLink.versionId === 'number')
     return `Bundle ${previewLink.versionId}`
   return 'Bundle preview'
