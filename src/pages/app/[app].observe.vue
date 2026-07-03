@@ -354,7 +354,10 @@ watch([packageId, days], async () => {
             {{ selectedPeriodLabel }} · {{ periodTimespanLabel }}
           </p>
         </div>
-        <div class="d-join shrink-0" role="group" :aria-label="t('selected-period')">
+        <fieldset class="d-join shrink-0">
+          <legend class="sr-only">
+            {{ t('selected-period') }}
+          </legend>
           <button
             v-for="option in periodDayOptions"
             :key="option"
@@ -366,7 +369,7 @@ watch([packageId, days], async () => {
           >
             {{ periodButtonLabel(option) }}
           </button>
-        </div>
+        </fieldset>
       </div>
 
       <div v-if="statsLoading && !stats" class="flex items-center justify-center h-80">

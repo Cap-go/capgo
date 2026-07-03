@@ -56,6 +56,8 @@ type NativeObserveReleaseMarker = {
   deployed_at: string
 }
 
+type NativeObserveNumericValue = number | string | null | undefined
+
 type BuildNativeObserveResponseInput = {
   labels: string[]
   days: NativeObservePeriodDays
@@ -114,9 +116,9 @@ const issueActionSet = new Set<string>(issueActions)
 const launchReadyAction = 'app_launch_ready'
 const webviewPageLoadedAction = 'webview_page_loaded'
 
-const durationExpression = `CASE
-  WHEN metadata ? 'duration_ms' AND metadata ->> 'duration_ms' ~ '^[0-9]+(\\.[0-9]+)?$' THEN (metadata ->> 'duration_ms')::double precision
-  WHEN metadata ? 'duration' AND metadata ->> 'duration' ~ '^[0-9]+(\\.[0-9]+)?$' THEN (metadata ->> 'duration')::double precision
+const durationExpression = String.raw`CASE
+  WHEN metadata ? 'duration_ms' AND metadata ->> 'duration_ms' ~ '^[0-9]+(\.[0-9]+)?$' THEN (metadata ->> 'duration_ms')::double precision
+  WHEN metadata ? 'duration' AND metadata ->> 'duration' ~ '^[0-9]+(\.[0-9]+)?$' THEN (metadata ->> 'duration')::double precision
   ELSE NULL
 END`
 
@@ -199,12 +201,11 @@ WHERE deploy_history.app_id = $1
 ORDER BY deploy_history.deployed_at DESC
 LIMIT 20`
 
-function normalizeNativeObservePeriodDays(days: number | undefined): NativeObservePeriodDays | null {
-  const requestedDays = days ?? 7
-  if (!Number.isInteger(requestedDays) || !supportedPeriodDays.includes(requestedDays as NativeObservePeriodDays))
+function normalizeNativeObservePeriodDays(days: number | undefined = 7): NativeObservePeriodDays | null {
+  if (!Number.isInteger(days) || !supportedPeriodDays.includes(days as NativeObservePeriodDays))
     return null
 
-  return requestedDays as NativeObservePeriodDays
+  return days as NativeObservePeriodDays
 }
 
 function generateDateLabels(from: Date, to: Date) {
@@ -223,12 +224,12 @@ function generateDateLabels(from: Date, to: Date) {
   return labels
 }
 
-function toCount(value: number | string | null | undefined) {
+function toCount(value: NativeObserveNumericValue) {
   const numeric = Number(value ?? 0)
   return Number.isFinite(numeric) ? Math.max(0, Math.round(numeric)) : 0
 }
 
-function toMetric(value: number | string | null | undefined, decimals = 0) {
+function toMetric(value: NativeObserveNumericValue, decimals = 0) {
   const numeric = Number(value)
   if (!Number.isFinite(numeric))
     return null
@@ -241,7 +242,7 @@ function createSeries(length: number) {
   return Array.from({ length }, () => 0)
 }
 
-function setMetric(series: Array<number | null>, index: number, value: number | string | null | undefined) {
+function setMetric(series: Array<number | null>, index: number, value: NativeObserveNumericValue) {
   const metric = toMetric(value)
   if (metric !== null)
     series[index] = metric
