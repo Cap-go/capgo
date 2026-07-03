@@ -47,6 +47,7 @@ const isLoadingPreviews = ref(false)
 const previewActionId = ref('')
 const previewActionName = ref('')
 const showOptions = ref(false)
+const pendingPreviewLoad = ref<PendingPreviewLoad | null>(null)
 
 let downloadListener: Awaited<ReturnType<typeof CapacitorUpdater.addListener>> | null = null
 let barcodeScannedListener: PluginListenerHandle | null = null
@@ -82,6 +83,16 @@ interface PreviewSessionMetadata {
   payloadUrl?: string
   name?: string
   source?: string
+}
+
+type PreviewLoadSource = 'camera' | 'link'
+
+interface PendingPreviewLoad {
+  appLabel: string
+  detail: string
+  source: PreviewLoadSource
+  start: () => Promise<void>
+  url: string
 }
 
 const PREVIEW_PAYLOAD_PATH = '/.capgo/preview.json'
@@ -223,6 +234,10 @@ const manualActionLabel = computed(() => {
     return 'Start preview'
   return isNativePlatform ? 'Download update' : 'Open update URL'
 })
+const previewConfirmTitle = computed(() => pendingPreviewLoad.value?.source === 'camera' ? 'Load scanned preview?' : 'Load preview?')
+const previewConfirmDescription = computed(() => pendingPreviewLoad.value?.source === 'camera'
+  ? 'A QR code was scanned. Confirm before this preview is downloaded and applied.'
+  : 'The app was opened from a preview link. Confirm before this preview is downloaded and applied.')
 const scannerHint = computed(() => {
   if (isLoading.value)
     return 'Downloading preview…'
@@ -292,6 +307,73 @@ function previewNameFromUrl(value: string) {
   return parsedUrl?.host || 'Preview'
 }
 
+function previewLinkAppLabel(previewLink: PreviewDeepLink) {
+  return previewLink.appId || hostFromUrl(previewLink.payloadUrl) || 'Unknown app'
+}
+
+function previewLinkDetail(previewLink: PreviewDeepLink) {
+  if (previewLink.type === 'channel')
+    return `Channel ${previewLink.channelName}`
+  if (typeof previewLink.versionId === 'number')
+    return `Bundle ${previewLink.versionId}`
+  return 'Bundle preview'
+}
+
+function previewHostDetail(target: PreviewHostTarget | null) {
+  if (!target)
+    return 'Preview payload'
+  if (typeof target.channelId === 'number')
+    return `Channel ${target.channelId}`
+  if (typeof target.versionId === 'number')
+    return `Bundle ${target.versionId}`
+  return 'Preview payload'
+}
+
+function queuePreviewLoad(previewLoad: PendingPreviewLoad) {
+  debugLog('preview load confirmation requested', {
+    appLabel: previewLoad.appLabel,
+    detail: previewLoad.detail,
+    source: previewLoad.source,
+    url: previewLoad.url,
+  })
+  pendingPreviewLoad.value = previewLoad
+  errorMessage.value = ''
+  statusMessage.value = 'Preview detected. Confirm before loading it.'
+  downloadProgress.value = 0
+  showOptions.value = false
+}
+
+async function confirmPreviewLoad() {
+  const previewLoad = pendingPreviewLoad.value
+  if (!previewLoad)
+    return
+
+  pendingPreviewLoad.value = null
+  statusMessage.value = ''
+  debugLog('preview load confirmed', { source: previewLoad.source, url: previewLoad.url })
+  try {
+    await previewLoad.start()
+  }
+  catch (error) {
+    debugWarn('failed to start confirmed preview', error)
+    const message = error instanceof Error ? error.message : String(error)
+    errorMessage.value = `Failed to start preview: ${message}`
+    toast.error(errorMessage.value)
+  }
+}
+
+async function cancelPreviewLoad() {
+  const previewLoad = pendingPreviewLoad.value
+  if (!previewLoad)
+    return
+
+  pendingPreviewLoad.value = null
+  debugLog('preview load canceled', { source: previewLoad.source, url: previewLoad.url })
+  statusMessage.value = previewLoad.source === 'camera' ? '' : 'Preview loading canceled'
+  if (previewLoad.source === 'camera' && isNativePlatform)
+    await startScanner()
+}
+
 onMounted(async () => {
   displayStore.NavTitle = 'Scan QR'
   displayStore.defaultBack = '/login'
@@ -300,7 +382,7 @@ onMounted(async () => {
   const previewLink = Array.isArray(route.query.preview) ? route.query.preview[0] : route.query.preview
   if (previewLink) {
     debugLog('handling preview query parameter', previewLink)
-    await handleBarcodeScan(previewLink)
+    await handleBarcodeScan(previewLink, 'link')
     await refreshSavedPreviews(true)
     return
   }
@@ -627,7 +709,7 @@ async function startScanner() {
       debugLog('handling scanned barcode', { format: barcode.format, value: barcode.value })
       try {
         await stopScanner(false, { keepHandlingBarcode: true })
-        await handleBarcodeScan(barcode.value)
+        await handleBarcodeScan(barcode.value, 'camera')
       }
       catch (error) {
         debugWarn('failed to handle scanned barcode', error)
@@ -675,24 +757,37 @@ async function startScanner() {
   }
 }
 
-async function handleBarcodeScan(scannedValue: string) {
+async function handleBarcodeScan(scannedValue: string, source: PreviewLoadSource = 'link') {
   const value = scannedValue.trim()
-  debugLog('handleBarcodeScan called', value)
+  debugLog('handleBarcodeScan called', { source, value })
   const previewLink = parsePreviewDeepLink(value)
   if (previewLink) {
     debugLog('scan parsed as preview deep link', previewLink)
     scannedUrl.value = value
     manualUrl.value = ''
-    await startPreviewLink(previewLink)
+    queuePreviewLoad({
+      appLabel: previewLinkAppLabel(previewLink),
+      detail: previewLinkDetail(previewLink),
+      source,
+      start: () => startPreviewLink(previewLink),
+      url: value,
+    })
     return
   }
 
   const previewPayloadUrl = previewPayloadUrlFromUrl(value)
   if (previewPayloadUrl) {
+    const target = previewHostTargetFromUrl(value)
     debugLog('scan parsed as preview host', { previewPayloadUrl, value })
     scannedUrl.value = value
     manualUrl.value = value
-    await startPreviewPayload(previewPayloadUrl)
+    queuePreviewLoad({
+      appLabel: target?.appId || hostFromUrl(value) || 'Unknown app',
+      detail: previewHostDetail(target),
+      source,
+      start: () => startPreviewPayload(previewPayloadUrl),
+      url: value,
+    })
     return
   }
 
@@ -707,7 +802,13 @@ async function handleBarcodeScan(scannedValue: string) {
   scannedUrl.value = value
   manualUrl.value = value
   debugLog('scan parsed as direct HTTP update URL', value)
-  await downloadUpdate(value)
+  queuePreviewLoad({
+    appLabel: hostFromUrl(value) || 'Unknown host',
+    detail: 'Direct update URL',
+    source,
+    start: () => downloadUpdate(value),
+    url: value,
+  })
 }
 
 async function startPreviewSession(metadata: PreviewSessionMetadata = {}) {
@@ -1409,6 +1510,62 @@ async function goBack() {
           </details>
         </div>
       </section>
+    </div>
+
+    <div
+      v-if="pendingPreviewLoad"
+      class="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/85 px-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="preview-confirm-title"
+    >
+      <div class="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900 p-5 text-left shadow-2xl">
+        <div class="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-azure-500/15 text-azure-300">
+          <IconPlay class="h-5 w-5" />
+        </div>
+        <h2 id="preview-confirm-title" class="text-lg font-semibold text-white">
+          {{ previewConfirmTitle }}
+        </h2>
+        <p class="mt-2 text-sm leading-6 text-white/65">
+          {{ previewConfirmDescription }}
+        </p>
+
+        <dl class="mt-5 divide-y divide-white/10 border-y border-white/10">
+          <div class="py-3">
+            <dt class="text-xs font-medium uppercase text-white/40">
+              App
+            </dt>
+            <dd class="mt-1 break-all text-sm font-semibold text-white">
+              {{ pendingPreviewLoad.appLabel }}
+            </dd>
+          </div>
+          <div class="py-3">
+            <dt class="text-xs font-medium uppercase text-white/40">
+              Target
+            </dt>
+            <dd class="mt-1 break-all text-sm text-white/75">
+              {{ pendingPreviewLoad.detail }}
+            </dd>
+          </div>
+        </dl>
+
+        <div class="mt-5 grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            class="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white/80 transition-colors active:bg-white/10"
+            @click="cancelPreviewLoad"
+          >
+            No
+          </button>
+          <button
+            type="button"
+            class="inline-flex min-h-11 items-center justify-center rounded-xl bg-azure-500 px-4 text-sm font-semibold text-white transition-colors active:bg-azure-600"
+            @click="confirmPreviewLoad"
+          >
+            Load preview
+          </button>
+        </div>
+      </div>
     </div>
   </main>
 </template>
