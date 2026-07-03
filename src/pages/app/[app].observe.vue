@@ -115,6 +115,13 @@ const periodTimespanLabel = computed(() => {
     return '-'
   return `${formatShortDate(period.start)} - ${formatShortDate(period.end)}`
 })
+const observeScopeLabel = computed(() => t('native-observe-scope-summary', {
+  period: selectedPeriodLabel.value,
+  range: periodTimespanLabel.value,
+}))
+const observeOverviewHelp = computed(() => t('native-observe-overview-help', {
+  period: selectedPeriodLabel.value,
+}))
 
 const chartLabels = computed(() => (stats.value?.labels ?? []).map(label => formatLocalDateShort(label) || label))
 
@@ -229,7 +236,7 @@ function periodButtonLabel(option: PeriodDayOption) {
     return t('three-days')
   if (option === 7)
     return t('seven-days')
-  return t('max-period')
+  return t('thirty-days')
 }
 
 function formatShortDate(value: string | null | undefined) {
@@ -351,7 +358,7 @@ watch([packageId, days], async () => {
             {{ t('native-observe-subtitle') }}
           </p>
           <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            {{ selectedPeriodLabel }} · {{ periodTimespanLabel }}
+            {{ observeScopeLabel }}
           </p>
         </div>
         <fieldset class="d-join shrink-0">
@@ -377,6 +384,15 @@ watch([packageId, days], async () => {
       </div>
 
       <template v-else>
+        <div class="flex flex-col gap-1">
+          <h2 class="text-base font-semibold text-slate-950 dark:text-white">
+            {{ t('native-observe-overview') }}
+          </h2>
+          <p class="text-sm text-slate-500 dark:text-slate-400">
+            {{ observeOverviewHelp }}
+          </p>
+        </div>
+
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
             <div class="text-sm truncate text-slate-600 dark:text-slate-400">
