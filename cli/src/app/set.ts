@@ -3,7 +3,7 @@ import type { Options } from '../api/app'
 import type { Database } from '../types/supabase.types'
 import { existsSync, readFileSync } from 'node:fs'
 import { intro, log, outro } from '@clack/prompts'
-import { checkAppExistsAndHasPermissionOrgErr, defaultAppIconPath, getAppIconStoragePath, newIconPath } from '../api/app'
+import { checkAppExistsAndHasPermissionOrgErr, defaultAppIconPath, getAppIconStoragePath, resolveAppSetIconPath } from '../api/app'
 import { assertChannelExists, disableDownloadChannels as disableAllDownloadChannels, setDefaultDownloadChannel } from './default-channels'
 import { normalizeStoreUrl } from './store-url'
 import {
@@ -113,22 +113,19 @@ export async function setAppInternal(appId: string, options: Options, silent = f
   const iconPath = getAppIconStoragePath(organizationUid, appId)
   let iconUrl: string | undefined = defaultAppIconPath
 
-  if (icon && existsSync(icon)) {
-    iconBuff = readFileSync(icon)
-    const contentType = getContentType(icon)
+  const iconToUpload = resolveAppSetIconPath(icon)
+  if (iconToUpload) {
+    if (!existsSync(iconToUpload)) {
+      if (!silent)
+        log.error(`Cannot find app icon at ${iconToUpload}`)
+      throw new Error(`Cannot find app icon at ${iconToUpload}`)
+    }
+
+    iconBuff = readFileSync(iconToUpload)
+    const contentType = getContentType(iconToUpload)
     iconType = contentType || 'image/png'
     if (!silent)
-      log.warn(`Found app icon ${icon}`)
-  }
-  else if (existsSync(newIconPath)) {
-    iconBuff = readFileSync(newIconPath)
-    const contentType = getContentType(newIconPath)
-    iconType = contentType || 'image/png'
-    if (!silent)
-      log.warn(`Found app icon ${newIconPath}`)
-  }
-  else if (!silent) {
-    log.warn(`Cannot find app icon in any of the following locations: ${icon}, ${newIconPath}`)
+      log.warn(`Found app icon ${iconToUpload}`)
   }
 
   if (iconBuff && iconType) {
