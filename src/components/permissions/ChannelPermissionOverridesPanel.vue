@@ -308,11 +308,14 @@ watch(
     </div>
 
     <div>
+      <label for="channel-overrides-search" class="sr-only">{{ t('search-channels') }}</label>
       <input
+        id="channel-overrides-search"
         v-model="channelOverridesSearch"
         type="text"
         class="w-full d-input d-input-bordered"
         :placeholder="t('search-channels')"
+        :aria-label="t('search-channels')"
         data-test="channel-permissions-search"
       >
     </div>
@@ -358,8 +361,10 @@ watch(
               class="px-3 py-2"
             >
               <select
+                :id="`channel-perm-${channel.id}-${perm.key}`"
                 class="w-full d-select d-select-sm d-select-bordered"
                 :value="getSelectValue(channel.id, perm.key)"
+                :aria-label="`${channel.name} ${perm.label}`"
                 :disabled="!editable || isSavingOverride(channel.id, perm.key)"
                 data-test="channel-permission-select"
                 :data-channel-id="channel.id"

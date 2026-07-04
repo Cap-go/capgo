@@ -11,6 +11,7 @@ import AdminFilterBar from '~/components/admin/AdminFilterBar.vue'
 import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
 import PageLoader from '~/components/PageLoader.vue'
+import { formatNumberValue, formatOneDecimal } from '~/services/formatLocale'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -201,7 +202,7 @@ displayStore.defaultBack = '/dashboard'
                   Total Updates Today
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-primary">
-                  {{ latestGlobalStats.updates.toLocaleString() }}
+                  {{ formatNumberValue(latestGlobalStats.updates) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-primary">
                   0
@@ -224,7 +225,7 @@ displayStore.defaultBack = '/dashboard'
                   Success Rate
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-success">
-                  {{ latestGlobalStats.success_rate.toFixed(1) }}%
+                  {{ formatOneDecimal(latestGlobalStats.success_rate) }}%
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-success">
                   0%

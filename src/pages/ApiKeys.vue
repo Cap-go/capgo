@@ -1681,11 +1681,14 @@ getKeys()
             </button>
           </div>
           <div v-if="scopePicker.items.length > 8" class="border-b border-slate-200 p-2 dark:border-slate-700">
+            <label for="scope-picker-search" class="sr-only">{{ t('search-scope-items') }}</label>
             <input
+              id="scope-picker-search"
               v-model="scopePickerQuery"
               type="search"
               class="min-h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
               :placeholder="t('search-scope-items')"
+              :aria-label="t('search-scope-items')"
             >
           </div>
           <ul class="max-h-80 overflow-y-auto p-2">
@@ -1924,7 +1927,9 @@ getKeys()
                   </span>
                 </span>
                 <select
+                  :id="`create-key-app-role-${appId}`"
                   data-test="create-key-app-role-select"
+                  :aria-label="t('select-role')"
                   class="d-select d-select-sm d-select-bordered"
                   :value="pendingAppBindings[appId] || ''"
                   @change="onAppRoleChange(appId, $event)"
@@ -1985,7 +1990,7 @@ getKeys()
                 >
                   <IconCalendar class="w-4 h-4 text-gray-500 dark:text-gray-400" />
                   <span :class="expirationDate ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'">
-                    {{ expirationDate ? dayjs(expirationDate).format('YYYY-MM-DD') : t('select-expiration-date') }}
+                    {{ expirationDate ? formatLocalDate(expirationDate) : t('select-expiration-date') }}
                   </span>
                 </button>
               </template>
@@ -2005,11 +2010,13 @@ getKeys()
           </div>
           <template v-else-if="selectedApiKeyForChannelPermissions?.rbac_id && selectedChannelPermissionApp">
             <div>
-              <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+              <label for="apikey-channel-permissions-app-select" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
                 {{ t('app') }}
               </label>
               <select
+                id="apikey-channel-permissions-app-select"
                 v-model="selectedChannelPermissionAppUuid"
+                :aria-label="t('app')"
                 class="w-full d-select d-select-bordered"
                 data-test="apikey-channel-permissions-app-select"
               >

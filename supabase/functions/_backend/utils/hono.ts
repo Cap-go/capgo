@@ -98,6 +98,11 @@ export interface MiddlewareKeyVariables {
     // RBAC context variables
     rbacEnabled?: boolean
     resolvedOrgId?: string
+    skipSupabaseStatsFallback?: boolean
+    skipSupabaseNotificationWrites?: boolean
+    queuePluginNotifications?: boolean
+    skipChannelSelfPostgresFallback?: boolean
+    requireReadReplica?: boolean
   }
 }
 
