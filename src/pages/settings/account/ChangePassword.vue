@@ -467,16 +467,18 @@ async function submit(form: { current_password?: string, password: string, passw
         <div>
           <label for="mfa-code" class="block mb-2 text-sm font-medium">{{ t('enter-2fa-code') }}</label>
           <input
+            id="mfa-code"
             v-model="mfaCode"
             type="text"
             placeholder="123456"
+            :aria-label="t('enter-2fa-code')"
             class="w-full input input-bordered"
             maxlength="6"
             inputmode="numeric"
           >
-        </div>
-        <div class="text-sm text-gray-500">
-          {{ t('enter-the-6-digit-code-from-your-authenticator-app') }}
+          <div class="text-sm text-gray-500">
+            {{ t('enter-the-6-digit-code-from-your-authenticator-app') }}
+          </div>
         </div>
       </div>
     </Teleport>

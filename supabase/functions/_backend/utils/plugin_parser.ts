@@ -18,6 +18,13 @@ function normalizeCustomId(customId: unknown): string | undefined {
   return trimmed === '' ? undefined : trimmed
 }
 
+function normalizeInstallSource(installSource: unknown): string | undefined {
+  if (typeof installSource !== 'string')
+    return undefined
+  const trimmed = installSource.trim().toLowerCase()
+  return trimmed === '' ? undefined : trimmed
+}
+
 function getInvalidCode(c: Context) {
   return c.req.method === 'GET' || c.req.method === 'DELETE' ? 'invalid_query_parameters' : 'invalid_json_body'
 }
@@ -37,6 +44,7 @@ export function makeDevice(devBody: AppInfos | DeviceLink | AppStats, allowCusto
     version_name: devBody.version_name,
     is_emulator: devBody.is_emulator ?? false,
     is_prod: devBody.is_prod ?? true,
+    install_source: normalizeInstallSource(devBody.install_source),
     custom_id: customId,
     updated_at: new Date().toISOString(),
     default_channel: devBody.defaultChannel ?? null,
@@ -46,7 +54,7 @@ export function makeDevice(devBody: AppInfos | DeviceLink | AppStats, allowCusto
 }
 
 export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: Context, body: T, schema: StandardSchema<T>, requireDevice = true) {
-  if (!body || (!body.app_id && !body.device_id && Object.keys(body).length === 0)) {
+  if (!body || (body.app_id === undefined && body.device_id === undefined && Object.keys(body).length === 0)) {
     throw simpleError(getInvalidCode(c), 'Cannot parse body', { body })
   }
   if (requireDevice && !body.device_id) {
@@ -97,6 +105,7 @@ export function convertQueryToBody(query: Record<string, string>): DeviceLink {
     custom_id: query.custom_id,
     is_emulator: query.is_emulator === 'true',
     is_prod: query.is_prod === 'true',
+    install_source: query.install_source,
     version_os: query.version_os,
     key_id: query.key_id,
   }

@@ -150,6 +150,11 @@
         }
       ],
       "routes": [
+        // TODO: remove after we switched cli to new domain
+        {
+          "pattern": "files.preprod.capgo.app",
+          "custom_domain": true
+        },
         {
           "pattern": "*.preview.preprod.capgo.app/*",
           "zone_name": "capgo.app"

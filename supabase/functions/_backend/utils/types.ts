@@ -14,6 +14,7 @@ export interface AppInfos {
   custom_id?: string
   is_prod?: boolean
   is_emulator?: boolean
+  install_source?: string
   plugin_version: string
   platform: string
   app_id: string
@@ -76,6 +77,7 @@ export interface ReadDevicesParams {
   app_id: string
   version_name?: string | undefined
   deviceIds?: string[]
+  installSources?: string[]
   search?: string
   order?: Order[]
   limit?: number

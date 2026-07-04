@@ -1,22 +1,102 @@
 # Capgo CLI
-  <a href="https://capgo.app/"><img src='https://raw.githubusercontent.com/Cap-go/capgo/main/assets/capgo_banner.png' alt='Capgo - Instant updates for capacitor'/></a>
+<a href="https://capgo.app/"><img src="https://capgo.app/readme-banner.svg?repo=Cap-go/capgo" alt="Capgo - Instant updates for Capacitor" /></a>
+[![Discord](https://badgen.net/badge/icon/discord?icon=discord&label)](https://discord.com/invite/VnYRvBfgA6)
+<a href="https://discord.com/invite/VnYRvBfgA6"><img src="https://img.shields.io/discord/912707985829163099?color=%237289DA&label=Discord" alt="Discord"></a>
+[![npm](https://img.shields.io/npm/dm/@capgo/cli)](https://www.npmjs.com/package/@capgo/cli)
+[![GitHub latest commit](https://badgen.net/github/last-commit/Cap-go/capgo/main)](https://github.com/Cap-go/capgo/commit/)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=Cap-go_capgo&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=Cap-go_capgo)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=Cap-go_capgo&metric=bugs)](https://sonarcloud.io/summary/new_code?id=Cap-go_capgo)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=Cap-go_capgo&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=Cap-go_capgo)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=Cap-go_capgo&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=Cap-go_capgo)
 
 <div align="center">
-<h2><a href="https://capgo.app/">Check out: Capgo — Instant updates for capacitor</a></h2>
+  <h2><a href="https://capgo.app/?ref=cli_readme"> ➡️ Get Instant updates for your App with Capgo</a></h2>
+  <h2><a href="https://capgo.app/consulting/?ref=cli_readme"> Missing a feature? We’ll build it for you 💪</a></h2>
 </div>
 
-A CLI to upload and download files from the Capgo Cloud.
+Command line tool to manage Capgo apps, bundles, channels, compatibility checks,
+and cloud builds from your terminal or CI.
 
-You can find the most up-to-date version of this doc in our web doc:
-https://capgo.app/docs/cli/overview/
+Open-source CLI for Capacitor live updates.
 
-## Usage
+## Why Capgo CLI?
 
-Before using the CLI, you should register here: https://capgo.app/
+Shipping live updates should not require clicking through a dashboard for every
+release. Capgo CLI solves this by:
 
-Then go to your account in the `apikey` section and click the `all` key to copy it.
+- **Fast setup** - Connect a Capacitor app to Capgo with one guided command
+- **CI-ready uploads** - Build your app, upload the web bundle, and assign it to a channel
+- **Compatibility checks** - Detect when a native release is required instead of an OTA update
+- **Channel control** - Promote bundles through production, beta, QA, or custom release tracks
+- **Cloud builds** - Save credentials locally and request iOS or Android builds from the CLI
+- **Automation** - Use the SDK or MCP server for scripts, agents, and release tooling
 
-Follow the documentation here: https://capacitorjs.com/docs/getting-started/
+Perfect for first-time setup, repeatable releases, native-vs-OTA decisions, and
+teams that want Capgo controlled from CI.
+
+## Features
+
+- ☁️ Cloud / Self hosted Support: Use [Capgo Cloud](https://capgo.app/) or your own Supabase backend.
+- 🚀 Guided Setup: Initialize a Capacitor app and verify live updates end to end.
+- 📦 Bundle Management: Upload, list, delete, encrypt, decrypt, and clean bundles.
+- 📺 Channel Support: Assign bundles to release channels and manage rollout tracks.
+- 🧪 Compatibility: Check native package compatibility before shipping OTA updates.
+- 🔁 **Delta Updates**: Upload changed files only when instant updates are enabled.
+- 🔒 **Security**: Support signed and encrypted bundles for sensitive apps.
+- 📱 Device Runner: Launch iOS or Android devices and simulators from the CLI.
+- 🏗️ Cloud Builds: Request iOS and Android builds with locally stored credentials.
+- 🤖 MCP + SDK: Automate Capgo from AI agents, Node.js, or TypeScript scripts.
+- 🔋 Supports Android and iOS
+- ⚡️ Capacitor 4/5/6/7/8 support through the Capgo updater ecosystem
+- 🌐 **Open Source Backend**: Self install [our backend](https://github.com/Cap-go/capgo) in your infra
+
+You have 3 ways possible:
+
+- Use [capgo.app](https://capgo.app) for a full featured live-update system with setup, upload, channels, rollback, stats, and cloud builds.
+- Use your own self-hosted backend with `--supa-host` and `--supa-anon` on supported commands.
+- Use the CLI programmatically through the SDK or MCP server for custom release automation.
+
+## Quick Start
+
+Create your account in [capgo.app](https://capgo.app), get your [API key](https://console.capgo.app/dashboard/apikeys), and run:
+
+```bash
+npx @capgo/cli@latest init YOUR_API_KEY com.example.app
+```
+
+For an app that is already configured, upload a new bundle with:
+
+```bash
+npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production
+```
+
+## CI Upload Example
+
+```bash
+npm ci
+npm run build
+npx @capgo/cli@latest bundle upload com.example.app \
+  --apikey "$CAPGO_API_KEY" \
+  --path ./dist \
+  --channel production \
+  --bundle "$GITHUB_SHA" \
+  --version-exists-ok
+```
+
+Add `--fail-on-incompatible` when CI must stop instead of uploading a bundle that
+cannot safely update the current native build.
+
+## Documentation
+
+The most complete [documentation is here](https://capgo.app/docs/).
+
+- CLI guide: https://capgo.app/docs/cli/overview/
+- Live updates setup: https://capgo.app/docs/plugin/cloud-mode/getting-started/
+- Cloud build guides: https://capgo.app/docs/cli/cloud-build/ios/ and https://capgo.app/docs/cli/cloud-build/android/
+
+## Community
+
+Join the [discord](https://discord.gg/VnYRvBfgA6) to get help.
 
 <!-- AUTO-GENERATED-DOCS-START -->
 ## 📑 Capgo CLI Commands
@@ -692,7 +772,7 @@ npx @capgo/cli@latest app set com.example.app --name "Updated App" --retention 3
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
 | **-n** | <code>string</code> | App name for display in Capgo Cloud |
-| **-i** | <code>string</code> | App icon path for display in Capgo Cloud |
+| **-i** | <code>string</code> | Local image file path (png, jpg, webp, svg) used as the app icon in Capgo Cloud |
 | **-a** | <code>string</code> | API key to link to your account |
 | **-r** | <code>string</code> | Days to keep old bundles (0 = infinite, default: 0) |
 | **--expose-metadata** | <code>string</code> | Expose bundle metadata (link and comment) to the plugin (true/false, default: false) |
@@ -1316,10 +1396,13 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | **--android-flavor** | <code>string</code> | Android: Product flavor to build (e.g. production). Required if your project has multiple flavors. |
 | **--in-app-update-priority** | <code>string</code> | Android: Google Play in-app update priority for this release (integer 0–5; higher = more urgent). See https://developer.android.com/guide/playcore/in-app-updates. Precedence: CLI > env > saved credentials |
 | **--no-playstore-upload** | <code>boolean</code> | Skip Play Store upload for this build (nulls out saved play config). Requires --output-upload. |
-| **--submit-to-store-review** | <code>boolean</code> | After upload, submit the store release for review instead of leaving it as a draft/inactive build. Android marks the Play release completed; iOS submits to TestFlight external review and requires --ios-testflight-groups. |
-| **--store-release-name** | <code>string</code> | Store release name/version label. Android sends this as the Google Play version_name. |
-| **--store-release-notes** | <code>string</code> | Store release notes. Android sends this as the Play changelog; iOS sends it as the TestFlight What to Test text. |
-| **--ios-testflight-groups** | <code>string</code> | iOS: comma-separated TestFlight external group names or IDs required with --submit-to-store-review. |
+| **--submit-to-store-review** | <code>boolean</code> | After upload, submit the store release for review instead of leaving it as a draft/inactive build. Android marks the Play release completed; iOS submits the processed TestFlight build to App Store review. |
+| **--store-release-name** | <code>string</code> | Store release name/version label. Android sends this as the Google Play version_name; iOS uses it as the App Store version when creating or reusing the editable version. |
+| **--store-release-notes** | <code>string</code> | Default store release notes. Android uses this as the Play changelog; iOS uses it as the fallback App Store What's New text. |
+| **--store-release-notes-locale** | <code>string</code> | Localized store release notes (repeatable), for example --store-release-notes-locale en-US="Bug fixes" --store-release-notes-locale fr-FR="Corrections". |
+| **--ios-testflight-groups** | <code>string</code> | iOS: optional comma-separated TestFlight external group names or IDs for external beta distribution. |
+| **--ios-automatic-release** | <code>boolean</code> | iOS: automatically release the App Store version after Apple approval. Default is manual release. |
+| **--no-ios-automatic-release** | <code>boolean</code> | iOS: keep the App Store version waiting for manual release after Apple approval. |
 | **--output-upload** | <code>boolean</code> | Override output upload behavior for this build only (enable). Precedence: CLI > env > saved credentials |
 | **--no-output-upload** | <code>boolean</code> | Override output upload behavior for this build only (disable). Precedence: CLI > env > saved credentials |
 | **--output-retention** | <code>string</code> | Override output link TTL for this build only (1h to 7d). Examples: 1h, 6h, 2d. Precedence: CLI > env > saved credentials |

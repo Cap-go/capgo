@@ -901,6 +901,7 @@ onMounted(checkLogin)
                       detect it for autofill purposes.
                     -->
                         <input
+                          id="login-username-hidden"
                           type="email"
                           :value="emailForLogin"
                           name="username"
@@ -908,9 +909,9 @@ onMounted(checkLogin)
                           readonly
                           tabindex="-1"
                           aria-hidden="true"
+                          :aria-label="t('email')"
                           style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none;"
                         >
-                        <!-- Show email context -->
                         <div :class="authAccountContextClass">
                           <button
                             type="button"

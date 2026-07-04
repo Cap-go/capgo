@@ -1582,10 +1582,13 @@ async function transferAppOwnership() {
     <!-- Teleport for Transfer App ID Input -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('confirm-transfer')" defer to="#dialog-v2-content">
       <div class="w-full">
+        <label for="transfer-app-id-input" class="sr-only">{{ t('type-app-id-to-confirm') }}</label>
         <input
+          id="transfer-app-id-input"
           v-model="transferAppIdInput"
           type="text"
           :placeholder="t('type-app-id-to-confirm')"
+          :aria-label="t('type-app-id-to-confirm')"
           class="w-full p-3 border border-gray-300 rounded-lg dark:text-white dark:bg-gray-800 dark:border-gray-600"
         >
       </div>
@@ -1595,10 +1598,13 @@ async function transferAppOwnership() {
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('select-default-upload-channel-header')" defer to="#dialog-v2-content">
       <div class="w-full space-y-3">
         <template v-if="uploadChannelOptions.length">
+          <label for="upload-channel-search" class="sr-only">{{ t('default-upload-channel-search-placeholder') }}</label>
           <input
+            id="upload-channel-search"
             v-model="uploadSearch"
             type="text"
             :placeholder="t('default-upload-channel-search-placeholder')"
+            :aria-label="t('default-upload-channel-search-placeholder')"
             class="w-full px-3 py-2 text-sm bg-white border rounded-lg focus:border-blue-500 focus:ring-2 border-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-blue-500/20"
           >
           <div v-if="visibleUploadChannels.length" class="space-y-2">
@@ -1687,10 +1693,13 @@ async function transferAppOwnership() {
               <p class="text-xs text-slate-500 dark:text-slate-300">
                 {{ t('default-download-channel-unified-hint') }}
               </p>
+              <label for="combined-channel-search" class="sr-only">{{ t('default-download-channel-search-placeholder') }}</label>
               <input
+                id="combined-channel-search"
                 v-model="combinedSearch"
                 type="text"
                 :placeholder="t('default-download-channel-search-placeholder')"
+                :aria-label="t('default-download-channel-search-placeholder')"
                 class="w-full px-3 py-2 text-sm bg-white border rounded-lg focus:border-blue-500 focus:ring-2 border-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-blue-500/20"
               >
               <div v-if="visibleCombinedOptions.length" class="space-y-2">
