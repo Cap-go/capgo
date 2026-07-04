@@ -16,7 +16,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   check:
@@ -44,6 +43,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     name: Generate visual diff report
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - name: Setup Node.js
         uses: actions/setup-node@v6

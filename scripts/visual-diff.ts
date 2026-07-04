@@ -75,6 +75,13 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+function parseThreshold(raw: string, source: string): number {
+  const value = Number(raw)
+  if (!Number.isFinite(value) || value < 0 || value > 100)
+    throw new Error(`${source} must be a number between 0 and 100, received "${raw}"`)
+  return value
+}
+
 function parseArgs(argv: string[]): CliOptions {
   const [commandRaw, ...rest] = argv
   const command = (commandRaw || 'run') as Command
@@ -85,12 +92,12 @@ function parseArgs(argv: string[]): CliOptions {
   let phase: Phase | undefined
   let baseRef = process.env.VISUAL_DIFF_BASE_REF
   let headRef = process.env.VISUAL_DIFF_HEAD_REF
-  let thresholdPercent = Number(process.env.VISUAL_DIFF_THRESHOLD_PERCENT || '0.1')
+  let thresholdPercent = parseThreshold(process.env.VISUAL_DIFF_THRESHOLD_PERCENT || '0.1', 'VISUAL_DIFF_THRESHOLD_PERCENT')
   let routes: string[] = []
   let skipGitCheckout = process.env.VISUAL_DIFF_SKIP_GIT === 'true'
 
   function requireArg(flag: string, value: string | undefined) {
-    if (!value)
+    if (!value || value.startsWith('--'))
       throw new Error(`${flag} requires a value`)
     return value
   }
@@ -111,9 +118,7 @@ function parseArgs(argv: string[]): CliOptions {
     }
     if (arg === '--threshold') {
       const rawThreshold = requireArg('--threshold', rest[++index])
-      thresholdPercent = Number(rawThreshold)
-      if (!Number.isFinite(thresholdPercent))
-        throw new Error(`--threshold requires a numeric value, received "${rawThreshold}"`)
+      thresholdPercent = parseThreshold(rawThreshold, '--threshold')
       continue
     }
     if (arg === '--routes') {
@@ -236,8 +241,11 @@ function startProcess(name: string, args: string[], env: NodeJS.ProcessEnv = {})
     detached: !isWindows,
   })
 
-  child.stdout.pipe(logStream)
-  child.stderr.pipe(logStream)
+  child.stdout.pipe(logStream, { end: false })
+  child.stderr.pipe(logStream, { end: false })
+  child.on('close', () => {
+    logStream.end()
+  })
 
   const managed = { child, name }
   managedProcesses.push(managed)
@@ -250,15 +258,18 @@ async function stopProcess(processToStop: ManagedProcess) {
   if (hasExited())
     return
 
-  const waitForExit = (timeoutMs: number) => {
+  const waitForExit = async (timeoutMs: number) => {
     if (hasExited())
-      return Promise.resolve(true)
+      return true
 
     return Promise.race([
       new Promise<boolean>((resolveExit) => {
         processToStop.child.once('exit', () => resolveExit(true))
       }),
-      sleep(timeoutMs).then(() => hasExited()),
+      (async () => {
+        await sleep(timeoutMs)
+        return hasExited()
+      })(),
     ])
   }
 
@@ -569,6 +580,10 @@ async function compareScreenshots(thresholdPercent: number, routeFilter: string[
     })
   }
 
+  if (results.length === 0 && routes.length > 0) {
+    throw new Error(`No screenshot pairs available to compare for ${routes.length} configured route(s). Capture before and after first.`)
+  }
+
   return results
 }
 
@@ -706,8 +721,12 @@ async function runPipeline(options: CliOptions) {
     if (!options.skipGitCheckout) {
       try {
         const currentRef = git(['rev-parse', 'HEAD'])
-        if (currentRef !== originalRef)
+        if (currentRef !== originalRef) {
           git(['checkout', '--force', originalRef])
+          const install = spawnSync('bun', ['install'], { cwd: repoRoot, stdio: 'inherit', env: process.env })
+          if ((install.status ?? 1) !== 0)
+            throw new Error(`bun install failed after restoring git ref ${originalRef}`)
+        }
       }
       catch (error) {
         console.error(`[visual-diff] failed to restore git ref ${originalRef}:`, error)
