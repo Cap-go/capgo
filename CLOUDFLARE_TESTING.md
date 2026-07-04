@@ -68,8 +68,8 @@ bun run plugin-replica:up
 bun run readreplicate:local
 ```
 
-Local Supabase must run with `wal_level=logical` (configured in `supabase/config.toml`).
-After changing that setting, restart Supabase: `bun run supabase:stop && bun run supabase:start`.
+Local Supabase must expose `wal_level=logical` for the subscription bootstrap. Verify with `SHOW wal_level;` on the local DB.
+Replication slot headroom is configured via `[db.settings]` in `supabase/config.toml`.
 
 ## Running Tests
 

@@ -92,7 +92,7 @@ READ_REPLICA_PASSWORD='new-password' bash read_replicate/update_readreplica_pass
 
 ## Local plugin read-replica
 
-For local Cloudflare plugin-replica worker development:
+For local Cloudflare plugin-replica worker development (requires local Supabase with `wal_level=logical`):
 
 ```bash
 bun run plugin-replica:up
