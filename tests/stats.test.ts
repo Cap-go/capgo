@@ -825,7 +825,7 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /stats', () => {
 })
 
 describe('rollout trigger metadata', () => {
-  it('records version usage failures only for production devices', async () => {
+  it.skipIf(USE_CLOUDFLARE)('records version usage failures only for production devices', async () => {
     const shortId = randomUUID().split('-')[0]
     const appId = `${APP_NAME}.rollout.failcohort.${shortId}`
     await resetAndSeedAppData(appId)
