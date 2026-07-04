@@ -215,8 +215,6 @@ export const newIconPath = 'assets/icon.png'
 export const defaultAppIconPath = 'public/capgo.png'
 
 export function resolveAppSetIconPath(explicitIcon?: string): string | undefined {
-  if (explicitIcon === undefined)
-    return undefined
   return explicitIcon
 }
 
