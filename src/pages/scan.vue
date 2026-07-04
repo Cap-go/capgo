@@ -316,8 +316,13 @@ function previewLinkAppLabel(previewLink: PreviewDeepLink) {
 }
 
 function previewLinkDetail(previewLink: PreviewDeepLink) {
-  if (previewLink.type === 'channel')
-    return previewLink.channelName ? `Channel ${previewLink.channelName}` : `Channel ${previewLink.channelId}`
+  if (previewLink.type === 'channel') {
+    if (previewLink.channelName)
+      return `Channel ${previewLink.channelName}`
+    if (typeof previewLink.channelId === 'number')
+      return `Channel ${previewLink.channelId}`
+    return 'Channel preview'
+  }
   if (typeof previewLink.versionId === 'number')
     return `Bundle ${previewLink.versionId}`
   return 'Bundle preview'

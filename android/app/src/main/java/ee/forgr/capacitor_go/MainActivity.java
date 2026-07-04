@@ -1,6 +1,5 @@
 package ee.forgr.capacitor_go;
 
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -16,6 +15,7 @@ public class MainActivity extends BridgeActivity {
 
     private boolean previewConfirmationVisible = false;
     private Intent pendingPreviewIntent;
+    private Intent dialogPreviewIntent;
     private AlertDialog previewConfirmationDialog;
 
     @Override
@@ -60,26 +60,16 @@ public class MainActivity extends BridgeActivity {
         }
 
         previewConfirmationVisible = true;
+        dialogPreviewIntent = new Intent(intent);
+        final Intent confirmationIntent = dialogPreviewIntent;
         runOnUiThread(() -> {
-            Uri previewUri = intent.getData();
+            Uri previewUri = confirmationIntent.getData();
             previewConfirmationDialog = new AlertDialog.Builder(this)
                 .setTitle("Load preview?")
                 .setMessage(previewConfirmationMessage(previewUri))
-                .setNegativeButton("No", (currentDialog, which) -> {
-                    if (currentDialog == previewConfirmationDialog && which == DialogInterface.BUTTON_NEGATIVE) {
-                        cancelPreviewConfirmation();
-                    }
-                })
-                .setPositiveButton("Load preview", (currentDialog, which) -> {
-                    if (currentDialog == previewConfirmationDialog && which == DialogInterface.BUTTON_POSITIVE) {
-                        confirmPreviewIntent();
-                    }
-                })
-                .setOnCancelListener(currentDialog -> {
-                    if (currentDialog == previewConfirmationDialog) {
-                        cancelPreviewConfirmation();
-                    }
-                })
+                .setNegativeButton("No", (_, __) -> cancelPreviewConfirmation())
+                .setPositiveButton("Load preview", (_, __) -> confirmPreviewIntent(confirmationIntent))
+                .setOnCancelListener(_ -> cancelPreviewConfirmation())
                 .create();
             previewConfirmationDialog.show();
         });
@@ -96,13 +86,14 @@ public class MainActivity extends BridgeActivity {
     private void cancelPreviewConfirmation() {
         dismissPreviewConfirmationDialog();
         pendingPreviewIntent = null;
+        dialogPreviewIntent = null;
         previewConfirmationVisible = false;
     }
 
-    private void confirmPreviewIntent() {
-        Intent intent = pendingPreviewIntent;
+    private void confirmPreviewIntent(Intent intent) {
         dismissPreviewConfirmationDialog();
         pendingPreviewIntent = null;
+        dialogPreviewIntent = null;
         previewConfirmationVisible = false;
         if (intent == null) {
             return;

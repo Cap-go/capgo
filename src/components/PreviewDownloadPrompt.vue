@@ -33,8 +33,9 @@ function buildAndroidStoreUrl(currentPreviewUrl: string) {
 
 function buildMobileAppDownloadUrl(currentPreviewUrl: string) {
   const url = new URL(MOBILE_APP_DOWNLOAD_URL)
-  const deferredPreviewUrl = buildDeferredPreviewInstallReferrerUrl(currentPreviewUrl) ?? currentPreviewUrl
-  url.searchParams.set('preview', deferredPreviewUrl)
+  const deferredPreviewUrl = buildDeferredPreviewInstallReferrerUrl(currentPreviewUrl)
+  if (deferredPreviewUrl)
+    url.searchParams.set('preview', deferredPreviewUrl)
   return url.toString()
 }
 
