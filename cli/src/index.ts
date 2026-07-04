@@ -455,7 +455,7 @@ Example: npx @capgo/cli@latest app set com.example.app --name "Updated App" --re
     await setApp(appId, options)
   })
   .option('-n, --name <name>', `App name for display in Capgo Cloud`)
-  .option('-i, --icon <icon>', `App icon path to upload. Only updates the icon when this flag is passed`)
+  .option('-i, --icon <icon>', `Local image file path (png, jpg, webp, svg) used as the app icon in Capgo Cloud`)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('-r, --retention <retention>', `Days to keep old bundles (0 = infinite, default: 0)`)
   .option('--expose-metadata <exposeMetadata>', `Expose bundle metadata (link and comment) to the plugin (true/false, default: false)`)
