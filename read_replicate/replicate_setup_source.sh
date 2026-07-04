@@ -5,9 +5,16 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=read_replicate/common.sh
 source "${SCRIPT_DIR}/common.sh"
 
-echo "==> Setting up Supabase source for Google read-replica replication..."
-load_replica_target
-load_source
+if [[ "${READ_REPLICA_LOCAL:-}" == "1" ]]; then
+  echo "==> Setting up local Supabase source for plugin read-replica replication..."
+  load_local_replica_target
+  load_source
+  apply_local_subscription_source_connection
+else
+  echo "==> Setting up Supabase source for Google read-replica replication..."
+  load_replica_target
+  load_source
+fi
 
 PUBLICATION_NAME="$(discover_publication_name)"
 DEFAULT_SUBSCRIPTION_NAME="capgo_google_$(replica_region_name)"

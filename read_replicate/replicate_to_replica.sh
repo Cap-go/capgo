@@ -5,10 +5,24 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=read_replicate/common.sh
 source "${SCRIPT_DIR}/common.sh"
 
-echo "==> Starting Supabase -> Google read-replica replication setup..."
+if [[ "${READ_REPLICA_LOCAL:-}" == "1" ]]; then
+  echo "==> Starting Supabase -> local plugin read-replica replication setup..."
+  load_local_replica_target
+  load_source
+  apply_local_subscription_source_connection
 
-load_replica_target
-load_source
+  WAL_LEVEL="$(psql-17 "$SOURCE_DB_URL" -t -A -c "SHOW wal_level;" 2>/dev/null || psql "$SOURCE_DB_URL" -t -A -c "SHOW wal_level;" || true)"
+  echo "==> Source wal_level: ${WAL_LEVEL:-unknown}"
+  if [[ "$WAL_LEVEL" != "logical" ]]; then
+    echo "Error: local Supabase wal_level must be 'logical' for read replication." >&2
+    echo "Enable logical replication in supabase/config.toml, then restart Supabase." >&2
+    exit 1
+  fi
+else
+  echo "==> Starting Supabase -> Google read-replica replication setup..."
+  load_replica_target
+  load_source
+fi
 
 PUBLICATION_NAME="$(discover_publication_name)"
 DEFAULT_SUBSCRIPTION_NAME="capgo_google_$(replica_region_name)"

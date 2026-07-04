@@ -1,0 +1,32 @@
+services:
+  plugin-read-replica:
+    image: postgres:17
+    container_name: capgo_plugin_read_replica
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=10
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_logical_replication_workers=10
+    ports:
+      - '${PLUGIN_REPLICA_DB_PORT:-55432}:5432'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d postgres']
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    volumes:
+      - plugin_read_replica_data:/var/lib/postgresql/data
+
+volumes:
+  plugin_read_replica_data:

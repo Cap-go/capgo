@@ -182,7 +182,11 @@ build_source_connection_parts() {
     echo "==> Changed Supabase source port from 6543 to 5432 for direct replication"
   fi
 
-  SOURCE_SSLMODE='require'
+  if [[ "${READ_REPLICA_LOCAL:-}" == "1" ]]; then
+    SOURCE_SSLMODE='disable'
+  else
+    SOURCE_SSLMODE='require'
+  fi
   SOURCE_DB_URL="postgresql://${SOURCE_USER}:${source_password_encoded}@${SOURCE_HOST}:${SOURCE_PORT}/${SOURCE_DB}?sslmode=${SOURCE_SSLMODE}"
   SOURCE_CONNECTION_STRING="host=$(libpq_escape_value "$SOURCE_HOST")
             port=$(libpq_escape_value "$SOURCE_PORT")
@@ -202,6 +206,60 @@ load_source() {
   db_url="$(load_source_db_url)"
   build_source_connection_parts "$db_url"
 }
+
+wait_for_local_replica() {
+  local attempts="${1:-60}"
+  local psql_bin="${PSQL_BIN:-$(command -v psql-17 || command -v psql || true)}"
+  local i
+
+  if [[ -z "$psql_bin" ]]; then
+    echo "Error: psql is required for local read-replica bootstrap." >&2
+    exit 1
+  fi
+
+  for ((i = 1; i <= attempts; i++)); do
+    if "$psql_bin" "$REPLICA_TARGET_DB_URL" -t -A -c 'SELECT 1;' >/dev/null 2>&1; then
+      echo "==> Local read-replica Postgres is ready on port ${PLUGIN_REPLICA_DB_PORT}."
+      return 0
+    fi
+    echo "==> Waiting for local read-replica Postgres... (${i}/${attempts})"
+    sleep 2
+  done
+
+  echo "Error: local read-replica Postgres did not become ready in time." >&2
+  exit 1
+}
+
+load_local_replica_target() {
+  PLUGIN_REPLICA_DB_PORT="${PLUGIN_REPLICA_DB_PORT:-55432}"
+  REPLICA_TARGET_ENV="LOCAL_READ_REPLICA"
+  REPLICA_TARGET_DB_URL="postgresql://postgres:postgres@127.0.0.1:${PLUGIN_REPLICA_DB_PORT}/postgres?connect_timeout=10"
+  REPLICA_TARGET_HOST="127.0.0.1"
+  REPLICA_SUBSCRIPTION_NAME="${READ_REPLICA_SUBSCRIPTION_NAME:-capgo_local_subscription}"
+  REPLICA_SLOT_NAME="${READ_REPLICA_SLOT_NAME:-capgo_local_slot}"
+  wait_for_local_replica
+}
+
+apply_local_subscription_source_connection() {
+  local subscription_host="${READ_REPLICA_SOURCE_HOST:-host.docker.internal}"
+  local source_password_encoded
+
+  source_password_encoded=$(echo "$SOURCE_DB_URL" | sed -E 's|postgresql://[^:]+:(.*)@[^@]+$||')
+  SOURCE_SSLMODE='disable'
+  SOURCE_DB_URL="postgresql://${SOURCE_USER}:${source_password_encoded}@${SOURCE_HOST}:${SOURCE_PORT}/${SOURCE_DB}?sslmode=${SOURCE_SSLMODE}"
+  SOURCE_CONNECTION_STRING="host=$(libpq_escape_value "$subscription_host")
+            port=$(libpq_escape_value "$SOURCE_PORT")
+            dbname=$(libpq_escape_value "$SOURCE_DB")
+            user=$(libpq_escape_value "$SOURCE_USER")
+            password=$(libpq_escape_value "$SOURCE_PASSWORD")
+            sslmode=disable
+            connect_timeout=10
+            keepalives=1
+            keepalives_idle=10
+            keepalives_interval=5
+            keepalives_count=3"
+}
+
 
 load_replica_target() {
   local forced_key="${READ_REPLICA_TARGET_ENV:-}"

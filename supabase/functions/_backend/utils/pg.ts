@@ -287,6 +287,13 @@ function setDatabaseSource(c: Context, source: string): void {
 }
 
 function getReadOnlyDatabaseURL(c: Context, dbRegion: string | undefined): string | null {
+  const localReplicaUrl = (c.env as Record<string, unknown>).LOCAL_READ_REPLICA_DB_URL
+  if (typeof localReplicaUrl === 'string' && localReplicaUrl.length > 0) {
+    setDatabaseSource(c, 'LOCAL_READ_REPLICA')
+    cloudlog({ requestId: c.get('requestId'), message: 'Using LOCAL_READ_REPLICA_DB_URL for read-only' })
+    return localReplicaUrl
+  }
+
   const selectedRoute = READ_REPLICA_ROUTES.find(route => route.region === dbRegion && c.env[route.binding])
   if (!selectedRoute)
     return null

@@ -24,6 +24,12 @@ enabled = false
 [db]
 # Port to use for the local database URL.
 port = 54322
+
+# Required for local plugin read-replica logical replication.
+[db.config]
+wal_level = "logical"
+max_replication_slots = 10
+max_wal_senders = 10
 # Port used by db diff command to initialize the shadow database.
 shadow_port = 54320
 # The database major version to use. This has to be the same as your remote database's. Run `SHOW

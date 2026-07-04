@@ -88,3 +88,19 @@ READ_REPLICA_PASSWORD='new-password' bash read_replicate/update_readreplica_pass
   false`, then re-enables the subscription.
 - `schema_replicate.sql` is intentionally limited to tables replicated into the
   Google subscriber. It excludes foreign keys, triggers, and RLS policies.
+
+
+## Local plugin read-replica
+
+For local Cloudflare plugin-replica worker development:
+
+```bash
+bun run plugin-replica:up
+bun run readreplicate:local
+```
+
+Or start everything with:
+
+```bash
+bun run plugin-replica:dev
+```

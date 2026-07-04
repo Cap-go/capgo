@@ -41,6 +41,36 @@ The workers support two testing modes:
 - Tests the traditional PostgreSQL code path
 - Simpler and faster for basic testing
 
+
+## Plugin read-replica worker (local)
+
+The plugin-replica worker mirrors production read-replica routing locally:
+
+1. Starts a Postgres 17 container (`cloudflare_workers/plugin-replica/docker-compose.yml`)
+2. Applies `read_replicate/schema_replicate.sql`
+3. Subscribes to logical replication from local Supabase
+4. Routes read-only plugin queries to the replica via `LOCAL_READ_REPLICA_DB_URL`
+
+Start the full stack:
+
+```bash
+bun run plugin-replica:dev
+```
+
+This runs the worker on `http://127.0.0.1:8790`.
+
+Manual steps:
+
+```bash
+bun run supabase:start
+bun run supabase:db:reset
+bun run plugin-replica:up
+bun run readreplicate:local
+```
+
+Local Supabase must run with `wal_level=logical` (configured in `supabase/config.toml`).
+After changing that setting, restart Supabase: `bun run supabase:stop && bun run supabase:start`.
+
 ## Running Tests
 
 ### Option 1: Manual Setup (Recommended for Development)
