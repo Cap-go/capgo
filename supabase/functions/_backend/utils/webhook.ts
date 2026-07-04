@@ -821,7 +821,7 @@ export async function queueWebhookDeliveryWithDelay(
   try {
     // pgmq.send with delay parameter
     await db.query(
-      'SELECT pgmq.send($1, $2::jsonb, $3)',
+      'SELECT pgmq.send($1::text, $2::jsonb, $3::integer)',
       ['webhook_delivery', JSON.stringify(message), delaySeconds],
     )
     cloudlog({

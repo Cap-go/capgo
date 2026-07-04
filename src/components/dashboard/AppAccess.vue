@@ -558,10 +558,10 @@ onMounted(async () => {
 
         <!-- Principal Type -->
         <div class="mt-4 form-control">
-          <label class="label">
+          <label class="label" for="assign-role-principal-type">
             <span class="label-text">{{ t('principal-type') }}</span>
           </label>
-          <select v-model="assignRoleForm.principal_type" class="d-select">
+          <select id="assign-role-principal-type" v-model="assignRoleForm.principal_type" class="d-select" :aria-label="t('principal-type')">
             <option value="user">
               {{ t('user') }}
             </option>
@@ -573,12 +573,12 @@ onMounted(async () => {
 
         <!-- Principal Selection -->
         <div class="mt-4 form-control">
-          <label class="label">
+          <label class="label" for="assign-role-principal-id">
             <span class="label-text">
               {{ assignRoleForm.principal_type === 'user' ? t('select-user') : t('select-group') }}
             </span>
           </label>
-          <select v-model="assignRoleForm.principal_id" class="d-select" required>
+          <select id="assign-role-principal-id" v-model="assignRoleForm.principal_id" class="d-select" required :aria-label="assignRoleForm.principal_type === 'user' ? t('select-user') : t('select-group')">
             <option value="">
               {{ assignRoleForm.principal_type === 'user' ? t('select-user') : t('select-group') }}
             </option>
@@ -603,12 +603,14 @@ onMounted(async () => {
 
         <!-- Reason (optional) -->
         <div class="mt-4 form-control">
-          <label class="label">
+          <label class="label" for="assign-role-reason">
             <span class="label-text">{{ t('reason-optional') }}</span>
           </label>
           <textarea
+            id="assign-role-reason"
             v-model="assignRoleForm.reason"
             :placeholder="t('reason-placeholder')"
+            :aria-label="t('reason-optional')"
             class="d-textarea"
             rows="2"
           />
