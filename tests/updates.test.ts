@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { env } from 'node:process'
 import { type } from 'arktype'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { parseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
@@ -7,6 +8,7 @@ import { APP_NAME, createAppVersions, getBaseData, getEndpointUrl, getSupabaseCl
 
 const id = randomUUID()
 const APP_NAME_UPDATE = `${APP_NAME}.${id}`
+const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
 
 interface UpdateRes {
   error?: string
@@ -112,6 +114,30 @@ afterAll(async () => {
   await resetAppData(APP_NAME_UPDATE)
   await resetAppDataStats(APP_NAME_UPDATE)
 }, 60_000)
+
+describe.skipIf(!USE_CLOUDFLARE)('[POST] /updates Cloudflare write guard', () => {
+  it('returns update data without creating a primary device row', async () => {
+    const uuid = randomUUID().toLowerCase()
+    const baseData = getBaseData(APP_NAME_UPDATE)
+    baseData.version_build = getVersionFromAction('get')
+    const version = await createAppVersions(baseData.version_build, APP_NAME_UPDATE)
+    baseData.version_name = version.name
+    baseData.device_id = uuid
+
+    const response = await postUpdate(baseData)
+    expect(response.status).toBe(200)
+    const jsonResponse = await response.json<UpdateRes>()
+    expect(jsonResponse.checksum).toBe('3885ee49')
+
+    const { count, error } = await getSupabaseClient()
+      .from('devices')
+      .select('*', { count: 'exact', head: true })
+      .eq('device_id', uuid)
+      .eq('app_id', APP_NAME_UPDATE)
+    expect(error).toBeNull()
+    expect(count).toBe(0)
+  })
+})
 
 describe('[POST] /updates', () => {
   it('no new version available', async () => {
@@ -462,7 +488,7 @@ describe('manifest bundle count gating', () => {
 })
 
 describe('[POST] /updates parallel tests', () => {
-  it('with new device', async () => {
+  it.skipIf(USE_CLOUDFLARE)('with new device', async () => {
     const uuid = randomUUID().toLowerCase()
 
     const baseData = getBaseData(APP_NAME_UPDATE)
@@ -1096,7 +1122,7 @@ describe('update scenarios', () => {
     }
   })
 
-  it('saves default_channel when provided', async () => {
+  it.skipIf(USE_CLOUDFLARE)('saves default_channel when provided', async () => {
     const uuid = randomUUID().toLowerCase()
     const testDefaultChannel = 'staging'
 
@@ -1126,7 +1152,7 @@ describe('update scenarios', () => {
     await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_UPDATE)
   })
 
-  it('overwrites default_channel with null when not provided', async () => {
+  it.skipIf(USE_CLOUDFLARE)('overwrites default_channel with null when not provided', async () => {
     const uuid = randomUUID().toLowerCase()
     const testDefaultChannel = 'production'
 

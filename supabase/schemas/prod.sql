@@ -315,7 +315,18 @@ CREATE TYPE "public"."stats_action" AS ENUM (
     'webview_render_process_gone',
     'webview_content_process_terminated',
     'os_version_changed',
-    'native_app_version_changed'
+    'native_app_version_changed',
+    'finish_download_fail',
+    'checksum_required',
+    'manifest_path_fail',
+    'rate_limit_reached',
+    'set_next',
+    'insufficient_disk_space',
+    'app_launch_start',
+    'app_launch_ready',
+    'app_launch_timeout',
+    'webview_dom_content_loaded',
+    'webview_page_loaded'
 );
 
 
