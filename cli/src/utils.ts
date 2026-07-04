@@ -611,6 +611,37 @@ export async function getLocalConfig(silent = false) {
 // eslint-disable-next-line regexp/no-unused-capturing-group
 const nativeFileRegex = /([A-Za-z0-9]+)\.(java|swift|kt|scala)$/
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function packageDeclaresNativePlugin(packageJson: unknown): boolean {
+  if (!isRecord(packageJson))
+    return false
+
+  const capacitor = packageJson.capacitor
+  if (isRecord(capacitor) && (capacitor.ios !== undefined || capacitor.android !== undefined))
+    return true
+
+  return false
+}
+
+function dependencyDeclaresNativePlugin(dependencyFolderPath: string): boolean {
+  if (existsSync(join(dependencyFolderPath, 'plugin.xml')))
+    return true
+
+  const packageJsonPath = join(dependencyFolderPath, PACKNAME)
+  if (!existsSync(packageJsonPath))
+    return false
+
+  try {
+    return packageDeclaresNativePlugin(JSON.parse(readFileSync(packageJsonPath, 'utf-8')))
+  }
+  catch {
+    return false
+  }
+}
+
 interface CapgoConfig {
   supaHost?: string
   supaKey?: string
@@ -1955,6 +1986,9 @@ export async function getLocalDependencies(packageJsonPath: string | undefined, 
           catch {
             // If we can't read the package.json, fall back to declared version
           }
+          if (!dependencyDeclaresNativePlugin(dependencyFolderPath))
+            continue
+
           try {
             const files = readDirRecursively(dependencyFolderPath)
             if (files.some(fileName => nativeFileRegex.test(fileName))) {

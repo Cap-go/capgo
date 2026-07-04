@@ -9,6 +9,15 @@ import { version } from '../../supabase/functions/_backend/utils/version.ts'
 const functionName = 'plugin'
 const app = createHono(functionName, version)
 
+app.use('*', async (c, next) => {
+  c.set('skipSupabaseStatsFallback', true)
+  c.set('skipSupabaseNotificationWrites', true)
+  c.set('queuePluginNotifications', true)
+  c.set('skipChannelSelfPostgresFallback', true)
+  c.set('requireReadReplica', true)
+  await next()
+})
+
 app.use('*', useCors)
 
 // TODO: deprecated remove when everyone use the new endpoint

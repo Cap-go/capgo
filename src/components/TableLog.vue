@@ -18,6 +18,8 @@ import IconSort from '~icons/lucide/chevrons-up-down'
 import IconDownload from '~icons/lucide/download'
 import IconFilter from '~icons/system-uicons/filtering'
 import IconReload from '~icons/tabler/reload'
+import { formatLocalDate, formatLocalDateShort, formatLocalTime } from '~/services/date'
+import { formatNumberValue } from '~/services/formatLocale'
 import '@vuepic/vue-datepicker/dist/main.css'
 
 interface Props {
@@ -26,6 +28,7 @@ interface Props {
   exportLoading?: boolean
   filterText?: string
   filters?: { [key: string]: boolean }
+  filterShortcuts?: { label: string, filters: string[] }[]
   range?: [Date, Date]
   searchPlaceholder?: string
   search?: string
@@ -103,6 +106,12 @@ const filterActivated = computed(() => {
       acc += 1
     return acc
   }, 0)
+})
+const filterButtonLabel = computed(() => {
+  if (!props.filterText)
+    return ''
+  const label = t(props.filterText)
+  return filterActivated.value ? `${label} (${filterActivated.value})` : label
 })
 const currentSelected = ref<'general' | 'precise'>('general')
 type QuickHourOption = 1 | 3 | 6 | 12
@@ -212,7 +221,26 @@ async function fastBackward() {
   emit('reload')
 }
 
+function rangeMatchesQuick(range: [Date, Date] | undefined, option: QuickHourOption) {
+  if (!range)
+    return false
+
+  const start = dayjs(range[0])
+  const end = dayjs(range[1])
+  const diffMinutes = Math.abs(end.diff(start, 'minute'))
+  const nowDiffMinutes = Math.abs(end.diff(dayjs(), 'minute'))
+
+  return Math.abs(diffMinutes - option * 60) <= 2 && nowDiffMinutes <= 5
+}
+
 function clickRight() {
+  const matchedOption = quickOptions.find(option => rangeMatchesQuick(preciseDates.value, option))
+  if (matchedOption) {
+    currentSelected.value = 'general'
+    currentGeneralTime.value = matchedOption
+    return
+  }
+
   currentSelected.value = 'precise'
 }
 
@@ -232,42 +260,39 @@ async function setTime(time: QuickHourOption, shouldCloseMenu = false) {
 }
 
 function formatValue(previewValue: Date[] | undefined) {
-  // previewValue is an array of Date objects
-  // we want to return object { start: time, end: time} and handle if it's not an array or empty
-  // time should be in format HH:MM
   if (!previewValue)
-    return { start: dayjs().subtract(2, 'hour').format('HH:mm'), end: dayjs().format('HH:mm') }
+    return { start: formatLocalTime(dayjs().subtract(2, 'hour').toDate()), end: formatLocalTime(new Date()) }
   return {
-    start: dayjs(previewValue[0]).format('HH:mm'),
-    end: dayjs(previewValue[1]).format('HH:mm'),
+    start: formatLocalTime(previewValue[0]),
+    end: formatLocalTime(previewValue[1]),
   }
 }
 
 const calendarPreview = computed(() => {
   if (!preciseDates.value) {
     return {
-      start: dayjs().subtract(1, 'hour').format('YYYY-MM-DD'),
-      end: dayjs().format('YYYY-MM-DD'),
+      start: formatLocalDate(dayjs().subtract(1, 'hour').toDate()),
+      end: formatLocalDate(new Date()),
     }
   }
 
   return {
-    start: dayjs(preciseDates.value[0]).format('YYYY-MM-DD'),
-    end: dayjs(preciseDates.value[1]).format('YYYY-MM-DD'),
+    start: formatLocalDate(preciseDates.value[0]),
+    end: formatLocalDate(preciseDates.value[1]),
   }
 })
 
 const timePreview = computed(() => {
   if (!preciseDates.value) {
     return {
-      start: dayjs().subtract(1, 'hour').format('HH:mm'),
-      end: dayjs().format('HH:mm'),
+      start: formatLocalTime(dayjs().subtract(1, 'hour').toDate()),
+      end: formatLocalTime(new Date()),
     }
   }
 
   return {
-    start: dayjs(preciseDates.value[0]).format('HH:mm'),
-    end: dayjs(preciseDates.value[1]).format('HH:mm'),
+    start: formatLocalTime(preciseDates.value[0]),
+    end: formatLocalTime(preciseDates.value[1]),
   }
 })
 
@@ -291,11 +316,11 @@ function formatDurationLabel(totalMinutes: number) {
   const mins = minutes % 60
   const parts: string[] = []
   if (days)
-    parts.push(`${days}d`)
+    parts.push(`${formatNumberValue(days)}d`)
   if (hours)
-    parts.push(`${hours}h`)
+    parts.push(`${formatNumberValue(hours)}h`)
   if (mins || !parts.length)
-    parts.push(`${mins}m`)
+    parts.push(`${formatNumberValue(mins)}m`)
   return parts.join(' ')
 }
 
@@ -319,18 +344,32 @@ const buttonLabel = computed(() => {
   }
 
   if (start.isSame(now, 'day') && end.isSame(now, 'day'))
-    return `${start.format('HH:mm')} → ${end.format('HH:mm')}`
+    return `${formatLocalTime(startDate)} → ${formatLocalTime(endDate)}`
 
   if (start.isSame(end, 'day'))
-    return `${start.format('D MMM HH:mm')} → ${end.format('HH:mm')}`
+    return `${formatLocalDateShort(startDate)} ${formatLocalTime(startDate)} → ${formatLocalTime(endDate)}`
 
-  return `${start.format('D MMM HH:mm')} → ${end.format('D MMM HH:mm')}`
+  return `${formatLocalDateShort(startDate)} ${formatLocalTime(startDate)} → ${formatLocalDateShort(endDate)} ${formatLocalTime(endDate)}`
 })
 
 function selectQuick(option: QuickHourOption) {
   if (currentSelected.value === 'general' && currentGeneralTime.value === option)
     return
   setTime(option, true)
+}
+
+function applyFilterShortcut(shortcut: { label: string, filters: string[] }) {
+  if (!props.filters)
+    return
+
+  const nextFilters = Object.fromEntries(
+    Object.keys(props.filters).map(key => [key, false]),
+  ) as Record<string, boolean>
+  shortcut.filters.forEach((filter) => {
+    if (filter in nextFilters)
+      nextFilters[filter] = true
+  })
+  emit('update:filters', nextFilters)
 }
 
 function updateUrlParams() {
@@ -443,7 +482,7 @@ onMounted(async () => {
 
 <template>
   <div class="pb-4 md:pb-0">
-    <div class="flex items-start justify-between p-3 pb-4 overflow-visible md:items-center">
+    <div class="flex flex-wrap items-start justify-between gap-2 p-3 pb-4 overflow-visible md:items-center md:flex-nowrap">
       <div class="flex h-10 md:mb-0">
         <button class="inline-flex items-center py-1.5 px-3 mr-2 text-sm font-medium text-gray-500 bg-white rounded-md border border-gray-300 dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden" type="button" @click="reloadData">
           <IconReload v-if="!isLoading" class="m-1 md:mr-2" />
@@ -482,7 +521,7 @@ onMounted(async () => {
           <template #trigger>
             <button
               type="button"
-              class="inline-flex gap-2 items-center py-1.5 px-3 h-10 text-sm font-medium text-gray-600 bg-white rounded-md border border-gray-300 transition-colors dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden whitespace-nowrap"
+              class="d-btn d-btn-sm h-10 min-h-10 min-w-32 justify-between gap-2 whitespace-nowrap border-gray-300 bg-white px-3 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
             >
               <IconCalendar class="w-4 h-4 shrink-0" />
               <span class="hidden truncate md:block">
@@ -598,7 +637,8 @@ onMounted(async () => {
       <div v-if="filterText && filterList.length" ref="filterDropdownRef" class="relative h-10 mr-2 md:mr-auto">
         <button
           type="button"
-          class="relative inline-flex items-center py-1.5 px-3 h-full text-sm font-medium text-gray-500 bg-white rounded-md border border-gray-300 cursor-pointer dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
+          :aria-label="filterButtonLabel"
+          class="d-btn d-btn-sm relative h-full min-h-10 border-gray-300 bg-white px-3 text-sm font-medium text-gray-500 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:hover:border-gray-600 dark:hover:bg-gray-700"
           @click="toggleFilterDropdown"
         >
           <div
@@ -608,7 +648,7 @@ onMounted(async () => {
             {{ filterActivated }}
           </div>
           <IconFilter class="mr-2 w-4 h-4" />
-          <span class="hidden md:block">{{ t(filterText) }}</span>
+          <span class="hidden md:block">{{ filterButtonLabel }}</span>
           <IconDown class="hidden ml-2 w-4 h-4 md:block" />
         </button>
         <Teleport to="body">
@@ -618,9 +658,22 @@ onMounted(async () => {
             :style="filterDropdownStyle"
             @click.stop
           >
+            <div v-if="filterShortcuts?.length" class="mb-2 border-b border-gray-200 pb-2 dark:border-gray-700">
+              <button
+                v-for="shortcut in filterShortcuts"
+                :key="shortcut.label"
+                type="button"
+                class="d-btn d-btn-ghost d-btn-sm w-full justify-start px-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+                @click="applyFilterShortcut(shortcut)"
+              >
+                {{ t(shortcut.label) }}
+              </button>
+            </div>
             <input
               v-model="filterSearchVal"
               type="text"
+              name="log-filter-search"
+              :aria-label="t('search')"
               :placeholder="t('search')"
               class="w-full px-3 py-2 mb-2 text-sm border border-gray-300 rounded-md dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               @click.stop
@@ -651,14 +704,14 @@ onMounted(async () => {
           </div>
         </Teleport>
       </div>
-      <div class="flex overflow-hidden md:w-auto">
+      <div class="flex min-w-0 overflow-hidden md:w-auto">
         <FormKit
           v-model="searchVal"
           :placeholder="searchPlaceholder"
-          :prefix-icon="IconSearch" :disabled="isLoading"
+          :prefix-icon="IconSearch"
           enterkeyhint="send"
           :classes="{
-            outer: 'mb-0! md:w-96',
+            outer: 'mb-0! w-48 sm:w-64 md:w-96',
           }"
         />
       </div>
@@ -679,7 +732,7 @@ onMounted(async () => {
             </th>
           </tr>
         </thead>
-        <tbody v-if="!isLoading && elementList.length !== 0">
+        <tbody v-if="elementList.length !== 0">
           <tr
             v-for="(elem, i) in elementList" :key="i"
             class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"

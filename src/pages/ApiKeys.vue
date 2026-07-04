@@ -84,7 +84,6 @@ interface ApiKeyAppAccessOption {
 
 type ApiKeyRow = Database['public']['Tables']['apikeys']['Row'] & {
   global_permissions?: string[]
-  is_hashed_key?: boolean
 }
 
 const { t } = useI18n()
@@ -159,33 +158,15 @@ function hideString(str: string | null) {
   return `${first}...${last}`
 }
 
-type ApiKeySecretMetadata = Partial<Pick<Database['public']['Tables']['apikeys']['Row'], 'key' | 'key_hash'>> & {
-  is_hashed_key?: boolean
-}
-
-function hasPlainApiKey(key: ApiKeySecretMetadata): key is ApiKeySecretMetadata & { key: string } {
-  return typeof key.key === 'string' && key.key.length > 0
-}
-
-function canCopyApiKey(key: ApiKeySecretMetadata): key is ApiKeySecretMetadata & { key: string } {
-  return hasPlainApiKey(key)
-}
-
-function isHashedKey(key: ApiKeySecretMetadata) {
-  return key.is_hashed_key === true || (key.key === null && key.key_hash !== null && key.key_hash !== undefined)
-}
-
-function formatApiKeySecret(key: ApiKeySecretMetadata) {
-  if (isHashedKey(key))
-    return t('secure-key-hidden')
-  if (!hasPlainApiKey(key))
-    return t('api-key-hidden')
-  return hideString(key.key)
+// Check if a key is a hashed (secure) key
+function isHashedKey(key: Database['public']['Tables']['apikeys']['Row']) {
+  return key.key === null && key.key_hash !== null
 }
 
 function getRoleDisplayName(roleName: string): string {
-  const i18nKey = getRbacRoleI18nKey(roleName)
-  return i18nKey ? t(i18nKey) : roleName.replaceAll('_', ' ')
+  const normalized = roleName.replace(/^invite_/, '')
+  const i18nKey = getRbacRoleI18nKey(normalized)
+  return i18nKey ? t(i18nKey) : normalized.replaceAll('_', ' ')
 }
 
 // Get bindings for a specific key
@@ -655,10 +636,24 @@ const unsupportedApiKeyOrgRoles = new Set(['org_billing_admin'])
 const orgRoles = computed(() => roles.value.filter(r => r.scope_type === 'org' && !unsupportedApiKeyOrgRoles.has(r.name)))
 const appRoles = computed(() => roles.value.filter(r => r.scope_type === 'app'))
 
+const legacyOrgRoleAliases: Record<string, string> = {
+  owner: 'org_super_admin',
+  super_admin: 'org_super_admin',
+  admin: 'org_admin',
+  write: 'org_member',
+  upload: 'org_member',
+  read: 'org_member',
+}
+
+function normalizeOrgRoleName(roleName: string) {
+  const normalized = roleName.replace(/^invite_/, '')
+  return legacyOrgRoleAliases[normalized] ?? normalized
+}
+
 function getRolePriority(roleName?: string | null) {
   if (!roleName)
     return 0
-  return roles.value.find(r => r.name === roleName)?.priority_rank ?? 0
+  return roles.value.find(r => r.name === normalizeOrgRoleName(roleName))?.priority_rank ?? 0
 }
 
 const callerOrgPriorityByOrgId = computed(() => new Map(
@@ -761,7 +756,10 @@ columns.value = [
     label: t('api-key'),
     head: true,
     displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
-      return formatApiKeySecret(row)
+      if (isHashedKey(row)) {
+        return t('secure-key-hidden')
+      }
+      return hideString(row.key)
     },
   },
   {
@@ -819,7 +817,6 @@ columns.value = [
       {
         icon: IconClipboard,
         title: t('copy'),
-        visible: (key: Database['public']['Tables']['apikeys']['Row']) => canCopyApiKey(key),
         onClick: (key: Database['public']['Tables']['apikeys']['Row']) => copyKey(key),
       },
       {
@@ -849,6 +846,7 @@ columns.value = [
     ],
   },
 ]
+
 async function refreshData() {
   try {
     currentPage.value = 1
@@ -1026,7 +1024,6 @@ async function createApiKey() {
     }
 
     const createdKey = data
-    createdKey.is_hashed_key = isHashed
     if (isHashed)
       plainKeyForDisplay = typeof data.key === 'string' ? data.key : null
 
@@ -1531,20 +1528,21 @@ async function getUserFacingErrorMessage(error: unknown, fallbackMessage: string
 }
 
 async function copyKey(apikey: Database['public']['Tables']['apikeys']['Row']) {
-  if (!canCopyApiKey(apikey)) {
-    toast.error(isHashedKey(apikey) ? t('cannot-copy-secure-key') : t('cannot-copy-hidden-key'))
+  // Cannot copy hashed keys - they are never stored in plain text
+  if (isHashedKey(apikey)) {
+    toast.error(t('cannot-copy-secure-key'))
     return
   }
 
   try {
-    await navigator.clipboard.writeText(apikey.key)
+    await navigator.clipboard.writeText(apikey.key!)
     toast.success(t('key-copied'))
   }
   catch (err) {
     console.error('Failed to copy: ', err)
     dialogStore.openDialog({
       title: t('cannot-copy-key'),
-      description: apikey.key,
+      description: apikey.key!,
       buttons: [
         {
           text: t('ok'),
@@ -1555,6 +1553,7 @@ async function copyKey(apikey: Database['public']['Tables']['apikeys']['Row']) {
     await dialogStore.onDialogDismiss()
   }
 }
+
 // Watch for org selection changes to prune app bindings
 watch([scopeFilterLabels, currentOrganizationId], () => {
   syncScopeFilters()
@@ -1682,15 +1681,14 @@ getKeys()
             </button>
           </div>
           <div v-if="scopePicker.items.length > 8" class="border-b border-slate-200 p-2 dark:border-slate-700">
-            <label for="api-key-scope-search" class="sr-only">
-              {{ t('search-scope-items') }}
-            </label>
+            <label for="scope-picker-search" class="sr-only">{{ t('search-scope-items') }}</label>
             <input
-              id="api-key-scope-search"
+              id="scope-picker-search"
               v-model="scopePickerQuery"
               type="search"
               class="min-h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
               :placeholder="t('search-scope-items')"
+              :aria-label="t('search-scope-items')"
             >
           </div>
           <ul class="max-h-80 overflow-y-auto p-2">
@@ -1928,12 +1926,10 @@ getKeys()
                     {{ getAppOrgNameById(appId) }}
                   </span>
                 </span>
-                <label :for="`create-key-app-role-${appId}`" class="sr-only">
-                  {{ getAppNameById(appId) }} {{ t('select-role') }}
-                </label>
                 <select
                   :id="`create-key-app-role-${appId}`"
                   data-test="create-key-app-role-select"
+                  :aria-label="t('select-role')"
                   class="d-select d-select-sm d-select-bordered"
                   :value="pendingAppBindings[appId] || ''"
                   @change="onAppRoleChange(appId, $event)"
@@ -1994,7 +1990,7 @@ getKeys()
                 >
                   <IconCalendar class="w-4 h-4 text-gray-500 dark:text-gray-400" />
                   <span :class="expirationDate ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'">
-                    {{ expirationDate ? dayjs(expirationDate).format('YYYY-MM-DD') : t('select-expiration-date') }}
+                    {{ expirationDate ? formatLocalDate(expirationDate) : t('select-expiration-date') }}
                   </span>
                 </button>
               </template>
@@ -2020,6 +2016,7 @@ getKeys()
               <select
                 id="apikey-channel-permissions-app-select"
                 v-model="selectedChannelPermissionAppUuid"
+                :aria-label="t('app')"
                 class="w-full d-select d-select-bordered"
                 data-test="apikey-channel-permissions-app-select"
               >

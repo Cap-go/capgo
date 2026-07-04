@@ -24,6 +24,7 @@ function simulateReplicaStorage(device: DeviceWithoutCreatedAt): DeviceExistingR
     version_name: comparable.version_name, // Already has 'unknown' default from toComparableDevice()
     is_prod: comparable.is_prod ? 1 : 0,
     is_emulator: comparable.is_emulator ? 1 : 0,
+    install_source: comparable.install_source,
     default_channel: comparable.default_channel,
     key_id: comparable.key_id,
   }
@@ -65,6 +66,7 @@ describe('deviceComparison utilities', () => {
         version_name: 'v1.0.0',
         is_prod: true,
         is_emulator: false,
+        install_source: 'google_play',
         default_channel: 'production',
       }
 
@@ -79,6 +81,7 @@ describe('deviceComparison utilities', () => {
         version_name: 'v1.0.0',
         is_prod: true,
         is_emulator: false,
+        install_source: 'google_play',
         default_channel: 'production',
         key_id: null,
       })
@@ -159,6 +162,7 @@ describe('deviceComparison utilities', () => {
         version_name: 'v1.0.0',
         is_prod: true,
         is_emulator: false,
+        install_source: 'app_store',
         default_channel: 'production',
       }
 
@@ -173,6 +177,7 @@ describe('deviceComparison utilities', () => {
         version_name: 'v1.0.0',
         is_prod: true,
         is_emulator: false,
+        install_source: 'app_store',
         default_channel: 'production',
         key_id: null,
       })
@@ -240,6 +245,29 @@ describe('deviceComparison utilities', () => {
   })
 
   describe('hasComparableDeviceChanged', () => {
+    it('should compare install_source only when the client reports it', () => {
+      const device: DeviceWithoutCreatedAt = {
+        device_id: 'test-device',
+        app_id: 'test-app',
+        platform: 'ios',
+        plugin_version: '8.0.0',
+        os_version: '18',
+        version_build: '100',
+        custom_id: '',
+        version_name: 'v1.0.0',
+        is_prod: true,
+        is_emulator: false,
+        default_channel: 'production',
+      }
+      const existing = simulateReplicaStorage({
+        ...device,
+        install_source: 'app_store',
+      })
+
+      expect(hasComparableDeviceChanged(existing, device)).toBe(false)
+      expect(hasComparableDeviceChanged(existing, { ...device, install_source: 'testflight' })).toBe(true)
+    })
+
     it('should return false when devices are identical', () => {
       const existing: DeviceExistingRowLike = {
         platform: 'android',

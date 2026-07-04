@@ -7,6 +7,7 @@ import type { Database } from '../utils/supabase.types.ts'
 import { parse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
+import { logSkippedSupabaseWrite, shouldSkipChannelSelfPostgresFallback } from '../utils/supabase_write_guard.ts'
 import { checkChannelSelfIPRateLimit, isChannelSelfRateLimited, recordChannelSelfIPRequest, recordChannelSelfRequest } from '../utils/channelSelfRateLimit.ts'
 import { deleteChannelSelfOverride, getChannelSelfOverride, isChannelSelfStoreEnabled, setChannelSelfOverride } from '../utils/channelSelfStore.ts'
 import { BRES, parseBody, quickError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
@@ -60,8 +61,18 @@ async function assertChannelSelfIPRateLimit(c: Context, appId: string) {
   }
 }
 
-function recordChannelSelfIPRateLimit(c: Context, appId: string) {
-  backgroundTask(c, recordChannelSelfIPRequest(c, appId))
+async function recordChannelSelfIPRateLimitSafely(c: Context, appId: string) {
+  try {
+    await recordChannelSelfIPRequest(c, appId)
+  }
+  catch (error) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Failed to record channel_self IP rate limit',
+      app_id: appId,
+      error,
+    })
+  }
 }
 
 async function recordChannelSelfRequestSafely(
@@ -206,6 +217,11 @@ async function deleteChannelSelfOverrideForDevice(
   if (isChannelSelfStoreEnabled(c))
     return deleteChannelSelfOverride(c, appId, deviceId)
 
+  if (shouldSkipChannelSelfPostgresFallback(c)) {
+    logSkippedSupabaseWrite(c, 'deleteChannelDevicePg fallback')
+    return false
+  }
+
   return deleteChannelDevicePg(c, appId, deviceId, drizzleClient)
 }
 
@@ -224,6 +240,11 @@ async function upsertChannelSelfOverrideForDevice(
         id: channel.id,
       },
     })
+  }
+
+  if (shouldSkipChannelSelfPostgresFallback(c)) {
+    logSkippedSupabaseWrite(c, 'upsertChannelDevicePg fallback')
+    return false
   }
 
   return upsertChannelDevicePg(c, {
@@ -635,7 +656,15 @@ async function runChannelSelfDeviceOperation(
   }
 
   // Old KV-backed requests and new local-storage requests can use the read replica.
-  const pgClient = getPgClient(c, isChannelSelfStoreEnabled(c) || isChannelSelfLocalChannelStorageVersion(c, bodyParsed, operationLabel))
+  const canUseReadReplica = isChannelSelfStoreEnabled(c) || isChannelSelfLocalChannelStorageVersion(c, bodyParsed, operationLabel)
+  if (!canUseReadReplica && shouldSkipChannelSelfPostgresFallback(c)) {
+    await recordChannelSelfRequestSafely(c, bodyParsed.app_id, bodyParsed.device_id, operation, channel)
+    await recordChannelSelfIPRateLimitSafely(c, bodyParsed.app_id)
+    logSkippedSupabaseWrite(c, 'channel_self channel_devices fallback')
+    return simpleError200(c, 'channel_self_server_storage_unavailable', 'Server channel_self storage unavailable')
+  }
+
+  const pgClient = getPgClient(c, canUseReadReplica)
 
   return await runChannelSelfWithPgClient(
     c,
@@ -643,7 +672,7 @@ async function runChannelSelfDeviceOperation(
     run,
     async () => {
       await recordChannelSelfRequestSafely(c, bodyParsed.app_id, bodyParsed.device_id, operation, channel)
-      recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
+      await recordChannelSelfIPRateLimitSafely(c, bodyParsed.app_id)
     },
   )
 }
@@ -758,7 +787,7 @@ app.get('/', async (c) => {
       if (bodyRaw.device_id) {
         await recordChannelSelfRequestSafely(c, bodyParsed.app_id, bodyRaw.device_id, 'list')
       }
-      recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
+      await recordChannelSelfIPRateLimitSafely(c, bodyParsed.app_id)
     },
   )
 })

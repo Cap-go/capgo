@@ -196,6 +196,10 @@ export type { AppOptions as Options } from '../schemas/app'
 export const newIconPath = 'assets/icon.png'
 export const defaultAppIconPath = 'public/capgo.png'
 
+export function resolveAppSetIconPath(explicitIcon?: string): string | undefined {
+  return explicitIcon
+}
+
 export function getAppIconStoragePath(organizationUid: string, appId: string) {
   return `org/${organizationUid}/${appId}/icon`
 }

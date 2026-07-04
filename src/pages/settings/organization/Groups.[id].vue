@@ -757,6 +757,7 @@ async function removeMemberFromGroup(userId: string) {
                   type="text"
                   class="w-full d-input d-input-bordered"
                   :placeholder="t('group-name')"
+                  :aria-label="t('name')"
                   :disabled="isSubmitting"
                 >
               </div>
@@ -770,6 +771,7 @@ async function removeMemberFromGroup(userId: string) {
                   type="text"
                   class="w-full d-input d-input-bordered"
                   :placeholder="t('description')"
+                  :aria-label="t('description')"
                   :disabled="isSubmitting"
                 >
               </div>
@@ -901,6 +903,7 @@ async function removeMemberFromGroup(userId: string) {
                     :id="`group-app-role-${appId}`"
                     class="d-select d-select-sm d-select-bordered"
                     :value="pendingAppBindings[appId] || ''"
+                    :aria-label="t('select-role')"
                     :disabled="isSubmitting"
                     @change="onAppRoleChange(appId, $event)"
                   >
