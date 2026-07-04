@@ -25,9 +25,12 @@ function handleDateRangeChange(event: Event) {
     <div class="flex items-center justify-end gap-2 flex-nowrap sm:gap-4">
       <!-- Date Range Mode Selector -->
       <div class="relative flex items-center">
+        <label for="admin-date-range" class="sr-only">{{ t('date-range') }}</label>
         <CalendarDaysIcon class="absolute w-4 h-4 text-gray-500 pointer-events-none left-3 dark:text-gray-400" />
         <select
+          id="admin-date-range"
           :value="adminStore.dateRangeMode"
+          :aria-label="t('date-range')"
           class="py-2 pr-10 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-lg appearance-none cursor-pointer pl-9 dark:text-white dark:bg-gray-700 dark:border-gray-600 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:hover:bg-gray-600 dark:focus:ring-blue-400"
           @change="handleDateRangeChange"
         >

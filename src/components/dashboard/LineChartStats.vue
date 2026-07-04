@@ -24,6 +24,8 @@ import { generateMonthDays, getCurrentDayMonth, getDaysInCurrentMonth } from '~/
 import { useOrganizationStore } from '~/stores/organization'
 import { inlineAnnotationPlugin } from '../../services/chartAnnotations'
 import { createTooltipConfig, todayLinePlugin, verticalLinePlugin } from '../../services/chartTooltip'
+import { createChartLegendItems } from './chartLegend'
+import ChartLegend from './ChartLegend.vue'
 
 const props = defineProps({
   accumulated: {
@@ -114,7 +116,7 @@ const evolution = computed(() => {
     const last = arrWithoutUndefined[i - 1] ?? 0
     return i > 0 ? val - last : 0
   })
-  const median = res.reduce((a, b) => a + b, 0.0) / accumulateData.value.length
+  const median = res.reduce((a, b) => a + b, 0) / accumulateData.value.length
   const min = Math.min(...res)
   const max = Math.max(...res)
   return [min, max, median]
@@ -145,7 +147,7 @@ const projectionData = computed(() => {
       newVal = last + randomizedEvolution
     return acc.concat([newVal as number])
   }, [])
-  res = res.filter(i => i)
+  res = res.filter(Boolean)
   for (let i = 0; i < arrWithoutUndefined.length - 1; i++)
     res.unshift(undefined)
 
@@ -307,6 +309,7 @@ const chartData = computed<ChartData<'line' | 'bar'>>(() => {
 
         const baseDataset = {
           label: props.appNames[appId] || appId,
+          appId,
           data: processedData,
           borderColor,
           backgroundColor,
@@ -377,6 +380,10 @@ const chartData = computed<ChartData<'line' | 'bar'>>(() => {
   }
 })
 
+const hasAppData = computed(() => Object.keys(props.dataByApp || {}).length > 0)
+
+const legendItems = computed(() => hasAppData.value ? createChartLegendItems(chartData.value.datasets, 'appId') : [])
+
 const todayLineOptions = computed(() => {
   if (!props.useBillingPeriod)
     return { enabled: false }
@@ -438,8 +445,7 @@ const dataMax = computed(() => {
 })
 
 const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin: AnnotationOptions, todayLine?: any } }>(() => {
-  const hasAppData = Object.keys(props.dataByApp || {}).length > 0
-  const scales = createStackedChartScales(isDark.value, hasAppData)
+  const scales = createStackedChartScales(isDark.value, hasAppData.value)
 
   // If we have a calculated max, use it to ensure small values are visible
   if (dataMax.value !== undefined) {
@@ -451,11 +457,11 @@ const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin
     scales,
     plugins: {
       inlineAnnotationPlugin: generateAnnotations.value,
-      legend: createLegendConfig(isDark.value, hasAppData),
+      legend: createLegendConfig(isDark.value, !hasAppData.value),
       title: {
         display: false,
       },
-      tooltip: createTooltipConfig(hasAppData, props.accumulated, props.useBillingPeriod ? cycleStart : false, hasAppData ? tooltipClickHandler.value : undefined),
+      tooltip: createTooltipConfig(hasAppData.value, props.accumulated, props.useBillingPeriod ? cycleStart : false, hasAppData.value ? tooltipClickHandler.value : undefined),
       filler: {
         propagate: false,
       },
@@ -470,6 +476,11 @@ const barPlugins = sharedPlugins as unknown as Plugin<'bar'>[]
 </script>
 
 <template>
-  <Line v-if="accumulated" :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="linePlugins" />
-  <Bar v-else :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="barPlugins" />
+  <div class="flex min-h-full flex-col">
+    <div class="min-h-[16rem] flex-1">
+      <Line v-if="accumulated" :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="linePlugins" />
+      <Bar v-else :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="barPlugins" />
+    </div>
+    <ChartLegend :items="legendItems" />
+  </div>
 </template>
