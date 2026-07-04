@@ -35,6 +35,68 @@ async function postStats(data: object) {
   return response
 }
 
+async function expectNoPrimaryStatsRows(appId: string, deviceIds: string[]) {
+  const { count: deviceCount, error: deviceError } = await getSupabaseClient()
+    .from('devices')
+    .select('*', { count: 'exact', head: true })
+    .eq('app_id', appId)
+    .in('device_id', deviceIds)
+  expect(deviceError).toBeNull()
+  expect(deviceCount).toBe(0)
+
+  const { count: statsCount, error: statsError } = await getSupabaseClient()
+    .from('stats')
+    .select('*', { count: 'exact', head: true })
+    .eq('app_id', appId)
+    .in('device_id', deviceIds)
+  expect(statsError).toBeNull()
+  expect(statsCount).toBe(0)
+}
+
+describe.skipIf(!USE_CLOUDFLARE)('[POST] /stats Cloudflare write guard', () => {
+  it('returns ok without primary device or stats writes', async () => {
+    const uuid = randomUUID().toLowerCase()
+    const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData.device_id = uuid
+    baseData.action = 'set'
+    baseData.version_build = getVersionFromAction('set')
+    const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
+    baseData.version_name = version.name
+
+    const response = await postStats(baseData)
+    expect(response.status).toBe(200)
+    expect(await response.json<StatsRes>()).toEqual({ status: 'ok' })
+    await expectNoPrimaryStatsRows(APP_NAME_STATS, [uuid])
+  })
+
+  it('returns batch ok without primary device or stats writes', async () => {
+    const uuid1 = randomUUID().toLowerCase()
+    const uuid2 = randomUUID().toLowerCase()
+    const baseData1 = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData1.device_id = uuid1
+    baseData1.action = 'get'
+    baseData1.version_build = getVersionFromAction('get')
+    const version1 = await createAppVersions(baseData1.version_build, APP_NAME_STATS)
+    baseData1.version_name = version1.name
+
+    const baseData2 = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData2.device_id = uuid2
+    baseData2.action = 'set'
+    baseData2.version_build = getVersionFromAction('set')
+    const version2 = await createAppVersions(baseData2.version_build, APP_NAME_STATS)
+    baseData2.version_name = version2.name
+
+    const response = await postStats([baseData1, baseData2])
+    expect(response.status).toBe(200)
+    const responseData = await response.json<BatchStatsRes>()
+    expect(responseData.status).toBe('ok')
+    expect(responseData.results).toHaveLength(2)
+    expect(responseData.results![0].status).toBe('ok')
+    expect(responseData.results![1].status).toBe('ok')
+    await expectNoPrimaryStatsRows(APP_NAME_STATS, [uuid1, uuid2])
+  })
+})
+
 beforeAll(async () => {
   await resetAndSeedAppData(APP_NAME_STATS)
   await resetAndSeedAppDataStats(APP_NAME_STATS)
@@ -62,7 +124,7 @@ describe('stats Action Types', () => {
     assertEqual(ALLOWED_STATS_ACTIONS)
   })
 })
-describe('test valid and invalid cases of version_build', () => {
+describe.skipIf(USE_CLOUDFLARE)('test valid and invalid cases of version_build', () => {
   it('test valid and invalid cases of version_build', async () => {
     const uuid = randomUUID().toLowerCase()
     const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
@@ -120,7 +182,7 @@ describe('test valid and invalid cases of version_build', () => {
   })
 })
 
-describe('[POST] /stats', () => {
+describe.skipIf(USE_CLOUDFLARE)('[POST] /stats', () => {
   it('create new device and log stats action', async () => {
     const uuid = randomUUID().toLowerCase()
     const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
@@ -650,7 +712,7 @@ interface BatchStatsRes {
 }
 
 // Test batch operations - concurrent for Supabase, sequential for Cloudflare
-const batchTestDescribe = USE_CLOUDFLARE ? describe : describe.concurrent
+const batchTestDescribe = USE_CLOUDFLARE ? describe.skip : describe.concurrent
 const batchTestIt = USE_CLOUDFLARE ? it : it.concurrent
 
 batchTestDescribe('[POST] /stats batch operations', () => {
