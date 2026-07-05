@@ -179,7 +179,9 @@
     "deploy:supabase_env:prod": "bunx supabase secrets set --project-ref xvwzpoazmxkqosrdewyv --env-file internal/cloudflare/.env.prod",
     "deploy:supabase_env:preprod": "bunx supabase secrets set --project-ref ibwjdnhknbkcqfbabwei --env-file internal/cloudflare/.env.preprod",
     "deploy:supabase_env:dev": "bunx supabase secrets set --project-ref aucsybvnhavogdmzwtcw --env-file internal/cloudflare/.env.alpha",
-    "size": "bunx vite-bundle-visualizer"
+    "size": "bunx vite-bundle-visualizer",
+    "test:analytics-sql": "vitest run tests/analytics-engine-sql.unit.test.ts",
+    "test:analytics-sql:live": "bun --env-file=internal/cloudflare/.env.prod scripts/validate-analytics-engine-sql.ts"
   },
   "dependencies": {
     "@bradenmacdonald/s3-lite-client": "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.6",

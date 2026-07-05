@@ -116,7 +116,7 @@ describe('buildReadDevicesCFQuery', () => {
     const groupByIndex = query.indexOf('GROUP BY blob1')
     const installSourceFilterIndex = query.indexOf(`install_source IN ('app_store', 'amazon_appstore')`)
 
-    expect(query).toContain(`argMax(blob9, CASE WHEN blob9 != '' THEN timestamp ELSE toDateTime('1970-01-01 00:00:00') END) AS install_source`)
+    expect(query).toContain('argMax(blob9, timestamp) AS install_source')
     expect(installSourceFilterIndex).toBeGreaterThan(groupByIndex)
     expect(query).not.toContain(`WHERE index1 = 'com.example.app' AND blob9 IN`)
     expect(query).toContain(`WHERE device_id > '11111111-1111-4111-8111-111111111111' AND install_source IN ('app_store', 'amazon_appstore')`)
@@ -195,8 +195,10 @@ describe('countInstallSourcesCF', () => {
     expect(counts).toEqual({ app_store: 3, testflight: 2 })
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(query).toContain('GROUP BY install_source')
-    expect(query).toContain('argMax(blob9')
+    expect(query).toContain('argMax(blob9, timestamp) AS install_source')
+    expect(query).toContain('COUNT() AS total')
     expect(query).not.toContain('COUNT(DISTINCT blob1) AS total')
+    expect(query).not.toContain('CASE WHEN blob9')
   })
 
   it('reuses cached install source counts for the same app', async () => {
