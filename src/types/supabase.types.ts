@@ -1841,6 +1841,201 @@ export type Database = {
           },
         ]
       }
+      notification_app_settings: {
+        Row: {
+          app_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          owner_org: string
+          push_update_channel: string | null
+          push_update_enabled: boolean
+          push_update_install_mode: string
+          updated_at: string
+        }
+        Insert: {
+          app_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          owner_org: string
+          push_update_channel?: string | null
+          push_update_enabled?: boolean
+          push_update_install_mode?: string
+          updated_at?: string
+        }
+        Update: {
+          app_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          owner_org?: string
+          push_update_channel?: string | null
+          push_update_enabled?: boolean
+          push_update_install_mode?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_app_settings_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: true
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "notification_app_settings_owner_org_app_id_fkey"
+            columns: ["owner_org", "app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["owner_org", "app_id"]
+          },
+          {
+            foreignKeyName: "notification_app_settings_owner_org_fkey"
+            columns: ["owner_org"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_campaigns: {
+        Row: {
+          app_id: string
+          audience: Json
+          completed_at: string | null
+          counters: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          name: string
+          owner_org: string
+          payload: Json
+          queued_at: string | null
+          scheduled_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          app_id: string
+          audience?: Json
+          completed_at?: string | null
+          counters?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          name: string
+          owner_org: string
+          payload?: Json
+          queued_at?: string | null
+          scheduled_at?: string | null
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          app_id?: string
+          audience?: Json
+          completed_at?: string | null
+          counters?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          name?: string
+          owner_org?: string
+          payload?: Json
+          queued_at?: string | null
+          scheduled_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_campaigns_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "notification_campaigns_owner_org_app_id_fkey"
+            columns: ["owner_org", "app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["owner_org", "app_id"]
+          },
+          {
+            foreignKeyName: "notification_campaigns_owner_org_fkey"
+            columns: ["owner_org"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_provider_configs: {
+        Row: {
+          app_id: string
+          config: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          owner_org: string
+          provider: string
+          secret_ref: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          app_id: string
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          owner_org: string
+          provider: string
+          secret_ref?: string | null
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          app_id?: string
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          owner_org?: string
+          provider?: string
+          secret_ref?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_provider_configs_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "notification_provider_configs_owner_org_app_id_fkey"
+            columns: ["owner_org", "app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["owner_org", "app_id"]
+          },
+          {
+            foreignKeyName: "notification_provider_configs_owner_org_fkey"
+            columns: ["owner_org"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string | null

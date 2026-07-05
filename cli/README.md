@@ -165,6 +165,8 @@ Join the [discord](https://discord.gg/VnYRvBfgA6) to get help.
     - [Update](#build-credentials-update)
     - [Manage](#build-credentials-manage)
     - [Migrate](#build-credentials-migrate)
+- 🔹 [Notifications](#notifications)
+  - [Setup](#notifications-setup)
 - 🔹 [Probe](#probe)
 - 🔹 [Generate-docs](#generate-docs)
 - 🔹 [Mcp](#mcp)
@@ -1704,6 +1706,36 @@ Example:
 | **--appId** | <code>string</code> | App ID (auto-detected from capacitor.config if omitted) |
 | **--platform** | <code>string</code> | Platform (only ios is supported) |
 | **--local** | <code>boolean</code> | Migrate from local .capgo-credentials.json instead of global |
+
+
+## <a id="notifications"></a> 🔹 **Notifications**
+
+🔔 Set up Capgo native notifications in your Capacitor app.
+
+### <a id="notifications-setup"></a> ⚙️ **Setup**
+
+```bash
+npx @capgo/cli@latest notifications setup
+```
+
+Install the Capgo notifications plugin, add Capacitor config, create a helper file, and run Capacitor sync.
+Before sending production notifications, configure Android and iOS push credentials in the Capgo app Notifications tab.
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest notifications setup com.example.app
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **--server-url** | <code>string</code> | Capgo API server URL |
+| **--file** | <code>string</code> | Helper file to create (default: src/capgo-notifications.ts) |
+| **--force** | <code>boolean</code> | Overwrite the helper file if it already exists |
+| **--no-install** | <code>boolean</code> | Skip installing the notifications package |
+| **--no-sync** | <code>boolean</code> | Skip Capacitor sync |
 
 
 ## <a id="probe"></a> 🔹 **Probe**

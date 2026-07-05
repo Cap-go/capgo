@@ -11556,6 +11556,7 @@ BEGIN
 
     WHEN public.rbac_perm_app_update_settings() THEN RETURN public.rbac_right_write();
     WHEN public.rbac_perm_app_create_channel() THEN RETURN public.rbac_right_write();
+    WHEN 'app.manage_notifications' THEN RETURN public.rbac_right_write();
     WHEN public.rbac_perm_app_manage_devices() THEN RETURN public.rbac_right_write();
     WHEN public.rbac_perm_app_build_native() THEN RETURN public.rbac_right_write();
     WHEN public.rbac_perm_channel_update_settings() THEN RETURN public.rbac_right_write();
@@ -11563,7 +11564,6 @@ BEGIN
     WHEN public.rbac_perm_channel_rollback_bundle() THEN RETURN public.rbac_right_write();
     WHEN public.rbac_perm_channel_manage_forced_devices() THEN RETURN public.rbac_right_write();
 
-    WHEN public.rbac_perm_org_create_app() THEN RETURN public.rbac_right_write();
     WHEN public.rbac_perm_org_update_settings() THEN RETURN public.rbac_right_admin();
     WHEN public.rbac_perm_org_invite_user() THEN RETURN public.rbac_right_admin();
     WHEN public.rbac_perm_org_read_billing() THEN RETURN public.rbac_right_admin();
@@ -11588,6 +11588,7 @@ BEGIN
     WHEN public.rbac_perm_platform_delete_orphan_users() THEN RETURN public.rbac_right_super_admin();
     WHEN public.rbac_perm_platform_read_all_audit() THEN RETURN public.rbac_right_super_admin();
     WHEN public.rbac_perm_platform_db_break_glass() THEN RETURN public.rbac_right_super_admin();
+
     ELSE RETURN NULL;
   END CASE;
 END;
@@ -17491,6 +17492,78 @@ ALTER SEQUENCE "public"."manifest_id_seq" OWNED BY "public"."manifest"."id";
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."notification_app_settings" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "owner_org" "uuid" NOT NULL,
+    "app_id" character varying(50) NOT NULL,
+    "push_update_enabled" boolean DEFAULT false NOT NULL,
+    "push_update_install_mode" "text" DEFAULT 'next'::"text" NOT NULL,
+    "push_update_channel" "text",
+    "created_by" "uuid",
+    CONSTRAINT "notification_app_settings_install_mode_check" CHECK (("push_update_install_mode" = ANY (ARRAY['next'::"text", 'set'::"text"])))
+);
+
+
+ALTER TABLE "public"."notification_app_settings" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."notification_app_settings" IS 'Low-cardinality native notification app settings, including whether Capgo can send silent push update checks. Device state remains in Cloudflare Analytics Engine.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."notification_campaigns" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "owner_org" "uuid" NOT NULL,
+    "app_id" character varying(50) NOT NULL,
+    "name" "text" NOT NULL,
+    "kind" "text" DEFAULT 'alert'::"text" NOT NULL,
+    "status" "text" NOT NULL,
+    "audience" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "payload" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "scheduled_at" timestamp with time zone,
+    "queued_at" timestamp with time zone,
+    "completed_at" timestamp with time zone,
+    "counters" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "created_by" "uuid",
+    CONSTRAINT "notification_campaigns_kind_check" CHECK (("kind" = ANY (ARRAY['alert'::"text", 'background'::"text", 'badge'::"text", 'update_check'::"text"]))),
+    CONSTRAINT "notification_campaigns_status_check" CHECK (("status" = ANY (ARRAY['draft'::"text", 'scheduled'::"text", 'queued'::"text", 'sending'::"text", 'sent'::"text", 'paused'::"text", 'failed'::"text", 'cancelled'::"text"])))
+);
+
+
+ALTER TABLE "public"."notification_campaigns" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."notification_campaigns" IS 'Low-cardinality native notification campaign control plane. Fanout state and delivery receipts are stored in Cloudflare Queues/Analytics Engine, not per-device Postgres rows.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."notification_provider_configs" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "owner_org" "uuid" NOT NULL,
+    "app_id" character varying(50) NOT NULL,
+    "provider" "text" NOT NULL,
+    "status" "text" NOT NULL,
+    "config" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "secret_ref" "text",
+    "created_by" "uuid",
+    CONSTRAINT "notification_provider_configs_provider_check" CHECK (("provider" = ANY (ARRAY['fcm'::"text", 'apns'::"text"]))),
+    CONSTRAINT "notification_provider_configs_status_check" CHECK (("status" = ANY (ARRAY['draft'::"text", 'configured'::"text", 'disabled'::"text", 'error'::"text"])))
+);
+
+
+ALTER TABLE "public"."notification_provider_configs" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."notification_provider_configs" IS 'Low-cardinality native notification provider configuration. Per-device push tokens are stored only as encrypted Cloudflare Analytics Engine events, not in Postgres.';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."notifications" (
     "created_at" timestamp with time zone DEFAULT "now"(),
     "updated_at" timestamp with time zone DEFAULT "now"(),
@@ -18714,6 +18787,31 @@ ALTER TABLE ONLY "public"."manifest"
 
 
 
+ALTER TABLE ONLY "public"."notification_app_settings"
+    ADD CONSTRAINT "notification_app_settings_app_key" UNIQUE ("app_id");
+
+
+
+ALTER TABLE ONLY "public"."notification_app_settings"
+    ADD CONSTRAINT "notification_app_settings_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."notification_campaigns"
+    ADD CONSTRAINT "notification_campaigns_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."notification_provider_configs"
+    ADD CONSTRAINT "notification_provider_configs_app_provider_key" UNIQUE ("app_id", "provider");
+
+
+
+ALTER TABLE ONLY "public"."notification_provider_configs"
+    ADD CONSTRAINT "notification_provider_configs_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."notifications"
     ADD CONSTRAINT "notifications_pkey" PRIMARY KEY ("owner_org", "event", "uniq_id");
 
@@ -19091,6 +19189,10 @@ CREATE INDEX "idx_apps_default_upload_channel" ON "public"."apps" USING "btree" 
 
 
 
+CREATE UNIQUE INDEX "idx_apps_owner_org_app_id" ON "public"."apps" USING "btree" ("owner_org", "app_id");
+
+
+
 CREATE INDEX "idx_audit_logs_created_at" ON "public"."audit_logs" USING "btree" ("created_at" DESC);
 
 
@@ -19252,6 +19354,30 @@ CREATE INDEX "idx_manifest_file_hash" ON "public"."manifest" USING "btree" ("fil
 
 
 CREATE INDEX "idx_manifest_file_name" ON "public"."manifest" USING "btree" ("file_name");
+
+
+
+CREATE INDEX "idx_notification_app_settings_owner_org" ON "public"."notification_app_settings" USING "btree" ("owner_org");
+
+
+
+CREATE INDEX "idx_notification_campaigns_app_created" ON "public"."notification_campaigns" USING "btree" ("app_id", "created_at" DESC);
+
+
+
+CREATE INDEX "idx_notification_campaigns_owner_org" ON "public"."notification_campaigns" USING "btree" ("owner_org");
+
+
+
+CREATE INDEX "idx_notification_campaigns_status_scheduled" ON "public"."notification_campaigns" USING "btree" ("status", "scheduled_at") WHERE ("status" = ANY (ARRAY['scheduled'::"text", 'queued'::"text"]));
+
+
+
+CREATE INDEX "idx_notification_provider_configs_app" ON "public"."notification_provider_configs" USING "btree" ("app_id");
+
+
+
+CREATE INDEX "idx_notification_provider_configs_owner_org" ON "public"."notification_provider_configs" USING "btree" ("owner_org");
 
 
 
@@ -19999,6 +20125,51 @@ ALTER TABLE ONLY "public"."manifest"
 
 
 
+ALTER TABLE ONLY "public"."notification_app_settings"
+    ADD CONSTRAINT "notification_app_settings_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."notification_app_settings"
+    ADD CONSTRAINT "notification_app_settings_owner_org_app_id_fkey" FOREIGN KEY ("owner_org", "app_id") REFERENCES "public"."apps"("owner_org", "app_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."notification_app_settings"
+    ADD CONSTRAINT "notification_app_settings_owner_org_fkey" FOREIGN KEY ("owner_org") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."notification_campaigns"
+    ADD CONSTRAINT "notification_campaigns_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."notification_campaigns"
+    ADD CONSTRAINT "notification_campaigns_owner_org_app_id_fkey" FOREIGN KEY ("owner_org", "app_id") REFERENCES "public"."apps"("owner_org", "app_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."notification_campaigns"
+    ADD CONSTRAINT "notification_campaigns_owner_org_fkey" FOREIGN KEY ("owner_org") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."notification_provider_configs"
+    ADD CONSTRAINT "notification_provider_configs_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."notification_provider_configs"
+    ADD CONSTRAINT "notification_provider_configs_owner_org_app_id_fkey" FOREIGN KEY ("owner_org", "app_id") REFERENCES "public"."apps"("owner_org", "app_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."notification_provider_configs"
+    ADD CONSTRAINT "notification_provider_configs_owner_org_fkey" FOREIGN KEY ("owner_org") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."onboarding_demo_data"
     ADD CONSTRAINT "onboarding_demo_data_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
 
@@ -20639,6 +20810,18 @@ CREATE POLICY "Deny all access" ON "public"."to_delete_accounts" USING (false) W
 
 
 
+CREATE POLICY "Deny all notification app settings access" ON "public"."notification_app_settings" AS RESTRICTIVE USING (false) WITH CHECK (false);
+
+
+
+CREATE POLICY "Deny all notification campaign access" ON "public"."notification_campaigns" AS RESTRICTIVE USING (false) WITH CHECK (false);
+
+
+
+CREATE POLICY "Deny all notification provider config access" ON "public"."notification_provider_configs" AS RESTRICTIVE USING (false) WITH CHECK (false);
+
+
+
 CREATE POLICY "Deny client insert on apikeys" ON "public"."apikeys" AS RESTRICTIVE FOR INSERT TO "anon", "authenticated" WITH CHECK (false);
 
 
@@ -21099,6 +21282,15 @@ CREATE POLICY "groups_update" ON "public"."groups" FOR UPDATE TO "authenticated"
 
 
 ALTER TABLE "public"."manifest" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."notification_app_settings" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."notification_campaigns" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."notification_provider_configs" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."notifications" ENABLE ROW LEVEL SECURITY;
@@ -23084,7 +23276,7 @@ GRANT ALL ON FUNCTION "public"."rbac_legacy_right_for_org_role"("p_role_name" "t
 
 
 
-GRANT ALL ON FUNCTION "public"."rbac_legacy_right_for_permission"("p_permission_key" "text") TO "anon";
+REVOKE ALL ON FUNCTION "public"."rbac_legacy_right_for_permission"("p_permission_key" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."rbac_legacy_right_for_permission"("p_permission_key" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."rbac_legacy_right_for_permission"("p_permission_key" "text") TO "service_role";
 
@@ -24252,6 +24444,18 @@ GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public".
 GRANT ALL ON SEQUENCE "public"."manifest_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."manifest_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."manifest_id_seq" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."notification_app_settings" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."notification_campaigns" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."notification_provider_configs" TO "service_role";
 
 
 
