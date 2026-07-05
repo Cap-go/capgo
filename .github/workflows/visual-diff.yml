@@ -45,7 +45,7 @@ jobs:
     name: Generate visual diff report
     permissions:
       contents: read
-      pull-requests: write
+      pull-requests: write # Upsert the sticky visual diff PR comment only in this job
     steps:
       - name: Setup Node.js
         uses: actions/setup-node@v6
