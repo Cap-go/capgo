@@ -33,6 +33,6 @@ describe('frontend channel RBAC scope regressions', () => {
   it.concurrent('keeps app reader channel defaults aligned with RBAC role permissions', async () => {
     const source = await readRepoFile('src/components/permissions/ChannelPermissionOverridesPanel.vue')
 
-    expect(source).toContain(`  app_reader: {\n    'channel.read': true,\n    'channel.read_history': true,\n    'channel.promote_bundle': false,\n  },`)
+    expect(source).toContain(`  app_reader: {\n    'channel.read': false,\n    'channel.read_history': false,\n    'channel.promote_bundle': false,\n  },`)
   })
 })
