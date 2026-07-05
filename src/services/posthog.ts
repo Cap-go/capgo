@@ -51,7 +51,7 @@ export function posthogLoader(supaHost: string) {
     api_host: 'https://psthg.capgo.app',
     ui_host: 'https://eu.posthog.com',
     person_profiles: 'identified_only',
-    defaults: '2025-11-30',
+    defaults: '2026-05-30',
     before_send: (event) => {
       if (shouldSuppressPostHogExceptionEvent(event))
         return false
