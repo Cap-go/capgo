@@ -297,8 +297,8 @@ describe('rbac permission system', () => {
         const apiKey = `notifications-key-${testSlug}`
 
         await query(`
-          INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
-          VALUES ($1::uuid, $2, $3, $4::uuid, true)
+          INSERT INTO public.orgs (id, name, management_email, created_by)
+          VALUES ($1::uuid, $2, $3, $4::uuid)
         `, [orgId, `Notifications RBAC Org ${testSlug}`, `notifications-rbac-${testSlug}@capgo.app`, USER_ID])
 
         const appResult = await query(`
