@@ -4419,10 +4419,11 @@ ALTER FUNCTION public.rescind_invitation(text, uuid) OWNER TO postgres;
 
 DROP FUNCTION IF EXISTS public.app_versions_has_app_permission(public.user_min_right, uuid, character varying, uuid, text);
 DROP FUNCTION IF EXISTS capgo_private.matches_app_storage_apikey_owner(text, character varying, public.key_mode[]);
-DROP FUNCTION IF EXISTS public.check_min_rights(public.user_min_right, uuid, character varying, bigint);
-DROP FUNCTION IF EXISTS public.check_min_rights(public.user_min_right, uuid, uuid, character varying, bigint);
-DROP FUNCTION IF EXISTS public.check_min_rights_legacy(public.user_min_right, uuid, uuid, character varying, bigint);
-DROP FUNCTION IF EXISTS public.check_min_rights_legacy_no_password_policy(public.user_min_right, uuid, uuid, character varying, bigint);
+
+DROP FUNCTION IF EXISTS public.check_min_rights(public.user_min_right, uuid, character varying, bigint) CASCADE;
+DROP FUNCTION IF EXISTS public.check_min_rights(public.user_min_right, uuid, uuid, character varying, bigint) CASCADE;
+DROP FUNCTION IF EXISTS public.check_min_rights_legacy(public.user_min_right, uuid, uuid, character varying, bigint) CASCADE;
+DROP FUNCTION IF EXISTS public.check_min_rights_legacy_no_password_policy(public.user_min_right, uuid, uuid, character varying, bigint) CASCADE;
 DROP FUNCTION IF EXISTS public.get_identity();
 DROP FUNCTION IF EXISTS public.get_identity(public.key_mode[]);
 DROP FUNCTION IF EXISTS public.get_identity_apikey_only(public.key_mode[]);
