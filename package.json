@@ -4,7 +4,8 @@
   "version": "12.187.4",
   "private": true,
   "workspaces": [
-    "cli"
+    "cli",
+    "packages/*"
   ],
   "license": "GPL-3.0",
   "scripts": {
@@ -159,6 +160,7 @@
     "deploy:cloudflare_env:api:prod": "bunx wrangler secret bulk internal/cloudflare/.env.prod --config cloudflare_workers/api/wrangler.jsonc --env=prod",
     "deploy:cloudflare_env:api:preprod": "bunx wrangler secret bulk internal/cloudflare/.env.preprod --config cloudflare_workers/api/wrangler.jsonc --env=preprod",
     "deploy:cloudflare_env:api:dev": "bunx wrangler secret bulk internal/cloudflare/.env.alpha --config cloudflare_workers/api/wrangler.jsonc --env=alpha",
+    "deploy:cloudflare:notifications:queues": "bun scripts/ensure-native-notification-queues.ts",
     "deploy:cloudflare_env:files:prod": "bunx wrangler secret bulk internal/cloudflare/.env.prod --config cloudflare_workers/files/wrangler.jsonc --env=prod",
     "deploy:cloudflare_env:files:preprod": "bunx wrangler secret bulk internal/cloudflare/.env.preprod --config cloudflare_workers/files/wrangler.jsonc --env=preprod",
     "deploy:cloudflare_env:files:dev": "bunx wrangler secret bulk internal/cloudflare/.env.alpha  --config cloudflare_workers/files/wrangler.jsonc --env=alpha",

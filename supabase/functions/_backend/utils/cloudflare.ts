@@ -1,4 +1,4 @@
-import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive, KVNamespace } from '@cloudflare/workers-types'
+import type { AnalyticsEngineDataset, D1Database, Hyperdrive, KVNamespace, Queue } from '@cloudflare/workers-types'
 import type { Context } from 'hono'
 import type { DeviceComparable } from './deviceComparison.ts'
 import type { Database } from './supabase.types.ts'
@@ -11,7 +11,7 @@ import { DEFAULT_LIMIT } from './types.ts'
 import { getEnv } from './utils.ts'
 
 /** Escape a value for safe interpolation into an Analytics Engine SQL string. */
-function escapeSqlString(value: string): string {
+export function escapeSqlString(value: string): string {
   return value.replace(/'/g, '\'\'').replace(/\\/g, '\\\\')
 }
 
@@ -37,11 +37,15 @@ type AiBinding = {
 
 // eslint-disable-next-line ts/consistent-type-definitions
 export type Bindings = {
-  DEVICE_USAGE: AnalyticsEngineDataPoint
-  BANDWIDTH_USAGE: AnalyticsEngineDataPoint
-  VERSION_USAGE: AnalyticsEngineDataPoint
-  APP_LOG: AnalyticsEngineDataPoint
-  DEVICE_INFO: AnalyticsEngineDataPoint
+  DEVICE_USAGE: AnalyticsEngineDataset
+  BANDWIDTH_USAGE: AnalyticsEngineDataset
+  VERSION_USAGE: AnalyticsEngineDataset
+  APP_LOG: AnalyticsEngineDataset
+  APP_LOG_EXTERNAL?: AnalyticsEngineDataset
+  DEVICE_INFO: AnalyticsEngineDataset
+  NOTIFICATION_REGISTRY?: AnalyticsEngineDataset
+  NOTIFICATION_EVENTS?: AnalyticsEngineDataset
+  NOTIFICATION_QUEUE?: Queue
   DB_STOREAPPS: D1Database
   CHANNEL_SELF_STORE?: KVNamespace
   PLUGIN_NOTIFICATION_QUEUE?: KVNamespace
@@ -353,7 +357,7 @@ function convertDataToJsTypes<T>(apiResponse: AnalyticsApiResponse) {
   })
 }
 
-async function runQueryToCFA<T>(c: Context, query: string) {
+export async function runQueryToCFA<T>(c: Context, query: string) {
   const CF_ANALYTICS_TOKEN = getEnv(c, 'CF_ANALYTICS_TOKEN')
   const CF_ACCOUNT_ID = getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')
 

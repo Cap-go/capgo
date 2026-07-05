@@ -209,7 +209,7 @@
     },
     "cli": {
       "name": "@capgo/cli",
-      "version": "8.24.1",
+      "version": "8.24.5",
       "bin": {
         "capgo": "dist/index.js",
       },
@@ -274,6 +274,22 @@
         "@capgo/cli-helper-darwin-x64": "^1.1.1",
         "node-pty": "^1.1.0",
       },
+    },
+    "packages/capacitor-notifications": {
+      "name": "@capgo/capacitor-notifications",
+      "version": "0.0.1-private.0",
+      "devDependencies": {
+        "@capacitor/android": "^8.0.0",
+        "@capacitor/ios": "^8.0.0",
+        "typescript": "^5.9.3",
+      },
+      "peerDependencies": {
+        "@capacitor/core": "^8.0.0",
+        "@capgo/capacitor-updater": "^8.0.0",
+      },
+      "optionalPeers": [
+        "@capgo/capacitor-updater",
+      ],
     },
   },
   "trustedDependencies": [
@@ -561,6 +577,8 @@
     "@capgo/capacitor-navigation-bar": ["@capgo/capacitor-navigation-bar@8.2.5", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-1GtsgwLyyzOppZd+moNei/Uim3iZT1q+Zvmlf03TBc08IQnje+8WlgiHNufaB/vVGy8RR8VB7/O3OkX3XNURhQ=="],
 
     "@capgo/capacitor-nfc": ["@capgo/capacitor-nfc@8.1.5", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-ZAgAygRbmCsS8nrEq4RW7ua9yUMSwPoyqx5MqzPVLdBQUyDuo9k8iVoQQYpFhYXr2fVTUC9PPdP0TtocFZSzhg=="],
+
+    "@capgo/capacitor-notifications": ["@capgo/capacitor-notifications@workspace:packages/capacitor-notifications"],
 
     "@capgo/capacitor-pdf-generator": ["@capgo/capacitor-pdf-generator@8.0.34", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-r3p67yTqRdi/pHydhlLOJVy+/fqR3l+wRhaRJ3AALnDF1hCbc9UcO7Sxkd1aWxuDty8NqhMjdPyTF3h6b/G7wg=="],
 
@@ -2923,6 +2941,8 @@
     "@capacitor/cli/commander": ["commander@12.1.0", "", {}, "sha512-Vw8qHK3bZM9y/P10u3Vib8o/DdkvA2OtPtZvD871QKjy74Wj1WSKFILMPRPSdUSx5RFK1arlJzEtA4PkFgnbuA=="],
 
     "@capacitor/cli/open": ["open@8.4.2", "", { "dependencies": { "define-lazy-prop": "^2.0.0", "is-docker": "^2.1.1", "is-wsl": "^2.2.0" } }, "sha512-7x81NCL719oNbsq/3mh+hVrAWmFuEYUqrq/Iw3kUzH8ReypT9QQ0BLoJS7/G9k6N81XjW4qHWtjWwe/9eLy1EQ=="],
+
+    "@capgo/capacitor-notifications/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "@capgo/cli/@typescript/native-preview": ["@typescript/native-preview@7.0.0-dev.20260526.1", "", { "optionalDependencies": { "@typescript/native-preview-darwin-arm64": "7.0.0-dev.20260526.1", "@typescript/native-preview-darwin-x64": "7.0.0-dev.20260526.1", "@typescript/native-preview-linux-arm": "7.0.0-dev.20260526.1", "@typescript/native-preview-linux-arm64": "7.0.0-dev.20260526.1", "@typescript/native-preview-linux-x64": "7.0.0-dev.20260526.1", "@typescript/native-preview-win32-arm64": "7.0.0-dev.20260526.1", "@typescript/native-preview-win32-x64": "7.0.0-dev.20260526.1" }, "bin": { "tsgo": "bin/tsgo.js" } }, "sha512-ys/rYFNEVb4LZ7zUFxWZ6iv5gnIW29WRv3L9+hJKfAF3d/ekI76B4Ej4dU7odNCFiX85sCotljzq8N0QyruuoA=="],
 
