@@ -45,6 +45,7 @@ import { finishActiveCliReplay } from './init/replay'
 import { createKey, deleteOldKey, saveKeyCommand } from './key'
 import { login } from './login'
 import { startMcpServer } from './mcp/server'
+import { setupNotifications } from './notifications/setup'
 import { addOrganization, deleteOrganization, listMembers, listOrganizations, setOrganization } from './organization'
 import { capturePosthogException, getCommandPath, shouldCapturePosthogException } from './posthog'
 import { getPreviewQr } from './preview/qr'
@@ -1173,6 +1174,22 @@ Example:
   .option('--appId <appId>', 'App ID (auto-detected from capacitor.config if omitted)')
   .option('--platform <platform>', 'Platform (only ios is supported)')
   .option('--local', 'Migrate from local .capgo-credentials.json instead of global')
+
+program
+  .command('notifications')
+  .description(`🔔 Set up Capgo native notifications in your Capacitor app.`)
+  .command('setup [appId]')
+  .description(`Install the Capgo notifications plugin, add Capacitor config, create a helper file, and run Capacitor sync.
+
+Before sending production notifications, configure Android and iOS push credentials in the Capgo app Notifications tab.
+
+Example: npx @capgo/cli@latest notifications setup com.example.app`)
+  .action(setupNotifications)
+  .option('--server-url <serverUrl>', 'Capgo API server URL')
+  .option('--file <file>', 'Helper file to create (default: src/capgo-notifications.ts)')
+  .option('--force', 'Overwrite the helper file if it already exists')
+  .option('--no-install', 'Skip installing the notifications package')
+  .option('--no-sync', 'Skip Capacitor sync')
 
 program
   .command('probe')

@@ -91,8 +91,8 @@ export function dependencyDiffPath(
 }
 
 /**
- * Minimal fields the occurrence grouping needs (kept narrow so lightweight
- * callers like the banner can pass a reduced row selection).
+ * Minimal fields the occurrence grouping needs, kept narrow so lightweight
+ * callers like the banner can pass a reduced row selection.
  */
 type GroupableEvent = Pick<
   CompatibilityEventRow,
