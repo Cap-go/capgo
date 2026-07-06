@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
 import type { TableColumn } from '../comp_def'
+import type { LinkedChannel } from '~/services/bundleLinkedChannels'
+import type { ChannelPromotionTarget } from '~/services/channelPromotion'
 import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
 import { computedAsync } from '@vueuse/core'
@@ -10,6 +12,7 @@ import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconSettings from '~icons/heroicons/cog-8-tooth'
 import IconTrash from '~icons/heroicons/trash'
+import { fetchLinkedChannelsForVersion, formatLinkedChannel, unlinkLinkedChannels } from '~/services/bundleLinkedChannels'
 import { findChannelsWithoutPromotionPermission, formatChannelPromotionTargets } from '~/services/channelPromotion'
 import { formatBytes } from '~/services/conversion'
 import { formatDate } from '~/services/date'
@@ -22,11 +25,6 @@ const props = defineProps<{
 }>()
 
 type Element = Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row']
-interface LinkedChannel {
-  id: number
-  name: string
-  version?: { name: string } | null
-}
 
 const canDeleteBundle = computedAsync(async () => {
   if (!props.appId)
@@ -181,7 +179,7 @@ async function showUnlinkDialog(message: string): Promise<boolean> {
   return !cancelled && shouldUnlink
 }
 
-function showChannelUnlinkPermissionError(deniedChannels: LinkedChannel[]) {
+function showChannelUnlinkPermissionError(deniedChannels: ChannelPromotionTarget[]) {
   toast.error(t('channel-permission-unlink-required', {
     channels: formatChannelPromotionTargets(deniedChannels),
   }))
@@ -262,17 +260,29 @@ async function getData() {
 
 async function fetchChannelsForVersions(versions: Element[]) {
   const versionIds = versions.map(v => v.id)
-  const { data: channelData, error } = await supabase
-    .from('channels')
-    .select('name, version, id')
-    .eq('app_id', props.appId)
-    .in('version', versionIds)
+  if (versionIds.length === 0)
+    return
+
+  const [stableResult, rolloutResult] = await Promise.all([
+    supabase
+      .from('channels')
+      .select('name, version, rollout_version, id')
+      .eq('app_id', props.appId)
+      .in('version', versionIds),
+    supabase
+      .from('channels')
+      .select('name, version, rollout_version, id')
+      .eq('app_id', props.appId)
+      .in('rollout_version', versionIds),
+  ])
+  const error = stableResult.error ?? rolloutResult.error
   if (error) {
     console.error('Error fetching channels:', error)
     return
   }
+  const channelData = [...(stableResult.data ?? []), ...(rolloutResult.data ?? [])]
   versionIds.forEach((id) => {
-    const channel = channelData?.find(c => c.version === id)
+    const channel = channelData?.find(c => c.version === id || c.rollout_version === id)
     channelCache.value[id] = channel ? { name: channel.name, id: channel.id } : { name: '' }
   })
 }
@@ -296,14 +306,7 @@ async function refreshData() {
 }
 
 async function unlinkChannels(_appId: string, unlink: LinkedChannel[]) {
-  if (unlink.length === 0) {
-    return
-  }
-  const { error: updateError } = await supabase
-    .from('channels')
-    .update({ version: null })
-    .in('id', unlink.map(c => c.id))
-
+  const updateError = await unlinkLinkedChannels(unlink)
   if (updateError) {
     toast.error(t('unlink-error'))
     console.error('unlink error (updateError)', updateError)
@@ -314,11 +317,7 @@ async function unlinkChannels(_appId: string, unlink: LinkedChannel[]) {
 async function deleteOne(one: Element) {
   try {
     // Check for linked channels
-    const { data: channelFound, error: errorChannel } = await supabase
-      .from('channels')
-      .select('id, name, version(name)')
-      .eq('app_id', one.app_id)
-      .eq('version', one.id)
+    const { data: channelFound, error: errorChannel } = await fetchLinkedChannelsForVersion(one.app_id, one.id)
 
     let unlink = [] as LinkedChannel[]
     if (errorChannel) {
@@ -335,7 +334,7 @@ async function deleteOne(one: Element) {
         return
       }
 
-      const channelsList = linkedChannels.map(ch => `${ch.name} (${ch.version?.name ?? ''})`).join(', ')
+      const channelsList = linkedChannels.map(formatLinkedChannel).join(', ')
       const message = t('channel-bundle-linked', { channels: channelsList })
       const shouldUnlink = await showUnlinkDialog(message)
 
@@ -487,11 +486,7 @@ async function massDelete() {
 
   const linkedChannels = (await Promise.all((selectedElements.value as any).map(async (element: Element) => {
     return {
-      data: (await supabase
-        .from('channels')
-        .select('id, name, version(name)')
-        .eq('app_id', element.app_id)
-        .eq('version', element.id)),
+      data: await fetchLinkedChannelsForVersion(element.app_id, element.id),
       element,
     }
   }))).map(({ data: { data, error }, element }) => {
@@ -508,7 +503,12 @@ async function massDelete() {
   let unlink = [] as LinkedChannel[]
 
   if (linkedChannelsList.length > 0) {
-    unlink = linkedChannelsList.flatMap(val => (val.rawChannel ?? []) as LinkedChannel[])
+    const selectedVersionIds = new Set((selectedElements.value as any).map((val: Element) => val.id))
+    unlink = linkedChannelsList.flatMap(val => ((val.rawChannel ?? []) as LinkedChannel[]).map(channel => ({
+      ...channel,
+      stable_linked: selectedVersionIds.has(channel.version),
+      rollout_linked: selectedVersionIds.has(channel.rollout_version),
+    })))
     const deniedChannels = await findChannelsWithoutPromotionPermission(props.appId, unlink)
     if (deniedChannels.length > 0) {
       showChannelUnlinkPermissionError(deniedChannels)
@@ -516,7 +516,7 @@ async function massDelete() {
     }
 
     const channelsList = linkedChannelsList
-      .map(val => val.rawChannel?.map((ch: any) => `${ch.name} (${ch.version?.name ?? t('channel-builtin')})`).join(', '))
+      .map(val => val.rawChannel?.map((ch: LinkedChannel) => formatLinkedChannel(ch)).join(', '))
       .join(', ')
     const message = t('channel-bundle-linked', { channels: channelsList })
     const shouldUnlink = await showUnlinkDialog(message)

@@ -52,7 +52,7 @@ export async function currentBundleInternal(channel: string, appId: string, opti
 
   const { data: supabaseChannel, error } = await withSupabaseSource('channels.currentBundle', () => supabase
     .from('channels')
-    .select('version ( name )')
+    .select('version:app_versions!channels_version_fkey( name )')
     .eq('name', channel)
     .eq('app_id', appId)
     .limit(1))

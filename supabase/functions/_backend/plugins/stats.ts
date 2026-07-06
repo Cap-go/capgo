@@ -9,7 +9,7 @@ import { BRES, simpleError, simpleError200, simpleRateLimit } from '../utils/hon
 import { cloudlog } from '../utils/logging.ts'
 import { invalidIpInfo } from '../utils/invalids_ip.ts'
 import { sendNotifOrgCached } from '../utils/notifications.ts'
-import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
+import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getEffectiveDeviceChannelNamePostgres, getPgClient } from '../utils/pg.ts'
 import { makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { getClientIP } from '../utils/rate_limit.ts'
 import { statsRequestSchema } from '../utils/plugin_validation.ts'
@@ -59,6 +59,11 @@ interface PostResult {
   message?: string
   isOnprem?: boolean
   moreInfo?: Record<string, unknown>
+}
+
+function normalizeStatsChannelName(channelName: string | null | undefined): string | null {
+  const trimmed = channelName?.trim()
+  return trimmed || null
 }
 
 function shouldRecordStatsAction(action: string, pluginVersion: string) {
@@ -145,6 +150,12 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     return { success: true }
   }
 
+  let effectiveStatsChannelPromise: ReturnType<typeof getEffectiveDeviceChannelNamePostgres> | undefined
+  const getEffectiveStatsChannel = () => {
+    effectiveStatsChannelPromise ??= getEffectiveDeviceChannelNamePostgres(c, app_id, device.device_id, normalizeStatsChannelName(device.default_channel), device.platform, appOwner.channel_device_count > 0, drizzleClient as ReturnType<typeof getDrizzleClient>)
+    return effectiveStatsChannelPromise
+  }
+
   // Extract version from composite format if present (e.g., "1.2.3:main.js" -> "1.2.3")
   // Composite format is used for file-specific failure stats
   const colonIndex = version_name.indexOf(':')
@@ -160,20 +171,20 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   }
   // device.version = appVersion.id
   if (action === 'set' && !device.is_emulator && device.is_prod) {
-    // Use versionOnly (from request body) instead of appVersion - no DB read needed for stats
-    await createStatsVersion(c, versionOnly, app_id, 'install')
+    // Use versionOnly from the request body and resolve channel overrides only when configured.
+    await createStatsVersion(c, versionOnly, app_id, 'install', await getEffectiveStatsChannel())
     if (old_version_name) {
       const oldVersion = await getAppVersionPostgres(c, app_id, old_version_name, undefined, drizzleClient as ReturnType<typeof getDrizzleClient>)
       if (oldVersion && oldVersion.id !== appVersion.id) {
-        await createStatsVersion(c, old_version_name, app_id, 'uninstall')
+        await createStatsVersion(c, old_version_name, app_id, 'uninstall', await getEffectiveStatsChannel())
         statsActions.push({ action: 'uninstall', versionName: old_version_name ?? 'unknown' })
       }
     }
   }
-  else if (action.endsWith('_fail')) {
-    if (shouldRecordAction) {
-      // Use versionOnly (from request body) instead of appVersion - no DB read needed for stats
-      await createStatsVersion(c, versionOnly, app_id, 'fail')
+  else if (action.endsWith('_fail') && shouldRecordAction) {
+    if (!device.is_emulator && device.is_prod) {
+      // Keep version_usage fail and install cohorts aligned for rollout auto-pause.
+      await createStatsVersion(c, versionOnly, app_id, 'fail', await getEffectiveStatsChannel())
       cloudlog({ requestId: c.get('requestId'), message: 'FAIL!' })
       // Daily fail ratio emails are now sent via cron job that checks aggregate stats
       // instead of per-device notifications. See process_daily_fail_ratio_email.

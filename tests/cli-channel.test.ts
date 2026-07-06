@@ -156,7 +156,7 @@ describe('tests CLI channel commands', () => {
       // Verify in database
       const { data, error } = await getSupabaseClient()
         .from('channels')
-        .select('id, version (id, name)')
+        .select('id, version:app_versions!channels_version_fkey(id, name)')
         .eq('name', channelName)
         .eq('app_id', APPNAME)
         .single()
@@ -406,7 +406,7 @@ describe('tests CLI channel commands', () => {
       // Verify in database
       const { data, error } = await getSupabaseClient()
         .from('channels')
-        .select('version (name)')
+        .select('version:app_versions!channels_version_fkey(name)')
         .eq('name', channelName)
         .eq('app_id', APPNAME)
         .single()
