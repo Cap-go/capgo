@@ -255,14 +255,22 @@ async function reloadNotifications() {
 async function refreshData(appId = id.value, refreshId = ++activeRefreshId) {
   isLoading.value = true
   try {
-    const [appData, notificationData] = await Promise.all([
-      loadAppInfo(appId),
-      loadNotifications(appId),
-    ])
+    const appData = await loadAppInfo(appId)
     if (refreshId !== activeRefreshId)
       return
     app.value = appData
-    applyNotificationData(notificationData)
+    if (!appData)
+      return
+
+    try {
+      applyNotificationData(await loadNotifications(appId))
+    }
+    catch (error) {
+      if (refreshId !== activeRefreshId)
+        return
+      console.error(error)
+      toast.error(t('notification-load-error'))
+    }
   }
   catch (error) {
     if (refreshId !== activeRefreshId)
@@ -466,9 +474,15 @@ watch(() => providerForm.value.platform, () => {
                   <IconBell class="w-5 h-5 text-azure-500" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                  <h1 class="text-xl font-semibold leading-tight text-slate-950 dark:text-white">
-                    {{ t('notification-title') }}
-                  </h1>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h1 class="text-xl font-semibold leading-tight text-slate-950 dark:text-white">
+                      {{ t('notification-title') }}
+                    </h1>
+                    <span class="px-2 py-0.5 text-[10px] font-semibold uppercase rounded border border-azure-500/40 bg-azure-500/10 text-azure-700 dark:text-azure-200">{{ t('beta') }}</span>
+                  </div>
+                  <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    {{ t('notification-beta-description') }}
+                  </p>
                   <p class="mt-1 font-mono text-sm text-slate-500 dark:text-slate-400">
                     {{ id }}
                   </p>
