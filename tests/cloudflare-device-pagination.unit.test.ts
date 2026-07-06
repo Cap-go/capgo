@@ -109,7 +109,7 @@ describe('buildReadDevicesCFQuery', () => {
     const query = buildDeviceIdsByInstallSourcesQuery('com.example.app', ['app_store', 'amazon_appstore'])
 
     expect(query).toContain(`WHERE index1 = 'com.example.app' AND blob9 != ''`)
-    expect(query).toContain(`WHERE index1 = 'com.example.app' AND blob9 != ''`)
+    expect(query).toContain('GROUP BY blob1')
     expect(query).toContain(`install_source IN ('app_store', 'amazon_appstore')`)
   })
 })
