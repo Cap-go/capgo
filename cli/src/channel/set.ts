@@ -3,6 +3,7 @@ import type { Database } from '../types/supabase.types'
 import type { Compatibility } from '../utils'
 import { intro, log, outro } from '@clack/prompts'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
+import { sendUpdateNotificationsForChannels } from '../notifications/send-update'
 import { printPreviewQrForResolvedTarget, resolveChannelPreviewTarget } from '../preview/qr'
 import { formatTable } from '../terminal-table'
 import {
@@ -134,8 +135,9 @@ export async function setChannelInternal(channel: string, appId: string, options
     autoPauseMinFailures,
     autoPauseAction,
     autoPauseCooldownMinutes,
+    sendUpdateNotification,
   } = options
-
+  let bundleLinkChanged = false
   if (latest && bundle) {
     if (!silent)
       log.error('Cannot set latest and bundle at the same time')
@@ -288,6 +290,7 @@ export async function setChannelInternal(channel: string, appId: string, options
       log.info(`Set ${appId} channel: ${channel} to @${resolvedBundleVersion}`)
 
     channelPayload.version = data.id
+    bundleLinkChanged = bundleLinkChanged || existingChannel.version !== data.id
   }
 
   if (latestRemote) {
@@ -332,6 +335,7 @@ export async function setChannelInternal(channel: string, appId: string, options
       log.info(`Set ${appId} channel: ${channel} to @${data.name}`)
 
     channelPayload.version = data.id
+    bundleLinkChanged = bundleLinkChanged || existingChannel.version !== data.id
   }
 
   if (rolloutBundle != null) {
@@ -370,6 +374,7 @@ export async function setChannelInternal(channel: string, appId: string, options
       throw new Error('Cannot set rollout target without a stable bundle')
 
     channelPayload.rollout_version = data.id
+    bundleLinkChanged = bundleLinkChanged || existingChannel.rollout_version !== data.id
     if (rolloutEnable == null)
       channelPayload.rollout_enabled = true
     if (!silent)
@@ -448,6 +453,7 @@ export async function setChannelInternal(channel: string, appId: string, options
     }
 
     channelPayload.version = rolloutVersion
+    bundleLinkChanged = bundleLinkChanged || existingChannel.version !== rolloutVersion
     channelPayload.rollout_version = null
     channelPayload.rollout_enabled = false
     channelPayload.rollout_percentage_bps = 0
@@ -569,6 +575,15 @@ export async function setChannelInternal(channel: string, appId: string, options
     if (!silent)
       log.error('Cannot set channel the upload key is not allowed to do that, use the "all" for this.')
     throw new Error('Upload key is not allowed to set this channel')
+  }
+
+  if (sendUpdateNotification) {
+    await sendUpdateNotificationsForChannels({
+      appId,
+      apikey: options.apikey,
+      channels: bundleLinkChanged ? [channel] : [],
+      silent,
+    })
   }
 
   if (options.qrPreview && !silent) {

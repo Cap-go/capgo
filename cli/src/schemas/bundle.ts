@@ -56,6 +56,7 @@ export const optionsUploadSchema = optionsBaseSchema.extend({
   disableBrotli: z.boolean().optional(),
   versionExistsOk: z.boolean().optional(),
   selfAssign: z.boolean().optional(),
+  sendUpdateNotification: z.boolean().optional(),
   verbose: z.boolean().optional(),
   showReplicationProgress: z.boolean().optional(),
   qrPreview: z.boolean().optional(),
@@ -92,7 +93,9 @@ export type DecryptResult = z.infer<typeof decryptResultSchema>
 
 export const uploadBundleResultSchema = z.object({
   success: z.boolean(),
+  appId: z.string().optional(),
   bundle: z.string(),
+  updatedChannels: z.array(z.string()).optional(),
   checksum: z.string().nullable().optional(),
   encryptionMethod: z.enum(['none', 'v1', 'v2']),
   sessionKey: z.string().optional(),

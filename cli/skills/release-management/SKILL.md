@@ -48,6 +48,7 @@ Use this skill for OTA update workflows in Capgo Cloud.
   - `--channel` accepts a single channel or a comma-separated list such as `production,beta`.
   - When multiple channels are provided, channels that already have the uploaded checksum are skipped and the remaining channels are assigned.
   - Use `--qr-preview` to print a terminal QR code for the uploaded bundle after a successful upload. App preview must be enabled first.
+  - Use `--send-update-notification` to queue native update-check notifications for channels whose linked bundle changed. Native notifications and push update notifications must be enabled for the app.
 - Important options:
   - `-p, --path <path>`
   - `-c, --channel <channel[,channel...]>`
@@ -84,6 +85,7 @@ Use this skill for OTA update workflows in Capgo Cloud.
   - `--version-exists-ok`
   - `--self-assign`
   - `--qr-preview`
+  - `--send-update-notification`
   - S3 options: `--s3-region`, `--s3-apikey`, `--s3-apisecret`, `--s3-endpoint`, `--s3-bucket-name`, `--s3-port`, `--no-s3-ssl`
   - Signing options: `--key-v2`, `--key-data-v2`, `--bundle-url`, `--no-key`, `--display-iv-session`
   - Deprecated options still supported: `--multipart`, `--partial`, `--partial-only`
@@ -206,6 +208,7 @@ Use this skill for OTA update workflows in Capgo Cloud.
   - Supports update policies `major`, `minor`, `metadata`, `patch`, and `none`.
   - Supports platform and device targeting.
   - Use `--qr-preview` to print a terminal QR code for the updated channel. App preview must be enabled first.
+  - Use `--send-update-notification` with bundle, latest, latest remote, rollout target, or rollout promote changes to make matching devices check for updates.
 - Key options:
   - `-b, --bundle <bundle>`
   - `-s, --state <state>`
@@ -223,6 +226,7 @@ Use this skill for OTA update workflows in Capgo Cloud.
   - `--package-json <packageJson>`
   - `--ignore-metadata-check`
   - `--qr-preview`
+  - `--send-update-notification`
 
 ## Encryption key workflows
 
