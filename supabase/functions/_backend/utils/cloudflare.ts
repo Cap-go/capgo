@@ -864,8 +864,9 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
     if (!sourceDeviceIds.length)
       return [] as DeviceRes[]
 
+    const sourceDeviceIdSet = new Set(sourceDeviceIds)
     const deviceIds = params.deviceIds?.length
-      ? params.deviceIds.filter(deviceId => sourceDeviceIds.includes(deviceId))
+      ? params.deviceIds.filter(deviceId => sourceDeviceIdSet.has(deviceId))
       : sourceDeviceIds
     if (!deviceIds.length)
       return [] as DeviceRes[]
@@ -1908,15 +1909,12 @@ export async function getAdminOrgMetrics(
         bandwidthByOrg.set(orgId, current)
       }
 
-      // Merge results
-      const bandwidthMap = bandwidthByOrg
-
       return orgMau.map(org => ({
         org_id: org.org_id,
         mau: org.mau,
         apps_count: org.apps_count,
-        bandwidth: bandwidthMap.get(org.org_id)?.bandwidth || 0,
-        updates: bandwidthMap.get(org.org_id)?.updates || 0,
+        bandwidth: bandwidthByOrg.get(org.org_id)?.bandwidth || 0,
+        updates: bandwidthByOrg.get(org.org_id)?.updates || 0,
       }))
     }
 
