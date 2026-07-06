@@ -385,7 +385,7 @@
     "vite-plugin-webfont-dl": "^3.12.0",
     "vitest": "^4.1.9",
     "vue-tsc": "3.3.5",
-    "wrangler": "^4.101.0"
+    "wrangler": "^4.107.0"
   },
   "gitmoji": {
     "autoAdd": false,

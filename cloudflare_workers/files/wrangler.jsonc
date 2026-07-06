@@ -9,6 +9,9 @@
   ],
   "workers_dev": false,
   "upload_source_maps": true,
+  "cache": {
+    "enabled": false
+  },
   "migrations": [
     {
       "tag": "v1",
@@ -29,6 +32,9 @@
   "env": {
     "prod": {
       "name": "capgo_files-prod",
+      "cache": {
+        "enabled": true
+      },
       "vars": {
         "ENV_NAME": "capgo_files-prod"
       },
