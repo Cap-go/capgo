@@ -6,15 +6,10 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconAlertCircle from '~icons/lucide/alert-circle'
-import IconBell from '~icons/lucide/bell'
 import IconCheckCircle from '~icons/lucide/check-circle-2'
-import IconClock from '~icons/lucide/clock-3'
-import IconDatabaseZap from '~icons/lucide/database-zap'
 import IconRefresh from '~icons/lucide/refresh-cw'
 import IconSearch from '~icons/lucide/search'
 import IconSend from '~icons/lucide/send'
-import IconSettings from '~icons/lucide/settings'
-import IconSmartphone from '~icons/lucide/smartphone'
 import IconZap from '~icons/lucide/zap'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
@@ -118,10 +113,14 @@ const sendTitle = ref('')
 const sendBody = ref('')
 const pushUpdateChannel = ref('')
 const notificationTabs: Tab[] = [
-  { label: 'notification-dashboard', icon: IconDatabaseZap, key: 'dashboard' },
-  { label: 'notification-broadcasts', icon: IconSend, key: 'broadcasts' },
-  { label: 'notification-api-sends', icon: IconZap, key: 'api' },
+  { label: 'notification-dashboard', key: 'dashboard' },
+  { label: 'notification-broadcasts', key: 'broadcasts' },
+  { label: 'notification-api-sends', key: 'api' },
 ]
+
+function setNotificationTab(tab: Tab) {
+  activeNotificationTab.value = tab.key as NotificationTab
+}
 
 function normalizeSecretRefSegment(value: string): string {
   let normalized = ''
@@ -616,485 +615,460 @@ watch(activeNotificationTab, () => {
 
 <template>
   <div>
-    <div v-if="app || isLoading" class="w-full h-full px-0 pt-0 mx-auto mb-8 sm:px-6 md:pt-8 lg:px-8 max-w-9xl">
-      <div class="space-y-4">
-        <header class="overflow-hidden bg-white border shadow-sm md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
-          <div class="flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
-            <div class="min-w-0">
-              <div class="flex items-center gap-3">
-                <span class="flex items-center justify-center w-10 h-10 border rounded-lg shrink-0 border-azure-500/30 bg-azure-500/10">
-                  <IconBell class="w-5 h-5 text-azure-500" aria-hidden="true" />
-                </span>
-                <div class="min-w-0">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <h1 class="text-xl font-semibold leading-tight text-slate-950 dark:text-white">
-                      {{ t('notification-title') }}
-                    </h1>
-                    <span class="px-2 py-0.5 text-[10px] font-semibold uppercase rounded border border-azure-500/40 bg-azure-500/10 text-azure-700 dark:text-azure-200">{{ t('beta') }}</span>
-                  </div>
-                  <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    {{ t('notification-beta-description') }}
-                  </p>
-                  <p class="mt-1 font-mono text-sm text-slate-500 dark:text-slate-400">
-                    {{ id }}
-                  </p>
+    <div v-if="app || isLoading">
+      <div class="mt-0 md:mt-8">
+        <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+            <div class="flex flex-col gap-4 px-4 py-4 border-b sm:flex-row sm:items-center sm:justify-between border-slate-200 dark:border-slate-700">
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <h1 class="text-lg font-semibold leading-6 text-gray-900 dark:text-gray-100">
+                    {{ t('notification-title') }}
+                  </h1>
+                  <span class="px-2 py-0.5 text-[10px] font-semibold uppercase rounded border border-azure-500/40 bg-azure-500/10 text-azure-700 dark:text-azure-200">{{ t('beta') }}</span>
+                </div>
+                <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                  {{ t('notification-beta-description') }}
+                </p>
+              </div>
+              <button class="self-start d-btn d-btn-sm d-btn-outline sm:self-auto" :disabled="isLoading" @click="() => refreshData()">
+                <span v-if="isLoading" class="d-loading d-loading-spinner d-loading-xs" />
+                <IconRefresh v-else class="w-4 h-4" aria-hidden="true" />
+                {{ t('refresh') }}
+              </button>
+            </div>
+
+            <nav class="flex min-w-0 gap-1 px-3 overflow-x-auto border-b border-slate-200 dark:border-slate-700" aria-label="Notification sections">
+              <button
+                v-for="tab in notificationTabs"
+                :key="tab.key"
+                type="button"
+                class="px-3 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap"
+                :class="activeNotificationTab === tab.key ? 'border-azure-500 text-azure-700 dark:text-azure-300' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'"
+                @click="setNotificationTab(tab)"
+              >
+                {{ t(tab.label) }}
+              </button>
+            </nav>
+
+            <div class="grid border-b divide-y sm:grid-cols-2 lg:grid-cols-4 sm:divide-x sm:divide-y-0 divide-slate-200 border-slate-200 dark:divide-slate-700 dark:border-slate-700">
+              <div class="p-4">
+                <div class="text-xs font-medium truncate text-slate-500 dark:text-slate-400">
+                  {{ t('notification-configured-providers') }}
+                </div>
+                <div class="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">
+                  {{ configuredProviders }}
+                </div>
+              </div>
+              <div class="p-4">
+                <div class="text-xs font-medium truncate text-slate-500 dark:text-slate-400">
+                  {{ t('notification-events-30d') }}
+                </div>
+                <div class="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">
+                  {{ totalEvents }}
+                </div>
+              </div>
+              <div class="p-4">
+                <div class="text-xs font-medium truncate text-slate-500 dark:text-slate-400">
+                  {{ t('notification-campaigns') }}
+                </div>
+                <div class="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">
+                  {{ campaigns.length }}
+                </div>
+              </div>
+              <div class="p-4">
+                <div class="text-xs font-medium truncate text-slate-500 dark:text-slate-400">
+                  {{ t('notification-device-results') }}
+                </div>
+                <div class="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">
+                  {{ devices.length }}
                 </div>
               </div>
             </div>
-            <button class="min-h-11 d-btn d-btn-outline" :disabled="isLoading" @click="() => refreshData()">
-              <span v-if="isLoading" class="d-loading d-loading-spinner d-loading-xs" />
-              <IconRefresh v-else class="w-4 h-4" aria-hidden="true" />
-              {{ t('refresh') }}
-            </button>
-          </div>
 
-          <div class="grid border-t divide-y sm:grid-cols-2 lg:grid-cols-4 sm:divide-x sm:divide-y-0 border-slate-200 divide-slate-200 dark:border-slate-700 dark:divide-slate-700">
-            <div class="p-4">
-              <div class="flex items-center gap-2 text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-                <IconCheckCircle class="w-4 h-4 text-vista-blue-500" aria-hidden="true" />
-                {{ t('notification-configured-providers') }}
-              </div>
-              <div class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
-                {{ configuredProviders }}
-              </div>
-            </div>
-            <div class="p-4">
-              <div class="flex items-center gap-2 text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-                <IconDatabaseZap class="w-4 h-4 text-azure-500" aria-hidden="true" />
-                {{ t('notification-events-30d') }}
-              </div>
-              <div class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
-                {{ totalEvents }}
-              </div>
-            </div>
-            <div class="p-4">
-              <div class="flex items-center gap-2 text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-                <IconClock class="w-4 h-4 text-cornflower-500" aria-hidden="true" />
-                {{ t('notification-campaigns') }}
-              </div>
-              <div class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
-                {{ campaigns.length }}
-              </div>
-            </div>
-            <div class="p-4">
-              <div class="flex items-center gap-2 text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-                <IconSmartphone class="w-4 h-4 text-pumpkin-orange-500" aria-hidden="true" />
-                {{ t('notification-device-results') }}
-              </div>
-              <div class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
-                {{ devices.length }}
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <Tabs v-model:active-tab="activeNotificationTab" :tabs="notificationTabs" no-wrap />
-
-        <div v-if="activeNotificationTab === 'dashboard'" class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
-          <main class="space-y-4">
-            <section class="bg-white border shadow-sm md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
-              <div class="flex flex-col gap-3 p-4 border-b sm:flex-row sm:items-center sm:justify-between border-slate-200 dark:border-slate-700">
-                <div>
-                  <div class="flex items-center gap-2">
-                    <IconSettings class="w-5 h-5 text-azure-500" aria-hidden="true" />
+            <div v-if="activeNotificationTab === 'dashboard'" class="grid divide-y xl:grid-cols-[minmax(0,1fr)_22rem] xl:divide-x xl:divide-y-0 divide-slate-200 dark:divide-slate-700">
+              <main class="min-w-0 p-4 space-y-5">
+                <section class="space-y-4">
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <h2 class="text-base font-semibold text-slate-950 dark:text-white">
                       {{ t('notification-provider-setup') }}
                     </h2>
+                    <button class="self-start d-btn d-btn-sm d-btn-primary sm:self-auto" :disabled="isSaving" @click="saveProvider">
+                      <span v-if="isSaving" class="d-loading d-loading-spinner d-loading-xs" />
+                      <IconCheckCircle v-else class="w-4 h-4" aria-hidden="true" />
+                      {{ t('notification-save-provider') }}
+                    </button>
                   </div>
-                </div>
-                <button class="min-h-11 d-btn d-btn-primary" :disabled="isSaving" @click="saveProvider">
-                  <span v-if="isSaving" class="d-loading d-loading-spinner d-loading-xs" />
-                  <IconCheckCircle v-else class="w-4 h-4" aria-hidden="true" />
-                  {{ t('notification-save-provider') }}
-                </button>
-              </div>
 
-              <div class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
-                <div class="space-y-4">
-                  <div class="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+                  <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+                    <div class="space-y-4">
+                      <div class="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+                        <label class="space-y-1">
+                          <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-platform') }}</span>
+                          <select v-model="providerForm.platform" class="w-full d-select d-select-bordered">
+                            <option value="android">
+                              {{ t('notification-platform-android') }}
+                            </option>
+                            <option value="ios">
+                              {{ t('notification-platform-ios') }}
+                            </option>
+                          </select>
+                        </label>
+                        <label class="space-y-1">
+                          <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('status') }}</span>
+                          <select v-model="providerForm.status" class="w-full d-select d-select-bordered">
+                            <option value="draft">
+                              {{ t('draft') }}
+                            </option>
+                            <option value="configured">
+                              {{ t('configured') }}
+                            </option>
+                            <option value="disabled">
+                              {{ t('disabled') }}
+                            </option>
+                          </select>
+                        </label>
+                        <label class="space-y-1 sm:col-span-2 2xl:col-span-2">
+                          <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-provider-secret-ref') }}</span>
+                          <input v-model="providerForm.secretRef" class="w-full d-input d-input-bordered" :placeholder="expectedProviderSecretRef">
+                          <span class="block text-xs leading-5 text-slate-500 dark:text-slate-400">{{ t('notification-provider-secret-ref-help') }}</span>
+                        </label>
+                      </div>
+                      <label class="block space-y-1">
+                        <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-provider-config-json') }}</span>
+                        <textarea v-model="providerForm.config" class="w-full font-mono text-sm d-textarea d-textarea-bordered min-h-36" :placeholder="providerConfigPlaceholder" />
+                        <span class="block text-xs leading-5 text-slate-500 dark:text-slate-400">{{ t('notification-provider-config-help') }}</span>
+                      </label>
+                    </div>
+
+                    <div class="overflow-hidden border rounded-lg border-slate-200 dark:border-slate-700">
+                      <div class="px-3 py-2 text-sm font-medium bg-slate-50 text-slate-700 dark:bg-slate-900/60 dark:text-slate-200">
+                        {{ t('notification-active-providers') }}
+                      </div>
+                      <div v-if="providers.length" class="divide-y divide-slate-200 dark:divide-slate-700">
+                        <div v-for="provider in providers" :key="provider.id" class="p-3">
+                          <div class="flex items-center justify-between gap-3">
+                            <span class="font-medium text-slate-950 dark:text-white">{{ notificationPlatformLabel(provider.platform) }}</span>
+                            <span class="inline-flex items-center px-2 py-1 text-xs font-medium border rounded-full" :class="statusClass(provider.status)">
+                              {{ provider.status }}
+                            </span>
+                          </div>
+                          <div class="mt-2 font-mono text-xs break-all text-slate-500 dark:text-slate-400">
+                            {{ provider.secret_ref || t('not-set') }}
+                          </div>
+                        </div>
+                      </div>
+                      <div v-else class="p-4 text-sm text-slate-500 dark:text-slate-400">
+                        {{ t('notification-no-providers') }}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              </main>
+
+              <aside class="p-4 space-y-6">
+                <section class="space-y-3">
+                  <h2 class="text-base font-semibold text-slate-950 dark:text-white">
+                    {{ t('notification-push-update') }}
+                  </h2>
+                  <label class="flex items-center justify-between gap-3 p-3 border rounded-lg border-slate-200 dark:border-slate-700">
+                    <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-push-update-enabled') }}</span>
+                    <input v-model="settings.pushUpdateEnabled" type="checkbox" class="d-toggle d-toggle-primary" :aria-label="t('notification-push-update-enabled')">
+                  </label>
+                  <label class="block space-y-1">
+                    <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-update-install-mode') }}</span>
+                    <select v-model="settings.pushUpdateInstallMode" class="w-full d-select d-select-bordered">
+                      <option value="next">
+                        {{ t('notification-update-install-next') }}
+                      </option>
+                      <option value="set">
+                        {{ t('notification-update-install-now') }}
+                      </option>
+                    </select>
+                  </label>
+                  <label class="block space-y-1">
+                    <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('channel') }}</span>
+                    <input v-model="pushUpdateChannel" class="w-full d-input d-input-bordered" :placeholder="t('channel')">
+                  </label>
+                  <div class="grid grid-cols-2 gap-2">
+                    <button class="d-btn d-btn-sm d-btn-outline" :disabled="isSaving" @click="saveNotificationSettings">
+                      <span v-if="isSaving" class="d-loading d-loading-spinner d-loading-xs" />
+                      <IconCheckCircle v-else class="w-4 h-4" aria-hidden="true" />
+                      {{ t('notification-save-settings') }}
+                    </button>
+                    <button class="d-btn d-btn-sm d-btn-primary" :disabled="isSaving || !settings.pushUpdateEnabled" @click="pushUpdateNow">
+                      <span v-if="isSaving" class="d-loading d-loading-spinner d-loading-xs" />
+                      <IconZap v-else class="w-4 h-4" aria-hidden="true" />
+                      {{ t('notification-push-update-now') }}
+                    </button>
+                  </div>
+                </section>
+
+                <section class="pt-6 space-y-3 border-t border-slate-200 dark:border-slate-700">
+                  <h2 class="text-base font-semibold text-slate-950 dark:text-white">
+                    {{ t('notification-stats') }}
+                  </h2>
+                  <div>
+                    <div class="text-3xl font-semibold text-slate-950 dark:text-white">
+                      {{ totalEvents }}
+                    </div>
+                    <div class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                      {{ t('notification-events-30d') }}
+                    </div>
+                  </div>
+                  <div v-if="hasStats" class="space-y-3">
+                    <div v-for="stat in stats" :key="stat.event" class="space-y-1">
+                      <div class="flex items-center justify-between gap-3 text-sm">
+                        <span class="font-medium text-slate-700 dark:text-slate-200">{{ stat.event }}</span>
+                        <span class="font-mono text-slate-950 dark:text-white">{{ stat.count }}</span>
+                      </div>
+                      <progress class="w-full h-1.5 d-progress d-progress-secondary" :value="stat.count" :max="totalEvents || 1" />
+                    </div>
+                  </div>
+                  <div v-else class="text-sm text-slate-500 dark:text-slate-400">
+                    {{ t('notification-no-stats') }}
+                  </div>
+                </section>
+              </aside>
+            </div>
+
+            <div v-else class="grid divide-y xl:grid-cols-[minmax(0,1fr)_22rem] xl:divide-x xl:divide-y-0 divide-slate-200 dark:divide-slate-700">
+              <main class="min-w-0">
+                <section v-if="activeNotificationTab === 'broadcasts'" class="p-4 space-y-4 border-b border-slate-200 dark:border-slate-700">
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <h2 class="text-base font-semibold text-slate-950 dark:text-white">
+                      {{ t('notification-create-broadcast') }}
+                    </h2>
+                    <button class="self-start d-btn d-btn-sm d-btn-primary sm:self-auto" :disabled="isSaving || !campaignForm.name.trim() || (!campaignForm.title.trim() && !campaignForm.body.trim())" @click="createBroadcast">
+                      <span v-if="isSaving" class="d-loading d-loading-spinner d-loading-xs" />
+                      <IconSend v-else class="w-4 h-4" aria-hidden="true" />
+                      {{ t('notification-create-broadcast') }}
+                    </button>
+                  </div>
+
+                  <div class="grid gap-4 lg:grid-cols-2">
                     <label class="space-y-1">
-                      <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-platform') }}</span>
-                      <select v-model="providerForm.platform" class="w-full min-h-11 d-select d-select-bordered">
-                        <option value="android">
-                          {{ t('notification-platform-android') }}
+                      <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-campaign-name') }}</span>
+                      <input v-model="campaignForm.name" class="w-full d-input d-input-bordered" :placeholder="t('notification-campaign-name')">
+                    </label>
+                    <label class="space-y-1">
+                      <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('type') }}</span>
+                      <select v-model="campaignForm.kind" class="w-full d-select d-select-bordered">
+                        <option value="alert">
+                          alert
                         </option>
-                        <option value="ios">
-                          {{ t('notification-platform-ios') }}
+                        <option value="background">
+                          background
                         </option>
                       </select>
                     </label>
                     <label class="space-y-1">
-                      <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('status') }}</span>
-                      <select v-model="providerForm.status" class="w-full min-h-11 d-select d-select-bordered">
-                        <option value="draft">
-                          {{ t('draft') }}
-                        </option>
-                        <option value="configured">
-                          {{ t('configured') }}
-                        </option>
-                        <option value="disabled">
-                          {{ t('disabled') }}
-                        </option>
-                      </select>
+                      <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-message-title') }}</span>
+                      <input v-model="campaignForm.title" class="w-full d-input d-input-bordered" :placeholder="t('notification-message-title')">
                     </label>
-                    <label class="space-y-1 sm:col-span-2 2xl:col-span-2">
-                      <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-provider-secret-ref') }}</span>
-                      <input v-model="providerForm.secretRef" class="w-full min-h-11 d-input d-input-bordered" :placeholder="expectedProviderSecretRef">
-                      <span class="block text-xs leading-5 text-slate-500 dark:text-slate-400">{{ t('notification-provider-secret-ref-help') }}</span>
+                    <label class="space-y-1">
+                      <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-message-body') }}</span>
+                      <textarea v-model="campaignForm.body" class="w-full d-textarea d-textarea-bordered min-h-24" :placeholder="t('notification-message-body')" />
                     </label>
                   </div>
-                  <label class="block space-y-1">
-                    <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-provider-config-json') }}</span>
-                    <textarea v-model="providerForm.config" class="w-full font-mono text-sm d-textarea d-textarea-bordered min-h-36" :placeholder="providerConfigPlaceholder" />
-                    <span class="block text-xs leading-5 text-slate-500 dark:text-slate-400">{{ t('notification-provider-config-help') }}</span>
-                  </label>
-                </div>
+                </section>
 
-                <div class="overflow-hidden border rounded-lg border-slate-200 dark:border-slate-700">
-                  <div class="px-3 py-2 text-xs font-medium uppercase bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
-                    {{ t('notification-active-providers') }}
+                <section class="px-4 pt-4">
+                  <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <h2 class="text-base font-semibold text-slate-950 dark:text-white">
+                      {{ activeNotificationTab === 'broadcasts' ? t('notification-broadcasts') : t('notification-api-sends') }}
+                    </h2>
+                    <span class="text-sm text-slate-500 dark:text-slate-400">
+                      {{ activeNotificationTab === 'broadcasts' ? broadcastCampaigns.length : apiCampaigns.length }} {{ t('notification-campaigns') }}
+                    </span>
                   </div>
-                  <div v-if="providers.length" class="divide-y divide-slate-200 dark:divide-slate-700">
-                    <div v-for="provider in providers" :key="provider.id" class="p-3">
-                      <div class="flex items-center justify-between gap-3">
-                        <span class="font-medium text-slate-950 dark:text-white">{{ notificationPlatformLabel(provider.platform) }}</span>
-                        <span class="inline-flex items-center px-2 py-1 text-xs font-medium border rounded-full" :class="statusClass(provider.status)">
-                          {{ provider.status }}
-                        </span>
-                      </div>
-                      <div class="mt-2 font-mono text-xs break-all text-slate-500 dark:text-slate-400">
-                        {{ provider.secret_ref || t('not-set') }}
-                      </div>
+                </section>
+                <DataTable
+                  v-if="activeNotificationTab === 'broadcasts'"
+                  v-model:columns="campaignColumns"
+                  v-model:current-page="broadcastCurrentPage"
+                  v-model:search="broadcastSearch"
+                  :total="broadcastCampaigns.length"
+                  :element-list="broadcastCampaigns"
+                  :is-loading="isLoading"
+                  :auto-reload="false"
+                  :mobile-fixed-pagination="false"
+                  :search-placeholder="t('notification-search-campaigns')"
+                  @reload="reloadNotifications()"
+                  @reset="reloadNotifications()"
+                />
+                <DataTable
+                  v-else
+                  v-model:columns="campaignColumns"
+                  v-model:current-page="apiCurrentPage"
+                  v-model:search="apiSearch"
+                  :total="apiCampaigns.length"
+                  :element-list="apiCampaigns"
+                  :is-loading="isLoading"
+                  :auto-reload="false"
+                  :mobile-fixed-pagination="false"
+                  :search-placeholder="t('notification-search-campaigns')"
+                  @reload="reloadNotifications()"
+                  @reset="reloadNotifications()"
+                />
+
+                <section v-if="activeNotificationTab === 'api'" class="grid gap-6 p-4 border-t lg:grid-cols-2 border-slate-200 dark:border-slate-700">
+                  <div class="space-y-3">
+                    <h2 class="text-base font-semibold text-slate-950 dark:text-white">
+                      {{ t('notification-quick-send') }}
+                    </h2>
+                    <label class="block space-y-1">
+                      <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-recipient-external-id') }}</span>
+                      <input v-model="sendExternalId" class="w-full d-input d-input-bordered" :placeholder="t('notification-recipient-external-id')">
+                    </label>
+                    <label class="block space-y-1">
+                      <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-message-title') }}</span>
+                      <input v-model="sendTitle" class="w-full d-input d-input-bordered" :placeholder="t('notification-message-title')">
+                    </label>
+                    <label class="block space-y-1">
+                      <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-message-body') }}</span>
+                      <textarea v-model="sendBody" class="w-full d-textarea d-textarea-bordered min-h-24" :placeholder="t('notification-message-body')" />
+                    </label>
+                    <button class="w-full d-btn d-btn-sm d-btn-primary" :disabled="isSaving || !sendExternalId.trim()" @click="sendTest">
+                      <span v-if="isSaving" class="d-loading d-loading-spinner d-loading-xs" />
+                      <IconSend v-else class="w-4 h-4" aria-hidden="true" />
+                      {{ t('notification-send-test') }}
+                    </button>
+                  </div>
+
+                  <div class="space-y-3">
+                    <h2 class="text-base font-semibold text-slate-950 dark:text-white">
+                      {{ t('notification-recipient-lookup') }}
+                    </h2>
+                    <label class="block space-y-1">
+                      <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-recipient-external-id') }}</span>
+                      <input v-model="lookupExternalId" class="w-full d-input d-input-bordered" :placeholder="t('notification-recipient-external-id')">
+                    </label>
+                    <button class="w-full d-btn d-btn-sm d-btn-outline" :disabled="isSaving || !lookupExternalId.trim()" @click="lookupRecipient">
+                      <IconSearch class="w-4 h-4" aria-hidden="true" />
+                      {{ t('notification-lookup') }}
+                    </button>
+                    <div class="overflow-x-auto border rounded-lg border-slate-200 dark:border-slate-700">
+                      <table class="w-full text-sm text-left text-gray-500 d-table d-table-sm dark:text-gray-400">
+                        <thead class="text-gray-700 bg-gray-50 dark:text-gray-400 dark:bg-gray-700">
+                          <tr>
+                            <th class="whitespace-nowrap">
+                              {{ t('device') }}
+                            </th>
+                            <th class="whitespace-nowrap">
+                              {{ t('platform') }}
+                            </th>
+                            <th class="whitespace-nowrap">
+                              {{ t('badge') }}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="device in devices" :key="device.deviceKey">
+                            <td class="font-mono text-xs">
+                              {{ shortKey(device.deviceKey) }}
+                            </td>
+                            <td>{{ notificationPlatformLabel(device.platform) }}</td>
+                            <td>{{ device.badge }}</td>
+                          </tr>
+                          <tr v-if="!devices.length">
+                            <td colspan="3" class="text-slate-500 dark:text-slate-400">
+                              {{ t('notification-no-devices') }}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
                     </div>
                   </div>
-                  <div v-else class="p-4 text-sm text-slate-500 dark:text-slate-400">
-                    {{ t('notification-no-providers') }}
-                  </div>
-                </div>
-              </div>
-            </section>
-          </main>
+                </section>
+              </main>
 
-          <aside class="space-y-4">
-            <section class="bg-white border shadow-sm md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
-              <div class="flex items-center gap-2 p-4 border-b border-slate-200 dark:border-slate-700">
-                <IconZap class="w-5 h-5 text-azure-500" aria-hidden="true" />
-                <h2 class="text-base font-semibold text-slate-950 dark:text-white">
-                  {{ t('notification-push-update') }}
-                </h2>
-              </div>
-              <div class="p-4 space-y-3">
-                <label class="flex items-center justify-between gap-3 p-3 border rounded-lg border-slate-200 dark:border-slate-700">
-                  <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-push-update-enabled') }}</span>
-                  <input v-model="settings.pushUpdateEnabled" type="checkbox" class="d-toggle d-toggle-primary" :aria-label="t('notification-push-update-enabled')">
-                </label>
-                <label class="block space-y-1">
-                  <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-update-install-mode') }}</span>
-                  <select v-model="settings.pushUpdateInstallMode" class="w-full min-h-11 d-select d-select-bordered">
-                    <option value="next">
-                      {{ t('notification-update-install-next') }}
-                    </option>
-                    <option value="set">
-                      {{ t('notification-update-install-now') }}
-                    </option>
-                  </select>
-                </label>
-                <label class="block space-y-1">
-                  <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('channel') }}</span>
-                  <input v-model="pushUpdateChannel" class="w-full min-h-11 d-input d-input-bordered" :placeholder="t('channel')">
-                </label>
-                <div class="grid grid-cols-2 gap-2">
-                  <button class="min-h-11 d-btn d-btn-outline" :disabled="isSaving" @click="saveNotificationSettings">
-                    <span v-if="isSaving" class="d-loading d-loading-spinner d-loading-xs" />
-                    <IconCheckCircle v-else class="w-4 h-4" aria-hidden="true" />
-                    {{ t('notification-save-settings') }}
-                  </button>
-                  <button class="min-h-11 d-btn d-btn-primary" :disabled="isSaving || !settings.pushUpdateEnabled" @click="pushUpdateNow">
-                    <span v-if="isSaving" class="d-loading d-loading-spinner d-loading-xs" />
-                    <IconZap v-else class="w-4 h-4" aria-hidden="true" />
-                    {{ t('notification-push-update-now') }}
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            <section class="bg-white border shadow-sm md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
-              <div class="flex items-center gap-2 p-4 border-b border-slate-200 dark:border-slate-700">
-                <IconDatabaseZap class="w-5 h-5 text-azure-500" aria-hidden="true" />
-                <h2 class="text-base font-semibold text-slate-950 dark:text-white">
-                  {{ t('notification-stats') }}
-                </h2>
-              </div>
-              <div class="p-4">
-                <div class="text-3xl font-semibold text-slate-950 dark:text-white">
-                  {{ totalEvents }}
-                </div>
-                <div class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  {{ t('notification-events-30d') }}
-                </div>
-                <div v-if="hasStats" class="mt-4 space-y-3">
-                  <div v-for="stat in stats" :key="stat.event" class="space-y-1">
-                    <div class="flex items-center justify-between gap-3 text-sm">
-                      <span class="font-medium text-slate-700 dark:text-slate-200">{{ stat.event }}</span>
-                      <span class="font-mono text-slate-950 dark:text-white">{{ stat.count }}</span>
-                    </div>
-                    <progress class="w-full h-1.5 d-progress d-progress-secondary" :value="stat.count" :max="totalEvents || 1" />
-                  </div>
-                </div>
-                <div v-else class="mt-4 text-sm text-slate-500 dark:text-slate-400">
-                  {{ t('notification-no-stats') }}
-                </div>
-              </div>
-            </section>
-          </aside>
-        </div>
-
-        <div v-else class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
-          <main class="space-y-4">
-            <section v-if="activeNotificationTab === 'broadcasts'" class="bg-white border shadow-sm md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
-              <div class="flex flex-col gap-3 p-4 border-b sm:flex-row sm:items-center sm:justify-between border-slate-200 dark:border-slate-700">
-                <div>
-                  <h2 class="text-base font-semibold text-slate-950 dark:text-white">
-                    {{ t('notification-create-broadcast') }}
-                  </h2>
-                </div>
-                <button class="min-h-11 d-btn d-btn-primary" :disabled="isSaving || !campaignForm.name.trim() || (!campaignForm.title.trim() && !campaignForm.body.trim())" @click="createBroadcast">
-                  <span v-if="isSaving" class="d-loading d-loading-spinner d-loading-xs" />
-                  <IconSend v-else class="w-4 h-4" aria-hidden="true" />
-                  {{ t('notification-create-broadcast') }}
-                </button>
-              </div>
-
-              <div class="grid gap-4 p-4 lg:grid-cols-2">
-                <label class="space-y-1">
-                  <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-campaign-name') }}</span>
-                  <input v-model="campaignForm.name" class="w-full min-h-11 d-input d-input-bordered" :placeholder="t('notification-campaign-name')">
-                </label>
-                <label class="space-y-1">
-                  <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('type') }}</span>
-                  <select v-model="campaignForm.kind" class="w-full min-h-11 d-select d-select-bordered">
-                    <option value="alert">
-                      alert
-                    </option>
-                    <option value="background">
-                      background
-                    </option>
-                  </select>
-                </label>
-                <label class="space-y-1">
-                  <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-message-title') }}</span>
-                  <input v-model="campaignForm.title" class="w-full min-h-11 d-input d-input-bordered" :placeholder="t('notification-message-title')">
-                </label>
-                <label class="space-y-1">
-                  <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-message-body') }}</span>
-                  <textarea v-model="campaignForm.body" class="w-full d-textarea d-textarea-bordered min-h-24" :placeholder="t('notification-message-body')" />
-                </label>
-              </div>
-            </section>
-
-            <section class="overflow-hidden bg-white border shadow-sm md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
-              <div class="flex flex-col gap-2 p-4 border-b sm:flex-row sm:items-center sm:justify-between border-slate-200 dark:border-slate-700">
-                <h2 class="text-base font-semibold text-slate-950 dark:text-white">
-                  {{ activeNotificationTab === 'broadcasts' ? t('notification-broadcasts') : t('notification-api-sends') }}
-                </h2>
-                <span class="text-sm text-slate-500 dark:text-slate-400">
-                  {{ activeNotificationTab === 'broadcasts' ? broadcastCampaigns.length : apiCampaigns.length }} {{ t('notification-campaigns') }}
-                </span>
-              </div>
-              <DataTable
-                v-if="activeNotificationTab === 'broadcasts'"
-                v-model:columns="campaignColumns"
-                v-model:current-page="broadcastCurrentPage"
-                v-model:search="broadcastSearch"
-                :total="broadcastCampaigns.length"
-                :element-list="broadcastCampaigns"
-                :is-loading="isLoading"
-                :auto-reload="false"
-                :mobile-fixed-pagination="false"
-                :search-placeholder="t('notification-search-campaigns')"
-                @reload="reloadNotifications()"
-                @reset="reloadNotifications()"
-              />
-              <DataTable
-                v-else
-                v-model:columns="campaignColumns"
-                v-model:current-page="apiCurrentPage"
-                v-model:search="apiSearch"
-                :total="apiCampaigns.length"
-                :element-list="apiCampaigns"
-                :is-loading="isLoading"
-                :auto-reload="false"
-                :mobile-fixed-pagination="false"
-                :search-placeholder="t('notification-search-campaigns')"
-                @reload="reloadNotifications()"
-                @reset="reloadNotifications()"
-              />
-            </section>
-
-            <section v-if="activeNotificationTab === 'api'" class="grid gap-4 lg:grid-cols-2">
-              <div class="bg-white border shadow-sm md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
-                <div class="flex items-center gap-2 p-4 border-b border-slate-200 dark:border-slate-700">
-                  <IconSend class="w-5 h-5 text-azure-500" aria-hidden="true" />
-                  <h2 class="text-base font-semibold text-slate-950 dark:text-white">
-                    {{ t('notification-quick-send') }}
-                  </h2>
-                </div>
-                <div class="p-4 space-y-3">
-                  <label class="block space-y-1">
-                    <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-recipient-external-id') }}</span>
-                    <input v-model="sendExternalId" class="w-full min-h-11 d-input d-input-bordered" :placeholder="t('notification-recipient-external-id')">
-                  </label>
-                  <label class="block space-y-1">
-                    <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-message-title') }}</span>
-                    <input v-model="sendTitle" class="w-full min-h-11 d-input d-input-bordered" :placeholder="t('notification-message-title')">
-                  </label>
-                  <label class="block space-y-1">
-                    <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-message-body') }}</span>
-                    <textarea v-model="sendBody" class="w-full d-textarea d-textarea-bordered min-h-24" :placeholder="t('notification-message-body')" />
-                  </label>
-                  <button class="w-full min-h-11 d-btn d-btn-primary" :disabled="isSaving || !sendExternalId.trim()" @click="sendTest">
-                    <span v-if="isSaving" class="d-loading d-loading-spinner d-loading-xs" />
-                    <IconSend v-else class="w-4 h-4" aria-hidden="true" />
-                    {{ t('notification-send-test') }}
-                  </button>
-                </div>
-              </div>
-
-              <div class="bg-white border shadow-sm md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
-                <div class="flex items-center gap-2 p-4 border-b border-slate-200 dark:border-slate-700">
-                  <IconSearch class="w-5 h-5 text-azure-500" aria-hidden="true" />
-                  <h2 class="text-base font-semibold text-slate-950 dark:text-white">
-                    {{ t('notification-recipient-lookup') }}
-                  </h2>
-                </div>
-                <div class="p-4 space-y-3">
-                  <label class="block space-y-1">
-                    <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-recipient-external-id') }}</span>
-                    <input v-model="lookupExternalId" class="w-full min-h-11 d-input d-input-bordered" :placeholder="t('notification-recipient-external-id')">
-                  </label>
-                  <button class="w-full min-h-11 d-btn d-btn-outline" :disabled="isSaving || !lookupExternalId.trim()" @click="lookupRecipient">
-                    <IconSearch class="w-4 h-4" aria-hidden="true" />
-                    {{ t('notification-lookup') }}
-                  </button>
-                </div>
-                <div class="overflow-x-auto border-t border-slate-200 dark:border-slate-700">
-                  <table class="d-table d-table-sm">
-                    <thead>
-                      <tr>
-                        <th>{{ t('device') }}</th>
-                        <th>{{ t('platform') }}</th>
-                        <th>{{ t('badge') }}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="device in devices" :key="device.deviceKey">
-                        <td class="font-mono text-xs">
-                          {{ shortKey(device.deviceKey) }}
-                        </td>
-                        <td>{{ notificationPlatformLabel(device.platform) }}</td>
-                        <td>{{ device.badge }}</td>
-                      </tr>
-                      <tr v-if="!devices.length">
-                        <td colspan="3" class="text-slate-500 dark:text-slate-400">
-                          {{ t('notification-no-devices') }}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </section>
-          </main>
-
-          <aside class="space-y-4">
-            <section class="bg-white border shadow-sm md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
-              <div class="flex items-center gap-2 p-4 border-b border-slate-200 dark:border-slate-700">
-                <IconDatabaseZap class="w-5 h-5 text-azure-500" aria-hidden="true" />
+              <aside class="p-4 space-y-4">
                 <h2 class="text-base font-semibold text-slate-950 dark:text-white">
                   {{ t('notification-campaign-stats') }}
                 </h2>
-              </div>
-              <div v-if="selectedCampaign" class="p-4 space-y-4">
-                <div>
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                      <h3 class="font-semibold break-words text-slate-950 dark:text-white">
-                        {{ selectedCampaign.name }}
-                      </h3>
-                      <p class="mt-1 font-mono text-xs break-all text-slate-500 dark:text-slate-400">
-                        {{ selectedCampaign.id }}
-                      </p>
+                <div v-if="selectedCampaign" class="space-y-4">
+                  <div>
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <h3 class="font-semibold break-words text-slate-950 dark:text-white">
+                          {{ selectedCampaign.name }}
+                        </h3>
+                        <p class="mt-1 font-mono text-xs break-all text-slate-500 dark:text-slate-400">
+                          {{ selectedCampaign.id }}
+                        </p>
+                      </div>
+                      <span class="inline-flex items-center px-2 py-1 text-xs font-medium border rounded-full shrink-0" :class="statusClass(selectedCampaign.status)">
+                        {{ selectedCampaign.status }}
+                      </span>
                     </div>
-                    <span class="inline-flex items-center px-2 py-1 text-xs font-medium border rounded-full shrink-0" :class="statusClass(selectedCampaign.status)">
-                      {{ selectedCampaign.status }}
-                    </span>
+                    <dl class="grid grid-cols-2 gap-2 mt-3 text-sm">
+                      <div class="p-2 border rounded-md border-slate-200 dark:border-slate-700">
+                        <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">
+                          {{ t('type') }}
+                        </dt>
+                        <dd class="font-medium text-slate-900 dark:text-white">
+                          {{ selectedCampaign.kind }}
+                        </dd>
+                      </div>
+                      <div class="p-2 border rounded-md border-slate-200 dark:border-slate-700">
+                        <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">
+                          {{ t('date') }}
+                        </dt>
+                        <dd class="font-medium text-slate-900 dark:text-white">
+                          {{ formatShortDate(selectedCampaign.created_at) }}
+                        </dd>
+                      </div>
+                    </dl>
                   </div>
-                  <div class="grid grid-cols-2 gap-2 mt-3 text-sm">
-                    <div class="p-2 border rounded-md border-slate-200 dark:border-slate-700">
-                      <div class="text-xs uppercase text-slate-500 dark:text-slate-400">
-                        {{ t('type') }}
-                      </div>
-                      <div class="font-medium text-slate-900 dark:text-white">
-                        {{ selectedCampaign.kind }}
-                      </div>
-                    </div>
-                    <div class="p-2 border rounded-md border-slate-200 dark:border-slate-700">
-                      <div class="text-xs uppercase text-slate-500 dark:text-slate-400">
-                        {{ t('date') }}
-                      </div>
-                      <div class="font-medium text-slate-900 dark:text-white">
-                        {{ formatShortDate(selectedCampaign.created_at) }}
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
-                <div>
-                  <div class="text-3xl font-semibold text-slate-950 dark:text-white">
-                    {{ selectedCampaignTotalEvents }}
-                  </div>
-                  <div class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    {{ t('notification-events-30d') }}
-                  </div>
-                </div>
-
-                <div v-if="selectedCampaignStatsLoading" class="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-                  <span class="d-loading d-loading-spinner d-loading-xs" />
-                  {{ t('loading') }}
-                </div>
-                <div v-else-if="selectedCampaignStats.length" class="space-y-3">
-                  <div v-for="stat in selectedCampaignStats" :key="stat.event" class="space-y-1">
-                    <div class="flex items-center justify-between gap-3 text-sm">
-                      <span class="font-medium text-slate-700 dark:text-slate-200">{{ stat.event }}</span>
-                      <span class="font-mono text-slate-950 dark:text-white">{{ stat.count }}</span>
+                  <div>
+                    <div class="text-3xl font-semibold text-slate-950 dark:text-white">
+                      {{ selectedCampaignTotalEvents }}
                     </div>
-                    <progress class="w-full h-1.5 d-progress d-progress-secondary" :value="stat.count" :max="selectedCampaignTotalEvents || 1" />
+                    <div class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                      {{ t('notification-events-30d') }}
+                    </div>
+                  </div>
+
+                  <div v-if="selectedCampaignStatsLoading" class="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                    <span class="d-loading d-loading-spinner d-loading-xs" />
+                    {{ t('loading') }}
+                  </div>
+                  <div v-else-if="selectedCampaignStats.length" class="space-y-3">
+                    <div v-for="stat in selectedCampaignStats" :key="stat.event" class="space-y-1">
+                      <div class="flex items-center justify-between gap-3 text-sm">
+                        <span class="font-medium text-slate-700 dark:text-slate-200">{{ stat.event }}</span>
+                        <span class="font-mono text-slate-950 dark:text-white">{{ stat.count }}</span>
+                      </div>
+                      <progress class="w-full h-1.5 d-progress d-progress-secondary" :value="stat.count" :max="selectedCampaignTotalEvents || 1" />
+                    </div>
+                  </div>
+                  <div v-else class="text-sm text-slate-500 dark:text-slate-400">
+                    {{ t('notification-no-stats') }}
+                  </div>
+
+                  <div class="space-y-3">
+                    <div>
+                      <div class="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                        {{ t('notification-audience-json') }}
+                      </div>
+                      <pre class="max-h-40 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200">{{ formatJson(selectedCampaign.audience) }}</pre>
+                    </div>
+                    <div>
+                      <div class="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                        {{ t('notification-payload-json') }}
+                      </div>
+                      <pre class="max-h-40 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200">{{ formatJson(selectedCampaign.payload) }}</pre>
+                    </div>
                   </div>
                 </div>
                 <div v-else class="text-sm text-slate-500 dark:text-slate-400">
-                  {{ t('notification-no-stats') }}
+                  {{ t('notification-select-campaign') }}
                 </div>
-
-                <div class="space-y-3">
-                  <div>
-                    <div class="mb-1 text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-                      {{ t('notification-audience-json') }}
-                    </div>
-                    <pre class="max-h-40 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200">{{ formatJson(selectedCampaign.audience) }}</pre>
-                  </div>
-                  <div>
-                    <div class="mb-1 text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-                      {{ t('notification-payload-json') }}
-                    </div>
-                    <pre class="max-h-40 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200">{{ formatJson(selectedCampaign.payload) }}</pre>
-                  </div>
-                </div>
-              </div>
-              <div v-else class="p-4 text-sm text-slate-500 dark:text-slate-400">
-                {{ t('notification-select-campaign') }}
-              </div>
-            </section>
-          </aside>
+              </aside>
+            </div>
+          </div>
         </div>
       </div>
     </div>
