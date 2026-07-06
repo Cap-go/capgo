@@ -145,6 +145,8 @@ interface ProviderBody {
 interface SendBody {
   appId: string
   campaignId?: string
+  name?: string
+  kind?: string
   payload?: Record<string, unknown>
   target?: {
     externalId?: string
@@ -779,12 +781,24 @@ app.post('/send', middlewareV2(['write', 'all']), async (c) => {
   const body = await parseBody<SendBody>(c)
   const appId = assertString(body.appId, 'appId', 128)
   await assertAppPermission(c, NOTIFICATION_MANAGE_PERMISSION, appId)
-  const campaignId = body.campaignId || crypto.randomUUID()
   const payload = assertOptionalRecord(body.payload, 'payload')
   const plan = await resolveTargetPlan(c, { ...body, appId })
   const providerConfigs = await getNotificationProviderConfigs(c, appId)
   if (!providerConfigs.length)
     throw simpleError('missing_notification_provider', 'Missing configured notification platform credentials')
+  let campaignId = body.campaignId
+  if (!campaignId) {
+    const campaignRecord = await createCampaignRecord(c, {
+      appId,
+      name: body.name ? assertString(body.name, 'name', 180) : 'API notification',
+      kind: body.kind && CAMPAIGN_KINDS.has(body.kind) ? body.kind : 'alert',
+      status: 'queued',
+      audience: body.target ?? {},
+      payload,
+      scheduledAt: null,
+    })
+    campaignId = String((campaignRecord as unknown as CampaignRecordRow).id)
+  }
   const queued = await enqueueNativeNotificationFanout(c, {
     kind: 'send',
     appId,
