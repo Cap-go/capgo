@@ -33,7 +33,8 @@
     "prod": {
       "name": "capgo_files-prod",
       "cache": {
-        "enabled": true
+        "enabled": true,
+        "cross_version_cache": true
       },
       "vars": {
         "ENV_NAME": "capgo_files-prod"
