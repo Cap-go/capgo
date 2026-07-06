@@ -37,7 +37,7 @@ export const ANALYTICS_ENGINE_SQL_LINT_RULES: AnalyticsEngineSqlLintRule[] = [
   },
   {
     id: 'no-from-table-alias',
-    test: sql => /\b(?:FROM|JOIN)\s+[\w.]+\s+(?:AS\s+)?[a-z][\w]*\s+(?:,|WHERE|LEFT|RIGHT|INNER|JOIN|GROUP|ORDER|LIMIT|$)/i.test(sql),
+    test: sql => /\b(?:FROM|JOIN)\s+[\w.]+\s+(?:AS\s+)?[a-z]\w*\s+(?:,|WHERE|LEFT|RIGHT|INNER|JOIN|GROUP|ORDER|LIMIT|$)/i.test(sql),
     message: 'Table aliases in FROM/JOIN are unsupported by Analytics Engine SQL',
   },
 ]
@@ -92,8 +92,9 @@ export async function validateAnalyticsEngineSqlLive(
   accountId: string,
   token: string,
   sql: string,
+  preparedSql?: string,
 ): Promise<AnalyticsEngineSqlLiveValidationResult | AnalyticsEngineSqlLiveValidationFailure> {
-  const prepared = prepareAnalyticsEngineSqlForLiveValidation(sql)
+  const prepared = preparedSql ?? prepareAnalyticsEngineSqlForLiveValidation(sql)
   if (!prepared)
     return { ok: true }
 
@@ -104,6 +105,7 @@ export async function validateAnalyticsEngineSqlLive(
       'Content-Type': 'text/plain; charset=utf-8',
     },
     body: prepared,
+    signal: AbortSignal.timeout(30000),
   })
 
   const body = await response.text()

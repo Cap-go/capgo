@@ -598,7 +598,7 @@ FROM (
     argMax(blob7, timestamp) AS default_channel,
     blob1 AS device_id
   FROM device_info
-  WHERE index1 = '${escapeSqlString(app_id)}'
+  WHERE index1 = '${escapeSqlString(app_id)}' AND blob9 != ''
   GROUP BY blob1
 )
 WHERE version_name != '' ${channelFilter}
@@ -621,6 +621,26 @@ GROUP BY version_name`
 function buildInstallSourceList(installSources: string[]) {
   return installSources.map(source => `'${escapeSqlString(source)}'`).join(', ')
 }
+export function buildDeviceIdsByInstallSourcesQuery(app_id: string, installSources: string[]) {
+  return `SELECT blob1 AS device_id
+FROM (
+  SELECT
+    blob1,
+    argMax(blob9, timestamp) AS install_source
+  FROM device_info
+  WHERE index1 = '${escapeSqlString(app_id)}' AND blob9 != ''
+  GROUP BY blob1
+)
+WHERE install_source IN (${buildInstallSourceList(installSources)})`
+}
+
+async function readDeviceIdsByInstallSourcesCF(c: Context, app_id: string, installSources: string[]): Promise<string[]> {
+  const query = buildDeviceIdsByInstallSourcesQuery(app_id, installSources)
+  cloudlog({ requestId: c.get('requestId'), message: 'readDeviceIdsByInstallSourcesCF query', query })
+  const res = await runQueryToCFA<{ device_id: string }>(c, query)
+  return res.map(row => row.device_id)
+}
+
 export async function countInstallSourcesCF(c: Context, app_id: string): Promise<Record<string, number>> {
   const cache = new CacheHelper(c)
   const cacheKey = cache.buildRequest('/internal/install-source-counts', { app_id })
@@ -750,10 +770,6 @@ function buildReadDevicesCFCursorCondition(cursor: string | undefined, devicesOr
 
 function buildReadDevicesCFOuterConditions(params: ReadDevicesParams, devicesOrder: DevicesOrderCF | null) {
   const conditions = [buildReadDevicesCFCursorCondition(params.cursor, devicesOrder)]
-
-  if (params.installSources?.length)
-    conditions.push(`install_source IN (${buildInstallSourceList(params.installSources)})`)
-
   return conditions.filter(Boolean)
 }
 
@@ -790,7 +806,6 @@ export function buildReadDevicesCFQuery(params: ReadDevicesParams, customIdMode:
   }
 
   const devicesOrder = getReadDevicesCFOrder(params)
-  const includeInstallSource = Boolean(params.installSources?.length)
   const outerConditions = buildReadDevicesCFOuterConditions(params, devicesOrder)
   const outerFilter = outerConditions.length ? `WHERE ${outerConditions.join(' AND ')}` : ''
   let orderBy = 'device_id ASC'
@@ -811,7 +826,6 @@ export function buildReadDevicesCFQuery(params: ReadDevicesParams, customIdMode:
     '    argMax(blob6, timestamp) AS version_build,',
     '    argMax(blob7, timestamp) AS default_channel,',
     '    argMax(blob8, timestamp) AS key_id,',
-    includeInstallSource ? '    argMax(blob9, timestamp) AS install_source,' : '',
     '    argMax(double1, timestamp) AS platform,',
     '    argMax(double2, timestamp) AS is_prod,',
     '    argMax(double3, timestamp) AS is_emulator,',
@@ -844,7 +858,26 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
     cloudlog({ requestId: c.get('requestId'), message: 'search', searchLength: params.search.length })
   }
 
-  const query = buildReadDevicesCFQuery(params, customIdMode)
+  let readParams = params
+  if (params.installSources?.length) {
+    const sourceDeviceIds = await readDeviceIdsByInstallSourcesCF(c, params.app_id, params.installSources)
+    if (!sourceDeviceIds.length)
+      return [] as DeviceRes[]
+
+    const deviceIds = params.deviceIds?.length
+      ? params.deviceIds.filter(deviceId => sourceDeviceIds.includes(deviceId))
+      : sourceDeviceIds
+    if (!deviceIds.length)
+      return [] as DeviceRes[]
+
+    readParams = {
+      ...params,
+      deviceIds,
+      installSources: undefined,
+    }
+  }
+
+  const query = buildReadDevicesCFQuery(readParams, customIdMode)
 
   cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF query', query })
   try {
@@ -1875,13 +1908,8 @@ export async function getAdminOrgMetrics(
         bandwidthByOrg.set(orgId, current)
       }
 
-      const bandwidthResult = [...bandwidthByOrg.entries()]
-        .map(([org_id, metrics]) => ({ org_id, ...metrics }))
-        .sort((a, b) => b.bandwidth - a.bandwidth)
-        .slice(0, safeLimit)
-
       // Merge results
-      const bandwidthMap = new Map(bandwidthResult.map(b => [b.org_id, b]))
+      const bandwidthMap = bandwidthByOrg
 
       return orgMau.map(org => ({
         org_id: org.org_id,

@@ -43,12 +43,88 @@ const SAMPLE_START = '2026-06-01 00:00:00'
 const SAMPLE_END = '2026-07-01 00:00:00'
 const SAMPLE_REFERENCE_DATE = new Date('2026-07-01T00:00:00.000Z')
 
-function createAnalyticsEngineSqlResponse() {
+function createAnalyticsEngineSqlResponse(query: string) {
+  const lowerQuery = query.toLowerCase()
+  const fields = new Set<string>()
+
+  for (const match of query.matchAll(/\bAS\s+(\w+)\b/g)) {
+    fields.add(match[1])
+  }
+
+  const scalarDefaults: Record<string, string> = {
+    count: '0',
+    total: '0',
+    mau: '0',
+    installs: '0',
+    fails: '0',
+    failures: '0',
+    bandwidth: '0',
+    updates: '0',
+    apps_count: '0',
+    active_apps: '0',
+    total_bandwidth: '0',
+    android_devices: '0',
+    ios_devices: '0',
+    electron_devices: '0',
+    total_devices: '0',
+    active_orgs: '0',
+    success_rate: '0',
+    failure_rate: '0',
+    total_actions: '0',
+    device_count: '0',
+    failed: '0',
+    set: '0',
+    get: '0',
+    downloads: '0',
+    storage_bytes: '0',
+    bandwidth_bytes: '0',
+    bundles_created: '0',
+    apps_created: '0',
+    uploads: '0',
+    date: '2026-01-01',
+    app_id: 'com.example.app',
+    org_id: 'org-id',
+    device_id: '11111111-1111-4111-8111-111111111111',
+    version_name: '1.0.0',
+    install_source: 'app_store',
+    plugin_version: '8.0.0',
+    platform: 'android',
+    version_build: '1',
+    action: 'get',
+    metadata: '{}',
+    created_at: '2026-01-01 00:00:00',
+  }
+
+  for (const name of Object.keys(scalarDefaults)) {
+    if (lowerQuery.includes(name))
+      fields.add(name)
+  }
+
+  if (fields.size === 0)
+    fields.add('count')
+
+  const row: Record<string, string> = {}
+  const meta = [...fields].map((name) => {
+    row[name] = scalarDefaults[name] ?? '0'
+    const stringField = name.includes('id')
+      || name.includes('source')
+      || name.includes('name')
+      || name.includes('version')
+      || name.includes('date')
+      || name.includes('platform')
+      || name.includes('action')
+      || name.includes('metadata')
+      || name.includes('created_at')
+      || name.includes('app_id')
+      || name.includes('org_id')
+    return { name, type: stringField ? 'String' : 'UInt64' }
+  })
+
   return new Response(JSON.stringify({
-    meta: [],
-    data: [],
-    rows: 0,
-    rows_before_limit_at_least: 0,
+    meta,
+    data: [row],
+    rows: 1,
+    rows_before_limit_at_least: 1,
   }), {
     status: 200,
     headers: { 'content-type': 'application/json' },
@@ -98,7 +174,7 @@ export function installAnalyticsEngineSqlCapture(): AnalyticsEngineSqlCapture {
       const name = count === 0 ? state.pendingName : `${state.pendingName}[${count}]`
       fixtures.push({ name, query })
     }
-    return createAnalyticsEngineSqlResponse()
+    return createAnalyticsEngineSqlResponse(query)
   }) as typeof fetch
 
   globalThis.caches = {

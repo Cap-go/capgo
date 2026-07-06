@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import { createClient } from '@supabase/supabase-js'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { buildReadDevicesCFQuery, countDevicesCF, countInstallSourcesCF, readBandwidthUsageCF } from '../supabase/functions/_backend/utils/cloudflare.ts'
+import { buildDeviceIdsByInstallSourcesQuery, buildReadDevicesCFQuery, countDevicesCF, countInstallSourcesCF, readBandwidthUsageCF } from '../supabase/functions/_backend/utils/cloudflare.ts'
 import { readDevicesSB } from '../supabase/functions/_backend/utils/supabase.ts'
 
 vi.mock('@supabase/supabase-js', () => ({
@@ -105,21 +105,12 @@ describe('buildReadDevicesCFQuery', () => {
     expect(query).toContain(`ORDER BY updated_at ASC, device_id ASC`)
   })
 
-  it.concurrent('filters install sources after device grouping', () => {
-    const query = buildReadDevicesCFQuery({
-      app_id: 'com.example.app',
-      installSources: ['app_store', 'amazon_appstore'],
-      cursor: '2026-04-04 03:05:59|11111111-1111-4111-8111-111111111111',
-      limit: 1,
-    }, false)
+  it.concurrent('builds install source device lookup from non-empty blob9 rows', () => {
+    const query = buildDeviceIdsByInstallSourcesQuery('com.example.app', ['app_store', 'amazon_appstore'])
 
-    const groupByIndex = query.indexOf('GROUP BY blob1')
-    const installSourceFilterIndex = query.indexOf(`install_source IN ('app_store', 'amazon_appstore')`)
-
-    expect(query).toContain('argMax(blob9, timestamp) AS install_source')
-    expect(installSourceFilterIndex).toBeGreaterThan(groupByIndex)
-    expect(query).not.toContain(`WHERE index1 = 'com.example.app' AND blob9 IN`)
-    expect(query).toContain(`WHERE device_id > '11111111-1111-4111-8111-111111111111' AND install_source IN ('app_store', 'amazon_appstore')`)
+    expect(query).toContain(`WHERE index1 = 'com.example.app' AND blob9 != ''`)
+    expect(query).toContain(`WHERE index1 = 'com.example.app' AND blob9 != ''`)
+    expect(query).toContain(`install_source IN ('app_store', 'amazon_appstore')`)
   })
 })
 describe('countDevicesCF', () => {

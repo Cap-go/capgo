@@ -33,7 +33,7 @@ for (const fixture of fixtures) {
   if (!prepared)
     continue
 
-  const result = await validateAnalyticsEngineSqlLive(accountId, token, fixture.query)
+  const result = await validateAnalyticsEngineSqlLive(accountId, token, fixture.query, prepared)
   if (!result.ok)
     liveFailures.push(`${fixture.name} (${result.status}): ${result.body.trim()}`)
 }
