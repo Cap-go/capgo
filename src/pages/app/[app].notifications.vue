@@ -186,7 +186,7 @@ function campaignMatchesSearch(campaign: NotificationCampaign, search: string) {
 }
 
 function isBroadcastCampaign(campaign: NotificationCampaign) {
-  return campaign.audience?.broadcast === true
+  return campaign.audience?.broadcast === true && campaign.kind !== 'update_check'
 }
 
 function campaignStatusCell(campaign: NotificationCampaign) {
@@ -401,6 +401,14 @@ async function saveProvider() {
   }
 }
 
+async function selectCampaignById(campaignId?: string) {
+  if (!campaignId)
+    return
+  const campaign = campaigns.value.find(item => item.id === campaignId)
+  if (campaign)
+    await selectCampaign(campaign)
+}
+
 async function createBroadcast() {
   if (!campaignForm.value.name.trim() || (!campaignForm.value.title.trim() && !campaignForm.value.body.trim()))
     return
@@ -427,11 +435,7 @@ async function createBroadcast() {
     campaignForm.value.body = ''
     toast.success(t('notification-broadcast-queued'))
     await reloadNotifications()
-    if (response.campaignId) {
-      const campaign = campaigns.value.find(item => item.id === response.campaignId)
-      if (campaign)
-        await selectCampaign(campaign)
-    }
+    await selectCampaignById(response.campaignId)
   }
   catch (error) {
     console.error(error)
@@ -528,11 +532,7 @@ async function pushUpdateNow() {
       throw new Error(t('notification-queue-unavailable'))
     toast.success(t('notification-update-push-success'))
     await reloadNotifications()
-    if (response.campaignId) {
-      const campaign = campaigns.value.find(item => item.id === response.campaignId)
-      if (campaign)
-        await selectCampaign(campaign)
-    }
+    await selectCampaignById(response.campaignId)
   }
   catch (error) {
     console.error(error)
@@ -563,11 +563,7 @@ async function sendTest() {
       throw new Error(t('notification-queue-unavailable'))
     toast.success(t('notification-send-success'))
     await reloadNotifications()
-    if (response.campaignId) {
-      const campaign = campaigns.value.find(item => item.id === response.campaignId)
-      if (campaign)
-        await selectCampaign(campaign)
-    }
+    await selectCampaignById(response.campaignId)
   }
   catch (error) {
     console.error(error)
