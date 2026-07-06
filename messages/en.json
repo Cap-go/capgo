@@ -1513,6 +1513,8 @@
   "notification-send-success": "Notification queued",
   "notification-send-test": "Send test",
   "notification-stats": "Notification stats",
+  "beta": "Beta",
+  "notification-beta-description": "Push notifications are in beta. Features and delivery may change.",
   "notification-title": "Notifications",
   "notifications-activity": "Activity Notifications",
   "notifications-billing-period-stats": "Billing period statistics",
