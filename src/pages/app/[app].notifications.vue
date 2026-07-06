@@ -766,9 +766,9 @@ watch(activeNotificationTab, () => {
                 </section>
               </main>
 
-              <aside class="p-4 space-y-6">
+              <aside class="p-4 space-y-6" aria-labelledby="notification-push-update-title">
                 <section class="space-y-3">
-                  <h2 class="text-base font-semibold text-slate-950 dark:text-white">
+                  <h2 id="notification-push-update-title" class="text-base font-semibold text-slate-950 dark:text-white">
                     {{ t('notification-push-update') }}
                   </h2>
                   <label class="flex items-center justify-between gap-3 p-3 border rounded-lg border-slate-200 dark:border-slate-700">
@@ -983,8 +983,8 @@ watch(activeNotificationTab, () => {
                 </section>
               </main>
 
-              <aside class="p-4 space-y-4">
-                <h2 class="text-base font-semibold text-slate-950 dark:text-white">
+              <aside class="p-4 space-y-4" aria-labelledby="notification-campaign-stats-title">
+                <h2 id="notification-campaign-stats-title" class="text-base font-semibold text-slate-950 dark:text-white">
                   {{ t('notification-campaign-stats') }}
                 </h2>
                 <div v-if="selectedCampaign" class="space-y-4">
