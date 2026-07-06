@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
-import type { DeviceWithoutCreatedAt, NativeVersionUsage, Order, ReadDevicesParams, ReadStatsParams, StatsMetadata, VersionUsage } from './types.ts'
+import type { DeviceWithoutCreatedAt, NativeVersionUsage, Order, ReadDevicesParams, ReadStatsParams, StatsMetadata, VersionUsage, VersionUsageChannel } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
 import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged, nullableString } from './deviceComparison.ts'
 import { simpleError } from './hono.ts'
@@ -1226,8 +1226,10 @@ export function trackVersionUsageSB(
   versionName: string,
   appId: string,
   action: Database['public']['Enums']['version_action'],
+  channel?: VersionUsageChannel | string | null,
 ) {
-  // Type cast needed: version_usage table now has version_name but auto-generated types are stale
+  const channelName = typeof channel === 'string' ? channel : channel?.name
+  const channelId = typeof channel === 'object' && channel ? channel.id : null
   return supabaseAdmin(c)
     .from('version_usage')
     .insert([
@@ -1235,7 +1237,9 @@ export function trackVersionUsageSB(
         version_name: versionName,
         app_id: appId,
         action,
-      } as unknown as { version_id: number, app_id: string, action: typeof action },
+        channel_name: channelName ?? null,
+        channel_id: channelId ?? null,
+      },
     ])
 }
 
@@ -1368,9 +1372,18 @@ export async function readStatsStorageSB(c: Context, app_id: string, period_star
   return data ?? []
 }
 
-export async function readStatsVersionSB(c: Context, app_id: string, period_start: string, period_end: string): Promise<VersionUsage[]> {
+export async function readStatsVersionSB(c: Context, app_id: string, period_start: string, period_end: string, channel?: VersionUsageChannel | string): Promise<VersionUsage[]> {
+  const channelId = typeof channel === 'object' && channel ? channel.id : null
+  const channelName = typeof channel === 'string' ? channel : channelId ? null : channel?.name
+  const args = {
+    p_app_id: app_id,
+    p_period_start: period_start,
+    p_period_end: period_end,
+    ...(channelName ? { p_channel_name: channelName } : {}),
+    ...(channelId ? { p_channel_id: channelId } : {}),
+  }
   const { data } = await supabaseAdmin(c)
-    .rpc('read_version_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
+    .rpc('read_version_usage', args)
   // Cast to VersionUsage[] - the SQL function returns version_name but auto-generated types are stale
   return (data ?? []) as unknown as VersionUsage[]
 }

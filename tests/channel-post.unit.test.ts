@@ -32,7 +32,7 @@ vi.mock('../supabase/functions/_backend/utils/utils.ts', () => ({
   isValidAppId,
 }))
 
-function buildSupabaseChain(body: { ownerOrg?: string, versionId?: number }) {
+function buildSupabaseChain(body: { existingChannelId?: number | null, existingChannelVersion?: number | null, existingRolloutVersion?: number | null, ownerOrg?: string, versionId?: number, eqCalls?: Array<[string, unknown]> }) {
   return {
     from(table: string) {
       if (table === 'apps') {
@@ -45,10 +45,32 @@ function buildSupabaseChain(body: { ownerOrg?: string, versionId?: number }) {
         }
       }
 
+      if (table === 'channels') {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: body.existingChannelId == null && body.existingChannelVersion == null && body.existingRolloutVersion == null
+                    ? null
+                    : {
+                        id: body.existingChannelId ?? 99,
+                        version: body.existingChannelVersion ?? null,
+                        rollout_version: body.existingRolloutVersion ?? null,
+                      },
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        }
+      }
+
       if (table === 'app_versions') {
         return {
           select: () => ({
-            eq() {
+            eq(column: string, value: unknown) {
+              body.eqCalls?.push([column, value])
               return this
             },
             single: async () => ({ data: { id: body.versionId ?? 123 }, error: null }),
@@ -148,5 +170,68 @@ describe('public channel post', () => {
         electron: false,
       }),
     )
+  })
+
+  it('filters numeric rollout target ids to active bundles', async () => {
+    const eqCalls: Array<[string, unknown]> = []
+    supabaseApikey.mockImplementation(() => buildSupabaseChain({ existingChannelId: 42, existingChannelVersion: 123, versionId: 456, eqCalls }))
+    const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
+
+    await post(
+      { json: vi.fn() } as any,
+      {
+        app_id: 'com.test.rollout-id',
+        channel: 'production',
+        version: '1.0.0',
+        rolloutVersion: 456,
+      },
+      { user_id: 'user-test', key: 'capg-key' } as any,
+    )
+
+    const rolloutIdCallIndex = eqCalls.findIndex(([column, value]) => column === 'id' && value === 456)
+    expect(rolloutIdCallIndex).toBeGreaterThanOrEqual(0)
+    expect(eqCalls.slice(rolloutIdCallIndex)).toContainEqual(['deleted', false])
+    expect(checkPermission).toHaveBeenCalledWith(expect.anything(), 'channel.promote_bundle', { appId: 'com.test.rollout-id', channelId: 42 })
+  })
+
+  it('rejects rollout target changes without channel promote permission', async () => {
+    supabaseApikey.mockImplementation(() => buildSupabaseChain({ existingChannelId: 42, existingChannelVersion: 123 }))
+    checkPermission
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
+    const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
+
+    await expect(post(
+      { json: vi.fn() } as any,
+      {
+        app_id: 'com.test.rollout-auth',
+        channel: 'production',
+        rolloutVersion: '2.0.0',
+      },
+      { user_id: 'user-test', key: 'capg-key' } as any,
+    )).rejects.toMatchObject({
+      cause: expect.objectContaining({ error: 'cannot_promote_bundle' }),
+    })
+
+    expect(updateOrCreateChannel).not.toHaveBeenCalled()
+  })
+
+  it('rejects rollout targets when a channel has no stable bundle', async () => {
+    supabaseApikey.mockImplementation(() => buildSupabaseChain({ existingChannelId: 42, existingChannelVersion: null }))
+    const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
+
+    await expect(post(
+      { json: vi.fn() } as any,
+      {
+        app_id: 'com.test.rollout-no-stable',
+        channel: 'new-rollout-channel',
+        rolloutVersion: '2.0.0',
+      },
+      { user_id: 'user-test', key: 'capg-key' } as any,
+    )).rejects.toMatchObject({
+      cause: expect.objectContaining({ error: 'missing_stable_version' }),
+    })
+
+    expect(updateOrCreateChannel).not.toHaveBeenCalled()
   })
 })
