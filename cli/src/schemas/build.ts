@@ -84,6 +84,7 @@ export const buildRequestOptionsSchema = optionsBaseSchema.extend({
   outputRetention: z.string().optional(),
   outputRecord: z.string().optional(),
   skipBuildNumberBump: z.boolean().optional(),
+  syncIosVersion: z.boolean().optional(),
   playstoreUpload: z.boolean().optional(),
   submitToStoreReview: z.boolean().optional(),
   storeReleaseName: z.string().trim().min(1).optional(),

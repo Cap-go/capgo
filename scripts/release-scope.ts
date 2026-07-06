@@ -29,6 +29,7 @@ export const componentMatchers: Record<Component, RegExp[]> = {
   capgo: [
     ...sharedMatchers,
     /^\.github\/workflows\/build_and_deploy\.yml$/,
+    /^\.github\/workflows\/build_mobile_ios\.yml$/,
     /^scripts\/deploy-scope\.ts$/,
     /^aliproxy\//,
     /^android\//,
