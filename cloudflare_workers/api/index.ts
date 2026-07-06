@@ -79,7 +79,7 @@ import { app as queue_consumer } from '../../supabase/functions/_backend/trigger
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
 import { app as webhook_delivery } from '../../supabase/functions/_backend/triggers/webhook_delivery.ts'
 import { app as webhook_dispatcher } from '../../supabase/functions/_backend/triggers/webhook_dispatcher.ts'
-import { BRES, createAllCatch, createHono, useCors } from '../../supabase/functions/_backend/utils/hono.ts'
+import { BRES, createAllCatch, createHono } from '../../supabase/functions/_backend/utils/hono.ts'
 import { processNativeNotificationQueueBatch } from '../../supabase/functions/_backend/utils/nativeNotificationSender.ts'
 import { flushQueuedPluginNotifications } from '../../supabase/functions/_backend/utils/plugin_notification_flush.ts'
 import { version } from '../../supabase/functions/_backend/utils/version.ts'
@@ -87,7 +87,6 @@ import { version } from '../../supabase/functions/_backend/utils/version.ts'
 // Public API
 const functionName = 'api'
 const app = createHono(functionName, version)
-app.use('*', useCors)
 const functionNameScheduled = 'api-scheduled'
 const appScheduled = createHono(functionNameScheduled, version)
 app.route('/ok', ok)
