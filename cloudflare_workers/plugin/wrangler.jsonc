@@ -103,10 +103,6 @@
       "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "655e307469ba496f9131556709b5a765" }],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
-          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_READ_NA",
           "id": "a09d6932219c4a6a918fe6fdad5565ae"
         },
@@ -201,10 +197,6 @@
       ],
       "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "655e307469ba496f9131556709b5a765" }],
       "hyperdrive": [
-        {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
-          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
-        },
         {
           "binding": "HYPERDRIVE_CAPGO_READ_NA",
           "id": "a09d6932219c4a6a918fe6fdad5565ae"
@@ -301,10 +293,6 @@
       "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "655e307469ba496f9131556709b5a765" }],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
-          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_READ_NA",
           "id": "a09d6932219c4a6a918fe6fdad5565ae"
         },
@@ -399,10 +387,6 @@
       ],
       "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "655e307469ba496f9131556709b5a765" }],
       "hyperdrive": [
-        {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
-          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
-        },
         {
           "binding": "HYPERDRIVE_CAPGO_READ_NA",
           "id": "a09d6932219c4a6a918fe6fdad5565ae"
@@ -499,10 +483,6 @@
       "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "655e307469ba496f9131556709b5a765" }],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
-          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_READ_NA",
           "id": "a09d6932219c4a6a918fe6fdad5565ae"
         },
@@ -597,10 +577,6 @@
       ],
       "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "655e307469ba496f9131556709b5a765" }],
       "hyperdrive": [
-        {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
-          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
-        },
         {
           "binding": "HYPERDRIVE_CAPGO_READ_NA",
           "id": "a09d6932219c4a6a918fe6fdad5565ae"
@@ -697,10 +673,6 @@
       "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "655e307469ba496f9131556709b5a765" }],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
-          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_READ_NA",
           "id": "a09d6932219c4a6a918fe6fdad5565ae"
         },
@@ -795,10 +767,6 @@
       ],
       "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "655e307469ba496f9131556709b5a765" }],
       "hyperdrive": [
-        {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
-          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
-        },
         {
           "binding": "HYPERDRIVE_CAPGO_READ_NA",
           "id": "a09d6932219c4a6a918fe6fdad5565ae"
@@ -895,10 +863,6 @@
       "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "655e307469ba496f9131556709b5a765" }],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
-          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_READ_NA",
           "id": "a09d6932219c4a6a918fe6fdad5565ae"
         },
@@ -974,10 +938,6 @@
         }
       ],
       "hyperdrive": [
-        {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
-          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
-        },
         {
           "binding": "HYPERDRIVE_CAPGO_READ_NA",
           "id": "a09d6932219c4a6a918fe6fdad5565ae"
@@ -1073,10 +1033,6 @@
         }
       ],
       "hyperdrive": [
-        {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
-          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
-        },
         {
           "binding": "HYPERDRIVE_CAPGO_READ_NA",
           "id": "a09d6932219c4a6a918fe6fdad5565ae"

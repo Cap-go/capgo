@@ -16,7 +16,7 @@ import { cloudlog, cloudlogErr } from './logging.ts'
 import * as schema from './postgres_schema.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
 import { getRolloutDecision } from './rollout.ts'
-import { shouldRequireReadReplica } from './supabase_write_guard.ts'
+import { shouldRequireReadReplica, shouldSkipDirectHyperdriveFallback } from './supabase_write_guard.ts'
 
 const REPLICATION_LAG_THRESHOLD_SECONDS = 180
 const REPLICATION_LAG_CACHE_TTL_SECONDS = 60
@@ -331,11 +331,14 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
     throw new Error('Read replica is required for this endpoint')
   }
 
-  // Fallback to single Hyperdrive if available
-  if (c.env.HYPERDRIVE_CAPGO_DIRECT_EU) {
+  if (c.env.HYPERDRIVE_CAPGO_DIRECT_EU && !shouldSkipDirectHyperdriveFallback(c)) {
     setDatabaseSource(c, 'HYPERDRIVE_CAPGO_DIRECT_EU')
     cloudlog({ requestId: c.get('requestId'), message: `Using HYPERDRIVE_CAPGO_DIRECT_EU for ${readOnly ? 'read-only' : 'read-write'}` })
     return c.env.HYPERDRIVE_CAPGO_DIRECT_EU.connectionString
+  }
+
+  if (c.env.HYPERDRIVE_CAPGO_DIRECT_EU) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Skipping HYPERDRIVE_CAPGO_DIRECT_EU fallback for this endpoint' })
   }
 
   // Main DB write poller EU region in supabase
