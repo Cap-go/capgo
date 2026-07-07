@@ -229,6 +229,21 @@ function assertOptionalDate(value: unknown, field: string): string | null {
   return date.toISOString()
 }
 
+function normalizeCampaignKind(kind: string | undefined) {
+  return kind && CAMPAIGN_KINDS.has(kind) ? kind : 'alert'
+}
+
+function normalizeSendPayload(kind: string, payload: Record<string, unknown>) {
+  if (kind !== 'background')
+    return payload
+  return {
+    ...payload,
+    kind: 'background',
+    background: true,
+    silent: true,
+  }
+}
+
 function assertPublicPluginApp(c: Context<MiddlewareKeyVariables>, appId: string) {
   if (!isValidAppId(appId))
     throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: appId })
@@ -504,7 +519,7 @@ async function createCampaignRecord(c: Context<MiddlewareKeyVariables>, body: Ca
   await assertAppPermission(c, NOTIFICATION_MANAGE_PERMISSION, appId)
   const ownerOrg = await getAppOwnerOrg(c, appId)
   const name = assertString(body.name, 'name', 180)
-  const kind = body.kind && CAMPAIGN_KINDS.has(body.kind) ? body.kind : 'alert'
+  const kind = normalizeCampaignKind(body.kind)
   const status = body.status && CAMPAIGN_STATUSES.has(body.status) ? body.status : 'draft'
   const audience = assertOptionalRecord(body.audience, 'audience')
   const payload = assertOptionalRecord(body.payload, 'payload')
@@ -781,7 +796,8 @@ app.post('/send', middlewareV2(['write', 'all']), async (c) => {
   const body = await parseBody<SendBody>(c)
   const appId = assertString(body.appId, 'appId', 128)
   await assertAppPermission(c, NOTIFICATION_MANAGE_PERMISSION, appId)
-  const payload = assertOptionalRecord(body.payload, 'payload')
+  const kind = normalizeCampaignKind(body.kind)
+  const payload = normalizeSendPayload(kind, assertOptionalRecord(body.payload, 'payload'))
   const plan = await resolveTargetPlan(c, { ...body, appId })
   const providerConfigs = await getNotificationProviderConfigs(c, appId)
   if (!providerConfigs.length)
@@ -791,7 +807,7 @@ app.post('/send', middlewareV2(['write', 'all']), async (c) => {
     const campaignRecord = await createCampaignRecord(c, {
       appId,
       name: body.name ? assertString(body.name, 'name', 180) : 'API notification',
-      kind: body.kind && CAMPAIGN_KINDS.has(body.kind) ? body.kind : 'alert',
+      kind,
       status: 'queued',
       audience: body.target ?? {},
       payload,
