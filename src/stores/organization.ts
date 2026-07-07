@@ -437,6 +437,9 @@ export const useOrganizationStore = defineStore('organization', () => {
       return
     }
 
+    if (appIconLoadRun !== organizationAppIconLoadRun)
+      return
+
     const organizationsByAppId = new Map<string, Organization>()
     const appsByOrgId = new Map<string, OrganizationApp[]>()
     const appsByAppId = new Map<string, OrganizationApp>()
