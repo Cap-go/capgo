@@ -34,14 +34,14 @@ function createContext(flags: Partial<Record<'skipSupabaseStatsFallback' | 'skip
   } as any
 }
 
-function createPluginPolicyContext() {
+function createPluginPolicyContext(env: Record<string, any> = {}) {
   return createContext({
     skipSupabaseStatsFallback: true,
     skipSupabaseNotificationWrites: true,
     queuePluginNotifications: true,
     skipChannelSelfPostgresFallback: true,
     requireReadReplica: true,
-  })
+  }, env)
 }
 
 interface WranglerConfig {
@@ -148,6 +148,9 @@ describe('plugin Supabase write policy', () => {
     for (const envName of ['prod', 'preprod', 'alpha'])
       expect(getHyperdriveId(apiWrangler, envName, 'HYPERDRIVE_CAPGO_DIRECT_EU')).toBe('ae1fe6178b564adc9fc9a71ccc769a35')
 
+    for (const envName of Object.keys(pluginWrangler.env))
+      expect(getHyperdriveId(pluginWrangler, envName, 'HYPERDRIVE_CAPGO_DIRECT_EU')).toBeUndefined()
+
     const envPairs = [
       ['prod', 'prod_eu'],
       ['prod', 'prod_na'],
@@ -177,6 +180,40 @@ describe('plugin Supabase write policy', () => {
     const { getPgClient } = await import('../supabase/functions/_backend/utils/pg.ts')
 
     expect(() => getPgClient(createPluginPolicyContext(), true)).toThrow('Read replica is required for this endpoint')
+  })
+
+  it('skips direct Hyperdrive fallback in plugin policy contexts', async () => {
+    const { getDatabaseURL } = await import('../supabase/functions/_backend/utils/pg.ts')
+    const previousMainDbUrl = process.env.MAIN_SUPABASE_DB_URL
+    process.env.MAIN_SUPABASE_DB_URL = 'postgres://main-pooler'
+    const context = createPluginPolicyContext({
+      HYPERDRIVE_CAPGO_DIRECT_EU: { connectionString: 'postgres://direct-hyperdrive' },
+      SUPABASE_DB_URL: 'postgres://supabase-direct',
+    })
+
+    try {
+      expect(getDatabaseURL(context)).toBe('postgres://main-pooler')
+      expect(cloudlogMock).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Skipping HYPERDRIVE_CAPGO_DIRECT_EU fallback for this endpoint',
+      }))
+    }
+    finally {
+      if (previousMainDbUrl === undefined)
+        delete process.env.MAIN_SUPABASE_DB_URL
+      else
+        process.env.MAIN_SUPABASE_DB_URL = previousMainDbUrl
+    }
+  })
+
+  it.concurrent('keeps direct Hyperdrive fallback available outside plugin policy contexts', async () => {
+    const { getDatabaseURL } = await import('../supabase/functions/_backend/utils/pg.ts')
+    const context = createContext({}, {
+      HYPERDRIVE_CAPGO_DIRECT_EU: { connectionString: 'postgres://direct-hyperdrive' },
+      MAIN_SUPABASE_DB_URL: 'postgres://main-pooler',
+      SUPABASE_DB_URL: 'postgres://supabase-direct',
+    })
+
+    expect(getDatabaseURL(context)).toBe('postgres://direct-hyperdrive')
   })
 
   it.concurrent('skips Supabase stats fallbacks when Cloudflare analytics bindings are absent', async () => {
