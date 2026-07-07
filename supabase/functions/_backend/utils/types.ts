@@ -50,6 +50,60 @@ export interface ReadStatsParams {
   actions?: string[]
 }
 
+export interface ReadStatsInsightsParams {
+  app_id: string
+  start_date: string
+  end_date: string
+  actions?: string[]
+}
+
+export interface StatsInsightSummary {
+  total: number
+  device_count: number
+  action_count: number
+}
+
+export interface StatsInsightAction {
+  action: string
+  total: number
+  device_count: number
+  version_count: number
+  first_seen: string | null
+  last_seen: string | null
+  latest_version_name: string
+  latest_device_id: string
+}
+
+export interface StatsInsightDaily {
+  date: string
+  action: string
+  total: number
+}
+
+export interface StatsInsightVersion {
+  action: string
+  version_name: string
+  total: number
+  device_count: number
+  last_seen: string | null
+}
+
+export interface StatsInsightDevice {
+  action: string
+  device_id: string
+  total: number
+  version_name: string
+  last_seen: string | null
+}
+
+export interface StatsInsightsResult {
+  summary: StatsInsightSummary
+  actions: StatsInsightAction[]
+  daily: StatsInsightDaily[]
+  versions: StatsInsightVersion[]
+  devices: StatsInsightDevice[]
+}
+
 // Unified version usage statistics interface (returned by both Cloudflare and Supabase)
 export interface VersionUsage {
   date: string
