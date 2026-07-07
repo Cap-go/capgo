@@ -67,15 +67,20 @@ const faviconThemes: Record<string, FaviconTheme> = {
   },
 }
 
-function getFaviconTheme(): FaviconTheme {
-  return faviconThemes[branch] ?? productionFaviconTheme
+function getFaviconTheme(isLocalDevServer = false): FaviconTheme {
+  const branchTheme = faviconThemes[branch]
+  // Plain `bun run dev` keeps branch=main and points at live config.
+  if (isLocalDevServer && (!branchTheme || branchTheme === productionFaviconTheme))
+    return faviconThemes.development
+
+  return branchTheme ?? productionFaviconTheme
 }
 
 function envFaviconPlugin(): Plugin {
   return {
     name: 'capgo-env-favicon',
-    transformIndexHtml(html) {
-      const theme = getFaviconTheme()
+    transformIndexHtml(html, context) {
+      const theme = getFaviconTheme(Boolean(context.server))
       const prefix = theme.iconPrefix
 
       return html
