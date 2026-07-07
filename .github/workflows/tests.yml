@@ -532,11 +532,12 @@ jobs:
             bun run backend:playwright' \
             > "${RUNNER_TEMP}/playwright-backend.log" 2>&1 &
           echo "backend_pid=$!" >> "$GITHUB_OUTPUT"
-          # The backend boots Supabase via the worktree wrapper (hash-derived ports), so poll the
-          # wrapper status — raw `supabase status` checks the default project and never succeeds.
-          nohup bash -c 'echo "waiting for worktree supabase status..."
-            until bun run supabase:status >/dev/null 2>&1; do sleep 2; done
-            echo "supabase is up, building frontend"
+          # The backend boots Supabase via the worktree wrapper (hash-derived ports). Plain status
+          # flips to exit-0 before API_URL is populated, so probe with-env itself: only start the
+          # build once the exact mechanism the real command uses can resolve the Supabase env.
+          nohup bash -c 'echo "waiting for supabase env via with-env..."
+            until bun run supabase:with-env -- bun -e "process.exit(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY ? 0 : 1)" >/dev/null 2>&1; do sleep 2; done
+            echo "supabase env ready, building frontend"
             bun run supabase:with-env -- bun scripts/playwright-frontend-preview.ts' \
             > "${RUNNER_TEMP}/playwright-frontend.log" 2>&1 &
           echo "frontend_pid=$!" >> "$GITHUB_OUTPUT"
