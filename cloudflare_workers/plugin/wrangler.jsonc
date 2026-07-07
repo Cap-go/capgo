@@ -99,16 +99,20 @@
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
-        // Cloudflare-embedded read replica (see cloudflare_workers/replicator).
-        // Uncomment once the D1 database exists and is seeded, then set
-        // "EDGE_REPLICA_MODE": "on" in vars to switch reads to it. Can be
-        // rolled out one regional env at a time.
-        // ,{
-        //   "binding": "DB_REPLICA",
-        //   "database_name": "capgo_edge_replica",
-        //   "database_id": "REPLACE_WITH_D1_DATABASE_ID"
-        // }
       ],
+      // Cloudflare-embedded read replica (per-app Durable Objects hosted by
+      // the capgo_replicator worker). Uncomment once capgo_replicator-prod is
+      // deployed, then set "EDGE_REPLICA_MODE": "on" in vars to switch reads
+      // to it. Can be rolled out one regional env at a time.
+      // "durable_objects": {
+      //   "bindings": [
+      //     {
+      //       "name": "APP_REPLICA",
+      //       "class_name": "AppReplica",
+      //       "script_name": "capgo_replicator-prod"
+      //     }
+      //   ]
+      // },
       "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "655e307469ba496f9131556709b5a765" }],
       "hyperdrive": [
         {
@@ -203,16 +207,20 @@
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
-        // Cloudflare-embedded read replica (see cloudflare_workers/replicator).
-        // Uncomment once the D1 database exists and is seeded, then set
-        // "EDGE_REPLICA_MODE": "on" in vars to switch reads to it. Can be
-        // rolled out one regional env at a time.
-        // ,{
-        //   "binding": "DB_REPLICA",
-        //   "database_name": "capgo_edge_replica",
-        //   "database_id": "REPLACE_WITH_D1_DATABASE_ID"
-        // }
       ],
+      // Cloudflare-embedded read replica (per-app Durable Objects hosted by
+      // the capgo_replicator worker). Uncomment once capgo_replicator-prod is
+      // deployed, then set "EDGE_REPLICA_MODE": "on" in vars to switch reads
+      // to it. Can be rolled out one regional env at a time.
+      // "durable_objects": {
+      //   "bindings": [
+      //     {
+      //       "name": "APP_REPLICA",
+      //       "class_name": "AppReplica",
+      //       "script_name": "capgo_replicator-prod"
+      //     }
+      //   ]
+      // },
       "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "655e307469ba496f9131556709b5a765" }],
       "hyperdrive": [
         {
@@ -307,16 +315,20 @@
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
-        // Cloudflare-embedded read replica (see cloudflare_workers/replicator).
-        // Uncomment once the D1 database exists and is seeded, then set
-        // "EDGE_REPLICA_MODE": "on" in vars to switch reads to it. Can be
-        // rolled out one regional env at a time.
-        // ,{
-        //   "binding": "DB_REPLICA",
-        //   "database_name": "capgo_edge_replica",
-        //   "database_id": "REPLACE_WITH_D1_DATABASE_ID"
-        // }
       ],
+      // Cloudflare-embedded read replica (per-app Durable Objects hosted by
+      // the capgo_replicator worker). Uncomment once capgo_replicator-prod is
+      // deployed, then set "EDGE_REPLICA_MODE": "on" in vars to switch reads
+      // to it. Can be rolled out one regional env at a time.
+      // "durable_objects": {
+      //   "bindings": [
+      //     {
+      //       "name": "APP_REPLICA",
+      //       "class_name": "AppReplica",
+      //       "script_name": "capgo_replicator-prod"
+      //     }
+      //   ]
+      // },
       "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "655e307469ba496f9131556709b5a765" }],
       "hyperdrive": [
         {
@@ -411,16 +423,20 @@
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
-        // Cloudflare-embedded read replica (see cloudflare_workers/replicator).
-        // Uncomment once the D1 database exists and is seeded, then set
-        // "EDGE_REPLICA_MODE": "on" in vars to switch reads to it. Can be
-        // rolled out one regional env at a time.
-        // ,{
-        //   "binding": "DB_REPLICA",
-        //   "database_name": "capgo_edge_replica",
-        //   "database_id": "REPLACE_WITH_D1_DATABASE_ID"
-        // }
       ],
+      // Cloudflare-embedded read replica (per-app Durable Objects hosted by
+      // the capgo_replicator worker). Uncomment once capgo_replicator-prod is
+      // deployed, then set "EDGE_REPLICA_MODE": "on" in vars to switch reads
+      // to it. Can be rolled out one regional env at a time.
+      // "durable_objects": {
+      //   "bindings": [
+      //     {
+      //       "name": "APP_REPLICA",
+      //       "class_name": "AppReplica",
+      //       "script_name": "capgo_replicator-prod"
+      //     }
+      //   ]
+      // },
       "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "655e307469ba496f9131556709b5a765" }],
       "hyperdrive": [
         {
@@ -515,16 +531,20 @@
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
-        // Cloudflare-embedded read replica (see cloudflare_workers/replicator).
-        // Uncomment once the D1 database exists and is seeded, then set
-        // "EDGE_REPLICA_MODE": "on" in vars to switch reads to it. Can be
-        // rolled out one regional env at a time.
-        // ,{
-        //   "binding": "DB_REPLICA",
-        //   "database_name": "capgo_edge_replica",
-        //   "database_id": "REPLACE_WITH_D1_DATABASE_ID"
-        // }
       ],
+      // Cloudflare-embedded read replica (per-app Durable Objects hosted by
+      // the capgo_replicator worker). Uncomment once capgo_replicator-prod is
+      // deployed, then set "EDGE_REPLICA_MODE": "on" in vars to switch reads
+      // to it. Can be rolled out one regional env at a time.
+      // "durable_objects": {
+      //   "bindings": [
+      //     {
+      //       "name": "APP_REPLICA",
+      //       "class_name": "AppReplica",
+      //       "script_name": "capgo_replicator-prod"
+      //     }
+      //   ]
+      // },
       "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "655e307469ba496f9131556709b5a765" }],
       "hyperdrive": [
         {
@@ -619,16 +639,20 @@
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
-        // Cloudflare-embedded read replica (see cloudflare_workers/replicator).
-        // Uncomment once the D1 database exists and is seeded, then set
-        // "EDGE_REPLICA_MODE": "on" in vars to switch reads to it. Can be
-        // rolled out one regional env at a time.
-        // ,{
-        //   "binding": "DB_REPLICA",
-        //   "database_name": "capgo_edge_replica",
-        //   "database_id": "REPLACE_WITH_D1_DATABASE_ID"
-        // }
       ],
+      // Cloudflare-embedded read replica (per-app Durable Objects hosted by
+      // the capgo_replicator worker). Uncomment once capgo_replicator-prod is
+      // deployed, then set "EDGE_REPLICA_MODE": "on" in vars to switch reads
+      // to it. Can be rolled out one regional env at a time.
+      // "durable_objects": {
+      //   "bindings": [
+      //     {
+      //       "name": "APP_REPLICA",
+      //       "class_name": "AppReplica",
+      //       "script_name": "capgo_replicator-prod"
+      //     }
+      //   ]
+      // },
       "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "655e307469ba496f9131556709b5a765" }],
       "hyperdrive": [
         {
@@ -723,16 +747,20 @@
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
-        // Cloudflare-embedded read replica (see cloudflare_workers/replicator).
-        // Uncomment once the D1 database exists and is seeded, then set
-        // "EDGE_REPLICA_MODE": "on" in vars to switch reads to it. Can be
-        // rolled out one regional env at a time.
-        // ,{
-        //   "binding": "DB_REPLICA",
-        //   "database_name": "capgo_edge_replica",
-        //   "database_id": "REPLACE_WITH_D1_DATABASE_ID"
-        // }
       ],
+      // Cloudflare-embedded read replica (per-app Durable Objects hosted by
+      // the capgo_replicator worker). Uncomment once capgo_replicator-prod is
+      // deployed, then set "EDGE_REPLICA_MODE": "on" in vars to switch reads
+      // to it. Can be rolled out one regional env at a time.
+      // "durable_objects": {
+      //   "bindings": [
+      //     {
+      //       "name": "APP_REPLICA",
+      //       "class_name": "AppReplica",
+      //       "script_name": "capgo_replicator-prod"
+      //     }
+      //   ]
+      // },
       "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "655e307469ba496f9131556709b5a765" }],
       "hyperdrive": [
         {
@@ -827,16 +855,20 @@
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
-        // Cloudflare-embedded read replica (see cloudflare_workers/replicator).
-        // Uncomment once the D1 database exists and is seeded, then set
-        // "EDGE_REPLICA_MODE": "on" in vars to switch reads to it. Can be
-        // rolled out one regional env at a time.
-        // ,{
-        //   "binding": "DB_REPLICA",
-        //   "database_name": "capgo_edge_replica",
-        //   "database_id": "REPLACE_WITH_D1_DATABASE_ID"
-        // }
       ],
+      // Cloudflare-embedded read replica (per-app Durable Objects hosted by
+      // the capgo_replicator worker). Uncomment once capgo_replicator-prod is
+      // deployed, then set "EDGE_REPLICA_MODE": "on" in vars to switch reads
+      // to it. Can be rolled out one regional env at a time.
+      // "durable_objects": {
+      //   "bindings": [
+      //     {
+      //       "name": "APP_REPLICA",
+      //       "class_name": "AppReplica",
+      //       "script_name": "capgo_replicator-prod"
+      //     }
+      //   ]
+      // },
       "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "655e307469ba496f9131556709b5a765" }],
       "hyperdrive": [
         {
@@ -931,16 +963,20 @@
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
-        // Cloudflare-embedded read replica (see cloudflare_workers/replicator).
-        // Uncomment once the D1 database exists and is seeded, then set
-        // "EDGE_REPLICA_MODE": "on" in vars to switch reads to it. Can be
-        // rolled out one regional env at a time.
-        // ,{
-        //   "binding": "DB_REPLICA",
-        //   "database_name": "capgo_edge_replica",
-        //   "database_id": "REPLACE_WITH_D1_DATABASE_ID"
-        // }
       ],
+      // Cloudflare-embedded read replica (per-app Durable Objects hosted by
+      // the capgo_replicator worker). Uncomment once capgo_replicator-prod is
+      // deployed, then set "EDGE_REPLICA_MODE": "on" in vars to switch reads
+      // to it. Can be rolled out one regional env at a time.
+      // "durable_objects": {
+      //   "bindings": [
+      //     {
+      //       "name": "APP_REPLICA",
+      //       "class_name": "AppReplica",
+      //       "script_name": "capgo_replicator-prod"
+      //     }
+      //   ]
+      // },
       "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "2860ca0f6b1e416fb8651792895cbffa" }, { "binding": "PLUGIN_NOTIFICATION_QUEUE", "id": "655e307469ba496f9131556709b5a765" }],
       "hyperdrive": [
         {

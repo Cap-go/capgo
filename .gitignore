@@ -113,3 +113,5 @@ graphify-out/cypher.txt
 cli-helper/dist/
 cli-helper/npm/*/CapgoKeychainHelper.app
 cli-helper/npm/*/CapgoAscKeyHelper.app
+
+.zigrep_archive

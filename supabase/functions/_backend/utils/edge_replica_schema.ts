@@ -1,26 +1,33 @@
-// Single source of truth for the Cloudflare-embedded read replica (D1).
-// The replicator worker derives the SQLite DDL, upsert and delete statements
-// from these specs, and the reader relies on the same column kinds to map
-// SQLite values back to the shapes the Postgres read path returns.
+// Single source of truth for the Cloudflare-embedded read replica
+// (per-app Durable Objects with SQLite storage).
+//
+// The replicator worker derives the SQLite DDL, upsert/delete statements and
+// the per-app seed queries from these specs; the AppReplica DO runs the
+// hot-path queries built here; the reader maps the resulting rows back to
+// the exact shapes the Postgres read path returns.
 //
 // Keep table list in sync with:
 // - supabase/migrations/20260707150000_edge_replica_outbox.sql (triggers)
-// - read_replicate/schema_replicate.sql (legacy Cloud SQL replica)
 
 export type EdgeColumnKind = 'text' | 'int' | 'real' | 'bool' | 'json' | 'timestamp'
 
 export interface EdgeTableSpec {
   // Replica primary key, used for upserts and delete replay.
   pk: string[]
+  // 'app' rows are routed/seeded by app_id, 'org' rows by owner_org.
+  scope: 'app' | 'org'
   columns: Record<string, EdgeColumnKind>
   indexes?: string[][]
 }
 
-export const EDGE_REPLICA_SCHEMA_VERSION = 1
+export const EDGE_REPLICA_SCHEMA_VERSION = 2
 
+// Only the tables the update hot path needs. Each per-app replica holds the
+// app's slice of the app-scoped tables plus its owning org's org-scoped rows.
 export const EDGE_REPLICA_TABLES: Record<string, EdgeTableSpec> = {
   apps: {
     pk: ['app_id'],
+    scope: 'app',
     columns: {
       created_at: 'timestamp',
       app_id: 'text',
@@ -33,28 +40,21 @@ export const EDGE_REPLICA_TABLES: Record<string, EdgeTableSpec> = {
       retention: 'int',
       owner_org: 'text',
       default_upload_channel: 'text',
-      transfer_history: 'json',
       channel_device_count: 'int',
       manifest_bundle_count: 'int',
       expose_metadata: 'bool',
       allow_preview: 'bool',
       allow_device_custom_id: 'bool',
-      need_onboarding: 'bool',
-      existing_app: 'bool',
       ios_store_url: 'text',
       android_store_url: 'text',
-      stats_updated_at: 'timestamp',
-      stats_refresh_requested_at: 'timestamp',
-      build_timeout_seconds: 'int',
-      build_timeout_updated_at: 'timestamp',
       block_provider_infra_requests: 'bool',
       rollout_channel_count: 'int',
       rollout_paused_version_names: 'json',
     },
-    indexes: [['owner_org']],
   },
   app_versions: {
     pk: ['id'],
+    scope: 'app',
     columns: {
       id: 'int',
       created_at: 'timestamp',
@@ -67,11 +67,8 @@ export const EDGE_REPLICA_TABLES: Record<string, EdgeTableSpec> = {
       session_key: 'text',
       storage_provider: 'text',
       min_update_version: 'text',
-      native_packages: 'json',
       owner_org: 'text',
-      user_id: 'text',
       r2_path: 'text',
-      manifest: 'json',
       link: 'text',
       comment: 'text',
       manifest_count: 'int',
@@ -83,6 +80,7 @@ export const EDGE_REPLICA_TABLES: Record<string, EdgeTableSpec> = {
   },
   channel_devices: {
     pk: ['id'],
+    scope: 'app',
     columns: {
       created_at: 'timestamp',
       channel_id: 'int',
@@ -96,6 +94,7 @@ export const EDGE_REPLICA_TABLES: Record<string, EdgeTableSpec> = {
   },
   channels: {
     pk: ['id'],
+    scope: 'app',
     columns: {
       id: 'int',
       created_at: 'timestamp',
@@ -115,7 +114,6 @@ export const EDGE_REPLICA_TABLES: Record<string, EdgeTableSpec> = {
       disable_auto_update: 'text',
       owner_org: 'text',
       created_by: 'text',
-      rbac_id: 'text',
       electron: 'bool',
       rollout_version: 'int',
       rollout_percentage_bps: 'int',
@@ -124,21 +122,12 @@ export const EDGE_REPLICA_TABLES: Record<string, EdgeTableSpec> = {
       rollout_paused_at: 'timestamp',
       rollout_pause_reason: 'text',
       rollout_cache_ttl_seconds: 'int',
-      auto_pause_enabled: 'bool',
-      auto_pause_window_minutes: 'int',
-      auto_pause_failure_rate_bps: 'int',
-      auto_pause_confidence: 'real',
-      auto_pause_min_attempts: 'int',
-      auto_pause_min_failures: 'int',
-      auto_pause_action: 'text',
-      auto_pause_cooldown_minutes: 'int',
-      auto_pause_last_triggered_at: 'timestamp',
-      auto_pause_last_checked_at: 'timestamp',
     },
     indexes: [['app_id', 'name'], ['app_id', 'public']],
   },
   manifest: {
     pk: ['id'],
+    scope: 'app',
     columns: {
       id: 'int',
       app_version_id: 'int',
@@ -149,103 +138,37 @@ export const EDGE_REPLICA_TABLES: Record<string, EdgeTableSpec> = {
     },
     indexes: [['app_version_id']],
   },
-  notifications: {
-    pk: ['owner_org', 'event', 'uniq_id'],
-    columns: {
-      created_at: 'timestamp',
-      updated_at: 'timestamp',
-      last_send_at: 'timestamp',
-      total_send: 'int',
-      owner_org: 'text',
-      event: 'text',
-      uniq_id: 'text',
-    },
-  },
-  onboarding_demo_data: {
-    pk: ['id'],
-    columns: {
-      id: 'text',
-      created_at: 'timestamp',
-      app_id: 'text',
-      owner_org: 'text',
-      relation_name: 'text',
-      row_key: 'text',
-      seed_id: 'text',
-    },
-    indexes: [['app_id']],
-  },
-  org_users: {
-    pk: ['id'],
-    columns: {
-      id: 'int',
-      created_at: 'timestamp',
-      updated_at: 'timestamp',
-      user_id: 'text',
-      org_id: 'text',
-      app_id: 'text',
-      channel_id: 'int',
-      user_right: 'text',
-      rbac_role_name: 'text',
-    },
-    indexes: [['org_id']],
-  },
   orgs: {
     pk: ['id'],
+    scope: 'org',
     columns: {
       id: 'text',
       created_by: 'text',
       created_at: 'timestamp',
       updated_at: 'timestamp',
-      logo: 'text',
       name: 'text',
       management_email: 'text',
       customer_id: 'text',
-      stats_updated_at: 'timestamp',
-      last_stats_updated_at: 'timestamp',
-      use_new_rbac: 'bool',
-      enforcing_2fa: 'bool',
-      email_preferences: 'json',
-      enforce_hashed_api_keys: 'bool',
-      require_apikey_expiration: 'bool',
-      max_apikey_expiration_days: 'int',
-      password_policy_config: 'json',
-      enforce_encrypted_bundles: 'bool',
-      required_encryption_key: 'text',
       has_usage_credits: 'bool',
-      website: 'text',
-      stats_refresh_requested_at: 'timestamp',
-      onboarding: 'json',
     },
-    indexes: [['customer_id']],
   },
   stripe_info: {
     pk: ['customer_id'],
+    scope: 'org',
     columns: {
       created_at: 'timestamp',
       updated_at: 'timestamp',
-      subscription_id: 'text',
       customer_id: 'text',
       status: 'text',
       product_id: 'text',
       trial_at: 'timestamp',
-      price_id: 'text',
       is_good_plan: 'bool',
-      plan_usage: 'int',
-      subscription_anchor_start: 'timestamp',
-      subscription_anchor_end: 'timestamp',
-      canceled_at: 'timestamp',
       mau_exceeded: 'bool',
       storage_exceeded: 'bool',
       bandwidth_exceeded: 'bool',
-      id: 'int',
-      plan_calculated_at: 'timestamp',
       build_time_exceeded: 'bool',
-      upgraded_at: 'timestamp',
-      paid_at: 'timestamp',
-      customer_country: 'text',
-      last_stripe_event_at: 'timestamp',
+      canceled_at: 'timestamp',
       past_due_at: 'timestamp',
-      churn_reason: 'text',
     },
   },
 }
@@ -263,11 +186,11 @@ function sqliteType(kind: EdgeColumnKind): string {
   }
 }
 
-// DDL applied by the replicator on /init and before seeding. Everything is
+// DDL applied by each AppReplica DO on first use. Everything is
 // IF NOT EXISTS so re-running is always safe.
 export function buildEdgeReplicaDDL(): string[] {
   const statements: string[] = [
-    `CREATE TABLE IF NOT EXISTS replication_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
+    `CREATE TABLE IF NOT EXISTS replica_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
   ]
   for (const [table, spec] of Object.entries(EDGE_REPLICA_TABLES)) {
     const cols = Object.entries(spec.columns)
@@ -334,4 +257,297 @@ export function pgJsonRowToPkValues(table: string, row: Record<string, unknown>)
   if (!spec)
     throw new Error(`edge replica: unknown table ${table}`)
   return spec.pk.map(colName => convertPgJsonValue(spec.columns[colName], row[colName]))
+}
+
+// ---------------------------------------------------------------------------
+// Per-app seed queries (run against Postgres, never the main hot path).
+// Each returns rows shaped as { r: <row_to_json> } for pgJsonRowToSqliteValues.
+// Keyset pagination is on the replica pk of each table.
+// ---------------------------------------------------------------------------
+
+export interface SeedQuerySpec {
+  table: string
+  sql: string
+  // Column used for keyset pagination, referenced as `keyset > $2`.
+  keyset: string
+  // 'app' binds [app_id], 'org' binds [owner_org] (before cursor values)
+  binds: 'app' | 'org'
+}
+
+export function buildAppSeedQueries(): SeedQuerySpec[] {
+  return [
+    { table: 'apps', binds: 'app', keyset: 't."app_id"', sql: `SELECT row_to_json(t) AS r, t."app_id" AS k1 FROM public.apps t WHERE t.app_id = $1` },
+    { table: 'orgs', binds: 'org', keyset: 't."id"::text', sql: `SELECT row_to_json(t) AS r, t."id"::text AS k1 FROM public.orgs t WHERE t.id = $1::uuid` },
+    { table: 'stripe_info', binds: 'org', keyset: 't."customer_id"', sql: `SELECT row_to_json(t) AS r, t."customer_id" AS k1 FROM public.stripe_info t WHERE t.customer_id = (SELECT o.customer_id FROM public.orgs o WHERE o.id = $1::uuid)` },
+    { table: 'channels', binds: 'app', keyset: 't."id"', sql: `SELECT row_to_json(t) AS r, t."id" AS k1 FROM public.channels t WHERE t.app_id = $1` },
+    // Only versions the hot path can select (activeChannelVersionJoin).
+    { table: 'app_versions', binds: 'app', keyset: 't."id"', sql: `SELECT row_to_json(t) AS r, t."id" AS k1 FROM public.app_versions t WHERE t.app_id = $1 AND (t.deleted = false OR t.name = 'builtin')` },
+    { table: 'manifest', binds: 'app', keyset: 't."id"', sql: `SELECT row_to_json(t) AS r, t."id" AS k1 FROM public.manifest t WHERE t.app_version_id IN (SELECT av.id FROM public.app_versions av WHERE av.app_id = $1 AND av.deleted = false AND av.manifest_count > 0)` },
+    { table: 'channel_devices', binds: 'app', keyset: 't."id"', sql: `SELECT row_to_json(t) AS r, t."id" AS k1 FROM public.channel_devices t WHERE t.app_id = $1` },
+  ]
+}
+
+// ---------------------------------------------------------------------------
+// RPC DTOs shared between the plugin workers (reader) and the replicator DOs.
+// Keep this file free of runtime imports so both bundles stay independent.
+// ---------------------------------------------------------------------------
+
+export type EdgeReplicaRow = Record<string, unknown>
+
+export interface EdgeQueryResult {
+  status: 'ok' | 'unavailable'
+  rows?: EdgeReplicaRow[]
+  // Channel-override rows when queryInfos ran an override lookup.
+  override?: EdgeReplicaRow[]
+}
+
+export interface EdgeInfosArgs {
+  platform: string
+  deviceId: string
+  defaultChannel: string
+  includeManifest: boolean
+  includeMetadata: boolean
+  rollout: boolean
+  queryOverride: boolean
+  channelSelfOverrideChannelId?: number | null
+}
+
+export interface EdgeApplyEntry {
+  table: string
+  op: 'INSERT' | 'UPDATE' | 'DELETE'
+  row: Record<string, unknown>
+}
+
+export interface EdgeApplyBatch {
+  entries: EdgeApplyEntry[]
+  leaseMs: number
+}
+
+export interface EdgeApplyResult {
+  ok?: boolean
+  unregister?: boolean
+}
+
+// RPC surface of the AppReplica DO as seen from the plugin workers.
+export interface AppReplicaRpc {
+  queryAppOwner: (appId: string, actions: PlanLimitAction[]) => Promise<EdgeQueryResult>
+  queryBlockProvider: (appId: string) => Promise<EdgeQueryResult>
+  queryInfos: (appId: string, args: EdgeInfosArgs) => Promise<EdgeQueryResult>
+  queryManifest: (appId: string, versionId: number) => Promise<EdgeQueryResult>
+}
+
+// ---------------------------------------------------------------------------
+// Hot-path queries, SQLite dialect, executed inside the AppReplica DO.
+// They mirror the drizzle queries in pg.ts exactly (see the *Postgres
+// functions of the same intent) and return flat rows the reader maps back to
+// the Postgres shapes.
+// ---------------------------------------------------------------------------
+
+export type PlanLimitAction = 'mau' | 'storage' | 'bandwidth'
+
+const PLAN_EXCEEDED_COLUMNS: Record<PlanLimitAction, string> = {
+  mau: 'mau_exceeded',
+  storage: 'storage_exceeded',
+  bandwidth: 'bandwidth_exceeded',
+}
+
+export interface EdgeQuery {
+  sql: string
+  params: unknown[]
+}
+
+// Mirrors buildPlanValidationExpression in pg.ts.
+function planValidSql(actions: PlanLimitAction[]): string {
+  const extraConditions = actions.map(action => ` AND si.${PLAN_EXCEEDED_COLUMNS[action]} = 0`).join('')
+  return `CASE WHEN (
+    EXISTS (SELECT 1 FROM orgs oc WHERE oc.id = a.owner_org AND oc.has_usage_credits = 1)
+    OR EXISTS (
+      SELECT 1 FROM stripe_info si
+      WHERE si.customer_id = (SELECT oi.customer_id FROM orgs oi WHERE oi.id = a.owner_org)
+        AND (
+          date(si.trial_at) > date('now')
+          OR (si.status = 'succeeded'${extraConditions})
+        )
+    )
+    OR (SELECT oi.customer_id FROM orgs oi WHERE oi.id = a.owner_org) IS NULL
+  ) THEN 1 ELSE 0 END`
+}
+
+// Mirrors getAppOwnerPostgres (pg.ts).
+export function buildAppOwnerQuery(appId: string, actions: PlanLimitAction[]): EdgeQuery {
+  return {
+    sql: `
+      SELECT
+        a.owner_org, a.channel_device_count, a.manifest_bundle_count, a.rollout_channel_count,
+        a.rollout_paused_version_names, a.expose_metadata, a.allow_device_custom_id,
+        a.block_provider_infra_requests,
+        o.created_by AS org_created_by, o.id AS org_id, o.management_email AS org_management_email,
+        ${planValidSql(actions)} AS plan_valid
+      FROM apps a
+      LEFT JOIN orgs o ON o.id = a.owner_org
+      WHERE a.app_id = ?
+      LIMIT 1`,
+    params: [appId],
+  }
+}
+
+export function buildBlockProviderQuery(appId: string): EdgeQuery {
+  return {
+    sql: 'SELECT block_provider_infra_requests FROM apps WHERE app_id = ? LIMIT 1',
+    params: [appId],
+  }
+}
+
+export const EDGE_CHANNEL_COLUMNS = [
+  'id',
+  'name',
+  'app_id',
+  'allow_dev',
+  'allow_prod',
+  'allow_emulator',
+  'allow_device',
+  'disable_auto_update_under_native',
+  'disable_auto_update',
+  'ios',
+  'android',
+  'electron',
+  'allow_device_self_set',
+  'public',
+  'rollout_version',
+  'rollout_percentage_bps',
+  'rollout_enabled',
+  'rollout_id',
+  'rollout_paused_at',
+  'rollout_pause_reason',
+  'rollout_cache_ttl_seconds',
+] as const
+
+function channelSelect(): string {
+  return EDGE_CHANNEL_COLUMNS.map(col => `ch."${col}" AS "c_${col}"`).join(', ')
+}
+
+// Mirrors getVersionSelect in pg.ts. `useBuiltinCase` matches the Postgres
+// behavior where a channel without a linked version resolves to 'builtin'.
+function versionSelect(aliasName: string, prefix: string, includeMetadata: boolean, useBuiltinCase: boolean): string {
+  const name = useBuiltinCase
+    ? `CASE WHEN ch.version IS NULL THEN 'builtin' ELSE ${aliasName}.name END`
+    : `${aliasName}.name`
+  const cols = [
+    `${aliasName}.id AS "${prefix}_id"`,
+    `${name} AS "${prefix}_name"`,
+    `${aliasName}.checksum AS "${prefix}_checksum"`,
+    `${aliasName}.session_key AS "${prefix}_session_key"`,
+    `${aliasName}.key_id AS "${prefix}_key_id"`,
+    `COALESCE(${aliasName}.storage_provider, 'r2') AS "${prefix}_storage_provider"`,
+    `${aliasName}.external_url AS "${prefix}_external_url"`,
+    `${aliasName}.min_update_version AS "${prefix}_min_update_version"`,
+    `${aliasName}.manifest_count AS "${prefix}_manifest_count"`,
+    `${aliasName}.r2_path AS "${prefix}_r2_path"`,
+  ]
+  if (includeMetadata) {
+    cols.push(`${aliasName}.link AS "${prefix}_link"`)
+    cols.push(`${aliasName}.comment AS "${prefix}_comment"`)
+  }
+  return cols.join(', ')
+}
+
+// Mirrors activeChannelVersionJoin in pg.ts.
+function versionJoin(aliasName: string, channelVersionColumn: string, joinType: 'LEFT' | 'INNER', matchAppId: boolean): string {
+  const appIdCondition = matchAppId ? ` AND ${aliasName}.app_id = ch.app_id` : ''
+  return `${joinType} JOIN app_versions ${aliasName}
+    ON ${channelVersionColumn} = ${aliasName}.id
+    AND (${aliasName}.deleted = 0 OR ${aliasName}.name = 'builtin')${appIdCondition}`
+}
+
+// Mirrors the json_agg(...) FILTER manifest aggregation in pg.ts.
+function manifestEntriesSelect(): string {
+  return `(
+    SELECT json_group_array(json_object('file_name', m.file_name, 'file_hash', m.file_hash, 's3_path', m.s3_path))
+    FROM manifest m WHERE m.app_version_id = v.id
+  ) AS "manifest_entries"`
+}
+
+export interface ChannelQueryOptions {
+  includeManifest: boolean
+  includeMetadata: boolean
+  rollout: boolean
+}
+
+// Mirrors requestInfosChannelByIdPostgres / ...PostgresRollout.
+export function buildChannelByIdQuery(appId: string, channelId: number, options: ChannelQueryOptions): EdgeQuery {
+  const { includeManifest, includeMetadata, rollout } = options
+  if (rollout) {
+    return {
+      sql: `
+        SELECT ${channelSelect()}, ${versionSelect('v', 'v', includeMetadata, true)}, ${versionSelect('rv', 'rv', includeMetadata, false)}
+        FROM channels ch
+        ${versionJoin('v', 'ch.version', 'LEFT', false)}
+        ${versionJoin('rv', 'ch.rollout_version', 'LEFT', true)}
+        WHERE ch.app_id = ? AND ch.id = ? AND (ch.version IS NULL OR v.id IS NOT NULL)
+        LIMIT 1`,
+      params: [appId, channelId],
+    }
+  }
+  const manifest = includeManifest ? `, ${manifestEntriesSelect()}` : ''
+  // INNER JOIN mirrors requestInfosChannelByIdPostgres.
+  return {
+    sql: `
+      SELECT ${channelSelect()}, ${versionSelect('v', 'v', includeMetadata, true)}${manifest}
+      FROM channels ch
+      ${versionJoin('v', 'ch.version', 'INNER', false)}
+      WHERE ch.app_id = ? AND ch.id = ?
+      LIMIT 1`,
+    params: [appId, channelId],
+  }
+}
+
+// Mirrors requestInfosChannelDevicePostgres / ...PostgresRollout.
+export function buildChannelDeviceQuery(appId: string, deviceId: string, options: ChannelQueryOptions): EdgeQuery {
+  const { includeManifest, includeMetadata, rollout } = options
+  const rolloutSelect = rollout ? `, ${versionSelect('rv', 'rv', includeMetadata, false)}` : ''
+  const rolloutJoin = rollout ? versionJoin('rv', 'ch.rollout_version', 'LEFT', true) : ''
+  const manifest = !rollout && includeManifest ? `, ${manifestEntriesSelect()}` : ''
+  return {
+    sql: `
+      SELECT cd.device_id AS cd_device_id, cd.app_id AS cd_app_id,
+        ${channelSelect()}, ${versionSelect('v', 'v', includeMetadata, true)}${rolloutSelect}${manifest}
+      FROM channel_devices cd
+      INNER JOIN channels ch ON cd.channel_id = ch.id
+      ${versionJoin('v', 'ch.version', 'LEFT', false)}
+      ${rolloutJoin}
+      WHERE cd.device_id = ? AND cd.app_id = ? AND (ch.version IS NULL OR v.id IS NOT NULL)
+      LIMIT 1`,
+    params: [deviceId, appId],
+  }
+}
+
+// Mirrors requestInfosChannelPostgres / ...PostgresRollout.
+export function buildChannelQuery(platform: string, appId: string, defaultChannel: string, options: ChannelQueryOptions): EdgeQuery {
+  const { includeManifest, includeMetadata, rollout } = options
+  const platformColumn = platform === 'android' ? 'ch.android' : platform === 'electron' ? 'ch.electron' : 'ch.ios'
+  const rolloutSelect = rollout ? `, ${versionSelect('rv', 'rv', includeMetadata, false)}` : ''
+  const rolloutJoin = rollout ? versionJoin('rv', 'ch.rollout_version', 'LEFT', true) : ''
+  const manifest = !rollout && includeManifest ? `, ${manifestEntriesSelect()}` : ''
+  const filter = defaultChannel
+    ? `ch.app_id = ? AND ch.name = ? AND ${platformColumn} = 1 AND (ch.public = 1 OR ch.allow_device_self_set = 1)`
+    : `ch.public = 1 AND ch.app_id = ? AND ${platformColumn} = 1`
+  return {
+    sql: `
+      SELECT ${channelSelect()}, ${versionSelect('v', 'v', includeMetadata, true)}${rolloutSelect}${manifest}
+      FROM channels ch
+      ${versionJoin('v', 'ch.version', 'LEFT', false)}
+      ${rolloutJoin}
+      WHERE ${filter} AND (ch.version IS NULL OR v.id IS NOT NULL)
+      ORDER BY ch.name, ch.id
+      LIMIT 1`,
+    params: defaultChannel ? [appId, defaultChannel] : [appId],
+  }
+}
+
+// Mirrors requestManifestEntriesPostgres.
+export function buildManifestQuery(versionId: number): EdgeQuery {
+  return {
+    sql: 'SELECT file_name, file_hash, s3_path FROM manifest WHERE app_version_id = ?',
+    params: [versionId],
+  }
 }

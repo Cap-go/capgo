@@ -1,58 +1,52 @@
-// Durable Object that keeps the Cloudflare-embedded read replica (D1) in
-// sync with the Supabase main database.
+// ReplicaRouter: the single Durable Object that links Supabase to the fleet
+// of per-app replica DOs (see app_replica.ts).
 //
-// Flow:
 // 1. Postgres triggers append every committed write on the replicated tables
-//    to public.replicate_outbox (see the edge_replica_outbox migration).
+//    to public.replicate_outbox with routing keys (app_id / owner_org).
 // 2. This DO polls the outbox with DELETE ... FOR UPDATE SKIP LOCKED inside a
-//    transaction, applies the batch to D1, then commits the delete. If the D1
-//    write fails the transaction rolls back and the rows are retried, so
-//    delivery is exactly-once and strictly ordered by outbox id.
-// 3. Initial data comes from a resumable, keyset-paginated seed that reads
-//    from a read replica (never the main database). Outbox rows accumulated
-//    while seeding are replayed afterwards; upserts are idempotent so the
-//    replica converges to a consistent snapshot.
+//    transaction and copies the rows into its own SQLite journal before
+//    committing the delete — exactly-once into the journal, strictly ordered
+//    by outbox id, resumable after any downtime.
+// 3. The journal fans out to every registered AppReplica: app-scoped rows to
+//    that app's replicas in each region, org-scoped rows to every replica of
+//    the org. The per-target cursor only advances on a successful push, so a
+//    flaky replica is retried and, after repeated failures, invalidated so
+//    it reseeds itself on its next read.
 //
-// D1 read replication (Sessions API) then distributes the database to every
-// D1 region automatically — that is the fan-out the regional Cloud SQL
-// replicas used to provide.
+// This is "one replica linked to Supabase, as many as needed inside
+// Cloudflare": the router is the single consumer Postgres sees; replicas are
+// created lazily per app per region by read traffic.
 
-import type { D1Database, D1PreparedStatement, DurableObjectNamespace, Hyperdrive, Request as WorkersRequest, Response as WorkersResponse } from '@cloudflare/workers-types'
+import type { DurableObjectNamespace, Hyperdrive, Request as WorkersRequest, Response as WorkersResponse } from '@cloudflare/workers-types'
+import type { EdgeApplyEntry } from '../utils/edge_replica_schema.ts'
 import { DurableObject } from 'cloudflare:workers'
 // @ts-types="npm:@types/pg"
 import { Client } from 'pg'
-import {
-  buildDeleteStatement,
-  buildEdgeReplicaDDL,
-  buildUpsertStatement,
-  EDGE_REPLICA_SCHEMA_VERSION,
-  EDGE_REPLICA_TABLES,
-  pgJsonRowToPkValues,
-  pgJsonRowToSqliteValues,
-} from '../utils/edge_replica_schema.ts'
 
 export interface ReplicatorEnv {
-  DB_REPLICA: D1Database
-  REPLICATOR: DurableObjectNamespace
-  // Source used to drain the outbox (main database or its pooler).
+  REPLICA_ROUTER: DurableObjectNamespace
+  APP_REPLICA: DurableObjectNamespace
+  // Source used to drain the outbox (main database, direct so the
+  // DELETE ... FOR UPDATE transaction stays on one session).
   HYPERDRIVE_OUTBOX?: Hyperdrive
   OUTBOX_DB_URL?: string
-  // Source used for the initial snapshot. Point it at a read replica so the
-  // seed never scans the main database. Falls back to the outbox source.
+  // Source used by AppReplica seeds. Point it at a read replica (or the
+  // pooler) so seeds never compete with the main hot path.
   HYPERDRIVE_SEED?: Hyperdrive
   SEED_DB_URL?: string
   REPLICATOR_SECRET?: string
   EDGE_REPLICA_POLL_SECONDS?: string
+  EDGE_REPLICA_LEASE_SECONDS?: string
 }
 
-type ReplicatorMode = 'idle' | 'seeding' | 'streaming'
-
-const OUTBOX_BATCH_SIZE = 200
+const OUTBOX_BATCH_SIZE = 500
 const MAX_BATCHES_PER_ALARM = 10
-const SEED_PAGE_SIZE = 2000
-const SEED_PAGES_PER_ALARM = 5
+const PUSH_CONCURRENCY = 10
+const MAX_PUSH_FAILURES = 3
+const JOURNAL_RETENTION_MS = 60 * 60 * 1000
 const ERROR_RETRY_MS = 10_000
 const DEFAULT_POLL_SECONDS = 5
+const DEFAULT_LEASE_SECONDS = 900
 
 const DRAIN_OUTBOX_SQL = `
   WITH batch AS (
@@ -64,14 +58,25 @@ const DRAIN_OUTBOX_SQL = `
   DELETE FROM public.replicate_outbox o
   USING batch
   WHERE o.id = batch.id
-  RETURNING o.id, o.table_name, o.op, o.row_data
+  RETURNING o.id, o.table_name, o.op, o.app_id, o.owner_org::text AS owner_org, o.row_data
 `
 
 interface OutboxRow {
   id: string
   table_name: string
   op: 'INSERT' | 'UPDATE' | 'DELETE'
+  app_id: string | null
+  owner_org: string | null
   row_data: Record<string, unknown>
+}
+
+interface TargetRow {
+  name: string
+  app_id: string
+  owner_org: string | null
+  cursor: number
+  fail_count: number
+  lease_refreshed_at: number
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -81,12 +86,45 @@ function jsonResponse(body: unknown, status = 200): Response {
   })
 }
 
-export class Replicator extends DurableObject<ReplicatorEnv> {
-  private upserts = new Map<string, D1PreparedStatement>()
-  private deletes = new Map<string, D1PreparedStatement>()
+export class ReplicaRouter extends DurableObject<ReplicatorEnv> {
+  constructor(ctx: DurableObjectState, env: ReplicatorEnv) {
+    super(ctx, env)
+    ctx.blockConcurrencyWhile(async () => {
+      this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS router_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`)
+      this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS journal (
+        id INTEGER PRIMARY KEY,
+        table_name TEXT NOT NULL,
+        op TEXT NOT NULL,
+        app_id TEXT,
+        owner_org TEXT,
+        row_data TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      )`)
+      this.ctx.storage.sql.exec(`CREATE INDEX IF NOT EXISTS idx_journal_app ON journal (app_id, id)`)
+      this.ctx.storage.sql.exec(`CREATE INDEX IF NOT EXISTS idx_journal_org ON journal (owner_org, id)`)
+      this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS targets (
+        name TEXT PRIMARY KEY,
+        app_id TEXT NOT NULL,
+        owner_org TEXT,
+        cursor INTEGER NOT NULL,
+        fail_count INTEGER NOT NULL DEFAULT 0,
+        lease_refreshed_at INTEGER NOT NULL
+      )`)
+      this.ctx.storage.sql.exec(`CREATE INDEX IF NOT EXISTS idx_targets_app ON targets (app_id)`)
+      this.ctx.storage.sql.exec(`CREATE INDEX IF NOT EXISTS idx_targets_org ON targets (owner_org)`)
+    })
+  }
 
-  private get db(): D1Database {
-    return this.env.DB_REPLICA
+  private getMeta(key: string): string | null {
+    const row = this.ctx.storage.sql
+      .exec('SELECT value FROM router_meta WHERE key = ?', key)
+      .toArray()
+      .at(0) as { value: string } | undefined
+    return row?.value ?? null
+  }
+
+  private setMeta(key: string, value: string) {
+    this.ctx.storage.sql.exec('INSERT OR REPLACE INTO router_meta (key, value) VALUES (?, ?)', key, value)
   }
 
   private pollMs(): number {
@@ -95,22 +133,35 @@ export class Replicator extends DurableObject<ReplicatorEnv> {
     return seconds * 1000
   }
 
-  private connectionString(kind: 'outbox' | 'seed'): string {
-    if (kind === 'seed') {
-      const seed = this.env.HYPERDRIVE_SEED?.connectionString ?? this.env.SEED_DB_URL
-      if (seed)
-        return seed
-    }
+  private leaseMs(): number {
+    const raw = Number(this.env.EDGE_REPLICA_LEASE_SECONDS)
+    const seconds = Number.isFinite(raw) && raw >= 60 ? raw : DEFAULT_LEASE_SECONDS
+    return seconds * 1000
+  }
+
+  private journalHead(): number {
+    return Number(this.getMeta('journal_head') ?? 0)
+  }
+
+  private replicaStub(name: string) {
+    return this.env.APP_REPLICA.get(this.env.APP_REPLICA.idFromName(name)) as any
+  }
+
+  private async scheduleAlarm(delayMs: number) {
+    await this.ctx.storage.setAlarm(Date.now() + delayMs)
+  }
+
+  private connectionString(): string {
     const outbox = this.env.HYPERDRIVE_OUTBOX?.connectionString ?? this.env.OUTBOX_DB_URL
     if (!outbox)
       throw new Error('replicator: no Postgres source configured (HYPERDRIVE_OUTBOX or OUTBOX_DB_URL)')
     return outbox
   }
 
-  private async withPg<T>(kind: 'outbox' | 'seed', fn: (client: Client) => Promise<T>): Promise<T> {
+  private async withPg<T>(fn: (client: Client) => Promise<T>): Promise<T> {
     const client = new Client({
-      connectionString: this.connectionString(kind),
-      application_name: `capgo_replicator_${kind}`,
+      connectionString: this.connectionString(),
+      application_name: 'capgo_replica_router',
       connectionTimeoutMillis: 10_000,
     })
     await client.connect()
@@ -118,50 +169,38 @@ export class Replicator extends DurableObject<ReplicatorEnv> {
       return await fn(client)
     }
     finally {
-      await client.end().catch(() => {})
+      await client.end().catch(() => undefined)
     }
   }
 
-  private upsertFor(table: string): D1PreparedStatement {
-    let statement = this.upserts.get(table)
-    if (!statement) {
-      statement = this.db.prepare(buildUpsertStatement(table))
-      this.upserts.set(table, statement)
-    }
-    return statement
+  // ------------------------------------------------------------------
+  // RPCs (called by AppReplica DOs)
+  // ------------------------------------------------------------------
+
+  async register(input: { name: string, appId: string, ownerOrg: string | null }): Promise<{ leaseMs: number }> {
+    this.ctx.storage.sql.exec(
+      `INSERT OR REPLACE INTO targets (name, app_id, owner_org, cursor, fail_count, lease_refreshed_at)
+       VALUES (?, ?, ?, ?, 0, ?)`,
+      input.name,
+      input.appId,
+      input.ownerOrg,
+      this.journalHead(),
+      Date.now(),
+    )
+    // Make sure the stream is running as soon as the first replica exists.
+    if ((await this.ctx.storage.getAlarm()) === null)
+      await this.scheduleAlarm(0)
+    return { leaseMs: this.leaseMs() }
   }
 
-  private deleteFor(table: string): D1PreparedStatement {
-    let statement = this.deletes.get(table)
-    if (!statement) {
-      statement = this.db.prepare(buildDeleteStatement(table))
-      this.deletes.set(table, statement)
-    }
-    return statement
+  async unregister(name: string): Promise<{ ok: boolean }> {
+    this.ctx.storage.sql.exec('DELETE FROM targets WHERE name = ?', name)
+    return { ok: true }
   }
 
-  private stateStatement(key: string, value: string): D1PreparedStatement {
-    return this.db
-      .prepare('INSERT OR REPLACE INTO replication_state (key, value) VALUES (?1, ?2)')
-      .bind(key, value)
-  }
-
-  private async ensureSchema() {
-    await this.db.batch(buildEdgeReplicaDDL().map(sql => this.db.prepare(sql)))
-    await this.stateStatement('schema_version', String(EDGE_REPLICA_SCHEMA_VERSION)).run()
-  }
-
-  private async setMode(mode: ReplicatorMode) {
-    await this.ctx.storage.put('mode', mode)
-  }
-
-  private async getMode(): Promise<ReplicatorMode> {
-    return (await this.ctx.storage.get<ReplicatorMode>('mode')) ?? 'idle'
-  }
-
-  private async scheduleAlarm(delayMs: number) {
-    await this.ctx.storage.setAlarm(Date.now() + delayMs)
-  }
+  // ------------------------------------------------------------------
+  // Admin endpoints (Bearer REPLICATOR_SECRET)
+  // ------------------------------------------------------------------
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url)
@@ -173,36 +212,29 @@ export class Replicator extends DurableObject<ReplicatorEnv> {
 
     try {
       switch (`${request.method} ${url.pathname}`) {
-        case 'POST /init': {
-          await this.ensureSchema()
-          return jsonResponse({ ok: true })
-        }
-        case 'POST /seed': {
-          await this.ensureSchema()
-          await this.ctx.storage.put('seed_tables', Object.keys(EDGE_REPLICA_TABLES))
-          await this.ctx.storage.delete('seed_cursor')
-          await this.db.prepare(`DELETE FROM replication_state WHERE key IN ('seeded_at', 'last_applied_at')`).run()
-          await this.stateStatement('seeding_started_at', new Date().toISOString()).run()
-          await this.setMode('seeding')
-          await this.scheduleAlarm(0)
-          return jsonResponse({ ok: true, mode: 'seeding' })
-        }
         case 'POST /pause': {
-          await this.setMode('idle')
+          this.setMeta('paused', '1')
           await this.ctx.storage.deleteAlarm()
-          return jsonResponse({ ok: true, mode: 'idle' })
+          return jsonResponse({ ok: true, paused: true })
         }
         case 'POST /resume': {
-          await this.setMode('streaming')
+          this.setMeta('paused', '0')
           await this.scheduleAlarm(0)
-          return jsonResponse({ ok: true, mode: 'streaming' })
+          return jsonResponse({ ok: true, paused: false })
         }
         case 'POST /ensure': {
           // Called by the cron trigger: re-arm the alarm if it was lost.
-          const mode = await this.getMode()
-          if (mode !== 'idle' && (await this.ctx.storage.getAlarm()) === null)
+          if (this.getMeta('paused') !== '1' && (await this.ctx.storage.getAlarm()) === null)
             await this.scheduleAlarm(0)
-          return jsonResponse({ ok: true, mode })
+          return jsonResponse({ ok: true })
+        }
+        case 'POST /invalidate-all': {
+          // Force every replica to reseed (e.g. after a schema change).
+          const targets = this.ctx.storage.sql.exec('SELECT name FROM targets').toArray() as { name: string }[]
+          for (const target of targets)
+            await this.replicaStub(target.name).invalidate().catch(() => undefined)
+          this.ctx.storage.sql.exec('DELETE FROM targets')
+          return jsonResponse({ ok: true, invalidated: targets.length })
         }
         case 'GET /status':
           return jsonResponse(await this.status())
@@ -211,160 +243,213 @@ export class Replicator extends DurableObject<ReplicatorEnv> {
       }
     }
     catch (e) {
-      console.error('replicator fetch error', e)
+      console.error('replica router fetch error', e)
       return jsonResponse({ error: e instanceof Error ? e.message : String(e) }, 500)
     }
   }
 
   private async status() {
-    const mode = await this.getMode()
-    const seedTables = await this.ctx.storage.get<string[]>('seed_tables')
-    const stateResult = await this.db.prepare('SELECT key, value FROM replication_state').all()
-    const state = Object.fromEntries((stateResult.results as { key: string, value: string }[]).map(row => [row.key, row.value]))
-    const outbox = await this.withPg('outbox', async client => (await client.query(
+    const targetCount = (this.ctx.storage.sql.exec('SELECT count(*) AS c FROM targets').toArray().at(0) as { c: number }).c
+    const journal = this.ctx.storage.sql
+      .exec('SELECT count(*) AS c, min(id) AS min_id, max(id) AS max_id FROM journal')
+      .toArray()
+      .at(0)
+    const lagging = this.ctx.storage.sql
+      .exec('SELECT count(*) AS c FROM targets WHERE cursor < ?', this.journalHead())
+      .toArray()
+      .at(0) as { c: number }
+    const outbox = await this.withPg(async client => (await client.query(
       'SELECT count(*)::bigint AS depth, min(created_at) AS oldest FROM public.replicate_outbox',
     )).rows[0]).catch((e: unknown) => ({ error: e instanceof Error ? e.message : String(e) }))
-    const counts: Record<string, number> = {}
-    for (const table of Object.keys(EDGE_REPLICA_TABLES)) {
-      const row = await this.db.prepare(`SELECT count(*) AS c FROM "${table}"`).first<{ c: number }>()
-      counts[table] = row?.c ?? 0
-    }
     return {
-      mode,
+      paused: this.getMeta('paused') === '1',
       alarm: await this.ctx.storage.getAlarm(),
-      pending_seed_tables: seedTables ?? [],
-      replication_state: state,
+      journal_head: this.journalHead(),
+      last_drain_at: this.getMeta('last_drain_at'),
+      targets: targetCount,
+      targets_lagging: lagging.c,
+      journal,
       outbox,
-      d1_row_counts: counts,
     }
   }
 
+  // ------------------------------------------------------------------
+  // Stream loop
+  // ------------------------------------------------------------------
+
   async alarm(): Promise<void> {
-    const mode = await this.getMode()
+    if (this.getMeta('paused') === '1')
+      return
     try {
-      if (mode === 'seeding') {
-        const done = await this.seedStep()
-        await this.scheduleAlarm(done ? this.pollMs() : 250)
-      }
-      else if (mode === 'streaming') {
-        await this.drainOutbox()
-        await this.scheduleAlarm(this.pollMs())
-      }
+      await this.drainOutbox()
+      await this.fanOut()
+      this.maintain()
+      await this.scheduleAlarm(this.pollMs())
     }
     catch (e) {
-      console.error('replicator alarm error', mode, e)
+      console.error('replica router alarm error', e)
       await this.scheduleAlarm(ERROR_RETRY_MS)
     }
   }
 
-  // Consume up to MAX_BATCHES_PER_ALARM batches from the outbox and apply
-  // them to D1. The heartbeat write happens every run, even when the outbox
-  // is empty: readers use it as the liveness/staleness signal.
+  // Move outbox rows into the local journal. The journal write happens
+  // before the Postgres COMMIT: if the DO dies in between, Postgres rolls
+  // back and the same rows are re-inserted next run (INSERT OR REPLACE by
+  // outbox id), so the journal never misses or duplicates a change.
   private async drainOutbox(): Promise<void> {
-    await this.withPg('outbox', async (client) => {
+    await this.withPg(async (client) => {
       for (let i = 0; i < MAX_BATCHES_PER_ALARM; i++) {
         await client.query('BEGIN')
         try {
           const result = await client.query(DRAIN_OUTBOX_SQL, [OUTBOX_BATCH_SIZE])
           const rows = (result.rows as OutboxRow[]).sort((a, b) => Number(a.id) - Number(b.id))
-          const statements = this.buildApplyStatements(rows)
-          statements.push(this.stateStatement('last_applied_at', new Date().toISOString()))
-          if (rows.length > 0)
-            statements.push(this.stateStatement('last_outbox_id', String(rows[rows.length - 1].id)))
-          await this.db.batch(statements)
+          if (rows.length > 0) {
+            const now = Date.now()
+            this.ctx.storage.transactionSync(() => {
+              for (const row of rows) {
+                this.ctx.storage.sql.exec(
+                  'INSERT OR REPLACE INTO journal (id, table_name, op, app_id, owner_org, row_data, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                  Number(row.id),
+                  row.table_name,
+                  row.op,
+                  row.app_id,
+                  row.owner_org,
+                  JSON.stringify(row.row_data),
+                  now,
+                )
+              }
+              this.setMeta('journal_head', String(Number(rows[rows.length - 1].id)))
+            })
+          }
           await client.query('COMMIT')
+          this.setMeta('last_drain_at', new Date().toISOString())
           if (rows.length < OUTBOX_BATCH_SIZE)
             return
         }
         catch (e) {
-          await client.query('ROLLBACK').catch(() => {})
+          await client.query('ROLLBACK').catch(() => undefined)
           throw e
         }
       }
     })
   }
 
-  private buildApplyStatements(rows: OutboxRow[]): D1PreparedStatement[] {
-    const statements: D1PreparedStatement[] = []
-    for (const row of rows) {
-      if (!EDGE_REPLICA_TABLES[row.table_name]) {
-        console.warn('replicator: skipping unknown table', row.table_name)
-        continue
-      }
-      if (row.op === 'DELETE')
-        statements.push(this.deleteFor(row.table_name).bind(...pgJsonRowToPkValues(row.table_name, row.row_data)))
-      else
-        statements.push(this.upsertFor(row.table_name).bind(...pgJsonRowToSqliteValues(row.table_name, row.row_data)))
+  // Push pending journal rows to every registered replica. The cursor is a
+  // journal watermark per target and only advances on success (or when the
+  // target has nothing relevant in the window), so delivery per replica is
+  // ordered and at-least-once; replicas apply idempotently.
+  private async fanOut(): Promise<void> {
+    const head = this.journalHead()
+    const pending = this.ctx.storage.sql
+      .exec('SELECT name, app_id, owner_org, cursor, fail_count, lease_refreshed_at FROM targets WHERE cursor < ?', head)
+      .toArray() as unknown as TargetRow[]
+    for (let i = 0; i < pending.length; i += PUSH_CONCURRENCY) {
+      await Promise.all(pending.slice(i, i + PUSH_CONCURRENCY).map(target => this.pushTarget(target, head)))
     }
-    return statements
   }
 
-  // One resumable seed step: copies up to SEED_PAGES_PER_ALARM pages of the
-  // current table from the seed source into D1. Returns true when the whole
-  // seed is finished.
-  private async seedStep(): Promise<boolean> {
-    const tables = (await this.ctx.storage.get<string[]>('seed_tables')) ?? []
-    if (tables.length === 0) {
-      await this.stateStatement('seeded_at', new Date().toISOString()).run()
-      await this.stateStatement('last_applied_at', new Date().toISOString()).run()
-      await this.setMode('streaming')
-      console.warn('replicator: seed complete, streaming outbox')
-      return true
+  private relevantRows(target: TargetRow, head: number): EdgeApplyEntry[] {
+    const rows = this.ctx.storage.sql
+      .exec(
+        `SELECT table_name, op, row_data FROM journal
+         WHERE id > ? AND id <= ? AND (app_id = ? OR (app_id IS NULL AND owner_org = ?))
+         ORDER BY id`,
+        target.cursor,
+        head,
+        target.app_id,
+        target.owner_org,
+      )
+      .toArray() as { table_name: string, op: EdgeApplyEntry['op'], row_data: string }[]
+    return rows.map(row => ({ table: row.table_name, op: row.op, row: JSON.parse(row.row_data) }))
+  }
+
+  private async pushTarget(target: TargetRow, head: number): Promise<void> {
+    const entries = this.relevantRows(target, head)
+    if (entries.length === 0) {
+      // Nothing relevant in the window: advance the watermark locally.
+      this.ctx.storage.sql.exec('UPDATE targets SET cursor = ? WHERE name = ?', head, target.name)
+      return
     }
-
-    const table = tables[0]
-    const spec = EDGE_REPLICA_TABLES[table]
-    const pkList = spec.pk.map(col => `t."${col}"`).join(', ')
-
-    await this.withPg('seed', async (client) => {
-      for (let page = 0; page < SEED_PAGES_PER_ALARM; page++) {
-        const cursor = await this.ctx.storage.get<unknown[]>('seed_cursor')
-        if (!cursor) {
-          // First page of this table: reset the D1 copy so reseeding is safe.
-          await this.db.prepare(`DELETE FROM "${table}"`).run()
-        }
-        const where = cursor
-          ? `WHERE (${pkList}) > (${spec.pk.map((_, index) => `$${index + 1}`).join(', ')})`
-          : ''
-        const result = await client.query(
-          `SELECT row_to_json(t) AS r, ${pkList} FROM public."${table}" t ${where} ORDER BY ${pkList} LIMIT ${SEED_PAGE_SIZE}`,
-          (cursor ?? []) as unknown[],
-        )
-        const rows = result.rows as ({ r: Record<string, unknown> } & Record<string, unknown>)[]
-        if (rows.length > 0) {
-          const statements = rows.map(row =>
-            this.upsertFor(table).bind(...pgJsonRowToSqliteValues(table, row.r)))
-          await this.db.batch(statements)
-          const last = rows[rows.length - 1]
-          await this.ctx.storage.put('seed_cursor', spec.pk.map(col => last[col]))
-        }
-        if (rows.length < SEED_PAGE_SIZE) {
-          await this.ctx.storage.put('seed_tables', tables.slice(1))
-          await this.ctx.storage.delete('seed_cursor')
-          console.warn('replicator: seeded table', table)
-          return
-        }
+    try {
+      const result = await this.replicaStub(target.name).applyBatch({ entries, leaseMs: this.leaseMs() })
+      if (result?.unregister) {
+        this.ctx.storage.sql.exec('DELETE FROM targets WHERE name = ?', target.name)
+        return
       }
-    })
-    return false
+      this.ctx.storage.sql.exec(
+        'UPDATE targets SET cursor = ?, fail_count = 0, lease_refreshed_at = ? WHERE name = ?',
+        head,
+        Date.now(),
+        target.name,
+      )
+    }
+    catch (e) {
+      const failCount = target.fail_count + 1
+      console.error('replica push failed', target.name, failCount, e)
+      if (failCount >= MAX_PUSH_FAILURES) {
+        // Give up: drop the registration and force a reseed on next read.
+        this.ctx.storage.sql.exec('DELETE FROM targets WHERE name = ?', target.name)
+        await this.replicaStub(target.name).invalidate().catch(() => undefined)
+      }
+      else {
+        this.ctx.storage.sql.exec('UPDATE targets SET fail_count = ? WHERE name = ?', failCount, target.name)
+      }
+    }
+  }
+
+  // Lease refresh for idle targets + journal pruning. Runs inline with the
+  // poll; the refresh set is small (only leases past 1/3 of their life).
+  private maintain(): void {
+    const now = Date.now()
+    const leaseMs = this.leaseMs()
+    const stale = this.ctx.storage.sql
+      .exec(
+        'SELECT name, app_id, owner_org, cursor, fail_count, lease_refreshed_at FROM targets WHERE lease_refreshed_at < ? LIMIT 200',
+        now - leaseMs / 3,
+      )
+      .toArray() as unknown as TargetRow[]
+    for (const target of stale) {
+      this.ctx.waitUntil((async () => {
+        try {
+          const result = await this.replicaStub(target.name).applyBatch({ entries: [], leaseMs })
+          if (result?.unregister)
+            this.ctx.storage.sql.exec('DELETE FROM targets WHERE name = ?', target.name)
+          else
+            this.ctx.storage.sql.exec('UPDATE targets SET lease_refreshed_at = ? WHERE name = ?', now, target.name)
+        }
+        catch {
+          // Push path handles persistent failures.
+        }
+      })())
+    }
+    // Prune everything all targets have consumed, and cap retention by age.
+    const minCursor = this.ctx.storage.sql
+      .exec('SELECT coalesce(min(cursor), ?) AS m FROM targets', this.journalHead())
+      .toArray()
+      .at(0) as { m: number }
+    this.ctx.storage.sql.exec(
+      'DELETE FROM journal WHERE id <= ? OR created_at < ?',
+      minCursor.m,
+      now - JOURNAL_RETENTION_MS,
+    )
   }
 }
 
-export function getReplicatorStub(env: ReplicatorEnv) {
-  return env.REPLICATOR.get(env.REPLICATOR.idFromName('main'))
+export function getRouterStub(env: ReplicatorEnv) {
+  return env.REPLICA_ROUTER.get(env.REPLICA_ROUTER.idFromName('main'))
 }
 
-// The worker in front of the DO: forwards management calls to the singleton
+// The worker in front of the DOs: forwards management calls to the router
 // and keeps its alarm alive from a cron trigger.
 export const replicatorWorker = {
   async fetch(request: WorkersRequest, env: ReplicatorEnv): Promise<WorkersResponse> {
-    return getReplicatorStub(env).fetch(request)
+    return getRouterStub(env).fetch(request)
   },
   async scheduled(_event: unknown, env: ReplicatorEnv): Promise<void> {
     const secret = env.REPLICATOR_SECRET
     if (!secret)
       return
-    await getReplicatorStub(env).fetch('https://replicator.internal/ensure', {
+    await getRouterStub(env).fetch('https://replicator.internal/ensure', {
       method: 'POST',
       headers: { Authorization: `Bearer ${secret}` },
     })

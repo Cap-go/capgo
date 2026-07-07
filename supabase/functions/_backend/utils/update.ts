@@ -623,7 +623,7 @@ export async function update(c: Context, body: AppInfos) {
     const drizzlePg = getDrizzleClient(pgClient)
     // Prefer the Cloudflare-embedded read replica (D1) when enabled; the
     // Postgres pool stays lazy and only connects if a fallback is needed.
-    const edgeReplica = getEdgeReplicaReader(c, drizzlePg)
+    const edgeReplica = getEdgeReplicaReader(c, body.app_id, drizzlePg)
     if (!edgeReplica)
       await setReplicationLagHeader(c, pgClient)
 

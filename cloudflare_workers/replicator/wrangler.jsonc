@@ -13,15 +13,12 @@
       "name": "capgo_replicator-prod",
       "vars": {
         "ENV_NAME": "capgo_replicator-prod",
-        "EDGE_REPLICA_POLL_SECONDS": "5"
+        "EDGE_REPLICA_POLL_SECONDS": "5",
+        "EDGE_REPLICA_LEASE_SECONDS": "900"
       },
       "observability": {
         "head_sampling_rate": 1,
         "enabled": true
-      },
-      // Keep the DO next to the database it drains.
-      "placement": {
-        "region": "gcp:europe-west8"
       },
       "routes": [
         {
@@ -29,34 +26,26 @@
           "custom_domain": true
         }
       ],
-      // Re-arm the outbox alarm if it is ever lost (deploys, DO eviction).
+      // Re-arm the router alarm if it is ever lost (deploys, DO eviction).
       "triggers": {
         "crons": ["*/2 * * * *"]
       },
       "durable_objects": {
         "bindings": [
           {
-            "name": "REPLICATOR",
-            "class_name": "Replicator"
+            "name": "REPLICA_ROUTER",
+            "class_name": "ReplicaRouter"
+          },
+          {
+            "name": "APP_REPLICA",
+            "class_name": "AppReplica"
           }
         ]
       },
       "migrations": [
         {
           "tag": "v1",
-          "new_sqlite_classes": ["Replicator"]
-        }
-      ],
-      "d1_databases": [
-        {
-          "binding": "DB_REPLICA",
-          "database_name": "capgo_edge_replica",
-          // Create with: bunx wrangler d1 create capgo_edge_replica
-          // then enable read replication:
-          //   curl -X PUT "https://api.cloudflare.com/client/v4/accounts/<account>/d1/database/<uuid>" \
-          //     -H "Authorization: Bearer <token>" -d '{"read_replication": {"mode": "auto"}}'
-          // and paste the database id here + in cloudflare_workers/plugin/wrangler.jsonc.
-          "database_id": "REPLACE_WITH_D1_DATABASE_ID"
+          "new_sqlite_classes": ["ReplicaRouter", "AppReplica"]
         }
       ],
       "hyperdrive": [
@@ -67,20 +56,21 @@
           "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          // Seed source: existing EU read replica so the initial snapshot
-          // never scans the main database.
+          // Seed source for AppReplica DOs: existing EU read replica so
+          // per-app seeds never touch the main database.
           "binding": "HYPERDRIVE_SEED",
           "id": "d5aae8be75f446868352110502fa9a1e"
         }
       ]
       // Secrets (bunx wrangler secret put --env prod -c cloudflare_workers/replicator/wrangler.jsonc):
-      // - REPLICATOR_SECRET: bearer token protecting /seed, /status, /pause, /resume
+      // - REPLICATOR_SECRET: bearer token protecting /status, /pause, /resume, /invalidate-all
     },
     "preprod": {
       "name": "capgo_replicator-preprod",
       "vars": {
         "ENV_NAME": "capgo_replicator-preprod",
-        "EDGE_REPLICA_POLL_SECONDS": "5"
+        "EDGE_REPLICA_POLL_SECONDS": "5",
+        "EDGE_REPLICA_LEASE_SECONDS": "900"
       },
       "observability": {
         "head_sampling_rate": 1,
@@ -92,22 +82,19 @@
       "durable_objects": {
         "bindings": [
           {
-            "name": "REPLICATOR",
-            "class_name": "Replicator"
+            "name": "REPLICA_ROUTER",
+            "class_name": "ReplicaRouter"
+          },
+          {
+            "name": "APP_REPLICA",
+            "class_name": "AppReplica"
           }
         ]
       },
       "migrations": [
         {
           "tag": "v1",
-          "new_sqlite_classes": ["Replicator"]
-        }
-      ],
-      "d1_databases": [
-        {
-          "binding": "DB_REPLICA",
-          "database_name": "capgo_edge_replica_preprod",
-          "database_id": "REPLACE_WITH_D1_DATABASE_ID"
+          "new_sqlite_classes": ["ReplicaRouter", "AppReplica"]
         }
       ]
       // Preprod uses OUTBOX_DB_URL / SEED_DB_URL secrets instead of Hyperdrive.
@@ -116,27 +103,25 @@
       "name": "capgo_replicator-dev",
       "vars": {
         "ENV_NAME": "capgo_replicator-dev",
-        "EDGE_REPLICA_POLL_SECONDS": "2"
+        "EDGE_REPLICA_POLL_SECONDS": "2",
+        "EDGE_REPLICA_LEASE_SECONDS": "120"
       },
       "durable_objects": {
         "bindings": [
           {
-            "name": "REPLICATOR",
-            "class_name": "Replicator"
+            "name": "REPLICA_ROUTER",
+            "class_name": "ReplicaRouter"
+          },
+          {
+            "name": "APP_REPLICA",
+            "class_name": "AppReplica"
           }
         ]
       },
       "migrations": [
         {
           "tag": "v1",
-          "new_sqlite_classes": ["Replicator"]
-        }
-      ],
-      "d1_databases": [
-        {
-          "binding": "DB_REPLICA",
-          "database_name": "capgo_edge_replica_dev",
-          "database_id": "local"
+          "new_sqlite_classes": ["ReplicaRouter", "AppReplica"]
         }
       ]
       // Local dev uses OUTBOX_DB_URL / SEED_DB_URL from internal/cloudflare/.env.local

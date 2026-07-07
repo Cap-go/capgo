@@ -50,9 +50,8 @@ export type Bindings = {
   NOTIFICATION_QUEUE?: Queue
   DB_STOREAPPS: D1Database
   // Cloudflare-embedded read replica (see utils/edge_replica.ts)
-  DB_REPLICA?: D1Database
+  APP_REPLICA?: DurableObjectNamespace
   EDGE_REPLICA_MODE?: string
-  EDGE_REPLICA_MAX_LAG_SECONDS?: string
   CHANNEL_SELF_STORE?: KVNamespace
   PLUGIN_NOTIFICATION_QUEUE?: KVNamespace
   LOCAL_READ_REPLICA_SUPABASE_DB_URL?: string

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildAppOwnerQuery,
+  buildAppSeedQueries,
+  buildChannelDeviceQuery,
+  buildChannelQuery,
   buildDeleteStatement,
   buildEdgeReplicaDDL,
   buildUpsertStatement,
@@ -17,9 +21,6 @@ describe('edge replica schema specs', () => {
       'channel_devices',
       'channels',
       'manifest',
-      'notifications',
-      'onboarding_demo_data',
-      'org_users',
       'orgs',
       'stripe_info',
     ])
@@ -32,15 +33,25 @@ describe('edge replica schema specs', () => {
     }
   })
 
-  it.concurrent('generates one CREATE TABLE per table plus replication_state', () => {
+  it.concurrent('generates one CREATE TABLE per table plus replica_meta', () => {
     const ddl = buildEdgeReplicaDDL()
     const createTables = ddl.filter(sql => sql.startsWith('CREATE TABLE'))
     expect(createTables).toHaveLength(Object.keys(EDGE_REPLICA_TABLES).length + 1)
-    expect(ddl[0]).toContain('replication_state')
+    expect(ddl[0]).toContain('replica_meta')
     // hot path indexes
     expect(ddl.some(sql => sql.includes('idx_channels_app_id_name'))).toBe(true)
     expect(ddl.some(sql => sql.includes('idx_channel_devices_app_id_device_id'))).toBe(true)
     expect(ddl.some(sql => sql.includes('idx_manifest_app_version_id'))).toBe(true)
+  })
+
+  it.concurrent('has one seed query per table with matching scope binds', () => {
+    const seeds = buildAppSeedQueries()
+    expect(seeds.map(seed => seed.table).sort()).toEqual(Object.keys(EDGE_REPLICA_TABLES).sort())
+    for (const seed of seeds) {
+      expect(seed.binds).toBe(EDGE_REPLICA_TABLES[seed.table].scope)
+      expect(seed.sql).toContain('row_to_json(t)')
+      expect(seed.sql).toContain('AS k1')
+    }
   })
 })
 
@@ -112,16 +123,44 @@ describe('edge replica statements', () => {
 
   it.concurrent('builds deletes on the replica primary key', () => {
     expect(buildDeleteStatement('apps')).toBe('DELETE FROM "apps" WHERE "app_id" = ?')
-    expect(buildDeleteStatement('notifications')).toBe('DELETE FROM "notifications" WHERE "owner_org" = ? AND "event" = ? AND "uniq_id" = ?')
+    expect(buildDeleteStatement('stripe_info')).toBe('DELETE FROM "stripe_info" WHERE "customer_id" = ?')
   })
 
-  it.concurrent('extracts composite pk values in pk order', () => {
-    const values = pgJsonRowToPkValues('notifications', {
-      uniq_id: 'u1',
-      event: 'org:missing_payment',
-      owner_org: 'org-1',
-      total_send: 3,
-    })
-    expect(values).toEqual(['org-1', 'org:missing_payment', 'u1'])
+  it.concurrent('extracts pk values in pk order', () => {
+    expect(pgJsonRowToPkValues('channels', { name: 'production', id: 7 })).toEqual([7])
+    expect(pgJsonRowToPkValues('apps', { app_id: 'com.demo.app', id: 'uuid' })).toEqual(['com.demo.app'])
+  })
+})
+
+describe('edge replica hot-path queries', () => {
+  it.concurrent('app owner query validates plan per requested action', () => {
+    const query = buildAppOwnerQuery('com.demo.app', ['mau', 'bandwidth'])
+    expect(query.params).toEqual(['com.demo.app'])
+    expect(query.sql).toContain('si.mau_exceeded = 0')
+    expect(query.sql).toContain('si.bandwidth_exceeded = 0')
+    expect(query.sql).not.toContain('si.storage_exceeded = 0')
+    expect(query.sql).toContain(`date(si.trial_at) > date('now')`)
+  })
+
+  it.concurrent('channel query filters platform and visibility like postgres', () => {
+    const named = buildChannelQuery('android', 'com.demo.app', 'beta', { includeManifest: true, includeMetadata: false, rollout: false })
+    expect(named.params).toEqual(['com.demo.app', 'beta'])
+    expect(named.sql).toContain('ch.android = 1')
+    expect(named.sql).toContain('ch.public = 1 OR ch.allow_device_self_set = 1')
+    expect(named.sql).toContain('manifest_entries')
+
+    const publicOnly = buildChannelQuery('ios', 'com.demo.app', '', { includeManifest: false, includeMetadata: false, rollout: true })
+    expect(publicOnly.params).toEqual(['com.demo.app'])
+    expect(publicOnly.sql).toContain('ch.public = 1')
+    expect(publicOnly.sql).toContain('rv.id AS "rv_id"')
+    expect(publicOnly.sql).not.toContain('manifest_entries')
+  })
+
+  it.concurrent('device override query keeps the builtin fallback semantics', () => {
+    const query = buildChannelDeviceQuery('com.demo.app', 'device-1', { includeManifest: false, includeMetadata: true, rollout: false })
+    expect(query.params).toEqual(['device-1', 'com.demo.app'])
+    expect(query.sql).toContain(`CASE WHEN ch.version IS NULL THEN 'builtin' ELSE v.name END`)
+    expect(query.sql).toContain('(ch.version IS NULL OR v.id IS NOT NULL)')
+    expect(query.sql).toContain('v.link AS "v_link"')
   })
 })
