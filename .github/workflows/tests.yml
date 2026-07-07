@@ -507,59 +507,50 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-browsers-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-      - name: Install Playwright browser
-        if: steps.playwright_browser_cache.outputs.cache-hit != 'true'
-        run: bunx playwright install --with-deps chromium
-      - name: Install Playwright system dependencies
-        if: steps.playwright_browser_cache.outputs.cache-hit == 'true'
-        run: bunx playwright install-deps chromium
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v2 # v2.0.0
         with:
           version: 2.84.2
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
-      - id: start_playwright_stripe_emulator
-        name: Start Stripe emulator for Playwright
-        env:
-          BACKGROUND_SERVICE_NAME: Stripe emulator
-          BACKGROUND_RUN_COMMAND: STRIPE_EMULATOR_PORT=4510 bun run stripe:emulator
-          BACKGROUND_WAIT_ON: |
-            tcp:127.0.0.1:4510
-          BACKGROUND_LOG_PATH: ${{ runner.temp }}/playwright-stripe-emulator.log
-          BACKGROUND_WAIT_TIMEOUT_MS: 60000
-          BACKGROUND_TAIL_LINES: 300
-        run: bash .github/scripts/start-background-service.sh
-      - id: start_playwright_backend
-        name: Start Playwright backend
-        env:
-          BACKGROUND_SERVICE_NAME: Playwright backend
-          BACKGROUND_RUN_COMMAND: |
-            rm -f .context/playwright/gha-backend.ready
-            PLAYWRIGHT_READY_FILE=.context/playwright/gha-backend.ready \
+      - id: start_playwright_services
+        name: Start Playwright services in background
+        run: |
+          mkdir -p .context/playwright
+          rm -f .context/playwright/gha-backend.ready
+          nohup bash -c 'STRIPE_EMULATOR_PORT=4510 bun run stripe:emulator' \
+            > "${RUNNER_TEMP}/playwright-stripe-emulator.log" 2>&1 &
+          echo "stripe_pid=$!" >> "$GITHUB_OUTPUT"
+          # Fresh CI runner: supabase start applies migrations + seed, so skip the redundant db reset.
+          nohup bash -c 'PLAYWRIGHT_READY_FILE=.context/playwright/gha-backend.ready \
+            SKIP_SUPABASE_DB_RESET=true \
             ENV=local \
             STRIPE_SECRET_KEY=sk_test_emulator \
             STRIPE_API_BASE_URL=http://host.docker.internal:4510 \
             STRIPE_WEBHOOK_SECRET=testsecret \
             WEBAPP_URL=http://localhost:5173 \
-            bun run backend:playwright
-          BACKGROUND_WAIT_ON: |
-            file:${{ github.workspace }}/.context/playwright/gha-backend.ready
-          BACKGROUND_LOG_PATH: ${{ runner.temp }}/playwright-backend.log
-          BACKGROUND_WAIT_TIMEOUT_MS: 360000
-          BACKGROUND_TAIL_LINES: 400
-        run: bash .github/scripts/start-background-service.sh
-      - id: start_playwright_frontend
-        name: Start Playwright frontend
-        env:
-          BACKGROUND_SERVICE_NAME: Playwright frontend
-          BACKGROUND_RUN_COMMAND: bun run supabase:with-env -- bun scripts/playwright-frontend-preview.ts
-          BACKGROUND_WAIT_ON: |
-            http-get://localhost:5173
-          BACKGROUND_LOG_PATH: ${{ runner.temp }}/playwright-frontend.log
-          BACKGROUND_WAIT_TIMEOUT_MS: 360000
-          BACKGROUND_TAIL_LINES: 300
-        run: bash .github/scripts/start-background-service.sh
+            bun run backend:playwright' \
+            > "${RUNNER_TEMP}/playwright-backend.log" 2>&1 &
+          echo "backend_pid=$!" >> "$GITHUB_OUTPUT"
+          # The vite build only bakes in env values, so it does not need Supabase to be up yet.
+          nohup bash -c 'SUPABASE_URL=http://127.0.0.1:54321 \
+            SUPABASE_ANON_KEY=sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH \
+            bun scripts/playwright-frontend-preview.ts' \
+            > "${RUNNER_TEMP}/playwright-frontend.log" 2>&1 &
+          echo "frontend_pid=$!" >> "$GITHUB_OUTPUT"
+      - name: Install Playwright browser
+        if: steps.playwright_browser_cache.outputs.cache-hit != 'true'
+        run: bunx playwright install --with-deps chromium
+      - name: Install Playwright system dependencies
+        if: steps.playwright_browser_cache.outputs.cache-hit == 'true'
+        run: bunx playwright install-deps chromium
+      - name: Wait for Playwright services
+        run: |
+          bunx wait-on@8.0.1 \
+            tcp:127.0.0.1:4510 \
+            "file:${{ github.workspace }}/.context/playwright/gha-backend.ready" \
+            http-get://localhost:5173 \
+            --timeout 360000 --interval 500 --log
       - name: Run Playwright tests
         env:
           SKIP_STRIPE_EMULATOR_START: 'true'
@@ -570,13 +561,13 @@ jobs:
         if: failure()
         run: |
           echo "::group::Stripe emulator log"
-          tail -n 200 "${{ steps.start_playwright_stripe_emulator.outputs.log_path }}" || true
+          tail -n 200 "${RUNNER_TEMP}/playwright-stripe-emulator.log" || true
           echo "::endgroup::"
           echo "::group::Playwright backend log"
-          tail -n 300 "${{ steps.start_playwright_backend.outputs.log_path }}" || true
+          tail -n 300 "${RUNNER_TEMP}/playwright-backend.log" || true
           echo "::endgroup::"
           echo "::group::Playwright frontend log"
-          tail -n 200 "${{ steps.start_playwright_frontend.outputs.log_path }}" || true
+          tail -n 200 "${RUNNER_TEMP}/playwright-frontend.log" || true
           echo "::endgroup::"
       - name: Upload Playwright background service logs
         if: failure()
@@ -584,9 +575,9 @@ jobs:
         with:
           name: playwright-background-service-logs
           path: |
-            ${{ steps.start_playwright_stripe_emulator.outputs.log_path }}
-            ${{ steps.start_playwright_backend.outputs.log_path }}
-            ${{ steps.start_playwright_frontend.outputs.log_path }}
+            ${{ runner.temp }}/playwright-stripe-emulator.log
+            ${{ runner.temp }}/playwright-backend.log
+            ${{ runner.temp }}/playwright-frontend.log
           if-no-files-found: ignore
           retention-days: 7
       - name: Upload Playwright artifacts
@@ -602,7 +593,7 @@ jobs:
       - name: Stop Playwright background services
         if: always()
         run: |
-          for pid in "${{ steps.start_playwright_frontend.outputs.pid }}" "${{ steps.start_playwright_backend.outputs.pid }}" "${{ steps.start_playwright_stripe_emulator.outputs.pid }}"; do
+          for pid in "${{ steps.start_playwright_services.outputs.frontend_pid }}" "${{ steps.start_playwright_services.outputs.backend_pid }}" "${{ steps.start_playwright_services.outputs.stripe_pid }}"; do
             if [ -n "${pid}" ] && kill -0 "${pid}" 2>/dev/null; then
               kill "${pid}" 2>/dev/null || true
             fi
