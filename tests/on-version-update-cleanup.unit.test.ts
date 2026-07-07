@@ -168,7 +168,7 @@ describe('on_version_update deleted version cleanup', () => {
     expect(response.status).toBe(200)
     expect(moveObjectToTrash).toHaveBeenCalledWith(expect.anything(), 'orgs/org-1/apps/com.cleanup.test/manifest/index.js')
     expect(deleteObject).not.toHaveBeenCalled()
-    expect(pgQuery).toHaveBeenCalledWith('UPDATE app_versions SET manifest_count = 0 WHERE id = $1', [123])
+    expect(pgQuery).toHaveBeenCalledWith('UPDATE app_versions SET manifest_count = 0, manifest = NULL WHERE id = $1', [123])
     expect(pgQuery).toHaveBeenCalledWith(expect.stringContaining('manifest_bundle_count = GREATEST(manifest_bundle_count - 1, 0)'), ['com.cleanup.test'])
   })
 

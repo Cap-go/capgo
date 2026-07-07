@@ -2,6 +2,7 @@ import { HTTPException } from 'hono/http-exception'
 import { describe, expect, it, vi } from 'vitest'
 import { __queueConsumerTestUtils__, MAX_QUEUE_READS, messagesArraySchema } from '../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { onManifestCreateTestUtils } from '../supabase/functions/_backend/triggers/on_manifest_create.ts'
+import { onVersionUpdateTestUtils } from '../supabase/functions/_backend/triggers/on_version_update.ts'
 import { s3TestUtils } from '../supabase/functions/_backend/utils/s3.ts'
 import { parseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
 
@@ -145,16 +146,39 @@ describe('queue_consumer legacy message compatibility', () => {
       },
     ])).toEqual([])
   })
-
-  it.concurrent('keeps manifest queue batches out of Cloudflare waitUntil', () => {
+  it.concurrent('checkpoints manifest queue deletes without reducing read batch size', () => {
     expect(__queueConsumerTestUtils__.getQueueBatchSize('on_manifest_create', 950)).toBe(950)
     expect(__queueConsumerTestUtils__.getQueueBatchSize('cron_email', 950)).toBe(950)
+    expect(__queueConsumerTestUtils__.getQueueAckChunkSize('on_manifest_create')).toBe(100)
+    expect(__queueConsumerTestUtils__.getQueueAckChunkSize('cron_email')).toBeNull()
     expect(__queueConsumerTestUtils__.getQueueHttpConcurrency('on_manifest_create')).toBe(100)
     expect(__queueConsumerTestUtils__.getQueueHttpConcurrency('cron_email')).toBe(25)
     expect(__queueConsumerTestUtils__.getQueueVisibilityTimeout('on_manifest_create')).toBe(900)
     expect(__queueConsumerTestUtils__.getQueueVisibilityTimeout('cron_email')).toBe(120)
     expect(__queueConsumerTestUtils__.shouldRunQueueSyncInBackground('on_manifest_create')).toBe(false)
     expect(__queueConsumerTestUtils__.shouldRunQueueSyncInBackground('cron_email')).toBe(true)
+  })
+
+  it.concurrent('does not reprocess manifests for already deleted versions', () => {
+    const deletedAt = '2026-07-07T00:40:00.096Z'
+    const appVersionRow = (value: Record<string, unknown>) => value as Parameters<typeof onVersionUpdateTestUtils.getDeletedVersionAction>[0]
+
+    expect(onVersionUpdateTestUtils.getDeletedVersionAction(
+      appVersionRow({ deleted_at: deletedAt, manifest: [{ file_name: 'index.html' }], manifest_count: 1 }),
+      appVersionRow({ deleted_at: deletedAt }),
+    )).toBe('cleanup_manifest')
+    expect(onVersionUpdateTestUtils.getDeletedVersionAction(
+      appVersionRow({ deleted_at: deletedAt, manifest: null, manifest_count: 0 }),
+      appVersionRow({ deleted_at: deletedAt }),
+    )).toBe('skip')
+    expect(onVersionUpdateTestUtils.getDeletedVersionAction(
+      appVersionRow({ deleted_at: deletedAt, manifest: null, manifest_count: 0 }),
+      appVersionRow({ deleted_at: null }),
+    )).toBe('delete')
+    expect(onVersionUpdateTestUtils.getDeletedVersionAction(
+      appVersionRow({ deleted_at: null, manifest: [{ file_name: 'index.html' }], manifest_count: 0 }),
+      appVersionRow({ deleted_at: null }),
+    )).toBe('continue')
   })
 
   it.concurrent('alerts Discord after retry budget is exhausted', () => {
