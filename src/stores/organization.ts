@@ -563,6 +563,8 @@ export const useOrganizationStore = defineStore('organization', () => {
       currentRole.value = null
       currentOrganizationFailed.value = false
       _organizationsByAppId.value = new Map()
+      _appsByOrgId.value = new Map()
+      _appsByAppId.value = new Map()
       _initialLoadPromise.value.resolve(true)
       return
     }
