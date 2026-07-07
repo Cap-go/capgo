@@ -531,8 +531,8 @@ async function createCampaignRecord(c: Context<MiddlewareKeyVariables>, body: Ca
     pgClient = getPgClient(c)
     const drizzleClient = getDrizzleClient(pgClient)
     const result = await drizzleClient.execute(sql`
-      INSERT INTO public.notification_campaigns (owner_org, app_id, name, kind, status, audience, payload, scheduled_at, created_by)
-      VALUES (${ownerOrg}::uuid, ${appId}, ${name}, ${kind}, ${status}, ${JSON.stringify(audience)}::jsonb, ${JSON.stringify(payload)}::jsonb, ${scheduledAt}::timestamptz, ${auth?.userId ?? null}::uuid)
+      INSERT INTO public.notification_campaigns (owner_org, app_id, name, kind, status, audience, payload, scheduled_at, queued_at, created_by)
+      VALUES (${ownerOrg}::uuid, ${appId}, ${name}, ${kind}, ${status}, ${JSON.stringify(audience)}::jsonb, ${JSON.stringify(payload)}::jsonb, ${scheduledAt}::timestamptz, CASE WHEN ${status} = 'queued' THEN now() ELSE NULL END, ${auth?.userId ?? null}::uuid)
       RETURNING id, created_at, updated_at, owner_org::text, app_id, name, kind, status, audience, payload, scheduled_at, queued_at, completed_at, counters
     `)
     return result.rows[0]

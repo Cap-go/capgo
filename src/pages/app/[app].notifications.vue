@@ -606,6 +606,14 @@ watch(() => providerForm.value.platform, () => {
   providerForm.value.config = providerConfigPlaceholder.value
 })
 
+watch(broadcastSearch, () => {
+  broadcastCurrentPage.value = 1
+})
+
+watch(apiSearch, () => {
+  apiCurrentPage.value = 1
+})
+
 watch(activeNotificationTab, () => {
   selectedCampaign.value = null
   selectedCampaignStats.value = []
