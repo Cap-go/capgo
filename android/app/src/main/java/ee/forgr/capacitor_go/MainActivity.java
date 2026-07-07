@@ -67,9 +67,10 @@ public class MainActivity extends BridgeActivity {
             previewConfirmationDialog = new AlertDialog.Builder(this)
                 .setTitle("Load preview?")
                 .setMessage(previewConfirmationMessage(previewUri))
-                .setNegativeButton("No", (dialog, which) -> cancelPreviewConfirmation())
-                .setPositiveButton("Load preview", (dialog, which) -> confirmPreviewIntent(confirmationIntent))
-                .setOnCancelListener(dialog -> cancelPreviewConfirmation())
+                .setNegativeButton("No", null)
+                .setPositiveButton("Load preview", (_dialog, _which) -> confirmPreviewIntent(confirmationIntent))
+                .setOnCancelListener(_dialog -> cancelPreviewConfirmation())
+                .setOnDismissListener(_dialog -> cancelPreviewConfirmation())
                 .create();
             previewConfirmationDialog.show();
         });
