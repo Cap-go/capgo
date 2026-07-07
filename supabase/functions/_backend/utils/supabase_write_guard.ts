@@ -37,6 +37,10 @@ export function shouldRequireReadReplica(c: Context): boolean {
   return getBooleanContextFlag(c, 'requireReadReplica')
 }
 
+export function shouldSkipDirectHyperdriveFallback(c: Context): boolean {
+  return shouldRequireReadReplica(c)
+}
+
 export function shouldSkipChannelSelfPostgresFallback(c: Context): boolean {
   return getBooleanContextFlag(c, 'skipChannelSelfPostgresFallback')
 }
