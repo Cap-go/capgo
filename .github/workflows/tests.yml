@@ -532,9 +532,11 @@ jobs:
             bun run backend:playwright' \
             > "${RUNNER_TEMP}/playwright-backend.log" 2>&1 &
           echo "backend_pid=$!" >> "$GITHUB_OUTPUT"
-          # The frontend build needs the real Supabase keys from supabase status, so wait for the
-          # stack the backend service is booting, then build while functions serve is still starting.
-          nohup bash -c 'until supabase status >/dev/null 2>&1; do sleep 2; done
+          # The backend boots Supabase via the worktree wrapper (hash-derived ports), so poll the
+          # wrapper status — raw `supabase status` checks the default project and never succeeds.
+          nohup bash -c 'echo "waiting for worktree supabase status..."
+            until bun run supabase:status >/dev/null 2>&1; do sleep 2; done
+            echo "supabase is up, building frontend"
             bun run supabase:with-env -- bun scripts/playwright-frontend-preview.ts' \
             > "${RUNNER_TEMP}/playwright-frontend.log" 2>&1 &
           echo "frontend_pid=$!" >> "$GITHUB_OUTPUT"
