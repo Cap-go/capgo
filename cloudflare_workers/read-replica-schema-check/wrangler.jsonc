@@ -1,0 +1,20 @@
+{
+  "name": "capgo_read_replica_schema_check",
+  "main": "./index.ts",
+  "compatibility_date": "2026-04-21",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "nodejs_compat_populate_process_env"
+  ],
+  "workers_dev": true,
+  "env": {
+    "prod": {
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_CAPGO_READ_EU",
+          "id": "d5aae8be75f446868352110502fa9a1e"
+        }
+      ]
+    }
+  }
+}

@@ -15,6 +15,8 @@
     "readreplicate:indexes": "bash read_replicate/replicate_ensure_indexes.sh",
     "readreplicate:status": "bash read_replicate/replicate_status.sh",
     "readreplicate:check-schema": "bash scripts/check-read-replica-schema.sh",
+    "readreplicate:check-target-schema": "bun run readreplicate:check-hyperdrive-schema",
+    "readreplicate:check-hyperdrive-schema": "bash scripts/check-read-replica-hyperdrive-schema.sh",
     "supabase:reset-postgres-config": "bash scripts/reset_supabase_postgres_config_defaults.sh",
     "cloudsql:allow-cloudflare": "bash scripts/update_cloudsql_authorized_networks.sh",
     "supabase:start": "bun scripts/supabase-worktree.ts start",
