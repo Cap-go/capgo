@@ -5,6 +5,9 @@ import { computed, h, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
+import IconChartBar from '~icons/heroicons/chart-bar'
+import IconCode from '~icons/heroicons/code-bracket'
+import IconMegaphone from '~icons/heroicons/megaphone'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconCheckCircle from '~icons/lucide/check-circle-2'
 import IconRefresh from '~icons/lucide/refresh-cw'
@@ -113,9 +116,9 @@ const sendTitle = ref('')
 const sendBody = ref('')
 const pushUpdateChannel = ref('')
 const notificationTabs: Tab[] = [
-  { label: 'notification-dashboard', key: 'dashboard' },
-  { label: 'notification-broadcasts', key: 'broadcasts' },
-  { label: 'notification-api-sends', key: 'api' },
+  { label: 'notification-dashboard', icon: IconChartBar, key: 'dashboard' },
+  { label: 'notification-broadcasts', icon: IconMegaphone, key: 'broadcasts' },
+  { label: 'notification-api-sends', icon: IconCode, key: 'api' },
 ]
 
 function setNotificationTab(tab: Tab) {
@@ -624,6 +627,24 @@ watch(activeNotificationTab, () => {
 <template>
   <div>
     <div v-if="app || isLoading">
+      <nav class="relative -mt-px border-t bg-blue-50 dark:bg-slate-800/40 border-blue-200/60 dark:border-blue-800/70" aria-label="Notification sections">
+        <ul class="flex flex-nowrap max-w-full gap-2 px-1 py-2 overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-x no-scrollbar text-sm font-medium text-center text-gray-600 dark:text-gray-200">
+          <li v-for="tab in notificationTabs" :key="tab.key" class="mr-2">
+            <button
+              type="button"
+              class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:focus-visible:ring-offset-slate-900 transition-colors group"
+              :class="activeNotificationTab === tab.key
+                ? 'text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-800 border border-blue-200/70 dark:border-blue-800 shadow-sm hover:ring-1 hover:ring-blue-200 dark:hover:ring-blue-700 hover:bg-blue-50 dark:hover:bg-slate-900 transition-colors'
+                : 'border border-transparent text-slate-500/75 dark:text-slate-400/75 hover:bg-white dark:hover:bg-slate-900 hover:text-slate-700 dark:hover:text-slate-200 transition-colors'"
+              :aria-current="activeNotificationTab === tab.key ? 'page' : undefined"
+              @click="setNotificationTab(tab)"
+            >
+              <component :is="tab.icon" class="w-5 h-5 transition-colors" aria-hidden="true" />
+              <span class="hidden text-xs font-medium transition-colors md:block md:text-sm first-letter:uppercase">{{ t(tab.label) }}</span>
+            </button>
+          </li>
+        </ul>
+      </nav>
       <div class="mt-0 md:mt-8">
         <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
           <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
@@ -645,20 +666,6 @@ watch(activeNotificationTab, () => {
                 {{ t('refresh') }}
               </button>
             </div>
-
-            <nav class="flex min-w-0 gap-1 px-3 overflow-x-auto border-b border-slate-200 dark:border-slate-700" aria-label="Notification sections">
-              <button
-                v-for="tab in notificationTabs"
-                :key="tab.key"
-                type="button"
-                class="px-3 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap"
-                :class="activeNotificationTab === tab.key ? 'border-azure-500 text-azure-700 dark:text-azure-300' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'"
-                @click="setNotificationTab(tab)"
-              >
-                {{ t(tab.label) }}
-              </button>
-            </nav>
-
             <div class="grid border-b divide-y sm:grid-cols-2 lg:grid-cols-4 sm:divide-x sm:divide-y-0 divide-slate-200 border-slate-200 dark:divide-slate-700 dark:border-slate-700">
               <div class="p-4">
                 <div class="text-xs font-medium truncate text-slate-500 dark:text-slate-400">
