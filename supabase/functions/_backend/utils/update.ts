@@ -13,6 +13,7 @@ import {
 } from '@std/semver'
 import { getRuntimeKey } from 'hono/adapter'
 import { getAppStatus, setAppStatus } from './appStatus.ts'
+import { getEdgeReplicaReader } from './edge_replica.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
@@ -118,12 +119,14 @@ async function providerInfrastructureBlockResponse(c: Context, blockProviderInfr
   return providerInfrastructureBlockedResponse(c, providerInfo.requestIp, providerInfo.providerInfo)
 }
 
-async function providerInfrastructureColdCacheBlockResponse(c: Context, appId: string, drizzleClient: ReturnType<typeof getDrizzleClient>) {
+async function providerInfrastructureColdCacheBlockResponse(c: Context, appId: string, drizzleClient: ReturnType<typeof getDrizzleClient>, edgeReplica?: ReturnType<typeof getEdgeReplicaReader>) {
   const providerInfo = await getProviderInfrastructureInfo(c)
   if (!providerInfo?.providerInfo.blocked)
     return null
 
-  const blockProviderInfraRequests = await getAppBlockProviderInfraRequestsPostgres(c, appId, drizzleClient)
+  const blockProviderInfraRequests = edgeReplica
+    ? await edgeReplica.getAppBlockProviderInfraRequests(appId)
+    : await getAppBlockProviderInfraRequestsPostgres(c, appId, drizzleClient)
   if (blockProviderInfraRequests.status === 'error')
     return null
   if (blockProviderInfraRequests.status === 'found' && !blockProviderInfraRequests.blockProviderInfraRequests)
@@ -201,6 +204,7 @@ export async function updateWithPG(
   body: AppInfos,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   appStatus?: Awaited<ReturnType<typeof getAppStatus>>,
+  edgeReplica?: ReturnType<typeof getEdgeReplicaReader>,
 ) {
   cloudlog({ requestId: c.get('requestId'), message: 'body', body, date: new Date().toISOString() })
   const {
@@ -233,12 +237,14 @@ export async function updateWithPG(
     return updateEnumerationLimitedResponse(c)
 
   if (!cachedAppStatus.cacheHit) {
-    const providerBlockedResponse = await providerInfrastructureColdCacheBlockResponse(c, app_id, drizzleClient)
+    const providerBlockedResponse = await providerInfrastructureColdCacheBlockResponse(c, app_id, drizzleClient, edgeReplica)
     if (providerBlockedResponse)
       return providerBlockedResponse
   }
 
-  const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT)
+  const appOwner = edgeReplica
+    ? await edgeReplica.getAppOwner(app_id, PLAN_LIMIT)
+    : await getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT)
   // if version_build is not semver, then make it semver
   const device = makeDevice(body, appOwner?.allow_device_custom_id)
   if (!appOwner) {
@@ -340,13 +346,11 @@ export async function updateWithPG(
   // Only query link/comment if plugin supports it (v5.35.0+, v6.35.0+, v7.35.0+, v8.35.0+) AND app has expose_metadata enabled
   const needsMetadata = appOwner.expose_metadata && !isDeprecatedPluginVersion(pluginVersion, '5.35.0', '6.35.0', '7.35.0', '8.35.0')
 
-  const requestedInto = await requestInfosPostgres({
-    c,
+  const requestInfosOptions = {
     platform,
     app_id,
     device_id,
     defaultChannel,
-    drizzleClient,
     channelDeviceCount: effectiveChannelDeviceCount,
     manifestBundleCount,
     rolloutChannelCount,
@@ -354,7 +358,10 @@ export async function updateWithPG(
     currentVersionName: version_name,
     includeMetadata: needsMetadata,
     channelSelfOverrideChannelId: channelSelfOverride?.channel_id.id,
-  })
+  }
+  const requestedInto = edgeReplica
+    ? await edgeReplica.requestInfos(requestInfosOptions)
+    : await requestInfosPostgres({ c, drizzleClient, ...requestInfosOptions })
   const { channelOverride } = requestedInto
   let { channelData } = requestedInto
   cloudlog({ requestId: c.get('requestId'), message: `channelData exists ? ${channelData !== undefined}, channelOverride exists ? ${channelOverride !== undefined}` })
@@ -613,11 +620,15 @@ export async function update(c: Context, body: AppInfos) {
   }
   const pgClient = getPgClient(c, true)
   try {
-    await setReplicationLagHeader(c, pgClient)
-
     const drizzlePg = getDrizzleClient(pgClient)
+    // Prefer the Cloudflare-embedded read replica (D1) when enabled; the
+    // Postgres pool stays lazy and only connects if a fallback is needed.
+    const edgeReplica = getEdgeReplicaReader(c, drizzlePg)
+    if (!edgeReplica)
+      await setReplicationLagHeader(c, pgClient)
+
     // Use the active DB client only when needed
-    return await updateWithPG(c, body, drizzlePg, appStatus)
+    return await updateWithPG(c, body, drizzlePg, appStatus, edgeReplica)
   }
   finally {
     await closeClient(c, pgClient)
