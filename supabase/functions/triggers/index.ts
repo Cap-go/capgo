@@ -4,6 +4,7 @@ import { app as cron_clean_orphan_images } from '../_backend/triggers/cron_clean
 import { app as cron_clear_versions } from '../_backend/triggers/cron_clear_versions.ts'
 import { app as cron_email } from '../_backend/triggers/cron_email.ts'
 import { app as cron_reconcile_build_status } from '../_backend/triggers/cron_reconcile_build_status.ts'
+import { app as cron_rollout_auto_pause } from '../_backend/triggers/cron_rollout_auto_pause.ts'
 import { app as cron_stat_app } from '../_backend/triggers/cron_stat_app.ts'
 import { app as cron_stat_org } from '../_backend/triggers/cron_stat_org.ts'
 import { app as cron_sync_sub } from '../_backend/triggers/cron_sync_sub.ts'
@@ -17,6 +18,7 @@ import { app as on_manifest_create } from '../_backend/triggers/on_manifest_crea
 import { app as on_org_update } from '../_backend/triggers/on_org_update.ts'
 import { app as on_organization_create } from '../_backend/triggers/on_organization_create.ts'
 import { app as on_organization_delete } from '../_backend/triggers/on_organization_delete.ts'
+import { app as pluginNotifications } from '../_backend/triggers/plugin_notifications.ts'
 import { app as on_user_create } from '../_backend/triggers/on_user_create.ts'
 import { app as on_user_delete } from '../_backend/triggers/on_user_delete.ts'
 import { app as on_user_update } from '../_backend/triggers/on_user_update.ts'
@@ -71,10 +73,12 @@ appGlobal.route('/cron_sync_sub', cron_sync_sub)
 appGlobal.route('/cron_clear_versions', cron_clear_versions)
 appGlobal.route('/cron_clean_orphan_images', cron_clean_orphan_images)
 appGlobal.route('/cron_reconcile_build_status', cron_reconcile_build_status)
+appGlobal.route('/cron_rollout_auto_pause', cron_rollout_auto_pause)
 appGlobal.route('/credit_usage_alerts', credit_usage_alerts)
 appGlobal.route('/credit_usage_posthog', credit_usage_posthog)
 appGlobal.route('/on_organization_delete', on_organization_delete)
 appGlobal.route('/on_deploy_history_create', on_deploy_history_create)
+appGlobal.route('/plugin_notifications', pluginNotifications)
 appGlobal.route('/queue_consumer', queue_consumer)
 appGlobal.route('/webhook_delivery', webhook_delivery)
 appGlobal.route('/webhook_dispatcher', webhook_dispatcher)

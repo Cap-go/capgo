@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import process from 'node:process'
 import { TextDecoder } from 'node:util'
 
-export type Component = 'capgo' | 'cli'
+export type Component = 'capgo' | 'cli' | 'notifications'
 export type ReleaseAs = 'patch' | 'minor' | 'major'
 type GitRunner = (args: string[]) => string
 
@@ -11,6 +11,7 @@ const sharedMatchers = [
   /^\.github\/workflows\/tests\.yml$/,
   /^\.github\/scripts\//,
   /^scripts\/release-scope\.ts$/,
+  /^scripts\/sync-notifications-package-version\.ts$/,
   /^scripts\/setup-bun\.sh$/,
   /^scripts\/setup-bun\.ps1$/,
   /^package\.json$/,
@@ -28,6 +29,7 @@ export const componentMatchers: Record<Component, RegExp[]> = {
   capgo: [
     ...sharedMatchers,
     /^\.github\/workflows\/build_and_deploy\.yml$/,
+    /^\.github\/workflows\/build_mobile_ios\.yml$/,
     /^scripts\/deploy-scope\.ts$/,
     /^aliproxy\//,
     /^android\//,
@@ -48,6 +50,7 @@ export const componentMatchers: Record<Component, RegExp[]> = {
     /^public\//,
     /^read_replicate\//,
     /^scriptable\//,
+    /^scripts\/ensure-native-notification-queues\.ts$/,
     /^shared\//,
     /^sql\//,
     /^src\//,
@@ -66,6 +69,11 @@ export const componentMatchers: Record<Component, RegExp[]> = {
     /^cli\/build\.mjs$/,
     /^cli\/tsconfig\.json$/,
     /^cli\/\.npmrc$/,
+  ],
+  notifications: [
+    ...sharedMatchers,
+    /^\.github\/workflows\/publish_notifications\.yml$/,
+    /^packages\/capacitor-notifications\//,
   ],
 }
 
@@ -219,8 +227,8 @@ if (import.meta.main) {
   const before = process.argv[3] ?? ''
   const after = process.argv[4] ?? 'HEAD'
 
-  if (componentArg !== 'capgo' && componentArg !== 'cli') {
-    console.error('Usage: bun scripts/release-scope.ts <capgo|cli> [before] [after]')
+  if (componentArg !== 'capgo' && componentArg !== 'cli' && componentArg !== 'notifications') {
+    console.error('Usage: bun scripts/release-scope.ts <capgo|cli|notifications> [before] [after]')
     process.exit(1)
   }
 

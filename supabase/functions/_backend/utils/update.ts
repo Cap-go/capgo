@@ -84,6 +84,7 @@ function updateError200(c: Context, errorCode: string, message: string, moreInfo
   })
 }
 
+
 async function getProviderInfrastructureInfo(c: Context) {
   const requestIp = getClientIP(c)
   if (requestIp === 'unknown')
@@ -131,8 +132,29 @@ async function providerInfrastructureColdCacheBlockResponse(c: Context, appId: s
   return providerInfrastructureBlockedResponse(c, providerInfo.requestIp, providerInfo.providerInfo)
 }
 
-export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[], expose_metadata: boolean = false) {
+type ResponseFeatureSupport = {
+  manifest: boolean
+  metadata: boolean
+}
+
+const responseFeatureSupportCache = new Map<string, ResponseFeatureSupport>()
+
+function getResponseFeatureSupport(plugin_version: string): ResponseFeatureSupport {
+  const cached = responseFeatureSupportCache.get(plugin_version)
+  if (cached)
+    return cached
+
   const pluginVersion = parse(plugin_version)
+  const support = {
+    manifest: !isDeprecatedPluginVersion(pluginVersion, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7),
+    metadata: !isDeprecatedPluginVersion(pluginVersion, '5.35.0', '6.35.0', '7.35.0', '8.35.0'),
+  }
+  responseFeatureSupportCache.set(plugin_version, support)
+  return support
+}
+
+export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[], expose_metadata: boolean = false) {
+  const support = getResponseFeatureSupport(plugin_version)
   const res: {
     version: string
     url: string
@@ -149,10 +171,10 @@ export function resToVersion(plugin_version: string, signedURL: string, version:
     checksum: version.checksum,
   }
   // manifest is supported in v5.10.0+, v6.25.0+, v7.0.35+, v8+
-  if (manifest.length > 0 && !isDeprecatedPluginVersion(pluginVersion, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7))
+  if (manifest.length > 0 && support.manifest)
     res.manifest = manifest
   // Include link and comment for plugin v5.35.0+, v6.35.0+, v7.35.0+, v8.35.0+ (only if expose_metadata is enabled and they have values)
-  if (expose_metadata && !isDeprecatedPluginVersion(pluginVersion, '5.35.0', '6.35.0', '7.35.0', '8.35.0')) {
+  if (expose_metadata && support.metadata) {
     if (version.link)
       res.link = version.link
     if (version.comment)
@@ -252,6 +274,8 @@ export async function updateWithPG(
   const channelDeviceCount = appOwner.channel_device_count ?? 0
   const effectiveChannelDeviceCount = channelDeviceCount
   const manifestBundleCount = appOwner.manifest_bundle_count ?? 0
+  const rolloutChannelCount = appOwner.rollout_channel_count ?? 0
+  const rolloutPausedVersionNames = appOwner.rollout_paused_version_names ?? []
   const bypassChannelOverrides = !channelSelfOverride && effectiveChannelDeviceCount <= 0
   // v5 is deprecated if < 5.10.0, v6 is deprecated if < 6.25.0, v7 is deprecated if < 7.25.0
   const isDeprecated = isDeprecatedPluginVersion(pluginVersion)
@@ -265,6 +289,8 @@ export async function updateWithPG(
     effectiveChannelDeviceCount,
     bypassChannelOverrides,
     manifestBundleCount,
+    rolloutChannelCount,
+    rolloutPausedVersionCount: rolloutPausedVersionNames.length,
     fetchManifestEntries,
   })
   if (body.version_build === 'unknown') {
@@ -323,6 +349,9 @@ export async function updateWithPG(
     drizzleClient,
     channelDeviceCount: effectiveChannelDeviceCount,
     manifestBundleCount,
+    rolloutChannelCount,
+    rolloutPausedVersionNames,
+    currentVersionName: version_name,
     includeMetadata: needsMetadata,
     channelSelfOverrideChannelId: channelSelfOverride?.channel_id.id,
   })

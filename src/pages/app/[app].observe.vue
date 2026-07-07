@@ -351,9 +351,12 @@ watch([packageId, days], async () => {
     <div class="flex flex-col gap-6">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div class="min-w-0">
-          <h1 class="text-xl font-semibold text-slate-950 dark:text-white">
-            {{ t('observe') }}
-          </h1>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="text-xl font-semibold text-slate-950 dark:text-white">
+              {{ t('observe') }}
+            </h1>
+            <span class="px-2 py-0.5 text-[10px] font-semibold uppercase rounded border border-azure-500/40 bg-azure-500/10 text-azure-700 dark:text-azure-200">{{ t('beta') }}</span>
+          </div>
           <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
             {{ t('native-observe-subtitle') }}
           </p>

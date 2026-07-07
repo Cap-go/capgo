@@ -2,13 +2,14 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
-import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadDevicesResponse, ReadStatsParams, StatsActions, StatsMetadata, VersionUsage } from './types.ts'
+import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadDevicesResponse, ReadStatsParams, StatsActions, StatsMetadata, VersionUsage, VersionUsageChannel } from './types.ts'
 import { getRuntimeKey } from 'hono/adapter'
 import { countDevicesCF, countInstallSourcesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readDeviceVersionCountsCF, readNativeVersionUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
 import { isDemoApp } from './demo.ts'
 import { simpleError, simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { countDevicesSB, countInstallSourcesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readDeviceVersionCountsSB, readNativeVersionUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
+import { logSkippedSupabaseWrite, shouldSkipSupabaseStatsFallback } from './supabase_write_guard.ts'
 import { DEFAULT_LIMIT } from './types.ts'
 import { backgroundTask, getEnv, isInternalVersionName } from './utils.ts'
 
@@ -16,6 +17,10 @@ export function createStatsMau(c: Context, device_id: string, app_id: string, or
   const lowerDeviceId = device_id
   const jobs: Promise<unknown>[] = []
   if (!c.env.DEVICE_USAGE) {
+    if (shouldSkipSupabaseStatsFallback(c)) {
+      logSkippedSupabaseWrite(c, 'trackDeviceUsageSB')
+      return Promise.resolve()
+    }
     jobs.push(Promise.resolve(trackDeviceUsageSB(c, lowerDeviceId, app_id, org_id, platform, version_build)))
   }
   else {
@@ -53,18 +58,28 @@ export function createStatsBandwidth(c: Context, device_id: string, app_id: stri
   cloudlog({ requestId: c.get('requestId'), message: 'createStatsBandwidth', device_id: lowerDeviceId, app_id, file_size })
   if (file_size === 0)
     return
-  if (!c.env.BANDWIDTH_USAGE)
+  if (!c.env.BANDWIDTH_USAGE) {
+    if (shouldSkipSupabaseStatsFallback(c)) {
+      logSkippedSupabaseWrite(c, 'trackBandwidthUsageSB')
+      return Promise.resolve()
+    }
     return backgroundTask(c, trackBandwidthUsageSB(c, lowerDeviceId, app_id, file_size))
+  }
   return trackBandwidthUsageCF(c, lowerDeviceId, app_id, file_size)
 }
 
 export type VersionAction = 'get' | 'fail' | 'install' | 'uninstall'
-export function createStatsVersion(c: Context, version_name: string, app_id: string, action: VersionAction) {
+export function createStatsVersion(c: Context, version_name: string, app_id: string, action: VersionAction, channel?: VersionUsageChannel | string | null) {
   if (isInternalVersionName(version_name))
     return Promise.resolve()
-  if (!c.env.VERSION_USAGE)
-    return backgroundTask(c, trackVersionUsageSB(c, version_name, app_id, action))
-  return trackVersionUsageCF(c, version_name, app_id, action)
+  if (!c.env.VERSION_USAGE) {
+    if (shouldSkipSupabaseStatsFallback(c)) {
+      logSkippedSupabaseWrite(c, 'trackVersionUsageSB')
+      return Promise.resolve()
+    }
+    return backgroundTask(c, trackVersionUsageSB(c, version_name, app_id, action, channel))
+  }
+  return trackVersionUsageCF(c, version_name, app_id, action, channel)
 }
 
 export function normalizeStatsMetadata(metadata?: StatsMetadata): StatsMetadata | undefined {
@@ -89,8 +104,13 @@ export function createStatsLogsExternal(c: Context, app_id: string, device_id: s
   const finalVersionName = versionName && versionName !== '' ? versionName : 'unknown'
   const finalMetadata = normalizeStatsMetadata(metadata)
   // This is super important until every device get the version of plugin 6.2.5
-  if (!c.env.APP_LOG_EXTERNAL)
+  if (!c.env.APP_LOG_EXTERNAL) {
+    if (shouldSkipSupabaseStatsFallback(c)) {
+      logSkippedSupabaseWrite(c, 'trackLogsSB(external)')
+      return Promise.resolve()
+    }
     return backgroundTask(c, trackLogsSB(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata))
+  }
   return trackLogsCFExternal(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata)
 }
 
@@ -99,8 +119,13 @@ export function createStatsLogs(c: Context, app_id: string, device_id: string, a
   const finalVersionName = versionName && versionName !== '' ? versionName : 'unknown'
   const finalMetadata = normalizeStatsMetadata(metadata)
   // This is super important until every device get the version of plugin 6.2.5
-  if (!c.env.APP_LOG)
+  if (!c.env.APP_LOG) {
+    if (shouldSkipSupabaseStatsFallback(c)) {
+      logSkippedSupabaseWrite(c, 'trackLogsSB')
+      return Promise.resolve()
+    }
     return backgroundTask(c, trackLogsSB(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata))
+  }
   return trackLogsCF(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata)
 }
 
@@ -111,6 +136,11 @@ export function createStatsDevices(c: Context, device: DeviceWithoutCreatedAt) {
   // recorded and downstream APIs/tests will break.
   if (getRuntimeKey() === 'workerd' && c.env.DEVICE_INFO)
     return backgroundTask(c, trackDevicesCF(c, device))
+
+  if (shouldSkipSupabaseStatsFallback(c)) {
+    logSkippedSupabaseWrite(c, 'trackDevicesSB')
+    return Promise.resolve()
+  }
 
   return backgroundTask(c, trackDevicesSB(c, device))
 }
@@ -131,6 +161,10 @@ export function createStatsMeta(c: Context, app_id: string, version_id: number, 
   if (size === 0)
     return { error: 'size is 0' }
   cloudlog({ requestId: c.get('requestId'), message: 'createStatsMeta', app_id, version_id, size })
+  if (shouldSkipSupabaseStatsFallback(c)) {
+    logSkippedSupabaseWrite(c, 'trackMetaSB')
+    return { error: 'supabase_write_forbidden' }
+  }
   return trackMetaSB(c, app_id, version_id, size)
 }
 
@@ -152,10 +186,10 @@ export function readStatsStorage(c: Context, app_id: string, start_date: string,
   return readStatsStorageSB(c, app_id, start_date, end_date)
 }
 
-export function readStatsVersion(c: Context, app_id: string, start_date: string, end_date: string): Promise<VersionUsage[]> {
+export function readStatsVersion(c: Context, app_id: string, start_date: string, end_date: string, channel?: VersionUsageChannel | string): Promise<VersionUsage[]> {
   if (!c.env.VERSION_USAGE)
-    return readStatsVersionSB(c, app_id, start_date, end_date)
-  return readStatsVersionCF(c, app_id, start_date, end_date)
+    return readStatsVersionSB(c, app_id, start_date, end_date, channel)
+  return readStatsVersionCF(c, app_id, start_date, end_date, channel)
 }
 
 export function readNativeVersionUsage(c: Context, app_id: string, start_date: string, end_date: string, supabase: SupabaseClient<Database>): Promise<NativeVersionUsage[]> {
@@ -274,7 +308,7 @@ async function generateDemoLogs(c: Context, params: ReadStatsParams): Promise<De
     const device = devices[i % devices.length]
     const sequence = actionSequences[i % actionSequences.length]
     // Use the device's current version or pick from demo versions
-    const versionName = (device.version as any)?.name || demoVersions[Math.floor(Math.random() * demoVersions.length)]
+    const versionName = (device.version as any)?.name || demoVersions[i % demoVersions.length]
 
     // Calculate base time for this sequence
     const sequenceStartTime = rangeStart + (timeSpan * i / numSequences)

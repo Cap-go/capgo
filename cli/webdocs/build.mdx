@@ -130,6 +130,7 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | **--output-record** | <code>string</code> | After a successful build, write a JSON record (jobId, status, outputUrl, qrCodeAscii, qrCodePngPath, finishedAt) to <path>. A PNG QR code is also written next to it as <path>.qr.png. Read fields back with `build last-output`. |
 | **--skip-build-number-bump** | <code>boolean</code> | Skip automatic build number/version code incrementing. Uses whatever version is already in the project files. |
 | **--no-skip-build-number-bump** | <code>boolean</code> | Override saved credentials to re-enable automatic build number incrementing for this build only. |
+| **--sync-ios-version** | <code>boolean</code> | iOS: sync Xcode MARKETING_VERSION from package.json before uploading the project. |
 | **--ai-analytics** | <code>boolean</code> | On build failure, send logs to Capgo AI for diagnosis. In interactive terminals this skips the upfront confirmation; in CI this auto-uploads and prints the analysis to stderr. |
 | **--no-prescan** | <code>boolean</code> | Skip the automatic pre-build scan |
 | **--prescan-ignore-fatal** | <code>boolean</code> | Run the pre-build scan but never block the build (report only) |
@@ -140,6 +141,27 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 | **--verbose** | <code>boolean</code> | Enable verbose output with detailed logging |
+
+### <a id="build-sync-ios-version"></a> 🔹 **Sync-ios-version**
+
+```bash
+npx @capgo/cli@latest build sync-ios-version
+```
+
+Sync the local iOS Xcode MARKETING_VERSION from package.json.
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest build sync-ios-version --path .
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **--path** | <code>string</code> | Path to the project directory (default: current directory) |
+| **--check** | <code>boolean</code> | Check only; exit non-zero when MARKETING_VERSION is out of sync |
 
 ### <a id="build-prescan"></a> 🔹 **Prescan**
 

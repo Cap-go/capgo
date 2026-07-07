@@ -16,6 +16,8 @@ const webhookAppId = `com.webhooks.${globalId}`
 const webhookName = `Test Webhook ${globalId}`
 const webhookUrl = 'https://example.com/webhook'
 const customerId = `cus_test_${WEBHOOK_TEST_ORG_ID}`
+const USE_CLOUDFLARE = process.env.USE_CLOUDFLARE_WORKERS === 'true'
+const describeBackend = describe.skipIf(USE_CLOUDFLARE)
 
 let createdWebhookId: string | null = null
 let standardWebhookId: string | null = null
@@ -53,6 +55,8 @@ async function getAuthenticatedAnonClient() {
 }
 
 beforeAll(async () => {
+  if (USE_CLOUDFLARE)
+    return
   // Create stripe_info for this test org
   const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
     customer_id: customerId,
@@ -128,6 +132,8 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
+  if (USE_CLOUDFLARE)
+    return
   // Clean up created webhooks
   // Note: Using type assertion as webhooks table types are not yet generated
   if (createdWebhookId) {
@@ -159,7 +165,7 @@ afterAll(async () => {
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
 }, 60000)
 
-describe('[GET] /webhooks', () => {
+describeBackend('[GET] /webhooks', () => {
   it('list webhooks for organization', async () => {
     const response = await fetchWithRetry(webhookEndpoint(`?orgId=${WEBHOOK_TEST_ORG_ID}`), {
       headers: webhookHeaders,
@@ -214,7 +220,7 @@ describe('[GET] /webhooks', () => {
   })
 })
 
-describe('[POST] /webhooks', () => {
+describeBackend('[POST] /webhooks', () => {
   it('create webhook', async () => {
     const response = await fetch(webhookEndpoint(), {
       method: 'POST',
@@ -511,7 +517,7 @@ describe('[POST] /webhooks', () => {
   })
 })
 
-describe('[GET] /webhooks (single webhook)', () => {
+describeBackend('[GET] /webhooks (single webhook)', () => {
   it('get single webhook by id', async () => {
     if (!createdWebhookId)
       throw new Error('Webhook was not created in previous test')
@@ -539,7 +545,7 @@ describe('[GET] /webhooks (single webhook)', () => {
   })
 })
 
-describe('[PUT] /webhooks', () => {
+describeBackend('[PUT] /webhooks', () => {
   it('update webhook name', async () => {
     if (!createdWebhookId)
       throw new Error('Webhook was not created in previous test')
@@ -730,7 +736,7 @@ describe('[PUT] /webhooks', () => {
   })
 })
 
-describe('[POST] /webhooks/test', () => {
+describeBackend('[POST] /webhooks/test', () => {
   it('test webhook', async () => {
     if (!createdWebhookId)
       throw new Error('Webhook was not created in previous test')
@@ -873,7 +879,7 @@ describe('[POST] /webhooks/test', () => {
   })
 })
 
-describe('[GET] /webhooks/deliveries', () => {
+describeBackend('[GET] /webhooks/deliveries', () => {
   it('get webhook deliveries', async () => {
     if (!createdWebhookId)
       throw new Error('Webhook was not created in previous test')
@@ -960,7 +966,7 @@ describe('[GET] /webhooks/deliveries', () => {
   })
 })
 
-describe('[POST] /webhooks/deliveries/retry', () => {
+describeBackend('[POST] /webhooks/deliveries/retry', () => {
   it('retry delivery with invalid deliveryId', async () => {
     const invalidDeliveryId = randomUUID()
     const response = await fetch(webhookEndpoint('/deliveries/retry'), {
@@ -1152,7 +1158,7 @@ describe('[POST] /webhooks/deliveries/retry', () => {
   })
 })
 
-describe('[DELETE] /webhooks', () => {
+describeBackend('[DELETE] /webhooks', () => {
   it('delete webhook with invalid webhookId', async () => {
     const invalidWebhookId = randomUUID()
     const response = await fetch(webhookEndpoint(`?orgId=${WEBHOOK_TEST_ORG_ID}&webhookId=${invalidWebhookId}`), {

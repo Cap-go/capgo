@@ -1,10 +1,11 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.187.0",
+  "version": "12.188.3",
   "private": true,
   "workspaces": [
-    "cli"
+    "cli",
+    "packages/*"
   ],
   "license": "GPL-3.0",
   "scripts": {
@@ -31,6 +32,7 @@
     "build": "vite build",
     "build:mobile": "vite build && cap copy",
     "build:dev": "BRANCH=development vite build",
+    "build:preprod": "BRANCH=preprod vite build",
     "build:dev:mobile": "BRANCH=development vite build && cap copy",
     "capacitor:assets": "bunx @capacitor/assets generate --assetPath assets --iconBackgroundColor '#111827' --iconBackgroundColorDark '#111827' --splashBackgroundColor '#111827' --splashBackgroundColorDark '#111827' --logoSplashScale 0.3",
     "resources": "cordova-res --skip-config --copy --icon-background-source '#ffffff'",
@@ -158,6 +160,7 @@
     "deploy:cloudflare_env:api:prod": "bunx wrangler secret bulk internal/cloudflare/.env.prod --config cloudflare_workers/api/wrangler.jsonc --env=prod",
     "deploy:cloudflare_env:api:preprod": "bunx wrangler secret bulk internal/cloudflare/.env.preprod --config cloudflare_workers/api/wrangler.jsonc --env=preprod",
     "deploy:cloudflare_env:api:dev": "bunx wrangler secret bulk internal/cloudflare/.env.alpha --config cloudflare_workers/api/wrangler.jsonc --env=alpha",
+    "deploy:cloudflare:notifications:queues": "bun scripts/ensure-native-notification-queues.ts",
     "deploy:cloudflare_env:files:prod": "bunx wrangler secret bulk internal/cloudflare/.env.prod --config cloudflare_workers/files/wrangler.jsonc --env=prod",
     "deploy:cloudflare_env:files:preprod": "bunx wrangler secret bulk internal/cloudflare/.env.preprod --config cloudflare_workers/files/wrangler.jsonc --env=preprod",
     "deploy:cloudflare_env:files:dev": "bunx wrangler secret bulk internal/cloudflare/.env.alpha  --config cloudflare_workers/files/wrangler.jsonc --env=alpha",
@@ -178,7 +181,9 @@
     "deploy:supabase_env:prod": "bunx supabase secrets set --project-ref xvwzpoazmxkqosrdewyv --env-file internal/cloudflare/.env.prod",
     "deploy:supabase_env:preprod": "bunx supabase secrets set --project-ref ibwjdnhknbkcqfbabwei --env-file internal/cloudflare/.env.preprod",
     "deploy:supabase_env:dev": "bunx supabase secrets set --project-ref aucsybvnhavogdmzwtcw --env-file internal/cloudflare/.env.alpha",
-    "size": "bunx vite-bundle-visualizer"
+    "size": "bunx vite-bundle-visualizer",
+    "test:analytics-sql": "vitest run tests/analytics-engine-sql.unit.test.ts",
+    "test:analytics-sql:live": "bun --env-file=internal/cloudflare/.env.prod scripts/validate-analytics-engine-sql.ts"
   },
   "dependencies": {
     "@bradenmacdonald/s3-lite-client": "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.6",

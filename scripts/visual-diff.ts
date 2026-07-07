@@ -75,6 +75,13 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+function parseThreshold(raw: string, source: string): number {
+  const value = Number(raw)
+  if (!Number.isFinite(value) || value < 0 || value > 100)
+    throw new Error(`${source} must be a number between 0 and 100, received "${raw}"`)
+  return value
+}
+
 function parseArgs(argv: string[]): CliOptions {
   const [commandRaw, ...rest] = argv
   const command = (commandRaw || 'run') as Command
@@ -85,30 +92,37 @@ function parseArgs(argv: string[]): CliOptions {
   let phase: Phase | undefined
   let baseRef = process.env.VISUAL_DIFF_BASE_REF
   let headRef = process.env.VISUAL_DIFF_HEAD_REF
-  let thresholdPercent = Number(process.env.VISUAL_DIFF_THRESHOLD_PERCENT || '0.1')
+  let thresholdPercent = parseThreshold(process.env.VISUAL_DIFF_THRESHOLD_PERCENT || '0.1', 'VISUAL_DIFF_THRESHOLD_PERCENT')
   let routes: string[] = []
   let skipGitCheckout = process.env.VISUAL_DIFF_SKIP_GIT === 'true'
+
+  function requireArg(flag: string, value: string | undefined) {
+    if (!value || value.startsWith('--'))
+      throw new Error(`${flag} requires a value`)
+    return value
+  }
 
   for (let index = 0; index < rest.length; index++) {
     const arg = rest[index]
     if (arg === '--phase') {
-      phase = rest[++index] as Phase
+      phase = requireArg('--phase', rest[++index]) as Phase
       continue
     }
     if (arg === '--base') {
-      baseRef = rest[++index]
+      baseRef = requireArg('--base', rest[++index])
       continue
     }
     if (arg === '--head') {
-      headRef = rest[++index]
+      headRef = requireArg('--head', rest[++index])
       continue
     }
     if (arg === '--threshold') {
-      thresholdPercent = Number(rest[++index])
+      const rawThreshold = requireArg('--threshold', rest[++index])
+      thresholdPercent = parseThreshold(rawThreshold, '--threshold')
       continue
     }
     if (arg === '--routes') {
-      routes = rest[++index].split(',').map(route => route.trim()).filter(Boolean)
+      routes = requireArg('--routes', rest[++index]).split(',').map(route => route.trim()).filter(Boolean)
       continue
     }
     if (arg === '--skip-git') {
@@ -158,10 +172,10 @@ function diffDir() {
   return resolve(outputRoot, 'diff')
 }
 
-async function isHttpReady(url: string): Promise<boolean> {
+async function isHttpReady(url: string, options: { requireSuccess?: boolean } = {}): Promise<boolean> {
   try {
-    const response = await fetch(url)
-    return response.status < 500
+    const response = await fetch(url, { signal: AbortSignal.timeout(5_000) })
+    return options.requireSuccess ? response.ok : response.status < 500
   }
   catch {
     return false
@@ -227,8 +241,11 @@ function startProcess(name: string, args: string[], env: NodeJS.ProcessEnv = {})
     detached: !isWindows,
   })
 
-  child.stdout.pipe(logStream)
-  child.stderr.pipe(logStream)
+  child.stdout.pipe(logStream, { end: false })
+  child.stderr.pipe(logStream, { end: false })
+  child.on('close', () => {
+    logStream.end()
+  })
 
   const managed = { child, name }
   managedProcesses.push(managed)
@@ -241,15 +258,18 @@ async function stopProcess(processToStop: ManagedProcess) {
   if (hasExited())
     return
 
-  const waitForExit = (timeoutMs: number) => {
+  const waitForExit = async (timeoutMs: number) => {
     if (hasExited())
-      return Promise.resolve(true)
+      return true
 
     return Promise.race([
       new Promise<boolean>((resolveExit) => {
         processToStop.child.once('exit', () => resolveExit(true))
       }),
-      sleep(timeoutMs).then(() => hasExited()),
+      (async () => {
+        await sleep(timeoutMs)
+        return hasExited()
+      })(),
     ])
   }
 
@@ -308,7 +328,19 @@ function resolveGitRef(ref: string | undefined, fallback: string) {
   return git(['rev-parse', ref])
 }
 
-async function ensureBackendStack() {
+async function stopBackendStack() {
+  for (let index = managedProcesses.length - 1; index >= 0; index--) {
+    if (managedProcesses[index].name !== 'backend-playwright')
+      continue
+    await stopProcess(managedProcesses[index])
+    managedProcesses.splice(index, 1)
+  }
+  rmSync(resolve(outputRoot, 'backend.ready'), { force: true })
+  if (!isWindows)
+    spawnSync('pkill', ['-f', 'supabase-functions.playwright.env'], { stdio: 'ignore' })
+}
+
+async function ensureBackendStack(options: { force?: boolean } = {}) {
   if (!(await isTcpReady(stripePort))) {
     startProcess('stripe-emulator', ['bun', 'run', 'stripe:emulator'], {
       STRIPE_EMULATOR_PORT: String(stripePort),
@@ -317,7 +349,8 @@ async function ensureBackendStack() {
   }
 
   const backendOkUrl = `${localSupabaseUrl}/functions/v1/ok`
-  if (!(await isHttpReady(backendOkUrl))) {
+  if (options.force || !(await isHttpReady(backendOkUrl, { requireSuccess: true }))) {
+    await stopBackendStack()
     const readyFile = resolve(outputRoot, 'backend.ready')
     rmSync(readyFile, { force: true })
     startProcess('backend-playwright', ['bun', 'run', 'backend:playwright'], {
@@ -432,13 +465,13 @@ async function settlePage(page: Page) {
   })
 }
 
-async function captureScreenshots(phase: Phase, routeFilter: string[], options: { forceFrontend?: boolean } = {}) {
+async function captureScreenshots(phase: Phase, routeFilter: string[], options: { forceFrontend?: boolean, forceBackend?: boolean } = {}) {
   const { visualDiffRoutes, visualDiffViewport } = await loadVisualDiffConfig()
   const routes = selectedRoutes(visualDiffRoutes, routeFilter)
   const targetDir = phaseDir(phase)
   mkdirSync(targetDir, { recursive: true })
 
-  const { supabaseUrl, supabaseAnon, apiDomain } = await ensureBackendStack()
+  const { supabaseUrl, supabaseAnon, apiDomain } = await ensureBackendStack({ force: options.forceBackend })
   await prepareScreenshotData(supabaseUrl, supabaseAnon)
   await ensureFrontendStack(supabaseUrl, supabaseAnon, apiDomain, { force: options.forceFrontend })
 
@@ -450,10 +483,13 @@ async function captureScreenshots(phase: Phase, routeFilter: string[], options: 
       deviceScaleFactor: 1,
     })
     const page = await context.newPage()
+    let authenticated = false
 
     for (const route of routes) {
-      if (route.auth)
+      if (route.auth && !authenticated) {
         await login(page)
+        authenticated = true
+      }
 
       await page.goto(route.path, { waitUntil: 'domcontentloaded' })
       await settlePage(page)
@@ -482,6 +518,7 @@ function writeDiffImage(beforePath: string, afterPath: string, diffPath: string)
     const height = Math.max(before.height, after.height)
     const diff = new PNG({ width, height })
     const mismatchPixels = width * height
+    mkdirSync(dirname(diffPath), { recursive: true })
     writeFileSync(diffPath, PNG.sync.write(diff))
     return {
       diffPixels: mismatchPixels,
@@ -541,6 +578,10 @@ async function compareScreenshots(thresholdPercent: number, routeFilter: string[
       afterPath,
       diffPath,
     })
+  }
+
+  if (results.length === 0 && routes.length > 0) {
+    throw new Error(`No screenshot pairs available to compare for ${routes.length} configured route(s). Capture before and after first.`)
   }
 
   return results
@@ -656,30 +697,36 @@ async function runPipeline(options: CliOptions) {
   try {
     if (!options.skipGitCheckout) {
       await stopFrontendStack()
+      await stopBackendStack()
       await checkoutRef(baseSha)
-      await captureScreenshots('before', options.routes, { forceFrontend: true })
+      await captureScreenshots('before', options.routes, { forceFrontend: true, forceBackend: true })
       await stopFrontendStack()
+      await stopBackendStack()
       await checkoutRef(headSha)
     }
 
-    await captureScreenshots('after', options.routes, { forceFrontend: !options.skipGitCheckout })
+    await captureScreenshots('after', options.routes, {
+      forceFrontend: !options.skipGitCheckout,
+      forceBackend: !options.skipGitCheckout,
+    })
     const results = await compareScreenshots(options.thresholdPercent, options.routes)
     const summary = generateReport(results, options.thresholdPercent)
 
-    if (summary.changedCount > 0) {
+    if (summary.changedCount > 0)
       console.log(`[visual-diff] ${summary.changedCount} route(s) changed`)
-      process.exitCode = 0
-    }
-    else {
+    else
       console.log('[visual-diff] no visual differences detected')
-    }
   }
   finally {
     if (!options.skipGitCheckout) {
       try {
         const currentRef = git(['rev-parse', 'HEAD'])
-        if (currentRef !== originalRef)
+        if (currentRef !== originalRef) {
           git(['checkout', '--force', originalRef])
+          const install = spawnSync('bun', ['install'], { cwd: repoRoot, stdio: 'inherit', env: process.env })
+          if ((install.status ?? 1) !== 0)
+            throw new Error(`bun install failed after restoring git ref ${originalRef}`)
+        }
       }
       catch (error) {
         console.error(`[visual-diff] failed to restore git ref ${originalRef}:`, error)

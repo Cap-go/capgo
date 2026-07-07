@@ -27,6 +27,7 @@ export function getSupabaseStatus(cwd = process.cwd()): SupabaseStatus | null {
     cwd,
     encoding: 'utf8',
     env: process.env,
+    timeout: 10_000,
   })
   if ((result.status ?? 1) !== 0)
     return null
