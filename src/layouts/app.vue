@@ -8,6 +8,7 @@ import { appTabs as baseAppTabs } from '~/constants/appTabs'
 import { bundleTabs } from '~/constants/bundleTabs'
 import { channelTabs } from '~/constants/channelTabs'
 import { deviceTabs } from '~/constants/deviceTabs'
+import { logTabs } from '~/constants/logTabs'
 import { useOrganizationStore } from '~/stores/organization'
 
 const router = useRouter()
@@ -108,26 +109,42 @@ const tabs = computed<Tab[]>(() => {
     key: tab.key ? `/app/${appRouteSegment.value}${tab.key}` : `/app/${appRouteSegment.value}`,
   }))
 })
+const appSectionType = computed(() => {
+  if (/^\/app\/[^/]+\/logs(?:\/|$)/.test(route.path))
+    return 'logs'
+  return null
+})
 
-// Get appropriate secondary tabs based on resource type
+const secondaryTabType = computed(() => resourceType.value ?? appSectionType.value)
+
+const secondaryTabBasePath = computed(() => {
+  if (!appRouteSegment.value || !secondaryTabType.value)
+    return ''
+  if (resourceType.value && resourceId.value)
+    return `/app/${appRouteSegment.value}/${resourceType.value}/${resourceId.value}`
+  if (secondaryTabType.value === 'logs')
+    return `/app/${appRouteSegment.value}/logs`
+  return ''
+})
+
+// Get appropriate secondary tabs based on resource or app section type
 const tabsConfig: Record<string, Tab[]> = {
   channel: channelTabs,
   device: deviceTabs,
   bundle: bundleTabs,
+  logs: logTabs,
 }
 
-// Generate secondary tabs with full paths for the current resource
+// Generate secondary tabs with full paths for the current resource or app section
 const secondaryTabs = computed<Tab[]>(() => {
-  if (!appRouteSegment.value || !resourceId.value || !resourceType.value)
+  if (!secondaryTabBasePath.value || !secondaryTabType.value)
     return []
 
-  const baseTabs = tabsConfig[resourceType.value] || []
+  const baseTabs = tabsConfig[secondaryTabType.value] || []
 
   return baseTabs.map(tab => ({
     ...tab,
-    key: tab.key
-      ? `/app/${appRouteSegment.value}/${resourceType.value}/${resourceId.value}${tab.key}`
-      : `/app/${appRouteSegment.value}/${resourceType.value}/${resourceId.value}`,
+    key: tab.key ? `${secondaryTabBasePath.value}${tab.key}` : secondaryTabBasePath.value,
   }))
 })
 
@@ -160,7 +177,6 @@ const activeTab = computed(() => {
     return exactTab.key
 
   // Fallback: nested pages under a tab should keep the parent tab active.
-  // Example: `/app/:id/bundles/new` should keep `/app/:id/bundles` active.
   const prefixMatch = tabs.value
     .map(t => ({ t, tabKey: t.key.replace(/\/$/, '') }))
     .filter(({ tabKey }) => path.startsWith(`${tabKey}/`))
@@ -178,7 +194,7 @@ const activeSecondaryTab = computed(() => {
     return path === tabKey
   })
 
-  return tab?.key ?? `/app/${appRouteSegment.value}/${resourceType.value}/${resourceId.value}`
+  return tab?.key ?? secondaryTabBasePath.value
 })
 
 function handleTab(key: string) {

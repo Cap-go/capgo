@@ -11,7 +11,7 @@ import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { appIdSchema, deviceIdSchema, hasInvalidQueryLimitInput, hasUnsafeStatsQueryText, MAX_QUERY_LIMIT, queryLimitSchema, safeQueryDateSchema, safeQueryTextSchema, statsActionSchema } from '../utils/privateAnalyticsValidation.ts'
 import { checkPermission } from '../utils/rbac.ts'
-import { readStats } from '../utils/stats.ts'
+import { readStats, readStatsInsights } from '../utils/stats.ts'
 
 interface DataStats {
   appId: string
@@ -22,6 +22,7 @@ interface DataStats {
   rangeEnd?: string | number
   limit?: number
   actions?: string[]
+  days?: number
 }
 
 const ORDER_KEYS = ['created_at', 'app_id', 'device_id', 'action', 'version_name'] as const
@@ -82,6 +83,50 @@ const exportSchema = type({
   'filename?': 'string',
 })
 
+const statsInsightsSchema = type({
+  'appId': appIdSchema,
+  'days?': 'number',
+  'actions?': statsActionSchema.array(),
+})
+
+const insightPeriodDays = [1, 3, 7, 30] as const
+type InsightPeriodDays = typeof insightPeriodDays[number]
+
+const defaultInsightActions = [
+  'set_fail',
+  'update_fail',
+  'download_fail',
+  'windows_path_fail',
+  'canonical_path_fail',
+  'directory_path_fail',
+  'unzip_fail',
+  'low_mem_fail',
+  'download_manifest_file_fail',
+  'download_manifest_checksum_fail',
+  'download_manifest_brotli_fail',
+  'finish_download_fail',
+  'manifest_path_fail',
+  'decrypt_fail',
+  'insufficient_disk_space',
+  'app_crash',
+  'app_crash_native',
+  'app_anr',
+  'app_killed_low_memory',
+  'app_killed_excessive_resource_usage',
+  'app_initialization_failure',
+  'webview_javascript_error',
+  'webview_unhandled_rejection',
+  'webview_resource_error',
+  'webview_security_policy_violation',
+  'webview_unclean_restart',
+  'webview_render_process_gone',
+  'webview_content_process_terminated',
+  'cannotGetBundle',
+  'checksum_fail',
+  'blocked_by_server_url',
+  'backend_refusal',
+]
+
 interface StatsBody {
   appId: string
   devicesId?: string[]
@@ -90,6 +135,12 @@ interface StatsBody {
   rangeStart?: string | number
   rangeEnd?: string | number
   limit?: number
+  actions?: string[]
+}
+
+interface StatsInsightsBody {
+  appId: string
+  days?: number
   actions?: string[]
 }
 
@@ -122,6 +173,35 @@ function normalizeRangeDate(value: string | number | undefined): string | undefi
     throw simpleError('invalid_body', 'Invalid body')
 
   return date.toISOString()
+}
+
+function normalizeStatsInsightsPeriodDays(days: number | undefined = 7): InsightPeriodDays | null {
+  if (!Number.isInteger(days) || !insightPeriodDays.includes(days as InsightPeriodDays))
+    return null
+
+  return days as InsightPeriodDays
+}
+
+function createUtcDate(year: number, month: number, day: number) {
+  return new Date(Date.UTC(year, month, day, 0, 0, 0, 0))
+}
+
+function getStatsInsightsPeriod(days: InsightPeriodDays, now = new Date()) {
+  const todayStart = createUtcDate(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  const endExclusive = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
+  const start = new Date(endExclusive.getTime() - days * 24 * 60 * 60 * 1000)
+  const labels: string[] = []
+  for (let cursor = new Date(start); cursor.getTime() < endExclusive.getTime(); cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000)) {
+    labels.push(cursor.toISOString().slice(0, 10))
+  }
+
+  return {
+    requested_days: days,
+    start: start.toISOString(),
+    end: new Date(endExclusive.getTime() - 1).toISOString(),
+    end_exclusive: endExclusive.toISOString(),
+    labels,
+  }
 }
 
 async function getValidatedStatsRequestBody<T extends StatsBody | ExportBody>(
@@ -173,6 +253,41 @@ function createStatsReadParams(
 app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   const { body, startDate, endDate } = await getValidatedStatsRequestBody(c, statsBodySchema, 'post private/stats body')
   return c.json(await readStats(c, createStatsReadParams(body, startDate, endDate)))
+})
+
+app.post('/insights', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
+  const bodyRaw = await parseBody<DataStats>(c)
+  const parsed = safeParseSchema(statsInsightsSchema, bodyRaw)
+  if (!parsed.success)
+    throw simpleError('invalid_body', 'Invalid body', { error: parsed.error })
+
+  const body = parsed.data as StatsInsightsBody
+  const days = normalizeStatsInsightsPeriodDays(body.days)
+  if (!days)
+    throw simpleError('invalid_days', 'days must be one of 1, 3, 7, or 30')
+
+  const hasAppReadLogsPermission = await checkPermission(c, 'app.read_logs', { appId: body.appId })
+  if (!hasAppReadLogsPermission)
+    throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.appId })
+
+  const period = getStatsInsightsPeriod(days)
+  const actions = body.actions?.length ? body.actions : defaultInsightActions
+  cloudlog({ requestId: c.get('requestId'), message: 'post private/stats/insights body', body: { appId: body.appId, days, actionCount: actions.length } })
+
+  return c.json({
+    ...(await readStatsInsights(c, {
+      app_id: body.appId,
+      start_date: period.start,
+      end_date: period.end_exclusive,
+      actions,
+    })),
+    period: {
+      requested_days: period.requested_days,
+      start: period.start,
+      end: period.end,
+      labels: period.labels,
+    },
+  })
 })
 
 app.post('/export', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {

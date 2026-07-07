@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
-import type { DeviceWithoutCreatedAt, NativeVersionUsage, Order, ReadDevicesParams, ReadStatsParams, StatsMetadata, VersionUsage, VersionUsageChannel } from './types.ts'
+import type { DeviceWithoutCreatedAt, NativeVersionUsage, Order, ReadDevicesParams, ReadStatsInsightsParams, ReadStatsParams, StatsInsightsResult, StatsMetadata, VersionUsage, VersionUsageChannel } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
 import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged, nullableString } from './deviceComparison.ts'
 import { simpleError } from './hono.ts'
@@ -10,6 +10,7 @@ import { cloudlog, cloudlogErr } from './logging.ts'
 import { closeClient, getPgClient } from './pg.ts'
 import { createCustomer } from './stripe.ts'
 import { Constants } from './supabase.types.ts'
+import { emptyStatsInsights, normalizeStatsInsightsResult } from './statsInsights.ts'
 import { getEnv, isStripeConfigured } from './utils.ts'
 
 const DEFAULT_LIMIT = 1000
@@ -1488,6 +1489,120 @@ export async function readStatsSB(c: Context, params: ReadStatsParams) {
   }
 
   return data ?? []
+}
+
+export async function readStatsInsightsSB(c: Context, params: ReadStatsInsightsParams): Promise<StatsInsightsResult> {
+  const pgClient = getPgClient(c)
+  const actionValues = params.actions?.length ? params.actions : []
+  const actionFilter = actionValues.length > 0 ? 'AND action = ANY($4::public.stats_action[])' : ''
+  const values = actionValues.length > 0
+    ? [params.app_id, params.start_date, params.end_date, actionValues]
+    : [params.app_id, params.start_date, params.end_date]
+
+  try {
+    const summaryQuery = `
+      SELECT
+        COUNT(*)::text AS total,
+        COUNT(DISTINCT device_id)::text AS device_count,
+        COUNT(DISTINCT action)::text AS action_count
+      FROM public.stats
+      WHERE app_id = $1
+        AND created_at >= $2::timestamptz
+        AND created_at < $3::timestamptz
+        ${actionFilter}
+    `
+
+    const actionsQuery = `
+      SELECT
+        action::text AS action,
+        COUNT(*)::text AS total,
+        COUNT(DISTINCT device_id)::text AS device_count,
+        COUNT(DISTINCT version_name)::text AS version_count,
+        MIN(created_at)::text AS first_seen,
+        MAX(created_at)::text AS last_seen,
+        COALESCE((ARRAY_AGG(version_name ORDER BY created_at DESC))[1], 'unknown') AS latest_version_name,
+        COALESCE((ARRAY_AGG(device_id ORDER BY created_at DESC))[1], '') AS latest_device_id
+      FROM public.stats
+      WHERE app_id = $1
+        AND created_at >= $2::timestamptz
+        AND created_at < $3::timestamptz
+        ${actionFilter}
+      GROUP BY action
+      ORDER BY COUNT(*) DESC
+      LIMIT 20
+    `
+
+    const dailyQuery = `
+      SELECT
+        TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date,
+        action::text AS action,
+        COUNT(*)::text AS total
+      FROM public.stats
+      WHERE app_id = $1
+        AND created_at >= $2::timestamptz
+        AND created_at < $3::timestamptz
+        ${actionFilter}
+      GROUP BY 1, 2
+      ORDER BY 1 ASC, COUNT(*) DESC
+    `
+
+    const versionsQuery = `
+      SELECT
+        action::text AS action,
+        COALESCE(NULLIF(version_name, ''), 'unknown') AS version_name,
+        COUNT(*)::text AS total,
+        COUNT(DISTINCT device_id)::text AS device_count,
+        MAX(created_at)::text AS last_seen
+      FROM public.stats
+      WHERE app_id = $1
+        AND created_at >= $2::timestamptz
+        AND created_at < $3::timestamptz
+        ${actionFilter}
+      GROUP BY action, COALESCE(NULLIF(version_name, ''), 'unknown')
+      ORDER BY COUNT(*) DESC
+      LIMIT 30
+    `
+
+    const devicesQuery = `
+      SELECT
+        action::text AS action,
+        device_id,
+        COUNT(*)::text AS total,
+        COALESCE((ARRAY_AGG(version_name ORDER BY created_at DESC))[1], 'unknown') AS version_name,
+        MAX(created_at)::text AS last_seen
+      FROM public.stats
+      WHERE app_id = $1
+        AND created_at >= $2::timestamptz
+        AND created_at < $3::timestamptz
+        ${actionFilter}
+      GROUP BY action, device_id
+      ORDER BY COUNT(*) DESC
+      LIMIT 30
+    `
+
+    const [summaryResult, actionsResult, dailyResult, versionsResult, devicesResult] = await Promise.all([
+      pgClient.query(summaryQuery, values),
+      pgClient.query(actionsQuery, values),
+      pgClient.query(dailyQuery, values),
+      pgClient.query(versionsQuery, values),
+      pgClient.query(devicesQuery, values),
+    ])
+
+    return normalizeStatsInsightsResult({
+      summary: summaryResult.rows[0],
+      actions: actionsResult.rows,
+      daily: dailyResult.rows,
+      versions: versionsResult.rows,
+      devices: devicesResult.rows,
+    })
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading stats insights from Supabase', error })
+    return emptyStatsInsights()
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
 }
 
 /**
