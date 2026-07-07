@@ -13,6 +13,7 @@ describe('security response headers', () => {
     expect(consoleHeaders).toContain('style-src \'self\' \'unsafe-inline\' https://fonts.bunny.net')
     expect(consoleHeaders).toContain('frame-src \'self\' https://challenges.cloudflare.com')
     expect(consoleHeaders).toContain('frame-ancestors \'none\'')
+    expect(consoleHeaders).toContain('connect-src \'self\' blob: https: wss:')
   })
 
   it.concurrent.each([

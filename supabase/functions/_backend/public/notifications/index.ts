@@ -145,6 +145,8 @@ interface ProviderBody {
 interface SendBody {
   appId: string
   campaignId?: string
+  name?: string
+  kind?: string
   payload?: Record<string, unknown>
   target?: {
     externalId?: string
@@ -225,6 +227,21 @@ function assertOptionalDate(value: unknown, field: string): string | null {
   if (Number.isNaN(date.getTime()))
     throw simpleError('invalid_body', 'Invalid body', { field })
   return date.toISOString()
+}
+
+function normalizeCampaignKind(kind: string | undefined) {
+  return kind && CAMPAIGN_KINDS.has(kind) ? kind : 'alert'
+}
+
+function normalizeSendPayload(kind: string, payload: Record<string, unknown>) {
+  if (kind !== 'background')
+    return payload
+  return {
+    ...payload,
+    kind: 'background',
+    background: true,
+    silent: true,
+  }
 }
 
 function assertPublicPluginApp(c: Context<MiddlewareKeyVariables>, appId: string) {
@@ -502,7 +519,7 @@ async function createCampaignRecord(c: Context<MiddlewareKeyVariables>, body: Ca
   await assertAppPermission(c, NOTIFICATION_MANAGE_PERMISSION, appId)
   const ownerOrg = await getAppOwnerOrg(c, appId)
   const name = assertString(body.name, 'name', 180)
-  const kind = body.kind && CAMPAIGN_KINDS.has(body.kind) ? body.kind : 'alert'
+  const kind = normalizeCampaignKind(body.kind)
   const status = body.status && CAMPAIGN_STATUSES.has(body.status) ? body.status : 'draft'
   const audience = assertOptionalRecord(body.audience, 'audience')
   const payload = assertOptionalRecord(body.payload, 'payload')
@@ -514,8 +531,8 @@ async function createCampaignRecord(c: Context<MiddlewareKeyVariables>, body: Ca
     pgClient = getPgClient(c)
     const drizzleClient = getDrizzleClient(pgClient)
     const result = await drizzleClient.execute(sql`
-      INSERT INTO public.notification_campaigns (owner_org, app_id, name, kind, status, audience, payload, scheduled_at, created_by)
-      VALUES (${ownerOrg}::uuid, ${appId}, ${name}, ${kind}, ${status}, ${JSON.stringify(audience)}::jsonb, ${JSON.stringify(payload)}::jsonb, ${scheduledAt}::timestamptz, ${auth?.userId ?? null}::uuid)
+      INSERT INTO public.notification_campaigns (owner_org, app_id, name, kind, status, audience, payload, scheduled_at, queued_at, created_by)
+      VALUES (${ownerOrg}::uuid, ${appId}, ${name}, ${kind}, ${status}, ${JSON.stringify(audience)}::jsonb, ${JSON.stringify(payload)}::jsonb, ${scheduledAt}::timestamptz, CASE WHEN ${status} = 'queued' THEN now() ELSE NULL END, ${auth?.userId ?? null}::uuid)
       RETURNING id, created_at, updated_at, owner_org::text, app_id, name, kind, status, audience, payload, scheduled_at, queued_at, completed_at, counters
     `)
     return result.rows[0]
@@ -779,12 +796,25 @@ app.post('/send', middlewareV2(['write', 'all']), async (c) => {
   const body = await parseBody<SendBody>(c)
   const appId = assertString(body.appId, 'appId', 128)
   await assertAppPermission(c, NOTIFICATION_MANAGE_PERMISSION, appId)
-  const campaignId = body.campaignId || crypto.randomUUID()
-  const payload = assertOptionalRecord(body.payload, 'payload')
+  const kind = normalizeCampaignKind(body.kind)
+  const payload = normalizeSendPayload(kind, assertOptionalRecord(body.payload, 'payload'))
   const plan = await resolveTargetPlan(c, { ...body, appId })
   const providerConfigs = await getNotificationProviderConfigs(c, appId)
   if (!providerConfigs.length)
     throw simpleError('missing_notification_provider', 'Missing configured notification platform credentials')
+  let campaignId = body.campaignId
+  if (!campaignId) {
+    const campaignRecord = await createCampaignRecord(c, {
+      appId,
+      name: body.name ? assertString(body.name, 'name', 180) : 'API notification',
+      kind,
+      status: 'queued',
+      audience: body.target ?? {},
+      payload,
+      scheduledAt: null,
+    })
+    campaignId = String((campaignRecord as unknown as CampaignRecordRow).id)
+  }
   const queued = await enqueueNativeNotificationFanout(c, {
     kind: 'send',
     appId,

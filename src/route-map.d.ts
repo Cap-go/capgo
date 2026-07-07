@@ -297,6 +297,13 @@ declare module 'vue-router/auto-routes' {
       { app: ParamValue<false> },
       | never
     >,
+    '/app/[app].observe': RouteRecordInfo<
+      '/app/[app].observe',
+      '/app/:app/observe',
+      { app: ParamValue<true> },
+      { app: ParamValue<false> },
+      | never
+    >,
     '/app/modules': RouteRecordInfo<
       '/app/modules',
       '/app/modules',
@@ -916,6 +923,14 @@ declare module 'vue-router/auto-routes' {
     'src/pages/app/[app].notifications.vue': {
       routes:
         | '/app/[app].notifications'
+      views:
+        | never
+      pathParamNames:
+        | 'app'
+    }
+    'src/pages/app/[app].observe.vue': {
+      routes:
+        | '/app/[app].observe'
       views:
         | never
       pathParamNames:
