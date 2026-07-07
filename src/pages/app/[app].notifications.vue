@@ -198,7 +198,7 @@ function campaignStatusCell(campaign: NotificationCampaign) {
 function campaignNameCell(campaign: NotificationCampaign) {
   return h('button', {
     type: 'button',
-    class: 'max-w-full text-left font-medium text-slate-950 hover:underline dark:text-white',
+    class: 'd-btn d-btn-ghost d-btn-sm h-auto min-h-0 max-w-full justify-start px-0 text-left font-medium text-slate-950 hover:underline dark:text-white',
     onClick: () => selectCampaign(campaign),
   }, campaign.name)
 }
@@ -457,6 +457,8 @@ async function loadCampaignStats(campaign: NotificationCampaign) {
       selectedCampaignStats.value = response.data || []
   }
   catch (error) {
+    if (selectedCampaign.value?.id !== campaign.id)
+      return
     console.error(error)
     toast.error(t('notification-load-error'))
   }
@@ -588,6 +590,7 @@ watch(() => {
     devices.value = []
     selectedCampaign.value = null
     selectedCampaignStats.value = []
+    selectedCampaignStatsLoading.value = false
     isLoading.value = false
     return
   }
@@ -606,6 +609,7 @@ watch(() => providerForm.value.platform, () => {
 watch(activeNotificationTab, () => {
   selectedCampaign.value = null
   selectedCampaignStats.value = []
+  selectedCampaignStatsLoading.value = false
 })
 </script>
 
