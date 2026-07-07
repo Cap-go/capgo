@@ -122,12 +122,18 @@ if [[ -f "$TYPES_DUMP" ]]; then
     REPLICA_FUNCTION_PATTERN="$(replica_config_pattern REPLICA_FUNCTIONS)"
 
     # Extract types
-    grep -E '\bTYPE\b' "$TYPES_LIST" | \
-      grep -E "$REPLICA_TYPE_PATTERN" > "$TYPES_FILTERED_LIST" || true
+    if [[ -n "$REPLICA_TYPE_PATTERN" ]]; then
+      grep -E '\bTYPE\b' "$TYPES_LIST" | \
+        grep -E "$REPLICA_TYPE_PATTERN" > "$TYPES_FILTERED_LIST" || true
+    else
+      : > "$TYPES_FILTERED_LIST"
+    fi
     
     # Also extract the functions required by replica table defaults
-    grep -E '\bFUNCTION\b' "$TYPES_LIST" | \
-      grep -E "$REPLICA_FUNCTION_PATTERN" >> "$TYPES_FILTERED_LIST" || true
+    if [[ -n "$REPLICA_FUNCTION_PATTERN" ]]; then
+      grep -E '\bFUNCTION\b' "$TYPES_LIST" | \
+        grep -E "$REPLICA_FUNCTION_PATTERN" >> "$TYPES_FILTERED_LIST" || true
+    fi
     
     if [[ -s "$TYPES_FILTERED_LIST" ]]; then
       # Restore only the filtered types and functions to SQL

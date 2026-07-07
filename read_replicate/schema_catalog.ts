@@ -41,7 +41,7 @@ export function replicaConfigPattern(values: readonly string[]): string {
 }
 
 function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return value.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
 }
 
 export interface Queryable {
