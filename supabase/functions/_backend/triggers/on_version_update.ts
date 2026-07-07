@@ -64,6 +64,21 @@ function versionUpdateLogFields(
   }
 }
 
+type DeletedVersionAction = 'continue' | 'delete' | 'cleanup_manifest' | 'skip'
+
+function getDeletedVersionAction(
+  record: Database['public']['Tables']['app_versions']['Row'],
+  oldRecord?: Database['public']['Tables']['app_versions']['Row'] | null,
+): DeletedVersionAction {
+  if (!record.deleted_at)
+    return 'continue'
+  if (record.deleted_at !== oldRecord?.deleted_at)
+    return 'delete'
+  if (record.manifest || (record.manifest_count ?? 0) > 0)
+    return 'cleanup_manifest'
+  return 'skip'
+}
+
 function getMetadataBranch(storageProvider: string | null, resolvedR2Path: string | null) {
   if (storageProvider === 'r2' && resolvedR2Path)
     return 'r2_bundle_size'
@@ -337,7 +352,7 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
       const updatePgClient = getPgClient(c, false)
       try {
         await updatePgClient.query(
-          `UPDATE app_versions SET manifest_count = 0 WHERE id = $1`,
+          `UPDATE app_versions SET manifest_count = 0, manifest = NULL WHERE id = $1`,
           [record.id],
         )
 
@@ -418,7 +433,7 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
-app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'UPDATE'), (c) => {
+app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'UPDATE'), async (c) => {
   const record = c.get('webhookBody') as Database['public']['Tables']['app_versions']['Row']
   const oldRecord = c.get('oldRecord') as Database['public']['Tables']['app_versions']['Row']
   cloudlog({ requestId: c.get('requestId'), message: 'on_version_update received', ...versionUpdateLogFields(record, oldRecord) })
@@ -428,9 +443,17 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'UPDATE'), (
     cloudlog({ requestId: c.get('requestId'), message: 'no app_id', record })
     return c.json(BRES)
   }
-  // check if version was soft-deleted (deleted_at was set)
-  if (record.deleted_at && record.deleted_at !== oldRecord.deleted_at)
+
+  const deletedVersionAction = getDeletedVersionAction(record, oldRecord)
+  if (deletedVersionAction === 'delete')
     return deleteIt(c, record)
+  if (deletedVersionAction === 'cleanup_manifest') {
+    cloudlog({ requestId: c.get('requestId'), message: 'cleaning manifest for already deleted version', ...versionUpdateLogFields(record, oldRecord) })
+    await deleteManifest(c, record)
+    return c.json(BRES)
+  }
+  if (deletedVersionAction === 'skip')
+    return c.json(BRES)
 
   if (!record.r2_path && !record.manifest) {
     cloudlog({ requestId: c.get('requestId'), message: 'no r2_path and no manifest, skipping update', ...versionUpdateLogFields(record, oldRecord) })
@@ -440,3 +463,7 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'UPDATE'), (
   cloudlog({ requestId: c.get('requestId'), message: 'Update but not deleted', ...versionUpdateLogFields(record, oldRecord) })
   return updateIt(c, record)
 })
+
+export const onVersionUpdateTestUtils = {
+  getDeletedVersionAction,
+}
