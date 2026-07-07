@@ -532,10 +532,10 @@ jobs:
             bun run backend:playwright' \
             > "${RUNNER_TEMP}/playwright-backend.log" 2>&1 &
           echo "backend_pid=$!" >> "$GITHUB_OUTPUT"
-          # The vite build only bakes in env values, so it does not need Supabase to be up yet.
-          nohup bash -c 'SUPABASE_URL=http://127.0.0.1:54321 \
-            SUPABASE_ANON_KEY=sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH \
-            bun scripts/playwright-frontend-preview.ts' \
+          # The frontend build needs the real Supabase keys from supabase status, so wait for the
+          # stack the backend service is booting, then build while functions serve is still starting.
+          nohup bash -c 'until supabase status >/dev/null 2>&1; do sleep 2; done
+            bun run supabase:with-env -- bun scripts/playwright-frontend-preview.ts' \
             > "${RUNNER_TEMP}/playwright-frontend.log" 2>&1 &
           echo "frontend_pid=$!" >> "$GITHUB_OUTPUT"
       - name: Install Playwright browser
