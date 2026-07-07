@@ -409,6 +409,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/preview/bundle': RouteRecordInfo<
+      '/preview/bundle',
+      '/preview/bundle',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/preview/channel': RouteRecordInfo<
       '/preview/channel',
       '/preview/channel',
@@ -1030,6 +1037,14 @@ declare module 'vue-router/auto-routes' {
     'src/pages/onboarding/set_password.vue': {
       routes:
         | '/onboarding/set_password'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/preview/bundle.vue': {
+      routes:
+        | '/preview/bundle'
       views:
         | never
       pathParamNames:
