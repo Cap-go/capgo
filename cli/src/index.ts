@@ -15,6 +15,7 @@ import { setApp } from './app/set'
 import { setSetting } from './app/setting'
 import { clearCredentialsCommand, listCredentialsCommand, migrateCredentialsCommand, saveCredentialsCommand, updateCredentialsCommand } from './build/credentials-command'
 import { manageCredentialsCommand } from './build/credentials-manage'
+import { syncIosMarketingVersionCommand } from './build/ios-marketing-version'
 import { lastOutputCommand } from './build/last-output-command'
 import { checkBuildNeeded } from './build/needed'
 import type { OnboardingBuilderOptions } from './build/onboarding/command'
@@ -927,6 +928,7 @@ Example: npx @capgo/cli@latest build request com.example.app --platform ios --pa
   .option('--output-record <path>', 'After a successful build, write a JSON record (jobId, status, outputUrl, qrCodeAscii, qrCodePngPath, finishedAt) to <path>. A PNG QR code is also written next to it as <path>.qr.png. Read fields back with `build last-output`.')
   .option('--skip-build-number-bump', 'Skip automatic build number/version code incrementing. Uses whatever version is already in the project files.')
   .option('--no-skip-build-number-bump', 'Override saved credentials to re-enable automatic build number incrementing for this build only.')
+  .option('--sync-ios-version', 'iOS: sync Xcode MARKETING_VERSION from package.json before uploading the project.')
   .option('--ai-analytics', 'On build failure, send logs to Capgo AI for diagnosis. In interactive terminals this skips the upfront confirmation; in CI this auto-uploads and prints the analysis to stderr.')
   .option('--no-prescan', 'Skip the automatic pre-build scan')
   .option('--prescan-ignore-fatal', 'Run the pre-build scan but never block the build (report only)')
@@ -937,6 +939,15 @@ Example: npx @capgo/cli@latest build request com.example.app --platform ios --pa
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
   .option('--verbose', optionDescriptions.verbose)
+
+build
+  .command('sync-ios-version')
+  .description(`Sync the local iOS Xcode MARKETING_VERSION from package.json.
+
+Example: npx @capgo/cli@latest build sync-ios-version --path .`)
+  .option('--path <path>', 'Path to the project directory (default: current directory)')
+  .option('--check', 'Check only; exit non-zero when MARKETING_VERSION is out of sync')
+  .action(syncIosMarketingVersionCommand)
 
 build
   .command('prescan [appId]')
