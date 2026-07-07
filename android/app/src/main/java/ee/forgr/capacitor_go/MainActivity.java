@@ -1,5 +1,6 @@
 package ee.forgr.capacitor_go;
 
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -68,12 +69,36 @@ public class MainActivity extends BridgeActivity {
                 .setTitle("Load preview?")
                 .setMessage(previewConfirmationMessage(previewUri))
                 .setNegativeButton("No", null)
-                .setPositiveButton("Load preview", (_dialog, _which) -> confirmPreviewIntent(confirmationIntent))
-                .setOnCancelListener(_dialog -> cancelPreviewConfirmation())
-                .setOnDismissListener(_dialog -> cancelPreviewConfirmation())
+                .setPositiveButton("Load preview", this::confirmPreviewFromDialog)
+                .setOnCancelListener(this::onPreviewDialogCancelled)
+                .setOnDismissListener(this::onPreviewDialogDismissed)
                 .create();
             previewConfirmationDialog.show();
         });
+    }
+
+    private void confirmPreviewFromDialog(DialogInterface dialog, int which) {
+        if (dialog == null && which != DialogInterface.BUTTON_POSITIVE) {
+            return;
+        }
+
+        confirmPreviewIntent(dialogPreviewIntent);
+    }
+
+    private void onPreviewDialogCancelled(DialogInterface dialog) {
+        if (dialog == null && !previewConfirmationVisible) {
+            return;
+        }
+
+        cancelPreviewConfirmation();
+    }
+
+    private void onPreviewDialogDismissed(DialogInterface dialog) {
+        if (dialog == null && !previewConfirmationVisible) {
+            return;
+        }
+
+        cancelPreviewConfirmation();
     }
 
     private void dismissPreviewConfirmationDialog() {
