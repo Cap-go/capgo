@@ -345,7 +345,7 @@ declare global {
   export type { BreadcrumbItem } from './stores/display'
   import('./stores/display')
   // @ts-ignore
-  export type { PasswordPolicyConfig, Organization, OrganizationRole, ExtendedOrganizationMember, ExtendedOrganizationMembers } from './stores/organization'
+  export type { PasswordPolicyConfig, Organization, OrganizationApp, OrganizationRole, ExtendedOrganizationMember, ExtendedOrganizationMembers } from './stores/organization'
   import('./stores/organization')
   // @ts-ignore
   export type { DeliveryPagination, TestResult, Webhook, WebhookDeliveryVersion } from './stores/webhooks'

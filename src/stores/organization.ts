@@ -30,6 +30,11 @@ export type Organization = Omit<RawOrganization, 'password_policy_config' | 'sta
   stats_refresh_requested_at: string | null
   stats_updated_at: string | null
 }
+export interface OrganizationApp {
+  app_id: string
+  name: string | null
+  owner_org: string
+}
 export type OrganizationRole
   = Database['public']['Enums']['user_min_right']
     | 'owner'
@@ -162,6 +167,8 @@ export const useOrganizationStore = defineStore('organization', () => {
   const main = useMainStore()
   const _organizations: Ref<Map<string, Organization>> = ref(new Map())
   const _organizationsByAppId: Ref<Map<string, Organization>> = ref(new Map())
+  const _appsByOrgId: Ref<Map<string, OrganizationApp[]>> = ref(new Map())
+  const _appsByAppId: Ref<Map<string, OrganizationApp>> = ref(new Map())
   const _initialLoadPromise = ref(createDeferredPromise<boolean>())
   const _initialized = ref(false)
 
@@ -350,13 +357,15 @@ export const useOrganizationStore = defineStore('organization', () => {
     const orgIds = selectableOrganizations.map(org => org.gid)
 
     if (orgIds.length === 0) {
+      _appsByOrgId.value = new Map()
+      _appsByAppId.value = new Map()
       _initialLoadPromise.value.resolve(true)
       return
     }
 
     const { error, data: allAppsByOwner } = await supabase
       .from('apps')
-      .select('app_id, owner_org')
+      .select('app_id, name, owner_org')
       .in('owner_org', orgIds)
 
     if (error) {
@@ -365,6 +374,8 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
 
     const organizationsByAppId = new Map<string, Organization>()
+    const appsByOrgId = new Map<string, OrganizationApp[]>()
+    const appsByAppId = new Map<string, OrganizationApp>()
 
     for (const app of allAppsByOwner) {
       // For each app find the org_id that owns said app
@@ -377,14 +388,38 @@ export const useOrganizationStore = defineStore('organization', () => {
       }
 
       organizationsByAppId.set(app.app_id, org)
+
+      const indexedApp: OrganizationApp = {
+        app_id: app.app_id,
+        name: app.name,
+        owner_org: app.owner_org,
+      }
+      appsByAppId.set(indexedApp.app_id, indexedApp)
+      const orgApps = appsByOrgId.get(indexedApp.owner_org) ?? []
+      orgApps.push(indexedApp)
+      appsByOrgId.set(indexedApp.owner_org, orgApps)
+    }
+
+    for (const apps of appsByOrgId.values()) {
+      apps.sort((a, b) => (a.name || a.app_id).localeCompare(b.name || b.app_id))
     }
 
     _organizationsByAppId.value = organizationsByAppId
+    _appsByOrgId.value = appsByOrgId
+    _appsByAppId.value = appsByAppId
     _initialLoadPromise.value.resolve(true)
   })
 
   const getOrgByAppId = (appId: string) => {
     return _organizationsByAppId.value.get(appId)
+  }
+
+  const getAppByAppId = (appId: string) => {
+    return _appsByAppId.value.get(appId)
+  }
+
+  const getAppsByOrgId = (orgId: string) => {
+    return _appsByOrgId.value.get(orgId) ?? []
   }
 
   const awaitInitialLoad = () => {
@@ -469,6 +504,8 @@ export const useOrganizationStore = defineStore('organization', () => {
           // Remove all from orgs
           _organizations.value = new Map()
           _organizationsByAppId.value = new Map()
+          _appsByOrgId.value = new Map()
+          _appsByAppId.value = new Map()
           _initialLoadPromise.value = createDeferredPromise<boolean>()
           currentOrganization.value = undefined
           currentRole.value = null
@@ -693,6 +730,8 @@ export const useOrganizationStore = defineStore('organization', () => {
     refreshOrganizationLogos,
     dedupFetchOrganizations,
     getOrgByAppId,
+    getAppByAppId,
+    getAppsByOrgId,
     awaitInitialLoad,
     deleteOrganization,
     canDeleteOrganization,
