@@ -2,11 +2,13 @@ import type { AnalyticsEngineDataset, D1Database, Hyperdrive, KVNamespace, Queue
 import type { Context } from 'hono'
 import type { DeviceComparable } from './deviceComparison.ts'
 import type { Database } from './supabase.types.ts'
-import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadStatsParams, StatsMetadata, VersionUsage, VersionUsageChannel } from './types.ts'
+import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadStatsInsightsParams, ReadStatsParams, StatsInsightsResult, StatsMetadata, VersionUsage, VersionUsageChannel } from './types.ts'
+import type { StatsInsightRawAction, StatsInsightRawDaily, StatsInsightRawDevice, StatsInsightRawSummary, StatsInsightRawVersion } from './statsInsights.ts'
 import dayjs from 'dayjs'
 import { CacheHelper } from './cache.ts'
 import { hasComparableDeviceChanged, toComparableDevice } from './deviceComparison.ts'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
+import { emptyStatsInsights, normalizeStatsInsightsResult } from './statsInsights.ts'
 import { DEFAULT_LIMIT } from './types.ts'
 import { getEnv } from './utils.ts'
 
@@ -1017,6 +1019,110 @@ LIMIT ${limit}`
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading stats list', error: serializeError(e), query })
   }
   return [] as StatRowCF[]
+}
+
+function buildStatsInsightsActionFilter(actions?: string[]) {
+  if (!actions?.length)
+    return ''
+
+  if (actions.length === 1)
+    return `AND blob2 = '${escapeSqlString(actions[0])}'`
+
+  const actionList = actions.map(action => `'${escapeSqlString(action)}'`).join(',')
+  return `AND blob2 IN (${actionList})`
+}
+
+export async function readStatsInsightsCF(c: Context, params: ReadStatsInsightsParams): Promise<StatsInsightsResult> {
+  const emptyResult = emptyStatsInsights()
+  if (!c.env.APP_LOG)
+    return emptyResult
+
+  const actionFilter = buildStatsInsightsActionFilter(params.actions)
+  const periodStart = formatDateCF(params.start_date)
+  const periodEnd = formatDateCF(params.end_date)
+  const baseWhere = `index1 = '${escapeSqlString(params.app_id)}'
+    AND timestamp >= toDateTime('${periodStart}')
+    AND timestamp < toDateTime('${periodEnd}')
+    ${actionFilter}`
+
+  const summaryQuery = `SELECT
+    count() AS total,
+    COUNT(DISTINCT blob1) AS device_count,
+    COUNT(DISTINCT blob2) AS action_count
+  FROM app_log
+  WHERE ${baseWhere}`
+
+  const actionsQuery = `SELECT
+    blob2 AS action,
+    count() AS total,
+    COUNT(DISTINCT blob1) AS device_count,
+    COUNT(DISTINCT blob3) AS version_count,
+    min(timestamp) AS first_seen,
+    max(timestamp) AS last_seen,
+    argMax(blob3, timestamp) AS latest_version_name,
+    argMax(blob1, timestamp) AS latest_device_id
+  FROM app_log
+  WHERE ${baseWhere}
+  GROUP BY action
+  ORDER BY total DESC
+  LIMIT 20`
+
+  const dailyQuery = `SELECT
+    formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
+    blob2 AS action,
+    count() AS total
+  FROM app_log
+  WHERE ${baseWhere}
+  GROUP BY date, action
+  ORDER BY date ASC, total DESC`
+
+  const versionsQuery = `SELECT
+    blob2 AS action,
+    blob3 AS version_name,
+    count() AS total,
+    COUNT(DISTINCT blob1) AS device_count,
+    max(timestamp) AS last_seen
+  FROM app_log
+  WHERE ${baseWhere}
+  GROUP BY action, version_name
+  ORDER BY total DESC
+  LIMIT 30`
+
+  const devicesQuery = `SELECT
+    blob2 AS action,
+    blob1 AS device_id,
+    count() AS total,
+    argMax(blob3, timestamp) AS version_name,
+    max(timestamp) AS last_seen
+  FROM app_log
+  WHERE ${baseWhere}
+  GROUP BY action, device_id
+  ORDER BY total DESC
+  LIMIT 30`
+
+  cloudlog({ requestId: c.get('requestId'), message: 'readStatsInsightsCF queries', appId: params.app_id, start: params.start_date, end: params.end_date, actions: params.actions })
+
+  try {
+    const [summaryRows, actionRows, dailyRows, versionRows, deviceRows] = await Promise.all([
+      runQueryToCFA<StatsInsightRawSummary>(c, summaryQuery),
+      runQueryToCFA<StatsInsightRawAction>(c, actionsQuery),
+      runQueryToCFA<StatsInsightRawDaily>(c, dailyQuery),
+      runQueryToCFA<StatsInsightRawVersion>(c, versionsQuery),
+      runQueryToCFA<StatsInsightRawDevice>(c, devicesQuery),
+    ])
+
+    return normalizeStatsInsightsResult({
+      summary: summaryRows[0],
+      actions: actionRows,
+      daily: dailyRows,
+      versions: versionRows,
+      devices: deviceRows,
+    })
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading stats insights', error: serializeError(e), queries: { summaryQuery, actionsQuery, dailyQuery, versionsQuery, devicesQuery } })
+    return emptyResult
+  }
 }
 
 export async function getAppsFromCF(c: Context, referenceDate?: Date): Promise<{ app_id: string }[]> {

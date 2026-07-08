@@ -2,16 +2,17 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
-import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadDevicesResponse, ReadStatsParams, StatsActions, StatsMetadata, VersionUsage, VersionUsageChannel } from './types.ts'
+import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadDevicesResponse, ReadStatsInsightsParams, ReadStatsParams, StatsActions, StatsInsightAction, StatsInsightDaily, StatsInsightDevice, StatsInsightsResult, StatsInsightVersion, StatsMetadata, VersionUsage, VersionUsageChannel } from './types.ts'
 import { getRuntimeKey } from 'hono/adapter'
-import { countDevicesCF, countInstallSourcesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readDeviceVersionCountsCF, readNativeVersionUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
+import { countDevicesCF, countInstallSourcesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readDeviceVersionCountsCF, readNativeVersionUsageCF, readStatsCF, readStatsInsightsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
 import { isDemoApp } from './demo.ts'
 import { simpleError, simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
-import { countDevicesSB, countInstallSourcesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readDeviceVersionCountsSB, readNativeVersionUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
+import { countDevicesSB, countInstallSourcesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readDeviceVersionCountsSB, readNativeVersionUsageSB, readStatsSB, readStatsInsightsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
 import { logSkippedSupabaseWrite, shouldSkipSupabaseStatsFallback } from './supabase_write_guard.ts'
 import { DEFAULT_LIMIT } from './types.ts'
 import { backgroundTask, getEnv, isInternalVersionName } from './utils.ts'
+import { normalizeStatsInsightDate, normalizeStatsInsightNumber, sortStatsInsightTotals } from './statsInsights.ts'
 
 export function createStatsMau(c: Context, device_id: string, app_id: string, org_id: string, platform: string, version_build?: string | null): Promise<void> {
   const lowerDeviceId = device_id
@@ -364,6 +365,126 @@ export async function readStats(c: Context<MiddlewareKeyVariables>, params: Read
   if (!c.env.APP_LOG)
     return readStatsSB(c, params)
   return readStatsCF(c, params)
+}
+
+interface StatsInsightSourceRow {
+  action: string
+  device_id: string
+  version_name: string
+  created_at: string
+}
+
+export function buildStatsInsightsFromRows(rows: StatsInsightSourceRow[]): StatsInsightsResult {
+  const actionMap = new Map<string, StatsInsightAction & { devices: Set<string>, versions: Set<string> }>()
+  const dailyMap = new Map<string, StatsInsightDaily>()
+  const versionMap = new Map<string, StatsInsightVersion>()
+  const deviceMap = new Map<string, StatsInsightDevice>()
+  const allDevices = new Set<string>()
+
+  rows.forEach((row) => {
+    const action = row.action || 'unknown'
+    const deviceId = row.device_id || ''
+    const versionName = row.version_name || 'unknown'
+    const createdAt = normalizeStatsInsightDate(row.created_at)
+    allDevices.add(deviceId)
+
+    const actionEntry = actionMap.get(action) ?? {
+      action,
+      total: 0,
+      device_count: 0,
+      version_count: 0,
+      first_seen: createdAt,
+      last_seen: createdAt,
+      latest_version_name: versionName,
+      latest_device_id: deviceId,
+      devices: new Set<string>(),
+      versions: new Set<string>(),
+    }
+    actionEntry.total += 1
+    actionEntry.devices.add(deviceId)
+    actionEntry.versions.add(versionName)
+    if (createdAt && (!actionEntry.first_seen || createdAt < actionEntry.first_seen))
+      actionEntry.first_seen = createdAt
+    if (createdAt && (!actionEntry.last_seen || createdAt > actionEntry.last_seen)) {
+      actionEntry.last_seen = createdAt
+      actionEntry.latest_version_name = versionName
+      actionEntry.latest_device_id = deviceId
+    }
+    actionMap.set(action, actionEntry)
+
+    if (createdAt) {
+      const date = createdAt.slice(0, 10)
+      const dailyKey = `${date}:${action}`
+      const dailyEntry = dailyMap.get(dailyKey) ?? { date, action, total: 0 }
+      dailyEntry.total += 1
+      dailyMap.set(dailyKey, dailyEntry)
+    }
+
+    const versionKey = `${action}:${versionName}`
+    const versionEntry = versionMap.get(versionKey) ?? { action, version_name: versionName, total: 0, device_count: 0, last_seen: createdAt }
+    versionEntry.total += 1
+    if (createdAt && (!versionEntry.last_seen || createdAt > versionEntry.last_seen))
+      versionEntry.last_seen = createdAt
+    versionMap.set(versionKey, versionEntry)
+
+    const deviceKey = `${action}:${deviceId}`
+    const deviceEntry = deviceMap.get(deviceKey) ?? { action, device_id: deviceId, total: 0, version_name: versionName, last_seen: createdAt }
+    deviceEntry.total += 1
+    if (createdAt && (!deviceEntry.last_seen || createdAt > deviceEntry.last_seen)) {
+      deviceEntry.last_seen = createdAt
+      deviceEntry.version_name = versionName
+    }
+    deviceMap.set(deviceKey, deviceEntry)
+  })
+
+  const versionDeviceSets = new Map<string, Set<string>>()
+  rows.forEach((row) => {
+    const key = `${row.action || 'unknown'}:${row.version_name || 'unknown'}`
+    const devices = versionDeviceSets.get(key) ?? new Set<string>()
+    devices.add(row.device_id || '')
+    versionDeviceSets.set(key, devices)
+  })
+
+  const actions = sortStatsInsightTotals([...actionMap.values()].map(({ devices, versions, ...entry }) => ({
+    ...entry,
+    total: normalizeStatsInsightNumber(entry.total),
+    device_count: devices.size,
+    version_count: versions.size,
+  })), 20)
+
+  const versions = sortStatsInsightTotals([...versionMap.entries()].map(([key, entry]) => ({
+    ...entry,
+    total: normalizeStatsInsightNumber(entry.total),
+    device_count: versionDeviceSets.get(key)?.size ?? 0,
+  })), 30)
+
+  const devices = sortStatsInsightTotals([...deviceMap.values()].map(entry => ({
+    ...entry,
+    total: normalizeStatsInsightNumber(entry.total),
+  })), 30)
+
+  return {
+    summary: {
+      total: rows.length,
+      device_count: allDevices.size,
+      action_count: actionMap.size,
+    },
+    actions,
+    daily: [...dailyMap.values()].sort((left, right) => left.date.localeCompare(right.date) || right.total - left.total),
+    versions,
+    devices,
+  }
+}
+
+export async function readStatsInsights(c: Context<MiddlewareKeyVariables>, params: ReadStatsInsightsParams) {
+  if (await isDemoApp(c, params.app_id)) {
+    const demoLogs = await generateDemoLogs(c, { ...params, limit: 10_000 })
+    return buildStatsInsightsFromRows(demoLogs)
+  }
+
+  if (!c.env.APP_LOG)
+    return readStatsInsightsSB(c, params)
+  return readStatsInsightsCF(c, params)
 }
 
 export function countDevices(

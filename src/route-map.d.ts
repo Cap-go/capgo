@@ -283,6 +283,13 @@ declare module 'vue-router/auto-routes' {
       { app: ParamValue<false> },
       | never
     >,
+    '/app/[app].logs.raw': RouteRecordInfo<
+      '/app/[app].logs.raw',
+      '/app/:app/logs/raw',
+      { app: ParamValue<true> },
+      { app: ParamValue<false> },
+      | never
+    >,
     '/app/[app].notifications': RouteRecordInfo<
       '/app/[app].notifications',
       '/app/:app/notifications',
@@ -900,6 +907,14 @@ declare module 'vue-router/auto-routes' {
     'src/pages/app/[app].logs.vue': {
       routes:
         | '/app/[app].logs'
+      views:
+        | never
+      pathParamNames:
+        | 'app'
+    }
+    'src/pages/app/[app].logs.raw.vue': {
+      routes:
+        | '/app/[app].logs.raw'
       views:
         | never
       pathParamNames:
