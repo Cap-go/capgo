@@ -234,12 +234,118 @@ AS $$
     AND orgs.id = ANY(COALESCE((SELECT "public"."orgs_readable_org_ids"()), '{}'::uuid[]))
 $$;
 
+CREATE OR REPLACE FUNCTION "public"."current_user_member_org_ids"()
+RETURNS "uuid"[]
+LANGUAGE "sql" STABLE SECURITY DEFINER
+SET "search_path" TO ''
+AS $$
+  SELECT COALESCE(array_agg(DISTINCT org_users.org_id), '{}'::uuid[])
+  FROM "public"."org_users"
+  WHERE org_users.user_id = (SELECT "auth"."uid"())
+$$;
+
+CREATE OR REPLACE FUNCTION "public"."role_bindings_readable_ids"()
+RETURNS "uuid"[]
+LANGUAGE "sql" STABLE SECURITY DEFINER
+SET "search_path" TO ''
+AS $$
+  WITH actor AS (
+    SELECT (SELECT "auth"."uid"()) AS user_id
+  ),
+  admin_orgs AS (
+    SELECT DISTINCT role_bindings.org_id
+    FROM "public"."role_bindings"
+    INNER JOIN "public"."roles" ON roles.id = role_bindings.role_id
+    INNER JOIN actor ON actor.user_id IS NOT NULL
+    WHERE role_bindings.principal_type = "public"."rbac_principal_user"()
+      AND role_bindings.principal_id = actor.user_id
+      AND role_bindings.scope_type = "public"."rbac_scope_org"()
+      AND role_bindings.org_id IS NOT NULL
+      AND roles.name IN ("public"."rbac_role_org_super_admin"(), "public"."rbac_role_org_admin"())
+  ),
+  admin_apps AS (
+    SELECT DISTINCT apps.id AS app_id
+    FROM "public"."apps"
+    INNER JOIN admin_orgs ON admin_orgs.org_id = apps.owner_org
+
+    UNION
+
+    SELECT DISTINCT role_bindings.app_id
+    FROM "public"."role_bindings"
+    INNER JOIN "public"."roles" ON roles.id = role_bindings.role_id
+    INNER JOIN actor ON actor.user_id IS NOT NULL
+    WHERE role_bindings.principal_type = "public"."rbac_principal_user"()
+      AND role_bindings.principal_id = actor.user_id
+      AND role_bindings.scope_type = "public"."rbac_scope_app"()
+      AND role_bindings.app_id IS NOT NULL
+      AND roles.name IN (
+        "public"."rbac_role_app_admin"(),
+        "public"."rbac_role_org_super_admin"(),
+        "public"."rbac_role_org_admin"()
+      )
+  ),
+  member_apps AS (
+    SELECT DISTINCT role_bindings.app_id
+    FROM "public"."role_bindings"
+    INNER JOIN actor ON actor.user_id IS NOT NULL
+    WHERE role_bindings.principal_type = "public"."rbac_principal_user"()
+      AND role_bindings.principal_id = actor.user_id
+      AND role_bindings.scope_type = "public"."rbac_scope_app"()
+      AND role_bindings.app_id IS NOT NULL
+  ),
+  admin_channels AS (
+    SELECT DISTINCT channels.rbac_id AS channel_id
+    FROM "public"."channels"
+    INNER JOIN "public"."apps" ON apps.app_id = channels.app_id
+    WHERE channels.rbac_id IS NOT NULL
+      AND apps.id IN (SELECT admin_apps.app_id FROM admin_apps)
+  )
+  SELECT COALESCE(array_agg(DISTINCT role_bindings.id), '{}'::uuid[])
+  FROM "public"."role_bindings"
+  WHERE role_bindings.org_id IN (SELECT admin_orgs.org_id FROM admin_orgs)
+    OR (
+      role_bindings.scope_type = "public"."rbac_scope_app"()
+      AND role_bindings.app_id IN (SELECT admin_apps.app_id FROM admin_apps)
+    )
+    OR (
+      role_bindings.scope_type = "public"."rbac_scope_app"()
+      AND role_bindings.app_id IN (SELECT member_apps.app_id FROM member_apps)
+    )
+    OR (
+      role_bindings.scope_type = "public"."rbac_scope_channel"()
+      AND role_bindings.channel_id IN (SELECT admin_channels.channel_id FROM admin_channels)
+    )
+$$;
+
+CREATE OR REPLACE FUNCTION "public"."channel_permission_override_readable_channel_ids"()
+RETURNS bigint[]
+LANGUAGE "sql" STABLE SECURITY DEFINER
+SET "search_path" TO ''
+AS $$
+  WITH allowed_apps AS (
+    SELECT apps.app_id
+    FROM "public"."apps"
+    WHERE "public"."rbac_check_permission"(
+      "public"."rbac_perm_app_update_user_roles"(),
+      apps.owner_org,
+      apps.app_id,
+      NULL::bigint
+    )
+  )
+  SELECT COALESCE(array_agg(DISTINCT channels.id), '{}'::bigint[])
+  FROM "public"."channels"
+  WHERE channels.app_id IN (SELECT allowed_apps.app_id FROM allowed_apps)
+$$;
+
 ALTER FUNCTION "public"."orgs_with_min_right"("public"."user_min_right") OWNER TO "postgres";
 ALTER FUNCTION "public"."orgs_readable_org_ids"() OWNER TO "postgres";
 ALTER FUNCTION "public"."org_member_readable_org_ids"() OWNER TO "postgres";
 ALTER FUNCTION "public"."readable_app_version_ids"() OWNER TO "postgres";
 ALTER FUNCTION "public"."readable_group_ids"() OWNER TO "postgres";
 ALTER FUNCTION "public"."readable_org_customer_ids"() OWNER TO "postgres";
+ALTER FUNCTION "public"."current_user_member_org_ids"() OWNER TO "postgres";
+ALTER FUNCTION "public"."role_bindings_readable_ids"() OWNER TO "postgres";
+ALTER FUNCTION "public"."channel_permission_override_readable_channel_ids"() OWNER TO "postgres";
 
 REVOKE ALL ON FUNCTION "public"."orgs_with_min_right"("public"."user_min_right") FROM PUBLIC;
 REVOKE ALL ON FUNCTION "public"."orgs_readable_org_ids"() FROM PUBLIC;
@@ -247,6 +353,9 @@ REVOKE ALL ON FUNCTION "public"."org_member_readable_org_ids"() FROM PUBLIC;
 REVOKE ALL ON FUNCTION "public"."readable_app_version_ids"() FROM PUBLIC;
 REVOKE ALL ON FUNCTION "public"."readable_group_ids"() FROM PUBLIC;
 REVOKE ALL ON FUNCTION "public"."readable_org_customer_ids"() FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."current_user_member_org_ids"() FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."role_bindings_readable_ids"() FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."channel_permission_override_readable_channel_ids"() FROM PUBLIC;
 
 GRANT EXECUTE ON FUNCTION "public"."orgs_with_min_right"("public"."user_min_right") TO "anon";
 GRANT EXECUTE ON FUNCTION "public"."orgs_with_min_right"("public"."user_min_right") TO "authenticated";
@@ -265,6 +374,12 @@ GRANT EXECUTE ON FUNCTION "public"."readable_group_ids"() TO "service_role";
 GRANT EXECUTE ON FUNCTION "public"."readable_org_customer_ids"() TO "anon";
 GRANT EXECUTE ON FUNCTION "public"."readable_org_customer_ids"() TO "authenticated";
 GRANT EXECUTE ON FUNCTION "public"."readable_org_customer_ids"() TO "service_role";
+GRANT EXECUTE ON FUNCTION "public"."current_user_member_org_ids"() TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."current_user_member_org_ids"() TO "service_role";
+GRANT EXECUTE ON FUNCTION "public"."role_bindings_readable_ids"() TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."role_bindings_readable_ids"() TO "service_role";
+GRANT EXECUTE ON FUNCTION "public"."channel_permission_override_readable_channel_ids"() TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."channel_permission_override_readable_channel_ids"() TO "service_role";
 
 COMMENT ON FUNCTION "public"."orgs_with_min_right"("public"."user_min_right") IS
 'Returns org IDs matching a minimum right for the current authenticated user or Capgo API key. API-key requests only use org-scoped API-key bindings, then exact-check each candidate with the existing RBAC permission path.';
@@ -278,6 +393,12 @@ COMMENT ON FUNCTION "public"."readable_group_ids"() IS
 'Returns group IDs readable by the current authenticated user. Group RLS uses this statement-level helper instead of checking group membership and org admin rights per row.';
 COMMENT ON FUNCTION "public"."readable_org_customer_ids"() IS
 'Returns Stripe customer IDs for readable orgs. Stripe RLS uses this statement-level helper instead of joining orgs and running org authorization per row.';
+COMMENT ON FUNCTION "public"."current_user_member_org_ids"() IS
+'Returns org IDs where the current authenticated user has an org membership. Deploy history RLS uses this statement-level helper instead of checking org_users for every deploy_history row.';
+COMMENT ON FUNCTION "public"."role_bindings_readable_ids"() IS
+'Returns role binding IDs visible to the current authenticated user from set-based admin, app, and channel scope calculations. Role bindings RLS uses this statement-level helper instead of calling RBAC helper functions per row.';
+COMMENT ON FUNCTION "public"."channel_permission_override_readable_channel_ids"() IS
+'Returns channel IDs whose permission overrides can be managed by the current authenticated user. Channel override RLS uses this statement-level helper instead of checking app role permissions for every override row.';
 
 DROP POLICY IF EXISTS "Allow select for auth, api keys (read+)"
 ON "public"."orgs";
@@ -336,6 +457,17 @@ USING (
   "app_id" = ANY(COALESCE((SELECT "public"."app_versions_readable_app_ids"()), '{}'::character varying[]))
 );
 
+DROP POLICY IF EXISTS "compatibility_events_select"
+ON "public"."compatibility_events";
+
+CREATE POLICY "compatibility_events_select"
+ON "public"."compatibility_events"
+FOR SELECT
+TO "authenticated"
+USING (
+  "app_id" = ANY(COALESCE((SELECT "public"."app_versions_readable_app_ids"()), '{}'::character varying[]))
+);
+
 DROP POLICY IF EXISTS "Allow read for auth, api keys (read+)"
 ON "public"."channel_devices";
 
@@ -345,6 +477,17 @@ FOR SELECT
 TO "anon", "authenticated"
 USING (
   "app_id" = ANY(COALESCE((SELECT "public"."app_versions_readable_app_ids"()), '{}'::character varying[]))
+);
+
+DROP POLICY IF EXISTS "channel_permission_overrides_admin_select"
+ON "public"."channel_permission_overrides";
+
+CREATE POLICY "channel_permission_overrides_admin_select"
+ON "public"."channel_permission_overrides"
+FOR SELECT
+TO "authenticated"
+USING (
+  "channel_id" = ANY(COALESCE((SELECT "public"."channel_permission_override_readable_channel_ids"()), '{}'::bigint[]))
 );
 
 DROP POLICY IF EXISTS "Allow select for auth, api keys (read+)"
@@ -435,6 +578,17 @@ USING (
   "app_id" = ANY(COALESCE((SELECT "public"."app_versions_readable_app_ids"()), '{}'::character varying[]))
 );
 
+DROP POLICY IF EXISTS "Allow users to view deploy history for their org"
+ON "public"."deploy_history";
+
+CREATE POLICY "Allow users to view deploy history for their org"
+ON "public"."deploy_history"
+FOR SELECT
+TO "authenticated"
+USING (
+  "owner_org" = ANY(COALESCE((SELECT "public"."current_user_member_org_ids"()), '{}'::uuid[]))
+);
+
 DROP POLICY IF EXISTS "groups_select"
 ON "public"."groups";
 
@@ -477,6 +631,42 @@ FOR SELECT
 TO "anon", "authenticated"
 USING (
   "org_id" = ANY(COALESCE((SELECT "public"."org_member_readable_org_ids"()), '{}'::uuid[]))
+);
+
+DROP POLICY IF EXISTS "Allow viewing role bindings with permission"
+ON "public"."role_bindings";
+
+DROP POLICY IF EXISTS "role_bindings_select"
+ON "public"."role_bindings";
+
+CREATE POLICY "role_bindings_select"
+ON "public"."role_bindings"
+FOR SELECT
+TO "authenticated"
+USING (
+  "id" = ANY(COALESCE((SELECT "public"."role_bindings_readable_ids"()), '{}'::uuid[]))
+);
+
+DROP POLICY IF EXISTS "Allow admin to select webhooks"
+ON "public"."webhooks";
+
+CREATE POLICY "Allow admin to select webhooks"
+ON "public"."webhooks"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "org_id" = ANY(COALESCE((SELECT "public"."orgs_with_min_right"('admin'::"public"."user_min_right")), '{}'::uuid[]))
+);
+
+DROP POLICY IF EXISTS "Allow org members to select webhook_deliveries"
+ON "public"."webhook_deliveries";
+
+CREATE POLICY "Allow org members to select webhook_deliveries"
+ON "public"."webhook_deliveries"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "org_id" = ANY(COALESCE((SELECT "public"."orgs_readable_org_ids"()), '{}'::uuid[]))
 );
 
 DROP POLICY IF EXISTS "allow_org_admins_select_sso_providers"
