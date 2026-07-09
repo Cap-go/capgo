@@ -42,7 +42,7 @@ const isDomainChecking = ref(false)
 const isCheckingSavedSession = ref(true)
 const captchaStatus = ref<'disabled' | 'loading' | 'ready' | 'unavailable'>(captchaKey.value ? 'loading' : 'disabled')
 let captchaInitTimeout: ReturnType<typeof setTimeout> | null = null
-const forgotPasswordEmailStorageKey = 'capgo:forgot-password-email'
+const resetEmailStorageKey = 'capgo:reset-email'
 
 const version = import.meta.env.VITE_APP_VERSION
 const isEmailStepBusy = computed(() => isDomainChecking.value || isCheckingSavedSession.value)
@@ -450,9 +450,9 @@ async function goBackToEmail() {
 async function goToForgotPassword() {
   if (typeof sessionStorage !== 'undefined') {
     if (emailForLogin.value)
-      sessionStorage.setItem(forgotPasswordEmailStorageKey, emailForLogin.value)
+      sessionStorage.setItem(resetEmailStorageKey, emailForLogin.value)
     else
-      sessionStorage.removeItem(forgotPasswordEmailStorageKey)
+      sessionStorage.removeItem(resetEmailStorageKey)
   }
 
   await router.push('/forgot_password')
