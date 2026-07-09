@@ -446,6 +446,13 @@ async function goBackToEmail() {
   focusLoginEmailInput()
 }
 
+async function goToForgotPassword() {
+  await router.push({
+    path: '/forgot_password',
+    state: emailForLogin.value ? { resetEmail: emailForLogin.value } : undefined,
+  })
+}
+
 async function checkAuthUser() {
   const { data: mfaData, error: mfaError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
   if (mfaError) {
@@ -994,13 +1001,14 @@ onMounted(checkLogin)
                           >
                             {{ t('create-a-free-account') }}
                           </a>
-                          <router-link
-                            to="/forgot_password"
+                          <button
+                            type="button"
                             data-test="forgot-password"
                             :class="authInlineLinkClass"
+                            @click="goToForgotPassword"
                           >
                             {{ t('forgot') }} {{ t('password') }} ?
-                          </router-link>
+                          </button>
                         </div>
                       </div>
                     </FormKit>
