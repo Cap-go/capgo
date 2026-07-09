@@ -10,7 +10,12 @@ ACTUAL_SCHEMA_CATALOG="$(mktemp)"
 SYNC_RESPONSE="$(mktemp)"
 WRANGLER_LOG="$(mktemp)"
 PORT="${READ_REPLICA_SCHEMA_CHECK_PORT:-8799}"
-SYNC_MAX_TIME="${READ_REPLICA_SCHEMA_SYNC_MAX_TIME:-600}"
+SYNC_MAX_TIME="${READ_REPLICA_SCHEMA_SYNC_MAX_TIME:-1800}"
+if ! [[ "$SYNC_MAX_TIME" =~ ^[0-9]+$ ]] || (( SYNC_MAX_TIME <= 30 )); then
+  echo '::error title=Invalid read-replica schema sync timeout::READ_REPLICA_SCHEMA_SYNC_MAX_TIME must be an integer greater than 30 seconds.'
+  exit 1
+fi
+SYNC_MAX_DURATION_MS="$(( (SYNC_MAX_TIME - 15) * 1000 ))"
 WORKER_PID=''
 SCHEMA_CHECK_TOKEN="$(bun --silent -e 'const bytes = crypto.getRandomValues(new Uint8Array(32)); console.log(Buffer.from(bytes).toString("hex"))')"
 
@@ -63,6 +68,7 @@ fi
 SYNC_STATUS="$(curl -sS --connect-timeout 10 --max-time "$SYNC_MAX_TIME" \
   --header "authorization: Bearer ${SCHEMA_CHECK_TOKEN}" \
   --header 'content-type: application/json' \
+  --header "x-schema-sync-max-duration-ms: ${SYNC_MAX_DURATION_MS}" \
   --data-binary "@${EXPECTED_SCHEMA_CATALOG}" \
   -w '%{http_code}' \
   -o "$SYNC_RESPONSE" \

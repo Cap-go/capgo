@@ -60,9 +60,17 @@ export interface AdditiveSchemaSyncResult {
   skipped: SkippedChange[]
 }
 
+export interface AdditiveSchemaSyncOptions {
+  statementTimeoutMs?: number
+  maxDurationMs?: number
+}
+
 const SAFE_IDENTIFIER_RE = /^[A-Za-z_]\w*$/
 const SAFE_SQL_FRAGMENT_RE = /^[\w .()[\],:'"{}+\-=<>!]+$/
 const REPLICA_TABLE_SET = new Set<string>(REPLICA_TABLES)
+const DEFAULT_SCHEMA_SYNC_STATEMENT_TIMEOUT_MS = 550_000
+const DEFAULT_SCHEMA_SYNC_MAX_DURATION_MS = 585_000
+const SCHEMA_SYNC_RESPONSE_BUFFER_MS = 5_000
 
 export function planReadReplicaAdditiveSchemaSync(expected: unknown, actual: unknown): AdditiveSchemaSyncPlan {
   const expectedCatalog = assertSchemaCatalog(expected)
@@ -177,17 +185,41 @@ export function planReadReplicaAdditiveSchemaSync(expected: unknown, actual: unk
   return { statements, skipped }
 }
 
-export async function applyReadReplicaAdditiveSchemaSync(client: Queryable, expected: unknown): Promise<AdditiveSchemaSyncResult> {
+export async function applyReadReplicaAdditiveSchemaSync(client: Queryable, expected: unknown, options: AdditiveSchemaSyncOptions = {}): Promise<AdditiveSchemaSyncResult> {
   const actual = await readReplicaSchemaCatalog(client)
   const plan = planReadReplicaAdditiveSchemaSync(expected, actual)
+  const statementTimeoutMs = positiveIntegerOrDefault(options.statementTimeoutMs, DEFAULT_SCHEMA_SYNC_STATEMENT_TIMEOUT_MS)
+  const deadline = Date.now() + positiveIntegerOrDefault(options.maxDurationMs, DEFAULT_SCHEMA_SYNC_MAX_DURATION_MS)
 
-  for (const statement of plan.statements)
-    await client.query(statement.sql)
+  try {
+    for (const statement of plan.statements) {
+      await setStatementTimeoutForRemainingBudget(client, statementTimeoutMs, deadline, statement)
+      await client.query(statement.sql)
+    }
+  }
+  finally {
+    await client.query('RESET statement_timeout')
+  }
 
   return {
     applied: plan.statements.map(({ kind, table, name }) => ({ kind, table, name })),
     skipped: plan.skipped,
   }
+}
+
+async function setStatementTimeoutForRemainingBudget(client: Queryable, maxStatementTimeoutMs: number, deadline: number, statement: SyncStatement): Promise<void> {
+  const remainingMs = deadline - Date.now() - SCHEMA_SYNC_RESPONSE_BUFFER_MS
+  if (remainingMs <= 0)
+    throw new Error(`Read-replica additive schema sync exceeded max duration before ${statement.kind} ${statement.table}.${statement.name}`)
+
+  await client.query(`SET statement_timeout = ${Math.min(maxStatementTimeoutMs, remainingMs)}`)
+}
+
+function positiveIntegerOrDefault(value: number | undefined, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0)
+    return fallback
+
+  return Math.trunc(value)
 }
 
 function assertSchemaCatalog(value: unknown): SchemaCatalog {
@@ -294,7 +326,7 @@ function buildCreateIndexStatement(index: SchemaIndex, actualTables: Set<string>
 }
 
 function buildReindexIndexStatement(index: SchemaIndex, actualTables: Set<string>): string | null {
-  if (!isSafeReplicaTable(index.table, actualTables) || !isSafeIdentifier(index.name))
+  if (!isSafeReplicaTable(index.table, actualTables) || !isSafeQuotedIdentifier(index.name))
     return null
 
   return `REINDEX INDEX CONCURRENTLY public.${quoteIdent(index.name)}`
@@ -371,6 +403,10 @@ function indexTailReferencesColumn(indexTail: string, column: string): boolean {
 
 function isSafeIdentifier(value: string): boolean {
   return SAFE_IDENTIFIER_RE.test(value)
+}
+
+function isSafeQuotedIdentifier(value: string): boolean {
+  return value.length > 0 && !value.includes('\0')
 }
 
 function escapeRegExp(value: string): string {

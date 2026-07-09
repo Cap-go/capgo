@@ -23,7 +23,7 @@ Optional overrides:
 | `READ_REPLICA_SLOT_NAME` | Slot name on Supabase |
 | `READ_REPLICA_FULL_RESET=1` | Allow full target reset in `replicate_to_replica.sh` |
 | `READ_REPLICA_SUBSCRIPTION_ONLY=1` | Recreate only the subscription |
-| `READ_REPLICA_SCHEMA_SYNC_MAX_TIME` | Max seconds for the Hyperdrive additive schema sync call |
+| `READ_REPLICA_SCHEMA_SYNC_MAX_TIME` | Max seconds for the Hyperdrive additive schema sync call; defaults to `1800` and the worker deadline is 15s shorter |
 
 If subscription name is not provided, scripts discover it from `pg_subscription`.
 If exactly one subscription exists, it is used. If multiple subscriptions exist,

@@ -10,6 +10,7 @@ interface Env {
 
 const textEncoder = new TextEncoder()
 const SCHEMA_SYNC_STATEMENT_TIMEOUT_MS = 550_000
+const SCHEMA_SYNC_MAX_DURATION_HEADER = 'x-schema-sync-max-duration-ms'
 
 type SchemaRoute = 'catalog' | 'sync-additive'
 
@@ -94,9 +95,27 @@ async function handleAdditiveSync(request: Request, pool: Pool): Promise<Respons
     return Response.json({ error: 'invalid_schema_catalog_json' }, { status: 400 })
   }
 
-  await pool.query(`SET statement_timeout = ${SCHEMA_SYNC_STATEMENT_TIMEOUT_MS}`)
-  const result = await applyReadReplicaAdditiveSchemaSync(pool, expectedCatalog)
+  const maxDurationMs = schemaSyncMaxDurationMs(request)
+  if (maxDurationMs instanceof Response)
+    return maxDurationMs
+
+  const result = await applyReadReplicaAdditiveSchemaSync(pool, expectedCatalog, {
+    maxDurationMs,
+    statementTimeoutMs: SCHEMA_SYNC_STATEMENT_TIMEOUT_MS,
+  })
   return Response.json(result)
+}
+
+function schemaSyncMaxDurationMs(request: Request): number | Response {
+  const value = request.headers.get(SCHEMA_SYNC_MAX_DURATION_HEADER)
+  if (!value)
+    return SCHEMA_SYNC_STATEMENT_TIMEOUT_MS
+
+  const durationMs = Number(value)
+  if (!Number.isSafeInteger(durationMs) || durationMs <= 0)
+    return Response.json({ error: 'invalid_schema_sync_max_duration' }, { status: 400 })
+
+  return durationMs
 }
 
 function hasExpectedAuthorization(request: Request, expectedToken: string): boolean {
