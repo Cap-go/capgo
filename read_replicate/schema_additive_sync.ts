@@ -114,22 +114,43 @@ export function planReadReplicaAdditiveSchemaSync(expected: unknown, actual: unk
       continue
     }
 
-    if (expectedConstraintIndexes.has(index.name)) {
-      skipped.push({
-        kind: 'index',
-        table: index.table,
-        name: index.name,
-        reason: 'constraint_owned_index',
-      })
-      continue
-    }
-
     if (actualIndex && actualIndex.table !== index.table) {
       skipped.push({
         kind: 'index',
         table: index.table,
         name: index.name,
         reason: 'index_name_conflict',
+      })
+      continue
+    }
+
+    if (actualIndex) {
+      const reindexSql = buildReindexIndexStatement(index, actualTables)
+      if (!reindexSql) {
+        skipped.push({
+          kind: 'index',
+          table: index.table,
+          name: index.name,
+          reason: 'unsupported_additive_index',
+        })
+        continue
+      }
+
+      statements.push({
+        kind: 'invalid_index',
+        table: index.table,
+        name: index.name,
+        sql: reindexSql,
+      })
+      continue
+    }
+
+    if (expectedConstraintIndexes.has(index.name)) {
+      skipped.push({
+        kind: 'index',
+        table: index.table,
+        name: index.name,
+        reason: 'constraint_owned_index',
       })
       continue
     }
@@ -141,16 +162,6 @@ export function planReadReplicaAdditiveSchemaSync(expected: unknown, actual: unk
         table: index.table,
         name: index.name,
         reason: 'unsupported_additive_index',
-      })
-      continue
-    }
-
-    if (actualIndex) {
-      statements.push({
-        kind: 'invalid_index',
-        table: index.table,
-        name: index.name,
-        sql: buildReindexIndexStatement(index),
       })
       continue
     }
@@ -282,7 +293,10 @@ function buildCreateIndexStatement(index: SchemaIndex, actualTables: Set<string>
   return `CREATE ${unique}INDEX CONCURRENTLY IF NOT EXISTS ${quoteIdent(index.name)} ON ${quoteQualifiedTable(index.table)} ${indexTail}`
 }
 
-function buildReindexIndexStatement(index: SchemaIndex): string {
+function buildReindexIndexStatement(index: SchemaIndex, actualTables: Set<string>): string | null {
+  if (!isSafeReplicaTable(index.table, actualTables) || !isSafeIdentifier(index.name))
+    return null
+
   return `REINDEX INDEX CONCURRENTLY public.${quoteIdent(index.name)}`
 }
 

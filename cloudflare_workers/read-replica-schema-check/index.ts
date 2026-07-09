@@ -9,6 +9,7 @@ interface Env {
 }
 
 const textEncoder = new TextEncoder()
+const SCHEMA_SYNC_STATEMENT_TIMEOUT_MS = 550_000
 
 type SchemaRoute = 'catalog' | 'sync-additive'
 
@@ -93,6 +94,7 @@ async function handleAdditiveSync(request: Request, pool: Pool): Promise<Respons
     return Response.json({ error: 'invalid_schema_catalog_json' }, { status: 400 })
   }
 
+  await pool.query(`SET statement_timeout = ${SCHEMA_SYNC_STATEMENT_TIMEOUT_MS}`)
   const result = await applyReadReplicaAdditiveSchemaSync(pool, expectedCatalog)
   return Response.json(result)
 }
