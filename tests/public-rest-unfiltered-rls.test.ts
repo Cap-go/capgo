@@ -60,8 +60,8 @@ WHERE n.nspname = 'public'
   AND NOT (
     c.relname = 'app_versions'
     AND p.polname = 'Allow for auth, api keys (read+)'
-    AND COALESCE(pg_get_expr(p.polqual, p.polrelid), '') ~ '\mapp_versions_has_app_permission\M'
-    AND COALESCE(pg_get_expr(p.polqual, p.polrelid), '') ~ '\mapp_versions_readable_app_ids\M'
+    AND COALESCE(pg_get_expr(p.polqual, p.polrelid), '') ~ '\\mapp_versions_has_app_permission\\M'
+    AND COALESCE(pg_get_expr(p.polqual, p.polrelid), '') ~ '\\mapp_versions_readable_app_ids\\M'
     AND COALESCE(pg_get_expr(p.polqual, p.polrelid), '') LIKE '%request.method%'
   )
 ORDER BY c.relname, p.polname
