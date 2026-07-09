@@ -200,12 +200,6 @@ export class ReplicaRouter extends DurableObject<ReplicatorEnv> {
     return { ok: true }
   }
 
-  // Routing-key update when an app changes org; the push cursor is
-  // deliberately untouched so no journal rows are skipped.
-  async updateOwnerOrg(input: { name: string, ownerOrg: string }): Promise<{ ok: boolean }> {
-    this.ctx.storage.sql.exec('UPDATE targets SET owner_org = ? WHERE name = ?', input.ownerOrg, input.name)
-    return { ok: true }
-  }
 
   // ------------------------------------------------------------------
   // Admin endpoints (Bearer REPLICATOR_SECRET)
@@ -418,11 +412,14 @@ export class ReplicaRouter extends DurableObject<ReplicatorEnv> {
   private maintain(drained: boolean): void {
     const now = Date.now()
     const leaseMs = this.leaseMs()
+    // Only targets that are fully caught up with the journal may have their
+    // lease refreshed without a data push: a lease asserts "caught up".
     const stale = drained
       ? this.ctx.storage.sql
           .exec(
-            'SELECT name, app_id, owner_org, cursor, fail_count, lease_refreshed_at FROM targets WHERE lease_refreshed_at < ? LIMIT 200',
+            'SELECT name, app_id, owner_org, cursor, fail_count, lease_refreshed_at FROM targets WHERE lease_refreshed_at < ? AND cursor >= ? LIMIT 200',
             now - leaseMs / 3,
+            this.journalHead(),
           )
           .toArray() as unknown as TargetRow[]
       : []
@@ -441,6 +438,22 @@ export class ReplicaRouter extends DurableObject<ReplicatorEnv> {
       })())
     }
     // Prune everything all targets have consumed, and cap retention by age.
+    // Age-pruning may drop rows a lagging target has not consumed yet, so
+    // any target still behind the aged window is invalidated first — it
+    // reseeds on its next read instead of silently missing changes forever.
+    const agedMax = this.ctx.storage.sql
+      .exec('SELECT max(id) AS m FROM journal WHERE created_at < ?', now - JOURNAL_RETENTION_MS)
+      .toArray()
+      .at(0) as { m: number | null }
+    if (agedMax.m !== null) {
+      const stranded = this.ctx.storage.sql
+        .exec('SELECT name FROM targets WHERE cursor < ?', agedMax.m)
+        .toArray() as { name: string }[]
+      for (const target of stranded) {
+        this.ctx.storage.sql.exec('DELETE FROM targets WHERE name = ?', target.name)
+        this.ctx.waitUntil(this.replicaStub(target.name).invalidate().catch(() => undefined))
+      }
+    }
     const minCursor = this.ctx.storage.sql
       .exec('SELECT coalesce(min(cursor), ?) AS m FROM targets', this.journalHead())
       .toArray()

@@ -50,6 +50,7 @@ type SqliteParams = (string | number | null)[]
 const SEED_PAGE_SIZE = 5000
 const IDLE_EVICT_MS = 7 * 24 * 3600 * 1000
 const SEED_CATCHUP_TRIES = 20
+const SEED_FAILURE_BACKOFF_MS = 60_000
 const SEED_CATCHUP_WAIT_MS = 500
 
 function sleep(ms: number) {
@@ -171,11 +172,22 @@ export class AppReplica extends DurableObject<ReplicatorEnv> {
       // the next read reseeds and re-registers from the journal head.
       return { unregister: true }
     }
+    let movedToOrgApp: string | null = null
     this.ctx.storage.transactionSync(() => {
-      this.applyEntries(batch.entries)
+      movedToOrgApp = this.applyEntries(batch.entries)
       if (batch.extendLease)
         this.setMeta('lease_until', String(Date.now() + batch.leaseMs))
     })
+    if (movedToOrgApp) {
+      // The app changed org: the journal window we were pushed was filtered
+      // by the old owner_org and the new org's rows may never appear in the
+      // journal at all. A reseed (snapshot + re-register with the new org)
+      // is the only consistent way forward; reads answer "no update" until
+      // it lands. Org moves are rare, seeds are small.
+      this.ctx.storage.sql.exec(`DELETE FROM replica_meta WHERE key IN ('seeded', 'lease_until')`)
+      this.scheduleSeed(movedToOrgApp)
+      return { unregister: true }
+    }
     return { ok: true }
   }
 
@@ -186,7 +198,10 @@ export class AppReplica extends DurableObject<ReplicatorEnv> {
 
   // ------------------------------------------------------------------
 
-  private applyEntries(entries: EdgeApplyBatch['entries']) {
+  // Applies entries and returns the app_id when an apps row moved to a new
+  // org (the caller must trigger a reseed), null otherwise.
+  private applyEntries(entries: EdgeApplyBatch['entries']): string | null {
+    let movedToOrgApp: string | null = null
     for (const entry of entries) {
       if (!EDGE_REPLICA_TABLES[entry.table])
         continue
@@ -195,17 +210,12 @@ export class AppReplica extends DurableObject<ReplicatorEnv> {
         continue
       }
       this.ctx.storage.sql.exec(buildUpsertStatement(entry.table), ...pgJsonRowToSqliteValues(entry.table, entry.row) as SqliteParams)
-      // If the app moved to another org, tell the router so org-scoped rows
-      // (orgs, stripe_info) keep routing here. The router only updates the
-      // routing key — the push cursor is untouched.
       const ownerOrg = typeof entry.row.owner_org === 'string' ? entry.row.owner_org : null
-      if (entry.table === 'apps' && ownerOrg && ownerOrg !== this.getMeta('owner_org')) {
-        this.setMeta('owner_org', ownerOrg)
-        const name = this.ctx.id.name
-        if (name)
-          this.ctx.waitUntil(this.routerStub().updateOwnerOrg({ name, ownerOrg }).catch(() => undefined))
-      }
+      const storedOrg = this.getMeta('owner_org')
+      if (entry.table === 'apps' && ownerOrg && storedOrg && ownerOrg !== storedOrg && typeof entry.row.app_id === 'string')
+        movedToOrgApp = entry.row.app_id
     }
+    return movedToOrgApp
   }
 
   private routerStub() {
@@ -227,11 +237,16 @@ export class AppReplica extends DurableObject<ReplicatorEnv> {
   private scheduleSeed(appId: string) {
     if (this.seedingPromise)
       return
+    // Backoff after a failed seed: reads keep answering "no update" without
+    // driving back-to-back Postgres connection attempts.
+    if (Date.now() < Number(this.getMeta('seed_backoff_until') ?? 0))
+      return
     this.seedingPromise = this.seed(appId)
       .catch(async (e: unknown) => {
         cloudlogErr({ message: 'app replica seed failed', replica: this.ctx.id.name, error: serializeError(e) })
+        this.setMeta('seed_backoff_until', String(Date.now() + SEED_FAILURE_BACKOFF_MS))
         // Stay unregistered on failure so the router never acks rows into
-        // the void; the next read retries the seed from scratch.
+        // the void; the next read past the backoff retries from scratch.
         const name = this.ctx.id.name
         if (name)
           await this.routerStub().unregister(name).catch(() => undefined)
@@ -329,6 +344,19 @@ export class AppReplica extends DurableObject<ReplicatorEnv> {
   }
 
   private async seed(appId: string) {
+    // An org move detected while replaying the seed-window pushes means the
+    // snapshot was taken against the old org: redo the seed once with the
+    // fresh owner. A second consecutive move fails the seed (backoff+retry).
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (!(await this.seedOnce(appId)))
+        return
+    }
+    throw new Error('app replica seed: org moved during two consecutive seeds')
+  }
+
+  // Returns true when the seed must be re-run because the app moved org
+  // while the snapshot was being taken.
+  private async seedOnce(appId: string): Promise<boolean> {
     const name = this.ctx.id.name ?? appId
     const router = this.routerStub()
 
@@ -357,21 +385,30 @@ export class AppReplica extends DurableObject<ReplicatorEnv> {
       }
 
       // Step 6: replay pushes buffered during the snapshot; upserts are
-      // idempotent so replay over the snapshot converges.
+      // idempotent so replay over the snapshot converges. owner_org is set
+      // first so a mid-seed org move is detected by the replay itself.
+      let movedDuringReplay = false
       this.ctx.storage.transactionSync(() => {
+        if (ownerOrg)
+          this.setMeta('owner_org', ownerOrg)
         const pending = this.ctx.storage.sql
           .exec('SELECT seq, payload FROM pending_batches ORDER BY seq')
           .toArray() as { seq: number, payload: string }[]
-        for (const batch of pending)
-          this.applyEntries(JSON.parse(batch.payload))
+        for (const batch of pending) {
+          if (this.applyEntries(JSON.parse(batch.payload)))
+            movedDuringReplay = true
+        }
         this.ctx.storage.sql.exec('DELETE FROM pending_batches')
-        if (ownerOrg)
-          this.setMeta('owner_org', ownerOrg)
-        this.setMeta('seeded', '1')
-        this.setMeta('lease_until', String(Date.now() + leaseMs))
-        this.setMeta('seeded_at', new Date().toISOString())
+        if (!movedDuringReplay) {
+          this.setMeta('seeded', '1')
+          this.setMeta('lease_until', String(Date.now() + leaseMs))
+          this.setMeta('seeded_at', new Date().toISOString())
+        }
       })
+      if (movedDuringReplay)
+        return true
       cloudlog({ message: 'app replica seeded', replica: name, appId })
+      return false
     }
     finally {
       await client.end().catch(() => undefined)
