@@ -36,7 +36,7 @@ interface SchemaCatalog {
 }
 
 interface SyncStatement {
-  kind: 'column' | 'index' | 'not_null'
+  kind: 'column' | 'index'
   table: string
   name: string
   sql: string
@@ -70,6 +70,7 @@ export function planReadReplicaAdditiveSchemaSync(expected: unknown, actual: unk
   const actualColumns = new Set((actualCatalog.columns ?? []).map(column => columnKey(column)))
   const actualIndexes = new Set((actualCatalog.indexes ?? []).map(index => index.name))
   const expectedConstraintIndexes = new Set((expectedCatalog.constraints ?? []).map(constraint => constraint.name))
+  const tablesWithSkippedColumns = new Set<string>()
   const statements: SyncStatement[] = []
   const skipped: SkippedChange[] = []
 
@@ -79,6 +80,7 @@ export function planReadReplicaAdditiveSchemaSync(expected: unknown, actual: unk
 
     const addColumnSql = buildAddColumnStatement(column, actualTables)
     if (!addColumnSql) {
+      tablesWithSkippedColumns.add(column.table)
       skipped.push({
         kind: 'column',
         table: column.table,
@@ -94,20 +96,21 @@ export function planReadReplicaAdditiveSchemaSync(expected: unknown, actual: unk
       name: column.name,
       sql: addColumnSql,
     })
-
-    if (column.notNull) {
-      statements.push({
-        kind: 'not_null',
-        table: column.table,
-        name: column.name,
-        sql: `ALTER TABLE ${quoteQualifiedTable(column.table)} ALTER COLUMN ${quoteIdent(column.name)} SET NOT NULL`,
-      })
-    }
   }
 
   for (const index of expectedCatalog.indexes ?? []) {
     if (actualIndexes.has(index.name))
       continue
+
+    if (tablesWithSkippedColumns.has(index.table)) {
+      skipped.push({
+        kind: 'index',
+        table: index.table,
+        name: index.name,
+        reason: 'unresolved_column_dependency',
+      })
+      continue
+    }
 
     if (expectedConstraintIndexes.has(index.name)) {
       skipped.push({
@@ -168,7 +171,53 @@ function assertSchemaCatalog(value: unknown): SchemaCatalog {
   if (catalog.tables && !Array.isArray(catalog.tables))
     throw new Error('Read-replica schema catalog tables must be an array')
 
+  for (const column of catalog.columns ?? [])
+    assertSchemaColumn(column)
+  for (const constraint of catalog.constraints ?? [])
+    assertSchemaConstraint(constraint)
+  for (const index of catalog.indexes ?? [])
+    assertSchemaIndex(index)
+  for (const table of catalog.tables ?? [])
+    assertSchemaTable(table)
+
   return catalog
+}
+
+function assertSchemaColumn(value: unknown): asserts value is SchemaColumn {
+  const column = assertCatalogObject(value, 'columns') as Partial<SchemaColumn>
+  if (typeof column.table !== 'string' || typeof column.name !== 'string' || typeof column.type !== 'string')
+    throw new Error('Read-replica schema catalog columns must include string table, name, and type')
+  if (typeof column.notNull !== 'boolean')
+    throw new Error('Read-replica schema catalog columns must include boolean notNull')
+  if (column.default !== null && typeof column.default !== 'string')
+    throw new Error('Read-replica schema catalog column defaults must be strings or null')
+  if (typeof column.identity !== 'string' || typeof column.generated !== 'string')
+    throw new Error('Read-replica schema catalog columns must include string identity and generated fields')
+}
+
+function assertSchemaConstraint(value: unknown): asserts value is SchemaConstraint {
+  const constraint = assertCatalogObject(value, 'constraints') as Partial<SchemaConstraint>
+  if (typeof constraint.name !== 'string')
+    throw new Error('Read-replica schema catalog constraints must include string names')
+}
+
+function assertSchemaIndex(value: unknown): asserts value is SchemaIndex {
+  const index = assertCatalogObject(value, 'indexes') as Partial<SchemaIndex>
+  if (typeof index.table !== 'string' || typeof index.name !== 'string' || typeof index.definition !== 'string')
+    throw new Error('Read-replica schema catalog indexes must include string table, name, and definition')
+}
+
+function assertSchemaTable(value: unknown): asserts value is SchemaTable {
+  const table = assertCatalogObject(value, 'tables') as Partial<SchemaTable>
+  if (typeof table.name !== 'string')
+    throw new Error('Read-replica schema catalog tables must include string names')
+}
+
+function assertCatalogObject(value: unknown, collection: string): object {
+  if (!value || typeof value !== 'object')
+    throw new Error(`Read-replica schema catalog ${collection} must contain objects`)
+
+  return value
 }
 
 function buildAddColumnStatement(column: SchemaColumn, actualTables: Set<string>): string | null {
@@ -186,7 +235,8 @@ function buildAddColumnStatement(column: SchemaColumn, actualTables: Set<string>
     return null
 
   const defaultSql = column.default === null ? '' : ` DEFAULT ${column.default}`
-  return `ALTER TABLE ${quoteQualifiedTable(column.table)} ADD COLUMN IF NOT EXISTS ${quoteIdent(column.name)} ${column.type}${defaultSql}`
+  const notNullSql = column.notNull ? ' NOT NULL' : ''
+  return `ALTER TABLE ${quoteQualifiedTable(column.table)} ADD COLUMN IF NOT EXISTS ${quoteIdent(column.name)} ${column.type}${defaultSql}${notNullSql}`
 }
 
 function buildCreateIndexStatement(index: SchemaIndex, actualTables: Set<string>): string | null {
