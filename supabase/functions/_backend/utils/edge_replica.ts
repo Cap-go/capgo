@@ -1,24 +1,24 @@
 // Read path for the Cloudflare-embedded read replica (per-app Durable
 // Objects, see supabase/functions/_backend/replicator/).
 //
-// The update hot path reads from a region-local AppReplica DO (two RPCs,
-// ~1ms in-colo) instead of crossing to an external Postgres replica. Every
-// method mirrors the exact shape of its Postgres counterpart in pg.ts and
-// falls back to it when the replica is unavailable, stale (lease expired) or
-// erroring, so turning the mode on is never worse than the current behavior.
+// Served on the parallel /updates_v2 endpoint. There is deliberately NO
+// Postgres fallback here: once the old Cloud SQL replicas are gone, falling
+// back would send device read traffic to the main database. When a replica
+// is not ready (warming up, lease expired, RPC error) every method throws
+// EdgeReplicaNotReadyError and the endpoint answers a plain "no update"
+// (kind: up_to_date), so devices simply retry on their next check while the
+// replica seeds itself in the background.
+//
+// Every method mirrors the exact result shape of its Postgres counterpart
+// in pg.ts, so /updates and /updates_v2 stay byte-comparable during the
+// load-balanced transition.
 
 import type { DurableObjectNamespace } from '@cloudflare/workers-types'
 import type { Context } from 'hono'
 import type { AppReplicaRpc, EdgeReplicaRow } from './edge_replica_schema.ts'
-import type { AppOwnerPostgresResult, PlanAction } from './pg.ts'
-import { cloudlog, cloudlogErr } from './logging.ts'
+import type { AppBlockProviderInfraRequestsLookup, AppOwnerPostgresResult, PlanAction } from './pg.ts'
 import { getClientDbRegionSB } from './geolocation.ts'
-import {
-  getAppBlockProviderInfraRequestsPostgres,
-  getAppOwnerPostgres,
-  getDrizzleClient,
-  requestInfosPostgres,
-} from './pg.ts'
+import { cloudlog, cloudlogErr } from './logging.ts'
 import { getRolloutDecision } from './rollout.ts'
 import { existInEnv, getEnv } from './utils.ts'
 
@@ -34,6 +34,13 @@ const REGION_LOCATION_HINTS: Record<string, string> = {
   HK: 'apac',
   AF: 'afr',
   ME: 'me',
+}
+
+export class EdgeReplicaNotReadyError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'EdgeReplicaNotReadyError'
+  }
 }
 
 export function isEdgeReplicaEnabled(c: Context): boolean {
@@ -179,17 +186,15 @@ export interface EdgeRequestInfosOptions {
 }
 
 // Region-local replica reader for the update hot path. One instance per
-// request. Any failure or 'unavailable' answer permanently downgrades the
-// instance to the Postgres fallback for the rest of the request.
+// request. No Postgres anywhere: not-ready replicas and RPC errors surface
+// as EdgeReplicaNotReadyError, which the endpoint turns into "no update".
 export class EdgeReplicaReader {
   private stub: AppReplicaRpc
-  private disabled = false
 
   constructor(
     private c: Context,
     namespace: DurableObjectNamespace,
     appId: string,
-    private fallbackDrizzle: ReturnType<typeof getDrizzleClient>,
   ) {
     const region = getClientDbRegionSB(c) ?? 'EU'
     const locationHint = REGION_LOCATION_HINTS[region] ?? 'weur'
@@ -197,96 +202,92 @@ export class EdgeReplicaReader {
     this.stub = namespace.get(id, { locationHint: locationHint as any }) as unknown as AppReplicaRpc
   }
 
-  get active(): boolean {
-    return !this.disabled
-  }
-
-  private downgrade(scope: string, error: unknown) {
-    this.disabled = true
-    if (error instanceof Error && error.message === 'edge replica unavailable') {
-      cloudlog({ requestId: this.c.get('requestId'), message: `edge replica warming up, fallback to postgres in ${scope}` })
+  private notReady(scope: string, error?: unknown): never {
+    if (error) {
+      cloudlogErr({ requestId: this.c.get('requestId'), message: `edge replica error in ${scope}`, error: error instanceof Error ? error.message : error })
     }
     else {
-      cloudlogErr({ requestId: this.c.get('requestId'), message: `edge replica fallback to postgres in ${scope}`, error: error instanceof Error ? error.message : error })
+      cloudlog({ requestId: this.c.get('requestId'), message: `edge replica not ready in ${scope} (seeding in background)` })
     }
-    safeHeader(this.c, 'X-Database-Source', 'edge_replica_fallback')
+    safeHeader(this.c, 'X-Database-Source', 'edge_replica_not_ready')
+    throw new EdgeReplicaNotReadyError(`edge replica not ready (${scope})`)
   }
 
   private markServed() {
     safeHeader(this.c, 'X-Database-Source', 'edge_replica')
   }
 
-  private ensureOk(result: { status: 'ok' | 'unavailable' }) {
-    if (result.status !== 'ok')
-      throw new Error('edge replica unavailable')
-  }
-
   // Mirrors getAppOwnerPostgres (pg.ts).
   async getAppOwner(appId: string, actions: PlanAction[]): Promise<AppOwnerPostgresResult | null> {
-    if (this.disabled)
-      return getAppOwnerPostgres(this.c, appId, this.fallbackDrizzle, actions)
     if (actions.length === 0)
       return null
+    let result
     try {
-      const result = await this.stub.queryAppOwner(appId, actions)
-      this.ensureOk(result)
-      this.markServed()
-      const row = result.rows?.at(0)
-      if (!row)
-        return null
-      const ownerOrg = String(row.owner_org)
-      if (!row.org_id) {
-        cloudlog({
-          requestId: this.c.get('requestId'),
-          message: 'App owner org missing on edge replica; preserving cloud app classification from apps row',
-          appId,
-          ownerOrg,
-        })
-      }
-      return {
-        owner_org: ownerOrg,
-        plan_valid: toBool(row.plan_valid),
-        channel_device_count: Number(row.channel_device_count ?? 0),
-        manifest_bundle_count: Number(row.manifest_bundle_count ?? 0),
-        rollout_channel_count: Number(row.rollout_channel_count ?? 0),
-        rollout_paused_version_names: toStringArray(row.rollout_paused_version_names),
-        expose_metadata: toBool(row.expose_metadata),
-        allow_device_custom_id: toBool(row.allow_device_custom_id),
-        block_provider_infra_requests: toBool(row.block_provider_infra_requests),
-        orgs: {
-          created_by: (row.org_created_by as string | null) ?? '',
-          id: (row.org_id as string | null) ?? ownerOrg,
-          management_email: (row.org_management_email as string | null) ?? '',
-        },
-      }
+      result = await this.stub.queryAppOwner(appId, actions)
     }
     catch (e) {
-      this.downgrade('getAppOwner', e)
-      return getAppOwnerPostgres(this.c, appId, this.fallbackDrizzle, actions)
+      this.notReady('getAppOwner', e)
+    }
+    if (result.status !== 'ok')
+      this.notReady('getAppOwner')
+    this.markServed()
+    const row = result.rows?.at(0)
+    if (!row)
+      return null
+    const ownerOrg = String(row.owner_org)
+    if (!row.org_id) {
+      cloudlog({
+        requestId: this.c.get('requestId'),
+        message: 'App owner org missing on edge replica; preserving cloud app classification from apps row',
+        appId,
+        ownerOrg,
+      })
+    }
+    return {
+      owner_org: ownerOrg,
+      plan_valid: toBool(row.plan_valid),
+      channel_device_count: Number(row.channel_device_count ?? 0),
+      manifest_bundle_count: Number(row.manifest_bundle_count ?? 0),
+      rollout_channel_count: Number(row.rollout_channel_count ?? 0),
+      rollout_paused_version_names: toStringArray(row.rollout_paused_version_names),
+      expose_metadata: toBool(row.expose_metadata),
+      allow_device_custom_id: toBool(row.allow_device_custom_id),
+      block_provider_infra_requests: toBool(row.block_provider_infra_requests),
+      orgs: {
+        created_by: (row.org_created_by as string | null) ?? '',
+        id: (row.org_id as string | null) ?? ownerOrg,
+        management_email: (row.org_management_email as string | null) ?? '',
+      },
     }
   }
 
   // Mirrors getAppBlockProviderInfraRequestsPostgres (pg.ts).
-  async getAppBlockProviderInfraRequests(appId: string): Promise<ReturnType<typeof getAppBlockProviderInfraRequestsPostgres>> {
-    if (this.disabled)
-      return getAppBlockProviderInfraRequestsPostgres(this.c, appId, this.fallbackDrizzle)
+  async getAppBlockProviderInfraRequests(appId: string): Promise<AppBlockProviderInfraRequestsLookup> {
+    let result
     try {
-      const result = await this.stub.queryBlockProvider(appId)
-      this.ensureOk(result)
-      const row = result.rows?.at(0)
-      if (!row)
-        return { status: 'missing' }
-      return { status: 'found', blockProviderInfraRequests: toBool(row.block_provider_infra_requests) }
+      result = await this.stub.queryBlockProvider(appId)
     }
     catch (e) {
-      this.downgrade('getAppBlockProviderInfraRequests', e)
-      return getAppBlockProviderInfraRequestsPostgres(this.c, appId, this.fallbackDrizzle)
+      this.notReady('getAppBlockProviderInfraRequests', e)
     }
+    if (result.status !== 'ok')
+      this.notReady('getAppBlockProviderInfraRequests')
+    const row = result.rows?.at(0)
+    if (!row)
+      return { status: 'missing' }
+    return { status: 'found', blockProviderInfraRequests: toBool(row.block_provider_infra_requests) }
   }
 
   private async requestManifestEntries(appId: string, versionId: number) {
-    const result = await this.stub.queryManifest(appId, versionId)
-    this.ensureOk(result)
+    let result
+    try {
+      result = await this.stub.queryManifest(appId, versionId)
+    }
+    catch (e) {
+      this.notReady('requestManifestEntries', e)
+    }
+    if (result.status !== 'ok')
+      this.notReady('requestManifestEntries')
     return (result.rows ?? []) as { file_name: string, file_hash: string, s3_path: string }[]
   }
 
@@ -325,8 +326,6 @@ export class EdgeReplicaReader {
   // Mirrors requestInfosPostgres (pg.ts). Both lookups run inside the DO,
   // i.e. one region-local round trip.
   async requestInfos(options: EdgeRequestInfosOptions): Promise<{ channelData: any, channelOverride: any }> {
-    if (this.disabled)
-      return this.requestInfosFallback(options)
     const {
       platform,
       app_id,
@@ -345,8 +344,9 @@ export class EdgeReplicaReader {
     const isPausedRolloutVersion = Array.isArray(rolloutPausedVersionNames) && rolloutPausedVersionNames.includes(currentVersionName)
     const rollout = (rolloutChannelCount ?? 0) > 0 || isPausedRolloutVersion
 
+    let result
     try {
-      const result = await this.stub.queryInfos(app_id, {
+      result = await this.stub.queryInfos(app_id, {
         platform,
         deviceId: device_id,
         defaultChannel,
@@ -356,44 +356,36 @@ export class EdgeReplicaReader {
         queryOverride: shouldQueryChannelOverride,
         channelSelfOverrideChannelId,
       })
-      this.ensureOk(result)
-
-      const mapOptions = { includeMetadata, hasRollout: rollout, hasManifest: !rollout && shouldFetchManifest }
-      const channelOverrideRaw = mapChannelRow(result.override?.at(0), {
-        ...mapOptions,
-        hasDevice: typeof channelSelfOverrideChannelId !== 'number',
-      })
-      const channelDataRaw = mapChannelRow(result.rows?.at(0), { ...mapOptions, hasDevice: false })
-
-      if (!rollout)
-        return { channelData: channelDataRaw, channelOverride: channelOverrideRaw }
-
-      const channelOverride = await this.resolveRolloutChannelData(channelOverrideRaw, app_id, device_id, currentVersionName, shouldFetchManifest)
-      const channelData = channelOverride
-        ? channelDataRaw
-        : await this.resolveRolloutChannelData(channelDataRaw, app_id, device_id, currentVersionName, shouldFetchManifest)
-      return { channelOverride, channelData }
     }
     catch (e) {
-      this.downgrade('requestInfos', e)
-      return this.requestInfosFallback(options)
+      this.notReady('requestInfos', e)
     }
-  }
+    if (result.status !== 'ok')
+      this.notReady('requestInfos')
 
-  private requestInfosFallback(options: EdgeRequestInfosOptions) {
-    return requestInfosPostgres({
-      c: this.c,
-      drizzleClient: this.fallbackDrizzle,
-      ...options,
+    const mapOptions = { includeMetadata, hasRollout: rollout, hasManifest: !rollout && shouldFetchManifest }
+    const channelOverrideRaw = mapChannelRow(result.override?.at(0), {
+      ...mapOptions,
+      hasDevice: typeof channelSelfOverrideChannelId !== 'number',
     })
+    const channelDataRaw = mapChannelRow(result.rows?.at(0), { ...mapOptions, hasDevice: false })
+
+    if (!rollout)
+      return { channelData: channelDataRaw, channelOverride: channelOverrideRaw }
+
+    const channelOverride = await this.resolveRolloutChannelData(channelOverrideRaw, app_id, device_id, currentVersionName, shouldFetchManifest)
+    const channelData = channelOverride
+      ? channelDataRaw
+      : await this.resolveRolloutChannelData(channelDataRaw, app_id, device_id, currentVersionName, shouldFetchManifest)
+    return { channelOverride, channelData }
   }
 }
 
-export function getEdgeReplicaReader(c: Context, appId: string, fallbackDrizzle: ReturnType<typeof getDrizzleClient>): EdgeReplicaReader | null {
+export function getEdgeReplicaReader(c: Context, appId: string): EdgeReplicaReader | null {
   if (!isEdgeReplicaEnabled(c) || !appId)
     return null
   try {
-    return new EdgeReplicaReader(c, (c.env as { APP_REPLICA: DurableObjectNamespace }).APP_REPLICA, appId, fallbackDrizzle)
+    return new EdgeReplicaReader(c, (c.env as { APP_REPLICA: DurableObjectNamespace }).APP_REPLICA, appId)
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'edge replica reader init failed', error: e instanceof Error ? e.message : e })

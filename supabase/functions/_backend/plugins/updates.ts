@@ -6,7 +6,7 @@ import { cloudlog } from '../utils/logging.ts'
 import { getManifestDownloadSize, parseManifestSizeVersionId } from '../utils/manifest_size.ts'
 import { parsePluginBody } from '../utils/plugin_parser.ts'
 import { updateRequestSchema } from '../utils/plugin_validation.ts'
-import { update } from '../utils/update.ts'
+import { update, updateV2 } from '../utils/update.ts'
 
 import {
   isLimited,
@@ -56,5 +56,25 @@ app.post('/manifest_size', async (c) => {
 })
 
 app.get('/', (c) => {
+  return c.json(BRES)
+})
+
+// Parallel update endpoint served purely by the Cloudflare-embedded read
+// replica (per-app Durable Objects) — no Postgres on the read path. Used to
+// load-balance against /updates in production until the old Cloud SQL
+// replica system is decommissioned.
+export const appV2 = new Hono<MiddlewareKeyVariables>()
+
+appV2.post('/', async (c) => {
+  const body = await parseBody<AppInfos>(c)
+  cloudlog({ requestId: c.get('requestId'), message: 'post updates_v2 body', body })
+  if (isLimited(c, body.app_id)) {
+    // Pass curated metadata only — see simpleRateLimit contract in hono.ts.
+    return simpleRateLimit({ app_id: body.app_id })
+  }
+  return updateV2(c, parsePluginBody<AppInfos>(c, body, updateRequestSchema))
+})
+
+appV2.get('/', (c) => {
   return c.json(BRES)
 })

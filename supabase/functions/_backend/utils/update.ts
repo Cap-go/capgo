@@ -13,7 +13,7 @@ import {
 } from '@std/semver'
 import { getRuntimeKey } from 'hono/adapter'
 import { getAppStatus, setAppStatus } from './appStatus.ts'
-import { getEdgeReplicaReader } from './edge_replica.ts'
+import { EdgeReplicaNotReadyError, getEdgeReplicaReader } from './edge_replica.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
@@ -50,6 +50,7 @@ export type UpdateResponseKind = 'up_to_date' | 'blocked' | 'failed'
 const UPDATE_UP_TO_DATE_CODES = new Set([
   'no_new_version_available',
   'already_on_builtin',
+  'edge_replica_not_ready',
 ])
 
 const UPDATE_BLOCKED_CODES = new Set([
@@ -620,17 +621,60 @@ export async function update(c: Context, body: AppInfos) {
   }
   const pgClient = getPgClient(c, true)
   try {
-    const drizzlePg = getDrizzleClient(pgClient)
-    // Prefer the Cloudflare-embedded read replica (D1) when enabled; the
-    // Postgres pool stays lazy and only connects if a fallback is needed.
-    const edgeReplica = getEdgeReplicaReader(c, body.app_id, drizzlePg)
-    if (!edgeReplica)
-      await setReplicationLagHeader(c, pgClient)
+    await setReplicationLagHeader(c, pgClient)
 
+    const drizzlePg = getDrizzleClient(pgClient)
     // Use the active DB client only when needed
-    return await updateWithPG(c, body, drizzlePg, appStatus, edgeReplica)
+    return await updateWithPG(c, body, drizzlePg, appStatus)
   }
   finally {
     await closeClient(c, pgClient)
+  }
+}
+
+// Parallel endpoint (/updates_v2) served purely by the Cloudflare-embedded
+// read replica so old and new systems can be load-balanced in production.
+// There is NO Postgres fallback on the read path: when the replica is not
+// ready the device gets a plain "no update" (kind: up_to_date) and retries
+// on its next check while the replica seeds itself in the background. A
+// lazy read-write client (main DB via Hyperdrive DIRECT, which outlives the
+// Cloud SQL decommission) exists only for rare non-read side paths such as
+// notification helpers; the hot path never touches it.
+export async function updateV2(c: Context, body: AppInfos) {
+  const appStatus = await getAppStatus(c, body.app_id)
+  if (appStatus.cacheHit) {
+    const providerBlockedResponse = await providerInfrastructureBlockResponse(c, appStatus.block_provider_infra_requests)
+    if (providerBlockedResponse)
+      return providerBlockedResponse
+  }
+  const edgeReplica = getEdgeReplicaReader(c, body.app_id)
+  if (!edgeReplica)
+    return updateError200(c, 'edge_replica_not_ready', 'Update backend not ready, no update available')
+
+  let pgClient: ReturnType<typeof getPgClient> | null = null
+  let drizzlePg: ReturnType<typeof getDrizzleClient> | null = null
+  const lazyDrizzle = new Proxy({}, {
+    get: (_target, prop) => {
+      if (!drizzlePg) {
+        pgClient = getPgClient(c, false)
+        drizzlePg = getDrizzleClient(pgClient)
+      }
+      return (drizzlePg as any)[prop]
+    },
+  }) as ReturnType<typeof getDrizzleClient>
+
+  try {
+    return await updateWithPG(c, body, lazyDrizzle, appStatus, edgeReplica)
+  }
+  catch (e) {
+    if (e instanceof EdgeReplicaNotReadyError) {
+      cloudlog({ requestId: c.get('requestId'), message: 'edge replica not ready, answering no update', app_id: body.app_id })
+      return updateError200(c, 'edge_replica_not_ready', 'Update backend not ready, no update available')
+    }
+    throw e
+  }
+  finally {
+    if (pgClient)
+      await closeClient(c, pgClient)
   }
 }

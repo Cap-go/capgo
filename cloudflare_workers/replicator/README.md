@@ -25,8 +25,14 @@ ReplicaRouter DO (this worker)       -- journal + registry, one per account
 AppReplica DO per region:app_id      -- SQLite slice of one app (+ its org)
   ▲  lazy: seeds itself from Postgres on first read in a region
   │
-capgo_plugin workers                 -- 2 region-local RPCs per update check
+capgo_plugin workers                 -- /updates_v2: 2 region-local RPCs
 ```
+
+The readers live on a **parallel endpoint, `/updates_v2`** — `/updates` keeps
+running on the old Cloud SQL path untouched. Load-balance device traffic
+between the two in production (both return identical response shapes),
+compare error rates and `X-Database-Source` headers, then decommission the
+old system when the numbers hold.
 
 - **Reads never touch Postgres.** The plugin worker asks the region-local
   `AppReplica` for app-owner/plan data and channel/version rows; both
@@ -40,12 +46,15 @@ capgo_plugin workers                 -- 2 region-local RPCs per update check
   the DO near that worker, which seeds its app slice from the read replica
   (small indexed queries), registers with the router, and buffers pushes
   that arrive mid-seed. Replicas idle for 7 days unregister and wipe.
-- **Freshness = lease.** Every push/heartbeat extends `lease_until`
-  (`EDGE_REPLICA_LEASE_SECONDS`, default 15 min; typical data lag is the
-  poll interval, ~5s, versus the 180s tolerated on Cloud SQL today). A read
-  past the lease answers `unavailable` and the worker falls back to the
-  existing Hyperdrive → Postgres path for that request. A dead router
-  degrades to today's behavior, never to stale data.
+- **Freshness = lease, and NO Postgres fallback.** Every push/heartbeat
+  extends `lease_until` (`EDGE_REPLICA_LEASE_SECONDS`, default 15 min;
+  typical data lag is the poll interval, ~5s, versus the 180s tolerated on
+  Cloud SQL today). When a replica is not ready (warming up, lease expired,
+  error) `/updates_v2` answers a plain "no update" (`edge_replica_not_ready`,
+  kind `up_to_date`) — devices retry on their next check while the replica
+  seeds in the background. The read path never touches Postgres, so it keeps
+  working unchanged after the old replicas are destroyed; a dead router can
+  only ever delay updates, never break devices or overload the main DB.
 - **Load on main DB**: trigger appends on writes + one indexed poll query
   every few seconds. Per-app seeds hit the seed source (`HYPERDRIVE_SEED`,
   the existing read replica; later a single kept replica or the pooler).
@@ -67,14 +76,18 @@ transactionally and is resumable after any downtime.
    curl https://replicator.capgo.app/status -H "Authorization: Bearer $REPLICATOR_SECRET"
    ```
 
-3. Roll out the readers one region at a time: uncomment the `APP_REPLICA`
+3. Enable `/updates_v2` one region at a time: uncomment the `APP_REPLICA`
    `durable_objects` block in that plugin env
    (`cloudflare_workers/plugin/wrangler.jsonc`), add
-   `"EDGE_REPLICA_MODE": "on"` to its vars, deploy, watch
-   `X-Database-Source: edge_replica` vs `edge_replica_fallback` + error
-   rates, continue. No pre-seeding is needed — replicas warm up from
-   traffic (first request per app/region falls back to Postgres while the
-   seed runs in the background).
+   `"EDGE_REPLICA_MODE": "on"` to its vars, deploy. Without the flag the
+   endpoint answers `edge_replica_not_ready` (a no-update), so deploying is
+   always safe.
+4. Load-balance: shift a share of device update traffic from `/updates` to
+   `/updates_v2` (LB rule / plugin config), watch
+   `X-Database-Source: edge_replica` vs `edge_replica_not_ready` rates and
+   response parity. No pre-seeding is needed — replicas warm up from
+   traffic (the very first checks per app/region get "no update" while the
+   seed runs, then serve normally).
 
 ## Admin endpoints (Bearer `REPLICATOR_SECRET`)
 
