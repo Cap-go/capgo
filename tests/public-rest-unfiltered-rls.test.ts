@@ -110,6 +110,17 @@ describe('public REST unfiltered RLS regression guard', () => {
     }))).toEqual([])
   })
 
+  it.concurrent('keeps manifest app-version helper stable for statement-level RLS', async () => {
+    const rows = await executeSQL(`
+      SELECT provolatile
+      FROM pg_proc
+      WHERE oid = 'public.readable_app_version_ids()'::regprocedure
+    `)
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0].provolatile).toBe('s')
+  })
+
   it('does not raise or timeout on unfiltered reads for exposed tables', async () => {
     const probes = await executeSQL(exposedTableProbeSql) as RestProbeRow[]
     const scenarios = [

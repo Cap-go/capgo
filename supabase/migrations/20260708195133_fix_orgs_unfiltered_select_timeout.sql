@@ -159,8 +159,6 @@ BEGIN
           FROM "public"."org_users"
           WHERE org_users.user_id = v_api_key.user_id
             AND org_users.org_id = candidate_orgs.org_id
-            AND org_users.app_id IS NULL
-            AND org_users.channel_id IS NULL
         );
 
       RETURN v_allowed;
@@ -179,8 +177,6 @@ BEGIN
   INTO v_allowed
   FROM "public"."org_users"
   WHERE org_users.user_id = v_auth_user_id
-    AND org_users.app_id IS NULL
-    AND org_users.channel_id IS NULL
     AND "public"."rbac_check_permission_direct"(
       v_permission,
       v_auth_user_id,
@@ -196,7 +192,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION "public"."readable_app_version_ids"()
 RETURNS bigint[]
-LANGUAGE "sql" VOLATILE SECURITY DEFINER
+LANGUAGE "sql" STABLE SECURITY DEFINER
 SET "search_path" TO ''
 AS $$
   SELECT COALESCE(array_agg(DISTINCT app_versions.id), '{}'::bigint[])
@@ -275,7 +271,7 @@ COMMENT ON FUNCTION "public"."orgs_with_min_right"("public"."user_min_right") IS
 COMMENT ON FUNCTION "public"."orgs_readable_org_ids"() IS
 'Returns org IDs readable by the current authenticated user or Capgo API key. This is used by orgs RLS so unfiltered PostgREST requests compute access once and then filter by orgs.id instead of doing per-row auth work.';
 COMMENT ON FUNCTION "public"."org_member_readable_org_ids"() IS
-'Returns org IDs where the current authenticated user or Capgo API-key owner is an org-level member with read rights. org_users RLS uses this narrower helper so org read access does not expose membership rows for non-members.';
+'Returns org IDs where the current authenticated user or Capgo API-key owner has a membership row in the org and read rights. org_users RLS uses this narrower helper so org read access does not expose membership rows for non-members.';
 COMMENT ON FUNCTION "public"."readable_app_version_ids"() IS
 'Returns app_version IDs readable by the current authenticated user or Capgo API key. Manifest RLS uses this statement-level helper instead of checking every manifest row through app_versions.';
 COMMENT ON FUNCTION "public"."readable_group_ids"() IS

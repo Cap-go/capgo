@@ -184,4 +184,14 @@ describe('orgs RLS DoS regression', () => {
     expect(rows[0].helper_exists).toBe(true)
     expect(rows[0].using_expr).toContain('org_member_readable_org_ids')
   })
+
+  it.concurrent('keeps scoped org_users memberships valid for the membership-gated helper', async () => {
+    const rows = await executeSQL(`
+      SELECT pg_get_functiondef('public.org_member_readable_org_ids()'::regprocedure) AS function_def
+    `)
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0].function_def).not.toContain('org_users.app_id IS NULL')
+    expect(rows[0].function_def).not.toContain('org_users.channel_id IS NULL')
+  })
 })
