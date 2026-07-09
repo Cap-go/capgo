@@ -53,21 +53,28 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-// The limiter uses a fixed one-second window, so a sequential burst can straddle a
-// window boundary and never trip it. Fire each burst in parallel so all requests land
-// in the same window, and allow a few rounds before declaring the limiter broken.
-async function fireBurst(makeRequest: (deviceId: string) => Promise<Response>, deviceId: string): Promise<Response | null> {
-  const responses = await Promise.all(
-    Array.from({ length: OP_LIMIT_PER_SECOND + 1 }, () => makeRequest(deviceId)),
-  )
-  return responses.find(response => response.status === 429) ?? null
-}
+// The limiter counts requests in a one-second window anchored to the first request
+// (see channelSelfRateLimit.ts) and its cache counter is not atomic under concurrent
+// requests, so bursts must be sequential AND finish inside the window to trip it.
+// Send sequential requests within the window budget; when a slow runner lets the
+// window expire before the limit trips, wait out the counter and retry the round.
+const WINDOW_BUDGET_MS = 900
 
 async function hitRateLimit(makeRequest: (deviceId: string) => Promise<Response>, deviceId: string): Promise<Response | null> {
-  for (let round = 0; round < 3; round++) {
-    const limited = await fireBurst(makeRequest, deviceId)
-    if (limited)
-      return limited
+  for (let round = 0; round < 4; round++) {
+    const roundStart = Date.now()
+    let sent = 0
+    while (Date.now() - roundStart < WINDOW_BUDGET_MS) {
+      const response = await makeRequest(deviceId)
+      sent += 1
+      if (response.status === 429)
+        return response
+      // Three times the limit landed inside one window without a 429: the limiter is broken.
+      if (sent >= OP_LIMIT_PER_SECOND * 3)
+        return null
+    }
+    // Window expired before the limit could trip; let the counter reset and retry.
+    await sleep(1100)
   }
   return null
 }
