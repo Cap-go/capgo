@@ -220,7 +220,7 @@ export function convertPgJsonValue(kind: EdgeColumnKind, value: unknown): unknow
       return JSON.stringify(value)
     case 'timestamp':
     case 'text':
-      return String(value)
+      return typeof value === 'object' ? JSON.stringify(value) : String(value)
   }
 }
 
@@ -321,6 +321,9 @@ export interface EdgeApplyEntry {
 export interface EdgeApplyBatch {
   entries: EdgeApplyEntry[]
   leaseMs: number
+  // Only true when the router is fully caught up with the outbox; a lease
+  // must never assert freshness while a backlog is pending.
+  extendLease: boolean
 }
 
 export interface EdgeApplyResult {
@@ -444,10 +447,8 @@ function versionSelect(aliasName: string, prefix: string, includeMetadata: boole
     `${aliasName}.manifest_count AS "${prefix}_manifest_count"`,
     `${aliasName}.r2_path AS "${prefix}_r2_path"`,
   ]
-  if (includeMetadata) {
-    cols.push(`${aliasName}.link AS "${prefix}_link"`)
-    cols.push(`${aliasName}.comment AS "${prefix}_comment"`)
-  }
+  if (includeMetadata)
+    cols.push(`${aliasName}.link AS "${prefix}_link"`, `${aliasName}.comment AS "${prefix}_comment"`)
   return cols.join(', ')
 }
 
@@ -522,9 +523,17 @@ export function buildChannelDeviceQuery(appId: string, deviceId: string, options
 }
 
 // Mirrors requestInfosChannelPostgres / ...PostgresRollout.
+function platformColumnFor(platform: string): string {
+  if (platform === 'android')
+    return 'ch.android'
+  if (platform === 'electron')
+    return 'ch.electron'
+  return 'ch.ios'
+}
+
 export function buildChannelQuery(platform: string, appId: string, defaultChannel: string, options: ChannelQueryOptions): EdgeQuery {
   const { includeManifest, includeMetadata, rollout } = options
-  const platformColumn = platform === 'android' ? 'ch.android' : platform === 'electron' ? 'ch.electron' : 'ch.ios'
+  const platformColumn = platformColumnFor(platform)
   const rolloutSelect = rollout ? `, ${versionSelect('rv', 'rv', includeMetadata, false)}` : ''
   const rolloutJoin = rollout ? versionJoin('rv', 'ch.rollout_version', 'LEFT', true) : ''
   const manifest = !rollout && includeManifest ? `, ${manifestEntriesSelect()}` : ''

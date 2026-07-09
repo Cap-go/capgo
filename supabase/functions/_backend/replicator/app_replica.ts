@@ -6,11 +6,22 @@
 // itself lazily from Postgres on first read in a region, registers with the
 // ReplicaRouter, and then receives ordered pushes from the outbox journal.
 //
-// Freshness is a lease: every push or heartbeat from the router extends
-// `lease_until`. Reads past the lease answer `unavailable` and the caller
-// falls back to Postgres, so a dead router degrades to today's behavior
-// instead of serving stale data. Replicas idle for a week ask the router to
-// unregister them and wipe their storage.
+// Seed protocol (safe against every known race):
+// 1. unregister from the router — no pushes can arrive under a stale cursor
+// 2. clear the pending-push buffer (leftovers from a previous attempt)
+// 3. if the seed source is an async replica, wait until it has replayed
+//    past the outbox source's current WAL position (or fall back to
+//    snapshotting from the outbox source) so the snapshot can never miss
+//    rows the outbox already skipped
+// 4. register (router cursor = journal head) — pushes from here on are
+//    buffered by applyBatch while the snapshot runs
+// 5. wipe + keyset-paginated snapshot
+// 6. replay the buffered pushes (idempotent upserts) and mark seeded
+//
+// Freshness is a lease: the router only extends it when it is fully caught
+// up with the outbox. Reads past the lease answer `unavailable` and
+// /updates_v2 turns that into a plain "no update" — never stale data, never
+// Postgres.
 
 import type { EdgeApplyBatch, EdgeApplyResult, EdgeInfosArgs, EdgeQueryResult, EdgeReplicaRow, PlanLimitAction } from '../utils/edge_replica_schema.ts'
 import type { ReplicatorEnv } from './replicator.ts'
@@ -33,8 +44,16 @@ import {
   pgJsonRowToSqliteValues,
 } from '../utils/edge_replica_schema.ts'
 
+type SqliteParams = (string | number | null)[]
+
 const SEED_PAGE_SIZE = 5000
 const IDLE_EVICT_MS = 7 * 24 * 3600 * 1000
+const SEED_CATCHUP_TRIES = 20
+const SEED_CATCHUP_WAIT_MS = 500
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
 
 export class AppReplica extends DurableObject<ReplicatorEnv> {
   private seedingPromise: Promise<void> | null = null
@@ -73,11 +92,11 @@ export class AppReplica extends DurableObject<ReplicatorEnv> {
   }
 
   private rows(sql: string, params: unknown[]): EdgeReplicaRow[] {
-    return this.ctx.storage.sql.exec(sql, ...params as (string | number | null)[]).toArray() as EdgeReplicaRow[]
+    return this.ctx.storage.sql.exec(sql, ...params as SqliteParams).toArray() as EdgeReplicaRow[]
   }
 
   private unavailable(appId: string): EdgeQueryResult {
-    // Kick the seed in the background; the caller falls back to Postgres for
+    // Kick the seed in the background; the caller answers "no update" for
     // this request so no device ever waits on a seed.
     this.scheduleSeed(appId)
     return { status: 'unavailable' }
@@ -145,12 +164,16 @@ export class AppReplica extends DurableObject<ReplicatorEnv> {
       return { ok: true }
     }
     if (this.getMeta('seeded') !== '1') {
-      // Not seeded: the future seed snapshot subsumes these rows.
-      return { ok: true }
+      // Registered but not seeded and no seed running (e.g. the DO restarted
+      // mid-seed or the seed failed): acking would let the router advance
+      // its cursor past rows we never stored. Drop the registration instead;
+      // the next read reseeds and re-registers from the journal head.
+      return { unregister: true }
     }
     this.ctx.storage.transactionSync(() => {
       this.applyEntries(batch.entries)
-      this.setMeta('lease_until', String(Date.now() + batch.leaseMs))
+      if (batch.extendLease)
+        this.setMeta('lease_until', String(Date.now() + batch.leaseMs))
     })
     return { ok: true }
   }
@@ -167,18 +190,25 @@ export class AppReplica extends DurableObject<ReplicatorEnv> {
       if (!EDGE_REPLICA_TABLES[entry.table])
         continue
       if (entry.op === 'DELETE') {
-        this.ctx.storage.sql.exec(buildDeleteStatement(entry.table), ...pgJsonRowToPkValues(entry.table, entry.row) as (string | number | null)[])
+        this.ctx.storage.sql.exec(buildDeleteStatement(entry.table), ...pgJsonRowToPkValues(entry.table, entry.row) as SqliteParams)
+        continue
       }
-      else {
-        this.ctx.storage.sql.exec(buildUpsertStatement(entry.table), ...pgJsonRowToSqliteValues(entry.table, entry.row) as (string | number | null)[])
-        // If the app moved to another org, re-register so org-scoped rows
-        // (orgs, stripe_info) keep routing to this replica.
-        if (entry.table === 'apps' && entry.row.owner_org && entry.row.owner_org !== this.getMeta('owner_org')) {
-          this.setMeta('owner_org', String(entry.row.owner_org))
-          this.ctx.waitUntil(this.register(String(entry.row.app_id), String(entry.row.owner_org)).then(() => undefined).catch(() => undefined))
-        }
+      this.ctx.storage.sql.exec(buildUpsertStatement(entry.table), ...pgJsonRowToSqliteValues(entry.table, entry.row) as SqliteParams)
+      // If the app moved to another org, tell the router so org-scoped rows
+      // (orgs, stripe_info) keep routing here. The router only updates the
+      // routing key — the push cursor is untouched.
+      const ownerOrg = typeof entry.row.owner_org === 'string' ? entry.row.owner_org : null
+      if (entry.table === 'apps' && ownerOrg && ownerOrg !== this.getMeta('owner_org')) {
+        this.setMeta('owner_org', ownerOrg)
+        const name = this.ctx.id.name
+        if (name)
+          this.ctx.waitUntil(this.routerStub().updateOwnerOrg({ name, ownerOrg }).catch(() => undefined))
       }
     }
+  }
+
+  private routerStub() {
+    return this.env.REPLICA_ROUTER.get(this.env.REPLICA_ROUTER.idFromName('main')) as any
   }
 
   private async wipe() {
@@ -189,83 +219,143 @@ export class AppReplica extends DurableObject<ReplicatorEnv> {
       this.ctx.storage.sql.exec(`DELETE FROM replica_meta WHERE key IN ('seeded', 'lease_until', 'owner_org')`)
     })
     const name = this.ctx.id.name
-    if (name) {
-      const router = this.env.REPLICA_ROUTER.get(this.env.REPLICA_ROUTER.idFromName('main')) as any
-      await router.unregister(name).catch(() => undefined)
-    }
+    if (name)
+      await this.routerStub().unregister(name).catch(() => undefined)
   }
 
   private scheduleSeed(appId: string) {
     if (this.seedingPromise)
       return
     this.seedingPromise = this.seed(appId)
-      .catch((e: unknown) => console.error('app replica seed failed', this.ctx.id.name, e))
+      .catch(async (e: unknown) => {
+        console.error('app replica seed failed', this.ctx.id.name, e)
+        // Stay unregistered on failure so the router never acks rows into
+        // the void; the next read retries the seed from scratch.
+        const name = this.ctx.id.name
+        if (name)
+          await this.routerStub().unregister(name).catch(() => undefined)
+      })
       .finally(() => {
         this.seedingPromise = null
       })
     this.ctx.waitUntil(this.seedingPromise)
   }
 
-  private async register(appId: string, ownerOrg: string | null) {
-    const name = this.ctx.id.name ?? appId
-    const router = this.env.REPLICA_ROUTER.get(this.env.REPLICA_ROUTER.idFromName('main')) as any
-    return await router.register({ name, appId, ownerOrg }) as { leaseMs: number }
+  private connectPg(url: string, purpose: string): Promise<Client> {
+    const client = new Client({
+      connectionString: url,
+      application_name: `capgo_app_replica_${purpose}`,
+      connectionTimeoutMillis: 10_000,
+    })
+    return client.connect().then(() => client)
   }
 
-  private seedSource(): string {
-    const url = this.env.HYPERDRIVE_SEED?.connectionString
-      ?? this.env.SEED_DB_URL
-      ?? this.env.HYPERDRIVE_OUTBOX?.connectionString
-      ?? this.env.OUTBOX_DB_URL
+  private outboxSourceUrl(): string | null {
+    return this.env.HYPERDRIVE_OUTBOX?.connectionString ?? this.env.OUTBOX_DB_URL ?? null
+  }
+
+  private seedSourceUrl(): string {
+    const url = this.env.HYPERDRIVE_SEED?.connectionString ?? this.env.SEED_DB_URL ?? this.outboxSourceUrl()
     if (!url)
       throw new Error('app replica: no Postgres seed source configured')
     return url
   }
 
+  // The outbox only captures writes made after its triggers were installed
+  // and after this replica registered. If the snapshot is read from an async
+  // replica that lags the outbox source, rows committed just before
+  // registration could be missing from BOTH the snapshot and the pushes.
+  // Guard: wait until the seed replica's subscription has replayed past the
+  // outbox source's current WAL position; if it does not catch up in time,
+  // snapshot from the outbox source instead.
+  private async openSeedClient(): Promise<Client> {
+    const seedUrl = this.seedSourceUrl()
+    const outboxUrl = this.outboxSourceUrl()
+    if (!outboxUrl || seedUrl === outboxUrl)
+      return this.connectPg(seedUrl, 'seed')
+
+    const outboxClient = await this.connectPg(outboxUrl, 'seed_watermark')
+    let seedClient: Client | null = null
+    try {
+      const watermark = (await outboxClient.query('SELECT pg_current_wal_lsn()::text AS lsn')).rows.at(0)?.lsn as string | undefined
+      if (!watermark) {
+        // Cannot establish a watermark: the outbox source is authoritative.
+        return outboxClient
+      }
+      seedClient = await this.connectPg(seedUrl, 'seed')
+      for (let attempt = 0; attempt < SEED_CATCHUP_TRIES; attempt++) {
+        // No subscription rows means the seed source is not an async
+        // subscriber (e.g. the pooler in front of main): trivially caught up.
+        const pending = (await seedClient.query(
+          'SELECT count(*)::int AS pending FROM pg_stat_subscription WHERE latest_end_lsn IS NULL OR latest_end_lsn < $1::pg_lsn',
+          [watermark],
+        )).rows.at(0)?.pending as number
+        if (pending === 0) {
+          await outboxClient.end().catch(() => undefined)
+          return seedClient
+        }
+        await sleep(SEED_CATCHUP_WAIT_MS)
+      }
+      console.warn('app replica seed source lagging, snapshotting from outbox source', this.ctx.id.name)
+      await seedClient.end().catch(() => undefined)
+      return outboxClient
+    }
+    catch (e) {
+      await seedClient?.end().catch(() => undefined)
+      await outboxClient.end().catch(() => undefined)
+      throw e
+    }
+  }
+
+  private async snapshotTable(client: Client, spec: ReturnType<typeof buildAppSeedQueries>[number], bind: string) {
+    let cursor: unknown = null
+    while (true) {
+      const pageSql = cursor === null
+        ? `${spec.sql} ORDER BY k1 LIMIT ${SEED_PAGE_SIZE}`
+        : `${spec.sql} AND ${spec.keyset} > $2 ORDER BY k1 LIMIT ${SEED_PAGE_SIZE}`
+      const result = await client.query(pageSql, cursor === null ? [bind] : [bind, cursor])
+      const rows = result.rows as { r: Record<string, unknown>, k1: unknown }[]
+      if (rows.length > 0) {
+        this.ctx.storage.transactionSync(() => {
+          for (const row of rows)
+            this.ctx.storage.sql.exec(buildUpsertStatement(spec.table), ...pgJsonRowToSqliteValues(spec.table, row.r) as SqliteParams)
+        })
+        cursor = rows.at(-1)!.k1
+      }
+      if (rows.length < SEED_PAGE_SIZE)
+        return
+    }
+  }
+
   private async seed(appId: string) {
-    const client = new Client({
-      connectionString: this.seedSource(),
-      application_name: 'capgo_app_replica_seed',
-      connectionTimeoutMillis: 10_000,
-    })
-    await client.connect()
+    const name = this.ctx.id.name ?? appId
+    const router = this.routerStub()
+
+    // Step 1-2: no pushes can arrive while unregistered, so the buffer we
+    // clear here can only contain leftovers from a previous failed attempt.
+    await router.unregister(name)
+    this.ctx.storage.sql.exec('DELETE FROM pending_batches')
+
+    const client = await this.openSeedClient()
     try {
       const appResult = await client.query('SELECT owner_org::text AS owner_org FROM public.apps WHERE app_id = $1', [appId])
       const ownerOrg: string | null = appResult.rows.at(0)?.owner_org ?? null
 
-      // Register first so the router pushes every change committed after this
-      // point; pushes arriving during the seed are buffered and replayed.
-      const { leaseMs } = await this.register(appId, ownerOrg)
+      // Step 4: register, then snapshot. Every change committed after this
+      // point is pushed and buffered by applyBatch while the snapshot runs.
+      const { leaseMs } = await router.register({ name, appId, ownerOrg }) as { leaseMs: number }
       this.ctx.storage.transactionSync(() => {
-        this.ctx.storage.sql.exec('DELETE FROM pending_batches')
         for (const table of Object.keys(EDGE_REPLICA_TABLES))
           this.ctx.storage.sql.exec(`DELETE FROM "${table}"`)
       })
 
       for (const spec of buildAppSeedQueries()) {
         const bind = spec.binds === 'app' ? appId : ownerOrg
-        if (bind === null)
-          continue
-        let cursor: unknown = null
-        while (true) {
-          const pageSql = cursor === null
-            ? `${spec.sql} ORDER BY k1 LIMIT ${SEED_PAGE_SIZE}`
-            : `${spec.sql} AND ${spec.keyset} > $2 ORDER BY k1 LIMIT ${SEED_PAGE_SIZE}`
-          const result = await client.query(pageSql, cursor === null ? [bind] : [bind, cursor])
-          const rows = result.rows as { r: Record<string, unknown>, k1: unknown }[]
-          if (rows.length > 0) {
-            this.ctx.storage.transactionSync(() => {
-              for (const row of rows)
-                this.ctx.storage.sql.exec(buildUpsertStatement(spec.table), ...pgJsonRowToSqliteValues(spec.table, row.r) as (string | number | null)[])
-            })
-            cursor = rows[rows.length - 1].k1
-          }
-          if (rows.length < SEED_PAGE_SIZE)
-            break
-        }
+        if (bind !== null)
+          await this.snapshotTable(client, spec, bind)
       }
 
-      // Replay pushes buffered while the snapshot ran; upserts are
+      // Step 6: replay pushes buffered during the snapshot; upserts are
       // idempotent so replay over the snapshot converges.
       this.ctx.storage.transactionSync(() => {
         const pending = this.ctx.storage.sql
@@ -280,7 +370,7 @@ export class AppReplica extends DurableObject<ReplicatorEnv> {
         this.setMeta('lease_until', String(Date.now() + leaseMs))
         this.setMeta('seeded_at', new Date().toISOString())
       })
-      console.warn('app replica seeded', this.ctx.id.name, appId)
+      console.warn('app replica seeded', name, appId)
     }
     finally {
       await client.end().catch(() => undefined)

@@ -189,10 +189,10 @@ export interface EdgeRequestInfosOptions {
 // request. No Postgres anywhere: not-ready replicas and RPC errors surface
 // as EdgeReplicaNotReadyError, which the endpoint turns into "no update".
 export class EdgeReplicaReader {
-  private stub: AppReplicaRpc
+  private readonly stub: AppReplicaRpc
 
   constructor(
-    private c: Context,
+    private readonly c: Context,
     namespace: DurableObjectNamespace,
     appId: string,
   ) {

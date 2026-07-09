@@ -45,6 +45,7 @@ const PUSH_CONCURRENCY = 10
 const MAX_PUSH_FAILURES = 3
 const JOURNAL_RETENTION_MS = 60 * 60 * 1000
 const ERROR_RETRY_MS = 10_000
+const BACKLOG_RETRY_MS = 250
 const DEFAULT_POLL_SECONDS = 5
 const DEFAULT_LEASE_SECONDS = 900
 
@@ -198,6 +199,13 @@ export class ReplicaRouter extends DurableObject<ReplicatorEnv> {
     return { ok: true }
   }
 
+  // Routing-key update when an app changes org; the push cursor is
+  // deliberately untouched so no journal rows are skipped.
+  async updateOwnerOrg(input: { name: string, ownerOrg: string }): Promise<{ ok: boolean }> {
+    this.ctx.storage.sql.exec('UPDATE targets SET owner_org = ? WHERE name = ?', input.ownerOrg, input.name)
+    return { ok: true }
+  }
+
   // ------------------------------------------------------------------
   // Admin endpoints (Bearer REPLICATOR_SECRET)
   // ------------------------------------------------------------------
@@ -244,7 +252,7 @@ export class ReplicaRouter extends DurableObject<ReplicatorEnv> {
     }
     catch (e) {
       console.error('replica router fetch error', e)
-      return jsonResponse({ error: e instanceof Error ? e.message : String(e) }, 500)
+      return jsonResponse({ error: 'internal error' }, 500)
     }
   }
 
@@ -281,10 +289,13 @@ export class ReplicaRouter extends DurableObject<ReplicatorEnv> {
     if (this.getMeta('paused') === '1')
       return
     try {
-      await this.drainOutbox()
-      await this.fanOut()
-      this.maintain()
-      await this.scheduleAlarm(this.pollMs())
+      const drained = await this.drainOutbox()
+      await this.fanOut(drained)
+      this.maintain(drained)
+      // While a backlog remains, loop immediately and keep leases frozen so
+      // replicas expire (and answer "no update") instead of serving data
+      // that silently lags the outbox.
+      await this.scheduleAlarm(drained ? this.pollMs() : BACKLOG_RETRY_MS)
     }
     catch (e) {
       console.error('replica router alarm error', e)
@@ -296,8 +307,8 @@ export class ReplicaRouter extends DurableObject<ReplicatorEnv> {
   // before the Postgres COMMIT: if the DO dies in between, Postgres rolls
   // back and the same rows are re-inserted next run (INSERT OR REPLACE by
   // outbox id), so the journal never misses or duplicates a change.
-  private async drainOutbox(): Promise<void> {
-    await this.withPg(async (client) => {
+  private async drainOutbox(): Promise<boolean> {
+    return await this.withPg(async (client) => {
       for (let i = 0; i < MAX_BATCHES_PER_ALARM; i++) {
         await client.query('BEGIN')
         try {
@@ -318,19 +329,21 @@ export class ReplicaRouter extends DurableObject<ReplicatorEnv> {
                   now,
                 )
               }
-              this.setMeta('journal_head', String(Number(rows[rows.length - 1].id)))
+              this.setMeta('journal_head', String(Number(rows.at(-1)!.id)))
             })
           }
           await client.query('COMMIT')
           this.setMeta('last_drain_at', new Date().toISOString())
           if (rows.length < OUTBOX_BATCH_SIZE)
-            return
+            return true
         }
         catch (e) {
           await client.query('ROLLBACK').catch(() => undefined)
           throw e
         }
       }
+      // Every batch came back full: there is more outbox behind us.
+      return false
     })
   }
 
@@ -338,13 +351,13 @@ export class ReplicaRouter extends DurableObject<ReplicatorEnv> {
   // journal watermark per target and only advances on success (or when the
   // target has nothing relevant in the window), so delivery per replica is
   // ordered and at-least-once; replicas apply idempotently.
-  private async fanOut(): Promise<void> {
+  private async fanOut(drained: boolean): Promise<void> {
     const head = this.journalHead()
     const pending = this.ctx.storage.sql
       .exec('SELECT name, app_id, owner_org, cursor, fail_count, lease_refreshed_at FROM targets WHERE cursor < ?', head)
       .toArray() as unknown as TargetRow[]
     for (let i = 0; i < pending.length; i += PUSH_CONCURRENCY) {
-      await Promise.all(pending.slice(i, i + PUSH_CONCURRENCY).map(target => this.pushTarget(target, head)))
+      await Promise.all(pending.slice(i, i + PUSH_CONCURRENCY).map(target => this.pushTarget(target, head, drained)))
     }
   }
 
@@ -363,7 +376,7 @@ export class ReplicaRouter extends DurableObject<ReplicatorEnv> {
     return rows.map(row => ({ table: row.table_name, op: row.op, row: JSON.parse(row.row_data) }))
   }
 
-  private async pushTarget(target: TargetRow, head: number): Promise<void> {
+  private async pushTarget(target: TargetRow, head: number, drained: boolean): Promise<void> {
     const entries = this.relevantRows(target, head)
     if (entries.length === 0) {
       // Nothing relevant in the window: advance the watermark locally.
@@ -371,7 +384,7 @@ export class ReplicaRouter extends DurableObject<ReplicatorEnv> {
       return
     }
     try {
-      const result = await this.replicaStub(target.name).applyBatch({ entries, leaseMs: this.leaseMs() })
+      const result = await this.replicaStub(target.name).applyBatch({ entries, leaseMs: this.leaseMs(), extendLease: drained })
       if (result?.unregister) {
         this.ctx.storage.sql.exec('DELETE FROM targets WHERE name = ?', target.name)
         return
@@ -399,19 +412,23 @@ export class ReplicaRouter extends DurableObject<ReplicatorEnv> {
 
   // Lease refresh for idle targets + journal pruning. Runs inline with the
   // poll; the refresh set is small (only leases past 1/3 of their life).
-  private maintain(): void {
+  // Heartbeats are skipped while the outbox has a backlog: leases must only
+  // ever assert "this replica is caught up as of now".
+  private maintain(drained: boolean): void {
     const now = Date.now()
     const leaseMs = this.leaseMs()
-    const stale = this.ctx.storage.sql
-      .exec(
-        'SELECT name, app_id, owner_org, cursor, fail_count, lease_refreshed_at FROM targets WHERE lease_refreshed_at < ? LIMIT 200',
-        now - leaseMs / 3,
-      )
-      .toArray() as unknown as TargetRow[]
+    const stale = drained
+      ? this.ctx.storage.sql
+          .exec(
+            'SELECT name, app_id, owner_org, cursor, fail_count, lease_refreshed_at FROM targets WHERE lease_refreshed_at < ? LIMIT 200',
+            now - leaseMs / 3,
+          )
+          .toArray() as unknown as TargetRow[]
+      : []
     for (const target of stale) {
       this.ctx.waitUntil((async () => {
         try {
-          const result = await this.replicaStub(target.name).applyBatch({ entries: [], leaseMs })
+          const result = await this.replicaStub(target.name).applyBatch({ entries: [], leaseMs, extendLease: true })
           if (result?.unregister)
             this.ctx.storage.sql.exec('DELETE FROM targets WHERE name = ?', target.name)
           else
