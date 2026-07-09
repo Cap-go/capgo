@@ -42,6 +42,7 @@ const isDomainChecking = ref(false)
 const isCheckingSavedSession = ref(true)
 const captchaStatus = ref<'disabled' | 'loading' | 'ready' | 'unavailable'>(captchaKey.value ? 'loading' : 'disabled')
 let captchaInitTimeout: ReturnType<typeof setTimeout> | null = null
+const forgotPasswordEmailStorageKey = 'capgo:forgot-password-email'
 
 const version = import.meta.env.VITE_APP_VERSION
 const isEmailStepBusy = computed(() => isDomainChecking.value || isCheckingSavedSession.value)
@@ -65,10 +66,6 @@ const loginHeroHighlights = computed(() => [
     description: t('login-highlight-team-description'),
   },
 ])
-const forgotPasswordRoute = computed(() => ({
-  path: '/forgot_password',
-  query: emailForLogin.value ? { email: emailForLogin.value } : undefined,
-}))
 const authCardShellClass = [
   'rounded-none border-0 bg-transparent p-0 shadow-none backdrop-blur-0',
   'sm:rounded-[1.75rem] sm:border sm:border-slate-200/75 sm:bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(255,255,255,0.84)_100%)]',
@@ -448,6 +445,17 @@ async function goBackToEmail() {
 
   await nextTick()
   focusLoginEmailInput()
+}
+
+async function goToForgotPassword() {
+  if (typeof sessionStorage !== 'undefined') {
+    if (emailForLogin.value)
+      sessionStorage.setItem(forgotPasswordEmailStorageKey, emailForLogin.value)
+    else
+      sessionStorage.removeItem(forgotPasswordEmailStorageKey)
+  }
+
+  await router.push('/forgot_password')
 }
 
 async function checkAuthUser() {
@@ -998,13 +1006,14 @@ onMounted(checkLogin)
                           >
                             {{ t('create-a-free-account') }}
                           </a>
-                          <router-link
-                            :to="forgotPasswordRoute"
+                          <button
+                            type="button"
                             data-test="forgot-password"
                             :class="authInlineLinkClass"
+                            @click="goToForgotPassword"
                           >
                             {{ t('forgot') }} {{ t('password') }} ?
-                          </router-link>
+                          </button>
                         </div>
                       </div>
                     </FormKit>

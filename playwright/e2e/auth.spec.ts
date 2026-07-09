@@ -53,7 +53,7 @@ test.describe('Authentication', () => {
     const email = 'test@capgo.app'
     await continueToPasswordStep(page, email)
     await page.click('[data-test="forgot-password"]')
-    await expect(page).toHaveURL(`/forgot_password?email=${email}`)
+    await expect(page).toHaveURL('/forgot_password')
     await expect(page.locator('[data-test="email"]')).toHaveValue(email)
   })
 
