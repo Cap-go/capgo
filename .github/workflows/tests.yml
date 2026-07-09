@@ -264,6 +264,33 @@ jobs:
       - name: Run unit tests
         run: bun run test:unit
 
+  test_db:
+    needs: changes
+    if: needs.changes.outputs.run_capgo == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    name: Run DB tests (Tinbase)
+    permissions:
+      contents: read
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+      - name: Checkout repository
+        uses: actions/checkout@v6 # v6
+      - name: Setup bun
+        run: bash scripts/setup-bun.sh
+      - name: Cache Tinbase Postgres binaries
+        uses: actions/cache@v5 # v5
+        with:
+          path: ~/.cache/tinbase
+          key: tinbase-postgres-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - name: Install dependencies
+        run: bun install
+      - name: Run DB tests against Tinbase
+        run: bash scripts/test-db-tinbase.sh
+
   test_backend:
     needs: changes
     if: needs.changes.outputs.run_capgo == 'true'
@@ -357,7 +384,7 @@ jobs:
       - name: Run backend integration tests
         env:
           VITEST_SHARD: ${{ matrix.shard }}
-        run: bun run supabase:with-env -- bunx vitest run --exclude=tests/*.unit.test.ts --exclude=tests/cli* --shard="$VITEST_SHARD"
+        run: bun run supabase:with-env -- bunx vitest run --exclude=tests/*.unit.test.ts --exclude=tests/cli* $(sed 's|^|--exclude=|' tests/tinbase-db-tests.txt | tr '\n' ' ') --shard="$VITEST_SHARD"
       - name: Show Edge server logs after backend test failure
         if: failure() && steps.bootstrap_edge_server.outputs.log_path != ''
         run: |
@@ -453,7 +480,7 @@ jobs:
       - name: Run Cloudflare Workers integration tests
         env:
           VITEST_SHARD: ${{ matrix.shard }}
-        run: bunx vitest run --exclude=tests/cli* --exclude=tests/*.unit.test.ts --config vitest.config.cloudflare.ts --shard="$VITEST_SHARD"
+        run: bunx vitest run --exclude=tests/cli* --exclude=tests/*.unit.test.ts $(sed 's|^|--exclude=|' tests/tinbase-db-tests.txt | tr '\n' ' ') --config vitest.config.cloudflare.ts --shard="$VITEST_SHARD"
       - name: Show Cloudflare Worker logs after Cloudflare test failure
         if: failure() && steps.start_cloudflare_workers.outputs.log_path != ''
         run: |

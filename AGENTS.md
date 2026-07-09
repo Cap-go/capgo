@@ -23,6 +23,11 @@ when working with code in this repository.
 - `bun test:all` - Run all backend tests
 - `bun test:unit` - Run unit tests only (`tests/*.unit.test.ts`, no Supabase or
   Docker required)
+- `bun test:db` - Run the DB-only test subset listed in
+  `tests/tinbase-db-tests.txt` against a throwaway Tinbase instance (no Docker;
+  boots in ~5s). Add a test file to that list only if it talks purely to
+  PostgREST/auth via supabase-js — no edge functions, Cloudflare workers, or raw
+  Postgres TCP (`executeSQL`/`getPostgresClient`)
 - `bun test:backend:integration` - Run backend tests excluding unit and CLI
   tests (requires running Supabase; this is what CI shards across runners; CLI
   integration tests run via `bun test:cli`)
