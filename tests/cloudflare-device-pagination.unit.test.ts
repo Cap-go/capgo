@@ -179,6 +179,24 @@ describe('readBandwidthUsageCF', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
+
+  it('includes Cloudflare Analytics HTTP error details in strict bandwidth failures', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      errors: [{ message: 'bad Analytics Engine query' }],
+    }), {
+      status: 400,
+      headers: { 'content-type': 'application/json' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(readBandwidthUsageCF(
+      createContextMock() as unknown as Context,
+      'com.example.app',
+      '2026-06-01',
+      '2026-07-01',
+      { throwOnError: true },
+    )).rejects.toThrow('runQueryToCFA HTTP 400: {"errors":[{"message":"bad Analytics Engine query"}]}')
+  })
 })
 
 describe('countInstallSourcesCF', () => {
