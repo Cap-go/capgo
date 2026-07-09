@@ -381,10 +381,14 @@ GRANT EXECUTE ON FUNCTION "public"."role_bindings_readable_ids"() TO "service_ro
 GRANT EXECUTE ON FUNCTION "public"."channel_permission_override_readable_channel_ids"() TO "authenticated";
 GRANT EXECUTE ON FUNCTION "public"."channel_permission_override_readable_channel_ids"() TO "service_role";
 
+ALTER FUNCTION "public"."app_versions_readable_app_ids"() STABLE;
+
 COMMENT ON FUNCTION "public"."orgs_with_min_right"("public"."user_min_right") IS
 'Returns org IDs matching a minimum right for the current authenticated user or Capgo API key. API-key requests only use org-scoped API-key bindings, then exact-check each candidate with the existing RBAC permission path.';
 COMMENT ON FUNCTION "public"."orgs_readable_org_ids"() IS
 'Returns org IDs readable by the current authenticated user or Capgo API key. This is used by orgs RLS so unfiltered PostgREST requests compute access once and then filter by orgs.id instead of doing per-row auth work.';
+COMMENT ON FUNCTION "public"."app_versions_readable_app_ids"() IS
+'Returns app IDs readable by the current authenticated user or Capgo API key. Exposed SELECT RLS policies use this statement-level helper instead of checking app RBAC once per candidate row.';
 COMMENT ON FUNCTION "public"."org_member_readable_org_ids"() IS
 'Returns org IDs where the current authenticated user or Capgo API-key owner has a membership row in the org and read rights. org_users RLS uses this narrower helper so org read access does not expose membership rows for non-members.';
 COMMENT ON FUNCTION "public"."readable_app_version_ids"() IS
@@ -417,6 +421,17 @@ ON "public"."apps";
 
 CREATE POLICY "Allow for auth, api keys (read+)"
 ON "public"."apps"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "app_id" = ANY(COALESCE((SELECT "public"."app_versions_readable_app_ids"()), '{}'::character varying[]))
+);
+
+DROP POLICY IF EXISTS "Allow for auth, api keys (read+)"
+ON "public"."app_versions";
+
+CREATE POLICY "Allow for auth, api keys (read+)"
+ON "public"."app_versions"
 FOR SELECT
 TO "anon", "authenticated"
 USING (

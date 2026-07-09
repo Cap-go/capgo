@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { executeSQL, fetchWithRetry, SUPABASE_ANON_KEY, SUPABASE_BASE_URL } from './test-utils.ts'
+import { APIKEY_TEST_ALL, executeSQL, fetchWithRetry, getAuthHeaders, SUPABASE_ANON_KEY, SUPABASE_BASE_URL } from './test-utils.ts'
 
 interface RestProbeRow {
   table_name: string
@@ -13,7 +13,7 @@ WITH exposed_tables AS (
   FROM pg_class c
   INNER JOIN pg_namespace n ON n.oid = c.relnamespace
   WHERE n.nspname = 'public'
-    AND c.relkind IN ('r', 'p')
+    AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
     AND (
       has_table_privilege('anon', c.oid, 'SELECT')
       OR has_table_privilege('authenticated', c.oid, 'SELECT')
@@ -77,6 +77,20 @@ function getInvalidApiKeyHeaders() {
   }
 }
 
+function getValidApiKeyHeaders() {
+  return {
+    ...getAnonHeaders(),
+    capgkey: APIKEY_TEST_ALL,
+  }
+}
+
+async function getAuthenticatedHeaders() {
+  return {
+    ...getAnonHeaders(),
+    ...await getAuthHeaders(),
+  }
+}
+
 async function fetchRestProbe(probe: RestProbeRow, headers: Record<string, string>) {
   const params = new URLSearchParams({
     select: probe.probe_column,
@@ -100,7 +114,7 @@ async function fetchRestProbe(probe: RestProbeRow, headers: Record<string, strin
 describe('public REST unfiltered RLS regression guard', () => {
   it('does not run direct per-row identity helpers in exposed SELECT policies', async () => {
     const riskyRows = await executeSQL(riskySelectPolicySql, [
-      '\\m(check_min_rights|get_identity|get_identity_org_allowed|get_identity_org_appid|get_user_main_org_id_by_app_id|is_member_of_org|is_current_user_group_member|rbac_check_permission|is_user_org_admin|is_user_app_admin|user_has_role_in_app|user_has_app_update_user_roles)\\M',
+      '\\m(check_min_rights|get_identity|get_identity_org_allowed|get_identity_org_appid|get_user_main_org_id_by_app_id|is_member_of_org|is_current_user_group_member|rbac_check_permission|app_versions_has_app_permission|is_user_org_admin|is_user_app_admin|user_has_role_in_app|user_has_app_update_user_roles)\\M',
     ])
 
     expect(riskyRows.map((row: any) => ({
@@ -110,15 +124,21 @@ describe('public REST unfiltered RLS regression guard', () => {
     }))).toEqual([])
   })
 
-  it.concurrent('keeps manifest app-version helper stable for statement-level RLS', async () => {
+  it.concurrent('keeps app-version helpers stable for statement-level RLS', async () => {
     const rows = await executeSQL(`
-      SELECT provolatile
+      SELECT proname, provolatile
       FROM pg_proc
-      WHERE oid = 'public.readable_app_version_ids()'::regprocedure
+      WHERE oid IN (
+        'public.app_versions_readable_app_ids()'::regprocedure,
+        'public.readable_app_version_ids()'::regprocedure
+      )
+      ORDER BY proname
     `)
 
-    expect(rows).toHaveLength(1)
-    expect(rows[0].provolatile).toBe('s')
+    expect(rows).toEqual([
+      { proname: 'app_versions_readable_app_ids', provolatile: 's' },
+      { proname: 'readable_app_version_ids', provolatile: 's' },
+    ])
   })
 
   it('does not raise or timeout on unfiltered reads for exposed tables', async () => {
@@ -126,6 +146,8 @@ describe('public REST unfiltered RLS regression guard', () => {
     const scenarios = [
       { name: 'anonymous', headers: getAnonHeaders() },
       { name: 'invalid API key', headers: getInvalidApiKeyHeaders() },
+      { name: 'authenticated', headers: await getAuthenticatedHeaders() },
+      { name: 'valid API key', headers: getValidApiKeyHeaders() },
     ]
     const failures: string[] = []
 
