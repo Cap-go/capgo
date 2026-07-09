@@ -109,7 +109,8 @@ indexes AS (
   SELECT
     t.table_name,
     idx.relname AS index_name,
-    pg_get_indexdef(idx.oid) AS definition
+    pg_get_indexdef(idx.oid) AS definition,
+    ix.indisvalid AS is_valid
   FROM tables t
   JOIN pg_index ix ON ix.indrelid = t.table_oid
   JOIN pg_class idx ON idx.oid = ix.indexrelid
@@ -218,7 +219,8 @@ SELECT jsonb_build_object(
     SELECT jsonb_agg(jsonb_build_object(
       'table', table_name,
       'name', index_name,
-      'definition', definition
+      'definition', definition,
+      'valid', is_valid
     ) ORDER BY table_name, index_name)
     FROM indexes
   ), '[]'::jsonb),

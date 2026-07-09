@@ -22,6 +22,7 @@ interface SchemaIndex {
   table: string
   name: string
   definition: string
+  valid: boolean
 }
 
 interface SchemaTable {
@@ -36,7 +37,7 @@ interface SchemaCatalog {
 }
 
 interface SyncStatement {
-  kind: 'column' | 'index'
+  kind: 'column' | 'index' | 'invalid_index'
   table: string
   name: string
   sql: string
@@ -68,7 +69,7 @@ export function planReadReplicaAdditiveSchemaSync(expected: unknown, actual: unk
   const actualCatalog = assertSchemaCatalog(actual)
   const actualTables = new Set((actualCatalog.tables ?? []).map(table => table.name))
   const actualColumns = new Set((actualCatalog.columns ?? []).map(column => columnKey(column)))
-  const actualIndexes = new Set((actualCatalog.indexes ?? []).map(index => index.name))
+  const actualIndexByName = new Map((actualCatalog.indexes ?? []).map(index => [index.name, index]))
   const expectedConstraintIndexes = new Set((expectedCatalog.constraints ?? []).map(constraint => constraint.name))
   const tablesWithSkippedColumns = new Set<string>()
   const statements: SyncStatement[] = []
@@ -99,7 +100,8 @@ export function planReadReplicaAdditiveSchemaSync(expected: unknown, actual: unk
   }
 
   for (const index of expectedCatalog.indexes ?? []) {
-    if (actualIndexes.has(index.name))
+    const actualIndex = actualIndexByName.get(index.name)
+    if (actualIndex?.valid)
       continue
 
     if (tablesWithSkippedColumns.has(index.table)) {
@@ -131,6 +133,15 @@ export function planReadReplicaAdditiveSchemaSync(expected: unknown, actual: unk
         reason: 'unsupported_additive_index',
       })
       continue
+    }
+
+    if (actualIndex) {
+      statements.push({
+        kind: 'invalid_index',
+        table: index.table,
+        name: index.name,
+        sql: buildDropIndexStatement(index),
+      })
     }
 
     statements.push({
@@ -205,6 +216,8 @@ function assertSchemaIndex(value: unknown): asserts value is SchemaIndex {
   const index = assertCatalogObject(value, 'indexes') as Partial<SchemaIndex>
   if (typeof index.table !== 'string' || typeof index.name !== 'string' || typeof index.definition !== 'string')
     throw new Error('Read-replica schema catalog indexes must include string table, name, and definition')
+  if (typeof index.valid !== 'boolean')
+    throw new Error('Read-replica schema catalog indexes must include boolean valid')
 }
 
 function assertSchemaTable(value: unknown): asserts value is SchemaTable {
@@ -256,6 +269,10 @@ function buildCreateIndexStatement(index: SchemaIndex, actualTables: Set<string>
     return null
 
   return `CREATE ${unique}INDEX CONCURRENTLY IF NOT EXISTS ${quoteIdent(index.name)} ON ${quoteQualifiedTable(index.table)} ${indexTail}`
+}
+
+function buildDropIndexStatement(index: SchemaIndex): string {
+  return `DROP INDEX CONCURRENTLY IF EXISTS public.${quoteIdent(index.name)}`
 }
 
 function parseCreateIndexDefinition(definition: string): { unique: string, indexName: string, tableName: string, indexTail: string } | null {
