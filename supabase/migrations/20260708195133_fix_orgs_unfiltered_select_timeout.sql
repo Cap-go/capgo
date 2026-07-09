@@ -24,31 +24,33 @@ BEGIN
     FROM "public"."find_apikey_by_value"(v_api_key_text)
     INTO v_api_key;
 
-    IF v_api_key.id IS NULL OR "public"."is_apikey_expired"(v_api_key.expires_at) THEN
+    IF v_api_key.id IS NOT NULL AND NOT "public"."is_apikey_expired"(v_api_key.expires_at) THEN
+      SELECT COALESCE(array_agg(DISTINCT candidate_orgs.org_id), '{}'::uuid[])
+      INTO v_allowed
+      FROM (
+        SELECT role_bindings.org_id
+        FROM "public"."role_bindings"
+        WHERE role_bindings.principal_type = "public"."rbac_principal_apikey"()
+          AND role_bindings.principal_id = v_api_key.rbac_id
+          AND role_bindings.scope_type = "public"."rbac_scope_org"()
+          AND role_bindings.org_id IS NOT NULL
+          AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+      ) candidate_orgs
+      WHERE "public"."rbac_check_permission_direct"(
+        v_permission,
+        v_api_key.user_id,
+        candidate_orgs.org_id,
+        NULL::character varying,
+        NULL::bigint,
+        v_api_key_text
+      );
+
       RETURN v_allowed;
     END IF;
 
-    SELECT COALESCE(array_agg(DISTINCT candidate_orgs.org_id), '{}'::uuid[])
-    INTO v_allowed
-    FROM (
-      SELECT role_bindings.org_id
-      FROM "public"."role_bindings"
-      WHERE role_bindings.principal_type = "public"."rbac_principal_apikey"()
-        AND role_bindings.principal_id = v_api_key.rbac_id
-        AND role_bindings.scope_type = "public"."rbac_scope_org"()
-        AND role_bindings.org_id IS NOT NULL
-        AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
-    ) candidate_orgs
-    WHERE "public"."rbac_check_permission_direct"(
-      v_permission,
-      v_api_key.user_id,
-      candidate_orgs.org_id,
-      NULL::character varying,
-      NULL::bigint,
-      v_api_key_text
-    );
-
-    RETURN v_allowed;
+    IF v_auth_user_id IS NULL THEN
+      RETURN v_allowed;
+    END IF;
   END IF;
 
   IF v_auth_user_id IS NULL THEN
@@ -90,12 +92,13 @@ BEGIN
   SELECT COALESCE(array_agg(DISTINCT candidate_orgs.org_id), '{}'::uuid[])
   INTO v_allowed
   FROM candidate_orgs
-  WHERE "public"."check_min_rights"(
-    "p_min_right",
+  WHERE "public"."rbac_check_permission_direct"(
+    v_permission,
     v_auth_user_id,
     candidate_orgs.org_id,
     NULL::character varying,
-    NULL::bigint
+    NULL::bigint,
+    NULL::text
   );
 
   RETURN v_allowed;
@@ -108,6 +111,87 @@ LANGUAGE "sql" STABLE SECURITY DEFINER
 SET "search_path" TO ''
 AS $$
   SELECT "public"."orgs_with_min_right"('read'::"public"."user_min_right")
+$$;
+
+CREATE OR REPLACE FUNCTION "public"."org_member_readable_org_ids"()
+RETURNS "uuid"[]
+LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+SET "search_path" TO ''
+AS $$
+DECLARE
+  v_auth_user_id uuid;
+  v_api_key_text text;
+  v_api_key public.apikeys%ROWTYPE;
+  v_permission text;
+  v_allowed uuid[] := '{}'::uuid[];
+BEGIN
+  SELECT "auth"."uid"() INTO v_auth_user_id;
+  SELECT "public"."get_apikey_header"() INTO v_api_key_text;
+  v_permission := "public"."rbac_permission_for_legacy"('read'::"public"."user_min_right", "public"."rbac_scope_org"());
+
+  IF v_api_key_text IS NOT NULL THEN
+    SELECT *
+    FROM "public"."find_apikey_by_value"(v_api_key_text)
+    INTO v_api_key;
+
+    IF v_api_key.id IS NOT NULL AND NOT "public"."is_apikey_expired"(v_api_key.expires_at) THEN
+      SELECT COALESCE(array_agg(DISTINCT candidate_orgs.org_id), '{}'::uuid[])
+      INTO v_allowed
+      FROM (
+        SELECT role_bindings.org_id
+        FROM "public"."role_bindings"
+        WHERE role_bindings.principal_type = "public"."rbac_principal_apikey"()
+          AND role_bindings.principal_id = v_api_key.rbac_id
+          AND role_bindings.scope_type = "public"."rbac_scope_org"()
+          AND role_bindings.org_id IS NOT NULL
+          AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+      ) candidate_orgs
+      WHERE "public"."rbac_check_permission_direct"(
+        v_permission,
+        v_api_key.user_id,
+        candidate_orgs.org_id,
+        NULL::character varying,
+        NULL::bigint,
+        v_api_key_text
+      )
+        AND EXISTS (
+          SELECT 1
+          FROM "public"."org_users"
+          WHERE org_users.user_id = v_api_key.user_id
+            AND org_users.org_id = candidate_orgs.org_id
+            AND org_users.app_id IS NULL
+            AND org_users.channel_id IS NULL
+        );
+
+      RETURN v_allowed;
+    END IF;
+
+    IF v_auth_user_id IS NULL THEN
+      RETURN v_allowed;
+    END IF;
+  END IF;
+
+  IF v_auth_user_id IS NULL THEN
+    RETURN v_allowed;
+  END IF;
+
+  SELECT COALESCE(array_agg(DISTINCT org_users.org_id), '{}'::uuid[])
+  INTO v_allowed
+  FROM "public"."org_users"
+  WHERE org_users.user_id = v_auth_user_id
+    AND org_users.app_id IS NULL
+    AND org_users.channel_id IS NULL
+    AND "public"."rbac_check_permission_direct"(
+      v_permission,
+      v_auth_user_id,
+      org_users.org_id,
+      NULL::character varying,
+      NULL::bigint,
+      NULL::text
+    );
+
+  RETURN v_allowed;
+END;
 $$;
 
 CREATE OR REPLACE FUNCTION "public"."readable_app_version_ids"()
@@ -156,12 +240,14 @@ $$;
 
 ALTER FUNCTION "public"."orgs_with_min_right"("public"."user_min_right") OWNER TO "postgres";
 ALTER FUNCTION "public"."orgs_readable_org_ids"() OWNER TO "postgres";
+ALTER FUNCTION "public"."org_member_readable_org_ids"() OWNER TO "postgres";
 ALTER FUNCTION "public"."readable_app_version_ids"() OWNER TO "postgres";
 ALTER FUNCTION "public"."readable_group_ids"() OWNER TO "postgres";
 ALTER FUNCTION "public"."readable_org_customer_ids"() OWNER TO "postgres";
 
 REVOKE ALL ON FUNCTION "public"."orgs_with_min_right"("public"."user_min_right") FROM PUBLIC;
 REVOKE ALL ON FUNCTION "public"."orgs_readable_org_ids"() FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."org_member_readable_org_ids"() FROM PUBLIC;
 REVOKE ALL ON FUNCTION "public"."readable_app_version_ids"() FROM PUBLIC;
 REVOKE ALL ON FUNCTION "public"."readable_group_ids"() FROM PUBLIC;
 REVOKE ALL ON FUNCTION "public"."readable_org_customer_ids"() FROM PUBLIC;
@@ -172,6 +258,9 @@ GRANT EXECUTE ON FUNCTION "public"."orgs_with_min_right"("public"."user_min_righ
 GRANT EXECUTE ON FUNCTION "public"."orgs_readable_org_ids"() TO "anon";
 GRANT EXECUTE ON FUNCTION "public"."orgs_readable_org_ids"() TO "authenticated";
 GRANT EXECUTE ON FUNCTION "public"."orgs_readable_org_ids"() TO "service_role";
+GRANT EXECUTE ON FUNCTION "public"."org_member_readable_org_ids"() TO "anon";
+GRANT EXECUTE ON FUNCTION "public"."org_member_readable_org_ids"() TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."org_member_readable_org_ids"() TO "service_role";
 GRANT EXECUTE ON FUNCTION "public"."readable_app_version_ids"() TO "anon";
 GRANT EXECUTE ON FUNCTION "public"."readable_app_version_ids"() TO "authenticated";
 GRANT EXECUTE ON FUNCTION "public"."readable_app_version_ids"() TO "service_role";
@@ -185,6 +274,8 @@ COMMENT ON FUNCTION "public"."orgs_with_min_right"("public"."user_min_right") IS
 'Returns org IDs matching a minimum right for the current authenticated user or Capgo API key. API-key requests only use org-scoped API-key bindings, then exact-check each candidate with the existing RBAC permission path.';
 COMMENT ON FUNCTION "public"."orgs_readable_org_ids"() IS
 'Returns org IDs readable by the current authenticated user or Capgo API key. This is used by orgs RLS so unfiltered PostgREST requests compute access once and then filter by orgs.id instead of doing per-row auth work.';
+COMMENT ON FUNCTION "public"."org_member_readable_org_ids"() IS
+'Returns org IDs where the current authenticated user or Capgo API-key owner is an org-level member with read rights. org_users RLS uses this narrower helper so org read access does not expose membership rows for non-members.';
 COMMENT ON FUNCTION "public"."readable_app_version_ids"() IS
 'Returns app_version IDs readable by the current authenticated user or Capgo API key. Manifest RLS uses this statement-level helper instead of checking every manifest row through app_versions.';
 COMMENT ON FUNCTION "public"."readable_group_ids"() IS
@@ -389,7 +480,7 @@ ON "public"."org_users"
 FOR SELECT
 TO "anon", "authenticated"
 USING (
-  "org_id" = ANY(COALESCE((SELECT "public"."orgs_readable_org_ids"()), '{}'::uuid[]))
+  "org_id" = ANY(COALESCE((SELECT "public"."org_member_readable_org_ids"()), '{}'::uuid[]))
 );
 
 DROP POLICY IF EXISTS "allow_org_admins_select_sso_providers"

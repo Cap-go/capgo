@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { APIKEY_TEST_ALL, APP_NAME, executeSQL, fetchWithRetry, SUPABASE_ANON_KEY, SUPABASE_BASE_URL, USER_ID } from './test-utils.ts'
+import { APIKEY_TEST_ALL, APP_NAME, executeSQL, fetchWithRetry, getAuthHeaders, SUPABASE_ANON_KEY, SUPABASE_BASE_URL, USER_ID } from './test-utils.ts'
 
 function getAnonHeaders() {
   if (!SUPABASE_BASE_URL || !SUPABASE_ANON_KEY)
@@ -38,6 +38,21 @@ describe('orgs RLS DoS regression', () => {
 
     expect(response.status, body).toBe(200)
     expect(JSON.parse(body)).toEqual([])
+  })
+
+  it.concurrent('falls back to the JWT identity when an invalid API key header is present', async () => {
+    const authHeaders = await getAuthHeaders()
+    const response = await fetchRest('orgs?select=id&limit=1', {
+      ...authHeaders,
+      apikey: SUPABASE_ANON_KEY,
+      capgkey: randomUUID(),
+    })
+    const body = await response.text()
+    const rows = JSON.parse(body) as Array<{ id: string }>
+
+    expect(response.status, body).toBe(200)
+    expect(rows.length).toBeGreaterThan(0)
+    expect(rows.every(row => typeof row.id === 'string')).toBe(true)
   })
 
   it.concurrent('keeps unrelated anonymous reads available during parallel org probes', async () => {
@@ -153,5 +168,20 @@ describe('orgs RLS DoS regression', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0].helper_exists).toBe(true)
     expect(rows[0].using_expr).toContain('orgs_readable_org_ids')
+  })
+
+  it.concurrent('keeps org_users reads behind the membership-gated helper', async () => {
+    const rows = await executeSQL(`
+      SELECT
+        to_regprocedure('public.org_member_readable_org_ids()') IS NOT NULL AS helper_exists,
+        pg_get_expr(polqual, polrelid) AS using_expr
+      FROM pg_policy
+      WHERE polrelid = 'public.org_users'::regclass
+        AND polname = 'Allow member and owner to select'
+    `)
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0].helper_exists).toBe(true)
+    expect(rows[0].using_expr).toContain('org_member_readable_org_ids')
   })
 })
