@@ -68,6 +68,27 @@ describe('buildReadDevicesCFQuery', () => {
 
     expect(query).not.toContain('blob9')
     expect(query).not.toContain('install_source')
+    expect(query).not.toContain('blob10')
+  })
+
+  it.concurrent('does not read country code for custom id listing without device ids', () => {
+    const query = buildReadDevicesCFQuery({
+      app_id: 'com.example.app',
+      limit: 1,
+    }, true)
+
+    expect(query).toContain('blob5 != \'\'')
+    expect(query).not.toContain('blob10')
+  })
+
+  it.concurrent('reads country code when devices are requested by id', () => {
+    const query = buildReadDevicesCFQuery({
+      app_id: 'com.example.app',
+      deviceIds: ['11111111-1111-4111-8111-111111111111'],
+      limit: 1,
+    }, false)
+
+    expect(query).toContain('argMax(blob10, if(blob10 != \'\', timestamp, toDateTime(\'1970-01-01 00:00:00\'))) AS country_code')
   })
 
   it.concurrent('applies descending cursor pagination after device grouping', () => {

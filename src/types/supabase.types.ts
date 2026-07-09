@@ -327,12 +327,12 @@ export type Database = {
           ios_store_url: string | null
           last_version: string | null
           manifest_bundle_count: number
-          rollout_channel_count: number
-          rollout_paused_version_names: string[]
           name: string | null
           need_onboarding: boolean
           owner_org: string
           retention: number
+          rollout_channel_count: number
+          rollout_paused_version_names: string[]
           stats_refresh_requested_at: string | null
           stats_updated_at: string | null
           transfer_history: Json[] | null
@@ -357,12 +357,12 @@ export type Database = {
           ios_store_url?: string | null
           last_version?: string | null
           manifest_bundle_count?: number
-          rollout_channel_count?: number
-          rollout_paused_version_names?: string[]
           name?: string | null
           need_onboarding?: boolean
           owner_org: string
           retention?: number
+          rollout_channel_count?: number
+          rollout_paused_version_names?: string[]
           stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
           transfer_history?: Json[] | null
@@ -387,12 +387,12 @@ export type Database = {
           ios_store_url?: string | null
           last_version?: string | null
           manifest_bundle_count?: number
-          rollout_channel_count?: number
-          rollout_paused_version_names?: string[]
           name?: string | null
           need_onboarding?: boolean
           owner_org?: string
           retention?: number
+          rollout_channel_count?: number
+          rollout_paused_version_names?: string[]
           stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
           transfer_history?: Json[] | null
@@ -803,16 +803,6 @@ export type Database = {
           allow_prod: boolean
           android: boolean
           app_id: string
-          created_at: string
-          created_by: string
-          disable_auto_update: Database["public"]["Enums"]["disable_update"]
-          disable_auto_update_under_native: boolean
-          electron: boolean
-          id: number
-          ios: boolean
-          name: string
-          owner_org: string
-          public: boolean
           auto_pause_action: string
           auto_pause_confidence: number
           auto_pause_cooldown_minutes: number
@@ -823,6 +813,17 @@ export type Database = {
           auto_pause_min_attempts: number | null
           auto_pause_min_failures: number | null
           auto_pause_window_minutes: number
+          created_at: string
+          created_by: string
+          disable_auto_update: Database["public"]["Enums"]["disable_update"]
+          disable_auto_update_under_native: boolean
+          electron: boolean
+          id: number
+          ios: boolean
+          name: string
+          owner_org: string
+          public: boolean
+          rbac_id: string
           rollout_cache_ttl_seconds: number
           rollout_enabled: boolean
           rollout_id: string
@@ -830,7 +831,6 @@ export type Database = {
           rollout_paused_at: string | null
           rollout_percentage_bps: number
           rollout_version: number | null
-          rbac_id: string
           updated_at: string
           version: number | null
         }
@@ -842,16 +842,6 @@ export type Database = {
           allow_prod?: boolean
           android?: boolean
           app_id: string
-          created_at?: string
-          created_by: string
-          disable_auto_update?: Database["public"]["Enums"]["disable_update"]
-          disable_auto_update_under_native?: boolean
-          electron?: boolean
-          id?: number
-          ios?: boolean
-          name: string
-          owner_org: string
-          public?: boolean
           auto_pause_action?: string
           auto_pause_confidence?: number
           auto_pause_cooldown_minutes?: number
@@ -862,6 +852,17 @@ export type Database = {
           auto_pause_min_attempts?: number | null
           auto_pause_min_failures?: number | null
           auto_pause_window_minutes?: number
+          created_at?: string
+          created_by: string
+          disable_auto_update?: Database["public"]["Enums"]["disable_update"]
+          disable_auto_update_under_native?: boolean
+          electron?: boolean
+          id?: number
+          ios?: boolean
+          name: string
+          owner_org: string
+          public?: boolean
+          rbac_id?: string
           rollout_cache_ttl_seconds?: number
           rollout_enabled?: boolean
           rollout_id?: string
@@ -869,7 +870,6 @@ export type Database = {
           rollout_paused_at?: string | null
           rollout_percentage_bps?: number
           rollout_version?: number | null
-          rbac_id?: string
           updated_at?: string
           version?: number | null
         }
@@ -881,16 +881,6 @@ export type Database = {
           allow_prod?: boolean
           android?: boolean
           app_id?: string
-          created_at?: string
-          created_by?: string
-          disable_auto_update?: Database["public"]["Enums"]["disable_update"]
-          disable_auto_update_under_native?: boolean
-          electron?: boolean
-          id?: number
-          ios?: boolean
-          name?: string
-          owner_org?: string
-          public?: boolean
           auto_pause_action?: string
           auto_pause_confidence?: number
           auto_pause_cooldown_minutes?: number
@@ -901,6 +891,17 @@ export type Database = {
           auto_pause_min_attempts?: number | null
           auto_pause_min_failures?: number | null
           auto_pause_window_minutes?: number
+          created_at?: string
+          created_by?: string
+          disable_auto_update?: Database["public"]["Enums"]["disable_update"]
+          disable_auto_update_under_native?: boolean
+          electron?: boolean
+          id?: number
+          ios?: boolean
+          name?: string
+          owner_org?: string
+          public?: boolean
+          rbac_id?: string
           rollout_cache_ttl_seconds?: number
           rollout_enabled?: boolean
           rollout_id?: string
@@ -908,7 +909,6 @@ export type Database = {
           rollout_paused_at?: string | null
           rollout_percentage_bps?: number
           rollout_version?: number | null
-          rbac_id?: string
           updated_at?: string
           version?: number | null
         }
@@ -3882,6 +3882,8 @@ export type Database = {
           need_onboarding: boolean
           owner_org: string
           retention: number
+          rollout_channel_count: number
+          rollout_paused_version_names: string[]
           stats_refresh_requested_at: string | null
           stats_updated_at: string | null
           transfer_history: Json[] | null
@@ -4963,7 +4965,13 @@ export type Database = {
         }[]
       }
       read_version_usage: {
-        Args: { p_app_id: string; p_channel_id?: number | null; p_channel_name?: string | null; p_period_end: string; p_period_start: string }
+        Args: {
+          p_app_id: string
+          p_channel_id?: number
+          p_channel_name?: string
+          p_period_end: string
+          p_period_start: string
+        }
         Returns: {
           app_id: string
           date: string
@@ -4988,6 +4996,10 @@ export type Database = {
       record_email_otp_verified: {
         Args: { p_user_id: string }
         Returns: string
+      }
+      refresh_app_rollout_channel_count_for_app: {
+        Args: { p_app_id: string }
+        Returns: undefined
       }
       refresh_app_rollups_after_demo_reset: {
         Args: { p_app_id: string; p_app_uuid: string; p_owner_org: string }

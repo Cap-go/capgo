@@ -10,6 +10,7 @@ describe('device update format helpers', () => {
     const { transformDeviceToUpdateRequest } = useDeviceUpdateFormat()
     const device: DeviceRow = {
       app_id: 'lgbt.vibes.application',
+      country_code: null,
       custom_id: '',
       default_channel: 'insiders',
       device_id: '31de6a5e-80a9-4348-9af1-31e1e9562583',
@@ -39,6 +40,7 @@ describe('device update format helpers', () => {
     const { transformDeviceToUpdateRequest } = useDeviceUpdateFormat()
     const device = {
       app_id: 'lgbt.vibes.application',
+      country_code: null,
       custom_id: '',
       default_channel: 'insiders',
       device_id: '31de6a5e-80a9-4348-9af1-31e1e9562583',
@@ -61,9 +63,11 @@ describe('device update format helpers', () => {
     })
     expect(transformDeviceToUpdateRequest(device, 'lgbt.vibes.application', device.default_channel ?? '')).not.toHaveProperty('channel')
   })
-  it.concurrent('keeps install_source in public device responses', () => {
+
+  it.concurrent('keeps install_source and country_code in public device responses', () => {
     const [device] = filterDeviceKeys([{
       app_id: 'lgbt.vibes.application',
+      country_code: 'FR',
       custom_id: '',
       default_channel: 'production',
       device_id: '31de6a5e-80a9-4348-9af1-31e1e9562583',
@@ -82,6 +86,7 @@ describe('device update format helpers', () => {
     }])
 
     expect(device).toMatchObject({
+      country_code: 'FR',
       device_id: '31de6a5e-80a9-4348-9af1-31e1e9562583',
       install_source: 'app_store',
     })
