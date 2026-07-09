@@ -26,6 +26,8 @@ const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 
 const isLoading = ref(false)
 const isLoadingMain = ref(true)
+const initialEmail = computed(() => typeof route.query.email === 'string' ? route.query.email : '')
+const initialFormValue = computed(() => ({ email: initialEmail.value }))
 const cardDescription = computed(() => step.value === 1 ? t('enter-your-email-add') : t('enter-your-new-passw'))
 
 function getRecoveryParams() {
@@ -184,7 +186,7 @@ watchEffect(() => {
       <Spinner size="w-14 h-14" class="my-auto" />
     </div>
 
-    <FormKit v-else id="forgot-password" type="form" :actions="false" @submit="submit">
+    <FormKit v-else id="forgot-password" type="form" :actions="false" :value="initialFormValue" @submit="submit">
       <div class="space-y-5 text-slate-500 dark:text-slate-300">
         <div v-if="step === 1">
           <FormKit
