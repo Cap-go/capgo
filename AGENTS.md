@@ -23,8 +23,9 @@ when working with code in this repository.
 - `bun test:all` - Run all backend tests
 - `bun test:unit` - Run unit tests only (`tests/*.unit.test.ts`, no Supabase or
   Docker required)
-- `bun test:backend:integration` - Run backend tests excluding unit tests
-  (requires running Supabase; this is what CI shards across runners)
+- `bun test:backend:integration` - Run backend tests excluding unit and CLI
+  tests (requires running Supabase; this is what CI shards across runners; CLI
+  integration tests run via `bun test:cli`)
 - `bun test:backend` - Run backend tests excluding CLI tests
 - `bun test:cli` - Run CLI-specific tests
 - `bun test:local` - Legacy alias for the default monorepo backend test run

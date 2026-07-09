@@ -306,7 +306,6 @@ jobs:
           (
             set -e
             bun install
-            bun run cli:build
           ) > "${RUNNER_TEMP}/deps-install.log" 2>&1 &
           deps_install_pid=$!
           (
@@ -321,7 +320,7 @@ jobs:
           pg17_install_pid=$!
           supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
           if ! wait "${deps_install_pid}"; then
-            echo "::error::Dependency install or CLI build failed"
+            echo "::error::Dependency install failed"
             cat "${RUNNER_TEMP}/deps-install.log"
             exit 1
           fi
@@ -354,8 +353,10 @@ jobs:
           BACKGROUND_LOG_PATH: ${{ runner.temp }}/bootstrap-edge-server.log
           BACKGROUND_WAIT_TIMEOUT_MS: 60000
         run: bash .github/scripts/start-background-service.sh
-      - name: Run backend and CLI integration tests
-        run: bun run supabase:with-env -- bunx vitest run --exclude=tests/*.unit.test.ts --shard=${{ matrix.shard }}
+      - name: Run backend integration tests
+        env:
+          VITEST_SHARD: ${{ matrix.shard }}
+        run: bun run supabase:with-env -- bunx vitest run --exclude=tests/*.unit.test.ts --exclude=tests/cli* --shard="$VITEST_SHARD"
       - name: Show Edge server logs after backend test failure
         if: failure() && steps.bootstrap_edge_server.outputs.log_path != ''
         run: |
@@ -449,7 +450,9 @@ jobs:
           BACKGROUND_TAIL_LINES: 400
         run: bash .github/scripts/start-background-service.sh
       - name: Run Cloudflare Workers integration tests
-        run: bunx vitest run --exclude=tests/cli* --exclude=tests/*.unit.test.ts --config vitest.config.cloudflare.ts --shard=${{ matrix.shard }}
+        env:
+          VITEST_SHARD: ${{ matrix.shard }}
+        run: bunx vitest run --exclude=tests/cli* --exclude=tests/*.unit.test.ts --config vitest.config.cloudflare.ts --shard="$VITEST_SHARD"
       - name: Show Cloudflare Worker logs after Cloudflare test failure
         if: failure() && steps.start_cloudflare_workers.outputs.log_path != ''
         run: |
@@ -895,7 +898,9 @@ jobs:
 
   cli_capgo_integration:
     needs: changes
-    if: needs.changes.outputs.run_cli == 'true'
+    # CLI integration tests exercise the backend edge functions, so backend-only
+    # changes must run them too (they are excluded from the backend shards).
+    if: needs.changes.outputs.run_cli == 'true' || needs.changes.outputs.run_capgo == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     name: Run Capgo CLI integration tests
