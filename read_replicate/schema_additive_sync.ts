@@ -59,8 +59,8 @@ export interface AdditiveSchemaSyncResult {
   skipped: SkippedChange[]
 }
 
-const SAFE_IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/
-const SAFE_SQL_FRAGMENT_RE = /^[A-Za-z0-9_ .()[\],:'"{}+\-=<>!]+$/
+const SAFE_IDENTIFIER_RE = /^[A-Za-z_]\w*$/
+const SAFE_SQL_FRAGMENT_RE = /^[\w .()[\],:'"{}+\-=<>!]+$/
 const REPLICA_TABLE_SET = new Set<string>(REPLICA_TABLES)
 
 export function planReadReplicaAdditiveSchemaSync(expected: unknown, actual: unknown): AdditiveSchemaSyncPlan {
@@ -197,15 +197,52 @@ function buildCreateIndexStatement(index: SchemaIndex, actualTables: Set<string>
   if (!isSafeSqlFragment(index.definition))
     return null
 
-  const match = index.definition.match(/^CREATE (UNIQUE )?INDEX ([A-Za-z_][A-Za-z0-9_]*) ON public\.([A-Za-z_][A-Za-z0-9_]*) (.+)$/s)
-  if (!match)
+  const parsedDefinition = parseCreateIndexDefinition(index.definition)
+  if (!parsedDefinition)
     return null
 
-  const [, unique = '', indexName, tableName, indexTail] = match
+  const { unique, indexName, tableName, indexTail } = parsedDefinition
   if (indexName !== index.name || tableName !== index.table)
     return null
 
   return `CREATE ${unique}INDEX CONCURRENTLY IF NOT EXISTS ${quoteIdent(index.name)} ON ${quoteQualifiedTable(index.table)} ${indexTail}`
+}
+
+function parseCreateIndexDefinition(definition: string): { unique: string, indexName: string, tableName: string, indexTail: string } | null {
+  let rest = definition
+  if (!rest.startsWith('CREATE '))
+    return null
+  rest = rest.slice('CREATE '.length)
+
+  const unique = rest.startsWith('UNIQUE ') ? 'UNIQUE ' : ''
+  if (unique)
+    rest = rest.slice(unique.length)
+
+  if (!rest.startsWith('INDEX '))
+    return null
+  rest = rest.slice('INDEX '.length)
+
+  const indexNameEnd = rest.indexOf(' ')
+  if (indexNameEnd === -1)
+    return null
+  const indexName = rest.slice(0, indexNameEnd)
+  rest = rest.slice(indexNameEnd + 1)
+
+  const tablePrefix = 'ON public.'
+  if (!rest.startsWith(tablePrefix))
+    return null
+  rest = rest.slice(tablePrefix.length)
+
+  const tableNameEnd = rest.indexOf(' ')
+  if (tableNameEnd === -1)
+    return null
+
+  return {
+    unique,
+    indexName,
+    tableName: rest.slice(0, tableNameEnd),
+    indexTail: rest.slice(tableNameEnd + 1),
+  }
 }
 
 function isSafeReplicaTable(table: string, actualTables: Set<string>): boolean {
@@ -225,7 +262,36 @@ function isSafeSqlFragment(value: string): boolean {
 }
 
 function isSafeConstantDefault(value: string): boolean {
-  return !/[A-Za-z_][A-Za-z0-9_]*\s*\(/.test(value)
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] !== '(')
+      continue
+
+    const previous = previousNonWhitespace(value, index)
+    if (previous && (isIdentifierChar(previous) || previous === '"'))
+      return false
+  }
+
+  return true
+}
+
+function previousNonWhitespace(value: string, index: number): string | null {
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    if (!isWhitespace(value[cursor]))
+      return value[cursor]
+  }
+
+  return null
+}
+
+function isWhitespace(value: string): boolean {
+  return value === ' ' || value === '\n' || value === '\r' || value === '\t' || value === '\f'
+}
+
+function isIdentifierChar(value: string): boolean {
+  return value === '_'
+    || (value >= 'A' && value <= 'Z')
+    || (value >= 'a' && value <= 'z')
+    || (value >= '0' && value <= '9')
 }
 
 function isNullDefault(value: string): boolean {

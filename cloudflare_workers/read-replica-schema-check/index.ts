@@ -10,67 +10,91 @@ interface Env {
 
 const textEncoder = new TextEncoder()
 
+type SchemaRoute = 'catalog' | 'sync-additive'
+
 export default {
   async fetch(request: Request, env: Env) {
     const { pathname } = new URL(request.url)
+    const route = schemaRoute(pathname, request.method)
 
-    if (pathname === '/ok')
+    if (route instanceof Response)
+      return route
+
+    if (route === 'ok')
       return Response.json({ status: 'ok' })
 
-    if (pathname !== '/catalog' && pathname !== '/sync-additive')
-      return Response.json({ error: 'not_found' }, { status: 404 })
-
-    if (pathname === '/catalog' && request.method !== 'GET')
-      return Response.json({ error: 'method_not_allowed' }, { status: 405 })
-
-    if (pathname === '/sync-additive' && request.method !== 'POST')
-      return Response.json({ error: 'method_not_allowed' }, { status: 405 })
-
-    const expectedToken = env.READ_REPLICA_SCHEMA_CHECK_TOKEN
-    if (!expectedToken)
-      return Response.json({ error: 'missing_schema_check_token' }, { status: 500 })
-    if (!hasExpectedAuthorization(request, expectedToken))
-      return Response.json({ error: 'unauthorized' }, { status: 401 })
-    const hyperdrive = env.HYPERDRIVE_CAPGO_READ_EU
-    if (!hyperdrive?.connectionString)
-      return Response.json({ error: 'missing_hyperdrive_binding' }, { status: 500 })
+    const setup = schemaCheckSetup(request, env)
+    if (setup instanceof Response)
+      return setup
 
     const pool = new Pool({
-      connectionString: hyperdrive.connectionString,
+      connectionString: setup.connectionString,
       max: 1,
       connectionTimeoutMillis: 10000,
     })
 
     try {
-      if (pathname === '/sync-additive') {
-        let expectedCatalog: unknown
-        try {
-          expectedCatalog = await request.json()
-        }
-        catch {
-          return Response.json({ error: 'invalid_schema_catalog_json' }, { status: 400 })
-        }
-
-        const result = await applyReadReplicaAdditiveSchemaSync(pool, expectedCatalog)
-        return Response.json(result)
-      }
-
-      const catalog = await readReplicaSchemaCatalog(pool)
-      return new Response(`${stableStringify(catalog)}\n`, {
-        headers: {
-          'content-type': 'application/json; charset=utf-8',
-        },
-      })
+      return await handleSchemaRoute(route, request, pool)
     }
     catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      const code = pathname === '/sync-additive' ? 'schema_sync_failed' : 'catalog_query_failed'
+      const code = route === 'sync-additive' ? 'schema_sync_failed' : 'catalog_query_failed'
       return Response.json({ error: code, message }, { status: 500 })
     }
     finally {
       await pool.end()
     }
   },
+}
+
+function schemaRoute(pathname: string, method: string): SchemaRoute | 'ok' | Response {
+  if (pathname === '/ok')
+    return 'ok'
+  if (pathname === '/catalog')
+    return method === 'GET' ? 'catalog' : Response.json({ error: 'method_not_allowed' }, { status: 405 })
+  if (pathname === '/sync-additive')
+    return method === 'POST' ? 'sync-additive' : Response.json({ error: 'method_not_allowed' }, { status: 405 })
+
+  return Response.json({ error: 'not_found' }, { status: 404 })
+}
+
+function schemaCheckSetup(request: Request, env: Env): { connectionString: string } | Response {
+  const expectedToken = env.READ_REPLICA_SCHEMA_CHECK_TOKEN
+  if (!expectedToken)
+    return Response.json({ error: 'missing_schema_check_token' }, { status: 500 })
+  if (!hasExpectedAuthorization(request, expectedToken))
+    return Response.json({ error: 'unauthorized' }, { status: 401 })
+
+  const connectionString = env.HYPERDRIVE_CAPGO_READ_EU?.connectionString
+  if (!connectionString)
+    return Response.json({ error: 'missing_hyperdrive_binding' }, { status: 500 })
+
+  return { connectionString }
+}
+
+async function handleSchemaRoute(route: SchemaRoute, request: Request, pool: Pool): Promise<Response> {
+  if (route === 'sync-additive')
+    return handleAdditiveSync(request, pool)
+
+  const catalog = await readReplicaSchemaCatalog(pool)
+  return new Response(`${stableStringify(catalog)}\n`, {
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+    },
+  })
+}
+
+async function handleAdditiveSync(request: Request, pool: Pool): Promise<Response> {
+  let expectedCatalog: unknown
+  try {
+    expectedCatalog = await request.json()
+  }
+  catch {
+    return Response.json({ error: 'invalid_schema_catalog_json' }, { status: 400 })
+  }
+
+  const result = await applyReadReplicaAdditiveSchemaSync(pool, expectedCatalog)
+  return Response.json(result)
 }
 
 function hasExpectedAuthorization(request: Request, expectedToken: string): boolean {
