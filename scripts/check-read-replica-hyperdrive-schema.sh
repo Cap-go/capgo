@@ -7,8 +7,10 @@ cd "$REPO_ROOT"
 
 EXPECTED_SCHEMA_CATALOG='read_replicate/schema_replicate.catalog.json'
 ACTUAL_SCHEMA_CATALOG="$(mktemp)"
+SYNC_RESPONSE="$(mktemp)"
 WRANGLER_LOG="$(mktemp)"
 PORT="${READ_REPLICA_SCHEMA_CHECK_PORT:-8799}"
+SYNC_MAX_TIME="${READ_REPLICA_SCHEMA_SYNC_MAX_TIME:-600}"
 WORKER_PID=''
 SCHEMA_CHECK_TOKEN="$(bun --silent -e 'const bytes = crypto.getRandomValues(new Uint8Array(32)); console.log(Buffer.from(bytes).toString("hex"))')"
 
@@ -17,7 +19,7 @@ cleanup() {
     kill "$WORKER_PID" 2>/dev/null || true
     wait "$WORKER_PID" 2>/dev/null || true
   fi
-  rm -f "$ACTUAL_SCHEMA_CATALOG" "$WRANGLER_LOG"
+  rm -f "$ACTUAL_SCHEMA_CATALOG" "$SYNC_RESPONSE" "$WRANGLER_LOG"
 }
 trap cleanup EXIT
 
@@ -57,6 +59,24 @@ if ! curl -fsS --connect-timeout 5 --max-time 5 "http://127.0.0.1:${PORT}/ok" >/
   cat "$WRANGLER_LOG"
   exit 1
 fi
+
+SYNC_STATUS="$(curl -sS --connect-timeout 10 --max-time "$SYNC_MAX_TIME" \
+  --header "authorization: Bearer ${SCHEMA_CHECK_TOKEN}" \
+  --header 'content-type: application/json' \
+  --data-binary "@${EXPECTED_SCHEMA_CATALOG}" \
+  -w '%{http_code}' \
+  -o "$SYNC_RESPONSE" \
+  "http://127.0.0.1:${PORT}/sync-additive" || true)"
+if [[ "$SYNC_STATUS" != "200" ]]; then
+  echo "::error title=Failed to sync additive read-replica schema::Worker /sync-additive returned HTTP ${SYNC_STATUS}."
+  cat "$SYNC_RESPONSE"
+  cat "$WRANGLER_LOG"
+  exit 1
+fi
+
+echo 'Read-replica additive schema sync result:'
+cat "$SYNC_RESPONSE"
+echo
 
 HTTP_STATUS="$(curl -sS --connect-timeout 5 --max-time 30 --header "authorization: Bearer ${SCHEMA_CHECK_TOKEN}" -w '%{http_code}' -o "$ACTUAL_SCHEMA_CATALOG" "http://127.0.0.1:${PORT}/catalog" || true)"
 if [[ "$HTTP_STATUS" != "200" ]]; then
