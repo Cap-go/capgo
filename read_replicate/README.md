@@ -48,6 +48,13 @@ Check that the committed replica schema matches the current database schema:
 bun run readreplicate:check-schema
 ```
 
+Check that the live read replica visible through Hyperdrive matches the committed
+replica schema catalog:
+
+```bash
+bun run readreplicate:check-hyperdrive-schema
+```
+
 Recreate the Google subscription:
 
 ```bash
@@ -88,3 +95,9 @@ READ_REPLICA_PASSWORD='new-password' bash read_replicate/update_readreplica_pass
   false`, then re-enables the subscription.
 - `schema_replicate.sql` is intentionally limited to tables replicated into the
   Google subscriber. It excludes foreign keys, triggers, and RLS policies.
+- `schema_replicate.catalog.json` is the machine-readable catalog snapshot used
+  by release CI to compare the committed schema against the live read replica
+  through Hyperdrive.
+- Production Supabase deploys run `bun run readreplicate:check-hyperdrive-schema`
+  before migrations, functions, or workers publish. If it fails, update the
+  Google subscriber schema before retrying the release.

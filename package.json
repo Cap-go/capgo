@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.190.2",
+  "version": "12.191.1",
   "private": true,
   "workspaces": [
     "cli",
@@ -15,6 +15,8 @@
     "readreplicate:indexes": "bash read_replicate/replicate_ensure_indexes.sh",
     "readreplicate:status": "bash read_replicate/replicate_status.sh",
     "readreplicate:check-schema": "bash scripts/check-read-replica-schema.sh",
+    "readreplicate:check-target-schema": "bun run readreplicate:check-hyperdrive-schema",
+    "readreplicate:check-hyperdrive-schema": "bash scripts/check-read-replica-hyperdrive-schema.sh",
     "supabase:reset-postgres-config": "bash scripts/reset_supabase_postgres_config_defaults.sh",
     "cloudsql:allow-cloudflare": "bash scripts/update_cloudsql_authorized_networks.sh",
     "supabase:start": "bun scripts/supabase-worktree.ts start",
@@ -78,6 +80,9 @@
     "test:local": "bun run test:all",
     "test:coverage:all": "bun run cli:build && bun run supabase:with-env -- bunx vitest run --coverage.enabled=true tests/*",
     "test:all": "bun run cli:build && bun run supabase:with-env -- bunx vitest run tests/*",
+    "test:unit": "vitest run tests/*.unit.test.ts",
+    "test:backend:integration": "bun run supabase:with-env -- bunx vitest run --exclude=tests/*.unit.test.ts --exclude=tests/cli*",
+    "test:cloudflare:integration": "vitest run --exclude=tests/cli* --exclude=tests/*.unit.test.ts --config vitest.config.cloudflare.ts",
     "test:updates": "bun run supabase:with-env -- bunx vitest run tests/updates*",
     "test:all:local": "bun run test:all",
     "test:backend": "bun run supabase:with-env -- bunx vitest run --exclude=tests/cli*",
