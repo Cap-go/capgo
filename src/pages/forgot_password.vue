@@ -21,7 +21,6 @@ const dialogStore = useDialogV2Store()
 const step = ref(1)
 const turnstileToken = ref('')
 const mfaCode = ref('')
-const resetEmailStorageKey = 'capgo:reset-email'
 
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 
@@ -31,11 +30,13 @@ const initialEmail = ref('')
 const initialFormValue = computed(() => ({ email: initialEmail.value }))
 const cardDescription = computed(() => step.value === 1 ? t('enter-your-email-add') : t('enter-your-new-passw'))
 
-if (typeof sessionStorage !== 'undefined') {
-  const storedEmail = sessionStorage.getItem(resetEmailStorageKey)
-  if (storedEmail) {
-    initialEmail.value = storedEmail
-    sessionStorage.removeItem(resetEmailStorageKey)
+if (typeof history !== 'undefined') {
+  const currentHistoryState = history.state as Record<string, unknown> | null
+  if (typeof currentHistoryState?.resetEmail === 'string') {
+    initialEmail.value = currentHistoryState.resetEmail
+    const nextHistoryState = { ...currentHistoryState }
+    delete nextHistoryState.resetEmail
+    history.replaceState(nextHistoryState, '')
   }
 }
 
