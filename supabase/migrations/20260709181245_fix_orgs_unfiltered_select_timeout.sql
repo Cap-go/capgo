@@ -388,7 +388,7 @@ COMMENT ON FUNCTION "public"."orgs_with_min_right"("public"."user_min_right") IS
 COMMENT ON FUNCTION "public"."orgs_readable_org_ids"() IS
 'Returns org IDs readable by the current authenticated user or Capgo API key. This is used by orgs RLS so unfiltered PostgREST requests compute access once and then filter by orgs.id instead of doing per-row auth work.';
 COMMENT ON FUNCTION "public"."app_versions_readable_app_ids"() IS
-'Returns app IDs readable by the current authenticated user or Capgo API key. Exposed SELECT RLS policies use this statement-level helper instead of checking app RBAC once per candidate row.';
+'Returns app IDs readable by the current authenticated user or Capgo API key. Normal read RLS uses this statement-level helper instead of checking app RBAC once per candidate row; targeted write RLS keeps the indexed row helper.';
 COMMENT ON FUNCTION "public"."org_member_readable_org_ids"() IS
 'Returns org IDs where the current authenticated user or Capgo API-key owner has a membership row in the org and read rights. org_users RLS uses this narrower helper so org read access does not expose membership rows for non-members.';
 COMMENT ON FUNCTION "public"."readable_app_version_ids"() IS
@@ -435,7 +435,42 @@ ON "public"."app_versions"
 FOR SELECT
 TO "anon", "authenticated"
 USING (
-  "app_id" = ANY(COALESCE((SELECT "public"."app_versions_readable_app_ids"()), '{}'::character varying[]))
+  CASE
+    WHEN COALESCE((SELECT current_setting('request.method', true)), '') = ANY('{PATCH,PUT,DELETE}'::text[])
+      THEN (
+        (((SELECT "auth"."uid"()) IS NOT NULL) OR ((SELECT "public"."get_apikey_header"()) IS NOT NULL))
+        AND EXISTS (
+          SELECT 1
+          FROM (
+            SELECT
+              "auth"."uid"() AS "uid",
+              "public"."get_apikey_header"() AS "apikey"
+          ) "identity"
+          WHERE (
+            "identity"."uid" IS NOT NULL
+            AND "public"."app_versions_has_app_permission"(
+              'read'::"public"."user_min_right",
+              "owner_org",
+              "app_id",
+              "identity"."uid",
+              NULL::text
+            )
+          )
+          OR (
+            "identity"."uid" IS NULL
+            AND "identity"."apikey" IS NOT NULL
+            AND "public"."app_versions_has_app_permission"(
+              'read'::"public"."user_min_right",
+              "owner_org",
+              "app_id",
+              NULL::uuid,
+              "identity"."apikey"
+            )
+          )
+        )
+      )
+    ELSE "app_id" = ANY(COALESCE((SELECT "public"."app_versions_readable_app_ids"()), '{}'::character varying[]))
+  END
 );
 
 DROP POLICY IF EXISTS "Allow read for auth (read+)"

@@ -596,16 +596,19 @@ SELECT ok(
 );
 
 SELECT ok(
-  position(
-    'app_versions_readable_app_ids'
-    in (
-      SELECT pg_get_expr(polqual, polrelid)
+  (
+    SELECT position('request.method' in policy_expr) > 0
+      AND position('PATCH' in policy_expr) > 0
+      AND position('app_versions_has_app_permission' in policy_expr) > 0
+      AND position('app_versions_readable_app_ids' in policy_expr) > 0
+    FROM (
+      SELECT pg_get_expr(polqual, polrelid) AS policy_expr
       FROM pg_policy
       WHERE polrelid = 'public.app_versions'::regclass
         AND polname = 'Allow for auth, api keys (read+)'
-    )
-  ) = 0,
-  'app_versions select policy does not materialize every readable app during targeted writes'
+    ) policy
+  ),
+  'app_versions select policy uses targeted helper only behind write-method guard'
 );
 
 SELECT ok(
