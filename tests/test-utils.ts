@@ -518,8 +518,8 @@ export async function fetchWithRetry(
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const response = await fetch(url, options)
-      // Only retry on 503 (service unavailable) or network errors
-      if (response.status === 503 && attempt < maxRetries - 1) {
+      // Only retry on 503 (service unavailable), 504 (PostgREST pool exhaustion) or network errors
+      if ((response.status === 503 || response.status === 504) && attempt < maxRetries - 1) {
         await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)))
         continue
       }
@@ -807,7 +807,8 @@ export function getSupabaseClient(): SupabaseClient<Database> {
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
           const response = await fetch(url, options)
-          if (response.status === 503 && attempt < maxRetries - 1) {
+          // 504 = PostgREST "Timed out acquiring connection from connection pool" under load
+          if ((response.status === 503 || response.status === 504) && attempt < maxRetries - 1) {
             await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)))
             continue
           }
