@@ -262,6 +262,7 @@ jobs:
           if command -v pg_dump-17 >/dev/null 2>&1 && command -v pg_restore-17 >/dev/null 2>&1 && command -v psql-17 >/dev/null 2>&1; then
             exit 0
           fi
+          sudo rm -f /etc/apt/sources.list.d/azure-cli.list /etc/apt/sources.list.d/azure-cli.sources /etc/apt/sources.list.d/microsoft-prod.list /etc/apt/sources.list.d/microsoft-prod.sources
           sudo apt-get update
           sudo apt-get install -y ca-certificates postgresql-common
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
@@ -377,6 +378,8 @@ jobs:
         run: bash scripts/setup-bun.sh
       - name: Install dependencies
         run: bun install
+      - name: Disable flaky runner apt sources
+        run: sudo rm -f /etc/apt/sources.list.d/azure-cli.list /etc/apt/sources.list.d/azure-cli.sources /etc/apt/sources.list.d/microsoft-prod.list /etc/apt/sources.list.d/microsoft-prod.sources
       - name: Install Playwright browser
         run: bunx playwright install --with-deps chromium
       - name: Install Supabase CLI
