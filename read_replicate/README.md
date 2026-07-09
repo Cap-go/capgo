@@ -23,6 +23,7 @@ Optional overrides:
 | `READ_REPLICA_SLOT_NAME` | Slot name on Supabase |
 | `READ_REPLICA_FULL_RESET=1` | Allow full target reset in `replicate_to_replica.sh` |
 | `READ_REPLICA_SUBSCRIPTION_ONLY=1` | Recreate only the subscription |
+| `READ_REPLICA_SCHEMA_SYNC_MAX_TIME` | Max seconds for the Hyperdrive additive schema sync call; defaults to `1800` and the worker deadline is 15s shorter |
 
 If subscription name is not provided, scripts discover it from `pg_subscription`.
 If exactly one subscription exists, it is used. If multiple subscriptions exist,
@@ -48,8 +49,8 @@ Check that the committed replica schema matches the current database schema:
 bun run readreplicate:check-schema
 ```
 
-Check that the live read replica visible through Hyperdrive matches the committed
-replica schema catalog:
+Sync safe additive changes through Hyperdrive, then check that the live read
+replica matches the committed replica schema catalog:
 
 ```bash
 bun run readreplicate:check-hyperdrive-schema
@@ -96,8 +97,10 @@ READ_REPLICA_PASSWORD='new-password' bash read_replicate/update_readreplica_pass
 - `schema_replicate.sql` is intentionally limited to tables replicated into the
   Google subscriber. It excludes foreign keys, triggers, and RLS policies.
 - `schema_replicate.catalog.json` is the machine-readable catalog snapshot used
-  by release CI to compare the committed schema against the live read replica
-  through Hyperdrive.
+  by release CI to sync missing additive schema changes and compare the committed
+  schema against the live read replica through Hyperdrive.
 - Production Supabase deploys run `bun run readreplicate:check-hyperdrive-schema`
-  before migrations, functions, or workers publish. If it fails, update the
-  Google subscriber schema before retrying the release.
+  before migrations, functions, or workers publish. The check first applies safe
+  missing columns and indexes on the Google subscriber, reindexes invalid
+  same-name indexes left by interrupted concurrent builds, then fails if any
+  unsupported drift remains.

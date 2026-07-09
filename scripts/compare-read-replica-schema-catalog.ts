@@ -31,10 +31,10 @@ async function main() {
     await writeFile(normalizedExpectedPath, expectedText)
     await writeFile(normalizedActualPath, actualText)
 
-    console.error('::error title=Read-replica schema is out of date::Hyperdrive read replica does not match read_replicate/schema_replicate.catalog.json.')
+    console.error('::error title=Read-replica schema is out of date::Hyperdrive read replica does not match read_replicate/schema_replicate.catalog.json after additive sync.')
     console.error('')
     console.error('The production source schema was updated, but the read replica visible through Hyperdrive still differs from the committed replica schema catalog.')
-    console.error('Apply the matching read-replica DDL or maintenance flow, then retry the release.')
+    console.error('Automatic sync only applies safe missing columns and indexes. Apply any remaining non-additive DDL or maintenance flow, then retry the release.')
     console.error('')
     console.error('Diff:')
 
