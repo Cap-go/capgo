@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { APIKEY_TEST_ALL, executeSQL, fetchWithRetry, SUPABASE_ANON_KEY, SUPABASE_BASE_URL } from './test-utils.ts'
+import { APIKEY_TEST_ALL, APP_NAME, executeSQL, fetchWithRetry, SUPABASE_ANON_KEY, SUPABASE_BASE_URL, USER_ID } from './test-utils.ts'
 
 function getAnonHeaders() {
   if (!SUPABASE_BASE_URL || !SUPABASE_ANON_KEY)
@@ -65,6 +65,79 @@ describe('orgs RLS DoS regression', () => {
     expect(response.status, body).toBe(200)
     expect(rows.length).toBeGreaterThan(0)
     expect(rows.every(row => typeof row.id === 'string')).toBe(true)
+  })
+
+  it('does not expose org rows to app-scoped API keys', async () => {
+    const appScopedKey = randomUUID()
+    const [apiKey] = await executeSQL(`
+      WITH inserted_key AS (
+        INSERT INTO public.apikeys (user_id, key, key_hash, name, expires_at)
+        VALUES ($1, $2, NULL, $3, NULL)
+        RETURNING id, rbac_id, user_id
+      ),
+      target_app AS (
+        SELECT id, owner_org
+        FROM public.apps
+        WHERE app_id = $4
+        LIMIT 1
+      ),
+      app_role AS (
+        SELECT id
+        FROM public.roles
+        WHERE name = 'app_reader'
+          AND scope_type = public.rbac_scope_app()
+        LIMIT 1
+      ),
+      inserted_binding AS (
+        INSERT INTO public.role_bindings (
+          principal_type,
+          principal_id,
+          role_id,
+          scope_type,
+          org_id,
+          app_id,
+          granted_by,
+          reason,
+          is_direct
+        )
+        SELECT
+          public.rbac_principal_apikey(),
+          inserted_key.rbac_id,
+          app_role.id,
+          public.rbac_scope_app(),
+          target_app.owner_org,
+          target_app.id,
+          inserted_key.user_id,
+          'Test app-only API key binding',
+          true
+        FROM inserted_key, target_app, app_role
+        RETURNING id
+      )
+      SELECT inserted_key.id, inserted_key.rbac_id
+      FROM inserted_key
+    `, [USER_ID, appScopedKey, `App-only orgs visibility ${randomUUID()}`, APP_NAME])
+
+    try {
+      expect(apiKey?.id).toBeDefined()
+      expect(apiKey?.rbac_id).toBeDefined()
+
+      const response = await fetchRest('orgs?select=id&limit=1', getApiKeyHeaders(appScopedKey))
+      const body = await response.text()
+
+      expect(response.status, body).toBe(200)
+      expect(JSON.parse(body)).toEqual([])
+    }
+    finally {
+      if (apiKey?.rbac_id) {
+        await executeSQL(
+          'DELETE FROM public.role_bindings WHERE principal_type = public.rbac_principal_apikey() AND principal_id = $1::uuid',
+          [apiKey.rbac_id],
+        )
+      }
+      if (apiKey?.id) {
+        await executeSQL('DELETE FROM public.apikeys WHERE id = $1::bigint', [apiKey.id])
+      }
+    }
   })
 
   it.concurrent('uses a statement-level readable org helper in the orgs select policy', async () => {
