@@ -104,7 +104,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
     is_prod: true,
     is_emulator: false,
     updated_at: new Date().toISOString(),
-  })
+  }, { includeRequestCountry: false })
 
   return c.json(BRES)
 })
