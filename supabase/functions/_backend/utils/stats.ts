@@ -5,6 +5,7 @@ import type { Database } from './supabase.types.ts'
 import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadDevicesResponse, ReadStatsInsightsParams, ReadStatsParams, StatsActions, StatsInsightAction, StatsInsightDaily, StatsInsightDevice, StatsInsightsResult, StatsInsightVersion, StatsMetadata, VersionUsage, VersionUsageChannel } from './types.ts'
 import { getRuntimeKey } from 'hono/adapter'
 import { countDevicesCF, countInstallSourcesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readDeviceVersionCountsCF, readNativeVersionUsageCF, readStatsCF, readStatsInsightsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
+import { normalizeDeviceCountryCode } from './deviceComparison.ts'
 import { isDemoApp } from './demo.ts'
 import { simpleError, simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
@@ -131,19 +132,23 @@ export function createStatsLogs(c: Context, app_id: string, device_id: string, a
 }
 
 export function createStatsDevices(c: Context, device: DeviceWithoutCreatedAt) {
+  const requestCountry = c.req.raw?.cf?.country
+  const countryCode = normalizeDeviceCountryCode(typeof requestCountry === 'string' ? requestCountry : undefined)
+  const deviceWithCountry = countryCode ? { ...device, country_code: countryCode } : device
+
   // In Cloudflare Workers (workerd), prefer Analytics Engine when available.
   // For local Cloudflare testing, these bindings are typically absent, so we
   // must fall back to the Postgres/Supabase path or device state won't be
   // recorded and downstream APIs/tests will break.
   if (getRuntimeKey() === 'workerd' && c.env.DEVICE_INFO)
-    return backgroundTask(c, trackDevicesCF(c, device))
+    return backgroundTask(c, trackDevicesCF(c, deviceWithCountry))
 
   if (shouldSkipSupabaseStatsFallback(c)) {
     logSkippedSupabaseWrite(c, 'trackDevicesSB')
     return Promise.resolve()
   }
 
-  return backgroundTask(c, trackDevicesSB(c, device))
+  return backgroundTask(c, trackDevicesSB(c, deviceWithCountry))
 }
 
 export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, statsActions: StatsActions[], isFailedStat = false) {

@@ -2,6 +2,11 @@ import type { DeviceWithoutCreatedAt } from './types.ts'
 
 const normalizeOptionalString = (value: string | null | undefined) => (value === undefined || value === null || value === '' ? null : value)
 
+export function normalizeDeviceCountryCode(countryCode: string | null | undefined) {
+  const normalized = normalizeOptionalString(countryCode)?.trim().toUpperCase()
+  return normalized && /^[A-Z]{2}$/.test(normalized) ? normalized : null
+}
+
 export interface DeviceComparable {
   // version: number | null
   platform: DeviceWithoutCreatedAt['platform'] | null
@@ -15,6 +20,7 @@ export interface DeviceComparable {
   install_source?: string | null
   default_channel: string | null // DB schema: TEXT (NULLABLE)
   key_id: string | null
+  country_code?: string | null
 }
 
 export type DeviceExistingRowLike = {
@@ -30,6 +36,7 @@ export type DeviceExistingRowLike = {
   install_source?: string | null
   default_channel?: string | null
   key_id?: string | null
+  country_code?: string | null
 } | null | undefined
 
 export function toComparableDevice(device: DeviceWithoutCreatedAt): DeviceComparable {
@@ -43,6 +50,7 @@ export function toComparableDevice(device: DeviceWithoutCreatedAt): DeviceCompar
   const normalizedVersionBuild = normalizeOptionalString(device.version_build)
   const normalizedKeyId = normalizeOptionalString(device.key_id)
   const normalizedInstallSource = normalizeOptionalString(device.install_source)
+  const normalizedCountryCode = normalizeDeviceCountryCode(device.country_code)
 
   const comparable: DeviceComparable = {
     // version: device.version ?? null,
@@ -65,6 +73,8 @@ export function toComparableDevice(device: DeviceWithoutCreatedAt): DeviceCompar
   }
   if (normalizedInstallSource !== null)
     comparable.install_source = normalizedInstallSource
+  if (normalizedCountryCode !== null)
+    comparable.country_code = normalizedCountryCode
   return comparable
 }
 
@@ -78,6 +88,7 @@ export function toComparableExisting(existing: DeviceExistingRowLike): DeviceCom
   const normalizedVersionBuild = normalizeOptionalString(existing?.version_build as string | null | undefined)
   const normalizedKeyId = normalizeOptionalString(existing?.key_id as string | null | undefined)
   const normalizedInstallSource = normalizeOptionalString(existing?.install_source)
+  const normalizedCountryCode = normalizeDeviceCountryCode(existing?.country_code)
 
   const comparable: DeviceComparable = {
     // version: existing?.version ?? null,
@@ -100,6 +111,8 @@ export function toComparableExisting(existing: DeviceExistingRowLike): DeviceCom
   }
   if (normalizedInstallSource !== null)
     comparable.install_source = normalizedInstallSource
+  if (normalizedCountryCode !== null)
+    comparable.country_code = normalizedCountryCode
   return comparable
 }
 
@@ -127,6 +140,7 @@ export function buildNormalizedDeviceForWrite(device: DeviceWithoutCreatedAt) {
     is_emulator: comparableDevice.is_emulator,
     install_source: comparableDevice.install_source,
     key_id: comparableDevice.key_id,
+    country_code: comparableDevice.country_code,
   }
 }
 

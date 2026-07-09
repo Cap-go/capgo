@@ -292,6 +292,7 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
         comparableDevice.default_channel ?? '',
         comparableDevice.key_id ?? '',
         comparableDevice.install_source ?? '',
+        comparableDevice.country_code ?? '',
       ],
       doubles: [
         platformValue,
@@ -749,6 +750,7 @@ interface DeviceInfoCF {
   default_channel: string
   key_id: string
   install_source: string
+  country_code: string
   platform: number // 0 = android, 1 = ios
   is_prod: number // 0 or 1
   is_emulator: number // 0 or 1
@@ -824,6 +826,7 @@ export function buildReadDevicesCFQuery(params: ReadDevicesParams, customIdMode:
 
   const devicesOrder = getReadDevicesCFOrder(params)
   const outerConditions = buildReadDevicesCFOuterConditions(params, devicesOrder)
+  const includeCountryCode = !!params.deviceIds?.length
   const outerFilter = outerConditions.length ? `WHERE ${outerConditions.join(' AND ')}` : ''
   let orderBy = 'device_id ASC'
   if (devicesOrder) {
@@ -843,6 +846,7 @@ export function buildReadDevicesCFQuery(params: ReadDevicesParams, customIdMode:
     '    argMax(blob6, timestamp) AS version_build,',
     '    argMax(blob7, timestamp) AS default_channel,',
     '    argMax(blob8, timestamp) AS key_id,',
+    ...(includeCountryCode ? ['    argMax(blob10, timestamp) AS country_code,'] : []),
     '    argMax(double1, timestamp) AS platform,',
     '    argMax(double2, timestamp) AS is_prod,',
     '    argMax(double3, timestamp) AS is_emulator,',
@@ -863,7 +867,7 @@ export function buildReadDevicesCFQuery(params: ReadDevicesParams, customIdMode:
 export async function readDevicesCF(c: Context, params: ReadDevicesParams, customIdMode: boolean): Promise<DeviceRes[]> {
   // Use Analytics Engine DEVICE_INFO for reading devices
   // Schema: blob1=device_id, blob2=version_name, blob3=plugin_version, blob4=os_version,
-  //         blob5=custom_id, blob6=version_build, blob7=default_channel, blob8=key_id, blob9=install_source
+  //         blob5=custom_id, blob6=version_build, blob7=default_channel, blob8=key_id, blob9=install_source, blob10=country_code
   //         double1=platform (0=android, 1=ios), double2=is_prod, double3=is_emulator
   //         index1=app_id, timestamp=updated_at
 
@@ -914,6 +918,7 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
       version_build: row.version_build,
       is_prod: Boolean(row.is_prod),
       is_emulator: Boolean(row.is_emulator),
+      country_code: row.country_code || null,
       install_source: row.install_source || null,
       custom_id: row.custom_id,
       updated_at: formatDateCF(row.updated_at),
