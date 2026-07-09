@@ -28,6 +28,7 @@ import type { ReplicatorEnv } from './replicator.ts'
 import { DurableObject } from 'cloudflare:workers'
 // @ts-types="npm:@types/pg"
 import { Client } from 'pg'
+import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
 import {
   buildAppOwnerQuery,
   buildAppSeedQueries,
@@ -228,7 +229,7 @@ export class AppReplica extends DurableObject<ReplicatorEnv> {
       return
     this.seedingPromise = this.seed(appId)
       .catch(async (e: unknown) => {
-        console.error('app replica seed failed', this.ctx.id.name, e)
+        cloudlogErr({ message: 'app replica seed failed', replica: this.ctx.id.name, error: serializeError(e) })
         // Stay unregistered on failure so the router never acks rows into
         // the void; the next read retries the seed from scratch.
         const name = this.ctx.id.name
@@ -296,7 +297,7 @@ export class AppReplica extends DurableObject<ReplicatorEnv> {
         }
         await sleep(SEED_CATCHUP_WAIT_MS)
       }
-      console.warn('app replica seed source lagging, snapshotting from outbox source', this.ctx.id.name)
+      cloudlog({ message: 'app replica seed source lagging, snapshotting from outbox source', replica: this.ctx.id.name })
       await seedClient.end().catch(() => undefined)
       return outboxClient
     }
@@ -370,7 +371,7 @@ export class AppReplica extends DurableObject<ReplicatorEnv> {
         this.setMeta('lease_until', String(Date.now() + leaseMs))
         this.setMeta('seeded_at', new Date().toISOString())
       })
-      console.warn('app replica seeded', name, appId)
+      cloudlog({ message: 'app replica seeded', replica: name, appId })
     }
     finally {
       await client.end().catch(() => undefined)

@@ -22,6 +22,7 @@ import type { EdgeApplyEntry } from '../utils/edge_replica_schema.ts'
 import { DurableObject } from 'cloudflare:workers'
 // @ts-types="npm:@types/pg"
 import { Client } from 'pg'
+import { cloudlogErr, serializeError } from '../utils/logging.ts'
 
 export interface ReplicatorEnv {
   REPLICA_ROUTER: DurableObjectNamespace
@@ -251,7 +252,7 @@ export class ReplicaRouter extends DurableObject<ReplicatorEnv> {
       }
     }
     catch (e) {
-      console.error('replica router fetch error', e)
+      cloudlogErr({ message: 'replica router fetch error', error: serializeError(e) })
       return jsonResponse({ error: 'internal error' }, 500)
     }
   }
@@ -298,7 +299,7 @@ export class ReplicaRouter extends DurableObject<ReplicatorEnv> {
       await this.scheduleAlarm(drained ? this.pollMs() : BACKLOG_RETRY_MS)
     }
     catch (e) {
-      console.error('replica router alarm error', e)
+      cloudlogErr({ message: 'replica router alarm error', error: serializeError(e) })
       await this.scheduleAlarm(ERROR_RETRY_MS)
     }
   }
@@ -398,7 +399,7 @@ export class ReplicaRouter extends DurableObject<ReplicatorEnv> {
     }
     catch (e) {
       const failCount = target.fail_count + 1
-      console.error('replica push failed', target.name, failCount, e)
+      cloudlogErr({ message: 'replica push failed', target: target.name, failCount, error: serializeError(e) })
       if (failCount >= MAX_PUSH_FAILURES) {
         // Give up: drop the registration and force a reseed on next read.
         this.ctx.storage.sql.exec('DELETE FROM targets WHERE name = ?', target.name)
