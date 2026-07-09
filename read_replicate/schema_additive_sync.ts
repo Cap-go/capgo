@@ -71,7 +71,7 @@ export function planReadReplicaAdditiveSchemaSync(expected: unknown, actual: unk
   const actualColumns = new Set((actualCatalog.columns ?? []).map(column => columnKey(column)))
   const actualIndexByName = new Map((actualCatalog.indexes ?? []).map(index => [index.name, index]))
   const expectedConstraintIndexes = new Set((expectedCatalog.constraints ?? []).map(constraint => constraint.name))
-  const tablesWithSkippedColumns = new Set<string>()
+  const skippedColumnsByTable = new Map<string, Set<string>>()
   const statements: SyncStatement[] = []
   const skipped: SkippedChange[] = []
 
@@ -81,7 +81,7 @@ export function planReadReplicaAdditiveSchemaSync(expected: unknown, actual: unk
 
     const addColumnSql = buildAddColumnStatement(column, actualTables)
     if (!addColumnSql) {
-      tablesWithSkippedColumns.add(column.table)
+      trackSkippedColumn(skippedColumnsByTable, column)
       skipped.push({
         kind: 'column',
         table: column.table,
@@ -104,7 +104,7 @@ export function planReadReplicaAdditiveSchemaSync(expected: unknown, actual: unk
     if (actualIndex?.valid)
       continue
 
-    if (tablesWithSkippedColumns.has(index.table)) {
+    if (hasUnresolvedColumnDependency(index, skippedColumnsByTable)) {
       skipped.push({
         kind: 'index',
         table: index.table,
@@ -120,6 +120,16 @@ export function planReadReplicaAdditiveSchemaSync(expected: unknown, actual: unk
         table: index.table,
         name: index.name,
         reason: 'constraint_owned_index',
+      })
+      continue
+    }
+
+    if (actualIndex && actualIndex.table !== index.table) {
+      skipped.push({
+        kind: 'index',
+        table: index.table,
+        name: index.name,
+        reason: 'index_name_conflict',
       })
       continue
     }
@@ -140,8 +150,9 @@ export function planReadReplicaAdditiveSchemaSync(expected: unknown, actual: unk
         kind: 'invalid_index',
         table: index.table,
         name: index.name,
-        sql: buildDropIndexStatement(index),
+        sql: buildReindexIndexStatement(index),
       })
+      continue
     }
 
     statements.push({
@@ -271,8 +282,8 @@ function buildCreateIndexStatement(index: SchemaIndex, actualTables: Set<string>
   return `CREATE ${unique}INDEX CONCURRENTLY IF NOT EXISTS ${quoteIdent(index.name)} ON ${quoteQualifiedTable(index.table)} ${indexTail}`
 }
 
-function buildDropIndexStatement(index: SchemaIndex): string {
-  return `DROP INDEX CONCURRENTLY IF EXISTS public.${quoteIdent(index.name)}`
+function buildReindexIndexStatement(index: SchemaIndex): string {
+  return `REINDEX INDEX CONCURRENTLY public.${quoteIdent(index.name)}`
 }
 
 function parseCreateIndexDefinition(definition: string): { unique: string, indexName: string, tableName: string, indexTail: string } | null {
@@ -316,8 +327,40 @@ function isSafeReplicaTable(table: string, actualTables: Set<string>): boolean {
   return REPLICA_TABLE_SET.has(table) && actualTables.has(table) && isSafeIdentifier(table)
 }
 
+function trackSkippedColumn(skippedColumnsByTable: Map<string, Set<string>>, column: SchemaColumn): void {
+  const tableColumns = skippedColumnsByTable.get(column.table) ?? new Set<string>()
+  tableColumns.add(column.name)
+  skippedColumnsByTable.set(column.table, tableColumns)
+}
+
+function hasUnresolvedColumnDependency(index: SchemaIndex, skippedColumnsByTable: Map<string, Set<string>>): boolean {
+  const skippedColumns = skippedColumnsByTable.get(index.table)
+  if (!skippedColumns?.size)
+    return false
+
+  const parsedDefinition = parseCreateIndexDefinition(index.definition)
+  if (!parsedDefinition)
+    return false
+
+  for (const column of skippedColumns) {
+    if (indexTailReferencesColumn(parsedDefinition.indexTail, column))
+      return true
+  }
+
+  return false
+}
+
+function indexTailReferencesColumn(indexTail: string, column: string): boolean {
+  return indexTail.includes(quoteIdent(column))
+    || new RegExp(`(^|[^A-Za-z0-9_"])${escapeRegExp(column)}($|[^A-Za-z0-9_"])`).test(indexTail)
+}
+
 function isSafeIdentifier(value: string): boolean {
   return SAFE_IDENTIFIER_RE.test(value)
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
 }
 
 function isSafeSqlFragment(value: string): boolean {

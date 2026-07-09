@@ -101,6 +101,6 @@ READ_REPLICA_PASSWORD='new-password' bash read_replicate/update_readreplica_pass
   schema against the live read replica through Hyperdrive.
 - Production Supabase deploys run `bun run readreplicate:check-hyperdrive-schema`
   before migrations, functions, or workers publish. The check first applies safe
-  missing columns and indexes on the Google subscriber, retries invalid
+  missing columns and indexes on the Google subscriber, reindexes invalid
   same-name indexes left by interrupted concurrent builds, then fails if any
   unsupported drift remains.
