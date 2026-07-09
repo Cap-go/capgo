@@ -284,7 +284,7 @@ describe('deviceComparison utilities', () => {
       expect(hasComparableDeviceChanged(existing, { ...device, install_source: 'testflight' })).toBe(true)
     })
 
-    it('should compare country only when the backend reports it', () => {
+    it.concurrent('should compare country only when the backend reports it', () => {
       const device: DeviceWithoutCreatedAt = {
         device_id: 'test-device',
         app_id: 'test-app',

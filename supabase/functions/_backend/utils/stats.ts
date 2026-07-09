@@ -131,8 +131,12 @@ export function createStatsLogs(c: Context, app_id: string, device_id: string, a
   return trackLogsCF(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata)
 }
 
-export function createStatsDevices(c: Context, device: DeviceWithoutCreatedAt) {
-  const requestCountry = c.req.raw?.cf?.country
+interface CreateStatsDevicesOptions {
+  includeRequestCountry?: boolean
+}
+
+export function createStatsDevices(c: Context, device: DeviceWithoutCreatedAt, options: CreateStatsDevicesOptions = {}) {
+  const requestCountry = options.includeRequestCountry === false ? undefined : c.req.raw?.cf?.country
   const countryCode = normalizeDeviceCountryCode(typeof requestCountry === 'string' ? requestCountry : undefined)
   const deviceWithCountry = countryCode ? { ...device, country_code: countryCode } : device
 

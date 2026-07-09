@@ -750,7 +750,7 @@ interface DeviceInfoCF {
   default_channel: string
   key_id: string
   install_source: string
-  country_code: string
+  country_code?: string
   platform: number // 0 = android, 1 = ios
   is_prod: number // 0 or 1
   is_emulator: number // 0 or 1
@@ -846,7 +846,7 @@ export function buildReadDevicesCFQuery(params: ReadDevicesParams, customIdMode:
     '    argMax(blob6, timestamp) AS version_build,',
     '    argMax(blob7, timestamp) AS default_channel,',
     '    argMax(blob8, timestamp) AS key_id,',
-    ...(includeCountryCode ? ['    argMax(blob10, timestamp) AS country_code,'] : []),
+    ...(includeCountryCode ? ['    argMax(blob10, if(blob10 != \'\', timestamp, toDateTime(\'1970-01-01 00:00:00\'))) AS country_code,'] : []),
     '    argMax(double1, timestamp) AS platform,',
     '    argMax(double2, timestamp) AS is_prod,',
     '    argMax(double3, timestamp) AS is_emulator,',
