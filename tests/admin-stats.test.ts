@@ -173,6 +173,7 @@ beforeAll(async () => {
       date_id: GLOBAL_STATS_TREND_DATES[2],
       apps: 12,
       updates: 160,
+      registers_today: 0,
       stars: 3,
     },
   ], { onConflict: 'date_id' })
