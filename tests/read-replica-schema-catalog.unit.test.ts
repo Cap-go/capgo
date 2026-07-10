@@ -1,0 +1,19 @@
+import { describe, expect, it } from 'vitest'
+import { readReplicaSchemaCatalog } from '../read_replicate/schema_catalog.ts'
+
+describe('read-replica schema catalog', () => {
+  it.concurrent('makes the post-DDL catalog read uncacheable in Hyperdrive', async () => {
+    const queries: Array<{ text: string, values?: unknown[] }> = []
+    const catalog = await readReplicaSchemaCatalog({
+      query: async (text, values) => {
+        queries.push({ text, values })
+        return { rows: [{ catalog: { version: 1 } }] }
+      },
+    })
+
+    expect(catalog).toEqual({ version: 1 })
+    expect(queries).toHaveLength(1)
+    expect(queries[0]?.text).toContain('CURRENT_TIMESTAMP')
+    expect(queries[0]?.text).toContain('fresh_catalog_read.checked_at IS NOT NULL')
+  })
+})
