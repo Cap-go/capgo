@@ -1,6 +1,7 @@
 import { app as channel_self } from '../../supabase/functions/_backend/plugins/channel_self.ts'
 import { app as stats } from '../../supabase/functions/_backend/plugins/stats.ts'
 import { app as updates } from '../../supabase/functions/_backend/plugins/updates.ts'
+import { app as cache_invalidate } from '../../supabase/functions/_backend/private/cache_invalidate.ts'
 import { app as latency } from '../../supabase/functions/_backend/private/latency.ts'
 import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
 import { createAllCatch, createHono, useCors } from '../../supabase/functions/_backend/utils/hono.ts'
@@ -32,6 +33,7 @@ app.route('/updates', updates)
 app.route('/stats', stats)
 app.route('/ok', ok)
 app.route('/latency', latency)
+app.route('/cache_invalidate', cache_invalidate)
 
 createAllCatch(app, functionName)
 

@@ -49,6 +49,11 @@ export type Bindings = {
   NOTIFICATION_EVENTS?: AnalyticsEngineDataset
   NOTIFICATION_QUEUE?: Queue
   DB_STOREAPPS: D1Database
+  // /updates colo cache + targeted invalidation (see utils/updates_colo_cache.ts)
+  UPDATES_CACHE_MODE?: string
+  UPDATES_CACHE_TTL_SECONDS?: string
+  CACHE_INVALIDATE_SECRET?: string
+  PLUGIN_INVALIDATE_URLS?: string
   CHANNEL_SELF_STORE?: KVNamespace
   PLUGIN_NOTIFICATION_QUEUE?: KVNamespace
   LOCAL_READ_REPLICA_SUPABASE_DB_URL?: string
