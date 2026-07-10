@@ -10,14 +10,18 @@
 set -euo pipefail
 
 PORT="${TINBASE_PORT:-55321}"
-DATA_DIR="$(mktemp -d "${TMPDIR:-/tmp}/tinbase-data.XXXXXX")"
 LOG="${TINBASE_LOG:-${TMPDIR:-/tmp}/tinbase-test-db.log}"
 
-bunx tinbase start --dir . -p "$PORT" --data-dir "$DATA_DIR" > "$LOG" 2>&1 &
+# Tinbase keeps state under <dir>/.tinbase even with --data-dir elsewhere; stale
+# state from a previous instance makes the seed re-apply and fail on duplicates,
+# so always start from a clean slate. .tinbase is gitignored and throwaway.
+rm -rf .tinbase
+
+bunx tinbase start --dir . -p "$PORT" > "$LOG" 2>&1 &
 TINBASE_PID=$!
 cleanup() {
   kill "$TINBASE_PID" 2>/dev/null || true
-  rm -rf "$DATA_DIR" 2>/dev/null || true
+  rm -rf .tinbase 2>/dev/null || true
 }
 trap cleanup EXIT
 
