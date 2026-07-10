@@ -54,12 +54,9 @@ FOR DELETE
 TO "anon", "authenticated"
 USING (false);
 
-INSERT INTO "public"."org_id_tombstones" ("org_id")
-SELECT DISTINCT "audit_logs"."org_id"
-FROM "public"."audit_logs" AS "audit_logs"
-LEFT JOIN "public"."orgs" AS "orgs" ON "orgs"."id" = "audit_logs"."org_id"
-WHERE "orgs"."id" IS NULL
-ON CONFLICT ("org_id") DO NOTHING;
+-- The existing foreign key guarantees there are no historical orphaned audit
+-- rows. Future org deletions are tombstoned by the trigger below, avoiding a
+-- full scan of the retained audit history during deployment.
 
 ALTER TABLE "public"."audit_logs"
   DROP CONSTRAINT IF EXISTS "audit_logs_org_id_fkey";
@@ -67,8 +64,11 @@ ALTER TABLE "public"."audit_logs"
 ALTER TABLE "public"."audit_logs"
   DROP CONSTRAINT IF EXISTS "audit_logs_user_id_fkey";
 
+-- A constant default keeps legacy rows classified as unknown without rewriting
+-- the retained audit history. New rows receive explicit attribution in the
+-- audit trigger below.
 ALTER TABLE "public"."audit_logs"
-  ADD COLUMN IF NOT EXISTS "actor_type" text NOT NULL DEFAULT 'system',
+  ADD COLUMN IF NOT EXISTS "actor_type" text NOT NULL DEFAULT 'unknown',
   ADD COLUMN IF NOT EXISTS "actor_user_id" uuid,
   ADD COLUMN IF NOT EXISTS "actor_user_email" text,
   ADD COLUMN IF NOT EXISTS "actor_apikey_id" bigint,
@@ -88,25 +88,6 @@ COMMENT ON COLUMN "public"."audit_logs"."actor_user_id" IS 'Snapshot of the user
 COMMENT ON COLUMN "public"."audit_logs"."actor_user_email" IS 'Snapshot of the user email at audit time. No foreign key by design.';
 COMMENT ON COLUMN "public"."audit_logs"."actor_apikey_id" IS 'Snapshot of the API key id used for the action. The API key secret is never stored here.';
 COMMENT ON COLUMN "public"."audit_logs"."actor_apikey_name" IS 'Snapshot of the API key name at audit time.';
-
-UPDATE "public"."audit_logs"
-SET
-  "actor_type" = 'unknown',
-  "actor_user_id" = "user_id"
-WHERE "actor_user_id" IS NULL
-  AND "actor_apikey_id" IS NULL;
-
-UPDATE "public"."audit_logs" AS "audit_logs"
-SET "actor_user_email" = "users"."email"
-FROM "public"."users" AS "users"
-WHERE "audit_logs"."actor_user_id" = "users"."id"
-  AND "audit_logs"."actor_user_email" IS NULL;
-
-CREATE INDEX IF NOT EXISTS "idx_audit_logs_actor_type"
-  ON "public"."audit_logs"("actor_type");
-
-CREATE INDEX IF NOT EXISTS "idx_audit_logs_actor_apikey_id"
-  ON "public"."audit_logs"("actor_apikey_id");
 
 CREATE OR REPLACE FUNCTION "public"."prevent_org_id_reuse"() RETURNS "trigger"
 LANGUAGE "plpgsql"
