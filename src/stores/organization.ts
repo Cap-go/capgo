@@ -30,6 +30,14 @@ export type Organization = Omit<RawOrganization, 'password_policy_config' | 'sta
   stats_refresh_requested_at: string | null
   stats_updated_at: string | null
 }
+export interface OrganizationApp {
+  app_id: string
+  name: string | null
+  owner_org: string
+  icon_url: string | null
+  icon_storage_path?: string | null
+  icon_url_loading?: boolean
+}
 export type OrganizationRole
   = 'owner'
     | 'org_member'
@@ -121,6 +129,8 @@ export const useOrganizationStore = defineStore('organization', () => {
   const main = useMainStore()
   const _organizations: Ref<Map<string, Organization>> = ref(new Map())
   const _organizationsByAppId: Ref<Map<string, Organization>> = ref(new Map())
+  const _appsByOrgId: Ref<Map<string, OrganizationApp[]>> = ref(new Map())
+  const _appsByAppId: Ref<Map<string, OrganizationApp>> = ref(new Map())
   const _initialLoadPromise = ref(createDeferredPromise<boolean>())
   const _initialized = ref(false)
 
@@ -163,6 +173,7 @@ export const useOrganizationStore = defineStore('organization', () => {
 
   const STORAGE_KEY = 'capgo_current_org_id'
   let organizationLogoLoadRun = 0
+  let organizationAppIconLoadRun = 0
 
   const getMemberImageKey = (member: { uid?: string | null, id?: number | string | null, email?: string | null }) => {
     return String(member.uid ?? member.id ?? member.email ?? '')
@@ -251,6 +262,65 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
   }
 
+  const appWithImmediateIcon = (app: { app_id: string, name: string | null, owner_org: string, icon_url: string | null }): OrganizationApp => {
+    const { normalized, shouldSign } = resolveImagePath(app.icon_url)
+    return {
+      app_id: app.app_id,
+      name: app.name,
+      owner_org: app.owner_org,
+      icon_url: shouldSign ? '' : normalized || null,
+      icon_storage_path: normalized || null,
+      icon_url_loading: shouldSign,
+    }
+  }
+
+  const updateOrganizationAppIconState = (appId: string, patch: Partial<OrganizationApp>, run: number) => {
+    if (run !== organizationAppIconLoadRun)
+      return
+
+    const app = _appsByAppId.value.get(appId)
+    if (!app)
+      return
+
+    const nextApp = { ...app, ...patch }
+    const nextAppsByAppId = new Map(_appsByAppId.value)
+    nextAppsByAppId.set(appId, nextApp)
+
+    const nextAppsByOrgId = new Map(_appsByOrgId.value)
+    const orgApps = nextAppsByOrgId.get(nextApp.owner_org)
+    if (orgApps)
+      nextAppsByOrgId.set(nextApp.owner_org, orgApps.map(orgApp => orgApp.app_id === appId ? nextApp : orgApp))
+
+    _appsByAppId.value = nextAppsByAppId
+    _appsByOrgId.value = nextAppsByOrgId
+  }
+
+  const loadOrganizationAppIcon = async (app: OrganizationApp, run: number) => {
+    if (!app.icon_url_loading || !app.icon_storage_path)
+      return
+
+    try {
+      const signedIcon = await createSignedImageUrl(app.icon_storage_path)
+      updateOrganizationAppIconState(app.app_id, {
+        icon_url: signedIcon || '',
+        icon_url_loading: false,
+      }, run)
+    }
+    catch (error) {
+      console.warn('Cannot load signed app icon', { appId: app.app_id, error })
+      updateOrganizationAppIconState(app.app_id, { icon_url_loading: false }, run)
+    }
+  }
+
+  const loadOrganizationAppIcons = (sourceApps: OrganizationApp[], run: number) => {
+    for (const app of sourceApps) {
+      loadOrganizationAppIcon(app, run).catch((error) => {
+        console.warn('Cannot load signed app icon', { appId: app.app_id, error })
+        updateOrganizationAppIconState(app.app_id, { icon_url_loading: false }, run)
+      })
+    }
+  }
+
   watch([currentOrganization, stripeEnabled], async ([currentOrganizationRaw, stripeEnabledValue], [previousOrganization]) => {
     if (!currentOrganizationRaw) {
       currentRole.value = null
@@ -309,13 +379,16 @@ export const useOrganizationStore = defineStore('organization', () => {
     const orgIds = selectableOrganizations.map(org => org.gid)
 
     if (orgIds.length === 0) {
+      _appsByOrgId.value = new Map()
+      _appsByAppId.value = new Map()
       _initialLoadPromise.value.resolve(true)
       return
     }
 
+    const appIconLoadRun = ++organizationAppIconLoadRun
     const { error, data: allAppsByOwner } = await supabase
       .from('apps')
-      .select('app_id, owner_org')
+      .select('app_id, name, owner_org, icon_url')
       .in('owner_org', orgIds)
 
     if (error) {
@@ -323,7 +396,12 @@ export const useOrganizationStore = defineStore('organization', () => {
       return
     }
 
+    if (appIconLoadRun !== organizationAppIconLoadRun)
+      return
+
     const organizationsByAppId = new Map<string, Organization>()
+    const appsByOrgId = new Map<string, OrganizationApp[]>()
+    const appsByAppId = new Map<string, OrganizationApp>()
 
     for (const app of allAppsByOwner) {
       // For each app find the org_id that owns said app
@@ -336,14 +414,35 @@ export const useOrganizationStore = defineStore('organization', () => {
       }
 
       organizationsByAppId.set(app.app_id, org)
+
+      const indexedApp = appWithImmediateIcon(app)
+      appsByAppId.set(indexedApp.app_id, indexedApp)
+      const orgApps = appsByOrgId.get(indexedApp.owner_org) ?? []
+      orgApps.push(indexedApp)
+      appsByOrgId.set(indexedApp.owner_org, orgApps)
+    }
+
+    for (const apps of appsByOrgId.values()) {
+      apps.sort((a, b) => (a.name || a.app_id).localeCompare(b.name || b.app_id))
     }
 
     _organizationsByAppId.value = organizationsByAppId
+    _appsByOrgId.value = appsByOrgId
+    _appsByAppId.value = appsByAppId
+    loadOrganizationAppIcons(Array.from(appsByAppId.values()), appIconLoadRun)
     _initialLoadPromise.value.resolve(true)
   })
 
   const getOrgByAppId = (appId: string) => {
     return _organizationsByAppId.value.get(appId)
+  }
+
+  const getAppByAppId = (appId: string) => {
+    return _appsByAppId.value.get(appId)
+  }
+
+  const getAppsByOrgId = (orgId: string) => {
+    return _appsByOrgId.value.get(orgId) ?? []
   }
 
   const awaitInitialLoad = () => {
@@ -427,6 +526,8 @@ export const useOrganizationStore = defineStore('organization', () => {
           // Remove all from orgs
           _organizations.value = new Map()
           _organizationsByAppId.value = new Map()
+          _appsByOrgId.value = new Map()
+          _appsByAppId.value = new Map()
           _initialLoadPromise.value = createDeferredPromise<boolean>()
           currentOrganization.value = undefined
           currentRole.value = null
@@ -484,6 +585,8 @@ export const useOrganizationStore = defineStore('organization', () => {
       currentRole.value = null
       currentOrganizationFailed.value = false
       _organizationsByAppId.value = new Map()
+      _appsByOrgId.value = new Map()
+      _appsByAppId.value = new Map()
       _initialLoadPromise.value.resolve(true)
       return
     }
@@ -650,6 +753,8 @@ export const useOrganizationStore = defineStore('organization', () => {
     refreshOrganizationLogos,
     dedupFetchOrganizations,
     getOrgByAppId,
+    getAppByAppId,
+    getAppsByOrgId,
     awaitInitialLoad,
     deleteOrganization,
     canDeleteOrganization,

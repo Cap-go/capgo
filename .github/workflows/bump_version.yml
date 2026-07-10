@@ -91,7 +91,7 @@ jobs:
         with:
           bun-version: latest
       - name: Install dependencies
-        if: ${{ needs.changes.outputs.run_cli == 'true' || needs.changes.outputs.run_notifications == 'true' }}
+        if: ${{ needs.changes.outputs.run_capgo == 'true' || needs.changes.outputs.run_cli == 'true' || needs.changes.outputs.run_notifications == 'true' }}
         run: bun install --frozen-lockfile
       - name: Git config
         run: |

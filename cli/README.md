@@ -155,6 +155,7 @@ Join the [discord](https://discord.gg/VnYRvBfgA6) to get help.
   - [Needed](#build-needed)
   - [Init](#build-init)
   - [Request](#build-request)
+  - [Sync-ios-version](#build-sync-ios-version)
   - [Prescan](#build-prescan)
   - [Last-output](#build-last-output)
   - [Credentials](#build-credentials)
@@ -165,6 +166,8 @@ Join the [discord](https://discord.gg/VnYRvBfgA6) to get help.
     - [Update](#build-credentials-update)
     - [Manage](#build-credentials-manage)
     - [Migrate](#build-credentials-migrate)
+- 🔹 [Notifications](#notifications)
+  - [Setup](#notifications-setup)
 - 🔹 [Probe](#probe)
 - 🔹 [Generate-docs](#generate-docs)
 - 🔹 [Mcp](#mcp)
@@ -364,6 +367,9 @@ npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel prod
 | **-a** | <code>string</code> | API key to link to your account |
 | **-p** | <code>string</code> | Path of the folder to upload, if not provided it will use the webDir set in capacitor.config |
 | **-c** | <code>string</code> | Channel to link to. Use commas for multiple channels, for example production,beta |
+| **--rollout** | <code>string</code> | Set the uploaded bundle as this channel's rollout target at a percentage from 0 to 100 |
+| **--rollout-percentage-bps** | <code>string</code> | Set the uploaded bundle rollout percentage in basis points from 0 to 10000 |
+| **--rollout-cache-ttl-seconds** | <code>string</code> | Cloudflare rollout decision cache TTL in seconds |
 | **-e** | <code>string</code> | Link to external URL instead of upload to Capgo Cloud |
 | **--iv-session-key** | <code>string</code> | Set the IV and session key for bundle URL external |
 | **--s3-region** | <code>string</code> | Region for your S3 bucket |
@@ -922,6 +928,25 @@ npx @capgo/cli@latest channel set production com.example.app --bundle 1.0.0 --st
 | **--self-assign** | <code>boolean</code> | Allow device to self-assign to this channel |
 | **--no-self-assign** | <code>boolean</code> | Disable devices to self-assign to this channel |
 | **--disable-auto-update** | <code>string</code> | Block updates by type: major, minor, metadata, patch, or none (allows all) |
+| **--rollout-bundle** | <code>string</code> | Bundle version to release gradually on this channel |
+| **--rollout-percentage** | <code>string</code> | Rollout percentage from 0 to 100 |
+| **--rollout-percentage-bps** | <code>string</code> | Rollout percentage in basis points from 0 to 10000 |
+| **--rollout-enable** | <code>boolean</code> | Enable the configured rollout |
+| **--rollout-disable** | <code>boolean</code> | Disable the configured rollout |
+| **--rollout-pause** | <code>boolean</code> | Pause rollout exposure without rolling back selected devices |
+| **--rollout-resume** | <code>boolean</code> | Resume a paused rollout |
+| **--rollout-rollback** | <code>boolean</code> | Clear rollout state and return devices to stable |
+| **--rollout-promote** | <code>boolean</code> | Promote rollout target to stable and clear rollout state |
+| **--rollout-cache-ttl-seconds** | <code>string</code> | Cloudflare rollout decision cache TTL in seconds |
+| **--auto-pause-enabled** | <code>boolean</code> | Enable rollout auto-pause policy |
+| **--auto-pause-disabled** | <code>boolean</code> | Disable rollout auto-pause policy |
+| **--auto-pause-window-minutes** | <code>string</code> | Stats window for rollout auto-pause |
+| **--auto-pause-failure-rate-bps** | <code>string</code> | Failure-rate threshold in basis points |
+| **--auto-pause-confidence** | <code>string</code> | Confidence level between 0 and 1 |
+| **--auto-pause-min-attempts** | <code>string</code> | Minimum install plus fail attempts before auto-pause can trigger |
+| **--auto-pause-min-failures** | <code>string</code> | Minimum failures before auto-pause can trigger |
+| **--auto-pause-action** | <code>string</code> | Auto-pause action: pause, rollback, or notify |
+| **--auto-pause-cooldown-minutes** | <code>string</code> | Cooldown before auto-pause can trigger again |
 | **--dev** | <code>boolean</code> | Allow sending update to development devices |
 | **--no-dev** | <code>boolean</code> | Disable sending update to development devices |
 | **--prod** | <code>boolean</code> | Allow sending update to production devices |
@@ -1400,6 +1425,7 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | **--output-record** | <code>string</code> | After a successful build, write a JSON record (jobId, status, outputUrl, qrCodeAscii, qrCodePngPath, finishedAt) to <path>. A PNG QR code is also written next to it as <path>.qr.png. Read fields back with `build last-output`. |
 | **--skip-build-number-bump** | <code>boolean</code> | Skip automatic build number/version code incrementing. Uses whatever version is already in the project files. |
 | **--no-skip-build-number-bump** | <code>boolean</code> | Override saved credentials to re-enable automatic build number incrementing for this build only. |
+| **--sync-ios-version** | <code>boolean</code> | iOS: sync Xcode MARKETING_VERSION from package.json before uploading the project. |
 | **--ai-analytics** | <code>boolean</code> | On build failure, send logs to Capgo AI for diagnosis. In interactive terminals this skips the upfront confirmation; in CI this auto-uploads and prints the analysis to stderr. |
 | **--no-prescan** | <code>boolean</code> | Skip the automatic pre-build scan |
 | **--prescan-ignore-fatal** | <code>boolean</code> | Run the pre-build scan but never block the build (report only) |
@@ -1410,6 +1436,27 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 | **--verbose** | <code>boolean</code> | Enable verbose output with detailed logging |
+
+### <a id="build-sync-ios-version"></a> 🔹 **Sync-ios-version**
+
+```bash
+npx @capgo/cli@latest build sync-ios-version
+```
+
+Sync the local iOS Xcode MARKETING_VERSION from package.json.
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest build sync-ios-version --path .
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **--path** | <code>string</code> | Path to the project directory (default: current directory) |
+| **--check** | <code>boolean</code> | Check only; exit non-zero when MARKETING_VERSION is out of sync |
 
 ### <a id="build-prescan"></a> 🔹 **Prescan**
 
@@ -1704,6 +1751,36 @@ Example:
 | **--appId** | <code>string</code> | App ID (auto-detected from capacitor.config if omitted) |
 | **--platform** | <code>string</code> | Platform (only ios is supported) |
 | **--local** | <code>boolean</code> | Migrate from local .capgo-credentials.json instead of global |
+
+
+## <a id="notifications"></a> 🔹 **Notifications**
+
+🔔 Set up Capgo native notifications in your Capacitor app.
+
+### <a id="notifications-setup"></a> ⚙️ **Setup**
+
+```bash
+npx @capgo/cli@latest notifications setup
+```
+
+Install the Capgo notifications plugin, add Capacitor config, create a helper file, and run Capacitor sync.
+Before sending production notifications, configure Android and iOS push credentials in the Capgo app Notifications tab.
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest notifications setup com.example.app
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **--server-url** | <code>string</code> | Capgo API server URL |
+| **--file** | <code>string</code> | Helper file to create (default: src/capgo-notifications.ts) |
+| **--force** | <code>boolean</code> | Overwrite the helper file if it already exists |
+| **--no-install** | <code>boolean</code> | Skip installing the notifications package |
+| **--no-sync** | <code>boolean</code> | Skip Capacitor sync |
 
 
 ## <a id="probe"></a> 🔹 **Probe**

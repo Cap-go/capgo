@@ -1,12 +1,9 @@
 import type { Context } from 'hono'
-import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
-import { sql } from 'drizzle-orm'
 import { CacheHelper } from '../../utils/cache.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlogErr } from '../../utils/logging.ts'
-import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
-import { checkPermission } from '../../utils/rbac.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 // Proxy for the CLI's "Email Capgo support" logs upload — forwards gzipped text
@@ -33,6 +30,24 @@ interface RateWindow {
   resetAt: number
 }
 
+export type SupportLogPlatform = 'ios' | 'android'
+
+export interface SupportLogsBody {
+  appId?: string
+  jobId?: string
+  platform?: SupportLogPlatform
+  gzB64: string
+}
+
+function parseSupportLogPlatform(platform: unknown): SupportLogPlatform | undefined {
+  if (typeof platform !== 'string')
+    return undefined
+  const normalized = platform.trim().toLowerCase()
+  if (normalized === 'ios' || normalized === 'android')
+    return normalized
+  return undefined
+}
+
 // Returns false when the window is exhausted. Fails open on cache errors,
 // matching the behavior of the rest of utils/rate_limit.ts.
 async function bumpWindow(c: Context, path: string, userId: string, limit: number, ttlSeconds: number): Promise<boolean> {
@@ -53,85 +68,62 @@ async function bumpWindow(c: Context, path: string, userId: string, limit: numbe
   }
 }
 
-async function appExists(c: Context, appId: string): Promise<boolean> {
-  let pgClient
-  try {
-    pgClient = getPgClient(c)
-    const drizzleClient = getDrizzleClient(pgClient)
-    const result = await drizzleClient.execute(
-      sql`SELECT EXISTS (
-        SELECT 1
-        FROM public.apps
-        WHERE app_id = ${appId}
-      ) AS exists`,
-    )
-    return (result.rows[0] as any)?.exists === true
+async function getSupportUploadEmail(c: Context, userId: string): Promise<string | undefined> {
+  const { data, error } = await supabaseAdmin(c)
+    .from('users')
+    .select('email')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'support-logs user email lookup failed', userId, error })
+    return undefined
   }
-  catch (err) {
-    cloudlogErr({
-      requestId: c.get('requestId'),
-      message: 'support-logs app existence check failed',
-      error: err instanceof Error ? err.message : String(err),
-    })
-    return true
-  }
-  finally {
-    if (pgClient)
-      closeClient(c, pgClient)
-  }
+
+  return data?.email?.trim() || undefined
 }
 
-async function hasCurrentWriteCapableOrgBinding(c: Context, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<boolean> {
-  if (!apikey.rbac_id)
-    return false
+async function getSupportUploadPlatform(c: Context, body: SupportLogsBody, userId: string): Promise<SupportLogPlatform | undefined> {
+  const requestPlatform = parseSupportLogPlatform(body.platform)
+  if (requestPlatform)
+    return requestPlatform
+  if (!body.jobId)
+    return undefined
 
-  let pgClient
-  try {
-    pgClient = getPgClient(c)
-    const drizzleClient = getDrizzleClient(pgClient)
-    const result = await drizzleClient.execute(
-      sql`SELECT public.apikey_has_current_org_create_capability(${apikey.rbac_id}::uuid) AS allowed`,
-    )
-    return (result.rows[0] as any)?.allowed === true
-  }
-  catch (err) {
+  const buildRequestQuery = supabaseAdmin(c)
+    .from('build_requests')
+    .select('platform')
+    .eq('builder_job_id', body.jobId)
+    .eq('requested_by', userId)
+
+  if (body.appId)
+    buildRequestQuery.eq('app_id', body.appId)
+
+  const { data, error } = await buildRequestQuery.maybeSingle()
+
+  if (error) {
     cloudlogErr({
       requestId: c.get('requestId'),
-      message: 'support-logs org write capability check failed',
-      error: err instanceof Error ? err.message : String(err),
+      message: 'support-logs platform lookup failed',
+      jobId: body.jobId,
+      appId: body.appId,
+      userId,
+      error,
     })
-    return false
-  }
-  finally {
-    if (pgClient)
-      closeClient(c, pgClient)
-  }
-}
-
-export async function hasSupportLogUploadPermission(
-  c: Context,
-  apikey: Database['public']['Tables']['apikeys']['Row'],
-  appId?: string,
-): Promise<boolean> {
-  const targetAppId = appId?.trim()
-  if (targetAppId) {
-    if (await checkPermission(c as Context<MiddlewareKeyVariables>, 'app.build_native', { appId: targetAppId }))
-      return true
-    if (await appExists(c, targetAppId))
-      return false
+    return undefined
   }
 
-  return hasCurrentWriteCapableOrgBinding(c, apikey)
+  return parseSupportLogPlatform(data?.platform)
 }
 
 export async function uploadSupportLogs(
   c: Context,
   apikey: Database['public']['Tables']['apikeys']['Row'],
-  body: { appId?: string, jobId?: string, gzB64: string },
+  body: SupportLogsBody,
 ): Promise<Response> {
-  if (!await hasSupportLogUploadPermission(c, apikey, body.appId))
-    throw simpleError('unauthorized', 'You do not have permission to upload support logs')
-
+  // Deliberately NO app-ownership permission check: onboarding failures can
+  // reference apps that were never registered, and these are the caller's own
+  // logs — the authenticated account (capgkey) is the abuse anchor.
   if (body.gzB64.length > MAX_GZ_B64_LENGTH)
     throw quickError(413, 'too_big', 'Logs exceed the 10 MB gzipped limit')
 
@@ -146,6 +138,11 @@ export async function uploadSupportLogs(
   if (!builderUrl || !builderApiKey)
     throw simpleError('config_error', 'Builder service not configured')
 
+  const [email, platform] = await Promise.all([
+    getSupportUploadEmail(c, userId),
+    getSupportUploadPlatform(c, body, userId),
+  ])
+
   let builderResp: Response
   try {
     builderResp = await fetch(`${builderUrl}/support-logs`, {
@@ -154,7 +151,7 @@ export async function uploadSupportLogs(
         'x-api-key': builderApiKey,
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ gzB64: body.gzB64, appId: body.appId, jobId: body.jobId, userId }),
+      body: JSON.stringify({ gzB64: body.gzB64, appId: body.appId, jobId: body.jobId, userId, email, platform }),
       signal: AbortSignal.timeout(60_000),
     })
   }

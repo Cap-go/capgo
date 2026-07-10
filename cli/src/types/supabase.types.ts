@@ -322,6 +322,8 @@ export type Database = {
           ios_store_url: string | null
           last_version: string | null
           manifest_bundle_count: number
+          rollout_channel_count: number
+          rollout_paused_version_names: string[]
           name: string | null
           need_onboarding: boolean
           owner_org: string
@@ -350,6 +352,8 @@ export type Database = {
           ios_store_url?: string | null
           last_version?: string | null
           manifest_bundle_count?: number
+          rollout_channel_count?: number
+          rollout_paused_version_names?: string[]
           name?: string | null
           need_onboarding?: boolean
           owner_org: string
@@ -378,6 +382,8 @@ export type Database = {
           ios_store_url?: string | null
           last_version?: string | null
           manifest_bundle_count?: number
+          rollout_channel_count?: number
+          rollout_paused_version_names?: string[]
           name?: string | null
           need_onboarding?: boolean
           owner_org?: string
@@ -795,6 +801,23 @@ export type Database = {
           name: string
           owner_org: string
           public: boolean
+          auto_pause_action: string
+          auto_pause_confidence: number
+          auto_pause_cooldown_minutes: number
+          auto_pause_enabled: boolean
+          auto_pause_failure_rate_bps: number | null
+          auto_pause_last_checked_at: string | null
+          auto_pause_last_triggered_at: string | null
+          auto_pause_min_attempts: number | null
+          auto_pause_min_failures: number | null
+          auto_pause_window_minutes: number
+          rollout_cache_ttl_seconds: number
+          rollout_enabled: boolean
+          rollout_id: string
+          rollout_pause_reason: string | null
+          rollout_paused_at: string | null
+          rollout_percentage_bps: number
+          rollout_version: number | null
           rbac_id: string
           updated_at: string
           version: number | null
@@ -817,6 +840,23 @@ export type Database = {
           name: string
           owner_org: string
           public?: boolean
+          auto_pause_action?: string
+          auto_pause_confidence?: number
+          auto_pause_cooldown_minutes?: number
+          auto_pause_enabled?: boolean
+          auto_pause_failure_rate_bps?: number | null
+          auto_pause_last_checked_at?: string | null
+          auto_pause_last_triggered_at?: string | null
+          auto_pause_min_attempts?: number | null
+          auto_pause_min_failures?: number | null
+          auto_pause_window_minutes?: number
+          rollout_cache_ttl_seconds?: number
+          rollout_enabled?: boolean
+          rollout_id?: string
+          rollout_pause_reason?: string | null
+          rollout_paused_at?: string | null
+          rollout_percentage_bps?: number
+          rollout_version?: number | null
           rbac_id?: string
           updated_at?: string
           version?: number | null
@@ -839,6 +879,23 @@ export type Database = {
           name?: string
           owner_org?: string
           public?: boolean
+          auto_pause_action?: string
+          auto_pause_confidence?: number
+          auto_pause_cooldown_minutes?: number
+          auto_pause_enabled?: boolean
+          auto_pause_failure_rate_bps?: number | null
+          auto_pause_last_checked_at?: string | null
+          auto_pause_last_triggered_at?: string | null
+          auto_pause_min_attempts?: number | null
+          auto_pause_min_failures?: number | null
+          auto_pause_window_minutes?: number
+          rollout_cache_ttl_seconds?: number
+          rollout_enabled?: boolean
+          rollout_id?: string
+          rollout_pause_reason?: string | null
+          rollout_paused_at?: string | null
+          rollout_percentage_bps?: number
+          rollout_version?: number | null
           rbac_id?: string
           updated_at?: string
           version?: number | null
@@ -850,6 +907,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "apps"
             referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "channels_rollout_version_fkey"
+            columns: ["rollout_version"]
+            isOneToOne: false
+            referencedRelation: "app_versions"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "channels_version_fkey"
@@ -3075,6 +3139,7 @@ export type Database = {
         Row: {
           action: Database["public"]["Enums"]["version_action"]
           app_id: string
+          channel_name: string | null
           timestamp: string
           version_id: number | null
           version_name: string | null
@@ -3082,6 +3147,7 @@ export type Database = {
         Insert: {
           action: Database["public"]["Enums"]["version_action"]
           app_id: string
+          channel_name?: string | null
           timestamp?: string
           version_id?: number | null
           version_name?: string | null
@@ -3089,6 +3155,7 @@ export type Database = {
         Update: {
           action?: Database["public"]["Enums"]["version_action"]
           app_id?: string
+          channel_name?: string | null
           timestamp?: string
           version_id?: number | null
           version_name?: string | null
@@ -4401,7 +4468,7 @@ export type Database = {
         }[]
       }
       read_version_usage: {
-        Args: { p_app_id: string; p_period_end: string; p_period_start: string }
+        Args: { p_app_id: string; p_channel_name?: string | null; p_period_end: string; p_period_start: string }
         Returns: {
           app_id: string
           date: string

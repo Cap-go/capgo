@@ -108,7 +108,7 @@ async function getData() {
           name,
           app_id,
           public,
-          version (
+          version:app_versions!channels_version_fkey(
             id,
             name,
             created_at,

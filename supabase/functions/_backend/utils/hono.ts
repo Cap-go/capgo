@@ -388,7 +388,7 @@ export function createHono(functionName: string, _version: string) {
 }
 
 export function createAllCatch(appGlobal: Hono<MiddlewareKeyVariables>, functionName: string) {
-  appGlobal.all('*', (c) => {
+  appGlobal.all('*', useCors, (c) => {
     cloudlog({ requestId: c.get('requestId'), functionName, message: 'Not found', url: c.req.url })
     return c.json({ error: 'not_found', message: 'Not found' }, 404)
   })

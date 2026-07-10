@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildNormalizedDeviceForWrite,
   hasComparableDeviceChanged,
+  normalizeDeviceCountryCode,
   nullableString as normalizeOptionalString,
   toComparableDevice,
   toComparableExisting,
@@ -26,6 +27,7 @@ function simulateReplicaStorage(device: DeviceWithoutCreatedAt): DeviceExistingR
     is_emulator: comparable.is_emulator ? 1 : 0,
     install_source: comparable.install_source,
     default_channel: comparable.default_channel,
+    country_code: comparable.country_code,
     key_id: comparable.key_id,
   }
 }
@@ -50,6 +52,20 @@ describe('deviceComparison utilities', () => {
 
     it('should keep whitespace-only strings', () => {
       expect(normalizeOptionalString('  ')).toBe('  ')
+    })
+  })
+
+  describe('normalizeDeviceCountryCode', () => {
+    it.concurrent('normalizes valid country codes', () => {
+      expect(normalizeDeviceCountryCode('fr')).toBe('FR')
+      expect(normalizeDeviceCountryCode(' US ')).toBe('US')
+    })
+
+    it.concurrent('rejects invalid country codes', () => {
+      expect(normalizeDeviceCountryCode(undefined)).toBe(null)
+      expect(normalizeDeviceCountryCode('')).toBe(null)
+      expect(normalizeDeviceCountryCode('USA')).toBe(null)
+      expect(normalizeDeviceCountryCode('1A')).toBe(null)
     })
   })
 
@@ -268,6 +284,29 @@ describe('deviceComparison utilities', () => {
       expect(hasComparableDeviceChanged(existing, { ...device, install_source: 'testflight' })).toBe(true)
     })
 
+    it.concurrent('should compare country only when the backend reports it', () => {
+      const device: DeviceWithoutCreatedAt = {
+        device_id: 'test-device',
+        app_id: 'test-app',
+        platform: 'ios',
+        plugin_version: '8.0.0',
+        os_version: '18',
+        version_build: '100',
+        custom_id: '',
+        version_name: 'v1.0.0',
+        is_prod: true,
+        is_emulator: false,
+        default_channel: 'production',
+      }
+      const existing = simulateReplicaStorage({
+        ...device,
+        country_code: 'FR',
+      })
+
+      expect(hasComparableDeviceChanged(existing, device)).toBe(false)
+      expect(hasComparableDeviceChanged(existing, { ...device, country_code: 'de' })).toBe(true)
+      expect(buildNormalizedDeviceForWrite({ ...device, country_code: 'de' }).country_code).toBe('DE')
+    })
     it('should return false when devices are identical', () => {
       const existing: DeviceExistingRowLike = {
         platform: 'android',

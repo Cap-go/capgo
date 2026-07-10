@@ -83,7 +83,7 @@ async function getChannelOverride() {
         channel_id (
           name,
           id,
-          version (
+          version:app_versions!channels_version_fkey(
             name,
             id
           )
@@ -432,6 +432,9 @@ async function copyCurlCommand() {
             </InfoRow>
             <InfoRow v-if="device.key_id" :label="t('public-key-prefix')">
               {{ device.key_id }}
+            </InfoRow>
+            <InfoRow v-if="device.country_code" :label="t('country')">
+              {{ device.country_code }}
             </InfoRow>
             <InfoRow v-if="device.default_channel" :label="t('default-channel')">
               <div class="flex items-center gap-2">

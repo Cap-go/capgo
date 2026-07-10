@@ -10,8 +10,13 @@ const ORG_ID = randomUUID()
 const globalId = randomUUID()
 const name = `Test Password Policy Org ${globalId}`
 const customerId = `cus_test_pwd_${ORG_ID}`
+const USE_CLOUDFLARE = process.env.USE_CLOUDFLARE_WORKERS === 'true'
+const describeSupabaseOnly = describe.skipIf(USE_CLOUDFLARE)
 
 beforeAll(async () => {
+  if (USE_CLOUDFLARE)
+    return
+
   // Create stripe_info for this test org
   const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
     customer_id: customerId,
@@ -37,13 +42,16 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
+  if (USE_CLOUDFLARE)
+    return
+
   // Clean up test organization and stripe_info
   await getSupabaseClient().from('user_password_compliance').delete().eq('org_id', ORG_ID)
   await getSupabaseClient().from('orgs').delete().eq('id', ORG_ID)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
 })
 
-describe('password Policy Configuration via SDK', () => {
+describeSupabaseOnly('password Policy Configuration via SDK', () => {
   it('enable password policy with all requirements via direct update', async () => {
     const policyConfig = {
       enabled: true,
@@ -196,7 +204,7 @@ describe('password Policy Configuration via SDK', () => {
   })
 })
 
-describe('[POST] /private/validate_password_compliance', () => {
+describeSupabaseOnly('[POST] /private/validate_password_compliance', () => {
   beforeAll(async () => {
     // Enable password policy for testing
     await getSupabaseClient()
@@ -578,7 +586,7 @@ describe('checkOrgReadAccess', () => {
   })
 })
 
-describe('[GET] /private/check_org_members_password_policy', () => {
+describeSupabaseOnly('[GET] /private/check_org_members_password_policy', () => {
   beforeAll(async () => {
     // Enable password policy for testing
     await getSupabaseClient()
@@ -616,7 +624,7 @@ describe('[GET] /private/check_org_members_password_policy', () => {
   })
 })
 
-describe('password Policy Enforcement Integration', () => {
+describeSupabaseOnly('password Policy Enforcement Integration', () => {
   const orgWithPolicyId = randomUUID()
   const orgWithPolicyName = `Pwd Policy Integration Org ${randomUUID()}`
   const orgWithPolicyCustomerId = `cus_pwd_int_${orgWithPolicyId}`
@@ -743,7 +751,7 @@ describe('password Policy Enforcement Integration', () => {
   })
 })
 
-describe('user_password_compliance table', () => {
+describeSupabaseOnly('user_password_compliance table', () => {
   it('can insert compliance record via service role', async () => {
     // Get the policy hash
     const { data: org, error: orgError } = await getSupabaseClient()

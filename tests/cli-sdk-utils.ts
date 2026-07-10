@@ -325,7 +325,7 @@ async function getAppsForApiKey(apikey: string, requiredPermissions: RbacPermiss
 async function getChannelVersionRecord(appId: string, channelId: string) {
   const { data } = await getSupabaseClient()
     .from('channels')
-    .select('version ( id, checksum, min_update_version, name, native_packages )')
+    .select('version:app_versions!channels_version_fkey( id, checksum, min_update_version, name, native_packages )')
     .eq('app_id', appId)
     .eq('name', channelId)
     .maybeSingle()

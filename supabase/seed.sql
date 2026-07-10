@@ -1024,6 +1024,27 @@ BEGIN
     )
   $sql2$ USING org_id, admin_user_id;
 
+  -- API keys use bindings-priority: a key with its own role_bindings can only reach
+  -- orgs it is bound to. Clone each owner key's Demo-org binding onto this org so
+  -- apikey-authed tests work against dedicated per-file orgs too. Skip orgs with
+  -- apikey expiration policies: their triggers reject bindings for non-expiring keys.
+  EXECUTE $sql3$
+    INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, granted_by, reason, is_direct)
+    SELECT rb.principal_type, rb.principal_id, rb.role_id, rb.scope_type, $1, rb.granted_by, 'Seeded API key V2 org binding (per-app org)', true
+    FROM public.role_bindings rb
+    JOIN public.apikeys ak ON ak.rbac_id = rb.principal_id
+    WHERE rb.principal_type = public.rbac_principal_apikey()
+      AND rb.scope_type = public.rbac_scope_org()
+      AND rb.org_id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid
+      AND ak.user_id IN ($2, $3)
+      AND NOT EXISTS (
+        SELECT 1 FROM public.orgs o
+        WHERE o.id = $1
+          AND (o.require_apikey_expiration OR o.max_apikey_expiration_days IS NOT NULL)
+      )
+    ON CONFLICT DO NOTHING
+  $sql3$ USING org_id, user_id, admin_user_id;
+
   INSERT INTO public.apps (created_at, app_id, icon_url, name, last_version, updated_at, owner_org, user_id)
   VALUES (NOW(), p_app_id, '', 'Seeded App', '1.0.0', NOW(), org_id, user_id);
   WITH version_inserts AS (

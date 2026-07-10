@@ -147,6 +147,34 @@ async function execAsRoleWithCapgkey(
   }
 }
 
+async function insertRlsAppVersion({
+  appId,
+  name,
+  orgId,
+  userId,
+}: {
+  appId: string
+  name: string
+  orgId: string
+  userId: string
+}) {
+  const result = await pool.query(
+    `INSERT INTO public.app_versions (app_id, name, owner_org, user_id, checksum, storage_provider, r2_path, deleted)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, false)
+     RETURNING id`,
+    [
+      appId,
+      name,
+      orgId,
+      userId,
+      `checksum-${name}`,
+      'r2',
+      `orgs/${orgId}/apps/${appId}/${name}.zip`,
+    ],
+  )
+  return Number(result.rows[0].id)
+}
+
 interface ApiKeyAccessOptions {
   orgId?: string
   orgRoleName?: 'org_admin' | 'org_member'
@@ -1057,10 +1085,14 @@ describe('rls policies with hashed api keys (via supabase sdk)', () => {
 })
 
 describe('channels rls blocks direct api-key updates', () => {
-  let allKey: { id: number, key: string, key_hash: string } | null = null
+  let allKey: { id: number, key: string, key_hash: string, rbac_id?: string } | null = null
   let writeKey: { id: number, key: string, key_hash: string } | null = null
   let versionId: number | null = null
+  let otherAppVersionId: number | null = null
+  let deletedAppVersionId: number | null = null
   let channelId: number | null = null
+  let appRbacId: string | null = null
+  const otherAppId = `com.rls.rollout.other.${randomUUID().slice(0, 8)}`
   const versionName = `rls-direct-version-${randomUUID().slice(0, 8)}`
   const channelName = `rls-direct-channel-${randomUUID().slice(0, 8)}`
 
@@ -1077,22 +1109,35 @@ describe('channels rls blocks direct api-key updates', () => {
       appId: APP_NAME_RLS,
       appRoleName: 'app_developer',
     })
+    const apiKeyResult = await pool.query('SELECT rbac_id FROM public.apikeys WHERE id = $1', [allKey.id])
+    allKey.rbac_id = apiKeyResult.rows[0].rbac_id
+    const appResult = await pool.query('SELECT id FROM public.apps WHERE app_id = $1', [APP_NAME_RLS])
+    appRbacId = appResult.rows[0].id
 
-    const versionResult = await pool.query(
-      `INSERT INTO public.app_versions (app_id, name, owner_org, user_id, checksum, storage_provider, r2_path, deleted)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, false)
-       RETURNING id`,
+    versionId = await insertRlsAppVersion({
+      appId: APP_NAME_RLS,
+      name: versionName,
+      orgId: ORG_ID_RLS,
+      userId: USER_ID_RLS,
+    })
+
+    await pool.query(
+      `INSERT INTO public.apps (app_id, owner_org, name, icon_url)
+       VALUES ($1, $2, $3, $4)`,
       [
-        APP_NAME_RLS,
-        versionName,
+        otherAppId,
         ORG_ID_RLS,
-        USER_ID_RLS,
-        `checksum-${versionName}`,
-        'r2',
-        `orgs/${ORG_ID_RLS}/apps/${APP_NAME_RLS}/${versionName}.zip`,
+        `RLS Rollout Other ${versionName}`,
+        'role-binding-test-icon',
       ],
     )
-    versionId = Number(versionResult.rows[0].id)
+
+    otherAppVersionId = await insertRlsAppVersion({
+      appId: otherAppId,
+      name: `${versionName}-other-app`,
+      orgId: ORG_ID_RLS,
+      userId: USER_ID_RLS,
+    })
 
     const channelResult = await pool.query(
       `INSERT INTO public.channels (app_id, name, version, owner_org, created_by, public, allow_emulator)
@@ -1117,6 +1162,16 @@ describe('channels rls blocks direct api-key updates', () => {
     if (versionId) {
       await pool.query('DELETE FROM public.app_versions WHERE id = $1', [versionId])
     }
+
+    if (otherAppVersionId) {
+      await pool.query('DELETE FROM public.app_versions WHERE id = $1', [otherAppVersionId])
+    }
+
+    if (deletedAppVersionId) {
+      await pool.query('DELETE FROM public.app_versions WHERE id = $1', [deletedAppVersionId])
+    }
+
+    await pool.query('DELETE FROM public.apps WHERE app_id = $1', [otherAppId])
 
     if (allKey)
       await deleteApiKey(allKey.id)
@@ -1176,6 +1231,111 @@ describe('channels rls blocks direct api-key updates', () => {
       'UPDATE public.channels SET allow_emulator = false WHERE id = $1',
       [channelId],
     )
+  })
+
+  it('requires channel promote permission for direct rollout target changes', async () => {
+    if (!allKey || !allKey.rbac_id || !appRbacId || !channelId || !versionId)
+      throw new Error('RLS channel test setup did not complete')
+
+    const orgResult = await pool.query('SELECT use_new_rbac FROM public.orgs WHERE id = $1', [ORG_ID_RLS])
+    const previousUseNewRbac = orgResult.rows[0]?.use_new_rbac ?? false
+    await pool.query('UPDATE public.orgs SET use_new_rbac = true WHERE id = $1', [ORG_ID_RLS])
+    await pool.query(
+      `INSERT INTO public.channel_permission_overrides (
+        principal_type, principal_id, channel_id, permission_key, is_allowed
+      ) VALUES (
+        public.rbac_principal_apikey(),
+        $1,
+        $2,
+        public.rbac_perm_channel_promote_bundle(),
+        false
+      )
+      ON CONFLICT (principal_type, principal_id, channel_id, permission_key)
+      DO UPDATE SET is_allowed = excluded.is_allowed`,
+      [allKey.rbac_id, channelId],
+    )
+
+    try {
+      await expect(execWithRoleClaims(
+        'UPDATE public.channels SET rollout_version = $1 WHERE id = $2 RETURNING id, rollout_version',
+        {
+          role: 'anon',
+          claims: {
+            role: 'anon',
+            aud: 'anon',
+          },
+          headers: { capgkey: allKey.key },
+          params: [versionId, channelId],
+        },
+      )).rejects.toThrow(/NO_RIGHTS/)
+
+      const result = await execWithRoleClaims(
+        'UPDATE public.channels SET allow_emulator = true WHERE id = $1 RETURNING id, allow_emulator',
+        {
+          role: 'anon',
+          claims: {
+            role: 'anon',
+            aud: 'anon',
+          },
+          headers: { capgkey: allKey.key },
+          params: [channelId],
+        },
+      )
+
+      expect(result.rowCount).toBe(1)
+      expect(result.rows[0].allow_emulator).toBe(true)
+    }
+    finally {
+      await pool.query(
+        `DELETE FROM public.channel_permission_overrides
+         WHERE principal_type = public.rbac_principal_apikey()
+           AND principal_id = $1
+           AND channel_id = $2
+           AND permission_key = public.rbac_perm_channel_promote_bundle()`,
+        [allKey.rbac_id, channelId],
+      )
+      await pool.query(
+        `DELETE FROM public.role_bindings
+         WHERE principal_type = public.rbac_principal_apikey()
+           AND principal_id = $1
+           AND app_id = $2
+           AND scope_type = public.rbac_scope_app()`,
+        [allKey.rbac_id, appRbacId],
+      )
+      await pool.query('UPDATE public.orgs SET use_new_rbac = $1 WHERE id = $2', [previousUseNewRbac, ORG_ID_RLS])
+      await pool.query(
+        'UPDATE public.channels SET allow_emulator = false, rollout_version = NULL WHERE id = $1',
+        [channelId],
+      )
+    }
+  })
+
+  it('rejects rollout targets from another app', async () => {
+    if (!channelId || !otherAppVersionId)
+      throw new Error('RLS channel test setup did not complete')
+
+    await expect(pool.query(
+      'UPDATE public.channels SET rollout_version = $1 WHERE id = $2 RETURNING id, rollout_version',
+      [otherAppVersionId, channelId],
+    )).rejects.toThrow(/INVALID_ROLLOUT_VERSION/)
+  })
+
+  it('rejects deleted rollout targets', async () => {
+    if (!channelId)
+      throw new Error('RLS channel test setup did not complete')
+
+    deletedAppVersionId = await insertRlsAppVersion({
+      appId: APP_NAME_RLS,
+      name: `deleted-rollout-${Date.now()}`,
+      orgId: ORG_ID_RLS,
+      userId: USER_ID_RLS,
+    })
+    await pool.query('UPDATE public.app_versions SET deleted = true WHERE id = $1', [deletedAppVersionId])
+
+    await expect(pool.query(
+      'UPDATE public.channels SET rollout_version = $1 WHERE id = $2 RETURNING id, rollout_version',
+      [deletedAppVersionId, channelId],
+    )).rejects.toThrow(/INVALID_ROLLOUT_VERSION/)
   })
 })
 

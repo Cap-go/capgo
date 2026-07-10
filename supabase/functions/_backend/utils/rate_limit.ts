@@ -10,9 +10,11 @@ const API_KEY_RATE_LIMIT_TTL = 60 // 1 minute window for API key rate limiting
 // Default limits - set high to catch only severe abuse, not normal usage
 const DEFAULT_FAILED_AUTH_LIMIT = 20 // 20 failed attempts before blocking (catches brute force, allows mistakes)
 const DEFAULT_API_KEY_RATE_LIMIT = 2000 // 2000 requests per minute per API key (catches infinite loops)
+const DEFAULT_UPLOAD_API_KEY_RATE_LIMIT = 20000 // 20000 upload requests per minute per API key (supports large bundles)
 const FAILED_AUTH_PATH = '/rate-limit/failed-auth'
 const FAILED_ACCOUNT_AUTH_PATH = '/rate-limit/failed-auth-account'
 const API_KEY_RATE_LIMIT_PATH = '/rate-limit/apikey'
+const UPLOAD_API_KEY_RATE_LIMIT_PATH = '/rate-limit/apikey-upload'
 
 interface RateLimitData {
   count: number
@@ -23,6 +25,8 @@ export interface RateLimitStatus {
   limited: boolean
   resetAt?: number
 }
+
+export type APIKeyRateLimitScope = 'default' | 'upload'
 
 /**
  * Get the client IP address from the request.
@@ -263,16 +267,16 @@ export async function clearFailedAccountAuth(c: Context, accountIdentifier: stri
  * Returns true if the API key has exceeded its configured rate limit.
  * Note: If cache is unavailable, rate limiting fails open (returns false).
  */
-export async function isAPIKeyRateLimited(c: Context, apiKeyId: number): Promise<RateLimitStatus> {
+export async function isAPIKeyRateLimited(c: Context, apiKeyId: number, scope: APIKeyRateLimitScope = 'default'): Promise<RateLimitStatus> {
   const cacheHelper = new CacheHelper(c)
-  const cacheKey = cacheHelper.buildRequest(API_KEY_RATE_LIMIT_PATH, { id: String(apiKeyId) })
+  const cacheKey = cacheHelper.buildRequest(getAPIKeyRateLimitPath(scope), { id: String(apiKeyId) })
   const data = await cacheHelper.matchJson<RateLimitData>(cacheKey)
 
   // If no data or cache unavailable, fail open (don't block)
   if (!data)
     return { limited: false }
 
-  const limit = getAPIKeyRateLimit(c)
+  const limit = getAPIKeyRateLimit(c, scope)
   const isLimited = data.count >= limit
 
   if (isLimited) {
@@ -280,6 +284,7 @@ export async function isAPIKeyRateLimited(c: Context, apiKeyId: number): Promise
       requestId: c.get('requestId'),
       message: 'API key rate limited',
       apiKeyId,
+      scope,
       count: data.count,
       limit,
     })
@@ -293,9 +298,9 @@ export async function isAPIKeyRateLimited(c: Context, apiKeyId: number): Promise
  * Tracks the number of calls per API key within the configured time window.
  * This should be awaited to ensure accurate counting before checking limits.
  */
-export async function recordAPIKeyUsage(c: Context, apiKeyId: number): Promise<void> {
+export async function recordAPIKeyUsage(c: Context, apiKeyId: number, scope: APIKeyRateLimitScope = 'default'): Promise<void> {
   const cacheHelper = new CacheHelper(c)
-  const cacheKey = cacheHelper.buildRequest(API_KEY_RATE_LIMIT_PATH, { id: String(apiKeyId) })
+  const cacheKey = cacheHelper.buildRequest(getAPIKeyRateLimitPath(scope), { id: String(apiKeyId) })
   const existingData = await cacheHelper.matchJson<RateLimitData>(cacheKey)
 
   const newData: RateLimitData = {
@@ -319,15 +324,20 @@ function getFailedAuthLimit(c: Context): number {
   return DEFAULT_FAILED_AUTH_LIMIT
 }
 
+function getAPIKeyRateLimitPath(scope: APIKeyRateLimitScope) {
+  return scope === 'upload' ? UPLOAD_API_KEY_RATE_LIMIT_PATH : API_KEY_RATE_LIMIT_PATH
+}
+
 /**
  * Get the API key rate limit from environment or use default (2000/minute).
  */
-function getAPIKeyRateLimit(c: Context): number {
-  const envLimit = getEnv(c, 'RATE_LIMIT_API_KEY')
+function getAPIKeyRateLimit(c: Context, scope: APIKeyRateLimitScope): number {
+  const envKey = scope === 'upload' ? 'RATE_LIMIT_API_KEY_UPLOAD' : 'RATE_LIMIT_API_KEY'
+  const envLimit = getEnv(c, envKey)
   if (envLimit) {
     const parsed = Number.parseInt(envLimit, 10)
     if (!Number.isNaN(parsed) && parsed > 0)
       return parsed
   }
-  return DEFAULT_API_KEY_RATE_LIMIT
+  return scope === 'upload' ? DEFAULT_UPLOAD_API_KEY_RATE_LIMIT : DEFAULT_API_KEY_RATE_LIMIT
 }

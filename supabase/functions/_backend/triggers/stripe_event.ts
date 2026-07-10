@@ -334,6 +334,19 @@ async function getBillingBentoEmails(c: Context, org: Org, customerId: string) {
   return emails
 }
 
+async function getBillingPlans(c: Context): Promise<PlanRow[]> {
+  const { data: plans, error } = await supabaseAdmin(c)
+    .from('plans')
+    .select()
+
+  if (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getBillingPlans error', error })
+    throw error
+  }
+
+  return plans ?? []
+}
+
 async function syncBillingBentoTags(
   c: Context,
   org: Org,
@@ -375,21 +388,10 @@ async function syncBillingBentoTagsFromStoredStripeInfo(c: Context, org: Org, cu
   if (!stripeInfo)
     return
 
-  let plan: PlanRow | null = null
-  if (stripeInfo.product_id) {
-    const { data: planData, error: planError } = await supabaseAdmin(c)
-      .from('plans')
-      .select()
-      .eq('stripe_id', stripeInfo.product_id)
-      .maybeSingle()
-
-    if (planError)
-      cloudlogErr({ requestId: c.get('requestId'), message: 'syncBillingBentoTagsFromStoredStripeInfo plan error', customerId, productId: stripeInfo.product_id, error: planError })
-
-    plan = planData ?? null
-  }
-
-  const segment = await customerToSegmentOrg(c, org.id, stripeInfo.price_id, plan)
+  const plans = await getBillingPlans(c)
+  const plan = plans.find(candidate => candidate.stripe_id === stripeInfo.product_id) ?? null
+  const trialPlanNames = plans.map(candidate => candidate.name)
+  const segment = await customerToSegmentOrg(c, org.id, stripeInfo.price_id, plan, trialPlanNames)
   await syncBillingBentoTags(c, org, customerId, segment)
 }
 
@@ -1030,6 +1032,7 @@ async function createdOrUpdated(
     if (paidAt)
       updateData.paid_at = paidAt
     const revenuePlans = await getRevenuePlans(c)
+    const billingPlans = await getBillingPlans(c)
     const revenueMovement = classifyRevenueMovement(currentStripeInfo, updateData, revenuePlans)
     if (shouldTrackOrganizationUpgrade(stripeData.isUpgrade, revenueMovement))
       updateData.upgraded_at = eventOccurredAtIso
@@ -1102,7 +1105,7 @@ async function createdOrUpdated(
       await writePaidAtAtomically(c, stripeData.data.customer_id, paidAt)
     }
 
-    const segment = await customerToSegmentOrg(c, org.id, stripeData.data.price_id, plan)
+    const segment = await customerToSegmentOrg(c, org.id, stripeData.data.price_id, plan, billingPlans.map(candidate => candidate.name))
     const isMonthly = plan.price_m_id === stripeData.data.price_id
     const eventName = `user:subscribe_${statusName}:${isMonthly ? 'monthly' : 'yearly'}`
     const subscriptionMetadata = buildSubscriptionEventMetadata(stripeData, plan, previousPlan)

@@ -37,6 +37,17 @@ jobs:
         run: bun run --cwd packages/capacitor-notifications typecheck
       - name: Build notifications plugin
         run: bun run --cwd packages/capacitor-notifications build
+      - name: Resolve previous successful notifications release
+        id: changelog_base
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          previous_tag=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 --json tagName,isDraft | jq -r --arg current "$GITHUB_REF_NAME" --arg prefix "notifications-" '[.[] | select(.isDraft == false and .tagName != $current and (.tagName | startswith($prefix)))] | first | .tagName // empty')
+          if [ -z "$previous_tag" ]; then
+            echo "::error::No previous successful notifications release found"
+            exit 1
+          fi
+          echo "from_tag=$previous_tag" >> "$GITHUB_OUTPUT"
       - name: Generate AI changelog
         id: changelog
         uses: mistricky/ccc@v0.2.6
@@ -44,16 +55,17 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ github.token }}
           model: claude-sonnet-4-5-20250929
-      - name: Publish notifications plugin privately
+          from_tag: ${{ steps.changelog_base.outputs.from_tag }}
+      - name: Publish notifications plugin to npm
         if: ${{ !contains(github.ref, '-alpha.') }}
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: bun publish --cwd packages/capacitor-notifications --access restricted
-      - name: Publish notifications plugin privately with next tag
+        run: bun publish --cwd packages/capacitor-notifications --access public
+      - name: Publish notifications plugin to npm with next tag
         if: ${{ contains(github.ref, '-alpha.') }}
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: bun publish --cwd packages/capacitor-notifications --tag next --access restricted
+        run: bun publish --cwd packages/capacitor-notifications --tag next --access public
       - name: Create GitHub release
         id: create_release
         uses: softprops/action-gh-release@v2

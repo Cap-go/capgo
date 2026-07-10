@@ -283,9 +283,23 @@ declare module 'vue-router/auto-routes' {
       { app: ParamValue<false> },
       | never
     >,
+    '/app/[app].logs.raw': RouteRecordInfo<
+      '/app/[app].logs.raw',
+      '/app/:app/logs/raw',
+      { app: ParamValue<true> },
+      { app: ParamValue<false> },
+      | never
+    >,
     '/app/[app].notifications': RouteRecordInfo<
       '/app/[app].notifications',
       '/app/:app/notifications',
+      { app: ParamValue<true> },
+      { app: ParamValue<false> },
+      | never
+    >,
+    '/app/[app].observe': RouteRecordInfo<
+      '/app/[app].observe',
+      '/app/:app/observe',
       { app: ParamValue<true> },
       { app: ParamValue<false> },
       | never
@@ -405,6 +419,13 @@ declare module 'vue-router/auto-routes' {
     '/onboarding/set_password': RouteRecordInfo<
       '/onboarding/set_password',
       '/onboarding/set_password',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/preview/bundle': RouteRecordInfo<
+      '/preview/bundle',
+      '/preview/bundle',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -891,9 +912,25 @@ declare module 'vue-router/auto-routes' {
       pathParamNames:
         | 'app'
     }
+    'src/pages/app/[app].logs.raw.vue': {
+      routes:
+        | '/app/[app].logs.raw'
+      views:
+        | never
+      pathParamNames:
+        | 'app'
+    }
     'src/pages/app/[app].notifications.vue': {
       routes:
         | '/app/[app].notifications'
+      views:
+        | never
+      pathParamNames:
+        | 'app'
+    }
+    'src/pages/app/[app].observe.vue': {
+      routes:
+        | '/app/[app].observe'
       views:
         | never
       pathParamNames:
@@ -1030,6 +1067,14 @@ declare module 'vue-router/auto-routes' {
     'src/pages/onboarding/set_password.vue': {
       routes:
         | '/onboarding/set_password'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/preview/bundle.vue': {
+      routes:
+        | '/preview/bundle'
       views:
         | never
       pathParamNames:
