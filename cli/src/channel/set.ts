@@ -407,6 +407,7 @@ export async function setChannelInternal(channel: string, appId: string, options
   }
 
   if (rolloutRollback) {
+    bundleLinkChanged = bundleLinkChanged || existingChannel.rollout_version != null
     channelPayload.rollout_version = null
     channelPayload.rollout_enabled = false
     channelPayload.rollout_percentage_bps = 0

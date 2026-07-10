@@ -462,7 +462,8 @@ async function handleUnlink() {
         text: t('continue'),
         role: 'primary',
         handler: async () => {
-          await saveChannelChange('version', null)
+          if (await saveChannelChange('version', null))
+            await askUpdateNotificationAfterBundleChange()
         },
       },
     ],
@@ -487,7 +488,8 @@ async function handleRevert() {
         text: t('confirm'),
         role: 'primary',
         handler: async () => {
-          await saveChannelChange('version', null)
+          if (await saveChannelChange('version', null))
+            await askUpdateNotificationAfterBundleChange()
         },
       },
     ],
