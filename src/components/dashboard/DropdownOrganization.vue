@@ -485,7 +485,21 @@ watch(
                   :aria-current="isSelectedApp(app) ? 'page' : undefined"
                   @click="onAppClick(org, app, $event)"
                 >
-                  <span class="flex size-5 items-center justify-center rounded-sm bg-gray-700 text-[10px] font-semibold text-gray-300 d-mask d-mask-squircle shrink-0">
+                  <img
+                    v-if="app.icon_url"
+                    :src="app.icon_url"
+                    :alt="`${getAppLabel(app)} icon`"
+                    class="object-cover size-5 rounded-sm d-mask d-mask-squircle shrink-0"
+                  >
+                  <span
+                    v-else-if="app.icon_url_loading"
+                    class="flex size-5 items-center justify-center rounded-sm bg-gray-700 d-mask d-mask-squircle shrink-0"
+                    :aria-label="t('loading')"
+                  >
+                    <span class="size-3 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
+                    <span class="sr-only">{{ t('loading') }}</span>
+                  </span>
+                  <span v-else class="flex size-5 items-center justify-center rounded-sm bg-gray-700 text-[10px] font-semibold text-gray-300 d-mask d-mask-squircle shrink-0">
                     {{ acronym(getAppLabel(app)) }}
                   </span>
                   <span class="min-w-0 flex-1">
