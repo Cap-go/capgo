@@ -97,18 +97,43 @@ transactionally and is resumable after any downtime.
 
 ## Cost & latency vs Cloud SQL replicas
 
-- Cloud SQL: 1 subscriber + 9 regional replicas running 24/7, cross-cloud
-  egress, Hyperdrive round trips out of Cloudflare.
-- DOs: requests (~$0.15/M, 2 per update check), SQLite rows read
-  (D1-equivalent pricing but spread over thousands of DOs — no shared
-  throughput ceiling), storage $0.20/GB-mo across replicas that traffic
-  actually created. The router is one DO polling every 5s. Total is tens of
-  dollars per month at Capgo scale, and reads are in-colo instead of
-  crossing to another cloud.
+Sized for real traffic: **55M monthly devices, ~5M daily**, so
+~150M checks/month at 1 check/device/day (225M at 1.5, 450M at 3).
+Each check costs one RPC session to the region-local AppReplica DO.
+
+The dominant cost is **DO duration**: every DO bills 128 MB x wall-clock
+while in memory, and a request-driven DO stays in memory ~10s after its
+last request. That makes duration ~= checks x 10s x 0.125 GB x $12.50/M GB-s,
+minus the overlap savings on app-regions hot enough to stay resident
+(>~0.1 req/s, cost cap ~$4/DO-month).
+
+| checks/device/day | checks/mo | DO requests | DO duration (est.) | rows read | rows written | storage | total |
+|---|---|---|---|---|---|---|---|
+| 1.0 | 150M | ~$23 | $1,300-2,300 | $0 (in 25B free) | $70-200 | ~$10 | **~$1.4k-2.5k** |
+| 1.5 | 225M | ~$34 | $2,000-3,500 | $0 | $70-200 | ~$10 | **~$2.1k-3.7k** |
+| 3.0 | 450M | ~$68 | $4,000-7,000 | $0 | $100-300 | ~$15 | **~$4.2k-7.4k** |
+
+Rows written scale with bundle-upload volume (outbox journal + fan-out),
+not device traffic. The router itself (poll every 5s, alarms, journal) is
+<$5/month. Worker requests on /updates_v2 replace the ones /updates
+already pays for today - no delta.
+
+For comparison, the current fleet is 1 Cloud SQL subscriber + 9 regional
+replicas running 24/7 plus cross-cloud egress on every read. At list
+prices that is typically $3k-5k/month, so the DO design is roughly
+cost-neutral to cheaper at current volume while removing the external
+hop (~1ms in-colo reads) and the fleet ops.
+
+**Biggest lever if the bill needs to shrink**: cache the channel
+resolution in the plugin worker (Cache API, 30-60s TTL, keyed by
+app+platform+channel; only usable for devices without per-device
+overrides). Most checks then never reach a DO, collapsing the duration
+term - estimated 2x or more reduction. Worth adding before ramping to
+100% if the observed duration bill matters.
 
 Very hot single apps: one DO per app *per region* already splits the load
 9 ways; if a single app-region ever saturates a DO (~1k req/s), shard its
-name by a device-hash suffix — the reader and router both key by name, so
+name by a device-hash suffix - the reader and router both key by name, so
 this is a localized change.
 
 ## Decommission (after full rollout)
