@@ -83,6 +83,47 @@ WHERE COALESCE(using_expr, '') ~ $1
   )
 ORDER BY table_name, policy_name
 `
+const statementLevelSelectPolicySql = `
+SELECT
+  c.relname AS table_name,
+  p.polname AS policy_name,
+  pg_get_expr(p.polqual, p.polrelid) AS using_expr
+FROM pg_policy p
+INNER JOIN pg_class c ON c.oid = p.polrelid
+INNER JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = 'public'
+  AND c.relkind IN ('r', 'p')
+  AND p.polcmd IN ('r', '*')
+  AND (
+    has_table_privilege('anon', c.oid, 'SELECT')
+    OR has_table_privilege('authenticated', c.oid, 'SELECT')
+  )
+ORDER BY c.relname, p.polname
+`
+
+const leadingIndexColumnSql = `
+WITH index_columns AS (
+  SELECT
+    t.relname AS table_name,
+    i.relname AS index_name,
+    array_agg(a.attname ORDER BY x.ordinality) AS columns
+  FROM pg_class t
+  INNER JOIN pg_namespace n ON n.oid = t.relnamespace
+  INNER JOIN pg_index ix ON ix.indrelid = t.oid
+  INNER JOIN pg_class i ON i.oid = ix.indexrelid
+  INNER JOIN unnest(ix.indkey) WITH ORDINALITY AS x(attnum, ordinality) ON true
+  INNER JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = x.attnum
+  WHERE n.nspname = 'public'
+    AND ix.indisvalid
+    AND ix.indisready
+  GROUP BY t.relname, i.relname
+)
+SELECT DISTINCT table_name, columns[1] AS column_name
+FROM index_columns
+WHERE columns[1] IS NOT NULL
+`
+
+const statementLevelHelperFilterRegex = /(?:\b([a-zA-Z_][a-zA-Z0-9_]*)\b|\(([a-zA-Z_][a-zA-Z0-9_]*)\)::text)\s*=\s*ANY\s*\(.*?SELECT\s+([a-zA-Z_][a-zA-Z0-9_]*)\(\)/g
 
 function getAnonHeaders() {
   if (!SUPABASE_BASE_URL || !SUPABASE_ANON_KEY)
@@ -178,6 +219,37 @@ describe('public REST unfiltered RLS regression guard', () => {
       policy: row.policy_name,
       using: row.using_expr,
     }))).toEqual([])
+  })
+
+  it('keeps statement-level helper policy filters backed by leading indexes', async () => {
+    const [policyRows, indexRows] = await Promise.all([
+      executeSQL(statementLevelSelectPolicySql),
+      executeSQL(leadingIndexColumnSql),
+    ])
+    const leadingIndexColumns = new Set(indexRows.map((row: any) => `${row.table_name}.${row.column_name}`))
+    const missingIndexes: Array<{ table: string, policy: string, column: string, helper: string }> = []
+
+    for (const row of policyRows) {
+      const usingExpr = String(row.using_expr ?? '').replace(/\s+/g, ' ')
+      const matches = usingExpr.matchAll(statementLevelHelperFilterRegex)
+
+      for (const match of matches) {
+        const column = match[1] ?? match[2]
+        const helper = match[3]
+        const indexKey = `${row.table_name}.${column}`
+
+        if (!leadingIndexColumns.has(indexKey)) {
+          missingIndexes.push({
+            table: row.table_name,
+            policy: row.policy_name,
+            column,
+            helper,
+          })
+        }
+      }
+    }
+
+    expect(missingIndexes).toEqual([])
   })
 
   it.concurrent('keeps app-version helpers stable for statement-level RLS', async () => {

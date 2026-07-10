@@ -758,6 +758,9 @@ COMMENT ON FUNCTION "public"."role_bindings_readable_ids"() IS
 COMMENT ON FUNCTION "public"."channel_permission_override_readable_channel_ids"() IS
 'Returns channel IDs whose permission overrides can be managed by the current authenticated user. Channel override RLS uses this statement-level helper instead of checking app role permissions for every override row.';
 
+CREATE INDEX IF NOT EXISTS "idx_deploy_history_owner_org"
+ON "public"."deploy_history" USING "btree" ("owner_org");
+
 DROP POLICY IF EXISTS "Allow select for auth, api keys (read+)"
 ON "public"."orgs";
 
