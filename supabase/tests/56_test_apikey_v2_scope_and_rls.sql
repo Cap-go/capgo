@@ -597,12 +597,17 @@ SELECT ok(
 
 SELECT ok(
   (
-    SELECT position('request.method' in policy_expr) > 0
-      AND position('PATCH' in policy_expr) > 0
-      AND position('app_versions_has_app_permission' in policy_expr) > 0
-      AND position('app_versions_readable_app_ids' in policy_expr) > 0
+    SELECT position('CASE WHEN' in normalized_expr) > 0
+      AND position('request.method' in normalized_expr) > 0
+      AND position('PATCH' in normalized_expr) > 0
+      AND position('THEN' in normalized_expr) > 0
+      AND position('ELSE' in normalized_expr) > position('THEN' in normalized_expr)
+      AND position('app_versions_has_app_permission' in normalized_expr) > position('THEN' in normalized_expr)
+      AND position('app_versions_has_app_permission' in normalized_expr) < position('ELSE' in normalized_expr)
+      AND position('app_versions_readable_app_ids' in substring(normalized_expr from position('ELSE' in normalized_expr))) > 0
+      AND position('app_versions_has_app_permission' in substring(normalized_expr from position('ELSE' in normalized_expr))) = 0
     FROM (
-      SELECT pg_get_expr(polqual, polrelid) AS policy_expr
+      SELECT regexp_replace(pg_get_expr(polqual, polrelid), '\s+', ' ', 'g') AS normalized_expr
       FROM pg_policy
       WHERE polrelid = 'public.app_versions'::regclass
         AND polname = 'Allow for auth, api keys (read+)'

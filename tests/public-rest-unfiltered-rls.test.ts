@@ -48,29 +48,40 @@ const coreUnfilteredRestTables = [
 ]
 
 const riskySelectPolicySql = `
-SELECT
-  c.relname AS table_name,
-  p.polname AS policy_name,
-  pg_get_expr(p.polqual, p.polrelid) AS using_expr
-FROM pg_policy p
-INNER JOIN pg_class c ON c.oid = p.polrelid
-INNER JOIN pg_namespace n ON n.oid = c.relnamespace
-WHERE n.nspname = 'public'
-  AND c.relkind IN ('r', 'p')
-  AND p.polcmd IN ('r', '*')
-  AND (
-    has_table_privilege('anon', c.oid, 'SELECT')
-    OR has_table_privilege('authenticated', c.oid, 'SELECT')
-  )
-  AND COALESCE(pg_get_expr(p.polqual, p.polrelid), '') ~ $1
+WITH exposed_select_policies AS (
+  SELECT
+    c.relname AS table_name,
+    p.polname AS policy_name,
+    pg_get_expr(p.polqual, p.polrelid) AS using_expr,
+    regexp_replace(COALESCE(pg_get_expr(p.polqual, p.polrelid), ''), '\\s+', ' ', 'g') AS normalized_expr
+  FROM pg_policy p
+  INNER JOIN pg_class c ON c.oid = p.polrelid
+  INNER JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = 'public'
+    AND c.relkind IN ('r', 'p')
+    AND p.polcmd IN ('r', '*')
+    AND (
+      has_table_privilege('anon', c.oid, 'SELECT')
+      OR has_table_privilege('authenticated', c.oid, 'SELECT')
+    )
+)
+SELECT table_name, policy_name, using_expr
+FROM exposed_select_policies
+WHERE COALESCE(using_expr, '') ~ $1
   AND NOT (
-    c.relname = 'app_versions'
-    AND p.polname = 'Allow for auth, api keys (read+)'
-    AND COALESCE(pg_get_expr(p.polqual, p.polrelid), '') ~ '\\mapp_versions_has_app_permission\\M'
-    AND COALESCE(pg_get_expr(p.polqual, p.polrelid), '') ~ '\\mapp_versions_readable_app_ids\\M'
-    AND COALESCE(pg_get_expr(p.polqual, p.polrelid), '') LIKE '%request.method%'
+    table_name = 'app_versions'
+    AND policy_name = 'Allow for auth, api keys (read+)'
+    AND position('CASE WHEN' in normalized_expr) > 0
+    AND position('request.method' in normalized_expr) > 0
+    AND position('PATCH' in normalized_expr) > 0
+    AND position('THEN' in normalized_expr) > 0
+    AND position('ELSE' in normalized_expr) > position('THEN' in normalized_expr)
+    AND position('app_versions_has_app_permission' in normalized_expr) > position('THEN' in normalized_expr)
+    AND position('app_versions_has_app_permission' in normalized_expr) < position('ELSE' in normalized_expr)
+    AND position('app_versions_readable_app_ids' in substring(normalized_expr from position('ELSE' in normalized_expr))) > 0
+    AND position('app_versions_has_app_permission' in substring(normalized_expr from position('ELSE' in normalized_expr))) = 0
   )
-ORDER BY c.relname, p.polname
+ORDER BY table_name, policy_name
 `
 
 function getAnonHeaders() {
@@ -104,6 +115,13 @@ async function getAuthenticatedHeaders() {
   }
 }
 
+async function getAuthenticatedWithInvalidApiKeyHeaders() {
+  return {
+    ...await getAuthenticatedHeaders(),
+    capgkey: randomUUID(),
+  }
+}
+
 async function fetchRestProbe(probe: RestProbeRow, headers: Record<string, string>) {
   const params = new URLSearchParams({
     select: probe.probe_column,
@@ -113,11 +131,14 @@ async function fetchRestProbe(probe: RestProbeRow, headers: Record<string, strin
   const timeout = setTimeout(() => controller.abort(), 5000)
 
   try {
-    return await fetchWithRetry(
+    const response = await fetchWithRetry(
       `${SUPABASE_BASE_URL}/rest/v1/${encodeURIComponent(probe.table_name)}?${params.toString()}`,
       { headers, signal: controller.signal },
       1,
     )
+    const body = await response.text()
+
+    return { response, body }
   }
   finally {
     clearTimeout(timeout)
@@ -165,6 +186,7 @@ describe('public REST unfiltered RLS regression guard', () => {
       { name: 'anonymous', headers: getAnonHeaders() },
       { name: 'invalid API key', headers: getInvalidApiKeyHeaders() },
       { name: 'authenticated', headers: await getAuthenticatedHeaders() },
+      { name: 'authenticated with invalid API key', headers: await getAuthenticatedWithInvalidApiKeyHeaders() },
       { name: 'valid API key', headers: getValidApiKeyHeaders() },
     ]
     const failures: string[] = []
@@ -173,8 +195,7 @@ describe('public REST unfiltered RLS regression guard', () => {
       const batch = probes.slice(index, index + 8)
       const results = await Promise.all(batch.flatMap(probe => scenarios.map(async (scenario) => {
         try {
-          const response = await fetchRestProbe(probe, scenario.headers)
-          const body = await response.text()
+          const { response, body } = await fetchRestProbe(probe, scenario.headers)
 
           if (response.status >= 500)
             return `${probe.table_name} ${scenario.name}: ${response.status} ${body}`

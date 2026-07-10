@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { APIKEY_TEST_ALL, APP_NAME, executeSQL, fetchWithRetry, getAuthHeaders, SUPABASE_ANON_KEY, SUPABASE_BASE_URL, USER_ID } from './test-utils.ts'
+import { APIKEY_TEST_ALL, executeSQL, fetchWithRetry, getAuthHeaders, SUPABASE_ANON_KEY, SUPABASE_BASE_URL, USER_ID } from './test-utils.ts'
 
 function getAnonHeaders() {
   if (!SUPABASE_BASE_URL || !SUPABASE_ANON_KEY)
@@ -53,6 +53,30 @@ describe('orgs RLS DoS regression', () => {
     expect(response.status, body).toBe(200)
     expect(rows.length).toBeGreaterThan(0)
     expect(rows.every(row => typeof row.id === 'string')).toBe(true)
+  })
+
+  it.concurrent('falls back to the JWT identity for app reads when an invalid API key header is present', async () => {
+    const authHeaders = await getAuthHeaders()
+    const headers = {
+      ...authHeaders,
+      apikey: SUPABASE_ANON_KEY,
+      capgkey: randomUUID(),
+    }
+    const probes = [
+      { path: 'apps?select=app_id&limit=1', column: 'app_id' },
+      { path: 'channels?select=id&limit=1', column: 'id' },
+      { path: 'app_versions?select=id&limit=1', column: 'id' },
+    ]
+
+    for (const probe of probes) {
+      const response = await fetchRest(probe.path, headers)
+      const body = await response.text()
+      const rows = JSON.parse(body) as Array<Record<string, unknown>>
+
+      expect(response.status, body).toBe(200)
+      expect(rows.length).toBeGreaterThan(0)
+      expect(rows.every(row => row[probe.column] != null)).toBe(true)
+    }
   })
 
   it.concurrent('keeps unrelated anonymous reads available during parallel org probes', async () => {
@@ -128,14 +152,15 @@ describe('orgs RLS DoS regression', () => {
         FROM inserted_key, target_app, app_role
         RETURNING id
       )
-      SELECT inserted_key.id, inserted_key.rbac_id
+      SELECT inserted_key.id, inserted_key.rbac_id, (SELECT count(*)::int FROM inserted_binding) AS binding_count
       FROM inserted_key
-    `, [USER_ID, appScopedKey, `App-only orgs visibility ${randomUUID()}`, APP_NAME])
+    `, [USER_ID, appScopedKey, `App-only orgs visibility ${randomUUID()}`, 'com.demo.app'])
 
     try {
       expect(apiKey?.id).toBeDefined()
       expect(apiKey?.rbac_id).toBeDefined()
 
+      expect(apiKey?.binding_count).toBe(1)
       const response = await fetchRest('orgs?select=id&limit=1', getApiKeyHeaders(appScopedKey))
       const body = await response.text()
 
