@@ -24,6 +24,11 @@ const auditLogSchema = type({
   old_record: 'unknown',
   new_record: 'unknown',
   changed_fields: 'string[] | null',
+  actor_type: '"user" | "apikey" | "system" | "unknown"',
+  actor_user_id: 'string | null',
+  actor_user_email: 'string | null',
+  actor_apikey_id: 'number | null',
+  actor_apikey_name: 'string | null',
 })
 
 const auditLogsSchema = auditLogSchema.array()

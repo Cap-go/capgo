@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(47);
+SELECT plan(49);
 
 -- Test helper function to create test users in both auth.users and public.users tables
 CREATE OR REPLACE FUNCTION create_test_user_for_deletion(
@@ -545,6 +545,10 @@ VALUES
     '{"email": "last_admin@test.com", "apikeys": []}'::JSONB
 );
 
+-- Ignore setup events so this test only observes deletion-time queue work.
+DELETE FROM pgmq.q_webhook_dispatcher
+WHERE message->'payload'->>'org_id' = '88888888-8888-8888-8888-888888888888';
+
 -- Verify resources exist before deletion
 SELECT
     ok(
@@ -614,6 +618,17 @@ SELECT
         'Last super_admin user deleted successfully'
     );
 
+
+-- Child audit logs are retained, but no webhook work can outlive this org.
+SELECT
+    ok(
+        NOT EXISTS (
+            SELECT 1
+            FROM pgmq.q_webhook_dispatcher
+            WHERE message->'payload'->>'org_id' = '88888888-8888-8888-8888-888888888888'
+        ),
+        'Last super_admin deletion does not queue orphaned child webhooks'
+    );
 -- Verify user is deleted
 SELECT
     ok(
@@ -976,30 +991,28 @@ SELECT
         'Deploy history ownership transferred to remaining super_admin'
     );
 
--- Clean up
+-- Clean up. A direct org delete cascades resources and must not enqueue
+-- webhooks that disappear with the organization.
 DELETE FROM public.deploy_history
 WHERE
     id = 2001;
 
-DELETE FROM public.channels
-WHERE
-    id = 2001;
-
-DELETE FROM public.app_versions
-WHERE
-    id = 2001;
-
-DELETE FROM public.apps
-WHERE
-    app_id = 'com.shared.app';
-
-DELETE FROM public.org_users
-WHERE
-    org_id = '99999999-9999-9999-9999-999999999999'::UUID;
+DELETE FROM pgmq.q_webhook_dispatcher
+WHERE message->'payload'->>'org_id' = '99999999-9999-9999-9999-999999999999';
 
 DELETE FROM public.orgs
 WHERE
     id = '99999999-9999-9999-9999-999999999999'::UUID;
+
+SELECT
+    ok(
+        NOT EXISTS (
+            SELECT 1
+            FROM pgmq.q_webhook_dispatcher
+            WHERE message->'payload'->>'org_id' = '99999999-9999-9999-9999-999999999999'
+        ),
+        'Direct org deletion does not queue orphaned child webhooks'
+    );
 
 DELETE FROM public.users
 WHERE
@@ -1062,7 +1075,16 @@ VALUES
 -- (Normally these would be created by triggers, but we insert directly for testing)
 INSERT INTO
 public.audit_logs (
-    table_name, record_id, operation, user_id, org_id, old_record, new_record
+    table_name,
+    record_id,
+    operation,
+    user_id,
+    org_id,
+    old_record,
+    new_record,
+    actor_type,
+    actor_user_id,
+    actor_user_email
 )
 VALUES
 (
@@ -1072,7 +1094,10 @@ VALUES
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
     NULL,
-    '{"app_id": "com.audit.test"}'::JSONB
+    '{"app_id": "com.audit.test"}'::JSONB,
+    'user',
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
+    'audit_admin1@test.com'
 ),
 (
     'channels',
@@ -1081,7 +1106,10 @@ VALUES
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
     '{"name": "old_channel"}'::JSONB,
-    '{"name": "new_channel"}'::JSONB
+    '{"name": "new_channel"}'::JSONB,
+    'user',
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
+    'audit_admin1@test.com'
 );
 
 -- Count audit logs before deletion (includes trigger-created entries from org/org_users inserts)
@@ -1156,8 +1184,7 @@ SELECT
         'Audit log entries still exist after user deletion'
     );
 
--- Verify audit logs that were owned by admin1 are now owned by admin2
--- The key test is that entries originally created by admin1 are transferred
+-- Verify audit logs keep the deleted user's legacy id snapshot instead of rewriting ownership
 SELECT
     ok(
         (
@@ -1165,26 +1192,30 @@ SELECT
             FROM
                 public.audit_logs
             WHERE
-                user_id = 'cccccccc-cccc-cccc-cccc-cccccccccccc'::UUID
+                user_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID
                 AND org_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID
                 AND table_name IN ('apps', 'channels')
                 AND record_id IN ('com.audit.test', '3001')
         ) = 2,
-        'Audit log entries ownership transferred to remaining super_admin'
+        'Audit log entries keep deleted user id snapshot'
     );
 
--- Verify no audit logs owned by admin1 remain (they should have been transferred)
+-- Verify actor attribution keeps the deleted user's email snapshot
 SELECT
     ok(
-        NOT EXISTS (
-            SELECT 1
+        (
+            SELECT count(*)
             FROM
                 public.audit_logs
             WHERE
                 org_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID
-                AND user_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID
-        ),
-        'No audit log entries remain owned by deleted user'
+                AND actor_type = 'user'
+                AND actor_user_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID
+                AND actor_user_email = 'audit_admin1@test.com'
+                AND table_name IN ('apps', 'channels')
+                AND record_id IN ('com.audit.test', '3001')
+        ) = 2,
+        'Audit log entries keep deleted user email snapshot'
     );
 
 -- Clean up audit log test

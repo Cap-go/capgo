@@ -53,7 +53,8 @@ jobs:
         if: github.event_name != 'workflow_call'
         uses: actions/checkout@v6 # v6
         with:
-          fetch-depth: 2
+          # Keep a stable merge base for paths-filter on long-lived branches.
+          fetch-depth: 0
 
       - name: Detect changed paths
         if: github.event_name != 'workflow_call'

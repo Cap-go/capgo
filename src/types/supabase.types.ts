@@ -319,6 +319,7 @@ export type Database = {
           build_timeout_updated_at: string
           channel_device_count: number
           created_at: string | null
+          created_from_onboarding: boolean
           default_upload_channel: string
           existing_app: boolean
           expose_metadata: boolean
@@ -329,6 +330,7 @@ export type Database = {
           manifest_bundle_count: number
           name: string | null
           need_onboarding: boolean
+          onboarding_completed_at: string | null
           owner_org: string
           retention: number
           rollout_channel_count: number
@@ -349,6 +351,7 @@ export type Database = {
           build_timeout_updated_at?: string
           channel_device_count?: number
           created_at?: string | null
+          created_from_onboarding?: boolean
           default_upload_channel?: string
           existing_app?: boolean
           expose_metadata?: boolean
@@ -359,6 +362,7 @@ export type Database = {
           manifest_bundle_count?: number
           name?: string | null
           need_onboarding?: boolean
+          onboarding_completed_at?: string | null
           owner_org: string
           retention?: number
           rollout_channel_count?: number
@@ -379,6 +383,7 @@ export type Database = {
           build_timeout_updated_at?: string
           channel_device_count?: number
           created_at?: string | null
+          created_from_onboarding?: boolean
           default_upload_channel?: string
           existing_app?: boolean
           expose_metadata?: boolean
@@ -389,6 +394,7 @@ export type Database = {
           manifest_bundle_count?: number
           name?: string | null
           need_onboarding?: boolean
+          onboarding_completed_at?: string | null
           owner_org?: string
           retention?: number
           rollout_channel_count?: number
@@ -418,6 +424,11 @@ export type Database = {
       }
       audit_logs: {
         Row: {
+          actor_apikey_id: number | null
+          actor_apikey_name: string | null
+          actor_type: string
+          actor_user_email: string | null
+          actor_user_id: string | null
           changed_fields: string[] | null
           created_at: string
           id: number
@@ -430,6 +441,11 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          actor_apikey_id?: number | null
+          actor_apikey_name?: string | null
+          actor_type?: string
+          actor_user_email?: string | null
+          actor_user_id?: string | null
           changed_fields?: string[] | null
           created_at?: string
           id?: number
@@ -442,6 +458,11 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          actor_apikey_id?: number | null
+          actor_apikey_name?: string | null
+          actor_type?: string
+          actor_user_email?: string | null
+          actor_user_id?: string | null
           changed_fields?: string[] | null
           created_at?: string
           id?: number
@@ -453,22 +474,7 @@ export type Database = {
           table_name?: string
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "audit_logs_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "audit_logs_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       backfill_progress: {
         Row: {
@@ -1463,6 +1469,7 @@ export type Database = {
       devices: {
         Row: {
           app_id: string
+          country_code: string | null
           custom_id: string
           default_channel: string | null
           device_id: string
@@ -1481,6 +1488,7 @@ export type Database = {
         }
         Insert: {
           app_id: string
+          country_code?: string | null
           custom_id?: string
           default_channel?: string | null
           device_id: string
@@ -1499,6 +1507,7 @@ export type Database = {
         }
         Update: {
           app_id?: string
+          country_code?: string | null
           custom_id?: string
           default_channel?: string | null
           device_id?: string
@@ -1522,6 +1531,9 @@ export type Database = {
           active_canceled_orgs: number
           active_past_due_orgs: number
           apps: number
+          apps_created: number
+          apps_with_cli_onboarding_builds_24h: number
+          apps_with_manual_builds_24h: number
           apps_active: number | null
           average_ltv: number
           build_avg_seconds_day_android: number
@@ -1614,6 +1626,9 @@ export type Database = {
           active_canceled_orgs?: number
           active_past_due_orgs?: number
           apps: number
+          apps_created?: number
+          apps_with_cli_onboarding_builds_24h?: number
+          apps_with_manual_builds_24h?: number
           apps_active?: number | null
           average_ltv?: number
           build_avg_seconds_day_android?: number
@@ -1706,6 +1721,9 @@ export type Database = {
           active_canceled_orgs?: number
           active_past_due_orgs?: number
           apps?: number
+          apps_created?: number
+          apps_with_cli_onboarding_builds_24h?: number
+          apps_with_manual_builds_24h?: number
           apps_active?: number | null
           average_ltv?: number
           build_avg_seconds_day_android?: number
@@ -2300,6 +2318,21 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      org_id_tombstones: {
+        Row: {
+          deleted_at: string
+          org_id: string
+        }
+        Insert: {
+          deleted_at?: string
+          org_id: string
+        }
+        Update: {
+          deleted_at?: string
+          org_id?: string
+        }
+        Relationships: []
       }
       orgs: {
         Row: {
@@ -3870,6 +3903,7 @@ export type Database = {
           build_timeout_updated_at: string
           channel_device_count: number
           created_at: string | null
+          created_from_onboarding: boolean
           default_upload_channel: string
           existing_app: boolean
           expose_metadata: boolean
@@ -3880,6 +3914,7 @@ export type Database = {
           manifest_bundle_count: number
           name: string | null
           need_onboarding: boolean
+          onboarding_completed_at: string | null
           owner_org: string
           retention: number
           rollout_channel_count: number
