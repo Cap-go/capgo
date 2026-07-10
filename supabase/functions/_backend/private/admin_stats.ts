@@ -6,7 +6,8 @@ import { literalUnion, safeParseSchema } from '../utils/ark_validation.ts'
 import { getAdminAppsTrend, getAdminBandwidthTrend, getAdminBundlesTrend, getAdminDistributionMetrics, getAdminFailureMetrics, getAdminMauTrend, getAdminOrgMetrics, getAdminPlatformOverview, getAdminStorageTrend, getAdminSuccessRate, getAdminSuccessRateTrend, getAdminUploadMetrics } from '../utils/cloudflare.ts'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { getAdminCancelledOrganizations, getAdminCustomerCountryBreakdown, getAdminDeploymentsTrend, getAdminEmailTypeBreakdown, getAdminGlobalStatsTrend, getAdminOnboardingFunnel, getAdminPluginBreakdown, getAdminTrialOrganizations } from '../utils/pg.ts'
+import { getAdminCancelledOrganizations, getAdminCustomerCountryBreakdown, getAdminDeploymentsTrend, getAdminEmailTypeBreakdown, getAdminGlobalStatsTrend, getAdminOnboardingFunnel, getAdminOrganizationInsights, getAdminPluginBreakdown, getAdminTrialOrganizations, getAdminTrialPlanBreakdown } from '../utils/pg.ts'
+import { getAdminBuilderAnalytics } from '../utils/builder_analytics.ts'
 import { getCancellationDetails } from '../utils/stripe.ts'
 import { supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
@@ -32,10 +33,13 @@ const metricCategories = [
   'global_stats_trend',
   'plugin_breakdown',
   'trial_organizations',
+  'trial_plan_breakdown',
   'onboarding_funnel',
   'cancelled_users',
   'email_type_breakdown',
   'customer_country_breakdown',
+  'organization_insights',
+  'builder_analytics',
 ] as const
 
 const isoUtcDatetimeSchema = type('string').narrow((value, ctx) => {
@@ -77,6 +81,10 @@ export const adminStatsBodySchema = type({
   'end_date': isoUtcDatetimeSchema,
   'app_id?': 'string > 0',
   'org_id?': 'string > 0',
+  'plan_name?': 'string <= 128',
+  'billing_type?': literalUnion(['monthly', 'yearly']),
+  'paid_only?': 'boolean',
+  'search?': 'string <= 128',
   'limit?': limitSchema,
   'offset?': offsetSchema,
 })
@@ -87,6 +95,10 @@ interface AdminStatsBody {
   end_date: string
   app_id?: string
   org_id?: string
+  plan_name?: string
+  billing_type?: 'monthly' | 'yearly'
+  paid_only?: boolean
+  search?: string
   limit?: number
   offset?: number
 }
@@ -110,10 +122,25 @@ const cancellationReasonLabels: Record<string, string> = {
   payment_failed: 'Payment failed',
 }
 
+const churnReasonLabels: Record<string, string> = {
+  past_due_unresolved: 'Failed to resolve past due',
+}
+
+function formatStoredChurnReason(churnReason: string | null): string | null {
+  if (!churnReason)
+    return null
+
+  return churnReasonLabels[churnReason] ?? churnReason
+}
+
 /**
- * Formats Stripe cancellation details into a short, human-readable label.
+ * Formats stored churn reasons or Stripe cancellation details into a short label.
  */
-function formatCancellationReason(details: CancellationDetails | null): string | null {
+function formatCancellationReason(details: CancellationDetails | null, churnReason: string | null): string | null {
+  const storedReason = formatStoredChurnReason(churnReason)
+  if (storedReason)
+    return storedReason
+
   if (!details)
     return null
 
@@ -158,7 +185,7 @@ app.post('/', middlewareAuth, async (c) => {
     throw simpleError('not_admin', 'Not admin - only admin users can access platform statistics')
   }
 
-  const { metric_category, start_date, end_date, app_id, org_id, limit, offset } = parsedBodyResult.data
+  const { metric_category, start_date, end_date, app_id, org_id, plan_name, billing_type, paid_only, search, limit, offset } = parsedBodyResult.data
 
   cloudlog({
     requestId: c.get('requestId'),
@@ -238,6 +265,10 @@ app.post('/', middlewareAuth, async (c) => {
         result = await getAdminTrialOrganizations(c, limit || 20, offset || 0)
         break
 
+      case 'trial_plan_breakdown':
+        result = await getAdminTrialPlanBreakdown(c, start_date, end_date)
+        break
+
       case 'cancelled_users': {
         const canceledOrgs = await getAdminCancelledOrganizations(c, start_date, end_date, limit || 20, offset || 0)
         const detailsCache = new Map<string, CancellationDetails | null>()
@@ -261,7 +292,7 @@ app.post('/', middlewareAuth, async (c) => {
               plan_name: org.plan_name,
               billing_type: org.billing_type,
               subscription_or_signup_date: org.subscription_or_signup_date,
-              cancellation_reason: formatCancellationReason(details),
+              cancellation_reason: formatCancellationReason(details, org.churn_reason),
             }
           }),
         )
@@ -284,6 +315,21 @@ app.post('/', middlewareAuth, async (c) => {
         result = await getAdminCustomerCountryBreakdown(c, start_date, end_date)
         break
 
+      case 'organization_insights':
+        result = await getAdminOrganizationInsights(c, start_date, end_date, {
+          limit: limit || 50,
+          offset: offset || 0,
+          plan_name,
+          billing_type,
+          paid_only,
+          search,
+        })
+        break
+
+      case 'builder_analytics':
+        result = await getAdminBuilderAnalytics(c, start_date, end_date)
+        break
+
       default:
         throw simpleError('invalid_metric_category', 'Invalid metric category', { metric_category })
     }
@@ -299,7 +345,8 @@ app.post('/', middlewareAuth, async (c) => {
     })
   }
   catch (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'admin_stats_error', error })
-    throw simpleError('admin_stats_error', 'Error fetching admin statistics', { error })
+    const message = error instanceof Error ? error.message : String(error)
+    cloudlog({ requestId: c.get('requestId'), message: 'admin_stats_error', error: message })
+    throw simpleError('admin_stats_error', 'Error fetching admin statistics', { error: message })
   }
 })

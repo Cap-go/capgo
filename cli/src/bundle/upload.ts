@@ -9,21 +9,27 @@ import { existsSync, readFileSync } from 'node:fs'
 import { cwd } from 'node:process'
 import { S3Client } from '@bradenmacdonald/s3-lite-client'
 import { intro, log, outro, confirm as pConfirm, isCancel as pIsCancel, select as pSelect, spinner as spinnerC } from '@clack/prompts'
-import { Table } from '@sauber/table'
 import { greaterOrEqual, parse } from '@std/semver'
 // Native fetch is available in Node.js >= 18
 import pack from '../../package.json'
+import { trackEvent } from '../analytics/track'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
 import { calcKeyId, encryptChecksum, encryptChecksumV3, encryptSource, generateSessionKey } from '../api/crypto'
 import { checkAlerts } from '../api/update'
+import { loadSavedCredentials } from '../build/credentials'
 import { getChecksum } from '../checksum'
 import { getRepoStarStatus, isRepoStarredInSession, starRepository } from '../github'
 import { confirmWithRememberedChoice } from '../promptPreferences'
 import { showReplicationProgress } from '../replicationProgress'
-import { baseKeyV2, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, canPromptInteractively, checkChecksum, checkCompatibilityCloud, checkPlanValidUpload, checkRemoteCliMessages, createSupabaseClient, deletedFailedVersion, findRoot, findSavedKey, formatError, getAppId, getBundleVersion, getCompatibilityDetails, getConfig, getInstalledVersion, getLocalConfig, getLocalDependencies, getOrganizationId, getPMAndCommand, getRemoteFileConfig, hasCliPermission, hasOrganizationPerm, isCompatible, isDeprecatedPluginVersion, OrganizationPerm, regexSemver, resolveUserIdFromApiKey, sendEvent, updateConfigUpdater, updateOrCreateChannel, updateOrCreateVersion, UPLOAD_TIMEOUT, uploadTUS, uploadUrl, zipFile } from '../utils'
+import { formatTable } from '../terminal-table'
+import { usesAlwaysDirectUpdate } from '../updaterConfig'
+import { baseKeyV2, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, canPromptInteractively, checkCompatibilityCloud, checkPlanValidUpload, checkRemoteCliMessages, createSupabaseClient, deletedFailedVersion, findRoot, findSavedKey, formatError, getAppId, getBundleVersion, getCompatibilityDetails, getConfig, getInstalledVersion, getLocalConfig, getLocalDependencies, getOrganizationId, getPMAndCommand, getRemoteChecksums, getRemoteFileConfig, hasCliPermission, hasOrganizationPerm, isCompatible, isDeprecatedPluginVersion, OrganizationPerm, regexSemver, resolveUserIdFromApiKey, sendEvent, updateConfigUpdater, updateOrCreateChannel, updateOrCreateVersion, UPLOAD_TIMEOUT, uploadTUS, uploadUrl, zipFile } from '../utils'
 import { getVersionSuggestions, interactiveVersionBump } from '../versionHelpers'
+import { maybePromptBuilderCta, shouldBlockIncompatibleUpload } from './builder-cta'
 import { checkIndexPosition, searchInDirectory } from './check'
+import { summarizeUploadCompatibility } from './compatibility'
 import { prepareBundlePartialFiles, uploadPartial } from './partial'
+import { formatUploadChannels, getChannelsToAssignByChecksum, parseUploadChannels } from './upload-channels'
 
 type SupabaseType = Awaited<ReturnType<typeof createSupabaseClient>>
 type pmType = ReturnType<typeof getPMAndCommand>
@@ -31,10 +37,20 @@ type localConfigType = Awaited<ReturnType<typeof getLocalConfig>>
 
 export type { UploadBundleResult }
 
+const UPLOAD_CANCELLED_BY_USER = 'Upload cancelled by user'
+
 function uploadFail(message: string): never {
   log.error(message)
   throw new Error(message)
 }
+
+/**
+ * Thrown when `--fail-on-incompatible` aborts an upload because the bundle is
+ * incompatible with the channel's current native packages. A dedicated type lets
+ * `uploadBundle` skip the generic "retry the upload?" prompt — retrying an
+ * incompatible bundle is pointless.
+ */
+class IncompatibleBundleError extends Error {}
 
 async function persistVersionData(
   supabase: SupabaseType,
@@ -50,25 +66,21 @@ async function persistVersionData(
  * Display a compatibility table for the given packages
  */
 function displayCompatibilityTable(packages: Compatibility[]) {
-  const table = new Table()
-  table.headers = ['Package', 'Local', 'Remote', 'Status', 'Details']
-  table.theme = Table.roundTheme
-  table.rows = []
-
-  for (const entry of packages) {
-    const { name, localVersion, remoteVersion } = entry
+  const rows = packages.map((entry) => {
     const details = getCompatibilityDetails(entry)
-    const statusSymbol = details.compatible ? '✅' : '❌'
-    table.rows.push([
-      name,
-      localVersion || '-',
-      remoteVersion || '-',
-      statusSymbol,
+    return [
+      entry.name,
+      entry.localVersion || '-',
+      entry.remoteVersion || '-',
+      details.compatible ? '✅' : '❌',
       details.message,
-    ])
-  }
+    ]
+  })
 
-  log.info(table.toString())
+  log.info(formatTable({
+    headers: ['Package', 'Local', 'Remote', 'Status', 'Details'],
+    rows,
+  }))
 }
 
 async function getBundle(config: CapacitorConfig, options: OptionsUpload) {
@@ -129,7 +141,7 @@ function checkNotifyAppReady(options: OptionsUpload, path: string) {
   }
 }
 
-async function verifyCompatibility(supabase: SupabaseType, pm: pmType, options: OptionsUpload, channel: string, appid: string, bundle: string) {
+async function verifyCompatibility(supabase: SupabaseType, pm: pmType, options: OptionsUpload, channel: string, appid: string, bundle: string, orgId: string) {
   // Check compatibility here
   const ignoreMetadataCheck = options.ignoreMetadataCheck
   const autoMinUpdateVersion = options.autoMinUpdateVersion
@@ -137,7 +149,7 @@ async function verifyCompatibility(supabase: SupabaseType, pm: pmType, options: 
 
   const { data: channelData, error: channelError } = await supabase
     .from('channels')
-    .select('disable_auto_update, version ( min_update_version, native_packages )')
+    .select('disable_auto_update, version ( id, name, min_update_version, native_packages )')
     .eq('name', channel)
     .eq('app_id', appid)
     .maybeSingle()
@@ -145,10 +157,15 @@ async function verifyCompatibility(supabase: SupabaseType, pm: pmType, options: 
   if (channelError)
     uploadFail(`Cannot load channel ${channel} for compatibility checks ${formatError(channelError)}`)
 
+  // The version currently live on the channel — what the new bundle is compared
+  // against. Captured here (before the channel is repointed at the new bundle)
+  // so the incompatible-bundle Bento signal can report the prior version.
+  const oldVersion = (channelData?.version ?? undefined) as unknown as { id?: number | string, name?: string } | undefined
+
   const updateMetadataRequired = !!channelData && channelData.disable_auto_update === 'version_number'
 
   let localDependencies: Awaited<ReturnType<typeof getLocalDependencies>> | undefined
-  let finalCompatibility: Awaited<ReturnType<typeof checkCompatibilityCloud>>['finalCompatibility']
+  let finalCompatibility: Awaited<ReturnType<typeof checkCompatibilityCloud>>['finalCompatibility'] | undefined
 
   // We only check compatibility IF the channel exists
   if (!channelError && channelData && channelData.version && (channelData.version as any).native_packages && !ignoreMetadataCheck) {
@@ -203,6 +220,29 @@ async function verifyCompatibility(supabase: SupabaseType, pm: pmType, options: 
     }
   }
 
+  const compatibilitySkipReason = finalCompatibility
+    ? undefined
+    : (ignoreMetadataCheck ? 'ignore_metadata_check' : 'no_remote_metadata')
+  const compatibilitySummary = summarizeUploadCompatibility(finalCompatibility)
+  void trackEvent({
+    channel: 'bundle',
+    event: 'Bundle Upload Compatibility Checked',
+    icon: '🧪',
+    apikey: options.apikey,
+    appId: appid,
+    orgId,
+    tags: {
+      result: compatibilitySummary.result,
+      incompatible_count: compatibilitySummary.incompatibleCount,
+      // `channel` is overwritten by the event category ('bundle') in PostHog, so
+      // also send channel_name to keep the app channel queryable.
+      channel,
+      channel_name: channel,
+      ...(compatibilitySummary.reasons.length > 0 ? { reasons: compatibilitySummary.reasons.join(',') } : {}),
+      ...(compatibilitySkipReason ? { skip_reason: compatibilitySkipReason } : {}),
+    },
+  })
+
   if (updateMetadataRequired && !minUpdateVersion && !ignoreMetadataCheck) {
     uploadFail('You need to provide a min-update-version to upload a bundle to this channel')
   }
@@ -218,17 +258,26 @@ async function verifyCompatibility(supabase: SupabaseType, pm: pmType, options: 
         .map(a => [a.name, a]))
     : new Map()
 
-  // Include platform checksums in native_packages for precise change detection
   const nativePackages = (hashedLocalDependencies.size > 0 || !options.ignoreMetadataCheck)
     ? Array.from(hashedLocalDependencies, ([name, value]) => ({
         name,
         version: value.version,
+        requested_version: value.requested_version,
         ...(value.ios_checksum && { ios_checksum: value.ios_checksum }),
         ...(value.android_checksum && { android_checksum: value.android_checksum }),
       }))
     : undefined
 
-  return { nativePackages, minUpdateVersion }
+  return {
+    nativePackages,
+    minUpdateVersion,
+    incompatibleCount: compatibilitySummary.incompatibleCount,
+    compatibility: {
+      result: compatibilitySummary.result,
+      versionOldId: oldVersion?.id != null ? String(oldVersion.id) : undefined,
+      versionOldName: oldVersion?.name,
+    },
+  }
 }
 
 async function checkVersionExists(supabase: SupabaseType, appid: string, bundle: string, versionExistsOk = false, interactive = false): Promise<boolean | string> {
@@ -269,7 +318,7 @@ async function checkVersionExists(supabase: SupabaseType, appid: string, bundle:
         ],
       })
 
-      if (pIsCancel(choice) || choice === 'cancel') {
+      if (pIsCancel(choice) || typeof choice !== 'string' || choice === 'cancel') {
         uploadFail('Upload cancelled by user')
       }
 
@@ -294,6 +343,56 @@ async function checkVersionExists(supabase: SupabaseType, appid: string, bundle:
   }
 
   return false
+}
+
+function pickHighestMinUpdateVersion(results: Array<{ minUpdateVersion?: string }>): string | undefined {
+  let selected: string | undefined
+
+  for (const { minUpdateVersion } of results) {
+    if (!minUpdateVersion)
+      continue
+    if (!selected || greaterOrEqual(parse(minUpdateVersion), parse(selected)))
+      selected = minUpdateVersion
+  }
+
+  return selected
+}
+
+async function getChannelsToAssignAfterChecksumCheck(supabase: SupabaseType, appid: string, channels: string[], currentChecksum: string): Promise<string[]> {
+  const remoteChecksums = new Map<string, string | null>()
+
+  for (const targetChannel of channels) {
+    const s = spinnerC()
+    s.start(`Checking bundle checksum compatibility with channel ${targetChannel}`)
+    const remoteChecksum = await getRemoteChecksums(supabase, appid, targetChannel)
+    remoteChecksums.set(targetChannel, remoteChecksum)
+
+    if (!remoteChecksum) {
+      s.stop(`No checksum found for channel ${targetChannel}, the bundle will be uploaded`)
+      continue
+    }
+
+    if (remoteChecksum === currentChecksum) {
+      s.stop(`Channel ${targetChannel} already has this bundle checksum`)
+      continue
+    }
+
+    s.stop(`Checksum compatible with ${targetChannel} channel`)
+  }
+
+  const { channelsAlreadyCurrent, channelsToAssign } = getChannelsToAssignByChecksum(channels, currentChecksum, remoteChecksums)
+
+  if (channelsToAssign.length === 0) {
+    const channelLabel = formatUploadChannels(channels)
+    log.error(`Cannot upload the same bundle content.\nCurrent bundle checksum matches remote bundle for channel${channels.length > 1 ? 's' : ''} ${channelLabel}\nDid you build your app before uploading?\nPS: You can ignore this check with "--ignore-checksum-check"`)
+    throw new Error('Cannot upload the same bundle content')
+  }
+
+  if (channelsAlreadyCurrent.length > 0) {
+    log.warn(`Skipping channel${channelsAlreadyCurrent.length > 1 ? 's' : ''} ${formatUploadChannels(channelsAlreadyCurrent)} because ${channelsAlreadyCurrent.length > 1 ? 'they already have' : 'it already has'} this bundle content.`)
+  }
+
+  return channelsToAssign
 }
 
 async function prepareBundleFile(path: string, options: OptionsUpload, apikey: string, orgId: string, appid: string, maxUploadLength: number, alertUploadSize: number, publicKeyFromConfig?: string) {
@@ -349,7 +448,8 @@ async function prepareBundleFile(path: string, options: OptionsUpload, apikey: s
       channel: 'app',
       event: 'App encryption v2',
       icon: '🔑',
-      user_id: orgId,
+      org_id: orgId,
+      tracking_version: 2,
       tags: {
         'app-id': appid,
       },
@@ -407,7 +507,8 @@ async function prepareBundleFile(path: string, options: OptionsUpload, apikey: s
       channel: 'app-error',
       event: 'App Too Large',
       icon: '🚛',
-      user_id: orgId,
+      org_id: orgId,
+      tracking_version: 2,
       tags: {
         'app-id': appid,
       },
@@ -594,7 +695,8 @@ async function uploadBundleToCapgoCloud(apikey: string, supabase: SupabaseType, 
     channel: 'performance',
     event: isTus ? 'TUS upload zip performance' : 'Upload zip performance',
     icon: '🚄',
-    user_id: orgId,
+    org_id: orgId,
+    tracking_version: 2,
     tags: {
       'app-id': appid,
       'time': uploadTime,
@@ -612,11 +714,36 @@ type LinkedChannelVersion = {
   name: string
 } | null
 
+function getUploadRolloutPercentageBps(options: OptionsUpload) {
+  if (options.rollout == null && options.rolloutPercentageBps == null)
+    return undefined
+
+  if (options.rolloutPercentageBps != null)
+    return options.rolloutPercentageBps
+
+  return Math.round((options.rollout ?? 0) * 100)
+}
+
+function formatRolloutPercentage(bps: number) {
+  return `${Number((bps / 100).toFixed(2))}%`
+}
+
+async function getVersionIdForChannelUpdate(supabase: SupabaseType, apikey: string, appid: string, bundle: string) {
+  const { data: versionId } = await supabase
+    .rpc('get_app_versions', { apikey, name_version: bundle, appid })
+    .single()
+
+  if (!versionId)
+    uploadFail('Cannot get version id, cannot set channel')
+
+  return versionId
+}
+
 // It is really important that this function never terminates the program, it should always return.
 async function getLinkedBundleOnChannel(supabase: SupabaseType, appid: string, channel: string): Promise<LinkedChannelVersion> {
   const { data, error } = await supabase
     .from('channels')
-    .select('version ( id, name, deleted )')
+    .select('version:app_versions!channels_version_fkey( id, name, deleted )')
     .eq('app_id', appid)
     .eq('name', channel)
 
@@ -672,13 +799,8 @@ async function setVersionInChannel(
   appid: string,
   localConfig: localConfigType,
   selfAssign?: boolean,
-) {
-  const { data: versionId } = await supabase
-    .rpc('get_app_versions', { apikey, name_version: bundle, appid })
-    .single()
-
-  if (!versionId)
-    uploadFail('Cannot get version id, cannot set channel')
+): Promise<boolean> {
+  const versionId = await getVersionIdForChannelUpdate(supabase, apikey, appid, bundle)
 
   const apiAccess = await hasCliPermission(supabase, apikey, 'app.create_channel', { appId: appid })
 
@@ -701,10 +823,75 @@ async function setVersionInChannel(
 
     if (displayBundleUrl)
       log.info(`Bundle url: ${bundleUrl}`)
+    return true
   }
-  else {
-    log.warn('The upload key is not allowed to set the version in the channel')
+
+  log.warn('The upload key is not allowed to set the version in the channel')
+  return false
+}
+
+async function setRolloutVersionInChannel(
+  supabase: SupabaseType,
+  apikey: string,
+  displayBundleUrl: boolean,
+  bundle: string,
+  channel: string,
+  appid: string,
+  localConfig: localConfigType,
+  rolloutPercentageBps: number,
+  rolloutCacheTtlSeconds?: number,
+  selfAssign?: boolean,
+): Promise<boolean> {
+  const versionId = await getVersionIdForChannelUpdate(supabase, apikey, appid, bundle)
+
+  const apiAccess = await hasCliPermission(supabase, apikey, 'app.create_channel', { appId: appid })
+  if (!apiAccess) {
+    log.warn('The upload key is not allowed to set the rollout version in the channel')
+    return false
   }
+
+  const { data: existingChannel, error: channelError } = await supabase
+    .from('channels')
+    .select('id, version, rollout_version')
+    .eq('app_id', appid)
+    .eq('name', channel)
+    .single()
+
+  if (channelError || !existingChannel) {
+    uploadFail(`Cannot set rollout, channel ${channel} must already exist with a stable bundle`)
+  }
+  if (!existingChannel.version) {
+    uploadFail(`Cannot set rollout, channel ${channel} needs a stable bundle before using progressive rollout`)
+  }
+
+  const shouldResumeSameRollout = existingChannel.rollout_version === versionId && rolloutPercentageBps > 0
+  const channelPayload: Database['public']['Tables']['channels']['Update'] = {
+    rollout_version: versionId,
+    rollout_percentage_bps: rolloutPercentageBps,
+    rollout_enabled: rolloutPercentageBps > 0,
+    ...(shouldResumeSameRollout ? { rollout_paused_at: null, rollout_pause_reason: null } : {}),
+    ...(selfAssign ? { allow_device_self_set: true } : {}),
+  }
+  if (rolloutCacheTtlSeconds != null)
+    channelPayload.rollout_cache_ttl_seconds = rolloutCacheTtlSeconds
+
+  const { error: rolloutError, data } = await supabase
+    .from('channels')
+    .update(channelPayload)
+    .eq('app_id', appid)
+    .eq('name', channel)
+    .select('id')
+    .single()
+
+  if (rolloutError)
+    uploadFail(`Cannot set rollout in channel ${formatError(rolloutError)}`)
+
+  const bundleUrl = `${localConfig.hostWeb}/app/${appid}/channel/${data.id}`
+  log.info(`Set ${appid} channel ${channel} rollout target to @${bundle} (${formatRolloutPercentage(rolloutPercentageBps)})`)
+
+  if (displayBundleUrl)
+    log.info(`Bundle url: ${bundleUrl}`)
+  return true
 }
 
 export async function getDefaultUploadChannel(appId: string, supabase: SupabaseType, hostWeb: string) {
@@ -749,21 +936,21 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   if (options.verbose)
     log.info(`[Verbose] Capacitor config loaded successfully`)
 
-  // Check if directUpdate is enabled and auto-enable delta updates
-  const directUpdateEnabled = extConfig?.config?.plugins?.CapacitorUpdater?.directUpdate === 'always'
+  // Check if instant updates are enabled and auto-enable delta updates.
+  const instantUpdateEnabled = usesAlwaysDirectUpdate(extConfig?.config?.plugins?.CapacitorUpdater)
   const interactive = canPromptInteractively({ silent })
-  if (directUpdateEnabled && options.delta === undefined) {
+  if (instantUpdateEnabled && options.delta === undefined) {
     if (interactive) {
-      log.info('💡 Direct Update (instant updates) is enabled in your config')
+      log.info('💡 Instant updates are enabled in your config')
       log.info('   Delta updates send only changed files instead of the full bundle')
       const enableDelta = await pConfirm({
-        message: 'Enable delta updates for this upload? (Recommended with Direct Update)',
+        message: 'Enable delta updates for this upload? (Recommended with instant updates)',
         initialValue: true,
       })
       if (!pIsCancel(enableDelta) && enableDelta) {
         options.delta = true
         if (options.verbose)
-          log.info(`[Verbose] Delta updates auto-enabled due to Direct Update configuration`)
+          log.info(`[Verbose] Delta updates auto-enabled due to instant update configuration`)
       }
     }
     else if (!silent) {
@@ -771,7 +958,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
       if (options.delta !== false) {
         options.delta = true
         if (options.verbose)
-          log.info(`[Verbose] Delta updates auto-enabled in CI/CD mode due to Direct Update configuration`)
+          log.info(`[Verbose] Delta updates auto-enabled in CI/CD mode due to instant update configuration`)
       }
     }
   }
@@ -833,10 +1020,20 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   if (options.verbose)
     log.info(`[Verbose] User verified successfully, user_id: ${userId}`)
 
-  const defaultUploadChannel = options.channel ? null : await getDefaultUploadChannel(appid, supabase, localConfig.hostWeb)
-  const channel = options.channel || defaultUploadChannel || 'production'
+  const requestedChannels = parseUploadChannels(options.channel)
+  if (options.channel !== undefined && requestedChannels.length === 0)
+    uploadFail('Missing channel name, pass one channel or a comma-separated list with --channel')
+
+  const defaultUploadChannel = requestedChannels.length > 0 ? null : await getDefaultUploadChannel(appid, supabase, localConfig.hostWeb)
+  const channels = requestedChannels.length > 0 ? requestedChannels : parseUploadChannels(defaultUploadChannel || 'production')
+  if (channels.length === 0)
+    uploadFail('Cannot resolve target channel')
+
+  const channelLabel = formatUploadChannels(channels)
+  let channelsToAssign = channels
+  const rolloutPercentageBps = getUploadRolloutPercentageBps(options)
   if (options.verbose)
-    log.info(`[Verbose] Target channel: ${channel}`)
+    log.info(`[Verbose] Target channel${channels.length > 1 ? 's' : ''}: ${channelLabel}`)
 
   // Now if it does exist we will fetch the org id
   const orgId = await getOrganizationId(supabase, appid)
@@ -852,16 +1049,6 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     log.info(`[Verbose] Plan validation passed`)
   if (options.verbose)
     log.info(`[Verbose] Trial check completed`)
-
-  if (options.verbose)
-    log.info(`[Verbose] Checking compatibility with channel ${channel}...`)
-
-  const { nativePackages, minUpdateVersion } = await verifyCompatibility(supabase, pm, options, channel, appid, bundle)
-  if (options.verbose) {
-    log.info(`[Verbose] Compatibility check completed:`)
-    log.info(`  - Native packages: ${nativePackages ? nativePackages.length : 0}`)
-    log.info(`  - Min update version: ${minUpdateVersion || 'none'}`)
-  }
 
   if (options.verbose)
     log.info(`[Verbose] Checking if version ${bundle} already exists...`)
@@ -895,62 +1082,142 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     uploadFail(`External link should should start with "https://" current is "${options.external}"`)
   }
 
+  let zipped: Buffer | null = null
+  let finalKeyData = ''
+  let preparedBundle: Awaited<ReturnType<typeof prepareBundleFile>> | undefined
+  if (!options.external) {
+    if (options.verbose)
+      log.info(`[Verbose] Preparing bundle file from path: ${path}`)
+
+    const publicKeyFromConfig = extConfig.config?.plugins?.CapacitorUpdater?.publicKey
+    preparedBundle = await prepareBundleFile(path, options, apikey, orgId, appid, fileConfig.maxUploadLength, fileConfig.alertUploadSize, publicKeyFromConfig)
+    sessionKey = preparedBundle.sessionKey
+    zipped = preparedBundle.zipped
+    encryptionMethod = preparedBundle.encryptionMethod
+    finalKeyData = preparedBundle.finalKeyData
+
+    if (options.verbose) {
+      log.info(`[Verbose] Bundle prepared:`)
+      log.info(`  - Size: ${Math.floor((preparedBundle.zipped?.byteLength ?? 0) / 1024)} KB`)
+      log.info(`  - Checksum: ${preparedBundle.checksum}`)
+      log.info(`  - Encryption: ${preparedBundle.encryptionMethod}`)
+      log.info(`  - IV Session Key: ${preparedBundle.ivSessionKey ? 'present' : 'none'}`)
+      log.info(`  - Key ID: ${preparedBundle.keyId || 'none'}`)
+    }
+
+    const shouldCheckChecksum = !options.ignoreChecksumCheck && rolloutPercentageBps == null
+    if (shouldCheckChecksum) {
+      if (options.verbose)
+        log.info(`[Verbose] Checking for duplicate checksum...`)
+      channelsToAssign = await getChannelsToAssignAfterChecksumCheck(supabase, appid, channels, preparedBundle.checksum)
+      if (options.verbose)
+        log.info(`[Verbose] Checksum is unique or already satisfied across target channels`)
+    }
+  }
+
+  const assignmentChannelLabel = formatUploadChannels(channelsToAssign)
+  if (options.verbose)
+    log.info(`[Verbose] Checking compatibility with channel${channelsToAssign.length > 1 ? 's' : ''} ${assignmentChannelLabel}...`)
+
+  const compatibilityResults = [] as Array<Awaited<ReturnType<typeof verifyCompatibility>> & { channel: string }>
+  for (const targetChannel of channelsToAssign) {
+    const compatibilityResult = await verifyCompatibility(supabase, pm, options, targetChannel, appid, bundle, orgId)
+    compatibilityResults.push({ channel: targetChannel, ...compatibilityResult })
+  }
+
+  const nativePackages = compatibilityResults.find(result => result.nativePackages)?.nativePackages
+  const minUpdateVersion = pickHighestMinUpdateVersion(compatibilityResults)
+  const incompatibleResults = compatibilityResults.filter(result => result.compatibility.result === 'incompatible')
+  const incompatible = incompatibleResults.length > 0
+  const incompatibleCount = incompatibleResults.reduce((count, result) => Math.max(count, result.incompatibleCount), 0)
+  const incompatibleChannelLabel = formatUploadChannels(incompatibleResults.map(result => result.channel))
+
+  // `--fail-on-incompatible`: abort the upload (exit non-zero) instead of shipping
+  // an OTA update that cannot take effect without a native build. Emits a single
+  // fire-and-forget telemetry event, then throws a dedicated error so the retry
+  // prompt in `uploadBundle` is skipped. Closes over the upload context.
+  const uploadFailIncompatible = (): never => {
+    const blockedChannelLabel = incompatibleChannelLabel || assignmentChannelLabel
+    void trackEvent({
+      channel: 'bundle',
+      event: 'Bundle Upload Blocked',
+      icon: '⛔',
+      apikey: options.apikey,
+      appId: appid,
+      orgId,
+      tags: { reason: 'incompatible', channel: blockedChannelLabel, channel_name: blockedChannelLabel, channel_names: blockedChannelLabel, channel_count: incompatibleResults.length || channelsToAssign.length, incompatible_count: incompatibleCount, interactive },
+    })
+    const channelText = incompatibleResults.length === 1 ? 'channel' : 'channels'
+    const message = `Upload aborted: bundle is incompatible with ${channelText} "${blockedChannelLabel}" (${incompatibleCount} native package(s) changed). A native build / app-store update is required. Run a native build with Capgo Builder (https://capgo.app/docs/cli/cloud-build/), or remove --fail-on-incompatible to upload anyway.`
+    log.error(message)
+    throw new IncompatibleBundleError(message)
+  }
+
+  // Incompatible bundle => a native build is required. Offer Capgo Builder:
+  // onboarding if the app has no build credentials, otherwise a native build.
+  // Accepting skips this OTA upload (a native build supersedes it). Skipped
+  // entirely for the programmatic SDK path (silent), which must not prompt,
+  // print, or emit CTA telemetry.
+  if (incompatible && !silent) {
+    // CI / non-interactive with the flag: hard fail now, before the promotional
+    // Builder ad prints (there is no escape-hatch prompt to offer).
+    if (options.failOnIncompatible && !interactive)
+      uploadFailIncompatible()
+
+    const hasCredentials = (await loadSavedCredentials(appid)) !== null
+    const builderAction = await maybePromptBuilderCta({ incompatible, interactive, hasCredentials, appId: appid, orgId, apikey, incompatibleCount })
+    if (builderAction === 'abort')
+      throw new Error(UPLOAD_CANCELLED_BY_USER)
+
+    if (builderAction !== 'continue') {
+      // Skip the OTA upload and hand the launch back to the CLI entry point, which
+      // runs the Ink-based build commands. Doing it here would pull `ink` into the
+      // programmatic SDK bundle (which also imports this module).
+      return {
+        success: true,
+        skipped: true,
+        reason: 'NATIVE_BUILD',
+        builderAction,
+        bundle,
+        checksum: null,
+        encryptionMethod,
+        storageProvider: defaultStorageProvider,
+      }
+    }
+
+    // Interactive and the user declined the native-build escape hatch.
+    if (shouldBlockIncompatibleUpload({ incompatible, failOnIncompatible: !!options.failOnIncompatible, interactive, builderAction }))
+      uploadFailIncompatible()
+  }
+  if (options.verbose) {
+    log.info(`[Verbose] Compatibility check completed:`)
+    log.info(`  - Native packages: ${nativePackages ? nativePackages.length : 0}`)
+    log.info(`  - Min update version: ${minUpdateVersion || 'none'}`)
+  }
+
   if (options.deleteLinkedBundleOnUpload) {
-    log.warn('Deleting linked bundle on upload is destructive, it will delete the currently linked bundle in the channel you are trying to upload to.')
+    log.warn(`Deleting linked bundle on upload is destructive, it will delete the currently linked bundle in the target channel${channelsToAssign.length > 1 ? 's' : ''}: ${assignmentChannelLabel}.`)
     log.warn('Please make sure you want to do this, if you are not sure, please do not use this option.')
   }
 
   const versionData = {
     name: bundle,
     app_id: appid,
-    session_key: undefined as undefined | string,
+    session_key: options.external ? options.ivSessionKey : preparedBundle?.ivSessionKey,
     external_url: options.external,
     storage_provider: defaultStorageProvider,
     min_update_version: minUpdateVersion,
     native_packages: nativePackages,
     owner_org: orgId,
     user_id: userId,
-    checksum: undefined as undefined | string,
+    checksum: options.external ? options.encryptedChecksum : preparedBundle?.checksum,
     link: options.link || null,
     comment: options.comment || null,
-    key_id: undefined as undefined | string,
+    key_id: preparedBundle?.keyId || undefined,
     cli_version: pack.version,
   } as Database['public']['Tables']['app_versions']['Insert']
 
-  let zipped: Buffer | null = null
-  let finalKeyData = ''
-  if (!options.external) {
-    if (options.verbose)
-      log.info(`[Verbose] Preparing bundle file from path: ${path}`)
-
-    const publicKeyFromConfig = extConfig.config?.plugins?.CapacitorUpdater?.publicKey
-    const { zipped: _zipped, ivSessionKey, checksum, sessionKey: sk, encryptionMethod: em, finalKeyData: fkd, keyId } = await prepareBundleFile(path, options, apikey, orgId, appid, fileConfig.maxUploadLength, fileConfig.alertUploadSize, publicKeyFromConfig)
-    versionData.session_key = ivSessionKey
-    versionData.checksum = checksum
-    versionData.key_id = keyId || undefined
-    sessionKey = sk
-    zipped = _zipped
-    encryptionMethod = em
-    finalKeyData = fkd
-
-    if (options.verbose) {
-      log.info(`[Verbose] Bundle prepared:`)
-      log.info(`  - Size: ${Math.floor((_zipped?.byteLength ?? 0) / 1024)} KB`)
-      log.info(`  - Checksum: ${checksum}`)
-      log.info(`  - Encryption: ${em}`)
-      log.info(`  - IV Session Key: ${ivSessionKey ? 'present' : 'none'}`)
-      log.info(`  - Key ID: ${keyId || 'none'}`)
-    }
-
-    if (!options.ignoreChecksumCheck) {
-      if (options.verbose)
-        log.info(`[Verbose] Checking for duplicate checksum...`)
-      await checkChecksum(supabase, appid, channel, checksum)
-      if (options.verbose)
-        log.info(`[Verbose] Checksum is unique`)
-    }
-  }
-  else {
+  if (options.external) {
     if (options.verbose)
       log.info(`[Verbose] Using external URL: ${options.external}`)
 
@@ -958,14 +1225,13 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
       channel: 'app',
       event: 'App external',
       icon: '📤',
-      user_id: orgId,
+      org_id: orgId,
+      tracking_version: 2,
       tags: {
         'app-id': appid,
       },
       notify: false,
     }, options.verbose)
-    versionData.session_key = options.ivSessionKey
-    versionData.checksum = options.encryptedChecksum
 
     if (options.verbose) {
       log.info(`[Verbose] External bundle configured:`)
@@ -1229,24 +1495,46 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   }
 
   const shouldDeleteLinkedBundle = options.deleteLinkedBundleOnUpload && hasOrganizationPerm(permissions, OrganizationPerm.write)
-  const linkedBundleToDelete = shouldDeleteLinkedBundle
-    ? await getLinkedBundleOnChannel(supabase, appid, channel)
-    : null
+  const linkedBundlesToDelete = shouldDeleteLinkedBundle
+    ? await Promise.all(channelsToAssign.map(async targetChannel => ({
+        channel: targetChannel,
+        version: await getLinkedBundleOnChannel(supabase, appid, targetChannel),
+      })))
+    : []
   if (options.deleteLinkedBundleOnUpload && !shouldDeleteLinkedBundle) {
     log.warn('Cannot delete linked bundle on upload as a upload organization member')
   }
 
+  const channelVersionSet = new Set<string>()
   if (hasOrganizationPerm(permissions, OrganizationPerm.write)) {
-    if (options.verbose)
-      log.info(`[Verbose] Setting bundle ${bundle} to channel ${channel}...`)
-    await setVersionInChannel(supabase, apikey, !!options.bundleUrl, bundle, channel, userId, orgId, appid, localConfig, options.selfAssign)
-    if (options.verbose)
-      log.info(`[Verbose] Channel updated successfully`)
+    for (const targetChannel of channelsToAssign) {
+      if (options.verbose) {
+        const targetDescription = rolloutPercentageBps != null ? 'as rollout target for' : 'to'
+        log.info(`[Verbose] Setting bundle ${bundle} ${targetDescription} channel ${targetChannel}...`)
+      }
+      const targetChannelVersionSet = rolloutPercentageBps != null
+        ? await setRolloutVersionInChannel(supabase, apikey, !!options.bundleUrl, bundle, targetChannel, appid, localConfig, rolloutPercentageBps, options.rolloutCacheTtlSeconds, options.selfAssign)
+        : await setVersionInChannel(supabase, apikey, !!options.bundleUrl, bundle, targetChannel, userId, orgId, appid, localConfig, options.selfAssign)
+      if (targetChannelVersionSet) {
+        channelVersionSet.add(targetChannel)
+        if (options.verbose)
+          log.info(`[Verbose] Channel ${targetChannel} updated successfully`)
+      }
+      else if (options.verbose) {
+        log.info(`[Verbose] Channel ${targetChannel} was not updated`)
+      }
+    }
 
     if (shouldDeleteLinkedBundle) {
-      if (options.verbose)
-        log.info(`[Verbose] Deleting previously linked bundle in channel ${channel}...`)
-      await deleteLinkedBundleOnUpload(supabase, linkedBundleToDelete)
+      const deletedVersionIds = new Set<number>()
+      for (const linkedBundle of linkedBundlesToDelete) {
+        if (!linkedBundle.version || deletedVersionIds.has(linkedBundle.version.id))
+          continue
+        if (options.verbose)
+          log.info(`[Verbose] Deleting previously linked bundle in channel ${linkedBundle.channel}...`)
+        await deleteLinkedBundleOnUpload(supabase, linkedBundle.version)
+        deletedVersionIds.add(linkedBundle.version.id)
+      }
     }
   }
   else {
@@ -1260,7 +1548,8 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     channel: 'app',
     event: 'App Uploaded',
     icon: '⏫',
-    user_id: orgId,
+    org_id: orgId,
+    tracking_version: 2,
     tags: {
       'app-id': appid,
       'bundle': bundle,
@@ -1272,7 +1561,8 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     channel: 'app',
     event: 'Bundle Uploaded',
     icon: '⏫',
-    user_id: orgId,
+    org_id: orgId,
+    tracking_version: 2,
     tags: {
       'app-id': appid,
       'bundle': bundle,
@@ -1280,6 +1570,34 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     notify: false,
     notifyConsole: true,
   }).catch(() => {})
+
+  // Record every incompatible upload in PostHog (`Bundle Incompatible`). The
+  // channel_overwritten flag lets the backend gate the org-member email to
+  // uploads that actually went live (i.e. overwrote the channel's version).
+  for (const compatibilityResult of compatibilityResults) {
+    if (compatibilityResult.compatibility.result !== 'incompatible')
+      continue
+
+    void trackEvent({
+      channel: 'bundle',
+      event: 'Bundle Incompatible',
+      icon: '🚫',
+      apikey,
+      appId: appid,
+      orgId,
+      tags: {
+        source: 'upload',
+        // `channel` is overwritten by the event category ('bundle') in PostHog
+        // (the backend still reads tags.channel); channel_name keeps it queryable.
+        channel: compatibilityResult.channel,
+        channel_name: compatibilityResult.channel,
+        channel_overwritten: channelVersionSet.has(compatibilityResult.channel),
+        version_new_name: bundle,
+        ...(compatibilityResult.compatibility.versionOldId ? { version_old_id: compatibilityResult.compatibility.versionOldId } : {}),
+        ...(compatibilityResult.compatibility.versionOldName ? { version_old_name: compatibilityResult.compatibility.versionOldName } : {}),
+      },
+    })
+  }
 
   const result: UploadBundleResult = {
     success: true,
@@ -1325,10 +1643,17 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   return result
 }
 
-function checkValidOptions(options: OptionsUpload) {
+/**
+ * Validate mutually-exclusive and dependent upload options, failing fast (via
+ * `uploadFail`) before any network call. Exported so the option-conflict guards
+ * (e.g. `--fail-on-incompatible` + `--ignore-metadata-check`) can be unit-tested
+ * directly.
+ */
+export function checkValidOptions(options: OptionsUpload) {
   const noKey = options.key === false
   const forceCrc32 = options.forceCrc32Checksum === true
   const hasEncryptionKey = (options.keyV2 || options.keyDataV2 || existsSync(baseKeyV2))
+  const hasUploadRollout = options.rollout != null || options.rolloutPercentageBps != null
 
   if (options.ivSessionKey && !options.external) {
     uploadFail('You need to provide an external url if you want to use the --iv-session-key option')
@@ -1370,6 +1695,24 @@ function checkValidOptions(options: OptionsUpload) {
   }
   if (forceCrc32 && hasEncryptionKey && !noKey) {
     uploadFail('You cannot use --force-crc32-checksum when encryption is enabled. Remove the flag or disable encryption.')
+  }
+  if (options.rollout != null && (!Number.isFinite(options.rollout) || options.rollout < 0 || options.rollout > 100)) {
+    uploadFail('Rollout percentage must be between 0 and 100')
+  }
+  if (options.rolloutPercentageBps != null && (!Number.isInteger(options.rolloutPercentageBps) || options.rolloutPercentageBps < 0 || options.rolloutPercentageBps > 10000)) {
+    uploadFail('Rollout percentage basis points must be between 0 and 10000')
+  }
+  if (options.rolloutCacheTtlSeconds != null && (!Number.isInteger(options.rolloutCacheTtlSeconds) || options.rolloutCacheTtlSeconds < 60 || options.rolloutCacheTtlSeconds > 31536000)) {
+    uploadFail('Rollout cache TTL seconds must be between 60 and 31536000')
+  }
+  if (hasUploadRollout && options.dryUpload) {
+    uploadFail('You cannot use --rollout with --dry-upload because dry upload does not update channels')
+  }
+  if (hasUploadRollout && options.deleteLinkedBundleOnUpload) {
+    uploadFail('You cannot use --rollout with --delete-linked-bundle-on-upload because rollout needs the stable channel bundle as fallback')
+  }
+  if (options.failOnIncompatible && options.ignoreMetadataCheck) {
+    uploadFail('You cannot use --fail-on-incompatible together with --ignore-metadata-check — the metadata check is exactly what --fail-on-incompatible enforces. Remove one of them.')
   }
 }
 
@@ -1417,12 +1760,21 @@ export async function uploadBundle(appid: string, options: OptionsUpload) {
     const simpleMessage = error instanceof Error ? error.message : String(error)
     const verboseMessage = formatError(error)
 
+    if (simpleMessage === UPLOAD_CANCELLED_BY_USER)
+      throw error instanceof Error ? error : new Error(String(error))
+
     if (options.verbose) {
       log.error(`uploadBundle failed:${verboseMessage}`)
     }
     else {
       log.error(`uploadBundle failed: ${simpleMessage}`)
     }
+
+    // An incompatible-bundle failure (`--fail-on-incompatible`) is intentional and
+    // not retryable — retrying the same bundle would just fail again. Re-throw
+    // before the generic retry prompt, mirroring the isChecksumError special-case.
+    if (error instanceof IncompatibleBundleError)
+      throw error
 
     // Check if this is a checksum error - offer specific retry option
     const isChecksumError = simpleMessage.includes('Cannot upload the same bundle content')

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { uploadBundleSDK } from './cli-sdk-utils'
 import { cleanupCli, getSemver, prepareCli, tempFileFolder } from './cli-utils'
-import { BASE_URL, getSupabaseClient, headers, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils'
+import { BASE_URL, createDirectApiKeyWithBindings, getSupabaseClient, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils'
 
 // Helper to retry SDK operations that may fail due to transient network issues in CI
 async function retryUpload<T extends { success: boolean, error?: string }>(
@@ -45,26 +45,23 @@ async function uploadWithFreshVersionRetry(
   return { result: lastResult, version: lastVersion }
 }
 
-async function createScopedApiKey(mode: 'all' | 'upload', limitedToOrgs: string[]) {
-  const response = await fetch(`${BASE_URL}/apikey`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      name: `cli-test-${randomUUID()}`,
-      mode,
-      limited_to_orgs: limitedToOrgs,
-      limited_to_apps: [],
-    }),
+async function createOrgBoundApiKey(orgId: string, roleName = 'org_admin') {
+  const data = await createDirectApiKeyWithBindings({
+    userId: USER_ID,
+    key: randomUUID(),
+    name: `cli-test-${randomUUID()}`,
+    orgId,
+    roleName,
   })
 
-  const data = await response.json() as { id?: number, key?: string, error?: string }
-  expect(response.status).toBe(200)
   expect(data.id).toBeTypeOf('number')
   expect(data.key).toBeTypeOf('string')
+  if (!data.key)
+    throw new Error('Failed to seed CLI API key')
 
   return {
-    id: data.id as number,
-    key: data.key as string,
+    id: data.id,
+    key: data.key,
   }
 }
 
@@ -99,6 +96,74 @@ describe('tests CLI upload', () => {
       ignoreCompatibilityCheck: true,
     })
     expect(result.success).toBe(true)
+  }, 60000)
+
+  it('should link uploaded bundle to multiple comma-separated channels', async () => {
+    const appName = `com.cli_multi_channel_${randomUUID()}`
+    const extraChannel = `multi-${randomUUID().slice(0, 8)}`
+    await Promise.all([
+      resetAndSeedAppData(appName),
+      prepareCli(appName),
+    ])
+
+    try {
+      const supabase = getSupabaseClient()
+      const { data: versionData, error: versionError } = await supabase
+        .from('app_versions')
+        .select('id')
+        .eq('app_id', appName)
+        .limit(1)
+        .single()
+
+      expect(versionError).toBeNull()
+      if (!versionData)
+        throw new Error('Missing seeded app version')
+
+      const { error: channelError } = await supabase
+        .from('channels')
+        .insert({
+          name: extraChannel,
+          app_id: appName,
+          version: versionData.id,
+          owner_org: ORG_ID,
+          created_by: USER_ID,
+          public: false,
+          disable_auto_update_under_native: true,
+          disable_auto_update: 'major' as const,
+          allow_device_self_set: false,
+          allow_emulator: false,
+          allow_device: false,
+          allow_dev: false,
+          allow_prod: false,
+          ios: false,
+          android: false,
+        })
+
+      expect(channelError).toBeNull()
+
+      const { result, version } = await uploadWithFreshVersionRetry(appName, `production,${extraChannel}`, {
+        ignoreCompatibilityCheck: true,
+      })
+      expect(result.success).toBe(true)
+
+      const { data: channels, error } = await supabase
+        .from('channels')
+        .select('name, version(name)')
+        .eq('app_id', appName)
+        .in('name', ['production', extraChannel])
+
+      expect(error).toBeNull()
+      const versionsByChannel = new Map((channels ?? []).map(row => [row.name, (row.version as any)?.name]))
+      expect(versionsByChannel.get('production')).toBe(version)
+      expect(versionsByChannel.get(extraChannel)).toBe(version)
+    }
+    finally {
+      await Promise.all([
+        cleanupCli(appName),
+        resetAppData(appName),
+        resetAppDataStats(appName),
+      ])
+    }
   }, 60000)
 
   it('should not upload same hash twice', async () => {
@@ -241,7 +306,7 @@ describe('tests CLI upload options in parallel', () => {
     let createdPlainKey: string | null = null
 
     try {
-      const createdApikey = await createScopedApiKey('all', [ORG_ID])
+      const createdApikey = await createOrgBoundApiKey(ORG_ID)
       createdApikeyId = createdApikey.id
       createdPlainKey = createdApikey.key
 
@@ -264,12 +329,11 @@ describe('tests CLI upload options in parallel', () => {
     usedApps.push(app.APPNAME)
 
     const semver = getSemver()
-    const wrongOrgId = randomUUID()
     let createdApikeyId: number | null = null
     let createdPlainKey: string | null = null
 
     try {
-      const createdApikey = await createScopedApiKey('upload', [wrongOrgId])
+      const createdApikey = await createOrgBoundApiKey(NON_OWNER_ORG_ID, 'org_member')
       createdApikeyId = createdApikey.id
       createdPlainKey = createdApikey.key
 

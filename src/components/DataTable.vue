@@ -30,6 +30,7 @@ interface Props {
   isLoading?: boolean
   filterText?: string
   filters?: { [key: string]: boolean }
+  filterLabels?: { [key: string]: string }
   searchPlaceholder?: string
   showAdd?: boolean
   addButtonTestId?: string
@@ -94,6 +95,10 @@ const filterActivated = computed(() => {
   }, 0)
 })
 
+function getFilterLabel(filter: string) {
+  return props.filterLabels?.[filter] ?? t(filter)
+}
+
 function sortClick(key: number) {
   if (!props.columns[key].sortable)
     return
@@ -125,10 +130,10 @@ function updateUrlParams() {
     params.set('search', searchVal.value)
   else params.delete('search')
   if (props.filters) {
+    params.delete('filter')
     Object.entries(props.filters).forEach(([key, value]) => {
       if (value)
         params.append('filter', key)
-      else params.delete('filter', key)
     })
   }
   if (props.currentPage)
@@ -172,7 +177,6 @@ function loadFromUrlParams() {
       newFilters[key] = filterParams.includes(key)
     })
     if (JSON.stringify(newFilters) !== JSON.stringify(props.filters)) {
-      console.log('update filters', newFilters, props.filters)
       emit('update:filters', newFilters)
     }
   }
@@ -497,10 +501,10 @@ const paginationClass = computed(() => props.mobileFixedPagination
             <span class="hidden md:block">{{ t(filterText) }}</span>
             <IconDown class="hidden w-4 h-4 ml-2 md:block" />
           </button>
-          <ul class="p-2 bg-white shadow w-52 d-dropdown-content d-menu rounded-box z-1 dark:bg-base-200">
+          <ul class="max-h-80 w-72 max-w-[calc(100vw-2rem)] overflow-y-auto border border-gray-200 bg-white p-2 shadow-xl d-dropdown-content d-menu rounded-box z-20 dark:border-gray-700 dark:bg-base-200">
             <li v-for="(f, i) in filterList" :key="i">
               <div
-                class="flex items-center p-2 rounded-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                class="flex min-h-10 items-center rounded-md p-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
               >
                 <input
                   :id="`filter-radio-example-${i}`" :checked="filters?.[f]" type="checkbox"
@@ -512,9 +516,9 @@ const paginationClass = computed(() => props.mobileFixedPagination
                 >
                 <label
                   :for="`filter-radio-example-${i}`"
-                  class="w-full ml-2 text-sm font-medium text-gray-900 rounded-sm cursor-pointer dark:text-gray-300 first-letter:uppercase"
+                  class="w-full min-w-0 truncate ml-2 text-sm font-medium text-gray-900 rounded-sm cursor-pointer dark:text-gray-300"
                 >{{
-                  t(f) }}</label>
+                  getFilterLabel(f) }}</label>
               </div>
             </li>
           </ul>
@@ -576,8 +580,12 @@ const paginationClass = computed(() => props.mobileFixedPagination
             <template v-if="true">
               <th v-if="props.massSelect" class="px-4 md:px-6">
                 <input
-                  id="select-rows" :checked="selectedRows[i]" class="scale-checkbox"
-                  type="checkbox" @click="(e: MouseEvent) => { handleCheckboxClick(i, e) }"
+                  :id="`select-row-${i}`"
+                  :checked="selectedRows[i]"
+                  class="scale-checkbox"
+                  type="checkbox"
+                  :aria-label="t('select_all')"
+                  @click="(e: MouseEvent) => { handleCheckboxClick(i, e) }"
                 >
               </th>
               <template v-for="(col, _y) in columns" :key="`${i}_${_y}`">

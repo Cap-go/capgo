@@ -1,5 +1,5 @@
 /*
- * Backfill the admin "Org Conversion Rate Trend" metric.
+ * Backfill the admin org and plan conversion rate trend metrics.
  *
  * The historical paying counts in public.global_stats are Stripe-backed
  * snapshots written by the admin stats cron. The raw org count was not stored,
@@ -26,14 +26,35 @@ const DATE_ID_REGEX = /^\d{4}-\d{2}-\d{2}$/
 type SupabaseClient = ReturnType<typeof createSupabaseServiceClient>
 type GlobalStatsRow = Pick<
   Database['public']['Tables']['global_stats']['Row'],
-  'date_id' | 'paying' | 'org_conversion_rate'
+  | 'date_id'
+  | 'org_conversion_rate'
+  | 'paying'
+  | 'plan_enterprise'
+  | 'plan_enterprise_conversion_rate'
+  | 'plan_maker'
+  | 'plan_maker_conversion_rate'
+  | 'plan_solo'
+  | 'plan_solo_conversion_rate'
+  | 'plan_team'
+  | 'plan_team_conversion_rate'
+  | 'plan_total_conversion_rate'
 >
 type OrgCreatedAtRow = Pick<Database['public']['Tables']['orgs']['Row'], 'created_at'>
 
+export interface PlanConversionRates {
+  enterprise: number
+  maker: number
+  solo: number
+  team: number
+  total: number
+}
+
 export interface OrgConversionRateBackfillRow {
   changed: boolean
+  current_plan_rates: PlanConversionRates
   current_rate: number
   date_id: string
+  next_plan_rates: PlanConversionRates
   orgs: number
   paying: number
   next_rate: number
@@ -74,6 +95,43 @@ export function calculateOrgConversionRate(paying: number | string | null | unde
   return Number(((payingCount * 100) / orgCount).toFixed(1))
 }
 
+function calculatePlanConversionRates(row: GlobalStatsRow, orgs: number): PlanConversionRates {
+  const total = toMetricNumber(row.plan_solo)
+    + toMetricNumber(row.plan_maker)
+    + toMetricNumber(row.plan_team)
+    + toMetricNumber(row.plan_enterprise)
+
+  return {
+    solo: calculateOrgConversionRate(row.plan_solo, orgs),
+    maker: calculateOrgConversionRate(row.plan_maker, orgs),
+    team: calculateOrgConversionRate(row.plan_team, orgs),
+    enterprise: calculateOrgConversionRate(row.plan_enterprise, orgs),
+    total: calculateOrgConversionRate(total, orgs),
+  }
+}
+
+function getCurrentPlanConversionRates(row: GlobalStatsRow): PlanConversionRates {
+  return {
+    solo: toMetricNumber(row.plan_solo_conversion_rate),
+    maker: toMetricNumber(row.plan_maker_conversion_rate),
+    team: toMetricNumber(row.plan_team_conversion_rate),
+    enterprise: toMetricNumber(row.plan_enterprise_conversion_rate),
+    total: toMetricNumber(row.plan_total_conversion_rate),
+  }
+}
+
+function hasRateChanged(currentRate: number, nextRate: number) {
+  return Math.abs(currentRate - nextRate) > 0.0001
+}
+
+function havePlanRatesChanged(currentRates: PlanConversionRates, nextRates: PlanConversionRates) {
+  return hasRateChanged(currentRates.solo, nextRates.solo)
+    || hasRateChanged(currentRates.maker, nextRates.maker)
+    || hasRateChanged(currentRates.team, nextRates.team)
+    || hasRateChanged(currentRates.enterprise, nextRates.enterprise)
+    || hasRateChanged(currentRates.total, nextRates.total)
+}
+
 function buildOrgCountsByDateId(dateIds: string[], orgRows: OrgCreatedAtRow[]) {
   const orgCreatedAtTimes = orgRows
     .map(row => row.created_at ? Date.parse(row.created_at) : Number.NaN)
@@ -100,13 +158,17 @@ export function buildOrgConversionRateBackfillRows(rows: GlobalStatsRow[], orgRo
     const paying = toMetricNumber(row.paying)
     const currentRate = toMetricNumber(row.org_conversion_rate)
     const nextRate = calculateOrgConversionRate(paying, orgs)
+    const currentPlanRates = getCurrentPlanConversionRates(row)
+    const nextPlanRates = calculatePlanConversionRates(row, orgs)
     return {
       date_id: row.date_id,
       orgs,
       paying,
+      current_plan_rates: currentPlanRates,
       current_rate: currentRate,
+      next_plan_rates: nextPlanRates,
       next_rate: nextRate,
-      changed: Math.abs(currentRate - nextRate) > 0.0001,
+      changed: hasRateChanged(currentRate, nextRate) || havePlanRatesChanged(currentPlanRates, nextPlanRates),
     }
   })
 }
@@ -118,7 +180,20 @@ async function fetchGlobalStatsRows(supabase: SupabaseClient, fromDateId: string
   while (true) {
     let query = supabase
       .from('global_stats')
-      .select('date_id, paying, org_conversion_rate')
+      .select(`
+        date_id,
+        paying,
+        org_conversion_rate,
+        plan_solo,
+        plan_maker,
+        plan_team,
+        plan_enterprise,
+        plan_solo_conversion_rate,
+        plan_maker_conversion_rate,
+        plan_team_conversion_rate,
+        plan_enterprise_conversion_rate,
+        plan_total_conversion_rate
+      `)
       .order('date_id', { ascending: true })
       .range(offset, offset + DEFAULT_PAGE_SIZE - 1)
 
@@ -174,7 +249,14 @@ async function fetchOrgCreatedAtRows(supabase: SupabaseClient, toDateId: string 
 async function updateConversionRate(supabase: SupabaseClient, row: OrgConversionRateBackfillRow) {
   const { error } = await supabase
     .from('global_stats')
-    .update({ org_conversion_rate: row.next_rate })
+    .update({
+      org_conversion_rate: row.next_rate,
+      plan_total_conversion_rate: row.next_plan_rates.total,
+      plan_solo_conversion_rate: row.next_plan_rates.solo,
+      plan_maker_conversion_rate: row.next_plan_rates.maker,
+      plan_team_conversion_rate: row.next_plan_rates.team,
+      plan_enterprise_conversion_rate: row.next_plan_rates.enterprise,
+    })
     .eq('date_id', row.date_id)
 
   if (error)
@@ -220,8 +302,9 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   const sampleRows = changedRows.slice(0, 10)
   if (sampleRows.length > 0) {
     console.log('Sample updates:')
-    for (const row of sampleRows)
-      console.log(`${row.date_id}: ${row.current_rate}% -> ${row.next_rate}% (${row.paying}/${row.orgs})`)
+    for (const row of sampleRows) {
+      console.log(`${row.date_id}: org ${row.current_rate}% -> ${row.next_rate}% (${row.paying}/${row.orgs}); paid plans ${row.current_plan_rates.total}% -> ${row.next_plan_rates.total}%; plans ${row.current_plan_rates.solo}/${row.current_plan_rates.maker}/${row.current_plan_rates.team}/${row.current_plan_rates.enterprise}% -> ${row.next_plan_rates.solo}/${row.next_plan_rates.maker}/${row.next_plan_rates.team}/${row.next_plan_rates.enterprise}%`)
+    }
   }
 
   if (!apply) {

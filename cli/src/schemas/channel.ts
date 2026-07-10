@@ -1,6 +1,21 @@
 import { z } from 'zod'
 import { optionsBaseSchema } from './base'
 
+function rejectConflictingBooleanGroup<T extends Record<string, unknown>>(value: T, ctx: z.RefinementCtx, keys: Array<keyof T>) {
+  const selected = keys.filter(key => value[key] === true)
+  if (selected.length < 2)
+    return
+
+  const first = String(selected[0])
+  for (const key of selected.slice(1)) {
+    const current = String(key)
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [current],
+      message: `"${first}" and "${current}" cannot be used together`,
+    })
+  }
+}
 // ============================================================================
 // Channel Data Schema
 // ============================================================================
@@ -64,6 +79,30 @@ export const optionsSetChannelSchema = optionsBaseSchema.extend({
   prod: z.boolean().optional(),
   packageJson: z.string().optional(),
   ignoreMetadataCheck: z.boolean().optional(),
+  qrPreview: z.boolean().optional(),
+  rolloutBundle: z.string().optional(),
+  rolloutPercentage: z.number().finite().min(0).max(100).optional(),
+  rolloutPercentageBps: z.number().int().min(0).max(10000).optional(),
+  rolloutEnable: z.boolean().optional(),
+  rolloutDisable: z.boolean().optional(),
+  rolloutPause: z.boolean().optional(),
+  rolloutResume: z.boolean().optional(),
+  rolloutRollback: z.boolean().optional(),
+  rolloutPromote: z.boolean().optional(),
+  rolloutCacheTtlSeconds: z.number().int().min(60).max(31536000).optional(),
+  autoPauseEnabled: z.boolean().optional(),
+  autoPauseDisabled: z.boolean().optional(),
+  autoPauseWindowMinutes: z.number().int().min(1).max(10080).optional(),
+  autoPauseFailureRateBps: z.number().int().min(0).max(10000).nullable().optional(),
+  autoPauseConfidence: z.number().finite().gt(0).lt(1).optional(),
+  autoPauseMinAttempts: z.number().int().min(0).nullable().optional(),
+  autoPauseMinFailures: z.number().int().min(0).nullable().optional(),
+  autoPauseAction: z.enum(['pause', 'rollback', 'notify']).optional(),
+  autoPauseCooldownMinutes: z.number().int().min(0).max(10080).optional(),
+}).superRefine((value, ctx) => {
+  rejectConflictingBooleanGroup(value, ctx, ['rolloutEnable', 'rolloutDisable'])
+  rejectConflictingBooleanGroup(value, ctx, ['rolloutPause', 'rolloutResume', 'rolloutRollback', 'rolloutPromote'])
+  rejectConflictingBooleanGroup(value, ctx, ['autoPauseEnabled', 'autoPauseDisabled'])
 })
 
 export type OptionsSetChannel = z.infer<typeof optionsSetChannelSchema>

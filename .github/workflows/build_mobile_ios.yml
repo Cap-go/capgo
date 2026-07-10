@@ -21,6 +21,10 @@ jobs:
       contents: read
       actions: write
     steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.inputs.tag }}
@@ -36,54 +40,30 @@ jobs:
         with:
           bun-version: latest
       - name: Install dependencies
-        run: bun install --frozen-lockfile
-      - name: Resolve app id
-        id: app_config
-        run: echo "app_id=$(bun -e \"import config from './capacitor.config.ts'; console.log(config.appId)\")" >> "$GITHUB_OUTPUT"
+        # Force bun's hoisted (flat) node_modules layout. Capacitor's native iOS
+        # tooling hardcodes flat paths like ../node_modules/@capacitor/<plugin>,
+        # which break under bun's default isolated linker (symlinks into a
+        # node_modules/.bun/<pkg>@<ver>+<peerHash> store that can dangle on hash
+        # drift). Hoisted lays real folders at node_modules/@capacitor/<plugin>.
+        run: bun install --frozen-lockfile --linker=hoisted
       - name: Prepare mobile project
-        run: bun run build:mobile
-      - name: Save iOS build credentials for Capgo CLI
+        # Use `cap sync ios` instead of build:mobile's `cap copy`. `cap copy`
+        # only pushes web assets + config; `cap sync` also regenerates the
+        # native SwiftPM project files so the remote builder does not consume
+        # stale Package.resolved/CapApp-SPM state from the repository.
+        run: |
+          bun run build
+          bunx cap sync ios
+      - name: Request iOS build through Capgo CLI
         env:
+          CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
           APP_STORE_CONNECT_TEAM_ID: ${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
-          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+          CAPGO_IOS_PROVISIONING_MAP_BASE64: ${{ secrets.CAPGO_IOS_PROVISIONING_MAP_BASE64 }}
           APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
           APPLE_KEY_CONTENT: ${{ secrets.APPLE_KEY_CONTENT }}
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          certificate_path="$RUNNER_TEMP/build_certificate.p12"
-          provisioning_profile_path="$RUNNER_TEMP/build_profile.mobileprovision"
-          apple_key_path="$RUNNER_TEMP/AuthKey.p8"
-
-          printf '%s' "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$certificate_path"
-          printf '%s' "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > "$provisioning_profile_path"
-          printf '%s' "$APPLE_KEY_CONTENT" | base64 --decode > "$apple_key_path"
-
-          args=(
-            build credentials save
-            --local
-            --appId "${{ steps.app_config.outputs.app_id }}"
-            --platform ios
-            --apple-team-id "$APP_STORE_CONNECT_TEAM_ID"
-            --apple-key "$apple_key_path"
-            --apple-key-id "$APPLE_KEY_ID"
-            --apple-issuer-id "$APPLE_ISSUER_ID"
-            --certificate "$certificate_path"
-            --ios-provisioning-profile "$provisioning_profile_path"
-            --output-upload
-            --output-retention 7d
-          )
-
-          if [[ -n "${P12_PASSWORD:-}" ]]; then
-            args+=(--p12-password "$P12_PASSWORD")
-          fi
-
-          bunx @capgo/cli@latest "${args[@]}"
-      - name: Request iOS build through Capgo CLI
-        env:
-          CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
-        run: bunx @capgo/cli@latest build request "${{ steps.app_config.outputs.app_id }}" --platform ios --path . --output-upload --output-retention 7d
+          BUILD_OUTPUT_UPLOAD_ENABLED: "true"
+          BUILD_OUTPUT_RETENTION_SECONDS: "604800"
+        run: bunx @capgo/cli@latest build request --platform ios --path . --sync-ios-version --ai-analytics

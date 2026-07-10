@@ -14,6 +14,7 @@ import IconLock from '~icons/heroicons/lock-closed'
 import IconShield from '~icons/heroicons/shield-check'
 import IconUser from '~icons/heroicons/user'
 import SsoConfiguration from '~/components/organizations/SsoConfiguration.vue'
+import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { checkPermissions } from '~/services/permissions'
 import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
 import { getCurrentPlanNameOrg, useSupabase } from '~/services/supabase'
@@ -49,6 +50,7 @@ const router = useRouter()
 const supabase = useSupabase()
 const isLoading = ref(true)
 const isSaving = ref(false)
+const hideExternalPurchaseFlows = isNativeAppStoreContext()
 
 displayStore.NavTitle = t('security')
 
@@ -1204,11 +1206,14 @@ onMounted(async () => {
                   </p>
                 </div>
                 <div class="flex flex-col gap-2 md:flex-row md:items-center">
+                  <label for="required-encryption-key" class="sr-only">{{ t('required-encryption-key') }}</label>
                   <input
+                    id="required-encryption-key"
                     v-model="requiredEncryptionKey"
                     type="text"
                     maxlength="21"
                     :placeholder="t('required-encryption-key-placeholder')"
+                    :aria-label="t('required-encryption-key')"
                     :disabled="isSaving"
                     class="flex-1 px-4 py-2 border rounded-lg font-mono text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white disabled:opacity-50"
                   >
@@ -1254,8 +1259,10 @@ onMounted(async () => {
               </div>
               <label class="relative inline-flex items-center cursor-pointer">
                 <input
+                  id="password-policy-enabled"
                   v-model="policyEnabled"
                   type="checkbox"
+                  :aria-label="t('enforce-password-policy')"
                   :disabled="!hasOrgPerm || isSaving"
                   class="sr-only peer"
                   @change="handlePolicyToggle"
@@ -1268,13 +1275,15 @@ onMounted(async () => {
             <div v-if="policyEnabled" class="pl-4 space-y-4 border-l-2 border-blue-500">
               <!-- Minimum Length -->
               <div class="flex items-center justify-between">
-                <label class="dark:text-white text-slate-800">{{ t('minimum-length') }}</label>
+                <label for="password-policy-min-length" class="dark:text-white text-slate-800">{{ t('minimum-length') }}</label>
                 <div class="flex items-center space-x-2">
                   <input
+                    id="password-policy-min-length"
                     v-model.number="minLength"
                     type="number"
                     min="6"
                     max="72"
+                    :aria-label="t('minimum-length')"
                     :disabled="!hasOrgPerm || isSaving"
                     class="w-20 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white disabled:opacity-50"
                     @change="handleSettingChange"
@@ -1285,10 +1294,12 @@ onMounted(async () => {
 
               <!-- Require Uppercase -->
               <div class="flex items-center justify-between">
-                <label class="dark:text-white text-slate-800">{{ t('require-uppercase') }}</label>
+                <label for="password-policy-require-uppercase" class="dark:text-white text-slate-800">{{ t('require-uppercase') }}</label>
                 <input
+                  id="password-policy-require-uppercase"
                   v-model="requireUppercase"
                   type="checkbox"
+                  :aria-label="t('require-uppercase')"
                   :disabled="!hasOrgPerm || isSaving"
                   class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50"
                   @change="handleSettingChange"
@@ -1297,10 +1308,12 @@ onMounted(async () => {
 
               <!-- Require Number -->
               <div class="flex items-center justify-between">
-                <label class="dark:text-white text-slate-800">{{ t('require-number') }}</label>
+                <label for="password-policy-require-number" class="dark:text-white text-slate-800">{{ t('require-number') }}</label>
                 <input
+                  id="password-policy-require-number"
                   v-model="requireNumber"
                   type="checkbox"
+                  :aria-label="t('require-number')"
                   :disabled="!hasOrgPerm || isSaving"
                   class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50"
                   @change="handleSettingChange"
@@ -1309,10 +1322,12 @@ onMounted(async () => {
 
               <!-- Require Special Character -->
               <div class="flex items-center justify-between">
-                <label class="dark:text-white text-slate-800">{{ t('require-special-character') }}</label>
+                <label for="password-policy-require-special" class="dark:text-white text-slate-800">{{ t('require-special-character') }}</label>
                 <input
+                  id="password-policy-require-special"
                   v-model="requireSpecial"
                   type="checkbox"
+                  :aria-label="t('require-special-character')"
                   :disabled="!hasOrgPerm || isSaving"
                   class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50"
                   @change="handleSettingChange"
@@ -1465,8 +1480,10 @@ onMounted(async () => {
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer">
                   <input
+                    id="enforce-hashed-api-keys"
                     type="checkbox"
                     :checked="enforceHashedApiKeys"
+                    :aria-label="t('enforce-hashed-api-keys')"
                     :disabled="isSaving"
                     class="sr-only peer"
                     @change="toggleEnforceHashedApiKeys"
@@ -1485,8 +1502,10 @@ onMounted(async () => {
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer">
                   <input
+                    id="require-apikey-expiration"
                     v-model="requireApikeyExpiration"
                     type="checkbox"
+                    :aria-label="t('require-apikey-expiration')"
                     :disabled="isSaving"
                     class="sr-only peer"
                     @change="saveApikeyPolicy"
@@ -1499,17 +1518,19 @@ onMounted(async () => {
               <div v-if="requireApikeyExpiration" class="pl-4 border-l-2 border-blue-500">
                 <div class="flex items-center justify-between">
                   <div>
-                    <label class="dark:text-white text-slate-800">{{ t('max-apikey-expiration-days') }}</label>
+                    <label for="max-apikey-expiration-days" class="dark:text-white text-slate-800">{{ t('max-apikey-expiration-days') }}</label>
                     <p class="text-sm text-gray-500 dark:text-gray-400">
                       {{ t('max-apikey-expiration-days-help') }}
                     </p>
                   </div>
                   <input
+                    id="max-apikey-expiration-days"
                     v-model.number="maxApikeyExpirationDays"
                     type="number"
                     min="1"
                     max="365"
                     :placeholder="t('max-apikey-expiration-days-placeholder')"
+                    :aria-label="t('max-apikey-expiration-days')"
                     :disabled="isSaving"
                     class="w-24 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white disabled:opacity-50"
                     @change="saveApikeyPolicy"
@@ -1520,7 +1541,7 @@ onMounted(async () => {
           </section>
 
           <!-- SSO Configuration Section -->
-          <section v-if="hasOrgPerm" class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
+          <section v-if="hasOrgPerm && (isEnterprisePlan || !hideExternalPurchaseFlows)" class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
             <!-- Enterprise Plan: Show SSO Configuration -->
             <template v-if="isEnterprisePlan">
               <div class="flex items-start gap-4 mb-6">

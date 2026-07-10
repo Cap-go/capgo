@@ -4,7 +4,8 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { lockOnboardingApp, unlockOnboardingApp } from '../../utils/demo.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
-import { hasOrgRight, supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
+import { closeClient, getPgClient, logPgError } from '../../utils/pg.ts'
+import { hasOrgRight, supabaseAdmin } from '../../utils/supabase.ts'
 
 /** Request body for creating a demo app */
 export interface CreateDemoApp {
@@ -34,6 +35,8 @@ interface DemoManifestEntry {
   file_size: number
 }
 
+const DEMO_CAPGO_UPDATER_VERSION = '8.47.3'
+
 /**
  * Generate demo native packages (Capacitor plugins)
  * @param versionName - Version name to base the package versions on
@@ -42,23 +45,23 @@ interface DemoManifestEntry {
 function getDemoNativePackages(versionName: string): DemoNativePackage[] {
   // Base packages that evolve with app versions
   const basePackages: DemoNativePackage[] = [
-    { name: '@capacitor/core', version: '6.0.0' },
-    { name: '@capacitor/app', version: '6.0.0' },
-    { name: '@capacitor/haptics', version: '6.0.0' },
-    { name: '@capacitor/keyboard', version: '6.0.0' },
-    { name: '@capacitor/status-bar', version: '6.0.0' },
-    { name: '@capgo/capacitor-updater', version: '6.0.0' },
+    { name: '@capacitor/core', version: '8.3.4' },
+    { name: '@capacitor/app', version: '8.1.0' },
+    { name: '@capacitor/haptics', version: '8.0.2' },
+    { name: '@capacitor/keyboard', version: '8.0.3' },
+    { name: '@capacitor/status-bar', version: '8.0.2' },
+    { name: '@capgo/capacitor-updater', version: DEMO_CAPGO_UPDATER_VERSION },
   ]
 
   // Add more plugins in later versions
   if (versionName >= '1.1.0') {
-    basePackages.push({ name: '@capacitor/push-notifications', version: '6.0.0' })
-    basePackages.push({ name: '@capacitor/local-notifications', version: '6.0.0' })
+    basePackages.push({ name: '@capacitor/push-notifications', version: '8.1.1' })
+    basePackages.push({ name: '@capacitor/local-notifications', version: '8.2.0' })
   }
 
   if (versionName >= '1.2.0') {
-    basePackages.push({ name: '@capacitor/camera', version: '6.0.0' })
-    basePackages.push({ name: '@capacitor/filesystem', version: '6.0.0' })
+    basePackages.push({ name: '@capacitor/camera', version: '8.2.0' })
+    basePackages.push({ name: '@capacitor/filesystem', version: '8.1.2' })
   }
 
   return basePackages
@@ -217,6 +220,542 @@ function generateDeviceId(): string {
   return crypto.randomUUID()
 }
 
+type PgClient = ReturnType<typeof getPgClient>
+
+interface SeedDemoAppDataOptions {
+  appUuid: string
+  appId: string
+  ownerOrg: string
+  seedId: string
+  userId: string
+  appVersions: Array<Record<string, unknown>>
+  manifestRows: Array<Record<string, unknown>>
+  channelRows: Array<Record<string, unknown>>
+  deployRows: Array<Record<string, unknown>>
+  deviceRows: Array<Record<string, unknown>>
+  dailyMauRows: Array<Record<string, unknown>>
+  dailyBandwidthRows: Array<Record<string, unknown>>
+  dailyStorageRows: Array<Record<string, unknown>>
+  dailyVersionRows: Array<Record<string, unknown>>
+  buildRows: Array<Record<string, unknown>>
+}
+
+async function trackOnboardingDemoRowsInTransaction(
+  pgClient: PgClient,
+  appId: string,
+  ownerOrg: string,
+  relationName: string,
+  rowKeys: Array<string | number>,
+  seedId: string,
+): Promise<void> {
+  if (rowKeys.length === 0)
+    return
+
+  await pgClient.query(
+    'SELECT public.track_onboarding_demo_data($1::text, $2::uuid, $3::text, $4::text[], $5::uuid)',
+    [appId, ownerOrg, relationName, rowKeys.map(String), seedId],
+  )
+}
+
+function assertRecognizedRows(
+  relationName: string,
+  rows: Array<{ name?: string, id: string | number, is_demo_shape?: boolean }>,
+  expectedCount: number,
+): void {
+  const unrecognizedRows = rows.filter(row => row.is_demo_shape === false)
+  if (rows.length !== expectedCount || unrecognizedRows.length > 0) {
+    throw new Error(`${relationName} has existing rows that do not match the onboarding demo seed: ${unrecognizedRows.map(row => row.name ?? row.id).join(', ')}`)
+  }
+}
+
+async function seedOnboardingDemoDataInTransaction(
+  c: Context<MiddlewareKeyVariables>,
+  options: SeedDemoAppDataOptions,
+): Promise<void> {
+  const pgClient = getPgClient(c)
+  let shouldRollback = false
+
+  try {
+    await pgClient.query('BEGIN')
+    shouldRollback = true
+
+    await pgClient.query('SELECT public.reset_onboarding_demo_app_data($1::uuid)', [options.appUuid])
+
+    const versionResult = await pgClient.query<{ id: number, name: string, is_demo_shape: boolean }>(
+      `WITH raw_input AS (
+        SELECT *
+        FROM jsonb_to_recordset($1::jsonb) AS version_data(
+          name text,
+          created_at timestamptz,
+          comment text,
+          link text,
+          manifest_count int,
+          manifest jsonb,
+          native_packages jsonb
+        )
+      ),
+      input AS (
+        SELECT
+          raw_input.name,
+          raw_input.created_at,
+          raw_input.comment,
+          raw_input.link,
+          raw_input.manifest_count,
+          ARRAY(
+            SELECT ROW(manifest_entry.file_name, manifest_entry.s3_path, manifest_entry.file_hash)::public.manifest_entry
+            FROM jsonb_to_recordset(raw_input.manifest) AS manifest_entry(
+              file_name text,
+              s3_path text,
+              file_hash text
+            )
+          ) AS manifest,
+          ARRAY(
+            SELECT native_package.value::jsonb
+            FROM jsonb_array_elements(raw_input.native_packages) AS native_package(value)
+          ) AS native_packages
+        FROM raw_input
+      ),
+      inserted AS (
+        INSERT INTO public.app_versions (
+          owner_org,
+          deleted,
+          name,
+          app_id,
+          created_at,
+          comment,
+          link,
+          user_id,
+          manifest,
+          manifest_count,
+          native_packages
+        )
+        SELECT
+          $2::uuid,
+          false,
+          input.name,
+          $3::text,
+          input.created_at,
+          input.comment,
+          input.link,
+          $4::uuid,
+          input.manifest,
+          input.manifest_count,
+          input.native_packages
+        FROM input
+        ON CONFLICT (name, app_id) DO NOTHING
+        RETURNING id, name
+      )
+      SELECT
+        app_versions.id,
+        app_versions.name,
+        (
+          app_versions.owner_org = $2::uuid
+          AND app_versions.user_id = $4::uuid
+          AND app_versions.deleted IS FALSE
+          AND app_versions.storage_provider = 'r2'
+          AND app_versions.r2_path IS NULL
+          AND app_versions.checksum IS NULL
+          AND app_versions.session_key IS NULL
+          AND app_versions.external_url IS NULL
+          AND app_versions.comment IS NOT DISTINCT FROM input.comment
+          AND app_versions.link IS NOT DISTINCT FROM input.link
+          AND app_versions.manifest_count = input.manifest_count
+        ) AS is_demo_shape
+      FROM input
+      INNER JOIN public.app_versions
+        ON app_versions.app_id = $3::text
+        AND app_versions.name = input.name
+      ORDER BY input.name`,
+      [JSON.stringify(options.appVersions), options.ownerOrg, options.appId, options.userId],
+    )
+
+    assertRecognizedRows('app_versions', versionResult.rows, options.appVersions.length)
+    await trackOnboardingDemoRowsInTransaction(
+      pgClient,
+      options.appId,
+      options.ownerOrg,
+      'app_versions',
+      versionResult.rows.map(row => row.id),
+      options.seedId,
+    )
+
+    const manifestResult = await pgClient.query<{ id: number }>(
+      `WITH input AS (
+        SELECT *
+        FROM jsonb_to_recordset($1::jsonb) AS manifest_data(
+          version_name text,
+          file_name text,
+          s3_path text,
+          file_hash text,
+          file_size bigint
+        )
+      )
+      INSERT INTO public.manifest (
+        app_version_id,
+        file_name,
+        s3_path,
+        file_hash,
+        file_size
+      )
+      SELECT
+        app_versions.id,
+        input.file_name,
+        input.s3_path,
+        input.file_hash,
+        input.file_size
+      FROM input
+      INNER JOIN public.app_versions
+        ON app_versions.app_id = $2::text
+        AND app_versions.name = input.version_name
+      RETURNING id`,
+      [JSON.stringify(options.manifestRows), options.appId],
+    )
+    await trackOnboardingDemoRowsInTransaction(
+      pgClient,
+      options.appId,
+      options.ownerOrg,
+      'manifest',
+      manifestResult.rows.map(row => row.id),
+      options.seedId,
+    )
+
+    const channelResult = await pgClient.query<{ id: number, name: string, is_demo_shape: boolean }>(
+      `WITH input AS (
+        SELECT *
+        FROM jsonb_to_recordset($1::jsonb) AS channel_data(
+          name text,
+          public boolean,
+          allow_device_self_set boolean,
+          version_name text
+        )
+      ),
+      inserted AS (
+        INSERT INTO public.channels (
+          created_by,
+          app_id,
+          name,
+          public,
+          disable_auto_update_under_native,
+          disable_auto_update,
+          ios,
+          android,
+          electron,
+          allow_device_self_set,
+          allow_emulator,
+          allow_device,
+          allow_dev,
+          allow_prod,
+          version,
+          owner_org
+        )
+        SELECT
+          $2::uuid,
+          $3::text,
+          input.name,
+          input.public,
+          true,
+          'major'::public.disable_update,
+          true,
+          true,
+          true,
+          input.allow_device_self_set,
+          true,
+          true,
+          input.name <> 'production',
+          true,
+          app_versions.id,
+          $4::uuid
+        FROM input
+        INNER JOIN public.app_versions
+          ON app_versions.app_id = $3::text
+          AND app_versions.name = input.version_name
+        ON CONFLICT DO NOTHING
+        RETURNING id, name
+      )
+      SELECT
+        channels.id,
+        channels.name,
+        (
+          channels.created_by = $2::uuid
+          AND channels.owner_org = $4::uuid
+          AND channels.public = input.public
+          AND channels.disable_auto_update_under_native IS TRUE
+          AND channels.disable_auto_update = 'major'::public.disable_update
+          AND channels.ios IS TRUE
+          AND channels.android IS TRUE
+          AND channels.electron IS TRUE
+          AND channels.allow_device_self_set = input.allow_device_self_set
+          AND channels.allow_emulator IS TRUE
+          AND channels.allow_device IS TRUE
+          AND channels.allow_dev = (input.name <> 'production')
+          AND channels.allow_prod IS TRUE
+          AND app_versions.name = input.version_name
+        ) AS is_demo_shape
+      FROM input
+      INNER JOIN public.channels
+        ON channels.app_id = $3::text
+        AND channels.name = input.name
+      INNER JOIN public.app_versions
+        ON app_versions.id = channels.version
+      ORDER BY input.name`,
+      [JSON.stringify(options.channelRows), options.userId, options.appId, options.ownerOrg],
+    )
+
+    assertRecognizedRows('channels', channelResult.rows, options.channelRows.length)
+    await trackOnboardingDemoRowsInTransaction(
+      pgClient,
+      options.appId,
+      options.ownerOrg,
+      'channels',
+      channelResult.rows.map(row => row.id),
+      options.seedId,
+    )
+
+    const deployResult = await pgClient.query<{ id: number }>(
+      `WITH input AS (
+        SELECT *
+        FROM jsonb_to_recordset($1::jsonb) AS deploy_data(
+          channel_name text,
+          version_name text,
+          created_at timestamptz,
+          deployed_at timestamptz
+        )
+      )
+      INSERT INTO public.deploy_history (
+        app_id,
+        channel_id,
+        version_id,
+        created_by,
+        owner_org,
+        created_at,
+        deployed_at
+      )
+      SELECT
+        $2::text,
+        channels.id,
+        app_versions.id,
+        $3::uuid,
+        $4::uuid,
+        input.created_at,
+        input.deployed_at
+      FROM input
+      INNER JOIN public.channels
+        ON channels.app_id = $2::text
+        AND channels.name = input.channel_name
+      INNER JOIN public.app_versions
+        ON app_versions.app_id = $2::text
+        AND app_versions.name = input.version_name
+      RETURNING id`,
+      [JSON.stringify(options.deployRows), options.appId, options.userId, options.ownerOrg],
+    )
+    await trackOnboardingDemoRowsInTransaction(
+      pgClient,
+      options.appId,
+      options.ownerOrg,
+      'deploy_history',
+      deployResult.rows.map(row => row.id),
+      options.seedId,
+    )
+
+    const deviceResult = await pgClient.query<{ id: number }>(
+      `WITH input AS (
+        SELECT *
+        FROM jsonb_to_recordset($1::jsonb) AS device_data(
+          device_id text,
+          platform text,
+          plugin_version text,
+          version_name text,
+          version_build text,
+          os_version text,
+          is_emulator boolean,
+          is_prod boolean,
+          updated_at timestamptz
+        )
+      )
+      INSERT INTO public.devices (
+        app_id,
+        device_id,
+        platform,
+        plugin_version,
+        version,
+        version_name,
+        version_build,
+        os_version,
+        is_emulator,
+        is_prod,
+        updated_at
+      )
+      SELECT
+        $2::text,
+        input.device_id,
+        input.platform::public.platform_os,
+        input.plugin_version,
+        app_versions.id,
+        input.version_name,
+        input.version_build,
+        input.os_version,
+        input.is_emulator,
+        input.is_prod,
+        input.updated_at
+      FROM input
+      INNER JOIN public.app_versions
+        ON app_versions.app_id = $2::text
+        AND app_versions.name = input.version_name
+      RETURNING id`,
+      [JSON.stringify(options.deviceRows), options.appId],
+    )
+    await trackOnboardingDemoRowsInTransaction(
+      pgClient,
+      options.appId,
+      options.ownerOrg,
+      'devices',
+      deviceResult.rows.map(row => row.id),
+      options.seedId,
+    )
+
+    await pgClient.query(
+      `INSERT INTO public.daily_mau (app_id, date, mau)
+      SELECT $2::text, date, mau
+      FROM jsonb_to_recordset($1::jsonb) AS daily_data(date date, mau bigint)
+      ON CONFLICT (app_id, date) DO NOTHING`,
+      [JSON.stringify(options.dailyMauRows), options.appId],
+    )
+
+    await pgClient.query(
+      `INSERT INTO public.daily_bandwidth (app_id, date, bandwidth)
+      SELECT $2::text, date, bandwidth
+      FROM jsonb_to_recordset($1::jsonb) AS daily_data(date date, bandwidth bigint)
+      ON CONFLICT (app_id, date) DO NOTHING`,
+      [JSON.stringify(options.dailyBandwidthRows), options.appId],
+    )
+
+    await pgClient.query(
+      `INSERT INTO public.daily_storage (app_id, date, storage)
+      SELECT $2::text, date, storage
+      FROM jsonb_to_recordset($1::jsonb) AS daily_data(date date, storage bigint)
+      ON CONFLICT (app_id, date) DO NOTHING`,
+      [JSON.stringify(options.dailyStorageRows), options.appId],
+    )
+
+    await pgClient.query(
+      `WITH input AS (
+        SELECT *
+        FROM jsonb_to_recordset($1::jsonb) AS daily_data(
+          date date,
+          version_name text,
+          get bigint,
+          install bigint,
+          fail bigint,
+          uninstall bigint
+        )
+      )
+      INSERT INTO public.daily_version (
+        app_id,
+        date,
+        version_id,
+        version_name,
+        get,
+        install,
+        fail,
+        uninstall
+      )
+      SELECT
+        $2::text,
+        input.date,
+        app_versions.id,
+        input.version_name,
+        input.get,
+        input.install,
+        input.fail,
+        input.uninstall
+      FROM input
+      INNER JOIN public.app_versions
+        ON app_versions.app_id = $2::text
+        AND app_versions.name = input.version_name
+      ON CONFLICT (app_id, date, version_name) DO NOTHING`,
+      [JSON.stringify(options.dailyVersionRows), options.appId],
+    )
+
+    const buildResult = await pgClient.query<{ id: string }>(
+      `WITH input AS (
+        SELECT *
+        FROM jsonb_to_recordset($1::jsonb) AS build_data(
+          id uuid,
+          platform text,
+          requested_by uuid,
+          status text,
+          build_mode text,
+          build_config jsonb,
+          builder_job_id text,
+          runner_wait_seconds bigint,
+          created_at timestamptz,
+          upload_expires_at timestamptz,
+          upload_path text,
+          upload_session_key text,
+          upload_url text
+        )
+      )
+      INSERT INTO public.build_requests (
+        id,
+        app_id,
+        owner_org,
+        platform,
+        requested_by,
+        status,
+        build_mode,
+        build_config,
+        builder_job_id,
+        runner_wait_seconds,
+        created_at,
+        upload_expires_at,
+        upload_path,
+        upload_session_key,
+        upload_url
+      )
+      SELECT
+        input.id,
+        $2::text,
+        $3::uuid,
+        input.platform,
+        input.requested_by,
+        input.status,
+        input.build_mode,
+        input.build_config,
+        input.builder_job_id,
+        input.runner_wait_seconds,
+        input.created_at,
+        input.upload_expires_at,
+        input.upload_path,
+        input.upload_session_key,
+        input.upload_url
+      FROM input
+      RETURNING id`,
+      [JSON.stringify(options.buildRows), options.appId, options.ownerOrg],
+    )
+    await trackOnboardingDemoRowsInTransaction(
+      pgClient,
+      options.appId,
+      options.ownerOrg,
+      'build_requests',
+      buildResult.rows.map(row => row.id),
+      options.seedId,
+    )
+
+    await pgClient.query('DELETE FROM public.app_metrics_cache WHERE org_id = $1::uuid', [options.ownerOrg])
+    await pgClient.query('COMMIT')
+  }
+  catch (error) {
+    if (shouldRollback)
+      await pgClient.query('ROLLBACK')
+
+    logPgError(c, 'seedOnboardingDemoDataInTransaction', error)
+    throw simpleError('cannot_create_demo_data', 'Cannot create demo data', { error: (error as Error)?.message })
+  }
+  finally {
+    await closeClient(c, pgClient)
+  }
+}
+
 async function getExistingPendingApp(
   c: Context<MiddlewareKeyVariables>,
   supabase: ReturnType<typeof supabaseAdmin>,
@@ -335,13 +874,7 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       throw simpleError('cannot_find_app', 'Cannot find app for demo onboarding', { owner_org: body.owner_org, app_id: lockedAppId })
     }
     const appId = appData.app_id
-    const { error: cleanupError } = await supabase
-      .rpc('clear_onboarding_app_data', { p_app_uuid: appData.id })
-
-    if (cleanupError) {
-      cloudlog({ requestId, message: 'Error clearing onboarding data before demo seeding', error: cleanupError, app_id: appId })
-      throw simpleError('cannot_prepare_demo_app', 'Cannot prepare app for demo data', { error: cleanupError })
-    }
+    const demoSeedId = crypto.randomUUID()
 
     cloudlog({ requestId, message: 'Creating demo app with demo data', appId, owner_org: body.owner_org })
 
@@ -355,8 +888,6 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
 
     // Demo versions to create - simulates app development lifecycle
     const demoVersions: DemoVersion[] = [
-      { name: 'unknown', daysAgo: 14 },
-      { name: 'builtin', daysAgo: 14 },
       { name: '1.0.0', daysAgo: 13, comment: 'Initial release' },
       { name: '1.0.1', daysAgo: 10, comment: 'Bug fixes for login screen' },
       { name: '1.1.0', daysAgo: 7, comment: 'Added dark mode support' },
@@ -364,88 +895,40 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       { name: '1.2.0', daysAgo: 1, comment: 'New dashboard features', link: 'https://github.com/example/demo-app/pull/123' },
     ]
 
-    // Create all versions with manifest and native_packages for real versions
-    const versionInserts = demoVersions.map((v) => {
-      const isSystemVersion = v.name === 'unknown' || v.name === 'builtin'
-      const manifest = isSystemVersion ? null : getDemoManifest(v.name, appId)
-      const nativePackages = isSystemVersion ? null : getDemoNativePackages(v.name)
+    const appVersionRows = demoVersions.map((v): Record<string, unknown> => {
+      const manifest = getDemoManifest(v.name, appId)
+      const nativePackages = getDemoNativePackages(v.name)
 
       return {
-        owner_org: body.owner_org,
-        deleted: isSystemVersion,
+        deleted: false,
         name: v.name,
-        app_id: appId,
         created_at: daysAgoDate(v.daysAgo),
-        comment: v.comment,
-        link: v.link,
-        user_id: auth.userId,
-        // Add manifest and native_packages for non-system versions
-        manifest: manifest as any,
+        comment: v.comment ?? null,
+        link: v.link ?? null,
+        manifest: manifest?.map(entry => ({
+          file_name: entry.file_name,
+          s3_path: entry.s3_path,
+          file_hash: entry.file_hash,
+        })) ?? null,
         manifest_count: manifest?.length ?? 0,
-        native_packages: nativePackages as any,
+        native_packages: nativePackages ?? null,
       }
     })
 
-    const { data: versionsData, error: versionsError } = await supabase
-      .from('app_versions')
-      .upsert(versionInserts, { onConflict: 'name,app_id', ignoreDuplicates: true })
-      .select()
-
-    if (versionsError) {
-      cloudlog({ requestId, message: 'Error creating demo versions', error: versionsError })
-    }
-    else {
-      cloudlog({ requestId, message: 'Demo versions created', count: versionsData?.length })
-    }
-
-    // Get all version IDs for channel and deploy history creation
-    const { data: allVersions, error: allVersionsError } = await supabase
-      .from('app_versions')
-      .select('id, name')
-      .eq('app_id', appId)
-      .eq('owner_org', body.owner_org)
-
-    if (allVersionsError || !allVersions) {
-      cloudlog({ requestId, message: 'Error getting versions', error: allVersionsError })
-      throw simpleError('cannot_get_versions', 'Cannot get versions', { error: allVersionsError })
-    }
-
-    const versionMap = new Map(allVersions.map(v => [v.name, v.id]))
-
     // Insert manifest entries into the manifest table for each version
     // This is required for the bundle file list to show in the UI
-    const manifestInserts: Database['public']['Tables']['manifest']['Insert'][] = []
+    const manifestRows: Array<Record<string, unknown>> = []
 
     for (const version of demoVersions) {
-      if (version.name === 'unknown' || version.name === 'builtin')
-        continue
-
-      const versionId = versionMap.get(version.name)
-      if (!versionId)
-        continue
-
       const manifestEntries = getDemoManifest(version.name, appId)
       for (const entry of manifestEntries) {
-        manifestInserts.push({
-          app_version_id: versionId,
+        manifestRows.push({
+          version_name: version.name,
           file_name: entry.file_name,
           file_hash: entry.file_hash,
           s3_path: entry.s3_path,
           file_size: entry.file_size,
         })
-      }
-    }
-
-    if (manifestInserts.length > 0) {
-      const { error: manifestError } = await supabase
-        .from('manifest')
-        .insert(manifestInserts)
-
-      if (manifestError) {
-        cloudlog({ requestId, message: 'Error creating manifest entries', error: manifestError })
-      }
-      else {
-        cloudlog({ requestId, message: 'Manifest entries created', count: manifestInserts.length })
       }
     }
 
@@ -463,61 +946,12 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       'pr-123': '1.2.0',
     }
 
-    // Create channels
-    const createdChannels: Map<string, number> = new Map()
-
-    for (const channel of demoChannels) {
-      const versionName = channelVersions[channel.name]
-      const versionId = versionMap.get(versionName)
-
-      if (!versionId) {
-        cloudlog({ requestId, message: 'Version not found for channel', channel: channel.name, versionName })
-        continue
-      }
-
-      const channelInsert: Database['public']['Tables']['channels']['Insert'] = {
-        created_by: auth.userId,
-        app_id: appId,
-        name: channel.name,
-        public: channel.public,
-        disable_auto_update_under_native: true,
-        disable_auto_update: 'major',
-        ios: true,
-        android: true,
-        electron: true,
-        allow_device_self_set: channel.allowDeviceSelfSet ?? false,
-        allow_emulator: true,
-        allow_device: true,
-        allow_dev: channel.name !== 'production',
-        allow_prod: true,
-        version: versionId,
-        owner_org: body.owner_org,
-      }
-
-      try {
-        await updateOrCreateChannel(c, channelInsert)
-        cloudlog({ requestId, message: 'Channel created', channel: channel.name })
-      }
-      catch (error) {
-        cloudlog({ requestId, message: 'Error creating channel', channel: channel.name, error })
-      }
-    }
-
-    // Get all channel IDs for deploy history creation
-    const { data: allChannels, error: allChannelsError } = await supabase
-      .from('channels')
-      .select('id, name')
-      .eq('app_id', appId)
-      .eq('owner_org', body.owner_org)
-
-    if (allChannelsError) {
-      cloudlog({ requestId, message: 'Error getting channels', error: allChannelsError })
-    }
-    else if (allChannels) {
-      for (const ch of allChannels) {
-        createdChannels.set(ch.name, ch.id)
-      }
-    }
+    const channelRows = demoChannels.map(channel => ({
+      name: channel.name,
+      public: channel.public,
+      allow_device_self_set: channel.allowDeviceSelfSet ?? false,
+      version_name: channelVersions[channel.name],
+    }))
 
     // Create deploy history to show progression
     const deployHistory: Array<{ channel: string, version: string, daysAgo: number }> = [
@@ -532,50 +966,30 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       { channel: 'development', version: '1.2.0', daysAgo: 1 },
     ]
 
-    const deployInserts = deployHistory
-      .filter(d => createdChannels.has(d.channel) && versionMap.has(d.version))
+    const deployRows = deployHistory
       .map(d => ({
-        app_id: appId,
-        channel_id: createdChannels.get(d.channel)!,
-        version_id: versionMap.get(d.version)!,
-        created_by: auth.userId,
-        owner_org: body.owner_org,
+        channel_name: d.channel,
+        version_name: d.version,
         created_at: daysAgoDate(d.daysAgo),
         deployed_at: daysAgoDate(d.daysAgo),
       }))
-
-    if (deployInserts.length > 0) {
-      const { error: deployError } = await supabase
-        .from('deploy_history')
-        .insert(deployInserts)
-
-      if (deployError) {
-        cloudlog({ requestId, message: 'Error creating deploy history', error: deployError })
-      }
-      else {
-        cloudlog({ requestId, message: 'Deploy history created', count: deployInserts.length })
-      }
-    }
 
     // Create fake devices - mix of iOS and Android
     // Note: In production Cloudflare Workers, devices are read from Analytics Engine (DEVICE_INFO)
     // This Supabase data serves as fallback for non-workerd environments (dev, staging, Deno)
     const platforms: Array<Database['public']['Enums']['platform_os']> = ['ios', 'android']
-    const deviceInserts: Database['public']['Tables']['devices']['Insert'][] = []
+    const deviceRows: Array<Record<string, unknown>> = []
     const generatedDeviceIds: string[] = []
 
     // Create 8 devices (4 iOS, 4 Android)
     for (let i = 0; i < 8; i++) {
       const platform = platforms[i % 2]
-      const latestVersionId = versionMap.get('1.1.1')
       const deviceId = generateDeviceId()
       generatedDeviceIds.push(deviceId)
-      deviceInserts.push({
-        app_id: appId,
+      deviceRows.push({
         device_id: deviceId,
         platform,
-        plugin_version: '6.0.0',
-        version: latestVersionId,
+        plugin_version: DEMO_CAPGO_UPDATER_VERSION,
         version_name: '1.1.1',
         version_build: '1',
         os_version: platform === 'ios' ? '17.0' : '14',
@@ -585,24 +999,13 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       })
     }
 
-    const { error: devicesError } = await supabase
-      .from('devices')
-      .insert(deviceInserts)
-
-    if (devicesError) {
-      cloudlog({ requestId, message: 'Error creating demo devices', error: devicesError })
-    }
-    else {
-      cloudlog({ requestId, message: 'Demo devices created', count: deviceInserts.length })
-    }
-
     // Create chart data for the past 14 days
     // Insert directly into daily_* tables (which the frontend queries via get_app_metrics RPC)
     // instead of raw *_usage tables (which require cron job aggregation)
-    const dailyMauInserts: Database['public']['Tables']['daily_mau']['Insert'][] = []
-    const dailyBandwidthInserts: Database['public']['Tables']['daily_bandwidth']['Insert'][] = []
-    const dailyStorageInserts: Database['public']['Tables']['daily_storage']['Insert'][] = []
-    const dailyVersionInserts: Database['public']['Tables']['daily_version']['Insert'][] = []
+    const dailyMauRows: Array<Record<string, unknown>> = []
+    const dailyBandwidthRows: Array<Record<string, unknown>> = []
+    const dailyStorageRows: Array<Record<string, unknown>> = []
+    const dailyVersionRows: Array<Record<string, unknown>> = []
 
     // Version sizes for storage calculation
     const versionSizes: Record<string, number> = {
@@ -630,8 +1033,7 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
 
       // MAU: Number of active devices increases over time (simulating user growth)
       const mau = Math.min(generatedDeviceIds.length, 3 + Math.floor((13 - daysAgo) * 0.5))
-      dailyMauInserts.push({
-        app_id: appId,
+      dailyMauRows.push({
         date,
         mau,
       })
@@ -640,8 +1042,7 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       const bundleSize = 5500000 // ~5.5MB average bundle
       const downloadsToday = Math.max(1, mau - 1)
       const bandwidth = bundleSize * downloadsToday
-      dailyBandwidthInserts.push({
-        app_id: appId,
+      dailyBandwidthRows.push({
         date,
         bandwidth,
       })
@@ -655,8 +1056,7 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       }
       // Only add storage entry if we have some storage
       if (cumulativeStorage > 0) {
-        dailyStorageInserts.push({
-          app_id: appId,
+        dailyStorageRows.push({
           date,
           storage: cumulativeStorage,
         })
@@ -665,10 +1065,6 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       // Version usage: Create aggregated stats for each active version on this day
       for (const [versionName, period] of Object.entries(versionActivePeriods)) {
         if (daysAgo <= period.startDaysAgo && daysAgo >= period.endDaysAgo) {
-          const versionId = versionMap.get(versionName)
-          if (!versionId)
-            continue
-
           // Activity increases as version gets more exposure
           const daysSinceRelease = period.startDaysAgo - daysAgo
           const baseActivity = Math.min(3 + daysSinceRelease, 8)
@@ -678,10 +1074,8 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
           const failCount = Math.max(0, Math.floor(getCount * 0.05))
           const uninstallCount = daysAgo < period.startDaysAgo - 1 ? Math.max(0, Math.floor(installCount * 0.1)) : 0
 
-          dailyVersionInserts.push({
-            app_id: appId,
+          dailyVersionRows.push({
             date,
-            version_id: versionId,
             version_name: versionName,
             get: getCount,
             install: installCount,
@@ -692,52 +1086,9 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       }
     }
 
-    // Insert chart data into daily_* tables
-    if (dailyMauInserts.length > 0) {
-      const { error: mauError } = await supabase.from('daily_mau').upsert(dailyMauInserts, { onConflict: 'app_id,date' })
-      if (mauError) {
-        cloudlog({ requestId, message: 'Error creating daily_mau data', error: mauError })
-      }
-      else {
-        cloudlog({ requestId, message: 'Daily MAU data created', count: dailyMauInserts.length })
-      }
-    }
-
-    if (dailyBandwidthInserts.length > 0) {
-      const { error: bandwidthError } = await supabase.from('daily_bandwidth').upsert(dailyBandwidthInserts, { onConflict: 'app_id,date' })
-      if (bandwidthError) {
-        cloudlog({ requestId, message: 'Error creating daily_bandwidth data', error: bandwidthError })
-      }
-      else {
-        cloudlog({ requestId, message: 'Daily bandwidth data created', count: dailyBandwidthInserts.length })
-      }
-    }
-
-    if (dailyStorageInserts.length > 0) {
-      const { error: storageError } = await supabase.from('daily_storage').upsert(dailyStorageInserts, { onConflict: 'app_id,date' })
-      if (storageError) {
-        cloudlog({ requestId, message: 'Error creating daily_storage data', error: storageError })
-      }
-      else {
-        cloudlog({ requestId, message: 'Daily storage data created', count: dailyStorageInserts.length })
-      }
-    }
-
-    if (dailyVersionInserts.length > 0) {
-      const { error: versionError } = await supabase.from('daily_version').upsert(dailyVersionInserts as any, { onConflict: 'app_id,date,version_name' })
-      if (versionError) {
-        cloudlog({ requestId, message: 'Error creating daily_version data', error: versionError })
-      }
-      else {
-        cloudlog({ requestId, message: 'Daily version data created', count: dailyVersionInserts.length })
-      }
-    }
-
-    cloudlog({ requestId, message: 'Chart data created for 14 days' })
-
     // Create fake native builds to showcase the build feature
     // Shows a mix of successful builds and one pending build
-    const buildInserts: Database['public']['Tables']['build_requests']['Insert'][] = []
+    const buildRows: Array<Record<string, unknown>> = []
 
     // Build configurations for different versions
     const nativeBuilds = [
@@ -756,10 +1107,8 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       const createdAt = daysAgoDate(build.daysAgo)
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Expires in 24 hours
 
-      buildInserts.push({
+      buildRows.push({
         id: buildId,
-        app_id: appId,
-        owner_org: body.owner_org,
         platform: build.platform,
         requested_by: auth.userId,
         status: build.status,
@@ -779,32 +1128,35 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       })
     }
 
-    if (buildInserts.length > 0) {
-      const { error: buildError } = await supabase
-        .from('build_requests')
-        .insert(buildInserts)
+    await seedOnboardingDemoDataInTransaction(c, {
+      appUuid: appData.id,
+      appId,
+      ownerOrg: body.owner_org,
+      seedId: demoSeedId,
+      userId: auth.userId,
+      appVersions: appVersionRows,
+      manifestRows,
+      channelRows,
+      deployRows,
+      deviceRows,
+      dailyMauRows,
+      dailyBandwidthRows,
+      dailyStorageRows,
+      dailyVersionRows,
+      buildRows,
+    })
 
-      if (buildError) {
-        cloudlog({ requestId, message: 'Error creating demo build requests', error: buildError })
-      }
-      else {
-        cloudlog({ requestId, message: 'Demo build requests created', count: buildInserts.length })
-      }
-    }
-
-    // Invalidate the app_metrics_cache so the dashboard shows fresh data immediately
-    // The get_app_metrics RPC caches results for 5 minutes, so we need to clear it
-    const { error: cacheError } = await supabase
-      .from('app_metrics_cache')
-      .delete()
-      .eq('org_id', body.owner_org)
-
-    if (cacheError) {
-      cloudlog({ requestId, message: 'Error invalidating app_metrics_cache', error: cacheError })
-    }
-    else {
-      cloudlog({ requestId, message: 'App metrics cache invalidated for org', org_id: body.owner_org })
-    }
+    cloudlog({
+      requestId,
+      message: 'Demo seed transaction committed',
+      appId,
+      versions: appVersionRows.length,
+      manifests: manifestRows.length,
+      channels: channelRows.length,
+      deploys: deployRows.length,
+      devices: deviceRows.length,
+      builds: buildRows.length,
+    })
 
     cloudlog({ requestId, message: 'Demo app with all demo data created successfully', appId })
 

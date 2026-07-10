@@ -178,7 +178,8 @@ export async function setOrganizationInternal(
         channel: 'organization',
         event: enforce2fa ? 'Organization 2FA Enabled' : 'Organization 2FA Disabled',
         icon: '🔐',
-        user_id: orgId,
+        org_id: orgId,
+        tracking_version: 2,
         tags: {
           'org-name': orgData.name,
           'enforce-2fa': enforce2fa.toString(),
@@ -273,7 +274,8 @@ export async function setOrganizationInternal(
         channel: 'organization',
         event: passwordPolicy ? 'Password Policy Enabled' : 'Password Policy Disabled',
         icon: '🔑',
-        user_id: orgId,
+        org_id: orgId,
+        tracking_version: 2,
         tags: {
           'org-name': orgData.name,
         },
@@ -349,7 +351,8 @@ export async function setOrganizationInternal(
         channel: 'organization',
         event: 'API Key Settings Updated',
         icon: '🔐',
-        user_id: orgId,
+        org_id: orgId,
+        tracking_version: 2,
         tags: {
           'org-name': orgData.name,
         },
@@ -417,7 +420,8 @@ export async function setOrganizationInternal(
     channel: 'organization',
     event: 'Organization Updated',
     icon: '✏️',
-    user_id: orgId,
+    org_id: orgId,
+    tracking_version: 2,
     tags: {
       'org-name': name,
     },

@@ -327,8 +327,8 @@ SELECT tests.authenticate_as('test_user');
 
 SELECT
     ok(
-        check_revert_to_builtin_version('com.demo.app') > 0,
-        'check_revert_to_builtin_version test - returns version id'
+        check_revert_to_builtin_version('com.demo.app') IS NULL,
+        'check_revert_to_builtin_version test - returns NULL for native rollback'
     );
 
 -- Test check_revert_to_builtin_version negative case (skipped due to missing app_versions table in test environment)

@@ -7,7 +7,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.9.1'
+        classpath 'com.android.tools.build:gradle:8.13.0'
         classpath 'com.google.gms:google-services:4.4.4'
 
         // NOTE: Do not place your application dependencies here; they belong
@@ -21,6 +21,16 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        // Custom SDK repositories for @capgo/capacitor-jw-player,
+        // @capgo/capacitor-mux-player and @capgo/capacitor-appinsights. Each plugin
+        // declares these in its own build.gradle, but :app resolves the plugins'
+        // transitive implementation deps (com.jwplayer:*, com.mux.player:android,
+        // com.appinsights:appinsights) against :app's repositories, so they must be
+        // visible here too — otherwise resolution only searches google()/mavenCentral()
+        // and fails with "Could not find ...".
+        maven { url = 'https://mvn.jwplayer.com/content/repositories/releases/' }
+        maven { url = 'https://muxinc.jfrog.io/artifactory/default-maven-release-local' }
+        maven { url = 'https://repo.apptopia.com/maven' }
     }
 }
 

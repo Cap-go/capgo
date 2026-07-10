@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to build (e.g., v1.0.0)'
+        description: "Tag to build (e.g., v1.0.0)"
         required: true
 
 permissions: {}
@@ -21,6 +21,10 @@ jobs:
       contents: read
       actions: write
     steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
       - name: Checkout
         uses: actions/checkout@v6
         with:
@@ -37,41 +41,29 @@ jobs:
         with:
           bun-version: latest
       - name: Install dependencies
-        run: bun install --frozen-lockfile
-      - name: Resolve app id
-        id: app_config
-        run: echo "app_id=$(bun -e \"import config from './capacitor.config.ts'; console.log(config.appId)\")" >> "$GITHUB_OUTPUT"
+        # Force bun's hoisted (flat) node_modules layout. The monorepo defaults to
+        # bun's isolated linker (node_modules/.bun/<pkg>@<ver>+<peerHash> + symlinks),
+        # which Capacitor's Gradle subprojects can't resolve (../node_modules/@capacitor/
+        # <plugin>/android), producing "No variants exist". Hoisted lays real folders.
+        run: bun install --frozen-lockfile --linker=hoisted
       - name: Prepare mobile project
-        run: bun run build:mobile
-      - name: Save Android build credentials for Capgo CLI
+        # Use `cap sync android` instead of build:mobile's `cap copy`. `cap copy`
+        # only pushes web assets + config; `cap sync` also runs `cap update`, which
+        # regenerates the cordova plugins subproject including
+        # android/capacitor-cordova-android-plugins/cordova.variables.gradle.
+        # That dir is gitignored, so the remote builder never receives it unless we
+        # regenerate it here before `capgo build request` uploads the workspace.
+        run: |
+          bun run build
+          bunx cap sync android
+      - name: Request Android build through Capgo CLI
         env:
+          CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
           ANDROID_KEYSTORE_FILE: ${{ secrets.ANDROID_KEYSTORE_FILE }}
           PLAY_CONFIG_JSON: ${{ secrets.PLAY_CONFIG_JSON }}
           KEYSTORE_KEY_ALIAS: ${{ secrets.KEYSTORE_KEY_ALIAS }}
           KEYSTORE_KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
           KEYSTORE_STORE_PASSWORD: ${{ secrets.KEYSTORE_STORE_PASSWORD }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          keystore_path="$RUNNER_TEMP/android_keystore.keystore"
-          play_config_path="$RUNNER_TEMP/serviceAccount.json"
-
-          printf '%s' "$ANDROID_KEYSTORE_FILE" | base64 --decode > "$keystore_path"
-          printf '%s' "$PLAY_CONFIG_JSON" | base64 --decode > "$play_config_path"
-
-          bunx @capgo/cli@latest build credentials save \
-            --local \
-            --appId "${{ steps.app_config.outputs.app_id }}" \
-            --platform android \
-            --keystore "$keystore_path" \
-            --keystore-alias "$KEYSTORE_KEY_ALIAS" \
-            --keystore-key-password "$KEYSTORE_KEY_PASSWORD" \
-            --keystore-store-password "$KEYSTORE_STORE_PASSWORD" \
-            --play-config "$play_config_path" \
-            --output-upload \
-            --output-retention 7d
-      - name: Request Android build through Capgo CLI
-        env:
-          CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
-        run: bunx @capgo/cli@latest build request "${{ steps.app_config.outputs.app_id }}" --platform android --path . --output-upload --output-retention 7d
+          BUILD_OUTPUT_UPLOAD_ENABLED: "true"
+          BUILD_OUTPUT_RETENTION_SECONDS: "604800"
+        run: bunx @capgo/cli@latest build request --platform android --path . --ai-analytics

@@ -46,6 +46,7 @@ const uploadSearch = ref('')
 const channels = ref<DownloadChannel[]>([])
 const selectedDownloadChannelIds = ref<Record<DownloadPlatform, number | null>>({ ios: null, android: null, electron: null })
 const splitDownloadDefaults = ref(false)
+const disableDownloadUpdates = ref(false)
 const selectedCombinedChannelId = ref<number | null>(null)
 const combinedSearch = ref('')
 const downloadSearches = reactive<Record<DownloadPlatform, string>>({ ios: '', android: '', electron: '' })
@@ -237,6 +238,7 @@ async function submit(form: {
   expose_metadata: boolean
   allow_preview: boolean
   allow_device_custom_id: boolean
+  block_provider_infra_requests: boolean
   build_timeout_minutes?: number | string
 }) {
   isLoading.value = true
@@ -292,6 +294,14 @@ async function submit(form: {
     // Defensive: avoid flipping the flag if the value is missing/invalid.
     if (typeof form.allow_device_custom_id === 'boolean')
       await updateAllowDeviceCustomId(form.allow_device_custom_id)
+  }
+  catch (error) {
+    toast.error(error as string)
+  }
+
+  try {
+    if (typeof form.block_provider_infra_requests === 'boolean')
+      await updateBlockProviderInfraRequests(form.block_provider_infra_requests)
   }
   catch (error) {
     toast.error(error as string)
@@ -537,6 +547,20 @@ async function updateAllowDeviceCustomId(newAllowDeviceCustomId: boolean) {
     appRef.value.allow_device_custom_id = newAllowDeviceCustomId
 }
 
+async function updateBlockProviderInfraRequests(enabled: boolean) {
+  const current = appRef.value?.block_provider_infra_requests ?? false
+  if (enabled === current)
+    return Promise.resolve()
+
+  const { error } = await supabase.from('apps').update({ block_provider_infra_requests: enabled }).eq('app_id', props.appId)
+  if (error)
+    return Promise.reject(t('cannot-change-block-provider-infra-requests'))
+
+  toast.success(t('changed-block-provider-infra-requests'))
+  if (appRef.value)
+    appRef.value.block_provider_infra_requests = enabled
+}
+
 async function loadChannels() {
   const { data, error } = await supabase
     .from('channels')
@@ -778,7 +802,7 @@ const downloadChannelLabel = computed(() => {
   const defaults = platforms.map(platform => defaultChannelByPlatform.value[platform])
 
   if (!defaults.some(Boolean))
-    return t('default-download-channel-empty')
+    return t('capgo-updates-disabled')
 
   const firstDefault = defaults[0]
   if (firstDefault && defaults.every(channel => channel?.id === firstDefault.id))
@@ -801,8 +825,8 @@ async function openDefaultDownloadChannelDialog() {
 
   await loadChannels()
 
-  if (!hasCombinedOptions.value && !canSplitDownloadDefaults.value) {
-    toast.error(t('no-compatible-download-channel'))
+  if (!channels.value.length) {
+    toast.error(t('no-channels-available'))
     return
   }
 
@@ -812,6 +836,7 @@ async function openDefaultDownloadChannelDialog() {
   const platforms = availableDownloadPlatforms.value
   const defaultChannels = platforms.map(platform => defaultChannelByPlatform.value[platform])
   const firstDefault = defaultChannels[0]
+  disableDownloadUpdates.value = !defaultChannels.some(Boolean)
   const sameDefaultChannel = !!firstDefault
     && defaultChannels.every(channel => channel?.id === firstDefault.id)
     && platforms.every(platform => firstDefault[platform])
@@ -848,6 +873,33 @@ async function openDefaultDownloadChannelDialog() {
         text: t('button-confirm'),
         role: 'primary',
         handler: async () => {
+          if (disableDownloadUpdates.value) {
+            const { error } = await supabase
+              .from('channels')
+              .update({ public: false })
+              .eq('app_id', props.appId)
+
+            if (error) {
+              toast.error(t('cannot-change-default-download-channel'))
+              console.error(error)
+              return false
+            }
+
+            channels.value = channels.value.map(channel => ({
+              ...channel,
+              public: false,
+            }))
+            await loadChannels()
+            forceDownloadBump.value += 1
+            toast.success(t('disabled-capgo-updates'))
+            return true
+          }
+
+          if (!hasCombinedOptions.value && !canSplitDownloadDefaults.value) {
+            toast.error(t('no-compatible-download-channel'))
+            return false
+          }
+
           const selectedChannels: Record<DownloadPlatform, DownloadChannel | null> = { ios: null, android: null, electron: null }
           const activePlatforms = availableDownloadPlatforms.value
 
@@ -1318,6 +1370,8 @@ async function transferAppOwnership() {
                 role="button"
                 tabindex="0"
                 @click="setDefaultChannel"
+                @keydown.enter.prevent="setDefaultChannel"
+                @keydown.space.prevent="setDefaultChannel"
               >
                 <FormKit
                   type="text"
@@ -1353,6 +1407,8 @@ async function transferAppOwnership() {
                 role="button"
                 tabindex="0"
                 @click="openDefaultDownloadChannelDialog"
+                @keydown.enter.prevent="openDefaultDownloadChannelDialog"
+                @keydown.space.prevent="openDefaultDownloadChannelDialog"
               >
                 <FormKit
                   type="text"
@@ -1459,6 +1515,13 @@ async function transferAppOwnership() {
                 :help="t('allow-device-custom-id-help')"
               />
               <FormKit
+                type="checkbox"
+                name="block_provider_infra_requests"
+                :value="appRef?.block_provider_infra_requests ?? false"
+                :label="t('block-provider-infra-requests')"
+                :help="t('block-provider-infra-requests-help')"
+              />
+              <FormKit
                 type="button"
                 :label="t('transfer-app-ownership')"
                 :help="t('change-app-organisation-owner')"
@@ -1519,10 +1582,13 @@ async function transferAppOwnership() {
     <!-- Teleport for Transfer App ID Input -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('confirm-transfer')" defer to="#dialog-v2-content">
       <div class="w-full">
+        <label for="transfer-app-id-input" class="sr-only">{{ t('type-app-id-to-confirm') }}</label>
         <input
+          id="transfer-app-id-input"
           v-model="transferAppIdInput"
           type="text"
           :placeholder="t('type-app-id-to-confirm')"
+          :aria-label="t('type-app-id-to-confirm')"
           class="w-full p-3 border border-gray-300 rounded-lg dark:text-white dark:bg-gray-800 dark:border-gray-600"
         >
       </div>
@@ -1532,10 +1598,13 @@ async function transferAppOwnership() {
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('select-default-upload-channel-header')" defer to="#dialog-v2-content">
       <div class="w-full space-y-3">
         <template v-if="uploadChannelOptions.length">
+          <label for="upload-channel-search" class="sr-only">{{ t('default-upload-channel-search-placeholder') }}</label>
           <input
+            id="upload-channel-search"
             v-model="uploadSearch"
             type="text"
             :placeholder="t('default-upload-channel-search-placeholder')"
+            :aria-label="t('default-upload-channel-search-placeholder')"
             class="w-full px-3 py-2 text-sm bg-white border rounded-lg focus:border-blue-500 focus:ring-2 border-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-blue-500/20"
           >
           <div v-if="visibleUploadChannels.length" class="space-y-2">
@@ -1583,110 +1652,137 @@ async function transferAppOwnership() {
           {{ t('default-download-channel-dialog-info') }}
         </p>
 
-        <div v-if="hasCombinedOptions" class="p-4 space-y-4 border rounded-lg border-slate-200 dark:border-slate-700">
-          <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">
+        <div class="p-4 space-y-2 border rounded-lg border-slate-200 dark:border-slate-700">
+          <div class="flex items-start justify-between gap-4">
             <div>
               <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                {{ t('default-download-channel-use-unified') }}
+                {{ t('disable-capgo-updates') }}
               </h3>
               <p class="text-xs text-slate-500 dark:text-slate-300">
-                {{ t('default-download-channel-use-unified-desc') }}
+                {{ t('disable-capgo-updates-desc') }}
               </p>
             </div>
-            <div class="flex items-center gap-2">
-              <Toggle
-                :value="!splitDownloadDefaults"
-                @update:value="setUnifiedDownloadMode"
-              />
-            </div>
-          </div>
-
-          <div v-if="!splitDownloadDefaults" class="space-y-3">
-            <p class="text-xs text-slate-500 dark:text-slate-300">
-              {{ t('default-download-channel-unified-hint') }}
-            </p>
-            <input
-              v-model="combinedSearch"
-              type="text"
-              :placeholder="t('default-download-channel-search-placeholder')"
-              class="w-full px-3 py-2 text-sm bg-white border rounded-lg focus:border-blue-500 focus:ring-2 border-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-blue-500/20"
-            >
-            <div v-if="visibleCombinedOptions.length" class="space-y-2">
-              <label
-                v-for="channel in visibleCombinedOptions"
-                :key="`combined-${channel.id}`"
-                :for="`combined-channel-${channel.id}`"
-                class="flex items-start gap-3 p-3 transition border rounded-lg hover:border-blue-400 border-slate-200 dark:border-slate-700 dark:hover:border-blue-500"
-              >
-                <input
-                  :id="`combined-channel-${channel.id}`"
-                  v-model="selectedCombinedChannelId"
-                  type="radio"
-                  :value="channel.id"
-                  class="mt-1 radio radio-primary"
-                >
-                <div class="flex flex-col">
-                  <span class="text-sm font-medium">{{ channel.name }}</span>
-                </div>
-              </label>
-            </div>
-            <div v-else class="px-3 py-6 text-sm text-center border border-dashed rounded-lg border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-300">
-              {{ combinedSearch.trim() ? t('default-download-channel-no-results') : t('default-download-channel-no-unified') }}
-            </div>
-            <p v-if="combinedHasHidden" class="text-xs text-slate-500 dark:text-slate-300">
-              {{ t('default-download-channel-more') }}
-            </p>
+            <Toggle
+              class="shrink-0"
+              :value="disableDownloadUpdates"
+              @update:value="disableDownloadUpdates = $event"
+            />
           </div>
         </div>
 
-        <div v-if="splitDownloadDefaults" class="space-y-6">
-          <div
-            v-for="section in downloadChannelSections"
-            :key="`download-${section.platform}`"
-            class="space-y-3"
-          >
-            <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-100">
-              {{ section.title }}
-            </h3>
-            <p class="text-xs text-slate-500 dark:text-slate-300">
-              {{ section.description }}
-            </p>
-            <input
-              v-if="platformOptions[section.platform].length"
-              v-model="downloadSearches[section.platform]"
-              type="text"
-              :name="`download-search-${section.platform}`"
-              :aria-label="section.title"
-              :placeholder="t('default-download-channel-search-placeholder')"
-              class="w-full px-3 py-2 text-sm bg-white border rounded-lg focus:border-blue-500 focus:ring-2 border-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-blue-500/20"
-            >
-            <div v-if="getVisiblePlatformOptions(section.platform).length" class="space-y-2">
-              <label
-                v-for="channel in getVisiblePlatformOptions(section.platform)"
-                :key="`${section.platform}-${channel.id}`"
-                :for="`${section.platform}-channel-${channel.id}`"
-                class="flex items-start gap-3 p-3 transition border rounded-lg hover:border-blue-400 border-slate-200 dark:border-slate-700 dark:hover:border-blue-500"
+        <template v-if="!disableDownloadUpdates">
+          <div v-if="hasCombinedOptions" class="p-4 space-y-4 border rounded-lg border-slate-200 dark:border-slate-700">
+            <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">
+              <div>
+                <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                  {{ t('default-download-channel-use-unified') }}
+                </h3>
+                <p class="text-xs text-slate-500 dark:text-slate-300">
+                  {{ t('default-download-channel-use-unified-desc') }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <Toggle
+                  :value="!splitDownloadDefaults"
+                  @update:value="setUnifiedDownloadMode"
+                />
+              </div>
+            </div>
+
+            <div v-if="!splitDownloadDefaults" class="space-y-3">
+              <p class="text-xs text-slate-500 dark:text-slate-300">
+                {{ t('default-download-channel-unified-hint') }}
+              </p>
+              <label for="combined-channel-search" class="sr-only">{{ t('default-download-channel-search-placeholder') }}</label>
+              <input
+                id="combined-channel-search"
+                v-model="combinedSearch"
+                type="text"
+                :placeholder="t('default-download-channel-search-placeholder')"
+                :aria-label="t('default-download-channel-search-placeholder')"
+                class="w-full px-3 py-2 text-sm bg-white border rounded-lg focus:border-blue-500 focus:ring-2 border-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-blue-500/20"
               >
-                <input
-                  :id="`${section.platform}-channel-${channel.id}`"
-                  v-model="selectedDownloadChannelIds[section.platform]"
-                  type="radio"
-                  :value="channel.id"
-                  class="mt-1 radio radio-primary"
+              <div v-if="visibleCombinedOptions.length" class="space-y-2">
+                <label
+                  v-for="channel in visibleCombinedOptions"
+                  :key="`combined-${channel.id}`"
+                  :for="`combined-channel-${channel.id}`"
+                  class="flex items-start gap-3 p-3 transition border rounded-lg hover:border-blue-400 border-slate-200 dark:border-slate-700 dark:hover:border-blue-500"
                 >
-                <div class="flex flex-col">
-                  <span class="text-sm font-medium">{{ channel.name }}</span>
-                </div>
-              </label>
+                  <input
+                    :id="`combined-channel-${channel.id}`"
+                    v-model="selectedCombinedChannelId"
+                    type="radio"
+                    :value="channel.id"
+                    class="mt-1 radio radio-primary"
+                  >
+                  <div class="flex flex-col">
+                    <span class="text-sm font-medium">{{ channel.name }}</span>
+                  </div>
+                </label>
+              </div>
+              <div v-else class="px-3 py-6 text-sm text-center border border-dashed rounded-lg border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-300">
+                {{ combinedSearch.trim() ? t('default-download-channel-no-results') : t('default-download-channel-no-unified') }}
+              </div>
+              <p v-if="combinedHasHidden" class="text-xs text-slate-500 dark:text-slate-300">
+                {{ t('default-download-channel-more') }}
+              </p>
             </div>
-            <div v-else class="px-3 py-6 text-sm text-center border border-dashed rounded-lg border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-300">
-              {{ downloadSearches[section.platform].trim() ? t('default-download-channel-no-results') : section.empty }}
-            </div>
-            <p v-if="platformHasHidden(section.platform)" class="text-xs text-slate-500 dark:text-slate-300">
-              {{ t('default-download-channel-more') }}
-            </p>
           </div>
-        </div>
+
+          <div v-if="splitDownloadDefaults" class="space-y-6">
+            <div
+              v-for="section in downloadChannelSections"
+              :key="`download-${section.platform}`"
+              class="space-y-3"
+            >
+              <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                {{ section.title }}
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-300">
+                {{ section.description }}
+              </p>
+              <input
+                v-if="platformOptions[section.platform].length"
+                v-model="downloadSearches[section.platform]"
+                type="text"
+                :name="`download-search-${section.platform}`"
+                :aria-label="section.title"
+                :placeholder="t('default-download-channel-search-placeholder')"
+                class="w-full px-3 py-2 text-sm bg-white border rounded-lg focus:border-blue-500 focus:ring-2 border-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-blue-500/20"
+              >
+              <div v-if="getVisiblePlatformOptions(section.platform).length" class="space-y-2">
+                <label
+                  v-for="channel in getVisiblePlatformOptions(section.platform)"
+                  :key="`${section.platform}-${channel.id}`"
+                  :for="`${section.platform}-channel-${channel.id}`"
+                  class="flex items-start gap-3 p-3 transition border rounded-lg hover:border-blue-400 border-slate-200 dark:border-slate-700 dark:hover:border-blue-500"
+                >
+                  <input
+                    :id="`${section.platform}-channel-${channel.id}`"
+                    v-model="selectedDownloadChannelIds[section.platform]"
+                    type="radio"
+                    :value="channel.id"
+                    class="mt-1 radio radio-primary"
+                  >
+                  <div class="flex flex-col">
+                    <span class="text-sm font-medium">{{ channel.name }}</span>
+                  </div>
+                </label>
+              </div>
+              <div v-else class="px-3 py-6 text-sm text-center border border-dashed rounded-lg border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-300">
+                {{ downloadSearches[section.platform].trim() ? t('default-download-channel-no-results') : section.empty }}
+              </div>
+              <p v-if="platformHasHidden(section.platform)" class="text-xs text-slate-500 dark:text-slate-300">
+                {{ t('default-download-channel-more') }}
+              </p>
+            </div>
+          </div>
+
+          <div v-if="!hasCombinedOptions && !canSplitDownloadDefaults" class="px-3 py-6 text-sm text-center border border-dashed rounded-lg border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-300">
+            {{ t('no-compatible-download-channel') }}
+          </div>
+        </template>
       </div>
     </Teleport>
   </div>

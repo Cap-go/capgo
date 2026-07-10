@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   BASE_URL,
+  createDirectApiKeyWithBindings,
   executeSQL,
   fetchWithRetry,
   getEndpointUrl,
@@ -21,37 +22,40 @@ function buildAttachmentPath(orgId: string, appId: string, filename: string) {
 
 async function createSeededApiKey({
   appId,
-  limitedToApp,
-  mode,
+  role,
+  scope,
   name,
 }: {
   appId: string
-  limitedToApp: boolean
-  mode: 'all' | 'upload'
+  role: 'admin' | 'upload'
+  scope: 'app' | 'org'
   name: string
 }): Promise<{ id: number, key: string }> {
   // Seed keys directly so this suite only validates files behavior. API key
   // creation behavior is covered in the dedicated apikey suites and can
   // otherwise introduce unrelated worker-auth flakiness here.
-  const plainKey = randomUUID()
-  const keyRow = {
-    user_id: USER_ID,
-    key: plainKey,
-    key_hash: null,
-    mode,
-    name,
-    limited_to_apps: limitedToApp ? [appId] : null,
-  }
-
-  const { data: created, error } = await getSupabaseClient()
-    .from('apikeys')
-    .insert(keyRow)
-    .select('id, key')
+  const { data: app, error: appError } = await getSupabaseClient()
+    .from('apps')
+    .select('owner_org')
+    .eq('app_id', appId)
     .single()
 
-  if (error || !created) {
-    throw new Error(`Failed to seed ${mode} API key: ${error?.message ?? 'missing key row'}`)
-  }
+  if (appError || !app?.owner_org)
+    throw new Error(`Failed to resolve app ${appId}: ${appError?.message ?? 'missing owner org'}`)
+
+  const created = await createDirectApiKeyWithBindings({
+    userId: USER_ID,
+    key: randomUUID(),
+    name,
+    orgId: app.owner_org,
+    roleName: role === 'admin' ? 'org_super_admin' : 'org_member',
+    ...(scope === 'app'
+      ? {
+          appId,
+          appRoleName: role === 'admin' ? 'app_admin' : 'app_uploader',
+        }
+      : {}),
+  })
 
   const key = created.key
 
@@ -117,7 +121,7 @@ describe('attachment upload plan gating regression', () => {
   beforeAll(async () => {
     await seedApp(appId, orgId, stripeCustomerId)
 
-    const createdKey = await createSeededApiKey({ appId, limitedToApp: true, mode: 'upload', name: `upload-only-${appId}` })
+    const createdKey = await createSeededApiKey({ appId, scope: 'app', role: 'upload', name: `upload-only-${appId}` })
     uploadKeyId = createdKey.id
     uploadKey = createdKey.key
 
@@ -150,6 +154,39 @@ describe('attachment upload plan gating regression', () => {
     const data = await response.json() as { error?: string }
     expect(data.error).toBe('on_premise_app')
   })
+
+  it('allows attachment uploads when only build time is over plan', async () => {
+    await executeSQL(
+      `
+        UPDATE public.stripe_info
+        SET
+          status = $1,
+          is_good_plan = $2,
+          trial_at = $3,
+          mau_exceeded = false,
+          storage_exceeded = false,
+          bandwidth_exceeded = false,
+          build_time_exceeded = true
+        WHERE customer_id = $4
+      `,
+      ['succeeded', false, '1970-01-01T00:00:00+00:00', stripeCustomerId],
+    )
+
+    const { uploadMetadata } = buildAttachmentPath(orgId, appId, `build-time-only-${randomUUID()}.txt`)
+
+    const response = await fetch(getEndpointUrl('/files/upload/attachments'), {
+      method: 'POST',
+      headers: {
+        'Authorization': uploadKey!,
+        'Content-Type': 'application/offset+octet-stream',
+        'Tus-Resumable': TUS_VERSION,
+        'Upload-Length': '4',
+        'Upload-Metadata': uploadMetadata,
+      },
+    })
+
+    expect(response.status).toBe(201)
+  })
 })
 
 describe('ready bundle upload immutability regression', () => {
@@ -164,7 +201,7 @@ describe('ready bundle upload immutability regression', () => {
   beforeAll(async () => {
     await seedApp(appId, orgId, stripeCustomerId)
 
-    const createdKey = await createSeededApiKey({ appId, limitedToApp: true, mode: 'upload', name: `upload-ready-${appId}` })
+    const createdKey = await createSeededApiKey({ appId, scope: 'app', role: 'upload', name: `upload-ready-${appId}` })
     uploadKeyId = createdKey.id
     uploadKey = createdKey.key
     readyBundle = await seedReadyBundle(appId, orgId, `ready-${scopeId}.zip`)
@@ -192,7 +229,7 @@ describe('ready bundle upload immutability regression', () => {
   })
 })
 
-describe('attachment cleanup on app deletion regression', () => {
+describe('attachment reads after app deletion', () => {
   const scopeId = randomUUID().replaceAll('-', '')
   const orgId = randomUUID()
   const stripeCustomerId = `cus_files_delete_${scopeId}`
@@ -204,11 +241,11 @@ describe('attachment cleanup on app deletion regression', () => {
 
   beforeAll(async () => {
     await seedApp(appId, orgId, stripeCustomerId)
-    const createdUploadKey = await createSeededApiKey({ appId, limitedToApp: true, mode: 'upload', name: `upload-cleanup-${appId}` })
+    const createdUploadKey = await createSeededApiKey({ appId, scope: 'org', role: 'admin', name: `upload-cleanup-${appId}` })
     uploadKeyId = createdUploadKey.id
     uploadKey = createdUploadKey.key
 
-    const createdDeleteKey = await createSeededApiKey({ appId, limitedToApp: false, mode: 'all', name: `delete-cleanup-${appId}` })
+    const createdDeleteKey = await createSeededApiKey({ appId, scope: 'org', role: 'admin', name: `delete-cleanup-${appId}` })
     deleteKeyId = createdDeleteKey.id
     deleteKey = createdDeleteKey.key
   }, 60_000)
@@ -217,7 +254,7 @@ describe('attachment cleanup on app deletion regression', () => {
     await cleanupSeededOrg(appId, orgId, stripeCustomerId, [uploadKeyId, deleteKeyId])
   }, 60_000)
 
-  it('returns not_found for uploaded attachments after the app is deleted', async () => {
+  it.concurrent('continues serving cached uploaded attachments after the app is deleted', async () => {
     await seedApp(appId, orgId, stripeCustomerId)
 
     const body = new TextEncoder().encode('delete-me-after-app-delete')
@@ -263,6 +300,7 @@ describe('attachment cleanup on app deletion regression', () => {
     expect(deleteResponse.status).toBe(200)
 
     const readAfterDelete = await fetch(getEndpointUrl(`/files/read/attachments/${filePath}`))
-    expect(readAfterDelete.status).toBe(404)
+    expect(readAfterDelete.status).toBe(200)
+    expect(await readAfterDelete.text()).toBe('delete-me-after-app-delete')
   })
 })

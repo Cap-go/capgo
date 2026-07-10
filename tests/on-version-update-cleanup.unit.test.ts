@@ -9,12 +9,24 @@ const {
   deleteObject,
   getDrizzleClient,
   getPgClient,
+  manifestDeleteEq,
+  manifestReferenceMaybeSingle,
+  manifestSelectWhere,
+  moveObjectToTrash,
+  pgQuery,
   supabaseAdmin,
 } = vi.hoisted(() => {
   const appVersionsMetaSelectEq = vi.fn()
   const appVersionsMetaSelect = vi.fn(() => ({ eq: appVersionsMetaSelectEq }))
   const appVersionsMetaUpdateEq = vi.fn()
   const appVersionsMetaUpdate = vi.fn(() => ({ eq: appVersionsMetaUpdateEq }))
+  const manifestDeleteEq = vi.fn()
+  const manifestDelete = vi.fn(() => ({ eq: manifestDeleteEq }))
+  const manifestReferenceMaybeSingle = vi.fn()
+  const manifestReferenceLimit = vi.fn(() => ({ maybeSingle: manifestReferenceMaybeSingle }))
+  const manifestReferenceEqFileName = vi.fn(() => ({ limit: manifestReferenceLimit }))
+  const manifestReferenceEqFileHash = vi.fn(() => ({ eq: manifestReferenceEqFileName }))
+  const manifestSelect = vi.fn(() => ({ eq: manifestReferenceEqFileHash }))
   const supabaseFrom = vi.fn((table: string) => {
     if (table === 'app_versions_meta') {
       return {
@@ -22,8 +34,16 @@ const {
         update: appVersionsMetaUpdate,
       }
     }
+    if (table === 'manifest') {
+      return {
+        delete: manifestDelete,
+        select: manifestSelect,
+      }
+    }
     return {}
   })
+  const manifestSelectWhere = vi.fn(async (): Promise<any[]> => [])
+  const pgQuery = vi.fn(async () => ({ rows: [] }))
 
   return {
     appVersionsMetaSelectEq,
@@ -35,11 +55,16 @@ const {
     getDrizzleClient: vi.fn(() => ({
       select: vi.fn(() => ({
         from: vi.fn(() => ({
-          where: vi.fn(async () => []),
+          where: manifestSelectWhere,
         })),
       })),
     })),
-    getPgClient: vi.fn(() => ({})),
+    getPgClient: vi.fn(() => ({ query: pgQuery })),
+    manifestDeleteEq,
+    manifestReferenceMaybeSingle,
+    manifestSelectWhere,
+    moveObjectToTrash: vi.fn(),
+    pgQuery,
     supabaseAdmin: vi.fn(() => ({ from: supabaseFrom })),
     supabaseFrom,
   }
@@ -49,6 +74,7 @@ vi.mock('../supabase/functions/_backend/utils/s3.ts', () => ({
   getPath: vi.fn(),
   s3: {
     deleteObject,
+    moveObjectToTrash,
   },
 }))
 
@@ -96,18 +122,24 @@ describe('on_version_update deleted version cleanup', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     deleteObject.mockResolvedValue(true)
+    moveObjectToTrash.mockResolvedValue(true)
     createStatsMeta.mockResolvedValue({ error: null })
+    manifestSelectWhere.mockResolvedValue([])
+    manifestDeleteEq.mockResolvedValue({ error: null })
+    manifestReferenceMaybeSingle.mockResolvedValue({ data: null, error: null })
+    pgQuery.mockResolvedValue({ rows: [] })
     appVersionsMetaSelectEq.mockReturnValue({
       single: vi.fn(async () => ({ data: { size: 1234 }, error: null })),
     })
     appVersionsMetaUpdateEq.mockResolvedValue({ error: null })
   })
 
-  it('deletes the bundle directly and clears stored size for soft-deleted versions', async () => {
+  it('moves the bundle to trash and clears stored size for soft-deleted versions', async () => {
     const response = await deleteIt(createContext(), createVersion())
 
     expect(response.status).toBe(200)
-    expect(deleteObject).toHaveBeenCalledWith(expect.anything(), 'orgs/org-1/apps/com.cleanup.test/1.0.0.zip')
+    expect(moveObjectToTrash).toHaveBeenCalledWith(expect.anything(), 'orgs/org-1/apps/com.cleanup.test/1.0.0.zip')
+    expect(deleteObject).not.toHaveBeenCalled()
     expect(appVersionsMetaUpdate).toHaveBeenCalledWith({ size: 0 })
     expect(appVersionsMetaUpdateEq).toHaveBeenCalledWith('id', 123)
     expect(createStatsMeta).toHaveBeenCalledWith(expect.anything(), 'com.cleanup.test', 123, -1234)
@@ -117,15 +149,33 @@ describe('on_version_update deleted version cleanup', () => {
     const response = await deleteIt(createContext(), createVersion({ r2_path: null }))
 
     expect(response.status).toBe(200)
-    expect(deleteObject).not.toHaveBeenCalled()
+    expect(moveObjectToTrash).not.toHaveBeenCalled()
     expect(appVersionsMetaUpdate).toHaveBeenCalledWith({ size: 0 })
     expect(createStatsMeta).toHaveBeenCalledWith(expect.anything(), 'com.cleanup.test', 123, -1234)
   })
 
-  it('keeps the queue retryable when R2 deletion fails', async () => {
-    deleteObject.mockResolvedValue(false)
+  it('moves unreferenced manifest files to trash instead of hard deleting them', async () => {
+    manifestSelectWhere.mockResolvedValue([{
+      app_version_id: 123,
+      file_hash: 'manifest-hash',
+      file_name: 'index.js',
+      id: 456,
+      s3_path: 'orgs/org-1/apps/com.cleanup.test/manifest/index.js',
+    }])
 
-    await expect(deleteIt(createContext(), createVersion())).rejects.toThrow('Cannot delete S3 object for deleted version')
+    const response = await deleteIt(createContext(), createVersion({ r2_path: null }))
+
+    expect(response.status).toBe(200)
+    expect(moveObjectToTrash).toHaveBeenCalledWith(expect.anything(), 'orgs/org-1/apps/com.cleanup.test/manifest/index.js')
+    expect(deleteObject).not.toHaveBeenCalled()
+    expect(pgQuery).toHaveBeenCalledWith('UPDATE app_versions SET manifest_count = 0, manifest = NULL WHERE id = $1', [123])
+    expect(pgQuery).toHaveBeenCalledWith(expect.stringContaining('manifest_bundle_count = GREATEST(manifest_bundle_count - 1, 0)'), ['com.cleanup.test'])
+  })
+
+  it('keeps the queue retryable when moving the bundle to trash fails', async () => {
+    moveObjectToTrash.mockResolvedValue(false)
+
+    await expect(deleteIt(createContext(), createVersion())).rejects.toThrow('Cannot move S3 object for deleted version to trash')
     expect(appVersionsMetaUpdate).not.toHaveBeenCalled()
     expect(createStatsMeta).not.toHaveBeenCalled()
   })

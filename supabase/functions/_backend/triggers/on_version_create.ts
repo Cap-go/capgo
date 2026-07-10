@@ -11,9 +11,6 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
-// Special bundle names that should not trigger email notifications
-const SKIP_EMAIL_BUNDLE_NAMES = ['unknown', 'builtin']
-
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), async (c) => {
@@ -25,11 +22,9 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), a
     throw simpleError('no_id', 'No id', { record })
   }
 
-  // Skip email notifications for special system bundles (unknown, builtin)
-  let shouldSkipNotifications = SKIP_EMAIL_BUNDLE_NAMES.includes(record.name)
+  let shouldSkipNotifications = false
 
-  // Also skip notifications for demo apps.
-  if (!shouldSkipNotifications && await isDemoApp(c, record.app_id)) {
+  if (await isDemoApp(c, record.app_id)) {
     cloudlog({ requestId: c.get('requestId'), message: 'Demo app detected, skipping email notifications' })
     shouldSkipNotifications = true
   }

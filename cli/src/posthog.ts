@@ -23,11 +23,11 @@ interface CapturePosthogExceptionPayload {
   status?: number
 }
 
-function isTruthyEnvValue(value: string | undefined) {
+export function isTruthyEnvValue(value: string | undefined) {
   return value === '1' || value?.toLowerCase() === 'true' || value?.toLowerCase() === 'yes'
 }
 
-function getPosthogToken() {
+export function getPosthogToken() {
   if (isTruthyEnvValue(env.CAPGO_DISABLE_TELEMETRY) || isTruthyEnvValue(env.CAPGO_DISABLE_POSTHOG))
     return undefined
 

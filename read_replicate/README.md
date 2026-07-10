@@ -1,131 +1,109 @@
-# Read Replica Replication Scripts (PlanetScale + Google)
+# Read Replica Scripts
 
-Scripts for replicating Supabase PostgreSQL data to read replicas using logical replication.
-Historically this was PlanetScale; we now also support Google-hosted replicas via `GOOGLE_*` env vars.
+These scripts manage the Supabase -> Google Cloud SQL read-replica subscriber.
+Google handles replication from that Cloud SQL instance to downstream regional
+replicas, so these scripts intentionally target only one Google database.
 
-## Prerequisites
+## Required Env
 
-- PostgreSQL client tools (`pg_dump`, `pg_restore`, `psql`)
-- Access to `internal/cloudflare/.env.prod` (and optionally `.env.preprod`) with database credentials
-
-## Scripts
-
-### 1. `replicate_prepare.sh`
-
-Prepares the schema for replica import by:
-- Dumping schema from Supabase (tables: `apps`, `app_versions`, `manifest`, `channels`, `channel_devices`, `orgs`, `stripe_info`, `org_users`)
-- Filtering out foreign keys, triggers, RLS policies
-- Keeping indexes
-- Adding required extensions (`uuid-ossp`)
-- Cleaning up temporary files
-
-**Output:** `schema_replicate.sql`
-
-```bash
-./replicate_prepare.sh
-```
-
-### 2. `replicate_copy.sh`
-
-Dumps data from the `channel_devices` table for manual import.
-
-**Output:** `data_replicate.sql`
-
-```bash
-./replicate_copy.sh
-```
-
-### 3. `replicate_to_replica.sh`
-
-Sets up logical replication from Supabase to a read replica target (PlanetScale or Google):
-- Fixes sequences on target database
-- Creates a subscription to the Supabase publication
-
-```bash
-./replicate_to_replica.sh
-```
-
-Note: `replicate_to_planetscale.sh` still exists as a wrapper for backward compatibility, but it just forwards to `replicate_to_replica.sh`.
-
-## Run Order (Recommended)
-
-1. Setup the source publication (one-time, or whenever you change the table list):
-   ```bash
-   ./replicate_setup_source.sh
-   ```
-2. Generate the schema SQL to import on the target (re-run when schema changes):
-   ```bash
-   ./replicate_prepare.sh
-   ```
-3. Create the subscription and start streaming changes (first time: choose **Full reset** so the script imports `schema_replicate.sql` and backfills data):
-   ```bash
-   ./replicate_to_replica.sh
-   ```
-
-Optional:
-- Validate / backfill missing indexes on the target:
-  ```bash
-  ./replicate_ensure_indexes.sh
-  ```
-- Add a new table after initial setup (exports data, creates table if missing, refreshes subscriptions):
-  ```bash
-  ./replicate_add_table.sh <table_name>
-  ```
-
-## Configuration
-
-All credentials are loaded from `internal/cloudflare/.env.prod` (prepare/copy also accept `.env.preprod` if present):
+Credentials are loaded from `internal/cloudflare/.env.prod`.
 
 | Variable | Description |
-|----------|-------------|
-| `MAIN_SUPABASE_DB_URL` | Supabase PostgreSQL connection string |
-| `PLANETSCALE_NA` | PlanetScale North America |
-| `PLANETSCALE_EU` | PlanetScale Europe |
-| `PLANETSCALE_SA` | PlanetScale South America |
-| `PLANETSCALE_OC` | PlanetScale Oceania |
-| `PLANETSCALE_AS_INDIA` | PlanetScale Asia (India) |
-| `PLANETSCALE_AS_JAPAN` | PlanetScale Asia (Japan) |
-| `GOOGLE_HK` | Google replica (Hong Kong) |
-| `GOOGLE_ME` | Google replica (Middle East) |
-| `GOOGLE_AF` | Google replica (Africa) |
+| --- | --- |
+| `MAIN_SUPABASE_DB_URL` | Supabase source PostgreSQL URL |
+| `READ_REPLICATE_GOOGLE_EU1` | Google Cloud SQL subscriber PostgreSQL URL |
 
-### Google SSL Notes
+Optional overrides:
 
-If your Google replicas are Cloud SQL and your `GOOGLE_*` URLs use an **IP address** as host, `sslmode=verify-full` usually fails because:
-- Cloud SQL uses a **Google Cloud SQL Server CA** (not in your OS trust store).
-- `verify-full` also enforces **hostname verification**, and an IP won't match the cert SAN.
+| Variable | Description |
+| --- | --- |
+| `READ_REPLICA_TARGET_ENV` | Env key to use if more than one Google DB URL exists |
+| `READ_REPLICA_PUBLICATION_NAME` | Publication name on Supabase |
+| `READ_REPLICA_SUBSCRIPTION_NAME` | Subscription name on Google |
+| `READ_REPLICA_SLOT_NAME` | Slot name on Supabase |
+| `READ_REPLICA_FULL_RESET=1` | Allow full target reset in `replicate_to_replica.sh` |
+| `READ_REPLICA_SUBSCRIPTION_ONLY=1` | Recreate only the subscription |
+| `READ_REPLICA_SCHEMA_SYNC_MAX_TIME` | Max seconds for the Hyperdrive additive schema sync call; defaults to `1800` and the worker deadline is 15s shorter |
 
-Quick fix (encrypted, no cert verification):
-- set `sslmode=require` in `GOOGLE_*` URLs.
+If subscription name is not provided, scripts discover it from `pg_subscription`.
+If exactly one subscription exists, it is used. If multiple subscriptions exist,
+the script exits instead of guessing.
 
-Note: with Postgres 17+ clients, avoid setting `sslrootcert=system` alongside `sslmode=require` (libpq rejects that combination).
+## Commands
 
-Stronger verification:
-- use `sslmode=verify-ca` and provide the Cloud SQL server CA via `sslrootcert=...`.
+Prepare or update the source publication without dropping subscriptions or slots:
 
-## Workflow
+```bash
+bun run readreplicate:setup-source
+```
 
-1. Create publication on Supabase (one-time):
-   ```bash
-   ./replicate_setup_source.sh
-   ```
+Generate the replica schema SQL from Supabase:
 
-2. Prepare the schema SQL:
-   ```bash
-   ./replicate_prepare.sh
-   ```
+```bash
+bun run readreplicate:prepare
+```
 
-3. Set up replication (first time: choose **Full reset**):
-   ```bash
-   ./replicate_to_replica.sh
-   ```
+Check that the committed replica schema matches the current database schema:
 
-### Why Do Subscriptions Start With `planetscale_subscription_`?
+```bash
+bun run readreplicate:check-schema
+```
 
-Logical replication objects (`PUBLICATION`/`SUBSCRIPTION`/replication slots) were originally created for PlanetScale,
-and some operational tooling (like replication-lag checks) matches on the `planetscale_subscription_%` prefix.
-We keep the prefix for backward compatibility even when the target replica is hosted on Google.
+Sync safe additive changes through Hyperdrive, then check that the live read
+replica is operationally compatible with the committed replica schema catalog:
 
-## References
+```bash
+bun run readreplicate:check-hyperdrive-schema
+```
 
-- [PlanetScale Postgres Migration Guide](https://planetscale.com/docs/postgres/imports/postgres-migrate-walstream)
+Recreate the Google subscription:
+
+```bash
+bun run readreplicate:replica
+```
+
+Re-sync one table only:
+
+```bash
+bun run readreplicate:add-table channels
+```
+
+Check and recreate missing indexes on the Google subscriber:
+
+```bash
+bun run readreplicate:indexes
+```
+
+Inspect subscription, slot, lag, and per-table states:
+
+```bash
+bun run readreplicate:status
+```
+
+Update the source password used by the Google subscription:
+
+```bash
+READ_REPLICA_PASSWORD='new-password' bash read_replicate/update_readreplica_passwords.sh
+```
+
+## Notes
+
+- `replicate_setup_source.sh` no longer drops publications or replication slots.
+- `replicate_to_replica.sh` defaults to subscription-only mode unless you choose
+  full reset interactively or set `READ_REPLICA_FULL_RESET=1`.
+- `replicate_add_table.sh` disables the subscription, reloads only the requested
+  table on the Google subscriber, refreshes the publication with `copy_data =
+  false`, then re-enables the subscription.
+- `schema_replicate.sql` is intentionally limited to tables replicated into the
+  Google subscriber. It excludes foreign keys, triggers, and RLS policies.
+- `schema_replicate.catalog.json` is the machine-readable catalog snapshot used
+  by release CI to sync missing additive schema changes and verify compatible
+  tables, columns, types, and exact index parity through Hyperdrive. The check
+  ignores column order, defaults, constraints, sequences, and functions because
+  they do not prevent logical replication. Unexpected indexes still fail the
+  check because they add storage and write-maintenance cost.
+- Production Supabase deploys run `bun run readreplicate:check-hyperdrive-schema`
+  before migrations, functions, or workers publish. Each check deploys a uniquely
+  named, token-protected Worker, applies safe missing columns and indexes on the
+  Google subscriber, verifies the live catalog, and deletes the Worker before
+  exiting. Concurrent CI runs therefore never share or replace a checker Worker.

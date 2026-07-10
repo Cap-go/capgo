@@ -54,13 +54,14 @@ function describeFetchFailure(error: unknown, endpoint: string) {
 
 export type { AppDebugOptions as OptionsBaseDebug } from '../schemas/app'
 
-export async function markSnag(channel: string, orgId: string, apikey: string, event: string, appId?: string, icon = '✅') {
+export async function markSnag(channel: string, orgId: string, apikey: string, event: string, appId?: string, icon = '✅', tags?: Record<string, string | number | boolean>) {
   await sendEvent(apikey, {
     channel,
     event,
     icon,
-    user_id: orgId,
-    ...(appId ? { tags: { 'app-id': appId } } : {}),
+    org_id: orgId,
+    tracking_version: 2,
+    ...((appId || tags) ? { tags: { ...(appId ? { 'app-id': appId } : {}), ...tags } } : {}),
     notify: false,
   })
 }

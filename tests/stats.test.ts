@@ -4,7 +4,7 @@ import { env } from 'node:process'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ALLOWED_STATS_ACTIONS } from '../supabase/functions/_backend/plugins/stats_actions.ts'
-import { APP_NAME, createAppVersions, getBaseData, getSupabaseClient, getVersionFromAction, headers, PLUGIN_BASE_URL, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { APP_NAME, createAppVersions, getBaseData, getSupabaseClient, getVersionFromAction, headers, ORG_ID, PLUGIN_BASE_URL, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APP_NAME_STATS = `${APP_NAME}.${id}`
@@ -22,6 +22,7 @@ type StatsAction = Database['public']['Enums']['stats_action']
 
 interface StatsPayload extends ReturnType<typeof getBaseData> {
   action: StatsAction
+  install_source?: string
   metadata?: Record<string, string>
 }
 
@@ -33,6 +34,68 @@ async function postStats(data: object) {
   })
   return response
 }
+
+async function expectNoPrimaryStatsRows(appId: string, deviceIds: string[]) {
+  const { count: deviceCount, error: deviceError } = await getSupabaseClient()
+    .from('devices')
+    .select('*', { count: 'exact', head: true })
+    .eq('app_id', appId)
+    .in('device_id', deviceIds)
+  expect(deviceError).toBeNull()
+  expect(deviceCount).toBe(0)
+
+  const { count: statsCount, error: statsError } = await getSupabaseClient()
+    .from('stats')
+    .select('*', { count: 'exact', head: true })
+    .eq('app_id', appId)
+    .in('device_id', deviceIds)
+  expect(statsError).toBeNull()
+  expect(statsCount).toBe(0)
+}
+
+describe.skipIf(!USE_CLOUDFLARE)('[POST] /stats Cloudflare write guard', () => {
+  it('returns ok without primary device or stats writes', async () => {
+    const uuid = randomUUID().toLowerCase()
+    const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData.device_id = uuid
+    baseData.action = 'set'
+    baseData.version_build = getVersionFromAction('set')
+    const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
+    baseData.version_name = version.name
+
+    const response = await postStats(baseData)
+    expect(response.status).toBe(200)
+    expect(await response.json<StatsRes>()).toEqual({ status: 'ok' })
+    await expectNoPrimaryStatsRows(APP_NAME_STATS, [uuid])
+  })
+
+  it('returns batch ok without primary device or stats writes', async () => {
+    const uuid1 = randomUUID().toLowerCase()
+    const uuid2 = randomUUID().toLowerCase()
+    const baseData1 = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData1.device_id = uuid1
+    baseData1.action = 'get'
+    baseData1.version_build = getVersionFromAction('get')
+    const version1 = await createAppVersions(baseData1.version_build, APP_NAME_STATS)
+    baseData1.version_name = version1.name
+
+    const baseData2 = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData2.device_id = uuid2
+    baseData2.action = 'set'
+    baseData2.version_build = getVersionFromAction('set')
+    const version2 = await createAppVersions(baseData2.version_build, APP_NAME_STATS)
+    baseData2.version_name = version2.name
+
+    const response = await postStats([baseData1, baseData2])
+    expect(response.status).toBe(200)
+    const responseData = await response.json<BatchStatsRes>()
+    expect(responseData.status).toBe('ok')
+    expect(responseData.results).toHaveLength(2)
+    expect(responseData.results![0].status).toBe('ok')
+    expect(responseData.results![1].status).toBe('ok')
+    await expectNoPrimaryStatsRows(APP_NAME_STATS, [uuid1, uuid2])
+  })
+})
 
 beforeAll(async () => {
   await resetAndSeedAppData(APP_NAME_STATS)
@@ -61,7 +124,7 @@ describe('stats Action Types', () => {
     assertEqual(ALLOWED_STATS_ACTIONS)
   })
 })
-describe('test valid and invalid cases of version_build', () => {
+describe.skipIf(USE_CLOUDFLARE)('test valid and invalid cases of version_build', () => {
   it('test valid and invalid cases of version_build', async () => {
     const uuid = randomUUID().toLowerCase()
     const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
@@ -119,12 +182,13 @@ describe('test valid and invalid cases of version_build', () => {
   })
 })
 
-describe('[POST] /stats', () => {
+describe.skipIf(USE_CLOUDFLARE)('[POST] /stats', () => {
   it('create new device and log stats action', async () => {
     const uuid = randomUUID().toLowerCase()
     const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
     baseData.device_id = uuid
     baseData.action = 'set'
+    baseData.install_source = 'app_store'
     baseData.version_build = getVersionFromAction('set')
 
     const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
@@ -139,6 +203,7 @@ describe('[POST] /stats', () => {
     expect(deviceData).toBeTruthy()
     expect(deviceData?.app_id).toBe(baseData.app_id)
     expect(deviceData?.version_name).toBe(version.name)
+    expect(deviceData?.install_source).toBe('app_store')
 
     // Check stats log
     const { error: statsError, data: statsData } = await getSupabaseClient().from('stats').select().eq('device_id', uuid).eq('app_id', APP_NAME_STATS).single()
@@ -149,6 +214,129 @@ describe('[POST] /stats', () => {
 
     // Clean up
     await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
+  })
+
+  it('attributes version usage stats to the channel device override', async () => {
+    const shortId = randomUUID().split('-')[0]
+    const appId = `${APP_NAME}.stats.override.${shortId}`
+    const deviceId = randomUUID().toLowerCase()
+    const overrideChannelName = `beta-${shortId}`
+    await resetAndSeedAppData(appId)
+    await resetAndSeedAppDataStats(appId)
+    const supabase = getSupabaseClient()
+
+    try {
+      const baseData = getBaseData(appId) as StatsPayload
+      baseData.device_id = deviceId
+      baseData.action = 'set'
+      baseData.defaultChannel = 'production'
+      baseData.channel = 'production'
+      baseData.version_build = getVersionFromAction('set')
+      const version = await createAppVersions(baseData.version_build, appId)
+      baseData.version_name = version.name
+
+      const { data: channel, error: channelError } = await supabase
+        .from('channels')
+        .insert({
+          app_id: appId,
+          name: overrideChannelName,
+          version: version.id,
+          created_by: USER_ID,
+          owner_org: ORG_ID,
+        })
+        .select('id')
+        .single()
+      expect(channelError).toBeNull()
+      expect(channel).toBeTruthy()
+
+      await supabase
+        .from('channel_devices')
+        .insert({
+          app_id: appId,
+          channel_id: channel!.id,
+          device_id: deviceId,
+          owner_org: ORG_ID,
+        })
+        .throwOnError()
+
+      await supabase
+        .from('apps')
+        .update({ channel_device_count: 1 })
+        .eq('app_id', appId)
+        .throwOnError()
+
+      const response = await postStats(baseData)
+      expect(response.status).toBe(200)
+      expect(await response.json<StatsRes>()).toEqual({ status: 'ok' })
+
+      const { data: usage, error: usageError } = await supabase
+        .from('version_usage')
+        .select('channel_id, channel_name')
+        .eq('app_id', appId)
+        .eq('version_name', version.name)
+        .eq('action', 'install')
+        .single()
+
+      expect(usageError).toBeNull()
+      expect(usage?.channel_id).toBe(channel!.id)
+      expect(usage?.channel_name).toBe(overrideChannelName)
+    }
+    finally {
+      await resetAppData(appId)
+      await resetAppDataStats(appId)
+    }
+  })
+
+  it('does not trust client-supplied channel for version usage stats', async () => {
+    const shortId = randomUUID().split('-')[0]
+    const appId = `${APP_NAME}.stats.spoof.${shortId}`
+    const deviceId = randomUUID().toLowerCase()
+    const spoofedChannelName = `private-${shortId}`
+    await resetAndSeedAppData(appId)
+    await resetAndSeedAppDataStats(appId)
+    const supabase = getSupabaseClient()
+
+    try {
+      const baseData = getBaseData(appId) as StatsPayload
+      baseData.device_id = deviceId
+      baseData.action = 'set'
+      delete baseData.defaultChannel
+      baseData.channel = spoofedChannelName
+      baseData.version_build = getVersionFromAction('set')
+      const version = await createAppVersions(baseData.version_build, appId)
+      baseData.version_name = version.name
+
+      const { error: channelError } = await supabase
+        .from('channels')
+        .insert({
+          app_id: appId,
+          name: spoofedChannelName,
+          version: version.id,
+          created_by: USER_ID,
+          owner_org: ORG_ID,
+        })
+      expect(channelError).toBeNull()
+
+      const response = await postStats(baseData)
+      expect(response.status).toBe(200)
+      expect(await response.json<StatsRes>()).toEqual({ status: 'ok' })
+
+      const { data: usage, error: usageError } = await supabase
+        .from('version_usage')
+        .select('channel_name')
+        .eq('app_id', appId)
+        .eq('version_name', version.name)
+        .eq('action', 'install')
+        .single()
+
+      expect(usageError).toBeNull()
+      expect(usage?.channel_name).toBe('production')
+      expect(usage?.channel_name).not.toBe(spoofedChannelName)
+    }
+    finally {
+      await resetAppData(appId)
+      await resetAppDataStats(appId)
+    }
   })
 
   it('stores metadata for app and WebView health stats', async () => {
@@ -181,6 +369,39 @@ describe('[POST] /stats', () => {
     expect(statsData?.metadata).toEqual(baseData.metadata)
 
     await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
+  })
+
+  it.concurrent('does not recreate unknown placeholder rows for missing versions', async () => {
+    const uuid = randomUUID().toLowerCase()
+    const appId = `${APP_NAME}.deleted.unknown.${randomUUID().split('-')[0]}`
+    await resetAndSeedAppData(appId)
+    await resetAndSeedAppDataStats(appId)
+
+    try {
+      const baseData = getBaseData(appId) as StatsPayload
+      baseData.device_id = uuid
+      baseData.action = 'set'
+      baseData.version_build = '1.0.0-missing.1'
+      baseData.version_name = '1.0.0-missing.1'
+
+      const response = await postStats(baseData)
+      expect(response.status).toBe(200)
+      expect(await response.json<StatsRes>()).toMatchObject({ error: 'version_not_found' })
+
+      const { count, error } = await getSupabaseClient()
+        .from('app_versions')
+        .select('id', { count: 'exact', head: true })
+        .eq('app_id', appId)
+        .eq('name', 'unknown')
+
+      expect(error).toBeNull()
+      expect(count).toBe(0)
+    }
+    finally {
+      await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', appId)
+      await resetAppData(appId)
+      await resetAppDataStats(appId)
+    }
   })
 
   it('should ignore custom_id when app disables allow_device_custom_id and emit customIdBlocked stat', async () => {
@@ -342,6 +563,8 @@ describe('[POST] /stats', () => {
         const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
         baseData.device_id = uuid
         baseData.action = action
+        if (action === 'download_fail')
+          baseData.plugin_version = '7.17.0'
         baseData.version_build = getVersionFromAction(action)
 
         const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
@@ -391,6 +614,56 @@ describe('[POST] /stats', () => {
           await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
         }
       })
+    }
+  })
+
+  testIt('filters legacy download_fail before saved stats and logs', async () => {
+    const cases = [
+      { pluginVersion: '7.16.9', shouldRecord: false, createVersion: true },
+      { pluginVersion: '7.16.9', shouldRecord: false, createVersion: false },
+      { pluginVersion: '7.17.0', shouldRecord: true, createVersion: true },
+      { pluginVersion: '6.14.24', shouldRecord: false, createVersion: true },
+      { pluginVersion: '6.14.25', shouldRecord: true, createVersion: true },
+      { pluginVersion: 'not-a-version', shouldRecord: false, createVersion: true },
+    ]
+
+    for (const [caseIndex, testCase] of cases.entries()) {
+      const uuid = randomUUID().toLowerCase()
+      const caseId = randomUUID().slice(0, 8)
+      const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
+      baseData.device_id = uuid
+      baseData.action = 'download_fail'
+      baseData.plugin_version = testCase.pluginVersion
+      baseData.version_build = `1.0.0-download-fail-${caseIndex}-${caseId}-${testCase.pluginVersion.replace(/\./g, '-')}-${testCase.createVersion ? 'existing' : 'missing'}`
+      const versionName = testCase.createVersion
+        ? (await createAppVersions(baseData.version_build, APP_NAME_STATS)).name
+        : baseData.version_build
+      baseData.version_name = versionName
+
+      const response = await postStats(baseData)
+      const responseData = await response.json<StatsRes>()
+      expect(response.status).toBe(200)
+      expect(responseData.status).toBe('ok')
+
+      const { error: statsError, count: statsCount } = await getSupabaseClient()
+        .from('stats')
+        .select('*', { count: 'exact', head: true })
+        .eq('device_id', uuid)
+        .eq('app_id', APP_NAME_STATS)
+        .eq('action', 'download_fail')
+
+      expect(statsError).toBeNull()
+      expect(statsCount).toBe(testCase.shouldRecord ? 1 : 0)
+
+      const { error: versionUsageError, count: versionUsageCount } = await getSupabaseClient()
+        .from('version_usage')
+        .select('*', { count: 'exact', head: true })
+        .eq('app_id', APP_NAME_STATS)
+        .eq('version_name', versionName)
+        .eq('action', 'fail')
+
+      expect(versionUsageError).toBeNull()
+      expect(versionUsageCount).toBe(testCase.shouldRecord ? 1 : 0)
     }
   })
 
@@ -551,6 +824,114 @@ describe('[POST] /stats', () => {
   })
 })
 
+describe('rollout trigger metadata', () => {
+  it.skipIf(USE_CLOUDFLARE)('records version usage failures only for production devices', async () => {
+    const shortId = randomUUID().split('-')[0]
+    const appId = `${APP_NAME}.rollout.failcohort.${shortId}`
+    await resetAndSeedAppData(appId)
+    await resetAndSeedAppDataStats(appId)
+    const supabase = getSupabaseClient()
+
+    try {
+      const version = await createAppVersions(`1.0.0-failcohort-${shortId}.1`, appId)
+      const cases = [
+        { deviceId: randomUUID().toLowerCase(), isEmulator: true, isProd: true },
+        { deviceId: randomUUID().toLowerCase(), isEmulator: false, isProd: false },
+        { deviceId: randomUUID().toLowerCase(), isEmulator: false, isProd: true },
+      ]
+
+      for (const item of cases) {
+        const baseData = getBaseData(appId) as StatsPayload
+        baseData.action = 'update_fail'
+        baseData.device_id = item.deviceId
+        baseData.version_build = version.name
+        baseData.version_name = version.name
+        baseData.is_emulator = item.isEmulator
+        baseData.is_prod = item.isProd
+
+        const response = await postStats(baseData)
+        const responseData = await response.json<StatsRes>()
+        expect(response.status, JSON.stringify(responseData)).toBe(200)
+        expect(responseData).toEqual({ status: 'ok' })
+      }
+
+      const { data, error } = await supabase
+        .from('version_usage')
+        .select('action')
+        .eq('app_id', appId)
+        .eq('version_name', version.name)
+        .eq('action', 'fail')
+
+      expect(error).toBeNull()
+      expect(data).toHaveLength(1)
+    }
+    finally {
+      await resetAppData(appId)
+      await resetAppDataStats(appId)
+    }
+  })
+  it('preserves explicit auto-pause rollback metadata when clearing rollout version', async () => {
+    const shortId = randomUUID().split('-')[0]
+    const appId = `${APP_NAME}.rollout.trigger.${shortId}`
+    await resetAndSeedAppData(appId)
+    await resetAndSeedAppDataStats(appId)
+    const supabase = getSupabaseClient()
+
+    try {
+      const stableVersion = await createAppVersions(`1.0.0-stable-${shortId}.1`, appId)
+      const rolloutVersion = await createAppVersions(`1.0.0-rollout-${shortId}.1`, appId)
+
+      const { data: channel, error: channelError } = await supabase
+        .from('channels')
+        .insert({
+          app_id: appId,
+          name: `production-${shortId}`,
+          version: stableVersion.id,
+          rollout_version: rolloutVersion.id,
+          rollout_enabled: true,
+          rollout_percentage_bps: 5000,
+          created_by: USER_ID,
+          owner_org: ORG_ID,
+        })
+        .select('id')
+        .single()
+      expect(channelError).toBeNull()
+      expect(channel).toBeTruthy()
+
+      const triggeredAt = new Date().toISOString()
+      const reason = `Auto-pause rollback test ${shortId}`
+      await supabase
+        .from('channels')
+        .update({
+          rollout_version: null,
+          rollout_enabled: false,
+          rollout_percentage_bps: 0,
+          rollout_paused_at: null,
+          rollout_pause_reason: reason,
+          auto_pause_last_triggered_at: triggeredAt,
+        })
+        .eq('id', channel!.id)
+        .throwOnError()
+
+      const { data: updatedChannel, error: updatedError } = await supabase
+        .from('channels')
+        .select('rollout_version, rollout_paused_at, rollout_pause_reason, auto_pause_last_triggered_at')
+        .eq('id', channel!.id)
+        .single()
+
+      expect(updatedError).toBeNull()
+      expect(updatedChannel?.rollout_version).toBeNull()
+      expect(updatedChannel?.rollout_paused_at).toBeNull()
+      expect(updatedChannel?.rollout_pause_reason).toBe(reason)
+      expect(new Date(updatedChannel!.auto_pause_last_triggered_at!).toISOString()).toBe(triggeredAt)
+    }
+    finally {
+      await resetAppData(appId)
+      await resetAppDataStats(appId)
+    }
+  })
+})
+
 interface BatchStatsRes {
   status: string
   results?: Array<{
@@ -562,7 +943,7 @@ interface BatchStatsRes {
 }
 
 // Test batch operations - concurrent for Supabase, sequential for Cloudflare
-const batchTestDescribe = USE_CLOUDFLARE ? describe : describe.concurrent
+const batchTestDescribe = USE_CLOUDFLARE ? describe.skip : describe.concurrent
 const batchTestIt = USE_CLOUDFLARE ? it : it.concurrent
 
 batchTestDescribe('[POST] /stats batch operations', () => {

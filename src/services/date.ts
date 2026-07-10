@@ -1,7 +1,8 @@
-import dayjs from 'dayjs'
 import { i18n } from '~/modules/i18n'
+import { getFormatLocale, resolveFormatLocale } from '~/services/formatLocale'
 
 const ZONELESS_ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/
+const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/
 
 function parseDatePreservingUtc(date: Date | string | undefined | null): Date | null {
   if (!date)
@@ -10,61 +11,112 @@ function parseDatePreservingUtc(date: Date | string | undefined | null): Date | 
   if (date instanceof Date)
     return Number.isNaN(date.getTime()) ? null : date
 
+  const dateOnlyMatch = DATE_ONLY_RE.exec(date)
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch
+    const parsedYear = Number(year)
+    const parsedMonth = Number(month)
+    const parsedDay = Number(day)
+    const parsed = new Date(parsedYear, parsedMonth - 1, parsedDay)
+    if (
+      Number.isNaN(parsed.getTime())
+      || parsed.getFullYear() !== parsedYear
+      || parsed.getMonth() !== parsedMonth - 1
+      || parsed.getDate() !== parsedDay
+    ) {
+      return null
+    }
+    return parsed
+  }
+
   const normalized = ZONELESS_ISO_DATETIME_RE.test(date) ? `${date}Z` : date
   const parsed = new Date(normalized)
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
-/**
- * Get the current app locale for date formatting
- */
-function getAppLocale(): string {
-  return i18n.global.locale.value || 'en'
+export function resolveDateLocale(formatLocale?: string | null): string {
+  return resolveFormatLocale(formatLocale)
 }
 
+export function getDateLocale(): string {
+  return getFormatLocale()
+}
 /**
- * Format a date using the app's locale (e.g., "12/15/2025" in English, "15/12/2025" in French)
+ * Format a date using the account date and number convention.
  */
 export function formatLocalDate(date: Date | string | undefined | null): string {
-  if (!date)
+  const d = parseDatePreservingUtc(date)
+  if (!d)
     return ''
-  const d = typeof date === 'string' ? new Date(date) : date
-  if (Number.isNaN(d.getTime()))
-    return ''
-  return d.toLocaleDateString(getAppLocale())
+  return d.toLocaleDateString(getDateLocale())
 }
 
 /**
- * Format a date with month name and day using the app's locale (e.g., "December 15" in English, "15 décembre" in French)
+ * Format a date with month name and day using the account date and number convention.
  */
 export function formatLocalDateLong(date: Date | string | undefined | null): string {
-  if (!date)
+  const d = parseDatePreservingUtc(date)
+  if (!d)
     return ''
-  const d = typeof date === 'string' ? new Date(date) : date
-  if (Number.isNaN(d.getTime()))
-    return ''
-  return d.toLocaleDateString(getAppLocale(), { month: 'long', day: 'numeric' })
+  return d.toLocaleDateString(getDateLocale(), { month: 'long', day: 'numeric' })
 }
 
 /**
- * Format a date/time using the app's locale (e.g., "Dec 15, 2025, 3:45 PM" in English)
+ * Format a compact date for dense chart axes using the account date and number convention.
+ */
+export function formatLocalDateShort(date: Date | string | undefined | null): string {
+  const d = parseDatePreservingUtc(date)
+  if (!d)
+    return ''
+  return d.toLocaleDateString(getDateLocale(), { month: 'short', day: 'numeric' })
+}
+
+/**
+ * Format a time using the account date and number convention.
+ */
+export function formatLocalTime(date: Date | string | undefined | null): string {
+  const d = parseDatePreservingUtc(date)
+  if (!d)
+    return ''
+  return d.toLocaleTimeString(getDateLocale(), { hour: 'numeric', minute: '2-digit' })
+}
+
+/**
+ * Format a month/year bucket using the account date and number convention.
+ */
+export function formatLocalMonthYear(date: Date | string | undefined | null): string {
+  const d = parseDatePreservingUtc(date)
+  if (!d)
+    return ''
+  return d.toLocaleDateString(getDateLocale(), { month: 'short', year: 'numeric' })
+}
+
+/**
+ * Format a date/time using the account date and number convention.
  */
 export function formatLocalDateTime(date: Date | string | undefined | null): string {
   const d = parseDatePreservingUtc(date)
   if (!d)
     return ''
-  return d.toLocaleString(getAppLocale(), { dateStyle: 'medium', timeStyle: 'short' })
+  return d.toLocaleString(getDateLocale(), { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-export function formatUtcDateTimeAsLocal(date: Date | string | undefined | null, format = 'MMMM D, YYYY HH:mm'): string {
-  const parsed = parseDatePreservingUtc(date)
-  if (!parsed)
+/**
+ * Format a date/time with seconds using the account date and number convention.
+ */
+export function formatLocalDateTimeWithSeconds(date: Date | string | undefined | null): string {
+  const d = parseDatePreservingUtc(date)
+  if (!d)
     return ''
-  return dayjs(parsed).format(format)
+  return d.toLocaleString(getDateLocale(), { dateStyle: 'medium', timeStyle: 'medium' })
+}
+
+export function formatUtcDateTimeAsLocal(date: Date | string | undefined | null): string {
+  return formatLocalDateTime(date)
 }
 
 export function formatDate(date: string | undefined) {
-  return dayjs(date).format('YYYY-MM-DD HH:mm')
+  return formatLocalDateTime(date)
 }
 
 export function getDaysInCurrentMonth() {
@@ -89,20 +141,23 @@ export function normalizeToStartOfDay(date: Date) {
   return normalized
 }
 
-export function getDayNumbers(startDate: Date, endDate: Date) {
-  const dayNumbers = []
-  const currentDate = new Date(startDate)
-  while (currentDate.getTime() <= endDate.getTime()) {
-    dayNumbers.push(currentDate.getDate())
+function getDatesInRange(startDate: Date, endDate: Date) {
+  const dates = []
+  const currentDate = normalizeToStartOfDay(startDate)
+  const normalizedEndDate = normalizeToStartOfDay(endDate)
+
+  while (currentDate.getTime() <= normalizedEndDate.getTime()) {
+    dates.push(new Date(currentDate))
     currentDate.setDate(currentDate.getDate() + 1)
   }
-  return dayNumbers
+
+  return dates
 }
 
 export function getChartDateRange(useBillingPeriod: boolean, billingStart?: Date | string | null, billingEnd?: Date | string | null) {
   if (useBillingPeriod) {
-    const startDate = new Date(billingStart ?? new Date())
-    const endDate = new Date(billingEnd ?? new Date())
+    const startDate = parseDatePreservingUtc(billingStart) ?? new Date()
+    const endDate = parseDatePreservingUtc(billingEnd) ?? new Date()
     startDate.setHours(0, 0, 0, 0)
     endDate.setHours(0, 0, 0, 0)
     return { startDate, endDate }
@@ -115,37 +170,19 @@ export function getChartDateRange(useBillingPeriod: boolean, billingStart?: Date
 }
 
 export function generateChartDayLabels(useBillingPeriod: boolean, startDate: Date, endDate: Date) {
-  if (!useBillingPeriod) {
-    // Last 30 days mode - generate actual dates
-    const today = new Date()
-    const dates = []
-    for (let i = 29; i >= 0; i--) {
-      const date = new Date(today)
-      date.setDate(date.getDate() - i)
-      dates.push(date.getDate())
-    }
-    return dates
-  }
+  const { startDate: rangeStart, endDate: rangeEnd } = useBillingPeriod
+    ? { startDate, endDate }
+    : getChartDateRange(false)
 
-  // Billing period mode - use the actual billing period end date
-  return getDayNumbers(startDate, endDate)
+  return getDatesInRange(rangeStart, rangeEnd).map(formatLocalDateShort)
 }
 
 export function generateMonthDays(useBillingPeriod: boolean, cycleStart: Date, cycleEnd: Date) {
-  if (!useBillingPeriod) {
-    // Last 30 days mode - generate actual dates
-    const today = new Date()
-    const dates = []
-    for (let i = 29; i >= 0; i--) {
-      const date = new Date(today)
-      date.setDate(date.getDate() - i)
-      dates.push(date.getDate())
-    }
-    return dates
-  }
+  const { startDate, endDate } = useBillingPeriod
+    ? { startDate: cycleStart, endDate: cycleEnd }
+    : getChartDateRange(false)
 
-  // Billing period mode - use the actual billing cycle end date
-  return getDayNumbers(cycleStart, cycleEnd)
+  return getDatesInRange(startDate, endDate).map(formatLocalDateShort)
 }
 
 /**

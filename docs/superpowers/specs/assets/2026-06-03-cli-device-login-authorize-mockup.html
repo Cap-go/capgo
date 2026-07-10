@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en" class="capgolight">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Authorize Capgo CLI — mockup</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root{
+      --primary:#515271; --secondary:#119eff; --accent:#1FB2A5;
+      --azure-500:#119eff; --pumpkin:#ff7211;
+      --base-100:#ffffff; --base-200:#f8fafc; --base-300:#f1f5f9; --base-content:#1e293b;
+      --success:#36d399; --error:#f87272;
+    }
+    body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;}
+    .font-prompt{font-family:"Prompt",sans-serif;}
+    .font-mono{font-family:"JetBrains Mono",ui-monospace,monospace;}
+    .auth-card{
+      border-radius:1.75rem; border:1px solid rgba(226,232,240,.75);
+      background:linear-gradient(180deg,rgba(255,255,255,.94) 0%,rgba(255,255,255,.84) 100%);
+      box-shadow:0 34px 80px -42px rgba(15,23,42,.5); backdrop-filter:blur(18px);
+    }
+    .btn-primary-capgo{
+      background:linear-gradient(135deg,rgba(36,67,102,1) 0%,rgba(12,110,184,1) 100%);
+      box-shadow:0 20px 38px -26px rgba(17,158,255,.85); color:#fff; transition:.2s;
+    }
+    .btn-primary-capgo:hover{transform:translateY(-2px);filter:brightness(1.05);}
+    .btn-secondary-capgo{
+      border:1px solid rgba(148,163,184,.55); background:rgba(255,255,255,.92); color:#334155; transition:.2s;
+    }
+    .btn-secondary-capgo:hover{border-color:rgba(17,158,255,.45);background:rgba(241,245,249,.95);}
+    .seg[aria-checked="true"]{
+      border-color:var(--secondary); background:rgba(17,158,255,.08);
+      box-shadow:0 0 0 1px var(--secondary) inset;
+    }
+    .seg[aria-checked="true"] .seg-dot{background:var(--secondary);border-color:var(--secondary);box-shadow:0 0 0 3px #fff inset;}
+  </style>
+</head>
+<body class="relative min-h-dvh w-full overflow-y-auto"
+  style="background:linear-gradient(180deg,rgba(248,250,252,.98) 0%,rgba(238,244,255,.9) 55%,rgba(248,250,252,.98) 100%);">
+
+  <div class="pointer-events-none absolute inset-0 hidden overflow-hidden lg:block" aria-hidden="true">
+    <div class="absolute top-[8%] -left-32 h-[22rem] w-[22rem] rounded-full opacity-55 blur-[52px]" style="background:rgba(17,158,255,.22)"></div>
+    <div class="absolute right-[-7rem] bottom-[8%] h-[18rem] w-[18rem] rounded-full opacity-55 blur-[52px]" style="background:rgba(104,118,225,.18)"></div>
+    <div class="absolute inset-0 opacity-40"
+      style="background-image:linear-gradient(rgba(148,163,184,.12) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,.12) 1px,transparent 1px);background-size:3rem 3rem;-webkit-mask-image:radial-gradient(circle at center,black 40%,transparent 82%);mask-image:radial-gradient(circle at center,black 40%,transparent 82%);"></div>
+  </div>
+
+  <div class="relative mx-auto flex min-h-dvh w-full max-w-xl flex-col justify-center px-4 py-10 sm:px-6">
+
+    <div class="mb-5 flex items-center gap-3">
+      <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200/80 bg-white/80 shadow-sm">
+        <span class="font-prompt text-lg font-bold" style="color:var(--primary)">C</span>
+      </span>
+      <div class="min-w-0">
+        <p class="text-[0.7rem] font-semibold tracking-[0.22em] text-slate-500 uppercase">Capgo Console</p>
+        <p class="mt-0.5 truncate text-sm font-medium text-slate-600"><span class="font-prompt">Capgo</span> CLI authorization</p>
+      </div>
+    </div>
+
+    <div class="auth-card p-7">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p class="text-[0.72rem] font-bold tracking-[0.22em] text-slate-500 uppercase">Authorize device</p>
+          <h2 class="mt-2 text-2xl font-semibold leading-tight text-slate-950">Authorize the Capgo CLI</h2>
+          <p class="mt-2 text-sm leading-6 text-slate-500">
+            A CLI on this machine is requesting a new API key. Review the scope, then authorize.
+          </p>
+        </div>
+        <span class="self-start shrink-0 rounded-full border border-slate-300/90 bg-slate-50/95 px-3 py-1.5 text-[0.72rem] font-semibold text-slate-600">device&nbsp;flow</span>
+      </div>
+
+      <div class="mt-6 rounded-2xl border border-slate-200/80 bg-white/70 p-4">
+        <div class="flex items-center gap-2">
+          <svg class="h-4 w-4" style="color:var(--secondary)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+          <p class="text-[0.72rem] font-bold tracking-[0.18em] text-slate-500 uppercase">Confirm this matches your terminal</p>
+        </div>
+        <div class="mt-3 flex items-center justify-center rounded-xl border border-dashed border-slate-300 py-3" style="background:var(--base-200)">
+          <span class="font-mono text-xl font-bold tracking-wide" style="color:var(--primary)">enjoy-enough-outwit-win</span>
+        </div>
+        <p class="mt-2 text-center text-xs text-slate-400">If the words differ, do not authorize — close this page.</p>
+      </div>
+
+      <div class="mt-4 flex items-center gap-3 rounded-xl bg-slate-50/80 px-4 py-3">
+        <svg class="h-5 w-5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        <div class="min-w-0 text-sm">
+          <p class="font-medium text-slate-700">MacBook-Pro · zsh</p>
+          <p class="text-slate-400">capgo-cli v6.2.0 · requested just now</p>
+        </div>
+      </div>
+
+      <div class="mt-6 space-y-5">
+        <div>
+          <label class="mb-1.5 block text-sm font-medium text-slate-700">Token name</label>
+          <input type="text" value="CLI – MacBook-Pro"
+            class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-[var(--secondary)] focus:ring-2 focus:ring-[rgba(17,158,255,.25)]" />
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label class="mb-1.5 block text-sm font-medium text-slate-700">Organization</label>
+            <div class="relative">
+              <select class="w-full appearance-none rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-[var(--secondary)] focus:ring-2 focus:ring-[rgba(17,158,255,.25)]">
+                <option>Acme Inc.</option><option>Personal</option>
+              </select>
+              <svg class="pointer-events-none absolute right-3 top-3 h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+          </div>
+          <div>
+            <label class="mb-1.5 block text-sm font-medium text-slate-700">App scope</label>
+            <div class="relative">
+              <select class="w-full appearance-none rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-[var(--secondary)] focus:ring-2 focus:ring-[rgba(17,158,255,.25)]">
+                <option>All apps in this org</option><option>com.acme.app</option><option>com.acme.staging</option>
+              </select>
+              <svg class="pointer-events-none absolute right-3 top-3 h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="mb-1.5 block text-sm font-medium text-slate-700">Role for this key</label>
+          <div class="relative">
+            <select class="w-full appearance-none rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-[var(--secondary)] focus:ring-2 focus:ring-[rgba(17,158,255,.25)]">
+              <option>Member — read &amp; upload bundles</option>
+              <option>Admin — full organisation access</option>
+            </select>
+            <svg class="pointer-events-none absolute right-3 top-3 h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <p class="mt-2 text-xs text-slate-400">v2 keys grant access by <strong>RBAC role</strong> (no read/upload/write/all mode). App-specific roles can be set per app above.</p>
+        </div>
+
+        <div class="flex items-center justify-between rounded-xl bg-slate-50/80 px-4 py-3">
+          <div class="text-sm">
+            <p class="font-medium text-slate-700">Expiration</p>
+            <p class="text-slate-400">Org policy: max 90 days</p>
+          </div>
+          <div class="relative">
+            <select class="appearance-none rounded-lg border border-slate-300 bg-white px-3 py-1.5 pr-8 text-sm text-slate-800 outline-none focus:border-[var(--secondary)]">
+              <option>90 days</option><option>30 days</option><option>7 days</option>
+            </select>
+            <svg class="pointer-events-none absolute right-2.5 top-2 h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-7 flex flex-col gap-3 sm:flex-row-reverse">
+        <button class="btn-primary-capgo inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-base font-semibold">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg>
+          Authorize &amp; send to CLI
+        </button>
+        <button class="btn-secondary-capgo inline-flex w-full items-center justify-center rounded-xl px-4 py-3.5 text-base font-semibold">Cancel</button>
+      </div>
+
+      <div class="mt-5 flex items-start gap-2 border-t border-slate-200/70 pt-4">
+        <svg class="mt-0.5 h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        <p class="text-xs leading-5 text-slate-400">
+          You are authorizing the Capgo CLI on <span class="font-medium text-slate-500">this device</span>. The new key is delivered over an encrypted channel and shown to the CLI only once. Authorizing creates a fresh key — it never exposes your existing keys.
+        </p>
+      </div>
+    </div>
+
+    <p class="mt-4 text-center text-xs text-slate-400">Capgo · console.capgo.app</p>
+  </div>
+
+  <script>
+    document.querySelectorAll('[role="radio"]').forEach(el=>{
+      el.addEventListener('click',()=>{
+        el.closest('[role="radiogroup"]').querySelectorAll('[role="radio"]').forEach(r=>r.setAttribute('aria-checked','false'));
+        el.setAttribute('aria-checked','true');
+      });
+    });
+  </script>
+</body>
+</html>

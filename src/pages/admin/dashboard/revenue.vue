@@ -10,7 +10,8 @@ import { useRouter } from 'vue-router'
 import AdminFilterBar from '~/components/admin/AdminFilterBar.vue'
 import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
-import Spinner from '~/components/Spinner.vue'
+import PageLoader from '~/components/PageLoader.vue'
+import { formatNumberValue } from '~/services/formatLocale'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -21,6 +22,8 @@ const mainStore = useMainStore()
 const adminStore = useAdminDashboardStore()
 const router = useRouter()
 const isLoading = ref(true)
+type ChurnChartMode = 'revenue' | 'rate'
+const churnChartMode = ref<ChurnChartMode>('revenue')
 
 // Global stats trend data
 const globalStatsTrendData = ref<Array<{
@@ -30,6 +33,12 @@ const globalStatsTrendData = ref<Array<{
   users: number
   users_active: number
   paying: number
+  org_conversion_rate: number
+  plan_total_conversion_rate: number
+  plan_solo_conversion_rate: number
+  plan_maker_conversion_rate: number
+  plan_team_conversion_rate: number
+  plan_enterprise_conversion_rate: number
   trial: number
   not_paying: number
   updates: number
@@ -49,7 +58,16 @@ const globalStatsTrendData = ref<Array<{
   new_paying_orgs: number
   canceled_orgs: number
   upgraded_orgs: number
+  past_due_orgs: number
+  past_due_orgs_average_days: number
+  active_canceled_orgs: number
+  active_past_due_orgs: number
   mrr: number
+  previous_mrr: number
+  previous_mrr_solo: number
+  previous_mrr_maker: number
+  previous_mrr_team: number
+  previous_mrr_enterprise: number
   nrr: number
   churn_revenue: number
   churn_revenue_solo: number
@@ -61,9 +79,21 @@ const globalStatsTrendData = ref<Array<{
   revenue_maker: number
   revenue_team: number
   revenue_enterprise: number
+  average_ltv: number
+  shortest_ltv: number
+  longest_ltv: number
+  paying_orgs_subscription?: number
+  paying_orgs_credits?: number
+  paying_orgs_total?: number
 }>>([])
 
 const isLoadingGlobalStatsTrend = ref(false)
+
+function toChurnRate(lostRevenue: number, previousMrr: number) {
+  if (!Number.isFinite(previousMrr) || previousMrr <= 0)
+    return 0
+  return Math.round((lostRevenue / previousMrr) * 10000) / 100
+}
 
 async function loadGlobalStatsTrend() {
   isLoadingGlobalStatsTrend.value = true
@@ -130,6 +160,70 @@ const subscriptionFlowSeries = computed(() => {
   ]
 })
 
+const pastDueOrgSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: t('past-due-organizations'),
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.past_due_orgs || 0,
+      })),
+      color: '#ef4444', // red
+    },
+  ]
+})
+
+const pastDueAverageDaysSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: t('average-past-due-days'),
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.past_due_orgs_average_days || 0,
+      })),
+      color: '#f59e0b', // amber
+    },
+  ]
+})
+
+const activeCanceledOrgSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: t('active-canceled-organizations'),
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.active_canceled_orgs || 0,
+      })),
+      color: '#f97316', // orange
+    },
+  ]
+})
+
+const activePastDueOrgSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: t('active-past-due-organizations'),
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.active_past_due_orgs || 0,
+      })),
+      color: '#dc2626', // red
+    },
+  ]
+})
+
 const upgradeTrendSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
     return []
@@ -150,6 +244,54 @@ const upgradeTrendSeries = computed(() => {
         value: item.upgraded_orgs || 0,
       })),
       color: '#10b981', // green
+    },
+  ]
+})
+
+const planConversionSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'All Paid Plans (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.plan_total_conversion_rate || 0,
+      })),
+      color: '#3b82f6', // blue
+    },
+    {
+      label: 'Solo Conversion (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.plan_solo_conversion_rate || 0,
+      })),
+      color: '#8b5cf6', // purple
+    },
+    {
+      label: 'Maker Conversion (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.plan_maker_conversion_rate || 0,
+      })),
+      color: '#ec4899', // pink
+    },
+    {
+      label: 'Team Conversion (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.plan_team_conversion_rate || 0,
+      })),
+      color: '#10b981', // green
+    },
+    {
+      label: 'Enterprise Conversion (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.plan_enterprise_conversion_rate || 0,
+      })),
+      color: '#f59e0b', // amber
     },
   ]
 })
@@ -239,6 +381,64 @@ const churnRevenueSeries = computed(() => {
   return [totalSeries]
 })
 
+const churnRateSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  const totalSeries = {
+    label: 'Total Churn Rate (%)',
+    data: globalStatsTrendData.value.map(item => ({
+      date: item.date,
+      value: toChurnRate(item.churn_revenue || 0, item.previous_mrr || 0),
+    })),
+    color: '#ef4444', // red
+  }
+  const planSeries = [
+    {
+      label: 'Solo Churn (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: toChurnRate(item.churn_revenue_solo || 0, item.previous_mrr_solo || 0),
+      })),
+      color: '#8b5cf6', // purple
+    },
+    {
+      label: 'Maker Churn (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: toChurnRate(item.churn_revenue_maker || 0, item.previous_mrr_maker || 0),
+      })),
+      color: '#ec4899', // pink
+    },
+    {
+      label: 'Team Churn (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: toChurnRate(item.churn_revenue_team || 0, item.previous_mrr_team || 0),
+      })),
+      color: '#10b981', // green
+    },
+    {
+      label: 'Enterprise Churn (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: toChurnRate(item.churn_revenue_enterprise || 0, item.previous_mrr_enterprise || 0),
+      })),
+      color: '#f59e0b', // amber
+    },
+  ]
+
+  if (planSeries.some(series => series.data.some(point => point.value > 0)))
+    return [totalSeries, ...planSeries]
+
+  return [totalSeries]
+})
+
+const churnChartSeries = computed(() => churnChartMode.value === 'rate' ? churnRateSeries.value : churnRevenueSeries.value)
+const churnChartTitle = computed(() => churnChartMode.value === 'rate' ? 'Churn Rate by Plan' : 'Churn Revenue - Lost MRR by Plan')
+const churnChartValuePrefix = computed(() => churnChartMode.value === 'revenue' ? '$' : '')
+const churnChartValueSuffix = computed(() => churnChartMode.value === 'rate' ? '%' : '')
+
 const arrSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
     return []
@@ -314,6 +514,38 @@ const planARRSeries = computed(() => {
   ]
 })
 
+const ltvSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Average LTV ($)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.average_ltv || 0,
+      })),
+      color: '#119eff',
+    },
+    {
+      label: 'Shortest LTV ($)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.shortest_ltv || 0,
+      })),
+      color: '#f59e0b',
+    },
+    {
+      label: 'Longest LTV ($)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.longest_ltv || 0,
+      })),
+      color: '#10b981',
+    },
+  ]
+})
+
 const totalPayingOrgsSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
     return []
@@ -369,9 +601,7 @@ displayStore.defaultBack = '/dashboard'
       <div class="w-full h-full px-4 pt-2 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
         <AdminFilterBar />
 
-        <div v-if="isLoading" class="flex items-center justify-center min-h-screen">
-          <Spinner size="w-24 h-24" />
-        </div>
+        <PageLoader v-if="isLoading" />
 
         <div v-else class="space-y-6">
           <!-- MRR & ARR Cards -->
@@ -388,7 +618,7 @@ displayStore.defaultBack = '/dashboard'
                   MRR - Monthly Recurring Revenue
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-primary">
-                  ${{ latestGlobalStats.mrr.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                  ${{ formatNumberValue(latestGlobalStats.mrr, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-primary">
                   $0.00
@@ -411,13 +641,65 @@ displayStore.defaultBack = '/dashboard'
                   ARR - Annual Recurring Revenue Projection
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-success">
-                  ${{ latestGlobalStats.total_revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                  ${{ formatNumberValue(latestGlobalStats.total_revenue, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-success">
                   $0.00
                 </p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   Projected annual recurring revenue (MRR × 12)
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Paid Organization Breakdown -->
+          <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  Total Paid Organizations
+                </p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-success">
+                  {{ formatNumberValue(latestGlobalStats.paying_orgs_total || latestGlobalStats.paying || 0) }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-success">
+                  0
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Subscription and/or available credits
+                </p>
+              </div>
+            </div>
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  Paid via Subscription
+                </p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-primary">
+                  {{ formatNumberValue(latestGlobalStats.paying_orgs_subscription || latestGlobalStats.paying || 0) }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-primary">
+                  0
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Active subscription organizations
+                </p>
+              </div>
+            </div>
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  Paid via Credits
+                </p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-accent">
+                  {{ formatNumberValue(latestGlobalStats.paying_orgs_credits || 0) }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-accent">
+                  0
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Organizations with available credits
                 </p>
               </div>
             </div>
@@ -437,7 +719,7 @@ displayStore.defaultBack = '/dashboard'
                   Total Paying
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-success">
-                  {{ latestGlobalStats.paying.toLocaleString() }}
+                  {{ formatNumberValue(latestGlobalStats.paying) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-success">
                   0
@@ -460,7 +742,7 @@ displayStore.defaultBack = '/dashboard'
                   Yearly Subscriptions
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-primary">
-                  {{ (latestGlobalStats.paying_yearly || 0).toLocaleString() }}
+                  {{ formatNumberValue(latestGlobalStats.paying_yearly || 0) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-primary">
                   0
@@ -483,7 +765,7 @@ displayStore.defaultBack = '/dashboard'
                   Monthly Subscriptions
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-info">
-                  {{ (latestGlobalStats.paying_monthly || 0).toLocaleString() }}
+                  {{ formatNumberValue(latestGlobalStats.paying_monthly || 0) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-info">
                   0
@@ -496,7 +778,7 @@ displayStore.defaultBack = '/dashboard'
           </div>
 
           <!-- Upgrade Metrics Cards -->
-          <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
             <!-- Organizations Needing Upgrade -->
             <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
               <div class="flex items-start justify-between mb-4">
@@ -509,7 +791,7 @@ displayStore.defaultBack = '/dashboard'
                   Orgs Need Upgrade
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-error">
-                  {{ latestGlobalStats.need_upgrade.toLocaleString() }}
+                  {{ formatNumberValue(latestGlobalStats.need_upgrade) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-error">
                   0
@@ -532,13 +814,105 @@ displayStore.defaultBack = '/dashboard'
                   {{ t('upgraded-organizations') }}
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-success">
-                  {{ (latestGlobalStats.upgraded_orgs || 0).toLocaleString() }}
+                  {{ formatNumberValue(latestGlobalStats.upgraded_orgs || 0) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-success">
                   0
                 </p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   {{ t('upgraded-organizations-latest-day') }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Past Due Organizations -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-error/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-error"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M9.172 4.172a4 4 0 015.656 0l5 5a4 4 0 010 5.656l-5 5a4 4 0 01-5.656 0l-5-5a4 4 0 010-5.656l5-5z" /></svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  {{ t('past-due-orgs') }}
+                </p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-error">
+                  {{ formatNumberValue(latestGlobalStats.past_due_orgs || 0) }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-error">
+                  0
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ t('stripe-subscriptions-past-due') }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Average Past Due Days -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-warning/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-warning"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" /></svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  {{ t('avg-past-due-days') }}
+                </p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-warning">
+                  {{ formatNumberValue(latestGlobalStats.past_due_orgs_average_days || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-warning">
+                  0.0
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ t('current-average-delay') }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Active Canceled (Paid Period) -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-warning/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-warning"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  {{ t('active-canceled-orgs') }}
+                </p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-warning">
+                  {{ formatNumberValue(latestGlobalStats.active_canceled_orgs || 0) }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-warning">
+                  0
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ t('active-canceled-orgs-description') }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Active Past Due (Still Access) -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-error/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-error"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86l-8.5 14.74A2 2 0 003.55 22h16.9a2 2 0 001.76-3.4l-8.5-14.74a2 2 0 00-3.42 0z" /></svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  {{ t('active-past-due-orgs') }}
+                </p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-error">
+                  {{ formatNumberValue(latestGlobalStats.active_past_due_orgs || 0) }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-error">
+                  0
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ t('active-past-due-orgs-description') }}
                 </p>
               </div>
             </div>
@@ -567,6 +941,69 @@ displayStore.defaultBack = '/dashboard'
               <AdminMultiLineChart
                 :series="subscriptionTypeSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+          </div>
+
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <ChartCard
+              :title="t('past-due-organizations')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="pastDueOrgSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="pastDueOrgSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+
+            <ChartCard
+              :title="t('average-past-due-days')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="pastDueAverageDaysSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="pastDueAverageDaysSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+                :value-suffix="` ${t('days')}`"
+              />
+            </ChartCard>
+          </div>
+
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <ChartCard
+              :title="t('active-canceled-organizations')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="activeCanceledOrgSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="activeCanceledOrgSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+
+            <ChartCard
+              :title="t('active-past-due-organizations')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="activePastDueOrgSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="activePastDueOrgSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+          </div>
+
+          <div class="grid grid-cols-1 gap-6">
+            <ChartCard
+              title="Paid Plan Conversion Rate"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="planConversionSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="planConversionSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+                value-suffix="%"
               />
             </ChartCard>
           </div>
@@ -611,6 +1048,18 @@ displayStore.defaultBack = '/dashboard'
                 value-prefix="$"
               />
             </ChartCard>
+
+            <ChartCard
+              title="LTV by Customer"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="ltvSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="ltvSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+                value-prefix="$"
+              />
+            </ChartCard>
           </div>
 
           <!-- Retention Charts -->
@@ -631,14 +1080,44 @@ displayStore.defaultBack = '/dashboard'
             </ChartCard>
 
             <ChartCard
-              title="Churn Revenue - Lost MRR by Plan"
+              :title="churnChartTitle"
               :is-loading="isLoadingGlobalStatsTrend"
-              :has-data="churnRevenueSeries.length > 0"
+              :has-data="churnChartSeries.length > 0"
             >
+              <template #header>
+                <div class="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <h2 class="text-xl font-semibold leading-tight text-slate-900 dark:text-white sm:text-2xl">
+                    {{ churnChartTitle }}
+                  </h2>
+                  <div class="d-join shrink-0" role="group" aria-label="Churn chart unit">
+                    <button
+                      type="button"
+                      class="d-btn d-btn-xs d-join-item min-w-10"
+                      :class="churnChartMode === 'revenue' ? 'd-btn-primary' : 'd-btn-outline'"
+                      :aria-pressed="churnChartMode === 'revenue'"
+                      aria-label="Show churn in dollars"
+                      @click="churnChartMode = 'revenue'"
+                    >
+                      $
+                    </button>
+                    <button
+                      type="button"
+                      class="d-btn d-btn-xs d-join-item min-w-10"
+                      :class="churnChartMode === 'rate' ? 'd-btn-primary' : 'd-btn-outline'"
+                      :aria-pressed="churnChartMode === 'rate'"
+                      aria-label="Show churn as percent"
+                      @click="churnChartMode = 'rate'"
+                    >
+                      %
+                    </button>
+                  </div>
+                </div>
+              </template>
               <AdminMultiLineChart
-                :series="churnRevenueSeries"
+                :series="churnChartSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
-                value-prefix="$"
+                :value-prefix="churnChartValuePrefix"
+                :value-suffix="churnChartValueSuffix"
               />
             </ChartCard>
           </div>

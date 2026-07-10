@@ -2,8 +2,7 @@ import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { intro, isCancel, log, outro, password } from '@clack/prompts'
 import { checkAlerts } from './api/update'
-import { createSupabaseClient, resolveUserIdFromApiKey, sendEvent } from './utils'
-import { appendToSafeFile, writeFileAtomic } from './utils/safeWrites'
+import { validateAndSaveKey } from './auth/session'
 
 interface Options {
   local: boolean
@@ -41,7 +40,7 @@ export async function loginInternal(apikey: string, options: Options, silent = f
 
   if (!silent)
     await checkAlerts()
-  // write in file .capgo the apikey in home directory
+
   const { local } = options
 
   if (local && !existsSync('.git')) {
@@ -50,25 +49,12 @@ export async function loginInternal(apikey: string, options: Options, silent = f
     throw new Error('Not in a git repository')
   }
 
-  const supabase = await createSupabaseClient(apikey, options.supaHost, options.supaAnon)
-  const userId = await resolveUserIdFromApiKey(supabase, apikey)
-
-  if (local) {
-    await writeFileAtomic('.capgo', `${apikey}\n`, { mode: 0o600 })
-    await appendToSafeFile('.gitignore', '.capgo\n', 0o600)
-  }
-  else {
-    const userHomeDir = homedir()
-    await writeFileAtomic(`${userHomeDir}/.capgo`, `${apikey}\n`, { mode: 0o600 })
-  }
-
-  await sendEvent(apikey, {
-    channel: 'user-login',
-    event: 'User CLI login',
-    icon: '✅',
-    user_id: userId,
-    notify: false,
-  }).catch()
+  // Validate, persist (0o600) and emit the login event via the shared auth core.
+  await validateAndSaveKey(apikey, {
+    local,
+    supaHost: options.supaHost,
+    supaAnon: options.supaAnon,
+  })
 
   if (!silent) {
     log.success(`login saved into .capgo file in ${local ? 'local' : 'home'} directory`)

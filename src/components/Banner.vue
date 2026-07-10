@@ -46,6 +46,7 @@ watchEffect(async () => {
 })
 
 const isMobile = Capacitor.isNativePlatform()
+const billingCtaHref = computed(() => isMobile ? '/settings/organization/usage' : '/settings/organization/plans')
 
 // Check if user lacks security compliance (2FA or password) - data is unreliable in this case
 const lacksSecurityAccess = computed(() => {
@@ -68,7 +69,7 @@ const bannerText = computed(() => {
     return null
   const org = organizationStore.currentOrganization
   if (!org)
-    return
+    return null
 
   // Don't show billing banner when user lacks 2FA or password access - data is unreliable
   if (lacksSecurityAccess.value)
@@ -107,7 +108,7 @@ const bannerColor = computed(() => {
 
   const org = organizationStore.currentOrganization
   if (!org)
-    return
+    return ''
 
   if (organizationStore.currentOrganizationFailed)
     return warning
@@ -143,7 +144,7 @@ const bannerColor = computed(() => {
     <span class="text-xs font-semibold sm:text-sm text-slate-800 dark:text-slate-200">
       {{ bannerText }}
     </span>
-    <a href="/settings/organization/plans" class="border-none d-btn d-btn-xs sm:d-btn-sm" :class="bannerColor">
+    <a :href="billingCtaHref" class="border-none d-btn d-btn-xs sm:d-btn-sm" :class="bannerColor">
       {{ isMobile ? t('see-usage') : t('upgrade') }}
     </a>
   </div>
@@ -154,6 +155,6 @@ const bannerColor = computed(() => {
       {{ bannerLeftText }}:
     </span>
     <span class="text-xs font-medium text-black sm:text-base dark:text-white">{{ bannerText }}</span>
-    <a href="/settings/organization/plans" class="ml-2 whitespace-nowrap border-none d-btn d-btn-xs sm:d-btn-sm" :class="bannerColor">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
+    <a :href="billingCtaHref" class="ml-2 whitespace-nowrap border-none d-btn d-btn-xs sm:d-btn-sm" :class="bannerColor">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
   </div>
 </template>

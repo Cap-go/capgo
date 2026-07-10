@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Tab } from './comp_def'
+import { Capacitor } from '@capacitor/core'
 import { onClickOutside } from '@vueuse/core'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -9,6 +10,7 @@ import IconDoc from '~icons/gg/loadbar-doc'
 import IconChart from '~icons/heroicons/chart-bar'
 import IconShield from '~icons/heroicons/shield-check'
 import IconDiscord from '~icons/ic/round-discord'
+import IconScanQrCode from '~icons/lucide/scan-qr-code'
 import IconApiKey from '~icons/mdi/shield-key'
 import IconAppStore from '~icons/simple-icons/appstore'
 import { useMainStore } from '~/stores/main'
@@ -24,11 +26,31 @@ const router = useRouter()
 const { t } = useI18n()
 const sidebar = useTemplateRef('sidebar')
 const route = useRoute()
+const isNativePlatform = Capacitor.isNativePlatform()
 
 onClickOutside(sidebar, () => emit('closeSidebar'))
 
+function normalizeSidebarPath(path: string) {
+  let normalizedPath = path
+
+  while (normalizedPath.length > 1 && normalizedPath.endsWith('/'))
+    normalizedPath = normalizedPath.slice(0, -1)
+
+  return normalizedPath || '/'
+}
+
 function isTabActive(tab: string) {
-  return route.path.includes(tab)
+  if (tab === '#')
+    return false
+
+  const currentPath = normalizeSidebarPath(route.path)
+  const activePaths = tab === '/apps' ? ['/apps', '/app'] : [tab]
+
+  return activePaths.some((activePath) => {
+    const tabPath = normalizeSidebarPath(activePath)
+
+    return currentPath === tabPath || currentPath.startsWith(`${tabPath}/`)
+  })
 }
 function openTab(tab: Tab) {
   if (tab.onClick)
@@ -51,6 +73,13 @@ const tabs = computed<Tab[]>(() => {
       icon: IconAppStore,
       key: '/apps',
     },
+    ...(isNativePlatform
+      ? [{
+          label: 'test-preview',
+          icon: IconScanQrCode,
+          key: '/scan',
+        }]
+      : []),
     {
       label: 'api-keys',
       icon: IconApiKey,
@@ -60,7 +89,7 @@ const tabs = computed<Tab[]>(() => {
       label: 'documentation',
       icon: IconDoc,
       key: '#',
-      onClick: () => window.open('https://docs.capgo.app', '_blank', 'noopener,noreferrer'),
+      onClick: () => window.open('https://capgo.app/docs', '_blank', 'noopener,noreferrer'),
       redirect: true,
     },
     {
@@ -134,7 +163,7 @@ const tabs = computed<Tab[]>(() => {
           <ul class="space-y-1 lg:space-y-2">
             <li v-for="tab, i in tabs" :key="i">
               <button
-                class="flex items-center p-3 w-full rounded-md transition duration-150 cursor-pointer lg:p-3 lg:rounded-lg focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none text-slate-200 min-h-[44px] lg:text-slate-200 lg:hover:bg-slate-700/50 hover:bg-slate-700/50 focus:ring-offset-slate-800"
+                class="flex items-center p-3 w-full rounded-md transition duration-150 cursor-pointer lg:p-3 lg:rounded-lg focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none text-slate-200 min-h-11 lg:text-slate-200 lg:hover:bg-slate-700/50 hover:bg-slate-700/50 focus:ring-offset-slate-800"
                 :class="{
                   'hover:bg-slate-700/50 lg:hover:bg-slate-700/50': !isTabActive(tab.key),
                   'bg-slate-700 text-white lg:bg-slate-700 lg:text-white': isTabActive(tab.key),

@@ -10,8 +10,10 @@ import {
   SUPABASE_ANON_KEY,
   SUPABASE_BASE_URL,
   USER_EMAIL,
+  USER_EMAIL_NONMEMBER,
   USER_ID,
   USER_PASSWORD,
+  USER_PASSWORD_NONMEMBER,
 } from './test-utils.ts'
 
 const orgId = randomUUID()
@@ -41,6 +43,24 @@ async function countCronStatAppMessages(appId: string): Promise<number> {
   return rows[0]?.count ?? 0
 }
 
+async function countStatsRefreshAuditLogs(): Promise<number> {
+  const rows = await executeSQL(
+    `SELECT COUNT(*)::integer AS count
+     FROM public.audit_logs
+     WHERE org_id = $1::uuid
+       AND operation = 'UPDATE'
+       AND table_name IN ('apps', 'orgs')
+       AND changed_fields && ARRAY['stats_refresh_requested_at', 'stats_updated_at']::text[]
+       AND NOT EXISTS (
+         SELECT 1
+         FROM pg_catalog.unnest(changed_fields) AS changed_field(field_name)
+         WHERE changed_field.field_name <> ALL(ARRAY['stats_refresh_requested_at', 'stats_updated_at', 'updated_at']::text[])
+       )`,
+    [orgId],
+  )
+  return rows[0]?.count ?? 0
+}
+
 async function getAppRefreshState(appId: string) {
   const { data, error } = await getSupabaseClient()
     .from('apps')
@@ -59,14 +79,17 @@ describe('chart refresh RPCs', () => {
   const unauthorizedClient = createAuthClient()
 
   beforeAll(async () => {
-    await authorizedClient.auth.signInWithPassword({
+    const { error: authorizedSignInError } = await authorizedClient.auth.signInWithPassword({
       email: USER_EMAIL,
       password: USER_PASSWORD,
     })
-    await unauthorizedClient.auth.signInWithPassword({
-      email: 'test2@capgo.app',
-      password: USER_PASSWORD,
+    expect(authorizedSignInError).toBeNull()
+
+    const { error: unauthorizedSignInError } = await unauthorizedClient.auth.signInWithPassword({
+      email: USER_EMAIL_NONMEMBER,
+      password: USER_PASSWORD_NONMEMBER,
     })
+    expect(unauthorizedSignInError).toBeNull()
 
     await getSupabaseClient().from('orgs').insert({
       created_by: USER_ID,
@@ -120,6 +143,7 @@ describe('chart refresh RPCs', () => {
       stats_refresh_requested_at: null,
       stats_updated_at: null,
     }).in('app_id', [staleAppId, freshAppId]).throwOnError()
+    await getSupabaseClient().from('audit_logs').delete().eq('org_id', orgId).throwOnError()
   })
 
   afterAll(async () => {
@@ -176,6 +200,7 @@ describe('chart refresh RPCs', () => {
     expect(firstResponse?.queued_count).toBe(1)
     expect(firstResponse?.skipped_count).toBe(0)
     expect(await countCronStatAppMessages(staleAppId)).toBe(1)
+    expect(await countStatsRefreshAuditLogs()).toBe(0)
 
     const { data: secondResponse, error: secondError } = await authorizedClient.rpc('request_app_chart_refresh', {
       app_id: staleAppId,
@@ -227,6 +252,7 @@ describe('chart refresh RPCs', () => {
     expect(freshState?.stats_refresh_requested_at).toBeNull()
     expect(await countCronStatAppMessages(staleAppId)).toBe(1)
     expect(await countCronStatAppMessages(freshAppId)).toBe(0)
+    expect(await countStatsRefreshAuditLogs()).toBe(0)
   })
 
   it('request_org_chart_refresh preserves the current org request marker when no apps are queued', async () => {

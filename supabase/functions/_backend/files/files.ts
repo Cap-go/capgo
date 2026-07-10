@@ -21,7 +21,7 @@ import { app as files_config } from './files_config.ts'
 import { parseUploadMetadata } from './parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
 import { supabaseTusCreateHandler, supabaseTusHeadHandler, supabaseTusPatchHandler } from './supabaseTusProxy.ts'
-import { ALLOWED_HEADERS, ALLOWED_METHODS, buildFileHttpMetadata, EXPOSED_HEADERS, isRetryableDurableObjectResetError, MAX_UPLOAD_LENGTH_BYTES, toBase64, TUS_EXTENSIONS, TUS_VERSION, withNoTransformCacheControl, X_CHECKSUM_SHA256, X_UPLOAD_HANDLER_RETRYABLE } from './util.ts'
+import { ALLOWED_HEADERS, ALLOWED_METHODS, buildFileHttpMetadata, EXPOSED_HEADERS, getSafeAttachmentReadCandidateKeys, headFirstExistingAttachmentCandidate, isRetryableDurableObjectResetError, MAX_UPLOAD_LENGTH_BYTES, NO_TRANSFORM_CACHE_CONTROL, parseAppScopedAttachmentPath, toBase64, TUS_EXTENSIONS, TUS_VERSION, withNoTransformCacheControl, X_CHECKSUM_SHA256, X_UPLOAD_HANDLER_RETRYABLE } from './util.ts'
 
 const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 30 minutes
 const DO_FETCH_RETRY_ATTEMPTS = 3
@@ -30,10 +30,8 @@ const DO_FETCH_RETRY_DELAY_MS = 250
 const ATTACHMENT_PREFIX = 'attachments'
 const ATTACHMENT_PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth', 'storage']
 const TUS_UPLOAD_CONTENT_TYPE = 'application/offset+octet-stream'
-
-type AppScopedAttachmentPath
-  = | { kind: 'scoped', app_id: string, owner_org: string }
-    | { kind: 'invalid_scoped' }
+const FILE_READ_CACHE_CONTROL = 'public, max-age=31536000, immutable'
+const TRACKING_QUERY_PARAMS = ['device_id']
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
@@ -163,7 +161,7 @@ async function recoverUploadOffsetFromDurableObject(
 function retryableUploadUnavailableResponse(): Response {
   return new Response(JSON.stringify({
     error: 'upload_retryable',
-    message: 'Upload worker moved during this request. Retry the upload request.',
+    message: 'Upload temporarily unavailable. Retry the upload request.',
   }), {
     status: 503,
     headers: {
@@ -237,10 +235,12 @@ async function fetchUploadHandlerWithRetry(
       })
 
       if (!shouldRetry) {
-        if (!canRetryRequest && isRetryableDurableObjectError) {
+        if (isRetryableDurableObjectError) {
           cloudlog({
             requestId: c.get('requestId'),
-            message: 'upload handler - durable object fetch failed for streaming request, returning retryable response',
+            message: canRetryRequest
+              ? 'upload handler - exhausted retryable durable object fetch attempts, returning retryable response'
+              : 'upload handler - durable object fetch failed for streaming request, returning retryable response',
             attempt,
             fileId: c.get('fileId'),
           })
@@ -256,8 +256,17 @@ async function fetchUploadHandlerWithRetry(
   throw lastError ?? new Error('Durable Object upload fetch failed')
 }
 
+function withFileReadCacheControl(cacheControl: string | null | undefined): string {
+  const normalizedCacheControl = cacheControl?.trim().toLowerCase()
+  if (!normalizedCacheControl || normalizedCacheControl === NO_TRANSFORM_CACHE_CONTROL) {
+    return withNoTransformCacheControl(FILE_READ_CACHE_CONTROL)
+  }
+
+  return withNoTransformCacheControl(cacheControl)
+}
+
 function ensureNoTransformResponse(response: Response): Response {
-  const cacheControl = withNoTransformCacheControl(response.headers.get('cache-control'))
+  const cacheControl = withFileReadCacheControl(response.headers.get('cache-control'))
   if (cacheControl === response.headers.get('cache-control')) {
     return response
   }
@@ -273,7 +282,7 @@ function ensureNoTransformResponse(response: Response): Response {
 
 function withAttachmentResponseHeaders(response: Response, fileId: string): Response {
   const headers = new Headers(response.headers)
-  headers.set('cache-control', withNoTransformCacheControl(headers.get('cache-control')))
+  headers.set('cache-control', withFileReadCacheControl(headers.get('cache-control')))
   headers.set('content-disposition', `attachment; filename="${fileId}"`)
 
   return new Response(response.body, {
@@ -304,61 +313,36 @@ function getTransferredBytesFromResponse(response: Response): number | null {
   return null
 }
 
+function isPositiveFiniteNumber(value: number | null | undefined): value is number {
+  return value != null && Number.isFinite(value) && value > 0
+}
+
+function getAppIdFromAttachmentPath(r2Path: string | null | undefined): string | undefined {
+  if (!r2Path)
+    return undefined
+
+  const pathParts = r2Path.split('/')
+  const appsIndex = pathParts.indexOf('apps')
+  if (appsIndex === -1)
+    return undefined
+
+  return pathParts[appsIndex + 1]
+}
+
 async function saveBandwidthUsage(c: Context, fileSize: number | null | undefined) {
   cloudlog({ requestId: c.get('requestId'), message: 'saveBandwidthUsage', fileSize })
-  if (!fileSize || fileSize <= 0)
+  if (!isPositiveFiniteNumber(fileSize))
     return Promise.resolve()
 
   cloudlog({ requestId: c.get('requestId'), message: 'getHandler files track bandwidth', fileSize })
-  const r2Path = new URL(c.req.url).pathname.split(`/files/read/${ATTACHMENT_PREFIX}/`)[1]
-  const app_id = r2Path?.split('/')[3]
+  const r2Path = c.get('fileId') || getRawAttachmentRouteId(c)
+  const app_id = getAppIdFromAttachmentPath(r2Path)
   const device_id = c.req.query('device_id')
   if (app_id && device_id) {
-    await createStatsBandwidth(c, device_id, app_id, fileSize ?? 0)
+    await createStatsBandwidth(c, device_id, app_id, fileSize)
   }
   else {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cannot track bandwidth no app_id or device_id', r2Path, app_id, device_id })
-  }
-}
-
-function parseAppScopedAttachmentPath(fileId: unknown): AppScopedAttachmentPath | null {
-  if (typeof fileId !== 'string') {
-    return null
-  }
-
-  const [orgs, owner_org, apps, app_id, ...suffix] = fileId.split('/')
-  if (orgs !== 'orgs') {
-    return null
-  }
-
-  if (!owner_org || apps !== 'apps' || !app_id || suffix.length === 0 || suffix.some(part => part.length === 0)) {
-    return { kind: 'invalid_scoped' }
-  }
-
-  return { kind: 'scoped', app_id, owner_org }
-}
-
-async function assertReadableAppScopedAttachment(c: Context, fileId: unknown): Promise<void> {
-  const scopedPath = parseAppScopedAttachmentPath(fileId)
-  if (scopedPath?.kind === 'invalid_scoped') {
-    quickError(404, 'not_found', 'Not found')
-  }
-  if (!scopedPath) {
-    return
-  }
-
-  // Attachment reads must use the primary to avoid replica lag serving deleted-app files.
-  const pgClient = getPgClient(c, false)
-  const drizzleClient = getDrizzleClient(pgClient)
-
-  try {
-    const app = await getAppByAppIdPg(c, scopedPath.app_id, drizzleClient)
-    if (!app || app.owner_org !== scopedPath.owner_org) {
-      quickError(404, 'not_found', 'Not found')
-    }
-  }
-  finally {
-    await closeClient(c, pgClient)
   }
 }
 
@@ -421,7 +405,10 @@ async function getSupabaseStorageResponse(c: Context, fileId: string): Promise<R
 
 async function getHandler(c: Context): Promise<Response> {
   const fileId = c.get('fileId')
-  await assertReadableAppScopedAttachment(c, fileId)
+  // It is imperative that files are read without any database read to avoid bottlenecks and keep file downloads highly available, especially under heavy load.
+  // This was designed that way, and access to a file that is going to be deleted is not important compared to download availability.
+  // Do not add DB or R2 checks before serving the file; if the file is missing in R2, a 404 is expected.
+
   cloudlog({ requestId: c.get('requestId'), message: 'getHandler files', fileId })
   if (getRuntimeKey() !== 'workerd') {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files using supabase storage' })
@@ -438,19 +425,30 @@ async function getHandler(c: Context): Promise<Response> {
   // Support for deno cache or CF cache do not remove this
   // @ts-expect-error-next-line
   const cache = getRuntimeKey() === 'workerd' ? caches.default : caches
+  const rawFileId = getRawAttachmentRouteId(c)
+  const candidateKeys = getSafeAttachmentReadCandidateKeys(fileId, rawFileId)
   const cacheUrl = new URL(c.req.url)
+  for (const queryParam of TRACKING_QUERY_PARAMS) {
+    cacheUrl.searchParams.delete(queryParam)
+  }
   cacheUrl.searchParams.set('range', c.req.header('range') || '')
+  cacheUrl.searchParams.sort()
   const cacheKey = new Request(cacheUrl, c.req)
   let response = await cache.match(cacheKey)
   if (response != null) {
     response = ensureNoTransformResponse(response)
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache hit' })
+    if (c.req.raw.method !== 'HEAD') {
+      await saveBandwidthUsage(c, getTransferredBytesFromResponse(response))
+    }
     // Best-effort restore: if file is cached but missing in R2, write it back.
     await backgroundTask(c, async () => {
       try {
-        const head = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).head(fileId)
-        if (head != null)
+        const retryBucket = new RetryBucket(bucket, DEFAULT_RETRY_PARAMS)
+        const existingObject = await headFirstExistingAttachmentCandidate(retryBucket, candidateKeys)
+        if (existingObject != null)
           return
+
         const cached = response.clone()
         const data = await cached.arrayBuffer()
         const contentType = cached.headers.get('content-type') || undefined
@@ -472,7 +470,8 @@ async function getHandler(c: Context): Promise<Response> {
   if (rangeHeaderFromRequest) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files range request', range: rangeHeaderFromRequest })
     try {
-      const objectInfo = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).head(fileId)
+      const retryBucket = new RetryBucket(bucket, DEFAULT_RETRY_PARAMS)
+      const objectInfo = await headFirstExistingAttachmentCandidate(retryBucket, candidateKeys)
       if (objectInfo != null) {
         const fileSize = objectInfo.size
         const rangeMatch = rangeHeaderFromRequest.match(/bytes=(\d+)-(\d*)/)
@@ -493,9 +492,13 @@ async function getHandler(c: Context): Promise<Response> {
 
   let object: R2ObjectBody | null = null
   try {
-    object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(fileId, {
-      range: c.req.raw.headers,
-    })
+    for (const candidateKey of candidateKeys) {
+      object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(candidateKey, {
+        range: c.req.raw.headers,
+      })
+      if (object != null)
+        break
+    }
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getHandler files get failed', fileId, error })
@@ -508,6 +511,7 @@ async function getHandler(c: Context): Promise<Response> {
   const bytesTransferred = calculateBytesTransferred(object.size, object.range)
   await saveBandwidthUsage(c, bytesTransferred)
   const headers = objectHeaders(object)
+  headers.set('content-length', bytesTransferred.toString())
   if (object.range != null && c.req.header('range')) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files range request', range: rangeHeader(object.size, object.range) })
     headers.set('content-range', rangeHeader(object.size, object.range))
@@ -528,7 +532,7 @@ function objectHeaders(object: R2Object): Headers {
   object.writeHttpMetadata(headers)
   // Prevent CDN transformations (auto-minify, email obfuscation, etc.) that modify
   // bytes in transit, breaking checksum verification on devices.
-  headers.set('cache-control', withNoTransformCacheControl(headers.get('cache-control')))
+  headers.set('cache-control', withFileReadCacheControl(headers.get('cache-control')))
   headers.set('etag', object.httpEtag)
 
   // the sha256 checksum was provided to R2 in the upload
@@ -552,13 +556,13 @@ function rangeHeader(objLen: number, r2Range: R2Range): string {
   if ('length' in r2Range && r2Range.length != null) {
     endIndexInclusive = startIndexInclusive + r2Range.length - 1
   }
-  if ('suffix' in r2Range) {
+  if ('suffix' in r2Range && r2Range.suffix != null) {
     startIndexInclusive = objLen - r2Range.suffix
   }
   return `bytes ${startIndexInclusive}-${endIndexInclusive}/${objLen}`
 }
 
-function calculateBytesTransferred(objLen: number, r2Range: R2Range | undefined): number {
+export function calculateBytesTransferred(objLen: number, r2Range: R2Range | undefined): number {
   if (!r2Range)
     return objLen
   let startIndexInclusive = 0
@@ -569,10 +573,11 @@ function calculateBytesTransferred(objLen: number, r2Range: R2Range | undefined)
   if ('length' in r2Range && r2Range.length != null) {
     endIndexInclusive = startIndexInclusive + r2Range.length - 1
   }
-  if ('suffix' in r2Range) {
+  if ('suffix' in r2Range && r2Range.suffix != null) {
     startIndexInclusive = objLen - r2Range.suffix
   }
-  return endIndexInclusive - startIndexInclusive + 1
+  const bytesTransferred = endIndexInclusive - startIndexInclusive + 1
+  return isPositiveFiniteNumber(bytesTransferred) ? bytesTransferred : objLen
 }
 
 function optionsHandler(c: Context) {
@@ -1046,7 +1051,7 @@ async function checkWriteAppAccess(c: Context, next: Next) {
 }
 
 app.options(`/upload/${ATTACHMENT_PREFIX}`, optionsHandler)
-app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromMetadata, checkWriteAppAccess, (c) => {
+app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload'], true, false, 'upload'), setKeyFromMetadata, checkWriteAppAccess, (c) => {
   if (getRuntimeKey() !== 'workerd') {
     return supabaseTusCreateHandler(c)
   }
@@ -1057,7 +1062,7 @@ app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, optionsHandler)
 // Combined GET/HEAD handler for TUS uploads - Hono tiny routes HEAD to GET
 app.get(
   `/upload/${ATTACHMENT_PREFIX}/:id{.+}`,
-  middlewareKey(['all', 'write', 'upload'], true),
+  middlewareKey(['all', 'write', 'upload'], true, false, 'upload'),
   setKeyFromIdParam,
   checkWriteAppAccess,
   (c) => {
@@ -1079,7 +1084,7 @@ app.get(
   },
 )
 app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, getHandler)
-app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromIdParam, checkWriteAppAccess, (c) => {
+app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload'], true, false, 'upload'), setKeyFromIdParam, checkWriteAppAccess, (c) => {
   if (getRuntimeKey() !== 'workerd') {
     return supabaseTusPatchHandler(c)
   }

@@ -14,8 +14,9 @@ if (typeof Object.groupBy !== 'function') {
 }
 
 const { default: antfu } = await import('@antfu/eslint-config')
+const { default: oxlint } = await import('eslint-plugin-oxlint')
 
-export default antfu(
+const config = antfu(
   {
     vue: true,
     formatters: true,
@@ -51,3 +52,5 @@ export default antfu(
     },
   },
 )
+
+export default config.append(...oxlint.buildFromOxlintConfigFile('./.oxlintrc.json'))

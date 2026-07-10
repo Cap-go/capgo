@@ -26,7 +26,6 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
       message: 'apikey context',
       apikeyId: (apikey as { id?: number }).id,
       userId: (apikey as { user_id?: string }).user_id,
-      mode: (apikey as { mode?: string }).mode,
     })
   }
   // Auth context is already set by middlewareKey

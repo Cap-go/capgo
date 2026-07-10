@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, fetchWithRetry, getSupabaseClient, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID, USER_ID_2 } from './test-utils.ts'
+import { BASE_URL, createDirectApiKeyWithBindings, executeSQL, fetchWithRetry, getAuthHeaders, getSupabaseClient, headers, ORG_ID, ORG_ID_2, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID, USER_ID_2 } from './test-utils.ts'
 
 function isDuplicateAppCreationError(body: any): boolean {
   if (!body || typeof body !== 'object')
@@ -125,18 +125,15 @@ describe('[GET] /app operations with subkey', () => {
       }
     }
 
-    // Create a subkey with limited rights to this app
-    const createSubkey = await fetch(`${BASE_URL}/apikey`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        name: 'Limited Subkey',
-        mode: 'all',
-        limited_to_apps: [APPNAME],
-      }),
+    // Create a V2 subkey with limited rights to this app.
+    const subkeyData = await createDirectApiKeyWithBindings({
+      key: randomUUID(),
+      name: `Limited Subkey ${id}`,
+      orgId: ORG_ID,
+      roleName: 'org_member',
+      appId: APPNAME,
+      appRoleName: 'app_admin',
     })
-    expect(createSubkey.status).toBe(200)
-    const subkeyData = await createSubkey.json() as { id: number }
     subkey = subkeyData.id
   })
 
@@ -205,23 +202,22 @@ describe('[GET] /app operations with subkey', () => {
 
   it('should not delete app with subkey if rights are read-only', async () => {
     // Attempt to delete app with subkey
-    const createSubkey = await fetch(`${BASE_URL}/apikey`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        name: 'Limited Subkey2',
-        mode: 'read',
-        limited_to_apps: [APPNAME],
-      }),
+    const subkeyData = await createDirectApiKeyWithBindings({
+      key: randomUUID(),
+      name: `Limited reader subkey ${id}`,
+      orgId: ORG_ID,
+      roleName: 'org_member',
+      appId: APPNAME,
+      appRoleName: 'app_reader',
     })
-    expect(createSubkey.status).toBe(200)
-    const subkeyData = await createSubkey.json() as { id: number }
     const subkeyHeaders = { 'x-limited-key-id': String(subkeyData.id) }
     const deleteApp = await fetch(`${BASE_URL}/app/${APPNAME}`, {
       method: 'DELETE',
       headers: { ...headers, ...subkeyHeaders },
     })
-    expect(deleteApp.status).toBe(401)
+    expect(deleteApp.status).toBe(400)
+    const deleteAppData = await deleteApp.json() as { error: string }
+    expect(deleteAppData.error).toBe('cannot_delete_app')
   })
 
   it('should get all apps with subkey', async () => {
@@ -261,22 +257,17 @@ describe('[GET] /app subkey ownership enforcement', () => {
   })
 
   it('should reject subkey id owned by another user', async () => {
-    const { data: subkeyData, error } = await getSupabaseClient()
-      .from('apikeys')
-      .insert({
-        user_id: USER_ID_2,
-        key: randomUUID(),
-        key_hash: null,
-        mode: 'read',
-        name: `Cross-tenant subkey ${randomUUID()}`,
-        limited_to_apps: [appId],
-      })
-      .select('id')
-      .single()
-
-    expect(error).toBeNull()
+    const subkeyData = await createDirectApiKeyWithBindings({
+      userId: USER_ID_2,
+      key: randomUUID(),
+      name: `Cross-tenant subkey ${randomUUID()}`,
+      orgId: ORG_ID_2,
+      roleName: 'org_member',
+      appId,
+      appRoleName: 'app_reader',
+    })
     expect(subkeyData?.id).toBeTruthy()
-    subkeyId = subkeyData!.id
+    subkeyId = subkeyData.id
 
     const subkeyHeaders = { 'x-limited-key-id': String(subkeyId) }
     const response = await fetch(`${BASE_URL}/app/${appId}`, {
@@ -318,18 +309,15 @@ describe('/app hashed subkey enforcement', () => {
 
   beforeAll(async () => {
     await createAppForTest(ALLOWED_APPNAME)
-    const createSubkey = await fetch(`${BASE_URL}/apikey`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        name: SUBKEY_NAME,
-        mode: 'all',
-        limited_to_apps: [ALLOWED_APPNAME],
-        hashed: true,
-      }),
+    const subkeyData = await createDirectApiKeyWithBindings({
+      key: randomUUID(),
+      name: SUBKEY_NAME,
+      orgId: ORG_ID,
+      roleName: 'org_member',
+      appId: ALLOWED_APPNAME,
+      appRoleName: 'app_admin',
+      hashed: true,
     })
-    expect(createSubkey.status).toBe(200)
-    const subkeyData = await createSubkey.json() as { id: number }
     subkeyId = subkeyData.id
   })
 
@@ -394,32 +382,128 @@ describe('[GET] /app invalid subkey header handling', () => {
 
 describe('[POST] /app operations with non-owner user', () => {
   const id = randomUUID()
-  const APPNAME = `com.nonowner.${id}`
+  const safeId = id.replaceAll('-', '')
+  const noAccessOrgId = randomUUID()
+  const adminAccessOrgId = randomUUID()
+  const noAccessCustomerId = `cus_nonowner_no_${safeId}`
+  const adminAccessCustomerId = `cus_nonowner_admin_${safeId}`
+  const noAccessAppName = `com.nonowner.denied.${safeId}`
+  const adminAccessAppName = `com.nonowner.allowed.${safeId}`
+  let authHeaders: Record<string, string>
 
-  afterAll(async () => {
-    await resetAppData(APPNAME)
-    await resetAppDataStats(APPNAME)
-    // Restore user rights back to 'read' to avoid polluting other tests
+  beforeAll(async () => {
+    authHeaders = await getAuthHeaders()
     const supabase = getSupabaseClient()
-    await supabase.from('org_users').update({
+
+    const { error: stripeError } = await supabase.from('stripe_info').insert([
+      {
+        customer_id: noAccessCustomerId,
+        status: 'succeeded',
+        product_id: 'prod_LQIregjtNduh4q',
+        subscription_id: `sub_no_${safeId}`,
+        trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+        is_good_plan: true,
+      },
+      {
+        customer_id: adminAccessCustomerId,
+        status: 'succeeded',
+        product_id: 'prod_LQIregjtNduh4q',
+        subscription_id: `sub_admin_${safeId}`,
+        trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+        is_good_plan: true,
+      },
+    ])
+    if (stripeError)
+      throw stripeError
+
+    const { error: orgError } = await supabase.from('orgs').insert([
+      {
+        id: noAccessOrgId,
+        name: `No access app org ${safeId}`,
+        management_email: `no-access-${safeId}@capgo.test`,
+        created_by: USER_ID_2,
+        customer_id: noAccessCustomerId,
+        use_new_rbac: false,
+      },
+      {
+        id: adminAccessOrgId,
+        name: `Admin access app org ${safeId}`,
+        management_email: `admin-access-${safeId}@capgo.test`,
+        created_by: USER_ID_2,
+        customer_id: adminAccessCustomerId,
+        use_new_rbac: false,
+      },
+    ])
+    if (orgError)
+      throw orgError
+
+    const { error: orgUserError } = await supabase.from('org_users').insert({
+      org_id: noAccessOrgId,
+      user_id: USER_ID,
       user_right: 'read',
-    }).eq('org_id', NON_OWNER_ORG_ID).eq('user_id', USER_ID)
+    })
+    if (orgUserError)
+      throw orgUserError
+
+    await executeSQL(`
+      DELETE FROM public.role_bindings
+      WHERE principal_type = public.rbac_principal_user()
+        AND principal_id = $1::uuid
+        AND org_id = $2::uuid
+    `, [USER_ID, noAccessOrgId])
+
+    await executeSQL(`
+      INSERT INTO public.role_bindings (
+        principal_type,
+        principal_id,
+        role_id,
+        scope_type,
+        org_id,
+        granted_by,
+        reason,
+        is_direct
+      )
+      SELECT
+        public.rbac_principal_user(),
+        $1::uuid,
+        roles.id,
+        public.rbac_scope_org(),
+        $2::uuid,
+        $1::uuid,
+        'app creation test admin binding',
+        true
+      FROM public.roles
+      WHERE roles.name = public.rbac_role_org_admin()
+        AND roles.scope_type = public.rbac_scope_org()
+      LIMIT 1
+    `, [USER_ID, adminAccessOrgId])
   })
 
-  it('should not allow app creation in an organization where user has no write access', async () => {
+  afterAll(async () => {
+    await resetAppData(noAccessAppName)
+    await resetAppDataStats(noAccessAppName)
+    await resetAppData(adminAccessAppName)
+    await resetAppDataStats(adminAccessAppName)
     const supabase = getSupabaseClient()
-    const { error: error2 } = await supabase.from('org_users').update({
-      user_right: 'read',
-    }).eq('org_id', NON_OWNER_ORG_ID).eq('user_id', USER_ID)
-    if (error2)
-      throw new Error(`Failed to update user rights for non-owner org: ${JSON.stringify(error2)}`)
+    await executeSQL(`
+      DELETE FROM public.role_bindings
+      WHERE principal_type = public.rbac_principal_user()
+        AND principal_id = $1::uuid
+        AND org_id = ANY($2::uuid[])
+    `, [USER_ID, [noAccessOrgId, adminAccessOrgId]])
+    await supabase.from('org_users').delete().eq('user_id', USER_ID).in('org_id', [noAccessOrgId, adminAccessOrgId])
+    await supabase.from('orgs').delete().in('id', [noAccessOrgId, adminAccessOrgId])
+    await supabase.from('stripe_info').delete().in('customer_id', [noAccessCustomerId, adminAccessCustomerId])
+  })
+
+  it('should ignore stale legacy org_users rights when creating an app', async () => {
     const createApp = await fetch(`${BASE_URL}/app`, {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
-        owner_org: NON_OWNER_ORG_ID,
-        app_id: APPNAME,
-        name: `${APPNAME}_no_access`,
+        owner_org: noAccessOrgId,
+        app_id: noAccessAppName,
+        name: `${noAccessAppName}_no_access`,
         icon: 'test-icon',
       }),
     })
@@ -428,26 +512,19 @@ describe('[POST] /app operations with non-owner user', () => {
     expect(responseData).toHaveProperty('error', 'cannot_access_organization')
   })
 
-  it('should allow app creation in an organization where user is not owner but has admin access', async () => {
-    const supabase = getSupabaseClient()
-    // org.update_settings permission requires 'admin' legacy right, not 'write'
-    const { error: error2 } = await supabase.from('org_users').update({
-      user_right: 'admin',
-    }).eq('org_id', NON_OWNER_ORG_ID).eq('user_id', USER_ID)
-    if (error2)
-      throw new Error(`Failed to update user rights for non-owner org: ${JSON.stringify(error2)}`)
+  it('should allow app creation in an organization where user has an RBAC admin binding', async () => {
     const createApp = await fetch(`${BASE_URL}/app`, {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
-        owner_org: NON_OWNER_ORG_ID,
-        app_id: APPNAME,
-        name: `App ${APPNAME}`,
+        owner_org: adminAccessOrgId,
+        app_id: adminAccessAppName,
+        name: `App ${adminAccessAppName}`,
         icon: 'test-icon',
       }),
     })
     expect(createApp.status).toBe(200)
     const responseData = await createApp.json()
-    expect(responseData).toHaveProperty('app_id', APPNAME)
+    expect(responseData).toHaveProperty('app_id', adminAccessAppName)
   })
 })

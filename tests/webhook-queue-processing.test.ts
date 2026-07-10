@@ -104,7 +104,7 @@ async function waitForWebhookDeliveryQueueMessage(deliveryId: string, timeoutMs 
   throw new Error(`Timed out waiting for webhook_delivery queue message for delivery ${deliveryId}`)
 }
 
-async function waitForDeliveryCompletion(deliveryId: string, timeoutMs = 15000) {
+async function waitForDeliveryAttempt(deliveryId: string, timeoutMs = 15000) {
   const start = Date.now()
   let lastState: Record<string, unknown> | null = null
 
@@ -120,13 +120,13 @@ async function waitForDeliveryCompletion(deliveryId: string, timeoutMs = 15000) 
 
     lastState = data
 
-    if (data?.status && data.status !== 'pending')
+    if ((data?.attempt_count ?? 0) > 0 && data?.response_status !== null)
       return data
 
     await new Promise(resolve => setTimeout(resolve, 250))
   }
 
-  throw new Error(`Timed out waiting for delivery ${deliveryId} to complete: ${JSON.stringify(lastState)}`)
+  throw new Error(`Timed out waiting for delivery ${deliveryId} to be attempted: ${JSON.stringify(lastState)}`)
 }
 
 describe('webhook queue processing', () => {
@@ -182,7 +182,7 @@ describe('webhook queue processing', () => {
     await pool.end()
   })
 
-  it('dispatches and delivers webhook queue messages end to end', { timeout: 30000 }, async () => {
+  it.concurrent('dispatches and delivers webhook queue messages end to end', { timeout: 30000 }, async () => {
     if (!createdWebhookId)
       throw new Error('Webhook was not created in setup')
 
@@ -213,10 +213,12 @@ describe('webhook queue processing', () => {
     expect(createdDelivery.event_type).toBe('apps.UPDATE')
     expect(createdDelivery.status).toBe('pending')
     await fetchQueueSync('webhook_delivery')
-    const completedDelivery = await waitForDeliveryCompletion(createdDelivery.id)
+    const attemptedDelivery = await waitForDeliveryAttempt(createdDelivery.id)
 
-    expect(completedDelivery.status).toBe('failed')
-    expect(completedDelivery.attempt_count).toBe(1)
-    expect(completedDelivery.response_body).toBeTruthy()
+    expect(attemptedDelivery.status).toBe('pending')
+    expect(attemptedDelivery.attempt_count).toBe(1)
+    expect(attemptedDelivery.response_status).toBe(405)
+    expect(attemptedDelivery.next_retry_at).toBeTruthy()
+    expect(attemptedDelivery.response_body).toBeTruthy()
   })
 })

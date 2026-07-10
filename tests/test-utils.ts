@@ -12,9 +12,9 @@ function normalizePostgresUrl(raw: string): string {
 
 function getPostgresUrlFromEnv(): string {
   return normalizePostgresUrl(
-  env.SUPABASE_DB_URL
-  ?? env.DB_URL
-  ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+    env.SUPABASE_DB_URL
+    ?? env.DB_URL
+    ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
   )
 }
 
@@ -236,6 +236,169 @@ export const headers = {
   'Authorization': APIKEY_TEST_ALL,
 }
 
+interface ApiKeyBinding {
+  role_name: string
+  scope_type: 'org' | 'app' | 'channel'
+  org_id: string
+  app_id?: string | null
+  channel_id?: string | number | null
+  reason?: string
+}
+
+export function orgApiKeyBindings(orgId = ORG_ID, roleName = 'org_admin'): ApiKeyBinding[] {
+  return [{
+    role_name: roleName,
+    scope_type: 'org',
+    org_id: orgId,
+  }]
+}
+
+export async function appApiKeyBindings(appId: string, roleName = 'app_admin'): Promise<ApiKeyBinding[]> {
+  const { data, error } = await getSupabaseClient()
+    .from('apps')
+    .select('id, owner_org')
+    .eq('app_id', appId)
+    .single()
+
+  if (error || !data?.id || !data.owner_org)
+    throw error ?? new Error(`Unable to resolve app ${appId}`)
+
+  return [{
+    role_name: roleName,
+    scope_type: 'app',
+    org_id: data.owner_org,
+    app_id: data.id,
+  }]
+}
+
+export async function createDirectApiKeyWithBindings(options: {
+  userId?: string
+  key: string
+  name: string
+  orgId: string
+  roleName?: string
+  appId?: string
+  appRoleName?: string
+  expiresAt?: string | null
+  hashed?: boolean
+}) {
+  const supabase = getSupabaseClient()
+  let apiKey: {
+    id: number
+    key: string | null
+    rbac_id: string
+    user_id: string
+    expires_at: string | null
+  } | null = null
+
+  if (options.hashed) {
+    const [insertedKey] = await executeSQL(
+      `INSERT INTO public.apikeys (user_id, key, key_hash, name, expires_at)
+       VALUES ($1, NULL, encode(extensions.digest($2, 'sha256'), 'hex'), $3, $4)
+       RETURNING id, key, rbac_id, user_id, expires_at`,
+      [options.userId ?? USER_ID, options.key, options.name, options.expiresAt ?? null],
+    )
+    apiKey = insertedKey
+      ? {
+          id: Number(insertedKey.id),
+          key: insertedKey.key,
+          rbac_id: insertedKey.rbac_id,
+          user_id: insertedKey.user_id,
+          expires_at: insertedKey.expires_at,
+        }
+      : null
+  }
+  else {
+    const { data, error: apiKeyError } = await supabase
+      .from('apikeys')
+      .insert({
+        user_id: options.userId ?? USER_ID,
+        key: options.key,
+        key_hash: null,
+        name: options.name,
+        expires_at: options.expiresAt ?? null,
+      })
+      .select('id, key, rbac_id, user_id, expires_at')
+      .single()
+
+    if (apiKeyError)
+      throw apiKeyError
+
+    apiKey = data
+  }
+
+  if (!apiKey)
+    throw new Error('Unable to create API key')
+
+  try {
+    const bindingRows: Database['public']['Tables']['role_bindings']['Insert'][] = []
+    const { data: orgRole, error: orgRoleError } = await supabase
+      .from('roles')
+      .select('id')
+      .eq('name', options.roleName ?? 'org_admin')
+      .single()
+    if (orgRoleError || !orgRole)
+      throw orgRoleError ?? new Error('Unable to resolve org role')
+
+    bindingRows.push({
+      principal_type: 'apikey',
+      principal_id: apiKey.rbac_id,
+      role_id: orgRole.id,
+      scope_type: 'org',
+      org_id: options.orgId,
+      granted_by: apiKey.user_id,
+      reason: 'Test API key binding',
+      is_direct: true,
+    })
+
+    if (options.appId) {
+      const { data: app, error: appError } = await supabase
+        .from('apps')
+        .select('id, owner_org')
+        .eq('app_id', options.appId)
+        .single()
+      if (appError || !app?.id || !app.owner_org)
+        throw appError ?? new Error(`Unable to resolve app ${options.appId}`)
+      if (app.owner_org !== options.orgId)
+        throw new Error(`App ${options.appId} belongs to org ${app.owner_org}, expected ${options.orgId}`)
+
+      const { data: appRole, error: appRoleError } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('name', options.appRoleName ?? 'app_admin')
+        .single()
+      if (appRoleError || !appRole)
+        throw appRoleError ?? new Error('Unable to resolve app role')
+
+      bindingRows.push({
+        principal_type: 'apikey',
+        principal_id: apiKey.rbac_id,
+        role_id: appRole.id,
+        scope_type: 'app',
+        org_id: options.orgId,
+        app_id: app.id,
+        granted_by: apiKey.user_id,
+        reason: 'Test API key app binding',
+        is_direct: true,
+      })
+    }
+
+    const { error: bindingError } = await supabase
+      .from('role_bindings')
+      .insert(bindingRows)
+    if (bindingError)
+      throw bindingError
+
+    return apiKey
+  }
+  catch (error) {
+    const { error: cleanupError } = await supabase.from('apikeys').delete().eq('id', apiKey.id)
+    if (cleanupError)
+      console.warn(`Failed to clean up API key ${apiKey.id} after binding setup error:`, cleanupError)
+    throw error
+  }
+}
+
 let cachedAuthHeaders: Record<string, string> | null = null
 let authHeadersPromise: Promise<Record<string, string>> | null = null
 
@@ -355,8 +518,8 @@ export async function fetchWithRetry(
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const response = await fetch(url, options)
-      // Only retry on 503 (service unavailable) or network errors
-      if (response.status === 503 && attempt < maxRetries - 1) {
+      // Only retry on 503 (service unavailable), 504 (PostgREST pool exhaustion) or network errors
+      if ((response.status === 503 || response.status === 504) && attempt < maxRetries - 1) {
         await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)))
         continue
       }
@@ -644,7 +807,8 @@ export function getSupabaseClient(): SupabaseClient<Database> {
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
           const response = await fetch(url, options)
-          if (response.status === 503 && attempt < maxRetries - 1) {
+          // 504 = PostgREST "Timed out acquiring connection from connection pool" under load
+          if ((response.status === 503 || response.status === 504) && attempt < maxRetries - 1) {
             await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)))
             continue
           }

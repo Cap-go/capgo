@@ -1,6 +1,21 @@
 import { z } from 'zod'
 import { buildCredentialsSchema } from './build'
 
+function rejectConflictingBooleanGroup<T extends Record<string, unknown>>(value: T, ctx: z.RefinementCtx, keys: Array<keyof T>) {
+  const selected = keys.filter(key => value[key] === true)
+  if (selected.length < 2)
+    return
+
+  const first = String(selected[0])
+  for (const key of selected.slice(1)) {
+    const current = String(key)
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [current],
+      message: `"${first}" and "${current}" cannot be used together`,
+    })
+  }
+}
 // ============================================================================
 // SDK Result Schema
 // ============================================================================
@@ -75,6 +90,9 @@ export const uploadOptionsSchema = z.object({
   path: z.string(),
   bundle: z.string().optional(),
   channel: z.string().optional(),
+  rollout: z.number().finite().min(0).max(100).optional(),
+  rolloutPercentageBps: z.number().int().min(0).max(10000).optional(),
+  rolloutCacheTtlSeconds: z.number().int().min(60).max(31536000).optional(),
   apikey: z.string().optional(),
   external: z.string().optional(),
   encrypt: z.boolean().optional(),
@@ -167,7 +185,7 @@ export type DeleteOldKeyOptions = z.infer<typeof deleteOldKeyOptionsSchema>
 // ============================================================================
 
 export const addChannelOptionsSchema = z.object({
-  channelId: z.string(),
+  channelId: z.string().describe('Channel name'),
   appId: z.string(),
   default: z.boolean().optional(),
   selfAssign: z.boolean().optional(),
@@ -178,8 +196,8 @@ export const addChannelOptionsSchema = z.object({
 
 export type AddChannelOptions = z.infer<typeof addChannelOptionsSchema>
 
-export const updateChannelOptionsSchema = z.object({
-  channelId: z.string(),
+export const updateChannelOptionsBaseSchema = z.object({
+  channelId: z.string().describe('Channel name'),
   appId: z.string(),
   bundle: z.string().optional(),
   state: z.string().optional(),
@@ -192,9 +210,34 @@ export const updateChannelOptionsSchema = z.object({
   emulator: z.boolean().optional(),
   device: z.boolean().optional(),
   prod: z.boolean().optional(),
+  rolloutBundle: z.string().optional(),
+  rolloutPercentage: z.number().finite().min(0).max(100).optional(),
+  rolloutPercentageBps: z.number().int().min(0).max(10000).optional(),
+  rolloutEnable: z.boolean().optional(),
+  rolloutDisable: z.boolean().optional(),
+  rolloutPause: z.boolean().optional(),
+  rolloutResume: z.boolean().optional(),
+  rolloutRollback: z.boolean().optional(),
+  rolloutPromote: z.boolean().optional(),
+  rolloutCacheTtlSeconds: z.number().int().min(60).max(31536000).optional(),
+  autoPauseEnabled: z.boolean().optional(),
+  autoPauseDisabled: z.boolean().optional(),
+  autoPauseWindowMinutes: z.number().int().min(1).max(10080).optional(),
+  autoPauseFailureRateBps: z.number().int().min(0).max(10000).nullable().optional(),
+  autoPauseConfidence: z.number().finite().gt(0).lt(1).optional(),
+  autoPauseMinAttempts: z.number().int().min(0).nullable().optional(),
+  autoPauseMinFailures: z.number().int().min(0).nullable().optional(),
+  autoPauseAction: z.enum(['pause', 'rollback', 'notify']).optional(),
+  autoPauseCooldownMinutes: z.number().int().min(0).max(10080).optional(),
   apikey: z.string().optional(),
   supaHost: z.string().optional(),
   supaAnon: z.string().optional(),
+})
+
+export const updateChannelOptionsSchema = updateChannelOptionsBaseSchema.superRefine((value, ctx) => {
+  rejectConflictingBooleanGroup(value, ctx, ['rolloutEnable', 'rolloutDisable'])
+  rejectConflictingBooleanGroup(value, ctx, ['rolloutPause', 'rolloutResume', 'rolloutRollback', 'rolloutPromote'])
+  rejectConflictingBooleanGroup(value, ctx, ['autoPauseEnabled', 'autoPauseDisabled'])
 })
 
 export type UpdateChannelOptions = z.infer<typeof updateChannelOptionsSchema>
@@ -332,10 +375,20 @@ export const requestBuildOptionsSchema = z.object({
   nodeModules: z.string().optional(),
   platform: z.enum(['ios', 'android']),
   credentials: buildCredentialsSchema.optional(),
+  submitToStoreReview: z.boolean().optional(),
+  storeReleaseName: z.string().trim().min(1).optional(),
+  storeReleaseNotes: z.string().trim().min(1).optional(),
+  storeReleaseNotesLocalized: z.record(z.string().trim().min(1), z.string().trim().min(1)).optional(),
+  iosTestflightGroups: z.string().trim().min(1).optional(),
+  iosAutomaticRelease: z.boolean().optional(),
   userId: z.string().optional(),
   apikey: z.string().optional(),
   supaHost: z.string().optional(),
   supaAnon: z.string().optional(),
+  /** set false to skip the automatic pre-build prescan (equivalent to --no-prescan) */
+  prescan: z.boolean().optional(),
+  /** run the prescan in report-only mode: findings never block the build */
+  prescanIgnoreFatal: z.boolean().optional(),
 })
 
 export type RequestBuildOptions = z.infer<typeof requestBuildOptionsSchema>

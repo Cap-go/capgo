@@ -1,4 +1,4 @@
-// list all apps in supabase and create version unknown for each
+// Backfill app_stats device counts for recently active apps.
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = 'https://***.supabase.co'

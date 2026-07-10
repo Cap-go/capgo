@@ -79,14 +79,14 @@ SELECT
     is(
         is_allowed_capgkey('ae6e7458-c46d-4c00-aa3b-153b0b8520ea', '{all}'),
         true,
-        'is_allowed_capgkey test - key has correct mode'
+        'is_allowed_capgkey test - key exists'
     );
 
 SELECT
     is(
         is_allowed_capgkey('ae6e7458-c46d-4c00-aa3b-153b0b8520ea', '{read}'),
-        false,
-        'is_allowed_capgkey test - key does not have correct mode'
+        true,
+        'is_allowed_capgkey test - key existence is mode-independent after V2 migration'
     );
 
 SELECT
@@ -105,7 +105,7 @@ SELECT
             'com.demo.app'
         ),
         true,
-        'is_allowed_capgkey test with app_id - key has correct mode and user is app owner'
+        'is_allowed_capgkey test with app_id - key has app RBAC permission'
     );
 
 SELECT
@@ -131,14 +131,14 @@ SELECT
     is(
         is_allowed_capgkey('test-hashed-apikey-for-auth-test', '{all}'),
         true,
-        'is_allowed_capgkey test - hashed key has correct mode'
+        'is_allowed_capgkey test - hashed key exists'
     );
 
 SELECT
     is(
         is_allowed_capgkey('test-hashed-apikey-for-auth-test', '{read}'),
-        false,
-        'is_allowed_capgkey test - hashed key does not have correct mode'
+        true,
+        'is_allowed_capgkey test - hashed key existence is mode-independent after V2 migration'
     );
 
 SELECT

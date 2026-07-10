@@ -12,11 +12,11 @@ import {
   PointElement,
   Tooltip,
 } from 'chart.js'
-import dayjs from 'dayjs'
 import { computed } from 'vue'
 import { Line } from 'vue-chartjs'
 import { createChartColorWithOpacity, resolveAccessibleChartColor } from '~/services/chartConfig'
-import { formatLocalDate } from '~/services/date'
+import { formatLocalDate, formatLocalMonthYear } from '~/services/date'
+import { formatNumberValue } from '~/services/formatLocale'
 
 interface DataSeries {
   label: string
@@ -63,15 +63,15 @@ const isDark = useDark()
 
 function formatChartDate(date: string) {
   if (props.dateGranularity === 'month') {
-    const parsed = dayjs(date)
-    if (parsed.isValid())
-      return parsed.format('MMM YYYY')
+    const formattedMonth = formatLocalMonthYear(date)
+    if (formattedMonth)
+      return formattedMonth
   }
   return formatLocalDate(date) || date
 }
 
 function formatChartValue(value: number) {
-  return `${props.valuePrefix}${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}${props.valueSuffix}`
+  return `${props.valuePrefix}${formatNumberValue(value, { maximumFractionDigits: 2 })}${props.valueSuffix}`
 }
 
 Chart.register(
@@ -141,8 +141,14 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
       position: 'bottom',
       labels: {
         color: isDark.value ? '#d1d5db' : '#4b5563',
+        boxHeight: 10,
+        boxWidth: 10,
+        font: {
+          size: 12,
+          weight: 500,
+        },
+        padding: 18,
         usePointStyle: true,
-        padding: 15,
       },
     },
     tooltip: {
@@ -201,7 +207,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
       <span class="loading loading-spinner loading-lg text-primary" />
     </div>
     <div v-else class="w-full h-full">
-      <Line :data="chartData" :options="chartOptions" />
+      <Line class="h-full w-full" :data="chartData" :options="chartOptions" />
     </div>
   </div>
 </template>

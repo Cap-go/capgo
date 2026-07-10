@@ -24,10 +24,12 @@ const props = withDefaults(defineProps<{
   noResultsLabel: string
   disabled?: boolean
   showSpinner?: boolean
+  compareMode?: 'manifest' | 'dependencies'
 }>(), {
   modelValue: null,
   disabled: false,
   showSpinner: false,
+  compareMode: 'manifest',
 })
 
 const emit = defineEmits<{
@@ -45,6 +47,12 @@ const compareSearchLoading = ref(false)
 const compareSearchRequestId = ref(0)
 const latestCompareRequestId = ref(0)
 let preferredCompareRequestId = 0
+
+// Map of bundle (version) id -> names of channels currently serving that bundle
+// (channels.version === bundleId). Used to badge a compare option that is live on
+// a channel, e.g. the one currently deployed on "production".
+const liveChannelsByVersion = ref<Map<number, string[]>>(new Map())
+let liveChannelsRequestId = 0
 
 const compareOptions = computed(() => {
   if (compareSearch.value.trim())
@@ -72,6 +80,26 @@ function resetSearchState() {
 function selectCompareVersion(option: VersionRow | null) {
   resetSearchState()
   emit('update:modelValue', option)
+  // The DaisyUI dropdown is CSS-only (opens on :focus-within), so blur the
+  // active element to close it after a selection.
+  if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement)
+    document.activeElement.blur()
+}
+
+// The manifest tab compares per-file manifest entries (manifest_count), while the
+// dependencies tab compares native_packages. Only offer bundles that actually carry
+// the data the current tab diffs on, so gate the candidate list per mode. Deleted
+// bundles are excluded — their storage may be gone (and is purged after 90 days),
+// so they are not meaningful comparison targets.
+function buildCompareBaseQuery() {
+  const query = supabase
+    .from('app_versions')
+    .select('id, name, created_at, manifest_count, app_id')
+    .eq('app_id', props.appId)
+    .eq('deleted', false)
+  return props.compareMode === 'dependencies'
+    ? query.not('native_packages', 'is', null)
+    : query.gt('manifest_count', 0)
 }
 
 async function loadLatestCompareVersions() {
@@ -80,11 +108,7 @@ async function loadLatestCompareVersions() {
     return
   }
   const requestId = ++latestCompareRequestId.value
-  const { data, error } = await supabase
-    .from('app_versions')
-    .select('id, name, created_at, manifest_count, app_id')
-    .eq('app_id', props.appId)
-    .gt('manifest_count', 0)
+  const { data, error } = await buildCompareBaseQuery()
     .neq('id', props.currentVersionId)
     .order('created_at', { ascending: false })
     .limit(5)
@@ -153,7 +177,12 @@ async function loadPreferredCompareVersions() {
   if (channelIds.size === 0)
     return
 
-  const preferredHistory: Array<{ versionId: number, deployedAt: string | null }> = []
+  // Fetch several recent prior deployments per channel (not just one): if the
+  // most recent points to a now-deleted bundle, the deleted filter below would
+  // otherwise leave the channel with no baseline. Keeping a small lookback lets
+  // us fall back to the next older non-deleted deployment instead.
+  const PREFERRED_LOOKBACK = 20
+  const candidatesByChannel: Array<Array<{ versionId: number, deployedAt: string | null }>> = []
   for (const channelId of channelIds) {
     const cutoff = deployedAtByChannel.get(channelId)
     let query = supabase
@@ -168,7 +197,7 @@ async function loadPreferredCompareVersions() {
 
     const { data, error } = await query
       .order('created_at', { ascending: false })
-      .limit(1)
+      .limit(PREFERRED_LOOKBACK)
 
     if (requestId !== preferredCompareRequestId)
       return
@@ -178,24 +207,19 @@ async function loadPreferredCompareVersions() {
       continue
     }
 
-    const entry = (data ?? [])[0] as DeployHistoryRow | undefined
-    if (!entry)
-      continue
-    preferredHistory.push({
+    const candidates = ((data ?? []) as DeployHistoryRow[]).map(entry => ({
       versionId: entry.version_id,
       deployedAt: entry.created_at ?? entry.deployed_at ?? null,
-    })
+    }))
+    if (candidates.length)
+      candidatesByChannel.push(candidates)
   }
 
-  if (!preferredHistory.length)
+  if (!candidatesByChannel.length)
     return
 
-  const uniqueIds = [...new Set(preferredHistory.map(entry => entry.versionId))]
-  const { data: versions, error } = await supabase
-    .from('app_versions')
-    .select('id, name, created_at, manifest_count, app_id')
-    .eq('app_id', props.appId)
-    .gt('manifest_count', 0)
+  const uniqueIds = [...new Set(candidatesByChannel.flat().map(entry => entry.versionId))]
+  const { data: versions, error } = await buildCompareBaseQuery()
     .in('id', uniqueIds)
 
   if (requestId !== preferredCompareRequestId)
@@ -207,17 +231,91 @@ async function loadPreferredCompareVersions() {
   }
 
   const versionMap = new Map((versions ?? []).map(version => [version.id, version]))
-  const sorted = preferredHistory
-    .filter(entry => versionMap.has(entry.versionId))
+  // Per channel, keep the most recent deployment whose bundle survived the
+  // deleted filter (candidates are already ordered newest-first).
+  const seen = new Set<number>()
+  preferredCompareVersions.value = candidatesByChannel
+    .map(candidates => candidates.find(entry => versionMap.has(entry.versionId)))
+    .filter((entry): entry is { versionId: number, deployedAt: string | null } => Boolean(entry))
     .sort((a, b) => (b.deployedAt ?? '').localeCompare(a.deployedAt ?? ''))
-
-  preferredCompareVersions.value = sorted
+    .filter((entry) => {
+      // Dedupe: the same bundle can be the surviving pick for multiple channels.
+      if (seen.has(entry.versionId))
+        return false
+      seen.add(entry.versionId)
+      return true
+    })
     .map(entry => versionMap.get(entry.versionId))
     .filter((version): version is VersionRow => Boolean(version))
 }
 
+// Load every channel for the app and index its current bundle, so any compare
+// option can show which channel(s) it is live on. Channels per app are few, so a
+// single unfiltered fetch is cheaper than per-option lookups.
+async function loadLiveChannels() {
+  const requestId = ++liveChannelsRequestId
+  liveChannelsByVersion.value = new Map()
+  if (!props.appId)
+    return
+
+  const { data, error } = await supabase
+    .from('channels')
+    .select('name, version')
+    .eq('app_id', props.appId)
+
+  if (requestId !== liveChannelsRequestId)
+    return
+
+  if (error) {
+    console.error('Failed to load channel bindings', error)
+    return
+  }
+
+  const map = new Map<number, string[]>()
+  for (const channel of data ?? []) {
+    if (channel.version == null)
+      continue
+    const names = map.get(channel.version) ?? []
+    names.push(channel.name)
+    map.set(channel.version, names)
+  }
+  // Sort each channel list so the compact "${names[0]} +N" badge and the tooltip
+  // are deterministic regardless of the row order the database returns.
+  for (const names of map.values())
+    names.sort((a, b) => a.localeCompare(b))
+  liveChannelsByVersion.value = map
+}
+
+function liveChannels(versionId: number): string[] {
+  return liveChannelsByVersion.value.get(versionId) ?? []
+}
+
+// Compact badge text: first channel name, with a "+N" suffix when a bundle is
+// live on several channels so the row stays uncluttered. The full list is in the
+// title tooltip.
+function liveBadgeLabel(versionId: number): string {
+  const names = liveChannels(versionId)
+  if (names.length === 0)
+    return ''
+  if (names.length === 1)
+    return names[0]
+  return `${names[0]} +${names.length - 1}`
+}
+
+function liveBadgeTitle(versionId: number): string {
+  const names = liveChannels(versionId)
+  if (names.length === 0)
+    return ''
+  return t('currently-live-on', { channels: names.join(', ') })
+}
+
+function escapeIlike(term: string): string {
+  return term.replace(/[\\%_]/g, '\\$&')
+}
+
 async function searchCompareVersions(term: string) {
-  if (!props.appId || !term.trim()) {
+  const trimmed = term.trim()
+  if (!props.appId || !trimmed) {
     compareSearchResults.value = []
     compareSearchLoading.value = false
     return
@@ -225,20 +323,19 @@ async function searchCompareVersions(term: string) {
 
   const requestId = ++compareSearchRequestId.value
   compareSearchLoading.value = true
-  const baseQuery = supabase
-    .from('app_versions')
-    .select('id, name, created_at, manifest_count, app_id')
-    .eq('app_id', props.appId)
-    .gt('manifest_count', 0)
-    .neq('id', props.currentVersionId)
 
-  const numericId = Number(term)
+  // Each chain must start from its own builder: the Supabase query builder is
+  // mutable and returns `this`, so reusing one instance across concurrent
+  // chains would leak filters between the requests.
+  const namePattern = `%${escapeIlike(trimmed)}%`
+  const numericId = /^\d+$/.test(trimmed) ? Number(trimmed) : Number.NaN
   let data: VersionRow[] | null = null
   let error: unknown = null
 
   if (Number.isNaN(numericId)) {
-    const response = await baseQuery
-      .ilike('name', `%${term}%`)
+    const response = await buildCompareBaseQuery()
+      .neq('id', props.currentVersionId)
+      .ilike('name', namePattern)
       .order('created_at', { ascending: false })
       .limit(5)
 
@@ -250,11 +347,13 @@ async function searchCompareVersions(term: string) {
   }
   else {
     const [nameResponse, idResponse] = await Promise.all([
-      baseQuery
-        .ilike('name', `%${term}%`)
+      buildCompareBaseQuery()
+        .neq('id', props.currentVersionId)
+        .ilike('name', namePattern)
         .order('created_at', { ascending: false })
         .limit(5),
-      baseQuery
+      buildCompareBaseQuery()
+        .neq('id', props.currentVersionId)
         .eq('id', numericId)
         .order('created_at', { ascending: false })
         .limit(5),
@@ -317,9 +416,10 @@ watch(
     if (!props.appId || !props.currentVersionId) {
       latestCompareVersions.value = []
       preferredCompareVersions.value = []
+      liveChannelsByVersion.value = new Map()
       return
     }
-    await Promise.all([loadLatestCompareVersions(), loadPreferredCompareVersions()])
+    await Promise.all([loadLatestCompareVersions(), loadPreferredCompareVersions(), loadLiveChannels()])
   },
   { immediate: true },
 )
@@ -337,8 +437,15 @@ watch(
           class="inline-flex w-full min-w-0 items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-700 shadow-sm transition hover:border-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
           :disabled="disabled"
         >
-          <span class="truncate min-w-0">
-            {{ modelValue?.name ?? noneLabel }}
+          <span class="flex min-w-0 items-center gap-2">
+            <span class="truncate min-w-0">{{ modelValue?.name ?? noneLabel }}</span>
+            <span
+              v-if="modelValue && liveChannels(modelValue.id).length"
+              class="max-w-[10rem] shrink-0 truncate rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
+              :title="liveBadgeTitle(modelValue.id)"
+            >
+              {{ liveBadgeLabel(modelValue.id) }}
+            </span>
           </span>
           <IconDown class="w-4 h-4 shrink-0 text-slate-400" />
         </button>
@@ -346,7 +453,7 @@ watch(
           tabindex="0"
           class="mt-1 w-full d-dropdown-content d-menu rounded-lg border border-slate-200 bg-white p-2 shadow-lg z-20 dark:border-slate-700 dark:bg-slate-900"
         >
-          <div class="p-2">
+          <div class="p-2" @mousedown.prevent>
             <FormKit
               v-model="compareSearch"
               :prefix-icon="IconSearch"
@@ -372,7 +479,16 @@ watch(
               class="flex w-full min-w-0 items-center justify-between rounded-md px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
               @click="selectCompareVersion(option)"
             >
-              <span class="truncate min-w-0">{{ option.name }}</span>
+              <span class="flex min-w-0 items-center gap-2">
+                <span class="truncate min-w-0">{{ option.name }}</span>
+                <span
+                  v-if="liveChannels(option.id).length"
+                  class="max-w-[8rem] shrink-0 truncate rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
+                  :title="liveBadgeTitle(option.id)"
+                >
+                  {{ liveBadgeLabel(option.id) }}
+                </span>
+              </span>
               <span class="ml-2 shrink-0 text-xs text-slate-400">{{ option.created_at ? formatLocalDate(option.created_at) : t('unknown') }}</span>
             </button>
             <div v-if="compareSearchLoading" class="px-3 py-2 text-xs text-slate-400">

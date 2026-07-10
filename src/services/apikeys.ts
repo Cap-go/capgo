@@ -6,19 +6,204 @@ import type { Database } from '~/types/supabase.types'
 export async function createDefaultApiKey(
   supabase: SupabaseClient<Database>,
   name: string,
+  options: {
+    orgId?: string | null
+    appId?: string | null
+    hashed?: boolean
+  } = {},
 ) {
+  let orgId = options.orgId ?? null
+  let appUuid: string | null = null
+
+  if (options.appId) {
+    const { data: app, error } = await supabase
+      .from('apps')
+      .select('id, owner_org')
+      .eq('app_id', options.appId)
+      .single()
+
+    if (error)
+      throw error
+
+    if (orgId && app?.owner_org && orgId !== app.owner_org) {
+      throw new Error('appId does not belong to orgId')
+    }
+
+    appUuid = app?.id ?? null
+    orgId = orgId ?? app?.owner_org ?? null
+  }
+
+  if (!orgId) {
+    throw new Error('Cannot create a default API key without an organization')
+  }
+
+  const bindings: Array<{
+    role_name: string
+    scope_type: 'org' | 'app'
+    org_id: string
+    app_id?: string
+  }> = appUuid && !options.orgId
+    ? [
+        {
+          role_name: 'org_member',
+          scope_type: 'org',
+          org_id: orgId,
+        },
+        {
+          role_name: 'app_admin',
+          scope_type: 'app',
+          org_id: orgId,
+          app_id: appUuid,
+        },
+      ]
+    : [
+        {
+          role_name: 'org_admin',
+          scope_type: 'org',
+          org_id: orgId,
+        },
+      ]
+
   return supabase.functions.invoke('apikey', {
     method: 'POST',
     body: {
       name,
-      mode: 'all',
+      hashed: options.hashed === true,
+      bindings,
     },
   })
 }
 
+export async function createAiApiKey(
+  supabase: SupabaseClient<Database>,
+  name: string,
+  options: {
+    /** One or more organizations the key spans. */
+    orgIds: string[]
+    role: 'admin' | 'member'
+    /** Member role only: the apps to grant access on, each with its owning org and chosen app-level role. */
+    apps?: Array<{ uuid: string, orgId: string, role: string }>
+    /** Admin role only: also grant the `org.create` global permission (create new orgs). */
+    allowOrgCreate?: boolean
+  },
+) {
+  const { orgIds, role } = options
+
+  if (!orgIds || orgIds.length === 0) {
+    throw new Error('Cannot create an AI API key without an organization')
+  }
+
+  const bindings: Array<{
+    role_name: string
+    scope_type: 'org' | 'app'
+    org_id: string
+    app_id?: string
+  }> = []
+
+  if (role === 'admin') {
+    for (const orgId of orgIds)
+      bindings.push({ role_name: 'org_admin', scope_type: 'org', org_id: orgId })
+  }
+  else {
+    const orgIdSet = new Set(orgIds)
+    for (const orgId of orgIds)
+      bindings.push({ role_name: 'org_member', scope_type: 'org', org_id: orgId })
+    for (const app of options.apps ?? []) {
+      if (!orgIdSet.has(app.orgId))
+        throw new Error('Each app.orgId must be one of the selected orgIds')
+      bindings.push({ role_name: app.role, scope_type: 'app', org_id: app.orgId, app_id: app.uuid })
+    }
+  }
+
+  // `org.create` is only valid on a key that has an org-admin binding — i.e. the admin role.
+  const globalPermissions = role === 'admin' && options.allowOrgCreate ? ['org.create'] : undefined
+
+  return supabase.functions.invoke('apikey', {
+    method: 'POST',
+    body: {
+      name,
+      hashed: false,
+      bindings,
+      global_permissions: globalPermissions,
+    },
+  })
+}
+
+export async function findUsablePlainApiKey(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  orgId?: string | null,
+  appId?: string | null,
+): Promise<string | null> {
+  const isLiveKey = (expiresAt: string | null) => !expiresAt || new Date(expiresAt).getTime() > Date.now()
+  let appUuid: string | null = null
+
+  const { data: keys, error } = await supabase
+    .from('apikeys')
+    .select('key, expires_at, rbac_id, created_at')
+    .eq('user_id', userId)
+    .not('key', 'is', null)
+    .order('created_at', { ascending: false })
+
+  if (error || !keys?.length)
+    return null
+
+  const liveKeys = keys.filter(key => key.key && isLiveKey(key.expires_at))
+  if (!liveKeys.length)
+    return null
+
+  if (!orgId)
+    return liveKeys[0].key ?? null
+
+  if (appId) {
+    const { data: app, error: appError } = await supabase
+      .from('apps')
+      .select('id, owner_org')
+      .eq('app_id', appId)
+      .single()
+
+    if (appError || !app?.id || !app.owner_org)
+      return null
+
+    if (app.owner_org !== orgId)
+      return null
+
+    appUuid = app.id
+  }
+
+  const rbacIds = liveKeys.map(key => key.rbac_id).filter((rbacId): rbacId is string => !!rbacId)
+  if (!rbacIds.length)
+    return null
+
+  const { data: bindings, error: bindingsError } = await supabase
+    .from('role_bindings')
+    .select('principal_id, scope_type, app_id, roles(name)')
+    .eq('principal_type', 'apikey')
+    .eq('org_id', orgId)
+    .in('principal_id', rbacIds)
+
+  if (bindingsError || !bindings?.length)
+    return null
+
+  const orgAdminRoles = new Set(['org_super_admin', 'org_admin'])
+  const scopedKeyIds = new Set(((bindings ?? []) as any[])
+    .filter((binding) => {
+      const roleName = Array.isArray(binding.roles) ? binding.roles[0]?.name : binding.roles?.name
+      if (binding.scope_type === 'org' && orgAdminRoles.has(roleName))
+        return true
+      return !!appUuid && binding.scope_type === 'app' && binding.app_id === appUuid
+    })
+    .map(binding => binding.principal_id)
+    .filter((principalId): principalId is string => typeof principalId === 'string'))
+
+  if (!scopedKeyIds.size)
+    return null
+
+  return liveKeys.find(key => scopedKeyIds.has(key.rbac_id))?.key ?? null
+}
+
 interface ApiKeyListRow {
   name?: string | null
-  mode: string | null
   created_at: string | null
 }
 
@@ -49,17 +234,6 @@ export function isApiKeyExpired(expiresAt: string | null): boolean {
   return new Date(expiresAt) < new Date()
 }
 
-export function formatApiKeyScope(
-  items: string[] | null | undefined,
-  formatItem: (item: string) => string,
-  emptyValue = '',
-): string {
-  if (!items || items.length === 0)
-    return emptyValue
-
-  return items.map(formatItem).join(', ')
-}
-
 export function sortApiKeyRows<T extends ApiKeyListRow>(
   rows: T[],
   columns: TableColumn[],
@@ -78,10 +252,6 @@ export function sortApiKeyRows<T extends ApiKeyListRow>(
         case 'name':
           aValue = a.name?.toLowerCase() || ''
           bValue = b.name?.toLowerCase() || ''
-          break
-        case 'mode':
-          aValue = (a.mode ?? '').toLowerCase()
-          bValue = (b.mode ?? '').toLowerCase()
           break
         case 'created_at':
           aValue = a.created_at ? new Date(a.created_at).getTime() : 0

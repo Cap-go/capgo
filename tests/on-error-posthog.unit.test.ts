@@ -35,14 +35,14 @@ vi.mock('../supabase/functions/_backend/utils/logging.ts', () => ({
   }),
 }))
 
-function createContext() {
+function createContext(request?: Request) {
   return {
     get: (key: string) => key === 'requestId' ? 'request-id' : undefined,
     json: (body: unknown, status: number) => ({ body, status }),
     req: {
-      method: 'GET',
-      raw: new Request('https://example.com/functions/v1/app', { method: 'GET' }),
-      url: 'https://example.com/functions/v1/app',
+      method: request?.method ?? 'GET',
+      raw: request ?? new Request('https://example.com/functions/v1/app', { method: 'GET' }),
+      url: request?.url ?? 'https://example.com/functions/v1/app',
     },
   } as any
 }
@@ -62,6 +62,50 @@ afterEach(() => {
 })
 
 describe('onError PostHog capture', () => {
+  it('redacts sensitive JSON request body fields before Discord alerts', async () => {
+    const { onError } = await import('../supabase/functions/_backend/utils/on_error.ts')
+
+    const error = new HTTPException(500, {
+      cause: {
+        error: 'internal_error',
+        message: 'Something broke',
+        moreInfo: {},
+      },
+    })
+
+    const response = await onError('private')(error, createContext(new Request('https://example.com/functions/v1/private/accept_invitation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        captchaToken: 'captcha-secret',
+        magic_invite_string: 'invite-secret',
+        nested: {
+          password: 'NestedPassword1!',
+        },
+        opt_for_newsletters: false,
+        password: 'Password1!',
+      }),
+    })))
+
+    expect(response.status).toBe(500)
+    expect(sendDiscordAlert500Mock).toHaveBeenCalledOnce()
+
+    const alertBody = sendDiscordAlert500Mock.mock.calls[0]?.[2]
+    expect(alertBody).toBe(JSON.stringify({
+      captchaToken: '[redacted]',
+      magic_invite_string: '[redacted]',
+      nested: {
+        password: '[redacted]',
+      },
+      opt_for_newsletters: false,
+      password: '[redacted]',
+    }))
+    expect(alertBody).not.toContain('captcha-secret')
+    expect(alertBody).not.toContain('invite-secret')
+    expect(alertBody).not.toContain('NestedPassword1!')
+    expect(alertBody).not.toContain('Password1!')
+  })
+
   it('captures backend HTTP exceptions in PostHog', async () => {
     const { onError } = await import('../supabase/functions/_backend/utils/on_error.ts')
 
@@ -120,6 +164,62 @@ describe('onError PostHog capture', () => {
       },
       status: 503,
     })
+  })
+
+  it('suppresses backend alerts for queue retries before the retry budget is exhausted', async () => {
+    const { onError } = await import('../supabase/functions/_backend/utils/on_error.ts')
+
+    const response = await onError('api')(new HTTPException(500, {
+      cause: {
+        error: 'analytics_engine_failed',
+        message: 'Analytics Engine temporarily failed',
+        moreInfo: {},
+      },
+    }), createContext(new Request('https://api.capgo.app/triggers/cron_stat_app', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-capgo-queue-max-reads': '5',
+        'x-capgo-queue-name': 'cron_stat_app',
+        'x-capgo-queue-read-count': '1',
+      },
+      body: JSON.stringify({ appId: 'com.example.app', orgId: 'org-id' }),
+    })))
+
+    expect(backgroundTaskMock).not.toHaveBeenCalled()
+    expect(sendDiscordAlert500Mock).not.toHaveBeenCalled()
+    expect(capturePosthogExceptionMock).not.toHaveBeenCalled()
+    expect(response.status).toBe(500)
+  })
+
+  it('keeps backend alerts for queue retries that exhausted the retry budget', async () => {
+    const { onError } = await import('../supabase/functions/_backend/utils/on_error.ts')
+
+    const response = await onError('api')(new HTTPException(500, {
+      cause: {
+        error: 'analytics_engine_failed',
+        message: 'Analytics Engine still failed',
+        moreInfo: {},
+      },
+    }), createContext(new Request('https://api.capgo.app/triggers/cron_stat_app', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-capgo-queue-max-reads': '5',
+        'x-capgo-queue-name': 'cron_stat_app',
+        'x-capgo-queue-read-count': '5',
+      },
+      body: JSON.stringify({ appId: 'com.example.app', orgId: 'org-id' }),
+    })))
+
+    expect(backgroundTaskMock).toHaveBeenCalledTimes(2)
+    expect(sendDiscordAlert500Mock).toHaveBeenCalledOnce()
+    expect(capturePosthogExceptionMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      functionName: 'api',
+      kind: 'http_exception',
+      status: 500,
+    }))
+    expect(response.status).toBe(500)
   })
 
   it('skips PostHog capture for client HTTP exceptions', async () => {

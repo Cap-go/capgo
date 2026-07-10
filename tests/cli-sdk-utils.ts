@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import { chdir, cwd, env } from 'node:process'
 import { CapgoSDK } from '@capgo/cli/sdk'
 import AdmZip from 'adm-zip'
+import { getChannelsToAssignByChecksum, parseUploadChannels } from '../cli/src/bundle/upload-channels'
 import { BASE_DEPENDENCIES, BASE_DEPENDENCIES_OLD, BASE_PACKAGE_JSON, TEMP_DIR_NAME } from './cli-utils'
 import { APIKEY_TEST_ALL, getSupabaseClient, USER_ID } from './test-utils'
 
@@ -185,8 +186,9 @@ async function getVersionId(appId: string, version: string) {
 
 type ApiKeyRow = Pick<
   Database['public']['Tables']['apikeys']['Row'],
-  'expires_at' | 'id' | 'key' | 'key_hash' | 'limited_to_apps' | 'limited_to_orgs' | 'mode' | 'user_id'
+  'expires_at' | 'id' | 'key' | 'key_hash' | 'rbac_id' | 'user_id'
 >
+type ApiKeyPermissionMode = 'all' | 'read' | 'upload' | 'write'
 
 interface NativePackage {
   name: string
@@ -223,49 +225,80 @@ async function getApiKeyRecord(apikey: string) {
   return row
 }
 
-function hasModeAccess(mode: Database['public']['Enums']['key_mode'], allowedModes: Database['public']['Enums']['key_mode'][]) {
-  return mode === 'all' || allowedModes.includes(mode)
+const permissionKeysByMode: Record<ApiKeyPermissionMode, string[]> = {
+  read: ['app.read'],
+  upload: ['app.upload_bundle'],
+  write: ['app.manage_devices'],
+  all: ['app.update_user_roles'],
+}
+
+function permissionKeysForModes(allowedModes: ApiKeyPermissionMode[]) {
+  return Array.from(new Set(allowedModes.flatMap(mode => permissionKeysByMode[mode])))
+}
+
+async function apiKeyHasAnyAppPermission(
+  apikey: string,
+  apiKey: ApiKeyRow,
+  app: { app_id: string, owner_org: string | null },
+  allowedModes: ApiKeyPermissionMode[],
+) {
+  if (!app.owner_org)
+    return false
+
+  for (const permissionKey of permissionKeysForModes(allowedModes)) {
+    const { data, error } = await getSupabaseClient().rpc('rbac_check_permission_direct' as any, {
+      p_permission_key: permissionKey,
+      p_user_id: apiKey.user_id,
+      p_org_id: app.owner_org,
+      p_app_id: app.app_id,
+      p_channel_id: null,
+      p_apikey: apikey,
+    })
+
+    if (!error && data === true)
+      return true
+  }
+
+  return false
 }
 
 async function getAuthorizedApp(
   apikey: string,
   appId: string,
-  allowedModes: Database['public']['Enums']['key_mode'][],
+  allowedModes: ApiKeyPermissionMode[],
 ) {
   const apiKey = await getApiKeyRecord(apikey)
-  if (!apiKey || !apiKey.mode || !hasModeAccess(apiKey.mode, allowedModes))
+  if (!apiKey)
     return { error: 'Invalid API key or insufficient permissions.' as const }
 
   const app = await getAppRecord(appId)
   if (!app)
     return { error: `App ${appId} does not exist` as const }
 
-  if (apiKey.limited_to_orgs?.length && (!app.owner_org || !apiKey.limited_to_orgs.includes(app.owner_org)))
-    return { error: 'Invalid API key or insufficient permissions.' as const }
-
-  if (apiKey.limited_to_apps?.length && !apiKey.limited_to_apps.includes(appId))
+  if (!(await apiKeyHasAnyAppPermission(apikey, apiKey, app, allowedModes)))
     return { error: 'Invalid API key or insufficient permissions.' as const }
 
   return { apiKey, app } as const
 }
 
-async function getAppsForApiKey(apikey: string, allowedModes: Database['public']['Enums']['key_mode'][]) {
+async function getAppsForApiKey(apikey: string, allowedModes: ApiKeyPermissionMode[]) {
   const apiKey = await getApiKeyRecord(apikey)
-  if (!apiKey || !apiKey.mode || !hasModeAccess(apiKey.mode, allowedModes))
+  if (!apiKey)
     return { error: 'Invalid API key or insufficient permissions.' as const }
 
   const { data, error } = await getSupabaseClient()
     .from('apps')
     .select('app_id, created_at, icon_url, name, owner_org, user_id')
-    .eq('user_id', apiKey.user_id)
     .order('created_at', { ascending: true })
 
   if (error)
     return { error: error.message }
 
-  const filteredApps = (data ?? [])
-    .filter(app => !apiKey.limited_to_orgs?.length || (app.owner_org != null && apiKey.limited_to_orgs.includes(app.owner_org)))
-    .filter(app => !apiKey.limited_to_apps?.length || apiKey.limited_to_apps.includes(app.app_id))
+  const filteredApps = []
+  for (const app of data ?? []) {
+    if (await apiKeyHasAnyAppPermission(apikey, apiKey, app, allowedModes))
+      filteredApps.push(app)
+  }
 
   return {
     apiKey,
@@ -276,7 +309,7 @@ async function getAppsForApiKey(apikey: string, allowedModes: Database['public']
 async function getChannelVersionRecord(appId: string, channelId: string) {
   const { data } = await getSupabaseClient()
     .from('channels')
-    .select('version ( id, checksum, min_update_version, name, native_packages )')
+    .select('version:app_versions!channels_version_fkey( id, checksum, min_update_version, name, native_packages )')
     .eq('app_id', appId)
     .eq('name', channelId)
     .maybeSingle()
@@ -805,8 +838,18 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
       if ('error' in uploadPayload)
         return { success: false, error: uploadPayload.error }
 
-      const currentChannelVersion = options.channel ? await getChannelVersionRecord(options.appId, options.channel) : null
-      if (currentChannelVersion?.checksum === uploadPayload.checksum) {
+      const targetChannels = parseUploadChannels(options.channel)
+      if (options.channel !== undefined && targetChannels.length === 0)
+        return { success: false, error: 'Missing channel name' }
+
+      const remoteChecksums = new Map<string, string | null>()
+      for (const targetChannel of targetChannels) {
+        const currentChannelVersion = await getChannelVersionRecord(options.appId, targetChannel)
+        remoteChecksums.set(targetChannel, currentChannelVersion?.checksum ?? null)
+      }
+      const { channelsToAssign } = getChannelsToAssignByChecksum(targetChannels, uploadPayload.checksum, remoteChecksums)
+
+      if (targetChannels.length > 0 && channelsToAssign.length === 0) {
         return {
           success: false,
           error: 'Cannot upload the same bundle content',
@@ -815,7 +858,7 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
 
       const minUpdateVersion = await resolveUploadMinUpdateVersion(
         options.appId,
-        options.channel,
+        channelsToAssign[0] ?? targetChannels[0],
         options.autoMinUpdateVersion,
         options.minUpdateVersion,
       )
@@ -847,10 +890,10 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
         throw uploadError
       }
 
-      if (options.channel) {
-        const channelRecord = await getChannelRecord(options.appId, options.channel)
+      for (const targetChannel of channelsToAssign) {
+        const channelRecord = await getChannelRecord(options.appId, targetChannel)
         if (!channelRecord)
-          return { success: false, error: `Channel ${options.channel} not found for app ${options.appId}` }
+          return { success: false, error: `Channel ${targetChannel} not found for app ${options.appId}` }
 
         const { error } = await getSupabaseClient()
           .from('channels')

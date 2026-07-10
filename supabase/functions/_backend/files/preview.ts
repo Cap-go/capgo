@@ -6,14 +6,16 @@ import { brotliDecompressSync } from 'node:zlib'
 import { getRuntimeKey } from 'hono/adapter'
 import { buildChannelPreviewSubdomain, buildPreviewSubdomain, parsePreviewHostname } from '../../shared/preview-subdomain.ts'
 import { CacheHelper } from '../utils/cache.ts'
+import { getBundleUrl } from '../utils/downloadUrl.ts'
 import { simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
-import { backgroundTask, isValidAppId } from '../utils/utils.ts'
+import { backgroundTask, getEnv, isValidAppId } from '../utils/utils.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
 // Cache settings
 const PREVIEW_AUTH_CACHE_PATH = '/.preview-auth'
 const PREVIEW_AUTH_CACHE_TTL_SECONDS = 60
+const PREVIEW_PAYLOAD_FILE_PATH = '.capgo/preview.json'
 
 interface PreviewAuthCache {
   actualAppId: string
@@ -23,6 +25,24 @@ interface PreviewAuthCache {
 interface BundleInfoCache {
   hasManifest: boolean
   isEncrypted: boolean
+}
+
+export interface PreviewDownloadBundle {
+  checksum: string | null
+  external_url: string | null
+  id: number
+  manifest_count: number | null
+  name: string
+  r2_path: string | null
+  session_key: string | null
+}
+
+export interface PreviewDownloadPayload {
+  appId: string
+  checksum?: string
+  sessionKey?: string
+  url: string
+  version: string
 }
 
 // Check if request is from a preview subdomain (*.preview[.env].capgo.app)
@@ -139,6 +159,59 @@ export function buildPreviewResponseHeaders(contentType: string, options: { disa
   return headers
 }
 
+function buildPreviewPayloadResponseHeaders(): Headers {
+  const headers = new Headers()
+  headers.set('Content-Type', 'application/json')
+  headers.set('X-Content-Type-Options', 'nosniff')
+  headers.set('Cache-Control', CHANNEL_PREVIEW_CACHE_CONTROL)
+  headers.set('Pragma', 'no-cache')
+  headers.set('Expires', '0')
+  headers.set('Access-Control-Allow-Origin', '*')
+  return headers
+}
+
+export async function buildPreviewDownloadPayload(c: Context, appId: string, bundle: PreviewDownloadBundle): Promise<PreviewDownloadPayload> {
+  const downloadUrl = bundle.external_url || rewritePreviewDownloadUrl(c, await getBundleUrl(c, bundle.r2_path, 'preview', bundle.checksum ?? String(bundle.id)))
+  if (!downloadUrl)
+    throw simpleError('bundle_download_unavailable', 'Bundle download URL is not available', { versionId: bundle.id })
+
+  return {
+    appId,
+    checksum: bundle.checksum ?? undefined,
+    sessionKey: bundle.session_key ?? undefined,
+    url: downloadUrl,
+    version: bundle.name || `preview-${bundle.id}`,
+  }
+}
+
+function publicApiOriginForPreview(c: Context) {
+  const configuredPublicUrl = getEnv(c, 'PUBLIC_URL')
+  if (configuredPublicUrl)
+    return new URL(configuredPublicUrl).origin
+
+  const requestUrl = new URL(c.req.url)
+  const apiHostname = requestUrl.hostname.replace(/^[^.]+\.preview(\.[^.]+)?\./, 'api$1.')
+  return `${requestUrl.protocol}//${apiHostname}`
+}
+
+function rewritePreviewDownloadUrl(c: Context, downloadUrl: string | null) {
+  if (!downloadUrl)
+    return null
+
+  const requestUrl = new URL(c.req.url)
+  if (!isPreviewSubdomain(requestUrl.hostname))
+    return downloadUrl
+
+  const parsedDownloadUrl = new URL(downloadUrl)
+  if (parsedDownloadUrl.origin !== requestUrl.origin || !parsedDownloadUrl.pathname.startsWith('/files/read/attachments/'))
+    return downloadUrl
+
+  const publicApiOrigin = new URL(publicApiOriginForPreview(c))
+  parsedDownloadUrl.protocol = publicApiOrigin.protocol
+  parsedDownloadUrl.host = publicApiOrigin.host
+  return parsedDownloadUrl.toString()
+}
+
 function parsePreviewSubdomain(hostname: string): ParsedPreviewSubdomain | null {
   const parsed = parsePreviewHostname(hostname)
   if (!parsed || !isValidAppId(parsed.appId))
@@ -160,11 +233,12 @@ async function getChannelPreviewVersionId(c: Context<MiddlewareKeyVariables>, ap
     throw simpleError('channel_not_found', 'Channel not found', { channelId })
   }
 
-  if (!Number.isSafeInteger(channel.version) || channel.version <= 0) {
+  const versionId = channel.version
+  if (!Number.isSafeInteger(versionId) || versionId === null || versionId <= 0) {
     throw simpleError('bundle_not_found', 'Bundle not found', { channelId })
   }
 
-  return channel.version
+  return versionId
 }
 
 // Export the handler directly for use in the main app
@@ -263,23 +337,37 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
     ? await getChannelPreviewVersionId(c, actualAppId, parsed.channelId)
     : parsed.versionId
 
+  const isPayloadRequest = filePath === PREVIEW_PAYLOAD_FILE_PATH
+
   // Check cache for bundle info
   let bundleInfo = await getBundleInfo(c, previewVersionId)
+  let payloadBundle: PreviewDownloadBundle | null = null
 
-  if (!bundleInfo) {
+  if (isPayloadRequest || !bundleInfo) {
     const supabase = supabaseAdmin(c)
 
-    // Get bundle to check encryption and manifest
-    const { data: bundle, error: bundleError } = await supabase
-      .from('app_versions')
-      .select('id, session_key, manifest_count')
-      .eq('app_id', actualAppId)
-      .eq('id', previewVersionId)
-      .single()
+    const bundleLookup = isPayloadRequest
+      ? await supabase
+          .from('app_versions')
+          .select('id,name,checksum,session_key,manifest_count,r2_path,external_url')
+          .eq('app_id', actualAppId)
+          .eq('id', previewVersionId)
+          .single()
+      : await supabase
+          .from('app_versions')
+          .select('id,session_key,manifest_count')
+          .eq('app_id', actualAppId)
+          .eq('id', previewVersionId)
+          .single()
+
+    const { data: bundle, error: bundleError } = bundleLookup
 
     if (bundleError || !bundle) {
       throw simpleError('bundle_not_found', 'Bundle not found', { versionId: previewVersionId })
     }
+
+    if (isPayloadRequest)
+      payloadBundle = bundle as unknown as PreviewDownloadBundle
 
     bundleInfo = {
       hasManifest: (bundle.manifest_count ?? 0) > 0,
@@ -288,6 +376,25 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
 
     // Cache the bundle info
     setBundleInfo(c, previewVersionId, bundleInfo)
+  }
+
+  if (isPayloadRequest) {
+    if (!payloadBundle)
+      throw simpleError('bundle_not_found', 'Bundle not found', { versionId: previewVersionId })
+
+    const payload = await buildPreviewDownloadPayload(c, actualAppId, payloadBundle)
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'serving preview payload',
+      appId: actualAppId,
+      hasExternalUrl: !!payloadBundle.external_url,
+      version: payload.version,
+      versionId: previewVersionId,
+    })
+
+    return new Response(JSON.stringify(payload), {
+      headers: buildPreviewPayloadResponseHeaders(),
+    })
   }
 
   // Check if bundle is encrypted

@@ -54,6 +54,7 @@ cat > package.json << EOF
   "name": "yarn-test-project",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "yarn@1.22.22",
   "dependencies": {
     "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
@@ -74,6 +75,7 @@ cat > package.json << EOF
   "name": "pnpm-test-project",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "pnpm@10.15.0",
   "dependencies": {
     "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
@@ -114,6 +116,7 @@ cat > package.json << EOF
   "name": "yarn-workspaces-monorepo",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "yarn@1.22.22",
   "workspaces": ["apps/*"]
 }
 EOF
@@ -141,7 +144,8 @@ cat > package.json << EOF
 {
   "name": "pnpm-workspaces-monorepo",
   "version": "1.0.0",
-  "private": true
+  "private": true,
+  "packageManager": "pnpm@10.15.0"
 }
 EOF
 cat > pnpm-workspace.yaml << EOF
@@ -172,7 +176,8 @@ cat > package.json << EOF
 {
   "name": "pnpm-catalog-monorepo",
   "version": "1.0.0",
-  "private": true
+  "private": true,
+  "packageManager": "pnpm@10.15.0"
 }
 EOF
 cat > pnpm-workspace.yaml << EOF

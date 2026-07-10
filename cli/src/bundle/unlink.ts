@@ -12,7 +12,6 @@ import {
   getConfig,
   getOrganizationId,
   OrganizationPerm,
-  resolveUserIdFromApiKey,
   sendEvent,
 } from '../utils'
 
@@ -78,10 +77,7 @@ export async function unlinkDeviceInternal(
     )
     await check2FAComplianceForApp(supabase, resolvedAppId, silent)
 
-    const [userId, orgId] = await Promise.all([
-      resolveUserIdFromApiKey(supabase, enrichedOptions.apikey),
-      getOrganizationId(supabase, resolvedAppId),
-    ])
+    const orgId = await getOrganizationId(supabase, resolvedAppId)
 
     await checkAppExistsAndHasPermissionOrgErr(
       supabase,
@@ -106,7 +102,8 @@ export async function unlinkDeviceInternal(
       channel: 'bundle',
       event: 'Unlink bundle',
       icon: '✅',
-      user_id: userId,
+      org_id: orgId,
+      tracking_version: 2,
       tags: {
         'app-id': resolvedAppId,
       },

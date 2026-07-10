@@ -1,12 +1,13 @@
 import type { Context } from 'hono'
 import { parseCronExpression } from 'cron-schedule'
-import { and, eq, inArray, isNull } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { isBentoConfigured, trackBentoEvent } from './bento.ts'
 import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
 import { claimNotifOrgOnce, hasNotifOrgClaim, sendNotifOrg, sendNotifOrgOnce } from './notifications.ts'
-import { getDrizzleClient, getPgClient, logPgError } from './pg.ts'
+import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
+import { logSkippedSupabaseWrite, shouldQueuePluginNotifications, shouldSkipSupabaseNotificationWrites } from './supabase_write_guard.ts'
 import { backgroundTask } from './utils.ts'
 
 // Cache path for org member notifications (separate from single-email notifications)
@@ -66,6 +67,7 @@ export type EmailPreferenceKey
   = | 'usage_limit'
     | 'credit_usage'
     | 'onboarding'
+    | 'builder_onboarding'
     | 'weekly_stats'
     | 'monthly_stats'
     | 'billing_period_stats'
@@ -76,11 +78,13 @@ export type EmailPreferenceKey
     | 'channel_self_rejected'
     | 'daily_fail_ratio'
     | 'cli_realtime_feed'
+    | 'bundle_incompatible'
 
 export interface EmailPreferences {
   usage_limit?: boolean
   credit_usage?: boolean
   onboarding?: boolean
+  builder_onboarding?: boolean
   weekly_stats?: boolean
   monthly_stats?: boolean
   billing_period_stats?: boolean
@@ -91,6 +95,19 @@ export interface EmailPreferences {
   channel_self_rejected?: boolean
   daily_fail_ratio?: boolean
   cli_realtime_feed?: boolean
+  bundle_incompatible?: boolean
+}
+
+/**
+ * Which org members receive a notification.
+ * - 'admins': org_admin + org_super_admin (org management + usage-credit data; the default).
+ * - 'billing': org_super_admin + org_billing_admin (billing/payment actions; the org.update_billing holders).
+ */
+export type NotificationAudience = 'admins' | 'billing'
+
+const AUDIENCE_ROLE_NAMES: Record<NotificationAudience, string[]> = {
+  admins: ['org_admin', 'org_super_admin'],
+  billing: ['org_super_admin', 'org_billing_admin'],
 }
 
 interface OrgWithPreferences {
@@ -113,6 +130,128 @@ interface PreparedEligibleEmailTargets extends EligibleEmailTargets {
 interface EligibleOrgMemberEmailsResult {
   emails: string[]
   resolutionFailed: boolean
+}
+
+
+type OrgRoleBindingRow = {
+  principal_id: string | null
+  expires_at: Date | null
+}
+
+function isActiveOrgRoleBinding(binding: OrgRoleBindingRow, now: Date): boolean {
+  const expiresAt = binding.expires_at ? new Date(binding.expires_at) : null
+  return !expiresAt || expiresAt > now
+}
+
+async function fetchOrgScopeRoleBindings(
+  c: Context,
+  orgId: string,
+  drizzle: ReturnType<typeof getDrizzleClient>,
+  adminRoleNames: string[],
+  principalType: 'user' | 'group',
+  errorMessage: string,
+): Promise<{ bindings: OrgRoleBindingRow[], failed: boolean }> {
+  try {
+    const bindings = await drizzle
+      .select({
+        principal_id: schema.role_bindings.principal_id,
+        expires_at: schema.role_bindings.expires_at,
+      })
+      .from(schema.role_bindings)
+      .innerJoin(schema.roles, eq(schema.role_bindings.role_id, schema.roles.id))
+      .where(
+        and(
+          eq(schema.role_bindings.org_id, orgId),
+          eq(schema.role_bindings.principal_type, principalType),
+          eq(schema.role_bindings.scope_type, 'org'),
+          inArray(schema.roles.name, adminRoleNames),
+        ),
+      )
+
+    return { bindings, failed: false }
+  }
+  catch (error) {
+    cloudlog({ requestId: c.get('requestId'), message: errorMessage, orgId, error })
+    return { bindings: [], failed: true }
+  }
+}
+
+async function collectOrgAudienceUserIds(
+  c: Context,
+  orgId: string,
+  drizzle: ReturnType<typeof getDrizzleClient>,
+  adminRoleNames: string[],
+  logPrefix: string,
+): Promise<{ userIds: Set<string>, resolutionFailed: boolean }> {
+  const now = new Date()
+  let resolutionFailed = false
+  const userIds = new Set<string>()
+
+  const userBindingsResult = await fetchOrgScopeRoleBindings(
+    c,
+    orgId,
+    drizzle,
+    adminRoleNames,
+    'user',
+    `${logPrefix} rbac user error`,
+  )
+  resolutionFailed ||= userBindingsResult.failed
+  for (const binding of userBindingsResult.bindings) {
+    if (!isActiveOrgRoleBinding(binding, now))
+      continue
+    if (binding.principal_id)
+      userIds.add(binding.principal_id)
+  }
+
+  const groupBindingsResult = await fetchOrgScopeRoleBindings(
+    c,
+    orgId,
+    drizzle,
+    adminRoleNames,
+    'group',
+    `${logPrefix} rbac group error`,
+  )
+  resolutionFailed ||= groupBindingsResult.failed
+
+  const groupIds = groupBindingsResult.bindings
+    .filter(binding => isActiveOrgRoleBinding(binding, now))
+    .map(binding => binding.principal_id)
+    .filter((groupId): groupId is string => Boolean(groupId))
+
+  if (groupIds.length > 0) {
+    try {
+      const groupMembers = await drizzle
+        .select({ user_id: schema.group_members.user_id })
+        .from(schema.group_members)
+        .where(inArray(schema.group_members.group_id, groupIds))
+
+      for (const member of groupMembers) {
+        if (member.user_id)
+          userIds.add(member.user_id)
+      }
+    }
+    catch (error) {
+      resolutionFailed = true
+      cloudlog({ requestId: c.get('requestId'), message: `${logPrefix} group members error`, orgId, error })
+    }
+  }
+
+  return { userIds, resolutionFailed }
+}
+
+function normalizeUniqueEmails(users: { email: string | null }[]): string[] {
+  const emails: string[] = []
+  const emailSet = new Set<string>()
+
+  for (const user of users) {
+    const email = user.email?.trim().toLowerCase()
+    if (!email || emailSet.has(email))
+      continue
+    emailSet.add(email)
+    emails.push(email)
+  }
+
+  return emails
 }
 
 interface PreparedEligibleEmailTargetsResult {
@@ -165,7 +304,7 @@ function isOrgPreferenceEnabled(org: OrgWithPreferences, preferenceKey: EmailPre
 }
 
 /**
- * Get all admin/super_admin members of an organization who have the specified email preference enabled.
+ * Get all RBAC admin/super_admin members of an organization who have the specified email preference enabled.
  * Returns array of emails that should receive the notification.
  */
 async function getEligibleOrgMemberEmails(
@@ -173,122 +312,23 @@ async function getEligibleOrgMemberEmails(
   orgId: string,
   preferenceKey: EmailPreferenceKey,
   drizzle: ReturnType<typeof getDrizzleClient>,
+  audience: NotificationAudience = 'admins',
 ): Promise<EligibleOrgMemberEmailsResult> {
-  const adminRoleNames = ['org_admin', 'org_super_admin']
-  const now = new Date()
-  let resolutionFailed = false
-  const userIds = new Set<string>()
+  const adminRoleNames = AUDIENCE_ROLE_NAMES[audience]
 
   try {
-    let legacyMembers: { user_id: string | null }[] = []
-    try {
-      legacyMembers = await drizzle
-        .select({ user_id: schema.org_users.user_id })
-        .from(schema.org_users)
-        .where(
-          and(
-            eq(schema.org_users.org_id, orgId),
-            inArray(schema.org_users.user_right, ['admin', 'super_admin']),
-            isNull(schema.org_users.app_id),
-          ),
-        )
-    }
-    catch (error) {
-      resolutionFailed = true
-      cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails legacy error', orgId, error })
-    }
-
-    for (const member of legacyMembers ?? []) {
-      if (member.user_id)
-        userIds.add(member.user_id)
-    }
-
-    let rbacUserBindings: { principal_id: string | null, expires_at: Date | null }[] = []
-    try {
-      rbacUserBindings = await drizzle
-        .select({
-          principal_id: schema.role_bindings.principal_id,
-          expires_at: schema.role_bindings.expires_at,
-        })
-        .from(schema.role_bindings)
-        .innerJoin(schema.roles, eq(schema.role_bindings.role_id, schema.roles.id))
-        .where(
-          and(
-            eq(schema.role_bindings.org_id, orgId),
-            eq(schema.role_bindings.principal_type, 'user'),
-            eq(schema.role_bindings.scope_type, 'org'),
-            inArray(schema.roles.name, adminRoleNames),
-          ),
-        )
-    }
-    catch (error) {
-      resolutionFailed = true
-      cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails rbac user error', orgId, error })
-    }
-
-    for (const binding of rbacUserBindings ?? []) {
-      const expiresAt = binding.expires_at ? new Date(binding.expires_at) : null
-      if (expiresAt && expiresAt <= now)
-        continue
-      const principalId = binding.principal_id
-      if (principalId)
-        userIds.add(principalId)
-    }
-
-    let rbacGroupBindings: { principal_id: string | null, expires_at: Date | null }[] = []
-    try {
-      rbacGroupBindings = await drizzle
-        .select({
-          principal_id: schema.role_bindings.principal_id,
-          expires_at: schema.role_bindings.expires_at,
-        })
-        .from(schema.role_bindings)
-        .innerJoin(schema.roles, eq(schema.role_bindings.role_id, schema.roles.id))
-        .where(
-          and(
-            eq(schema.role_bindings.org_id, orgId),
-            eq(schema.role_bindings.principal_type, 'group'),
-            eq(schema.role_bindings.scope_type, 'org'),
-            inArray(schema.roles.name, adminRoleNames),
-          ),
-        )
-    }
-    catch (error) {
-      resolutionFailed = true
-      cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails rbac group error', orgId, error })
-    }
-
-    const groupIds = (rbacGroupBindings ?? [])
-      .filter((binding) => {
-        const expiresAt = binding.expires_at ? new Date(binding.expires_at) : null
-        return !expiresAt || expiresAt > now
-      })
-      .map(binding => binding.principal_id)
-      .filter((groupId): groupId is string => Boolean(groupId))
-
-    if (groupIds.length > 0) {
-      let groupMembers: { user_id: string | null }[] = []
-      try {
-        groupMembers = await drizzle
-          .select({ user_id: schema.group_members.user_id })
-          .from(schema.group_members)
-          .where(inArray(schema.group_members.group_id, groupIds))
-      }
-      catch (error) {
-        resolutionFailed = true
-        cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails group members error', orgId, error })
-      }
-
-      for (const member of groupMembers ?? []) {
-        if (member.user_id)
-          userIds.add(member.user_id)
-      }
-    }
+    const { userIds, resolutionFailed: audienceResolutionFailed } = await collectOrgAudienceUserIds(
+      c,
+      orgId,
+      drizzle,
+      adminRoleNames,
+      'getEligibleOrgMemberEmails',
+    )
+    let resolutionFailed = audienceResolutionFailed
 
     const userIdList = Array.from(userIds)
-    if (userIdList.length === 0) {
+    if (userIdList.length === 0)
       return { emails: [], resolutionFailed }
-    }
 
     let users: { id: string, email: string, email_preferences: unknown }[] = []
     try {
@@ -304,12 +344,6 @@ async function getEligibleOrgMemberEmails(
     catch (error) {
       resolutionFailed = true
       cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails users error', orgId, error })
-      return { emails: [], resolutionFailed }
-    }
-
-    if (!users) {
-      resolutionFailed = true
-      cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails users error', orgId, error: 'No users returned' })
       return { emails: [], resolutionFailed }
     }
 
@@ -334,9 +368,8 @@ async function getEligibleOrgMemberEmails(
     return { emails: eligibleEmails, resolutionFailed }
   }
   catch (error) {
-    resolutionFailed = true
     cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails users error', orgId, error })
-    return { emails: [], resolutionFailed }
+    return { emails: [], resolutionFailed: true }
   }
 }
 
@@ -350,6 +383,7 @@ async function getAllEligibleEmails(
   orgId: string,
   preferenceKey: EmailPreferenceKey,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
+  audience: NotificationAudience = 'admins',
 ): Promise<{ adminEmails: string[], managementEmail: string | null, org: OrgWithPreferences | null, resolutionFailed: boolean }> {
   // Get org info
   const org = await getOrgInfoWithClient(c, orgId, drizzleClient)
@@ -358,7 +392,7 @@ async function getAllEligibleEmails(
   }
 
   // Get eligible admin emails
-  const { emails: adminEmails, resolutionFailed } = await getEligibleOrgMemberEmails(c, orgId, preferenceKey, drizzleClient)
+  const { emails: adminEmails, resolutionFailed } = await getEligibleOrgMemberEmails(c, orgId, preferenceKey, drizzleClient, audience)
 
   // Check if management_email should receive the notification:
   // 1. Must be different from all admin emails
@@ -399,8 +433,9 @@ async function getPreparedEligibleEmailTargets(
   orgId: string,
   preferenceKey: EmailPreferenceKey,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
+  audience: NotificationAudience = 'admins',
 ): Promise<PreparedEligibleEmailTargetsResult> {
-  const { adminEmails, managementEmail, org, resolutionFailed } = await getAllEligibleEmails(c, orgId, preferenceKey, drizzleClient)
+  const { adminEmails, managementEmail, org, resolutionFailed } = await getAllEligibleEmails(c, orgId, preferenceKey, drizzleClient, audience)
   if (!org)
     return { recipients: null, resolutionFailed }
 
@@ -512,13 +547,19 @@ export async function sendNotifToOrgMembers(
   uniqId: string,
   cron: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
+  audience: NotificationAudience = 'admins',
 ): Promise<boolean | { sent: false, lastSendAt: string }> {
+  if (shouldSkipSupabaseNotificationWrites(c)) {
+    logSkippedSupabaseWrite(c, 'sendNotifToOrgMembers')
+    return false
+  }
+
   // If Bento isn't configured, sending is impossible; skip DB work entirely.
   if (!isBentoConfigured(c))
     return false
 
   // Get all eligible emails (includes org info)
-  const { recipients } = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, drizzleClient)
+  const { recipients } = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, drizzleClient, audience)
   if (!recipients) {
     cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembers: org not found', orgId })
     return false
@@ -577,136 +618,149 @@ export async function sendNotifToOrgMembersOnce(
   orgId: string,
   uniqId: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
+  audience: NotificationAudience = 'admins',
 ): Promise<boolean> {
+  if (shouldSkipSupabaseNotificationWrites(c)) {
+    logSkippedSupabaseWrite(c, 'sendNotifToOrgMembersOnce')
+    return false
+  }
+
   if (!isBentoConfigured(c))
     return false
 
-  const writeClient = getDrizzleClient(getPgClient(c))
-  const alreadySentForOrg = await hasNotifOrgClaim(c, writeClient, eventName, orgId, uniqId)
-  if (alreadySentForOrg === null) {
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'sendNotifToOrgMembersOnce: org claim lookup failed',
-      eventName,
-      preferenceKey,
-      orgId,
-      uniqId,
-    })
-    return false
-  }
-  if (alreadySentForOrg) {
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'sendNotifToOrgMembersOnce: org already claimed',
-      eventName,
-      preferenceKey,
-      orgId,
-      uniqId,
-    })
-    return false
-  }
+  const pgClient = getPgClient(c)
+  const writeClient = getDrizzleClient(pgClient)
 
-  const { recipients, resolutionFailed } = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, writeClient)
-  if (!recipients) {
-    cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembersOnce: org not found', orgId })
-    return false
-  }
-  if (resolutionFailed) {
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'sendNotifToOrgMembersOnce: recipient resolution failed',
-      eventName,
-      preferenceKey,
-      orgId,
-    })
-    return false
-  }
-
-  const { managementEmail, allEmails, primaryEmail, additionalEmails } = recipients
-  if (allEmails.length === 0 || !primaryEmail) {
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'sendNotifToOrgMembersOnce: no eligible recipients',
-      eventName,
-      preferenceKey,
-      orgId,
-    })
-    return false
-  }
-
-  const recipientEmails = [primaryEmail, ...additionalEmails]
-  const recipientEntries: { email: string, recipientUniqId: string, wasAlreadyClaimedBeforeRun: boolean }[] = []
-  for (const email of recipientEmails) {
-    const recipientUniqId = await buildOneTimeRecipientNotifUniqId(uniqId, email)
-    const wasAlreadyClaimedBeforeRun = await hasNotifOrgClaim(c, writeClient, eventName, orgId, recipientUniqId)
-    if (wasAlreadyClaimedBeforeRun === null) {
+  try {
+    const alreadySentForOrg = await hasNotifOrgClaim(c, writeClient, eventName, orgId, uniqId)
+    if (alreadySentForOrg === null) {
       cloudlog({
         requestId: c.get('requestId'),
-        message: 'sendNotifToOrgMembersOnce: recipient claim lookup failed',
+        message: 'sendNotifToOrgMembersOnce: org claim lookup failed',
         eventName,
         preferenceKey,
         orgId,
-        recipientUniqId,
+        uniqId,
       })
       return false
     }
-    recipientEntries.push({ email, recipientUniqId, wasAlreadyClaimedBeforeRun })
-  }
-
-  const sendResults: { cleanupFailed: boolean, email: string, recipientUniqId: string, sent: boolean, wasAlreadyClaimedBeforeRun: boolean }[] = []
-  for (const recipient of recipientEntries) {
-    if (recipient.wasAlreadyClaimedBeforeRun) {
-      sendResults.push({ ...recipient, sent: false, cleanupFailed: false })
-      continue
+    if (alreadySentForOrg) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'sendNotifToOrgMembersOnce: org already claimed',
+        eventName,
+        preferenceKey,
+        orgId,
+        uniqId,
+      })
+      return true
     }
 
-    const sendResult = await sendNotifOrgOnce(c, eventName, eventData, orgId, recipient.recipientUniqId, recipient.email, drizzleClient, writeClient)
-    sendResults.push({ ...recipient, ...sendResult })
-  }
+    const { recipients, resolutionFailed } = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, writeClient, audience)
+    if (!recipients) {
+      cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembersOnce: org not found', orgId })
+      return false
+    }
+    if (resolutionFailed) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'sendNotifToOrgMembersOnce: recipient resolution failed',
+        eventName,
+        preferenceKey,
+        orgId,
+      })
+      return false
+    }
 
-  const sentEmails = sendResults
-    .filter(result => result.sent)
-    .map(result => result.email)
-  const cleanupFailedEmails = sendResults
-    .filter(result => result.cleanupFailed)
-    .map(result => result.email)
-  const alreadyClaimedBeforeRunEmails = sendResults
-    .filter(result => result.wasAlreadyClaimedBeforeRun)
-    .map(result => result.email)
+    const { managementEmail, allEmails, primaryEmail, additionalEmails } = recipients
+    if (allEmails.length === 0 || !primaryEmail) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'sendNotifToOrgMembersOnce: no eligible recipients',
+        eventName,
+        preferenceKey,
+        orgId,
+      })
+      return false
+    }
 
-  if (cleanupFailedEmails.length > 0) {
+    const recipientEmails = [primaryEmail, ...additionalEmails]
+    const recipientEntries: { email: string, recipientUniqId: string, wasAlreadyClaimedBeforeRun: boolean }[] = []
+    for (const email of recipientEmails) {
+      const recipientUniqId = await buildOneTimeRecipientNotifUniqId(uniqId, email)
+      const wasAlreadyClaimedBeforeRun = await hasNotifOrgClaim(c, writeClient, eventName, orgId, recipientUniqId)
+      if (wasAlreadyClaimedBeforeRun === null) {
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'sendNotifToOrgMembersOnce: recipient claim lookup failed',
+          eventName,
+          preferenceKey,
+          orgId,
+          recipientUniqId,
+        })
+        return false
+      }
+      recipientEntries.push({ email, recipientUniqId, wasAlreadyClaimedBeforeRun })
+    }
+
+    const sendResults: { cleanupFailed: boolean, email: string, recipientUniqId: string, sent: boolean, wasAlreadyClaimedBeforeRun: boolean }[] = []
+    for (const recipient of recipientEntries) {
+      if (recipient.wasAlreadyClaimedBeforeRun) {
+        sendResults.push({ ...recipient, sent: false, cleanupFailed: false })
+        continue
+      }
+
+      const sendResult = await sendNotifOrgOnce(c, eventName, eventData, orgId, recipient.recipientUniqId, recipient.email, drizzleClient, writeClient)
+      sendResults.push({ ...recipient, ...sendResult })
+    }
+
+    const sentEmails = sendResults
+      .filter(result => result.sent)
+      .map(result => result.email)
+    const cleanupFailedEmails = sendResults
+      .filter(result => result.cleanupFailed)
+      .map(result => result.email)
+    const alreadyClaimedBeforeRunEmails = sendResults
+      .filter(result => result.wasAlreadyClaimedBeforeRun)
+      .map(result => result.email)
+
+    if (cleanupFailedEmails.length > 0) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'sendNotifToOrgMembersOnce: recipient cleanup failed',
+        eventName,
+        preferenceKey,
+        orgId,
+        cleanupFailedRecipients: cleanupFailedEmails,
+      })
+      return false
+    }
+
+    const unresolvedResults = sendResults.filter(result => !result.sent && !result.wasAlreadyClaimedBeforeRun)
+    if (unresolvedResults.length > 0)
+      return false
+
+    const firstOrgSend = await claimNotifOrgOnce(c, eventName, orgId, uniqId, writeClient)
+
     cloudlog({
       requestId: c.get('requestId'),
-      message: 'sendNotifToOrgMembersOnce: recipient cleanup failed',
+      message: 'sendNotifToOrgMembersOnce: delivered',
       eventName,
       preferenceKey,
       orgId,
-      cleanupFailedRecipients: cleanupFailedEmails,
+      primaryEmail,
+      additionalRecipients: additionalEmails.length,
+      deliveredRecipients: sentEmails.length,
+      alreadyClaimedRecipients: alreadyClaimedBeforeRunEmails.length,
+      firstOrgSend,
+      managementEmailIncluded: !!managementEmail,
     })
-    return false
+
+    return firstOrgSend
   }
-
-  const unresolvedResults = sendResults.filter(result => !result.sent && !result.wasAlreadyClaimedBeforeRun)
-  if (unresolvedResults.length > 0)
-    return false
-
-  const firstOrgSend = await claimNotifOrgOnce(c, eventName, orgId, uniqId, writeClient)
-
-  cloudlog({
-    requestId: c.get('requestId'),
-    message: 'sendNotifToOrgMembersOnce: delivered',
-    eventName,
-    preferenceKey,
-    orgId,
-    primaryEmail,
-    additionalRecipients: additionalEmails.length,
-    deliveredRecipients: sentEmails.length,
-    alreadyClaimedRecipients: alreadyClaimedBeforeRunEmails.length,
-    firstOrgSend,
-    managementEmailIncluded: !!managementEmail,
-  })
-
-  return firstOrgSend
+  finally {
+    await closeClient(c, pgClient)
+  }
 }
 
 /**
@@ -726,8 +780,23 @@ export async function sendNotifToOrgMembersCached(
   uniqId: string,
   cron: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
+  audience: NotificationAudience = 'admins',
 ): Promise<boolean> {
-  // Check cache first - if we recently checked and it wasn't sendable, skip DB query
+  if (shouldQueuePluginNotifications(c)) {
+    const { queuePluginOrgMembersNotification } = await import('./plugin_notification_queue.ts')
+    await queuePluginOrgMembersNotification(c, {
+      eventName,
+      preferenceKey,
+      eventData,
+      orgId,
+      uniqId,
+      cron,
+      audience,
+    })
+    return false
+  }
+
+  // Check cache first - if we recently checked and found it wasn't sendable, skip DB query
   const cachedSendable = await getOrgMembersNotifCacheStatus(c, orgId, eventName, uniqId)
   if (cachedSendable === false) {
     cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembers cache hit - not sendable', event: eventName, orgId, uniqId })
@@ -735,7 +804,7 @@ export async function sendNotifToOrgMembersCached(
   }
 
   // Cache miss, call the actual function
-  const result = await sendNotifToOrgMembers(c, eventName, preferenceKey, eventData, orgId, uniqId, cron, drizzleClient)
+  const result = await sendNotifToOrgMembers(c, eventName, preferenceKey, eventData, orgId, uniqId, cron, drizzleClient, audience)
 
   // Handle the "not sendable" case with lastSendAt for proper TTL calculation
   if (typeof result === 'object' && result.sent === false && result.lastSendAt) {
@@ -748,6 +817,53 @@ export async function sendNotifToOrgMembersCached(
   // For other cases (true/false), just return the boolean result
   // No need to cache "sent=true" as next check should query DB anyway
   return result === true
+}
+
+
+/**
+ * Resolve org admin/super_admin member emails for Bento profile tagging.
+ * Unlike notification delivery, tagging ignores email preference opt-outs.
+ */
+export async function getOrgAdminMemberEmailsForTags(
+  c: Context,
+  orgId: string,
+  drizzle: ReturnType<typeof getDrizzleClient>,
+  audience: NotificationAudience = 'admins',
+): Promise<EligibleOrgMemberEmailsResult> {
+  const adminRoleNames = AUDIENCE_ROLE_NAMES[audience]
+
+  try {
+    const { userIds, resolutionFailed: audienceResolutionFailed } = await collectOrgAudienceUserIds(
+      c,
+      orgId,
+      drizzle,
+      adminRoleNames,
+      'getOrgAdminMemberEmailsForTags',
+    )
+    let resolutionFailed = audienceResolutionFailed
+
+    const userIdList = Array.from(userIds)
+    if (userIdList.length === 0)
+      return { emails: [], resolutionFailed }
+
+    try {
+      const users = await drizzle
+        .select({ email: schema.users.email })
+        .from(schema.users)
+        .where(inArray(schema.users.id, userIdList))
+
+      return { emails: normalizeUniqueEmails(users), resolutionFailed }
+    }
+    catch (error) {
+      resolutionFailed = true
+      cloudlog({ requestId: c.get('requestId'), message: 'getOrgAdminMemberEmailsForTags users error', orgId, error })
+      return { emails: [], resolutionFailed }
+    }
+  }
+  catch (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'getOrgAdminMemberEmailsForTags error', orgId, error })
+    return { emails: [], resolutionFailed: true }
+  }
 }
 
 export const orgEmailNotificationTestUtils = {

@@ -1,6 +1,34 @@
-import { describe, expect, it } from 'vitest'
-import { __translationWorkerTestUtils__ } from '../cloudflare_workers/translation/index.ts'
+import { describe, expect, it, vi } from 'vitest'
+import translationWorker, { __translationWorkerTestUtils__ } from '../cloudflare_workers/translation/index.ts'
 import sourceMessages from '../messages/en.json'
+
+function stubWorkerCache() {
+  const cache = {
+    match: vi.fn(async () => null),
+    put: vi.fn(async () => undefined),
+  }
+  Object.defineProperty(globalThis, 'caches', {
+    configurable: true,
+    value: { default: cache },
+  })
+  return cache
+}
+
+function createTranslationStoreMock(latestReadyEntry: Record<string, unknown> | null) {
+  return {
+    prepare: vi.fn((sql: string) => ({
+      bind: vi.fn(() => ({
+        first: vi.fn(async () => {
+          if (sql.includes('status = \'ready\'') && sql.includes('ORDER BY updated_at DESC'))
+            return latestReadyEntry
+          return null
+        }),
+        run: vi.fn(async () => ({ meta: { changes: 1 } })),
+      })),
+      run: vi.fn(async () => ({ meta: { changes: 1 } })),
+    })),
+  }
+}
 
 describe('translation queue helpers', () => {
   it.concurrent('splits the English catalog into bounded queue batches', () => {
@@ -29,9 +57,9 @@ describe('translation queue helpers', () => {
     expect(__translationWorkerTestUtils__.translationBatchIndexFromStore(marker)).toBe(2)
   })
 
-  it.concurrent('keeps pending queue state longer than ready cache entries', () => {
-    expect(__translationWorkerTestUtils__.translationStoreTtlSeconds({ status: 'pending' })).toBeGreaterThan(
-      __translationWorkerTestUtils__.translationStoreTtlSeconds({ status: 'ready' }),
+  it.concurrent('keeps ready translations long enough to reuse while pending refreshes', () => {
+    expect(__translationWorkerTestUtils__.translationStoreTtlSeconds({ status: 'ready' })).toBeGreaterThan(
+      __translationWorkerTestUtils__.translationStoreTtlSeconds({ status: 'pending' }),
     )
   })
 
@@ -51,5 +79,161 @@ describe('translation queue helpers', () => {
 
     expect(__translationWorkerTestUtils__.isTranslationBatchLeaseExpired(entry)).toBe(false)
     expect(__translationWorkerTestUtils__.isTranslationBatchLeaseExpired({ ...entry, updatedAt: now - (15 * 60 + 1) })).toBe(true)
+  })
+
+  it.concurrent('checks ready translation freshness with a 5 minute window', () => {
+    const now = Math.floor(Date.now() / 1000)
+
+    expect(__translationWorkerTestUtils__.isReadyTranslationFresh({
+      checksum: 'checksum',
+      messages: {},
+      model: 'model',
+      nextBatchIndex: 1,
+      status: 'ready',
+      targetLanguage: 'fr',
+      updatedAt: now - 299,
+    })).toBe(true)
+    expect(__translationWorkerTestUtils__.isReadyTranslationFresh({
+      checksum: 'checksum',
+      messages: {},
+      model: 'model',
+      nextBatchIndex: 1,
+      status: 'ready',
+      targetLanguage: 'fr',
+      updatedAt: now - 300,
+    })).toBe(false)
+  })
+
+  it('serves a recent saved translation without queueing a refresh', async () => {
+    stubWorkerCache()
+    const now = Math.floor(Date.now() / 1000)
+    const latestReadyEntry = {
+      checksum: 'previous-checksum',
+      messages: JSON.stringify({ account: 'Compte' }),
+      model: 'model',
+      next_batch_index: 1,
+      status: 'ready',
+      target_language: 'fr',
+      updated_at: now - 30,
+    }
+    const db = createTranslationStoreMock(latestReadyEntry)
+    const queue = {
+      send: vi.fn(),
+    }
+    const response = await translationWorker.fetch(new Request('https://api.capgo.app/translation/messages', {
+      body: JSON.stringify({ targetLanguage: 'fr' }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    }), {
+      DB_TRANSLATIONS: db,
+      TRANSLATION_MESSAGES_QUEUE: queue,
+    } as any)
+    const payload = await response.json() as { checksum: string, messages: Record<string, string>, status: string }
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(response.headers.get('x-capgo-translation-stale')).toBe('1')
+    expect(payload).toEqual({
+      checksum: 'previous-checksum',
+      messages: { account: 'Compte' },
+      model: 'model',
+      status: 'ready',
+    })
+    expect(queue.send).not.toHaveBeenCalled()
+  })
+
+  it('serves the last saved translation and queues a refresh when the checksum changed', async () => {
+    stubWorkerCache()
+    const now = Math.floor(Date.now() / 1000)
+    const latestReadyEntry = {
+      checksum: 'previous-checksum',
+      messages: JSON.stringify({ account: 'Compte' }),
+      model: 'model',
+      next_batch_index: 1,
+      status: 'ready',
+      target_language: 'fr',
+      updated_at: now - 301,
+    }
+    const db = createTranslationStoreMock(latestReadyEntry)
+    const queue = {
+      send: vi.fn(),
+    }
+    const response = await translationWorker.fetch(new Request('https://api.capgo.app/translation/messages', {
+      body: JSON.stringify({ targetLanguage: 'fr' }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    }), {
+      DB_TRANSLATIONS: db,
+      TRANSLATION_MESSAGES_QUEUE: queue,
+    } as any)
+    const payload = await response.json() as { checksum: string, messages: Record<string, string>, status: string }
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(payload.status).toBe('ready')
+    expect(payload.checksum).toBe('previous-checksum')
+    expect(queue.send).toHaveBeenCalledTimes(1)
+  })
+
+  it('queues the first translation and tells the frontend to retry later', async () => {
+    stubWorkerCache()
+    const db = createTranslationStoreMock(null)
+    const queue = {
+      send: vi.fn(),
+    }
+    const response = await translationWorker.fetch(new Request('https://api.capgo.app/translation/messages', {
+      body: JSON.stringify({ targetLanguage: 'fr' }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    }), {
+      DB_TRANSLATIONS: db,
+      TRANSLATION_MESSAGES_QUEUE: queue,
+    } as any)
+    const payload = await response.json() as { status: string }
+
+    expect(response.status).toBe(202)
+    expect(payload.status).toBe('pending')
+    expect(queue.send).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects supported aliases outside the public generation allow-list before queueing', async () => {
+    const queue = {
+      send: vi.fn(),
+    }
+    const response = await translationWorker.fetch(new Request('https://api.capgo.app/translation/messages', {
+      body: JSON.stringify({ targetLanguage: 'pt-br' }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    }), {
+      TRANSLATION_MESSAGES_QUEUE: queue,
+    } as any)
+    const payload = await response.json() as { error: string, message: string }
+
+    expect(response.status).toBe(400)
+    expect(payload.error).toBe('unsupported_translation_language')
+    expect(payload.message).toBe('Target language is not enabled')
+    expect(queue.send).not.toHaveBeenCalled()
+  })
+
+  it('ignores queued translations outside the generation allow-list before AI work', async () => {
+    const ai = {
+      run: vi.fn(),
+    }
+    const message = {
+      ack: vi.fn(),
+      body: {
+        batchIndex: 0,
+        checksum: 'checksum',
+        model: 'model',
+        targetLanguage: 'pt-br',
+      },
+      retry: vi.fn(),
+    }
+
+    await translationWorker.queue({ messages: [message] } as any, { AI: ai } as any, {} as any)
+
+    expect(ai.run).not.toHaveBeenCalled()
+    expect(message.ack).toHaveBeenCalledTimes(1)
+    expect(message.retry).not.toHaveBeenCalled()
   })
 })

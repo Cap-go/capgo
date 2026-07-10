@@ -112,19 +112,8 @@ app.post('/', middlewareAPISecret, async (c) => {
 
     if ((count ?? 0) > 0) {
       if (notFound) {
-        // set channel to unknown version where version is currently set
-        // find id of unknown version
-        const { data: unknownVersion, error: errorUnknownVersion } = await supabase.from('app_versions')
-          .select('id')
-          .eq('app_id', version.app_id)
-          .eq('name', 'unknown')
-          .single()
-        if (errorUnknownVersion)
-          throw simpleError('cannot_find_unknown_version', 'Cannot find unknown version for app_id', { error: errorUnknownVersion })
-        if (!unknownVersion)
-          throw simpleError('cannot_find_unknown_version', 'Cannot find unknown version for app_id', { error: 'no unknown version found' })
         await supabase.from('channels')
-          .update({ version: unknownVersion.id })
+          .update({ version: null })
           .eq('version', version.id)
       }
       else {

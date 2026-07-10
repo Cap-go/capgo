@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en" class="capgolight">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Capgo CLI Web Login — Architecture</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+<style>
+  :root{--primary:#515271;--secondary:#119eff;--accent:#1FB2A5;--ink:#1e293b;}
+  body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#1e293b;}
+  .font-prompt{font-family:"Prompt",sans-serif;}
+  .font-mono{font-family:"JetBrains Mono",ui-monospace,monospace;}
+  .card{border-radius:1.25rem;border:1px solid rgba(226,232,240,.8);background:#fff;box-shadow:0 24px 60px -40px rgba(15,23,42,.4);}
+  .chip{background:linear-gradient(135deg,#244366 0%,#0c6eb8 100%);}
+  .actor-cli{background:#eef5ff;color:#0c6eb8;border:1px solid rgba(17,158,255,.3);}
+  .actor-be{background:#eef0f7;color:#515271;border:1px solid rgba(81,82,113,.3);}
+  .actor-web{background:#e8f7f4;color:#0e8a7e;border:1px solid rgba(31,178,165,.35);}
+  .stepnum{background:linear-gradient(135deg,#244366 0%,#0c6eb8 100%);}
+  .rail{background:linear-gradient(180deg,#119eff 0%,#6876e1 100%);}
+</style>
+</head>
+<body style="background:linear-gradient(180deg,#f8fafc 0%,#eef4ff 60%,#f8fafc 100%);">
+
+<div class="mx-auto max-w-4xl px-5 py-12">
+
+  <!-- header -->
+  <header class="flex items-center gap-3">
+    <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl chip text-white font-prompt text-xl font-bold shadow-lg">C</span>
+    <div>
+      <p class="text-[0.72rem] font-bold tracking-[0.24em] text-slate-500 uppercase">Capgo · Engineering</p>
+      <h1 class="text-2xl font-semibold text-slate-950 sm:text-3xl">CLI Web Login — Architecture Overview</h1>
+    </div>
+  </header>
+  <p class="mt-3 text-sm text-slate-500">Proposal · 3 June 2026 · how a developer logs the Capgo CLI in from the browser</p>
+
+  <!-- TL;DR -->
+  <section class="card mt-8 p-6">
+    <h2 class="text-sm font-bold tracking-[0.18em] text-slate-500 uppercase">In one sentence</h2>
+    <p class="mt-3 text-lg leading-8 text-slate-700">
+      A developer runs <span class="font-mono text-[0.95em] text-slate-900">capgo&nbsp;login</span>, a browser opens to a Capgo page where they pick which
+      <strong>organisation, app and permissions</strong> to grant, click <strong>Authorize</strong>, and a brand-new API key is
+      created and delivered straight back to their terminal — <strong>no copy-pasting keys by hand</strong>.
+    </p>
+    <div class="mt-5 grid gap-3 sm:grid-cols-3">
+      <div class="rounded-xl bg-slate-50 p-4"><p class="text-2xl font-semibold text-slate-900">~2</p><p class="text-sm text-slate-500">new backend endpoints</p></div>
+      <div class="rounded-xl bg-slate-50 p-4"><p class="text-2xl font-semibold text-slate-900">1</p><p class="text-sm text-slate-500">new web page</p></div>
+      <div class="rounded-xl bg-slate-50 p-4"><p class="text-2xl font-semibold text-slate-900">0</p><p class="text-sm text-slate-500">changes to how keys/permissions work</p></div>
+    </div>
+  </section>
+
+  <!-- problem / solution -->
+  <section class="mt-6 grid gap-4 sm:grid-cols-2">
+    <div class="card p-6">
+      <h2 class="text-sm font-bold tracking-[0.18em] text-slate-500 uppercase">The problem today</h2>
+      <p class="mt-3 text-sm leading-7 text-slate-600">
+        The only way to log the CLI in is to manually find an API key in the dashboard and paste it.
+        There is no "log in with your browser" button. It's clunky and error-prone, and nudges people
+        toward reusing long-lived keys.
+      </p>
+    </div>
+    <div class="card p-6">
+      <h2 class="text-sm font-bold tracking-[0.18em] text-slate-500 uppercase">The approach</h2>
+      <p class="mt-3 text-sm leading-7 text-slate-600">
+        We reuse the proven login choreography that <strong>GitHub, Stripe and Tailscale</strong> CLIs use —
+        the OAuth <em>Device Flow</em> — but it hands back a normal Capgo API key. It's a recognised,
+        auditable industry standard, not a bespoke design.
+      </p>
+    </div>
+  </section>
+
+  <!-- flow -->
+  <section class="card mt-6 p-6">
+    <h2 class="text-sm font-bold tracking-[0.18em] text-slate-500 uppercase">How it works, step by step</h2>
+    <div class="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+      <span class="rounded-full px-3 py-1 actor-cli">● CLI (developer's terminal)</span>
+      <span class="rounded-full px-3 py-1 actor-be">● Capgo backend</span>
+      <span class="rounded-full px-3 py-1 actor-web">● Browser page</span>
+    </div>
+
+    <ol class="mt-6 space-y-5">
+      <li class="relative flex gap-4">
+        <span class="stepnum flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white">1</span>
+        <div>
+          <p class="font-semibold text-slate-800">Developer runs <span class="font-mono text-[0.9em]">capgo login</span> <span class="ml-1 rounded px-1.5 py-0.5 text-[0.7rem] actor-cli">CLI</span></p>
+          <p class="mt-1 text-sm leading-6 text-slate-600">The CLI asks the backend to start a login session and receives a short confirmation phrase, e.g. <span class="font-mono text-slate-900">enjoy-enough-outwit-win</span>.</p>
+        </div>
+      </li>
+      <li class="relative flex gap-4">
+        <span class="stepnum flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white">2</span>
+        <div>
+          <p class="font-semibold text-slate-800">Browser opens to the authorize page <span class="ml-1 rounded px-1.5 py-0.5 text-[0.7rem] actor-web">Browser</span></p>
+          <p class="mt-1 text-sm leading-6 text-slate-600">The page shows the <strong>same phrase</strong>, so the developer can confirm they are on the genuine page for <em>their</em> terminal. They pick the organisation, app and permission level.</p>
+        </div>
+      </li>
+      <li class="relative flex gap-4">
+        <span class="stepnum flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white">3</span>
+        <div>
+          <p class="font-semibold text-slate-800">Developer clicks "Authorize" <span class="ml-1 rounded px-1.5 py-0.5 text-[0.7rem] actor-web">Browser</span> → <span class="rounded px-1.5 py-0.5 text-[0.7rem] actor-be">backend</span></p>
+          <p class="mt-1 text-sm leading-6 text-slate-600">The backend checks the user is allowed and <strong>creates the key right away</strong> (stored only as a hash, so it is never visible in the dashboard), keeping a one-time copy to hand to the terminal.</p>
+        </div>
+      </li>
+      <li class="relative flex gap-4">
+        <span class="stepnum flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white">4</span>
+        <div>
+          <p class="font-semibold text-slate-800">CLI receives the key over HTTPS <span class="ml-1 rounded px-1.5 py-0.5 text-[0.7rem] actor-cli">CLI</span></p>
+          <p class="mt-1 text-sm leading-6 text-slate-600">The terminal has been quietly checking with the backend; once approved it collects the <strong>one-time key</strong>, saves it locally, the temporary copy is burned, and only the hash remains on the server. Done.</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- security -->
+  <section class="card mt-6 p-6">
+    <h2 class="text-sm font-bold tracking-[0.18em] text-slate-500 uppercase">Why it's safe</h2>
+    <div class="mt-4 grid gap-4 sm:grid-cols-2">
+      <div class="flex gap-3">
+        <span class="text-lg">🔒</span>
+        <p class="text-sm leading-6 text-slate-600"><strong>Key never travels in a link or browser history.</strong> It only moves over the same encrypted channel the CLI already uses for every command.</p>
+      </div>
+      <div class="flex gap-3">
+        <span class="text-lg">👁️</span>
+        <p class="text-sm leading-6 text-slate-600"><strong>Visual confirmation.</strong> The matching word-phrase in the terminal and the browser proves the developer is authorising their own session.</p>
+      </div>
+      <div class="flex gap-3">
+        <span class="text-lg">⏱️</span>
+        <p class="text-sm leading-6 text-slate-600"><strong>Short-lived &amp; single-use.</strong> A login session expires in ~10 minutes, is rate-limited against guessing, and the key can only be collected once.</p>
+      </div>
+      <div class="flex gap-3">
+        <span class="text-lg">✅</span>
+        <p class="text-sm leading-6 text-slate-600"><strong>Same permissions model.</strong> Authorising reuses our existing role/permission checks — it introduces no new way to grant access.</p>
+      </div>
+    </div>
+    <p class="mt-5 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+      <strong class="text-slate-800">For security review:</strong> this is the OAuth 2.0 Device Authorization Grant (RFC&nbsp;8628) — the
+      same recognised flow used by the GitHub, Stripe and Tailscale CLIs — which makes it far easier to audit and defend
+      than a custom-built scheme.
+    </p>
+  </section>
+
+  <!-- why this design -->
+  <section class="card mt-6 p-6">
+    <h2 class="text-sm font-bold tracking-[0.18em] text-slate-500 uppercase">Why this design over the alternative</h2>
+    <div class="mt-4 overflow-hidden rounded-xl border border-slate-200">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50 text-left text-slate-500">
+          <tr><th class="px-4 py-2.5 font-semibold">&nbsp;</th><th class="px-4 py-2.5 font-semibold">Device flow (chosen)</th><th class="px-4 py-2.5 font-semibold">Local-server redirect</th></tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 text-slate-700">
+          <tr><td class="px-4 py-2.5 font-medium text-slate-500">Key exposure</td><td class="px-4 py-2.5">Encrypted channel only</td><td class="px-4 py-2.5">Briefly in browser history</td></tr>
+          <tr><td class="px-4 py-2.5 font-medium text-slate-500">Reliability</td><td class="px-4 py-2.5">No local network port needed</td><td class="px-4 py-2.5">Depends on browser rules that keep tightening</td></tr>
+          <tr><td class="px-4 py-2.5 font-medium text-slate-500">Security review</td><td class="px-4 py-2.5">Recognised standard</td><td class="px-4 py-2.5">Bespoke surface to defend</td></tr>
+          <tr><td class="px-4 py-2.5 font-medium text-slate-500">Build cost</td><td class="px-4 py-2.5">~2 small endpoints + 1 page</td><td class="px-4 py-2.5">No backend, but trickier client</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="mt-8 text-center text-xs text-slate-400">
+    Capgo · CLI Web Login proposal · accompanying mockup of the authorize screen available separately
+  </footer>
+</div>
+</body>
+</html>

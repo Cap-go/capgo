@@ -1,0 +1,30 @@
+{
+  "rules": [
+    {
+      "id": "delete-trash-after-7-days",
+      "enabled": true,
+      "conditions": {
+        "prefix": "deleted-after-7-days/"
+      },
+      "deleteObjectsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 604800
+        }
+      }
+    },
+    {
+      "id": "Default Multipart Abort Rule",
+      "enabled": true,
+      "conditions": {
+        "prefix": ""
+      },
+      "abortMultipartUploadsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 86400
+        }
+      }
+    }
+  ]
+}

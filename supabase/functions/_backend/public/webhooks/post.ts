@@ -1,11 +1,12 @@
 import type { Context } from 'hono'
-import type { Database } from '../../utils/supabase.types.ts'
+import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import { type } from 'arktype'
 import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { simpleError } from '../../utils/hono.ts'
-import { supabaseApikey } from '../../utils/supabase.ts'
-import { getWebhookUrlValidationError, WEBHOOK_EVENT_TYPES } from '../../utils/webhook.ts'
-import { checkWebhookPermission } from './index.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
+import { getWebhookLogUrlMetadata, getWebhookPublicUrlValidationError, parseWebhookDeliveryVersion, WEBHOOK_EVENT_TYPES } from '../../utils/webhook.ts'
+import { checkWebhookPermissionV2 } from './index.ts'
+import { webhookCreatedSelect } from './response.ts'
 
 const bodySchema = type({
   'orgId': 'string',
@@ -13,16 +14,25 @@ const bodySchema = type({
   'url': 'string.url',
   'events': 'string[] > 0',
   'enabled?': 'boolean',
+  'deliveryVersion?': 'string',
+  'delivery_version?': 'string',
 })
 
-export async function post(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function post(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw: any, auth: AuthInfo): Promise<Response> {
   const bodyParsed = safeParseSchema(bodySchema, bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
 
-  await checkWebhookPermission(c, body.orgId, apikey)
+  await checkWebhookPermissionV2(c, body.orgId, auth)
+
+  const deliveryVersion = parseWebhookDeliveryVersion(body.deliveryVersion ?? body.delivery_version ?? 'legacy')
+  if (!deliveryVersion) {
+    throw simpleError('invalid_delivery_version', 'Invalid webhook delivery version', {
+      allowed: ['legacy', 'standard'],
+    })
+  }
 
   // Validate events are allowed
   const invalidEvents = body.events.filter(e => !WEBHOOK_EVENT_TYPES.includes(e as any))
@@ -33,14 +43,12 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
     })
   }
 
-  const urlError = getWebhookUrlValidationError(c, body.url)
+  const urlError = await getWebhookPublicUrlValidationError(c, body.url)
   if (urlError)
-    throw simpleError('invalid_url', urlError, { url: body.url })
+    throw simpleError('invalid_url', urlError, { urlInfo: getWebhookLogUrlMetadata(body.url) })
 
-  // Create webhook using authenticated client - RLS will enforce access
-  // Note: Using type assertion as webhooks table types are not yet generated
-  const supabase = supabaseApikey(c, c.get('capgkey') as string)
-  const { data, error } = await (supabase as any)
+  // Direct RLS access to webhook tables is intentionally denied; use service-role only after explicit permission checks.
+  const { data, error } = await supabaseAdmin(c)
     .from('webhooks')
     .insert({
       org_id: body.orgId,
@@ -48,9 +56,11 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
       url: body.url,
       events: body.events,
       enabled: body.enabled ?? true,
-      created_by: apikey.user_id,
+      delivery_version: deliveryVersion,
+      created_by: auth.userId,
     })
-    .select()
+    // Return the secret once on creation so admins can store it; read/update endpoints never expose it.
+    .select(webhookCreatedSelect)
     .single()
 
   if (error) {

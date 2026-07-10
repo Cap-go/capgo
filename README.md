@@ -1,7 +1,7 @@
 # Console to manage and distribute your live update
 
 <p align='center'>
-  <img src='https://raw.githubusercontent.com/Cap-go/capgo/main/assets/capgo_banner.png' alt='Capgo - Instant updates for capacitor'/>
+  <img src='https://capgo.app/readme-banner.svg?repo=Cap-go/capgo' alt='Capgo - Instant updates for capacitor'/>
 </p>
 
 [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=Cap-go_capgo&metric=bugs)](https://sonarcloud.io/summary/new_code?id=Cap-go_capgo)
@@ -18,7 +18,6 @@
 ![GitHub license](https://img.shields.io/github/license/Cap-go/capgo)
 [![Bump version](https://github.com/Cap-go/capgo/actions/workflows/bump_version.yml/badge.svg)](https://github.com/Cap-go/capgo/actions/workflows/bump_version.yml)
 [![Build source code and send to Capgo](https://github.com/Cap-go/capgo/actions/workflows/build_and_deploy.yml/badge.svg)](https://github.com/Cap-go/capgo/actions/workflows/build_and_deploy.yml)
-[![udd-update-dependencies](https://github.com/Cap-go/capgo/actions/workflows/udd.yml/badge.svg)](https://github.com/Cap-go/capgo/actions/workflows/udd.yml)
 <a href="#badge">
 <img alt="semantic-release" src="https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg">
 </a>

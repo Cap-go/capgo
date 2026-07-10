@@ -13,7 +13,7 @@ import IconSettings from '~icons/lucide/settings-2'
 import IconTerminal from '~icons/lucide/terminal-square'
 import IconAndroid from '~icons/mdi/android'
 import IconApple from '~icons/mdi/apple'
-import { createDefaultApiKey } from '~/services/apikeys'
+import { createDefaultApiKey, findUsablePlainApiKey } from '~/services/apikeys'
 import { pushEvent } from '~/services/posthog'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
@@ -93,7 +93,7 @@ const setupStep = computed<Step>(() => {
     return {
       key: 'setup-ios',
       title: t('build-step-ios-setup-title'),
-      command: `npx @capgo/cli@latest build init -a ${apiKey.value}`,
+      command: `npx @capgo/cli@latest build init -a ${apiKey.value} --platform ios`,
       subtitle: t('build-step-ios-setup-subtitle'),
       icon: IconSettings,
     }
@@ -102,7 +102,7 @@ const setupStep = computed<Step>(() => {
   return {
     key: 'setup-android',
     title: t('build-step-android-setup-title'),
-    command: `npx @capgo/cli@latest build credentials save --appId ${props.appId} --platform android`,
+    command: `npx @capgo/cli@latest build init -a ${apiKey.value} --platform android`,
     subtitle: t('build-step-android-setup-subtitle'),
     icon: IconSettings,
   }
@@ -141,14 +141,18 @@ function stepToName(stepNumber: number): string {
 
 function setLog() {
   if (initialOnboarding && main.user?.id) {
-    sendEvent({
-      channel: 'onboarding-build',
-      event: `onboarding-build-step-${stepToName(step.value)}`,
-      icon: 'build',
-      user_id: organizationStore.currentOrganization?.gid,
-      notify: false,
-    }).catch()
-    pushEvent(`user:onboarding-build-${stepToName(step.value)}`, config.supaHost)
+    const orgId = organizationStore.currentOrganization?.gid
+    if (orgId) {
+      sendEvent({
+        channel: 'onboarding-build',
+        event: `onboarding-build-step-${stepToName(step.value)}`,
+        icon: 'build',
+        org_id: orgId,
+        tracking_version: 2,
+        notify: false,
+      }).catch()
+      pushEvent(`user:onboarding-build-${stepToName(step.value)}`, config.supaHost, { org_id: orgId })
+    }
   }
   if (step.value === completedStepIndex.value) {
     emit('done')
@@ -222,35 +226,30 @@ async function addNewApiKey() {
 
   if (!userId) {
     console.log('Not logged in, cannot regenerate API key')
-    return
+    return null
   }
-  const { error } = await createDefaultApiKey(supabase, t('api-key'))
+  const { data, error } = await createDefaultApiKey(supabase, t('api-key'), {
+    orgId: organizationStore.currentOrganization?.gid,
+    appId: props.appId,
+  })
 
   if (error)
     throw error
+
+  return typeof data?.key === 'string' ? data.key : null
 }
 
 async function getKey(retry = true): Promise<void> {
   isLoading.value = true
   if (!main?.user?.id)
     return
-  const { data, error } = await supabase
-    .from('apikeys')
-    .select()
-    .eq('user_id', main?.user?.id)
-    .eq('mode', 'all')
-    .order('created_at', { ascending: true })
-    .limit(1)
 
-  if (typeof data !== 'undefined' && data !== null && !error) {
-    if (data.length === 0) {
-      await addNewApiKey()
-      return getKey(false)
-    }
-    apiKey.value = data[0].key ?? '[APIKEY]'
+  const existingKey = await findUsablePlainApiKey(supabase, main.user.id, organizationStore.currentOrganization?.gid, props.appId)
+  if (existingKey) {
+    apiKey.value = existingKey
   }
-  else if (retry && main?.user?.id) {
-    return getKey(false)
+  else if (retry) {
+    apiKey.value = await addNewApiKey() ?? '[APIKEY]'
   }
 
   isLoading.value = false
@@ -356,9 +355,6 @@ onUnmounted(() => {
                 <h2 class="text-2xl font-semibold text-slate-950 dark:text-white sm:text-3xl">
                   {{ t('build-setup-command-title') }}
                 </h2>
-                <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-200">
-                  BETA
-                </span>
               </div>
               <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
                 {{ t('build-setup-command-subtitle') }}

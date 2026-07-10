@@ -10,8 +10,13 @@ const ORG_ID = randomUUID()
 const globalId = randomUUID()
 const name = `Test Password Policy Org ${globalId}`
 const customerId = `cus_test_pwd_${ORG_ID}`
+const USE_CLOUDFLARE = process.env.USE_CLOUDFLARE_WORKERS === 'true'
+const describeSupabaseOnly = describe.skipIf(USE_CLOUDFLARE)
 
 beforeAll(async () => {
+  if (USE_CLOUDFLARE)
+    return
+
   // Create stripe_info for this test org
   const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
     customer_id: customerId,
@@ -30,7 +35,7 @@ beforeAll(async () => {
     management_email: TEST_EMAIL,
     created_by: USER_ID,
     customer_id: customerId,
-    use_new_rbac: false, // Explicitly legacy — preserves legacy check_min_rights coverage
+    use_new_rbac: false, // Compatibility flag is ignored; permissions are RBAC-backed.
   })
   if (error)
     throw error
@@ -46,6 +51,9 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
+  if (USE_CLOUDFLARE)
+    return
+
   // Clean up test organization and stripe_info
   await getSupabaseClient().from('user_password_compliance').delete().eq('org_id', ORG_ID)
   await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID)
@@ -53,7 +61,7 @@ afterAll(async () => {
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
 })
 
-describe('password Policy Configuration via SDK', () => {
+describeSupabaseOnly('password Policy Configuration via SDK', () => {
   it('enable password policy with all requirements via direct update', async () => {
     const policyConfig = {
       enabled: true,
@@ -206,7 +214,7 @@ describe('password Policy Configuration via SDK', () => {
   })
 })
 
-describe('[POST] /private/validate_password_compliance', () => {
+describeSupabaseOnly('[POST] /private/validate_password_compliance', () => {
   beforeAll(async () => {
     // Enable password policy for testing
     await getSupabaseClient()
@@ -588,7 +596,7 @@ describe('checkOrgReadAccess', () => {
   })
 })
 
-describe('[GET] /private/check_org_members_password_policy', () => {
+describeSupabaseOnly('[GET] /private/check_org_members_password_policy', () => {
   beforeAll(async () => {
     // Enable password policy for testing
     await getSupabaseClient()
@@ -626,7 +634,7 @@ describe('[GET] /private/check_org_members_password_policy', () => {
   })
 })
 
-describe('password Policy Enforcement Integration', () => {
+describeSupabaseOnly('password Policy Enforcement Integration', () => {
   const orgWithPolicyId = randomUUID()
   const orgWithPolicyName = `Pwd Policy Integration Org ${randomUUID()}`
   const orgWithPolicyCustomerId = `cus_pwd_int_${orgWithPolicyId}`
@@ -642,7 +650,7 @@ describe('password Policy Enforcement Integration', () => {
       is_good_plan: true,
     })
 
-    // Create org with password policy enabled (legacy mode — preserves legacy check_min_rights coverage)
+    // Create org with password policy enabled while the compatibility flag is false.
     await getSupabaseClient().from('orgs').insert({
       id: orgWithPolicyId,
       name: orgWithPolicyName,
@@ -674,8 +682,8 @@ describe('password Policy Enforcement Integration', () => {
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', orgWithPolicyCustomerId)
   })
 
-  it('check_min_rights respects password policy (legacy mode)', async () => {
-    // Directly test the check_min_rights function via RPC in legacy mode
+  it('check_min_rights respects password policy with compatibility flag disabled', async () => {
+    // Directly test the compatibility check_min_rights function via RPC
     const { data, error } = await getSupabaseClient().rpc('check_min_rights', {
       min_right: 'read',
       user_id: USER_ID,
@@ -771,7 +779,7 @@ describe('password Policy Enforcement Integration', () => {
   })
 })
 
-describe('user_password_compliance table', () => {
+describeSupabaseOnly('user_password_compliance table', () => {
   it('can insert compliance record via service role', async () => {
     // Get the policy hash
     const { data: org, error: orgError } = await getSupabaseClient()

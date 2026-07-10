@@ -10,6 +10,7 @@ import {
   normalizeBuildTimeoutSeconds,
   shouldApplyBuildTimeout,
 } from '../../utils/build_timeout.ts'
+import { emitBuildTransitionEvent } from '../../utils/build_tracking.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
@@ -96,7 +97,7 @@ export async function getBuildStatus(
   // This prevents cross-app access by mixing an allowed app_id with another app's job_id.
   const { data: buildRequest, error: buildRequestError } = await supabase
     .from('build_requests')
-    .select('app_id, owner_org, platform')
+    .select('app_id, owner_org, requested_by, platform, status, build_mode')
     .eq('builder_job_id', job_id)
     .maybeSingle()
 
@@ -208,7 +209,15 @@ export async function getBuildStatus(
   // Use admin client: access was already verified above (RLS SELECT + checkPermission).
   // The data written comes from the trusted builder API, not from user input.
   // An RLS UPDATE policy would let API-key holders forge status/build-time, so we bypass RLS here.
-  const { error: updateError } = await supabaseAdmin(c)
+  //
+  // Optimistic concurrency-control (CAS) guard: `.eq('status', previousStatus)` ensures
+  // only one writer wins when two concurrent pollers race on the same job. The
+  // `.select('id')` lets us detect whether this writer actually advanced the row;
+  // if `updatedRows` is empty, another writer already moved the status and has
+  // (or will) emit the lifecycle event — skip emission here to avoid double-firing.
+  const previousStatus = buildRequest.status
+
+  const { data: updatedRows, error: updateError } = await supabaseAdmin(c)
     .from('build_requests')
     .update({
       status: effectiveStatus,
@@ -218,6 +227,8 @@ export async function getBuildStatus(
     })
     .eq('builder_job_id', job_id)
     .eq('app_id', buildRequest.app_id)
+    .eq('status', previousStatus)
+    .select('id')
 
   if (updateError) {
     cloudlogErr({
@@ -227,6 +238,26 @@ export async function getBuildStatus(
       error: updateError.message,
     })
   }
+  else if (updatedRows && updatedRows.length > 0) {
+    await emitBuildTransitionEvent(c, {
+      previousStatus,
+      effectiveStatus,
+      timeoutApplied,
+      effectiveError,
+      effectiveBuildTimeSeconds,
+      build: {
+        app_id: buildRequest.app_id,
+        platform: buildRequest.platform,
+        build_mode: buildRequest.build_mode,
+        owner_org: buildRequest.owner_org,
+        requested_by: buildRequest.requested_by,
+      },
+    })
+  }
+  // else: another writer already advanced the status (or it never matched
+  // previousStatus) — skip emission to avoid double-firing. recordBuildTime
+  // below stays unconditional: it's idempotent at the DB layer, and skipping
+  // it would let billing miss a build.
 
   const shouldRecordBuildTime = !!builderJob.job.started_at
     && (timeoutApplied || ((effectiveStatus === 'succeeded' || effectiveStatus === 'failed') && !!builderJob.job.completed_at))

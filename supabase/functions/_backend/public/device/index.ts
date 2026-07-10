@@ -23,7 +23,6 @@ function logDeviceRequestContext(
     message: `device ${operation} apikey context`,
     apikeyId: apikey.id,
     userId: apikey.user_id,
-    mode: apikey.mode,
   })
 }
 

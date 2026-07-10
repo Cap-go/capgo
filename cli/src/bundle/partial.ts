@@ -14,7 +14,7 @@ import { parse } from '@std/semver'
 import * as micromatch from 'micromatch'
 import * as tus from 'tus-js-client'
 import { encryptChecksum, encryptChecksumV3, encryptSource } from '../api/crypto'
-import { BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, findRoot, generateManifest, getContentType, getInstalledVersion, getLocalConfig, isDeprecatedPluginVersion, sendEvent } from '../utils'
+import { BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, findRoot, generateManifest, getContentType, getInstalledVersion, getLocalConfig, isDeprecatedPluginVersion, sendEvent, TUS_UPLOAD_RETRY_DELAYS } from '../utils'
 
 // Check if file already exists on server (bypass cache and force storage lookup)
 async function fileExists(localConfig: any, filename: string): Promise<boolean> {
@@ -147,7 +147,8 @@ export async function prepareBundlePartialFiles(
     channel: 'partial-update',
     event: 'Generate manifest',
     icon: '📂',
-    user_id: orgId,
+    org_id: orgId,
+    tracking_version: 2,
     tags: {
       'app-id': appid,
     },
@@ -165,14 +166,21 @@ function convertToUnixPath(windowsPath: string): string {
   return normalizedPath.split(win32.sep).join(posix.sep)
 }
 
-// Properly encode path segments while preserving slashes
 function encodePathSegments(path: string): string {
-  const result = path.split('/').map(segment => encodeURIComponent(segment)).join('/')
-  // if has space print it
-  if (path.includes(' ')) {
-    log.warn(`File "${path}" contains spaces in its name.`)
+  return path.split('/').map(segment => encodeURIComponent(segment)).join('/')
+}
+
+export function buildPartialUploadPath(orgId: string, appId: string, fileHash: string, filePathUnix: string, encryptionOptions?: { ivSessionKey: string }) {
+  // Keep the storage prefix short while preserving the full hash in manifest verification.
+  const filenameHash = createHash('sha256').update(fileHash).digest('hex')
+  const filePathUnixSafe = encodePathSegments(filePathUnix)
+
+  if (encryptionOptions) {
+    const ivSessionKeyHex = Buffer.from(encryptionOptions.ivSessionKey).toString('hex')
+    return `orgs/${orgId}/apps/${appId}/delta/${ivSessionKeyHex}/${filenameHash}_${filePathUnixSafe}`
   }
-  return result
+
+  return `orgs/${orgId}/apps/${appId}/delta/${filenameHash}_${filePathUnixSafe}`
 }
 
 interface PartialEncryptionOptions {
@@ -264,23 +272,7 @@ export async function uploadPartial(
         brFilesCount++
       }
 
-      const filePathUnixSafe = encodePathSegments(uploadPathUnix)
-      // Use SHA256 of file.hash for filename to keep it short (64 chars)
-      // The full hash (encrypted or not) is preserved in the manifest's file_hash field for plugin verification
-      const filenameHash = createHash('sha256').update(file.hash).digest('hex')
-
-      // Include hex-encoded ivSessionKey in the path for encrypted files
-      // This ensures files encrypted with different session keys/IVs have different paths
-      // and allows caching of files encrypted with the same session key/IV
-      let filename: string
-      if (encryptionOptions) {
-        // Convert ivSessionKey to hex for use in path (URL-safe)
-        const ivSessionKeyHex = Buffer.from(encryptionOptions.ivSessionKey).toString('hex')
-        filename = `orgs/${orgId}/apps/${appId}/delta/${ivSessionKeyHex}/${filenameHash}_${filePathUnixSafe}`
-      }
-      else {
-        filename = `orgs/${orgId}/apps/${appId}/delta/${filenameHash}_${filePathUnixSafe}`
-      }
+      const filename = buildPartialUploadPath(orgId, appId, file.hash, uploadPathUnix, encryptionOptions)
 
       // Check if file already exists on server
       // Skip reuse when encryption is enabled because the session key changes per upload
@@ -288,7 +280,7 @@ export async function uploadPartial(
       if (!encryptionOptions && await fileExists(localConfig, filename)) {
         uploadedFiles++
         return Promise.resolve({
-          file_name: filePathUnixSafe,
+          file_name: uploadPathUnix,
           s3_path: filename,
           file_hash: file.hash,
         })
@@ -301,7 +293,7 @@ export async function uploadPartial(
         const upload = new tus.Upload(finalBuffer as any, {
           endpoint: `${localConfig.hostFilesApi}/files/upload/attachments/`,
           chunkSize: options.tusChunkSize,
-          retryDelays: [0, 1000, 3000, 5000, 10000],
+          retryDelays: [...TUS_UPLOAD_RETRY_DELAYS],
           removeFingerprintOnSuccess: true,
           metadata: {
             filename,
@@ -339,7 +331,7 @@ export async function uploadPartial(
           onSuccess() {
             uploadedFiles++
             resolve({
-              file_name: filePathUnixSafe,
+              file_name: uploadPathUnix,
               s3_path: filename,
               file_hash: file.hash,
             })
@@ -378,7 +370,8 @@ export async function uploadPartial(
       channel: 'app',
       event: `App Partial TUS done${brFilesCount > 0 ? ' with .br extension' : ''}`,
       icon: '⏫',
-      user_id: orgId,
+      org_id: orgId,
+      tracking_version: 2,
       tags: {
         'app-id': appId,
       },
@@ -388,7 +381,8 @@ export async function uploadPartial(
       channel: 'performance',
       event: 'Partial upload performance',
       icon: '🚄',
-      user_id: orgId,
+      org_id: orgId,
+      tracking_version: 2,
       tags: {
         'app-id': appId,
         'time': uploadTime,

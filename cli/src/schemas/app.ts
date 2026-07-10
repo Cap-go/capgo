@@ -10,6 +10,15 @@ export const appOptionsSchema = optionsBaseSchema.extend({
   icon: z.string().optional(),
   retention: z.number().optional(),
   exposeMetadata: z.boolean().optional(),
+  preview: z.boolean().optional(),
+  allowDeviceCustomId: z.boolean().optional(),
+  blockProviderInfraRequests: z.boolean().optional(),
+  buildTimeoutMinutes: z.number().optional(),
+  iosStoreUrl: z.string().optional(),
+  androidStoreUrl: z.string().optional(),
+  defaultUploadChannel: z.string().optional(),
+  defaultDownloadChannel: z.string().optional(),
+  disableDownloadChannels: z.boolean().optional(),
 })
 
 export type AppOptions = z.infer<typeof appOptionsSchema>

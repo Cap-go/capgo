@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, createAppVersions, fetchBundle, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils.ts'
+import { BASE_URL, createAppVersions, createDirectApiKeyWithBindings, fetchBundle, getSupabaseClient, headers, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.app.b.${id}`
@@ -181,6 +181,49 @@ describe('[DELETE] /bundle operations', () => {
     expect(deleteBundleData.status).toBe('ok')
   })
 
+  it('does not delete a rollout target bundle linked to a channel', async () => {
+    const supabase = getSupabaseClient()
+    const stableVersion = await createAppVersions(`1.0.0-delete-rollout-stable-${id}`, APPNAME)
+    const rolloutVersion = await createAppVersions(`1.0.0-delete-rollout-target-${id}`, APPNAME)
+    const channelName = `delete-rollout-${id}`
+
+    const { error: channelError } = await supabase
+      .from('channels')
+      .insert({
+        app_id: APPNAME,
+        name: channelName,
+        version: stableVersion.id,
+        rollout_version: rolloutVersion.id,
+        rollout_enabled: true,
+        rollout_percentage_bps: 1000,
+        owner_org: ORG_ID,
+        created_by: USER_ID,
+      })
+
+    expect(channelError).toBeNull()
+
+    const deleteBundle = await fetch(`${BASE_URL}/bundle`, {
+      method: 'DELETE',
+      headers,
+      body: JSON.stringify({
+        app_id: APPNAME,
+        version: rolloutVersion.name,
+      }),
+    })
+    const deleteBundleData = await deleteBundle.json() as { error?: string }
+    expect(deleteBundle.status).toBe(400)
+    expect(deleteBundleData.error).toBe('cannot_delete_linked_version')
+
+    const { data: versionAfterDelete, error: versionError } = await supabase
+      .from('app_versions')
+      .select('deleted')
+      .eq('id', rolloutVersion.id)
+      .single()
+
+    expect(versionError).toBeNull()
+    expect(versionAfterDelete?.deleted).toBe(false)
+  })
+
   it('delete all bundles for an app', async () => {
     const deleteAllBundles = await fetch(`${BASE_URL}/bundle`, {
       method: 'DELETE',
@@ -207,17 +250,7 @@ describe('[PUT] /bundle operations - Set bundle to channel', () => {
     const version = await createAppVersions('1.0.0-test-channel', APPNAME)
     versionId = version.id
 
-    // Get the unknown version for this app
     const supabase = getSupabaseClient()
-    const { data: unknownVersion } = await supabase
-      .from('app_versions')
-      .select('id')
-      .eq('app_id', APPNAME)
-      .eq('name', 'unknown')
-      .single()
-    if (!unknownVersion) {
-      throw new Error('Failed to find unknown version')
-    }
 
     // Create a test channel using proper seeded values
     const { data: channel, error } = await supabase
@@ -225,7 +258,7 @@ describe('[PUT] /bundle operations - Set bundle to channel', () => {
       .insert({
         name: 'test-channel',
         app_id: APPNAME,
-        version: unknownVersion.id, // Use app's unknown version
+        version: null,
         created_by: '6aa76066-55ef-4238-ade6-0b32334a4097', // test@capgo.app user from seed
         owner_org: '046a36ac-e03c-4590-9257-bd6c9dba9ee8', // Demo org from seed
       })
@@ -240,20 +273,16 @@ describe('[PUT] /bundle operations - Set bundle to channel', () => {
     }
     channelId = channel.id
 
-    const createKeyResponse = await fetch(`${BASE_URL}/apikey`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        name: `bundle-write-key-${APPNAME}`,
-        mode: 'write',
-        limited_to_apps: [APPNAME],
-      }),
+    const createKeyData = await createDirectApiKeyWithBindings({
+      key: randomUUID(),
+      name: `bundle-write-key-${APPNAME}`,
+      orgId: ORG_ID,
+      roleName: 'org_member',
+      appId: APPNAME,
+      appRoleName: 'app_developer',
     })
-
-    const createKeyData = await createKeyResponse.json() as { id: number, key: string }
-    if (createKeyResponse.status !== 200) {
-      throw new Error(`Failed to create write-scoped bundle key: ${JSON.stringify(createKeyData)}`)
-    }
+    if (!createKeyData.key)
+      throw new Error('Failed to create write-scoped bundle key')
 
     writeScopedKeyId = createKeyData.id
     writeScopedHeaders = {
@@ -264,10 +293,7 @@ describe('[PUT] /bundle operations - Set bundle to channel', () => {
 
   afterAll(async () => {
     if (writeScopedKeyId != null) {
-      await fetch(`${BASE_URL}/apikey/${writeScopedKeyId}`, {
-        method: 'DELETE',
-        headers,
-      })
+      await getSupabaseClient().from('apikeys').delete().eq('id', writeScopedKeyId)
     }
   })
 
@@ -494,9 +520,21 @@ describe('[PUT] /bundle RBAC channel overrides', () => {
       throw channelError ?? new Error('Failed to create RBAC denied channel')
     channelId = channel.id
 
+    const apiKey = await createDirectApiKeyWithBindings({
+      userId: USER_ID,
+      key: randomUUID(),
+      name: `bundle-rbac-denied-${id}`,
+      orgId: RBAC_ORG_ID,
+      roleName: 'org_member',
+      appId: RBAC_APPNAME,
+      appRoleName: 'app_developer',
+    })
+    if (!apiKey.key)
+      throw new Error('Failed to create RBAC API key')
+
     const { error: overrideError } = await supabase.from('channel_permission_overrides').insert({
-      principal_type: 'user',
-      principal_id: USER_ID,
+      principal_type: 'apikey',
+      principal_id: apiKey.rbac_id,
       channel_id: channelId,
       permission_key: 'channel.promote_bundle',
       is_allowed: false,
@@ -504,21 +542,6 @@ describe('[PUT] /bundle RBAC channel overrides', () => {
     if (overrideError)
       throw overrideError
 
-    const { data: apiKey, error: apiKeyError } = await supabase
-      .from('apikeys')
-      .insert({
-        user_id: USER_ID,
-        key: randomUUID(),
-        key_hash: null,
-        mode: 'write',
-        name: `bundle-rbac-denied-${id}`,
-        limited_to_apps: [RBAC_APPNAME],
-        limited_to_orgs: [],
-      })
-      .select('id, key')
-      .single()
-    if (apiKeyError || !apiKey?.key)
-      throw apiKeyError ?? new Error('Failed to create RBAC API key')
     rbacApiKeyId = apiKey.id
     rbacHeaders = {
       'Content-Type': 'application/json',

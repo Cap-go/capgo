@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
 import type { Tab } from '~/components/comp_def'
-import { Capacitor } from '@capacitor/core'
 import { computedAsync } from '@vueuse/core'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconBilling from '~icons/mingcute/bill-fill'
-import AdminOnlyModal from '~/components/AdminOnlyModal.vue'
 import FailedCard from '~/components/FailedCard.vue'
+import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import Tabs from '~/components/Tabs.vue'
 import { accountTabs } from '~/constants/accountTabs'
 import { organizationTabs as baseOrgTabs } from '~/constants/organizationTabs'
 import { settingsTabs } from '~/constants/settingsTabs'
+import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { checkPermissions } from '~/services/permissions'
 import { openPortal } from '~/services/stripe'
 import { stripeEnabled } from '~/services/supabase'
@@ -22,33 +22,10 @@ const { t } = useI18n()
 const organizationStore = useOrganizationStore()
 const router = useRouter()
 const route = useRoute()
+const hideExternalPurchaseFlows = isNativeAppStoreContext()
 
 // Modal state for non-admin billing access (triggered by billing tab click)
 const showBillingModal = ref(false)
-
-// Routes that require super_admin access (security-sensitive settings)
-const adminOnlyRoutes = [
-  '/settings/organization/audit-logs',
-  '/settings/organization/auditlogs',
-  '/settings/organization/security',
-]
-
-// Check if user is super_admin
-const isSuperAdmin = computed(() => {
-  const orgId = organizationStore.currentOrganization?.gid
-  return organizationStore.hasPermissionsInRole('super_admin', ['org_super_admin'], orgId)
-})
-
-// Check if current route is admin-only and user is not admin
-const isOnAdminOnlyRoute = computed(() => {
-  const path = route.path.replace(/\/$/, '')
-  return adminOnlyRoutes.some(r => path === r || path.startsWith(`${r}/`))
-})
-
-// Show admin-only modal when non-admin is on admin-only route
-const showAdminOnlyModal = computed(() => {
-  return !isSuperAdmin.value && isOnAdminOnlyRoute.value
-})
 
 // Check if user needs to setup 2FA or update password for organization access
 const needsSecurityCompliance = computed(() => {
@@ -64,7 +41,19 @@ const shouldBlockContent = computed(() => {
 })
 
 // keep Tab icon typing (including ShallowRef) instead of Vue's UnwrapRef narrowing
-const organizationTabs = ref<Tab[]>([...baseOrgTabs]) as Ref<Tab[]>
+function withoutExternalPurchaseTabs(tabs: Tab[]) {
+  if (!hideExternalPurchaseFlows)
+    return tabs
+
+  const restrictedKeys = new Set([
+    '/billing',
+    '/settings/organization/credits',
+    '/settings/organization/plans',
+  ])
+  return tabs.filter(tab => !restrictedKeys.has(tab.key))
+}
+
+const organizationTabs = ref<Tab[]>(withoutExternalPurchaseTabs([...baseOrgTabs])) as Ref<Tab[]>
 
 const canReadBilling = computedAsync(async () => {
   const orgId = organizationStore.currentOrganization?.gid
@@ -80,39 +69,59 @@ const canUpdateBilling = computedAsync(async () => {
   return await checkPermissions('org.update_billing', { orgId })
 }, false)
 
+const auditLogsAccessEvaluating = ref(false)
 const canReadAuditLogs = computedAsync(async () => {
   const orgId = organizationStore.currentOrganization?.gid
   if (!orgId)
     return false
   return await checkPermissions('org.read_audit', { orgId })
-}, false)
+}, false, { evaluating: auditLogsAccessEvaluating })
 
+const securityAccessEvaluating = ref(false)
 const canManageSecurity = computedAsync(async () => {
   const orgId = organizationStore.currentOrganization?.gid
   if (!orgId)
     return false
   return await checkPermissions('org.update_settings', { orgId })
-}, false)
+}, false, { evaluating: securityAccessEvaluating })
+
+// Security-sensitive org routes are gated by their own RBAC permission. When the
+// current user lacks it (e.g. reached the route via a direct link), show a modal
+// explaining what access is needed and who can grant it.
+const adminOnlyRouteGate = computed(() => {
+  const path = route.path.replace(/\/$/, '')
+  if (path === '/settings/organization/security') {
+    return { permission: 'org.update_settings' as const, title: t('security-access-required'), hasAccess: canManageSecurity.value, evaluating: securityAccessEvaluating.value }
+  }
+  if (path === '/settings/organization/audit-logs' || path === '/settings/organization/auditlogs') {
+    return { permission: 'org.read_audit' as const, title: t('audit-access-required'), hasAccess: canReadAuditLogs.value, evaluating: auditLogsAccessEvaluating.value }
+  }
+  return null
+})
+
+// Don't flash the modal while the permission check is still resolving.
+const showAdminOnlyModal = computed(() => {
+  const gate = adminOnlyRouteGate.value
+  return !!gate && !gate.evaluating && !gate.hasAccess
+})
 
 watchEffect(() => {
-  if (!stripeEnabled.value) {
+  if (!stripeEnabled.value || hideExternalPurchaseFlows) {
     const path = route.path.replace(/\/$/, '')
     const billingPaths = [
-      '/settings/organization/usage',
+      ...(hideExternalPurchaseFlows ? [] : ['/settings/organization/usage']),
       '/settings/organization/credits',
       '/settings/organization/plans',
       '/billing',
     ]
     if (billingPaths.some(p => path === p || path.startsWith(`${p}/`)))
-      router.replace('/settings/organization')
+      router.replace(hideExternalPurchaseFlows ? '/settings/organization/usage' : '/settings/organization')
   }
 })
 
 watchEffect(() => {
   const billingEnabled = stripeEnabled.value
-  const hasOrgRbacEnabled = !!organizationStore.currentOrganization?.use_new_rbac
-
-  const needsGroups = hasOrgRbacEnabled
+  const needsGroups = !!organizationStore.currentOrganization?.gid
   const hasGroups = organizationTabs.value.find(tab => tab.key === '/settings/organization/groups')
   if (needsGroups && !hasGroups) {
     const base = baseOrgTabs.find(t => t.key === '/settings/organization/groups')
@@ -125,27 +134,6 @@ watchEffect(() => {
   if (!needsGroups && hasGroups)
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/groups')
 
-  const needsApiKeys = hasOrgRbacEnabled
-  const hasApiKeys = organizationTabs.value.find(tab => tab.key === '/settings/organization/api-keys')
-  if (needsApiKeys && !hasApiKeys) {
-    const base = baseOrgTabs.find(t => t.key === '/settings/organization/api-keys')
-    const insertAfterKeys = [
-      '/settings/organization/groups',
-      '/settings/organization/members',
-      '/settings/organization',
-    ]
-    const insertAfterIndex = insertAfterKeys
-      .map(key => organizationTabs.value.findIndex(tab => tab.key === key))
-      .find(index => index >= 0) ?? -1
-
-    if (base && insertAfterIndex >= 0)
-      organizationTabs.value.splice(insertAfterIndex + 1, 0, { ...base })
-    else if (base)
-      organizationTabs.value.push({ ...base })
-  }
-  if (!needsApiKeys && hasApiKeys)
-    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/api-keys')
-
   // ensure usage/plans tabs based on permissions (keeps icons from base)
   const needsUsage = billingEnabled && canReadBilling.value
   const hasUsage = organizationTabs.value.find(tab => tab.key === '/settings/organization/usage')
@@ -157,7 +145,7 @@ watchEffect(() => {
   if (!needsUsage && hasUsage)
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/usage')
 
-  const needsCredits = billingEnabled && canUpdateBilling.value
+  const needsCredits = billingEnabled && canUpdateBilling.value && !hideExternalPurchaseFlows
   const hasCredits = organizationTabs.value.find(tab => tab.key === '/settings/organization/credits')
 
   if (needsCredits && !hasCredits) {
@@ -169,7 +157,7 @@ watchEffect(() => {
   if (!needsCredits && hasCredits)
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/credits')
 
-  const needsPlans = billingEnabled && canUpdateBilling.value
+  const needsPlans = billingEnabled && canUpdateBilling.value && !hideExternalPurchaseFlows
   const hasPlans = organizationTabs.value.find(tab => tab.key === '/settings/organization/plans')
   if (needsPlans && !hasPlans) {
     const base = baseOrgTabs.find(t => t.key === '/settings/organization/plans')
@@ -215,7 +203,7 @@ watchEffect(() => {
   })
 
   // Check billing access - users with org.read_billing permission can access billing
-  if (!Capacitor.isNativePlatform()
+  if (!hideExternalPurchaseFlows
     && billingEnabled
     && canReadBilling.value
     && !organizationTabs.value.find(tab => tab.key === '/billing')) {
@@ -224,8 +212,8 @@ watchEffect(() => {
       icon: IconBilling,
       key: '/billing',
       onClick: () => {
-        // Check permissions at click time to handle role changes
-        if (organizationStore.hasPermissionsInRole('super_admin', ['org_super_admin'], organizationStore.currentOrganization?.gid)) {
+        // Check permission at click time to handle role changes
+        if (canUpdateBilling.value) {
           openPortal(organizationStore.currentOrganization?.gid ?? '', t)
         }
         else {
@@ -234,7 +222,7 @@ watchEffect(() => {
       },
     })
   }
-  else if (!canReadBilling.value || !billingEnabled) {
+  else if (hideExternalPurchaseFlows || !canReadBilling.value || !billingEnabled) {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/billing')
   }
 })
@@ -301,10 +289,19 @@ function handleSecondary(val: string) {
         <FailedCard v-if="shouldBlockContent" />
         <RouterView v-else class="w-full" />
       </div>
-      <!-- Admin-only modal for admin-only routes -->
-      <AdminOnlyModal v-if="showAdminOnlyModal" />
-      <!-- Admin-only modal for billing tab click -->
-      <AdminOnlyModal v-if="showBillingModal" @click="showBillingModal = false" />
+      <!-- Permission modal for security-sensitive org routes reached without access -->
+      <RbacPermissionOnlyModal
+        v-if="showAdminOnlyModal && adminOnlyRouteGate"
+        :title="adminOnlyRouteGate.title"
+        :permission="adminOnlyRouteGate.permission"
+      />
+      <!-- Permission modal for the billing tab click -->
+      <RbacPermissionOnlyModal
+        v-if="showBillingModal"
+        :title="t('billing-access-required')"
+        permission="org.update_billing"
+        @click="showBillingModal = false"
+      />
     </main>
   </div>
 </template>

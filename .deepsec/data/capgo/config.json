@@ -1,0 +1,9 @@
+{
+  "priorityPaths": [
+    "supabase/functions/_backend/",
+    "cloudflare_workers/",
+    "supabase/migrations/",
+    "src/services/",
+    "cli/src/"
+  ]
+}

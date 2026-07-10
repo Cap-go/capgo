@@ -2,8 +2,10 @@ import type { OptionsBase } from '../schemas/base'
 import type { Organization } from '../utils'
 import { intro, log, outro } from '@clack/prompts'
 import { Table } from '@sauber/table'
+import { trackEvent } from '../analytics/track'
 import { checkAlerts } from '../api/update'
 import {
+  consoleWebUrl,
   createSupabaseClient,
   findSavedKey,
   formatError,
@@ -47,7 +49,7 @@ function displayOrganizations(data: Organization[], silent: boolean) {
     for (const org of noAccessOrgs) {
       log.warn(`   - ${org.name} (${org.gid})`)
     }
-    log.warn(`\nTo regain access, enable 2FA on your account at https://web.capgo.app/settings/account`)
+    log.warn(`\nTo regain access, enable 2FA on your account at ${consoleWebUrl('/settings/account')}`)
   }
 }
 
@@ -87,6 +89,8 @@ export async function listOrganizationsInternal(options: OptionsBase, silent = f
   }
 
   const organizations = allOrganizations || []
+
+  void trackEvent({ channel: 'organization', event: 'Orgs Listed', icon: '📋', tags: { org_count: organizations.length } })
 
   if (!silent) {
     log.info(`Organizations found: ${organizations.length}`)

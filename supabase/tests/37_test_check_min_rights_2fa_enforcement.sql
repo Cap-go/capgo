@@ -42,11 +42,11 @@ BEGIN
     test_unverified_2fa_user_id := tests.get_supabase_uid('test_unverified_2fa_user');
     test_admin_id := tests.get_supabase_uid('test_admin');
 
-    -- Create org WITH 2FA enforcement (use_new_rbac = false: preserves legacy check_min_rights coverage)
+    -- Create org WITH 2FA enforcement while the compatibility flag is false.
     INSERT INTO public.orgs (id, created_by, name, management_email, enforcing_2fa, use_new_rbac)
     VALUES (org_with_2fa_enforcement_id, test_admin_id, '2FA Enforced Org', '2fa@org.com', true, false);
 
-    -- Create org WITHOUT 2FA enforcement (use_new_rbac = false: preserves legacy check_min_rights coverage)
+    -- Create org WITHOUT 2FA enforcement while the compatibility flag is false.
     INSERT INTO public.orgs (id, created_by, name, management_email, enforcing_2fa, use_new_rbac)
     VALUES (org_without_2fa_enforcement_id, test_admin_id, 'No 2FA Org', 'no2fa@org.com', false, false);
 
@@ -55,14 +55,14 @@ BEGIN
     INSERT INTO public.org_users (org_id, user_id, user_right)
     VALUES 
         (org_with_2fa_enforcement_id, test_2fa_user_id, 'admin'::public.user_min_right),
-        (org_with_2fa_enforcement_id, test_no_2fa_user_id, 'write'::public.user_min_right),
+        (org_with_2fa_enforcement_id, test_no_2fa_user_id, 'admin'::public.user_min_right),
         (org_with_2fa_enforcement_id, test_unverified_2fa_user_id, 'admin'::public.user_min_right);
 
     -- Add members to org WITHOUT 2FA enforcement
     INSERT INTO public.org_users (org_id, user_id, user_right)
     VALUES 
         (org_without_2fa_enforcement_id, test_2fa_user_id, 'read'::public.user_min_right),
-        (org_without_2fa_enforcement_id, test_no_2fa_user_id, 'write'::public.user_min_right),
+        (org_without_2fa_enforcement_id, test_no_2fa_user_id, 'admin'::public.user_min_right),
         (org_without_2fa_enforcement_id, test_unverified_2fa_user_id, 'admin'::public.user_min_right);
 
     -- Store org IDs for later use

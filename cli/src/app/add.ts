@@ -5,6 +5,7 @@ import type { Database } from '../types/supabase.types'
 import type { Organization } from '../utils'
 import { existsSync, readFileSync } from 'node:fs'
 import { intro, log, outro } from '@clack/prompts'
+import { getInvocationSource } from '../analytics/track'
 import { checkAppExists, defaultAppIconPath, getAppIconStoragePath, newIconPath } from '../api/app'
 import { checkAlerts } from '../api/update'
 import {
@@ -72,11 +73,20 @@ async function ensureAppDoesNotExist(
   throw new Error(`App ${appId} already exists`)
 }
 
+export type AppCreateSource = 'cli-direct' | 'onboarding' | 'mcp'
+
+export function resolveAppCreateSource(explicit?: AppCreateSource): AppCreateSource {
+  if (explicit)
+    return explicit
+  return getInvocationSource() === 'mcp' ? 'mcp' : 'cli-direct'
+}
+
 export async function addAppInternal(
   initialAppId: string,
   options: AppOptions,
   organization?: Organization,
   silent = false,
+  source?: AppCreateSource,
 ) {
   if (!silent)
     intro('Adding')
@@ -179,8 +189,9 @@ export async function addAppInternal(
     channel: 'app',
     event: 'App Created',
     icon: '🆕',
-    user_id: organizationUid,
-    tags: { 'app-id': appId },
+    org_id: organizationUid,
+    tracking_version: 2,
+    tags: { 'app-id': appId, 'source': resolveAppCreateSource(source) },
     notify: false,
     notifyConsole: true,
   }).catch(() => {})

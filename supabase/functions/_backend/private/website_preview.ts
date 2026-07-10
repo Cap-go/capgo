@@ -1,12 +1,19 @@
-import type { Context } from 'hono'
 import { createHono, middlewareAuth, parseBody, quickError, useCors } from '../utils/hono.ts'
+import { fetchPublicUrl, getPublicHostnameValidationError as getPublicHostnameValidationErrorBase } from '../utils/publicUrl.ts'
 import { version } from '../utils/version.ts'
-import { getWebhookUrlValidationError } from '../utils/webhook.ts'
 
 const MAX_ICON_BYTES = 512 * 1024
 const MAX_HTML_BYTES = 1024 * 1024
 const MAX_REDIRECTS = 5
-const DNS_LOOKUP_URL = 'https://cloudflare-dns.com/dns-query'
+const WEBSITE_URL_VALIDATION_MESSAGES = {
+  invalidUrl: 'Website must be a valid URL',
+  publicHost: 'Website must point to a public host',
+  ipLiteral: 'Website must point to a public host',
+  https: 'Website must use HTTPS',
+  dnsResolution: 'Could not resolve website host',
+  fetchFailed: 'Could not fetch website',
+  tooManyRedirects: 'Too many redirects',
+}
 
 export const app = createHono('', version)
 
@@ -134,89 +141,11 @@ function findIconHref(html: string) {
   return candidates.sort((a, b) => b.priority - a.priority)[0]?.href ?? ''
 }
 
-function isPrivateIpv4(ip: string) {
-  const octets = ip.split('.').map(part => Number.parseInt(part, 10))
-  if (octets.length !== 4 || octets.some(part => Number.isNaN(part) || part < 0 || part > 255))
-    return true
-
-  const [a, b] = octets
-  return a === 0
-    || a === 10
-    || a === 127
-    || (a === 169 && b === 254)
-    || (a === 172 && b >= 16 && b <= 31)
-    || (a === 192 && b === 168)
-    || (a === 100 && b >= 64 && b <= 127)
-    || (a === 198 && (b === 18 || b === 19))
-  // Reserved TEST-NET ranges are also non-public for this fetch path.
-    || (a === 192 && b === 0)
-    || (a === 192 && b === 0 && octets[2] === 2)
-    || (a === 198 && b === 51 && octets[2] === 100)
-    || (a === 203 && b === 0 && octets[2] === 113)
-}
-
-function isPrivateIpv6(ip: string) {
-  const normalized = ip.toLowerCase()
-  if (normalized === '::1' || normalized === '::')
-    return true
-  if (normalized.startsWith('fe80:') || normalized.startsWith('fc') || normalized.startsWith('fd'))
-    return true
-  if (normalized.startsWith('::ffff:')) {
-    const mappedIpv4 = normalized.slice(7)
-    return isPrivateIpv4(mappedIpv4)
-  }
-  return false
-}
-
-function isPrivateIp(ip: string) {
-  return ip.includes(':') ? isPrivateIpv6(ip) : isPrivateIpv4(ip)
-}
-
-function isIpLiteral(value: string) {
-  return /^[0-9.]+$/.test(value) || value.includes(':')
-}
-
-async function resolveHostnameIps(hostname: string, type: 'A' | 'AAAA') {
-  const dnsUrl = new URL(DNS_LOOKUP_URL)
-  dnsUrl.searchParams.set('name', hostname)
-  dnsUrl.searchParams.set('type', type)
-
-  const response = await fetch(dnsUrl.toString(), {
-    headers: { Accept: 'application/dns-json' },
+async function getWebsitePublicHostnameValidationError(urlString: string) {
+  return await getPublicHostnameValidationErrorBase(urlString, {
+    messages: WEBSITE_URL_VALIDATION_MESSAGES,
+    requireDnsResolution: true,
   })
-  if (!response.ok)
-    return []
-
-  const data = await response.json() as { Answer?: Array<{ data?: string }> }
-  return (data.Answer ?? [])
-    .map(answer => answer.data?.trim() ?? '')
-    .filter(answer => !!answer && isIpLiteral(answer))
-}
-
-async function getPublicHostnameValidationError(c: Context, urlString: string) {
-  const validationError = getWebhookUrlValidationError(c, urlString)
-  if (validationError)
-    return validationError
-
-  let url: URL
-  try {
-    url = new URL(urlString)
-  }
-  catch {
-    return 'Website must be a valid URL'
-  }
-
-  const ips = [
-    ...await resolveHostnameIps(url.hostname, 'A'),
-    ...await resolveHostnameIps(url.hostname, 'AAAA'),
-  ]
-
-  if (ips.length === 0)
-    return 'Could not resolve website host'
-  if (ips.some(isPrivateIp))
-    return 'Website must point to a public host'
-
-  return null
 }
 
 async function readResponseTextWithLimit(response: Response, limit: number) {
@@ -258,45 +187,18 @@ async function readResponseTextWithLimit(response: Response, limit: number) {
 }
 
 async function fetchValidatedUrl(
-  c: Context,
   urlString: string,
   init?: RequestInit,
 ) {
-  let currentUrl = urlString
-
-  for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount++) {
-    const validationError = await getPublicHostnameValidationError(c, currentUrl)
-    if (validationError)
-      return { error: validationError, response: null as Response | null }
-
-    let response: Response
-    try {
-      response = await fetch(currentUrl, {
-        ...init,
-        redirect: 'manual',
-      })
-    }
-    catch {
-      return { error: 'Could not fetch website', response: null as Response | null }
-    }
-
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get('location')
-      if (!location)
-        return { error: 'Could not fetch website', response: null as Response | null }
-
-      currentUrl = new URL(location, currentUrl).toString()
-      continue
-    }
-
-    return { error: null, response }
-  }
-
-  return { error: 'Too many redirects', response: null as Response | null }
+  return await fetchPublicUrl(urlString, init, {
+    messages: WEBSITE_URL_VALIDATION_MESSAGES,
+    requireDnsResolution: true,
+    maxRedirects: MAX_REDIRECTS,
+  })
 }
 
-async function fetchIconDataUrl(c: Context, iconUrl: string) {
-  const { error, response } = await fetchValidatedUrl(c, iconUrl)
+async function fetchIconDataUrl(iconUrl: string) {
+  const { error, response } = await fetchValidatedUrl(iconUrl)
   if (error || !response)
     return null
 
@@ -334,11 +236,11 @@ app.post('/', middlewareAuth, async (c) => {
   if (!website)
     return quickError(400, 'invalid_website', 'Website must be a valid URL')
 
-  const websiteValidationError = await getPublicHostnameValidationError(c, website)
+  const websiteValidationError = await getWebsitePublicHostnameValidationError(website)
   if (websiteValidationError)
     return quickError(400, 'invalid_website', websiteValidationError)
 
-  const { error: fetchError, response } = await fetchValidatedUrl(c, website, {
+  const { error: fetchError, response, finalUrl } = await fetchValidatedUrl(website, {
     headers: {
       'User-Agent': 'CapgoWebsitePreview/1.0',
       'Accept': 'text/html,application/xhtml+xml',
@@ -357,8 +259,8 @@ app.post('/', middlewareAuth, async (c) => {
   const html = await readResponseTextWithLimit(response, MAX_HTML_BYTES)
   if (!html)
     return quickError(400, 'website_too_large', 'Website response is too large')
-  const finalUrl = new URL(response.url)
-  const hostname = finalUrl.hostname.replace(/^www\./, '')
+  const finalUrlParsed = new URL(finalUrl ?? response.url)
+  const hostname = finalUrlParsed.hostname.replace(/^www\./, '')
 
   const name = normalizeCandidateName(findMetaContent(html, 'og:site_name'), hostname)
     || normalizeCandidateName(findMetaContent(html, 'application-name'), hostname)
@@ -366,11 +268,11 @@ app.post('/', middlewareAuth, async (c) => {
     || deriveNameFromHostname(hostname)
 
   const iconHref = findIconHref(html)
-  const iconUrl = iconHref ? new URL(iconHref, finalUrl).toString() : ''
-  const icon = iconUrl ? await fetchIconDataUrl(c, iconUrl) : null
+  const iconUrl = iconHref ? new URL(iconHref, finalUrlParsed).toString() : ''
+  const icon = iconUrl ? await fetchIconDataUrl(iconUrl) : null
 
   return c.json({
-    website: finalUrl.toString(),
+    website: finalUrlParsed.toString(),
     hostname,
     name,
     icon,

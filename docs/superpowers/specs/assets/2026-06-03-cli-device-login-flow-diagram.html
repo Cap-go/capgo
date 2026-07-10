@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Capgo CLI Web Login — Flow Diagram</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root{--primary:#515271;--secondary:#119eff;--accent:#1FB2A5;}
+  body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#1e293b;}
+  .font-prompt{font-family:"Prompt",sans-serif;}
+  .chip{background:linear-gradient(135deg,#244366 0%,#0c6eb8 100%);}
+  .card{border-radius:1.25rem;border:1px solid rgba(226,232,240,.8);background:#fff;box-shadow:0 24px 60px -40px rgba(15,23,42,.4);}
+  .mermaid{display:flex;justify-content:center;}
+  .legend-cli{background:#eef5ff;color:#0c6eb8;border:1px solid rgba(17,158,255,.3);}
+  .legend-be{background:#eef0f7;color:#515271;border:1px solid rgba(81,82,113,.3);}
+  .legend-web{background:#e8f7f4;color:#0e8a7e;border:1px solid rgba(31,178,165,.35);}
+</style>
+</head>
+<body style="background:linear-gradient(180deg,#f8fafc 0%,#eef4ff 60%,#f8fafc 100%);">
+<div class="mx-auto max-w-5xl px-5 py-12">
+
+  <header class="flex items-center gap-3">
+    <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl chip text-white font-prompt text-xl font-bold shadow-lg">C</span>
+    <div>
+      <p class="text-[0.72rem] font-bold tracking-[0.24em] text-slate-500 uppercase">Capgo · Engineering</p>
+      <h1 class="text-2xl font-semibold text-slate-950 sm:text-3xl">CLI Web Login — Flow Diagram</h1>
+    </div>
+  </header>
+  <p class="mt-3 text-sm text-slate-500">OAuth Device Flow shape · who talks to whom, and in what order</p>
+
+  <div class="mt-5 flex flex-wrap gap-2 text-xs font-semibold">
+    <span class="rounded-full px-3 py-1 legend-cli">● CLI (developer's terminal — not logged in)</span>
+    <span class="rounded-full px-3 py-1 legend-be">● Capgo backend</span>
+    <span class="rounded-full px-3 py-1 legend-web">● Browser (developer IS logged in → has JWT)</span>
+  </div>
+
+  <!-- Sequence diagram -->
+  <section class="card mt-6 p-6">
+    <h2 class="mb-4 text-sm font-bold tracking-[0.18em] text-slate-500 uppercase">Sequence — start to finish</h2>
+    <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor Dev as Developer
+    participant CLI as CLI (terminal)
+    participant BE as Capgo Backend
+    participant Web as Browser (logged in)
+
+    Dev->>CLI: runs `capgo login`
+    CLI->>BE: POST /cli-auth/start (device name)
+    BE-->>CLI: device_code (secret) + user_code<br/>"enjoy-enough-outwit-win" + verify URL
+    CLI-->>Dev: prints the phrase to confirm
+    CLI->>Web: opens the verify URL
+
+    rect rgb(238,245,255)
+    note over CLI,BE: CLI quietly polls in the background
+    loop every few seconds
+        CLI->>BE: POST /cli-auth/poll (device_code)
+        BE-->>CLI: "authorization_pending"
+    end
+    end
+
+    Web->>BE: GET /cli-auth/session  [JWT]
+    BE-->>Web: device info + the same phrase
+    Dev->>Web: confirms phrase matches,<br/>picks org / app / permission
+    Web->>BE: POST /cli-auth/authorize  [JWT]
+    BE->>BE: check permission + create key NOW (hashed),<br/>stash one-time encrypted secret
+    BE-->>Web: success → "return to your terminal"
+
+    CLI->>BE: POST /cli-auth/poll (device_code)
+    BE-->>CLI: "authorized" + api_key (delivered once)<br/>secret burned, session destroyed
+    CLI->>CLI: save key to ~/.capgo
+    CLI-->>Dev: "Logged in!"
+    </pre>
+  </section>
+
+  <!-- Simple block view -->
+  <section class="card mt-6 p-6">
+    <h2 class="mb-4 text-sm font-bold tracking-[0.18em] text-slate-500 uppercase">At a glance — the two credentials</h2>
+    <pre class="mermaid">
+flowchart LR
+    Dev([Developer]) -->|runs capgo login| CLI[CLI · terminal]
+    CLI <-->|device_code secret<br/>start + poll| BE[(Capgo Backend)]
+    CLI -->|opens browser| Web[Browser page]
+    Web <-->|JWT session<br/>session + authorize| BE
+    BE -->|mint NEW key| Key{{New API key}}
+    Key -.delivered once over HTTPS.-> CLI
+    classDef cli fill:#eef5ff,stroke:#119eff,color:#0c6eb8;
+    classDef be fill:#eef0f7,stroke:#515271,color:#515271;
+    classDef web fill:#e8f7f4,stroke:#1FB2A5,color:#0e8a7e;
+    classDef key fill:#fff4e8,stroke:#ff7211,color:#b8480a;
+    class CLI cli; class BE be; class Web web; class Key key;
+    </pre>
+    <p class="mt-4 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+      The <strong>CLI</strong> talks to the backend with a one-time <em>device_code</em> secret (it isn't logged in).
+      The <strong>browser</strong> talks to the backend with the developer's <em>JWT</em> (their existing dashboard login).
+      The backend is the bridge: the logged-in browser authorises, and the key flows back to the waiting terminal.
+    </p>
+  </section>
+
+  <footer class="mt-8 text-center text-xs text-slate-400">Capgo · CLI Web Login proposal</footer>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    themeVariables:{
+      primaryColor:'#eef0f7', primaryBorderColor:'#515271', primaryTextColor:'#1e293b',
+      lineColor:'#94a3b8', actorBkg:'#eef5ff', actorBorder:'#119eff', actorTextColor:'#0c6eb8',
+      signalColor:'#475569', signalTextColor:'#334155', noteBkgColor:'#e8f7f4', noteBorderColor:'#1FB2A5',
+      fontFamily:'ui-sans-serif, system-ui, sans-serif'
+    },
+    securityLevel:'loose'
+  });
+</script>
+</body>
+</html>

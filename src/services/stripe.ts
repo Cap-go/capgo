@@ -29,10 +29,11 @@ async function presentActionSheetOpen(url: string) {
 }
 export function openBlank(link: string) {
   console.log('openBlank', link)
-  if (Capacitor.getPlatform() === 'ios')
+  if (Capacitor.getPlatform() === 'ios') {
     presentActionSheetOpen(link)
-  else
-    window.open(link, '_blank')
+    return true
+  }
+  return Boolean(globalThis.open(link, '_blank'))
 }
 export async function openPortal(orgId: string, t: ComposerTranslation) {
   let url = ''
@@ -46,7 +47,7 @@ export async function openPortal(orgId: string, t: ComposerTranslation) {
   // datafast_visitor_id
 
   const prem = supabase.functions.invoke('private/stripe_portal', {
-    body: JSON.stringify({ callbackUrl: window.location.href, orgId }),
+    body: JSON.stringify({ callbackUrl: globalThis.location.href, orgId }),
   }).then(({ data }) => {
     if (data?.url) {
       url = data.url
@@ -78,9 +79,23 @@ export async function openPortal(orgId: string, t: ComposerTranslation) {
   return dialogStore.onDialogDismiss()
 }
 
-async function getAttributionId() {
-  // attribute is made via cookie of name datafast_visitor_id
-  return (await cookieStore.get('datafast_visitor_id'))?.value
+async function getCookieValue(name: string) {
+  if ('cookieStore' in globalThis && globalThis.cookieStore)
+    return (await globalThis.cookieStore.get(name))?.value
+
+  if (typeof document === 'undefined')
+    return undefined
+
+  const encodedName = `${encodeURIComponent(name)}=`
+  const cookie = document.cookie.split('; ').find(cookie => cookie.startsWith(encodedName))
+  return cookie ? decodeURIComponent(cookie.slice(encodedName.length)) : undefined
+}
+
+export async function getDatafastAttribution() {
+  return {
+    visitorId: await getCookieValue('datafast_visitor_id'),
+    sessionId: await getCookieValue('datafast_session_id'),
+  }
 }
 
 export async function openCheckout(priceId: string, successUrl: string, cancelUrl: string, isYear: boolean, orgId: string) {
@@ -88,8 +103,8 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
   const supabase = useSupabase()
   const session = await supabase.auth.getSession()
   if (!session)
-    return
-  const attributionId = await getAttributionId()
+    return false
+  const datafastAttribution = await getDatafastAttribution()
   try {
     const resp = await supabase.functions.invoke('private/stripe_checkout', {
       body: JSON.stringify({
@@ -98,15 +113,19 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
         cancelUrl,
         recurrence: isYear ? 'year' : 'month',
         orgId,
-        attributionId,
+        attributionId: datafastAttribution.visitorId,
+        datafastVisitorId: datafastAttribution.visitorId,
+        datafastSessionId: datafastAttribution.sessionId,
       }),
     })
     if (!resp.error && resp.data?.url)
-      openBlank(resp.data.url)
+      return openBlank(resp.data.url)
+    return false
   }
   catch (error) {
     console.error(error)
     toast.error('Cannot get your checkout')
+    return false
   }
 }
 
@@ -114,15 +133,21 @@ export async function startCreditTopUp(orgId: string, quantity = 100) {
   if (!orgId)
     return
   const supabase = useSupabase()
+  const datafastAttribution = await getDatafastAttribution()
   try {
     const { data, error } = await supabase.functions.invoke('private/credits/start-top-up', {
-      body: JSON.stringify({ orgId, quantity }),
+      body: JSON.stringify({
+        orgId,
+        quantity,
+        datafastVisitorId: datafastAttribution.visitorId,
+        datafastSessionId: datafastAttribution.sessionId,
+      }),
     })
     if (error || !data?.url) {
       console.error('Failed to start credit top-up', error ?? data)
       throw error ?? new Error('Missing checkout URL')
     }
-    window.location.href = data.url
+    globalThis.location.href = data.url
   }
   catch (error) {
     console.error('Cannot start credit top-up checkout', error)

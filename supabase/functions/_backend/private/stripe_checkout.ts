@@ -12,6 +12,8 @@ interface CheckoutData {
   clientReferenceId?: string
   recurrence: 'month' | 'year'
   attributionId?: string
+  datafastVisitorId?: string
+  datafastSessionId?: string
   successUrl: string
   cancelUrl: string
   orgId: string
@@ -55,6 +57,9 @@ app.post('/', middlewareAuth, async (c) => {
     throw simpleError('not_authorize', 'Not authorize')
 
   cloudlog({ requestId: c.get('requestId'), message: 'user', org })
-  const checkout = await createCheckout(c, org.customer_id, body.recurrence ?? 'month', body.priceId ?? 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId, body.attributionId)
+  const checkout = await createCheckout(c, org.customer_id, body.recurrence ?? 'month', body.priceId ?? 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId, body.attributionId, {
+    visitorId: body.datafastVisitorId,
+    sessionId: body.datafastSessionId,
+  })
   return c.json({ url: checkout.url })
 })

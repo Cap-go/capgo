@@ -112,7 +112,8 @@ export async function deleteAppInternal(
     channel: 'app',
     event: 'App Deleted',
     icon: '🗑️',
-    user_id: orgId,
+    org_id: orgId,
+    tracking_version: 2,
     tags: { 'app-id': appId },
     notify: false,
   }).catch(() => {})

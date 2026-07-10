@@ -87,7 +87,8 @@ export async function deleteOrganizationInternal(
     channel: 'organization',
     event: 'Organization Deleted',
     icon: '🗑️',
-    user_id: orgId,
+    org_id: orgId,
+    tracking_version: 2,
     tags: {
       'org-name': orgData.name,
     },

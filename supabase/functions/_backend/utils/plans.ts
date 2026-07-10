@@ -22,14 +22,45 @@ import {
   set_storage_exceeded,
   supabaseAdmin,
 } from './supabase.ts'
+import { buildOnboardingIntentBentoEventData, parseOrgOnboardingIntent } from './org_onboarding_intent.ts'
 import { sendEventToTracking } from './tracking.ts'
 import { isStripeConfigured } from './utils.ts'
 
 type CreditMetric = Database['public']['Enums']['credit_metric_type']
+type PlanUsageMetric = Exclude<keyof PlanUsage, 'total_percent'>
+
+const PLAN_USAGE_ALERT_THRESHOLDS = [90, 70, 50] as const
+const PLAN_USAGE_ALERT_EVENT_BY_THRESHOLD: Record<(typeof PLAN_USAGE_ALERT_THRESHOLDS)[number], string> = {
+  50: 'user:usage_50_percent_of_plan',
+  70: 'user:usage_70_percent_of_plan',
+  90: 'user:usage_90_percent_of_plan',
+}
+const PLAN_USAGE_METRICS: Array<{ key: PlanUsageMetric, metric: CreditMetric }> = [
+  { key: 'mau_percent', metric: 'mau' },
+  { key: 'bandwidth_percent', metric: 'bandwidth' },
+  { key: 'storage_percent', metric: 'storage' },
+  { key: 'build_time_percent', metric: 'build_time' },
+]
 
 interface BillingCycleInfo {
   subscription_anchor_start: string | null
   subscription_anchor_end: string | null
+}
+
+interface StripeInfoForPlanCheck {
+  subscription_id: string | null
+  subscription_anchor_start?: string | null
+  subscription_anchor_end?: string | null
+  status?: Database['public']['Enums']['stripe_status'] | null
+  trial_at?: string | null
+}
+
+interface OrgWithCustomerInfo {
+  customer_id: string | null
+  has_usage_credits?: boolean | null
+  name?: string | null
+  website?: string | null
+  stripe_info: StripeInfoForPlanCheck | null
 }
 
 interface BillingCycleRange {
@@ -47,6 +78,46 @@ interface CreditApplicationResult {
   credit_step_id: number | null
 }
 
+function getHighestPlanUsage(percentUsage: PlanUsage) {
+  return PLAN_USAGE_METRICS.reduce((highest, current) => {
+    const percent = Number(percentUsage[current.key] ?? 0)
+    if (percent > highest.percent) {
+      return {
+        metric: current.metric,
+        percent,
+      }
+    }
+    return highest
+  }, {
+    metric: 'mau' as CreditMetric,
+    percent: 0,
+  })
+}
+
+function normalizePlanUsage(percentUsage: PlanUsage): PlanUsage {
+  const highestUsage = getHighestPlanUsage(percentUsage)
+  return {
+    ...percentUsage,
+    total_percent: highestUsage.percent,
+  }
+}
+
+function getPlanUsageAlert(percentUsage: PlanUsage) {
+  const normalizedUsage = normalizePlanUsage(percentUsage)
+  const highestUsage = getHighestPlanUsage(normalizedUsage)
+  const threshold = PLAN_USAGE_ALERT_THRESHOLDS.find(value => highestUsage.percent >= value)
+  if (!threshold)
+    return null
+
+  return {
+    eventName: PLAN_USAGE_ALERT_EVENT_BY_THRESHOLD[threshold],
+    metric: highestUsage.metric,
+    metricPercent: highestUsage.percent,
+    percentUsage: normalizedUsage,
+    threshold,
+  }
+}
+
 function getDefaultBillingCycleRange(referenceDate = new Date()): BillingCycleRange {
   const start = new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), 1, 0, 0, 0, 0))
   const end = new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth() + 1, 1, 0, 0, 0, 0))
@@ -54,6 +125,43 @@ function getDefaultBillingCycleRange(referenceDate = new Date()): BillingCycleRa
     subscription_anchor_start: start.toISOString(),
     subscription_anchor_end: end.toISOString(),
   }
+}
+
+function isFutureTimestamp(value: string | null | undefined): boolean {
+  if (!value)
+    return false
+
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) && timestamp > Date.now()
+}
+
+function isActivePlanStatus(status: string | null | undefined): boolean {
+  return status === 'succeeded'
+}
+
+function hasActivePlanEntitlement(org: Pick<OrgWithCustomerInfo, 'stripe_info'>): boolean {
+  const stripeInfo = org.stripe_info
+  if (!stripeInfo)
+    return false
+
+  if (isFutureTimestamp(stripeInfo.trial_at))
+    return true
+
+  if (!isActivePlanStatus(stripeInfo.status))
+    return false
+
+  if (!stripeInfo.subscription_anchor_end)
+    return true
+
+  const subscriptionEnd = Date.parse(stripeInfo.subscription_anchor_end)
+  if (!Number.isFinite(subscriptionEnd))
+    return true
+
+  return subscriptionEnd > Date.now()
+}
+
+function isCreditOnlyBillingOrg(org: Pick<OrgWithCustomerInfo, 'has_usage_credits' | 'stripe_info'>): boolean {
+  return org.has_usage_credits === true && !hasActivePlanEntitlement(org)
 }
 
 async function getBillingCycleRange(c: Context, orgId: string): Promise<BillingCycleRange> {
@@ -203,13 +311,17 @@ export async function findBestPlan(c: Context, stats: Database['public']['Functi
 
 async function userAbovePlan(c: Context, org: {
   customer_id: string | null
+  has_usage_credits?: boolean | null
   stripe_info: {
     subscription_id: string | null
-    status?: string | null
+    status?: Database['public']['Enums']['stripe_status'] | null
+    trial_at?: string | null
+    subscription_anchor_end?: string | null
   } | null
-}, orgId: string, is_good_plan: boolean, drizzleClient: ReturnType<typeof getDrizzleClient>): Promise<boolean> {
-  cloudlog({ requestId: c.get('requestId'), message: 'userAbovePlan', orgId, is_good_plan })
-  const hasActivePlan = org?.stripe_info?.status === 'succeeded'
+}, orgId: string, is_good_plan: boolean, drizzleClient: ReturnType<typeof getDrizzleClient>, forceCreditMode = false): Promise<boolean> {
+  const creditOnlyMode = forceCreditMode || isCreditOnlyBillingOrg(org)
+  cloudlog({ requestId: c.get('requestId'), message: 'userAbovePlan', orgId, is_good_plan, creditOnlyMode })
+  const hasActivePlan = hasActivePlanEntitlement(org)
   const totalStats = await getTotalStats(c, orgId)
   if (!totalStats) {
     return false
@@ -231,10 +343,10 @@ async function userAbovePlan(c: Context, org: {
   const planId = currentPlan?.id
 
   const metrics: Array<{ key: CreditMetric, usage: number, limit: number | null | undefined }> = [
-    { key: 'mau', usage: Number(totalStats.mau ?? 0), limit: currentPlan?.mau },
-    { key: 'storage', usage: Number(totalStats.storage ?? 0), limit: currentPlan?.storage },
-    { key: 'bandwidth', usage: Number(totalStats.bandwidth ?? 0), limit: currentPlan?.bandwidth },
-    { key: 'build_time', usage: Number(totalStats.build_time_unit ?? 0), limit: currentPlan?.build_time_unit },
+    { key: 'mau', usage: Number(totalStats.mau ?? 0), limit: creditOnlyMode ? 0 : currentPlan?.mau },
+    { key: 'storage', usage: Number(totalStats.storage ?? 0), limit: creditOnlyMode ? 0 : currentPlan?.storage },
+    { key: 'bandwidth', usage: Number(totalStats.bandwidth ?? 0), limit: creditOnlyMode ? 0 : currentPlan?.bandwidth },
+    { key: 'build_time', usage: Number(totalStats.build_time_unit ?? 0), limit: creditOnlyMode ? 0 : currentPlan?.build_time_unit },
   ]
 
   const creditResults: Record<CreditMetric, CreditApplicationResult | null> = {
@@ -335,47 +447,30 @@ async function userIsAtPlanUsage(c: Context, orgId: string, customerId: string |
   await set_bandwidth_exceeded(c, customerId, false, orgId)
   await set_build_time_exceeded(c, orgId, false)
 
-  // check if user is at more than 90%, 50% or 70% of plan usage
-  if (percentUsage.total_percent >= 90) {
-    // cron every month
-    const sent = await sendNotifToOrgMembers(c, 'user:usage_90_percent_of_plan', 'usage_limit', { percent: percentUsage }, orgId, orgId, '0 0 1 * *', drizzleClient)
-    if (sent) {
-      await sendEventToTracking(c, {
-        channel: 'usage',
-        event: 'User is at 90% of plan usage',
-        icon: '⚠️',
-        user_id: orgId,
-        groups: { organization: orgId },
-        notify: false,
-      }).catch()
-    }
-  }
-  else if (percentUsage.total_percent >= 70) {
-    // cron every month
-    const sent = await sendNotifToOrgMembers(c, 'user:usage_70_percent_of_plan', 'usage_limit', { percent: percentUsage }, orgId, orgId, '0 0 1 * *', drizzleClient)
-    if (sent) {
-      await sendEventToTracking(c, {
-        channel: 'usage',
-        event: 'User is at 70% of plan usage',
-        icon: '⚠️',
-        user_id: orgId,
-        groups: { organization: orgId },
-        notify: false,
-      }).catch()
-    }
-  }
-  else if (percentUsage.total_percent >= 50) {
-    const sent = await sendNotifToOrgMembers(c, 'user:usage_50_percent_of_plan', 'usage_limit', { percent: percentUsage }, orgId, orgId, '0 0 1 * *', drizzleClient)
-    if (sent) {
-      await sendEventToTracking(c, {
-        channel: 'usage',
-        event: 'User is at 50% of plan usage',
-        icon: '⚠️',
-        user_id: orgId,
-        groups: { organization: orgId },
-        notify: false,
-      }).catch()
-    }
+  const alert = getPlanUsageAlert(percentUsage)
+  if (!alert)
+    return
+
+  const sent = await sendNotifToOrgMembers(c, alert.eventName, 'usage_limit', {
+    metric: alert.metric,
+    metric_percent: alert.metricPercent,
+    percent: alert.percentUsage,
+    threshold: alert.threshold,
+  }, orgId, orgId, '0 0 1 * *', drizzleClient)
+  if (sent) {
+    await sendEventToTracking(c, {
+      channel: 'usage',
+      event: `User is at ${alert.threshold}% of plan usage`,
+      icon: '⚠️',
+      user_id: orgId,
+      groups: { organization: orgId },
+      notify: false,
+      tags: {
+        metric: alert.metric,
+        metric_percent: alert.metricPercent.toString(),
+        threshold: alert.threshold.toString(),
+      },
+    }).catch()
   }
 }
 
@@ -383,7 +478,7 @@ async function userIsAtPlanUsage(c: Context, orgId: string, customerId: string |
 export async function getOrgWithCustomerInfo(c: Context, orgId: string) {
   const { data: org, error: userError } = await supabaseAdmin(c)
     .from('orgs')
-    .select('customer_id, name, website, stripe_info(status, subscription_id, subscription_anchor_start, subscription_anchor_end)')
+    .select('customer_id, has_usage_credits, name, website, onboarding, stripe_info(status, subscription_id, subscription_anchor_start, subscription_anchor_end, trial_at)')
     .eq('id', orgId)
     .maybeSingle()
   if (userError)
@@ -419,7 +514,7 @@ export async function handleTrialOrg(c: Context, orgId: string, org: any): Promi
 export async function calculatePlanStatus(c: Context, orgId: string) {
   const planUsage = await getPlanUsageAndFit(c, orgId)
   const { is_good_plan, total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent } = planUsage
-  const percentUsage = { total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent }
+  const percentUsage = normalizePlanUsage({ total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent })
   return { is_good_plan, percentUsage }
 }
 
@@ -427,12 +522,12 @@ export async function calculatePlanStatusFresh(c: Context, orgId: string) {
   try {
     const planUsage = await getPlanUsageAndFitUncached(c, orgId)
     const { is_good_plan, total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent } = planUsage
-    const percentUsage = { total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent }
+    const percentUsage = normalizePlanUsage({ total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent })
     return { is_good_plan, percentUsage }
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'calculatePlanStatusFresh fallback', orgId, error })
-    const percentUsage = await getPlanUsagePercent(c, orgId)
+    const percentUsage = normalizePlanUsage(await getPlanUsagePercent(c, orgId))
     const is_good_plan = await isGoodPlanOrg(c, orgId)
     return { is_good_plan, percentUsage }
   }
@@ -445,16 +540,21 @@ export async function handleOrgNotificationsAndEvents(c: Context, org: any, orgI
 
   let finalIsGoodPlan = is_good_plan
 
-  if (!is_good_plan && is_onboarded) {
+  if (is_onboarded && isCreditOnlyBillingOrg(org)) {
+    const needsUpgrade = await userAbovePlan(c, org, orgId, is_good_plan, drizzleClient, true)
+    finalIsGoodPlan = !needsUpgrade
+  }
+  else if (!is_good_plan && is_onboarded) {
     const needsUpgrade = await userAbovePlan(c, org, orgId, is_good_plan, drizzleClient)
     finalIsGoodPlan = !needsUpgrade
   }
   else if (!is_onboarded && is_onboarding_needed) {
-    const sent = await sendNotifToOrgMembersOnce(c, 'user:need_onboarding', 'onboarding', {
-      org_id: orgId,
-      org_name: org.name ?? '',
-      org_website: org.website ?? null,
-    }, orgId, orgId, drizzleClient)
+    const onboardingIntent = parseOrgOnboardingIntent(org.onboarding)
+    const sent = await sendNotifToOrgMembersOnce(c, 'user:need_onboarding', 'onboarding', buildOnboardingIntentBentoEventData(c, onboardingIntent, {
+      id: orgId,
+      name: org.name ?? '',
+      website: org.website ?? null,
+    }), orgId, orgId, drizzleClient)
     if (sent) {
       await sendEventToTracking(c, {
         channel: 'usage',
@@ -476,11 +576,12 @@ export async function handleOrgNotificationsAndEvents(c: Context, org: any, orgI
 
 // Update stripe_info with plan status
 export async function updatePlanStatus(c: Context, org: any, is_good_plan: boolean, percentUsage: PlanUsage): Promise<void> {
+  const normalizedUsage = normalizePlanUsage(percentUsage)
   await supabaseAdmin(c)
     .from('stripe_info')
     .update({
       is_good_plan,
-      plan_usage: Math.round(percentUsage.total_percent),
+      plan_usage: Math.round(normalizedUsage.total_percent),
     })
     .eq('customer_id', org.customer_id!)
     .then()

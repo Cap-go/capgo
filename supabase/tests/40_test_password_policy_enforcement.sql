@@ -46,7 +46,7 @@ BEGIN
     -- Define password policy config
     policy_config := '{"enabled": true, "min_length": 10, "require_uppercase": true, "require_number": true, "require_special": true}'::jsonb;
 
-    -- Create org WITH password policy enforcement (use_new_rbac = false: preserves legacy check_min_rights coverage)
+    -- Create org WITH password policy enforcement while the compatibility flag is false.
     INSERT INTO public.orgs (id, created_by, name, management_email, password_policy_config, use_new_rbac)
     VALUES (
         org_with_pwd_policy_id,
@@ -57,7 +57,7 @@ BEGIN
         false
     );
 
-    -- Create org WITHOUT password policy enforcement (use_new_rbac = false: preserves legacy check_min_rights coverage)
+    -- Create org WITHOUT password policy enforcement while the compatibility flag is false.
     INSERT INTO public.orgs (id, created_by, name, management_email, password_policy_config, use_new_rbac)
     VALUES (
         org_without_pwd_policy_id,
@@ -72,13 +72,13 @@ BEGIN
     INSERT INTO public.org_users (org_id, user_id, user_right)
     VALUES
         (org_with_pwd_policy_id, compliant_user_id, 'admin'::public.user_min_right),
-        (org_with_pwd_policy_id, noncompliant_user_id, 'write'::public.user_min_right);
+        (org_with_pwd_policy_id, noncompliant_user_id, 'admin'::public.user_min_right);
 
     -- Add members to org WITHOUT password policy
     INSERT INTO public.org_users (org_id, user_id, user_right)
     VALUES
         (org_without_pwd_policy_id, compliant_user_id, 'read'::public.user_min_right),
-        (org_without_pwd_policy_id, noncompliant_user_id, 'write'::public.user_min_right);
+        (org_without_pwd_policy_id, noncompliant_user_id, 'admin'::public.user_min_right);
 
     -- Add compliance record for the compliant user (password verified)
     -- This simulates a user who has successfully validated their password via the backend
@@ -269,7 +269,7 @@ BEGIN
     test_admin_id := tests.get_supabase_uid('test_admin');
     noncompliant_user_id := tests.get_supabase_uid('test_pwd_noncompliant_user');
 
-    -- use_new_rbac = false: preserves legacy check_min_rights coverage
+    -- use_new_rbac = false verifies the compatibility flag does not disable RBAC checks.
     INSERT INTO public.orgs (id, created_by, name, management_email, password_policy_config, use_new_rbac)
     VALUES (
         org_disabled_policy_id,
@@ -281,7 +281,7 @@ BEGIN
     );
 
     INSERT INTO public.org_users (org_id, user_id, user_right)
-    VALUES (org_disabled_policy_id, noncompliant_user_id, 'write'::public.user_min_right);
+    VALUES (org_disabled_policy_id, noncompliant_user_id, 'admin'::public.user_min_right);
 
     PERFORM set_config('test.org_disabled_policy', org_disabled_policy_id::text, false);
 END $$;

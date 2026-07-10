@@ -1,20 +1,18 @@
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
-import type { Database } from '../../utils/supabase.types.ts'
-import type {
-  WebhookPayload,
-} from '../../utils/webhook.ts'
+import type { WebhookDeliveryPayload } from '../../utils/webhook.ts'
 import { type } from 'arktype'
 import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { simpleError } from '../../utils/hono.ts'
-import { supabaseApikey, supabaseWithAuth } from '../../utils/supabase.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
 import {
   getDeliveryById,
   getWebhookById,
-  getWebhookUrlValidationError,
+  getWebhookLogUrlMetadata,
+  getWebhookPublicUrlValidationError,
   queueWebhookDelivery,
 } from '../../utils/webhook.ts'
-import { checkWebhookPermission, checkWebhookPermissionV2 } from './index.ts'
+import { checkWebhookPermissionV2 } from './index.ts'
 
 const getDeliveriesSchema = type({
   'orgId': 'string',
@@ -30,20 +28,19 @@ const retryDeliverySchema = type({
 
 const DELIVERIES_PER_PAGE = 50
 
-export async function getDeliveries(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function getDeliveries(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw: any, auth: AuthInfo): Promise<Response> {
   const bodyParsed = safeParseSchema(getDeliveriesSchema, bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
 
-  await checkWebhookPermission(c, body.orgId, apikey)
+  await checkWebhookPermissionV2(c, body.orgId, auth)
 
-  // Use authenticated client - RLS will enforce access
-  const supabase = supabaseApikey(c, c.get('capgkey') as string)
+  // Direct RLS access to webhook tables is intentionally denied; use service-role only after explicit permission checks.
+  const supabase = supabaseAdmin(c)
 
   // Verify webhook belongs to org
-  // Note: Using type assertion as webhooks table types are not yet generated
   const { data: webhook, error: webhookError } = await supabase
     .from('webhooks')
     .select('id, org_id')
@@ -116,8 +113,7 @@ export async function retryDelivery(c: Context<MiddlewareKeyVariables, any, any>
 
   await checkWebhookPermissionV2(c, body.orgId, auth)
 
-  // Use authenticated client for data queries - RLS will enforce access
-  const supabase = supabaseWithAuth(c, auth)
+  const supabase = supabaseAdmin(c)
 
   // Get delivery
   const delivery = await getDeliveryById(c, body.deliveryId)
@@ -129,9 +125,12 @@ export async function retryDelivery(c: Context<MiddlewareKeyVariables, any, any>
     throw simpleError('no_permission', 'Delivery does not belong to this organization', { deliveryId: body.deliveryId })
   }
 
-  // Can only retry failed deliveries
-  if (delivery.status === 'success') {
-    throw simpleError('already_successful', 'Delivery was already successful', { deliveryId: body.deliveryId })
+  // Can only retry failed deliveries. Pending deliveries are already queued or in flight.
+  if (delivery.status !== 'failed') {
+    throw simpleError('delivery_not_failed', 'Only failed deliveries can be retried', {
+      deliveryId: body.deliveryId,
+      status: delivery.status,
+    })
   }
 
   // Get webhook for URL
@@ -144,12 +143,12 @@ export async function retryDelivery(c: Context<MiddlewareKeyVariables, any, any>
     throw simpleError('webhook_disabled', 'Webhook is disabled')
   }
 
-  const urlError = getWebhookUrlValidationError(c, webhook.url)
+  const urlError = await getWebhookPublicUrlValidationError(c, webhook.url)
   if (urlError)
-    throw simpleError('invalid_url', urlError, { url: webhook.url })
+    throw simpleError('invalid_url', urlError, { urlInfo: getWebhookLogUrlMetadata(webhook.url) })
 
   // Reset delivery status and queue for retry
-  await supabase
+  const { error: updateError } = await supabase
     .from('webhook_deliveries')
     .update({
       status: 'pending',
@@ -162,13 +161,20 @@ export async function retryDelivery(c: Context<MiddlewareKeyVariables, any, any>
     })
     .eq('id', body.deliveryId)
 
+  if (updateError) {
+    throw simpleError('cannot_reset_delivery', 'Cannot reset delivery for retry', {
+      deliveryId: body.deliveryId,
+      error: updateError,
+    })
+  }
+
   // Queue for immediate delivery
   await queueWebhookDelivery(
     c,
     delivery.id,
     webhook.id,
     webhook.url,
-    delivery.request_payload as any as WebhookPayload,
+    delivery.request_payload as WebhookDeliveryPayload,
   )
 
   return c.json({

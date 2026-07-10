@@ -31,10 +31,14 @@ import {
 type UnknownRecord = Record<string, unknown>
 type DevicePlatform = 'ios' | 'android' | 'electron'
 
-const DEVICE_PLATFORMS = new Set<DevicePlatform>(['ios', 'android', 'electron'])
 const MAX_STATS_METADATA_FIELDS = 30
 const MAX_STATS_METADATA_KEY_LENGTH = 64
 const MAX_STATS_METADATA_VALUE_LENGTH = 2048
+const commonSemverRegex = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/
+
+function isDevicePlatformValue(value: unknown): value is DevicePlatform {
+  return value === 'ios' || value === 'android' || value === 'electron'
+}
 
 function isRecord(value: unknown): value is UnknownRecord {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -99,6 +103,15 @@ function validateOptionalStringMaxLength(
     return undefined
   }
   return value
+}
+
+function validateInstallSourceValue(value: unknown, issues: ValidationIssue[]) {
+  if (typeof value !== 'string') {
+    issues.push(fieldIssue('install_source', 'install_source must be a string'))
+    return
+  }
+  if (value.length > 64)
+    issues.push(fieldIssue('install_source', 'String must contain at most 64 character(s)'))
 }
 
 function validateRequiredAppId(input: UnknownRecord, issues: ValidationIssue[]): string | undefined {
@@ -167,11 +180,11 @@ function validateRequiredDevicePlatform(input: UnknownRecord, issues: Validation
     issues.push(fieldIssue('platform', MISSING_STRING_PLATFORM))
     return undefined
   }
-  if (typeof value !== 'string' || !DEVICE_PLATFORMS.has(value as DevicePlatform)) {
+  if (!isDevicePlatformValue(value)) {
     issues.push(fieldIssue('platform', INVALID_STRING_PLATFORM))
     return undefined
   }
-  return value as DevicePlatform
+  return value
 }
 
 function validateRequiredPluginVersion(input: UnknownRecord, issues: ValidationIssue[]): string | undefined {
@@ -180,7 +193,7 @@ function validateRequiredPluginVersion(input: UnknownRecord, issues: ValidationI
     issues.push(fieldIssue('plugin_version', MISSING_STRING_PLUGIN_VERSION))
     return undefined
   }
-  if (typeof value !== 'string' || !canParse(value)) {
+  if (typeof value !== 'string' || (!commonSemverRegex.test(value) && !canParse(value))) {
     issues.push(fieldIssue('plugin_version', INVALID_STRING_PLUGIN_VERSION))
     return undefined
   }
@@ -245,6 +258,8 @@ function validateOptionalCommonStrings(input: UnknownRecord, issues: ValidationI
   validateOptionalString(input, 'old_version_name', issues)
   validateOptionalString(input, 'version_code', issues)
   validateOptionalString(input, 'plugin_version', issues)
+  if (input.install_source !== undefined)
+    validateInstallSourceValue(input.install_source, issues)
   validateOptionalStringMaxLength(input, 'custom_id', 36, issues)
   validateOptionalStringMaxLength(input, 'key_id', 20, issues)
 }
@@ -267,7 +282,7 @@ function createPluginSchema<T>(validateFields: (input: UnknownRecord, issues: Va
 }
 
 export function isDevicePlatform(value: unknown): value is DevicePlatform {
-  return typeof value === 'string' && DEVICE_PLATFORMS.has(value as DevicePlatform)
+  return isDevicePlatformValue(value)
 }
 
 export const updateRequestSchema = createPluginSchema<AppInfos>((input, issues) => {
@@ -279,6 +294,8 @@ export const updateRequestSchema = createPluginSchema<AppInfos>((input, issues) 
   validateRequiredDevicePlatform(input, issues)
   validateRequiredPluginVersion(input, issues)
   validateOptionalString(input, 'defaultChannel', issues)
+  if (input.install_source !== undefined)
+    validateInstallSourceValue(input.install_source, issues)
   validateOptionalStringMaxLength(input, 'key_id', 20, issues)
 })
 
@@ -305,6 +322,8 @@ export const channelSelfRequestSchema = createPluginSchema<AppInfos>((input, iss
   validateOptionalString(input, 'defaultChannel', issues)
   validateOptionalString(input, 'channel', issues)
   validateOptionalString(input, 'plugin_version', issues)
+  if (input.install_source !== undefined)
+    validateInstallSourceValue(input.install_source, issues)
   validateOptionalStringMaxLength(input, 'key_id', 20, issues)
 })
 

@@ -5,6 +5,8 @@ import { existInEnv, getEnv } from './utils.ts'
 
 const POSTHOG_CAPTURE_URL = 'https://eu.i.posthog.com/capture/'
 const POSTHOG_EXCEPTION_URL = 'https://eu.i.posthog.com/i/v0/e/'
+const POSTHOG_SNAPSHOT_URL = 'https://eu.i.posthog.com/s/'
+const POSTHOG_DELIVERY_TIMEOUT_MS = 5000
 
 export type PostHogGroups = Record<string, string>
 
@@ -14,6 +16,8 @@ interface PostHogCapturePayload extends Pick<TrackOptions, 'event'>, Pick<TrackO
   ip?: string
   setPersonProperties?: boolean
   tags?: Record<string, any>
+  nonPersonTags?: Record<string, any>
+  timestamp?: string
   user_id?: string
 }
 
@@ -33,7 +37,12 @@ export async function trackPosthogEvent(c: Context, payload: PostHogCapturePaylo
 
   const hasGroups = payload.groups && Object.keys(payload.groups).length > 0
 
+  // `tags` become BOTH event properties and PostHog person properties ($set).
+  // `nonPersonTags` are event properties ONLY — never $set — for volatile
+  // per-event context (e.g. the CLI's global runtime props) that must not
+  // become last-write-wins identity traits on the actor.
   const properties = {
+    ...(payload.nonPersonTags || {}),
     ...(payload.tags || {}),
     channel: payload.channel,
     description: payload.description,
@@ -47,7 +56,7 @@ export async function trackPosthogEvent(c: Context, payload: PostHogCapturePaylo
     distinct_id: distinctId,
     properties,
     ip: payload.ip,
-    timestamp: new Date().toISOString(),
+    timestamp: payload.timestamp ?? new Date().toISOString(),
   }
 
   try {
@@ -74,15 +83,122 @@ export async function trackPosthogEvent(c: Context, payload: PostHogCapturePaylo
   }
 }
 
+function trimTrailingSlashes(value: string) {
+  let end = value.length
+  while (end > 0 && value.charCodeAt(end - 1) === 47)
+    end--
+  return value.slice(0, end)
+}
+
+function stripPostHogEndpoint(host: string) {
+  for (const suffix of ['/i/v0/e', '/capture', '/e']) {
+    if (host.endsWith(suffix))
+      return `${host.slice(0, -suffix.length)}/`
+  }
+  return host
+}
+
+function getPostHogSnapshotUrl(host: string) {
+  const trimmedHost = trimTrailingSlashes(host)
+  if (trimmedHost.endsWith('/s'))
+    return `${trimmedHost}/`
+
+  const normalizedHost = stripPostHogEndpoint(trimmedHost)
+  return new URL('s/', normalizedHost.endsWith('/') ? normalizedHost : `${normalizedHost}/`).toString()
+}
+function jsonByteLength(value: unknown) {
+  return new TextEncoder().encode(JSON.stringify(value)).length
+}
+
+export interface PostHogReplaySnapshotPayload {
+  currentUrl: string
+  distinctId: string
+  events: unknown[]
+  lib: string
+  libVersion: string
+  sessionId: string
+  snapshotBytes?: number
+  timestamp: string
+  userEmail?: string
+  userId: string
+  windowId: string
+}
+
+export async function capturePosthogReplaySnapshot(c: Context, payload: PostHogReplaySnapshotPayload) {
+  const apiKey = getEnv(c, 'POSTHOG_API_KEY')
+  if (!apiKey || !existInEnv(c, 'POSTHOG_API_KEY')) {
+    cloudlog({ requestId: c.get('requestId'), message: 'PostHog not configured' })
+    return false
+  }
+
+  const host = getEnv(c, 'POSTHOG_API_HOST') || POSTHOG_SNAPSHOT_URL
+  let posthogUrl: string
+  try {
+    posthogUrl = getPostHogSnapshotUrl(host)
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid PostHog replay host', error: serializeError(e), host })
+    return false
+  }
+
+  const body = {
+    api_key: apiKey,
+    distinct_id: payload.distinctId,
+    event: '$snapshot',
+    properties: {
+      $current_url: payload.currentUrl,
+      $lib: payload.lib,
+      $lib_version: payload.libVersion,
+      $session_id: payload.sessionId,
+      ...(payload.userEmail ? { $set: { email: payload.userEmail } } : {}),
+      $snapshot_bytes: payload.snapshotBytes ?? jsonByteLength(payload.events),
+      $snapshot_data: payload.events,
+      $snapshot_source: 'web',
+      $window_id: payload.windowId,
+      distinct_id: payload.distinctId,
+      token: apiKey,
+      user_id: payload.userId,
+    },
+    timestamp: payload.timestamp,
+  }
+  try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), POSTHOG_DELIVERY_TIMEOUT_MS)
+    try {
+      const res = await fetch(posthogUrl, {
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        signal: controller.signal,
+      })
+
+      if (!res.ok) {
+        const error = await res.text()
+        cloudlogErr({ requestId: c.get('requestId'), message: 'PostHog replay error', status: res.status, error, sessionId: payload.sessionId, distinctId: payload.distinctId })
+        return false
+      }
+
+      cloudlog({ requestId: c.get('requestId'), message: 'PostHog replay sent', sessionId: payload.sessionId, distinctId: payload.distinctId })
+      return true
+    }
+    finally {
+      clearTimeout(timeoutId)
+    }
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'PostHog replay fetch failed', error: serializeError(e), sessionId: payload.sessionId, distinctId: payload.distinctId })
+    return false
+  }
+}
+
 function getPostHogExceptionUrl(host: string) {
-  const trimmedHost = host.replace(/\/+$/, '')
+  const trimmedHost = trimTrailingSlashes(host)
   if (trimmedHost.endsWith('/i/v0/e'))
     return `${trimmedHost}/`
 
-  const normalizedHost = trimmedHost.replace(/\/capture$/, '/')
+  const normalizedHost = trimmedHost.endsWith('/capture') ? `${trimmedHost.slice(0, -'/capture'.length)}/` : trimmedHost
   return new URL('i/v0/e/', normalizedHost.endsWith('/') ? normalizedHost : `${normalizedHost}/`).toString()
 }
-
 function getRequestPath(url: string) {
   try {
     return new URL(url).pathname || '/'
@@ -202,7 +318,7 @@ export async function capturePosthogException(c: Context, payload: {
 
   try {
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 5000)
+    const timeoutId = setTimeout(() => controller.abort(), POSTHOG_DELIVERY_TIMEOUT_MS)
     let res: Response
     try {
       res = await fetch(posthogUrl, {
@@ -219,7 +335,6 @@ export async function capturePosthogException(c: Context, payload: {
       clearTimeout(timeoutId)
       throw fetchError
     }
-
     if (!res.ok) {
       const error = await res.text()
       cloudlogErr({ requestId: c.get('requestId'), message: 'PostHog exception error', status: res.status, error, event: '$exception', distinctId })

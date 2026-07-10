@@ -1,31 +1,29 @@
 import type { Context } from 'hono'
-import type { Database } from '../../utils/supabase.types.ts'
+import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import { type } from 'arktype'
 import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { simpleError } from '../../utils/hono.ts'
-import { supabaseApikey } from '../../utils/supabase.ts'
-import { checkWebhookPermission } from './index.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
+import { checkWebhookPermissionV2 } from './index.ts'
 
 const bodySchema = type({
   orgId: 'string',
   webhookId: 'string',
 })
 
-export async function deleteWebhook(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function deleteWebhook(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw: any, auth: AuthInfo): Promise<Response> {
   const bodyParsed = safeParseSchema(bodySchema, bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
 
-  await checkWebhookPermission(c, body.orgId, apikey)
+  await checkWebhookPermissionV2(c, body.orgId, auth)
 
-  // Use authenticated client - RLS will enforce access
-  const supabase = supabaseApikey(c, c.get('capgkey') as string)
+  const supabase = supabaseAdmin(c)
 
   // Verify webhook belongs to org
-  // Note: Using type assertion as webhooks table types are not yet generated
-  const { data: existingWebhook, error: fetchError } = await (supabase as any)
+  const { data: existingWebhook, error: fetchError } = await supabase
     .from('webhooks')
     .select('id, org_id')
     .eq('id', body.webhookId)
@@ -40,7 +38,7 @@ export async function deleteWebhook(c: Context, bodyRaw: any, apikey: Database['
   }
 
   // Delete webhook (cascade will delete deliveries)
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('webhooks')
     .delete()
     .eq('id', body.webhookId)

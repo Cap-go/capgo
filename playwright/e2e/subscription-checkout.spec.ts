@@ -141,6 +141,7 @@ test.describe('Subscription Checkout', () => {
       market_desc: 'Emulator current subscription plan',
       mau: 1000,
       name: currentPlanName,
+      native_build_concurrency: 2,
       price_m: 1,
       price_m_id: currentMonthlyPrice.id,
       price_y: 10,
@@ -159,6 +160,7 @@ test.describe('Subscription Checkout', () => {
       market_desc: 'Emulator subscription plan',
       mau: 10000,
       name: planName,
+      native_build_concurrency: 3,
       price_m: 10,
       price_m_id: upgradeMonthlyPrice.id,
       price_y: 96,
@@ -200,6 +202,7 @@ test.describe('Subscription Checkout', () => {
     })
 
     await expect(planCard).toHaveCount(1)
+    await expect(planCard.getByText('3 concurrent native builds')).toBeVisible()
     await expect(planCard.getByRole('button', { name: 'Upgrade' })).toBeEnabled()
     await planCard.locator('[data-test="plan-action-button"]').click()
 

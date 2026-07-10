@@ -113,6 +113,40 @@ describe('backend alert resilience helpers', () => {
     expect(handler.fetch).toHaveBeenCalledTimes(2)
   })
 
+  it.concurrent('returns retryable response after exhausting replayable network upload creation failures', async () => {
+    const { filesTestUtils } = await import('../supabase/functions/_backend/files/files.ts')
+
+    const handler = {
+      fetch: vi.fn(async () => {
+        throw Object.assign(new Error('Network connection lost.'), {
+          retryable: true,
+        })
+      }),
+    } as any
+
+    const response = await filesTestUtils.fetchUploadHandlerWithRetry(
+      createTestContext(),
+      handler,
+      new Request('http://localhost/files/upload/attachments/test.zip', {
+        method: 'POST',
+        headers: {
+          'Content-Length': '0',
+          'Tus-Resumable': '1.0.0',
+          'Upload-Length': '2500',
+        },
+      }),
+    )
+
+    expect(response.status).toBe(503)
+    expect(response.headers.get('Retry-After')).toBe('1')
+    expect(response.headers.get('Tus-Resumable')).toBe('1.0.0')
+    await expect(response.json()).resolves.toEqual({
+      error: 'upload_retryable',
+      message: 'Upload temporarily unavailable. Retry the upload request.',
+    })
+    expect(handler.fetch).toHaveBeenCalledTimes(3)
+  })
+
   it.concurrent('forwards a replayable zero-byte TUS creation-with-upload body', async () => {
     const { filesTestUtils } = await import('../supabase/functions/_backend/files/files.ts')
 
@@ -273,7 +307,7 @@ describe('backend alert resilience helpers', () => {
     expect(response.headers.get('Tus-Resumable')).toBe('1.0.0')
     await expect(response.json()).resolves.toEqual({
       error: 'upload_retryable',
-      message: 'Upload worker moved during this request. Retry the upload request.',
+      message: 'Upload temporarily unavailable. Retry the upload request.',
     })
     expect(handler.fetch).toHaveBeenCalledTimes(1)
   })
@@ -371,6 +405,15 @@ describe('backend alert resilience helpers', () => {
     expect(attempts).toBe(2)
   })
 
+  it.concurrent('marks missing manifest storage size as queue-retryable unless a trusted size already exists', async () => {
+    const { onManifestCreateTestUtils } = await import('../supabase/functions/_backend/triggers/on_manifest_create.ts')
+
+    expect(onManifestCreateTestUtils.shouldRetryManifestSizeLookup(0, 0)).toBe(true)
+    expect(onManifestCreateTestUtils.shouldRetryManifestSizeLookup(0, null)).toBe(true)
+    expect(onManifestCreateTestUtils.shouldRetryManifestSizeLookup(0, 128)).toBe(false)
+    expect(onManifestCreateTestUtils.shouldRetryManifestSizeLookup(128, 0)).toBe(false)
+  })
+
   it.concurrent('returns empty strings when env bindings are missing from the context', () => {
     const context = {
       req: {
@@ -433,5 +476,38 @@ describe('backend alert resilience helpers', () => {
       reason: 'app_not_found',
       status: 'skipped',
     })
+  })
+
+  it('passes the queue retry budget to dispatched trigger requests', async () => {
+    const { http_post_helper, MAX_QUEUE_READS } = await import('../supabase/functions/_backend/triggers/queue_consumer.ts')
+    const originalFetch = globalThis.fetch
+    let dispatchedHeaders: Record<string, string> = {}
+    const fetchMock = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      dispatchedHeaders = init?.headers as Record<string, string>
+      return new Response(JSON.stringify({ status: 'ok' }), { status: 200 })
+    })
+    globalThis.fetch = fetchMock as typeof fetch
+
+    try {
+      await http_post_helper({
+        env: { API_SECRET: 'testsecret' },
+        get: (key: string) => key === 'requestId' ? 'request-id' : undefined,
+      } as any, 'cron_stat_app', 'cloudflare', {
+        appId: 'com.example.app',
+        orgId: 'org-id',
+      }, 'cf-id', {
+        msgId: 1271329,
+        queueName: 'cron_stat_app',
+        readCount: 1,
+      }, 'https://api.capgo.app/triggers/cron_stat_app')
+    }
+    finally {
+      globalThis.fetch = originalFetch
+    }
+
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(dispatchedHeaders['x-capgo-queue-name']).toBe('cron_stat_app')
+    expect(dispatchedHeaders['x-capgo-queue-read-count']).toBe('1')
+    expect(dispatchedHeaders['x-capgo-queue-max-reads']).toBe(String(MAX_QUEUE_READS))
   })
 })

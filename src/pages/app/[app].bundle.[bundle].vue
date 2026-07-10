@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { LinkedChannel } from '~/services/bundleLinkedChannels'
+import type { ChannelPromotionTarget } from '~/services/channelPromotion'
 import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
 import { FormKit } from '@formkit/vue'
@@ -15,6 +17,7 @@ import IconTrash from '~icons/heroicons/trash'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconPencil from '~icons/lucide/pencil'
+import { fetchLinkedChannelsForVersion, formatLinkedChannel, unlinkLinkedChannels } from '~/services/bundleLinkedChannels'
 import { findChannelsWithoutPromotionPermission, formatChannelPromotionTargets } from '~/services/channelPromotion'
 import { formatBytes, getChecksumInfo } from '~/services/conversion'
 import { formatDate, formatLocalDate } from '~/services/date'
@@ -52,11 +55,6 @@ const channelSearchVal = ref('')
 const filteredChannels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
 const promotableChannelIds = ref<Set<number>>(new Set())
 
-interface LinkedChannel {
-  id: number
-  name: string
-}
-
 function canPromoteChannel(channelId: number) {
   return promotableChannelIds.value.has(channelId)
 }
@@ -65,7 +63,7 @@ function getPromotableChannels() {
   return channels.value.filter(channel => canPromoteChannel(channel.id))
 }
 
-function showChannelUnlinkPermissionError(deniedChannels: LinkedChannel[]) {
+function showChannelUnlinkPermissionError(deniedChannels: ChannelPromotionTarget[]) {
   toast.error(t('channel-permission-unlink-required', {
     channels: formatChannelPromotionTargets(deniedChannels),
   }))
@@ -195,7 +193,7 @@ async function getChannels() {
     }
   }))
   promotableChannelIds.value = new Set(channelPermissions.filter(result => result.allowed).map(result => result.channelId))
-  showBundleMetadataInput.value = !!channels.value.find(c => c.disable_auto_update === 'version_number')
+  showBundleMetadataInput.value = channels.value.some(c => c.disable_auto_update === 'version_number')
 }
 
 async function openChannelLink() {
@@ -220,34 +218,22 @@ const checksumInfo = computed(() => {
   return getChecksumInfo(version.value?.checksum)
 })
 
-async function getUnknownBundleId() {
-  if (!version.value)
-    return
-  const { data } = await supabase
-    .from('app_versions')
-    .select()
-    .eq('app_id', version.value.app_id)
-    .eq('name', 'unknown')
-    .single()
-  return data?.id
-}
-
 // add check compatibility here
-async function setChannel(channel: Database['public']['Tables']['channels']['Row'], id: number) {
+async function setChannel(channel: Database['public']['Tables']['channels']['Row'], id: number | null) {
   if (!canPromoteChannel(channel.id)) {
     toast.error(t('no-permission'))
-    return Promise.reject(new Error('No permission'))
+    throw new Error('No permission')
   }
 
-  if (!id || typeof id !== 'number') {
+  if (id !== null && typeof id !== 'number') {
     console.error('Invalid version ID:', id)
     toast.error(t('error-invalid-version'))
-    return Promise.reject(new Error('Invalid version ID'))
+    throw new Error('Invalid version ID')
   }
 
   if (!(await checkPermissions('channel.promote_bundle', { channelId: channel.id }))) {
     toast.error(t('no-permission'))
-    return Promise.reject(new Error('No permission to update channel version'))
+    throw new Error('No permission to update channel version')
   }
 
   return supabase
@@ -256,6 +242,7 @@ async function setChannel(channel: Database['public']['Tables']['channels']['Row
       version: id,
     })
     .eq('id', channel.id)
+    .throwOnError()
 }
 
 async function ASChannelChooser() {
@@ -311,17 +298,26 @@ async function handleChannelLink(chan: Database['public']['Tables']['channels'][
     } = await checkCompatibilityNativePackages(version.value.app_id, chan.name, (version.value.native_packages as any) ?? [])
 
     // Check if any package is incompatible
-    if (localDependencies.length > 0 && finalCompatibility.find(x => !isCompatible(x))) {
+    if (localDependencies.length > 0 && finalCompatibility.some(x => !isCompatible(x))) {
       toast.error(t('bundle-not-compatible-with-channel', { channel: chan.name }))
-      toast.info(t('channel-not-compatible-with-channel-description', { cmd: 'bunx @capgo/cli@latest bundle compatibility' }))
 
       dialogStore.openDialog({
         title: t('confirm-action'),
-        description: t('set-even-not-compatible', { cmd: 'bunx @capgo/cli@latest bundle compatibility' }),
+        description: t('set-even-not-compatible'),
         buttons: [
           {
             text: t('button-cancel'),
             role: 'cancel',
+          },
+          {
+            text: t('view-dependencies'),
+            role: 'cancel',
+            handler: () => {
+              // Pre-select the channel's current bundle as the comparison baseline so the
+              // Dependencies page opens already diffed against what is live on the channel.
+              const compareQuery = chan.version ? `?compare=${chan.version}` : ''
+              router.push(`/app/${packageId.value}/bundle/${version.value!.id}/dependencies${compareQuery}`)
+            },
           },
           {
             text: t('button-confirm'),
@@ -398,10 +394,7 @@ async function handleChannelAction(action: 'set' | 'open' | 'unlink') {
   }
   else if (action === 'unlink') {
     try {
-      const id = await getUnknownBundleId()
-      if (!id)
-        return
-      await setChannel(channel.value, id)
+      await setChannel(channel.value, null)
       await getChannels()
       toast.success(t('channels-unlinked-successfully'))
       toast.info(t('cloud-replication-delay'))
@@ -702,35 +695,9 @@ async function didCancel(name: string, askForMethod = true): Promise<boolean | '
   return method
 }
 
-async function unlinkChannels(appId: string, unlink: { id: number, name: string }[]) {
+async function unlinkChannels(_appId: string, unlink: LinkedChannel[]) {
   // Unlink channels if confirmed
-  if (unlink.length === 0) {
-    return
-  }
-  const { data: unknownVersion, error: unknownError } = await supabase
-    .from('app_versions')
-    .select('id')
-    .eq('app_id', appId)
-    .eq('name', 'unknown')
-    .single()
-
-  if (unknownError || !unknownVersion) {
-    toast.error(t('cannot-find-unknown-version'))
-    console.error('Cannot find unknown version:', unknownError)
-    return Promise.reject(new Error('Cannot find unknown version'))
-  }
-
-  if (!unknownVersion.id || typeof unknownVersion.id !== 'number') {
-    toast.error(t('error-invalid-version'))
-    console.error('Invalid unknown version ID:', unknownVersion)
-    return Promise.reject(new Error('Invalid unknown version ID'))
-  }
-
-  const { error: updateError } = await supabase
-    .from('channels')
-    .update({ version: unknownVersion.id })
-    .in('id', unlink.map(c => c.id))
-
+  const updateError = await unlinkLinkedChannels(unlink)
   if (updateError) {
     toast.error(t('unlink-error'))
     console.error('Channel unlink error:', updateError)
@@ -749,13 +716,9 @@ async function deleteBundle() {
   }
 
   try {
-    const { data: channelFound, error: errorChannel } = await supabase
-      .from('channels')
-      .select('id, name, version!inner(name)') // Ensure version is selected for display
-      .eq('app_id', version.value.app_id)
-      .eq('version', version.value.id)
+    const { data: channelFound, error: errorChannel } = await fetchLinkedChannelsForVersion(version.value.app_id, version.value.id)
 
-    let unlink = [] as { id: number, name: string }[] // Store id and name
+    let unlink = [] as LinkedChannel[]
     if (errorChannel) {
       console.error('Error checking channels:', errorChannel)
       toast.error(t('error-checking-channels'))
@@ -763,7 +726,8 @@ async function deleteBundle() {
     }
 
     if (channelFound && channelFound.length > 0) {
-      const deniedChannels = await findChannelsWithoutPromotionPermission(version.value.app_id, channelFound)
+      const linkedChannels = channelFound as LinkedChannel[]
+      const deniedChannels = await findChannelsWithoutPromotionPermission(version.value.app_id, linkedChannels)
       if (deniedChannels.length > 0) {
         showChannelUnlinkPermissionError(deniedChannels)
         return
@@ -774,7 +738,7 @@ async function deleteBundle() {
       dialogStore.openDialog({
         title: t('want-to-unlink'),
         description: t('channel-bundle-linked', {
-          channels: channelFound.map((ch: any) => `${ch.name} (${ch.version.name})`).join(', '),
+          channels: linkedChannels.map(formatLinkedChannel).join(', '),
         }),
         buttons: [
           {
@@ -786,7 +750,7 @@ async function deleteBundle() {
             role: 'primary',
             handler: () => {
               shouldUnlink = true
-              unlink = channelFound.map((ch: any) => ({ id: ch.id, name: ch.name })) // Map to id and name
+              unlink = linkedChannels
             },
           },
         ],
@@ -847,9 +811,7 @@ async function deleteBundle() {
 
 <template>
   <div>
-    <div v-if="loading" class="flex flex-col justify-center items-center min-h-[50vh]">
-      <Spinner size="w-40 h-40" />
-    </div>
+    <PageLoader v-if="loading" />
     <div v-else-if="version">
       <div id="devices" class="mt-0 md:mt-8">
         <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">

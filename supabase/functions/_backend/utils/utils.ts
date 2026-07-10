@@ -70,18 +70,53 @@ export const BROTLI_MIN_UPDATER_VERSION_V5 = '5.10.0'
 export const BROTLI_MIN_UPDATER_VERSION_V6 = '6.25.0'
 export const BROTLI_MIN_UPDATER_VERSION_V7 = '7.0.35'
 
+const SEMVER_5_10_0 = parse('5.10.0')
+const SEMVER_5_35_0 = parse('5.35.0')
+const SEMVER_6_25_0 = parse('6.25.0')
+const SEMVER_6_35_0 = parse('6.35.0')
+const SEMVER_7_0_35 = parse('7.0.35')
+const SEMVER_7_25_0 = parse('7.25.0')
+const SEMVER_7_35_0 = parse('7.35.0')
+const SEMVER_8_0_0 = parse('8.0.0')
+const SEMVER_8_35_0 = parse('8.35.0')
+
+function getParsedVersion(version: string): SemVer {
+  switch (version) {
+    case '5.10.0':
+      return SEMVER_5_10_0
+    case '5.35.0':
+      return SEMVER_5_35_0
+    case '6.25.0':
+      return SEMVER_6_25_0
+    case '6.35.0':
+      return SEMVER_6_35_0
+    case '7.0.35':
+      return SEMVER_7_0_35
+    case '7.25.0':
+      return SEMVER_7_25_0
+    case '7.35.0':
+      return SEMVER_7_35_0
+    case '8.0.0':
+      return SEMVER_8_0_0
+    case '8.35.0':
+      return SEMVER_8_35_0
+    default:
+      return parse(version)
+  }
+}
+
 export function isDeprecatedPluginVersion(parsedPluginVersion: SemVer, minFive = '5.10.0', minSix = '6.25.0', minSeven = '7.25.0', minEight = '8.0.0'): boolean {
   // v5 is deprecated if < 5.10.0, v6 is deprecated if < 6.25.0, v7 is deprecated if < 7.25.0, v8 is deprecated if < 8.0.0
-  if (parsedPluginVersion.major === 5 && lessThan(parsedPluginVersion, parse(minFive))) {
+  if (parsedPluginVersion.major === 5 && lessThan(parsedPluginVersion, getParsedVersion(minFive))) {
     return true
   }
-  if (parsedPluginVersion.major === 6 && lessThan(parsedPluginVersion, parse(minSix))) {
+  if (parsedPluginVersion.major === 6 && lessThan(parsedPluginVersion, getParsedVersion(minSix))) {
     return true
   }
-  if (parsedPluginVersion.major === 7 && lessThan(parsedPluginVersion, parse(minSeven))) {
+  if (parsedPluginVersion.major === 7 && lessThan(parsedPluginVersion, getParsedVersion(minSeven))) {
     return true
   }
-  if (parsedPluginVersion.major === 8 && lessThan(parsedPluginVersion, parse(minEight))) {
+  if (parsedPluginVersion.major === 8 && lessThan(parsedPluginVersion, getParsedVersion(minEight))) {
     return true
   }
   return false

@@ -40,6 +40,84 @@ export function getLocalConfig() {
 let config: CapgoConfig = getLocalConfig()
 export const stripeEnabled = ref<boolean>(config.stripeEnabled ?? true)
 
+interface SpoofedAdminSession {
+  jwt: string
+  refreshToken: string
+}
+
+const SPOOF_ADMIN_TOKEN_REFRESH_WINDOW_SECONDS = 60
+
+function getSpoofedAdminStorageKey() {
+  return `supabase-${config.supbaseId}.spoof_admin_jwt`
+}
+
+function saveSpoofedAdminSession(session: SpoofedAdminSession) {
+  return localStorage.setItem(getSpoofedAdminStorageKey(), JSON.stringify({ jwt: session.jwt, refreshToken: session.refreshToken }))
+}
+
+function getSpoofedAdminSession(): SpoofedAdminSession | null {
+  const textData = localStorage.getItem(getSpoofedAdminStorageKey())
+  if (!textData)
+    return null
+
+  try {
+    const parsed = JSON.parse(textData) as Partial<SpoofedAdminSession>
+    if (typeof parsed.jwt !== 'string' || !parsed.jwt)
+      return null
+    if (typeof parsed.refreshToken !== 'string' || !parsed.refreshToken)
+      return null
+    return { jwt: parsed.jwt, refreshToken: parsed.refreshToken }
+  }
+  catch {
+    return null
+  }
+}
+
+function decodeBase64Url(value: string) {
+  const base64 = value.replace(/-/g, '+').replace(/_/g, '/')
+  return globalThis.atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '='))
+}
+
+function getJwtExpiresAt(jwt: string) {
+  const payload = jwt.split('.')[1]
+  if (!payload)
+    return null
+
+  try {
+    const parsed = JSON.parse(decodeBase64Url(payload)) as { exp?: unknown }
+    return typeof parsed.exp === 'number' ? parsed.exp : null
+  }
+  catch {
+    return null
+  }
+}
+
+function shouldRefreshSpoofedAdminJwt(jwt: string) {
+  const expiresAt = getJwtExpiresAt(jwt)
+  if (!expiresAt)
+    return true
+
+  return expiresAt - Date.now() / 1000 <= SPOOF_ADMIN_TOKEN_REFRESH_WINDOW_SECONDS
+}
+
+function createSpoofAdminSupabase() {
+  return createClient<Database>(getSupabaseHost(), config.supaKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+  })
+}
+
+async function refreshSpoofedAdminSession(session: SpoofedAdminSession): Promise<SpoofedAdminSession | null> {
+  const { data, error } = await createSpoofAdminSupabase().auth.refreshSession({ refresh_token: session.refreshToken })
+  if (error || !data.session?.access_token || !data.session.refresh_token)
+    return null
+
+  return { jwt: data.session.access_token, refreshToken: data.session.refresh_token }
+}
+
 export function mergeRemoteConfig(localConfig: CapgoConfig, remoteConfig: Partial<CapgoConfig> | null | undefined): CapgoConfig {
   return {
     ...localConfig,
@@ -97,10 +175,41 @@ export function useSupabase() {
 }
 
 export function isSpoofed() {
-  return !!localStorage.getItem(`supabase-${config.supbaseId}.spoof_admin_jwt`)
+  return !!getSpoofedAdminSession()
 }
 export function saveSpoof(jwt: string, refreshToken: string) {
-  return localStorage.setItem(`supabase-${config.supbaseId}.spoof_admin_jwt`, JSON.stringify({ jwt, refreshToken }))
+  return saveSpoofedAdminSession({ jwt, refreshToken })
+}
+
+export function clearSpoof() {
+  localStorage.removeItem(getSpoofedAdminStorageKey())
+}
+
+export async function getSpoofedAdminJwt() {
+  const spoofedAdminSession = getSpoofedAdminSession()
+  if (!spoofedAdminSession)
+    return null
+
+  if (!shouldRefreshSpoofedAdminJwt(spoofedAdminSession.jwt))
+    return spoofedAdminSession.jwt
+
+  try {
+    const refreshedSession = await refreshSpoofedAdminSession(spoofedAdminSession)
+    if (refreshedSession) {
+      saveSpoofedAdminSession(refreshedSession)
+      return refreshedSession.jwt
+    }
+  }
+  catch {
+    console.error('Failed to refresh spoofed admin session')
+  }
+
+  const expiresAt = getJwtExpiresAt(spoofedAdminSession.jwt)
+  if (expiresAt && expiresAt > Date.now() / 1000)
+    return spoofedAdminSession.jwt
+
+  clearSpoof()
+  return null
 }
 
 export async function hashEmail(email: string) {
@@ -113,18 +222,24 @@ export async function hashEmail(email: string) {
   return hashHex
 }
 
-export function unspoofUser() {
-  const textData: string | null = localStorage.getItem(`supabase-${config.supbaseId}.spoof_admin_jwt`)
-  if (!textData || !isSpoofed())
+export async function unspoofUser() {
+  const spoofedAdminSession = getSpoofedAdminSession()
+  if (!spoofedAdminSession)
     return false
 
-  const { jwt, refreshToken } = JSON.parse(textData)
-  if (!jwt || !refreshToken)
+  const restoredAdminSession = await refreshSpoofedAdminSession(spoofedAdminSession).catch(() => null)
+  if (!restoredAdminSession) {
+    clearSpoof()
     return false
+  }
 
   const supabase = useSupabase()
-  supabase.auth.setSession({ access_token: jwt, refresh_token: refreshToken })
-  localStorage.removeItem(`supabase-${config.supbaseId}.spoof_admin_jwt`)
+  const { data, error } = await supabase.auth.setSession({ access_token: restoredAdminSession.jwt, refresh_token: restoredAdminSession.refreshToken })
+  clearSpoof()
+
+  if (error || !data.session)
+    return false
+
   return true
 }
 
@@ -184,6 +299,7 @@ export interface AppUsageByApp {
   date: string
   mau: number
   storage: number
+  storage_byte_hours?: number
   bandwidth: number
   build_time_seconds: number
   get: number
@@ -194,6 +310,7 @@ export interface AppUsageGlobal {
   bandwidth: number
   mau: number
   storage: number
+  storage_byte_hours?: number
   build_time_seconds: number
   get: number
 }
@@ -269,8 +386,8 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
     }
 
     const { global, byApp } = response.data as {
-      global: { mau: number, storage: number, bandwidth: number, build_time_seconds: number, date: string, get: number }[]
-      byApp: { app_id: string, mau: number, storage: number, bandwidth: number, build_time_seconds: number, date: string, get: number }[]
+      global: { mau: number, storage: number, storage_byte_hours?: number, bandwidth: number, build_time_seconds: number, date: string, get: number }[]
+      byApp: { app_id: string, mau: number, storage: number, storage_byte_hours?: number, bandwidth: number, build_time_seconds: number, date: string, get: number }[]
     }
 
     return {
@@ -560,8 +677,8 @@ export function convertNativePackages(nativePackages: { name: string, version: s
 export async function getRemoteDependencies(appId: string, channel: string) {
   const { data: remoteNativePackages, error } = await useSupabase()
     .from('channels')
-    .select(`version ( 
-            native_packages 
+    .select(`version:app_versions!channels_version_fkey(
+            native_packages
         )`)
     .eq('name', channel)
     .eq('app_id', appId)
@@ -570,7 +687,7 @@ export async function getRemoteDependencies(appId: string, channel: string) {
   if (error) {
     throw new Error(error.message)
   }
-  return convertNativePackages((remoteNativePackages.version.native_packages as any) ?? [])
+  return convertNativePackages(((remoteNativePackages.version as any)?.native_packages as any) ?? [])
 }
 
 interface Compatibility {

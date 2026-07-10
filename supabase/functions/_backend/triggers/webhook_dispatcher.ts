@@ -5,11 +5,12 @@ import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
 import { backgroundTask } from '../utils/utils.ts'
 import {
-
+  buildWebhookDeliveryPayload,
   buildWebhookPayload,
   createDeliveryRecord,
   findWebhooksForEvent,
-  getWebhookUrlValidationError,
+  getWebhookPublicUrlValidationError,
+  normalizeWebhookDeliveryVersion,
   queueWebhookDelivery,
   updateDeliveryResult,
 } from '../utils/webhook.ts'
@@ -80,6 +81,9 @@ app.post('/', middlewareAPISecret, async (c) => {
     // Process each webhook
     await backgroundTask(c, Promise.all(webhooks.map(async (webhook) => {
       try {
+        const deliveryVersion = normalizeWebhookDeliveryVersion(webhook.delivery_version)
+        const deliveryPayload = buildWebhookDeliveryPayload(payload, deliveryVersion)
+
         // Create a delivery record
         const delivery = await createDeliveryRecord(
           c,
@@ -88,6 +92,7 @@ app.post('/', middlewareAPISecret, async (c) => {
           auditLogData.audit_log_id,
           eventType,
           payload,
+          deliveryVersion,
         )
 
         if (!delivery) {
@@ -99,7 +104,7 @@ app.post('/', middlewareAPISecret, async (c) => {
           return
         }
 
-        const urlError = getWebhookUrlValidationError(c, webhook.url)
+        const urlError = await getWebhookPublicUrlValidationError(c, webhook.url)
         if (urlError) {
           await updateDeliveryResult(
             c,
@@ -124,7 +129,7 @@ app.post('/', middlewareAPISecret, async (c) => {
           delivery.id,
           webhook.id,
           webhook.url,
-          payload,
+          deliveryPayload,
         )
 
         cloudlog({

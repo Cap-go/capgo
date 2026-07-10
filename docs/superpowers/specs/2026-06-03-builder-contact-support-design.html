@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capgo Builder — Contact Support &amp; Easy Help (Design)</title>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#141925; --panel2:#1b2233; --line:#2a3349;
+    --ink:#e6ebf5; --muted:#94a3b8; --dim:#64748b;
+    --blue:#4f8cff; --green:#34d399; --amber:#fbbf24; --pink:#f472b6; --purple:#a78bfa; --red:#fb7185;
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 700px at 70% -10%,#16203a 0%,var(--bg) 55%);
+       color:var(--ink);font:15px/1.65 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:48px 24px 90px}
+  .wrap{max-width:1040px;margin:0 auto}
+  h1{font-size:30px;margin:0 0 4px;letter-spacing:-.5px}
+  .meta{color:var(--dim);font-family:var(--mono);font-size:12.5px;margin:0 0 4px}
+  .status{display:inline-block;font-family:var(--mono);font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid #2a3f33;background:#0f2920;color:var(--green);margin:8px 0 30px}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:1.5px;color:var(--blue);margin:42px 0 14px;border-bottom:1px solid var(--line);padding-bottom:8px}
+  h3{font-size:15px;margin:22px 0 8px;color:var(--ink)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 22px;margin-bottom:14px}
+  .goal{background:linear-gradient(135deg,#1a2336,#141b2b);border-left:3px solid var(--blue)}
+  code{font-family:var(--mono);font-size:.87em;background:#0e1421;border:1px solid var(--line);padding:1.5px 6px;border-radius:5px;color:#cbd5e1}
+  pre{font-family:var(--mono);font-size:12.5px;line-height:1.55;background:#0e1421;border:1px solid var(--line);border-radius:12px;padding:16px 18px;overflow-x:auto;color:#aeb9cc}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin:6px 0}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.8px}
+  ul,ol{margin:8px 0 0;padding-left:20px}
+  li{margin:5px 0}
+  .tag{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:6px;margin:2px 4px 2px 0;border:1px solid var(--line)}
+  .t-green{color:var(--green);background:#0f2920} .t-blue{color:var(--blue);background:#13203a}
+  .t-amber{color:var(--amber);background:#2a230f} .t-pink{color:var(--pink);background:#2c1424}
+  .t-purple{color:var(--purple);background:#1f1a33} .t-red{color:var(--red);background:#2c1620}
+  .note{font-size:13px;color:var(--muted)}
+  .warn{border-left:3px solid var(--amber);background:#221d0d}
+  .warn b{color:var(--amber)}
+  .ok{border-left:3px solid var(--green);background:#0f1c19}
+  .ok b{color:var(--green)}
+  .menu{font-family:var(--mono);font-size:13px;background:#0e1421;border:1px solid var(--line);border-radius:10px;padding:12px 16px;line-height:2}
+  .first{color:var(--green);font-weight:700}
+  .toc{columns:2;gap:24px;font-size:13.5px}
+  @media(max-width:640px){.toc{columns:1}}
+  .toc a,a{color:var(--blue);text-decoration:none}
+  .hl{color:var(--amber);font-weight:600}
+  .good{color:var(--green);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Capgo Builder — "Contact Support" &amp; Easy Help</h1>
+  <div class="meta">docs/superpowers/specs/2026-06-03-builder-contact-support-design.md · 2026-06-03</div>
+  <span class="status" style="background:#221d0d;border-color:#3a2f0d;color:#fbbf24">⏸ SHELVED — design complete, deemed too complex to build now (Martin). Preserved for reference.</span>
+  <div class="card warn" style="margin:0 0 24px"><b>Outcome:</b> Fully designed &amp; stress-tested (sizing, Cloudflare Email Service limits, gzip/truncation, telemetry, and integration with the <code>Cap-go/automations</code> email↔Discord bridge). The complexity concentrated in the bridge integration — making a programmatically-sent ticket behave correctly (avoiding the <code>ownedOutboundCopy</code> heuristic, the double-delivery race from multiple bridge-routed <code>@capgo.app</code> recipients, and two-party reply threading). The cleanest robust path (a dedicated <code>POST /builder-ticket</code> endpoint in the automations worker + team-in-Discord) was judged not worth the cost now. Preserved so the analysis isn't lost. No implementation plan was produced (§8 is the closest skeleton).</div>
+
+  <div class="card">
+    <div class="toc">
+      <a href="#goal">1 · Goal</a><br>
+      <a href="#triggers">2 · Triggers &amp; menu</a><br>
+      <a href="#arch">3 · Architecture &amp; data flow</a><br>
+      <a href="#email">4 · Email transport + addressing + limits</a><br>
+      <a href="#log">5 · Internal log + combined bundle</a><br>
+      <a href="#ux">6 · Support-flow UX</a><br>
+      <a href="#sec">7 · Security &amp; privacy</a><br>
+      <a href="#build">8 · Components to build</a><br>
+      <a href="#test">9 · Error handling &amp; testing</a><br>
+      <a href="#open">10 · Open items + resolved decisions</a>
+    </div>
+  </div>
+
+  <h2 id="goal">1 · Goal</h2>
+  <div class="card goal">
+    Make it frictionless for a builder user to get help when something goes wrong, via two clearly-separated paths:
+    <ul>
+      <li><b>📨 Ask Capgo support</b> — email the user's logs to the team; the user receives a clean copy and the team replies to that thread.</li>
+      <li><b>🤖 Ask AI for help</b> — the existing AI build-log analysis (only when a build log exists).</li>
+    </ul>
+    A rich <b>internal log</b> is captured invisibly during every builder run and sent <i>in full</i> when help is requested — replacing today's truncated 12-line support bundle.
+    <p class="note" style="margin-bottom:0">Scope: Capgo <b>builder</b> CLI flows only. Not the rest of the CLI; no standalone command.</p>
+  </div>
+
+  <h2 id="triggers">2 · Triggers &amp; menu</h2>
+  <div class="card">
+    <p>Unified help menu at three points. <b class="first">"Ask Capgo support" is always first.</b></p>
+    <table>
+      <tr><th>Trigger</th><th>Build log?</th><th>Menu options (in order)</th></tr>
+      <tr><td>Build failure</td><td>Yes (<code>jobId</code> + log)</td><td><span class="tag t-green">📨 Ask Capgo support</span><span class="tag t-purple">🤖 Ask AI</span><span class="tag t-blue">🔄 Try again</span><span class="tag t-red">❌ Exit</span></td></tr>
+      <tr><td>Onboarding error</td><td>No</td><td><span class="tag t-green">📨 Ask Capgo support</span><span class="tag t-blue">🔄 Try again / ↩️ Restart</span><span class="tag t-red">❌ Exit</span></td></tr>
+      <tr><td>Unhandled error (raw provider API error)</td><td>No</td><td><span class="tag t-green">📨 Ask Capgo support</span><span class="tag t-blue">🔄 Try again</span><span class="tag t-red">❌ Exit</span></td></tr>
+    </table>
+    <p class="note"><b>AI is offered only when a build log exists.</b> Onboarding/unhandled errors get support only.</p>
+    <h3>AI ↔ support: fork + escalation</h3>
+    <p style="margin:0">Independent choices. After AI returns its analysis and the user is still stuck, the AI result screen adds <span class="tag t-green">📨 Still stuck — send this to Capgo support</span> carrying the <b>same logs + the AI analysis</b> into the email (no re-gathering).</p>
+  </div>
+
+  <h2 id="arch">3 · Architecture &amp; data flow</h2>
+  <div class="card">
+    <p>Reuses the proven path the AI feature already uses (<code>CLI → ${apiHost}/build/* → builder worker</code>). Backend is a <b>thin proxy</b> owning identity + rate limiting; the <b>worker</b> sends. <b class="good">Compression (gzip -9) happens in the CLI</b>, so the worker is a near pass-through.</p>
+<pre>CLI (user machine)
+  builder run writes a hidden verbose internal log as it goes
+  on failure/error → unified help menu
+  user picks "Ask Capgo support"
+    • assemble ONE combined bundle (labeled sections):
+        DIAGNOSTICS / INTERNAL CLI LOG / BUILD LOG (fastlane)? / AI ANALYSIS? / USER MESSAGE?
+    • <span style="color:#34d399">redact secrets (CLI-only) + TELL the user we do it</span>
+    • <span style="color:#34d399">GZIP -9 + BASE64 in the CLI</span> (Node — no mem/CPU limits)
+    • "We'll send your request to Capgo &amp; email you a copy at &lt;email&gt;. Secrets removed."
+        Send  /  View logs first  /  Cancel
+        └ View logs first → Show path (copies to clipboard) / Open preview (combined bundle)
+    • on Send → POST { appId, jobId?, bundleB64, … }  → ${apiHost}/build/support  (capgkey)
+        │
+        ▼
+capgo-new backend  public/build/support.ts   (THIN PROXY, JSON only)
+    1. auth capgkey → resolve user → VERIFIED email
+    2. <span style="color:#fbbf24">RATE LIMIT here (1/60s + 10/day per user) — NOT in the worker</span>
+    3. To = resolved email; reject if client-sent email differs
+    4. forward JSON { bundleB64, verifiedEmail, appId, jobId? }
+        ▼
+capgo_builder worker  /support
+    1. <span style="color:#34d399">NO gzip, NO DO pull</span> — drop bundleB64 into the attachment
+    2. env.EMAIL.send(...)        ← Cloudflare Email Service binding
+         from: "Capgo Builder Support" &lt;capgo_builder_support@capgo.app&gt;
+         to:   &lt;verified user email&gt;            (the USER — clean, well-titled email)
+         cc:   michael@capgo.app                (internal, NON-routed → safe; NOT martin@)
+         bcc:  capgo_builder_support@capgo.app  (ONLY bridge-routed addr; invisible)
+         (martin@ excluded — it IS bridge-routed → would race; NO replyTo)
+         attachments: [{ content: bundleB64, filename: …log.gz, type: application/gzip }]
+        ▼
+Cap-go/automations bridge → ingests the BCC copy → R2 attachment → Discord [SUPPORT] thread
+    (team works in Discord, not email)
+    team replies → To = capgo_builder_support@ (routed → dropped as self-copy),
+    CC = buildReplyAllCc = user + michael@ (originalTo+originalCc) → both get every reply → no loop/race</pre>
+    <p class="note" style="margin-bottom:0"><b>Split:</b> CLI = capture + combined bundle + redact(+inform) + <b>gzip-9/base64</b> · backend = identity + verified email + <b>rate limit</b> + forwarding · worker = attach blob + send.</p>
+  </div>
+
+  <h2 id="email">4 · Email transport, addressing &amp; real limits</h2>
+  <div class="card">
+    <p>Use <b>Cloudflare Email Service</b> (transactional, onboarded for <code>capgo.app</code>) — <b>not</b> the legacy Email Routing binding. <b>Resend is not used.</b> <b class="good">Capgo is on a paid CF plan (confirmed)</b> — required to send to arbitrary recipients (the user).</p>
+    <h3>Addressing — user is the visible To; BCC triggers the bridge</h3>
+    <ul>
+      <li><b>From</b> = <code>"Capgo Builder Support" &lt;capgo_builder_support@capgo.app&gt;</code>.</li>
+      <li><b>To</b> = the <b>user</b> (verified server-side from the capgkey owner) — external, not bridge-routed. The user gets a normal, well-titled email addressed to them.</li>
+      <li><b>BCC</b> = <code>capgo_builder_support@capgo.app</code> — the <b>single bridge-routed recipient</b> and the only envelope address that reaches the bridge; stripped from headers → invisible. Routed via ForwardEmail alias → <code>support@usecapgo.com</code>.</li>
+      <li><b>CC</b> = internal addresses that are <b>NOT bridge-routed</b> (e.g. <code>michael@capgo.app</code>). A non-routed CC adds an inbox recipient without a second <i>routed</i> one, and the bridge includes it on replies (<code>buildReplyAllCc</code> reads <code>originalCc</code>). <b><code>martin@capgo.app</code> is excluded</b> — it <i>is</i> bridge-routed → would race. CC list in worker config; every entry <b>must be a verified non-routed mailbox</b>.</li>
+      <li><b>No Reply-To</b> (bridge ignores it); <code>support@</code> not used.</li>
+    </ul>
+    <div class="card warn" style="margin:6px 0 12px">
+      <b>Invariant:</b> exactly ONE bridge-routed recipient per email — the BCC'd <code>capgo_builder_support@</code>. <code>To</code>/<code>CC</code> may include non-routed addresses (the user; non-routed internal mailboxes like <code>michael@</code>), but <b>never a second bridge-routed address</b> (<code>support@</code>, <code>martin@</code>). <b>Safety hinges on CC'd addresses staying non-routed — verify <code>michael@</code> before shipping, never add a routed address to the CC config.</b> Rare edge: if the <i>builder user's own</i> email is a routed <code>@capgo.app</code> address, the <code>To</code> copy also routes in → detect and drop the BCC in that case, or accept the dedup fallback.
+    </div>
+    <h3>Why a single routed address — the double-delivery race</h3>
+    <p>Two bridge-routed recipients ⇒ the bridge receives the mail twice. Its Message-ID dedup (index.ts:605-621) is <code>get</code>-then-<code>put</code>, <b>non-atomic</b>, on eventually-consistent KV across separate worker invocations — so simultaneous double-delivery (e.g. a reply-all hitting two routed addresses) could slip through and double-post. One routed recipient (the BCC) makes the race impossible by construction.</p>
+    <h3>Verified bridge behavior — replies reach the user (<code>Cap-go/automations/email/index.ts</code>)</h3>
+    <ul>
+      <li>Bridge ingests the BCC'd copy (envelope-routed to <code>capgo_builder_support@</code>), parses <b>header</b> To/CC → <code>originalTo = [user]</code>, <code>originalSender = From</code>.</li>
+      <li>Team replies in Discord → <code>to: originalSender</code> (<code>capgo_builder_support@</code>, routed → dropped as self-copy via <code>x-bridge-source</code>) and <code>cc: buildReplyAllCc = originalTo + originalCc</code> = <b>the user + the non-routed CC (<code>michael@</code>)</b> (index.ts:185/1577/1660) → <b>both receive every reply</b> (those copies land in normal inboxes → no re-ingest).</li>
+      <li>If the user replies by email → addressed to <code>capgo_builder_support@</code> → routed → threaded into their existing Discord thread (In-Reply-To). Bidirectional; user only ever sees clean emails.</li>
+      <li><b>No loop / no race:</b> the only routed recipient on any message is <code>capgo_builder_support@</code>, and the bridge drops its own <code>x-bridge-source</code> copies.</li>
+    </ul>
+    <h3>Limits that actually matter <span class="note">(verified against Cloudflare docs)</span></h3>
+    <table>
+      <tr><th>Limit</th><th>Value</th><th>Implication</th></tr>
+      <tr><td><b>Total message size</b></td><td class="hl">5 MiB</td><td>Hard ceiling on the base64'd email</td></tr>
+      <tr><td>… for verified <b>destination</b> addrs only</td><td>25 MiB</td><td>Recipient verified in the CF account (not the sender). The user isn't one → 5 MiB tier. Moot (measured 28 KB).</td></tr>
+      <tr><td><b>Attachments</b></td><td class="hl">must be base64 (~+33%)</td><td>5 MiB budget is the <i>encoded</i> size</td></tr>
+      <tr><td>Worker memory</td><td class="good">128 MB / isolate</td><td><b>Not</b> a constraint — the "10 MB" is <i>script bundle</i> size</td></tr>
+      <tr><td>Email-binding CPU</td><td class="hl">~50 ms / request</td><td><b>Why we don't gzip in the worker</b></td></tr>
+      <tr><td>Recipients (to+cc+bcc)</td><td>50</td><td>Fine (we use 2)</td></tr>
+    </table>
+    <div class="card ok" style="margin:10px 0">
+      <b>Sizing model — MEASURED:</b> a real GitHub build log (<code>logs_72018286007.zip</code>) = 123 KB raw → <b class="good">28 KB gzip(-9)+base64</b> = ~<b>4.4×</b> shrink, <b>188× under</b> the 5 MiB ceiling; the ~4.5 MiB encoded budget holds <b>~20 MiB raw</b>. <b>gzip level 9</b>, run in the <b>CLI</b>.
+    </div>
+    <h3>Config &amp; sender</h3>
+<pre>// builder worker wrangler.jsonc (prod + preprod)
+"send_email": [
+  { "name": "EMAIL", "remote": true,
+    "allowed_sender_addresses": ["capgo_builder_support@capgo.app"] }
+]</pre>
+    <p class="note">Sender setup: the <code>capgo.app</code> domain onboarding (SPF/DKIM) <i>is</i> the sender verification — any <code>@capgo.app</code> address sends immediately.</p>
+  </div>
+
+  <h2 id="log">5 · Internal log + combined bundle</h2>
+  <div class="card">
+    <p>Today only ~12 in-memory lines exist. Add a full, hidden, on-disk log per builder run.</p>
+    <ul>
+      <li><b>Module:</b> <code>cli/src/support/internal-log.ts</code> (new).</li>
+      <li><b>File:</b> <code>~/.capgo-credentials/support/internal-&lt;appId&gt;-&lt;ts&gt;.log</code>, <b>append-as-you-go</b> — survives crashes &amp; unhandled errors.</li>
+      <li><b>Captures:</b> all log levels incl. <code>debug</code>; every external API request+response (method, URL, status, body — <b>including raw provider API errors: Apple App Store Connect AND Google Play, plus Gradle/CocoaPods/signing</b>); every shell command (<code>cap add ios/android</code>, <code>pod install</code>, Gradle, …) with stdout/stderr; diagnostics (OS/arch, Node, CLI version, package manager, Capgo/Capacitor versions, appId, platform, channel, step).</li>
+      <li><b>Secret redaction on write — CLI-only</b> (capgkey/API keys, tokens, Apple/Google keys &amp; signing secrets). <b>No server-side re-scrub.</b> The support flow <b>tells the user</b> secrets are removed (§6).</li>
+      <li><b>Visibility:</b> never shown in normal runs; surfaced only on help request.</li>
+    </ul>
+    <h3>The combined bundle</h3>
+    <p style="margin:0">On <b>Ask Capgo support</b>, internal log + build log are <b>combined into one bundle file</b> with labeled sections (<code>DIAGNOSTICS / INTERNAL CLI LOG / BUILD LOG (fastlane) / AI ANALYSIS / USER MESSAGE</code>). One file = one attachment, one preview, one gzip. Built by <b>extending the existing <code>writeOnboardingSupportBundle</code></b>, then gzipped(-9)+base64'd in the CLI.</p>
+  </div>
+
+  <h2 id="ux">6 · Support-flow UX (CLI)</h2>
+  <div class="card">
+    <div class="menu">
+1. pick <span class="first">📨 Ask Capgo support</span><br>
+2. assemble <b>combined</b> bundle locally + redact secrets<br>
+3. "We'll send your request to the Capgo team and email you a copy at <b>&lt;email&gt;</b> —<br>
+&nbsp;&nbsp;&nbsp;&nbsp;they'll reply in that thread. <span style="color:var(--green)">Secrets are automatically removed.</span>"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--blue)">Send</span> · <span style="color:var(--blue)">View logs first</span> · <span style="color:var(--dim)">Cancel</span><br>
+4. View logs first → <b>Show path</b> (write file, <b>copy to clipboard</b>, "Copied: &lt;path&gt;") / <b>Open preview</b> (combined bundle)<br>
+5. Send → gzip-9+base64 → POST → <span style="color:var(--green)">"Sent — the team will reply to &lt;email&gt;."</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fail → <span style="color:var(--amber)">"Couldn't reach support. Logs at &lt;path&gt; — email support@capgo.app."</span>
+    </div>
+    <p class="note" style="margin-bottom:0">User-facing email: addressed <b>To: the user</b> (CC'd to non-routed internal addrs like <code>michael@</code>); the Discord bridge is triggered by an invisible BCC. Preview is <b>never shown by default</b> — only via "View logs first".</p>
+  </div>
+
+  <h2 id="sec">7 · Security &amp; privacy</h2>
+  <div class="card">
+    <ul>
+      <li><b>Recipient anti-spoofing:</b> the user's <code>To</code> email is derived <b>server-side</b> from the capgkey owner; reject if client-sent email differs. The routed <code>BCC</code> and any internal <code>CC</code> (<b>non-routed only</b>, e.g. <code>michael@</code>) are worker config; <b>never CC a bridge-routed address</b> (<code>support@</code>, <code>martin@</code>) → would race.</li>
+      <li><b>Secret redaction — CLI-only &amp; disclosed:</b> applied in the CLI on write; no server-side re-scrub; the flow <b>tells the user</b> secrets are removed.</li>
+      <li><b>Sender lock:</b> worker <code>send_email</code> restricted via <code>allowed_sender_addresses</code>.</li>
+      <li><b>Rate limiting — capgo-new backend, NOT the worker:</b> <span class="hl">1 request / 60 s + 10 / day per user</span>, enforced in <code>public/build/support.ts</code> using the resolved capgkey owner.</li>
+      <li><b>Size cap (encoded) — minimal guard, no R2 now:</b> real logs ~28 KB (188× under 5 MiB), so it almost never fires — but it turns a rare hard failure (<code>E_CONTENT_TOO_LARGE</code>) into graceful degradation. Iterative but cheap (CLI, no 50 ms limit): gzip-9+base64 once → if ≤ 4.5 MiB <b>send, no loop</b>; else keep diagnostics header, estimate raw budget from measured ratio, cut to the <b>tail</b>, refine with <b>linear ~200 KB steps</b> (capped ~8), + a "truncated" notice. Emit <code>support_truncated</code> telemetry → the trigger to reconsider R2.</li>
+    </ul>
+  </div>
+
+  <h2 id="build">8 · Components to build / change</h2>
+  <div class="card">
+    <h3>CLI <code>cli/src</code></h3>
+    <ul>
+      <li><code>support/internal-log.ts</code> — verbose logger + CLI-only redaction; wire into builder/onboarding + API/shell sites (capture raw Apple <b>and</b> Google errors).</li>
+      <li><b>Extend <code>writeOnboardingSupportBundle</code></b> → combined labeled bundle.</li>
+      <li><code>support/contact-support.ts</code> — assemble, gzip-9+base64, encoded-size guard, preview/path/clipboard UX (incl. "secrets removed" disclosure), POST, success/failure.</li>
+      <li>Update failure menus in <code>build/onboarding/ui/steps/ios-shared.tsx</code> &amp; <code>init/command.ts</code> (support-first); add AI escalation option.</li>
+      <li><b>Telemetry → PostHog</b> via existing <code>sendEvent()</code> (same as <code>ai/telemetry.ts</code>). Events: <code>CLI Builder Support Requested / Sent / Failed / Truncated</code> + <code>Escalated from AI</code>. Tags = closed-enum + metadata only (<code>app_id, platform, job_id?, trigger, has_build_log, has_ai_analysis, result, error_status?, truncated, raw_bytes, encoded_bytes</code>). <b>Never</b> send log content or the user's description. Respect <code>CAPGO_DISABLE_TELEMETRY</code> / <code>CAPGO_DISABLE_POSTHOG</code>.</li>
+    </ul>
+    <h3>capgo-new backend <code>public/build</code></h3>
+    <ul>
+      <li><code>support.ts</code> — mirror <code>ai_analyze.ts</code>: auth → verified email → <b>rate limit (1/60s + 10/day)</b> → reject mismatch → validate size → proxy JSON.</li>
+      <li>Register route in <code>public/build/index.ts</code>.</li>
+    </ul>
+    <h3>capgo_builder worker</h3>
+    <ul>
+      <li><code>/support</code> route — drop <code>bundleB64</code> into attachment; compose <code>env.EMAIL.send</code> with <b>To = user, BCC = capgo_builder_support@</b>. No gzip in worker.</li>
+      <li><code>wrangler.jsonc</code> — add <code>send_email</code> binding (prod + preprod, <code>remote: true</code>, sender allowlist).</li>
+    </ul>
+    <h3>Ops / DNS / account (one-time)</h3>
+    <ul>
+      <li><code>capgo.app</code> onboarded/verified in Email Service (SPF + DKIM) — done.</li>
+      <li class="good">Capgo on a <b>paid Cloudflare plan</b> — confirmed.</li>
+      <li><b>Route <code>capgo_builder_support@capgo.app</code> into the bridge</b> (ForwardEmail alias → <code>support@usecapgo.com</code>) — used only as BCC. <b>A CC is allowed only for NON-routed internal mailboxes</b> (e.g. <code>michael@</code>); <b>never CC a bridge-routed address</b> (<code>support@</code>, <code>martin@</code>) or the race returns. <b>Verify each CC address's routing before adding it</b> (and if routing rules change). Discord forum stays the team's primary view (optional role @mention).</li>
+    </ul>
+  </div>
+
+  <h2 id="test">9 · Error handling &amp; testing</h2>
+  <div class="card">
+    <ul>
+      <li><b>CLI:</b> network/backend failure → local-file fallback + instructions; clipboard failure non-fatal; encoded-size guard + truncation.</li>
+      <li><b>Backend:</b> auth failure, email mismatch, <b>rate-limit (429)</b>, oversize (<code>413</code>) → distinct errors.</li>
+      <li><b>Worker:</b> catch Email Service errors by <code>code</code> (<code>E_CONTENT_TOO_LARGE</code>, <code>E_RATE_LIMIT_EXCEEDED</code>, <code>E_DAILY_LIMIT_EXCEEDED</code>, <code>E_SENDER_DOMAIN_NOT_AVAILABLE</code>) → surface to CLI fallback.</li>
+      <li><b>Tests:</b> unit (redaction, combined-bundle assembly, gzip-9+base64 + truncation, menu logic, clipboard) · integration (auth + rate-limit 429 + email-verify + proxy + 413) · mocked Email Service send incl. <code>E_CONTENT_TOO_LARGE</code>; verify To=user + BCC addressing.</li>
+    </ul>
+  </div>
+
+  <h2 id="open">10 · Open items + resolved decisions</h2>
+  <div class="card">
+    <h3>Open</h3>
+    <ol>
+      <li>Final menu/label + email subject/body wording (provisional).</li>
+      <li>Confirm preprod Email Service onboarding for <code>capgo.app</code>.</li>
+      <li>Optional: Discord <b>role @mention</b> when the bridge opens a builder ticket (small automations change; replaces the rejected email-CC idea that would have raced).</li>
+    </ol>
+    <h3>Resolved decisions</h3>
+    <ul>
+      <li>Transport: Cloudflare Email Service (not Resend); <b>paid plan confirmed</b>.</li>
+      <li>Compression: <b>gzip level 9</b> in the CLI; worker is base64 pass-through.</li>
+      <li>Oversize: minimal CLI estimate+linear truncation guard; <b>no R2 now</b>; <code>support_truncated</code> telemetry as the trigger to reconsider.</li>
+      <li><b>Addressing (verified against bridge code):</b> <b>To = user</b> (clean inbox), <b>BCC = <code>capgo_builder_support@capgo.app</code></b> = the single bridge-routed recipient that opens the thread (invisible). <b>CC = non-routed internal addrs only</b> (e.g. <code>michael@</code>) — safe, and included on replies via <code>buildReplyAllCc</code>; <b><code>martin@</code> excluded</b> (bridge-routed → would race). No Reply-To; <code>support@</code> not used. User + <code>michael@</code> get every reply; single routed recipient + <code>x-bridge-source</code> drop ⇒ no loop, no race. Hinges on CC'd addrs staying non-routed.</li>
+      <li>Logs: <b>combined</b> into one labeled bundle by <b>extending <code>writeOnboardingSupportBundle</code></b>.</li>
+      <li>Redaction: <b>CLI-only</b>, disclosed to the user.</li>
+      <li>Rate limiting: <b>1/60s + 10/day per user</b>, at the <b>capgo-new backend</b>.</li>
+      <li>Provider errors captured for <b>both</b> Apple and Google.</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

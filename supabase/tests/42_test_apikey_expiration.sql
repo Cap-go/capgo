@@ -61,14 +61,13 @@ SELECT
 -- =============================================================================
 
 -- Create test API keys with different expiration dates
-INSERT INTO apikeys (id, user_id, key, mode, name, expires_at)
+INSERT INTO apikeys (id, user_id, key, name, expires_at)
 VALUES
 -- Key expired 31 days ago (should be deleted)
 (
     99901,
     '6aa76066-55ef-4238-ade6-0b32334a4097',
     'test-key-expired-31d',
-    'all',
     'Test Expired 31 days',
     now() - interval '31 days'
 ),
@@ -77,7 +76,6 @@ VALUES
     99902,
     '6aa76066-55ef-4238-ade6-0b32334a4097',
     'test-key-expired-35d',
-    'all',
     'Test Expired 35 days',
     now() - interval '35 days'
 ),
@@ -86,7 +84,6 @@ VALUES
     99903,
     '6aa76066-55ef-4238-ade6-0b32334a4097',
     'test-key-expired-29d',
-    'all',
     'Test Expired 29 days',
     now() - interval '29 days'
 ),
@@ -95,7 +92,6 @@ VALUES
     99904,
     '6aa76066-55ef-4238-ade6-0b32334a4097',
     'test-key-expired-1d',
-    'all',
     'Test Expired 1 day',
     now() - interval '1 day'
 ),
@@ -104,7 +100,6 @@ VALUES
     99905,
     '6aa76066-55ef-4238-ade6-0b32334a4097',
     'test-key-not-expired',
-    'all',
     'Test Not Expired',
     now() + interval '30 days'
 ),
@@ -113,7 +108,6 @@ VALUES
     99906,
     '6aa76066-55ef-4238-ade6-0b32334a4097',
     'test-key-no-expiry',
-    'all',
     'Test No Expiry',
     NULL
 );
@@ -205,25 +199,23 @@ SELECT
 -- =============================================================================
 
 -- Create a test expired API key
-INSERT INTO apikeys (id, user_id, key, mode, name, expires_at)
+INSERT INTO apikeys (id, user_id, key, name, expires_at)
 VALUES
 (
     99907,
     '6aa76066-55ef-4238-ade6-0b32334a4097',
     'test-key-for-identity-expired',
-    'all',
     'Test Identity Expired',
     now() - interval '1 day'
 );
 
 -- Create a test valid API key
-INSERT INTO apikeys (id, user_id, key, mode, name, expires_at)
+INSERT INTO apikeys (id, user_id, key, name, expires_at)
 VALUES
 (
     99908,
     '6aa76066-55ef-4238-ade6-0b32334a4097',
     'test-key-for-identity-valid',
-    'all',
     'Test Identity Valid',
     now() + interval '30 days'
 );
@@ -288,22 +280,27 @@ END $$;
 SELECT tests.authenticate_as_service_role();
 
 -- Create test API keys for get_orgs_v6 tests
-INSERT INTO apikeys (id, user_id, key, mode, name, expires_at)
-VALUES
-(
+SELECT tests.create_v2_apikey(
     99909,
-    '6aa76066-55ef-4238-ade6-0b32334a4097',
+    '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
     'test-key-orgs-expired',
-    'all',
     'Test Orgs Expired',
+    '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid,
+    public.rbac_role_org_super_admin(),
+    NULL,
+    NULL,
     now() - interval '1 day'
-),
-(
+);
+
+SELECT tests.create_v2_apikey(
     99910,
-    '6aa76066-55ef-4238-ade6-0b32334a4097',
+    '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
     'test-key-orgs-valid',
-    'all',
     'Test Orgs Valid',
+    '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid,
+    public.rbac_role_org_super_admin(),
+    NULL,
+    NULL,
     now() + interval '30 days'
 );
 
@@ -336,14 +333,15 @@ SELECT
     );
 
 -- Test 20: get_orgs_v6 with no expiration key should work
-INSERT INTO apikeys (id, user_id, key, mode, name, expires_at)
-VALUES
-(
+SELECT tests.create_v2_apikey(
     99911,
-    '6aa76066-55ef-4238-ade6-0b32334a4097',
+    '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
     'test-key-orgs-no-expiry',
-    'all',
     'Test Orgs No Expiry',
+    '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid,
+    public.rbac_role_org_super_admin(),
+    NULL,
+    NULL,
     NULL
 );
 
@@ -368,17 +366,17 @@ END $$;
 -- Test organization API key policy columns
 -- =============================================================================
 
--- Test 21: get_orgs_v6 with expired key AND limited_to_orgs should also reject
-INSERT INTO apikeys (id, user_id, key, mode, name, expires_at, limited_to_orgs)
-VALUES
-(
+-- Test 21: get_orgs_v6 with expired org-bound key should also reject
+SELECT tests.create_v2_apikey(
     99912,
-    '6aa76066-55ef-4238-ade6-0b32334a4097',
+    '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
     'test-key-orgs-expired-limited',
-    'all',
     'Test Orgs Expired Limited',
-    now() - interval '1 day',
-    '{046a36ac-e03c-4590-9257-bd6c9dba9ee8}'
+    '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid,
+    public.rbac_role_org_super_admin(),
+    NULL,
+    NULL,
+    now() - interval '1 day'
 );
 
 DO $$
@@ -391,7 +389,7 @@ SELECT
         'SELECT * FROM get_orgs_v6()',
         'P0001',
         'API key has expired',
-        'get_orgs_v6: Raises exception for expired API key with limited_to_orgs'
+        'get_orgs_v6: Raises exception for expired org-bound API key'
     );
 
 -- Reset headers
@@ -443,70 +441,60 @@ SELECT
         'get_user_org_ids: Returns results for valid (not expired) API key'
     );
 
--- Test 25: Unscoped keys must honor expiration-required org memberships
+-- Test 25: Scoped V2 keys must honor expiration-required org bindings
 UPDATE orgs
 SET
     require_apikey_expiration = TRUE,
     max_apikey_expiration_days = 30
 WHERE id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8';
 
+SELECT tests.create_v2_apikey(
+    99913,
+    '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
+    'test-scoped-key-missing-expiration',
+    'Test scoped missing expiration',
+    '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid,
+    public.rbac_role_org_super_admin(),
+    NULL,
+    NULL,
+    now() + interval '1 day'
+);
+
 SELECT
     throws_ok(
         $$
-        INSERT INTO apikeys (
-            id,
-            user_id,
-            key,
-            mode,
-            name,
-            expires_at,
-            limited_to_orgs,
-            limited_to_apps
-        )
-        VALUES (
-            99913,
-            '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
-            'test-unscoped-key-missing-expiration',
-            'all',
-            'Test unscoped missing expiration',
-            NULL,
-            '{}'::uuid[],
-            '{}'::text[]
-        )
+        UPDATE apikeys
+        SET expires_at = NULL
+        WHERE id = 99913
         $$,
         'P0001',
         'expiration_required',
-        'enforce_apikey_expiration_policy: unscoped keys inherit membership expiration requirement'
+        'enforce_apikey_expiration_policy: scoped V2 keys honor org expiration requirement'
     );
 
--- Test 26: Unscoped keys must honor max expiration days from org memberships
+-- Test 26: Scoped V2 keys must honor max expiration days from org bindings
+SELECT tests.create_v2_apikey(
+    99914,
+    '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
+    'test-scoped-key-too-long-expiration',
+    'Test scoped too long expiration',
+    '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid,
+    public.rbac_role_org_super_admin(),
+    NULL,
+    NULL,
+    now() + interval '1 day'
+);
+
 SELECT
     throws_ok(
         $$
-        INSERT INTO apikeys (
-            id,
-            user_id,
-            key,
-            mode,
-            name,
-            expires_at,
-            limited_to_orgs,
-            limited_to_apps
-        )
-        VALUES (
-            99914,
-            '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
-            'test-unscoped-key-too-long-expiration',
-            'all',
-            'Test unscoped too long expiration',
-            now() + interval '31 days',
-            '{}'::uuid[],
-            '{}'::text[]
-        )
+        UPDATE apikeys
+        SET expires_at = now() + interval '31 days'
+        WHERE id = 99914
         $$,
         'P0001',
         'expiration_exceeds_max',
-        'enforce_apikey_expiration_policy: unscoped keys inherit membership max expiration days'
+        'enforce_apikey_expiration_policy: scoped V2 keys honor max expiration days'
     );
 
 SELECT *

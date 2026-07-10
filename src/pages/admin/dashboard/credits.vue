@@ -14,9 +14,11 @@ import MagnifyingGlassIcon from '~icons/heroicons/magnifying-glass'
 import XMarkIcon from '~icons/heroicons/x-mark'
 import AdminFilterBar from '~/components/admin/AdminFilterBar.vue'
 import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
+import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
 import Spinner from '~/components/Spinner.vue'
 import { formatLocalDateTime } from '~/services/date'
+import { formatNumberValue } from '~/services/formatLocale'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 import { useDisplayStore } from '~/stores/display'
@@ -105,11 +107,12 @@ function getExpiresAt() {
 }
 
 function formatCredits(value: number) {
-  return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+  return formatNumberValue(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function toMonthKey(date: string) {
-  return dayjs(date).startOf('month').format('YYYY-MM-01')
+  const month = dayjs(date).startOf('month')
+  return `${month.year()}-${String(month.month() + 1).padStart(2, '0')}-01`
 }
 
 async function loadCreditAnalytics() {
@@ -159,6 +162,20 @@ const monthlyCreditSummary = computed(() => {
   }
 
   return Array.from(monthlyBuckets.values())
+})
+
+const periodCreditTotals = computed(() => {
+  return globalStatsTrendData.value.reduce(
+    (totals, row) => {
+      totals.creditsBought += Number(row.credits_bought || 0)
+      totals.creditsConsumed += Number(row.credits_consumed || 0)
+      return totals
+    },
+    {
+      creditsBought: 0,
+      creditsConsumed: 0,
+    },
+  )
 })
 
 const dailyCreditsSeries = computed(() => {
@@ -456,6 +473,23 @@ onMounted(async () => {
             <AdminFilterBar />
           </div>
 
+          <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <AdminStatsCard
+              :title="t('admin-credits-period-total-bought')"
+              :value="formatCredits(periodCreditTotals.creditsBought)"
+              :is-loading="isLoadingCreditAnalytics"
+              color-class="text-[#119eff]"
+              :subtitle="t('admin-credits-period-total-subtitle')"
+            />
+            <AdminStatsCard
+              :title="t('admin-credits-period-total-used')"
+              :value="formatCredits(periodCreditTotals.creditsConsumed)"
+              :is-loading="isLoadingCreditAnalytics"
+              color-class="text-red-500"
+              :subtitle="t('admin-credits-period-total-subtitle')"
+            />
+          </div>
+
           <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <ChartCard
               :title="t('admin-credits-analytics-chart-day')"
@@ -531,11 +565,14 @@ onMounted(async () => {
 
               <div v-else class="relative">
                 <div class="relative">
+                  <label for="admin-credits-search" class="sr-only">{{ t('admin-credits-search-placeholder') }}</label>
                   <MagnifyingGlassIcon class="absolute w-5 h-5 text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
                   <input
+                    id="admin-credits-search"
                     v-model="searchQuery"
                     type="text"
                     :placeholder="t('admin-credits-search-placeholder')"
+                    :aria-label="t('admin-credits-search-placeholder')"
                     class="w-full py-3 pl-10 pr-4 border rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
                   >
                   <Spinner v-if="isSearching" size="w-5 h-5" class="absolute text-blue-500 transform -translate-y-1/2 right-3 top-1/2" />

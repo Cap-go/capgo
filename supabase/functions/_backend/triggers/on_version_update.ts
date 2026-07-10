@@ -5,12 +5,12 @@ import { eq } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { normalizeLegacyEncodedManifestFileName } from '../utils/manifest_encoding.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { manifest } from '../utils/postgres_schema.ts'
 import { getPath, s3 } from '../utils/s3.ts'
 import { createStatsMeta } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
-import { backgroundTask } from '../utils/utils.ts'
 
 /**
  * Resolves `owner_org` for an app version row.
@@ -37,20 +37,93 @@ async function resolveOwnerOrg(c: Context, record: Database['public']['Tables'][
   return data?.owner_org ?? null
 }
 
+function getManifestEntryCount(value: unknown): number {
+  if (Array.isArray(value))
+    return value.length
+  return value ? 1 : 0
+}
+
+function versionUpdateLogFields(
+  record: Database['public']['Tables']['app_versions']['Row'],
+  oldRecord?: Database['public']['Tables']['app_versions']['Row'] | null,
+) {
+  return {
+    app_id: record.app_id,
+    deleted_at: record.deleted_at,
+    id: record.id,
+    manifest_count: record.manifest_count,
+    manifest_entries: getManifestEntryCount(record.manifest),
+    old_deleted_at: oldRecord?.deleted_at ?? null,
+    old_r2_path: oldRecord?.r2_path ?? null,
+    old_storage_provider: oldRecord?.storage_provider ?? null,
+    old_updated_at: oldRecord?.updated_at ?? null,
+    r2_path: record.r2_path,
+    storage_provider: record.storage_provider,
+    updated_at: record.updated_at,
+    version_name: record.name,
+  }
+}
+
+type DeletedVersionAction = 'continue' | 'delete' | 'cleanup_manifest' | 'skip'
+
+function getDeletedVersionAction(
+  record: Database['public']['Tables']['app_versions']['Row'],
+  oldRecord?: Database['public']['Tables']['app_versions']['Row'] | null,
+): DeletedVersionAction {
+  if (!record.deleted_at)
+    return 'continue'
+  if (record.deleted_at !== oldRecord?.deleted_at)
+    return 'delete'
+  if (record.manifest || (record.manifest_count ?? 0) > 0)
+    return 'cleanup_manifest'
+  return 'skip'
+}
+
+function getMetadataBranch(storageProvider: string | null, resolvedR2Path: string | null) {
+  if (storageProvider === 'r2' && resolvedR2Path)
+    return 'r2_bundle_size'
+  if (storageProvider === 'r2')
+    return 'zero_metadata_r2_path_unavailable'
+  if (storageProvider === 'r2-direct')
+    return 'zero_metadata_r2_direct_not_finalized'
+  return 'zero_metadata_non_r2_storage'
+}
+
 /**
  * Handles v2 storage metadata updates (size/checksum/stats) for R2-backed bundles.
  *
  * Returns `false` only when processing must stop (e.g. missing owner org).
  */
 async function v2PathSize(c: Context, record: Database['public']['Tables']['app_versions']['Row'], v2Path: string): Promise<boolean> {
-  // pdate size and checksum
-  cloudlog({ requestId: c.get('requestId'), message: 'V2', r2_path: record.r2_path })
-  // set checksum in s3
-  const size = await s3.getSize(c, v2Path)
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'on_version_update reading bundle size',
+    ...versionUpdateLogFields(record),
+    resolved_r2_path: v2Path,
+  })
+
+  const diagnostics = await s3.getSizeDiagnostics(c, v2Path)
+  const size = diagnostics.size
   if (!size) {
-    cloudlog({ requestId: c.get('requestId'), message: 'no size found for r2_path', r2_path: record.r2_path })
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'no size found for r2_path',
+      ...versionUpdateLogFields(record),
+      resolved_r2_path: v2Path,
+      size,
+      storageDiagnostics: diagnostics,
+    })
     return true
   }
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'on_version_update resolved bundle size',
+    ...versionUpdateLogFields(record),
+    resolved_r2_path: v2Path,
+    selectedCandidateKey: diagnostics.selectedCandidateKey,
+    size,
+  })
 
   const ownerOrg = await resolveOwnerOrg(c, record)
   if (!ownerOrg) {
@@ -71,8 +144,12 @@ async function v2PathSize(c: Context, record: Database['public']['Tables']['app_
       onConflict: 'id',
     })
     .eq('id', record.id)
-  if (errorUpdate)
-    cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate })
+  if (errorUpdate) {
+    cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate, ...versionUpdateLogFields(record), size })
+  }
+  else {
+    cloudlog({ requestId: c.get('requestId'), message: 'app_versions_meta size upserted', ...versionUpdateLogFields(record), owner_org: ownerOrg, size })
+  }
   const { error } = await createStatsMeta(c, record.app_id, record.id, size)
   if (error)
     cloudlog({ requestId: c.get('requestId'), message: 'error createStatsMeta', error })
@@ -99,7 +176,7 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
       .filter(entry => entry.file_name && entry.file_hash && entry.s3_path)
       .map(entry => ({
         app_version_id: record.id,
-        file_name: entry.file_name!,
+        file_name: normalizeLegacyEncodedManifestFileName(entry.file_name, entry.s3_path)!,
         file_hash: entry.file_hash!,
         s3_path: entry.s3_path!,
         file_size: 0,
@@ -155,14 +232,22 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
  */
 async function updateIt(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
   const v2Path = await getPath(c, record)
+  const metadataBranch = getMetadataBranch(record.storage_provider, v2Path)
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'on_version_update metadata branch selected',
+    ...versionUpdateLogFields(record),
+    metadataBranch,
+    resolved_r2_path: v2Path,
+  })
 
-  if (v2Path && record.storage_provider === 'r2') {
+  if (metadataBranch === 'r2_bundle_size' && v2Path) {
     const shouldContinue = await v2PathSize(c, record, v2Path)
     if (!shouldContinue)
       return c.json(BRES)
   }
   else {
-    cloudlog({ requestId: c.get('requestId'), message: 'no v2 path' })
+    cloudlog({ requestId: c.get('requestId'), message: 'on_version_update zero metadata branch selected', ...versionUpdateLogFields(record), metadataBranch, resolved_r2_path: v2Path })
     const ownerOrg = await resolveOwnerOrg(c, record)
     if (!ownerOrg) {
       cloudlog({ requestId: c.get('requestId'), message: 'missing owner_org for app_versions_meta upsert', id: record.id, app_id: record.app_id })
@@ -180,8 +265,12 @@ async function updateIt(c: Context, record: Database['public']['Tables']['app_ve
         onConflict: 'id',
       })
       .eq('id', record.id)
-    if (errorUpdate)
-      cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate })
+    if (errorUpdate) {
+      cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate, ...versionUpdateLogFields(record), metadataBranch, size: 0 })
+    }
+    else {
+      cloudlog({ requestId: c.get('requestId'), message: 'app_versions_meta zero size upserted', ...versionUpdateLogFields(record), metadataBranch, owner_org: ownerOrg, size: 0 })
+    }
   }
 
   // Handle manifest entries
@@ -193,7 +282,7 @@ async function updateIt(c: Context, record: Database['public']['Tables']['app_ve
 }
 
 /**
- * Deletes manifest rows and orphaned S3 assets for a removed app version.
+ * Deletes manifest rows and moves orphaned S3 assets to the R2 trash prefix.
  */
 async function deleteManifest(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
   // Delete manifest entries - first get them to delete from S3
@@ -209,11 +298,11 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
     if (manifestEntries && manifestEntries.length > 0) {
       const manifestCount = manifestEntries.length
 
-      // Delete each file from S3
-      const promisesDeleteS3 = []
+      // Move each unreferenced file to the R2 trash prefix.
+      const promisesMoveToTrash = []
       for (const entry of manifestEntries) {
         if (entry.s3_path) {
-          promisesDeleteS3.push(
+          promisesMoveToTrash.push(
             // First delete the manifest row from database
             supabaseAdmin(c)
               .from('manifest')
@@ -228,9 +317,11 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
                 // This avoids race condition where concurrent deletes both skip S3 cleanup
                 return supabaseAdmin(c)
                   .from('manifest')
-                  .select('*', { count: 'exact', head: true })
-                  .eq('file_name', entry.file_name)
+                  .select('id')
                   .eq('file_hash', entry.file_hash)
+                  .eq('file_name', entry.file_name)
+                  .limit(1)
+                  .maybeSingle()
               })
               .then((v) => {
                 if (!v)
@@ -239,25 +330,29 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
                   cloudlog({ requestId: c.get('requestId'), message: 'error checking manifest references', error: v.error })
                   return // Don't delete S3 if we can't confirm no other references
                 }
-                const count = v.count ?? 0
-                if (count) {
+                if (v.data) {
                   // Other versions still use this file, S3 cleanup not needed
                   return
                 }
-                // No other versions use this file, delete from S3
-                cloudlog({ requestId: c.get('requestId'), message: 'deleted manifest file from S3', s3_path: entry.s3_path })
-                return s3.deleteObject(c, entry.s3_path)
+                // No other versions use this file, move it to the R2 trash prefix.
+                cloudlog({ requestId: c.get('requestId'), message: 'moving manifest file to R2 trash', s3_path: entry.s3_path })
+                return s3.moveObjectToTrash(c, entry.s3_path)
+                  .then((moved) => {
+                    if (!moved) {
+                      throw simpleError('cannot_move_manifest_s3_to_trash', 'Cannot move S3 object for deleted manifest file to trash', { id: entry.id, s3_path: entry.s3_path })
+                    }
+                  })
               }),
           )
         }
       }
-      await backgroundTask(c, Promise.all(promisesDeleteS3))
+      await Promise.all(promisesMoveToTrash)
 
       // After deleting manifest entries, update manifest_count and decrement manifest_bundle_count
       const updatePgClient = getPgClient(c, false)
       try {
         await updatePgClient.query(
-          `UPDATE app_versions SET manifest_count = 0 WHERE id = $1`,
+          `UPDATE app_versions SET manifest_count = 0, manifest = NULL WHERE id = $1`,
           [record.id],
         )
 
@@ -281,7 +376,7 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
     }
   }
   catch (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'error fetch manifest entries', error })
+    cloudlog({ requestId: c.get('requestId'), message: 'error deleting manifest entries', error })
   }
   finally {
     await closeClient(c, pgClient)
@@ -292,17 +387,17 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
   cloudlog({ requestId: c.get('requestId'), message: 'Delete', r2_path: record.r2_path })
 
   if (record.r2_path) {
-    let deleted = false
+    let moved = false
     try {
-      deleted = await s3.deleteObject(c, record.r2_path)
+      moved = await s3.moveObjectToTrash(c, record.r2_path)
     }
     catch (error) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Cannot delete s3 (v2)', error })
-      throw simpleError('cannot_delete_s3', 'Cannot delete S3 object for deleted version', { id: record.id, r2_path: record.r2_path }, error)
+      cloudlog({ requestId: c.get('requestId'), message: 'Cannot move s3 to trash (v2)', error })
+      throw simpleError('cannot_move_s3_to_trash', 'Cannot move S3 object for deleted version to trash', { id: record.id, r2_path: record.r2_path }, error)
     }
 
-    if (!deleted) {
-      throw simpleError('cannot_delete_s3', 'Cannot delete S3 object for deleted version', { id: record.id, r2_path: record.r2_path })
+    if (!moved) {
+      throw simpleError('cannot_move_s3_to_trash', 'Cannot move S3 object for deleted version to trash', { id: record.id, r2_path: record.r2_path })
     }
   }
   else {
@@ -338,24 +433,37 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
-app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'UPDATE'), (c) => {
+app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'UPDATE'), async (c) => {
   const record = c.get('webhookBody') as Database['public']['Tables']['app_versions']['Row']
   const oldRecord = c.get('oldRecord') as Database['public']['Tables']['app_versions']['Row']
+  cloudlog({ requestId: c.get('requestId'), message: 'on_version_update received', ...versionUpdateLogFields(record, oldRecord) })
   cloudlog({ requestId: c.get('requestId'), message: 'record', record })
 
   if (!record.app_id) {
     cloudlog({ requestId: c.get('requestId'), message: 'no app_id', record })
     return c.json(BRES)
   }
-  // check if version was soft-deleted (deleted_at was set)
-  if (record.deleted_at && record.deleted_at !== oldRecord.deleted_at)
+
+  const deletedVersionAction = getDeletedVersionAction(record, oldRecord)
+  if (deletedVersionAction === 'delete')
     return deleteIt(c, record)
+  if (deletedVersionAction === 'cleanup_manifest') {
+    cloudlog({ requestId: c.get('requestId'), message: 'cleaning manifest for already deleted version', ...versionUpdateLogFields(record, oldRecord) })
+    await deleteManifest(c, record)
+    return c.json(BRES)
+  }
+  if (deletedVersionAction === 'skip')
+    return c.json(BRES)
 
   if (!record.r2_path && !record.manifest) {
-    cloudlog({ requestId: c.get('requestId'), message: 'no r2_path and no manifest, skipping update', record })
+    cloudlog({ requestId: c.get('requestId'), message: 'no r2_path and no manifest, skipping update', ...versionUpdateLogFields(record, oldRecord) })
     return c.json(BRES)
   }
 
-  cloudlog({ requestId: c.get('requestId'), message: 'Update but not deleted' })
+  cloudlog({ requestId: c.get('requestId'), message: 'Update but not deleted', ...versionUpdateLogFields(record, oldRecord) })
   return updateIt(c, record)
 })
+
+export const onVersionUpdateTestUtils = {
+  getDeletedVersionAction,
+}

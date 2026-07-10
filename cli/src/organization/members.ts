@@ -1,6 +1,7 @@
 import type { OptionsBase } from '../schemas/base'
 import { intro, log, outro } from '@clack/prompts'
 import { Table } from '@sauber/table'
+import { trackEvent } from '../analytics/track'
 import { checkAlerts } from '../api/update'
 import {
   assertOrgPermission,
@@ -181,6 +182,8 @@ export async function listMembersInternal(orgId: string, options: OptionsBase, s
       password_policy_compliant: pwPolicyStatus?.password_policy_compliant ?? false,
     }
   })
+
+  void trackEvent({ channel: 'organization', event: 'Org Members Listed', icon: '👥', tags: { member_count: memberInfoList.length, with_2fa_count: memberInfoList.filter(m => m.has_2fa).length } })
 
   if (!silent) {
     log.info(`Members found: ${memberInfoList.length}`)

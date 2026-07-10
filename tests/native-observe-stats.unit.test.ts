@@ -1,0 +1,66 @@
+import { describe, expect, it } from 'vitest'
+import { nativeObserveStatsTestUtils } from '../supabase/functions/_backend/private/native_observe_stats.ts'
+
+describe('native observe stats helpers', () => {
+  it.concurrent('normalizes supported period presets', () => {
+    expect(nativeObserveStatsTestUtils.normalizeNativeObservePeriodDays(undefined)).toBe(7)
+    expect(nativeObserveStatsTestUtils.normalizeNativeObservePeriodDays(1)).toBe(1)
+    expect(nativeObserveStatsTestUtils.normalizeNativeObservePeriodDays(3)).toBe(3)
+    expect(nativeObserveStatsTestUtils.normalizeNativeObservePeriodDays(7)).toBe(7)
+    expect(nativeObserveStatsTestUtils.normalizeNativeObservePeriodDays(30)).toBe(30)
+    expect(nativeObserveStatsTestUtils.normalizeNativeObservePeriodDays(2)).toBeNull()
+    expect(nativeObserveStatsTestUtils.normalizeNativeObservePeriodDays(7.5)).toBeNull()
+  })
+
+  it.concurrent('generates inclusive UTC day labels', () => {
+    expect(nativeObserveStatsTestUtils.generateDateLabels(
+      new Date('2026-07-01T18:00:00Z'),
+      new Date('2026-07-03T02:00:00Z'),
+    )).toEqual(['2026-07-01', '2026-07-02', '2026-07-03'])
+  })
+
+  it('builds daily timing, issue, action, and version aggregates', () => {
+    const response = nativeObserveStatsTestUtils.buildNativeObserveResponse({
+      labels: ['2026-07-01', '2026-07-02'],
+      days: 7,
+      start: '2026-07-01T00:00:00.000Z',
+      end: '2026-07-02T23:59:59.999Z',
+      dailyRows: [
+        { day: '2026-07-01', action: 'app_launch_ready', events: 4, devices: 3, p50_ms: 410.4, p90_ms: 912.8, p99_ms: 1200 },
+        { day: '2026-07-01', action: 'webview_page_loaded', events: 3, devices: 2, p50_ms: 720, p90_ms: 1450, p99_ms: 1800 },
+        { day: '2026-07-02', action: 'app_crash', events: 1, devices: 1, p50_ms: null, p90_ms: null, p99_ms: null },
+      ],
+      actionRows: [
+        { action: 'app_launch_ready', events: 4, devices: 3, p50_ms: 410.4, p90_ms: 912.8, p99_ms: 1200 },
+        { action: 'app_crash', events: 1, devices: 1, p50_ms: null, p90_ms: null, p99_ms: null },
+      ],
+      versionRows: [
+        { version_name: '1.2.3', events: 8, devices: 4, issue_count: 1, affected_devices: 1, launch_p90_ms: 912.8, webview_load_p90_ms: 1450 },
+      ],
+      overviewRow: {
+        events: 8,
+        devices: 4,
+        issue_count: 1,
+        affected_devices: 1,
+        launch_timeout_count: 0,
+        launch_p50_ms: 410.4,
+        launch_p90_ms: 912.8,
+        webview_load_p50_ms: 720,
+        webview_load_p90_ms: 1450,
+      },
+      releaseMarkers: [
+        { version_name: '1.2.3', channel_name: 'production', deployed_at: '2026-07-01T12:00:00.000Z' },
+      ],
+    })
+
+    expect(response.overview.issue_free_rate).toBe(75)
+    expect(response.overview.launch_p90_ms).toBe(913)
+    expect(response.daily.launches).toEqual([4, 0])
+    expect(response.daily.webview_loads).toEqual([3, 0])
+    expect(response.daily.issue_events).toEqual([0, 1])
+    expect(response.daily.launch_p50_ms).toEqual([410, null])
+    expect(response.actionBreakdown[1]).toMatchObject({ action: 'app_crash', is_issue: true })
+    expect(response.versions[0]).toMatchObject({ version_name: '1.2.3', issue_free_rate: 75, launch_p90_ms: 913 })
+    expect(response.releaseMarkers).toHaveLength(1)
+  })
+})

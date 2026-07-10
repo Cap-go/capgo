@@ -3,7 +3,7 @@ import { type } from 'arktype'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { safeParseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
 
-import { BASE_URL, fetchWithRetry, getAuthHeaders, getSupabaseClient, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, createDirectApiKeyWithBindings, fetchWithRetry, getAuthHeaders, getSupabaseClient, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
@@ -107,7 +107,7 @@ beforeAll(async () => {
     management_email: TEST_EMAIL,
     created_by: USER_ID,
     customer_id: customerId,
-    // This suite validates legacy API-key audit attribution, not RBAC bindings.
+    // This suite keeps the classic org membership path enabled while API keys use V2 bindings.
     use_new_rbac: false,
   })
   if (error)
@@ -132,18 +132,17 @@ beforeAll(async () => {
   if (appError)
     throw appError
 
-  const { data: apiKeyData, error: apiKeyError } = await getSupabaseClient().rpc('create_hashed_apikey_for_user', {
-    p_user_id: USER_ID,
-    // This suite exercises bundle create, metadata update, delete, and channel promotion flows.
-    // Use an all-mode key so the audit assertions track the current permission model instead of failing on RBAC gating.
-    p_mode: 'all',
-    p_name: `audit-api-key-${globalId}`,
-    p_limited_to_orgs: [ORG_ID],
-    p_limited_to_apps: [APIKEY_AUDIT_APP_ID],
-    p_expires_at: null as unknown as string,
+  const apiKeyData = await createDirectApiKeyWithBindings({
+    userId: USER_ID,
+    key: randomUUID(),
+    name: `audit-api-key-${globalId}`,
+    orgId: ORG_ID,
+    roleName: 'org_admin',
+    appId: APIKEY_AUDIT_APP_ID,
+    appRoleName: 'app_admin',
   })
-  if (apiKeyError || !apiKeyData?.id || !apiKeyData.key) {
-    throw new Error(`Failed to create isolated audit API key: ${apiKeyError?.message ?? 'missing key data'}`)
+  if (!apiKeyData?.id || !apiKeyData.key) {
+    throw new Error('Failed to create isolated audit API key')
   }
 
   apiKeyId = apiKeyData.id
@@ -577,7 +576,7 @@ describe('audit logs for app_versions via API key', () => {
     expect(safe.success).toBe(true)
 
     if (safe.success) {
-      // Find the audit log for our soft-deleted version (look for 'deleted' in changed_fields)
+      // Find the audit log for our soft-deleted version:app_versions!channels_version_fkey(look for 'deleted' in changed_fields)
       const deleteAuditLog = safe.data.data.find(
         log => log.record_id === versionIdToDelete.toString()
           && log.changed_fields?.includes('deleted'),

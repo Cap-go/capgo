@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { Database } from '~/types/supabase.types'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
@@ -8,7 +7,7 @@ import { useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
-import { notifyExistingUserInvite, resolveInviteNewUserErrorMessage, shouldNotifyExistingUserInvite } from '~/utils/invites'
+import { notifyExistingUserInvite, resolveInviteNewUserErrorMessage } from '~/utils/invites'
 
 interface InviteSuccessPayload {
   email: string
@@ -39,9 +38,8 @@ const inviteCaptchaElement = ref<InstanceType<typeof VueTurnstile> | null>(null)
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 const shouldUseCaptcha = computed(() => Boolean(captchaKey.value))
 const isInviting = ref(false)
-const useRbacInvites = computed(() => organizationStore.currentOrganization?.use_new_rbac === true)
-const existingUserInviteRole = computed(() => (useRbacInvites.value ? 'org_admin' : 'invite_admin'))
-const newUserInviteRole = computed(() => (useRbacInvites.value ? 'org_admin' : 'admin'))
+const existingUserInviteRole = 'org_admin'
+const newUserInviteRole = 'org_admin'
 const emailDialogTitle = computed(() => props.inviteKind === 'technical'
   ? t('onboarding-invite-option-modal-title')
   : t('invite-teammate-modal-title'))
@@ -174,13 +172,17 @@ function completeInviteSuccess(payload: InviteSuccessPayload) {
   isEmailDialogOpen.value = false
   isFullDetailsDialogOpen.value = false
   emit('success', payload)
-  sendEvent({
-    channel: 'onboarding-v2',
-    event: `onboarding-step-invite-teammate`,
-    icon: '👥',
-    user_id: organizationStore.currentOrganization?.gid,
-    notify: false,
-  }).catch()
+  const orgId = organizationStore.currentOrganization?.gid
+  if (orgId) {
+    sendEvent({
+      channel: 'onboarding-v2',
+      event: `onboarding-step-invite-teammate`,
+      icon: '👥',
+      org_id: orgId,
+      tracking_version: 2,
+      notify: false,
+    }).catch()
+  }
 }
 
 async function handleEmailSubmit() {
@@ -212,24 +214,13 @@ async function handleEmailSubmit() {
     let data: string | null = null
     let error: unknown = null
 
-    if (useRbacInvites.value) {
-      const result = await supabase.rpc('invite_user_to_org_rbac', {
-        email,
-        org_id: orgId,
-        role_name: existingUserInviteRole.value,
-      })
-      data = result.data
-      error = result.error
-    }
-    else {
-      const result = await supabase.rpc('invite_user_to_org', {
-        email,
-        org_id: orgId,
-        invite_type: existingUserInviteRole.value as Database['public']['Enums']['user_min_right'],
-      })
-      data = result.data
-      error = result.error
-    }
+    const result = await supabase.rpc('invite_user_to_org_rbac', {
+      email,
+      org_id: orgId,
+      role_name: existingUserInviteRole,
+    })
+    data = result.data
+    error = result.error
 
     if (error) {
       console.error('Error inviting user:', error)
@@ -243,12 +234,10 @@ async function handleEmailSubmit() {
     }
 
     if (data === 'OK') {
-      if (shouldNotifyExistingUserInvite(existingUserInviteRole.value, useRbacInvites.value)) {
-        const notified = await notifyExistingUserInvite(supabase, email, orgId)
-        if (!notified) {
-          console.warn('Failed to send invite email notification, but invite was created')
-          toast.warning(t('org-invite-email-notification-failed'))
-        }
+      const notified = await notifyExistingUserInvite(supabase, email, orgId)
+      if (!notified) {
+        console.warn('Failed to send invite email notification, but invite was created')
+        toast.warning(t('org-invite-email-notification-failed'))
       }
       toast.success(t('org-invited-user'))
       completeInviteSuccess({
@@ -330,7 +319,7 @@ async function handleFullDetailsSubmit() {
       body: {
         email,
         org_id: orgId,
-        invite_type: newUserInviteRole.value,
+        invite_type: newUserInviteRole,
         captcha_token: shouldUseCaptcha.value ? inviteCaptchaToken.value : undefined,
         first_name: firstName,
         last_name: lastName,

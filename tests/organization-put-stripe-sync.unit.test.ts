@@ -77,6 +77,7 @@ function createOrgRow(overrides: Partial<OrgRow> & Pick<OrgRow, 'id' | 'name' | 
     management_email: 'billing@capgo.app',
     max_apikey_expiration_days: null,
     name: 'Old Name',
+    onboarding: { intent: 'unknown' },
     password_policy_config: null,
     require_apikey_expiration: false,
     required_encryption_key: null,

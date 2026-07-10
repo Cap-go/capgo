@@ -4,9 +4,10 @@ import { builderPayloadTestUtils } from '../supabase/functions/_backend/public/b
 const { buildBuilderPayload } = builderPayloadTestUtils
 
 describe('builder payload shape', () => {
-  it('maps build_options (snake_case input) to buildOptions (camelCase output)', () => {
+  it.concurrent('maps build_options (snake_case input) to buildOptions (camelCase output)', () => {
     const payload = buildBuilderPayload({
       orgId: 'org-123',
+      actorUserId: 'user-1',
       uploadPath: 'orgs/org-123/apps/com.test/native-builds/session.zip',
       platform: 'ios',
       buildOptions: { platform: 'ios', buildMode: 'release', cliVersion: '7.83.0' },
@@ -19,9 +20,10 @@ describe('builder payload shape', () => {
     expect(payload).not.toHaveProperty('build_options')
   })
 
-  it('maps build_credentials (snake_case input) to buildCredentials (camelCase output)', () => {
+  it.concurrent('maps build_credentials (snake_case input) to buildCredentials (camelCase output)', () => {
     const payload = buildBuilderPayload({
       orgId: 'org-123',
+      actorUserId: 'user-1',
       uploadPath: 'orgs/org-123/apps/com.test/native-builds/session.zip',
       platform: 'android',
       buildOptions: {},
@@ -34,9 +36,10 @@ describe('builder payload shape', () => {
     expect(payload).not.toHaveProperty('build_credentials')
   })
 
-  it('does not include a legacy flat credentials field', () => {
+  it.concurrent('does not include a legacy flat credentials field', () => {
     const payload = buildBuilderPayload({
       orgId: 'org-123',
+      actorUserId: 'user-1',
       uploadPath: 'path.zip',
       platform: 'ios',
       buildOptions: {},
@@ -46,9 +49,10 @@ describe('builder payload shape', () => {
     expect(payload).not.toHaveProperty('credentials')
   })
 
-  it('includes userId, artifactKey, and fastlane with correct values', () => {
+  it.concurrent('includes userId (org), actorUserId (human), artifactKey, and fastlane with correct values', () => {
     const payload = buildBuilderPayload({
       orgId: 'org-456',
+      actorUserId: 'user-789',
       uploadPath: 'orgs/org-456/apps/com.example/native-builds/uuid.zip',
       platform: 'android',
       buildOptions: {},
@@ -56,13 +60,15 @@ describe('builder payload shape', () => {
     })
 
     expect(payload.userId).toBe('org-456')
+    expect(payload.actorUserId).toBe('user-789')
     expect(payload.artifactKey).toBe('orgs/org-456/apps/com.example/native-builds/uuid.zip')
     expect(payload.fastlane).toEqual({ lane: 'android' })
   })
 
-  it('contains exactly the expected top-level keys', () => {
+  it.concurrent('contains exactly the expected top-level keys', () => {
     const payload = buildBuilderPayload({
       orgId: 'org-789',
+      actorUserId: 'user-1',
       uploadPath: 'path/to/artifact.zip',
       platform: 'ios',
       buildOptions: { foo: 'bar' },
@@ -71,6 +77,7 @@ describe('builder payload shape', () => {
 
     const keys = Object.keys(payload).sort()
     expect(keys).toEqual([
+      'actorUserId',
       'artifactKey',
       'buildCredentials',
       'buildOptions',
@@ -82,6 +89,7 @@ describe('builder payload shape', () => {
   it.concurrent('drops timeoutSeconds from buildOptions', () => {
     const payload = buildBuilderPayload({
       orgId: 'org-timeout',
+      actorUserId: 'user-1',
       uploadPath: 'path/to/artifact.zip',
       platform: 'ios',
       buildOptions: { platform: 'ios', timeoutSeconds: 999999 },
@@ -91,7 +99,7 @@ describe('builder payload shape', () => {
     expect(payload.buildOptions).toEqual({ platform: 'ios' })
   })
 
-  it('passes through buildOptions and buildCredentials contents unchanged', () => {
+  it.concurrent('passes through buildOptions and buildCredentials contents unchanged', () => {
     const complexOptions = {
       platform: 'ios',
       buildMode: 'debug',
@@ -106,6 +114,7 @@ describe('builder payload shape', () => {
 
     const payload = buildBuilderPayload({
       orgId: 'org-test',
+      actorUserId: 'user-1',
       uploadPath: 'test/path.zip',
       platform: 'ios',
       buildOptions: complexOptions,

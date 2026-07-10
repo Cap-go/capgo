@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Webhook } from '~/stores/webhooks'
 import type { Database } from '~/types/supabase.types'
 import { storeToRefs } from 'pinia'
 import { onMounted, ref, watch } from 'vue'
@@ -13,10 +14,12 @@ import IconClock from '~icons/heroicons/clock'
 import IconX from '~icons/heroicons/x-circle'
 import IconXMark from '~icons/heroicons/x-mark'
 import Spinner from '~/components/Spinner.vue'
+import { formatLocalDateTimeWithSeconds } from '~/services/date'
+import { formatNumberValue } from '~/services/formatLocale'
 import { useWebhooksStore } from '~/stores/webhooks'
 
 const props = defineProps<{
-  webhook: Database['public']['Tables']['webhooks']['Row']
+  webhook: Webhook
 }>()
 
 const emit = defineEmits<{
@@ -31,6 +34,7 @@ const currentPage = ref(0)
 const statusFilter = ref<string | undefined>(undefined)
 const expandedDeliveryId = ref<string | null>(null)
 const retryingDeliveryId = ref<string | null>(null)
+const modalTitleId = 'webhook-delivery-log-title'
 
 const statusFilters = [
   { value: undefined, label: 'All' },
@@ -65,6 +69,10 @@ function toggleExpand(deliveryId: string) {
   expandedDeliveryId.value = expandedDeliveryId.value === deliveryId ? null : deliveryId
 }
 
+function getDeliveryDetailsId(deliveryId: string) {
+  return `webhook-delivery-details-${deliveryId}`
+}
+
 async function retryDelivery(delivery: Database['public']['Tables']['webhook_deliveries']['Row']) {
   retryingDeliveryId.value = delivery.id
   const result = await webhooksStore.retryDelivery(delivery.id)
@@ -94,22 +102,15 @@ function prevPage() {
 function formatDate(dateString: string | null): string {
   if (!dateString)
     return '-'
-  return new Date(dateString).toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  })
+  return formatLocalDateTimeWithSeconds(dateString) || '-'
 }
 
 function formatDuration(ms: number | null): string {
   if (ms === null)
     return '-'
   if (ms < 1000)
-    return `${ms}ms`
-  return `${(ms / 1000).toFixed(2)}s`
+    return `${formatNumberValue(ms)}ms`
+  return `${formatNumberValue(ms / 1000, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}s`
 }
 
 function getStatusColor(status: string): string {
@@ -136,15 +137,18 @@ function formatJson(data: any): string {
 </script>
 
 <template>
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+  <dialog
+    open
+    class="fixed inset-0 z-50 flex items-center justify-center w-full h-full max-w-none max-h-none p-0 m-0 border-0 bg-black/50"
+    :aria-labelledby="modalTitleId"
     @click="handleBackdropClick"
+    @keydown.esc.stop.prevent="handleClose"
   >
-    <div class="w-full max-w-4xl mx-4 overflow-hidden bg-white rounded-lg shadow-xl dark:bg-gray-800 max-h-[90vh] flex flex-col">
+    <div class="w-full max-w-4xl mx-4 overflow-hidden bg-white rounded-lg shadow-xl dark:bg-gray-800 max-h-[90dvh] flex flex-col">
       <!-- Header -->
       <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
         <div>
-          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+          <h3 :id="modalTitleId" class="text-lg font-semibold text-gray-900 dark:text-white">
             {{ t('delivery-log') }}
           </h3>
           <p class="text-sm text-gray-500 dark:text-gray-400">
@@ -152,7 +156,9 @@ function formatJson(data: any): string {
           </p>
         </div>
         <button
-          class="p-1 text-gray-400 rounded-lg hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-white"
+          type="button"
+          class="flex items-center justify-center text-gray-400 rounded-lg size-11 hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-white"
+          :aria-label="t('close')"
           @click="handleClose"
         >
           <IconXMark class="w-5 h-5" />
@@ -171,6 +177,7 @@ function formatJson(data: any): string {
                 ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
                 : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700',
             ]"
+            :aria-pressed="statusFilter === filter.value"
             @click="statusFilter = filter.value"
           >
             {{ filter.label }}
@@ -212,61 +219,66 @@ function formatJson(data: any): string {
             class="hover:bg-gray-50 dark:hover:bg-gray-700/50"
           >
             <!-- Delivery Header -->
-            <div
-              class="flex items-center gap-4 p-4 cursor-pointer"
-              @click="toggleExpand(delivery.id)"
-            >
-              <!-- Status Icon -->
-              <div class="shrink-0">
-                <IconCheck v-if="delivery.status === 'success'" class="w-5 h-5 text-green-500" />
-                <IconX v-else-if="delivery.status === 'failed'" class="w-5 h-5 text-red-500" />
-                <IconClock v-else class="w-5 h-5 text-yellow-500" />
-              </div>
-
-              <!-- Info -->
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2">
-                  <span
-                    class="px-2 py-0.5 text-xs font-medium rounded"
-                    :class="getStatusColor(delivery.status)"
-                  >
-                    {{ delivery.status }}
-                  </span>
-                  <span class="text-sm font-medium text-gray-900 truncate dark:text-white">
-                    {{ delivery.event_type }}
-                  </span>
+            <div class="flex items-center gap-2 p-4">
+              <button
+                type="button"
+                class="flex items-center flex-1 min-w-0 gap-4 text-left rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                :aria-expanded="expandedDeliveryId === delivery.id"
+                :aria-controls="getDeliveryDetailsId(delivery.id)"
+                @click="toggleExpand(delivery.id)"
+              >
+                <!-- Status Icon -->
+                <div class="shrink-0">
+                  <IconCheck v-if="delivery.status === 'success'" class="w-5 h-5 text-green-500" />
+                  <IconX v-else-if="delivery.status === 'failed'" class="w-5 h-5 text-red-500" />
+                  <IconClock v-else class="w-5 h-5 text-yellow-500" />
                 </div>
-                <div class="flex items-center gap-4 mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  <span>{{ formatDate(delivery.created_at) }}</span>
-                  <span v-if="delivery.response_status">HTTP {{ delivery.response_status }}</span>
-                  <span v-if="delivery.duration_ms">{{ formatDuration(delivery.duration_ms) }}</span>
-                  <span>Attempts: {{ delivery.attempt_count }}/{{ delivery.max_attempts }}</span>
-                </div>
-              </div>
 
-              <!-- Actions -->
-              <div class="flex items-center gap-2 shrink-0">
-                <button
-                  v-if="delivery.status === 'failed'"
-                  class="flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                  :disabled="retryingDeliveryId === delivery.id"
-                  @click.stop="retryDelivery(delivery)"
-                >
-                  <Spinner v-if="retryingDeliveryId === delivery.id" size="w-3 h-3" />
-                  <IconRefresh v-else class="w-3 h-3" />
-                  {{ t('retry') }}
-                </button>
+                <!-- Info -->
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span
+                      class="px-2 py-0.5 text-xs font-medium rounded"
+                      :class="getStatusColor(delivery.status)"
+                    >
+                      {{ delivery.status }}
+                    </span>
+                    <span class="text-sm font-medium text-gray-900 truncate dark:text-white">
+                      {{ delivery.event_type }}
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-4 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <span>{{ formatDate(delivery.created_at) }}</span>
+                    <span v-if="delivery.response_status">HTTP {{ delivery.response_status }}</span>
+                    <span v-if="delivery.duration_ms">{{ formatDuration(delivery.duration_ms) }}</span>
+                    <span>{{ t('attempts-count', { current: formatNumberValue(delivery.attempt_count), max: formatNumberValue(delivery.max_attempts) }) }}</span>
+                  </div>
+                </div>
+
                 <IconChevronDown
-                  class="w-5 h-5 text-gray-400 transition-transform" :class="[
+                  class="w-5 h-5 text-gray-400 transition-transform shrink-0" :class="[
                     expandedDeliveryId === delivery.id ? 'rotate-180' : '',
                   ]"
                 />
-              </div>
+              </button>
+
+              <!-- Actions -->
+              <button
+                v-if="delivery.status === 'failed'"
+                class="flex items-center gap-1 px-3 py-1.5 min-h-11 text-xs font-medium text-blue-600 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                :disabled="retryingDeliveryId === delivery.id"
+                @click="retryDelivery(delivery)"
+              >
+                <Spinner v-if="retryingDeliveryId === delivery.id" size="w-3 h-3" />
+                <IconRefresh v-else class="w-3 h-3" />
+                {{ t('retry') }}
+              </button>
             </div>
 
             <!-- Expanded Content -->
             <div
               v-if="expandedDeliveryId === delivery.id"
+              :id="getDeliveryDetailsId(delivery.id)"
               class="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50"
             >
               <!-- Request Payload -->
@@ -307,19 +319,21 @@ function formatJson(data: any): string {
         class="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700 shrink-0"
       >
         <span class="text-sm text-gray-500 dark:text-gray-400">
-          {{ t('showing-deliveries', { count: deliveries.length, total: deliveryPagination.total }) }}
+          {{ t('showing-deliveries', { count: formatNumberValue(deliveries.length), total: formatNumberValue(deliveryPagination.total) }) }}
         </span>
         <div class="flex gap-2">
           <button
-            class="p-2 text-gray-600 rounded-lg hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="flex items-center justify-center text-gray-600 rounded-lg size-11 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
             :disabled="currentPage === 0"
+            :aria-label="t('previous')"
             @click="prevPage"
           >
             <IconChevronLeft class="w-5 h-5" />
           </button>
           <button
-            class="p-2 text-gray-600 rounded-lg hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="flex items-center justify-center text-gray-600 rounded-lg size-11 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
             :disabled="!deliveryPagination.has_more"
+            :aria-label="t('next')"
             @click="nextPage"
           >
             <IconChevronRight class="w-5 h-5" />
@@ -327,5 +341,5 @@ function formatJson(data: any): string {
         </div>
       </div>
     </div>
-  </div>
+  </dialog>
 </template>

@@ -1,7 +1,7 @@
 import type { ChannelAddOptions } from '../schemas/channel'
 import { intro, log, outro } from '@clack/prompts'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
-import { createChannel, findUnknownVersion } from '../api/channels'
+import { createChannel } from '../api/channels'
 import {
   createSupabaseClient,
   findSavedKey,
@@ -37,17 +37,14 @@ export async function addChannelInternal(channelId: string, appId: string, optio
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon, silent)
   await check2FAComplianceForApp(supabase, appId, silent)
   await resolveUserIdFromApiKey(supabase, options.apikey)
-  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.admin, silent, true)
+  // Creating a channel needs app_admin tier (app.create_channel / the INSERT RLS's app.update_settings),
+  // which get_org_perm_for_apikey reports as perm_write; org_super_admin's app.delete is NOT required.
+  // Gating on admin here was a false-negative that blocked org_admin/app_admin keys. The channels
+  // INSERT RLS remains authoritative, so a non-admin key is still rejected at the DB.
+  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.write, silent, true)
 
   if (!silent)
     log.info(`Creating channel ${appId}#${channelId} to Capgo`)
-
-  const data = await findUnknownVersion(supabase, appId, { silent })
-  if (!data) {
-    if (!silent)
-      log.error('Cannot find default version for channel creation, please contact Capgo support 🤨')
-    throw new Error('Cannot find default version for channel creation')
-  }
 
   const orgId = await getOrganizationId(supabase, appId)
   const userId = await resolveUserIdFromApiKey(supabase, options.apikey)
@@ -55,7 +52,7 @@ export async function addChannelInternal(channelId: string, appId: string, optio
   const res = await createChannel(supabase, {
     name: channelId,
     app_id: appId,
-    version: data.id,
+    version: null,
     created_by: userId,
     owner_org: orgId,
     allow_device_self_set: options.selfAssign ?? false,
@@ -72,7 +69,8 @@ export async function addChannelInternal(channelId: string, appId: string, optio
     channel: 'channel',
     event: 'Create channel',
     icon: '✅',
-    user_id: orgId,
+    org_id: orgId,
+    tracking_version: 2,
     tags: {
       'app-id': appId,
       'channel': channelId,

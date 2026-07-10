@@ -35,12 +35,10 @@ const search = ref('')
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
-const rbacSystemEnabled = import.meta.env.VITE_FEATURE_RBAC_SYSTEM === 'true'
 const dialogStore = useDialogV2Store()
 const emailInput = ref('')
 const displayStore = useDisplayStore()
 displayStore.NavTitle = t('members')
-const useNewRbac = ref(false)
 
 type OrganizationMemberRow = ExtendedOrganizationMember & { is_invite?: boolean }
 type OrganizationMemberRows = OrganizationMemberRow[]
@@ -183,65 +181,26 @@ function isInviteMember(member: OrganizationMemberRow) {
 }
 
 function getMemberRoleLabel(member: OrganizationMemberRow) {
-  if (useNewRbac.value) {
-    const normalizedRole = member.role.replace(/^invite_/, '')
-    const i18nKey = getRbacRoleI18nKey(normalizedRole)
-    return i18nKey ? t(i18nKey) : normalizedRole.replaceAll('_', ' ')
-  }
-  return member.role.replaceAll('_', ' ')
-}
-
-function getMemberStatusLabel(member: OrganizationMemberRow) {
-  return isInviteMember(member) ? t('sso-status-pending') : t('sso-status-active')
-}
-
-function getMemberStatusClasses(member: OrganizationMemberRow) {
-  if (isInviteMember(member)) {
-    return {
-      pill: 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/25 dark:bg-amber-500/8 dark:text-amber-200',
-      dot: 'bg-amber-400 dark:bg-amber-300',
-    }
-  }
-
-  return {
-    pill: 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/25 dark:bg-emerald-500/8 dark:text-emerald-200',
-    dot: 'bg-emerald-500 dark:bg-emerald-300',
-  }
+  const normalizedRole = member.role.replace(/^invite_/, '')
+  const i18nKey = getRbacRoleI18nKey(normalizedRole)
+  return i18nKey ? t(i18nKey) : normalizedRole.replaceAll('_', ' ')
 }
 
 function renderRoleCell(member: OrganizationMemberRow) {
-  const statusClasses = getMemberStatusClasses(member)
-
-  return h('div', { class: 'flex flex-wrap items-center gap-2 min-w-0 whitespace-normal' }, [
+  const content = [
     h('span', { class: 'truncate text-slate-700 dark:text-slate-200' }, getMemberRoleLabel(member)),
-    h('span', { class: `inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border shrink-0 ${statusClasses.pill}` }, [
-      h('span', { class: `w-1.5 h-1.5 rounded-full ${statusClasses.dot}` }),
-      h('span', getMemberStatusLabel(member)),
-    ]),
-  ])
-}
+  ]
 
-async function checkRbacEnabled() {
-  useNewRbac.value = false
-  if (!currentOrganization.value)
-    return
-
-  try {
-    const { data, error } = await supabase
-      .from('orgs')
-      .select('use_new_rbac')
-      .eq('id', currentOrganization.value.gid)
-      .single()
-
-    if (error)
-      throw error
-
-    useNewRbac.value = (data as any)?.use_new_rbac || false
+  if (isInviteMember(member)) {
+    content.push(
+      h('div', { class: 'inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[0.625rem] font-medium text-amber-700 shrink-0 dark:border-amber-400/25 dark:bg-amber-500/8 dark:text-amber-200' }, [
+        h('span', { class: 'size-1.5 rounded-full bg-amber-400 dark:bg-amber-300' }),
+        h('span', t('sso-status-pending')),
+      ]),
+    )
   }
-  catch (error: any) {
-    useNewRbac.value = false
-    console.error('Error checking RBAC status:', error)
-  }
+
+  return h('div', { class: 'flex flex-wrap items-center gap-2 min-w-0 whitespace-normal' }, content)
 }
 
 const isInviteNewUserDialogOpen = ref(false)
@@ -279,35 +238,17 @@ const filteredMembers = computed(() => {
 })
 
 const permissionOptions = computed(() => {
-  if (useNewRbac.value) {
-    // Options RBAC
-    const options = [
-      { label: t('role-org-member'), value: 'org_member' },
-      { label: t('role-org-billing-admin'), value: 'org_billing_admin' },
-      { label: t('role-org-admin'), value: 'org_admin' },
-    ]
+  const options = [
+    { label: t('role-org-member'), value: 'org_member' },
+    { label: t('role-org-billing-admin'), value: 'org_billing_admin' },
+    { label: t('role-org-admin'), value: 'org_admin' },
+  ]
 
-    if (canUpdateUserRoles.value) {
-      options.push({ label: t('role-org-super-admin'), value: 'org_super_admin' })
-    }
-
-    return options
+  if (canUpdateUserRoles.value) {
+    options.push({ label: t('role-org-super-admin'), value: 'org_super_admin' })
   }
-  else {
-    // Options legacy
-    const options = [
-      { label: t('key-read'), value: 'read' },
-      { label: t('key-upload'), value: 'upload' },
-      { label: t('key-write'), value: 'write' },
-      { label: t('key-admin'), value: 'admin' },
-    ]
 
-    if (canUpdateUserRoles.value) {
-      options.push({ label: t('key-super-admin'), value: 'super_admin' })
-    }
-
-    return options
-  }
+  return options
 })
 
 const filteredAppAccessApps = computed(() => {
@@ -375,7 +316,7 @@ const isAppAccessSelectionValid = computed(() => {
 
 const membersOptions = computed(() => {
   if (!searchUserForAdminDelegation.value) {
-    return
+    return undefined
   }
 
   const searchLower = searchUserForAdminDelegation.value.toLowerCase()
@@ -430,7 +371,7 @@ columns.value = [
     actions: computed(() => [
       {
         icon: IconWrench,
-        title: rbacSystemEnabled ? t('edit-role') : t('actions'),
+        title: t('edit-role'),
         visible: (member: OrganizationMemberRow) => canUpdateUserRoles.value && member.uid !== currentOrganization?.value?.created_by,
         onClick: (member: OrganizationMemberRow) => {
           changeMemberPermission(member)
@@ -440,7 +381,7 @@ columns.value = [
         icon: IconShield,
         title: t('app-access-control'),
         visible: (member: OrganizationMemberRow) => {
-          if (!useNewRbac.value || !canUpdateUserRoles.value || isInviteMember(member))
+          if (!canUpdateUserRoles.value || isInviteMember(member))
             return false
           const normalizedRole = member.role.replace(/^invite_/, '')
           return !['org_super_admin', 'org_admin'].includes(normalizedRole)
@@ -464,53 +405,41 @@ async function reloadData() {
   isLoading.value = true
   const imageLoadRun = ++memberImageLoadRun
   try {
-    await checkRbacEnabled()
+    if (!currentOrganization.value)
+      return
 
-    if (useNewRbac.value && currentOrganization.value) {
-      // Utiliser la RPC RBAC pour récupérer les membres
-      const { data: rbacMembers, error: rbError } = await supabase
-        .rpc('get_org_members_rbac', {
-          p_org_id: currentOrganization.value.gid,
-        })
+    const { data: rbacMembers, error: rbError } = await supabase
+      .rpc('get_org_members_rbac', {
+        p_org_id: currentOrganization.value.gid,
+      })
 
-      if (rbError) {
-        console.error('Error fetching RBAC members:', rbError)
-        toast.error(t('error-fetching-members'))
-        return
+    if (rbError) {
+      console.error('Error fetching RBAC members:', rbError)
+      toast.error(t('error-fetching-members'))
+      return
+    }
+
+    const memberImageSources: MemberImageSource[] = []
+    members.value = (rbacMembers || []).map((member: any) => {
+      const isInvite = member.is_invite === true
+      const isTmp = member.is_tmp === true
+      const orgUserId = member.org_user_id
+      const hasOrgUserInvite = isInvite && !isTmp && orgUserId != null && orgUserId !== ''
+      const memberKey = String(member.user_id ?? member.email ?? '')
+      memberImageSources.push({ key: memberKey, imageUrl: member.image_url })
+
+      return {
+        id: member.user_id,
+        aid: hasOrgUserInvite ? Number(orgUserId) : -1,
+        uid: member.user_id,
+        email: member.email,
+        image_url: getImmediateImageUrl(member.image_url) || '',
+        role: member.role_name,
+        is_tmp: isTmp,
+        is_invite: isInvite,
       }
-
-      const memberImageSources: MemberImageSource[] = []
-      // Mapper les données RBAC vers le format attendu par la table
-      members.value = (rbacMembers || []).map((member: any) => {
-        const isInvite = member.is_invite === true
-        const isTmp = member.is_tmp === true
-        const orgUserId = member.org_user_id
-        const hasOrgUserInvite = isInvite && !isTmp && orgUserId != null && orgUserId !== ''
-        const memberKey = String(member.user_id ?? member.email ?? '')
-        memberImageSources.push({ key: memberKey, imageUrl: member.image_url })
-
-        return {
-          id: member.user_id,
-          aid: hasOrgUserInvite ? Number(orgUserId) : -1,
-          uid: member.user_id,
-          email: member.email,
-          image_url: getImmediateImageUrl(member.image_url) || '',
-          role: member.role_name,
-          is_tmp: isTmp,
-          is_invite: isInvite,
-        }
-      })
-      void loadMemberImages(memberImageSources, imageLoadRun)
-    }
-    else {
-      // Utiliser l'ancienne méthode pour les orgs sans RBAC
-      members.value = await organizationStore.getMembers((signedImages) => {
-        if (imageLoadRun !== memberImageLoadRun)
-          return
-
-        applySignedMemberImages(signedImages)
-      })
-    }
+    })
+    void loadMemberImages(memberImageSources, imageLoadRun)
   }
   catch (error) {
     console.error('Error reloading members:', error)
@@ -567,9 +496,7 @@ function validateEmail(email: string) {
 
 async function showPermModal(invite: boolean, onConfirm?: (permission: Database['public']['Enums']['user_min_right'] | string) => Promise<boolean>, currentRole?: string): Promise<Database['public']['Enums']['user_min_right'] | string | undefined> {
   const normalizedRole = currentRole?.replace(/^invite_/, '')
-  const initialRole = useNewRbac.value
-    ? (normalizedRole ? normalizedRole.trim().toLowerCase().replace(/\s+/g, '_') : '')
-    : (currentRole ?? '')
+  const initialRole = normalizedRole ? normalizedRole.trim().toLowerCase().replace(/\s+/g, '_') : ''
   selectedPermission.value = initialRole
     ? initialRole as Database['public']['Enums']['user_min_right']
     : undefined
@@ -590,10 +517,8 @@ async function showPermModal(invite: boolean, onConfirm?: (permission: Database[
   }
 
   dialogStore.openDialog({
-    title: useNewRbac.value ? t('select-user-role') : t('select-user-perms'),
-    description: useNewRbac.value
-      ? t('select-user-role-expanded')
-      : t('select-user-perms-expanded'),
+    title: t('select-user-role'),
+    description: t('select-user-role-expanded'),
     size: 'lg',
     preventAccidentalClose: !!onConfirm,
     buttons: [
@@ -700,17 +625,11 @@ async function sendInvitation(email: string, type: Database['public']['Enums']['
 
   isLoading.value = true
   try {
-    const { data, error } = useNewRbac.value
-      ? await supabase.rpc('invite_user_to_org_rbac', {
-          email,
-          org_id: orgId,
-          role_name: type,
-        })
-      : await supabase.rpc('invite_user_to_org', {
-          email,
-          org_id: orgId,
-          invite_type: type as Database['public']['Enums']['user_min_right'],
-        })
+    const { data, error } = await supabase.rpc('invite_user_to_org_rbac', {
+      email,
+      org_id: orgId,
+      role_name: type,
+    })
 
     if (error) {
       console.error('Error inviting user:', error)
@@ -743,7 +662,7 @@ async function handleSendInvitationOutput(output: string, email: string, type: D
   const existingMember = members.value.find(member => member.email.toLowerCase() === email.toLowerCase())
   const hasPendingInvite = existingMember ? isInviteMember(existingMember) : false
 
-  if (orgId && shouldAttemptExistingUserInviteNotification(output, type, useNewRbac.value, hasPendingInvite)) {
+  if (orgId && shouldAttemptExistingUserInviteNotification(output, hasPendingInvite)) {
     const notified = await notifyExistingUserInvite(supabase, email, orgId)
     if (!notified) {
       console.warn('Failed to send invite email notification')
@@ -888,7 +807,7 @@ async function cannotDeleteOwner() {
                   // get member from id
                   const selectedUser = members.value.filter(m => m.id === selectedUserToDelegateAdmin.value)[0]
                   // set user to super admin
-                  _changeMemberPermission(selectedUser, useNewRbac.value ? 'org_super_admin' : 'super_admin')
+                  _changeMemberPermission(selectedUser, 'org_super_admin')
                   selectedUserToDelegateAdmin.value = null
                   // get current member
                   const currentMember = members.value.filter(m => m.uid === main.user?.id)[0]
@@ -1108,64 +1027,20 @@ async function updateRbacInviteRole(member: OrganizationMemberRow, perm: string)
   }
 }
 
-async function updateTmpMemberRole(member: OrganizationMemberRow, perm: Database['public']['Enums']['user_min_right']) {
-  const { data, error } = await supabase.rpc('modify_permissions_tmp', {
-    email: member.email,
-    org_id: currentOrganization.value?.gid ?? '',
-    new_role: perm,
-  })
-
-  if (error) {
-    console.error('Error changing permission for invitation: ', error)
-    toast.error(`${t('cannot-change-permission')}: ${error.message}`)
-    return
-  }
-
-  if (data === 'OK') {
-    toast.success(t('permission-changed'))
-  }
-  else {
-    toast.warning(`${t('unexpected-response')}: ${data}`)
-  }
-
-  await reloadData()
-}
-
-async function updateLegacyMemberRole(member: OrganizationMemberRow, perm: Database['public']['Enums']['user_min_right']) {
-  const { error } = await supabase
-    .from('org_users')
-    .update({ user_right: perm })
-    .eq('id', member.aid)
-
-  if (error) {
-    console.error('Error changing permission: ', error)
-    toast.error(`${t('cannot-change-permission')}: ${error.message}`)
-    return
-  }
-
-  toast.success(t('permission-changed'))
-  await reloadData()
-}
-
 async function _changeMemberPermission(member: OrganizationMemberRow, perm: Database['public']['Enums']['user_min_right'] | string) {
   isLoading.value = true
   try {
-    if (useNewRbac.value && currentOrganization.value) {
-      if (isInviteMember(member)) {
-        await updateRbacInviteRole(member, perm as string)
-      }
-      else {
-        await updateRbacMemberRole(member, perm as string)
-      }
+    if (!currentOrganization.value) {
+      toast.error(t('no-permission'))
       return
     }
 
-    if (member.is_tmp) {
-      await updateTmpMemberRole(member, perm as Database['public']['Enums']['user_min_right'])
-      return
+    if (isInviteMember(member)) {
+      await updateRbacInviteRole(member, perm as string)
     }
-
-    await updateLegacyMemberRole(member, perm as Database['public']['Enums']['user_min_right'])
+    else {
+      await updateRbacMemberRole(member, perm as string)
+    }
   }
   catch (error) {
     console.error('Permission change failed:', error)
@@ -1177,7 +1052,7 @@ async function _changeMemberPermission(member: OrganizationMemberRow, perm: Data
 }
 
 async function changeMemberPermission(member: OrganizationMemberRow) {
-  const isInvite = useNewRbac.value ? isInviteMember(member) : member.role.includes('invite')
+  const isInvite = isInviteMember(member)
   const perm = await showPermModal(isInvite, undefined, member.role)
 
   if (!perm) {
@@ -1227,35 +1102,8 @@ function canDelete(member: OrganizationMemberRow) {
   return currentUserIsAdmin
 }
 
-function handlePermissionSelection(permission: Database['public']['Enums']['user_min_right'] | string, invite: boolean) {
-  if (useNewRbac.value) {
-    // Pour RBAC, on utilise directement le nom du rôle (org_super_admin, org_admin, etc.)
-    // Les invitations RBAC ne nécessitent pas de préfixe 'invite_'
-    selectedPermission.value = permission as any
-  }
-  else if (invite) {
-    // Legacy: ajouter le préfixe invite_ pour les invitations
-    switch (permission) {
-      case 'read':
-        selectedPermission.value = 'invite_read'
-        break
-      case 'upload':
-        selectedPermission.value = 'invite_upload'
-        break
-      case 'write':
-        selectedPermission.value = 'invite_write'
-        break
-      case 'admin':
-        selectedPermission.value = 'invite_admin'
-        break
-      case 'super_admin':
-        selectedPermission.value = 'invite_super_admin'
-        break
-    }
-  }
-  else {
-    selectedPermission.value = permission as any
-  }
+function handlePermissionSelection(permission: Database['public']['Enums']['user_min_right'] | string, _invite: boolean) {
+  selectedPermission.value = permission as any
 }
 
 function handleFormKitPermissionSelection(value: string | undefined) {
@@ -1398,7 +1246,7 @@ function updateAppAccessSaveButton() {
 }
 
 async function openAppAccessModal(member: OrganizationMemberRow) {
-  if (!currentOrganization.value || !useNewRbac.value) {
+  if (!currentOrganization.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -1602,17 +1450,6 @@ async function handleInviteNewUserSubmit() {
           {{ t('members') }}
         </h2>
       </div>
-      <div v-if="rbacSystemEnabled && useNewRbac" class="items-start gap-3 mb-4 d-alert d-alert-info">
-        <IconInformation class="w-6 h-6 text-sky-400 shrink-0" />
-        <div class="text-sm text-slate-100">
-          <p class="font-semibold">
-            {{ t('rbac-system-enabled') }}
-          </p>
-          <p class="text-slate-200">
-            {{ t('rbac-system-enabled-body') }}
-          </p>
-        </div>
-      </div>
       <DataTable
         v-model:columns="columns"
         v-model:current-page="currentPage"
@@ -1633,10 +1470,13 @@ async function handleInviteNewUserSubmit() {
     <!-- Teleport for email input dialog -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('insert-invite-email')" defer to="#dialog-v2-content">
       <div class="w-full">
+        <label for="invite-email-input" class="sr-only">{{ t('email') }}</label>
         <input
+          id="invite-email-input"
           v-model="emailInput"
           type="email"
           :placeholder="t('email')"
+          :aria-label="t('email')"
           class="w-full p-3 border border-gray-300 rounded-lg dark:text-white dark:bg-gray-800 dark:border-gray-600"
           @keydown.enter="$event.preventDefault()"
         >
@@ -1649,50 +1489,58 @@ async function handleInviteNewUserSubmit() {
         <form @submit.prevent="handleInviteNewUserSubmit">
           <!-- Email (not editable) -->
           <div class="mb-4">
-            <label for="email" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="invite-user-email" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t('email') }}
             </label>
             <input
+              id="invite-user-email"
               v-model="inviteUserEmail"
               type="email"
               disabled
+              :aria-label="t('email')"
               class="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg cursor-not-allowed dark:bg-gray-700 dark:border-gray-600"
             >
           </div>
 
           <!-- Role (not editable) -->
           <div class="mb-4">
-            <label for="role" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="invite-user-role" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t('role') }}
             </label>
             <input
+              id="invite-user-role"
               v-model="inviteUserRole"
               type="text"
               disabled
+              :aria-label="t('role')"
               class="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg cursor-not-allowed dark:bg-gray-700 dark:border-gray-600"
             >
           </div>
 
           <!-- First Name -->
           <div class="mb-4">
-            <label for="first-name" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="invite-user-first-name" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t('first-name') }}
             </label>
             <input
+              id="invite-user-first-name"
               v-model="inviteUserFirstName"
               type="text"
+              :aria-label="t('first-name')"
               class="w-full px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-800 dark:border-gray-600"
             >
           </div>
 
           <!-- Last Name -->
           <div class="mb-4">
-            <label for="last-name" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label for="invite-user-last-name" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t('last-name') }}
             </label>
             <input
+              id="invite-user-last-name"
               v-model="inviteUserLastName"
               type="text"
+              :aria-label="t('last-name')"
               class="w-full px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-800 dark:border-gray-600"
             >
           </div>
@@ -1851,10 +1699,13 @@ async function handleInviteNewUserSubmit() {
       <div class="w-full">
         <div class="flex mb-5 overflow-hidden md:w-auto">
           <div class="relative w-full">
+            <label for="delegate-admin-search" class="sr-only">{{ t('search-by-name-or-email') }}</label>
             <input
+              id="delegate-admin-search"
               v-model="searchUserForAdminDelegation"
               type="text"
               :placeholder="t('search-by-name-or-email')"
+              :aria-label="t('search-by-name-or-email')"
               :disabled="isLoading"
               class="w-full pl-10 rounded-full input input-bordered"
             >
@@ -1884,7 +1735,6 @@ async function handleInviteNewUserSubmit() {
       </div>
     </Teleport>
 
-    <!-- offer possibility to directly delete organization when the last super admin want to delete himself -->
     <DeleteOrgDialog
       ref="dialogRef"
       :org="currentOrganization"

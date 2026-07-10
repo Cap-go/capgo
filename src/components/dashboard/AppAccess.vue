@@ -4,7 +4,6 @@ import type { TableColumn } from '~/components/comp_def'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import IconInformation from '~icons/heroicons/information-circle'
 import IconLock from '~icons/heroicons/lock-closed'
 import IconPlus from '~icons/heroicons/plus'
 import IconShield from '~icons/heroicons/shield-check'
@@ -14,6 +13,7 @@ import DataTable from '~/components/DataTable.vue'
 import RoleSelect from '~/components/forms/RoleSelect.vue'
 import SearchInput from '~/components/forms/SearchInput.vue'
 import RoleSelectionModal from '~/components/modals/RoleSelectionModal.vue'
+import { formatLocalDate } from '~/services/date'
 import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -60,7 +60,6 @@ const roleBindings = ref<RoleBinding[]>([])
 const availableAppRoles = ref<Role[]>([])
 const search = ref('')
 const currentPage = ref(1)
-const useNewRbac = ref(false)
 const canAssignRoles = ref(false)
 const ownerOrg = ref<string>('')
 
@@ -142,27 +141,6 @@ async function fetchAppDetails() {
   }
   catch (error: any) {
     console.error('Error fetching app details:', error)
-  }
-}
-
-async function checkRbacEnabled() {
-  if (!ownerOrg.value)
-    return
-
-  try {
-    const { data, error } = await supabase
-      .from('orgs')
-      .select('use_new_rbac')
-      .eq('id', ownerOrg.value)
-      .single()
-
-    if (error)
-      throw error
-
-    useNewRbac.value = (data as any)?.use_new_rbac || false
-  }
-  catch (error: any) {
-    console.error('Error checking RBAC status:', error)
   }
 }
 
@@ -454,7 +432,6 @@ async function removeRoleBinding(bindingId: string) {
 
 async function loadAppAccess() {
   await fetchAppDetails()
-  await checkRbacEnabled()
   if (props.appId) {
     try {
       canAssignRoles.value = await checkPermissions('app.update_user_roles', { appId: props.appId })
@@ -467,14 +444,12 @@ async function loadAppAccess() {
   else {
     canAssignRoles.value = false
   }
-  if (useNewRbac.value) {
-    await Promise.all([
-      fetchAppRoleBindings(),
-      fetchAvailableAppRoles(),
-      fetchAvailableMembers(),
-      fetchAvailableGroups(),
-    ])
-  }
+  await Promise.all([
+    fetchAppRoleBindings(),
+    fetchAvailableAppRoles(),
+    fetchAvailableMembers(),
+    fetchAvailableGroups(),
+  ])
 }
 
 watch(() => props.appId, async () => {
@@ -488,12 +463,6 @@ onMounted(async () => {
 
 <template>
   <div class="w-full px-3 py-2">
-    <!-- RBAC not enabled message -->
-    <div v-if="!useNewRbac" class="mb-4 alert alert-info">
-      <IconInformation class="size-5" />
-      <span>{{ t('rbac-not-enabled-for-org') }}</span>
-    </div>
-
     <!-- Header -->
     <div class="flex items-center justify-between mb-4">
       <div>
@@ -506,7 +475,7 @@ onMounted(async () => {
         </p>
       </div>
       <button
-        v-if="useNewRbac && canAssignRoles"
+        v-if="canAssignRoles"
         class="d-btn d-btn-primary"
         @click="openAssignRoleModal"
       >
@@ -516,7 +485,7 @@ onMounted(async () => {
     </div>
 
     <!-- Search -->
-    <div v-if="useNewRbac" class="mb-4">
+    <div class="mb-4">
       <SearchInput
         v-model="search"
         :placeholder="t('search-role-bindings')"
@@ -526,7 +495,6 @@ onMounted(async () => {
 
     <!-- Role bindings table -->
     <DataTable
-      v-if="useNewRbac"
       :columns="columns"
       :element-list="filteredBindings"
       :total="filteredBindings.length"
@@ -557,7 +525,7 @@ onMounted(async () => {
 
       <template #granted_at="{ row }">
         <span class="text-sm text-gray-600">
-          {{ new Date(row.granted_at).toLocaleDateString() }}
+          {{ formatLocalDate(row.granted_at) }}
         </span>
       </template>
 
@@ -590,10 +558,10 @@ onMounted(async () => {
 
         <!-- Principal Type -->
         <div class="mt-4 form-control">
-          <label class="label">
+          <label class="label" for="assign-role-principal-type">
             <span class="label-text">{{ t('principal-type') }}</span>
           </label>
-          <select v-model="assignRoleForm.principal_type" class="d-select">
+          <select id="assign-role-principal-type" v-model="assignRoleForm.principal_type" class="d-select" :aria-label="t('principal-type')">
             <option value="user">
               {{ t('user') }}
             </option>
@@ -605,12 +573,12 @@ onMounted(async () => {
 
         <!-- Principal Selection -->
         <div class="mt-4 form-control">
-          <label class="label">
+          <label class="label" for="assign-role-principal-id">
             <span class="label-text">
               {{ assignRoleForm.principal_type === 'user' ? t('select-user') : t('select-group') }}
             </span>
           </label>
-          <select v-model="assignRoleForm.principal_id" class="d-select" required>
+          <select id="assign-role-principal-id" v-model="assignRoleForm.principal_id" class="d-select" required :aria-label="assignRoleForm.principal_type === 'user' ? t('select-user') : t('select-group')">
             <option value="">
               {{ assignRoleForm.principal_type === 'user' ? t('select-user') : t('select-group') }}
             </option>
@@ -635,12 +603,14 @@ onMounted(async () => {
 
         <!-- Reason (optional) -->
         <div class="mt-4 form-control">
-          <label class="label">
+          <label class="label" for="assign-role-reason">
             <span class="label-text">{{ t('reason-optional') }}</span>
           </label>
           <textarea
+            id="assign-role-reason"
             v-model="assignRoleForm.reason"
             :placeholder="t('reason-placeholder')"
+            :aria-label="t('reason-optional')"
             class="d-textarea"
             rows="2"
           />

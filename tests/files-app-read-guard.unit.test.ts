@@ -1,7 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
-const getAppByAppIdPgMock = vi.fn()
+const getAppByAppIdPgMock = vi.fn(async () => null)
 const getPgClientMock = vi.fn(() => ({}))
+const originalCaches = globalThis.caches
+const cachedBodiesByPath = new Map([
+  ['/read/attachments/orgs/test-org/apps/test-app/orphan.txt', 'cached orphan bytes'],
+  ['/read/attachments/orgs/test-org/apps/test-app/', 'cached malformed bytes'],
+])
 
 vi.mock('hono/adapter', async (importOriginal) => {
   const actual = await importOriginal<typeof import('hono/adapter')>()
@@ -28,34 +33,46 @@ vi.mock('../supabase/functions/_backend/utils/pg_files.ts', () => ({
   getUserIdFromApikey: vi.fn(),
 }))
 
-describe('files app-scoped read guard', () => {
-  beforeEach(() => {
-    vi.resetModules()
+async function createFilesApp() {
+  const { app: files } = await import('../supabase/functions/_backend/files/files.ts')
+  const { createAllCatch, createHono } = await import('../supabase/functions/_backend/utils/hono.ts')
+  const { version } = await import('../supabase/functions/_backend/utils/version.ts')
+
+  const appGlobal = createHono('files', version)
+  appGlobal.route('/', files)
+  createAllCatch(appGlobal, 'files')
+  return appGlobal
+}
+
+describe('files app-scoped cached reads', () => {
+  beforeAll(() => {
     vi.clearAllMocks()
-  })
-
-  it('returns 404 for deleted app-scoped files before serving cached content', async () => {
-    getAppByAppIdPgMock.mockResolvedValue(null)
-
-    const bucketPut = vi.fn()
     globalThis.caches = {
       default: {
-        match: async () => new Response('cached orphan bytes', {
-          headers: {
-            'content-type': 'text/plain',
-          },
-        }),
+        match: async (request: Request) => {
+          const pathname = new URL(request.url).pathname
+          const body = cachedBodiesByPath.get(pathname)
+          if (body == null)
+            return null
+
+          return new Response(body, {
+            headers: {
+              'content-type': 'text/plain',
+            },
+          })
+        },
         put: async () => { },
       },
     } as any
+  })
 
-    const { app: files } = await import('../supabase/functions/_backend/files/files.ts')
-    const { createAllCatch, createHono } = await import('../supabase/functions/_backend/utils/hono.ts')
-    const { version } = await import('../supabase/functions/_backend/utils/version.ts')
+  afterAll(() => {
+    globalThis.caches = originalCaches
+  })
 
-    const appGlobal = createHono('files', version)
-    appGlobal.route('/', files)
-    createAllCatch(appGlobal, 'files')
+  it.concurrent('serves deleted app-scoped files from cache without a database lookup', async () => {
+    const bucketPut = vi.fn()
+    const appGlobal = await createFilesApp()
 
     const response = await appGlobal.fetch(
       new Request('http://localhost/read/attachments/orgs/test-org/apps/test-app/orphan.txt'),
@@ -65,31 +82,16 @@ describe('files app-scoped read guard', () => {
       { waitUntil: () => { } } as any,
     )
 
-    expect(response.status).toBe(404)
+    expect(response.status).toBe(200)
+    expect(await response.text()).toBe('cached orphan bytes')
     expect(bucketPut).not.toHaveBeenCalled()
-    expect(getPgClientMock).toHaveBeenCalledWith(expect.anything(), false)
+    expect(getPgClientMock).not.toHaveBeenCalled()
+    expect(getAppByAppIdPgMock).not.toHaveBeenCalled()
   })
 
-  it('returns 404 for malformed app-scoped paths before serving cached content', async () => {
+  it.concurrent('serves malformed app-scoped paths from cache without a database lookup', async () => {
     const bucketPut = vi.fn()
-    globalThis.caches = {
-      default: {
-        match: async () => new Response('cached malformed bytes', {
-          headers: {
-            'content-type': 'text/plain',
-          },
-        }),
-        put: async () => { },
-      },
-    } as any
-
-    const { app: files } = await import('../supabase/functions/_backend/files/files.ts')
-    const { createAllCatch, createHono } = await import('../supabase/functions/_backend/utils/hono.ts')
-    const { version } = await import('../supabase/functions/_backend/utils/version.ts')
-
-    const appGlobal = createHono('files', version)
-    appGlobal.route('/', files)
-    createAllCatch(appGlobal, 'files')
+    const appGlobal = await createFilesApp()
 
     const response = await appGlobal.fetch(
       new Request('http://localhost/read/attachments/orgs/test-org/apps/test-app/'),
@@ -99,8 +101,11 @@ describe('files app-scoped read guard', () => {
       { waitUntil: () => { } } as any,
     )
 
-    expect(response.status).toBe(404)
+    expect(response.status).toBe(200)
+    expect(await response.text()).toBe('cached malformed bytes')
     expect(bucketPut).not.toHaveBeenCalled()
+    expect(getPgClientMock).not.toHaveBeenCalled()
     expect(getAppByAppIdPgMock).not.toHaveBeenCalled()
+    expect(getPgClientMock).not.toHaveBeenCalled()
   })
 })

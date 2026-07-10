@@ -2,20 +2,27 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
-import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadDevicesResponse, ReadStatsParams, StatsActions, StatsMetadata, VersionUsage } from './types.ts'
+import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadDevicesResponse, ReadStatsInsightsParams, ReadStatsParams, StatsActions, StatsInsightAction, StatsInsightDaily, StatsInsightDevice, StatsInsightsResult, StatsInsightVersion, StatsMetadata, VersionUsage, VersionUsageChannel } from './types.ts'
 import { getRuntimeKey } from 'hono/adapter'
-import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readDeviceVersionCountsCF, readNativeVersionUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
+import { countDevicesCF, countInstallSourcesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readDeviceVersionCountsCF, readNativeVersionUsageCF, readStatsCF, readStatsInsightsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
+import { normalizeDeviceCountryCode } from './deviceComparison.ts'
 import { isDemoApp } from './demo.ts'
-import { simpleError200 } from './hono.ts'
+import { simpleError, simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
-import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readDeviceVersionCountsSB, readNativeVersionUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
+import { countDevicesSB, countInstallSourcesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readDeviceVersionCountsSB, readNativeVersionUsageSB, readStatsSB, readStatsInsightsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
+import { logSkippedSupabaseWrite, shouldSkipSupabaseStatsFallback } from './supabase_write_guard.ts'
 import { DEFAULT_LIMIT } from './types.ts'
 import { backgroundTask, getEnv, isInternalVersionName } from './utils.ts'
+import { normalizeStatsInsightDate, normalizeStatsInsightNumber, sortStatsInsightTotals } from './statsInsights.ts'
 
 export function createStatsMau(c: Context, device_id: string, app_id: string, org_id: string, platform: string, version_build?: string | null): Promise<void> {
   const lowerDeviceId = device_id
   const jobs: Promise<unknown>[] = []
   if (!c.env.DEVICE_USAGE) {
+    if (shouldSkipSupabaseStatsFallback(c)) {
+      logSkippedSupabaseWrite(c, 'trackDeviceUsageSB')
+      return Promise.resolve()
+    }
     jobs.push(Promise.resolve(trackDeviceUsageSB(c, lowerDeviceId, app_id, org_id, platform, version_build)))
   }
   else {
@@ -53,18 +60,28 @@ export function createStatsBandwidth(c: Context, device_id: string, app_id: stri
   cloudlog({ requestId: c.get('requestId'), message: 'createStatsBandwidth', device_id: lowerDeviceId, app_id, file_size })
   if (file_size === 0)
     return
-  if (!c.env.BANDWIDTH_USAGE)
+  if (!c.env.BANDWIDTH_USAGE) {
+    if (shouldSkipSupabaseStatsFallback(c)) {
+      logSkippedSupabaseWrite(c, 'trackBandwidthUsageSB')
+      return Promise.resolve()
+    }
     return backgroundTask(c, trackBandwidthUsageSB(c, lowerDeviceId, app_id, file_size))
+  }
   return trackBandwidthUsageCF(c, lowerDeviceId, app_id, file_size)
 }
 
 export type VersionAction = 'get' | 'fail' | 'install' | 'uninstall'
-export function createStatsVersion(c: Context, version_name: string, app_id: string, action: VersionAction) {
+export function createStatsVersion(c: Context, version_name: string, app_id: string, action: VersionAction, channel?: VersionUsageChannel | string | null) {
   if (isInternalVersionName(version_name))
     return Promise.resolve()
-  if (!c.env.VERSION_USAGE)
-    return backgroundTask(c, trackVersionUsageSB(c, version_name, app_id, action))
-  return trackVersionUsageCF(c, version_name, app_id, action)
+  if (!c.env.VERSION_USAGE) {
+    if (shouldSkipSupabaseStatsFallback(c)) {
+      logSkippedSupabaseWrite(c, 'trackVersionUsageSB')
+      return Promise.resolve()
+    }
+    return backgroundTask(c, trackVersionUsageSB(c, version_name, app_id, action, channel))
+  }
+  return trackVersionUsageCF(c, version_name, app_id, action, channel)
 }
 
 export function normalizeStatsMetadata(metadata?: StatsMetadata): StatsMetadata | undefined {
@@ -89,8 +106,13 @@ export function createStatsLogsExternal(c: Context, app_id: string, device_id: s
   const finalVersionName = versionName && versionName !== '' ? versionName : 'unknown'
   const finalMetadata = normalizeStatsMetadata(metadata)
   // This is super important until every device get the version of plugin 6.2.5
-  if (!c.env.APP_LOG_EXTERNAL)
+  if (!c.env.APP_LOG_EXTERNAL) {
+    if (shouldSkipSupabaseStatsFallback(c)) {
+      logSkippedSupabaseWrite(c, 'trackLogsSB(external)')
+      return Promise.resolve()
+    }
     return backgroundTask(c, trackLogsSB(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata))
+  }
   return trackLogsCFExternal(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata)
 }
 
@@ -99,20 +121,38 @@ export function createStatsLogs(c: Context, app_id: string, device_id: string, a
   const finalVersionName = versionName && versionName !== '' ? versionName : 'unknown'
   const finalMetadata = normalizeStatsMetadata(metadata)
   // This is super important until every device get the version of plugin 6.2.5
-  if (!c.env.APP_LOG)
+  if (!c.env.APP_LOG) {
+    if (shouldSkipSupabaseStatsFallback(c)) {
+      logSkippedSupabaseWrite(c, 'trackLogsSB')
+      return Promise.resolve()
+    }
     return backgroundTask(c, trackLogsSB(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata))
+  }
   return trackLogsCF(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata)
 }
 
-export function createStatsDevices(c: Context, device: DeviceWithoutCreatedAt) {
+interface CreateStatsDevicesOptions {
+  includeRequestCountry?: boolean
+}
+
+export function createStatsDevices(c: Context, device: DeviceWithoutCreatedAt, options: CreateStatsDevicesOptions = {}) {
+  const requestCountry = options.includeRequestCountry === false ? undefined : c.req.raw?.cf?.country
+  const countryCode = normalizeDeviceCountryCode(typeof requestCountry === 'string' ? requestCountry : undefined)
+  const deviceWithCountry = countryCode ? { ...device, country_code: countryCode } : device
+
   // In Cloudflare Workers (workerd), prefer Analytics Engine when available.
   // For local Cloudflare testing, these bindings are typically absent, so we
   // must fall back to the Postgres/Supabase path or device state won't be
   // recorded and downstream APIs/tests will break.
   if (getRuntimeKey() === 'workerd' && c.env.DEVICE_INFO)
-    return backgroundTask(c, trackDevicesCF(c, device))
+    return backgroundTask(c, trackDevicesCF(c, deviceWithCountry))
 
-  return backgroundTask(c, trackDevicesSB(c, device))
+  if (shouldSkipSupabaseStatsFallback(c)) {
+    logSkippedSupabaseWrite(c, 'trackDevicesSB')
+    return Promise.resolve()
+  }
+
+  return backgroundTask(c, trackDevicesSB(c, deviceWithCountry))
 }
 
 export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, statsActions: StatsActions[], isFailedStat = false) {
@@ -131,19 +171,24 @@ export function createStatsMeta(c: Context, app_id: string, version_id: number, 
   if (size === 0)
     return { error: 'size is 0' }
   cloudlog({ requestId: c.get('requestId'), message: 'createStatsMeta', app_id, version_id, size })
+  if (shouldSkipSupabaseStatsFallback(c)) {
+    logSkippedSupabaseWrite(c, 'trackMetaSB')
+    return { error: 'supabase_write_forbidden' }
+  }
   return trackMetaSB(c, app_id, version_id, size)
 }
 
 export function readStatsMau(c: Context, app_id: string, start_date: string, end_date: string) {
   if (!c.env.DEVICE_USAGE)
     return readDeviceUsageSB(c, app_id, start_date, end_date)
-  return readDeviceUsageCF(c, app_id, start_date, end_date).then(res => res.map(({ org_id, ...rest }) => rest))
+  return readDeviceUsageCF(c, app_id, start_date, end_date).then(res => res.map(({ org_id: _org_id, ...rest }) => rest))
 }
 
 export function readStatsBandwidth(c: Context, app_id: string, start_date: string, end_date: string) {
   if (!c.env.BANDWIDTH_USAGE)
     return readBandwidthUsageSB(c, app_id, start_date, end_date)
-  return readBandwidthUsageCF(c, app_id, start_date, end_date)
+  assertAnalyticsEngineReadConfig(c, 'bandwidth usage')
+  return readBandwidthUsageCF(c, app_id, start_date, end_date, { throwOnError: true })
 }
 
 export function readStatsStorage(c: Context, app_id: string, start_date: string, end_date: string) {
@@ -151,10 +196,10 @@ export function readStatsStorage(c: Context, app_id: string, start_date: string,
   return readStatsStorageSB(c, app_id, start_date, end_date)
 }
 
-export function readStatsVersion(c: Context, app_id: string, start_date: string, end_date: string): Promise<VersionUsage[]> {
+export function readStatsVersion(c: Context, app_id: string, start_date: string, end_date: string, channel?: VersionUsageChannel | string): Promise<VersionUsage[]> {
   if (!c.env.VERSION_USAGE)
-    return readStatsVersionSB(c, app_id, start_date, end_date)
-  return readStatsVersionCF(c, app_id, start_date, end_date)
+    return readStatsVersionSB(c, app_id, start_date, end_date, channel)
+  return readStatsVersionCF(c, app_id, start_date, end_date, channel)
 }
 
 export function readNativeVersionUsage(c: Context, app_id: string, start_date: string, end_date: string, supabase: SupabaseClient<Database>): Promise<NativeVersionUsage[]> {
@@ -162,14 +207,23 @@ export function readNativeVersionUsage(c: Context, app_id: string, start_date: s
     return readNativeVersionUsageSB(c, app_id, start_date, end_date, supabase)
   return readNativeVersionUsageCF(c, app_id, start_date, end_date)
 }
+function hasAnalyticsEngineReadConfig(c: Context): boolean {
+  const token = getEnv(c, 'CF_ANALYTICS_TOKEN')
+  const accountId = getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')
+  return Boolean(token && accountId)
+}
 
 function shouldUseAnalyticsEngine(c: Context): boolean {
   if (getRuntimeKey() !== 'workerd' || !c.env.DEVICE_INFO)
     return false
   // Analytics reads require API access; fall back to Supabase when tokens are missing.
-  const token = getEnv(c, 'CF_ANALYTICS_TOKEN')
-  const accountId = getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')
-  return Boolean(token && accountId)
+  return hasAnalyticsEngineReadConfig(c)
+}
+
+function assertAnalyticsEngineReadConfig(c: Context, metricName: string): void {
+  if (!hasAnalyticsEngineReadConfig(c)) {
+    throw simpleError('analytics_engine_unavailable', `Cannot read ${metricName} without Analytics Engine read configuration`)
+  }
 }
 
 export function readDeviceVersionCounts(c: Context, app_id: string, channelName?: string): Promise<Record<string, number>> {
@@ -264,7 +318,7 @@ async function generateDemoLogs(c: Context, params: ReadStatsParams): Promise<De
     const device = devices[i % devices.length]
     const sequence = actionSequences[i % actionSequences.length]
     // Use the device's current version or pick from demo versions
-    const versionName = (device.version as any)?.name || demoVersions[Math.floor(Math.random() * demoVersions.length)]
+    const versionName = (device.version as any)?.name || demoVersions[i % demoVersions.length]
 
     // Calculate base time for this sequence
     const sequenceStartTime = rangeStart + (timeSpan * i / numSequences)
@@ -322,6 +376,126 @@ export async function readStats(c: Context<MiddlewareKeyVariables>, params: Read
   return readStatsCF(c, params)
 }
 
+interface StatsInsightSourceRow {
+  action: string
+  device_id: string
+  version_name: string
+  created_at: string
+}
+
+export function buildStatsInsightsFromRows(rows: StatsInsightSourceRow[]): StatsInsightsResult {
+  const actionMap = new Map<string, StatsInsightAction & { devices: Set<string>, versions: Set<string> }>()
+  const dailyMap = new Map<string, StatsInsightDaily>()
+  const versionMap = new Map<string, StatsInsightVersion>()
+  const deviceMap = new Map<string, StatsInsightDevice>()
+  const allDevices = new Set<string>()
+
+  rows.forEach((row) => {
+    const action = row.action || 'unknown'
+    const deviceId = row.device_id || ''
+    const versionName = row.version_name || 'unknown'
+    const createdAt = normalizeStatsInsightDate(row.created_at)
+    allDevices.add(deviceId)
+
+    const actionEntry = actionMap.get(action) ?? {
+      action,
+      total: 0,
+      device_count: 0,
+      version_count: 0,
+      first_seen: createdAt,
+      last_seen: createdAt,
+      latest_version_name: versionName,
+      latest_device_id: deviceId,
+      devices: new Set<string>(),
+      versions: new Set<string>(),
+    }
+    actionEntry.total += 1
+    actionEntry.devices.add(deviceId)
+    actionEntry.versions.add(versionName)
+    if (createdAt && (!actionEntry.first_seen || createdAt < actionEntry.first_seen))
+      actionEntry.first_seen = createdAt
+    if (createdAt && (!actionEntry.last_seen || createdAt > actionEntry.last_seen)) {
+      actionEntry.last_seen = createdAt
+      actionEntry.latest_version_name = versionName
+      actionEntry.latest_device_id = deviceId
+    }
+    actionMap.set(action, actionEntry)
+
+    if (createdAt) {
+      const date = createdAt.slice(0, 10)
+      const dailyKey = `${date}:${action}`
+      const dailyEntry = dailyMap.get(dailyKey) ?? { date, action, total: 0 }
+      dailyEntry.total += 1
+      dailyMap.set(dailyKey, dailyEntry)
+    }
+
+    const versionKey = `${action}:${versionName}`
+    const versionEntry = versionMap.get(versionKey) ?? { action, version_name: versionName, total: 0, device_count: 0, last_seen: createdAt }
+    versionEntry.total += 1
+    if (createdAt && (!versionEntry.last_seen || createdAt > versionEntry.last_seen))
+      versionEntry.last_seen = createdAt
+    versionMap.set(versionKey, versionEntry)
+
+    const deviceKey = `${action}:${deviceId}`
+    const deviceEntry = deviceMap.get(deviceKey) ?? { action, device_id: deviceId, total: 0, version_name: versionName, last_seen: createdAt }
+    deviceEntry.total += 1
+    if (createdAt && (!deviceEntry.last_seen || createdAt > deviceEntry.last_seen)) {
+      deviceEntry.last_seen = createdAt
+      deviceEntry.version_name = versionName
+    }
+    deviceMap.set(deviceKey, deviceEntry)
+  })
+
+  const versionDeviceSets = new Map<string, Set<string>>()
+  rows.forEach((row) => {
+    const key = `${row.action || 'unknown'}:${row.version_name || 'unknown'}`
+    const devices = versionDeviceSets.get(key) ?? new Set<string>()
+    devices.add(row.device_id || '')
+    versionDeviceSets.set(key, devices)
+  })
+
+  const actions = sortStatsInsightTotals([...actionMap.values()].map(({ devices, versions, ...entry }) => ({
+    ...entry,
+    total: normalizeStatsInsightNumber(entry.total),
+    device_count: devices.size,
+    version_count: versions.size,
+  })), 20)
+
+  const versions = sortStatsInsightTotals([...versionMap.entries()].map(([key, entry]) => ({
+    ...entry,
+    total: normalizeStatsInsightNumber(entry.total),
+    device_count: versionDeviceSets.get(key)?.size ?? 0,
+  })), 30)
+
+  const devices = sortStatsInsightTotals([...deviceMap.values()].map(entry => ({
+    ...entry,
+    total: normalizeStatsInsightNumber(entry.total),
+  })), 30)
+
+  return {
+    summary: {
+      total: rows.length,
+      device_count: allDevices.size,
+      action_count: actionMap.size,
+    },
+    actions,
+    daily: [...dailyMap.values()].sort((left, right) => left.date.localeCompare(right.date) || right.total - left.total),
+    versions,
+    devices,
+  }
+}
+
+export async function readStatsInsights(c: Context<MiddlewareKeyVariables>, params: ReadStatsInsightsParams) {
+  if (await isDemoApp(c, params.app_id)) {
+    const demoLogs = await generateDemoLogs(c, { ...params, limit: 10_000 })
+    return buildStatsInsightsFromRows(demoLogs)
+  }
+
+  if (!c.env.APP_LOG)
+    return readStatsInsightsSB(c, params)
+  return readStatsInsightsCF(c, params)
+}
+
 export function countDevices(
   c: Context,
   app_id: string,
@@ -330,13 +504,20 @@ export function countDevices(
   versionName?: string,
   search?: string,
 ) {
-  // Use Analytics Engine DEVICE_INFO when available in Cloudflare Workers.
-  // In local Cloudflare testing these bindings are often absent, so fall back
-  // to the Postgres/Supabase path.
   const trimmedSearch = search?.trim()
   if (shouldUseAnalyticsEngine(c))
     return countDevicesCF(c, app_id, customIdMode, deviceIds, versionName, trimmedSearch)
   return countDevicesSB(c, app_id, customIdMode, deviceIds, versionName, trimmedSearch)
+}
+
+export function countInstallSources(c: Context, app_id: string) {
+  if (getRuntimeKey() === 'workerd' && c.env.DEVICE_INFO && !shouldUseAnalyticsEngine(c)) {
+    throw simpleError('analytics_engine_unavailable', 'Cannot count install sources without Analytics Engine read configuration')
+  }
+
+  if (shouldUseAnalyticsEngine(c))
+    return countInstallSourcesCF(c, app_id)
+  return countInstallSourcesSB(c, app_id)
 }
 
 export async function readDevices(c: Context, params: ReadDevicesParams, customIdMode: boolean): Promise<ReadDevicesResponse> {
@@ -363,24 +544,24 @@ export async function readDevices(c: Context, params: ReadDevicesParams, customI
   return { data, nextCursor, hasMore }
 }
 
-export async function countAllApps(c: Context): Promise<number> {
+export async function countAllApps(c: Context, referenceDate?: Date): Promise<number> {
   const [cloudflareApps, supabaseApps] = await Promise.all([
-    getAppsFromCF(c),
-    getAppsFromSB(c),
+    getAppsFromCF(c, referenceDate),
+    getAppsFromSB(c, referenceDate),
   ])
 
   const allApps = [...new Set([...cloudflareApps, ...supabaseApps])]
   return allApps.length
 }
 
-export async function countAllUpdates(c: Context): Promise<number> {
-  const logsCount = await countUpdatesFromLogsCF(c)
+export async function countAllUpdates(c: Context, referenceDate?: Date): Promise<number> {
+  const logsCount = await countUpdatesFromLogsCF(c, referenceDate)
 
   return logsCount
 }
 
-export async function countAllUpdatesExternal(c: Context): Promise<number> {
-  const externalCount = await countUpdatesFromLogsExternalCF(c)
+export async function countAllUpdatesExternal(c: Context, referenceDate?: Date): Promise<number> {
+  const externalCount = await countUpdatesFromLogsExternalCF(c, referenceDate)
   return externalCount
 }
 

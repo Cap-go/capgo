@@ -2,6 +2,10 @@ import { exit } from 'node:process'
 import { log } from '@clack/prompts'
 import { Option, program } from 'commander'
 import pack from '../package.json'
+import { categorizeCliError } from './analytics/error-category'
+import { applyCommandAnalyticsOptOut, applyRawCommandAnalyticsOptOut } from './analytics/opt-out'
+import { enableSupabaseInstrumentation } from './analytics/supabase-perf'
+import { extractCommandContext, flushAnalytics, trackCommandFailed, trackCommandInvoked, trackCommandSucceeded } from './analytics/track'
 import { addApp } from './app/add'
 import { debugApp } from './app/debug'
 import { deleteApp } from './app/delete'
@@ -10,7 +14,15 @@ import { listApp } from './app/list'
 import { setApp } from './app/set'
 import { setSetting } from './app/setting'
 import { clearCredentialsCommand, listCredentialsCommand, migrateCredentialsCommand, saveCredentialsCommand, updateCredentialsCommand } from './build/credentials-command'
+import { manageCredentialsCommand } from './build/credentials-manage'
+import { syncIosMarketingVersionCommand } from './build/ios-marketing-version'
+import { lastOutputCommand } from './build/last-output-command'
+import { checkBuildNeeded } from './build/needed'
+import type { OnboardingBuilderOptions } from './build/onboarding/command'
 import { onboardingBuilderCommand } from './build/onboarding/command'
+import { prescanCommand } from './build/prescan/command'
+import type { CreateAppleKeyOptions } from './build/onboarding/asc-key/command'
+import { createAppleKeyCommand } from './build/onboarding/asc-key/command'
 import { requestBuildCommand } from './build/request'
 import { cleanupBundle } from './bundle/cleanup'
 import { checkCompatibility } from './bundle/compatibility'
@@ -19,7 +31,7 @@ import { deleteBundle } from './bundle/delete'
 import { encryptZip } from './bundle/encrypt'
 import { listBundle } from './bundle/list'
 import { printReleaseType } from './bundle/releaseType'
-import { uploadBundle } from './bundle/upload'
+import { handleBundleUploadCommand } from './bundle/upload-command'
 import { zipBundle } from './bundle/zip'
 import { addChannel } from './channel/add'
 import { currentBundle } from './channel/currentBundle'
@@ -30,11 +42,14 @@ import { generateDocs } from './docs'
 import { defaultStarRepo } from './github'
 import { starAllRepositoriesCommand, starRepositoryCommand } from './github-command'
 import { initApp } from './init'
+import { finishActiveCliReplay } from './init/replay'
 import { createKey, deleteOldKey, saveKeyCommand } from './key'
 import { login } from './login'
 import { startMcpServer } from './mcp/server'
+import { setupNotifications } from './notifications/setup'
 import { addOrganization, deleteOrganization, listMembers, listOrganizations, setOrganization } from './organization'
 import { capturePosthogException, getCommandPath, shouldCapturePosthogException } from './posthog'
+import { getPreviewQr } from './preview/qr'
 import { probe } from './probe'
 import { testRunDeviceCommand } from './run/device'
 import { getUserId } from './user/account'
@@ -60,10 +75,20 @@ program
   .description(`📦 Manage packages and bundle versions in Capgo Cloud`)
   .version(pack.version, '-v, --version', `output the current version`)
 
+// Turn on client-side Supabase perf tracking for the CLI. (Off by default so
+// the SDK bundle, which transitively imports createSupabaseClient, stays clean.)
+enableSupabaseInstrumentation()
+
 let currentCommandPath = 'unknown'
 
 program.hook('preAction', (_thisCommand, actionCommand) => {
   currentCommandPath = getCommandPath(actionCommand)
+  applyCommandAnalyticsOptOut(currentCommandPath, actionCommand.opts())
+  trackCommandInvoked(currentCommandPath, extractCommandContext(actionCommand))
+})
+
+program.hook('postAction', (_thisCommand, actionCommand) => {
+  trackCommandSucceeded(getCommandPath(actionCommand))
 })
 
 program
@@ -81,6 +106,7 @@ Example: npx @capgo/cli@latest init YOUR_API_KEY com.example.app`)
   .option('-i, --icon <icon>', `App icon path for display in Capgo Cloud`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+  .option('--no-analytics', 'Disable init analytics and terminal replay for this run')
 
 const run = program
   .command('run')
@@ -142,6 +168,29 @@ Example: npx @capgo/cli@latest login YOUR_API_KEY`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
+program
+  .command('get-qr [appId] [target]')
+  .description(`🔳 Print a terminal QR code for a bundle or channel preview.
+
+Preview must be enabled for the app.
+
+Examples:
+  npx @capgo/cli@latest get-qr com.example.app --bundle 1.2.3
+  npx @capgo/cli@latest get-qr com.example.app --bundle 123
+  npx @capgo/cli@latest get-qr com.example.app --channel production
+  npx @capgo/cli@latest get-qr com.example.app production --type channel`)
+  .action(getPreviewQr)
+  .option('-a, --apikey <apikey>', optionDescriptions.apikey)
+  .option('--bundle <bundle>', `Bundle name or id to preview`)
+  .option('--channel <channel>', `Channel name or id to preview`)
+  .addOption(new Option('--type <type>', `Type for positional target`).choices(['bundle', 'channel']))
+  .option('--png <path>', `Write the preview QR code as a PNG image to the given file path`)
+  .option('--url', `Print preview URLs only (web and deep link), without a terminal QR code`)
+  .option('--web-url', `Encode the web preview URL in the QR code and PNG instead of the capgo:// deep link`)
+  .addOption(new Option('--preview-env <env>', `Preview web URL environment`).choices(['prod', 'preprod', 'dev']).default('prod'))
+  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+
 const bundle = program
   .command('bundle')
   .description(`📦 Manage app bundles for deployment in Capgo Cloud, including upload, compatibility checks, and encryption.`)
@@ -156,13 +205,14 @@ Version must be > 0.0.0 and unique. Deleted versions cannot be reused for securi
 External option: Store only a URL link (useful for apps >200MB or privacy requirements).
 Capgo never inspects external content. Add encryption for trustless security.
 
-Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production`)
-  .action(async (...args: Parameters<typeof uploadBundle>): Promise<void> => {
-    await uploadBundle(...args)
-  })
+Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production,beta`)
+  .action(handleBundleUploadCommand)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('-p, --path <path>', `Path of the folder to upload, if not provided it will use the webDir set in capacitor.config`)
-  .option('-c, --channel <channel>', `Channel to link to`)
+  .option('-c, --channel <channel>', `Channel to link to. Use commas for multiple channels, for example production,beta`)
+  .option('--rollout <rollout>', `Set the uploaded bundle as this channel's rollout target at a percentage from 0 to 100`, value => Number.parseFloat(value))
+  .option('--rollout-percentage-bps <rolloutPercentageBps>', `Set the uploaded bundle rollout percentage in basis points from 0 to 10000`, value => Number.parseInt(value, 10))
+  .option('--rollout-cache-ttl-seconds <rolloutCacheTtlSeconds>', `Cloudflare rollout decision cache TTL in seconds`, value => Number.parseInt(value, 10))
   .option('-e, --external <url>', `Link to external URL instead of upload to Capgo Cloud`)
   .option('--iv-session-key <key>', `Set the IV and session key for bundle URL external`)
   .option('--s3-region <region>', `Region for your S3 bucket`)
@@ -187,6 +237,7 @@ Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --cha
   )
   .option('--auto-min-update-version', `Set the min update version based on native packages`)
   .option('--ignore-metadata-check', `Ignores the metadata (node_modules) check when uploading`)
+  .option('--fail-on-incompatible', `Fail the upload (exit non-zero) instead of uploading when the bundle is incompatible with the channel's current native packages. In an interactive terminal you can still choose a native build; declining fails. Cannot be combined with --ignore-metadata-check.`)
   .option('--ignore-checksum-check', `Ignores the checksum check when uploading`)
   .option('--force-crc32-checksum', `Force CRC32 checksum for upload (override auto-detection)`)
   .option('--timeout <timeout>', `Timeout for the upload process in seconds`)
@@ -198,7 +249,7 @@ Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --cha
   .option('--partial-only', `[DEPRECATED] Use --delta-only instead. Upload only incremental updates, skip full bundle`)
   .option('--delta', `Upload delta updates (only changed files) for instant, super-fast updates instead of big zip downloads`)
   .option('--delta-only', `Upload only delta updates without full bundle for maximum speed (useful for large apps)`)
-  .option('--no-delta', `Disable delta updates even if Direct Update is enabled`)
+  .option('--no-delta', `Disable delta updates even if instant updates are enabled`)
   .option('--encrypted-checksum <encryptedChecksum>', `An encrypted checksum (signature). Used only when uploading an external bundle.`)
   .option('--auto-set-bundle', `Set the bundle in capacitor.config.json`)
   .option('--dry-upload', `Dry upload the bundle process: add the row in database without uploading files or updating channels (Used by Capgo for internal testing)`)
@@ -210,6 +261,7 @@ Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --cha
   .option('--disable-brotli', `Completely disable brotli compression even if updater version supports it`)
   .option('--version-exists-ok', `Exit successfully if bundle version already exists, useful for CI/CD workflows with monorepos`)
   .option('--self-assign', `Allow devices to auto-join this channel (updates channel setting)`)
+  .option('--qr-preview', `Print a terminal QR code for this bundle preview after upload`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
   .option('--verbose', optionDescriptions.verbose)
@@ -408,10 +460,22 @@ Example: npx @capgo/cli@latest app set com.example.app --name "Updated App" --re
     await setApp(appId, options)
   })
   .option('-n, --name <name>', `App name for display in Capgo Cloud`)
-  .option('-i, --icon <icon>', `App icon path for display in Capgo Cloud`)
+  .option('-i, --icon <icon>', `Local image file path (png, jpg, webp, svg) used as the app icon in Capgo Cloud`)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('-r, --retention <retention>', `Days to keep old bundles (0 = infinite, default: 0)`)
   .option('--expose-metadata <exposeMetadata>', `Expose bundle metadata (link and comment) to the plugin (true/false, default: false)`)
+  .option('--preview', `Enable bundle and channel preview QR codes for this app`)
+  .option('--no-preview', `Disable bundle and channel preview QR codes for this app`)
+  .option('--allow-device-custom-id', `Allow devices to set a custom device ID for this app`)
+  .option('--no-allow-device-custom-id', `Disallow custom device IDs for this app`)
+  .option('--block-provider-infra-requests', `Block provider infrastructure requests for this app`)
+  .option('--no-block-provider-infra-requests', `Allow provider infrastructure requests for this app`)
+  .option('--build-timeout-minutes <minutes>', `Native build timeout in minutes (5-360, default: 15)`)
+  .option('--ios-store-url <url>', `iOS App Store URL for this app`)
+  .option('--android-store-url <url>', `Google Play Store URL for this app`)
+  .option('--default-upload-channel <channel>', `Default upload channel name for this app`)
+  .option('--default-download-channel <channel>', `Default download channel name for this app (sets channel public=true)`)
+  .option('--disable-download-channels', `Disable Capgo download channels for this app (sets all channels public=false)`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
@@ -420,7 +484,7 @@ const channel = program
   .description(`📢 Manage distribution channels for app updates in Capgo Cloud, controlling how updates are delivered to devices.`)
 
 channel
-  .command('add [channelId] [appId]')
+  .command('add [channelName] [appId]')
   .alias('a')
   .description(`➕ Create a new channel for app distribution in Capgo Cloud to manage update delivery.
 
@@ -433,7 +497,7 @@ Example: npx @capgo/cli@latest channel add production com.example.app --default`
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
 channel
-  .command('delete [channelId] [appId]')
+  .command('delete [channelName] [appId]')
   .alias('d')
   .description(`🗑️ Delete a channel from Capgo Cloud, optionally removing associated bundles to free up resources.
 
@@ -475,7 +539,7 @@ Example: npx @capgo/cli@latest channel currentBundle production com.example.app`
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
 channel
-  .command('set [channelId] [appId]')
+  .command('set [channelName] [appId]')
   .alias('s')
   .description(`⚙️ Configure settings for a channel, such as linking a bundle, setting update strategies (major, minor, metadata, patch, none), or device targeting (iOS, Android, dev, prod, emulator, device).
 
@@ -499,6 +563,25 @@ Example: npx @capgo/cli@latest channel set production com.example.app --bundle 1
   .option('--self-assign', `Allow device to self-assign to this channel`)
   .option('--no-self-assign', `Disable devices to self-assign to this channel`)
   .option('--disable-auto-update <disableAutoUpdate>', `Block updates by type: major, minor, metadata, patch, or none (allows all)`)
+  .option('--rollout-bundle <rolloutBundle>', `Bundle version to release gradually on this channel`)
+  .option('--rollout-percentage <rolloutPercentage>', `Rollout percentage from 0 to 100`, value => Number.parseFloat(value))
+  .option('--rollout-percentage-bps <rolloutPercentageBps>', `Rollout percentage in basis points from 0 to 10000`, value => Number.parseInt(value, 10))
+  .option('--rollout-enable', `Enable the configured rollout`)
+  .option('--rollout-disable', `Disable the configured rollout`)
+  .option('--rollout-pause', `Pause rollout exposure without rolling back selected devices`)
+  .option('--rollout-resume', `Resume a paused rollout`)
+  .option('--rollout-rollback', `Clear rollout state and return devices to stable`)
+  .option('--rollout-promote', `Promote rollout target to stable and clear rollout state`)
+  .option('--rollout-cache-ttl-seconds <rolloutCacheTtlSeconds>', `Cloudflare rollout decision cache TTL in seconds`, value => Number.parseInt(value, 10))
+  .option('--auto-pause-enabled', `Enable rollout auto-pause policy`)
+  .option('--auto-pause-disabled', `Disable rollout auto-pause policy`)
+  .option('--auto-pause-window-minutes <autoPauseWindowMinutes>', `Stats window for rollout auto-pause`, value => Number.parseInt(value, 10))
+  .option('--auto-pause-failure-rate-bps <autoPauseFailureRateBps>', `Failure-rate threshold in basis points`, value => Number.parseInt(value, 10))
+  .option('--auto-pause-confidence <autoPauseConfidence>', `Confidence level between 0 and 1`, value => Number.parseFloat(value))
+  .option('--auto-pause-min-attempts <autoPauseMinAttempts>', `Minimum install plus fail attempts before auto-pause can trigger`, value => Number.parseInt(value, 10))
+  .option('--auto-pause-min-failures <autoPauseMinFailures>', `Minimum failures before auto-pause can trigger`, value => Number.parseInt(value, 10))
+  .option('--auto-pause-action <autoPauseAction>', `Auto-pause action: pause, rollback, or notify`)
+  .option('--auto-pause-cooldown-minutes <autoPauseCooldownMinutes>', `Cooldown before auto-pause can trigger again`, value => Number.parseInt(value, 10))
   .option('--dev', `Allow sending update to development devices`)
   .option('--no-dev', `Disable sending update to development devices`)
   .option('--prod', `Allow sending update to production devices`)
@@ -507,6 +590,7 @@ Example: npx @capgo/cli@latest channel set production com.example.app --bundle 1
   .option('--no-emulator', `Disable sending update to emulator devices`)
   .option('--device', `Allow sending update to physical devices`)
   .option('--no-device', `Disable sending update to physical devices`)
+  .option('--qr-preview', `Print a terminal QR code for this channel preview after updating it`)
   .option('--package-json <packageJson>', optionDescriptions.packageJson)
   .option('--ignore-metadata-check', `Ignore checking node_modules compatibility if present in the bundle`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
@@ -744,7 +828,7 @@ const build = program
   .command('build')
   .description(`🏗️  Manage native iOS/Android builds through Capgo Cloud.
 
-⚠️ This feature is currently in PUBLIC BETA and cannot be used by anyone at this time.
+⚠️ Native cloud build requests are currently in LIMITED BETA. Access is restricted.
 
  🔒 SECURITY GUARANTEE:
     Build credentials are NEVER stored on Capgo servers.
@@ -754,14 +838,40 @@ const build = program
 📋 BEFORE BUILDING:
    Save your credentials first:
    npx @capgo/cli build credentials save --appId <your-app-id> --platform ios
-   npx @capgo/cli build credentials save --appId <your-app-id> --platform android`)
+   npx @capgo/cli build credentials save --appId <your-app-id> --platform android
+
+📤 CAPTURE THE OUTPUT URL FROM CI:
+   Pass --output-record to persist the download URL + QR code, then read it
+   back with \`build last-output\`:
+   npx @capgo/cli build request <appId> --platform android --output-upload --output-record /tmp/build.json
+   URL=$(npx @capgo/cli build last-output --path /tmp/build.json --field outputUrl)`)
+
+build
+  .command('needed [appId]')
+  .description(`🧭 Print "yes" and exit with code 1 if a native build is required; otherwise print "no" and exit with code 0. Command failures exit with code 2.
+
+Example: npx @capgo/cli@latest build needed com.example.app --channel production --verbose`)
+  .action(checkBuildNeeded)
+  .option('-a, --apikey <apikey>', optionDescriptions.apikey)
+  .option('-c, --channel <channel>', `Channel to compare against. Defaults to CapacitorUpdater.defaultChannel or the public default channel`)
+  .option('--package-json <packageJson>', optionDescriptions.packageJson)
+  .option('--node-modules <nodeModules>', optionDescriptions.nodeModules)
+  .option('--verbose', optionDescriptions.verbose)
+  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
 build
   .command('init')
   .alias('onboarding')
-  .description('Set up iOS build credentials interactively (creates certificates and profiles automatically)')
+  .description('Set up build credentials interactively (iOS: certificates + profiles automated; Android: keystore + Google OAuth provisions GCP service account and Play Console invite)')
   .option('-a, --apikey <apikey>', 'API key to link to your account')
-  .action(onboardingBuilderCommand)
+  .option('-p, --platform <platform>', 'Platform to onboard (ios or android). If omitted, auto-detects when only one native folder exists; prompts otherwise.')
+  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  .option('--no-analytics', 'Disable build onboarding analytics and terminal replay for this run')
+  // enableSelfUpdate is set ONLY here (the genuine `build init` entrypoint) so
+  // the self-update prompt's re-exec replays `build init`, never a wrapper
+  // command that reached onboarding as a sub-step (bundle upload / credentials).
+  .action((options: OnboardingBuilderOptions) => onboardingBuilderCommand({ ...options, enableSelfUpdate: true }))
 
 build
   .command('request [appId]')
@@ -785,8 +895,9 @@ Example: npx @capgo/cli@latest build request com.example.app --platform ios --pa
   // iOS credential CLI options (can also be set via env vars or saved credentials)
   .option('--build-certificate-base64 <cert>', 'iOS: Base64-encoded .p12 certificate')
   .option('--p12-password <password>', 'iOS: Certificate password (optional if cert has no password)')
-  .option('--apple-id <email>', 'iOS: Apple ID email')
-  .option('--apple-app-specific-password <password>', 'iOS: App-specific password')
+  .option('--apple-id <email>', 'iOS: Apple ID email for app-specific password uploads (alternative to App Store Connect API key)')
+  .option('--apple-app-specific-password <password>', 'iOS: App-specific password (xxxx-xxxx-xxxx-xxxx) for TestFlight uploads')
+  .option('--apple-app-id <id>', 'iOS: Numeric App Store Connect app id (required together with --apple-id and --apple-app-specific-password)')
   .option('--apple-key-id <id>', 'iOS: App Store Connect API Key ID')
   .option('--apple-issuer-id <id>', 'iOS: App Store Connect Issuer ID')
   .option('--apple-key-content <content>', 'iOS: Base64-encoded App Store Connect API key (.p8)')
@@ -802,16 +913,76 @@ Example: npx @capgo/cli@latest build request com.example.app --platform ios --pa
   .option('--keystore-store-password <password>', 'Android: Keystore store password')
   .option('--play-config-json <json>', 'Android: Base64-encoded Google Play service account JSON')
   .option('--android-flavor <flavor>', 'Android: Product flavor to build (e.g. production). Required if your project has multiple flavors.')
+  .option('--in-app-update-priority <priority>', 'Android: Google Play in-app update priority for this release (integer 0–5; higher = more urgent). See https://developer.android.com/guide/playcore/in-app-updates. Precedence: CLI > env > saved credentials')
   .option('--no-playstore-upload', 'Skip Play Store upload for this build (nulls out saved play config). Requires --output-upload.')
+  .option('--submit-to-store-review', 'After upload, submit the store release for review instead of leaving it as a draft/inactive build. Android marks the Play release completed; iOS submits the processed TestFlight build to App Store review.')
+  .option('--store-release-name <name>', 'Store release name/version label. Android sends this as the Google Play version_name; iOS uses it as the App Store version when creating or reusing the editable version.')
+  .option('--store-release-notes <notes>', 'Default store release notes. Android uses this as the Play changelog; iOS uses it as the fallback App Store What\'s New text.')
+  .option('--store-release-notes-locale <locale=notes>', 'Localized store release notes (repeatable), for example --store-release-notes-locale en-US="Bug fixes" --store-release-notes-locale fr-FR="Corrections".', collect, [])
+  .option('--ios-testflight-groups <groups>', 'iOS: optional comma-separated TestFlight external group names or IDs for external beta distribution.')
+  .option('--ios-automatic-release', 'iOS: automatically release the App Store version after Apple approval. Default is manual release.')
+  .option('--no-ios-automatic-release', 'iOS: keep the App Store version waiting for manual release after Apple approval.')
   .option('--output-upload', 'Override output upload behavior for this build only (enable). Precedence: CLI > env > saved credentials')
   .option('--no-output-upload', 'Override output upload behavior for this build only (disable). Precedence: CLI > env > saved credentials')
   .option('--output-retention <duration>', 'Override output link TTL for this build only (1h to 7d). Examples: 1h, 6h, 2d. Precedence: CLI > env > saved credentials')
+  .option('--output-record <path>', 'After a successful build, write a JSON record (jobId, status, outputUrl, qrCodeAscii, qrCodePngPath, finishedAt) to <path>. A PNG QR code is also written next to it as <path>.qr.png. Read fields back with `build last-output`.')
   .option('--skip-build-number-bump', 'Skip automatic build number/version code incrementing. Uses whatever version is already in the project files.')
   .option('--no-skip-build-number-bump', 'Override saved credentials to re-enable automatic build number incrementing for this build only.')
+  .option('--sync-ios-version', 'iOS: sync Xcode MARKETING_VERSION from package.json before uploading the project.')
+  .option('--ai-analytics', 'On build failure, send logs to Capgo AI for diagnosis. In interactive terminals this skips the upfront confirmation; in CI this auto-uploads and prints the analysis to stderr.')
+  .option('--no-prescan', 'Skip the automatic pre-build scan')
+  .option('--prescan-ignore-fatal', 'Run the pre-build scan but never block the build (report only)')
+  .option('--fail-on-warnings', 'Treat prescan warnings as fatal')
+  .option('--send-logs-to-support', 'On a CI/CD build failure, automatically upload the build logs to Capgo support (no email required). Capgo support is notified and will follow up by email. Additive to --ai-analytics.')
+  .addOption(new Option('--send-logs', 'Deprecated alias for --send-logs-to-support').hideHelp())
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
   .option('--verbose', optionDescriptions.verbose)
+
+build
+  .command('sync-ios-version')
+  .description(`Sync the local iOS Xcode MARKETING_VERSION from package.json.
+
+Example: npx @capgo/cli@latest build sync-ios-version --path .`)
+  .option('--path <path>', 'Path to the project directory (default: current directory)')
+  .option('--check', 'Check only; exit non-zero when MARKETING_VERSION is out of sync')
+  .action(syncIosMarketingVersionCommand)
+
+build
+  .command('prescan [appId]')
+  .description(`Scan your project and saved credentials for problems that would fail a cloud build — before uploading anything.
+
+Checks credentials (expiry, passwords, profile pairing), project state (cap sync, node_modules layout), and platform config. Runs automatically inside \`build request\`; this command runs it standalone (e.g. in CI).`)
+  .option('--platform <platform>', 'Target platform: ios or android (required)')
+  .option('--path <path>', 'Path to the project directory (default: current directory)')
+  .option('-a, --apikey <apikey>', optionDescriptions.apikey)
+  .option('--android-flavor <flavor>', 'Android: product flavor the build will use')
+  .addOption(new Option('--ios-dist <mode>', 'iOS: distribution mode to validate against').choices(['app_store', 'ad_hoc']))
+  .option('--json', 'Output a machine-readable JSON report')
+  .option('--fail-on-warnings', 'Exit non-zero when warnings are found (CI)')
+  .option('--ignore-fatal', 'Diagnostic mode: report everything but always exit 0')
+  .option('--verbose', optionDescriptions.verbose)
+  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+  .action(prescanCommand)
+
+build
+  .command('last-output')
+  .description(`Read the build output record written by a previous \`build request --output-record\`.
+
+Prints the full JSON by default, a single field with --field, or the ASCII QR
+code with --qr. Useful in CI to grab the download URL or QR for posting back
+to a PR or issue.
+
+Examples:
+  npx @capgo/cli build last-output --path /tmp/build.json
+  npx @capgo/cli build last-output --path /tmp/build.json --field outputUrl
+  npx @capgo/cli build last-output --path /tmp/build.json --qr`)
+  .action(lastOutputCommand)
+  .option('--path <path>', 'Path to the JSON record written by --output-record (required)')
+  .option('--field <field>', 'Print a single field (one of: jobId, appId, platform, buildMode, status, outputUrl, qrCodeAscii, qrCodePngPath, finishedAt, schemaVersion)')
+  .option('--qr', 'Print the rendered ASCII QR code (shortcut for --field qrCodeAscii)')
 
 const buildCredentials = build
   .command('credentials')
@@ -826,6 +997,24 @@ const buildCredentials = build
 📚 DOCUMENTATION:
    iOS setup: https://capgo.app/docs/cli/cloud-build/ios/
    Android setup: https://capgo.app/docs/cli/cloud-build/android/`)
+
+buildCredentials
+  .command('apple-key')
+  .alias('asc-key')
+  .description(`Create an App Store Connect team API key with a guided macOS helper (macOS only).
+
+Opens a native window that walks you through Apple's App Store Connect UI in an
+embedded browser, auto-captures the Issuer ID + Key ID, intercepts the one-time
+.p8, validates it against Apple, and saves it to ~/.appstoreconnect/private_keys.
+Progress statistics are forwarded to Capgo analytics (disable with CAPGO_DISABLE_TELEMETRY).
+
+Example:
+  npx @capgo/cli build credentials apple-key --appId com.example.app`)
+  .action((options: CreateAppleKeyOptions) => createAppleKeyCommand(options))
+  .option('-a, --apikey <apikey>', optionDescriptions.apikey)
+  .option('--appId <appId>', 'Save the captured key into this app iOS build credentials')
+  .option('--local', 'Save into the per-project .capgo-credentials.json instead of the global file')
+  .option('--json', 'Print the captured Key ID / Issuer ID / .p8 path as JSON')
 
 buildCredentials
   .command('save')
@@ -877,8 +1066,9 @@ Local storage (per-project):
   .option('--apple-issuer-id <id>', 'iOS: App Store Connect Issuer ID')
   .option('--apple-team-id <id>', 'iOS: App Store Connect Team ID')
   .addOption(new Option('--ios-distribution <mode>', 'iOS: Distribution mode').choices(['app_store', 'ad_hoc']).default('app_store'))
-  .option('--apple-id <email>', 'iOS: Apple ID email (optional)')
-  .option('--apple-app-password <password>', 'iOS: App-specific password (optional)')
+  .option('--apple-id <email>', 'iOS: Apple ID email for app-specific password uploads (alternative to App Store Connect API key)')
+  .option('--apple-app-specific-password <password>', 'iOS: App-specific password (xxxx-xxxx-xxxx-xxxx) for TestFlight uploads')
+  .option('--apple-app-id <id>', 'iOS: Numeric App Store Connect app id (required together with --apple-id and --apple-app-specific-password)')
   // Android options
   .option('--keystore <path>', 'Android: Path to keystore file (.keystore or .jks)')
   .option('--keystore-alias <alias>', 'Android: Keystore key alias')
@@ -886,6 +1076,7 @@ Local storage (per-project):
   .option('--keystore-store-password <password>', 'Android: Keystore store password')
   .option('--play-config <path>', 'Android: Path to Play Store service account JSON')
   .option('--android-flavor <flavor>', 'Android: Product flavor to build (e.g. production). Required if your project has multiple flavors.')
+  .option('--in-app-update-priority <priority>', 'Android: Google Play in-app update priority for future releases (integer 0–5; higher = more urgent). Omit to leave Play’s existing value untouched.')
   // Storage option
   .option('--local', 'Save to .capgo-credentials.json in project root instead of global ~/.capgo-credentials/')
   .option('--output-upload', 'Upload build outputs (IPA/APK/AAB) to Capgo storage and print download links')
@@ -946,6 +1137,9 @@ Examples:
   .option('--apple-key-id <id>', 'App Store Connect API Key ID')
   .option('--apple-issuer-id <id>', 'App Store Connect Issuer ID')
   .option('--apple-team-id <id>', 'App Store Connect Team ID')
+  .option('--apple-id <email>', 'iOS: Apple ID email for app-specific password uploads (alternative to App Store Connect API key)')
+  .option('--apple-app-specific-password <password>', 'iOS: App-specific password (xxxx-xxxx-xxxx-xxxx) for TestFlight uploads')
+  .option('--apple-app-id <id>', 'iOS: Numeric App Store Connect app id (required together with --apple-id and --apple-app-specific-password)')
   .addOption(new Option('--ios-distribution <mode>', 'iOS: Distribution mode').choices(['app_store', 'ad_hoc']).default('app_store'))
   // Android options
   .option('--keystore <path>', 'Path to keystore file (.keystore or .jks)')
@@ -954,11 +1148,29 @@ Examples:
   .option('--keystore-store-password <password>', 'Keystore store password')
   .option('--play-config <path>', 'Path to Google Play service account JSON')
   .option('--android-flavor <flavor>', 'Android: Product flavor to build (e.g. production). Required if your project has multiple flavors.')
+  .option('--in-app-update-priority <priority>', 'Android: Google Play in-app update priority for future releases (integer 0–5; higher = more urgent).')
   .option('--output-upload', 'Upload build outputs (IPA/APK/AAB) to Capgo storage and print download links')
   .option('--no-output-upload', 'Do not upload build outputs (IPA/APK/AAB) to Capgo storage')
   .option('--output-retention <duration>', 'Output link TTL: 1h to 7d. Examples: 1h, 6h, 2d')
   .option('--skip-build-number-bump', 'Skip automatic build number/version code incrementing on future builds')
   .option('--no-skip-build-number-bump', 'Re-enable automatic build number incrementing (default behavior)')
+
+buildCredentials
+  .command('manage')
+  .description(`Interactively manage saved build credentials.
+
+Browse stored credentials, view what's configured, export a CI/CD-ready .env file,
+or delete a platform's credentials. Reuses the same TUI as \`capgo init\`.
+
+Examples:
+  npx @capgo/cli build credentials manage
+  npx @capgo/cli build credentials manage --appId com.example.app
+  npx @capgo/cli build credentials manage --appId com.example.app --platform ios
+  npx @capgo/cli build credentials manage --local`)
+  .action(manageCredentialsCommand)
+  .option('--appId <appId>', 'App ID to manage (optional, prompts to pick if omitted)')
+  .option('--platform <platform>', 'Platform to manage: ios or android (optional, prompts to pick if omitted)')
+  .option('--local', 'Only browse local .capgo-credentials.json')
 
 buildCredentials
   .command('migrate')
@@ -973,6 +1185,22 @@ Example:
   .option('--appId <appId>', 'App ID (auto-detected from capacitor.config if omitted)')
   .option('--platform <platform>', 'Platform (only ios is supported)')
   .option('--local', 'Migrate from local .capgo-credentials.json instead of global')
+
+program
+  .command('notifications')
+  .description(`🔔 Set up Capgo native notifications in your Capacitor app.`)
+  .command('setup [appId]')
+  .description(`Install the Capgo notifications plugin, add Capacitor config, create a helper file, and run Capacitor sync.
+
+Before sending production notifications, configure Android and iOS push credentials in the Capgo app Notifications tab.
+
+Example: npx @capgo/cli@latest notifications setup com.example.app`)
+  .action(setupNotifications)
+  .option('--server-url <serverUrl>', 'Capgo API server URL')
+  .option('--file <file>', 'Helper file to create (default: src/capgo-notifications.ts)')
+  .option('--force', 'Overwrite the helper file if it already exists')
+  .option('--no-install', 'Skip installing the notifications package')
+  .option('--no-sync', 'Skip Capacitor sync')
 
 program
   .command('probe')
@@ -1033,38 +1261,50 @@ program.configureOutput({
     // Suppress Commander's default error output since we handle it in catch
   },
 })
+applyRawCommandAnalyticsOptOut(process.argv)
 
-program.parseAsync().catch(async (error: unknown) => {
-  if (typeof error === 'object' && error !== null && 'code' in error) {
-    const commanderError = error as { code: string, exitCode?: number, message?: string }
-    // These are normal Commander.js exits (help, version, etc.) - exit silently
-    if (commanderError.code === 'commander.version' || commanderError.code === 'commander.helpDisplayed') {
-      exit(0)
-    }
-    const capturePromise = shouldCapturePosthogException(error)
-      ? capturePosthogException({
+void (async () => {
+  try {
+    await program.parseAsync()
+    await flushAnalytics()
+  }
+  catch (error: unknown) {
+    if (typeof error === 'object' && error !== null && 'code' in error) {
+      const commanderError = error as { code: string, exitCode?: number, message?: string }
+      // These are normal Commander.js exits (help, version, etc.) - exit silently
+      if (commanderError.code === 'commander.version' || commanderError.code === 'commander.helpDisplayed') {
+        await flushAnalytics()
+        exit(0)
+      }
+      const capturePromise = shouldCapturePosthogException(error)
+        ? capturePosthogException({
           error,
           functionName: currentCommandPath,
           kind: 'unhandled_error',
           status: commanderError.exitCode ?? 1,
         })
-      : Promise.resolve(false)
-    // For actual errors, show just the message without the full stack trace
-    if (commanderError.message) {
-      log.error(commanderError.message)
+        : Promise.resolve(false)
+      // For actual errors, show just the message without the full stack trace
+      if (commanderError.message) {
+        log.error(commanderError.message)
+      }
+      const exitCode = commanderError.exitCode ?? 1
+      // Track the failure for usage analytics regardless of exception-capture
+      // policy (commander usage errors are real failures, categorized 'commander').
+      trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode })
+      await Promise.all([capturePromise, flushAnalytics(), finishActiveCliReplay().catch(() => {})])
+      exit(exitCode)
     }
-    await capturePromise
-    const exitCode = commanderError.exitCode ?? 1
-    exit(exitCode)
+    const capturePromise = capturePosthogException({
+      error,
+      functionName: currentCommandPath,
+      kind: 'unhandled_error',
+      status: 1,
+    })
+    // For non-Commander errors, show full error details
+    log.error(`Error: ${formatError(error)}`)
+    trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode: 1 })
+    await Promise.all([capturePromise, flushAnalytics(), finishActiveCliReplay().catch(() => {})])
+    exit(1)
   }
-  const capturePromise = capturePosthogException({
-    error,
-    functionName: currentCommandPath,
-    kind: 'unhandled_error',
-    status: 1,
-  })
-  // For non-Commander errors, show full error details
-  log.error(`Error: ${formatError(error)}`)
-  await capturePromise
-  exit(1)
-})
+})()

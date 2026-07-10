@@ -1,197 +1,122 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ============================================================================
-# Add a new table to existing read-replica replication (PlanetScale + Google)
+# Re-sync one table on the single Google read-replica subscriber.
 # Usage: ./replicate_add_table.sh <table_name>
-# ============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=read_replicate/common.sh
+source "${SCRIPT_DIR}/common.sh"
 
 if [[ $# -lt 1 ]]; then
   echo "Usage: $0 <table_name>"
-  echo "Example: $0 notifications"
+  echo "Example: $0 channels"
   exit 1
 fi
 
 TABLE_NAME="$1"
+validate_public_identifier "$TABLE_NAME" "table name"
 DUMP_DIR="${SCRIPT_DIR}/dumps"
 mkdir -p "$DUMP_DIR"
 
-echo "==> Adding table '${TABLE_NAME}' to read replica replication..."
+load_replica_target
+load_source
 
-# -------- Load Config --------
-ENV_FILE="${SCRIPT_DIR}/../internal/cloudflare/.env.prod"
+PUBLICATION_NAME="$(discover_publication_name)"
+DEFAULT_SUBSCRIPTION_NAME="capgo_google_$(replica_region_name)"
+discover_subscription "$DEFAULT_SUBSCRIPTION_NAME"
+print_target_summary
+echo "==> Publication: ${PUBLICATION_NAME}"
+echo "==> Re-syncing table: public.${TABLE_NAME}"
 
-if [[ -f "$ENV_FILE" ]]; then
-  echo "==> Loading connection strings from $ENV_FILE"
-  PLANETSCALE_NA=$(grep '^PLANETSCALE_NA=' "$ENV_FILE" | cut -d'=' -f2- || true)
-  PLANETSCALE_EU=$(grep '^PLANETSCALE_EU=' "$ENV_FILE" | cut -d'=' -f2- || true)
-  PLANETSCALE_SA=$(grep '^PLANETSCALE_SA=' "$ENV_FILE" | cut -d'=' -f2- || true)
-  PLANETSCALE_OC=$(grep '^PLANETSCALE_OC=' "$ENV_FILE" | cut -d'=' -f2- || true)
-  PLANETSCALE_AS_INDIA=$(grep '^PLANETSCALE_AS_INDIA=' "$ENV_FILE" | cut -d'=' -f2- || true)
-  PLANETSCALE_AS_JAPAN=$(grep '^PLANETSCALE_AS_JAPAN=' "$ENV_FILE" | cut -d'=' -f2- || true)
-
-  GOOGLE_HK=$(grep '^GOOGLE_HK=' "$ENV_FILE" | cut -d'=' -f2- || true)
-  GOOGLE_ME=$(grep '^GOOGLE_ME=' "$ENV_FILE" | cut -d'=' -f2- || true)
-  GOOGLE_AF=$(grep '^GOOGLE_AF=' "$ENV_FILE" | cut -d'=' -f2- || true)
-
-  DB_URL=$(grep '^MAIN_SUPABASE_DB_URL=' "$ENV_FILE" | cut -d'=' -f2-)
-  DB_URL="${DB_URL//ssl=false/sslmode=disable}"
-else
-  echo "Error: $ENV_FILE not found"
-  exit 1
+SAFE_CONNECTION_STRING="$(sql_literal_escape "$SOURCE_CONNECTION_STRING")"
+SOURCE_SLOT_STATUS=$(psql-17 "$SOURCE_DB_URL" -t -A -F '|' -c "
+  SELECT COALESCE(wal_status, ''), COALESCE(invalidation_reason, '')
+  FROM pg_replication_slots
+  WHERE slot_name = '${REPLICA_SLOT_NAME}';
+" || true)
+SOURCE_SLOT_WAL_STATUS="${SOURCE_SLOT_STATUS%%|*}"
+SOURCE_SLOT_INVALIDATION_REASON="${SOURCE_SLOT_STATUS#*|}"
+SOURCE_SLOT_LOST=false
+if [[ "$SOURCE_SLOT_WAL_STATUS" == "lost" || "$SOURCE_SLOT_INVALIDATION_REASON" == "wal_removed" ]]; then
+  SOURCE_SLOT_LOST=true
+  echo "==> Source slot is lost (${SOURCE_SLOT_WAL_STATUS}/${SOURCE_SLOT_INVALIDATION_REASON}); this run will recreate subscription and slot after copy."
 fi
 
-# Ensure sslrootcert=system is present for libpq when using verify modes.
-# Postgres 17+ rejects sslrootcert=system when sslmode is "require" (weak mode).
-ensure_sslrootcert_system() {
-  local url="$1"
-  if [[ "$url" == *"sslmode=require"* ]]; then
-    printf "%s" "$url"
-    return 0
-  fi
-  if [[ "$url" == *"sslrootcert="* ]]; then
-    printf "%s" "$url"
-    return 0
-  fi
-  if [[ "$url" == *"?"* ]]; then
-    printf "%s" "${url}&sslrootcert=system"
-  else
-    printf "%s" "${url}?sslrootcert=system"
-  fi
-}
-
-# Extract hostname from a postgres URL (handles host:port, host/db, querystring)
-extract_host() {
-  local url="$1"
-  echo "$url" | sed -E 's|.*@([^/:?]+).*|\1|'
-}
-
-# Parse source connection
-SOURCE_USER=$(echo "$DB_URL" | sed -E 's|postgresql://([^:]+):.*|\1|')
-SOURCE_PASSWORD=$(echo "$DB_URL" | sed -E 's|postgresql://[^:]+:(.*)@[^@]+$|\1|')
-_HOST_PORT_DB=$(echo "$DB_URL" | sed -E 's|.*@([^@]+)$|\1|')
-SOURCE_HOST=$(echo "$_HOST_PORT_DB" | sed -E 's|([^:]+):.*|\1|')
-SOURCE_PORT=$(echo "$_HOST_PORT_DB" | sed -E 's|[^:]+:([0-9]+)/.*|\1|')
-SOURCE_DB=$(echo "$_HOST_PORT_DB" | sed -E 's|[^/]+/([^?]+).*|\1|')
-
-# Convert pooler URL to direct connection
-if [[ "$SOURCE_USER" == postgres.* ]]; then
-  PROJECT_ID=$(echo "$SOURCE_USER" | sed -E 's|postgres\.(.+)|\1|')
-  SOURCE_HOST="db.${PROJECT_ID}.supabase.co"
-  SOURCE_PORT="5432"
-  SOURCE_USER="postgres"
-elif [[ "$SOURCE_PORT" == "6543" ]]; then
-  SOURCE_PORT="5432"
-fi
-
-SOURCE_DB_URL="postgresql://${SOURCE_USER}:${SOURCE_PASSWORD}@${SOURCE_HOST}:${SOURCE_PORT}/${SOURCE_DB}?sslmode=require"
-PUBLICATION_NAME='planetscale_replicate'
-
-# -------- Region Selection --------
-echo ""
-echo "Select read replica target:"
-echo "  1) PlanetScale NA (North America)"
-echo "  2) PlanetScale EU (Europe)"
-echo "  3) PlanetScale SA (South America)"
-echo "  4) PlanetScale OC (Oceania)"
-echo "  5) PlanetScale AS_INDIA (Asia - India)"
-echo "  6) PlanetScale AS_JAPAN (Asia - Japan)"
-echo "  7) Google HK (Hong Kong)"
-echo "  8) Google ME (Middle East)"
-echo "  9) Google AF (Africa)"
-echo "  10) ALL targets"
-echo ""
-read -rp "Enter choice [1-10]: " REGION_CHOICE
-
-REGIONS=()
-case "$REGION_CHOICE" in
-  1) REGIONS=("PLANETSCALE_NA") ;;
-  2) REGIONS=("PLANETSCALE_EU") ;;
-  3) REGIONS=("PLANETSCALE_SA") ;;
-  4) REGIONS=("PLANETSCALE_OC") ;;
-  5) REGIONS=("PLANETSCALE_AS_INDIA") ;;
-  6) REGIONS=("PLANETSCALE_AS_JAPAN") ;;
-  7) REGIONS=("GOOGLE_HK") ;;
-  8) REGIONS=("GOOGLE_ME") ;;
-  9) REGIONS=("GOOGLE_AF") ;;
-  10) REGIONS=("PLANETSCALE_NA" "PLANETSCALE_EU" "PLANETSCALE_SA" "PLANETSCALE_OC" "PLANETSCALE_AS_INDIA" "PLANETSCALE_AS_JAPAN" "GOOGLE_HK" "GOOGLE_ME" "GOOGLE_AF") ;;
-  *) echo "Invalid choice"; exit 1 ;;
-esac
-
-# ============================================================================
-# Step 1: Check if table exists in source
-# ============================================================================
-echo "==> Checking if table '${TABLE_NAME}' exists in source..."
-TABLE_EXISTS=$(psql-17 "$SOURCE_DB_URL" -t -A -c "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '${TABLE_NAME}';" || true)
+TABLE_EXISTS=$(psql-17 "$SOURCE_DB_URL" -t -A -c "
+  SELECT 1
+  FROM information_schema.tables
+  WHERE table_schema = 'public'
+    AND table_name = '${TABLE_NAME}';
+" || true)
 
 if [[ -z "$TABLE_EXISTS" ]]; then
-  echo "ERROR: Table public.${TABLE_NAME} does not exist in source database!"
+  echo "ERROR: public.${TABLE_NAME} does not exist in source database."
   exit 1
 fi
-echo "    Table exists."
 
-# ============================================================================
-# Step 2: Add table to publication (if not already there)
-# ============================================================================
-echo "==> Checking publication..."
-IN_PUBLICATION=$(psql-17 "$SOURCE_DB_URL" -t -A -c "SELECT 1 FROM pg_publication_tables WHERE pubname = '${PUBLICATION_NAME}' AND tablename = '${TABLE_NAME}';" || true)
+echo "==> Ensuring public.${TABLE_NAME} is in source publication..."
+psql-17 "$SOURCE_DB_URL" -v ON_ERROR_STOP=0 <<SQL
+DO \$\$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_publication_tables
+    WHERE pubname = '${PUBLICATION_NAME}'
+      AND schemaname = 'public'
+      AND tablename = '${TABLE_NAME}'
+  ) THEN
+    EXECUTE 'ALTER PUBLICATION ${PUBLICATION_NAME} ADD TABLE public.${TABLE_NAME}';
+    RAISE NOTICE 'Added public.${TABLE_NAME} to ${PUBLICATION_NAME}';
+  ELSE
+    RAISE NOTICE 'public.${TABLE_NAME} already in ${PUBLICATION_NAME}';
+  END IF;
+END
+\$\$;
+SQL
 
-if [[ -z "$IN_PUBLICATION" ]]; then
-  echo "    Adding table to publication..."
-  psql-17 "$SOURCE_DB_URL" -c "ALTER PUBLICATION ${PUBLICATION_NAME} ADD TABLE public.${TABLE_NAME};"
-  echo "    Done."
-else
-  echo "    Table already in publication."
-fi
-
-# ============================================================================
-# Step 3: Export data from source
-# ============================================================================
 DUMP_FILE="${DUMP_DIR}/${TABLE_NAME}.csv.gz"
-echo "==> Exporting data from source..."
-psql-17 "$SOURCE_DB_URL" -c "\\COPY public.${TABLE_NAME} TO STDOUT WITH (FORMAT csv, HEADER)" | gzip > "$DUMP_FILE"
-ROW_COUNT=$(gunzip -c "$DUMP_FILE" | wc -l | tr -d ' ')
-ROW_COUNT=$((ROW_COUNT - 1))  # Subtract header
-echo "    Exported ${ROW_COUNT} rows to ${DUMP_FILE}"
-
-# ============================================================================
-# Step 4: Get table schema from source
-# ============================================================================
-echo "==> Extracting table schema..."
 SCHEMA_FILE="${DUMP_DIR}/${TABLE_NAME}_schema.sql"
 
-# Get CREATE TABLE statement
+echo "==> Exporting source data..."
+psql-17 "$SOURCE_DB_URL" -c "\\COPY public.${TABLE_NAME} TO STDOUT WITH (FORMAT csv, HEADER)" | gzip > "$DUMP_FILE"
+ROW_COUNT=$(gunzip -c "$DUMP_FILE" | wc -l | tr -d ' ')
+ROW_COUNT=$((ROW_COUNT - 1))
+echo "    Exported ${ROW_COUNT} rows."
+
+echo "==> Extracting source table schema..."
 psql-17 "$SOURCE_DB_URL" -t -A -c "
 SELECT 'CREATE TABLE public.${TABLE_NAME} (' || string_agg(
-  column_name || ' ' ||
-  data_type ||
+  quote_ident(column_name) || ' ' ||
+  CASE
+    WHEN data_type = 'ARRAY' THEN udt_name
+    WHEN data_type = 'USER-DEFINED' THEN udt_schema || '.' || udt_name
+    ELSE data_type
+  END ||
   CASE WHEN character_maximum_length IS NOT NULL THEN '(' || character_maximum_length || ')' ELSE '' END ||
   CASE WHEN is_nullable = 'NO' THEN ' NOT NULL' ELSE '' END ||
   CASE WHEN column_default IS NOT NULL THEN ' DEFAULT ' || column_default ELSE '' END,
   ', ' ORDER BY ordinal_position
 ) || ');'
 FROM information_schema.columns
-WHERE table_schema = 'public' AND table_name = '${TABLE_NAME}';
+WHERE table_schema = 'public'
+  AND table_name = '${TABLE_NAME}';
 " > "$SCHEMA_FILE"
 
-# Add REPLICA IDENTITY FULL
 echo "ALTER TABLE ONLY public.${TABLE_NAME} REPLICA IDENTITY FULL;" >> "$SCHEMA_FILE"
 
-# Get primary key
 PK_COLUMNS=$(psql-17 "$SOURCE_DB_URL" -t -A -c "
-SELECT string_agg(a.attname, ', ' ORDER BY array_position(i.indkey, a.attnum))
+SELECT string_agg(quote_ident(a.attname), ', ' ORDER BY array_position(i.indkey, a.attnum))
 FROM pg_index i
 JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-WHERE i.indrelid = 'public.${TABLE_NAME}'::regclass AND i.indisprimary;
+WHERE i.indrelid = 'public.${TABLE_NAME}'::regclass
+  AND i.indisprimary;
 ")
 
 if [[ -n "$PK_COLUMNS" ]]; then
   echo "ALTER TABLE ONLY public.${TABLE_NAME} ADD CONSTRAINT ${TABLE_NAME}_pkey PRIMARY KEY (${PK_COLUMNS});" >> "$SCHEMA_FILE"
 fi
 
-# Get indexes (non-primary key)
 psql-17 "$SOURCE_DB_URL" -t -A -c "
 SELECT pg_get_indexdef(i.indexrelid) || ';'
 FROM pg_index i
@@ -201,80 +126,67 @@ WHERE i.indrelid = 'public.${TABLE_NAME}'::regclass
   AND c.relname NOT LIKE '%_pkey';
 " >> "$SCHEMA_FILE"
 
-echo "    Schema saved to ${SCHEMA_FILE}"
+echo "==> Disabling subscription while table is reloaded..."
+psql-17 "$REPLICA_TARGET_DB_URL" -v ON_ERROR_STOP=1 -c "ALTER SUBSCRIPTION ${REPLICA_SUBSCRIPTION_NAME} DISABLE;"
 
-# ============================================================================
-# Step 5: Process each region
-# ============================================================================
-for REGION_VAR in "${REGIONS[@]}"; do
-  DB_T="${!REGION_VAR}"
+cleanup_enable_subscription() {
+  psql-17 "$REPLICA_TARGET_DB_URL" -v ON_ERROR_STOP=0 -c "ALTER SUBSCRIPTION ${REPLICA_SUBSCRIPTION_NAME} ENABLE;" >/dev/null 2>&1 || true
+}
+trap cleanup_enable_subscription EXIT
 
-  if [[ -z "$DB_T" ]]; then
-    echo "==> WARNING: ${REGION_VAR} not configured, skipping..."
-    continue
-  fi
+TABLE_EXISTS_TARGET=$(psql-17 "$REPLICA_TARGET_DB_URL" -t -A -c "
+  SELECT 1
+  FROM information_schema.tables
+  WHERE table_schema = 'public'
+    AND table_name = '${TABLE_NAME}';
+" 2>/dev/null || true)
 
-  # Google (Cloud SQL) usually can't use sslmode=verify-full with IP hosts out-of-the-box.
-  if [[ "$REGION_VAR" == GOOGLE_* && "$DB_T" == *"sslmode=verify-full"* ]]; then
-    echo "==> WARNING: ${REGION_VAR} uses sslmode=verify-full with an IP host; this typically fails on Cloud SQL."
-    echo "==> Downgrading to sslmode=require (encrypted, no cert verification)."
-    DB_T="${DB_T/sslmode=verify-full/sslmode=require}"
-  fi
+if [[ -n "$TABLE_EXISTS_TARGET" ]]; then
+  echo "==> Truncating target public.${TABLE_NAME}..."
+  psql-17 "$REPLICA_TARGET_DB_URL" -v ON_ERROR_STOP=1 -c "TRUNCATE TABLE public.${TABLE_NAME};"
+else
+  echo "==> Creating target public.${TABLE_NAME}..."
+  psql-17 "$REPLICA_TARGET_DB_URL" -v ON_ERROR_STOP=1 -f "$SCHEMA_FILE"
+fi
 
-  TARGET_DB_URL="$(ensure_sslrootcert_system "$DB_T")"
+echo "==> Importing source data into target..."
+gunzip -c "$DUMP_FILE" | psql-17 "$REPLICA_TARGET_DB_URL" -v ON_ERROR_STOP=1 -c "\\COPY public.${TABLE_NAME} FROM STDIN WITH (FORMAT csv, HEADER)"
 
-  # Extract region name from host (PlanetScale DNS) or env key (Google IPs)
-  host="$(extract_host "$DB_T")"
-  if [[ "$host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ && "$REGION_VAR" == GOOGLE_* ]]; then
-    REGION="google_${REGION_VAR#GOOGLE_}"
-  else
-    REGION="${host%%.*}"
-  fi
-  REGION="${REGION//-/_}"
-  REGION="${REGION//[^A-Za-z0-9_]/_}"
-  # bash 3.2 (macOS default) doesn't support ${var,,}
-  REGION="$(printf '%s' "$REGION" | tr '[:upper:]' '[:lower:]')"
-  SUBSCRIPTION_NAME="planetscale_subscription_${REGION}"
+IMPORTED_COUNT=$(psql-17 "$REPLICA_TARGET_DB_URL" -t -A -c "SELECT COUNT(*) FROM public.${TABLE_NAME};")
+echo "    Imported ${IMPORTED_COUNT} rows."
 
-  echo ""
-  echo "========================================"
-  echo "  Processing region: ${REGION_VAR}"
-  echo "  Subscription: ${SUBSCRIPTION_NAME}"
-  echo "========================================"
+trap - EXIT
 
-  # Check if table already exists on target
-  TABLE_EXISTS_TARGET=$(psql-17 "$TARGET_DB_URL" -t -A -c "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '${TABLE_NAME}';" 2>/dev/null || true)
+if [[ "$SOURCE_SLOT_LOST" == "true" ]]; then
+  echo "==> Recreating lost subscription and slot..."
+  psql-17 "$REPLICA_TARGET_DB_URL" -v ON_ERROR_STOP=0 -c "ALTER SUBSCRIPTION ${REPLICA_SUBSCRIPTION_NAME} SET (slot_name = NONE);" || true
+  psql-17 "$REPLICA_TARGET_DB_URL" -v ON_ERROR_STOP=0 -c "DROP SUBSCRIPTION ${REPLICA_SUBSCRIPTION_NAME};" || true
+  psql-17 "$SOURCE_DB_URL" -v ON_ERROR_STOP=0 -c "SELECT pg_drop_replication_slot('${REPLICA_SLOT_NAME}') WHERE EXISTS (SELECT 1 FROM pg_replication_slots WHERE slot_name = '${REPLICA_SLOT_NAME}');" || true
+  psql-17 "$REPLICA_TARGET_DB_URL" -v ON_ERROR_STOP=1 <<SQL
+CREATE SUBSCRIPTION ${REPLICA_SUBSCRIPTION_NAME}
+CONNECTION '${SAFE_CONNECTION_STRING}'
+PUBLICATION ${PUBLICATION_NAME}
+WITH (
+  slot_name = '${REPLICA_SLOT_NAME}',
+  copy_data = false,
+  create_slot = true,
+  enabled = true,
+  disable_on_error = false
+);
+SQL
+else
+  echo "==> Re-enabling subscription..."
+  psql-17 "$REPLICA_TARGET_DB_URL" -v ON_ERROR_STOP=1 -c "ALTER SUBSCRIPTION ${REPLICA_SUBSCRIPTION_NAME} ENABLE;"
 
-  if [[ -n "$TABLE_EXISTS_TARGET" ]]; then
-    echo "==> Table already exists on target. Truncating..."
-    psql-17 "$TARGET_DB_URL" -c "TRUNCATE TABLE public.${TABLE_NAME};"
-  else
-    echo "==> Creating table on target..."
-    psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 -f "$SCHEMA_FILE"
-  fi
+  echo "==> Refreshing subscription publication..."
+  psql-17 "$REPLICA_TARGET_DB_URL" -v ON_ERROR_STOP=1 -c "ALTER SUBSCRIPTION ${REPLICA_SUBSCRIPTION_NAME} REFRESH PUBLICATION WITH (copy_data = false);"
+fi
 
-  # Import data
-  echo "==> Importing data..."
-  gunzip -c "$DUMP_FILE" | psql-17 "$TARGET_DB_URL" -c "\\COPY public.${TABLE_NAME} FROM STDIN WITH (FORMAT csv, HEADER)"
+echo "==> Subscription table state:"
+psql-17 "$REPLICA_TARGET_DB_URL" -c "
+  SELECT srrelid::regclass AS table_name, srsubstate
+  FROM pg_subscription_rel
+  WHERE srrelid = 'public.${TABLE_NAME}'::regclass;
+"
 
-  IMPORTED_COUNT=$(psql-17 "$TARGET_DB_URL" -t -A -c "SELECT COUNT(*) FROM public.${TABLE_NAME};")
-  echo "    Imported ${IMPORTED_COUNT} rows."
-
-  # Refresh subscription
-  echo "==> Refreshing subscription..."
-  psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=0 -c "ALTER SUBSCRIPTION ${SUBSCRIPTION_NAME} REFRESH PUBLICATION;"
-
-  # Verify subscription includes the table
-  echo "==> Verifying subscription..."
-  psql-17 "$TARGET_DB_URL" -c "SELECT srrelid::regclass, srsubstate FROM pg_subscription_rel WHERE srrelid::regclass::text = '${TABLE_NAME}' ORDER BY srrelid::regclass;"
-
-  echo "==> Done with ${REGION_VAR}"
-done
-
-echo ""
-echo "========================================"
-echo "  Table '${TABLE_NAME}' added to replication"
-echo "========================================"
-echo ""
-echo "Verify with:"
-echo "  psql-17 \"\$TARGET_DB_URL\" -c \"SELECT srrelid::regclass, srsubstate FROM pg_subscription_rel ORDER BY srrelid::regclass;\""
+echo "==> Done."

@@ -1,35 +1,49 @@
 import type { TrackOptions } from '@logsnag/node'
 import type { Context } from 'hono'
+import type { EmailPreferenceKey, NotificationAudience } from './org_email_notifications.ts'
 import type { PostHogGroups } from './posthog.ts'
 import { cloudlogErr, serializeError } from './logging.ts'
 import { logsnag } from './logsnag.ts'
-import { sendNotifToOrgMembers } from './org_email_notifications.ts'
+import { sendNotifToOrgMembers, sendNotifToOrgMembersOnce } from './org_email_notifications.ts'
 import { getDrizzleClient, getPgClient } from './pg.ts'
 import { trackPosthogEvent } from './posthog.ts'
 import { backgroundTask } from './utils.ts'
 
 export interface BentoTrackingPayload {
-  cron: string
+  /** Cron window for the throttle/dedupe. Used only when `once` is not set. */
+  cron?: string
   data: Record<string, unknown>
   event: string
-  preferenceKey: import('./org_email_notifications.ts').EmailPreferenceKey
+  /**
+   * Send at most ONE notification ever per (event, org, uniqId) via a permanent
+   * claim instead of a reopening cron window. Use for per-entity alerts that must
+   * not re-fire on retries (e.g. an incompatible bundle version). Ignores `cron`.
+   */
+  once?: boolean
+  preferenceKey: EmailPreferenceKey
   uniqId: string
+  /** Which org members receive the email. Defaults to 'admins'; use 'billing' for payment/subscription events. */
+  audience?: NotificationAudience
 }
 
 export interface SendEventToTrackingPayload extends TrackOptions {
   bento?: BentoTrackingPayload
   groups?: PostHogGroups
   sentToBento?: boolean
+  nonPersonTags?: Record<string, string | number | boolean>
 }
 
 export interface SendEventToTrackingOptions {
   background?: boolean
   ip?: string
+  strict?: boolean
 }
 
-async function runTrackedCall(c: Context, provider: string, task: () => Promise<unknown>) {
+async function runTrackedCall(c: Context, provider: string, task: () => Promise<unknown>, strict = false) {
   try {
-    await task()
+    const result = await task()
+    if (strict && result === false)
+      throw new Error(`${provider} tracking returned false`)
   }
   catch (error) {
     cloudlogErr({
@@ -38,6 +52,8 @@ async function runTrackedCall(c: Context, provider: string, task: () => Promise<
       provider,
       error: serializeError(error),
     })
+    if (strict)
+      throw error
   }
 }
 
@@ -50,16 +66,17 @@ function getTrackingIp(c: Context, ip?: string) {
 
 async function executeTracking(c: Context, payload: SendEventToTrackingPayload, options: SendEventToTrackingOptions) {
   const tasks: Array<Promise<void>> = [
-    runTrackedCall(c, 'logsnag', () => logsnag(c).track(payload)),
+    runTrackedCall(c, 'logsnag', () => logsnag(c).track(payload), options.strict),
     runTrackedCall(c, 'posthog', () => trackPosthogEvent(c, {
       event: payload.event,
       user_id: payload.user_id,
       tags: payload.tags,
+      nonPersonTags: payload.nonPersonTags,
       channel: payload.channel,
       description: payload.description,
       groups: payload.groups,
       ip: getTrackingIp(c, options.ip),
-    })),
+    }), options.strict),
   ]
 
   await Promise.all(tasks)
@@ -80,7 +97,10 @@ async function executeBentoTracking(c: Context, payload: SendEventToTrackingPayl
     return
   }
 
-  const orgId = payload.user_id
+  // Under tracking v2 the org lives in the PostHog `organization` group, not in
+  // user_id (which is now the authenticated actor). Fall back to user_id for
+  // legacy v1 payloads where user_id still carried the org id.
+  const orgId = payload.groups?.organization ?? payload.user_id
   if (!orgId || typeof orgId !== 'string') {
     cloudlogErr({
       requestId: c.get('requestId'),
@@ -94,16 +114,33 @@ async function executeBentoTracking(c: Context, payload: SendEventToTrackingPayl
   await runTrackedCall(c, 'bento', async () => {
     const pgClient = getPgClient(c, true)
     try {
-      await sendNotifToOrgMembers(
-        c,
-        bento.event,
-        bento.preferenceKey,
-        bento.data,
-        orgId,
-        bento.uniqId,
-        bento.cron,
-        getDrizzleClient(pgClient),
-      )
+      if (bento.once) {
+        // Permanent per-(event, org, uniqId) claim: per-entity alerts (e.g. an
+        // incompatible bundle version) must not re-email org admins on retries.
+        await sendNotifToOrgMembersOnce(
+          c,
+          bento.event,
+          bento.preferenceKey,
+          bento.data,
+          orgId,
+          bento.uniqId,
+          getDrizzleClient(pgClient),
+          bento.audience,
+        )
+      }
+      else {
+        await sendNotifToOrgMembers(
+          c,
+          bento.event,
+          bento.preferenceKey,
+          bento.data,
+          orgId,
+          bento.uniqId,
+          bento.cron ?? '* * * * *',
+          getDrizzleClient(pgClient),
+          bento.audience,
+        )
+      }
     }
     finally {
       await pgClient.end()

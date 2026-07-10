@@ -7,6 +7,7 @@
 - Keep `src/index.ts` limited to CLI command registration, options, and wiring.
 - Put command implementation logic in dedicated modules/handlers instead of inline `.action(...)` bodies in `src/index.ts`.
 - When adding or changing a CLI command, prefer an exported command handler function in a dedicated module and wire it from `src/index.ts`.
+- CLI command names must be lowercase and should use kebab-case for multiple words. Do not add camelCase, PascalCase, or other cased command names.
 - When adding or changing a CLI command, command option, or CLI-facing workflow, update the TanStack Intent skill docs in `skills/` as part of the same change so the published skills stay aligned with `webdocs/` and `src/index.ts`.
 - For end-customer-facing docs and skills in `skills/` and `webdocs/`, use generic command runners in examples (`npx @capgo/cli@latest ...`) instead of Bun-specific runners. Reserve `bun` and `bunx` for repo-local development and agent execution.
 - Reuse shared option descriptions from `src/index.ts` when an option already exists instead of introducing slightly different wording.

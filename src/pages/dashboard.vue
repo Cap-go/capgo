@@ -15,6 +15,8 @@ const supabase = useSupabase()
 const { t } = useI18n()
 const displayStore = useDisplayStore()
 const apps = ref<Database['public']['Tables']['apps']['Row'][]>([])
+// Scroll container ref - used to reset scroll when a blocking overlay activates
+const scrollContainer = ref<HTMLElement | null>(null)
 
 const { currentOrganization } = storeToRefs(organizationStore)
 
@@ -41,6 +43,17 @@ const paymentFailed = computed(() => {
 
 // Should blur the content (either no apps OR payment failed)
 const shouldBlurContent = computed(() => hasNoApps.value || paymentFailed.value)
+
+// Locking the scroll container with `overflow-hidden` preserves its current
+// scrollTop. If the user had already scrolled (e.g. before the overlay resolved,
+// or after switching to a failed org), the absolutely-positioned overlay would
+// stay anchored to the top of the scroll content and end up above the viewport,
+// out of reach. Reset the scroll position when the overlay activates so it stays
+// centered in view.
+watch(shouldBlurContent, (blur) => {
+  if (blur && scrollContainer.value)
+    scrollContainer.value.scrollTop = 0
+}, { flush: 'post' })
 
 async function getMyApps() {
   await organizationStore.awaitInitialLoad()
@@ -86,7 +99,11 @@ displayStore.defaultBack = '/apps'
 <template>
   <div>
     <div class="overflow-hidden pb-4 h-full">
-      <div class="relative overflow-y-auto px-4 pt-2 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+      <div
+        ref="scrollContainer"
+        class="relative px-4 pt-2 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit"
+        :class="shouldBlurContent ? 'overflow-hidden' : 'overflow-y-auto'"
+      >
         <!-- Only show FailedCard for security access issues (2FA/password) -->
         <FailedCard v-if="lacksSecurityAccess" />
 

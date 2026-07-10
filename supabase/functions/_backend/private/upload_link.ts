@@ -27,7 +27,6 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     message: 'apikey context',
     apikeyId: apikey.id,
     userId: apikey.user_id,
-    mode: apikey.mode,
   })
   // Auth context is already set by middlewareKey
   if (!(await checkPermission(c, 'app.upload_bundle', { appId: body.app_id }))) {

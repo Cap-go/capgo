@@ -42,50 +42,20 @@ export async function post(c: Context<MiddlewareKeyVariables>, bodyRaw: any, _ap
 
   const supabase = supabaseApikey(c, _apikey?.key)
 
-  const { data: org, error: orgError } = await supabase
-    .from('orgs')
-    .select('use_new_rbac')
-    .eq('id', body.orgId)
-    .single()
-
-  if (orgError) {
-    throw simpleError('cannot_access_organization', 'You can\'t access this organization', { error: orgError.message })
-  }
-
-  const useNewRbac = org?.use_new_rbac === true
   const isRbacRole = rbacInviteRoles.includes(body.invite_type as RbacInviteRole)
   const legacyInviteType = body.invite_type as LegacyInviteRole
   const rbacRoleName = isRbacRole
     ? (body.invite_type as RbacInviteRole)
     : legacyToRbac[legacyInviteType]
 
-  if (!useNewRbac && isRbacRole) {
+  if (!rbacRoleName)
     throw simpleError('invalid_body', 'Invalid invite type', { invite_type: body.invite_type })
-  }
 
-  let data: string | null = null
-  let error: unknown = null
-
-  if (useNewRbac) {
-    const result = await supabase.rpc('invite_user_to_org_rbac', {
-      email: body.email,
-      org_id: body.orgId,
-      role_name: rbacRoleName ?? 'org_member',
-    })
-    data = result.data
-    error = result.error
-  }
-  else {
-    const legacyInviteType = body.invite_type as LegacyInviteRole
-    const inviteType = `invite_${legacyInviteType}` as Database['public']['Enums']['user_min_right']
-    const result = await supabase.rpc('invite_user_to_org', {
-      email: body.email,
-      org_id: body.orgId,
-      invite_type: inviteType,
-    })
-    data = result.data
-    error = result.error
-  }
+  const { data, error } = await supabase.rpc('invite_user_to_org_rbac', {
+    email: body.email,
+    org_id: body.orgId,
+    role_name: rbacRoleName,
+  })
 
   if (error) {
     throw simpleError('error_inviting_user_to_organization', 'Error inviting user to organization', { error })

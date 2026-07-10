@@ -5,6 +5,8 @@ import { setupLayouts } from 'virtual:generated-layouts'
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import { routes } from 'vue-router/auto-routes'
+import { installDeepLinkHandler } from '~/services/deepLinks'
+import { getNativeExternalPurchaseRedirect, isNativeAppStoreContext, isNativeExternalPurchaseRestrictedPath } from '~/services/nativeCompliance'
 import { posthogLoader } from '~/services/posthog'
 import { getErrorMessage, isKnownCrawlerNoiseErrorMessage, isStaleAssetErrorMessage } from '~/services/staleAssetErrors'
 import { getLocalConfig } from '~/services/supabase'
@@ -125,6 +127,9 @@ window.addEventListener('vite:preloadError', (event) => {
 })
 
 const guestPath = ['/login', '/delete_account', '/confirm-signup', '/forgot_password', '/resend_email', '/onboarding', '/register', '/invitation', '/scan', '/sso-callback']
+function isGuestRoutePath(path: string) {
+  return guestPath.includes(path) || path === '/preview' || path.startsWith('/preview/')
+}
 
 getRemoteConfig()
 const app = createApp(App)
@@ -132,7 +137,7 @@ CapacitorUpdater.notifyAppReady()
 console.log(`Capgo Version : "${import.meta.env.VITE_APP_VERSION}"`)
 // setup up pages with layouts
 const newRoutes = routes.map((route) => {
-  if (guestPath.includes(route.path)) {
+  if (isGuestRoutePath(route.path)) {
     route.meta ??= {}
     route.meta.layout = 'naked'
   }
@@ -175,6 +180,10 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
 })
 router.beforeEach((to, from, next) => {
+  if (isNativeAppStoreContext() && isNativeExternalPurchaseRestrictedPath(to.path)) {
+    return next(getNativeExternalPurchaseRedirect(to.path))
+  }
+
   if (to.path.startsWith('/app/') && to.query.tab) {
     const tab = to.query.tab as string
     const newPath = to.path.endsWith('/') ? `${to.path}${tab}` : `${to.path}/${tab}`
@@ -194,6 +203,7 @@ Object.values(import.meta.glob<{ install: UserModule }>('./modules/*.ts', { eage
   .forEach(i => i.install?.({ app, router }))
 
 app.use(router)
+void installDeepLinkHandler(router)
 
 router.isReady().then(async () => {
   app.mount('#app')

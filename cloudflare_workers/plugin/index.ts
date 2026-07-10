@@ -3,11 +3,22 @@ import { app as stats } from '../../supabase/functions/_backend/plugins/stats.ts
 import { app as updates } from '../../supabase/functions/_backend/plugins/updates.ts'
 import { app as latency } from '../../supabase/functions/_backend/private/latency.ts'
 import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
-import { createAllCatch, createHono } from '../../supabase/functions/_backend/utils/hono.ts'
+import { createAllCatch, createHono, useCors } from '../../supabase/functions/_backend/utils/hono.ts'
 import { version } from '../../supabase/functions/_backend/utils/version.ts'
 
 const functionName = 'plugin'
 const app = createHono(functionName, version)
+
+app.use('*', async (c, next) => {
+  c.set('skipSupabaseStatsFallback', true)
+  c.set('skipSupabaseNotificationWrites', true)
+  c.set('queuePluginNotifications', true)
+  c.set('skipChannelSelfPostgresFallback', true)
+  c.set('requireReadReplica', true)
+  await next()
+})
+
+app.use('*', useCors)
 
 // TODO: deprecated remove when everyone use the new endpoint
 app.route('/plugin/ok', ok)

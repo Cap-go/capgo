@@ -9,8 +9,9 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import BeakerIcon from '~icons/heroicons/beaker'
 import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
-import Spinner from '~/components/Spinner.vue'
+import PageLoader from '~/components/PageLoader.vue'
 import { formatLocalDateTime } from '~/services/date'
+import { formatNumberValue } from '~/services/formatLocale'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { showUploadReplicationToast } from '~/services/updateReplicationToast'
 import { useDisplayStore } from '~/stores/display'
@@ -90,7 +91,7 @@ const maxLagMinutes = computed(() => {
     return data.value.max_lag_minutes
   if (data.value.max_lag_seconds === null || data.value.max_lag_seconds === undefined)
     return undefined
-  return Number((data.value.max_lag_seconds / 60).toFixed(2))
+  return Math.round((data.value.max_lag_seconds / 60) * 100) / 100
 })
 
 const checkedAt = computed(() => {
@@ -99,26 +100,19 @@ const checkedAt = computed(() => {
   return formatLocalDateTime(data.value.checked_at)
 })
 
-const internalReplicationSecret = import.meta.env.VITE_REPLICATION_API_SECRET as string | undefined
-
 async function loadReplicationStatus() {
   isLoading.value = true
   errorMessage.value = null
 
   try {
     const headers: Record<string, string> = {}
-    if (internalReplicationSecret) {
-      headers.apisecret = internalReplicationSecret
-    }
-    else {
-      const supabase = useSupabase()
-      const { data: { session } } = await supabase.auth.getSession()
+    const supabase = useSupabase()
+    const { data: { session } } = await supabase.auth.getSession()
 
-      if (!session?.access_token)
-        throw new Error('No session available and replication secret is not configured')
+    if (!session?.access_token)
+      throw new Error('No active session available')
 
-      headers.Authorization = `Bearer ${session.access_token}`
-    }
+    headers.Authorization = `Bearer ${session.access_token}`
 
     const response = await fetch(`${defaultApiHost}/replication`, {
       method: 'GET',
@@ -209,9 +203,7 @@ displayStore.defaultBack = '/dashboard'
           {{ errorMessage }}
         </div>
 
-        <div v-else-if="isLoading && !data" class="flex items-center justify-center min-h-[300px]">
-          <Spinner size="w-24 h-24" />
-        </div>
+        <PageLoader v-else-if="isLoading && !data" />
 
         <div v-else-if="data" class="space-y-6">
           <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
@@ -219,7 +211,7 @@ displayStore.defaultBack = '/dashboard'
               title="Status"
               :value="statusLabel"
               :color-class="statusColor"
-              :subtitle="`Threshold ${thresholdMinutes} min`"
+              :subtitle="`Threshold ${formatNumberValue(thresholdMinutes)} min`"
             />
             <AdminStatsCard
               title="Max lag"
@@ -230,7 +222,7 @@ displayStore.defaultBack = '/dashboard'
             <AdminStatsCard
               title="Active slots"
               :value="activeCount"
-              :subtitle="`Total ${slotCount}`"
+              :subtitle="`Total ${formatNumberValue(slotCount)}`"
             />
             <AdminStatsCard
               title="Last check"
@@ -302,7 +294,7 @@ displayStore.defaultBack = '/dashboard'
                       {{ slot.slot_lag ?? '-' }}
                     </td>
                     <td class="whitespace-nowrap px-4 py-3 text-gray-700 dark:text-gray-200">
-                      {{ slot.lag_minutes ?? '-' }}
+                      {{ slot.lag_minutes === null || slot.lag_minutes === undefined ? '-' : formatNumberValue(slot.lag_minutes, { maximumFractionDigits: 2 }) }}
                     </td>
                     <td class="whitespace-nowrap px-4 py-3">
                       <span

@@ -77,23 +77,38 @@ BEGIN
     PERFORM set_config('test.app_without_2fa', 'com.test.no2fa.app', false);
 
     -- Create API key for test_2fa_user_app (use high IDs to avoid conflicts)
-    INSERT INTO public.apikeys (id, user_id, key, mode, name)
-    VALUES (
+    PERFORM tests.create_v2_apikey(
         9001,
         test_2fa_user_id,
         'test-2fa-apikey-for-app',
-        'all'::public.key_mode,
-        'Test 2FA API Key'
+        'Test 2FA API Key',
+        org_with_2fa_enforcement_id,
+        public.rbac_role_org_super_admin(),
+        'com.test.2fa.enforced.app',
+        public.rbac_role_app_admin()
     );
 
     -- Create API key for test_no_2fa_user_app
-    INSERT INTO public.apikeys (id, user_id, key, mode, name)
-    VALUES (
+    PERFORM tests.create_v2_apikey(
         9002,
         test_no_2fa_user_id,
         'test-no2fa-apikey-for-app',
-        'all'::public.key_mode,
-        'Test No 2FA API Key'
+        'Test No 2FA API Key',
+        org_with_2fa_enforcement_id,
+        public.rbac_role_org_super_admin(),
+        'com.test.2fa.enforced.app',
+        public.rbac_role_app_admin()
+    );
+
+    PERFORM tests.create_v2_apikey(
+        9002,
+        test_no_2fa_user_id,
+        'test-no2fa-apikey-for-app',
+        'Test No 2FA API Key',
+        org_without_2fa_enforcement_id,
+        public.rbac_role_org_super_admin(),
+        'com.test.no2fa.app',
+        public.rbac_role_app_admin()
     );
 END $$;
 

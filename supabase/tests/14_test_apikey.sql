@@ -47,7 +47,7 @@ SELECT
 SELECT
     is(
         get_org_perm_for_apikey(
-            'ac4d9a98-ec25-4af8-933c-2aae4aa52b85',
+            'ab4d9a98-ec25-4af8-933c-2aae4aa52b85',
             'com.demo.app'
         ),
         'perm_upload',
@@ -59,10 +59,18 @@ WHERE
     user_id = '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5'
     AND org_id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8';
 
+DELETE FROM public.role_bindings
+WHERE principal_type = public.rbac_principal_apikey()
+  AND principal_id = (
+    SELECT rbac_id FROM public.apikeys
+    WHERE key = 'ab4d9a98-ec25-4af8-933c-2aae4aa52b85'
+  )
+  AND org_id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8';
+
 SELECT
     is(
         get_org_perm_for_apikey(
-            'ac4d9a98-ec25-4af8-933c-2aae4aa52b85',
+            'ab4d9a98-ec25-4af8-933c-2aae4aa52b85',
             'com.demo.app'
         ),
         'perm_none',

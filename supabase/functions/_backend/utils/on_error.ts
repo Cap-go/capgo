@@ -8,6 +8,31 @@ import { backgroundTask } from './utils.ts'
 
 const drizzleErrorNames = new Set(['DrizzleError', 'DrizzleQueryError', 'TransactionRollbackError'])
 const filesUploadFunctionNames = new Set(['files', 'TUS handler'])
+const queueRetryHeaderNames = {
+  maxReads: 'x-capgo-queue-max-reads',
+  name: 'x-capgo-queue-name',
+  readCount: 'x-capgo-queue-read-count',
+}
+const sensitiveRequestBodyKeys = new Set([
+  'captchaToken',
+  'captcha_token',
+  'invite_magic_string',
+  'magic_invite_string',
+  'password',
+])
+
+function redactSensitiveRequestBody(value: unknown): unknown {
+  if (Array.isArray(value))
+    return value.map(redactSensitiveRequestBody)
+
+  if (!value || typeof value !== 'object')
+    return value
+
+  return Object.fromEntries(Object.entries(value).map(([key, entryValue]) => [
+    key,
+    sensitiveRequestBodyKeys.has(key) ? '[redacted]' : redactSensitiveRequestBody(entryValue),
+  ]))
+}
 
 function isFilesDurableObjectStorageTimeout(functionName: string, error: unknown): boolean {
   if (!filesUploadFunctionNames.has(functionName) || !error || typeof error !== 'object' || !('message' in error))
@@ -20,6 +45,29 @@ function isFilesDurableObjectStorageTimeout(functionName: string, error: unknown
   const normalizedMessage = message.toLowerCase()
   return normalizedMessage.includes('storage operation exceeded timeout')
     && normalizedMessage.includes('object to be reset')
+}
+
+function readRequestHeader(c: Context, name: string): string | undefined {
+  const fromHono = c.req.header?.(name)
+  if (fromHono)
+    return fromHono
+  return c.req.raw.headers.get(name) ?? undefined
+}
+
+function parsePositiveInteger(value: string | undefined): number | null {
+  if (!value)
+    return null
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed <= 0)
+    return null
+  return parsed
+}
+
+function shouldSuppressQueueRetryAlert(c: Context): boolean {
+  const queueName = readRequestHeader(c, queueRetryHeaderNames.name)
+  const readCount = parsePositiveInteger(readRequestHeader(c, queueRetryHeaderNames.readCount))
+  const maxReads = parsePositiveInteger(readRequestHeader(c, queueRetryHeaderNames.maxReads))
+  return Boolean(queueName) && readCount !== null && maxReads !== null && readCount < maxReads
 }
 
 export function onError(functionName: string) {
@@ -37,7 +85,7 @@ export function onError(functionName: string) {
           const textBody = await rawReq?.clone().text()
           if (textBody) {
             try {
-              body = JSON.stringify(JSON.parse(textBody))
+              body = JSON.stringify(redactSensitiveRequestBody(JSON.parse(textBody)))
             }
             catch {
               body = textBody
@@ -118,7 +166,18 @@ export function onError(functionName: string) {
       const suppressDiscordAlert = e.cause
         && typeof e.cause === 'object'
         && (e.cause as { suppressDiscordAlert?: unknown }).suppressDiscordAlert === true
+      const suppressBackendAlert = suppressDiscordAlert || shouldSuppressQueueRetryAlert(c)
       if (e.status === 429) {
+        // Set rate-limit headers from moreInfo when available, but DO NOT
+        // overwrite the response body. Several distinct conditions reach this
+        // branch — `too_many_requests` from simpleRateLimit (IP failed-auth,
+        // API-key flood), `native_build_concurrency_limit_exceeded` from
+        // reserveNativeBuildSlot, and others — and collapsing them to a
+        // generic "You are being rate limited" string strips the actual
+        // errorCode/message/moreInfo (activeBuilds, limit, planName, reason,
+        // …) that callers need to react correctly. Fall through to
+        // `return c.json(res, e.status)` below so the thrower's real error
+        // payload is preserved.
         const rateLimitResetAt = typeof res.moreInfo?.rateLimitResetAt === 'number' ? res.moreInfo.rateLimitResetAt : undefined
         let retryAfterSeconds = typeof res.moreInfo?.retryAfterSeconds === 'number' ? res.moreInfo.retryAfterSeconds : undefined
         if (typeof rateLimitResetAt === 'number' && Number.isFinite(rateLimitResetAt) && !(typeof retryAfterSeconds === 'number' && Number.isFinite(retryAfterSeconds))) {
@@ -130,9 +189,8 @@ export function onError(functionName: string) {
         if (typeof retryAfterSeconds === 'number' && Number.isFinite(retryAfterSeconds)) {
           c.header('Retry-After', String(Math.max(0, Math.floor(retryAfterSeconds))))
         }
-        return c.json({ error: 'too_many_requests', message: 'You are being rate limited' }, e.status)
       }
-      if (e.status >= 500 && !suppressDiscordAlert) {
+      if (e.status >= 500 && !suppressBackendAlert) {
         await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
         void backgroundTask(c, capturePosthogException(c, {
           error: e,
@@ -167,7 +225,8 @@ export function onError(functionName: string) {
       return c.json(defaultResponse, 500)
     }
     // Non-HTTP errors: log with stack and return 500
-    const suppressDiscordAlert = isFilesDurableObjectStorageTimeout(functionName, e)
+    const suppressQueueRetryAlert = shouldSuppressQueueRetryAlert(c)
+    const suppressDiscordAlert = suppressQueueRetryAlert || isFilesDurableObjectStorageTimeout(functionName, e)
     cloudlogErr({
       requestId: c.get('requestId'),
       functionName,
@@ -180,12 +239,14 @@ export function onError(functionName: string) {
     if (!suppressDiscordAlert)
       await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
 
-    void backgroundTask(c, capturePosthogException(c, {
-      error: e,
-      functionName,
-      kind: 'unhandled_error',
-      status: 500,
-    }))
+    if (!suppressQueueRetryAlert) {
+      void backgroundTask(c, capturePosthogException(c, {
+        error: e,
+        functionName,
+        kind: 'unhandled_error',
+        status: 500,
+      }))
+    }
     return c.json(defaultResponse, 500)
   }
 }

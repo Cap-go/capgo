@@ -161,7 +161,6 @@ async function loadData() {
     }))
 
     defaultChannels.value = allowedChannels.filter((channel): channel is DefaultChannel => channel !== null)
-    console.log('[DeploymentBanner] Default channels:', defaultChannels.value)
 
     // Step 2: Get latest bundle (excluding special bundle types)
     // We filter out 'unknown' and 'builtin' bundles as these are not deployable
@@ -175,8 +174,6 @@ async function loadData() {
       .neq('name', 'builtin')
       .order('created_at', { ascending: false })
       .limit(1)
-
-    console.log('[DeploymentBanner] Latest bundle:', bundles?.[0])
 
     latestBundle.value = bundles?.[0] ?? null
   }

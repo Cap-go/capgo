@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Database } from '~/types/supabase.types'
+import type { Webhook } from '~/stores/webhooks'
 import { computedAsync } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { onMounted, ref, watch } from 'vue'
@@ -17,6 +17,7 @@ import IconX from '~icons/heroicons/x-circle'
 import Spinner from '~/components/Spinner.vue'
 import WebhookDeliveryLog from '~/components/WebhookDeliveryLog.vue'
 import WebhookForm from '~/components/WebhookForm.vue'
+import { formatLocalDateTime } from '~/services/date'
 import { checkPermissions } from '~/services/permissions'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
@@ -35,9 +36,9 @@ const { currentOrganization } = storeToRefs(organizationStore)
 const { webhooks, isLoading } = storeToRefs(webhooksStore)
 
 const showForm = ref(false)
-const editingWebhook = ref<Database['public']['Tables']['webhooks']['Row'] | null>(null)
+const editingWebhook = ref<Webhook | null>(null)
 const showDeliveryLog = ref(false)
-const selectedWebhookForLog = ref<Database['public']['Tables']['webhooks']['Row'] | null>(null)
+const selectedWebhookForLog = ref<Webhook | null>(null)
 const testingWebhookId = ref<string | null>(null)
 const expandedWebhookId = ref<string | null>(null)
 
@@ -66,7 +67,7 @@ function openCreateForm() {
   showForm.value = true
 }
 
-function openEditForm(webhook: Database['public']['Tables']['webhooks']['Row']) {
+function openEditForm(webhook: Webhook) {
   if (!canManageWebhooks.value) {
     toast.error(t('no-permission'))
     return
@@ -75,7 +76,7 @@ function openEditForm(webhook: Database['public']['Tables']['webhooks']['Row']) 
   showForm.value = true
 }
 
-async function handleFormSubmit(data: { name: string, url: string, events: string[], enabled: boolean }) {
+async function handleFormSubmit(data: { name: string, url: string, events: string[], enabled: boolean, deliveryVersion: 'legacy' | 'standard' }) {
   if (editingWebhook.value) {
     // When editing, pass all fields including enabled
     const result = await webhooksStore.updateWebhook(editingWebhook.value.id, data)
@@ -101,7 +102,7 @@ async function handleFormSubmit(data: { name: string, url: string, events: strin
   }
 }
 
-async function deleteWebhook(webhook: Database['public']['Tables']['webhooks']['Row']) {
+async function deleteWebhook(webhook: Webhook) {
   if (!canManageWebhooks.value) {
     toast.error(t('no-permission'))
     return
@@ -132,7 +133,7 @@ async function deleteWebhook(webhook: Database['public']['Tables']['webhooks']['
   })
 }
 
-async function testWebhook(webhook: Database['public']['Tables']['webhooks']['Row']) {
+async function testWebhook(webhook: Webhook) {
   if (!canManageWebhooks.value) {
     toast.error(t('no-permission'))
     return
@@ -150,7 +151,7 @@ async function testWebhook(webhook: Database['public']['Tables']['webhooks']['Ro
   }
 }
 
-async function toggleWebhook(webhook: Database['public']['Tables']['webhooks']['Row']) {
+async function toggleWebhook(webhook: Webhook) {
   if (!canManageWebhooks.value) {
     toast.error(t('no-permission'))
     return
@@ -166,7 +167,7 @@ async function toggleWebhook(webhook: Database['public']['Tables']['webhooks']['
   }
 }
 
-function viewDeliveries(webhook: Database['public']['Tables']['webhooks']['Row']) {
+function viewDeliveries(webhook: Webhook) {
   selectedWebhookForLog.value = webhook
   showDeliveryLog.value = true
 }
@@ -181,13 +182,7 @@ function getEventLabel(eventValue: string): string {
 }
 
 function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatLocalDateTime(dateString) || '-'
 }
 
 async function copySecret(secret: string) {
@@ -202,10 +197,10 @@ async function copySecret(secret: string) {
 
 const signatureVerificationCode = `import crypto from 'crypto'
 
-function verifyWebhookSignature(req, secret) {
-  const signature = req.headers['x-capgo-signature']
-  const timestamp = req.headers['x-capgo-timestamp']
-  const payload = JSON.stringify(req.body)
+function verifyWebhookSignature(rawBody, headers, secret) {
+  const messageId = headers['webhook-id']
+  const timestamp = headers['webhook-timestamp']
+  const signatures = headers['webhook-signature']?.split(' ') ?? []
 
   // Check timestamp to prevent replay attacks (5 min tolerance)
   const currentTime = Math.floor(Date.now() / 1000)
@@ -214,21 +209,70 @@ function verifyWebhookSignature(req, secret) {
   }
 
   // Compute expected signature
-  const signaturePayload = \`\${timestamp}.\${payload}\`
-  const hmac = crypto.createHmac('sha256', secret)
+  const secretBytes = Buffer.from(secret.replace(/^whsec_/, ''), 'base64')
+  const signaturePayload = \`\${messageId}.\${timestamp}.\${rawBody}\`
+  const hmac = crypto.createHmac('sha256', secretBytes)
   hmac.update(signaturePayload)
-  const expectedSignature = \`v1=\${timestamp}.\${hmac.digest('hex')}\`
+  const expectedSignature = \`v1,\${hmac.digest('base64')}\`
 
   // Compare signatures (timing-safe)
-  if (!crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(expectedSignature)
-  )) {
+  const isValid = signatures.some(signature =>
+    signature.length === expectedSignature.length
+    && crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))
+  )
+
+  if (!isValid) {
     throw new Error('Invalid webhook signature')
   }
 
   return true
 }`
+
+const legacySignatureVerificationCode = `import crypto from 'crypto'
+
+function verifyWebhookSignature(rawBody, headers, secret) {
+  const signature = headers['x-capgo-signature'] ?? headers['X-Capgo-Signature']
+  const match = signature?.match(/^v1=(\\d+)\\.([a-f0-9]{64})$/i)
+
+  if (!match) {
+    throw new Error('Invalid webhook signature format')
+  }
+
+  const [, timestamp, receivedHmac] = match
+
+  // Check timestamp to prevent replay attacks (5 min tolerance)
+  const currentTime = Math.floor(Date.now() / 1000)
+  if (Math.abs(currentTime - parseInt(timestamp)) > 300) {
+    throw new Error('Webhook timestamp too old')
+  }
+
+  const signaturePayload = \`\${timestamp}.\${rawBody}\`
+  const expectedHmac = crypto
+    .createHmac('sha256', secret)
+    .update(signaturePayload)
+    .digest('hex')
+
+  const isValid = receivedHmac.length === expectedHmac.length
+    && crypto.timingSafeEqual(Buffer.from(receivedHmac), Buffer.from(expectedHmac))
+
+  if (!isValid) {
+    throw new Error('Invalid webhook signature')
+  }
+
+  return true
+}`
+
+function getSignatureVerificationCode(webhook: Webhook) {
+  return webhook.delivery_version === 'standard' ? signatureVerificationCode : legacySignatureVerificationCode
+}
+
+function getDeliveryVersionLabel(webhook: Webhook) {
+  return webhook.delivery_version === 'standard' ? t('webhook-version-standard') : t('webhook-version-legacy')
+}
+
+function getWebhookDetailsId(webhookId: string) {
+  return `webhook-details-${webhookId}`
+}
 </script>
 
 <template>
@@ -293,22 +337,26 @@ function verifyWebhookSignature(req, secret) {
             class="overflow-hidden border rounded-lg border-slate-200 dark:border-slate-700"
           >
             <!-- Webhook Header -->
-            <div
-              class="p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+            <button
+              type="button"
+              class="w-full p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
+              :aria-expanded="expandedWebhookId === webhook.id"
+              :aria-controls="getWebhookDetailsId(webhook.id)"
               @click="toggleExpand(webhook.id)"
             >
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
                   <div
-                    class="w-3 h-3 rounded-full" :class="[
+                    aria-hidden="true"
+                    class="w-3 h-3 rounded-full shrink-0" :class="[
                       webhook.enabled ? 'bg-green-500' : 'bg-gray-400',
                     ]"
-                    :title="webhook.enabled ? t('enabled') : t('disabled')"
                   />
                   <div>
                     <h3 class="font-medium text-gray-900 dark:text-white">
                       {{ webhook.name }}
                     </h3>
+                    <span class="sr-only">{{ webhook.enabled ? t('enabled') : t('disabled') }}</span>
                     <p class="max-w-xs text-sm text-gray-500 truncate dark:text-gray-400 sm:max-w-md">
                       {{ webhook.url }}
                     </p>
@@ -338,11 +386,12 @@ function verifyWebhookSignature(req, secret) {
                   />
                 </div>
               </div>
-            </div>
+            </button>
 
             <!-- Expanded Content -->
             <div
               v-if="expandedWebhookId === webhook.id"
+              :id="getWebhookDetailsId(webhook.id)"
               class="p-4 border-t border-slate-200 dark:border-slate-700 bg-gray-50 dark:bg-gray-900/50"
             >
               <!-- Events -->
@@ -366,18 +415,23 @@ function verifyWebhookSignature(req, secret) {
                 <h4 class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                   {{ t('signing-secret') }}
                 </h4>
-                <div class="flex items-center gap-2">
+                <div v-if="webhook.secret" class="flex items-center gap-2">
                   <code class="flex-1 px-3 py-2 font-mono text-sm text-gray-700 truncate bg-gray-100 border border-gray-200 rounded dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300">
                     {{ webhook.secret }}
                   </code>
                   <button
-                    class="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    type="button"
+                    class="flex items-center justify-center text-gray-500 rounded-lg size-11 hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-300"
                     :title="t('copy-secret')"
+                    :aria-label="t('copy-secret')"
                     @click.stop="copySecret(webhook.secret)"
                   >
                     <IconClipboard class="w-4 h-4" />
                   </button>
                 </div>
+                <p v-else class="px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded bg-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300">
+                  {{ t('signing-secret-unavailable') }}
+                </p>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   {{ t('signing-secret-hint') }}
                 </p>
@@ -392,21 +446,28 @@ function verifyWebhookSignature(req, secret) {
                       {{ t('signature-verification-intro') }}
                     </p>
                     <ul class="mb-3 space-y-1 text-xs text-gray-600 list-disc list-inside dark:text-gray-400">
-                      <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">X-Capgo-Signature</code>: {{ t('header-signature-desc') }}</li>
-                      <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">X-Capgo-Timestamp</code>: {{ t('header-timestamp-desc') }}</li>
-                      <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">X-Capgo-Event</code>: {{ t('header-event-desc') }}</li>
-                      <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">X-Capgo-Event-ID</code>: {{ t('header-event-id-desc') }}</li>
+                      <template v-if="webhook.delivery_version === 'standard'">
+                        <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">webhook-signature</code>: {{ t('header-signature-desc') }}</li>
+                        <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">webhook-timestamp</code>: {{ t('header-timestamp-desc') }}</li>
+                        <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">webhook-id</code>: {{ t('header-event-id-desc') }}</li>
+                      </template>
+                      <template v-else>
+                        <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">X-Capgo-Signature</code>: {{ t('legacy-header-signature-desc') }}</li>
+                        <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">X-Capgo-Timestamp</code>: {{ t('header-timestamp-desc') }}</li>
+                        <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">X-Capgo-Event-ID</code>: {{ t('header-event-id-desc') }}</li>
+                      </template>
                     </ul>
                     <p class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">
                       {{ t('signature-example-title') }}
                     </p>
-                    <pre class="p-3 overflow-x-auto text-xs text-gray-100 bg-gray-900 rounded"><code>{{ signatureVerificationCode }}</code></pre>
+                    <pre class="p-3 overflow-x-auto text-xs text-gray-100 bg-gray-900 rounded"><code>{{ getSignatureVerificationCode(webhook) }}</code></pre>
                   </div>
                 </details>
               </div>
 
               <!-- Metadata -->
               <div class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+                <p>{{ t('webhook-delivery-version') }}: {{ getDeliveryVersionLabel(webhook) }}</p>
                 <p>{{ t('created-at') }}: {{ formatDate(webhook.created_at) }}</p>
                 <p>{{ t('updated-at') }}: {{ formatDate(webhook.updated_at) }}</p>
               </div>
@@ -414,7 +475,7 @@ function verifyWebhookSignature(req, secret) {
               <!-- Actions -->
               <div class="flex flex-wrap gap-2">
                 <button
-                  class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                  class="flex items-center gap-1 px-3 py-1.5 min-h-11 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
                   :disabled="testingWebhookId === webhook.id"
                   @click.stop="testWebhook(webhook)"
                 >
@@ -423,7 +484,7 @@ function verifyWebhookSignature(req, secret) {
                   {{ t('test') }}
                 </button>
                 <button
-                  class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                  class="flex items-center gap-1 px-3 py-1.5 min-h-11 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
                   @click.stop="viewDeliveries(webhook)"
                 >
                   <IconClock class="w-4 h-4" />
@@ -431,7 +492,7 @@ function verifyWebhookSignature(req, secret) {
                 </button>
                 <button
                   v-if="canManageWebhooks"
-                  class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                  class="flex items-center gap-1 px-3 py-1.5 min-h-11 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
                   @click.stop="toggleWebhook(webhook)"
                 >
                   <IconCheck v-if="!webhook.enabled" class="w-4 h-4" />
@@ -440,7 +501,7 @@ function verifyWebhookSignature(req, secret) {
                 </button>
                 <button
                   v-if="canManageWebhooks"
-                  class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                  class="flex items-center gap-1 px-3 py-1.5 min-h-11 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
                   @click.stop="openEditForm(webhook)"
                 >
                   <IconPencil class="w-4 h-4" />
@@ -448,7 +509,7 @@ function verifyWebhookSignature(req, secret) {
                 </button>
                 <button
                   v-if="canManageWebhooks"
-                  class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-lg hover:bg-red-50 dark:bg-gray-800 dark:border-red-600 dark:hover:bg-red-900/20"
+                  class="flex items-center gap-1 px-3 py-1.5 min-h-11 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-lg hover:bg-red-50 dark:bg-gray-800 dark:border-red-600 dark:hover:bg-red-900/20"
                   @click.stop="deleteWebhook(webhook)"
                 >
                   <IconTrash class="w-4 h-4" />

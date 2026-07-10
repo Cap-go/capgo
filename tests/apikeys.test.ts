@@ -1,12 +1,30 @@
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, headers, resetAndSeedAppData, resetAppData } from './test-utils.ts'
+import { appApiKeyBindings, BASE_URL, getAuthHeaders, getSupabaseClient, orgApiKeyBindings, resetAndSeedAppData, resetAppData } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.app.key.${id}`
+let authHeaders: Record<string, string>
+
+function orgKeyBody(name: string, extra: Record<string, unknown> = {}) {
+  return {
+    name,
+    bindings: orgApiKeyBindings(),
+    ...extra,
+  }
+}
+
+async function appKeyBody(name: string, appId = APPNAME, extra: Record<string, unknown> = {}) {
+  return {
+    name,
+    bindings: await appApiKeyBindings(appId),
+    ...extra,
+  }
+}
 
 beforeAll(async () => {
+  authHeaders = await getAuthHeaders()
   await resetAndSeedAppData(APPNAME)
 })
 
@@ -18,7 +36,7 @@ describe('[GET] /apikey operations', () => {
   it('get api keys for the user', async () => {
     const response = await fetch(`${BASE_URL}/apikey`, {
       method: 'GET',
-      headers,
+      headers: authHeaders,
     })
 
     const data = await response.json()
@@ -30,7 +48,7 @@ describe('[GET] /apikey operations', () => {
     // Using seeded API key ID 10 (dedicated test key)
     const response = await fetch(`${BASE_URL}/apikey/10`, {
       method: 'GET',
-      headers,
+      headers: authHeaders,
     })
 
     const data = await response.json()
@@ -41,7 +59,7 @@ describe('[GET] /apikey operations', () => {
   it('get api key with invalid id', async () => {
     const response = await fetch(`${BASE_URL}/apikey/424242`, {
       method: 'GET',
-      headers,
+      headers: authHeaders,
     })
     const data = await response.json() as { error: string }
     expect(data).toHaveProperty('error', 'failed_to_get_apikey')
@@ -54,11 +72,8 @@ describe('[POST] /apikey operations', () => {
     const keyName = 'test-key-creation'
     const response = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
-      body: JSON.stringify({
-        name: keyName,
-        mode: 'all',
-      }),
+      headers: authHeaders,
+      body: JSON.stringify(orgKeyBody(keyName)),
     })
     const data = await response.json<{ key: string, id: number }>()
     expect(response.status).toBe(200)
@@ -68,7 +83,7 @@ describe('[POST] /apikey operations', () => {
     expect(typeof data.id).toBe('number')
 
     // Verify the created key
-    const verifyResponse = await fetch(`${BASE_URL}/apikey/${data.id}`, { headers })
+    const verifyResponse = await fetch(`${BASE_URL}/apikey/${data.id}`, { headers: authHeaders })
     const verifyData = await verifyResponse.json() as { name: string }
     expect(verifyData.name).toBe(keyName)
   })
@@ -76,12 +91,8 @@ describe('[POST] /apikey operations', () => {
   it('app-limited key cannot create another API key', async () => {
     const limitedCreatorResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
-      body: JSON.stringify({
-        name: 'limited-app-key-creator',
-        mode: 'all',
-        limited_to_apps: [APPNAME],
-      }),
+      headers: authHeaders,
+      body: JSON.stringify(await appKeyBody('app-key-creator')),
     })
     expect(limitedCreatorResponse.status).toBe(200)
     const limitedCreatorData = await limitedCreatorResponse.json<{ id: number, key: string }>()
@@ -94,11 +105,7 @@ describe('[POST] /apikey operations', () => {
     const escalationResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
       headers: limitedHeaders,
-      body: JSON.stringify({
-        name: 'blocked-limited-creation',
-        mode: 'all',
-        limited_to_apps: [APPNAME],
-      }),
+      body: JSON.stringify(await appKeyBody('blocked-key-creation')),
     })
     const escalationData = await escalationResponse.json() as { error: string }
     expect(escalationResponse.status).toBe(400)
@@ -106,7 +113,7 @@ describe('[POST] /apikey operations', () => {
 
     await fetch(`${BASE_URL}/apikey/${limitedCreatorData.id}`, {
       method: 'DELETE',
-      headers,
+      headers: authHeaders,
     })
   })
 
@@ -115,25 +122,18 @@ describe('[POST] /apikey operations', () => {
 
     try {
       const limitedResponse = await fetch(`${BASE_URL}/apikey`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          name: 'app-limited-management-blocked',
-          mode: 'all',
-          limited_to_apps: [APPNAME],
-        }),
+      method: 'POST',
+      headers: authHeaders,
+        body: JSON.stringify(await appKeyBody('app-management-blocked')),
       })
       expect(limitedResponse.status).toBe(200)
       const limitedData = await limitedResponse.json<{ id: number, key: string }>()
       createdKeyIds.push(limitedData.id)
 
       const siblingResponse = await fetch(`${BASE_URL}/apikey`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          name: 'sibling-management-target',
-          mode: 'all',
-        }),
+      method: 'POST',
+      headers: authHeaders,
+        body: JSON.stringify(orgKeyBody('sibling-management-target')),
       })
       expect(siblingResponse.status).toBe(200)
       const siblingData = await siblingResponse.json<{ id: number }>()
@@ -175,7 +175,7 @@ describe('[POST] /apikey operations', () => {
       expect(deleteResponse.status).toBe(401)
       await expect(deleteResponse.json()).resolves.toHaveProperty('error', 'cannot_delete_apikey')
 
-      const verifyResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, { headers })
+      const verifyResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, { headers: authHeaders })
       expect(verifyResponse.status).toBe(200)
       const verifyData = await verifyResponse.json<{ name: string }>()
       expect(verifyData.name).toBe('sibling-management-target')
@@ -184,7 +184,7 @@ describe('[POST] /apikey operations', () => {
       for (const keyId of createdKeyIds.reverse()) {
         await fetch(`${BASE_URL}/apikey/${keyId}`, {
           method: 'DELETE',
-          headers,
+          headers: authHeaders,
         })
       }
     }
@@ -193,7 +193,7 @@ describe('[POST] /apikey operations', () => {
   it('create api key with missing name', async () => {
     const response = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({}),
     })
     expect(response.status).toBe(400)
@@ -204,7 +204,7 @@ describe('[POST] /apikey operations', () => {
   it('create api key with empty name', async () => {
     const response = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({ name: '' }),
     })
     expect(response.status).toBe(400)
@@ -212,56 +212,59 @@ describe('[POST] /apikey operations', () => {
     expect(data).toHaveProperty('error', 'name_is_required')
   })
 
-  it('create api key with invalid mode', async () => {
+  it('create api key with invalid binding scope', async () => {
     const response = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'test-key',
-        mode: 'invalid_mode',
+        bindings: [{ role_name: 'org_admin', scope_type: 'invalid', org_id: randomUUID() }],
       }),
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data).toHaveProperty('error', 'invalid_mode')
+    expect(data).toHaveProperty('error', 'invalid_bindings')
   })
 
   it('create api key with non-existent org_id', async () => {
     const nonExistentOrgId = randomUUID()
     const response = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'test-key',
-        mode: 'all',
-        org_id: nonExistentOrgId,
+        bindings: orgApiKeyBindings(nonExistentOrgId),
       }),
     })
-    expect(response.status).toBe(404)
+    expect(response.status).toBe(403)
     const data = await response.json() as { error: string }
-    expect(data).toHaveProperty('error', 'org_not_found')
+    expect(data).toHaveProperty('error', 'forbidden_binding')
   })
 
   it('create api key with non-existent app_id', async () => {
     const nonExistentAppId = randomUUID()
     const response = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'test-key',
-        mode: 'all',
-        app_id: nonExistentAppId,
+        bindings: [{
+          role_name: 'app_admin',
+          scope_type: 'app',
+          org_id: orgApiKeyBindings()[0].org_id,
+          app_id: nonExistentAppId,
+        }],
       }),
     })
     expect(response.status).toBe(404)
     const data = await response.json() as { error: string }
-    expect(data).toHaveProperty('error', 'app_not_found')
+    expect(data).toHaveProperty('error', 'binding_failed')
   })
 
   it('create api key with invalid JSON body', async () => {
     const response = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: 'invalid json',
     })
     expect(response.status).toBeGreaterThanOrEqual(400)
@@ -274,7 +277,7 @@ describe('[PUT] /apikey/:id operations', () => {
     const newName = 'updated-test-key-name'
     const response = await fetch(`${BASE_URL}/apikey/11`, {
       method: 'PUT',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: newName,
       }),
@@ -285,15 +288,65 @@ describe('[PUT] /apikey/:id operations', () => {
     expect(data).toHaveProperty('name', newName)
 
     // Verify the update
-    const verifyResponse = await fetch(`${BASE_URL}/apikey/11`, { headers })
+    const verifyResponse = await fetch(`${BASE_URL}/apikey/11`, { headers: authHeaders })
     const verifyData = await verifyResponse.json() as { name: string }
     expect(verifyData.name).toBe(newName)
+  })
+
+  it.concurrent('updates api key role bindings', async () => {
+    let createData: { id: number, rbac_id: string } | undefined
+
+    try {
+      const createResponse = await fetch(`${BASE_URL}/apikey`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify(orgKeyBody('temp-key-update-bindings')),
+      })
+      expect(createResponse.status).toBe(200)
+      createData = await createResponse.json<{ id: number, rbac_id: string }>()
+
+      const appBindings = await appApiKeyBindings(APPNAME, 'app_reader')
+      const updateResponse = await fetch(`${BASE_URL}/apikey/${createData.id}`, {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify({
+          bindings: appBindings,
+        }),
+      })
+      expect(updateResponse.status).toBe(200)
+
+      const { data: bindings, error } = await getSupabaseClient()
+        .from('role_bindings')
+        .select('scope_type, app_id, roles(name)')
+        .eq('principal_type', 'apikey')
+        .eq('principal_id', createData.rbac_id)
+
+      expect(error).toBeNull()
+      const bindingRows = (bindings || []) as any[]
+      expect(bindingRows).toHaveLength(2)
+      expect(bindingRows).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          scope_type: 'app',
+          app_id: appBindings[0].app_id,
+          roles: expect.objectContaining({ name: 'app_reader' }),
+        }),
+        expect.objectContaining({
+          scope_type: 'org',
+          roles: expect.objectContaining({ name: 'apikey_org_reader' }),
+        }),
+      ]))
+    }
+    finally {
+      if (createData) {
+        await fetch(`${BASE_URL}/apikey/${createData.id}`, { method: 'DELETE', headers: authHeaders })
+      }
+    }
   })
 
   it('update api key with invalid id', async () => {
     const response = await fetch(`${BASE_URL}/apikey/424242`, {
       method: 'PUT',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({ name: 'wont-work' }),
     })
     expect(response.status).toBe(404)
@@ -301,67 +354,67 @@ describe('[PUT] /apikey/:id operations', () => {
     expect(data).toHaveProperty('error')
   })
 
-  it('update api key with invalid mode', async () => {
-    // Using seeded API key ID 12 (dedicated test key for update mode)
+  it('update api key with unsupported field has no valid fields', async () => {
+    // Using seeded API key ID 12 (dedicated test key)
     const response = await fetch(`${BASE_URL}/apikey/12`, {
       method: 'PUT',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
-        mode: 'invalid_mode',
+        unsupported_field: 'invalid',
       }),
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toContain('invalid_mode')
+    expect(data.error).toContain('no_valid_fields_provided_for_update')
   })
 
-  it('update api key with invalid limited_to_apps format', async () => {
+  it('update api key with unsupported app scope field has no valid fields', async () => {
     // Using seeded API key ID 13 (dedicated test key for update apps)
     const response = await fetch(`${BASE_URL}/apikey/13`, {
       method: 'PUT',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
-        limited_to_apps: 'not_an_array',
+        unsupported_app_scope: 'not_an_array',
       }),
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data).toHaveProperty('error', 'limited_to_apps_must_be_an_array_of_strings')
+    expect(data.error).toContain('no_valid_fields_provided_for_update')
   })
 
-  it('update api key with invalid limited_to_orgs format', async () => {
+  it('update api key with unsupported org scope field has no valid fields', async () => {
     // Create a temporary key for this test
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
-      body: JSON.stringify({ name: 'temp-test-key', mode: 'all' }),
+      headers: authHeaders,
+      body: JSON.stringify(orgKeyBody('temp-test-key')),
     })
     const createData = await createResponse.json<{ id: number }>()
 
     const response = await fetch(`${BASE_URL}/apikey/${createData.id}`, {
       method: 'PUT',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
-        limited_to_orgs: 'not_an_array',
+        unsupported_org_scope: 'not_an_array',
       }),
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data).toHaveProperty('error', 'limited_to_orgs_must_be_an_array_of_strings')
+    expect(data.error).toContain('no_valid_fields_provided_for_update')
   })
 
   it('update api key with no valid fields', async () => {
     // Create a temporary key for this test
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
-      body: JSON.stringify({ name: 'temp-test-key-2', mode: 'all' }),
+      headers: authHeaders,
+      body: JSON.stringify(orgKeyBody('temp-test-key-2')),
     })
     const createData = await createResponse.json<{ id: number }>()
 
     const response = await fetch(`${BASE_URL}/apikey/${createData.id}`, {
       method: 'PUT',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({}),
     })
     expect(response.status).toBe(400)
@@ -372,8 +425,8 @@ describe('[PUT] /apikey/:id operations', () => {
   it('regenerate plain api key (key changes and old key no longer works)', async () => {
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
-      body: JSON.stringify({ name: 'temp-plain-key-regenerate', mode: 'all', hashed: false }),
+      headers: authHeaders,
+      body: JSON.stringify(orgKeyBody('temp-plain-key-regenerate', { hashed: false })),
     })
     const createData = await createResponse.json<{ id: number, key: string }>()
     expect(createResponse.status).toBe(200)
@@ -383,7 +436,7 @@ describe('[PUT] /apikey/:id operations', () => {
 
     const regenerateResponse = await fetch(`${BASE_URL}/apikey/${createData.id}`, {
       method: 'PUT',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({ regenerate: true }),
     })
     const regenerateData = await regenerateResponse.json<{ id: number, key: string }>()
@@ -400,16 +453,17 @@ describe('[PUT] /apikey/:id operations', () => {
     // New key must authenticate.
     const newAuthHeaders = { 'Content-Type': 'application/json', 'Authorization': regenerateData.key }
     const newAuthResponse = await fetch(`${BASE_URL}/apikey`, { method: 'GET', headers: newAuthHeaders })
-    expect(newAuthResponse.status).toBe(200)
+    expect(newAuthResponse.status).toBe(401)
+    await expect(newAuthResponse.json()).resolves.toHaveProperty('error', 'cannot_list_apikeys')
 
-    await fetch(`${BASE_URL}/apikey/${createData.id}`, { method: 'DELETE', headers })
+    await fetch(`${BASE_URL}/apikey/${createData.id}`, { method: 'DELETE', headers: authHeaders })
   })
 
   it('regenerate hashed api key (key changes and remains hashed in DB)', async () => {
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
-      body: JSON.stringify({ name: 'temp-hashed-key-regenerate', mode: 'all', hashed: true }),
+      headers: authHeaders,
+      body: JSON.stringify(orgKeyBody('temp-hashed-key-regenerate', { hashed: true })),
     })
     const createData = await createResponse.json<{ id: number, key: string, key_hash: string }>()
     expect(createResponse.status).toBe(200)
@@ -419,7 +473,7 @@ describe('[PUT] /apikey/:id operations', () => {
 
     const regenerateResponse = await fetch(`${BASE_URL}/apikey/${createData.id}`, {
       method: 'PUT',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({ regenerate: true }),
     })
     const regenerateData = await regenerateResponse.json<{ id: number, key: string, key_hash: string }>()
@@ -429,7 +483,7 @@ describe('[PUT] /apikey/:id operations', () => {
     expect(regenerateData.key_hash).not.toBe(oldHash)
 
     // DB must keep the hashed key non-copyable (key column null).
-    const verifyResponse = await fetch(`${BASE_URL}/apikey/${createData.id}`, { headers })
+    const verifyResponse = await fetch(`${BASE_URL}/apikey/${createData.id}`, { headers: authHeaders })
     const verifyData = await verifyResponse.json() as { key: string | null, key_hash: string }
     expect(verifyData.key).toBeNull()
     expect(verifyData.key_hash).toBe(regenerateData.key_hash)
@@ -442,16 +496,17 @@ describe('[PUT] /apikey/:id operations', () => {
     // New key must authenticate.
     const newAuthHeaders = { 'Content-Type': 'application/json', 'Authorization': regenerateData.key }
     const newAuthResponse = await fetch(`${BASE_URL}/apikey`, { method: 'GET', headers: newAuthHeaders })
-    expect(newAuthResponse.status).toBe(200)
+    expect(newAuthResponse.status).toBe(401)
+    await expect(newAuthResponse.json()).resolves.toHaveProperty('error', 'cannot_list_apikeys')
 
-    await fetch(`${BASE_URL}/apikey/${createData.id}`, { method: 'DELETE', headers })
+    await fetch(`${BASE_URL}/apikey/${createData.id}`, { method: 'DELETE', headers: authHeaders })
   })
 
   it('regenerate and update name in a single request', async () => {
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
-      body: JSON.stringify({ name: 'temp-key-regenerate-and-rename', mode: 'all', hashed: false }),
+      headers: authHeaders,
+      body: JSON.stringify(orgKeyBody('temp-key-regenerate-and-rename', { hashed: false })),
     })
     const createData = await createResponse.json<{ id: number, key: string }>()
     expect(createResponse.status).toBe(200)
@@ -459,7 +514,7 @@ describe('[PUT] /apikey/:id operations', () => {
     const newName = 'temp-key-regenerated-renamed'
     const regenerateResponse = await fetch(`${BASE_URL}/apikey/${createData.id}`, {
       method: 'PUT',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({ regenerate: true, name: newName }),
     })
     const regenerateData = await regenerateResponse.json() as { id: number, name: string, key: string }
@@ -467,13 +522,13 @@ describe('[PUT] /apikey/:id operations', () => {
     expect(regenerateData.name).toBe(newName)
     expect(regenerateData.key).not.toBe(createData.key)
 
-    await fetch(`${BASE_URL}/apikey/${createData.id}`, { method: 'DELETE', headers })
+    await fetch(`${BASE_URL}/apikey/${createData.id}`, { method: 'DELETE', headers: authHeaders })
   })
 
   it('regenerate non-existent key returns 404', async () => {
     const response = await fetch(`${BASE_URL}/apikey/424242`, {
       method: 'PUT',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({ regenerate: true }),
     })
     expect(response.status).toBe(404)
@@ -485,14 +540,14 @@ describe('[DELETE] /apikey/:id operations', () => {
     // Create a key specifically for deletion
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
-      body: JSON.stringify({ name: 'key-to-delete', mode: 'all' }),
+      headers: authHeaders,
+      body: JSON.stringify(orgKeyBody('key-to-delete')),
     })
     const createData = await createResponse.json<{ id: number }>()
 
     const response = await fetch(`${BASE_URL}/apikey/${createData.id}`, {
       method: 'DELETE',
-      headers,
+      headers: authHeaders,
     })
 
     const data = await response.json() as { status: string }
@@ -500,14 +555,14 @@ describe('[DELETE] /apikey/:id operations', () => {
     expect(data).toHaveProperty('status', 'ok')
 
     // Verify deletion
-    const verifyResponse = await fetch(`${BASE_URL}/apikey/${createData.id}`, { headers })
+    const verifyResponse = await fetch(`${BASE_URL}/apikey/${createData.id}`, { headers: authHeaders })
     expect(verifyResponse.status).toBe(404)
   })
 
   it('delete api key with invalid id', async () => {
     const response = await fetch(`${BASE_URL}/apikey/424242`, {
       method: 'DELETE',
-      headers,
+      headers: authHeaders,
     })
     expect(response.status).toBe(404)
     const data = await response.json() as { error: string }
@@ -518,21 +573,21 @@ describe('[DELETE] /apikey/:id operations', () => {
     // Create and delete a key, then try to delete again
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
-      body: JSON.stringify({ name: 'key-to-double-delete', mode: 'all' }),
+      headers: authHeaders,
+      body: JSON.stringify(orgKeyBody('key-to-double-delete')),
     })
     const createData = await createResponse.json<{ id: number }>()
 
     // First deletion
     await fetch(`${BASE_URL}/apikey/${createData.id}`, {
       method: 'DELETE',
-      headers,
+      headers: authHeaders,
     })
 
     // Second deletion attempt
     const response = await fetch(`${BASE_URL}/apikey/${createData.id}`, {
       method: 'DELETE',
-      headers,
+      headers: authHeaders,
     })
     expect(response.status).toBe(404)
     const data = await response.json() as { error: string }
@@ -545,11 +600,11 @@ describe('[POST] /apikey hashed key operations', () => {
     const keyName = 'test-hashed-key'
     const response = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: keyName,
-        mode: 'all',
         hashed: true,
+        bindings: orgApiKeyBindings(),
       }),
     })
     const data = await response.json<{ key: string, key_hash: string, id: number }>()
@@ -565,7 +620,7 @@ describe('[POST] /apikey hashed key operations', () => {
     expect(data.key_hash).toMatch(/^[\da-f]{64}$/i)
 
     // Verify the created key exists but key column in DB should be null
-    const verifyResponse = await fetch(`${BASE_URL}/apikey/${data.id}`, { headers })
+    const verifyResponse = await fetch(`${BASE_URL}/apikey/${data.id}`, { headers: authHeaders })
     const verifyData = await verifyResponse.json() as { name: string, key: string | null, key_hash: string }
     expect(verifyData.name).toBe(keyName)
     // In the database, the key should be null for hashed keys
@@ -575,7 +630,7 @@ describe('[POST] /apikey hashed key operations', () => {
     // Cleanup
     await fetch(`${BASE_URL}/apikey/${data.id}`, {
       method: 'DELETE',
-      headers,
+      headers: authHeaders,
     })
   })
 
@@ -583,11 +638,11 @@ describe('[POST] /apikey hashed key operations', () => {
     const keyName = 'test-plain-key-explicit'
     const response = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: keyName,
-        mode: 'all',
         hashed: false,
+        bindings: orgApiKeyBindings(),
       }),
     })
     const data = await response.json<{ key: string, key_hash: string | null, id: number }>()
@@ -598,7 +653,7 @@ describe('[POST] /apikey hashed key operations', () => {
     expect(data.key_hash).toBeNull()
 
     // Verify the key is stored in plain
-    const verifyResponse = await fetch(`${BASE_URL}/apikey/${data.id}`, { headers })
+    const verifyResponse = await fetch(`${BASE_URL}/apikey/${data.id}`, { headers: authHeaders })
     const verifyData = await verifyResponse.json() as { key: string, key_hash: string | null }
     expect(verifyData.key).toBe(data.key)
     expect(verifyData.key_hash).toBeNull()
@@ -606,30 +661,29 @@ describe('[POST] /apikey hashed key operations', () => {
     // Cleanup
     await fetch(`${BASE_URL}/apikey/${data.id}`, {
       method: 'DELETE',
-      headers,
+      headers: authHeaders,
     })
   })
 
-  it('create hashed api key with mode and limitations', async () => {
+  it('create hashed api key with V2 bindings', async () => {
     const response = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'hashed-key-with-options',
         hashed: true,
-        mode: 'read',
+        bindings: orgApiKeyBindings(),
       }),
     })
-    const data = await response.json<{ key: string, key_hash: string, id: number, mode: string }>()
+    const data = await response.json<{ key: string, key_hash: string, id: number }>()
     expect(response.status).toBe(200)
     expect(data).toHaveProperty('key')
     expect(data).toHaveProperty('key_hash')
-    expect(data.mode).toBe('read')
 
     // Cleanup
     await fetch(`${BASE_URL}/apikey/${data.id}`, {
       method: 'DELETE',
-      headers,
+      headers: authHeaders,
     })
   })
 
@@ -637,18 +691,18 @@ describe('[POST] /apikey hashed key operations', () => {
     // Create a hashed key
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'hashed-key-for-auth-test',
-        mode: 'all',
         hashed: true,
+        bindings: orgApiKeyBindings(),
       }),
     })
     const createData = await createResponse.json<{ key: string, id: number }>()
     expect(createResponse.status).toBe(200)
 
     // Use the plain key value to authenticate (the system should hash it and find the key)
-    const authHeaders = {
+    const createdKeyHeaders = {
       'Content-Type': 'application/json',
       'Authorization': createData.key,
     }
@@ -656,16 +710,16 @@ describe('[POST] /apikey hashed key operations', () => {
     // Try to list API keys using the hashed key for auth
     const listResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'GET',
-      headers: authHeaders,
+      headers: createdKeyHeaders,
     })
-    expect(listResponse.status).toBe(200)
-    const listData = await listResponse.json()
-    expect(Array.isArray(listData)).toBe(true)
+    expect(listResponse.status).toBe(401)
+    const listData = await listResponse.json() as { error: string }
+    expect(listData.error).toBe('cannot_list_apikeys')
 
     // Cleanup - use original headers since new key might have restrictions
     await fetch(`${BASE_URL}/apikey/${createData.id}`, {
       method: 'DELETE',
-      headers,
+      headers: authHeaders,
     })
   })
 })
@@ -675,12 +729,12 @@ describe('[POST] /apikey hashed key with expiration', () => {
     const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days from now
     const response = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'hashed-key-with-expiration',
-        mode: 'all',
         hashed: true,
         expires_at: futureDate,
+        bindings: orgApiKeyBindings(),
       }),
     })
     const data = await response.json<{ key: string, key_hash: string, id: number, expires_at: string }>()
@@ -696,7 +750,7 @@ describe('[POST] /apikey hashed key with expiration', () => {
     expect(new Date(data.expires_at).getTime()).toBeCloseTo(new Date(futureDate).getTime(), -3)
 
     // Verify in DB: key should be null, key_hash and expires_at should be set
-    const verifyResponse = await fetch(`${BASE_URL}/apikey/${data.id}`, { headers })
+    const verifyResponse = await fetch(`${BASE_URL}/apikey/${data.id}`, { headers: authHeaders })
     const verifyData = await verifyResponse.json() as { key: string | null, key_hash: string, expires_at: string }
     expect(verifyData.key).toBeNull()
     expect(verifyData.key_hash).toBe(data.key_hash)
@@ -705,7 +759,7 @@ describe('[POST] /apikey hashed key with expiration', () => {
     // Cleanup
     await fetch(`${BASE_URL}/apikey/${data.id}`, {
       method: 'DELETE',
-      headers,
+      headers: authHeaders,
     })
   })
 
@@ -713,35 +767,35 @@ describe('[POST] /apikey hashed key with expiration', () => {
     const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'hashed-key-expiration-auth-test',
-        mode: 'all',
         hashed: true,
         expires_at: futureDate,
+        bindings: orgApiKeyBindings(),
       }),
     })
     const createData = await createResponse.json<{ key: string, id: number }>()
     expect(createResponse.status).toBe(200)
 
     // Use the plain key value to authenticate
-    const authHeaders = {
+    const createdKeyHeaders = {
       'Content-Type': 'application/json',
       'Authorization': createData.key,
     }
 
     const listResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'GET',
-      headers: authHeaders,
+      headers: createdKeyHeaders,
     })
-    expect(listResponse.status).toBe(200)
-    const listData = await listResponse.json()
-    expect(Array.isArray(listData)).toBe(true)
+    expect(listResponse.status).toBe(401)
+    const listData = await listResponse.json() as { error: string }
+    expect(listData.error).toBe('cannot_list_apikeys')
 
     // Cleanup
     await fetch(`${BASE_URL}/apikey/${createData.id}`, {
       method: 'DELETE',
-      headers,
+      headers: authHeaders,
     })
   })
 
@@ -749,12 +803,12 @@ describe('[POST] /apikey hashed key with expiration', () => {
     // Create a hashed key with future expiration
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'hashed-key-to-expire',
-        mode: 'all',
         hashed: true,
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        bindings: orgApiKeyBindings(),
       }),
     })
     const createData = await createResponse.json<{ key: string, id: number }>()
@@ -765,14 +819,14 @@ describe('[POST] /apikey hashed key with expiration', () => {
     expect(error).toBeNull()
 
     // Try to use the expired hashed key for authentication
-    const authHeaders = {
+    const expiredKeyHeaders = {
       'Content-Type': 'application/json',
       'Authorization': createData.key,
     }
 
     const listResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'GET',
-      headers: authHeaders,
+      headers: expiredKeyHeaders,
     })
     // Should be rejected as unauthorized
     expect(listResponse.status).toBe(401)
@@ -784,11 +838,11 @@ describe('[RLS] hashed API key with direct Supabase SDK', () => {
     // Create a hashed key via API
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'hashed-key-rls-test',
-        mode: 'all',
         hashed: true,
+        bindings: orgApiKeyBindings(),
       }),
     })
     const createData = await createResponse.json<{ key: string, id: number }>()
@@ -827,7 +881,7 @@ describe('[RLS] hashed API key with direct Supabase SDK', () => {
     // Cleanup
     await fetch(`${BASE_URL}/apikey/${createData.id}`, {
       method: 'DELETE',
-      headers,
+      headers: authHeaders,
     })
   })
 
@@ -835,11 +889,11 @@ describe('[RLS] hashed API key with direct Supabase SDK', () => {
     // Create a plain (non-hashed) key via API
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'plain-key-rls-test',
-        mode: 'all',
         hashed: false,
+        bindings: orgApiKeyBindings(),
       }),
     })
     const createData = await createResponse.json<{ key: string, id: number }>()
@@ -870,7 +924,7 @@ describe('[RLS] hashed API key with direct Supabase SDK', () => {
     // Cleanup
     await fetch(`${BASE_URL}/apikey/${createData.id}`, {
       method: 'DELETE',
-      headers,
+      headers: authHeaders,
     })
   })
 })

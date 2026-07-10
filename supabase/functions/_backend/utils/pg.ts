@@ -1,5 +1,6 @@
+import type { SQL } from 'drizzle-orm'
 import type { Context } from 'hono'
-import { and, eq, or, sql } from 'drizzle-orm'
+import { and, eq, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { alias } from 'drizzle-orm/pg-core'
 import { getRuntimeKey } from 'hono/adapter'
@@ -7,17 +8,33 @@ import { getRuntimeKey } from 'hono/adapter'
 import { Pool } from 'pg'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { CacheHelper } from './cache.ts'
+import { getChannelSelfOverride, isChannelSelfStoreEnabled } from './channelSelfStore.ts'
 import { DISPOSABLE_EMAIL_DOMAINS, PERSONAL_EMAIL_DOMAINS } from './emailClassification.ts'
 import { getClientDbRegionSB } from './geolocation.ts'
+import { REQUIRED_GLOBAL_STATS_SHARDS } from './global_stats.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import * as schema from './postgres_schema.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
+import { getRolloutDecision } from './rollout.ts'
+import { shouldRequireReadReplica, shouldSkipDirectHyperdriveFallback } from './supabase_write_guard.ts'
 
 const REPLICATION_LAG_THRESHOLD_SECONDS = 180
 const REPLICATION_LAG_CACHE_TTL_SECONDS = 60
 const REPLICATION_LAG_CACHE_TTL_MS = REPLICATION_LAG_CACHE_TTL_SECONDS * 1000
 
 type ReplicationStatus = 'ok' | 'lagging' | 'unknown'
+interface ChannelLookupResult { id: number, name: string, allow_device_self_set: boolean, public: boolean, owner_org: string }
+type PlanAction = 'mau' | 'storage' | 'bandwidth'
+type ReadReplicaHyperdriveBinding
+  = | 'HYPERDRIVE_CAPGO_READ_AS_JAPAN'
+    | 'HYPERDRIVE_CAPGO_READ_AS_INDIA'
+    | 'HYPERDRIVE_CAPGO_READ_NA'
+    | 'HYPERDRIVE_CAPGO_READ_EU'
+    | 'HYPERDRIVE_CAPGO_READ_OC'
+    | 'HYPERDRIVE_CAPGO_READ_SA'
+    | 'HYPERDRIVE_CAPGO_READ_ME'
+    | 'HYPERDRIVE_CAPGO_READ_AF'
+    | 'HYPERDRIVE_CAPGO_READ_HK'
 
 interface ReplicationLagStatus {
   status: ReplicationStatus
@@ -31,14 +48,26 @@ interface ReplicationLagCacheEntry extends ReplicationLagStatus {
 const replicationLagMemoryCache = new Map<string, ReplicationLagCacheEntry>()
 const replicationLagInflight = new Map<string, Promise<ReplicationLagStatus>>()
 
-const PLAN_EXCEEDED_COLUMNS: Record<'mau' | 'storage' | 'bandwidth', string> = {
+const READ_REPLICA_ROUTES: { region: string, binding: ReadReplicaHyperdriveBinding }[] = [
+  { region: 'AS_JAPAN', binding: 'HYPERDRIVE_CAPGO_READ_AS_JAPAN' },
+  { region: 'AS_INDIA', binding: 'HYPERDRIVE_CAPGO_READ_AS_INDIA' },
+  { region: 'NA', binding: 'HYPERDRIVE_CAPGO_READ_NA' },
+  { region: 'EU', binding: 'HYPERDRIVE_CAPGO_READ_EU' },
+  { region: 'OC', binding: 'HYPERDRIVE_CAPGO_READ_OC' },
+  { region: 'SA', binding: 'HYPERDRIVE_CAPGO_READ_SA' },
+  { region: 'ME', binding: 'HYPERDRIVE_CAPGO_READ_ME' },
+  { region: 'AF', binding: 'HYPERDRIVE_CAPGO_READ_AF' },
+  { region: 'HK', binding: 'HYPERDRIVE_CAPGO_READ_HK' },
+]
+
+const PLAN_EXCEEDED_COLUMNS: Record<PlanAction, string> = {
   mau: 'mau_exceeded',
   storage: 'storage_exceeded',
   bandwidth: 'bandwidth_exceeded',
 }
 
-function buildPlanValidationExpression(
-  actions: ('mau' | 'storage' | 'bandwidth')[],
+export function buildPlanValidationExpression(
+  actions: PlanAction[],
   ownerColumn: typeof schema.app_versions.owner_org | typeof schema.apps.owner_org,
 ) {
   const extraConditions = actions.map(action => ` AND ${PLAN_EXCEEDED_COLUMNS[action]} = false`).join('')
@@ -54,6 +83,9 @@ function buildPlanValidationExpression(
   // Backward compatibility for replicas that haven't replicated the column yet:
   // read via `to_jsonb(row)->>'has_usage_credits'` so the query still parses
   // even if the column doesn't exist. Missing column fails closed.
+  //
+  // Keep the subscription branch action-specific. is_good_plan also includes
+  // build_time, which must not block update/upload paths when their own metrics fit.
   const hasCreditsExpression = sql`EXISTS (
     SELECT 1
     FROM ${schema.orgs}
@@ -70,7 +102,6 @@ function buildPlanValidationExpression(
       (${schema.stripe_info.trial_at}::date > CURRENT_DATE)
       OR (
         ${schema.stripe_info.status} = 'succeeded'
-        AND ${schema.stripe_info.is_good_plan} = true
         ${sql.raw(extraConditions)}
       )
     )
@@ -133,10 +164,9 @@ function toReplicationLagSeconds(value: unknown): number | null {
 async function queryReplicaLag(c: Context, pool: Pool): Promise<ReplicationLagStatus> {
   try {
     const query = `
-      SELECT EXTRACT(EPOCH FROM (now() - last_msg_receipt_time)) AS lag_seconds
+      SELECT MAX(EXTRACT(EPOCH FROM (now() - last_msg_receipt_time))) AS lag_seconds
       FROM pg_stat_subscription
-      WHERE subname LIKE 'planetscale_subscription_%'
-      LIMIT 1
+      WHERE last_msg_receipt_time IS NOT NULL
     `
 
     const result = await pool.query(query)
@@ -259,72 +289,56 @@ function setDatabaseSource(c: Context, source: string): void {
   safeSetResponseHeader(c, 'X-Database-Source', source)
 }
 
+function getReadOnlyDatabaseURL(c: Context, dbRegion: string | undefined): string | null {
+  const selectedRoute = READ_REPLICA_ROUTES.find(route => route.region === dbRegion && c.env[route.binding])
+  if (!selectedRoute)
+    return null
+
+  setDatabaseSource(c, selectedRoute.binding)
+  cloudlog({ requestId: c.get('requestId'), message: `Using ${selectedRoute.binding} for read-only` })
+  return c.env[selectedRoute.binding].connectionString
+}
+
+function isLocalWorkerEnv(c: Context): boolean {
+  return existInEnv(c, 'ENV_NAME') && getEnv(c, 'ENV_NAME').endsWith('-local')
+}
+
+function getLocalReadOnlyDatabaseURL(c: Context): string | null {
+  if (!isLocalWorkerEnv(c) || !existInEnv(c, 'LOCAL_READ_REPLICA_SUPABASE_DB_URL'))
+    return null
+
+  setDatabaseSource(c, 'local_read_replica')
+  cloudlog({ requestId: c.get('requestId'), message: 'Using LOCAL_READ_REPLICA_SUPABASE_DB_URL for read-only' })
+  return fixSupabaseHost(getEnv(c, 'LOCAL_READ_REPLICA_SUPABASE_DB_URL'))
+}
+
 export function getDatabaseURL(c: Context, readOnly = false): string {
   const dbRegion = getClientDbRegionSB(c)
 
   // For read-only queries, use region to avoid Network latency
   if (readOnly) {
-    // Hyperdrive main read replica regional routing in Cloudflare Workers
-    // When using Hyperdrive we use session databases directly to avoid supabase pooler overhead and allow prepared statements
-    // Asia region - Japan
-    if (c.env.HYPERDRIVE_CAPGO_PS_AS_JAPAN && dbRegion === 'AS_JAPAN') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_AS_JAPAN')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_AS_JAPAN for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_AS_JAPAN.connectionString
-    }
-    // Asia region - India
-    if (c.env.HYPERDRIVE_CAPGO_PS_AS_INDIA && dbRegion === 'AS_INDIA') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_AS_INDIA')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_AS_INDIA for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_AS_INDIA.connectionString
-    }
-    // // US region
-    if (c.env.HYPERDRIVE_CAPGO_PS_NA && dbRegion === 'NA') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_NA')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_NA for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_NA.connectionString
-    }
-    // // EU region
-    if (c.env.HYPERDRIVE_CAPGO_PS_EU && dbRegion === 'EU') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_EU')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_EU for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_EU.connectionString
-    }
-    // // OC region
-    if (c.env.HYPERDRIVE_CAPGO_PS_OC && dbRegion === 'OC') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_OC')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_OC for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_OC.connectionString
-    }
-    // // SA region
-    if (c.env.HYPERDRIVE_CAPGO_PS_SA && dbRegion === 'SA') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_SA')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_SA for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_SA.connectionString
-    }
-    // Google Cloud Hyperdrive read replica routing
-    if (c.env.HYPERDRIVE_CAPGO_GG_ME && dbRegion === 'ME') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_GOOGLE_ME')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_GOOGLE_ME for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_GG_ME.connectionString
-    }
-    if (c.env.HYPERDRIVE_CAPGO_GG_AF && dbRegion === 'AF') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_GOOGLE_AF')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_GOOGLE_AF for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_GG_AF.connectionString
-    }
-    if (c.env.HYPERDRIVE_CAPGO_GG_HK && dbRegion === 'HK') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_GOOGLE_HK')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_GOOGLE_HK for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_GG_HK.connectionString
-    }
+    const readOnlyDatabaseURL = getReadOnlyDatabaseURL(c, dbRegion)
+    if (readOnlyDatabaseURL)
+      return readOnlyDatabaseURL
+
+    const localReadOnlyDatabaseURL = getLocalReadOnlyDatabaseURL(c)
+    if (localReadOnlyDatabaseURL)
+      return localReadOnlyDatabaseURL
   }
 
-  // Fallback to single Hyperdrive if available
-  if (c.env.HYPERDRIVE_CAPGO_DIRECT_EU) {
+  if (readOnly && shouldRequireReadReplica(c)) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Read replica is required for this endpoint' })
+    throw new Error('Read replica is required for this endpoint')
+  }
+
+  if (c.env.HYPERDRIVE_CAPGO_DIRECT_EU && !shouldSkipDirectHyperdriveFallback(c)) {
     setDatabaseSource(c, 'HYPERDRIVE_CAPGO_DIRECT_EU')
     cloudlog({ requestId: c.get('requestId'), message: `Using HYPERDRIVE_CAPGO_DIRECT_EU for ${readOnly ? 'read-only' : 'read-write'}` })
     return c.env.HYPERDRIVE_CAPGO_DIRECT_EU.connectionString
+  }
+
+  if (c.env.HYPERDRIVE_CAPGO_DIRECT_EU) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Skipping HYPERDRIVE_CAPGO_DIRECT_EU fallback for this endpoint' })
   }
 
   // Main DB write poller EU region in supabase
@@ -437,31 +451,45 @@ export function closeClient(c: Context, db: ReturnType<typeof getPgClient>) {
 
 export function getAlias() {
   const versionAlias = alias(schema.app_versions, 'version')
+  const rolloutVersionAlias = alias(schema.app_versions, 'rollout_version')
   const channelDevicesAlias = alias(schema.channel_devices, 'channel_devices')
   const channelAlias = alias(schema.channels, 'channels')
-  return { versionAlias, channelDevicesAlias, channelAlias }
+  return { versionAlias, rolloutVersionAlias, channelDevicesAlias, channelAlias }
+}
+
+function getVersionSelect(
+  versionAlias: any,
+  prefix: string,
+  includeMetadata = false,
+  channelVersionColumn?: any,
+) {
+  const versionSelect: any = {
+    id: sql<number | null>`${versionAlias.id}`.as(`${prefix}id`),
+    name: channelVersionColumn
+      ? sql<string>`CASE WHEN ${channelVersionColumn} IS NULL THEN 'builtin' ELSE ${versionAlias.name} END`.as(`${prefix}name`)
+      : sql<string>`${versionAlias.name}`.as(`${prefix}name`),
+    checksum: sql<string | null>`${versionAlias.checksum}`.as(`${prefix}checksum`),
+    session_key: sql<string | null>`${versionAlias.session_key}`.as(`${prefix}session_key`),
+    key_id: sql<string | null>`${versionAlias.key_id}`.as(`${prefix}key_id`),
+    storage_provider: sql<string>`COALESCE(${versionAlias.storage_provider}, 'r2')`.as(`${prefix}storage_provider`),
+    external_url: sql<string | null>`${versionAlias.external_url}`.as(`${prefix}external_url`),
+    min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as(`${prefix}minUpdateVersion`),
+    manifest_count: sql<number>`${versionAlias.manifest_count}`.as(`${prefix}manifest_count`),
+    r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as(`${prefix}r2_path`),
+  }
+
+  if (includeMetadata) {
+    versionSelect.link = sql<string | null>`${versionAlias.link}`.as(`${prefix}link`)
+    versionSelect.comment = sql<string | null>`${versionAlias.comment}`.as(`${prefix}comment`)
+  }
+
+  return versionSelect
 }
 
 function getSchemaUpdatesAlias(includeMetadata = false) {
-  const { versionAlias, channelDevicesAlias, channelAlias } = getAlias()
-
-  const versionSelect: any = {
-    id: sql<number>`${versionAlias.id}`.as('vid'),
-    name: sql<string>`${versionAlias.name}`.as('vname'),
-    checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
-    session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
-    key_id: sql<string | null>`${versionAlias.key_id}`.as('vkey_id'),
-    storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
-    external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
-    min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
-    r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
-  }
-
-  // Only include link and comment when needed (for plugin v7.35.0+ with expose_metadata enabled)
-  if (includeMetadata) {
-    versionSelect.link = sql<string | null>`${versionAlias.link}`.as('vlink')
-    versionSelect.comment = sql<string | null>`${versionAlias.comment}`.as('vcomment')
-  }
+  const { versionAlias, rolloutVersionAlias, channelDevicesAlias, channelAlias } = getAlias()
+  const versionSelect = getVersionSelect(versionAlias, 'v', includeMetadata, channelAlias.version)
+  const rolloutVersionSelect = getVersionSelect(rolloutVersionAlias, 'rv', includeMetadata)
   const channelSelect = {
     id: channelAlias.id,
     name: channelAlias.name,
@@ -477,6 +505,13 @@ function getSchemaUpdatesAlias(includeMetadata = false) {
     electron: channelAlias.electron,
     allow_device_self_set: channelAlias.allow_device_self_set,
     public: channelAlias.public,
+    rollout_version: channelAlias.rollout_version,
+    rollout_percentage_bps: channelAlias.rollout_percentage_bps,
+    rollout_enabled: channelAlias.rollout_enabled,
+    rollout_id: channelAlias.rollout_id,
+    rollout_paused_at: channelAlias.rollout_paused_at,
+    rollout_pause_reason: channelAlias.rollout_pause_reason,
+    rollout_cache_ttl_seconds: channelAlias.rollout_cache_ttl_seconds,
   }
   const manifestSelect = sql<{ file_name: string, file_hash: string, s3_path: string }[]>`COALESCE(json_agg(
         json_build_object(
@@ -485,19 +520,23 @@ function getSchemaUpdatesAlias(includeMetadata = false) {
           's3_path', ${schema.manifest.s3_path}
         )
       ) FILTER (WHERE ${schema.manifest.file_name} IS NOT NULL), '[]'::json)`
-  return { versionSelect, channelDevicesAlias, channelAlias, channelSelect, manifestSelect, versionAlias }
+  return { versionSelect, rolloutVersionSelect, channelDevicesAlias, channelAlias, channelSelect, manifestSelect, versionAlias, rolloutVersionAlias }
 }
 
 function activeChannelVersionJoin(
-  channelVersionColumn: typeof schema.channels.version,
-  versionAlias: ReturnType<typeof getAlias>['versionAlias'],
+  channelVersionColumn: any,
+  versionAlias: any,
+  channelAppIdColumn?: any,
 ) {
-  // /updates still reaches app_versions through the channel/version PK join.
-  // The deleted filter is only applied to that single matched row, so it does not widen the hot-path scan.
-  return and(
+  const conditions = [
     eq(channelVersionColumn, versionAlias.id),
     or(eq(versionAlias.deleted, false), eq(versionAlias.name, 'builtin')),
-  )
+  ]
+
+  if (channelAppIdColumn)
+    conditions.push(eq(versionAlias.app_id, channelAppIdColumn))
+
+  return and(...conditions)
 }
 
 export function requestInfosChannelDevicePostgres(
@@ -523,17 +562,150 @@ export function requestInfosChannelDevicePostgres(
     .select(selectShape)
     .from(channelDevicesAlias)
     .innerJoin(channelAlias, eq(channelDevicesAlias.channel_id, channelAlias.id))
-    .innerJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
+    .leftJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
 
   const channelDevice = (includeManifest
     ? baseQuery.leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
     : baseQuery)
-    .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
+    .where(and(
+      eq(channelDevicesAlias.device_id, device_id),
+      eq(channelDevicesAlias.app_id, app_id),
+      or(isNull(channelAlias.version), isNotNull(versionAlias.id)),
+    ))
     .groupBy(channelDevicesAlias.device_id, channelDevicesAlias.app_id, channelAlias.id, versionAlias.id)
     .limit(1)
   cloudlog({ requestId: c.get('requestId'), message: 'channelDevice Query:', channelDeviceQuery: channelDevice.toSQL() })
 
   return channelDevice.then(data => data.at(0))
+}
+
+export async function getEffectiveDeviceChannelNamePostgres(
+  c: Context,
+  app_id: string,
+  device_id: string,
+  fallbackChannelName: string | null | undefined,
+  platform: string,
+  hasChannelDeviceOverrides: boolean,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+) {
+  const fallback = typeof fallbackChannelName === 'string' && fallbackChannelName.trim() !== ''
+    ? fallbackChannelName.trim()
+    : null
+  const { channelDevicesAlias, channelAlias } = getAlias()
+  const platformQuery = platform === 'android' ? channelAlias.android : platform === 'electron' ? channelAlias.electron : channelAlias.ios
+
+  const getChannelById = async (channelId: number) => {
+    const channelQuery = drizzleClient
+      .select({ id: channelAlias.id, name: channelAlias.name })
+      .from(channelAlias)
+      .where(and(
+        eq(channelAlias.app_id, app_id),
+        eq(channelAlias.id, channelId),
+        eq(platformQuery, true),
+        or(
+          eq(channelAlias.public, true),
+          eq(channelAlias.allow_device_self_set, true),
+        ),
+      ))
+      .limit(1)
+
+    cloudlog({ requestId: c.get('requestId'), message: 'stats channel self override Query:', channelQuery: channelQuery.toSQL() })
+    const channel = await channelQuery.then(data => data.at(0))
+    return channel?.name ? channel : null
+  }
+
+  if (isChannelSelfStoreEnabled(c as any)) {
+    const storedOverride = await getChannelSelfOverride(c as any, app_id, device_id.toLowerCase())
+    if (storedOverride?.channel_id.id) {
+      const channel = await getChannelById(storedOverride.channel_id.id)
+      if (channel?.name)
+        return channel
+    }
+  }
+
+  if (hasChannelDeviceOverrides) {
+    const channelQuery = drizzleClient
+      .select({ id: channelAlias.id, name: channelAlias.name })
+      .from(channelDevicesAlias)
+      .innerJoin(channelAlias, and(eq(channelDevicesAlias.channel_id, channelAlias.id), eq(channelAlias.app_id, app_id)))
+      .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
+      .limit(1)
+
+    cloudlog({ requestId: c.get('requestId'), message: 'stats channel override Query:', channelQuery: channelQuery.toSQL() })
+    const channel = await channelQuery.then(data => data.at(0))
+    if (channel?.name)
+      return channel
+  }
+  const getChannelByName = async (channelName: string | null) => {
+    const channelQuery = drizzleClient
+      .select({ id: channelAlias.id, name: channelAlias.name })
+      .from(channelAlias)
+      .where(
+        channelName
+          ? and(
+              eq(channelAlias.app_id, app_id),
+              eq(channelAlias.name, channelName),
+              eq(platformQuery, true),
+              or(
+                eq(channelAlias.public, true),
+                eq(channelAlias.allow_device_self_set, true),
+              ),
+            )
+          : and(
+              eq(channelAlias.public, true),
+              eq(channelAlias.app_id, app_id),
+              eq(platformQuery, true),
+            ),
+      )
+      .orderBy(channelAlias.name, channelAlias.id)
+      .limit(1)
+
+    cloudlog({ requestId: c.get('requestId'), message: 'stats channel Query:', channelQuery: channelQuery.toSQL(), fallbackChannelName: channelName })
+    const channel = await channelQuery.then(data => data.at(0))
+    return channel?.name ? channel : null
+  }
+
+  if (fallback) {
+    const channelName = await getChannelByName(fallback)
+    if (channelName)
+      return channelName
+  }
+
+  return getChannelByName(null)
+}
+
+export function requestInfosChannelByIdPostgres(
+  c: Context,
+  app_id: string,
+  channelId: number,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  includeManifest: boolean,
+  includeMetadata = false,
+) {
+  const { versionSelect, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias(includeMetadata)
+  const baseSelect = {
+    version: versionSelect,
+    channels: channelSelect,
+  }
+  const selectShape = withOptionalManifestSelect(baseSelect, includeManifest, manifestSelect)
+
+  const baseQuery = drizzleClient
+    .select(selectShape)
+    .from(channelAlias)
+    .innerJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
+
+  const channel = (includeManifest
+    ? baseQuery.leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
+    : baseQuery)
+    .where(and(
+      eq(channelAlias.app_id, app_id),
+      eq(channelAlias.id, channelId),
+    ))
+    .groupBy(channelAlias.id, versionAlias.id)
+    .limit(1)
+  cloudlog({ requestId: c.get('requestId'), message: 'channel self override Query:', channelSelfOverrideQuery: channel.toSQL() })
+
+  return channel.then(data => data.at(0))
 }
 
 export function requestInfosChannelPostgres(
@@ -546,7 +718,11 @@ export function requestInfosChannelPostgres(
   includeMetadata = false,
 ) {
   const { versionSelect, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias(includeMetadata)
-  const platformQuery = platform === 'android' ? channelAlias.android : platform === 'electron' ? channelAlias.electron : channelAlias.ios
+  let platformQuery = channelAlias.ios
+  if (platform === 'android')
+    platformQuery = channelAlias.android
+  else if (platform === 'electron')
+    platformQuery = channelAlias.electron
   const baseSelect = {
     version: versionSelect,
     channels: channelSelect,
@@ -556,19 +732,14 @@ export function requestInfosChannelPostgres(
   const baseQuery = drizzleClient
     .select(selectShape)
     .from(channelAlias)
-    .innerJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
+    .leftJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
 
   const channelQuery = (includeManifest
     ? baseQuery.leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
     : baseQuery)
-    .where(
-      !defaultChannel
+    .where(and(
+      defaultChannel
         ? and(
-            eq(channelAlias.public, true),
-            eq(channelAlias.app_id, app_id),
-            eq(platformQuery, true),
-          )
-        : and(
             eq(channelAlias.app_id, app_id),
             eq(channelAlias.name, defaultChannel),
             eq(platformQuery, true),
@@ -576,9 +747,16 @@ export function requestInfosChannelPostgres(
               eq(channelAlias.public, true),
               eq(channelAlias.allow_device_self_set, true),
             ),
+          )
+        : and(
+            eq(channelAlias.public, true),
+            eq(channelAlias.app_id, app_id),
+            eq(platformQuery, true),
           ),
-    )
+      or(isNull(channelAlias.version), isNotNull(versionAlias.id)),
+    ))
     .groupBy(channelAlias.id, versionAlias.id)
+    .orderBy(channelAlias.name, channelAlias.id)
     .limit(1)
   cloudlog({ requestId: c.get('requestId'), message: 'channel Query:', channelQuery: channelQuery.toSQL() })
   const channel = channelQuery.then(data => data.at(0))
@@ -586,31 +764,257 @@ export function requestInfosChannelPostgres(
   return channel
 }
 
-export function requestInfosPostgres(
+export function requestManifestEntriesPostgres(
+  c: Context,
+  versionId: number,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+) {
+  const manifestQuery = drizzleClient
+    .select({
+      file_name: schema.manifest.file_name,
+      file_hash: schema.manifest.file_hash,
+      s3_path: schema.manifest.s3_path,
+    })
+    .from(schema.manifest)
+    .where(eq(schema.manifest.app_version_id, versionId))
+
+  cloudlog({ requestId: c.get('requestId'), message: 'rollout manifest Query:', manifestQuery: manifestQuery.toSQL() })
+  return manifestQuery
+}
+
+export function requestInfosChannelByIdPostgresRollout(
+  c: Context,
+  app_id: string,
+  channelId: number,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  includeMetadata = false,
+) {
+  const { versionSelect, rolloutVersionSelect, channelAlias, channelSelect, versionAlias, rolloutVersionAlias } = getSchemaUpdatesAlias(includeMetadata)
+  const channel = drizzleClient
+    .select({
+      version: versionSelect,
+      rolloutVersion: rolloutVersionSelect,
+      channels: channelSelect,
+    })
+    .from(channelAlias)
+    .leftJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
+    .leftJoin(rolloutVersionAlias, activeChannelVersionJoin(channelAlias.rollout_version, rolloutVersionAlias, channelAlias.app_id))
+    .where(and(
+      eq(channelAlias.app_id, app_id),
+      eq(channelAlias.id, channelId),
+      or(isNull(channelAlias.version), isNotNull(versionAlias.id)),
+    ))
+    .limit(1)
+
+  cloudlog({ requestId: c.get('requestId'), message: 'channel self override rollout Query:', channelSelfOverrideQuery: channel.toSQL() })
+  return channel.then(data => data.at(0))
+}
+
+export function requestInfosChannelDevicePostgresRollout(
+  c: Context,
+  app_id: string,
+  device_id: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  includeMetadata = false,
+) {
+  const { versionSelect, rolloutVersionSelect, channelDevicesAlias, channelAlias, channelSelect, versionAlias, rolloutVersionAlias } = getSchemaUpdatesAlias(includeMetadata)
+  const channelDevice = drizzleClient
+    .select({
+      version: versionSelect,
+      rolloutVersion: rolloutVersionSelect,
+      channels: channelSelect,
+    })
+    .from(channelDevicesAlias)
+    .innerJoin(channelAlias, eq(channelDevicesAlias.channel_id, channelAlias.id))
+    .leftJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
+    .leftJoin(rolloutVersionAlias, activeChannelVersionJoin(channelAlias.rollout_version, rolloutVersionAlias, channelAlias.app_id))
+    .where(and(
+      eq(channelDevicesAlias.device_id, device_id),
+      eq(channelDevicesAlias.app_id, app_id),
+      or(isNull(channelAlias.version), isNotNull(versionAlias.id)),
+    ))
+    .limit(1)
+
+  cloudlog({ requestId: c.get('requestId'), message: 'channelDevice rollout Query:', channelDeviceQuery: channelDevice.toSQL() })
+  return channelDevice.then(data => data.at(0))
+}
+
+export function requestInfosChannelPostgresRollout(
   c: Context,
   platform: string,
   app_id: string,
-  device_id: string,
   defaultChannel: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
-  channelDeviceCount?: number | null,
-  manifestBundleCount?: number | null,
   includeMetadata = false,
 ) {
+  const { versionSelect, rolloutVersionSelect, channelAlias, channelSelect, versionAlias, rolloutVersionAlias } = getSchemaUpdatesAlias(includeMetadata)
+  const platformQuery = platform === 'android' ? channelAlias.android : platform === 'electron' ? channelAlias.electron : channelAlias.ios
+
+  const channelFilter = defaultChannel
+    ? and(
+        eq(channelAlias.app_id, app_id),
+        eq(channelAlias.name, defaultChannel),
+        eq(platformQuery, true),
+        or(
+          eq(channelAlias.public, true),
+          eq(channelAlias.allow_device_self_set, true),
+        ),
+      )
+    : and(
+        eq(channelAlias.public, true),
+        eq(channelAlias.app_id, app_id),
+        eq(platformQuery, true),
+      )
+
+  const channelQuery = drizzleClient
+    .select({
+      version: versionSelect,
+      rolloutVersion: rolloutVersionSelect,
+      channels: channelSelect,
+    })
+    .from(channelAlias)
+    .leftJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
+    .leftJoin(rolloutVersionAlias, activeChannelVersionJoin(channelAlias.rollout_version, rolloutVersionAlias, channelAlias.app_id))
+    .where(and(
+      channelFilter,
+      or(isNull(channelAlias.version), isNotNull(versionAlias.id)),
+    ))
+    .orderBy(channelAlias.name, channelAlias.id)
+    .limit(1)
+
+  cloudlog({ requestId: c.get('requestId'), message: 'channel rollout Query:', channelQuery: channelQuery.toSQL() })
+  return channelQuery.then(data => data.at(0))
+}
+
+async function resolveRolloutChannelDataPostgres(
+  c: Context,
+  channelData: any,
+  appId: string,
+  deviceId: string,
+  currentVersionName: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  includeManifest: boolean,
+) {
+  if (!channelData)
+    return channelData
+
+  const stableVersion = channelData.version
+  const rolloutVersion = channelData.rolloutVersion
+  let selectedVersion = stableVersion
+
+  if (rolloutVersion?.id && channelData.channels?.rollout_version) {
+    const decision = await getRolloutDecision(c, {
+      appId,
+      channelId: channelData.channels.id,
+      currentVersionName,
+      deviceId,
+      rolloutCacheTtlSeconds: channelData.channels.rollout_cache_ttl_seconds,
+      rolloutEnabled: channelData.channels.rollout_enabled,
+      rolloutId: channelData.channels.rollout_id,
+      rolloutPausedAt: channelData.channels.rollout_paused_at,
+      rolloutPercentageBps: channelData.channels.rollout_percentage_bps,
+      rolloutVersionId: rolloutVersion.id,
+      rolloutVersionName: rolloutVersion.name,
+    })
+
+    if (decision.selected)
+      selectedVersion = rolloutVersion
+
+    cloudlog({ requestId: c.get('requestId'), message: 'rollout decision', appId, channelId: channelData.channels.id, selected: decision.selected, reason: decision.reason })
+  }
+
+  const manifestEntries = includeManifest && selectedVersion?.manifest_count > 0
+    ? await requestManifestEntriesPostgres(c, selectedVersion.id, drizzleClient)
+    : []
+
+  return {
+    ...channelData,
+    version: selectedVersion,
+    manifestEntries,
+  }
+}
+
+interface RequestInfosPostgresOptions {
+  c: Context
+  platform: string
+  app_id: string
+  device_id: string
+  defaultChannel: string
+  drizzleClient: ReturnType<typeof getDrizzleClient>
+  channelDeviceCount?: number | null
+  manifestBundleCount?: number | null
+  rolloutChannelCount?: number | null
+  rolloutPausedVersionNames?: string[] | null
+  currentVersionName: string
+  includeMetadata?: boolean
+  channelSelfOverrideChannelId?: number | null
+}
+
+export function requestInfosPostgres(options: RequestInfosPostgresOptions) {
+  const {
+    c,
+    platform,
+    app_id,
+    device_id,
+    defaultChannel,
+    drizzleClient,
+    channelDeviceCount,
+    manifestBundleCount,
+    rolloutChannelCount,
+    rolloutPausedVersionNames,
+    currentVersionName,
+    includeMetadata = false,
+    channelSelfOverrideChannelId,
+  } = options
   const shouldQueryChannelOverride = channelDeviceCount === undefined || channelDeviceCount === null ? true : channelDeviceCount > 0
   const shouldFetchManifest = manifestBundleCount === undefined || manifestBundleCount === null ? true : manifestBundleCount > 0
+  const isPausedRolloutVersion = Array.isArray(rolloutPausedVersionNames) && rolloutPausedVersionNames.includes(currentVersionName)
+  const shouldUseRolloutPath = (rolloutChannelCount ?? 0) > 0 || isPausedRolloutVersion
 
-  const channelDevice = shouldQueryChannelOverride
-    ? requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient, shouldFetchManifest, includeMetadata)
-    : Promise.resolve(undefined)
-        .then(() => {
-          cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
-          return null
-        })
-  const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest, includeMetadata)
+  if (!shouldUseRolloutPath) {
+    let channelDevice: ReturnType<typeof requestInfosChannelByIdPostgres> | ReturnType<typeof requestInfosChannelDevicePostgres> | Promise<null>
+
+    if (typeof channelSelfOverrideChannelId === 'number') {
+      channelDevice = requestInfosChannelByIdPostgres(c, app_id, channelSelfOverrideChannelId, drizzleClient, shouldFetchManifest, includeMetadata)
+    }
+    else if (shouldQueryChannelOverride) {
+      channelDevice = requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient, shouldFetchManifest, includeMetadata)
+    }
+    else {
+      cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
+      channelDevice = Promise.resolve(null)
+    }
+    const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest, includeMetadata)
+
+    return Promise.all([channelDevice, channel])
+      .then(([channelOverride, channelData]) => ({ channelData, channelOverride }))
+      .catch((e) => {
+        logPgError(c, 'requestInfosPostgres', e)
+        throw e
+      })
+  }
+
+  let channelDevice: ReturnType<typeof requestInfosChannelByIdPostgresRollout> | ReturnType<typeof requestInfosChannelDevicePostgresRollout> | Promise<null>
+  if (typeof channelSelfOverrideChannelId === 'number') {
+    channelDevice = requestInfosChannelByIdPostgresRollout(c, app_id, channelSelfOverrideChannelId, drizzleClient, includeMetadata)
+  }
+  else if (shouldQueryChannelOverride) {
+    channelDevice = requestInfosChannelDevicePostgresRollout(c, app_id, device_id, drizzleClient, includeMetadata)
+  }
+  else {
+    cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override rollout query' })
+    channelDevice = Promise.resolve(null)
+  }
+  const channel = requestInfosChannelPostgresRollout(c, platform, app_id, defaultChannel, drizzleClient, includeMetadata)
 
   return Promise.all([channelDevice, channel])
-    .then(([channelOverride, channelData]) => ({ channelData, channelOverride }))
+    .then(async ([channelOverride, channelData]) => {
+      const resolvedChannelOverride = await resolveRolloutChannelDataPostgres(c, channelOverride, app_id, device_id, currentVersionName, drizzleClient, shouldFetchManifest)
+      const resolvedChannelData = resolvedChannelOverride
+        ? channelData
+        : await resolveRolloutChannelDataPostgres(c, channelData, app_id, device_id, currentVersionName, drizzleClient, shouldFetchManifest)
+      return { channelOverride: resolvedChannelOverride, channelData: resolvedChannelData }
+    })
     .catch((e) => {
       logPgError(c, 'requestInfosPostgres', e)
       throw e
@@ -623,15 +1027,18 @@ export interface AppOwnerPostgresResult {
   plan_valid: boolean
   channel_device_count: number
   manifest_bundle_count: number
+  rollout_channel_count: number
+  rollout_paused_version_names: string[]
   expose_metadata: boolean
   allow_device_custom_id: boolean
+  block_provider_infra_requests: boolean
 }
 
 export async function getAppOwnerPostgres(
   c: Context,
   appId: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
-  actions: ('mau' | 'storage' | 'bandwidth')[] = [],
+  actions: PlanAction[] = [],
 ): Promise<AppOwnerPostgresResult | null> {
   try {
     if (actions.length === 0)
@@ -645,8 +1052,11 @@ export async function getAppOwnerPostgres(
         plan_valid: planExpression,
         channel_device_count: schema.apps.channel_device_count,
         manifest_bundle_count: schema.apps.manifest_bundle_count,
+        rollout_channel_count: schema.apps.rollout_channel_count,
+        rollout_paused_version_names: schema.apps.rollout_paused_version_names,
         expose_metadata: schema.apps.expose_metadata,
         allow_device_custom_id: schema.apps.allow_device_custom_id,
+        block_provider_infra_requests: schema.apps.block_provider_infra_requests,
         orgs: {
           created_by: orgAlias.created_by,
           id: orgAlias.id,
@@ -687,6 +1097,37 @@ export async function getAppOwnerPostgres(
   }
 }
 
+export type AppBlockProviderInfraRequestsLookup =
+  | { status: 'found', blockProviderInfraRequests: boolean }
+  | { status: 'missing' }
+  | { status: 'error' }
+
+export async function getAppBlockProviderInfraRequestsPostgres(
+  c: Context,
+  appId: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<AppBlockProviderInfraRequestsLookup> {
+  try {
+    const app = await drizzleClient
+      .select({
+        block_provider_infra_requests: schema.apps.block_provider_infra_requests,
+      })
+      .from(schema.apps)
+      .where(eq(schema.apps.app_id, appId))
+      .limit(1)
+      .then(data => data[0])
+
+    if (!app)
+      return { status: 'missing' }
+
+    return { status: 'found', blockProviderInfraRequests: app.block_provider_infra_requests }
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAppBlockProviderInfraRequestsPostgres', e)
+    return { status: 'error' }
+  }
+}
+
 export async function getAppVersionPostgres(
   c: Context,
   appId: string,
@@ -695,6 +1136,10 @@ export async function getAppVersionPostgres(
   drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<{ id: number, owner_org: string } | null> {
   try {
+    const deletedConditions: ReturnType<typeof eq>[] = []
+    if (allowedDeleted !== undefined)
+      deletedConditions.push(eq(schema.app_versions.deleted, allowedDeleted))
+
     const appVersion = await drizzleClient
       .select({
         id: schema.app_versions.id,
@@ -704,7 +1149,7 @@ export async function getAppVersionPostgres(
       .where(and(
         eq(schema.app_versions.app_id, appId),
         eq(schema.app_versions.name, versionName),
-        ...(allowedDeleted !== undefined ? [eq(schema.app_versions.deleted, allowedDeleted)] : []),
+        ...deletedConditions,
       ))
       .limit(1)
       .then(data => data[0])
@@ -716,33 +1161,12 @@ export async function getAppVersionPostgres(
   }
 }
 
-export async function ensurePlaceholderVersions(c: Context, appId: string) {
-  let pgClient: ReturnType<typeof getPgClient> | undefined
-  try {
-    pgClient = getPgClient(c)
-    await pgClient.query(
-      `INSERT INTO public.app_versions (name, app_id, storage_provider)
-       VALUES ('builtin', $1, 'r2'), ('unknown', $1, 'r2')
-       ON CONFLICT (name, app_id) DO NOTHING`,
-      [appId],
-    )
-  }
-  catch (e: unknown) {
-    logPgError(c, 'ensurePlaceholderVersions', e)
-  }
-  finally {
-    if (pgClient) {
-      await closeClient(c, pgClient)
-    }
-  }
-}
-
 export async function getAppVersionsByAppIdPg(
   c: Context,
   appId: string,
   versionName: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
-  actions: ('mau' | 'storage' | 'bandwidth')[] = [],
+  actions: PlanAction[] = [],
 ): Promise<{ id: number, owner_org: string, name: string, plan_valid: boolean }[]> {
   try {
     if (actions.length === 0)
@@ -816,14 +1240,15 @@ export async function getChannelDeviceOverridePg(
   }
 }
 
-export async function getChannelByNamePg(
+async function getChannelByPg(
   c: Context,
   appId: string,
-  channelName: string,
+  channelFilter: SQL,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
-): Promise<{ id: number, name: string, allow_device_self_set: boolean, public: boolean, owner_org: string } | null> {
+  logName: string,
+): Promise<ChannelLookupResult | null> {
   try {
-    const channel = await drizzleClient
+    return await drizzleClient
       .select({
         id: schema.channels.id,
         name: schema.channels.name,
@@ -834,16 +1259,33 @@ export async function getChannelByNamePg(
       .from(schema.channels)
       .where(and(
         eq(schema.channels.app_id, appId),
-        eq(schema.channels.name, channelName),
+        channelFilter,
       ))
       .limit(1)
       .then(data => data[0])
-    return channel
   }
   catch (e: unknown) {
-    logPgError(c, 'getChannelByNamePg', e)
+    logPgError(c, logName, e)
     return null
   }
+}
+
+export async function getChannelByNamePg(
+  c: Context,
+  appId: string,
+  channelName: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<ChannelLookupResult | null> {
+  return getChannelByPg(c, appId, eq(schema.channels.name, channelName), drizzleClient, 'getChannelByNamePg')
+}
+
+export async function getChannelByIdPg(
+  c: Context,
+  appId: string,
+  channelId: number,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<ChannelLookupResult | null> {
+  return getChannelByPg(c, appId, eq(schema.channels.id, channelId), drizzleClient, 'getChannelByIdPg')
 }
 
 export async function getMainChannelsPg(
@@ -961,7 +1403,7 @@ export async function getAppByIdPg(
   c: Context,
   appId: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
-  actions: ('mau' | 'storage' | 'bandwidth')[] = [],
+  actions: PlanAction[] = [],
 ): Promise<{ owner_org: string, plan_valid: boolean } | null> {
   try {
     if (actions.length === 0)
@@ -999,7 +1441,11 @@ export async function getCompatibleChannelsPg(
     const buildCondition = isProd
       ? eq(schema.channels.allow_prod, true)
       : eq(schema.channels.allow_dev, true)
-    const platformColumn = platform === 'ios' ? schema.channels.ios : platform === 'electron' ? schema.channels.electron : schema.channels.android
+    let platformColumn = schema.channels.android
+    if (platform === 'ios')
+      platformColumn = schema.channels.ios
+    else if (platform === 'electron')
+      platformColumn = schema.channels.electron
     const channels = await drizzleClient
       .select({
         id: schema.channels.id,
@@ -1086,6 +1532,11 @@ export interface AdminGlobalStatsTrend {
   users_active: number
   paying: number
   org_conversion_rate: number
+  plan_total_conversion_rate: number
+  plan_solo_conversion_rate: number
+  plan_maker_conversion_rate: number
+  plan_team_conversion_rate: number
+  plan_enterprise_conversion_rate: number
   trial: number
   not_paying: number
   updates: number
@@ -1108,7 +1559,18 @@ export interface AdminGlobalStatsTrend {
   new_paying_orgs: number
   canceled_orgs: number
   upgraded_orgs: number
+  trial_extended_orgs: number
+  trial_extended_subscribed_orgs: number
+  past_due_orgs: number
+  past_due_orgs_average_days: number
+  active_canceled_orgs: number
+  active_past_due_orgs: number
   mrr: number
+  previous_mrr: number
+  previous_mrr_solo: number
+  previous_mrr_maker: number
+  previous_mrr_team: number
+  previous_mrr_enterprise: number
   nrr: number
   churn_revenue: number
   churn_revenue_solo: number
@@ -1120,6 +1582,9 @@ export interface AdminGlobalStatsTrend {
   revenue_maker: number
   revenue_team: number
   revenue_enterprise: number
+  average_ltv: number
+  shortest_ltv: number
+  longest_ltv: number
   credits_bought: number
   credits_consumed: number
   builds_total: number
@@ -1143,6 +1608,9 @@ export interface AdminGlobalStatsTrend {
   build_count_day_android: number
   builder_active_paying_clients_60d: number
   live_updates_active_paying_clients_60d: number
+  paying_orgs_subscription: number
+  paying_orgs_credits: number
+  paying_orgs_total: number
 }
 
 export async function getAdminGlobalStatsTrend(
@@ -1151,70 +1619,97 @@ export async function getAdminGlobalStatsTrend(
   end_date: string,
 ): Promise<AdminGlobalStatsTrend[]> {
   try {
-    const pgClient = getPgClient(c, true) // Read-only query
+    // Admin global stats are low traffic and depend on recently migrated
+    // global_stats columns. Use primary DB so replica schema/data drift does not
+    // silently blank the dashboard.
+    const pgClient = getPgClient(c)
     const drizzleClient = getDrizzleClient(pgClient)
 
     // Extract just the date portion (YYYY-MM-DD) from ISO timestamps
     const startDateOnly = start_date.split('T')[0]
     const endDateOnly = end_date.split('T')[0]
+    const requiredCompletedShardsJson = JSON.stringify(REQUIRED_GLOBAL_STATS_SHARDS)
 
-    // Simple query - just SELECT all columns from global_stats
-    // Revenue metrics are already calculated and stored by logsnag_insights cron job
+    // Keep in-progress placeholder snapshots hidden until all core shards complete.
     const query = sql`
-      WITH stats AS (
+      WITH completed_stats AS (
+        SELECT *
+        FROM global_stats
+        WHERE completed_shards @> ${requiredCompletedShardsJson}::jsonb
+      ),
+      stats AS (
         SELECT
-        date_id AS date,
-        apps::int,
-        apps_active::int,
-        users::int,
-        users_active::int,
-        paying::int,
-        org_conversion_rate::float,
-        trial::int,
-        not_paying::int,
-        updates::int,
-        updates_external::int,
-        success_rate::float,
-        bundle_storage_gb::float,
-        plan_solo::int,
-        plan_maker::int,
-        plan_team::int,
-        plan_enterprise::int,
-        registers_today::int,
-        COALESCE(demo_apps_created, 0)::int AS demo_apps_created,
-        devices_last_month::int,
-        COALESCE(devices_last_month_ios, 0)::int AS devices_last_month_ios,
-        COALESCE(devices_last_month_android, 0)::int AS devices_last_month_android,
-        stars::int,
-        need_upgrade::int,
-        paying_yearly::int,
-        paying_monthly::int,
-        new_paying_orgs::int,
-        canceled_orgs::int,
-        COALESCE(upgraded_orgs, 0)::int AS upgraded_orgs,
-        mrr::float,
+        gs.date_id AS date,
+        gs.apps::int AS apps,
+        gs.apps_active::int AS apps_active,
+        gs.users::int AS users,
+        gs.users_active::int AS users_active,
+        gs.paying::int AS paying,
+        gs.org_conversion_rate::float AS org_conversion_rate,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_total_conversion_rate', '')::float, 0)::float AS plan_total_conversion_rate,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_solo_conversion_rate', '')::float, 0)::float AS plan_solo_conversion_rate,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_maker_conversion_rate', '')::float, 0)::float AS plan_maker_conversion_rate,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_team_conversion_rate', '')::float, 0)::float AS plan_team_conversion_rate,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_enterprise_conversion_rate', '')::float, 0)::float AS plan_enterprise_conversion_rate,
+        gs.trial::int AS trial,
+        gs.not_paying::int AS not_paying,
+        gs.updates::int AS updates,
+        gs.updates_external::int AS updates_external,
+        gs.success_rate::float AS success_rate,
+        gs.bundle_storage_gb::float AS bundle_storage_gb,
+        gs.plan_solo::int AS plan_solo,
+        gs.plan_maker::int AS plan_maker,
+        gs.plan_team::int AS plan_team,
+        gs.plan_enterprise::int AS plan_enterprise,
+        gs.registers_today::int AS registers_today,
+        COALESCE(gs.demo_apps_created, 0)::int AS demo_apps_created,
+        gs.devices_last_month::int AS devices_last_month,
+        COALESCE(gs.devices_last_month_ios, 0)::int AS devices_last_month_ios,
+        COALESCE(gs.devices_last_month_android, 0)::int AS devices_last_month_android,
+        gs.stars::int AS stars,
+        gs.need_upgrade::int AS need_upgrade,
+        gs.paying_yearly::int AS paying_yearly,
+        gs.paying_monthly::int AS paying_monthly,
+        gs.new_paying_orgs::int AS new_paying_orgs,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'past_due_orgs', '')::int, 0)::int AS past_due_orgs,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'past_due_orgs_average_days', '')::float, 0)::float AS past_due_orgs_average_days,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'active_canceled_orgs', '')::int, 0)::int AS active_canceled_orgs,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'active_past_due_orgs', '')::int, 0)::int AS active_past_due_orgs,
+        gs.canceled_orgs::int AS canceled_orgs,
+        COALESCE(gs.upgraded_orgs, 0)::int AS upgraded_orgs,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'trial_extended_orgs', '')::int, 0)::int AS trial_extended_orgs,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'trial_extended_subscribed_orgs', '')::int, 0)::int AS trial_extended_subscribed_orgs,
+        gs.mrr::float AS mrr,
+        COALESCE(prev.mrr, 0)::float AS previous_mrr,
+        (COALESCE(prev.revenue_solo, 0)::float / 12)::float AS previous_mrr_solo,
+        (COALESCE(prev.revenue_maker, 0)::float / 12)::float AS previous_mrr_maker,
+        (COALESCE(prev.revenue_team, 0)::float / 12)::float AS previous_mrr_team,
+        (COALESCE(prev.revenue_enterprise, 0)::float / 12)::float AS previous_mrr_enterprise,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'nrr', '')::float, 100)::float AS nrr,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue', '')::float, 0)::float AS churn_revenue,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue_solo', '')::float, 0)::float AS churn_revenue_solo,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue_maker', '')::float, 0)::float AS churn_revenue_maker,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue_team', '')::float, 0)::float AS churn_revenue_team,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue_enterprise', '')::float, 0)::float AS churn_revenue_enterprise,
-        total_revenue::float,
-        revenue_solo::float,
-        revenue_maker::float,
-        revenue_team::float,
-        revenue_enterprise::float,
-        COALESCE(credits_bought, 0)::float AS credits_bought,
-        COALESCE(credits_consumed, 0)::float AS credits_consumed,
-        COALESCE(builds_total, 0)::int AS builds_total,
-        COALESCE(builds_ios, 0)::int AS builds_ios,
-        COALESCE(builds_android, 0)::int AS builds_android,
-        COALESCE(builds_success_total, 0)::int AS builds_success_total,
-        COALESCE(builds_success_ios, 0)::int AS builds_success_ios,
-        COALESCE(builds_success_android, 0)::int AS builds_success_android,
-        COALESCE(builds_last_month, 0)::int AS builds_last_month,
-        COALESCE(builds_last_month_ios, 0)::int AS builds_last_month_ios,
-        COALESCE(builds_last_month_android, 0)::int AS builds_last_month_android,
+        gs.total_revenue::float AS total_revenue,
+        gs.revenue_solo::float AS revenue_solo,
+        gs.revenue_maker::float AS revenue_maker,
+        gs.revenue_team::float AS revenue_team,
+        gs.revenue_enterprise::float AS revenue_enterprise,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'average_ltv', '')::float, 0)::float AS average_ltv,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'shortest_ltv', '')::float, 0)::float AS shortest_ltv,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'longest_ltv', '')::float, 0)::float AS longest_ltv,
+        COALESCE(gs.credits_bought, 0)::float AS credits_bought,
+        COALESCE(gs.credits_consumed, 0)::float AS credits_consumed,
+        COALESCE(gs.builds_total, 0)::int AS builds_total,
+        COALESCE(gs.builds_ios, 0)::int AS builds_ios,
+        COALESCE(gs.builds_android, 0)::int AS builds_android,
+        COALESCE(gs.builds_success_total, 0)::int AS builds_success_total,
+        COALESCE(gs.builds_success_ios, 0)::int AS builds_success_ios,
+        COALESCE(gs.builds_success_android, 0)::int AS builds_success_android,
+        COALESCE(gs.builds_last_month, 0)::int AS builds_last_month,
+        COALESCE(gs.builds_last_month_ios, 0)::int AS builds_last_month_ios,
+        COALESCE(gs.builds_last_month_android, 0)::int AS builds_last_month_android,
         COALESCE(
           NULLIF(to_jsonb(gs) ->> 'build_minutes_day_ios', '')::float,
           COALESCE(NULLIF(to_jsonb(gs) ->> 'build_total_seconds_day_ios', '')::bigint, 0)::float / 60,
@@ -1250,9 +1745,28 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(NULLIF(to_jsonb(gs) ->> 'build_count_day_ios', '')::int, NULLIF(to_jsonb(gs) ->> 'builds_day_ios', '')::int, 0)::int AS build_count_day_ios,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'build_count_day_android', '')::int, NULLIF(to_jsonb(gs) ->> 'builds_day_android', '')::int, 0)::int AS build_count_day_android,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'builder_active_paying_clients_60d', '')::int, 0)::int AS builder_active_paying_clients_60d,
-        COALESCE(NULLIF(to_jsonb(gs) ->> 'live_updates_active_paying_clients_60d', '')::int, 0)::int AS live_updates_active_paying_clients_60d
-      FROM global_stats gs
-      WHERE date_id <= ${endDateOnly}
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'live_updates_active_paying_clients_60d', '')::int, 0)::int AS live_updates_active_paying_clients_60d,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'paying_orgs_subscription', '')::int, gs.paying::int, 0)::int AS paying_orgs_subscription,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'paying_orgs_credits', '')::int, 0)::int AS paying_orgs_credits,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'paying_orgs_total', '')::int, gs.paying::int, 0)::int AS paying_orgs_total
+      FROM completed_stats gs
+      LEFT JOIN completed_stats prev ON prev.date_id = (
+        CASE
+          WHEN gs.date_id ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN
+            CASE
+              WHEN to_char(to_date(gs.date_id, 'YYYY-MM-DD'), 'YYYY-MM-DD') = gs.date_id
+                THEN (to_date(gs.date_id, 'YYYY-MM-DD') - 1)::text
+              ELSE NULL
+            END
+          ELSE NULL
+        END
+      )
+      WHERE CASE
+          WHEN gs.date_id ~ '^\\d{4}-\\d{2}-\\d{2}$'
+            THEN to_char(to_date(gs.date_id, 'YYYY-MM-DD'), 'YYYY-MM-DD') = gs.date_id
+          ELSE false
+        END
+        AND gs.date_id <= ${endDateOnly}
       )
       SELECT *
       FROM stats
@@ -1263,13 +1777,18 @@ export async function getAdminGlobalStatsTrend(
     const result = await drizzleClient.execute(query)
 
     const data: AdminGlobalStatsTrend[] = result.rows.map((row: any) => ({
-      date: row.date,
+      date: normalizeAdminStatsDate(row.date),
       apps: Number(row.apps) || 0,
       apps_active: Number(row.apps_active) || 0,
       users: Number(row.users) || 0,
       users_active: Number(row.users_active) || 0,
       paying: Number(row.paying) || 0,
       org_conversion_rate: Number(row.org_conversion_rate) || 0,
+      plan_total_conversion_rate: Number(row.plan_total_conversion_rate) || 0,
+      plan_solo_conversion_rate: Number(row.plan_solo_conversion_rate) || 0,
+      plan_maker_conversion_rate: Number(row.plan_maker_conversion_rate) || 0,
+      plan_team_conversion_rate: Number(row.plan_team_conversion_rate) || 0,
+      plan_enterprise_conversion_rate: Number(row.plan_enterprise_conversion_rate) || 0,
       trial: Number(row.trial) || 0,
       not_paying: Number(row.not_paying) || 0,
       updates: Number(row.updates) || 0,
@@ -1288,11 +1807,22 @@ export async function getAdminGlobalStatsTrend(
       stars: Number(row.stars) || 0,
       need_upgrade: Number(row.need_upgrade) || 0,
       paying_yearly: Number(row.paying_yearly) || 0,
+      past_due_orgs: Number(row.past_due_orgs) || 0,
+      past_due_orgs_average_days: Number(row.past_due_orgs_average_days) || 0,
+      active_canceled_orgs: Number(row.active_canceled_orgs) || 0,
+      active_past_due_orgs: Number(row.active_past_due_orgs) || 0,
       paying_monthly: Number(row.paying_monthly) || 0,
       new_paying_orgs: Number(row.new_paying_orgs) || 0,
       canceled_orgs: Number(row.canceled_orgs) || 0,
       upgraded_orgs: Number(row.upgraded_orgs) || 0,
+      trial_extended_orgs: Number(row.trial_extended_orgs) || 0,
+      trial_extended_subscribed_orgs: Number(row.trial_extended_subscribed_orgs) || 0,
       mrr: Number(row.mrr) || 0,
+      previous_mrr: Number(row.previous_mrr) || 0,
+      previous_mrr_solo: Number(row.previous_mrr_solo) || 0,
+      previous_mrr_maker: Number(row.previous_mrr_maker) || 0,
+      previous_mrr_team: Number(row.previous_mrr_team) || 0,
+      previous_mrr_enterprise: Number(row.previous_mrr_enterprise) || 0,
       nrr: Number(row.nrr) || 0,
       churn_revenue: Number(row.churn_revenue) || 0,
       churn_revenue_solo: Number(row.churn_revenue_solo) || 0,
@@ -1304,6 +1834,9 @@ export async function getAdminGlobalStatsTrend(
       revenue_maker: Number(row.revenue_maker) || 0,
       revenue_team: Number(row.revenue_team) || 0,
       revenue_enterprise: Number(row.revenue_enterprise) || 0,
+      average_ltv: Number(row.average_ltv) || 0,
+      shortest_ltv: Number(row.shortest_ltv) || 0,
+      longest_ltv: Number(row.longest_ltv) || 0,
       credits_bought: Number(row.credits_bought) || 0,
       credits_consumed: Number(row.credits_consumed) || 0,
       builds_total: Number(row.builds_total) || 0,
@@ -1327,7 +1860,27 @@ export async function getAdminGlobalStatsTrend(
       build_count_day_android: Number(row.build_count_day_android) || 0,
       builder_active_paying_clients_60d: Number(row.builder_active_paying_clients_60d) || 0,
       live_updates_active_paying_clients_60d: Number(row.live_updates_active_paying_clients_60d) || 0,
+      paying_orgs_subscription: Number(row.paying_orgs_subscription) || 0,
+      paying_orgs_credits: Number(row.paying_orgs_credits) || 0,
+      paying_orgs_total: Number(row.paying_orgs_total) || 0,
     }))
+
+    if (data.length > 0) {
+      const latestIndex = data.length - 1
+      if (data[latestIndex].users <= 0) {
+        const liveRegisteredUsers = await getLiveRegisteredUsersCount(c)
+        if (liveRegisteredUsers > 0)
+          data[latestIndex].users = liveRegisteredUsers
+      }
+
+      const livePayingBreakdown = await getAdminPayingOrgBreakdown(c)
+      data[latestIndex] = {
+        ...data[latestIndex],
+        paying_orgs_subscription: livePayingBreakdown.paying_orgs_subscription || data[latestIndex].paying_orgs_subscription,
+        paying_orgs_credits: livePayingBreakdown.paying_orgs_credits || data[latestIndex].paying_orgs_credits,
+        paying_orgs_total: livePayingBreakdown.paying_orgs_total || data[latestIndex].paying_orgs_total,
+      }
+    }
 
     cloudlog({ requestId: c.get('requestId'), message: 'getAdminGlobalStatsTrend result', resultCount: data.length })
 
@@ -1335,7 +1888,7 @@ export async function getAdminGlobalStatsTrend(
   }
   catch (e: unknown) {
     logPgError(c, 'getAdminGlobalStatsTrend', e)
-    return []
+    throw e
   }
 }
 
@@ -1353,6 +1906,149 @@ export interface AdminEmailTypeBreakdown {
     disposable: number
     total: number
   }>
+}
+
+interface AdminUtcDateRange {
+  startDay: Date
+  seriesEndDay: Date
+  endExclusive: Date
+}
+
+export function normalizeAdminStatsDate(value: unknown): string {
+  if (value instanceof Date)
+    return value.toISOString().split('T')[0]
+
+  const rawValue = String(value ?? '').trim()
+  if (!rawValue)
+    return ''
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(rawValue))
+    return rawValue
+
+  const parsed = new Date(rawValue)
+  if (!Number.isNaN(parsed.getTime()))
+    return parsed.toISOString().split('T')[0]
+
+  return rawValue.slice(0, 10)
+}
+
+async function getLiveRegisteredUsersCount(c: Context): Promise<number> {
+  const pgClient = getPgClient(c)
+  const drizzleClient = getDrizzleClient(pgClient)
+
+  try {
+    const result = await drizzleClient.execute(sql`
+      SELECT COUNT(*)::int AS count
+      FROM public.users u
+      WHERE u.created_via_invite = false
+    `)
+
+    return Number((result.rows[0] as { count?: number | string | null } | undefined)?.count) || 0
+  }
+  catch (error) {
+    logPgError(c, 'getLiveRegisteredUsersCount', error)
+    return 0
+  }
+  finally {
+    await closeClient(c, pgClient)
+  }
+}
+
+export interface AdminPayingOrgBreakdown {
+  paying_orgs_subscription: number
+  paying_orgs_credits: number
+  paying_orgs_total: number
+}
+
+export async function getAdminPayingOrgBreakdown(c: Context): Promise<AdminPayingOrgBreakdown> {
+  const emptyResult: AdminPayingOrgBreakdown = {
+    paying_orgs_subscription: 0,
+    paying_orgs_credits: 0,
+    paying_orgs_total: 0,
+  }
+
+  const pgClient = getPgClient(c)
+  const drizzleClient = getDrizzleClient(pgClient)
+
+  try {
+    const result = await drizzleClient.execute(sql`
+      WITH active_subscriptions AS (
+        SELECT DISTINCT ON (si.customer_id)
+          si.customer_id
+        FROM public.stripe_info si
+        INNER JOIN public.plans p ON p.stripe_id = si.product_id
+        WHERE si.is_good_plan = true
+          AND si.status IN (
+            'succeeded'::public.stripe_status,
+            'canceled'::public.stripe_status,
+            'deleted'::public.stripe_status
+          )
+          AND (si.canceled_at IS NULL OR si.canceled_at > NOW())
+          AND si.subscription_anchor_end > NOW()
+        ORDER BY si.customer_id, si.created_at DESC
+      ),
+      subscription_orgs AS (
+        SELECT DISTINCT o.id AS org_id
+        FROM public.orgs o
+        INNER JOIN active_subscriptions active ON active.customer_id = o.customer_id
+      ),
+      credit_orgs AS (
+        SELECT DISTINCT ucb.org_id
+        FROM public.usage_credit_balances ucb
+        WHERE COALESCE(ucb.available_credits, 0) > 0
+      )
+      SELECT
+        (SELECT COUNT(*)::int FROM subscription_orgs) AS paying_orgs_subscription,
+        (SELECT COUNT(*)::int FROM credit_orgs) AS paying_orgs_credits,
+        (
+          SELECT COUNT(*)::int
+          FROM (
+            SELECT org_id FROM subscription_orgs
+            UNION
+            SELECT org_id FROM credit_orgs
+          ) paid_orgs
+        ) AS paying_orgs_total
+    `)
+
+    const row = result.rows[0] as {
+      paying_orgs_subscription?: number | string | null
+      paying_orgs_credits?: number | string | null
+      paying_orgs_total?: number | string | null
+    } | undefined
+
+    return {
+      paying_orgs_subscription: Number(row?.paying_orgs_subscription) || 0,
+      paying_orgs_credits: Number(row?.paying_orgs_credits) || 0,
+      paying_orgs_total: Number(row?.paying_orgs_total) || 0,
+    }
+  }
+  catch (error) {
+    logPgError(c, 'getAdminPayingOrgBreakdown', error)
+    return emptyResult
+  }
+  finally {
+    await closeClient(c, pgClient)
+  }
+}
+
+function getAdminUtcDateRange(start_date: string, end_date: string): AdminUtcDateRange {
+  const startTimestamp = new Date(start_date)
+  const endTimestamp = new Date(end_date)
+  const startDay = new Date(Date.UTC(startTimestamp.getUTCFullYear(), startTimestamp.getUTCMonth(), startTimestamp.getUTCDate()))
+  const endDay = new Date(Date.UTC(endTimestamp.getUTCFullYear(), endTimestamp.getUTCMonth(), endTimestamp.getUTCDate()))
+  const endIsExactUtcDayBoundary = endTimestamp.getTime() === endDay.getTime()
+  const seriesEndDay = new Date(endDay)
+
+  if (endIsExactUtcDayBoundary)
+    seriesEndDay.setUTCDate(seriesEndDay.getUTCDate() - 1)
+
+  return {
+    startDay,
+    seriesEndDay,
+    endExclusive: endIsExactUtcDayBoundary
+      ? endTimestamp
+      : new Date(endDay.getTime() + 24 * 60 * 60 * 1000),
+  }
 }
 
 export async function getAdminEmailTypeBreakdown(
@@ -1373,17 +2069,7 @@ export async function getAdminEmailTypeBreakdown(
   try {
     const pgClient = getPgClient(c, true)
     const drizzleClient = getDrizzleClient(pgClient)
-    const startTimestamp = new Date(start_date)
-    const endTimestamp = new Date(end_date)
-    const startDay = new Date(Date.UTC(startTimestamp.getUTCFullYear(), startTimestamp.getUTCMonth(), startTimestamp.getUTCDate()))
-    const endDay = new Date(Date.UTC(endTimestamp.getUTCFullYear(), endTimestamp.getUTCMonth(), endTimestamp.getUTCDate()))
-    const endIsExactUtcDayBoundary = endTimestamp.getTime() === endDay.getTime()
-    const seriesEndDay = new Date(endDay)
-    if (endIsExactUtcDayBoundary)
-      seriesEndDay.setUTCDate(seriesEndDay.getUTCDate() - 1)
-    const endExclusive = endIsExactUtcDayBoundary
-      ? endTimestamp
-      : new Date(endDay.getTime() + 24 * 60 * 60 * 1000)
+    const { startDay, seriesEndDay, endExclusive } = getAdminUtcDateRange(start_date, end_date)
 
     const personalDomainsSql = sql.join(PERSONAL_EMAIL_DOMAINS.map(domain => sql`${domain}`), sql`, `)
     const disposableDomainsSql = sql.join(DISPOSABLE_EMAIL_DOMAINS.map(domain => sql`${domain}`), sql`, `)
@@ -1496,8 +2182,9 @@ export async function getAdminCustomerCountryBreakdown(
   }
 
   try {
-    const pgClient = getPgClient(c, true)
+    const pgClient = getPgClient(c, false)
     const drizzleClient = getDrizzleClient(pgClient)
+    const { startDay, endExclusive } = getAdminUtcDateRange(start_date, end_date)
 
     const query = sql`
       WITH country_counts AS (
@@ -1506,8 +2193,8 @@ export async function getAdminCustomerCountryBreakdown(
           COUNT(*)::int AS organizations
         FROM orgs o
         INNER JOIN stripe_info si ON si.customer_id = o.customer_id
-        WHERE o.created_at >= ${start_date}::timestamptz
-          AND o.created_at < ${end_date}::timestamptz
+        WHERE o.created_at >= ${startDay.toISOString()}::timestamptz
+          AND o.created_at < ${endExclusive.toISOString()}::timestamptz
           AND si.customer_country IS NOT NULL
           AND UPPER(BTRIM(si.customer_country)) ~ '^[A-Z]{2}$'
         GROUP BY UPPER(BTRIM(si.customer_country))
@@ -1680,6 +2367,8 @@ function normalizeTimestamp(value: unknown): string | null {
     return null
   if (value instanceof Date)
     return value.toISOString()
+  if (typeof value !== 'string' && typeof value !== 'number')
+    return null
 
   const rawValue = String(value)
   let parsed = new Date(rawValue)
@@ -1695,6 +2384,336 @@ function normalizeTimestamp(value: unknown): string | null {
   return parsed.toISOString()
 }
 
+export interface AdminOrganizationInsightRow {
+  org_id: string
+  org_name: string
+  management_email: string
+  plan_name: string | null
+  billing_type: 'monthly' | 'yearly' | null
+  upload_count: number
+  build_count: number
+  failed_update_count: number
+  install_count: number
+  update_attempt_count: number
+  needs_attention: boolean
+  fail_rate: number
+  mau: number
+  members_count: number
+  apps_count: number
+  last_upload_at: string | null
+  last_build_at: string | null
+  paid_at: string | null
+  registered_at: string
+}
+
+export interface AdminOrganizationInsightsResult {
+  organizations: AdminOrganizationInsightRow[]
+  total: number
+  plan_options: string[]
+}
+
+interface AdminOrganizationInsightsFilters {
+  limit?: number
+  offset?: number
+  plan_name?: string
+  billing_type?: 'monthly' | 'yearly'
+  paid_only?: boolean
+  search?: string
+}
+
+const ADMIN_ORG_ATTENTION_FAIL_RATE_PERCENT = 20
+const ADMIN_ORG_ATTENTION_MIN_FAILED_UPDATES = 2
+const ADMIN_ORG_ATTENTION_MIN_UPDATE_ATTEMPTS = 10
+
+/**
+ * Fetches admin organization rows with selected-period usage rollups.
+ * Uses daily_* preprocessed tables for MAU, update failures, and build counts;
+ * raw tables are only used for org metadata, bundle upload counts, and latest timestamps.
+ */
+export async function getAdminOrganizationInsights(
+  c: Context,
+  start_date: string,
+  end_date: string,
+  filters: AdminOrganizationInsightsFilters = {},
+): Promise<AdminOrganizationInsightsResult> {
+  let pgClient: ReturnType<typeof getPgClient> | undefined
+  try {
+    pgClient = getPgClient(c)
+    const drizzleClient = getDrizzleClient(pgClient)
+    const safeLimit = Math.max(1, Math.min(Math.floor(filters.limit ?? 50), 500))
+    const safeOffset = Math.max(0, Math.floor(filters.offset ?? 0))
+    const startDateOnly = start_date.split('T')[0]
+    const endDateOnly = end_date.split('T')[0]
+    const trimmedPlanName = filters.plan_name?.trim()
+    const trimmedSearch = filters.search?.trim()
+
+    const billingTypeExpression = sql`
+      CASE
+        WHEN si.price_id = p.price_y_id THEN 'yearly'
+        WHEN si.price_id = p.price_m_id THEN 'monthly'
+        WHEN si.subscription_anchor_start IS NOT NULL
+          AND si.subscription_anchor_end IS NOT NULL
+          AND si.subscription_anchor_end::timestamp - si.subscription_anchor_start::timestamp >= INTERVAL '330 days'
+          THEN 'yearly'
+        WHEN si.subscription_anchor_start IS NOT NULL
+          AND si.subscription_anchor_end IS NOT NULL
+          THEN 'monthly'
+        ELSE NULL
+      END
+    `
+    const planFilter = trimmedPlanName ? sql`AND p.name = ${trimmedPlanName}` : sql``
+    const billingFilter = filters.billing_type ? sql`AND ${billingTypeExpression} = ${filters.billing_type}` : sql``
+    const paidFilter = filters.paid_only ? sql`AND si.status = 'succeeded'` : sql``
+    const searchFilter = trimmedSearch
+      ? sql`AND (
+          o.name ILIKE ${`%${trimmedSearch}%`}
+          OR o.management_email ILIKE ${`%${trimmedSearch}%`}
+          OR o.id::text = ${trimmedSearch}
+        )`
+      : sql``
+
+    const dataQuery = sql`
+      WITH filtered_orgs_all AS (
+        SELECT
+          o.id AS org_id,
+          o.name AS org_name,
+          o.management_email,
+          o.created_at AS registered_at,
+          si.paid_at,
+          p.name AS plan_name,
+          ${billingTypeExpression} AS billing_type
+        FROM orgs o
+        LEFT JOIN stripe_info si ON si.customer_id = o.customer_id
+        LEFT JOIN plans p ON p.stripe_id = si.product_id
+        WHERE true
+          ${planFilter}
+          ${billingFilter}
+          ${paidFilter}
+          ${searchFilter}
+      ),
+      version_usage_totals AS (
+        SELECT
+          a.owner_org AS org_id,
+          COALESCE(SUM(COALESCE(dv.fail, 0)), 0)::bigint AS failed_update_count,
+          COALESCE(SUM(COALESCE(dv.install, 0)), 0)::bigint AS install_count
+        FROM filtered_orgs_all filtered
+        INNER JOIN apps a ON a.owner_org = filtered.org_id
+        INNER JOIN daily_version dv ON dv.app_id = a.app_id
+        WHERE dv.date >= ${startDateOnly}::date
+          AND dv.date <= ${endDateOnly}::date
+        GROUP BY a.owner_org
+      ),
+      version_usage_rank AS (
+        SELECT
+          vut.org_id,
+          vut.failed_update_count,
+          vut.install_count,
+          (vut.install_count + vut.failed_update_count)::bigint AS update_attempt_count,
+          CASE
+            WHEN vut.install_count + vut.failed_update_count > 0
+              THEN (vut.failed_update_count::float / (vut.install_count + vut.failed_update_count)::float) * 100
+            ELSE 0
+          END::float AS fail_rate
+        FROM version_usage_totals vut
+      ),
+      filtered_orgs_scored AS (
+        SELECT
+          filtered.org_id,
+          filtered.org_name,
+          filtered.management_email,
+          filtered.registered_at,
+          filtered.paid_at,
+          filtered.plan_name,
+          filtered.billing_type,
+          COALESCE(vur.failed_update_count, 0)::bigint AS failed_update_count,
+          COALESCE(vur.install_count, 0)::bigint AS install_count,
+          COALESCE(vur.update_attempt_count, 0)::bigint AS update_attempt_count,
+          COALESCE(vur.fail_rate, 0)::float AS fail_rate,
+          (
+            COALESCE(vur.fail_rate, 0) >= ${ADMIN_ORG_ATTENTION_FAIL_RATE_PERCENT}
+            AND COALESCE(vur.failed_update_count, 0) >= ${ADMIN_ORG_ATTENTION_MIN_FAILED_UPDATES}
+            AND COALESCE(vur.update_attempt_count, 0) >= ${ADMIN_ORG_ATTENTION_MIN_UPDATE_ATTEMPTS}
+          )::boolean AS needs_attention
+        FROM filtered_orgs_all filtered
+        LEFT JOIN version_usage_rank vur ON vur.org_id = filtered.org_id
+      ),
+      filtered_orgs AS (
+        SELECT *
+        FROM filtered_orgs_scored
+        ORDER BY
+          needs_attention DESC,
+          CASE
+            WHEN needs_attention THEN fail_rate
+            ELSE NULL
+          END DESC,
+          registered_at DESC NULLS LAST,
+          org_id
+        LIMIT ${safeLimit}
+        OFFSET ${safeOffset}
+      ),
+      apps_by_org AS (
+        SELECT
+          a.owner_org AS org_id,
+          COUNT(*)::int AS apps_count
+        FROM apps a
+        INNER JOIN filtered_orgs filtered ON filtered.org_id = a.owner_org
+        GROUP BY a.owner_org
+      ),
+      members_by_org AS (
+        SELECT
+          ou.org_id,
+          COUNT(DISTINCT ou.user_id)::int AS members_count
+        FROM org_users ou
+        INNER JOIN filtered_orgs filtered ON filtered.org_id = ou.org_id
+        WHERE ou.user_right IS NULL OR ou.user_right::text NOT LIKE 'invite_%'
+        GROUP BY ou.org_id
+      ),
+      mau_by_org AS (
+        SELECT
+          a.owner_org AS org_id,
+          COALESCE(SUM(dm.mau), 0)::bigint AS mau
+        FROM filtered_orgs filtered
+        INNER JOIN apps a ON a.owner_org = filtered.org_id
+        INNER JOIN daily_mau dm ON dm.app_id = a.app_id
+        WHERE dm.date >= ${startDateOnly}::date
+          AND dm.date <= ${endDateOnly}::date
+        GROUP BY a.owner_org
+      ),
+      build_usage_by_org AS (
+        SELECT
+          a.owner_org AS org_id,
+          COALESCE(SUM(dbt.build_count), 0)::bigint AS build_count
+        FROM filtered_orgs filtered
+        INNER JOIN apps a ON a.owner_org = filtered.org_id
+        INNER JOIN daily_build_time dbt ON dbt.app_id = a.app_id
+        WHERE dbt.date >= ${startDateOnly}::date
+          AND dbt.date <= ${endDateOnly}::date
+        GROUP BY a.owner_org
+      ),
+      bundle_uploads_by_org AS (
+        SELECT
+          av.owner_org AS org_id,
+          COUNT(*) FILTER (
+            WHERE av.created_at >= ${start_date}::timestamp
+              AND av.created_at < ${end_date}::timestamp
+          )::int AS upload_count,
+          MAX(av.created_at) AS last_upload_at
+        FROM app_versions av
+        INNER JOIN filtered_orgs filtered ON filtered.org_id = av.owner_org
+        WHERE av.name NOT IN ('builtin', 'unknown')
+        GROUP BY av.owner_org
+      ),
+      last_builds_by_org AS (
+        SELECT
+          bl.org_id,
+          MAX(bl.created_at) AS last_build_at
+        FROM build_logs bl
+        INNER JOIN filtered_orgs filtered ON filtered.org_id = bl.org_id
+        GROUP BY bl.org_id
+      )
+      SELECT
+        filtered.org_id,
+        filtered.org_name,
+        filtered.management_email,
+        filtered.plan_name,
+        filtered.billing_type,
+        COALESCE(buo.upload_count, 0)::int AS upload_count,
+        COALESCE(bu.build_count, 0)::bigint AS build_count,
+        filtered.failed_update_count,
+        filtered.install_count,
+        filtered.update_attempt_count,
+        filtered.needs_attention,
+        filtered.fail_rate,
+        COALESCE(mau.mau, 0)::bigint AS mau,
+        COALESCE(members.members_count, 0)::int AS members_count,
+        COALESCE(apps.apps_count, 0)::int AS apps_count,
+        buo.last_upload_at,
+        lb.last_build_at,
+        filtered.paid_at,
+        filtered.registered_at
+      FROM filtered_orgs filtered
+      LEFT JOIN apps_by_org apps ON apps.org_id = filtered.org_id
+      LEFT JOIN members_by_org members ON members.org_id = filtered.org_id
+      LEFT JOIN mau_by_org mau ON mau.org_id = filtered.org_id
+      LEFT JOIN build_usage_by_org bu ON bu.org_id = filtered.org_id
+      LEFT JOIN bundle_uploads_by_org buo ON buo.org_id = filtered.org_id
+      LEFT JOIN last_builds_by_org lb ON lb.org_id = filtered.org_id
+      ORDER BY
+        filtered.needs_attention DESC,
+        CASE
+          WHEN filtered.needs_attention THEN filtered.fail_rate
+          ELSE NULL
+        END DESC,
+        filtered.registered_at DESC NULLS LAST,
+        filtered.org_id
+    `
+
+    const countQuery = sql`
+      SELECT COUNT(*)::int AS total
+      FROM orgs o
+      LEFT JOIN stripe_info si ON si.customer_id = o.customer_id
+      LEFT JOIN plans p ON p.stripe_id = si.product_id
+      WHERE true
+        ${planFilter}
+        ${billingFilter}
+        ${paidFilter}
+        ${searchFilter}
+    `
+
+    const planOptionsQuery = sql`
+      SELECT DISTINCT name
+      FROM plans
+      WHERE name IS NOT NULL AND name != ''
+      ORDER BY name ASC
+    `
+
+    const [result, countResult, planOptionsResult] = await Promise.all([
+      drizzleClient.execute(dataQuery),
+      drizzleClient.execute(countQuery),
+      drizzleClient.execute(planOptionsQuery),
+    ])
+
+    const organizations: AdminOrganizationInsightRow[] = result.rows.map((row: any) => ({
+      org_id: row.org_id,
+      org_name: row.org_name,
+      management_email: row.management_email,
+      plan_name: row.plan_name ?? null,
+      billing_type: row.billing_type ?? null,
+      upload_count: Number(row.upload_count) || 0,
+      build_count: Number(row.build_count) || 0,
+      failed_update_count: Number(row.failed_update_count) || 0,
+      install_count: Number(row.install_count) || 0,
+      update_attempt_count: Number(row.update_attempt_count) || 0,
+      needs_attention: row.needs_attention === true,
+      fail_rate: Number(row.fail_rate) || 0,
+      mau: Number(row.mau) || 0,
+      members_count: Number(row.members_count) || 0,
+      apps_count: Number(row.apps_count) || 0,
+      last_upload_at: normalizeTimestamp(row.last_upload_at),
+      last_build_at: normalizeTimestamp(row.last_build_at),
+      paid_at: normalizeTimestamp(row.paid_at),
+      registered_at: normalizeTimestamp(row.registered_at) ?? '',
+    }))
+
+    const total = Number((countResult.rows[0] as any)?.total) || 0
+    const plan_options = planOptionsResult.rows
+      .map((row: any) => String(row.name || '').trim())
+      .filter(Boolean)
+
+    cloudlog({ requestId: c.get('requestId'), message: 'getAdminOrganizationInsights result', resultCount: organizations.length, total })
+
+    return { organizations, total, plan_options }
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAdminOrganizationInsights', e)
+    return { organizations: [], total: 0, plan_options: [] }
+  }
+  finally {
+    if (pgClient)
+      await closeClient(c, pgClient)
+  }
+}
+
 // Admin Cancelled Organizations List
 export interface AdminCancelledOrganizationRow {
   org_id: string
@@ -1703,6 +2722,7 @@ export interface AdminCancelledOrganizationRow {
   canceled_at: string
   customer_id: string
   subscription_id: string | null
+  churn_reason: string | null
   plan_name: string | null
   billing_type: 'monthly' | 'yearly' | null
   subscription_or_signup_date: string
@@ -1741,6 +2761,7 @@ export async function getAdminCancelledOrganizations(
         o.management_email,
         si.canceled_at,
         si.customer_id,
+        si.churn_reason,
         si.subscription_id,
         p.name AS plan_name,
         CASE
@@ -1785,6 +2806,7 @@ export async function getAdminCancelledOrganizations(
       org_name: row.org_name,
       management_email: row.management_email,
       canceled_at: normalizeTimestamp(row.canceled_at) ?? '',
+      churn_reason: row.churn_reason ?? null,
       customer_id: row.customer_id,
       subscription_id: row.subscription_id,
       plan_name: row.plan_name ?? null,
@@ -1808,6 +2830,7 @@ export interface AdminTrialOrganization {
   org_id: string
   org_name: string
   management_email: string
+  plan_name: string | null
   trial_end_date: string
   days_remaining: number
   trial_extension_count: number
@@ -1835,14 +2858,16 @@ export async function getAdminTrialOrganizations(
   offset: number = 0,
 ): Promise<AdminTrialOrganizationsResult> {
   try {
-    const pgClient = getPgClient(c, true) // Read-only query
+    // The admin dashboard needs plans.name, and plans is not replicated to
+    // read replicas.
+    const pgClient = getPgClient(c)
     const drizzleClient = getDrizzleClient(pgClient)
 
     // Query to get trial organizations ordered by days remaining (ascending - expiring soon first)
     // Filter logic:
     // - trial_at >= CURRENT_DATE: includes trials expiring today (days_remaining = 0)
     // - status IS NULL: new organizations that haven't attempted payment yet
-    // - status != 'succeeded': organizations without an active paid subscription
+    // - status not 'succeeded': organizations without an active subscription
     const query = sql`
       WITH latest_bundle_uploads AS (
         SELECT
@@ -1857,6 +2882,7 @@ export async function getAdminTrialOrganizations(
         o.id AS org_id,
         o.name AS org_name,
         o.management_email,
+        p.name AS plan_name,
         si.trial_at AS trial_end_date,
         GREATEST(0, (si.trial_at::date - CURRENT_DATE)) AS days_remaining,
         CASE
@@ -1868,6 +2894,7 @@ export async function getAdminTrialOrganizations(
         lbu.last_bundle_upload_at
       FROM orgs o
       INNER JOIN stripe_info si ON si.customer_id = o.customer_id
+      LEFT JOIN plans p ON p.stripe_id = si.product_id
       LEFT JOIN latest_bundle_uploads lbu ON lbu.owner_org = o.id
       WHERE si.trial_at::date >= CURRENT_DATE
         AND (si.status IS NULL OR si.status != 'succeeded')
@@ -1894,6 +2921,7 @@ export async function getAdminTrialOrganizations(
       org_id: row.org_id,
       org_name: row.org_name,
       management_email: row.management_email,
+      plan_name: row.plan_name ?? null,
       trial_end_date: normalizeTimestamp(row.trial_end_date) ?? '',
       days_remaining: Number(row.days_remaining),
       trial_extension_count: Number(row.trial_extension_count) || 0,
@@ -1910,6 +2938,129 @@ export async function getAdminTrialOrganizations(
   catch (e: unknown) {
     logPgError(c, 'getAdminTrialOrganizations', e)
     return { organizations: [], total: 0 }
+  }
+}
+
+export interface AdminTrialPlanBreakdown {
+  totals: Array<{
+    plan_name: string
+    total: number
+  }>
+  trend: Array<{
+    date: string
+    total: number
+    plans: Record<string, number>
+  }>
+}
+
+function createAdminTrialPlanTrendDay(date: string): AdminTrialPlanBreakdown['trend'][number] {
+  return { date, total: 0, plans: {} }
+}
+
+export async function getAdminTrialPlanBreakdown(
+  c: Context,
+  start_date: string,
+  end_date: string,
+): Promise<AdminTrialPlanBreakdown> {
+  const emptyResult: AdminTrialPlanBreakdown = {
+    totals: [],
+    trend: [],
+  }
+
+  let pgClient: ReturnType<typeof getPgClient> | undefined
+  try {
+    // The admin dashboard needs plans.name, and plans is not available on every read replica.
+    pgClient = getPgClient(c)
+    const drizzleClient = getDrizzleClient(pgClient)
+    const { startDay, seriesEndDay, endExclusive } = getAdminUtcDateRange(start_date, end_date)
+
+    const query = sql`
+      WITH date_series AS (
+        SELECT generate_series(
+          ${startDay.toISOString()}::timestamptz::date,
+          ${seriesEndDay.toISOString()}::timestamptz::date,
+          interval '1 day'
+        )::date AS date
+      ),
+      daily_trials AS (
+        SELECT
+          (o.created_at AT TIME ZONE 'UTC')::date AS date,
+          COALESCE(NULLIF(BTRIM(p.name), ''), 'Unknown') AS plan_name,
+          COUNT(DISTINCT o.id)::int AS trials
+        FROM orgs o
+        INNER JOIN stripe_info si ON si.customer_id = o.customer_id
+        LEFT JOIN plans p ON p.stripe_id = si.product_id
+        WHERE o.created_at >= ${startDay.toISOString()}::timestamptz
+          AND o.created_at < ${endExclusive.toISOString()}::timestamptz
+          AND si.trial_at IS NOT NULL
+        GROUP BY (o.created_at AT TIME ZONE 'UTC')::date, COALESCE(NULLIF(BTRIM(p.name), ''), 'Unknown')
+      ),
+      plan_names AS (
+        SELECT BTRIM(name) AS plan_name
+        FROM plans
+        WHERE BTRIM(name) != ''
+        UNION
+        SELECT plan_name
+        FROM daily_trials
+      ),
+      filled AS (
+        SELECT
+          ds.date,
+          plan_name_set.plan_name,
+          COALESCE(dt.trials, 0)::int AS trials
+        FROM date_series ds
+        CROSS JOIN plan_names plan_name_set
+        LEFT JOIN daily_trials dt ON dt.date = ds.date AND dt.plan_name = plan_name_set.plan_name
+      )
+      SELECT
+        date,
+        plan_name,
+        trials
+      FROM filled
+      ORDER BY date ASC, plan_name ASC
+    `
+
+    const result = await drizzleClient.execute(query)
+    const totalsByPlan = new Map<string, number>()
+    const trendByDate = new Map<string, { date: string, total: number, plans: Record<string, number> }>()
+
+    for (const row of result.rows as any[]) {
+      const date = row.date instanceof Date ? row.date.toISOString().split('T')[0] : String(row.date)
+      const planName = String(row.plan_name || 'Unknown')
+      const trials = Number(row.trials) || 0
+      const day = trendByDate.get(date) ?? createAdminTrialPlanTrendDay(date)
+
+      day.plans[planName] = trials
+      day.total += trials
+      trendByDate.set(date, day)
+      totalsByPlan.set(planName, (totalsByPlan.get(planName) ?? 0) + trials)
+    }
+
+    const totals = Array.from(totalsByPlan.entries())
+      .map(([plan_name, total]) => ({ plan_name, total }))
+      .sort((a, b) => b.total - a.total || a.plan_name.localeCompare(b.plan_name))
+
+    const trend = Array.from(trendByDate.values())
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'getAdminTrialPlanBreakdown result',
+      resultCount: trend.length,
+      planCount: totals.length,
+    })
+
+    return {
+      totals,
+      trend,
+    }
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAdminTrialPlanBreakdown', e)
+    return emptyResult
+  }
+  finally {
+    if (pgClient)
+      await closeClient(c, pgClient)
   }
 }
 
@@ -2175,7 +3326,7 @@ export async function getAdminPluginBreakdown(
         major_breakdown: parseBreakdownJson(row.plugin_major_breakdown),
       }
     })
-    const latestRow = rows[rows.length - 1]
+    const latestRow = rows.at(-1)!
     const latestDate = latestRow.date instanceof Date ? latestRow.date.toISOString().split('T')[0] : String(latestRow.date)
     const versionBreakdown = parseBreakdownJson(latestRow.plugin_version_breakdown)
     const majorBreakdown = parseBreakdownJson(latestRow.plugin_major_breakdown)

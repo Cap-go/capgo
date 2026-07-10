@@ -17,6 +17,7 @@ Use this skill for Capgo Cloud native iOS and Android build workflows.
 - Backward compatibility: `npx @capgo/cli@latest build onboarding` still works.
 - Options:
   - `-a, --apikey <apikey>` — Capgo API key to authenticate with (alternative to the `CAPGO_TOKEN` env var or `~/.capgo` / local `.capgo` file). Takes precedence over a saved key when both are present. Lets the SaaS onboarding wizard render a single copy-pasteable command across bash, zsh, fish, PowerShell, and cmd.exe.
+  - `--no-analytics` — Disable build onboarding analytics and terminal replay for this run.
   - Example: `npx @capgo/cli@latest build init -a cap_xxx`
 - Notes:
   - Uses Ink (React for terminal) for the interactive UI, alongside the main `init` onboarding flow.
@@ -29,6 +30,7 @@ Use this skill for Capgo Cloud native iOS and Android build workflows.
   - Optionally kicks off the first build at the end.
   - If the native `ios/` folder is missing, onboarding can offer to run `cap add ios` automatically instead of exiting immediately.
   - Unexpected failures now keep the user inside the recovery screen, show package-manager-aware commands, and save a support bundle under `~/.capgo-credentials/support/`.
+  - The recovery screen offers an "Email Capgo support" action: it writes a redacted diagnostics bundle as both `.log` and `.log.gz` under `~/.capgo-credentials/support/`, copies the `.log.gz` path to the clipboard, reveals it in Finder on macOS, and opens a pre-filled `mailto:support@capgo.app` for the user to attach the file and send (no logs are uploaded automatically). An "Ask AI for help" option is also offered when a build log exists.
 
 #### What it automates (iOS)
 
@@ -74,6 +76,17 @@ interface BuildLogger {
 
 ## Core build request
 
+### `build needed [appId]`
+
+- Example: `npx @capgo/cli@latest build needed com.example.app --channel production --verbose`
+- Prints `yes` or `no` and exits with code `1` only when local native dependency metadata requires a new native build.
+- If `--channel` is omitted, it uses `plugins.CapacitorUpdater.defaultChannel` from local config, then the public default channel in Capgo Cloud.
+- Key options:
+  - `-c, --channel <channel>`
+  - `--verbose`
+  - `--package-json <packageJson>`
+  - `--node-modules <nodeModules>`
+
 ### `build request [appId]`
 
 - Example: `npx @capgo/cli@latest build request com.example.app --platform ios --path .`
@@ -114,10 +127,15 @@ interface BuildLogger {
 - `--keystore-store-password <password>`
 - `--play-config-json <json>`
 - `--android-flavor <flavor>`
+- `--in-app-update-priority <0-5>`: Google Play in-app update priority (higher = more urgent)
 
 #### Output behavior options
 
 - `--no-playstore-upload`: skip Play Store upload for the build, requires `--output-upload`
+- `--submit-to-store-review`: submit after upload instead of leaving a draft/inactive store release. Android completes the Google Play release; iOS submits to TestFlight external review.
+- `--store-release-name <name>`: Android Google Play version_name/release label.
+- `--store-release-notes <notes>`: Google Play changelog and iOS TestFlight What to Test text.
+- `--ios-testflight-groups <groups>`: comma-separated external TestFlight group names or IDs required with `--submit-to-store-review` on iOS.
 - `--output-upload`
 - `--no-output-upload`
 - `--output-retention <duration>`: `1h` to `7d`

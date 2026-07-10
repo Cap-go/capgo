@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APIKEY_STATS, getEndpointUrl, getSupabaseClient, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
+import { APIKEY_STATS, createDirectApiKeyWithBindings, getEndpointUrl, getSupabaseClient, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.private.error.${id}`
@@ -8,6 +8,9 @@ const APPNAME = `com.private.error.${id}`
 const testOrgId = randomUUID()
 const testOrgEmail = `test-private-error-${id}@capgo.app`
 const testCustomerId = `cus_test_${id}`
+const testOrgApiKey = randomUUID()
+let testOrgHeaders: Record<string, string>
+let testOrgApiKeyId: number | null = null
 
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
@@ -25,7 +28,7 @@ beforeAll(async () => {
     throw stripeError
 
   // Create unique test organization (WITH a customer_id so RLS allows access)
-  // use_new_rbac: false — this test checks error handling (404 for missing app).
+  // use_new_rbac false is kept to verify compatibility flag handling while RBAC remains authoritative.
   // In RBAC mode check_min_rights fails for non-existent apps before the app lookup.
   const { error: orgError } = await getSupabaseClient().from('orgs').insert({
     id: testOrgId,
@@ -47,12 +50,29 @@ beforeAll(async () => {
   })
   if (orgUserError)
     throw orgUserError
+
+  const apiKey = await createDirectApiKeyWithBindings({
+    key: testOrgApiKey,
+    name: `private-error-org-${id}`,
+    orgId: testOrgId,
+    roleName: 'org_super_admin',
+  })
+  if (!apiKey.key)
+    throw new Error('Failed to create private error API key')
+
+  testOrgApiKeyId = apiKey.id
+  testOrgHeaders = {
+    'Content-Type': 'application/json',
+    'Authorization': apiKey.key,
+  }
 })
 
 afterAll(async () => {
   await resetAppData(APPNAME)
 
   // Clean up the unique test organization
+  if (testOrgApiKeyId !== null)
+    await getSupabaseClient().from('apikeys').delete().eq('id', testOrgApiKeyId).throwOnError()
   await getSupabaseClient().from('org_users').delete().eq('org_id', testOrgId)
   await getSupabaseClient().from('orgs').delete().eq('id', testOrgId)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', testCustomerId)
@@ -76,7 +96,7 @@ describe('[POST] /private/create_device - Error Cases', () => {
     const deviceId = randomUUID()
     const response = await fetch(getEndpointUrl('/private/create_device'), {
       method: 'POST',
-      headers,
+      headers: testOrgHeaders,
       body: JSON.stringify({
         app_id: APPNAME,
         org_id: testOrgId,
@@ -153,7 +173,7 @@ describe('[POST] /private/create_device - Error Cases', () => {
     // Use testOrgId where user has super_admin rights to properly test app not found
     const response = await fetch(getEndpointUrl('/private/create_device'), {
       method: 'POST',
-      headers,
+      headers: testOrgHeaders,
       body: JSON.stringify({
         app_id: 'nonexistent.app',
         org_id: testOrgId,
@@ -432,7 +452,7 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
 
     const response = await fetch(getEndpointUrl('/private/set_org_email'), {
       method: 'POST',
-      headers,
+      headers: testOrgHeaders,
       body: JSON.stringify({
         org_id: testOrgId,
         email: 'test@example.com',
@@ -447,19 +467,19 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
     await getSupabaseClient().from('orgs').update({ customer_id: testCustomerId }).eq('id', testOrgId)
   })
 
-  it('should return 403 when not authorized for org', async () => {
+  it('should return 400 when the scoped API key cannot read the org', async () => {
     const response = await fetch(getEndpointUrl('/private/set_org_email'), {
       method: 'POST',
-      headers,
+      headers: testOrgHeaders,
       body: JSON.stringify({
         org_id: NON_OWNER_ORG_ID,
         email: 'test@example.com',
       }),
     })
 
-    expect(response.status).toBe(401)
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('not_authorized')
+    expect(data.error).toBe('org_not_found')
   })
 })
 

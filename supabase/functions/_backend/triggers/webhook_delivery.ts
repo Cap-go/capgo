@@ -1,5 +1,5 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import type { WebhookPayload } from '../utils/webhook.ts'
+import type { WebhookDeliveryPayload } from '../utils/webhook.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
@@ -8,13 +8,18 @@ import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { backgroundTask } from '../utils/utils.ts'
 import {
   deliverWebhook,
+  disableWebhook,
   getDeliveryById,
   getWebhookById,
+  getWebhookLogUrlMetadata,
+  getWebhookPayloadEvent,
+  getWebhookPayloadEventId,
   incrementAttemptCount,
   markDeliveryFailed,
+  normalizeWebhookDeliveryVersion,
   queueWebhookDeliveryWithDelay,
+  scheduleRetry,
   updateDeliveryResult,
-
 } from '../utils/webhook.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -23,7 +28,7 @@ interface DeliveryMessage {
   delivery_id: string
   webhook_id: string
   url: string
-  payload: WebhookPayload
+  payload: WebhookDeliveryPayload
 }
 
 /**
@@ -48,20 +53,25 @@ app.post('/', middlewareAPISecret, async (c) => {
     const deliveryData: DeliveryMessage = body?.delivery_id && body?.webhook_id && body?.url
       ? body
       : (body.payload || body)
+    const urlInfo = getWebhookLogUrlMetadata(typeof deliveryData?.url === 'string' ? deliveryData.url : '')
 
     cloudlog({
       requestId: c.get('requestId'),
       message: 'Webhook delivery handler received',
       deliveryId: deliveryData.delivery_id,
       webhookId: deliveryData.webhook_id,
-      url: deliveryData.url,
+      urlInfo,
     })
 
     if (!deliveryData.delivery_id || !deliveryData.webhook_id || !deliveryData.url || !deliveryData.payload) {
       cloudlogErr({
         requestId: c.get('requestId'),
         message: 'Invalid delivery data',
-        deliveryData,
+        hasDeliveryId: Boolean(deliveryData.delivery_id),
+        hasWebhookId: Boolean(deliveryData.webhook_id),
+        hasUrl: Boolean(deliveryData.url),
+        hasPayload: Boolean(deliveryData.payload),
+        urlInfo,
       })
       return c.json(BRES)
     }
@@ -100,6 +110,7 @@ app.post('/', middlewareAPISecret, async (c) => {
 
     // Increment attempt count
     const attemptCount = await incrementAttemptCount(c, deliveryData.delivery_id)
+    const deliveryVersion = normalizeWebhookDeliveryVersion(delivery.delivery_version ?? webhook.delivery_version)
 
     // Attempt delivery with signature
     const result = await deliverWebhook(
@@ -108,6 +119,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       deliveryData.url,
       deliveryData.payload,
       webhook.secret,
+      deliveryVersion,
     )
 
     // Update delivery record with result
@@ -131,12 +143,32 @@ app.post('/', middlewareAPISecret, async (c) => {
       return c.json(BRES)
     }
 
+    // 410 Gone is an explicit opt-out: disable the endpoint and stop retrying.
+    if (result.status === 410) {
+      await markDeliveryFailed(c, deliveryData.delivery_id)
+      await disableWebhook(c, deliveryData.webhook_id)
+
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'Webhook endpoint disabled after 410 Gone response',
+        deliveryId: deliveryData.delivery_id,
+        webhookId: deliveryData.webhook_id,
+      })
+
+      return c.json(BRES)
+    }
+
     // Handle failure
-    const maxAttempts = delivery.max_attempts || 3
+    const maxAttempts = delivery.max_attempts || 10
 
     if (attemptCount < maxAttempts) {
-      // Schedule retry with exponential backoff
-      const retryDelaySeconds = 2 ** attemptCount * 60 // 2min, 4min, 8min
+      const retryDelaySeconds = await scheduleRetry(
+        c,
+        deliveryData.delivery_id,
+        attemptCount,
+        result.retryAfter,
+        result.status ?? null,
+      )
 
       cloudlog({
         requestId: c.get('requestId'),
@@ -160,6 +192,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     else {
       // Max retries reached, mark as permanently failed
       await markDeliveryFailed(c, deliveryData.delivery_id)
+      await disableWebhook(c, deliveryData.webhook_id)
 
       cloudlog({
         requestId: c.get('requestId'),
@@ -179,14 +212,15 @@ app.post('/', middlewareAPISecret, async (c) => {
             'webhook:delivery_failed',
             {
               webhook_name: webhook.name,
-              webhook_url: webhook.url,
-              event_type: deliveryData.payload.event,
+              webhook_id: webhook.id,
+              webhook_url_info: getWebhookLogUrlMetadata(webhook.url),
+              event_type: getWebhookPayloadEvent(deliveryData.payload),
               attempts: attemptCount,
               last_error: result.body?.slice(0, 500) || 'Unknown error',
               delivery_id: deliveryData.delivery_id,
             },
             webhook.org_id,
-            `webhook_failure_${webhook.id}_${deliveryData.payload.event_id}`,
+            `webhook_failure_${webhook.id}_${getWebhookPayloadEventId(deliveryData.payload)}`,
             '0 0 * * *', // Rate limit to once per day per webhook+event
             webhook.orgs.management_email,
             drizzleClient,

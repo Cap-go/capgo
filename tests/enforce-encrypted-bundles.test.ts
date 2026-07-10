@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APIKEY_ENCRYPTED, APP_NAME_ENCRYPTED, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, ORG_ID_ENCRYPTED, SUPABASE_ANON_KEY, SUPABASE_BASE_URL, USER_ID, USER_ID_2, USER_ID_ENCRYPTED, USER_PASSWORD } from './test-utils.ts'
+import { APIKEY_ENCRYPTED, APP_NAME_ENCRYPTED, createDirectApiKeyWithBindings, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, ORG_ID_ENCRYPTED, SUPABASE_ANON_KEY, SUPABASE_BASE_URL, USER_ID, USER_ID_2, USER_ID_ENCRYPTED, USER_PASSWORD } from './test-utils.ts'
 
 // This test file uses ISOLATED test data seeded in seed.sql:
 // - USER_ID_ENCRYPTED: f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f708193
@@ -171,21 +171,18 @@ beforeAll(async () => {
   // Ensure enforcement is disabled at the start of tests
   await resetEncryptedBundleSettings()
 
-  const { data: scopedApiKey, error: scopedApiKeyError } = await getSupabaseClient()
-    .from('apikeys')
-    .insert({
-      user_id: USER_ID_ENCRYPTED,
-      key: APIKEY_ENCRYPTED_SCOPED_NAME,
-      mode: 'all',
-      name: APIKEY_ENCRYPTED_SCOPED_NAME,
-      limited_to_apps: [APP_NAME_ENCRYPTED],
-      limited_to_orgs: [],
-    })
-    .select('key')
-    .single()
+  const scopedApiKey = await createDirectApiKeyWithBindings({
+    userId: USER_ID_ENCRYPTED,
+    key: APIKEY_ENCRYPTED_SCOPED_NAME,
+    name: APIKEY_ENCRYPTED_SCOPED_NAME,
+    orgId: ORG_ID_ENCRYPTED,
+    roleName: 'org_member',
+    appId: APP_NAME_ENCRYPTED,
+    appRoleName: 'app_admin',
+  })
 
-  if (scopedApiKeyError || !scopedApiKey?.key)
-    throw new Error(`Failed to seed scoped encrypted API key: ${scopedApiKeyError?.message ?? 'missing key'}`)
+  if (!scopedApiKey.key)
+    throw new Error('Failed to seed scoped encrypted API key')
 
   apiKeyEncryptedScoped = scopedApiKey.key
 
@@ -196,7 +193,7 @@ beforeAll(async () => {
     .eq('app_id', APP_NAME_ENCRYPTED)
     .neq('name', 'builtin')
     .neq('name', 'unknown')
-})
+}, 60_000)
 
 afterAll(async () => {
   // Clean up test versions
@@ -215,7 +212,7 @@ afterAll(async () => {
     .delete()
     .eq('name', APIKEY_ENCRYPTED_SCOPED_NAME)
     .throwOnError()
-})
+}, 60_000)
 
 describe('[Encrypted Bundles Enforcement]', () => {
   describe('org Setting Management', () => {

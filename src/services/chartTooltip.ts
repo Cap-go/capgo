@@ -1,6 +1,7 @@
 import type { Chart, TooltipItem as ChartTooltipItem, TooltipLabelStyle, TooltipModel } from 'chart.js'
 import { useDark } from '@vueuse/core'
 import { formatLocalDateLong } from '~/services/date'
+import { formatNumberValue } from '~/services/formatLocale'
 
 interface TooltipContext {
   chart: Chart
@@ -50,8 +51,7 @@ function formatTooltipValue(value: unknown) {
   if (typeof value !== 'number' || Number.isNaN(value))
     return '0'
 
-  const rounded = Number(value.toFixed(1))
-  return Number.isInteger(rounded) ? Math.trunc(rounded).toString() : rounded.toFixed(1)
+  return formatNumberValue(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 }
 
 /**
@@ -201,39 +201,9 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
   if (tooltip.body) {
     const dataPoints = tooltip.dataPoints || []
 
-    // Calculate the formatted date title from the data index
     const dataIndex = dataPoints[0]?.dataIndex ?? 0
-    // Use the actual label from the chart for the tooltip title
-    // This ensures alignment between what's shown on the X-axis and the tooltip
-    const chartLabels = chart.data?.labels || []
-    const labelAtIndex = chartLabels[dataIndex]
-    let formattedTitle: string
-    // Declare tooltipDate at higher scope so it's accessible for click handler
-    let tooltipDate: Date
-
-    if (labelAtIndex !== undefined && dateStartOrUseBillingPeriod instanceof Date) {
-      // Create date using the day number from the label and the month/year from billing start
-      tooltipDate = new Date(dateStartOrUseBillingPeriod)
-      const dayNumber = typeof labelAtIndex === 'number' ? labelAtIndex : Number.parseInt(String(labelAtIndex), 10)
-      if (!Number.isNaN(dayNumber)) {
-        // Handle month transitions - if label day is less than billing start day, it's next month
-        const billingStartDay = dateStartOrUseBillingPeriod.getDate()
-        if (dayNumber < billingStartDay) {
-          // Next month
-          tooltipDate.setMonth(tooltipDate.getMonth() + 1)
-        }
-        tooltipDate.setDate(dayNumber)
-        formattedTitle = formatDateForTooltip(tooltipDate)
-      }
-      else {
-        formattedTitle = String(labelAtIndex)
-      }
-    }
-    else {
-      // Fallback to original calculation
-      tooltipDate = getDateFromIndex(dataIndex, dateStartOrUseBillingPeriod)
-      formattedTitle = formatDateForTooltip(tooltipDate)
-    }
+    const tooltipDate = getDateFromIndex(dataIndex, dateStartOrUseBillingPeriod)
+    const formattedTitle = formatDateForTooltip(tooltipDate)
 
     // Create an array of items with their values, colors, and labels
     const items: ProcessedTooltipItem[] = dataPoints.map((dataPoint, index) => {
@@ -251,7 +221,7 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
       // Look up the app ID from the label using the provided mapping
       const appId = clickHandler?.appIdByLabel?.[label]
       const formattedValue = numericCount !== null
-        ? `${formatTooltipValue(numericValue)}% (${numericCount.toLocaleString()})`
+        ? `${formatTooltipValue(numericValue)}% (${formatNumberValue(numericCount)})`
         : formatTooltipValue(numericValue)
 
       return {
@@ -312,7 +282,7 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
       totalEl.style.borderBottom = `1px solid ${isDark.value ? 'rgba(75, 85, 99, 0.3)' : 'rgba(209, 213, 219, 0.3)'}`
       totalEl.style.color = totalColor
       totalEl.textContent = hasCountValues
-        ? `Total devices: ${Math.round(totalCount).toLocaleString()}`
+        ? `Total devices: ${formatNumberValue(Math.round(totalCount))}`
         : `Total: ${formatTooltipValue(totalValue)}`
       container.appendChild(totalEl)
     }
@@ -725,7 +695,7 @@ export function createTooltipConfig(hasMultipleDatasets: boolean, isAccumulated:
       label(context: ChartTooltipItem<any>) {
         if (isAccumulated && !hasMultipleDatasets) {
           // For single dataset in accumulated mode, show total
-          return `Total: ${context.parsed.y}`
+          return `Total: ${formatNumberValue(context.parsed.y)}`
         }
         else if (hasMultipleDatasets) {
           const datasetIndex = context.datasetIndex ?? 0
@@ -740,7 +710,7 @@ export function createTooltipConfig(hasMultipleDatasets: boolean, isAccumulated:
             ? Math.max(0, Math.round(countCandidate))
             : null
           if (numericCount !== null)
-            return `${formatTooltipValue(numericValue)}% (${numericCount.toLocaleString()}) - ${context.dataset.label}`
+            return `${formatTooltipValue(numericValue)}% (${formatNumberValue(numericCount)}) - ${context.dataset.label}`
           return `${formatTooltipValue(numericValue)} - ${context.dataset.label}`
         }
         // For single dataset in daily mode, use default formatting
@@ -753,7 +723,7 @@ export function createTooltipConfig(hasMultipleDatasets: boolean, isAccumulated:
           const currentValue = context.parsed.y
           const previousValue = dataIndex > 0 ? context.dataset.data[dataIndex - 1] : 0
           const dailyValue = currentValue - previousValue
-          return dailyValue > 0 ? `(+${dailyValue} today)` : undefined
+          return dailyValue > 0 ? `(+${formatNumberValue(dailyValue)} today)` : undefined
         }
         return undefined
       },

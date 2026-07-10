@@ -49,6 +49,37 @@ describe('admin stats validation', () => {
     expect(parsed.success).toBe(true)
   })
 
+  it.concurrent('accepts the trial plan breakdown metric', () => {
+    const parsed = safeParseSchema(adminStatsBodySchema, {
+      ...baseBody,
+      metric_category: 'trial_plan_breakdown',
+    })
+
+    expect(parsed.success).toBe(true)
+  })
+
+  it.concurrent('accepts organization insights filters', () => {
+    const parsed = safeParseSchema(adminStatsBodySchema, {
+      ...baseBody,
+      metric_category: 'organization_insights',
+      plan_name: 'Solo',
+      billing_type: 'monthly',
+      paid_only: true,
+      search: 'admin stats',
+      limit: 50,
+      offset: 0,
+    })
+
+    expect(parsed.success).toBe(true)
+    if (!parsed.success)
+      return
+
+    expect(parsed.data.plan_name).toBe('Solo')
+    expect(parsed.data.billing_type).toBe('monthly')
+    expect(parsed.data.paid_only).toBe(true)
+    expect(parsed.data.search).toBe('admin stats')
+  })
+
   it.each([
     ['plain date start', { start_date: '2025-01-01' }],
     ['plain date end', { end_date: '2025-01-31' }],
@@ -113,5 +144,15 @@ describe('buildPluginBreakdownResult', () => {
         ],
       },
     ])
+  })
+})
+
+import { normalizeAdminStatsDate } from '../supabase/functions/_backend/utils/pg.ts'
+
+describe('normalizeAdminStatsDate', () => {
+  it.concurrent('normalizes Date objects and ISO timestamps to YYYY-MM-DD', () => {
+    expect(normalizeAdminStatsDate(new Date('2026-06-20T15:30:00.000Z'))).toBe('2026-06-20')
+    expect(normalizeAdminStatsDate('2026-06-20T00:00:00.000Z')).toBe('2026-06-20')
+    expect(normalizeAdminStatsDate('2026-06-20')).toBe('2026-06-20')
   })
 })

@@ -50,8 +50,8 @@ SELECT
            AND step_min = 0
          ORDER BY step_max ASC
          LIMIT 1$$,
-        $$VALUES (0.16::double precision)$$,
-        'build_time credit pricing starts at $0.16 per minute'
+        $$VALUES (0.08::double precision)$$,
+        'build_time credit pricing starts at $0.08 per minute'
     );
 
 SELECT
@@ -62,14 +62,14 @@ SELECT
            AND org_id IS NULL
          ORDER BY step_max DESC, step_min DESC
          LIMIT 1$$,
-        $$VALUES (0.08::double precision)$$,
-        'build_time credit pricing floors at $0.08 per minute'
+        $$VALUES (0.04::double precision)$$,
+        'build_time credit pricing floors at $0.04 per minute'
     );
 
 SELECT
     results_eq(
         $$SELECT credits_required FROM public.calculate_credit_cost('build_time', 6000)$$,
-        $$VALUES (16.0::numeric)$$,
+        $$VALUES (8.0::numeric)$$,
         'calculate_credit_cost prices build_time through the shared credit ladder'
     );
 
@@ -239,7 +239,7 @@ FROM repricing_overage;
 
 UPDATE public.capgo_credits_steps
 SET
-    price_per_unit = 0.16,
+    price_per_unit = 0.08,
     unit_factor = 60
 WHERE id = (SELECT credit_step_id FROM test_repricing_context);
 

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { fetchWithRetry, getAuthHeaders, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, POSTGRES_URL, USER_ID } from './test-utils.ts'
+import { fetchWithRetry, getAuthHeaders, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, POSTGRES_URL, USER_ADMIN_EMAIL, USER_EMAIL_NONMEMBER, USER_ID, USER_PASSWORD_NONMEMBER } from './test-utils.ts'
 
 const SSO_TEST_ORG_ID = randomUUID()
 const SSO_TEST_CUSTOMER_ID = `cus_sso_test_${randomUUID()}`
@@ -42,6 +42,71 @@ beforeAll(async () => {
     throw orgUserError
 })
 
+async function withEnforcedSsoPasswordUser(callback: (context: { targetAuthHeaders: Record<string, string>, email: string }) => Promise<void>) {
+  const enforcementOrgId = randomUUID()
+  const enforcementCustomerId = `cus_sso_impersonation_${randomUUID()}`
+  const providerId = randomUUID()
+  const externalProviderId = randomUUID()
+  const domain = `${randomUUID()}.sso.test`
+  const email = `impersonated-user@${domain}`
+  const password = 'testtest'
+
+  const { data: createdUser, error: createUserError } = await getSupabaseClient().auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  })
+  if (createUserError || !createdUser.user)
+    throw createUserError ?? new Error('Failed to create dedicated SSO impersonation auth user')
+
+  try {
+    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+      customer_id: enforcementCustomerId,
+      status: 'succeeded',
+      product_id: 'prod_LQIregjtNduh4q',
+      subscription_id: `sub_sso_impersonation_${randomUUID()}`,
+      trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      is_good_plan: true,
+    })
+    if (stripeError)
+      throw stripeError
+
+    const { error: orgError } = await getSupabaseClient().from('orgs').insert({
+      id: enforcementOrgId,
+      name: `SSO Impersonation Org ${enforcementOrgId}`,
+      management_email: `sso-impersonation-${enforcementOrgId}@capgo.app`,
+      created_by: USER_ID,
+      customer_id: enforcementCustomerId,
+    })
+    if (orgError)
+      throw orgError
+
+    const { error: providerError } = await (getSupabaseClient().from as any)('sso_providers').insert({
+      id: providerId,
+      org_id: enforcementOrgId,
+      domain,
+      provider_id: externalProviderId,
+      status: 'active',
+      enforce_sso: true,
+      dns_verification_token: `dns-${randomUUID()}`,
+    })
+    if (providerError)
+      throw providerError
+
+    const targetAuthHeaders = await getAuthHeadersForCredentials(email, password)
+    await callback({ targetAuthHeaders, email })
+  }
+  finally {
+    await Promise.allSettled([
+      (getSupabaseClient().from as any)('sso_providers').delete().eq('id', providerId),
+      getSupabaseClient().from('orgs').delete().eq('id', enforcementOrgId),
+      getSupabaseClient().from('stripe_info').delete().eq('customer_id', enforcementCustomerId),
+      getSupabaseClient().auth.admin.deleteUser(createdUser.user.id),
+    ])
+  }
+}
+
+// Keep shared SSO suite fixture cleanup separate from per-test random SSO fixtures.
 afterAll(async () => {
   await getSupabaseClient().from('org_users').delete().eq('org_id', SSO_TEST_ORG_ID)
   await getSupabaseClient().from('orgs').delete().eq('id', SSO_TEST_ORG_ID)
@@ -223,6 +288,70 @@ describe('[POST] /private/sso/check-enforcement', () => {
     expect(data.allowed).toBe(true)
   })
 
+  it.concurrent('should allow platform admin impersonation when SSO is enforced', async () => {
+    await withEnforcedSsoPasswordUser(async ({ targetAuthHeaders }) => {
+      const adminHeaders = await getAuthHeadersForCredentials(USER_ADMIN_EMAIL, 'adminadmin')
+
+      const response = await fetchWithRetry(getEndpointUrl('/private/sso/check-enforcement'), {
+        method: 'POST',
+        headers: {
+          ...targetAuthHeaders,
+          'X-Capgo-Spoof-Admin-Authorization': adminHeaders.Authorization,
+        },
+        body: JSON.stringify({
+          email: 'ignored@example.com',
+          auth_type: 'password',
+        }),
+      })
+
+      expect(response.status).toBe(200)
+      const data = await response.json() as { allowed: boolean }
+      expect(data.allowed).toBe(true)
+    })
+  })
+
+  it.concurrent('should not allow a user token to bypass SSO enforcement as spoof proof', async () => {
+    await withEnforcedSsoPasswordUser(async ({ targetAuthHeaders }) => {
+      const response = await fetchWithRetry(getEndpointUrl('/private/sso/check-enforcement'), {
+        method: 'POST',
+        headers: {
+          ...targetAuthHeaders,
+          'X-Capgo-Spoof-Admin-Authorization': targetAuthHeaders.Authorization,
+        },
+        body: JSON.stringify({
+          email: 'ignored@example.com',
+          auth_type: 'password',
+        }),
+      })
+
+      expect(response.status).toBe(200)
+      const data = await response.json() as { allowed: boolean, reason?: string }
+      expect(data).toEqual({ allowed: false, reason: 'sso_enforced' })
+    })
+  })
+
+  it.concurrent('should not allow a different non-admin token to bypass SSO enforcement as spoof proof', async () => {
+    await withEnforcedSsoPasswordUser(async ({ targetAuthHeaders }) => {
+      const nonAdminHeaders = await getAuthHeadersForCredentials(USER_EMAIL_NONMEMBER, USER_PASSWORD_NONMEMBER)
+
+      const response = await fetchWithRetry(getEndpointUrl('/private/sso/check-enforcement'), {
+        method: 'POST',
+        headers: {
+          ...targetAuthHeaders,
+          'X-Capgo-Spoof-Admin-Authorization': nonAdminHeaders.Authorization,
+        },
+        body: JSON.stringify({
+          email: 'ignored@example.com',
+          auth_type: 'password',
+        }),
+      })
+
+      expect(response.status).toBe(200)
+      const data = await response.json() as { allowed: boolean, reason?: string }
+      expect(data).toEqual({ allowed: false, reason: 'sso_enforced' })
+    })
+  })
+
   it.concurrent('should ignore malformed provider entries in JWT app metadata', async () => {
     const email = `${randomUUID()}@no-sso-enforcement-domain.com`
     const password = 'testtest'
@@ -286,6 +415,63 @@ describe('[GET] /private/sso/sp-metadata', () => {
       sp_metadata_url: `${expectedBaseUrl}/auth/v1/sso/saml/metadata`,
       nameid_format: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
     })
+  })
+})
+
+describe('[POST] /private/sso/providers', () => {
+  it.concurrent('rejects pending Enterprise onboarding plans for SSO provider creation', async () => {
+    const orgId = randomUUID()
+    const pendingCustomerId = `pending_${orgId}`
+
+    try {
+      const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+        customer_id: pendingCustomerId,
+        status: null,
+        product_id: ENTERPRISE_PRODUCT_ID,
+        subscription_id: null,
+        trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+        is_good_plan: true,
+      })
+      if (stripeError)
+        throw stripeError
+
+      const { error: orgError } = await getSupabaseClient().from('orgs').insert({
+        id: orgId,
+        name: `Pending Enterprise SSO ${orgId}`,
+        management_email: `pending-enterprise-${orgId}@capgo.app`,
+        created_by: USER_ID,
+        customer_id: pendingCustomerId,
+      })
+      if (orgError)
+        throw orgError
+
+      const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+        org_id: orgId,
+        user_id: USER_ID,
+        user_right: 'super_admin' as const,
+      })
+      if (orgUserError)
+        throw orgUserError
+
+      const response = await fetchWithRetry(getEndpointUrl('/private/sso/providers'), {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          org_id: orgId,
+          domain: `${randomUUID()}.sso.test`,
+          metadata_url: 'https://idp.example.com/metadata.xml',
+        }),
+      })
+
+      expect(response.status).toBe(403)
+      const data = await response.json() as { error: string }
+      expect(data.error).toBe('enterprise_plan_required')
+    }
+    finally {
+      await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
+      await getSupabaseClient().from('orgs').delete().eq('id', orgId)
+      await getSupabaseClient().from('stripe_info').delete().eq('customer_id', pendingCustomerId)
+    }
   })
 })
 

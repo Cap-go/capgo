@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { writeFileSync, mkdtempSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import { parseMobileprovision, parseMobileprovisionFromBase64 } from '../src/build/mobileprovision-parser.ts'
+import { createHash, randomBytes } from 'node:crypto'
+import { parseMobileprovision, parseMobileprovisionDetailed, parseMobileprovisionFromBase64 } from '../src/build/mobileprovision-parser.ts'
 
 function t(name, fn) {
   try {
@@ -112,6 +113,131 @@ t('parses base64-encoded mobileprovision', () => {
 
   assert.equal(result.name, 'match AppStore com.example.app')
   assert.equal(result.bundleId, 'com.example.app')
+})
+
+// ─── parseMobileprovisionDetailed ─────────────────────────────────────
+
+function detailedFixture({ profileType = 'app_store', includeCerts = true }) {
+  // Use crypto.randomBytes (not Math.random) so each test run gets a unique
+  // fake DER without tripping CodeQL's "weak RNG feeding into a hash" rule.
+  // The bytes themselves carry no security weight — they're just test scaffolding.
+  const fakeDer = Buffer.from(`fake-der-${profileType}-${randomBytes(8).toString('hex')}`)
+  const sha1 = createHash('sha1').update(fakeDer).digest('hex').toLowerCase()
+  const certBlock = includeCerts
+    ? `<key>DeveloperCertificates</key>\n  <array>\n    <data>${fakeDer.toString('base64')}</data>\n  </array>`
+    : ''
+  let provisionsBlock = ''
+  let entitlementsExtra = ''
+  if (profileType === 'enterprise') {
+    provisionsBlock = `<key>ProvisionsAllDevices</key>\n  <true/>`
+  }
+  else if (profileType === 'ad_hoc') {
+    provisionsBlock = `<key>ProvisionedDevices</key>\n  <array><string>fake-device-id</string></array>`
+  }
+  else if (profileType === 'development') {
+    provisionsBlock = `<key>ProvisionedDevices</key>\n  <array><string>fake-device-id</string></array>`
+    entitlementsExtra = `<key>get-task-allow</key>\n    <true/>`
+  }
+
+  const plist = `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+  <key>Name</key>
+  <string>Test ${profileType}</string>
+  <key>UUID</key>
+  <string>uuid-${profileType}</string>
+  <key>TeamIdentifier</key>
+  <array>
+    <string>TEAMABCDEF</string>
+  </array>
+  <key>ExpirationDate</key>
+  <date>2030-06-01T12:00:00Z</date>
+  ${provisionsBlock}
+  ${certBlock}
+  <key>Entitlements</key>
+  <dict>
+    <key>application-identifier</key>
+    <string>TEAMABCDEF.com.example.app</string>
+    ${entitlementsExtra}
+  </dict>
+</dict>
+</plist>`
+  return { plist, sha1 }
+}
+
+t('parseMobileprovisionDetailed extracts team id, expiry, and cert sha1s', () => {
+  const { plist, sha1 } = detailedFixture({ profileType: 'app_store' })
+  const dir = mkdtempSync(join(tmpdir(), 'mp-detail-'))
+  try {
+    const path = join(dir, 'p.mobileprovision')
+    writeFileSync(path, createFakeProfile(plist))
+    const detail = parseMobileprovisionDetailed(path)
+    assert.equal(detail.name, 'Test app_store')
+    assert.equal(detail.teamId, 'TEAMABCDEF')
+    assert.equal(detail.expirationDate, '2030-06-01T12:00:00Z')
+    assert.equal(detail.profileType, 'app_store')
+    assert.deepEqual(detail.certificateSha1s, [sha1])
+    assert.equal(detail.bundleId, 'com.example.app')
+  }
+  finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+t('parseMobileprovisionDetailed classifies ad_hoc profiles', () => {
+  const { plist } = detailedFixture({ profileType: 'ad_hoc' })
+  const dir = mkdtempSync(join(tmpdir(), 'mp-detail-'))
+  try {
+    const path = join(dir, 'p.mobileprovision')
+    writeFileSync(path, createFakeProfile(plist))
+    const detail = parseMobileprovisionDetailed(path)
+    assert.equal(detail.profileType, 'ad_hoc')
+  }
+  finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+t('parseMobileprovisionDetailed classifies development profiles', () => {
+  const { plist } = detailedFixture({ profileType: 'development' })
+  const dir = mkdtempSync(join(tmpdir(), 'mp-detail-'))
+  try {
+    const path = join(dir, 'p.mobileprovision')
+    writeFileSync(path, createFakeProfile(plist))
+    const detail = parseMobileprovisionDetailed(path)
+    assert.equal(detail.profileType, 'development')
+  }
+  finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+t('parseMobileprovisionDetailed classifies enterprise profiles', () => {
+  const { plist } = detailedFixture({ profileType: 'enterprise' })
+  const dir = mkdtempSync(join(tmpdir(), 'mp-detail-'))
+  try {
+    const path = join(dir, 'p.mobileprovision')
+    writeFileSync(path, createFakeProfile(plist))
+    const detail = parseMobileprovisionDetailed(path)
+    assert.equal(detail.profileType, 'enterprise')
+  }
+  finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+t('parseMobileprovisionDetailed returns empty cert list when none embedded', () => {
+  const { plist } = detailedFixture({ profileType: 'app_store', includeCerts: false })
+  const dir = mkdtempSync(join(tmpdir(), 'mp-detail-'))
+  try {
+    const path = join(dir, 'p.mobileprovision')
+    writeFileSync(path, createFakeProfile(plist))
+    const detail = parseMobileprovisionDetailed(path)
+    assert.deepEqual(detail.certificateSha1s, [])
+  }
+  finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 process.stdout.write('OK\n')

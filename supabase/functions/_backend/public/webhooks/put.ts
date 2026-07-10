@@ -1,11 +1,14 @@
 import type { Context } from 'hono'
+import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
+import type { WebhookDeliveryVersion } from '../../utils/webhook.ts'
 import { type } from 'arktype'
 import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { simpleError } from '../../utils/hono.ts'
-import { supabaseApikey } from '../../utils/supabase.ts'
-import { getWebhookUrlValidationError, WEBHOOK_EVENT_TYPES } from '../../utils/webhook.ts'
-import { checkWebhookPermission } from './index.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
+import { getWebhookLogUrlMetadata, getWebhookPublicUrlValidationError, parseWebhookDeliveryVersion, WEBHOOK_EVENT_TYPES } from '../../utils/webhook.ts'
+import { checkWebhookPermissionV2 } from './index.ts'
+import { webhookPublicSelect } from './response.ts'
 
 const bodySchema = type({
   'orgId': 'string',
@@ -14,23 +17,91 @@ const bodySchema = type({
   'url?': 'string.url',
   'events?': 'string[] > 0',
   'enabled?': 'boolean',
+  'deliveryVersion?': 'string',
+  'delivery_version?': 'string',
 })
 
-export async function put(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+interface PutWebhookBody {
+  orgId: string
+  webhookId: string
+  name?: string
+  url?: string
+  events?: string[]
+  enabled?: boolean
+  deliveryVersion?: string
+  delivery_version?: string
+}
+
+function parseRequestedDeliveryVersion(requestedDeliveryVersion: string | undefined): WebhookDeliveryVersion | undefined {
+  if (requestedDeliveryVersion === undefined)
+    return undefined
+
+  const deliveryVersion = parseWebhookDeliveryVersion(requestedDeliveryVersion)
+  if (!deliveryVersion) {
+    throw simpleError('invalid_delivery_version', 'Invalid webhook delivery version', {
+      allowed: ['legacy', 'standard'],
+    })
+  }
+
+  return deliveryVersion
+}
+
+function validateEvents(events: string[] | undefined): void {
+  if (!events)
+    return
+
+  const invalidEvents = events.filter(e => !WEBHOOK_EVENT_TYPES.includes(e as any))
+  if (invalidEvents.length > 0) {
+    throw simpleError('invalid_events', 'Invalid event types', {
+      invalid: invalidEvents,
+      allowed: WEBHOOK_EVENT_TYPES,
+    })
+  }
+}
+
+async function validateWebhookUrl(c: Context<MiddlewareKeyVariables, any, any>, url: string | undefined): Promise<void> {
+  if (!url)
+    return
+
+  const urlError = await getWebhookPublicUrlValidationError(c, url)
+  if (urlError)
+    throw simpleError('invalid_url', urlError, { urlInfo: getWebhookLogUrlMetadata(url) })
+}
+
+function buildWebhookUpdateData(
+  body: PutWebhookBody,
+  deliveryVersion: WebhookDeliveryVersion | undefined,
+): Database['public']['Tables']['webhooks']['Update'] {
+  const updateData: Database['public']['Tables']['webhooks']['Update'] = {}
+  if (body.name !== undefined)
+    updateData.name = body.name
+  if (body.url !== undefined)
+    updateData.url = body.url
+  if (body.events !== undefined)
+    updateData.events = body.events
+  if (body.enabled !== undefined)
+    updateData.enabled = body.enabled
+  if (deliveryVersion !== undefined)
+    updateData.delivery_version = deliveryVersion
+
+  return updateData
+}
+
+export async function put(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw: any, auth: AuthInfo): Promise<Response> {
   const bodyParsed = safeParseSchema(bodySchema, bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
-  const body = bodyParsed.data
+  const body = bodyParsed.data as PutWebhookBody
 
-  await checkWebhookPermission(c, body.orgId, apikey)
+  await checkWebhookPermissionV2(c, body.orgId, auth)
+  const deliveryVersion = parseRequestedDeliveryVersion(body.deliveryVersion ?? body.delivery_version)
 
-  // Use authenticated client - RLS will enforce access
-  const supabase = supabaseApikey(c, c.get('capgkey') as string)
+  // Direct RLS access to webhook tables is intentionally denied; use service-role only after explicit permission checks.
+  const supabase = supabaseAdmin(c)
 
   // Verify webhook belongs to org
-  // Note: Using type assertion as webhooks table types are not yet generated
-  const { data: existingWebhook, error: fetchError } = await (supabase as any)
+  const { data: existingWebhook, error: fetchError } = await supabase
     .from('webhooks')
     .select('id, org_id')
     .eq('id', body.webhookId)
@@ -44,45 +115,21 @@ export async function put(c: Context, bodyRaw: any, apikey: Database['public']['
     throw simpleError('no_permission', 'Webhook does not belong to this organization', { webhookId: body.webhookId })
   }
 
-  // Validate events if provided
-  if (body.events) {
-    const invalidEvents = body.events.filter(e => !WEBHOOK_EVENT_TYPES.includes(e as any))
-    if (invalidEvents.length > 0) {
-      throw simpleError('invalid_events', 'Invalid event types', {
-        invalid: invalidEvents,
-        allowed: WEBHOOK_EVENT_TYPES,
-      })
-    }
-  }
-
-  // Validate URL if provided
-  if (body.url) {
-    const urlError = getWebhookUrlValidationError(c, body.url)
-    if (urlError)
-      throw simpleError('invalid_url', urlError, { url: body.url })
-  }
+  validateEvents(body.events)
+  await validateWebhookUrl(c, body.url)
 
   // Build update object
-  const updateData: Record<string, any> = {}
-  if (body.name !== undefined)
-    updateData.name = body.name
-  if (body.url !== undefined)
-    updateData.url = body.url
-  if (body.events !== undefined)
-    updateData.events = body.events
-  if (body.enabled !== undefined)
-    updateData.enabled = body.enabled
-
+  const updateData = buildWebhookUpdateData(body, deliveryVersion)
   if (Object.keys(updateData).length === 0) {
     throw simpleError('no_updates', 'No fields to update')
   }
 
   // Update webhook
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('webhooks')
     .update(updateData)
     .eq('id', body.webhookId)
-    .select()
+    .select(webhookPublicSelect)
     .single()
 
   if (error) {

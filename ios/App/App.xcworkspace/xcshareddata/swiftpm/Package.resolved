@@ -1,13 +1,13 @@
 {
-  "originHash" : "f152cdb6913d3043085000e58fcedce3ab7d660fa46fe7c80d13dbe048aebaf3",
+  "originHash" : "ab06eac6f466fa5a658cff1940891bc0d5d22a674cbf5f219ad0cdd49e671f87",
   "pins" : [
     {
       "identity" : "alamofire",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Alamofire/Alamofire.git",
       "state" : {
-        "revision" : "513364f870f6bfc468f9d2ff0a95caccc10044c5",
-        "version" : "5.10.2"
+        "revision" : "7595cbcf59809f9977c5f6378500de2ad73b7ddb",
+        "version" : "5.12.0"
       }
     },
     {
@@ -24,8 +24,17 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/ionic-team/capacitor-swift-pm.git",
       "state" : {
-        "revision" : "145cf37b8e3b240efef3d2d8a7262e621f08bb6f",
-        "version" : "7.4.4"
+        "revision" : "44ae2505f54a80c5e559533950886d0644fc2fca",
+        "version" : "8.4.0"
+      }
+    },
+    {
+      "identity" : "cocoamqtt",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/emqx/CocoaMQTT.git",
+      "state" : {
+        "revision" : "9a756497f412214b9a7e9f40ea908dbd977bfaba",
+        "version" : "2.2.4"
       }
     },
     {
@@ -33,17 +42,170 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/crisp-im/crisp-sdk-ios.git",
       "state" : {
-        "revision" : "30991356e5ee97153729c95fa1978f227328980a",
-        "version" : "2.11.0"
+        "revision" : "61e11393f22812e3b3fc6ab98a2d22a4eaef0102",
+        "version" : "2.13.0"
       }
     },
     {
-      "identity" : "swiftkeychainwrapper",
+      "identity" : "gcdwebserver",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/jrendel/SwiftKeychainWrapper.git",
+      "location" : "https://github.com/yene/GCDWebServer",
       "state" : {
-        "revision" : "185a3165346a03767101c4f62e9a545a0fe0530f",
-        "version" : "4.0.1"
+        "revision" : "c2f837b30038ef716b77225f40cc8d104b6ff645",
+        "version" : "3.5.7"
+      }
+    },
+    {
+      "identity" : "google-cast-sdk",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/SRGSSR/google-cast-sdk.git",
+      "state" : {
+        "revision" : "516f7111116bc412230309636842d3bbf77efdd8",
+        "version" : "4.8.4"
+      }
+    },
+    {
+      "identity" : "intercom-ios-sp",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/intercom/intercom-ios-sp.git",
+      "state" : {
+        "revision" : "1ec7bb229a892b6dfa440ac5e8c0347fd91a5760",
+        "version" : "19.5.7"
+      }
+    },
+    {
+      "identity" : "interop-ios-for-google-sdks",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/google/interop-ios-for-google-sdks.git",
+      "state" : {
+        "revision" : "040d087ac2267d2ddd4cca36c757d1c6a05fdbfe",
+        "version" : "101.0.0"
+      }
+    },
+    {
+      "identity" : "ion-ios-camera",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ionic-team/ion-ios-camera.git",
+      "state" : {
+        "revision" : "2cd4f06b0ece21b6458e23357280c51f94bfceb8",
+        "version" : "1.0.4"
+      }
+    },
+    {
+      "identity" : "ion-ios-filesystem",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ionic-team/ion-ios-filesystem.git",
+      "state" : {
+        "revision" : "0d81e26e828ff9582807e2339112cedf2e0fab85",
+        "version" : "1.1.2"
+      }
+    },
+    {
+      "identity" : "ion-ios-geolocation",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ionic-team/ion-ios-geolocation.git",
+      "state" : {
+        "revision" : "db363927d3a954e3ea24d2e72b6e9814769a84be",
+        "version" : "2.1.1"
+      }
+    },
+    {
+      "identity" : "jwplayerkit-package",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/jwplayer/JWPlayerKit-package.git",
+      "state" : {
+        "revision" : "d5e3b35adf991191b829e745e71b29781bceb276",
+        "version" : "4.26.2"
+      }
+    },
+    {
+      "identity" : "mqttcocoaasyncsocket",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leeway1208/MqttCocoaAsyncSocket",
+      "state" : {
+        "revision" : "ce3e18607fd01079495f86ff6195d8a3ca469f73",
+        "version" : "1.0.8"
+      }
+    },
+    {
+      "identity" : "mux-player-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/muxinc/mux-player-swift",
+      "state" : {
+        "revision" : "08ae5c6d60f4755c70c011951f2ddf3472b4fb2d",
+        "version" : "1.6.1"
+      }
+    },
+    {
+      "identity" : "mux-stats-sdk-avplayer",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/muxinc/mux-stats-sdk-avplayer",
+      "state" : {
+        "revision" : "a8c04056f331218959fff89c9d249d7db6ecc73d",
+        "version" : "4.12.0"
+      }
+    },
+    {
+      "identity" : "purchases-hybrid-common",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/RevenueCat/purchases-hybrid-common.git",
+      "state" : {
+        "revision" : "a9d25f3d300cdb515b0cce464b59ebb29ad9ec14",
+        "version" : "18.10.0"
+      }
+    },
+    {
+      "identity" : "purchases-ios-spm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/RevenueCat/purchases-ios-spm",
+      "state" : {
+        "revision" : "92e2804a6b84b3b7ce60bfe7e9ff63dc9524ef5b",
+        "version" : "5.76.0"
+      }
+    },
+    {
+      "identity" : "recaptcha-enterprise-mobile-sdk",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/GoogleCloudPlatform/recaptcha-enterprise-mobile-sdk.git",
+      "state" : {
+        "revision" : "100e379fa2a2435dbf2edc2f514d9a67b78bc4da",
+        "version" : "18.9.0"
+      }
+    },
+    {
+      "identity" : "rudder-sdk-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/rudderlabs/rudder-sdk-ios.git",
+      "state" : {
+        "revision" : "1e1246148018bee5da3d27eef6c6525b10221c09",
+        "version" : "2.6.0"
+      }
+    },
+    {
+      "identity" : "sqlitecipher",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/zhuorantan/SQLiteCipher.git",
+      "state" : {
+        "revision" : "70589046bd800e3db5c0155a558a9bc7a9f260ef",
+        "version" : "0.16.0"
+      }
+    },
+    {
+      "identity" : "starscream",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/daltoniam/Starscream.git",
+      "state" : {
+        "revision" : "c6bfd1af48efcc9a9ad203665db12375ba6b145a",
+        "version" : "4.0.8"
+      }
+    },
+    {
+      "identity" : "stats-sdk-objc",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/muxinc/stats-sdk-objc.git",
+      "state" : {
+        "revision" : "aba0b57a2fb75e154848b30ad8ec07283b520b75",
+        "version" : "5.11.0"
       }
     },
     {
@@ -56,12 +218,12 @@
       }
     },
     {
-      "identity" : "ziparchive",
+      "identity" : "zipfoundation",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/ZipArchive/ZipArchive.git",
+      "location" : "https://github.com/weichsel/ZIPFoundation.git",
       "state" : {
-        "revision" : "38e0ce0598e06b034271f296a8e15b149c91aa19",
-        "version" : "2.4.3"
+        "revision" : "22787ffb59de99e5dc1fbfe80b19c97a904ad48d",
+        "version" : "0.9.20"
       }
     }
   ],

@@ -22,7 +22,7 @@ const canManage = computedAsync(async () => {
 }, false, { evaluating: isPermissionLoading })
 
 const canShow = computed(() =>
-  !!currentOrganization.value?.use_new_rbac && !!currentOrganization.value?.gid,
+  !!currentOrganization.value?.gid,
 )
 </script>
 

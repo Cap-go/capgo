@@ -89,7 +89,8 @@ export async function deleteChannelInternal(channelId: string, appId: string, op
     channel: 'channel',
     event: 'Delete channel',
     icon: '✅',
-    user_id: orgId,
+    org_id: orgId,
+    tracking_version: 2,
     tags: {
       'app-id': appId,
       'channel': channelId,

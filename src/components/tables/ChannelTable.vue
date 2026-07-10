@@ -30,7 +30,7 @@ interface Channel {
     name: string
     created_at: string
     min_update_version: string | null
-  }
+  } | null
   misconfigured: boolean | undefined
 }
 type Element = Database['public']['Tables']['channels']['Row'] & Channel
@@ -47,7 +47,7 @@ const search = ref('')
 const elements = ref<(Element)[]>([])
 const isLoading = ref(true)
 const currentPage = ref(1)
-const versionId = ref<number>()
+const versionId = ref<number | null>(null)
 const filters = ref()
 const newChannelName = ref('')
 const canPromoteChannel = ref<Record<number, boolean>>({})
@@ -70,19 +70,8 @@ const currentVersionsNumber = computed(() => {
 })
 const { currentOrganization } = storeToRefs(organizationStore)
 
-function findUnknownVersion() {
-  return supabase
-    .from('app_versions')
-    .select('id')
-    .eq('app_id', props.appId)
-    .eq('name', 'unknown')
-    .throwOnError()
-    .single()
-    .then(({ data }) => data?.id)
-}
-
 async function addChannel(name: string) {
-  if (!name || !versionId.value || !main.user)
+  if (!name || !main.user)
     return
   try {
     console.log('addChannel', name, versionId.value, main.user)
@@ -96,7 +85,7 @@ async function addChannel(name: string) {
         {
           name,
           app_id: props.appId,
-          version: versionId.value as number,
+          version: versionId.value,
           owner_org: currentGid as string,
           created_by: main.user?.id,
         },
@@ -123,7 +112,7 @@ async function getData() {
           name,
           app_id,
           public,
-          version (
+          version:app_versions!channels_version_fkey(
             id,
             name,
             created_at,
@@ -164,7 +153,7 @@ async function getData() {
       .map(e => e as any as Element)
 
     for (const channel of channels) {
-      if (channel.version.min_update_version === null) {
+      if (channel.version && channel.version.min_update_version === null) {
         channel.misconfigured = true
         anyMisconfigured = true
       }
@@ -172,7 +161,7 @@ async function getData() {
 
     // Inform the parent component if there are any misconfigured channels
     emit('misconfigured', anyMisconfigured)
-    versionId.value = await findUnknownVersion()
+    versionId.value = null
     await loadChannelPermissions(elements.value)
   }
   catch (error) {
@@ -309,7 +298,7 @@ columns.value = [
     key: 'version',
     mobile: true,
     sortable: true,
-    displayFunction: (elem: Element) => elem.version.name,
+    displayFunction: (elem: Element) => elem.version?.name ?? t('channel-builtin'),
     onClick: (elem: Element) => openOneVersion(elem),
   },
   {
@@ -382,7 +371,8 @@ async function showAddModal() {
 }
 
 async function openOneVersion(one: Element) {
-  router.push(`/app/${props.appId}/bundle/${one.version?.id}`)
+  if (one.version?.id)
+    router.push(`/app/${props.appId}/bundle/${one.version.id}`)
 }
 
 async function openOne(one: Element) {

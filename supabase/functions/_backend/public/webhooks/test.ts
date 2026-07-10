@@ -3,12 +3,14 @@ import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import { type } from 'arktype'
 import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { simpleError } from '../../utils/hono.ts'
-import { supabaseWithAuth } from '../../utils/supabase.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
 import {
   createDeliveryRecord,
   createTestPayload,
   deliverWebhook,
-  getWebhookUrlValidationError,
+  getWebhookLogUrlMetadata,
+  getWebhookPublicUrlValidationError,
+  normalizeWebhookDeliveryVersion,
   updateDeliveryResult,
 } from '../../utils/webhook.ts'
 import { checkWebhookPermissionV2 } from './index.ts'
@@ -27,12 +29,10 @@ export async function test(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw
 
   await checkWebhookPermissionV2(c, body.orgId, auth)
 
-  // Use authenticated client - RLS will enforce access
-  const supabase = supabaseWithAuth(c, auth)
+  const supabase = supabaseAdmin(c)
 
   // Get webhook
-  // Note: Using type assertion as webhooks table types are not yet generated
-  const { data: webhook, error: fetchError } = await (supabase as any)
+  const { data: webhook, error: fetchError } = await supabase
     .from('webhooks')
     .select('*')
     .eq('id', body.webhookId)
@@ -46,12 +46,13 @@ export async function test(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw
     throw simpleError('no_permission', 'Webhook does not belong to this organization', { webhookId: body.webhookId })
   }
 
-  const urlError = getWebhookUrlValidationError(c, webhook.url)
+  const urlError = await getWebhookPublicUrlValidationError(c, webhook.url)
   if (urlError)
-    throw simpleError('invalid_url', urlError, { url: webhook.url })
+    throw simpleError('invalid_url', urlError, { urlInfo: getWebhookLogUrlMetadata(webhook.url) })
 
   // Create test payload
   const payload = createTestPayload(body.orgId)
+  const deliveryVersion = normalizeWebhookDeliveryVersion(webhook.delivery_version)
 
   // Create delivery record for the test
   const delivery = await createDeliveryRecord(
@@ -61,6 +62,7 @@ export async function test(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw
     null, // No audit_log_id for test events
     'test.ping',
     payload,
+    deliveryVersion,
   )
 
   if (!delivery) {
@@ -68,7 +70,7 @@ export async function test(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw
   }
 
   // Immediately deliver the test webhook (bypass queue)
-  const result = await deliverWebhook(c, delivery.id, webhook.url, payload, webhook.secret)
+  const result = await deliverWebhook(c, delivery.id, webhook.url, payload, webhook.secret, deliveryVersion)
 
   // Update delivery record with result
   await updateDeliveryResult(
@@ -81,10 +83,16 @@ export async function test(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw
   )
 
   // Update attempt count
-  await (supabase as any)
+  const { error: attemptCountError } = await supabase
     .from('webhook_deliveries')
     .update({ attempt_count: 1 })
     .eq('id', delivery.id)
+
+  if (attemptCountError) {
+    throw simpleError('cannot_update_delivery', 'Cannot update delivery attempt count', {
+      deliveryId: delivery.id,
+    })
+  }
 
   return c.json({
     success: result.success,

@@ -3,7 +3,7 @@
 BEGIN;
 
 -- Plan the number of tests
-SELECT plan(43);
+SELECT plan(46);
 
 -- Test app_versions policies
 SELECT
@@ -14,8 +14,7 @@ SELECT
             'Allow all for auth (super_admin+)',
             'Allow for auth, api keys (read+)',
             'Allow insert for api keys (write,all,upload) (upload+)',
-            'Allow update for auth (write+)',
-            'Allow update for api keys (write,all,upload) (upload+)',
+            'Allow update for auth and api keys',
             'Prevent non 2FA access'
         ],
         'app_versions should have correct policies'
@@ -51,7 +50,6 @@ SELECT
         'public',
         'stats',
         ARRAY[
-            'Allow apikey to read',
             'Allow read for auth (read+)'
         ],
         'stats should have correct policies'
@@ -102,19 +100,57 @@ SELECT
         'channel_permission_overrides should expose only one permissive SELECT path for authenticated'
     );
 
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM (
+                SELECT
+                    schemaname,
+                    tablename,
+                    cmd
+                FROM pg_policies
+                WHERE
+                    schemaname = 'public'
+                    AND permissive = 'PERMISSIVE'
+                GROUP BY
+                    schemaname,
+                    tablename,
+                    cmd
+                HAVING count(*) > 1
+            ) duplicate_public_policies
+        ),
+        0::bigint,
+        'public RLS should not have duplicate permissive policies for the same table operation'
+    );
+
 -- Test orgs policies
 SELECT
     policies_are(
         'public',
         'orgs',
         ARRAY[
-            'Allow insert org for apikey or user',
+            'Allow insert org for user',
             'Allow org delete for super_admin',
             'Allow select for auth, api keys (read+)',
             'Allow update for auth (admin+)',
             'Prevent non 2FA access'
         ],
         'orgs should have correct policies'
+    );
+
+-- Test apikey_global_permissions policies
+SELECT
+    policies_are(
+        'public',
+        'apikey_global_permissions',
+        ARRAY[
+            'Deny delete on apikey_global_permissions',
+            'Deny insert on apikey_global_permissions',
+            'Deny select on apikey_global_permissions',
+            'Deny update on apikey_global_permissions'
+        ],
+        'apikey_global_permissions should have correct restrictive policies'
     );
 
 -- Test devices policies
@@ -284,6 +320,26 @@ SELECT
         'manifest should have correct policies'
     );
 
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM pg_policies
+            WHERE
+                schemaname = 'public'
+                AND tablename = 'manifest'
+                AND policyname = 'Prevent users from updating manifest entries'
+                AND permissive = 'RESTRICTIVE'
+                AND cmd = 'UPDATE'
+                AND roles @> ARRAY['anon', 'authenticated']::name []
+                AND array_length(roles, 1) = 2
+                AND qual = 'false'
+                AND with_check = 'false'
+        ),
+        1::bigint,
+        'manifest update deny policy should match restrictive role shape'
+    );
+
 -- Test deploy_history policies
 SELECT
     policies_are(
@@ -359,9 +415,9 @@ SELECT
         'apikeys',
         ARRAY[
             'Allow owner to delete own apikeys',
-            'Allow owner to insert own apikeys',
             'Allow owner to select own apikeys',
             'Allow owner to update own apikeys',
+            'Deny client insert on apikeys',
             'Prevent non 2FA access'
         ],
         'apikeys should have correct policies'

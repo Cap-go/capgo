@@ -91,6 +91,17 @@ export function parseOptionalBoolean(value: boolean | string | undefined): boole
   throw new Error('output-upload must be true/false (examples: --output-upload, --output-upload false)')
 }
 
+export function parseInAppUpdatePriority(value: number | string): number {
+  // Reject blank/whitespace-only strings before numeric coercion — Number('') and Number('   ')
+  // both yield 0, which would silently apply priority 0 to a Play release.
+  if (typeof value === 'string' && value.trim() === '')
+    throw new Error('in-app-update-priority must be an integer between 0 and 5')
+  const num = typeof value === 'number' ? value : Number(value)
+  if (!Number.isInteger(num) || num < 0 || num > 5)
+    throw new Error('in-app-update-priority must be an integer between 0 and 5')
+  return num
+}
+
 /**
  * Convert a file to base64 string
  */
@@ -184,6 +195,10 @@ export function loadCredentialsFromEnv(): Partial<BuildCredentials> {
   const appleIssuerId = readRuntimeEnv('APPLE_ISSUER_ID')
   const appleKeyContent = readRuntimeEnv('APPLE_KEY_CONTENT')
   const appStoreConnectTeamId = readRuntimeEnv('APP_STORE_CONNECT_TEAM_ID')
+  // iOS app-specific password upload (alternative to the App Store Connect API key)
+  const fastlaneUser = readRuntimeEnv('FASTLANE_USER')
+  const appSpecificPassword = readRuntimeEnv('FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD')
+  const appleAppId = readRuntimeEnv('APPLE_APP_ID')
   const capgoIosScheme = readRuntimeEnv('CAPGO_IOS_SCHEME')
   const capgoIosTarget = readRuntimeEnv('CAPGO_IOS_TARGET')
   // Provisioning map can be supplied as raw JSON (CAPGO_IOS_PROVISIONING_MAP) or
@@ -202,10 +217,17 @@ export function loadCredentialsFromEnv(): Partial<BuildCredentials> {
   const keystoreKeyPassword = readRuntimeEnv('KEYSTORE_KEY_PASSWORD')
   const keystoreStorePassword = readRuntimeEnv('KEYSTORE_STORE_PASSWORD')
   const playConfigJson = readRuntimeEnv('PLAY_CONFIG_JSON')
+  const playStoreInAppUpdatePriority = readRuntimeEnv('PLAY_STORE_IN_APP_UPDATE_PRIORITY')
   const buildOutputUploadEnabled = readRuntimeEnv('BUILD_OUTPUT_UPLOAD_ENABLED')
   const buildOutputRetentionSeconds = readRuntimeEnv('BUILD_OUTPUT_RETENTION_SECONDS')
   const skipBuildNumberBump = readRuntimeEnv('SKIP_BUILD_NUMBER_BUMP')
   const capgoIosDistribution = readRuntimeEnv('CAPGO_IOS_DISTRIBUTION')
+  const capgoStoreSubmitReview = readRuntimeEnv('CAPGO_STORE_SUBMIT_REVIEW')
+  const capgoStoreReleaseName = readRuntimeEnv('CAPGO_STORE_RELEASE_NAME')
+  const capgoStoreReleaseNotes = readRuntimeEnv('CAPGO_STORE_RELEASE_NOTES')
+  const capgoStoreReleaseNotesLocalized = readRuntimeEnv('CAPGO_STORE_RELEASE_NOTES_LOCALIZED')
+  const capgoIosTestflightGroups = readRuntimeEnv('CAPGO_IOS_TESTFLIGHT_GROUPS')
+  const capgoIosAutomaticRelease = readRuntimeEnv('CAPGO_IOS_AUTOMATIC_RELEASE')
 
   // iOS credentials
   if (buildCertificateBase64)
@@ -220,8 +242,26 @@ export function loadCredentialsFromEnv(): Partial<BuildCredentials> {
     credentials.APPLE_KEY_CONTENT = appleKeyContent
   if (appStoreConnectTeamId)
     credentials.APP_STORE_CONNECT_TEAM_ID = appStoreConnectTeamId
+  if (fastlaneUser)
+    credentials.FASTLANE_USER = fastlaneUser
+  if (appSpecificPassword)
+    credentials.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD = appSpecificPassword
+  if (appleAppId)
+    credentials.APPLE_APP_ID = appleAppId
   if (capgoIosScheme)
     credentials.CAPGO_IOS_SCHEME = capgoIosScheme
+  if (capgoStoreSubmitReview)
+    credentials.CAPGO_STORE_SUBMIT_REVIEW = parseOptionalBoolean(capgoStoreSubmitReview) ? 'true' : 'false'
+  if (capgoStoreReleaseName?.trim())
+    credentials.CAPGO_STORE_RELEASE_NAME = capgoStoreReleaseName.trim()
+  if (capgoStoreReleaseNotes?.trim())
+    credentials.CAPGO_STORE_RELEASE_NOTES = capgoStoreReleaseNotes.trim()
+  if (capgoStoreReleaseNotesLocalized?.trim())
+    credentials.CAPGO_STORE_RELEASE_NOTES_LOCALIZED = capgoStoreReleaseNotesLocalized.trim()
+  if (capgoIosTestflightGroups?.trim())
+    credentials.CAPGO_IOS_TESTFLIGHT_GROUPS = capgoIosTestflightGroups.trim()
+  if (capgoIosAutomaticRelease)
+    credentials.CAPGO_IOS_AUTOMATIC_RELEASE = parseOptionalBoolean(capgoIosAutomaticRelease) ? 'true' : 'false'
   if (capgoIosTarget)
     credentials.CAPGO_IOS_TARGET = capgoIosTarget
   if (capgoIosDistribution)
@@ -243,6 +283,9 @@ export function loadCredentialsFromEnv(): Partial<BuildCredentials> {
     credentials.KEYSTORE_STORE_PASSWORD = keystoreStorePassword
   if (playConfigJson)
     credentials.PLAY_CONFIG_JSON = playConfigJson
+  if (playStoreInAppUpdatePriority) {
+    credentials.PLAY_STORE_IN_APP_UPDATE_PRIORITY = String(parseInAppUpdatePriority(playStoreInAppUpdatePriority))
+  }
   if (buildOutputUploadEnabled) {
     credentials.BUILD_OUTPUT_UPLOAD_ENABLED = parseOptionalBoolean(buildOutputUploadEnabled) ? 'true' : 'false'
   }

@@ -1,9 +1,10 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
-import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
+import { cloudlog, cloudlogErr, serializeError } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
+import { sendEventToTracking } from '../../utils/tracking.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 export interface RequestBuildBody {
@@ -33,6 +34,15 @@ interface BuilderJobResponse {
   status: string
 }
 
+interface ValidBuildRequestBody {
+  app_id: string
+  platform: 'ios' | 'android'
+  build_mode: 'release' | 'debug'
+  build_config: Record<string, any>
+  build_options: Record<string, unknown>
+  build_credentials: Record<string, string>
+}
+
 function throwBuilderUnavailable(message: string, moreInfo: Record<string, unknown> = {}, cause?: unknown): never {
   throw quickError(503, 'service_unavailable', message, moreInfo, cause, { alert: false })
 }
@@ -43,6 +53,7 @@ function throwBuilderUnavailable(message: string, moreInfo: Record<string, unkno
  */
 export function buildBuilderPayload(input: {
   orgId: string
+  actorUserId: string
   uploadPath: string
   platform: string
   buildOptions: Record<string, unknown>
@@ -52,7 +63,11 @@ export function buildBuilderPayload(input: {
   delete buildOptions.timeoutSeconds
 
   return {
+    // userId carries the org_id (anonymized owner) — kept for backwards compat.
     userId: input.orgId,
+    // actorUserId is the human user who triggered the build (apikey.user_id). The builder
+    // uses it as the PostHog distinct_id so its build events join this same person.
+    actorUserId: input.actorUserId,
     artifactKey: input.uploadPath,
     fastlane: { lane: input.platform },
     buildOptions,
@@ -63,11 +78,12 @@ export function buildBuilderPayload(input: {
 /** Exported for unit tests — follows bundleUsageTestUtils pattern. */
 export const builderPayloadTestUtils = { buildBuilderPayload }
 
-export async function requestBuild(
-  c: Context,
-  body: RequestBuildBody,
-  apikey: Database['public']['Tables']['apikeys']['Row'],
-): Promise<Response> {
+function hasLegacyCredentials(body: RequestBuildBody): boolean {
+  const credentials = Reflect.get(body, 'credentials')
+  return typeof credentials === 'object' && credentials !== null && Object.keys(credentials).length > 0
+}
+
+function validateBuildRequestBody(c: Context, body: RequestBuildBody, userId: string): ValidBuildRequestBody {
   const {
     app_id,
     platform,
@@ -75,11 +91,18 @@ export async function requestBuild(
     build_config = {},
     build_options = {},
     build_credentials = {},
-    credentials,
   } = body
 
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Build request received',
+    app_id,
+    platform,
+    user_id: userId,
+  })
+
   // Reject deprecated `credentials` field — old CLIs must upgrade
-  if (credentials && Object.keys(credentials).length > 0) {
+  if (hasLegacyCredentials(body)) {
     cloudlogErr({
       requestId: c.get('requestId'),
       message: 'Deprecated credentials field received',
@@ -91,14 +114,6 @@ export async function requestBuild(
       '`credentials` field is deprecated. Please update your CLI and use `build_credentials` instead.',
     )
   }
-
-  cloudlog({
-    requestId: c.get('requestId'),
-    message: 'Build request received',
-    app_id,
-    platform,
-    user_id: apikey.user_id,
-  })
 
   // Validate required fields
   if (!app_id) {
@@ -126,50 +141,78 @@ export async function requestBuild(
     throw simpleError('invalid_parameter', 'build_config must be an object')
   }
 
+  return {
+    app_id,
+    platform: platform as 'ios' | 'android',
+    build_mode: build_mode as 'release' | 'debug',
+    build_config: build_config as Record<string, any>,
+    build_options,
+    build_credentials,
+  }
+}
+
+async function ensureBuildPermission(c: Context, appId: string, userId: string) {
   // Check if the user has permission to request builds (auth context set by middlewareKey)
-  if (!(await checkPermission(c, 'app.build_native', { appId: app_id }))) {
+  if (!(await checkPermission(c, 'app.build_native', { appId }))) {
     cloudlogErr({
       requestId: c.get('requestId'),
       message: 'Unauthorized build request',
-      app_id,
-      user_id: apikey.user_id,
+      app_id: appId,
+      user_id: userId,
     })
     throw simpleError('unauthorized', 'You do not have permission to request builds for this app')
   }
+}
 
-  // Use authenticated client for data queries - RLS will enforce access
-  const supabase = supabaseApikey(c, apikey.key)
-
+async function getBuildOwnerOrg(c: Context, supabase: ReturnType<typeof supabaseApikey>, appId: string): Promise<string> {
   // Get org_id for the app to use as anonymized user ID
   const { data: app, error: appError } = await supabase
     .from('apps')
     .select('owner_org')
-    .eq('app_id', app_id)
+    .eq('app_id', appId)
     .single()
 
   if (appError || !app) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'App not found', app_id, error: appError })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'App not found', app_id: appId, error: appError })
     throw simpleError('not_found', 'App not found')
   }
 
-  const org_id = app.owner_org
+  return app.owner_org
+}
 
-  cloudlog({
-    requestId: c.get('requestId'),
-    message: 'Creating job in builder',
-    org_id,
-    app_id,
-    platform,
-  })
+async function ensureBuildTimePlanAllowed(c: Context, supabase: ReturnType<typeof supabaseApikey>, orgId: string, appId: string) {
+  // Native builds consume build-time credits; check that metric before creating a builder job.
+  const buildTimePlanArgs = { orgid: orgId, actions: ['build_time'], appid: appId } as never
+  const { data: buildTimeAllowed, error: buildTimePlanError } = await supabase.rpc('is_allowed_action_org_action', buildTimePlanArgs)
+  if (buildTimePlanError) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Cannot validate native build plan',
+      org_id: orgId,
+      app_id: appId,
+      error: buildTimePlanError,
+    })
+    throw quickError(503, 'cannot_validate_build_plan', 'Cannot validate native build plan', { app_id: appId, org_id: orgId })
+  }
 
-  // Create upload_path BEFORE calling builder so we can pass it
-  const upload_session_key = crypto.randomUUID()
-  const upload_path = `orgs/${org_id}/apps/${app_id}/native-builds/${upload_session_key}.zip`
+  if (!buildTimeAllowed) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Native build blocked by build time plan limit',
+      org_id: orgId,
+      app_id: appId,
+    })
+    throw quickError(429, 'need_plan_upgrade', 'Cannot request native build, upgrade plan to continue to build', {
+      app_id: appId,
+      org_id: orgId,
+      reason: 'build_time',
+    }, undefined, { alert: false })
+  }
+}
 
-  // Create job in builder.capgo.app
+function getBuilderConfig(c: Context) {
   const builderUrl = getEnv(c, 'BUILDER_URL')
   const builderApiKey = getEnv(c, 'BUILDER_API_KEY')
-  let builderJob: BuilderJobResponse | null = null
 
   if (!builderUrl || !builderApiKey) {
     cloudlogErr({
@@ -181,17 +224,32 @@ export async function requestBuild(
     throwBuilderUnavailable('Build service unavailable (builder not configured)')
   }
 
-  try {
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'Calling builder API',
-      builder_url: builderUrl,
-      org_id,
-      app_id,
-      platform,
-      artifact_key: upload_path,
-    })
+  return { builderUrl, builderApiKey }
+}
 
+async function createBuilderJob(c: Context, input: {
+  builderUrl: string
+  builderApiKey: string
+  orgId: string
+  actorUserId: string
+  appId: string
+  platform: 'ios' | 'android'
+  uploadPath: string
+  buildOptions: Record<string, unknown>
+  buildCredentials: Record<string, string>
+}): Promise<BuilderJobResponse> {
+  const { builderUrl, builderApiKey, orgId, actorUserId, appId, platform, uploadPath, buildOptions, buildCredentials } = input
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Calling builder API',
+    builder_url: builderUrl,
+    org_id: orgId,
+    app_id: appId,
+    platform,
+    artifact_key: uploadPath,
+  })
+
+  try {
     const builderResponse = await fetch(`${builderUrl}/jobs`, {
       method: 'POST',
       headers: {
@@ -199,46 +257,47 @@ export async function requestBuild(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(buildBuilderPayload({
-        orgId: org_id,
-        uploadPath: upload_path,
+        orgId,
+        actorUserId,
+        uploadPath,
         platform,
-        buildOptions: build_options,
-        buildCredentials: build_credentials,
+        buildOptions,
+        buildCredentials,
       })),
     })
 
     if (builderResponse.ok) {
-      builderJob = await builderResponse.json() as BuilderJobResponse
+      const builderJob = await builderResponse.json() as BuilderJobResponse
       cloudlog({
         requestId: c.get('requestId'),
         message: 'Builder job created successfully',
         job_id: builderJob.jobId,
         upload_url: builderJob.uploadUrl,
       })
+      return builderJob
     }
-    else {
-      const errorText = await builderResponse.text()
-      const responseHeaders: Record<string, string> = {}
-      builderResponse.headers.forEach((value, key) => {
-        responseHeaders[key] = value
-      })
-      cloudlogErr({
-        requestId: c.get('requestId'),
-        message: 'Builder API returned error',
-        builder_url: builderUrl,
-        status: builderResponse.status,
-        status_text: builderResponse.statusText,
-        error_body: errorText,
-        response_headers: responseHeaders,
-        org_id,
-        app_id,
-        platform,
-      })
-      throwBuilderUnavailable('Build service unavailable (builder error)', {
-        status: builderResponse.status,
-        statusText: builderResponse.statusText,
-      })
-    }
+
+    const errorText = await builderResponse.text()
+    const responseHeaders: Record<string, string> = {}
+    builderResponse.headers.forEach((value, key) => {
+      responseHeaders[key] = value
+    })
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Builder API returned error',
+      builder_url: builderUrl,
+      status: builderResponse.status,
+      status_text: builderResponse.statusText,
+      error_body: errorText,
+      response_headers: responseHeaders,
+      org_id: orgId,
+      app_id: appId,
+      platform,
+    })
+    throwBuilderUnavailable('Build service unavailable (builder error)', {
+      status: builderResponse.status,
+      statusText: builderResponse.statusText,
+    })
   }
   catch (error) {
     if (error && typeof error === 'object' && 'status' in error && (error as { status?: unknown }).status === 503) {
@@ -251,17 +310,16 @@ export async function requestBuild(
       error: (error as Error)?.message,
       error_stack: (error as Error)?.stack,
       error_name: (error as Error)?.name,
-      org_id,
-      app_id,
+      org_id: orgId,
+      app_id: appId,
       platform,
     })
     throwBuilderUnavailable('Build service unavailable (builder call failed)', {}, error)
   }
+}
 
-  const upload_expires_at = new Date(Date.now() + 60 * 60 * 1000)
-
-  // Builder upload URL is mandatory; no fallback allowed
-  if (!builderJob?.uploadUrl) {
+function ensureBuilderUploadUrl(c: Context, builderUrl: string, builderApiKey: string, builderJob: BuilderJobResponse) {
+  if (!builderJob.uploadUrl) {
     cloudlogErr({
       requestId: c.get('requestId'),
       message: 'Builder did not return uploadUrl; rejecting request',
@@ -270,14 +328,38 @@ export async function requestBuild(
     })
     throwBuilderUnavailable('Build service unavailable (upload URL missing)')
   }
+}
 
-  const upload_url = `${getEnv(c, 'PUBLIC_URL') || 'https://api.capgo.app'}/build/upload/${builderJob.jobId}`
-  cloudlog({
-    requestId: c.get('requestId'),
-    message: 'Using Capgo TUS proxy URL for builder',
-    proxy_url: upload_url,
-    builder_url: builderJob.uploadUrl,
-  })
+function getBuildUploadUrl(c: Context, builderJob: BuilderJobResponse) {
+  return `${getEnv(c, 'PUBLIC_URL') || 'https://api.capgo.app'}/build/upload/${builderJob.jobId}`
+}
+
+async function persistBuildRequest(c: Context, input: {
+  app_id: string
+  org_id: string
+  requested_by: string
+  platform: 'ios' | 'android'
+  build_mode: 'release' | 'debug'
+  build_config: Record<string, any>
+  builder_job_id: string
+  upload_session_key: string
+  upload_path: string
+  upload_url: string
+  upload_expires_at: Date
+}) {
+  const {
+    app_id,
+    org_id,
+    requested_by,
+    platform,
+    build_mode,
+    build_config,
+    builder_job_id,
+    upload_session_key,
+    upload_path,
+    upload_url,
+    upload_expires_at,
+  } = input
 
   const supabaseAdminClient = supabaseAdmin(c)
   const { data: buildRequestRow, error: insertError } = await supabaseAdminClient
@@ -285,12 +367,12 @@ export async function requestBuild(
     .insert({
       app_id,
       owner_org: org_id,
-      requested_by: apikey.user_id,
+      requested_by,
       platform,
       build_mode,
       build_config,
       status: 'pending',
-      builder_job_id: builderJob.jobId,
+      builder_job_id,
       upload_session_key,
       upload_path,
       upload_url,
@@ -304,6 +386,114 @@ export async function requestBuild(
     throw simpleError('internal_error', 'Unable to persist build request')
   }
 
+  return buildRequestRow
+}
+
+async function recordBuildRequestedTelemetry(c: Context, input: {
+  app_id: string
+  org_id: string
+  platform: 'ios' | 'android'
+  build_mode: 'release' | 'debug'
+  user_id: string
+}) {
+  // Telemetry MUST NOT break the build request. sendEventToTracking swallows
+  // per-provider errors internally, but defend against an unexpected throw at
+  // the orchestration layer (e.g. backgroundTask unavailable in tests).
+  try {
+    await sendEventToTracking(c, {
+      event: 'Build Requested',
+      channel: 'build-lifecycle',
+      icon: '🛠️',
+      notify: false,
+      user_id: input.user_id,
+      groups: { organization: input.org_id },
+      tags: {
+        app_id: input.app_id,
+        org_id: input.org_id,
+        platform: input.platform,
+        build_mode: input.build_mode,
+      },
+    })
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Build Requested telemetry failed',
+      error: serializeError(error),
+    })
+  }
+}
+
+export async function requestBuild(
+  c: Context,
+  body: RequestBuildBody,
+  apikey: Database['public']['Tables']['apikeys']['Row'],
+): Promise<Response> {
+  const {
+    app_id,
+    platform,
+    build_mode,
+    build_config,
+    build_options,
+    build_credentials,
+  } = validateBuildRequestBody(c, body, apikey.user_id)
+
+  await ensureBuildPermission(c, app_id, apikey.user_id)
+
+  // Use authenticated client for data queries - RLS will enforce access
+  const supabase = supabaseApikey(c, apikey.key)
+  const org_id = await getBuildOwnerOrg(c, supabase, app_id)
+  await ensureBuildTimePlanAllowed(c, supabase, org_id, app_id)
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Creating job in builder',
+    org_id,
+    app_id,
+    platform,
+  })
+
+  // Create upload_path BEFORE calling builder so we can pass it
+  const upload_session_key = crypto.randomUUID()
+  const upload_path = `orgs/${org_id}/apps/${app_id}/native-builds/${upload_session_key}.zip`
+  const { builderUrl, builderApiKey } = getBuilderConfig(c)
+  const builderJob = await createBuilderJob(c, {
+    builderUrl,
+    builderApiKey,
+    orgId: org_id,
+    actorUserId: apikey.user_id,
+    appId: app_id,
+    platform,
+    uploadPath: upload_path,
+    buildOptions: build_options,
+    buildCredentials: build_credentials,
+  })
+
+  ensureBuilderUploadUrl(c, builderUrl, builderApiKey, builderJob)
+
+  const upload_expires_at = new Date(Date.now() + 60 * 60 * 1000)
+  const upload_url = getBuildUploadUrl(c, builderJob)
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Using Capgo TUS proxy URL for builder',
+    proxy_url: upload_url,
+    builder_url: builderJob.uploadUrl,
+  })
+
+  const buildRequestRow = await persistBuildRequest(c, {
+    app_id,
+    org_id,
+    requested_by: apikey.user_id,
+    platform,
+    build_mode,
+    build_config,
+    builder_job_id: builderJob.jobId,
+    upload_session_key,
+    upload_path,
+    upload_url,
+    upload_expires_at,
+  })
+
   cloudlog({
     requestId: c.get('requestId'),
     message: 'Build job created',
@@ -311,6 +501,14 @@ export async function requestBuild(
     org_id,
     app_id,
     platform,
+  })
+
+  await recordBuildRequestedTelemetry(c, {
+    app_id,
+    org_id,
+    platform,
+    build_mode,
+    user_id: apikey.user_id,
   })
 
   return c.json({

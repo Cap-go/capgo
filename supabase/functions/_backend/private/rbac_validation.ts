@@ -11,7 +11,7 @@ type ValidationIssues = readonly ValidationIssue[]
 const ROLE_SCOPE_TYPE_SCHEMA = type('"org" | "app" | "channel"')
 const PRINCIPAL_TYPE_SCHEMA = type('"user" | "group" | "apikey"')
 const NON_EMPTY_STRING_SCHEMA = type('string > 0')
-const JSON_CONTENT_TYPE_REGEX = /^application\/(?:[a-z-.]+\+)?json(?:;\s*[a-zA-Z0-9\-]+=[^;]+)*$/
+const JSON_CONTENT_TYPE_REGEX = /^application\/(?:[a-z-.]+\+)?json(?:;\s*[a-zA-Z0-9-]+=[^;]+)*$/
 
 interface StandardSchema<T> {
   '~standard': {
@@ -129,6 +129,10 @@ export const orgIdParamSchema = type({
   org_id: 'string.uuid',
 })
 
+export const appIdParamSchema = type({
+  app_id: 'string.uuid',
+})
+
 export const groupIdParamSchema = type({
   group_id: 'string.uuid',
 })
@@ -172,6 +176,8 @@ export const updateRoleBindingBodySchema = type({
 })
 
 export const invalidOrgIdHook = createErrorHook(() => 'Invalid org_id')
+
+export const invalidAppIdHook = createErrorHook(() => 'Invalid app_id')
 
 export const invalidGroupIdHook = createErrorHook(() => 'Invalid group_id')
 

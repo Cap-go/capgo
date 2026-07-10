@@ -81,10 +81,10 @@ BEGIN
     (NOW(), encode(extensions.digest('deleted@capgo.app'::bytea, 'sha256'::text)::bytea, 'hex'::text), '00000000-0000-0000-0000-000000000001');
 
     INSERT INTO "public"."plans" ("created_at", "updated_at", "name", "description", "price_m", "price_y", "stripe_id", "credit_id", "id", "price_m_id", "price_y_id", "storage", "bandwidth", "mau", "market_desc", "build_time_unit", "native_build_concurrency") VALUES
-    (NOW(), NOW(), 'Maker', 'plan.maker.desc', 39, 396, 'prod_LQIs1Yucml9ChU', 'prod_TJRd2hFHZsBIPK', '440cfd69-0cfd-486e-b59b-cb99f7ae76a0', 'price_1KjSGyGH46eYKnWwL4h14DsK', 'price_1KjSKIGH46eYKnWwFG9u4tNi', 3221225472, 268435456000, 10000, 'Best for small business owners', 3600, 3),
-    (NOW(), NOW(), 'Enterprise', 'plan.payasyougo.desc', 239, 4799, 'prod_MH5Jh6ajC9e7ZH', 'prod_TJRd2hFHZsBIPK', '745d7ab3-6cd6-4d65-b257-de6782d5ba50', 'price_1LYX8yGH46eYKnWwzeBjISvW', 'price_1LYX8yGH46eYKnWwzeBjISvW', 12884901888, 3221225472000, 1000000, 'Best for scalling enterprises', 600000, 6),
-    (NOW(), NOW(), 'Solo', 'plan.solo.desc', 14, 146, 'prod_LQIregjtNduh4q', 'prod_TJRd2hFHZsBIPK', '526e11d8-3c51-4581-ac92-4770c602f47c', 'price_1LVvuZGH46eYKnWwuGKOf4DK', 'price_1LVvuIGH46eYKnWwHMDCrxcH', 1073741824, 13958643712, 1000, 'Best for independent developers', 1800, 2),
-    (NOW(), NOW(), 'Team', 'plan.team.desc', 99, 998, 'prod_LQIugvJcPrxhda', 'prod_TJRd2hFHZsBIPK', 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77', 'price_1KjSIUGH46eYKnWwWHvg8XYs', 'price_1KjSLlGH46eYKnWwAwMW2wiW', 6442450944, 536870912000, 100000, 'Best for medium enterprises', 18000, 4);
+    (NOW(), NOW(), 'Maker', 'plan.maker.desc', 39, 396, 'prod_LQIs1Yucml9ChU', 'prod_TJRd2hFHZsBIPK', '440cfd69-0cfd-486e-b59b-cb99f7ae76a0', 'price_1KjSGyGH46eYKnWwL4h14DsK', 'price_1KjSKIGH46eYKnWwFG9u4tNi', 3221225472, 268435456000, 10000, 'Best for small business owners', 7200, 3),
+    (NOW(), NOW(), 'Enterprise', 'plan.payasyougo.desc', 239, 4799, 'prod_MH5Jh6ajC9e7ZH', 'prod_TJRd2hFHZsBIPK', '745d7ab3-6cd6-4d65-b257-de6782d5ba50', 'price_1LYX8yGH46eYKnWwzeBjISvW', 'price_1LYX8yGH46eYKnWwzeBjISvW', 12884901888, 3221225472000, 1000000, 'Best for scalling enterprises', 1200000, 6),
+    (NOW(), NOW(), 'Solo', 'plan.solo.desc', 14, 146, 'prod_LQIregjtNduh4q', 'prod_TJRd2hFHZsBIPK', '526e11d8-3c51-4581-ac92-4770c602f47c', 'price_1LVvuZGH46eYKnWwuGKOf4DK', 'price_1LVvuIGH46eYKnWwHMDCrxcH', 1073741824, 13958643712, 2000, 'Best for independent developers', 3600, 2),
+    (NOW(), NOW(), 'Team', 'plan.team.desc', 99, 998, 'prod_LQIugvJcPrxhda', 'prod_TJRd2hFHZsBIPK', 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77', 'price_1KjSIUGH46eYKnWwWHvg8XYs', 'price_1KjSLlGH46eYKnWwAwMW2wiW', 6442450944, 536870912000, 100000, 'Best for medium enterprises', 36000, 4);
 
     INSERT INTO
       "public"."capgo_credits_steps" (
@@ -104,12 +104,12 @@ BEGIN
       ('mau', 25000000, 40000000, 0.001, 1, NULL),
       ('mau', 40000000, 100000000, 0.0009, 1, NULL),
       ('mau', 100000000, 9223372036854775807, 0.0007, 1, NULL),
-      ('bandwidth', 0, 1099511627776, 0.12, 1073741824, NULL), -- 0–1 TB
+      ('bandwidth', 0, 1099511627776, 0.06, 1073741824, NULL), -- 0–1 TB
       (
         'bandwidth',
         1099511627776,
         2199023255552,
-        0.10,
+        0.05,
         1073741824,
         NULL
       ), -- 1–2 TB
@@ -117,7 +117,7 @@ BEGIN
         'bandwidth',
         2199023255552,
         6597069766656,
-        0.085,
+        0.0425,
         1073741824,
         NULL
       ), -- 2–6 TB
@@ -125,7 +125,7 @@ BEGIN
         'bandwidth',
         6597069766656,
         13194139533312,
-        0.07,
+        0.035,
         1073741824,
         NULL
       ), -- 6–12 TB
@@ -133,7 +133,7 @@ BEGIN
         'bandwidth',
         13194139533312,
         27487790694400,
-        0.055,
+        0.0275,
         1073741824,
         NULL
       ), -- 12–25 TB
@@ -141,7 +141,7 @@ BEGIN
         'bandwidth',
         27487790694400,
         69269232549888,
-        0.04,
+        0.02,
         1073741824,
         NULL
       ), -- 25–63 TB
@@ -149,7 +149,7 @@ BEGIN
         'bandwidth',
         69269232549888,
         139637976727552,
-        0.03,
+        0.015,
         1073741824,
         NULL
       ), -- 63–127 TB
@@ -157,7 +157,7 @@ BEGIN
         'bandwidth',
         139637976727552,
         9223372036854775807,
-        0.02,
+        0.01,
         1073741824,
         NULL
       ), -- 127+ TB
@@ -218,12 +218,12 @@ BEGIN
         1073741824,
         NULL
       ), -- 1280+ GiB
-      ('build_time', 0, 6000, 0.16, 60, NULL), -- 0-100 minutes (in seconds, displayed as minutes)
-      ('build_time', 6000, 30000, 0.14, 60, NULL), -- 100-500 minutes (in seconds, displayed as minutes)
-      ('build_time', 30000, 60000, 0.12, 60, NULL), -- 500-1000 minutes (in seconds, displayed as minutes)
-      ('build_time', 60000, 300000, 0.10, 60, NULL), -- 1000-5000 minutes (in seconds, displayed as minutes)
-      ('build_time', 300000, 600000, 0.09, 60, NULL), -- 5000-10000 minutes (in seconds, displayed as minutes)
-      ('build_time', 600000, 9223372036854775807, 0.08, 60, NULL); -- 10000+ minutes (in seconds, displayed as minutes)
+      ('build_time', 0, 6000, 0.08, 60, NULL), -- 0-100 minutes (in seconds, displayed as minutes)
+      ('build_time', 6000, 30000, 0.07, 60, NULL), -- 100-500 minutes (in seconds, displayed as minutes)
+      ('build_time', 30000, 60000, 0.06, 60, NULL), -- 500-1000 minutes (in seconds, displayed as minutes)
+      ('build_time', 60000, 300000, 0.05, 60, NULL), -- 1000-5000 minutes (in seconds, displayed as minutes)
+      ('build_time', 300000, 600000, 0.045, 60, NULL), -- 5000-10000 minutes (in seconds, displayed as minutes)
+      ('build_time', 600000, 9223372036854775807, 0.04, 60, NULL); -- 10000+ minutes (in seconds, displayed as minutes)
 
     INSERT INTO "storage"."buckets" ("id", "name", "owner", "created_at", "updated_at", "public") VALUES
     ('capgo', 'capgo', NULL, NOW(), NOW(), 't'),
@@ -520,42 +520,42 @@ BEGIN
     ('e4f5a6b7-c8d9-4ea0-9f1a-2b3c4d5e6f70', '6aa76066-55ef-4238-ade6-0b32334a4097', 'super_admin'::"public"."user_min_right", null, null),
     ('e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a82', '6aa76066-55ef-4238-ade6-0b32334a4097', 'super_admin'::"public"."user_min_right", null, null);
 
-    INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "mode", "updated_at", "name") VALUES
-    (1, NOW(), 'c591b04e-cf29-4945-b9a0-776d0672061a', 'c591b04e-cf29-4945-b9a0-776d0672061e', 'upload', NOW(), 'admin upload'),
-    (2, NOW(), 'c591b04e-cf29-4945-b9a0-776d0672061a', '67eeaff4-ae4c-49a6-8eb1-0875f5369de1', 'read', NOW(), 'admin read'),
-    (3, NOW(), 'c591b04e-cf29-4945-b9a0-776d0672061a', 'ae6e7458-c46d-4c00-aa3b-153b0b8520eb', 'all', NOW(), 'admin all'),
-    (4, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', 'c591b04e-cf29-4945-b9a0-776d0672061b', 'upload', NOW(), 'test upload'),
-    (5, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', '67eeaff4-ae4c-49a6-8eb1-0875f5369de0', 'read', NOW(), 'test read'),
-    (6, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea', 'all', NOW(), 'test all'),
-    (7, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', '985640ce-4031-4cfd-8095-d1d1066b6b3b', 'write', NOW(), 'test write'),
-    (8, NOW(), '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'ab4d9a98-ec25-4af8-933c-2aae4aa52b85', 'upload', NOW(), 'test2 upload'),
-    (9, NOW(), '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'ac4d9a98-ec25-4af8-933c-2aae4aa52b85', 'all', NOW(), 'test2 all'),
+    INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "updated_at", "name") VALUES
+    (1, NOW(), 'c591b04e-cf29-4945-b9a0-776d0672061a', 'c591b04e-cf29-4945-b9a0-776d0672061e', NOW(), 'admin upload'),
+    (2, NOW(), 'c591b04e-cf29-4945-b9a0-776d0672061a', '67eeaff4-ae4c-49a6-8eb1-0875f5369de1', NOW(), 'admin read'),
+    (3, NOW(), 'c591b04e-cf29-4945-b9a0-776d0672061a', 'ae6e7458-c46d-4c00-aa3b-153b0b8520eb', NOW(), 'admin all'),
+    (4, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', 'c591b04e-cf29-4945-b9a0-776d0672061b', NOW(), 'test upload'),
+    (5, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', '67eeaff4-ae4c-49a6-8eb1-0875f5369de0', NOW(), 'test read'),
+    (6, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea', NOW(), 'test all'),
+    (7, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', '985640ce-4031-4cfd-8095-d1d1066b6b3b', NOW(), 'test write'),
+    (8, NOW(), '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'ab4d9a98-ec25-4af8-933c-2aae4aa52b85', NOW(), 'test2 upload'),
+    (9, NOW(), '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'ac4d9a98-ec25-4af8-933c-2aae4aa52b85', NOW(), 'test2 all'),
     -- Dedicated test keys for apikeys.test.ts to avoid interference with other tests
-    (10, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', '8b2c3d4e-5f6a-4c7b-8d9e-0f1a2b3c4d5f', 'upload', NOW(), 'apikey test get by id'),
-    (11, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', '8b2c3d4e-5f6a-4c7b-8d9e-0f1a2b3c4d5g', 'read', NOW(), 'apikey test update name'),
-    (12, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', '8b2c3d4e-5f6a-4c7b-8d9e-0f1a2b3c4d5a', 'all', NOW(), 'apikey test update mode'),
-    (13, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', '8b2c3d4e-5f6a-4c7b-8d9e-0f1a2b3c4d5d', 'write', NOW(), 'apikey test update apps'),
+    (10, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', '8b2c3d4e-5f6a-4c7b-8d9e-0f1a2b3c4d5f', NOW(), 'apikey test get by id'),
+    (11, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', '8b2c3d4e-5f6a-4c7b-8d9e-0f1a2b3c4d5g', NOW(), 'apikey test update name'),
+    (12, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', '8b2c3d4e-5f6a-4c7b-8d9e-0f1a2b3c4d5a', NOW(), 'apikey test update all'),
+    (13, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', '8b2c3d4e-5f6a-4c7b-8d9e-0f1a2b3c4d5d', NOW(), 'apikey test update apps'),
     -- Dedicated user and API key for statistics tests
-    (14, NOW(), '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d', '8b2c3d4e-5f6a-4c7b-8d9e-0f1a2b3c4d5e', 'all', NOW(), 'stats test all'),
+    (14, NOW(), '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d', '8b2c3d4e-5f6a-4c7b-8d9e-0f1a2b3c4d5e', NOW(), 'stats test all'),
     -- Dedicated user and API key for RLS hashed apikey tests (isolated to prevent interference)
-    (15, NOW(), '8b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e', '9c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f', 'all', NOW(), 'rls test all'),
+    (15, NOW(), '8b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e', '9c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f', NOW(), 'rls test all'),
     -- Dedicated user and API key for CLI hashed apikey tests (isolated to prevent interference)
-    (110, NOW(), 'e5f6a7b8-c9d0-4e1f-8a2b-3c4d5e6f7a81', 'a7b8c9d0-e1f2-4a3b-8c4d-5e6f7a8b9c03', 'all', NOW(), 'cli hashed test all'),
+    (110, NOW(), 'e5f6a7b8-c9d0-4e1f-8a2b-3c4d5e6f7a81', 'a7b8c9d0-e1f2-4a3b-8c4d-5e6f7a8b9c03', NOW(), 'cli hashed test all'),
     -- Dedicated user and API key for encrypted bundles tests (isolated to prevent interference)
-    (111, NOW(), 'f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f708193', 'b8c9d0e1-f2a3-4b4c-9d5e-6f7a8b9c0d14', 'all', NOW(), 'encrypted test all');
+    (111, NOW(), 'f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f708193', 'b8c9d0e1-f2a3-4b4c-9d5e-6f7a8b9c0d14', NOW(), 'encrypted test all');
 
     -- Hashed API key for testing (hash of 'test-hashed-apikey-for-auth-test')
     -- Used by 07_auth_functions.sql tests
-    INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "key_hash", "mode", "updated_at", "name") VALUES
-    (100, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', NULL, encode(extensions.digest('test-hashed-apikey-for-auth-test', 'sha256'), 'hex'), 'all', NOW(), 'test hashed all');
+    INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "key_hash", "updated_at", "name") VALUES
+    (100, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', NULL, encode(extensions.digest('test-hashed-apikey-for-auth-test', 'sha256'), 'hex'), NOW(), 'test hashed all');
 
     -- Expired hashed API key for testing (expired 1 day ago)
-    INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "key_hash", "mode", "updated_at", "name", "expires_at") VALUES
-    (101, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', NULL, encode(extensions.digest('expired-hashed-key-for-test', 'sha256'), 'hex'), 'all', NOW(), 'test expired hashed', NOW() - INTERVAL '1 day');
+    INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "key_hash", "updated_at", "name", "expires_at") VALUES
+    (101, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', NULL, encode(extensions.digest('expired-hashed-key-for-test', 'sha256'), 'hex'), NOW(), 'test expired hashed', NOW() - INTERVAL '1 day');
 
     -- Expired plain API key for testing (expired 1 day ago)
-    INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "mode", "updated_at", "name", "expires_at") VALUES
-    (102, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', 'expired-plain-key-for-test', 'all', NOW(), 'test expired plain', NOW() - INTERVAL '1 day');
+    INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "updated_at", "name", "expires_at") VALUES
+    (102, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', 'expired-plain-key-for-test', NOW(), 'test expired plain', NOW() - INTERVAL '1 day');
 
     INSERT INTO "public"."apps" ("created_at", "app_id", "icon_url", "name", "last_version", "updated_at", "owner_org", "user_id") VALUES
     (NOW(), 'com.demoadmin.app', '', 'Demo Admin app', '1.0.0', NOW(), '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a'),
@@ -565,22 +565,115 @@ BEGIN
     (NOW(), 'com.encrypted.app', '', 'Encrypted Test App', '1.0.0', NOW(), 'a7b8c9d0-e1f2-4a3b-9c4d-5e6f7a8b9ca4', 'f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f708193'),
     (NOW(), 'com.test2.app', '', 'Test2 App', '1.0.0', NOW(), '34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5');
 
+    WITH seed_key_modes (id, key_kind) AS (
+      VALUES
+        (1, 'upload'),
+        (2, 'read'),
+        (3, 'all'),
+        (4, 'upload'),
+        (5, 'read'),
+        (6, 'all'),
+        (7, 'write'),
+        (8, 'upload'),
+        (9, 'all'),
+        (10, 'upload'),
+        (11, 'read'),
+        (12, 'all'),
+        (13, 'write'),
+        (14, 'all'),
+        (15, 'all'),
+        (100, 'all'),
+        (101, 'all'),
+        (102, 'all'),
+        (110, 'all'),
+        (111, 'all')
+    )
+    INSERT INTO public.role_bindings (
+      principal_type,
+      principal_id,
+      role_id,
+      scope_type,
+      org_id,
+      granted_by,
+      reason,
+      is_direct
+    )
+    SELECT
+      public.rbac_principal_apikey(),
+      ak.rbac_id,
+      roles.id,
+      public.rbac_scope_org(),
+      org_memberships.org_id,
+      ak.user_id,
+      'Seeded API key V2 org binding',
+      true
+    FROM seed_key_modes key_modes
+    JOIN public.apikeys ak ON ak.id = key_modes.id
+    JOIN public.org_users org_memberships
+      ON org_memberships.user_id = ak.user_id
+      AND (org_memberships.user_right IS NULL OR org_memberships.user_right::text NOT LIKE 'invite_%')
+    JOIN public.roles roles
+      ON roles.name = CASE
+        WHEN key_modes.key_kind = 'all' THEN public.rbac_role_org_super_admin()
+        ELSE public.rbac_role_org_member()
+      END
+    ON CONFLICT DO NOTHING;
+
+    WITH seed_key_modes (id, key_kind) AS (
+      VALUES
+        (1, 'upload'),
+        (2, 'read'),
+        (4, 'upload'),
+        (5, 'read'),
+        (7, 'write'),
+        (8, 'upload'),
+        (10, 'upload'),
+        (11, 'read'),
+        (13, 'write')
+    )
+    INSERT INTO public.role_bindings (
+      principal_type,
+      principal_id,
+      role_id,
+      scope_type,
+      org_id,
+      app_id,
+      granted_by,
+      reason,
+      is_direct
+    )
+    SELECT
+      public.rbac_principal_apikey(),
+      ak.rbac_id,
+      roles.id,
+      public.rbac_scope_app(),
+      apps.owner_org,
+      apps.id,
+      ak.user_id,
+      'Seeded API key V2 app binding',
+      true
+    FROM seed_key_modes key_modes
+    JOIN public.apikeys ak ON ak.id = key_modes.id
+    JOIN public.org_users org_memberships
+      ON org_memberships.user_id = ak.user_id
+      AND (org_memberships.user_right IS NULL OR org_memberships.user_right::text NOT LIKE 'invite_%')
+    JOIN public.apps apps ON apps.owner_org = org_memberships.org_id
+    JOIN public.roles roles
+      ON roles.name = CASE key_modes.key_kind
+        WHEN 'write' THEN public.rbac_role_app_developer()
+        WHEN 'upload' THEN public.rbac_role_app_uploader()
+        ELSE public.rbac_role_app_reader()
+      END
+    ON CONFLICT DO NOTHING;
+
     INSERT INTO "public"."app_versions" ("id", "created_at", "app_id", "name", "r2_path", "updated_at", "deleted", "external_url", "checksum", "session_key", "storage_provider", "owner_org", "user_id", "comment", "link") VALUES
-    (1, NOW(), 'com.demo.app', 'builtin', NULL, NOW(), 't', NULL, NULL, NULL, 'supabase', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', NULL, NULL, NULL),
-    (2, NOW(), 'com.demo.app', 'unknown', NULL, NOW(), 't', NULL, NULL, NULL, 'supabase', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', NULL, NULL, NULL),
     (3, NOW(), 'com.demo.app', '1.0.0', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/1.0.0.zip', NOW(), 'f', NULL, '3885ee49', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'its a test', 'https://capgo.app'),
     (4, NOW(), 'com.demo.app', '1.0.1', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/1.0.1.zip', NOW(), 'f', NULL, '', NULL, 'r2-direct', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'its a test', 'https://capgo.app'),
     (5, NOW(), 'com.demo.app', '1.361.0', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/1.361.0.zip', NOW(), 'f', NULL, '9d4f798a', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'its a test', 'https://capgo.app'),
     (6, NOW(), 'com.demo.app', '1.360.0', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/1.360.0.zip', NOW(), 'f', NULL, '44913a9f', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'its a test', 'https://capgo.app'),
     (7, NOW(), 'com.demo.app', '1.359.0', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/1.359.0.zip', NOW(), 'f', NULL, '9f74e70a', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'its a test', 'https://capgo.app'),
-    (8, NOW(), 'com.demoadmin.app', 'builtin', NULL, NOW(), 't', NULL, NULL, NULL, 'supabase', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', NULL, NULL, NULL),
-    (9, NOW(), 'com.demoadmin.app', 'unknown', NULL, NOW(), 't', NULL, NULL, NULL, 'supabase', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', NULL, NULL, NULL),
     (10, NOW(), 'com.demoadmin.app', '1.0.0', 'orgs/22dbad8a-b885-4309-9b3b-a09f8460fb6d/apps/com.demoadmin.app/1.0.0.zip', NOW(), 'f', NULL, 'admin123', NULL, 'r2', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'admin app test version', 'https://capgo.app'),
-    (11, NOW(), 'com.stats.app', 'builtin', NULL, NOW(), 't', NULL, NULL, NULL, 'supabase', 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, NULL, NULL),
-    (12, NOW(), 'com.stats.app', 'unknown', NULL, NOW(), 't', NULL, NULL, NULL, 'supabase', 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, NULL, NULL),
     (13, NOW(), 'com.stats.app', '1.0.0', 'orgs/b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e/apps/com.stats.app/1.0.0.zip', NOW(), 'f', NULL, 'stats123', NULL, 'r2', 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d', 'stats test version', 'https://capgo.app'),
-    (14, now(), 'com.test2.app', 'builtin', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '34a8c55d-2d0f-4652-a43f-684c7a9403ac', NULL, NULL, NULL),
-    (15, now(), 'com.test2.app', 'unknown', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '34a8c55d-2d0f-4652-a43f-684c7a9403ac', NULL, NULL, NULL),
     (16, now(), 'com.test2.app', '1.0.0', 'orgs/34a8c55d-2d0f-4652-a43f-684c7a9403ac/apps/com.test2.app/1.0.0.zip', now(), 'f', NULL, 'test2123', NULL, 'r2', '34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'test2 app version', 'https://capgo.app');
 
     INSERT INTO "public"."app_versions_meta" ("id", "created_at", "app_id", "updated_at", "checksum", "size") VALUES
@@ -809,7 +902,7 @@ DECLARE
     WHEN p_org_id IS NULL THEN 'Demo org'
     ELSE concat('Seeded Org ', p_app_id)
   END;
-  builtin_version_id bigint; unknown_version_id bigint; v1_0_1_version_id bigint; v1_0_0_version_id bigint; v1_361_0_version_id bigint; v1_360_0_version_id bigint; v1_359_0_version_id bigint;
+  v1_0_1_version_id bigint; v1_0_0_version_id bigint; v1_361_0_version_id bigint; v1_360_0_version_id bigint; v1_359_0_version_id bigint;
   production_channel_id bigint; beta_channel_id bigint; development_channel_id bigint; no_access_channel_id bigint; electron_only_channel_id bigint;
 BEGIN
   PERFORM pg_advisory_xact_lock(hashtext(p_app_id));
@@ -895,13 +988,32 @@ BEGIN
     )
   $sql2$ USING org_id, admin_user_id;
 
+  -- API keys use bindings-priority: a key with its own role_bindings can only reach
+  -- orgs it is bound to. Clone each owner key's Demo-org binding onto this org so
+  -- apikey-authed tests work against dedicated per-file orgs too. Skip orgs with
+  -- apikey expiration policies: their triggers reject bindings for non-expiring keys.
+  EXECUTE $sql3$
+    INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, granted_by, reason, is_direct)
+    SELECT rb.principal_type, rb.principal_id, rb.role_id, rb.scope_type, $1, rb.granted_by, 'Seeded API key V2 org binding (per-app org)', true
+    FROM public.role_bindings rb
+    JOIN public.apikeys ak ON ak.rbac_id = rb.principal_id
+    WHERE rb.principal_type = public.rbac_principal_apikey()
+      AND rb.scope_type = public.rbac_scope_org()
+      AND rb.org_id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid
+      AND ak.user_id IN ($2, $3)
+      AND NOT EXISTS (
+        SELECT 1 FROM public.orgs o
+        WHERE o.id = $1
+          AND (o.require_apikey_expiration OR o.max_apikey_expiration_days IS NOT NULL)
+      )
+    ON CONFLICT DO NOTHING
+  $sql3$ USING org_id, user_id, admin_user_id;
+
   INSERT INTO public.apps (created_at, app_id, icon_url, name, last_version, updated_at, owner_org, user_id)
   VALUES (NOW(), p_app_id, '', 'Seeded App', '1.0.0', NOW(), org_id, user_id);
   WITH version_inserts AS (
     INSERT INTO public.app_versions (created_at, app_id, name, r2_path, updated_at, deleted, external_url, checksum, storage_provider, owner_org, comment, link, user_id)
     VALUES
-      (NOW(), p_app_id, 'builtin', NULL, NOW(), 't', NULL, NULL, 'supabase', org_id, NULL, NULL, NULL),
-      (NOW(), p_app_id, 'unknown', NULL, NOW(), 't', NULL, NULL, 'supabase', org_id, NULL, NULL, NULL),
       (NOW(), p_app_id, '1.0.1', 'orgs/'||org_id||'/apps/'||p_app_id||'/1.0.1.zip', NOW(), 'f', NULL, '', 'r2-direct', org_id, 'Bug fixes and minor improvements', 'https://github.com/Cap-go/capgo/releases/tag/v1.0.1', user_id),
       (NOW(), p_app_id, '1.0.0', 'orgs/'||org_id||'/apps/'||p_app_id||'/1.0.0.zip', NOW(), 'f', NULL, '3885ee49', 'r2', org_id, 'Initial release', 'https://github.com/Cap-go/capgo/releases/tag/v1.0.0', user_id),
       (NOW(), p_app_id, '1.361.0', 'orgs/'||org_id||'/apps/'||p_app_id||'/1.361.0.zip', NOW(), 'f', NULL, '9d4f798a', 'r2', org_id, 'Major version update with new features', 'https://github.com/Cap-go/capgo/releases/tag/v1.361.0', user_id),
@@ -909,8 +1021,8 @@ BEGIN
       (NOW(), p_app_id, '1.359.0', 'orgs/'||org_id||'/apps/'||p_app_id||'/1.359.0.zip', NOW(), 'f', NULL, '9f74e70a', 'r2', org_id, 'Stability improvements', 'https://github.com/Cap-go/capgo/releases/tag/v1.359.0', user_id)
     RETURNING id, name
   )
-  SELECT MAX(CASE WHEN name='builtin' THEN id END), MAX(CASE WHEN name='unknown' THEN id END), MAX(CASE WHEN name='1.0.1' THEN id END), MAX(CASE WHEN name='1.0.0' THEN id END), MAX(CASE WHEN name='1.361.0' THEN id END), MAX(CASE WHEN name='1.360.0' THEN id END), MAX(CASE WHEN name='1.359.0' THEN id END)
-  INTO builtin_version_id, unknown_version_id, v1_0_1_version_id, v1_0_0_version_id, v1_361_0_version_id, v1_360_0_version_id, v1_359_0_version_id FROM version_inserts;
+  SELECT MAX(CASE WHEN name='1.0.1' THEN id END), MAX(CASE WHEN name='1.0.0' THEN id END), MAX(CASE WHEN name='1.361.0' THEN id END), MAX(CASE WHEN name='1.360.0' THEN id END), MAX(CASE WHEN name='1.359.0' THEN id END)
+  INTO v1_0_1_version_id, v1_0_0_version_id, v1_361_0_version_id, v1_360_0_version_id, v1_359_0_version_id FROM version_inserts;
   WITH channel_inserts AS (
     INSERT INTO public.channels (created_at, name, app_id, version, updated_at, public, disable_auto_update_under_native, disable_auto_update, ios, android, electron, allow_device_self_set, allow_emulator, allow_device, allow_dev, allow_prod, created_by, owner_org)
     VALUES
@@ -930,7 +1042,7 @@ BEGIN
     (NOW() - interval '5 days', NOW() - interval '5 days', development_channel_id, p_app_id, v1_359_0_version_id, NOW() - interval '5 days', org_id, user_id),
     (NOW() - interval '3 days', NOW() - interval '3 days', no_access_channel_id, p_app_id, v1_361_0_version_id, NOW() - interval '3 days', org_id, user_id),
     (NOW() - interval '2 days', NOW() - interval '2 days', electron_only_channel_id, p_app_id, v1_360_0_version_id, NOW() - interval '2 days', org_id, user_id);
-  PERFORM builtin_version_id, unknown_version_id, v1_0_1_version_id, v1_360_0_version_id;
+  PERFORM v1_0_1_version_id, v1_360_0_version_id;
 END;
 $$;
 
@@ -1093,6 +1205,7 @@ BEGIN
       (public.rbac_perm_app_create_channel(), public.rbac_scope_app(), 'Create channels'),
       (public.rbac_perm_app_read_channels(), public.rbac_scope_app(), 'List/read channels'),
       (public.rbac_perm_app_read_logs(), public.rbac_scope_app(), 'Read app logs/metrics'),
+      ('app.manage_notifications', public.rbac_scope_app(), 'Manage notification campaigns, badge updates, recipient lookup, and delivery stats for an app'),
       (public.rbac_perm_app_manage_devices(), public.rbac_scope_app(), 'Manage devices at app scope'),
       (public.rbac_perm_app_read_devices(), public.rbac_scope_app(), 'Read devices at app scope'),
       (public.rbac_perm_app_build_native(), public.rbac_scope_app(), 'Trigger native builds'),
@@ -1120,6 +1233,7 @@ BEGIN
       public.rbac_perm_org_read_billing(), public.rbac_perm_org_update_billing(), public.rbac_perm_org_read_invoices(), public.rbac_perm_org_read_audit(), public.rbac_perm_org_read_billing_audit(),
       public.rbac_perm_app_read(), public.rbac_perm_app_update_settings(), public.rbac_perm_app_delete(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(),
       public.rbac_perm_app_create_channel(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_manage_devices(), public.rbac_perm_app_read_devices(),
+      'app.manage_notifications',
       public.rbac_perm_app_build_native(), public.rbac_perm_app_read_audit(), public.rbac_perm_app_update_user_roles(), public.rbac_perm_app_transfer(), public.rbac_perm_bundle_delete(),
       public.rbac_perm_channel_read(), public.rbac_perm_channel_update_settings(), public.rbac_perm_channel_delete(), public.rbac_perm_channel_read_history(),
       public.rbac_perm_channel_promote_bundle(), public.rbac_perm_channel_rollback_bundle(), public.rbac_perm_channel_manage_forced_devices(), public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
@@ -1135,6 +1249,7 @@ BEGIN
       public.rbac_perm_org_read_billing(), public.rbac_perm_org_read_invoices(), public.rbac_perm_org_read_audit(), public.rbac_perm_org_read_billing_audit(),
       public.rbac_perm_app_read(), public.rbac_perm_app_update_settings(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(),
       public.rbac_perm_app_create_channel(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_manage_devices(), public.rbac_perm_app_read_devices(),
+      'app.manage_notifications',
       public.rbac_perm_app_build_native(), public.rbac_perm_app_read_audit(), public.rbac_perm_app_update_user_roles(),
       public.rbac_perm_channel_read(), public.rbac_perm_channel_update_settings(), public.rbac_perm_channel_read_history(),
       public.rbac_perm_channel_promote_bundle(), public.rbac_perm_channel_rollback_bundle(), public.rbac_perm_channel_manage_forced_devices(), public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
@@ -1160,12 +1275,20 @@ BEGIN
     WHERE r.name = public.rbac_role_org_member()
     ON CONFLICT DO NOTHING;
 
+    -- apikey_org_reader: compatibility org metadata read without org-wide app access
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r
+    JOIN public.permissions p ON p.key = public.rbac_perm_org_read()
+    WHERE r.name = public.rbac_role_apikey_org_reader()
+    ON CONFLICT DO NOTHING;
+
     -- app_admin: full app control
     INSERT INTO public.role_permissions (role_id, permission_id)
     SELECT r.id, p.id FROM public.roles r
     JOIN public.permissions p ON p.key IN (
       public.rbac_perm_app_read(), public.rbac_perm_app_update_settings(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(),
       public.rbac_perm_app_create_channel(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_manage_devices(),
+      'app.manage_notifications',
       public.rbac_perm_app_read_devices(), public.rbac_perm_app_build_native(), public.rbac_perm_app_read_audit(), public.rbac_perm_app_update_user_roles(), public.rbac_perm_bundle_delete(),
       public.rbac_perm_channel_read(), public.rbac_perm_channel_update_settings(), public.rbac_perm_channel_delete(), public.rbac_perm_channel_read_history(),
       public.rbac_perm_channel_promote_bundle(), public.rbac_perm_channel_rollback_bundle(), public.rbac_perm_channel_manage_forced_devices(), public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
@@ -1178,11 +1301,19 @@ BEGIN
     SELECT r.id, p.id FROM public.roles r
     JOIN public.permissions p ON p.key IN (
       public.rbac_perm_app_read(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(),
+      'app.manage_notifications',
       public.rbac_perm_app_manage_devices(), public.rbac_perm_app_read_devices(), public.rbac_perm_app_build_native(), public.rbac_perm_app_read_audit(),
       public.rbac_perm_channel_read(), public.rbac_perm_channel_update_settings(), public.rbac_perm_channel_read_history(),
       public.rbac_perm_channel_promote_bundle(), public.rbac_perm_channel_rollback_bundle(), public.rbac_perm_channel_manage_forced_devices(), public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
     )
     WHERE r.name = public.rbac_role_app_developer()
+    ON CONFLICT DO NOTHING;
+
+    -- app_notifications: notification send, recipient lookup, badge, campaign, and stats access only
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r
+    JOIN public.permissions p ON p.key = 'app.manage_notifications'
+    WHERE r.name = 'app_notifications'
     ON CONFLICT DO NOTHING;
 
     -- app_uploader: upload only

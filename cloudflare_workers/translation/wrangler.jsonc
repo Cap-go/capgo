@@ -1,5 +1,5 @@
 {
-  "name": "capgo_translation",
+  "name": "capgo_translation_console",
   "logpush": true,
   "compatibility_date": "2026-04-21",
   "main": "./index.ts",
@@ -17,12 +17,12 @@
   "upload_source_maps": true,
   "env": {
     "prod": {
-      "name": "capgo_translation-prod",
+      "name": "capgo_translation_console-prod",
       "ai": {
         "binding": "AI"
       },
       "vars": {
-        "ENV_NAME": "capgo_translation-prod"
+        "ENV_NAME": "capgo_translation_console-prod"
       },
       "observability": {
         "enabled": true,
@@ -30,9 +30,9 @@
       },
       "d1_databases": [
         {
-          "binding": "DB_STOREAPPS",
-          "database_name": "capgo_prod_storeapps",
-          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+          "binding": "DB_TRANSLATIONS",
+          "database_name": "capgo_translation_console",
+          "database_id": "af3c37eb-e571-43d6-acca-57c14ba0b9d5"
         }
       ],
       "queues": {
@@ -64,21 +64,21 @@
       ]
     },
     "preprod": {
-      "name": "capgo_translation-preprod",
+      "name": "capgo_translation_console-preprod",
       "ai": {
         "binding": "AI"
       },
       "vars": {
-        "ENV_NAME": "capgo_translation-preprod"
+        "ENV_NAME": "capgo_translation_console-preprod"
       },
       "observability": {
         "enabled": true
       },
       "d1_databases": [
         {
-          "binding": "DB_STOREAPPS",
-          "database_name": "capgo_prod_storeapps",
-          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+          "binding": "DB_TRANSLATIONS",
+          "database_name": "capgo_translation_console",
+          "database_id": "af3c37eb-e571-43d6-acca-57c14ba0b9d5"
         }
       ],
       "queues": {
@@ -110,21 +110,21 @@
       ]
     },
     "alpha": {
-      "name": "capgo_translation-alpha",
+      "name": "capgo_translation_console-alpha",
       "ai": {
         "binding": "AI"
       },
       "vars": {
-        "ENV_NAME": "capgo_translation-alpha"
+        "ENV_NAME": "capgo_translation_console-alpha"
       },
       "observability": {
         "enabled": true
       },
       "d1_databases": [
         {
-          "binding": "DB_STOREAPPS",
-          "database_name": "capgo_prod_storeapps",
-          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+          "binding": "DB_TRANSLATIONS",
+          "database_name": "capgo_translation_console",
+          "database_id": "af3c37eb-e571-43d6-acca-57c14ba0b9d5"
         }
       ],
       "queues": {
@@ -156,18 +156,18 @@
       ]
     },
     "local": {
-      "name": "capgo_translation-local",
+      "name": "capgo_translation_console-local",
       "ai": {
         "binding": "AI"
       },
       "vars": {
-        "ENV_NAME": "capgo_translation-local"
+        "ENV_NAME": "capgo_translation_console-local"
       },
       "d1_databases": [
         {
-          "binding": "DB_STOREAPPS",
-          "database_name": "capgo_prod_storeapps",
-          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+          "binding": "DB_TRANSLATIONS",
+          "database_name": "capgo_translation_console",
+          "database_id": "af3c37eb-e571-43d6-acca-57c14ba0b9d5"
         }
       ],
       "queues": {

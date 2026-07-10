@@ -1,10 +1,11 @@
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
-import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
+import { and, eq, isNull, or, sql } from 'drizzle-orm'
 import { getClaimsFromJWT, honoFactory, quickError, simpleRateLimit } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
+import type { APIKeyRateLimitScope } from './rate_limit.ts'
 import { isAPIKeyRateLimited, isIPRateLimited, recordAPIKeyUsage, recordFailedAuth } from './rate_limit.ts'
 import { buildRateLimitInfo } from './rateLimitInfo.ts'
 import { checkKey, checkKeyById, supabaseAdmin } from './supabase.ts'
@@ -170,11 +171,9 @@ type FindApikeyByValueResult = {
   user_id: string
   key: string | null
   key_hash: string | null
-  mode: Database['public']['Enums']['key_mode'] | null
+  rbac_id: string
   updated_at: string | null
   name: string
-  limited_to_orgs: string[] | null
-  limited_to_apps: string[] | null
   expires_at: string | null
 } & Record<string, unknown>
 
@@ -200,12 +199,6 @@ async function checkKeyPg(
       return null
     }
 
-    // Check if mode is allowed (NULL mode = RBAC-managed, always passes mode check)
-    if (apiKey.mode !== null && !rights.includes(apiKey.mode)) {
-      cloudlog({ requestId: _c.get('requestId'), message: 'Invalid apikey mode (pg)', keyStringPrefix: keyString?.substring(0, 8), rights, mode: apiKey.mode })
-      return null
-    }
-
     // Check if key is expired
     if (apiKey.expires_at && new Date(apiKey.expires_at) < new Date()) {
       cloudlog({ requestId: _c.get('requestId'), message: 'Apikey expired (pg)', keyStringPrefix: keyString?.substring(0, 8) })
@@ -218,11 +211,10 @@ async function checkKeyPg(
       created_at: apiKey.created_at,
       user_id: apiKey.user_id,
       key: apiKey.key,
-      mode: apiKey.mode,
+      key_hash: apiKey.key_hash,
+      rbac_id: apiKey.rbac_id,
       updated_at: apiKey.updated_at,
       name: apiKey.name,
-      limited_to_orgs: apiKey.limited_to_orgs || [],
-      limited_to_apps: apiKey.limited_to_apps || [],
       expires_at: apiKey.expires_at,
     } as Database['public']['Tables']['apikeys']['Row']
   }
@@ -239,14 +231,13 @@ async function checkKeyPg(
 async function checkKeyByIdPg(
   _c: Context,
   id: number,
-  rights: Database['public']['Enums']['key_mode'][],
+  _rights: Database['public']['Enums']['key_mode'][],
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   expectedUserId?: string,
 ): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   try {
     const conditions = [
       eq(schema.apikeys.id, id),
-      or(isNull(schema.apikeys.mode), inArray(schema.apikeys.mode, rights)),
       notExpiredCondition,
     ]
     if (expectedUserId) {
@@ -272,11 +263,10 @@ async function checkKeyByIdPg(
       created_at: result.created_at?.toISOString() || null,
       user_id: result.user_id,
       key: result.key,
-      mode: result.mode,
+      key_hash: result.key_hash,
+      rbac_id: result.rbac_id,
       updated_at: result.updated_at?.toISOString() || null,
       name: result.name,
-      limited_to_orgs: result.limited_to_orgs || [],
-      limited_to_apps: result.limited_to_apps || [],
       expires_at: result.expires_at?.toISOString() || null,
     } as Database['public']['Tables']['apikeys']['Row']
   }
@@ -355,26 +345,99 @@ function setSubkeyAuthContext(c: Context, userId: string, subkey: Database['publ
 }
 
 /**
- * Returns true when a subkey explicitly limits access to zero apps and zero orgs.
- *
- * @param subkey - The row representing the subkey to evaluate.
- * @returns True when both app and org limit lists are empty.
- */
-function hasEmptySubkeyLimits(subkey: Database['public']['Tables']['apikeys']['Row']) {
-  const apps = subkey.limited_to_apps
-  const orgs = subkey.limited_to_orgs
-  return Array.isArray(apps) && apps.length === 0 && Array.isArray(orgs) && orgs.length === 0
-}
-
-/**
  * Ensures the subkey enforces at least one organization or application limit.
  *
  * @param c - Hono context used for logging.
  * @param subkey - The candidate subkey row.
  * @returns quickError response when invalid limits are detected, otherwise null.
  */
-function validateSubkeyLimits(c: Context, subkey: Database['public']['Tables']['apikeys']['Row']) {
-  if (hasEmptySubkeyLimits(subkey)) {
+async function hasLimitedRbacSubkeyScope(
+  c: Context,
+  subkey: Database['public']['Tables']['apikeys']['Row'],
+) {
+  if (!subkey.rbac_id)
+    return false
+
+  let pgClient: ReturnType<typeof getPgClient> | null = null
+  try {
+    pgClient = getPgClient(c)
+    const result = await pgClient.query<{ is_limited: boolean }>(
+      `
+      WITH user_orgs AS (
+        SELECT rb.org_id
+        FROM public.role_bindings rb
+        WHERE rb.principal_type = public.rbac_principal_user()
+          AND rb.principal_id = $1::uuid
+          AND rb.org_id IS NOT NULL
+          AND (rb.expires_at IS NULL OR rb.expires_at > now())
+
+        UNION
+
+        SELECT g.org_id
+        FROM public.group_members gm
+        INNER JOIN public.groups g ON g.id = gm.group_id
+        INNER JOIN public.role_bindings rb
+          ON rb.principal_type = public.rbac_principal_group()
+          AND rb.principal_id = gm.group_id
+          AND rb.org_id = g.org_id
+        WHERE gm.user_id = $1::uuid
+          AND rb.org_id IS NOT NULL
+          AND (rb.expires_at IS NULL OR rb.expires_at > now())
+      ),
+      active_bindings AS (
+        SELECT rb.scope_type, rb.org_id, r.name AS role_name
+        FROM public.role_bindings rb
+        INNER JOIN public.roles r ON r.id = rb.role_id
+        WHERE rb.principal_type = public.rbac_principal_apikey()
+          AND rb.principal_id = $2::uuid
+          AND (rb.expires_at IS NULL OR rb.expires_at > now())
+      )
+      SELECT (
+        EXISTS (SELECT 1 FROM active_bindings)
+        AND (
+          EXISTS (
+            SELECT 1
+            FROM active_bindings
+            WHERE scope_type <> public.rbac_scope_org()
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM user_orgs u
+            WHERE NOT EXISTS (
+              SELECT 1
+              FROM active_bindings b
+              WHERE b.scope_type = public.rbac_scope_org()
+                AND b.org_id = u.org_id
+                AND b.role_name IN (public.rbac_role_org_super_admin(), public.rbac_role_org_admin())
+            )
+          )
+          OR NOT EXISTS (
+            SELECT 1
+            FROM active_bindings b
+            WHERE b.scope_type = public.rbac_scope_org()
+              AND b.role_name IN (public.rbac_role_org_super_admin(), public.rbac_role_org_admin())
+          )
+        )
+      ) AS is_limited
+      `,
+      [subkey.user_id, subkey.rbac_id],
+    )
+
+    return result.rows[0]?.is_limited === true
+  }
+  catch (error) {
+    logPgError(c, 'hasLimitedRbacSubkeyScope', error)
+    return false
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
+  }
+}
+
+async function validateSubkeyLimits(c: Context, subkey: Database['public']['Tables']['apikeys']['Row']) {
+  if (!(await hasLimitedRbacSubkeyScope(c, subkey))) {
     cloudlog({
       requestId: c.get('requestId'),
       message: 'Invalid subkey, no limited apps or orgs',
@@ -457,6 +520,7 @@ async function resolveApiKey(
   key: string,
   rights: Database['public']['Enums']['key_mode'][],
   usePostgres: boolean,
+  readOnly = true,
 ) {
   if (!usePostgres) {
     return checkKey(c, key, supabaseAdmin(c), rights)
@@ -464,7 +528,7 @@ async function resolveApiKey(
 
   let pgClient: ReturnType<typeof getPgClient> | null = null
   try {
-    pgClient = getPgClient(c, true)
+    pgClient = getPgClient(c, readOnly)
     const drizzleClient = getDrizzleClient(pgClient)
     return await checkKeyPg(c, key, rights, drizzleClient)
   }
@@ -481,6 +545,7 @@ async function resolveSubkey(
   rights: Database['public']['Enums']['key_mode'][],
   usePostgres: boolean,
   expectedUserId?: string,
+  readOnly = true,
 ) {
   if (!usePostgres) {
     return checkKeyById(c, subkeyId, supabaseAdmin(c), rights, expectedUserId)
@@ -488,7 +553,7 @@ async function resolveSubkey(
 
   let subkeyPgClient: ReturnType<typeof getPgClient> | null = null
   try {
-    subkeyPgClient = getPgClient(c, true)
+    subkeyPgClient = getPgClient(c, readOnly)
     const drizzleClient = getDrizzleClient(subkeyPgClient)
     return await checkKeyByIdPg(c, subkeyId, rights, drizzleClient, expectedUserId)
   }
@@ -548,7 +613,7 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
     if (userError) {
       return userError
     }
-    const limitError = validateSubkeyLimits(c, subkey)
+    const limitError = await validateSubkeyLimits(c, subkey)
     if (limitError) {
       return limitError
     }
@@ -613,8 +678,10 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
  *
  * @param rights - Required key modes for the route.
  * @param usePostgres - When true, performs key lookups via Postgres instead of Supabase client.
+ * @param readOnly - When using Postgres, choose replica-safe read-only connections by default; latency-sensitive write flows can force primary auth.
+ * @param rateLimitScope - Selects the API-key rate-limit bucket for this route.
  */
-export function middlewareKey(rights: Database['public']['Enums']['key_mode'][], usePostgres = false) {
+export function middlewareKey(rights: Database['public']['Enums']['key_mode'][], usePostgres = false, readOnly = true, rateLimitScope: APIKeyRateLimitScope = 'default') {
   const subMiddlewareKey = honoFactory.createMiddleware(async (c, next) => {
     // Check if IP is rate limited due to failed auth attempts
     const ipRateLimited = await isIPRateLimited(c)
@@ -642,7 +709,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
       return quickError(401, 'no_key_provided', 'No key provided')
     }
 
-    const apikey = await resolveApiKey(c, key, rights, usePostgres)
+    const apikey = await resolveApiKey(c, key, rights, usePostgres, readOnly)
 
     if (!apikey) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', keyPrefix: maskSecret(key), method: c.req.method, url: c.req.url })
@@ -652,19 +719,20 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
     }
 
     // Record API usage first, then check if rate limited
-    await recordAPIKeyUsage(c, apikey.id)
+    await recordAPIKeyUsage(c, apikey.id, rateLimitScope)
 
     // Check if API key is rate limited after recording usage
-    const apiKeyRateLimited = await isAPIKeyRateLimited(c, apikey.id)
+    const apiKeyRateLimited = await isAPIKeyRateLimited(c, apikey.id, rateLimitScope)
     if (apiKeyRateLimited.limited) {
-      return simpleRateLimit({ reason: 'api_key_rate_limit_exceeded', apikey_id: apikey.id, ...buildRateLimitInfo(apiKeyRateLimited.resetAt) })
+      const reason = rateLimitScope === 'upload' ? 'api_key_upload_rate_limit_exceeded' : 'api_key_rate_limit_exceeded'
+      return simpleRateLimit({ reason, apikey_id: apikey.id, ...buildRateLimitInfo(apiKeyRateLimited.resetAt) })
     }
 
     // Set auth context for RBAC (can be overridden by subkey below)
     setApiKeyAuthContext(c, apikey, key)
 
     if (subkey_id !== null) {
-      const subkey = await resolveSubkey(c, subkey_id, rights, usePostgres, apikey.user_id)
+      const subkey = await resolveSubkey(c, subkey_id, rights, usePostgres, apikey.user_id, readOnly)
 
       if (!subkey) {
         cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
@@ -674,7 +742,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
       if (userError) {
         return userError
       }
-      const limitError = validateSubkeyLimits(c, subkey)
+      const limitError = await validateSubkeyLimits(c, subkey)
       if (limitError) {
         return limitError
       }
