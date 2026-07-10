@@ -100,7 +100,7 @@ READ_REPLICA_PASSWORD='new-password' bash read_replicate/update_readreplica_pass
   by release CI to sync missing additive schema changes and compare the committed
   schema against the live read replica through Hyperdrive.
 - Production Supabase deploys run `bun run readreplicate:check-hyperdrive-schema`
-  before migrations, functions, or workers publish. The check first applies safe
-  missing columns and indexes on the Google subscriber, reindexes invalid
-  same-name indexes left by interrupted concurrent builds, then fails if any
-  unsupported drift remains.
+  before migrations, functions, or workers publish. Each check deploys a uniquely
+  named, token-protected Worker, applies safe missing columns and indexes on the
+  Google subscriber, verifies the live catalog, and deletes the Worker before
+  exiting. Concurrent CI runs therefore never share or replace a checker Worker.
