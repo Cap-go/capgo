@@ -1427,6 +1427,8 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | **--output-record** | <code>string</code> | After a successful build, write a JSON record (jobId, status, outputUrl, qrCodeAscii, qrCodePngPath, finishedAt) to <path>. A PNG QR code is also written next to it as <path>.qr.png. Read fields back with `build last-output`. |
 | **--skip-build-number-bump** | <code>boolean</code> | Skip automatic build number/version code incrementing. Uses whatever version is already in the project files. |
 | **--no-skip-build-number-bump** | <code>boolean</code> | Override saved credentials to re-enable automatic build number incrementing for this build only. |
+| **--skip-marketing-version-bump** | <code>boolean</code> | Skip automatic marketing version (CFBundleShortVersionString / versionName) bump when the app is already released. |
+| **--no-skip-marketing-version-bump** | <code>boolean</code> | Override saved credentials to re-enable automatic marketing version bump for this build only. |
 | **--sync-ios-version** | <code>boolean</code> | iOS: sync Xcode MARKETING_VERSION from package.json before uploading the project. |
 | **--ai-analytics** | <code>boolean</code> | On build failure, send logs to Capgo AI for diagnosis. In interactive terminals this skips the upfront confirmation; in CI this auto-uploads and prints the analysis to stderr. |
 | **--no-prescan** | <code>boolean</code> | Skip the automatic pre-build scan |
@@ -1619,6 +1621,8 @@ iOS Example:
 | **--output-retention** | <code>string</code> | Output link TTL: 1h to 7d (default: 1h). Examples: 1h, 6h, 2d |
 | **--skip-build-number-bump** | <code>boolean</code> | Skip automatic build number/version code incrementing on future builds |
 | **--no-skip-build-number-bump** | <code>boolean</code> | Re-enable automatic build number incrementing (default behavior) |
+| **--skip-marketing-version-bump** | <code>boolean</code> | Skip automatic marketing version bump on future builds when the app is already released |
+| **--no-skip-marketing-version-bump** | <code>boolean</code> | Re-enable automatic marketing version bump (default behavior) |
 
 #### <a id="build-credentials-list"></a> 📋 **List**
 
@@ -1705,6 +1709,8 @@ Examples:
 | **--output-retention** | <code>string</code> | Output link TTL: 1h to 7d. Examples: 1h, 6h, 2d |
 | **--skip-build-number-bump** | <code>boolean</code> | Skip automatic build number/version code incrementing on future builds |
 | **--no-skip-build-number-bump** | <code>boolean</code> | Re-enable automatic build number incrementing (default behavior) |
+| **--skip-marketing-version-bump** | <code>boolean</code> | Skip automatic marketing version bump on future builds when the app is already released |
+| **--no-skip-marketing-version-bump** | <code>boolean</code> | Re-enable automatic marketing version bump (default behavior) |
 
 #### <a id="build-credentials-manage"></a> 🔹 **Manage**
 
