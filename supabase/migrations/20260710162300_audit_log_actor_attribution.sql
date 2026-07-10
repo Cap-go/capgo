@@ -321,6 +321,11 @@ LANGUAGE "plpgsql"
 SECURITY DEFINER
 SET search_path = ''
 AS $$
+  -- Organization deletion cascades to webhooks in the same transaction. Do not
+  -- enqueue an event that the asynchronous dispatcher can no longer deliver.
+  IF NEW.table_name = 'orgs' AND NEW.operation = 'DELETE' THEN
+    RETURN NEW;
+  END IF;
 BEGIN
   -- Queue the audit log event for webhook dispatch
   PERFORM pgmq.send(
