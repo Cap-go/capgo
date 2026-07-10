@@ -534,12 +534,18 @@ jobs:
         run: bun install
       - name: Disable flaky runner apt sources
         run: sudo rm -f /etc/apt/sources.list.d/azure-cli.list /etc/apt/sources.list.d/azure-cli.sources /etc/apt/sources.list.d/microsoft-prod.list /etc/apt/sources.list.d/microsoft-prod.sources
+      - id: playwright_version
+        name: Resolve Playwright version
+        run: echo "version=$(bun -e "console.log(require('@playwright/test/package.json').version)")" >> "$GITHUB_OUTPUT"
+      # Key on the Playwright version, not the lockfile: bun.lock churns on every
+      # release bump, which made this cache miss (and re-download ~50s of browsers)
+      # on nearly every run. Browsers only change when the Playwright version does.
       - name: Cache Playwright browsers
         id: playwright_browser_cache
         uses: actions/cache@v5 # v5
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          key: playwright-browsers-${{ runner.os }}-${{ steps.playwright_version.outputs.version }}
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v2 # v2.0.0
         with:
