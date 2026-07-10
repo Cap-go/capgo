@@ -18,15 +18,17 @@ export async function handleBundleUploadCommand(appId: string, options: OptionsU
   if (options.qrPreview && result?.bundle && result.reason !== 'DRY_UPLOAD' && !result.builderAction)
     await getPreviewQr(resolvedAppId, undefined, buildBundleUploadPreviewQrOptions(options, result.bundle))
 
-  if (options.sendUpdateNotification && result?.success && result.reason !== 'DRY_UPLOAD' && !result.builderAction) {
-    await sendUpdateNotificationsForChannels({
-      appId: resolvedAppId,
-      apikey: options.apikey,
-      channels: result.updatedChannels,
-      verbose: options.verbose,
-    })
+  if (options.sendUpdateNotification && result?.success && !result.skipped && result.updatedChannels?.length && !result.builderAction) {
+    try {
+      await sendUpdateNotificationsForChannels({
+        appId: resolvedAppId,
+        apikey: options.apikey,
+        channels: result.updatedChannels,
+        verbose: options.verbose,
+      })
+    }
+    catch {}
   }
-
   if (!result?.builderAction)
     return
 
