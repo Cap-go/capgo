@@ -3,6 +3,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { CacheHelper } from '../../utils/cache.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlogErr } from '../../utils/logging.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 // Proxy for the CLI's "Email Capgo support" logs upload — forwards gzipped text
@@ -29,6 +30,24 @@ interface RateWindow {
   resetAt: number
 }
 
+export type SupportLogPlatform = 'ios' | 'android'
+
+export interface SupportLogsBody {
+  appId?: string
+  jobId?: string
+  platform?: SupportLogPlatform
+  gzB64: string
+}
+
+function parseSupportLogPlatform(platform: unknown): SupportLogPlatform | undefined {
+  if (typeof platform !== 'string')
+    return undefined
+  const normalized = platform.trim().toLowerCase()
+  if (normalized === 'ios' || normalized === 'android')
+    return normalized
+  return undefined
+}
+
 // Returns false when the window is exhausted. Fails open on cache errors,
 // matching the behavior of the rest of utils/rate_limit.ts.
 async function bumpWindow(c: Context, path: string, userId: string, limit: number, ttlSeconds: number): Promise<boolean> {
@@ -49,10 +68,58 @@ async function bumpWindow(c: Context, path: string, userId: string, limit: numbe
   }
 }
 
+async function getSupportUploadEmail(c: Context, userId: string): Promise<string | undefined> {
+  const { data, error } = await supabaseAdmin(c)
+    .from('users')
+    .select('email')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'support-logs user email lookup failed', userId, error })
+    return undefined
+  }
+
+  return data?.email?.trim() || undefined
+}
+
+async function getSupportUploadPlatform(c: Context, body: SupportLogsBody, userId: string): Promise<SupportLogPlatform | undefined> {
+  const requestPlatform = parseSupportLogPlatform(body.platform)
+  if (requestPlatform)
+    return requestPlatform
+  if (!body.jobId)
+    return undefined
+
+  const buildRequestQuery = supabaseAdmin(c)
+    .from('build_requests')
+    .select('platform')
+    .eq('builder_job_id', body.jobId)
+    .eq('requested_by', userId)
+
+  if (body.appId)
+    buildRequestQuery.eq('app_id', body.appId)
+
+  const { data, error } = await buildRequestQuery.maybeSingle()
+
+  if (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'support-logs platform lookup failed',
+      jobId: body.jobId,
+      appId: body.appId,
+      userId,
+      error,
+    })
+    return undefined
+  }
+
+  return parseSupportLogPlatform(data?.platform)
+}
+
 export async function uploadSupportLogs(
   c: Context,
   apikey: Database['public']['Tables']['apikeys']['Row'],
-  body: { appId?: string, jobId?: string, gzB64: string },
+  body: SupportLogsBody,
 ): Promise<Response> {
   // Deliberately NO app-ownership permission check: onboarding failures can
   // reference apps that were never registered, and these are the caller's own
@@ -71,6 +138,11 @@ export async function uploadSupportLogs(
   if (!builderUrl || !builderApiKey)
     throw simpleError('config_error', 'Builder service not configured')
 
+  const [email, platform] = await Promise.all([
+    getSupportUploadEmail(c, userId),
+    getSupportUploadPlatform(c, body, userId),
+  ])
+
   let builderResp: Response
   try {
     builderResp = await fetch(`${builderUrl}/support-logs`, {
@@ -79,7 +151,7 @@ export async function uploadSupportLogs(
         'x-api-key': builderApiKey,
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ gzB64: body.gzB64, appId: body.appId, jobId: body.jobId, userId }),
+      body: JSON.stringify({ gzB64: body.gzB64, appId: body.appId, jobId: body.jobId, userId, email, platform }),
       signal: AbortSignal.timeout(60_000),
     })
   }

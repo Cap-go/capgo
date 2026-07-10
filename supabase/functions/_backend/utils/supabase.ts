@@ -2,14 +2,16 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
-import type { DeviceWithoutCreatedAt, NativeVersionUsage, Order, ReadDevicesParams, ReadStatsParams, StatsMetadata, VersionUsage } from './types.ts'
+import type { DeviceWithoutCreatedAt, NativeVersionUsage, Order, ReadDevicesParams, ReadStatsInsightsParams, ReadStatsParams, StatsInsightsResult, StatsMetadata, VersionUsage, VersionUsageChannel } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
+import { type BillingPlanBentoState, buildBillingPlanBentoTags } from './billing_bento_tags.ts'
 import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged, nullableString } from './deviceComparison.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { closeClient, getPgClient } from './pg.ts'
 import { createCustomer } from './stripe.ts'
 import { Constants } from './supabase.types.ts'
+import { emptyStatsInsights, normalizeStatsInsightsResult } from './statsInsights.ts'
 import { getEnv, isStripeConfigured } from './utils.ts'
 
 const DEFAULT_LIMIT = 1000
@@ -1046,6 +1048,7 @@ export async function customerToSegmentOrg(
   orgId: string,
   price_id?: string | null,
   plan?: Database['public']['Tables']['plans']['Row'] | null,
+  trialPlanNamesToRemove?: readonly string[] | null,
 ): Promise<{ segments: string[], deleteSegments: string[] }> {
   const segmentsObj = {
     capgo: true,
@@ -1056,7 +1059,6 @@ export async function customerToSegmentOrg(
     trial0: false,
     paying: false,
     payingMonthly: plan?.price_m_id === price_id,
-    plan: plan?.name ?? '',
     overuse: false,
     canceled: await isCanceledOrg(c, orgId),
     issueSegment: false,
@@ -1065,9 +1067,23 @@ export async function customerToSegmentOrg(
   const trialDaysLeft = await isTrialOrg(c, orgId)
   const paying = await isPayingOrg(c, orgId)
   const canUseMore = await isGoodPlanOrg(c, orgId)
+  let billingPlanState: BillingPlanBentoState = 'none'
+  if (paying)
+    billingPlanState = 'paying'
+  else if (trialDaysLeft > 0)
+    billingPlanState = 'trial'
+  const planTags = buildBillingPlanBentoTags(
+    plan?.name,
+    billingPlanState,
+    trialPlanNamesToRemove,
+  )
 
   if (!segmentsObj.onboarded) {
-    return processSegments(segmentsObj)
+    const segments = processSegments(segmentsObj)
+    return {
+      segments: [...segments.segments, ...planTags.segments],
+      deleteSegments: [...segments.deleteSegments, ...planTags.deleteSegments],
+    }
   }
 
   if (!paying && trialDaysLeft > 1 && trialDaysLeft <= 7) {
@@ -1093,7 +1109,11 @@ export async function customerToSegmentOrg(
     segmentsObj.issueSegment = true
   }
 
-  return processSegments(segmentsObj)
+  const segments = processSegments(segmentsObj)
+  return {
+    segments: [...segments.segments, ...planTags.segments],
+    deleteSegments: [...segments.deleteSegments, ...planTags.deleteSegments],
+  }
 }
 
 function processSegments(segmentsObj: any): { segments: string[], deleteSegments: string[] } {
@@ -1162,8 +1182,10 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
       customer_id: customer.id,
       trial_at: trial_at.toISOString(),
     })
-  if (createInfoError)
+  if (createInfoError) {
     cloudlog({ requestId: c.get('requestId'), message: 'createInfoError', createInfoError })
+    return null
+  }
 
   const { error: updateUserError } = await supabaseAdmin(c)
     .from('orgs')
@@ -1171,9 +1193,12 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
       customer_id: customer.id,
     })
     .eq('id', org.id)
-  if (updateUserError)
+  if (updateUserError) {
     cloudlog({ requestId: c.get('requestId'), message: 'updateUserError', updateUserError })
+    return null
+  }
   cloudlog({ requestId: c.get('requestId'), message: 'stripe_info done' })
+  return selectedPlan.name
 }
 
 export async function finalizePendingStripeCustomer(c: Context, org: Database['public']['Tables']['orgs']['Row']) {
@@ -1183,7 +1208,7 @@ export async function finalizePendingStripeCustomer(c: Context, org: Database['p
     return
   }
 
-  await createStripeCustomer(c, org)
+  const trialPlanName = await createStripeCustomer(c, org)
 
   const { data: updatedOrg } = await supabaseAdmin(c)
     .from('orgs')
@@ -1202,6 +1227,8 @@ export async function finalizePendingStripeCustomer(c: Context, org: Database['p
     .eq('customer_id', pendingCustomerId)
   if (deleteError)
     cloudlogErr({ requestId: c.get('requestId'), message: 'finalizePendingStripeCustomer: orphan pending stripe_info', deleteError })
+
+  return trialPlanName
 }
 
 export function trackBandwidthUsageSB(
@@ -1226,8 +1253,10 @@ export function trackVersionUsageSB(
   versionName: string,
   appId: string,
   action: Database['public']['Enums']['version_action'],
+  channel?: VersionUsageChannel | string | null,
 ) {
-  // Type cast needed: version_usage table now has version_name but auto-generated types are stale
+  const channelName = typeof channel === 'string' ? channel : channel?.name
+  const channelId = typeof channel === 'object' && channel ? channel.id : null
   return supabaseAdmin(c)
     .from('version_usage')
     .insert([
@@ -1235,7 +1264,9 @@ export function trackVersionUsageSB(
         version_name: versionName,
         app_id: appId,
         action,
-      } as unknown as { version_id: number, app_id: string, action: typeof action },
+        channel_name: channelName ?? null,
+        channel_id: channelId ?? null,
+      },
     ])
 }
 
@@ -1282,7 +1313,7 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
 
   const { data: existingRow, error } = await client
     .from('devices')
-    .select('version_name, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator, default_channel, key_id')
+    .select('version_name, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator, install_source, default_channel, key_id, country_code')
     .eq('app_id', device.app_id)
     .eq('device_id', device.device_id)
     .maybeSingle()
@@ -1295,8 +1326,13 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
   // This avoids accidental clearing, and lets higher-level callers strip custom_id
   // (e.g., when an app disables device self-setting) without overwriting owner-set values.
   const requestedCustomId = nullableString(device.custom_id)
-  const deviceForWrite: DeviceWithoutCreatedAt = requestedCustomId === null && existingRow
-    ? { ...device, custom_id: existingRow.custom_id ?? '' }
+  const requestedInstallSource = nullableString(device.install_source)
+  const deviceForWrite: DeviceWithoutCreatedAt = existingRow
+    ? {
+        ...device,
+        ...(requestedCustomId === null ? { custom_id: existingRow.custom_id ?? '' } : {}),
+        ...(requestedInstallSource === null ? { install_source: existingRow.install_source ?? undefined } : {}),
+      }
     : device
 
   if (existingRow && !hasComparableDeviceChanged(existingRow, deviceForWrite)) {
@@ -1320,8 +1356,10 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
     version_name: normalizedDevice.version_name ?? deviceForWrite.version_name,
     is_prod: normalizedDevice.is_prod,
     is_emulator: normalizedDevice.is_emulator,
+    ...(requestedInstallSource === null ? {} : { install_source: normalizedDevice.install_source ?? undefined }),
     default_channel: device.default_channel ?? null,
     key_id: normalizedDevice.key_id ?? undefined,
+    country_code: normalizedDevice.country_code ?? undefined,
   } as Database['public']['Tables']['devices']['Insert']
 
   return client
@@ -1362,9 +1400,18 @@ export async function readStatsStorageSB(c: Context, app_id: string, period_star
   return data ?? []
 }
 
-export async function readStatsVersionSB(c: Context, app_id: string, period_start: string, period_end: string): Promise<VersionUsage[]> {
+export async function readStatsVersionSB(c: Context, app_id: string, period_start: string, period_end: string, channel?: VersionUsageChannel | string): Promise<VersionUsage[]> {
+  const channelId = typeof channel === 'object' && channel ? channel.id : null
+  const channelName = typeof channel === 'string' ? channel : channelId ? null : channel?.name
+  const args = {
+    p_app_id: app_id,
+    p_period_start: period_start,
+    p_period_end: period_end,
+    ...(channelName ? { p_channel_name: channelName } : {}),
+    ...(channelId ? { p_channel_id: channelId } : {}),
+  }
   const { data } = await supabaseAdmin(c)
-    .rpc('read_version_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
+    .rpc('read_version_usage', args)
   // Cast to VersionUsage[] - the SQL function returns version_name but auto-generated types are stale
   return (data ?? []) as unknown as VersionUsage[]
 }
@@ -1471,6 +1518,120 @@ export async function readStatsSB(c: Context, params: ReadStatsParams) {
   return data ?? []
 }
 
+export async function readStatsInsightsSB(c: Context, params: ReadStatsInsightsParams): Promise<StatsInsightsResult> {
+  const pgClient = getPgClient(c)
+  const actionValues = params.actions?.length ? params.actions : []
+  const actionFilter = actionValues.length > 0 ? 'AND action = ANY($4::public.stats_action[])' : ''
+  const values = actionValues.length > 0
+    ? [params.app_id, params.start_date, params.end_date, actionValues]
+    : [params.app_id, params.start_date, params.end_date]
+
+  try {
+    const summaryQuery = `
+      SELECT
+        COUNT(*)::text AS total,
+        COUNT(DISTINCT device_id)::text AS device_count,
+        COUNT(DISTINCT action)::text AS action_count
+      FROM public.stats
+      WHERE app_id = $1
+        AND created_at >= $2::timestamptz
+        AND created_at < $3::timestamptz
+        ${actionFilter}
+    `
+
+    const actionsQuery = `
+      SELECT
+        action::text AS action,
+        COUNT(*)::text AS total,
+        COUNT(DISTINCT device_id)::text AS device_count,
+        COUNT(DISTINCT version_name)::text AS version_count,
+        MIN(created_at)::text AS first_seen,
+        MAX(created_at)::text AS last_seen,
+        COALESCE((ARRAY_AGG(version_name ORDER BY created_at DESC))[1], 'unknown') AS latest_version_name,
+        COALESCE((ARRAY_AGG(device_id ORDER BY created_at DESC))[1], '') AS latest_device_id
+      FROM public.stats
+      WHERE app_id = $1
+        AND created_at >= $2::timestamptz
+        AND created_at < $3::timestamptz
+        ${actionFilter}
+      GROUP BY action
+      ORDER BY COUNT(*) DESC
+      LIMIT 20
+    `
+
+    const dailyQuery = `
+      SELECT
+        TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date,
+        action::text AS action,
+        COUNT(*)::text AS total
+      FROM public.stats
+      WHERE app_id = $1
+        AND created_at >= $2::timestamptz
+        AND created_at < $3::timestamptz
+        ${actionFilter}
+      GROUP BY 1, 2
+      ORDER BY 1 ASC, COUNT(*) DESC
+    `
+
+    const versionsQuery = `
+      SELECT
+        action::text AS action,
+        COALESCE(NULLIF(version_name, ''), 'unknown') AS version_name,
+        COUNT(*)::text AS total,
+        COUNT(DISTINCT device_id)::text AS device_count,
+        MAX(created_at)::text AS last_seen
+      FROM public.stats
+      WHERE app_id = $1
+        AND created_at >= $2::timestamptz
+        AND created_at < $3::timestamptz
+        ${actionFilter}
+      GROUP BY action, COALESCE(NULLIF(version_name, ''), 'unknown')
+      ORDER BY COUNT(*) DESC
+      LIMIT 30
+    `
+
+    const devicesQuery = `
+      SELECT
+        action::text AS action,
+        device_id,
+        COUNT(*)::text AS total,
+        COALESCE((ARRAY_AGG(version_name ORDER BY created_at DESC))[1], 'unknown') AS version_name,
+        MAX(created_at)::text AS last_seen
+      FROM public.stats
+      WHERE app_id = $1
+        AND created_at >= $2::timestamptz
+        AND created_at < $3::timestamptz
+        ${actionFilter}
+      GROUP BY action, device_id
+      ORDER BY COUNT(*) DESC
+      LIMIT 30
+    `
+
+    const [summaryResult, actionsResult, dailyResult, versionsResult, devicesResult] = await Promise.all([
+      pgClient.query(summaryQuery, values),
+      pgClient.query(actionsQuery, values),
+      pgClient.query(dailyQuery, values),
+      pgClient.query(versionsQuery, values),
+      pgClient.query(devicesQuery, values),
+    ])
+
+    return normalizeStatsInsightsResult({
+      summary: summaryResult.rows[0],
+      actions: actionsResult.rows,
+      daily: dailyResult.rows,
+      versions: versionsResult.rows,
+      devices: devicesResult.rows,
+    })
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading stats insights from Supabase', error })
+    return emptyStatsInsights()
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
+}
+
 /**
  * Query the devices table for an app with search, cursor pagination, and ordering helpers applied.
  */
@@ -1511,6 +1672,9 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
   if (params.version_name)
     query = query.eq('version_name', params.version_name)
 
+  if (params.installSources?.length)
+    query = query.in('install_source', params.installSources)
+
   const devicesOrder = getDevicesOrder(params.order)
 
   if (params.cursor) {
@@ -1541,6 +1705,32 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
   }
 
   return data ?? []
+}
+
+export async function countInstallSourcesSB(c: Context, app_id: string): Promise<Record<string, number>> {
+  const pgClient = await getPgClient(c)
+  try {
+    const result = await pgClient.query<{ install_source: string, total: string }>(`
+      SELECT install_source, COUNT(*)::text AS total
+      FROM public.devices
+      WHERE app_id = $1
+        AND install_source IS NOT NULL
+        AND install_source != ''
+      GROUP BY install_source
+    `, [app_id])
+
+    return result.rows.reduce<Record<string, number>>((acc, row) => {
+      acc[row.install_source] = Number(row.total)
+      return acc
+    }, {})
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error counting install sources', error })
+    return {}
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
 }
 
 /**

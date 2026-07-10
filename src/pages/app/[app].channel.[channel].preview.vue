@@ -54,7 +54,7 @@ async function getChannel() {
         id,
         app_id,
         name,
-        version (
+        version:app_versions!channels_version_fkey(
           id,
           name,
           manifest_count,

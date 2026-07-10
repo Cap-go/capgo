@@ -315,7 +315,18 @@ CREATE TYPE "public"."stats_action" AS ENUM (
     'webview_render_process_gone',
     'webview_content_process_terminated',
     'os_version_changed',
-    'native_app_version_changed'
+    'native_app_version_changed',
+    'finish_download_fail',
+    'checksum_required',
+    'manifest_path_fail',
+    'rate_limit_reached',
+    'set_next',
+    'insufficient_disk_space',
+    'app_launch_start',
+    'app_launch_ready',
+    'app_launch_timeout',
+    'webview_dom_content_loaded',
+    'webview_page_loaded'
 );
 
 
@@ -3858,25 +3869,26 @@ CREATE OR REPLACE FUNCTION "public"."delete_old_deleted_versions"() RETURNS "voi
 DECLARE
   deleted_count bigint;
 BEGIN
-  DELETE FROM "public"."app_versions"
-  WHERE "app_versions"."deleted" = true
-    AND "app_versions"."deleted_at" IS NOT NULL
-    AND "app_versions"."deleted_at" <= pg_catalog.now() - INTERVAL '90 days'
-    AND "app_versions"."name" NOT IN ('builtin', 'unknown')
-    AND "app_versions"."manifest_count" = 0
+  DELETE FROM public.app_versions AS av
+  WHERE av.deleted = true
+    AND av.deleted_at IS NOT NULL
+    AND av.deleted_at <= pg_catalog.now() - INTERVAL '90 days'
+    AND av.name NOT IN ('builtin', 'unknown')
+    AND av.manifest_count = 0
     AND (
-      "app_versions"."r2_path" IS NULL
+      av.r2_path IS NULL
       OR EXISTS (
         SELECT 1
-        FROM "public"."app_versions_meta"
-        WHERE "app_versions_meta"."id" = "app_versions"."id"
-          AND "app_versions_meta"."size" = 0
+        FROM public.app_versions_meta AS avm
+        WHERE avm.id = av.id
+          AND avm.size = 0
       )
     )
     AND NOT EXISTS (
       SELECT 1
-      FROM "public"."channels"
-      WHERE "channels"."version" = "app_versions"."id"
+      FROM public.channels AS c
+      WHERE c.app_id = av.app_id
+        AND (c.version = av.id OR c.rollout_version = av.id)
     );
 
   GET DIAGNOSTICS deleted_count = ROW_COUNT;
@@ -4887,6 +4899,9 @@ CREATE TABLE IF NOT EXISTS "public"."apps" (
     "stats_refresh_requested_at" timestamp without time zone,
     "build_timeout_seconds" bigint DEFAULT 900 NOT NULL,
     "build_timeout_updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "block_provider_infra_requests" boolean DEFAULT true NOT NULL,
+    "rollout_channel_count" bigint DEFAULT 0 NOT NULL,
+    "rollout_paused_version_names" character varying[] DEFAULT '{}'::character varying[] NOT NULL,
     CONSTRAINT "apps_build_timeout_seconds_check" CHECK ((("build_timeout_seconds" >= 300) AND ("build_timeout_seconds" <= 21600)))
 );
 
@@ -4933,6 +4948,10 @@ COMMENT ON COLUMN "public"."apps"."build_timeout_seconds" IS 'Maximum native clo
 
 
 COMMENT ON COLUMN "public"."apps"."build_timeout_updated_at" IS 'Timestamp when the native cloud build timeout setting last changed.';
+
+
+
+COMMENT ON COLUMN "public"."apps"."block_provider_infra_requests" IS 'When true, /updates, /stats, and /channel_self block known Google/Apple infrastructure IPs. Existing apps default to false; newly created apps default to true.';
 
 
 
@@ -6176,7 +6195,7 @@ $$;
 ALTER FUNCTION "public"."get_org_apikeys"("p_org_id" "uuid") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."get_org_apps_with_last_upload"("p_org_id" "uuid", "p_search" "text" DEFAULT NULL::"text", "p_sort_by" "text" DEFAULT 'last_upload_at'::"text", "p_sort_desc" boolean DEFAULT true, "p_limit" integer DEFAULT 10, "p_offset" integer DEFAULT 0) RETURNS TABLE("created_at" timestamp with time zone, "app_id" character varying, "icon_url" character varying, "user_id" "uuid", "name" character varying, "last_version" character varying, "updated_at" timestamp with time zone, "id" "uuid", "retention" bigint, "owner_org" "uuid", "default_upload_channel" character varying, "transfer_history" "jsonb"[], "channel_device_count" bigint, "manifest_bundle_count" bigint, "expose_metadata" boolean, "allow_preview" boolean, "allow_device_custom_id" boolean, "need_onboarding" boolean, "existing_app" boolean, "ios_store_url" "text", "android_store_url" "text", "stats_updated_at" timestamp without time zone, "stats_refresh_requested_at" timestamp without time zone, "build_timeout_seconds" bigint, "build_timeout_updated_at" timestamp with time zone, "last_upload_at" timestamp with time zone, "total_count" bigint)
+CREATE OR REPLACE FUNCTION "public"."get_org_apps_with_last_upload"("p_org_id" "uuid", "p_search" "text" DEFAULT NULL::"text", "p_sort_by" "text" DEFAULT 'last_upload_at'::"text", "p_sort_desc" boolean DEFAULT true, "p_limit" integer DEFAULT 10, "p_offset" integer DEFAULT 0) RETURNS TABLE("created_at" timestamp with time zone, "app_id" character varying, "icon_url" character varying, "user_id" "uuid", "name" character varying, "last_version" character varying, "updated_at" timestamp with time zone, "id" "uuid", "retention" bigint, "owner_org" "uuid", "default_upload_channel" character varying, "transfer_history" "jsonb"[], "channel_device_count" bigint, "manifest_bundle_count" bigint, "expose_metadata" boolean, "allow_preview" boolean, "allow_device_custom_id" boolean, "need_onboarding" boolean, "existing_app" boolean, "ios_store_url" "text", "android_store_url" "text", "stats_updated_at" timestamp without time zone, "stats_refresh_requested_at" timestamp without time zone, "build_timeout_seconds" bigint, "build_timeout_updated_at" timestamp with time zone, "block_provider_infra_requests" boolean, "rollout_channel_count" bigint, "rollout_paused_version_names" character varying[], "last_upload_at" timestamp with time zone, "total_count" bigint)
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
@@ -6184,7 +6203,6 @@ DECLARE
     v_limit integer := LEAST(GREATEST(COALESCE(p_limit, 10), 1), 100);
     v_offset integer := GREATEST(COALESCE(p_offset, 0), 0);
     v_search text := NULLIF(btrim(COALESCE(p_search, '')), '');
-    -- Whitelist sort keys to avoid dynamic-SQL injection via p_sort_by.
     v_sort text := CASE
         WHEN p_sort_by IN ('name', 'last_version', 'updated_at', 'created_at', 'last_upload_at')
             THEN p_sort_by
@@ -6219,7 +6237,6 @@ BEGIN
         COUNT(*) OVER () AS total_count
     FROM scoped s
     ORDER BY
-        -- NULLS LAST in both directions so apps without uploads sort to the bottom.
         CASE WHEN v_sort = 'last_upload_at' AND v_desc THEN s.last_upload_at END DESC NULLS LAST,
         CASE WHEN v_sort = 'last_upload_at' AND NOT v_desc THEN s.last_upload_at END ASC NULLS LAST,
         CASE WHEN v_sort = 'updated_at' AND v_desc THEN s.updated_at END DESC NULLS LAST,
@@ -6230,7 +6247,6 @@ BEGIN
         CASE WHEN v_sort = 'name' AND NOT v_desc THEN s.name END ASC NULLS LAST,
         CASE WHEN v_sort = 'last_version' AND v_desc THEN s.last_version END DESC NULLS LAST,
         CASE WHEN v_sort = 'last_version' AND NOT v_desc THEN s.last_version END ASC NULLS LAST,
-        -- Stable tiebreaker so pagination is deterministic across pages.
         s.app_id ASC
     LIMIT v_limit
     OFFSET v_offset;
@@ -8886,6 +8902,26 @@ $$;
 ALTER FUNCTION "public"."is_canceled_org"("orgid" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."is_current_user_group_member"("p_group_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.group_members gm
+    WHERE gm.group_id = p_group_id
+      AND gm.user_id = (SELECT auth.uid())
+  );
+$$;
+
+
+ALTER FUNCTION "public"."is_current_user_group_member"("p_group_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."is_current_user_group_member"("p_group_id" "uuid") IS 'RLS helper: true when auth.uid() belongs to the given group. SECURITY DEFINER to avoid group_members policy recursion.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."is_good_plan_v5_org"("orgid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -10087,66 +10123,46 @@ DECLARE
   should_run boolean;
   lock_acquired boolean;
 BEGIN
-  -- Try to acquire an advisory lock (non-blocking)
-  -- Lock ID 1 is reserved for process_all_cron_tasks
-  -- pg_try_advisory_lock returns true if lock acquired, false if already held
   lock_acquired := pg_try_advisory_lock(1);
 
   IF NOT lock_acquired THEN
-    -- Another instance is already running, skip this execution
     RAISE NOTICE 'process_all_cron_tasks: skipped, another instance is already running';
     RETURN;
   END IF;
 
-  -- Wrap everything in a block so we can ensure the lock is released
   BEGIN
-    -- Get current time components in UTC
     current_hour := EXTRACT(HOUR FROM NOW());
     current_minute := EXTRACT(MINUTE FROM NOW());
     current_second := EXTRACT(SECOND FROM NOW());
     current_dow := EXTRACT(DOW FROM NOW());
     current_day := EXTRACT(DAY FROM NOW());
 
-    -- Loop through all enabled tasks
     FOR task IN SELECT * FROM public.cron_tasks WHERE enabled = true LOOP
       should_run := false;
 
-      -- Check if task should run based on its schedule
       IF task.second_interval IS NOT NULL THEN
-        -- Run every N seconds
-        -- Since pg_cron interval is not clock-aligned, we run on every invocation
-        -- for second_interval tasks (the cron job itself runs every 10 seconds)
         should_run := true;
       ELSIF task.minute_interval IS NOT NULL THEN
-        -- Run every N minutes
-        -- Use current_second < 10 to catch first run of each minute (works with any cron offset)
         should_run := (current_minute % task.minute_interval = 0)
                       AND (current_second < 10);
       ELSIF task.hour_interval IS NOT NULL THEN
-        -- Run every N hours at specific minute
-        -- Use current_second < 10 to catch first run
         should_run := (current_hour % task.hour_interval = 0)
                       AND (current_minute = COALESCE(task.run_at_minute, 0))
                       AND (current_second < 10);
       ELSIF task.run_at_hour IS NOT NULL THEN
-        -- Run at specific time
-        -- Use current_second < 10 to catch first run
         should_run := (current_hour = task.run_at_hour)
                       AND (current_minute = COALESCE(task.run_at_minute, 0))
                       AND (current_second < 10);
 
-        -- Check day of week constraint
         IF should_run AND task.run_on_dow IS NOT NULL THEN
           should_run := (current_dow = task.run_on_dow);
         END IF;
 
-        -- Check day of month constraint
         IF should_run AND task.run_on_day IS NOT NULL THEN
           should_run := (current_day = task.run_on_day);
         END IF;
       END IF;
 
-      -- Execute the task if it should run
       IF should_run THEN
         BEGIN
           CASE task.task_type
@@ -10160,7 +10176,6 @@ BEGIN
               );
 
             WHEN 'function_queue' THEN
-              -- Parse JSON array of queue names
               SELECT array_agg(value::text) INTO queue_names
               FROM jsonb_array_elements_text(task.target::jsonb);
 
@@ -10182,13 +10197,22 @@ BEGIN
       END IF;
     END LOOP;
 
+    IF current_minute % 5 = 0 AND current_second < 10 THEN
+      PERFORM pgmq.send(
+        'cron_rollout_auto_pause',
+        jsonb_build_object(
+          'function_name', 'cron_rollout_auto_pause',
+          'function_type', 'cloudflare'
+        )
+      );
+    END IF;
+
+    PERFORM public.process_function_queue(ARRAY['cron_rollout_auto_pause']);
   EXCEPTION WHEN OTHERS THEN
-    -- Release the lock even if an error occurred
     PERFORM pg_advisory_unlock(1);
     RAISE;
   END;
 
-  -- Release the advisory lock
   PERFORM pg_advisory_unlock(1);
 END;
 $$;
@@ -10199,7 +10223,8 @@ ALTER FUNCTION "public"."process_all_cron_tasks"() OWNER TO "postgres";
 
 COMMENT ON FUNCTION "public"."process_all_cron_tasks"() IS 'Consolidated cron task processor that runs every 10 seconds. Uses advisory
 lock (ID=1) to prevent concurrent execution - if a previous run is still
-executing, the new invocation will skip.';
+executing, the new invocation will skip. Also queues and processes progressive
+rollout auto-pause evaluation through the existing cron processor.';
 
 
 
@@ -11495,6 +11520,7 @@ BEGIN
 
     WHEN public.rbac_perm_app_update_settings() THEN RETURN public.rbac_right_write();
     WHEN public.rbac_perm_app_create_channel() THEN RETURN public.rbac_right_write();
+    WHEN 'app.manage_notifications' THEN RETURN public.rbac_right_write();
     WHEN public.rbac_perm_app_manage_devices() THEN RETURN public.rbac_right_write();
     WHEN public.rbac_perm_app_build_native() THEN RETURN public.rbac_right_write();
     WHEN public.rbac_perm_channel_update_settings() THEN RETURN public.rbac_right_write();
@@ -11502,7 +11528,6 @@ BEGIN
     WHEN public.rbac_perm_channel_rollback_bundle() THEN RETURN public.rbac_right_write();
     WHEN public.rbac_perm_channel_manage_forced_devices() THEN RETURN public.rbac_right_write();
 
-    WHEN public.rbac_perm_org_create_app() THEN RETURN public.rbac_right_write();
     WHEN public.rbac_perm_org_update_settings() THEN RETURN public.rbac_right_admin();
     WHEN public.rbac_perm_org_invite_user() THEN RETURN public.rbac_right_admin();
     WHEN public.rbac_perm_org_read_billing() THEN RETURN public.rbac_right_admin();
@@ -11527,6 +11552,7 @@ BEGIN
     WHEN public.rbac_perm_platform_delete_orphan_users() THEN RETURN public.rbac_right_super_admin();
     WHEN public.rbac_perm_platform_read_all_audit() THEN RETURN public.rbac_right_super_admin();
     WHEN public.rbac_perm_platform_db_break_glass() THEN RETURN public.rbac_right_super_admin();
+
     ELSE RETURN NULL;
   END CASE;
 END;
@@ -12855,7 +12881,7 @@ $$;
 ALTER FUNCTION "public"."read_storage_usage"("p_app_id" character varying, "p_period_start" timestamp without time zone, "p_period_end" timestamp without time zone) OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."read_version_usage"("p_app_id" character varying, "p_period_start" timestamp without time zone, "p_period_end" timestamp without time zone) RETURNS TABLE("app_id" character varying, "version_name" character varying, "date" timestamp without time zone, "get" bigint, "fail" bigint, "install" bigint, "uninstall" bigint)
+CREATE OR REPLACE FUNCTION "public"."read_version_usage"("p_app_id" character varying, "p_period_start" timestamp without time zone, "p_period_end" timestamp without time zone, "p_channel_name" "text" DEFAULT NULL::"text", "p_channel_id" bigint DEFAULT NULL::bigint) RETURNS TABLE("app_id" character varying, "version_name" character varying, "date" timestamp without time zone, "get" bigint, "fail" bigint, "install" bigint, "uninstall" bigint)
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
@@ -12863,26 +12889,26 @@ BEGIN
   RETURN QUERY
   SELECT
     vu.app_id,
-    -- Use version_name if available (new data), otherwise look up from app_versions (old data)
-    COALESCE(vu.version_name, av.name)::character varying as version_name,
+    COALESCE(vu.version_name, av.name)::character varying AS version_name,
     DATE_TRUNC('day', vu.timestamp) AS date,
-    SUM(CASE WHEN vu.action = 'get' THEN 1 ELSE 0 END) AS get,
+    SUM(CASE WHEN vu.action = 'get' THEN 1 ELSE 0 END) AS "get",
     SUM(CASE WHEN vu.action = 'fail' THEN 1 ELSE 0 END) AS fail,
     SUM(CASE WHEN vu.action = 'install' THEN 1 ELSE 0 END) AS install,
     SUM(CASE WHEN vu.action = 'uninstall' THEN 1 ELSE 0 END) AS uninstall
-  FROM public.version_usage vu
-  LEFT JOIN public.app_versions av ON vu.version_id = av.id AND vu.version_name IS NULL
-  WHERE
-    vu.app_id = p_app_id
+  FROM public.version_usage AS vu
+  LEFT JOIN public.app_versions AS av ON vu.version_id = av.id AND vu.version_name IS NULL
+  WHERE vu.app_id = p_app_id
     AND vu.timestamp >= p_period_start
     AND vu.timestamp < p_period_end
+    AND (p_channel_name IS NULL OR vu.channel_name = p_channel_name)
+    AND (p_channel_id IS NULL OR vu.channel_id = p_channel_id)
   GROUP BY date, vu.app_id, COALESCE(vu.version_name, av.name)
   ORDER BY date;
 END;
 $$;
 
 
-ALTER FUNCTION "public"."read_version_usage"("p_app_id" character varying, "p_period_start" timestamp without time zone, "p_period_end" timestamp without time zone) OWNER TO "postgres";
+ALTER FUNCTION "public"."read_version_usage"("p_app_id" character varying, "p_period_start" timestamp without time zone, "p_period_end" timestamp without time zone, "p_channel_name" "text", "p_channel_id" bigint) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."reassign_webhook_created_by_before_user_delete"() RETURNS "trigger"
@@ -13098,6 +13124,72 @@ $$;
 ALTER FUNCTION "public"."record_trial_extension_event"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."refresh_app_rollout_channel_count"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    PERFORM "public"."refresh_app_rollout_channel_count_for_app"(NEW."app_id");
+    RETURN NEW;
+  ELSIF TG_OP = 'DELETE' THEN
+    PERFORM "public"."refresh_app_rollout_channel_count_for_app"(OLD."app_id");
+    RETURN OLD;
+  END IF;
+
+  PERFORM "public"."refresh_app_rollout_channel_count_for_app"(NEW."app_id");
+  IF OLD."app_id" IS DISTINCT FROM NEW."app_id" THEN
+    PERFORM "public"."refresh_app_rollout_channel_count_for_app"(OLD."app_id");
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."refresh_app_rollout_channel_count"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."refresh_app_rollout_channel_count_for_app"("p_app_id" character varying) RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  IF p_app_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  UPDATE public.apps AS a
+  SET
+    rollout_channel_count = (
+      SELECT count(*)::bigint
+      FROM public.channels AS c
+      WHERE c.app_id = p_app_id
+        AND c.rollout_version IS NOT NULL
+        AND c.rollout_enabled = true
+        AND c.rollout_percentage_bps > 0
+        AND c.rollout_paused_at IS NULL
+    ),
+    rollout_paused_version_names = ARRAY(
+      SELECT DISTINCT rv.name
+      FROM public.channels AS c
+      INNER JOIN public.app_versions AS rv ON rv.id = c.rollout_version AND rv.app_id = c.app_id
+      WHERE c.app_id = p_app_id
+        AND c.rollout_version IS NOT NULL
+        AND c.rollout_enabled = true
+        AND c.rollout_percentage_bps > 0
+        AND c.rollout_paused_at IS NOT NULL
+      ORDER BY rv.name
+    ),
+    updated_at = now()
+  WHERE a.app_id = p_app_id;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."refresh_app_rollout_channel_count_for_app"("p_app_id" character varying) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."refresh_app_rollups_after_demo_reset"("p_app_uuid" "uuid", "p_app_id" "text", "p_owner_org" "uuid") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -13143,6 +13235,73 @@ $$;
 
 
 ALTER FUNCTION "public"."refresh_app_rollups_after_demo_reset"("p_app_uuid" "uuid", "p_app_id" "text", "p_owner_org" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."refresh_channel_rollout_id"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  rollout_changed boolean;
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    rollout_changed := NEW."rollout_version" IS NOT NULL;
+  ELSE
+    rollout_changed := NEW."rollout_version" IS DISTINCT FROM OLD."rollout_version";
+  END IF;
+
+  IF rollout_changed THEN
+    IF ("auth"."uid"() IS NOT NULL OR "public"."get_apikey_header"() IS NOT NULL)
+      AND NOT "public"."rbac_check_permission_request"(
+        "public"."rbac_perm_channel_promote_bundle"(),
+        NEW."owner_org",
+        NEW."app_id",
+        NEW."id"
+      )
+    THEN
+      RAISE EXCEPTION 'NO_RIGHTS';
+    END IF;
+
+    IF NEW."rollout_version" IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1
+        FROM "public"."app_versions" AS av
+        WHERE av."id" = NEW."rollout_version"
+          AND av."app_id" = NEW."app_id"
+          AND av."owner_org" = NEW."owner_org"
+          AND av."deleted" = false
+      )
+    THEN
+      RAISE EXCEPTION 'INVALID_ROLLOUT_VERSION';
+    END IF;
+
+    NEW."rollout_id" = gen_random_uuid();
+    IF NEW."rollout_version" IS NULL THEN
+      NEW."rollout_paused_at" = NULL;
+      IF TG_OP = 'INSERT' THEN
+        NEW."rollout_pause_reason" = NULL;
+        NEW."auto_pause_last_triggered_at" = NULL;
+      ELSE
+        IF NEW."rollout_pause_reason" IS NOT DISTINCT FROM OLD."rollout_pause_reason" THEN
+          NEW."rollout_pause_reason" = NULL;
+        END IF;
+        IF NEW."auto_pause_last_triggered_at" IS NOT DISTINCT FROM OLD."auto_pause_last_triggered_at" THEN
+          NEW."auto_pause_last_triggered_at" = NULL;
+        END IF;
+      END IF;
+    ELSE
+      NEW."rollout_paused_at" = NULL;
+      NEW."rollout_pause_reason" = NULL;
+      NEW."auto_pause_last_triggered_at" = NULL;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."refresh_channel_rollout_id"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."refresh_orgs_has_usage_credits"() RETURNS "void"
@@ -15203,39 +15362,17 @@ CREATE OR REPLACE FUNCTION "public"."total_bundle_storage_bytes"() RETURNS bigin
     LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-  SELECT (
-    -- Sum bundle sizes only for active app versions.
-    COALESCE(
-      (
-        SELECT SUM(avm.size)
-        FROM public.app_versions_meta avm
-        INNER JOIN public.app_versions av ON av.id = avm.id
-        WHERE av.deleted = false
-      ),
-      0
-    ) +
-    -- Sum manifest file sizes only for active app versions.
-    COALESCE(
-      (
-        SELECT SUM(m.file_size)
-        FROM public.manifest m
-        WHERE EXISTS (
-          SELECT 1
-          FROM public.app_versions av
-          WHERE av.id = m.app_version_id
-            AND av.deleted = false
-        )
-      ),
-      0
-    )
-  )::bigint;
+  SELECT COALESCE(SUM(avm.size), 0)::bigint
+  FROM public.app_versions_meta avm
+  INNER JOIN public.app_versions av ON av.id = avm.id
+  WHERE av.deleted = false;
 $$;
 
 
 ALTER FUNCTION "public"."total_bundle_storage_bytes"() OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."total_bundle_storage_bytes"() IS 'Returns active bundle storage in bytes including bundle sizes (app_versions_meta.size) and manifest file sizes for non-deleted app versions.';
+COMMENT ON FUNCTION "public"."total_bundle_storage_bytes"() IS 'Returns active bundle storage in bytes from app_versions_meta.size for non-deleted app versions.';
 
 
 
@@ -15543,21 +15680,22 @@ CREATE OR REPLACE FUNCTION "public"."update_app_versions_retention"() RETURNS "v
     SET "search_path" TO ''
     AS $$
 BEGIN
-    UPDATE public.app_versions
+    UPDATE public.app_versions AS av
     SET deleted = true
-    WHERE app_versions.deleted = false
-      AND (SELECT retention FROM public.apps WHERE apps.app_id = app_versions.app_id) >= 0
-      AND (SELECT retention FROM public.apps WHERE apps.app_id = app_versions.app_id) < 63113904
-      AND app_versions.created_at < (
+    WHERE av.deleted = false
+      AND (SELECT retention FROM public.apps WHERE apps.app_id = av.app_id) >= 0
+      AND (SELECT retention FROM public.apps WHERE apps.app_id = av.app_id) < 63113904
+      AND av.name NOT IN ('builtin', 'unknown')
+      AND av.created_at < (
           SELECT NOW() - make_interval(secs => apps.retention)
           FROM public.apps
-          WHERE apps.app_id = app_versions.app_id
+          WHERE apps.app_id = av.app_id
       )
       AND NOT EXISTS (
           SELECT 1
-          FROM public.channels
-          WHERE channels.app_id = app_versions.app_id
-            AND channels.version = app_versions.id
+          FROM public.channels AS c
+          WHERE c.app_id = av.app_id
+            AND (c.version = av.id OR c.rollout_version = av.id)
       );
 END;
 $$;
@@ -16552,7 +16690,33 @@ CREATE TABLE IF NOT EXISTS "public"."channels" (
     "allow_device" boolean DEFAULT true NOT NULL,
     "allow_prod" boolean DEFAULT true NOT NULL,
     "electron" boolean DEFAULT true NOT NULL,
-    "rbac_id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL
+    "rbac_id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "rollout_version" bigint,
+    "rollout_percentage_bps" integer DEFAULT 0 NOT NULL,
+    "rollout_enabled" boolean DEFAULT false NOT NULL,
+    "rollout_id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "rollout_paused_at" timestamp with time zone,
+    "rollout_pause_reason" "text",
+    "rollout_cache_ttl_seconds" integer DEFAULT 2592000 NOT NULL,
+    "auto_pause_enabled" boolean DEFAULT false NOT NULL,
+    "auto_pause_window_minutes" integer DEFAULT 60 NOT NULL,
+    "auto_pause_failure_rate_bps" integer,
+    "auto_pause_confidence" numeric(5,4) DEFAULT 0.9500 NOT NULL,
+    "auto_pause_min_attempts" integer,
+    "auto_pause_min_failures" integer,
+    "auto_pause_action" "text" DEFAULT 'pause'::"text" NOT NULL,
+    "auto_pause_cooldown_minutes" integer DEFAULT 60 NOT NULL,
+    "auto_pause_last_triggered_at" timestamp with time zone,
+    "auto_pause_last_checked_at" timestamp with time zone,
+    CONSTRAINT "channels_auto_pause_action_check" CHECK (("auto_pause_action" = ANY (ARRAY['pause'::"text", 'rollback'::"text", 'notify'::"text"]))),
+    CONSTRAINT "channels_auto_pause_confidence_check" CHECK ((("auto_pause_confidence" > (0)::numeric) AND ("auto_pause_confidence" < (1)::numeric))),
+    CONSTRAINT "channels_auto_pause_cooldown_minutes_check" CHECK ((("auto_pause_cooldown_minutes" >= 0) AND ("auto_pause_cooldown_minutes" <= 10080))),
+    CONSTRAINT "channels_auto_pause_failure_rate_bps_check" CHECK ((("auto_pause_failure_rate_bps" IS NULL) OR (("auto_pause_failure_rate_bps" >= 0) AND ("auto_pause_failure_rate_bps" <= 10000)))),
+    CONSTRAINT "channels_auto_pause_min_attempts_check" CHECK ((("auto_pause_min_attempts" IS NULL) OR ("auto_pause_min_attempts" >= 0))),
+    CONSTRAINT "channels_auto_pause_min_failures_check" CHECK ((("auto_pause_min_failures" IS NULL) OR ("auto_pause_min_failures" >= 0))),
+    CONSTRAINT "channels_auto_pause_window_minutes_check" CHECK ((("auto_pause_window_minutes" > 0) AND ("auto_pause_window_minutes" <= 10080))),
+    CONSTRAINT "channels_rollout_cache_ttl_seconds_check" CHECK ((("rollout_cache_ttl_seconds" >= 60) AND ("rollout_cache_ttl_seconds" <= 31536000))),
+    CONSTRAINT "channels_rollout_percentage_bps_check" CHECK ((("rollout_percentage_bps" >= 0) AND ("rollout_percentage_bps" <= 10000)))
 );
 
 ALTER TABLE ONLY "public"."channels" REPLICA IDENTITY FULL;
@@ -17003,7 +17167,8 @@ CREATE TABLE IF NOT EXISTS "public"."devices" (
     "id" bigint NOT NULL,
     "version_name" "text" DEFAULT 'unknown'::"text" NOT NULL,
     "default_channel" character varying(255),
-    "key_id" character varying(4)
+    "key_id" character varying(4),
+    "install_source" "text"
 );
 
 
@@ -17015,6 +17180,10 @@ COMMENT ON COLUMN "public"."devices"."default_channel" IS 'The default channel n
 
 
 COMMENT ON COLUMN "public"."devices"."key_id" IS 'First 4 characters of the base64-encoded public key (identifies which key is in use)';
+
+
+
+COMMENT ON COLUMN "public"."devices"."install_source" IS 'Optional native install source reported by the updater plugin, for example app_store, testflight, or google_play. Android store sources only identify the installer, not the production/alpha/beta/internal track.';
 
 
 
@@ -17133,7 +17302,9 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
     "past_due_orgs" integer DEFAULT 0 NOT NULL,
     "past_due_orgs_average_days" double precision DEFAULT 0 NOT NULL,
     "orgs" bigint DEFAULT 0 NOT NULL,
-    "completed_shards" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL
+    "completed_shards" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
+    "active_canceled_orgs" integer DEFAULT 0 NOT NULL,
+    "active_past_due_orgs" integer DEFAULT 0 NOT NULL
 );
 
 
@@ -17372,6 +17543,14 @@ COMMENT ON COLUMN "public"."global_stats"."completed_shards" IS 'Global stats sh
 
 
 
+COMMENT ON COLUMN "public"."global_stats"."active_canceled_orgs" IS 'Organizations canceled in Stripe but still inside the paid subscription period at snapshot time.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."active_past_due_orgs" IS 'Organizations in Stripe past_due status that still retain Capgo access until cancel or period end at snapshot time.';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."group_members" (
     "group_id" "uuid" NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -17434,6 +17613,78 @@ ALTER SEQUENCE "public"."manifest_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."manifest_id_seq" OWNED BY "public"."manifest"."id";
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."notification_app_settings" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "owner_org" "uuid" NOT NULL,
+    "app_id" character varying(50) NOT NULL,
+    "push_update_enabled" boolean DEFAULT false NOT NULL,
+    "push_update_install_mode" "text" DEFAULT 'next'::"text" NOT NULL,
+    "push_update_channel" "text",
+    "created_by" "uuid",
+    CONSTRAINT "notification_app_settings_install_mode_check" CHECK (("push_update_install_mode" = ANY (ARRAY['next'::"text", 'set'::"text"])))
+);
+
+
+ALTER TABLE "public"."notification_app_settings" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."notification_app_settings" IS 'Low-cardinality native notification app settings, including whether Capgo can send silent push update checks. Device state remains in Cloudflare Analytics Engine.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."notification_campaigns" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "owner_org" "uuid" NOT NULL,
+    "app_id" character varying(50) NOT NULL,
+    "name" "text" NOT NULL,
+    "kind" "text" DEFAULT 'alert'::"text" NOT NULL,
+    "status" "text" NOT NULL,
+    "audience" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "payload" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "scheduled_at" timestamp with time zone,
+    "queued_at" timestamp with time zone,
+    "completed_at" timestamp with time zone,
+    "counters" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "created_by" "uuid",
+    CONSTRAINT "notification_campaigns_kind_check" CHECK (("kind" = ANY (ARRAY['alert'::"text", 'background'::"text", 'badge'::"text", 'update_check'::"text"]))),
+    CONSTRAINT "notification_campaigns_status_check" CHECK (("status" = ANY (ARRAY['draft'::"text", 'scheduled'::"text", 'queued'::"text", 'sending'::"text", 'sent'::"text", 'paused'::"text", 'failed'::"text", 'cancelled'::"text"])))
+);
+
+
+ALTER TABLE "public"."notification_campaigns" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."notification_campaigns" IS 'Low-cardinality native notification campaign control plane. Fanout state and delivery receipts are stored in Cloudflare Queues/Analytics Engine, not per-device Postgres rows.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."notification_provider_configs" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "owner_org" "uuid" NOT NULL,
+    "app_id" character varying(50) NOT NULL,
+    "provider" "text" NOT NULL,
+    "status" "text" NOT NULL,
+    "config" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "secret_ref" "text",
+    "created_by" "uuid",
+    CONSTRAINT "notification_provider_configs_provider_check" CHECK (("provider" = ANY (ARRAY['fcm'::"text", 'apns'::"text"]))),
+    CONSTRAINT "notification_provider_configs_status_check" CHECK (("status" = ANY (ARRAY['draft'::"text", 'configured'::"text", 'disabled'::"text", 'error'::"text"])))
+);
+
+
+ALTER TABLE "public"."notification_provider_configs" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."notification_provider_configs" IS 'Low-cardinality native notification provider configuration. Per-device push tokens are stored only as encrypted Cloudflare Analytics Engine events, not in Postgres.';
 
 
 
@@ -18281,7 +18532,8 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
     "opt_for_newsletters" boolean DEFAULT true NOT NULL,
     "ban_time" timestamp with time zone,
     "email_preferences" "jsonb" DEFAULT '{"onboarding": true, "usage_limit": true, "credit_usage": true, "device_error": true, "weekly_stats": true, "monthly_stats": true, "bundle_created": true, "bundle_deployed": true, "deploy_stats_24h": true, "cli_realtime_feed": true, "builder_onboarding": true, "bundle_incompatible": true, "billing_period_stats": true, "channel_self_rejected": true}'::"jsonb" NOT NULL,
-    "created_via_invite" boolean DEFAULT false NOT NULL
+    "created_via_invite" boolean DEFAULT false NOT NULL,
+    "format_locale" character varying
 );
 
 
@@ -18293,6 +18545,10 @@ COMMENT ON COLUMN "public"."users"."email_preferences" IS 'Per-user email notifi
 
 
 COMMENT ON COLUMN "public"."users"."created_via_invite" IS 'True when the account was created through /private/accept_invitation (invited members), false for normal self-signups.';
+
+
+
+COMMENT ON COLUMN "public"."users"."format_locale" IS 'Optional BCP 47 locale tag used for date and number formatting. Language stays independent from formatting.';
 
 
 
@@ -18312,7 +18568,9 @@ CREATE TABLE IF NOT EXISTS "public"."version_usage" (
     "app_id" character varying(50) NOT NULL,
     "version_id" bigint,
     "action" "public"."version_action" NOT NULL,
-    "version_name" character varying(255)
+    "version_name" character varying(255),
+    "channel_name" character varying(255),
+    "channel_id" bigint
 );
 
 
@@ -18652,6 +18910,31 @@ ALTER TABLE ONLY "public"."groups"
 
 ALTER TABLE ONLY "public"."manifest"
     ADD CONSTRAINT "manifest_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."notification_app_settings"
+    ADD CONSTRAINT "notification_app_settings_app_key" UNIQUE ("app_id");
+
+
+
+ALTER TABLE ONLY "public"."notification_app_settings"
+    ADD CONSTRAINT "notification_app_settings_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."notification_campaigns"
+    ADD CONSTRAINT "notification_campaigns_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."notification_provider_configs"
+    ADD CONSTRAINT "notification_provider_configs_app_provider_key" UNIQUE ("app_id", "provider");
+
+
+
+ALTER TABLE ONLY "public"."notification_provider_configs"
+    ADD CONSTRAINT "notification_provider_configs_pkey" PRIMARY KEY ("id");
 
 
 
@@ -19032,6 +19315,10 @@ CREATE INDEX "idx_apps_default_upload_channel" ON "public"."apps" USING "btree" 
 
 
 
+CREATE UNIQUE INDEX "idx_apps_owner_org_app_id" ON "public"."apps" USING "btree" ("owner_org", "app_id");
+
+
+
 CREATE INDEX "idx_audit_logs_created_at" ON "public"."audit_logs" USING "btree" ("created_at" DESC);
 
 
@@ -19112,6 +19399,14 @@ CREATE INDEX "idx_channels_public_app_id_ios" ON "public"."channels" USING "btre
 
 
 
+CREATE INDEX "idx_channels_rollout_targets" ON "public"."channels" USING "btree" ("app_id", "rollout_version") WHERE ("rollout_version" IS NOT NULL);
+
+
+
+CREATE INDEX "idx_channels_rollout_version" ON "public"."channels" USING "btree" ("rollout_version") WHERE ("rollout_version" IS NOT NULL);
+
+
+
 CREATE INDEX "idx_compatibility_events_app_created" ON "public"."compatibility_events" USING "btree" ("app_id", "created_at" DESC);
 
 
@@ -19164,6 +19459,10 @@ CREATE INDEX "idx_device_usage_app_timestamp_version_build" ON "public"."device_
 
 
 
+CREATE INDEX "idx_devices_app_id_install_source" ON "public"."devices" USING "btree" ("app_id", "install_source") WHERE ("install_source" IS NOT NULL);
+
+
+
 CREATE INDEX "idx_devices_default_channel" ON "public"."devices" USING "btree" ("default_channel");
 
 
@@ -19189,6 +19488,30 @@ CREATE INDEX "idx_manifest_file_hash" ON "public"."manifest" USING "btree" ("fil
 
 
 CREATE INDEX "idx_manifest_file_name" ON "public"."manifest" USING "btree" ("file_name");
+
+
+
+CREATE INDEX "idx_notification_app_settings_owner_org" ON "public"."notification_app_settings" USING "btree" ("owner_org");
+
+
+
+CREATE INDEX "idx_notification_campaigns_app_created" ON "public"."notification_campaigns" USING "btree" ("app_id", "created_at" DESC);
+
+
+
+CREATE INDEX "idx_notification_campaigns_owner_org" ON "public"."notification_campaigns" USING "btree" ("owner_org");
+
+
+
+CREATE INDEX "idx_notification_campaigns_status_scheduled" ON "public"."notification_campaigns" USING "btree" ("status", "scheduled_at") WHERE ("status" = ANY (ARRAY['scheduled'::"text", 'queued'::"text"]));
+
+
+
+CREATE INDEX "idx_notification_provider_configs_app" ON "public"."notification_provider_configs" USING "btree" ("app_id");
+
+
+
+CREATE INDEX "idx_notification_provider_configs_owner_org" ON "public"."notification_provider_configs" USING "btree" ("owner_org");
 
 
 
@@ -19301,6 +19624,10 @@ CREATE INDEX "idx_users_email_preferences" ON "public"."users" USING "gin" ("ema
 
 
 CREATE INDEX "idx_version_meta_app_id_timestamp" ON "public"."version_meta" USING "btree" ("app_id", "timestamp");
+
+
+
+CREATE INDEX "idx_version_usage_app_channel_time" ON "public"."version_usage" USING "btree" ("app_id", "channel_id", "timestamp") WHERE ("channel_id" IS NOT NULL);
 
 
 
@@ -19708,6 +20035,14 @@ CREATE OR REPLACE TRIGGER "record_trial_extension_event_on_stripe_info" AFTER UP
 
 
 
+CREATE OR REPLACE TRIGGER "refresh_app_rollout_channel_count" AFTER INSERT OR DELETE OR UPDATE OF "app_id", "rollout_enabled", "rollout_version", "rollout_percentage_bps", "rollout_paused_at" ON "public"."channels" FOR EACH ROW EXECUTE FUNCTION "public"."refresh_app_rollout_channel_count"();
+
+
+
+CREATE OR REPLACE TRIGGER "refresh_channel_rollout_id" BEFORE INSERT OR UPDATE OF "rollout_version" ON "public"."channels" FOR EACH ROW EXECUTE FUNCTION "public"."refresh_channel_rollout_id"();
+
+
+
 CREATE OR REPLACE TRIGGER "role_bindings_enforce_apikey_expiration_policy" BEFORE INSERT OR UPDATE OF "principal_type", "principal_id", "org_id", "expires_at" ON "public"."role_bindings" FOR EACH ROW EXECUTE FUNCTION "public"."enforce_apikey_role_binding_expiration_policy"();
 
 
@@ -19867,6 +20202,11 @@ ALTER TABLE ONLY "public"."channels"
 
 
 ALTER TABLE ONLY "public"."channels"
+    ADD CONSTRAINT "channels_rollout_version_fkey" FOREIGN KEY ("rollout_version") REFERENCES "public"."app_versions"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."channels"
     ADD CONSTRAINT "channels_version_fkey" FOREIGN KEY ("version") REFERENCES "public"."app_versions"("id") ON DELETE SET NULL;
 
 
@@ -19933,6 +20273,51 @@ ALTER TABLE ONLY "public"."groups"
 
 ALTER TABLE ONLY "public"."manifest"
     ADD CONSTRAINT "manifest_app_version_id_fkey" FOREIGN KEY ("app_version_id") REFERENCES "public"."app_versions"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."notification_app_settings"
+    ADD CONSTRAINT "notification_app_settings_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."notification_app_settings"
+    ADD CONSTRAINT "notification_app_settings_owner_org_app_id_fkey" FOREIGN KEY ("owner_org", "app_id") REFERENCES "public"."apps"("owner_org", "app_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."notification_app_settings"
+    ADD CONSTRAINT "notification_app_settings_owner_org_fkey" FOREIGN KEY ("owner_org") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."notification_campaigns"
+    ADD CONSTRAINT "notification_campaigns_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."notification_campaigns"
+    ADD CONSTRAINT "notification_campaigns_owner_org_app_id_fkey" FOREIGN KEY ("owner_org", "app_id") REFERENCES "public"."apps"("owner_org", "app_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."notification_campaigns"
+    ADD CONSTRAINT "notification_campaigns_owner_org_fkey" FOREIGN KEY ("owner_org") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."notification_provider_configs"
+    ADD CONSTRAINT "notification_provider_configs_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."notification_provider_configs"
+    ADD CONSTRAINT "notification_provider_configs_owner_org_app_id_fkey" FOREIGN KEY ("owner_org", "app_id") REFERENCES "public"."apps"("owner_org", "app_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."notification_provider_configs"
+    ADD CONSTRAINT "notification_provider_configs_owner_org_fkey" FOREIGN KEY ("owner_org") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
 
 
 
@@ -20576,6 +20961,18 @@ CREATE POLICY "Deny all access" ON "public"."to_delete_accounts" USING (false) W
 
 
 
+CREATE POLICY "Deny all notification app settings access" ON "public"."notification_app_settings" AS RESTRICTIVE USING (false) WITH CHECK (false);
+
+
+
+CREATE POLICY "Deny all notification campaign access" ON "public"."notification_campaigns" AS RESTRICTIVE USING (false) WITH CHECK (false);
+
+
+
+CREATE POLICY "Deny all notification provider config access" ON "public"."notification_provider_configs" AS RESTRICTIVE USING (false) WITH CHECK (false);
+
+
+
 CREATE POLICY "Deny client insert on apikeys" ON "public"."apikeys" AS RESTRICTIVE FOR INSERT TO "anon", "authenticated" WITH CHECK (false);
 
 
@@ -20994,10 +21391,9 @@ CREATE POLICY "group_members_insert" ON "public"."group_members" FOR INSERT TO "
 
 CREATE POLICY "group_members_select" ON "public"."group_members" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
    FROM ( SELECT "auth"."uid"() AS "current_uid") "actor_ref"
-  WHERE (EXISTS ( SELECT 1
-           FROM ("public"."groups"
-             JOIN "public"."org_users" ON (("groups"."org_id" = "org_users"."org_id")))
-          WHERE (("groups"."id" = "group_members"."group_id") AND ("org_users"."user_id" = "actor_ref"."current_uid")))))));
+  WHERE ("public"."is_current_user_group_member"("group_members"."group_id") OR (EXISTS ( SELECT 1
+           FROM "public"."groups" "g"
+          WHERE (("g"."id" = "group_members"."group_id") AND "public"."check_min_rights"("public"."rbac_right_admin"(), "actor_ref"."current_uid", "g"."org_id", NULL::character varying, NULL::bigint))))))));
 
 
 
@@ -21026,9 +21422,7 @@ CREATE POLICY "groups_insert" ON "public"."groups" FOR INSERT TO "authenticated"
 
 CREATE POLICY "groups_select" ON "public"."groups" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
    FROM ( SELECT "auth"."uid"() AS "current_uid") "actor_ref"
-  WHERE (EXISTS ( SELECT 1
-           FROM "public"."org_users"
-          WHERE (("org_users"."org_id" = "groups"."org_id") AND ("org_users"."user_id" = "actor_ref"."current_uid")))))));
+  WHERE ("public"."is_current_user_group_member"("groups"."id") OR "public"."check_min_rights"("public"."rbac_right_admin"(), "actor_ref"."current_uid", "groups"."org_id", NULL::character varying, NULL::bigint)))));
 
 
 
@@ -21039,6 +21433,15 @@ CREATE POLICY "groups_update" ON "public"."groups" FOR UPDATE TO "authenticated"
 
 
 ALTER TABLE "public"."manifest" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."notification_app_settings" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."notification_campaigns" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."notification_provider_configs" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."notifications" ENABLE ROW LEVEL SECURITY;
@@ -22693,6 +23096,12 @@ GRANT ALL ON FUNCTION "public"."is_canceled_org"("orgid" "uuid") TO "authenticat
 
 
 
+REVOKE ALL ON FUNCTION "public"."is_current_user_group_member"("p_group_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."is_current_user_group_member"("p_group_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."is_current_user_group_member"("p_group_id" "uuid") TO "authenticated";
+
+
+
 REVOKE ALL ON FUNCTION "public"."is_good_plan_v5_org"("orgid" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."is_good_plan_v5_org"("orgid" "uuid") TO "service_role";
 GRANT ALL ON FUNCTION "public"."is_good_plan_v5_org"("orgid" "uuid") TO "anon";
@@ -23018,7 +23427,7 @@ GRANT ALL ON FUNCTION "public"."rbac_legacy_right_for_org_role"("p_role_name" "t
 
 
 
-GRANT ALL ON FUNCTION "public"."rbac_legacy_right_for_permission"("p_permission_key" "text") TO "anon";
+REVOKE ALL ON FUNCTION "public"."rbac_legacy_right_for_permission"("p_permission_key" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."rbac_legacy_right_for_permission"("p_permission_key" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."rbac_legacy_right_for_permission"("p_permission_key" "text") TO "service_role";
 
@@ -23555,9 +23964,10 @@ GRANT ALL ON FUNCTION "public"."read_storage_usage"("p_app_id" character varying
 
 
 
-GRANT ALL ON FUNCTION "public"."read_version_usage"("p_app_id" character varying, "p_period_start" timestamp without time zone, "p_period_end" timestamp without time zone) TO "anon";
-GRANT ALL ON FUNCTION "public"."read_version_usage"("p_app_id" character varying, "p_period_start" timestamp without time zone, "p_period_end" timestamp without time zone) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."read_version_usage"("p_app_id" character varying, "p_period_start" timestamp without time zone, "p_period_end" timestamp without time zone) TO "service_role";
+REVOKE ALL ON FUNCTION "public"."read_version_usage"("p_app_id" character varying, "p_period_start" timestamp without time zone, "p_period_end" timestamp without time zone, "p_channel_name" "text", "p_channel_id" bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."read_version_usage"("p_app_id" character varying, "p_period_start" timestamp without time zone, "p_period_end" timestamp without time zone, "p_channel_name" "text", "p_channel_id" bigint) TO "service_role";
+GRANT ALL ON FUNCTION "public"."read_version_usage"("p_app_id" character varying, "p_period_start" timestamp without time zone, "p_period_end" timestamp without time zone, "p_channel_name" "text", "p_channel_id" bigint) TO "anon";
+GRANT ALL ON FUNCTION "public"."read_version_usage"("p_app_id" character varying, "p_period_start" timestamp without time zone, "p_period_end" timestamp without time zone, "p_channel_name" "text", "p_channel_id" bigint) TO "authenticated";
 
 
 
@@ -23585,8 +23995,23 @@ GRANT ALL ON FUNCTION "public"."record_trial_extension_event"() TO "service_role
 
 
 
+REVOKE ALL ON FUNCTION "public"."refresh_app_rollout_channel_count"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."refresh_app_rollout_channel_count"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."refresh_app_rollout_channel_count_for_app"("p_app_id" character varying) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."refresh_app_rollout_channel_count_for_app"("p_app_id" character varying) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."refresh_app_rollups_after_demo_reset"("p_app_uuid" "uuid", "p_app_id" "text", "p_owner_org" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."refresh_app_rollups_after_demo_reset"("p_app_uuid" "uuid", "p_app_id" "text", "p_owner_org" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."refresh_channel_rollout_id"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."refresh_channel_rollout_id"() TO "service_role";
 
 
 
@@ -24186,6 +24611,18 @@ GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public".
 GRANT ALL ON SEQUENCE "public"."manifest_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."manifest_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."manifest_id_seq" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."notification_app_settings" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."notification_campaigns" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."notification_provider_configs" TO "service_role";
 
 
 

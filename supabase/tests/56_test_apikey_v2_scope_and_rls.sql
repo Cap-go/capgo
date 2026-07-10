@@ -572,11 +572,20 @@ SELECT is(
 SELECT set_config('request.method', '', true);
 
 SELECT ok(
-  position(
-    'rbac_check_permission_direct'
-    in pg_get_functiondef('public.app_versions_readable_app_ids()'::regprocedure)
-  ) = 0,
-  'app_versions readable app helper does not use per-app RBAC checks'
+  (
+    SELECT position('WHERE v_api_key_text IS NULL OR "public"."rbac_check_permission_direct"' in helper_def) > 0
+      AND position('"public"."rbac_perm_app_read"()' in helper_def) > 0
+      AND position('v_user_id IS NOT NULL THEN v_api_key_text := NULL' in helper_def) > 0
+    FROM (
+      SELECT regexp_replace(
+        pg_get_functiondef('public.app_versions_readable_app_ids()'::regprocedure),
+        '\s+',
+        ' ',
+        'g'
+      ) AS helper_def
+    ) helper
+  ),
+  'app_versions readable app helper lets JWT win and exact-checks API-key app candidates'
 );
 
 SELECT ok(
@@ -596,16 +605,24 @@ SELECT ok(
 );
 
 SELECT ok(
-  position(
-    'app_versions_readable_app_ids'
-    in (
-      SELECT pg_get_expr(polqual, polrelid)
+  (
+    SELECT position('CASE WHEN' in normalized_expr) > 0
+      AND position('request.method' in normalized_expr) > 0
+      AND position('PATCH' in normalized_expr) > 0
+      AND position('THEN' in normalized_expr) > 0
+      AND position('ELSE' in normalized_expr) > position('THEN' in normalized_expr)
+      AND position('app_versions_has_app_permission' in normalized_expr) > position('THEN' in normalized_expr)
+      AND position('app_versions_has_app_permission' in normalized_expr) < position('ELSE' in normalized_expr)
+      AND position('app_versions_readable_app_ids' in substring(normalized_expr from position('ELSE' in normalized_expr))) > 0
+      AND position('app_versions_has_app_permission' in substring(normalized_expr from position('ELSE' in normalized_expr))) = 0
+    FROM (
+      SELECT regexp_replace(pg_get_expr(polqual, polrelid), '\s+', ' ', 'g') AS normalized_expr
       FROM pg_policy
       WHERE polrelid = 'public.app_versions'::regclass
         AND polname = 'Allow for auth, api keys (read+)'
-    )
-  ) = 0,
-  'app_versions select policy does not materialize every readable app during targeted writes'
+    ) policy
+  ),
+  'app_versions select policy uses targeted helper only behind write-method guard'
 );
 
 SELECT ok(

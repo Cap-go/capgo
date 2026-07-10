@@ -21,6 +21,16 @@ when working with code in this repository.
 #### Supabase Edge Functions (Default)
 
 - `bun test:all` - Run all backend tests
+- `bun test:unit` - Run unit tests only (`tests/*.unit.test.ts`, no Supabase or
+  Docker required)
+- `bun test:db` - Run the DB-only test subset listed in
+  `tests/tinbase-db-tests.txt` against a throwaway Tinbase instance (no Docker;
+  boots in ~5s). Add a test file to that list only if it talks purely to
+  PostgREST/auth via supabase-js — no edge functions, Cloudflare workers, or raw
+  Postgres TCP (`executeSQL`/`getPostgresClient`)
+- `bun test:backend:integration` - Run backend tests excluding unit and CLI
+  tests (requires running Supabase; this is what CI shards across runners; CLI
+  integration tests run via `bun test:cli`)
 - `bun test:backend` - Run backend tests excluding CLI tests
 - `bun test:cli` - Run CLI-specific tests
 - `bun test:local` - Legacy alias for the default monorepo backend test run
@@ -739,6 +749,37 @@ Key points:
   `src/styles/style.css` (e.g., `--color-primary-500: #515271`) when introducing
   new UI.
 
+### Form accessibility (WCAG 2.0 A)
+
+SonarQube flags any `<input>`, `<select>`, or `<textarea>` without an associated
+label. Treat this as a default requirement for every new or touched form control —
+do not wait for the scanner to catch it later.
+
+Every form control must have **one** of these associations before shipping:
+
+1. **Visible label + `for`/`id`** — when label text is shown next to the field:
+   ```vue
+   <label for="field-id" class="label">...</label>
+   <input id="field-id" ...>
+   ```
+2. **Wrapping `<label>`** — for radios, checkboxes, and toggle rows where the
+   label already wraps the control.
+3. **`sr-only` label + matching `id`** — for search/icon-only fields that only
+   show a placeholder:
+   ```vue
+   <label for="search-id" class="sr-only">{{ t('search') }}</label>
+   <input id="search-id" :aria-label="t('search')" ...>
+   ```
+4. **`aria-label`** — acceptable alongside (1) or (3); required when the only
+   cue is placeholder text.
+
+Reusable components must generate stable ids (`useId()` or an `inputId` prop) and
+expose accessible names by default. Follow `SearchInput.vue` and `RoleSelect.vue`.
+
+Also applies to dialog/Teleport content, admin filters, and hidden utility inputs
+(e.g. file pickers): they still need `aria-label` or an associated label.
+
+
 ## Auth Redirect Guardrails
 
 - We intentionally route auth email links through `/confirm-signup` to avoid
@@ -752,6 +793,46 @@ Key points:
 - Cover customer-facing flows with the Playwright MCP suite. Add scenarios under
   `playwright/e2e` and run them locally with `bun run test:front` before
   shipping UI changes.
+
+### Visual diff for UI changes
+
+When a PR changes customer-facing UI (layout, spacing, colors, components, or
+copy placement), reviewers need a before/after screenshot diff.
+
+**Request the automated PR report** by either:
+
+- adding the `visual-change` label to the PR, or
+- including `<!-- visual-diff:required -->` anywhere in the PR description.
+
+On each push, the `Visual diff` GitHub Action captures screenshots from the PR
+base commit and head commit, generates a diff report, uploads it as a workflow
+artifact, and updates a sticky PR comment (`<!-- capgo-visual-diff -->`).
+
+**Local workflow before opening or updating the PR:**
+
+1. Capture the current UI baseline: `bun run visual:capture:before`
+2. Apply your UI edits and rebuild or refresh the local app as needed.
+3. Capture the updated UI: `bun run visual:capture:after`
+4. Generate the report: `bun run visual:diff`
+5. Paste `.context/visual-diff/report/summary.md` into the PR description under
+   `## Visual changes`.
+6. Add the `visual-change` label (or the HTML marker above) so CI refreshes the
+   report on every push.
+
+**Full local pipeline against `main`:**
+
+```bash
+bun run visual:run -- --base origin/main
+```
+
+**Route configuration:** edit `playwright/visual-diff.config.ts` when a PR
+introduces a new screen that should be part of the visual diff set.
+
+**Outputs:**
+
+- `.context/visual-diff/before/` and `after/` — raw PNG captures
+- `.context/visual-diff/report/index.html` — side-by-side before/after/diff view
+- `.context/visual-diff/report/summary.md` — markdown table for the PR body
 
 ## Mobile Development
 

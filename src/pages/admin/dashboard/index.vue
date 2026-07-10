@@ -11,6 +11,7 @@ import AdminFilterBar from '~/components/admin/AdminFilterBar.vue'
 import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
 import PageLoader from '~/components/PageLoader.vue'
+import { formatNumberValue, formatOneDecimal } from '~/services/formatLocale'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -284,13 +285,13 @@ displayStore.defaultBack = '/dashboard'
                   <span class="loading loading-spinner loading-lg text-primary" />
                 </div>
                 <p v-else-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-primary">
-                  {{ latestGlobalStats.apps.toLocaleString() }}
+                  {{ formatNumberValue(latestGlobalStats.apps) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-primary">
                   0
                 </p>
                 <p v-if="latestGlobalStats" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ latestGlobalStats.apps_active.toLocaleString() }} active
+                  {{ formatNumberValue(latestGlobalStats.apps_active) }} active
                 </p>
               </div>
             </div>
@@ -310,13 +311,13 @@ displayStore.defaultBack = '/dashboard'
                   <span class="loading loading-spinner loading-lg text-secondary" />
                 </div>
                 <p v-else-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-secondary">
-                  {{ latestGlobalStats.users.toLocaleString() }}
+                  {{ formatNumberValue(latestGlobalStats.users) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-secondary">
                   0
                 </p>
                 <p v-if="latestGlobalStats" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ latestGlobalStats.users_active.toLocaleString() }} active
+                  {{ formatNumberValue(latestGlobalStats.users_active) }} active
                 </p>
               </div>
             </div>
@@ -336,7 +337,7 @@ displayStore.defaultBack = '/dashboard'
                   <span class="loading loading-spinner loading-lg text-accent" />
                 </div>
                 <p v-else-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-accent">
-                  {{ latestGlobalStats.bundle_storage_gb.toFixed(1) }} GB
+                  {{ formatOneDecimal(latestGlobalStats.bundle_storage_gb) }} GB
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-accent">
                   0 GB
@@ -362,7 +363,7 @@ displayStore.defaultBack = '/dashboard'
                   <span class="loading loading-spinner loading-lg text-success" />
                 </div>
                 <p v-else-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-success">
-                  {{ latestGlobalStats.success_rate.toFixed(1) }}%
+                  {{ formatOneDecimal(latestGlobalStats.success_rate) }}%
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-success">
                   0%
@@ -460,13 +461,13 @@ displayStore.defaultBack = '/dashboard'
                   <span class="loading loading-spinner loading-lg text-gray-900 dark:text-gray-100" />
                 </div>
                 <p v-else-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
-                  {{ (latestGlobalStats.devices_last_month_ios || 0).toLocaleString() }}
+                  {{ formatNumberValue(latestGlobalStats.devices_last_month_ios || 0) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
                   0
                 </p>
                 <p v-if="latestGlobalStats && latestGlobalStats.devices_last_month" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ ((latestGlobalStats.devices_last_month_ios || 0) / latestGlobalStats.devices_last_month * 100).toFixed(1) }}% of total
+                  {{ formatOneDecimal((latestGlobalStats.devices_last_month_ios || 0) / latestGlobalStats.devices_last_month * 100) }}% of total
                 </p>
               </div>
             </div>
@@ -488,13 +489,13 @@ displayStore.defaultBack = '/dashboard'
                   <span class="loading loading-spinner loading-lg text-green-500" />
                 </div>
                 <p v-else-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-green-500">
-                  {{ (latestGlobalStats.devices_last_month_android || 0).toLocaleString() }}
+                  {{ formatNumberValue(latestGlobalStats.devices_last_month_android || 0) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-green-500">
                   0
                 </p>
                 <p v-if="latestGlobalStats && latestGlobalStats.devices_last_month" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ ((latestGlobalStats.devices_last_month_android || 0) / latestGlobalStats.devices_last_month * 100).toFixed(1) }}% of total
+                  {{ formatOneDecimal((latestGlobalStats.devices_last_month_android || 0) / latestGlobalStats.devices_last_month * 100) }}% of total
                 </p>
               </div>
             </div>

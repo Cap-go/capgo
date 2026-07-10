@@ -580,8 +580,12 @@ const paginationClass = computed(() => props.mobileFixedPagination
             <template v-if="true">
               <th v-if="props.massSelect" class="px-4 md:px-6">
                 <input
-                  id="select-rows" :checked="selectedRows[i]" class="scale-checkbox"
-                  type="checkbox" @click="(e: MouseEvent) => { handleCheckboxClick(i, e) }"
+                  :id="`select-row-${i}`"
+                  :checked="selectedRows[i]"
+                  class="scale-checkbox"
+                  type="checkbox"
+                  :aria-label="t('select_all')"
+                  @click="(e: MouseEvent) => { handleCheckboxClick(i, e) }"
                 >
               </th>
               <template v-for="(col, _y) in columns" :key="`${i}_${_y}`">

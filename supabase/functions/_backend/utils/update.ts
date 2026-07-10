@@ -16,8 +16,9 @@ import { getAppStatus, setAppStatus } from './appStatus.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
+import { getClientIP } from './rate_limit.ts'
 import { sendNotifOrgCached } from './notifications.ts'
-import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres, setReplicationLagHeader } from './pg.ts'
+import { closeClient, getAppBlockProviderInfraRequestsPostgres, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres, setReplicationLagHeader } from './pg.ts'
 import { makeDevice } from './plugin_parser.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './stats.ts'
@@ -29,6 +30,19 @@ const CHANNEL_SELF_STORE_MIN_V5 = '5.34.0'
 const CHANNEL_SELF_STORE_MIN_V6 = '6.34.0'
 const CHANNEL_SELF_STORE_MIN_V7 = '7.34.0'
 const CHANNEL_SELF_STORE_MIN_V8 = '8.0.0'
+
+type InvalidIpInfo = {
+  blocked: boolean
+  provider: 'google' | 'apple' | null
+}
+
+let loadInvalidIpInfo: Promise<((ip: string, context?: Context) => Promise<InvalidIpInfo>)> | null = null
+
+function getInvalidIpInfo(): Promise<(ip: string, context?: Context) => Promise<InvalidIpInfo>> {
+  if (!loadInvalidIpInfo)
+    loadInvalidIpInfo = import('./invalids_ip.ts').then(module => module.invalidIpInfo)
+  return loadInvalidIpInfo
+}
 
 export type UpdateResponseKind = 'up_to_date' | 'blocked' | 'failed'
 
@@ -52,6 +66,7 @@ const UPDATE_BLOCKED_CODES = new Set([
   'disable_device',
   'disable_emulator',
   'key_id_mismatch',
+  'provider_infrastructure_request_blocked',
 ])
 
 export function getUpdateResponseKind(errorCode: string): UpdateResponseKind {
@@ -69,8 +84,77 @@ function updateError200(c: Context, errorCode: string, message: string, moreInfo
   })
 }
 
-export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[], expose_metadata: boolean = false) {
+
+async function getProviderInfrastructureInfo(c: Context) {
+  const requestIp = getClientIP(c)
+  if (requestIp === 'unknown')
+    return null
+
+  const invalidIpInfo = await getInvalidIpInfo()
+  const providerInfo = await invalidIpInfo(requestIp, c)
+  return { requestIp, providerInfo }
+}
+
+function providerInfrastructureBlockedResponse(c: Context, requestIp: string, providerInfo: InvalidIpInfo) {
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Blocking update request from provider infrastructure IP',
+    ip: requestIp,
+    provider: providerInfo.provider,
+  })
+  return updateError200(c, 'provider_infrastructure_request_blocked', 'Update requests from known provider infrastructure are blocked', {
+    provider: providerInfo.provider,
+  })
+}
+
+async function providerInfrastructureBlockResponse(c: Context, blockProviderInfraRequests: boolean, knownProviderInfo?: Awaited<ReturnType<typeof getProviderInfrastructureInfo>>) {
+  if (!blockProviderInfraRequests)
+    return null
+
+  const providerInfo = knownProviderInfo ?? await getProviderInfrastructureInfo(c)
+  if (!providerInfo?.providerInfo.blocked)
+    return null
+
+  return providerInfrastructureBlockedResponse(c, providerInfo.requestIp, providerInfo.providerInfo)
+}
+
+async function providerInfrastructureColdCacheBlockResponse(c: Context, appId: string, drizzleClient: ReturnType<typeof getDrizzleClient>) {
+  const providerInfo = await getProviderInfrastructureInfo(c)
+  if (!providerInfo?.providerInfo.blocked)
+    return null
+
+  const blockProviderInfraRequests = await getAppBlockProviderInfraRequestsPostgres(c, appId, drizzleClient)
+  if (blockProviderInfraRequests.status === 'error')
+    return null
+  if (blockProviderInfraRequests.status === 'found' && !blockProviderInfraRequests.blockProviderInfraRequests)
+    return null
+
+  return providerInfrastructureBlockedResponse(c, providerInfo.requestIp, providerInfo.providerInfo)
+}
+
+type ResponseFeatureSupport = {
+  manifest: boolean
+  metadata: boolean
+}
+
+const responseFeatureSupportCache = new Map<string, ResponseFeatureSupport>()
+
+function getResponseFeatureSupport(plugin_version: string): ResponseFeatureSupport {
+  const cached = responseFeatureSupportCache.get(plugin_version)
+  if (cached)
+    return cached
+
   const pluginVersion = parse(plugin_version)
+  const support = {
+    manifest: !isDeprecatedPluginVersion(pluginVersion, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7),
+    metadata: !isDeprecatedPluginVersion(pluginVersion, '5.35.0', '6.35.0', '7.35.0', '8.35.0'),
+  }
+  responseFeatureSupportCache.set(plugin_version, support)
+  return support
+}
+
+export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[], expose_metadata: boolean = false) {
+  const support = getResponseFeatureSupport(plugin_version)
   const res: {
     version: string
     url: string
@@ -87,10 +171,10 @@ export function resToVersion(plugin_version: string, signedURL: string, version:
     checksum: version.checksum,
   }
   // manifest is supported in v5.10.0+, v6.25.0+, v7.0.35+, v8+
-  if (manifest.length > 0 && !isDeprecatedPluginVersion(pluginVersion, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7))
+  if (manifest.length > 0 && support.manifest)
     res.manifest = manifest
   // Include link and comment for plugin v5.35.0+, v6.35.0+, v7.35.0+, v8.35.0+ (only if expose_metadata is enabled and they have values)
-  if (expose_metadata && !isDeprecatedPluginVersion(pluginVersion, '5.35.0', '6.35.0', '7.35.0', '8.35.0')) {
+  if (expose_metadata && support.metadata) {
     if (version.link)
       res.link = version.link
     if (version.comment)
@@ -116,6 +200,7 @@ export async function updateWithPG(
   c: Context,
   body: AppInfos,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
+  appStatus?: Awaited<ReturnType<typeof getAppStatus>>,
 ) {
   cloudlog({ requestId: c.get('requestId'), message: 'body', body, date: new Date().toISOString() })
   const {
@@ -127,7 +212,7 @@ export async function updateWithPG(
     plugin_version = '2.3.3',
     defaultChannel,
   } = body
-  const cachedAppStatus = await getAppStatus(c, app_id)
+  const cachedAppStatus = appStatus ?? await getAppStatus(c, app_id)
   const cachedStatus = cachedAppStatus.status
   if (cachedStatus === 'onprem') {
     const updateEnumerationLimit = await recordUpdateEnumerationMiss(c, app_id)
@@ -147,6 +232,12 @@ export async function updateWithPG(
   if (existingUpdateEnumerationLimit.limited)
     return updateEnumerationLimitedResponse(c)
 
+  if (!cachedAppStatus.cacheHit) {
+    const providerBlockedResponse = await providerInfrastructureColdCacheBlockResponse(c, app_id, drizzleClient)
+    if (providerBlockedResponse)
+      return providerBlockedResponse
+  }
+
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT)
   // if version_build is not semver, then make it semver
   const device = makeDevice(body, appOwner?.allow_device_custom_id)
@@ -155,11 +246,15 @@ export async function updateWithPG(
     if (updateEnumerationLimit.limited)
       return updateEnumerationLimitedResponse(c)
 
-    await setAppStatus(c, app_id, 'onprem', true)
+    await setAppStatus(c, app_id, 'onprem', true, cachedAppStatus.block_provider_infra_requests)
     return onPremStats(c, app_id, 'get', device)
   }
+  const providerBlockedResponse = await providerInfrastructureBlockResponse(c, appOwner.block_provider_infra_requests)
+  if (providerBlockedResponse)
+    return providerBlockedResponse
+
   if (!appOwner.plan_valid) {
-    await setAppStatus(c, app_id, 'cancelled', appOwner.allow_device_custom_id)
+    await setAppStatus(c, app_id, 'cancelled', appOwner.allow_device_custom_id, appOwner.block_provider_infra_requests)
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     // Send weekly notification about missing payment (not configurable - payment related)
@@ -170,7 +265,7 @@ export async function updateWithPG(
     }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
-  await setAppStatus(c, app_id, 'cloud', appOwner.allow_device_custom_id)
+  await setAppStatus(c, app_id, 'cloud', appOwner.allow_device_custom_id, appOwner.block_provider_infra_requests)
   const pluginVersion = parse(plugin_version)
   const shouldUseChannelSelfStore = usesLegacyChannelSelfStoreVersion(pluginVersion) && hasChannelSelfStoreBinding(c)
   const channelSelfOverride = shouldUseChannelSelfStore
@@ -179,6 +274,8 @@ export async function updateWithPG(
   const channelDeviceCount = appOwner.channel_device_count ?? 0
   const effectiveChannelDeviceCount = channelDeviceCount
   const manifestBundleCount = appOwner.manifest_bundle_count ?? 0
+  const rolloutChannelCount = appOwner.rollout_channel_count ?? 0
+  const rolloutPausedVersionNames = appOwner.rollout_paused_version_names ?? []
   const bypassChannelOverrides = !channelSelfOverride && effectiveChannelDeviceCount <= 0
   // v5 is deprecated if < 5.10.0, v6 is deprecated if < 6.25.0, v7 is deprecated if < 7.25.0
   const isDeprecated = isDeprecatedPluginVersion(pluginVersion)
@@ -192,6 +289,8 @@ export async function updateWithPG(
     effectiveChannelDeviceCount,
     bypassChannelOverrides,
     manifestBundleCount,
+    rolloutChannelCount,
+    rolloutPausedVersionCount: rolloutPausedVersionNames.length,
     fetchManifestEntries,
   })
   if (body.version_build === 'unknown') {
@@ -250,6 +349,9 @@ export async function updateWithPG(
     drizzleClient,
     channelDeviceCount: effectiveChannelDeviceCount,
     manifestBundleCount,
+    rolloutChannelCount,
+    rolloutPausedVersionNames,
+    currentVersionName: version_name,
     includeMetadata: needsMetadata,
     channelSelfOverrideChannelId: channelSelfOverride?.channel_id.id,
   })
@@ -274,8 +376,6 @@ export async function updateWithPG(
   const version = channelOverride?.version ?? channelData.version
   const manifestEntries = (channelOverride?.manifestEntries ?? channelData?.manifestEntries ?? []) as Partial<Database['public']['Tables']['manifest']['Row']>[]
   // device.version = versionData ? versionData.id : version.id
-
-  // TODO: find better solution to check if device is from apple or google, currently not working in
 
   if (!version.external_url && !version.r2_path && !isInternalVersionName(version.name) && (!manifestEntries || manifestEntries.length === 0)) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot get bundle', id: app_id, version, manifestEntriesLength: manifestEntries ? manifestEntries.length : 0, channelData: channelData ? channelData.channels.name : 'no channel data', defaultChannel })
@@ -505,14 +605,21 @@ export async function updateWithPG(
 }
 
 export async function update(c: Context, body: AppInfos) {
+  const appStatus = await getAppStatus(c, body.app_id)
+  if (appStatus.cacheHit) {
+    const providerBlockedResponse = await providerInfrastructureBlockResponse(c, appStatus.block_provider_infra_requests)
+    if (providerBlockedResponse)
+      return providerBlockedResponse
+  }
   const pgClient = getPgClient(c, true)
+  try {
+    await setReplicationLagHeader(c, pgClient)
 
-  await setReplicationLagHeader(c, pgClient)
-
-  const drizzlePg = pgClient ? getDrizzleClient(pgClient) : (null as any)
-  // Use the active DB client only when needed
-  const res = await updateWithPG(c, body, drizzlePg)
-  if (pgClient)
+    const drizzlePg = getDrizzleClient(pgClient)
+    // Use the active DB client only when needed
+    return await updateWithPG(c, body, drizzlePg, appStatus)
+  }
+  finally {
     await closeClient(c, pgClient)
-  return res
+  }
 }

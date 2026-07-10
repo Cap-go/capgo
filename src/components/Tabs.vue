@@ -47,6 +47,7 @@ const labelClass = 'hidden md:block text-xs md:text-sm font-medium transition-co
           <button :class="[buttonPrimaryClass, activeTabColor(tab.key)]" @click="emit('update:activeTab', tab.key)">
             <component :is="tab.icon" :class="iconClass" />
             <span :class="labelClass">{{ t(tab.label) }}</span>
+            <span v-if="tab.badge" class="hidden px-1.5 py-0.5 text-[10px] font-semibold uppercase rounded border md:inline border-azure-500/40 bg-azure-500/10 text-azure-700 dark:text-azure-200">{{ t(tab.badge) }}</span>
           </button>
         </li>
       </ul>
@@ -57,6 +58,7 @@ const labelClass = 'hidden md:block text-xs md:text-sm font-medium transition-co
           <button :class="[buttonSecondaryClass, activeTabColor(tab.key, true)]" @click="emit('update:secondaryActiveTab', tab.key)">
             <component :is="tab.icon" :class="iconClass" />
             <span :class="labelClass">{{ t(tab.label) }}</span>
+            <span v-if="tab.badge" class="hidden px-1.5 py-0.5 text-[10px] font-semibold uppercase rounded border md:inline border-azure-500/40 bg-azure-500/10 text-azure-700 dark:text-azure-200">{{ t(tab.badge) }}</span>
           </button>
         </li>
       </ul>

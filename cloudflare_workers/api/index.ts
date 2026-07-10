@@ -1,8 +1,11 @@
+import type { ExecutionContext, ScheduledController } from '@cloudflare/workers-types'
+import type { Bindings } from '../../supabase/functions/_backend/utils/cloudflare.ts'
 import { app as accept_invitation } from '../../supabase/functions/_backend/private/accept_invitation.ts'
 import { app as admin_credits } from '../../supabase/functions/_backend/private/admin_credits.ts'
 import { app as admin_stats } from '../../supabase/functions/_backend/private/admin_stats.ts'
 import { app as channel_device } from '../../supabase/functions/_backend/private/channel_device.ts'
 import { app as channel_stats } from '../../supabase/functions/_backend/private/channel_stats.ts'
+import { app as native_observe_stats } from '../../supabase/functions/_backend/private/native_observe_stats.ts'
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
 import { app as configBuilder } from '../../supabase/functions/_backend/private/config_builder.ts'
 import { app as create_device } from '../../supabase/functions/_backend/private/create_device.ts'
@@ -40,9 +43,10 @@ import { app as bundle } from '../../supabase/functions/_backend/public/bundle/i
 import { app as channel } from '../../supabase/functions/_backend/public/channel/index.ts'
 import { app as check_cpu_usage } from '../../supabase/functions/_backend/public/check_cpu_usage.ts'
 import { app as device } from '../../supabase/functions/_backend/public/device/index.ts'
+import { app as notifications } from '../../supabase/functions/_backend/public/notifications/index.ts'
 import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
-import { app as pluginRegions } from '../../supabase/functions/_backend/public/plugin_regions.ts'
 import { app as organization } from '../../supabase/functions/_backend/public/organization/index.ts'
+import { app as pluginRegions } from '../../supabase/functions/_backend/public/plugin_regions.ts'
 import { app as replication } from '../../supabase/functions/_backend/public/replication.ts'
 import { app as statistics } from '../../supabase/functions/_backend/public/statistics/index.ts'
 import { app as translation } from '../../supabase/functions/_backend/public/translation.ts'
@@ -52,10 +56,11 @@ import { app as cron_clean_orphan_images } from '../../supabase/functions/_backe
 import { app as cron_clear_versions } from '../../supabase/functions/_backend/triggers/cron_clear_versions.ts'
 import { app as cron_email } from '../../supabase/functions/_backend/triggers/cron_email.ts'
 import { app as cron_reconcile_build_status } from '../../supabase/functions/_backend/triggers/cron_reconcile_build_status.ts'
+import { app as cron_rollout_auto_pause } from '../../supabase/functions/_backend/triggers/cron_rollout_auto_pause.ts'
 import { app as cron_stat_app } from '../../supabase/functions/_backend/triggers/cron_stat_app.ts'
 import { app as cron_stat_org } from '../../supabase/functions/_backend/triggers/cron_stat_org.ts'
 import { app as cron_sync_sub } from '../../supabase/functions/_backend/triggers/cron_sync_sub.ts'
-import { app as logsnag_insights, logsnagInsightsShardApps } from '../../supabase/functions/_backend/triggers/logsnag_insights.ts'
+import { app as logsnag_insights, logsnagInsightsLegacyUsageApp, logsnagInsightsShardApps } from '../../supabase/functions/_backend/triggers/logsnag_insights.ts'
 import { app as on_app_create } from '../../supabase/functions/_backend/triggers/on_app_create.ts'
 import { app as on_app_delete } from '../../supabase/functions/_backend/triggers/on_app_delete.ts'
 import { app as on_app_update } from '../../supabase/functions/_backend/triggers/on_app_update.ts'
@@ -71,22 +76,28 @@ import { app as on_user_update } from '../../supabase/functions/_backend/trigger
 import { app as on_version_create } from '../../supabase/functions/_backend/triggers/on_version_create.ts'
 import { app as on_version_delete } from '../../supabase/functions/_backend/triggers/on_version_delete.ts'
 import { app as on_version_update } from '../../supabase/functions/_backend/triggers/on_version_update.ts'
+import { app as pluginNotifications } from '../../supabase/functions/_backend/triggers/plugin_notifications.ts'
 import { app as queue_consumer } from '../../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
 import { app as webhook_delivery } from '../../supabase/functions/_backend/triggers/webhook_delivery.ts'
 import { app as webhook_dispatcher } from '../../supabase/functions/_backend/triggers/webhook_dispatcher.ts'
-import { createAllCatch, createHono } from '../../supabase/functions/_backend/utils/hono.ts'
+import { BRES, createAllCatch, createHono } from '../../supabase/functions/_backend/utils/hono.ts'
+import { processNativeNotificationQueueBatch } from '../../supabase/functions/_backend/utils/nativeNotificationSender.ts'
+import { flushQueuedPluginNotifications } from '../../supabase/functions/_backend/utils/plugin_notification_flush.ts'
 import { version } from '../../supabase/functions/_backend/utils/version.ts'
 
 // Public API
 const functionName = 'api'
 const app = createHono(functionName, version)
+const functionNameScheduled = 'api-scheduled'
+const appScheduled = createHono(functionNameScheduled, version)
 app.route('/ok', ok)
 app.route('/apikey', apikey)
 app.route('/bundle', bundle)
 app.route('/channel', channel)
 app.route('/device', device)
 app.route('/organization', organization)
+app.route('/notifications', notifications)
 app.route('/statistics', statistics)
 app.route('/webhooks', webhooks)
 app.route('/app', appEndpoint)
@@ -117,6 +128,7 @@ appPrivate.route('/admin_credits', admin_credits)
 appPrivate.route('/admin_stats', admin_stats)
 appPrivate.route('/stats', stats_priv)
 appPrivate.route('/channel_stats', channel_stats)
+appPrivate.route('/native_observe_stats', native_observe_stats)
 appPrivate.route('/stripe_checkout', stripe_checkout)
 appPrivate.route('/stripe_portal', stripe_portal)
 appPrivate.route('/verify_email_otp', verify_email_otp)
@@ -146,7 +158,14 @@ appTriggers.route('/cron_reconcile_build_status', cron_reconcile_build_status)
 appTriggers.route('/credit_usage_alerts', credit_usage_alerts)
 appTriggers.route('/logsnag_insights', logsnag_insights)
 appTriggers.route('/logsnag_insights_core', logsnagInsightsShardApps.core)
-appTriggers.route('/logsnag_insights_usage', logsnagInsightsShardApps.usage)
+appTriggers.route('/logsnag_insights_usage', logsnagInsightsLegacyUsageApp)
+appTriggers.route('/logsnag_insights_usage_updates', logsnagInsightsShardApps.usage_updates)
+appTriggers.route('/logsnag_insights_usage_devices', logsnagInsightsShardApps.usage_devices)
+appTriggers.route('/logsnag_insights_usage_device_platforms', logsnagInsightsShardApps.usage_device_platforms)
+appTriggers.route('/logsnag_insights_usage_registrations', logsnagInsightsShardApps.usage_registrations)
+appTriggers.route('/logsnag_insights_usage_storage', logsnagInsightsShardApps.usage_storage)
+appTriggers.route('/logsnag_insights_usage_success_rate', logsnagInsightsShardApps.usage_success_rate)
+appTriggers.route('/logsnag_insights_usage_demo_apps', logsnagInsightsShardApps.usage_demo_apps)
 appTriggers.route('/logsnag_insights_revenue', logsnagInsightsShardApps.revenue)
 appTriggers.route('/logsnag_insights_plugins', logsnagInsightsShardApps.plugins)
 appTriggers.route('/logsnag_insights_builds', logsnagInsightsShardApps.builds)
@@ -159,6 +178,7 @@ appTriggers.route('/on_app_create', on_app_create)
 appTriggers.route('/on_app_delete', on_app_delete)
 appTriggers.route('/on_app_update', on_app_update)
 appTriggers.route('/on_org_update', on_org_update)
+appTriggers.route('/plugin_notifications', pluginNotifications)
 appTriggers.route('/on_organization_delete', on_organization_delete)
 appTriggers.route('/on_user_create', on_user_create)
 appTriggers.route('/on_user_update', on_user_update)
@@ -173,6 +193,7 @@ appTriggers.route('/on_organization_create', on_organization_create)
 appTriggers.route('/cron_stat_app', cron_stat_app)
 appTriggers.route('/cron_stat_org', cron_stat_org)
 appTriggers.route('/cron_sync_sub', cron_sync_sub)
+appTriggers.route('/cron_rollout_auto_pause', cron_rollout_auto_pause)
 appTriggers.route('/queue_consumer', queue_consumer)
 appTriggers.route('/webhook_delivery', webhook_delivery)
 appTriggers.route('/webhook_dispatcher', webhook_dispatcher)
@@ -180,10 +201,31 @@ appTriggers.route('/webhook_dispatcher', webhook_dispatcher)
 app.route('/triggers', appTriggers)
 app.route('/private', appPrivate)
 
+appScheduled.post('/flush-plugin-notifications', async (c) => {
+  const result = await flushQueuedPluginNotifications(c)
+  return c.json({ ...BRES, ...result })
+})
+
+async function runScheduledPluginNotificationFlush(env: Bindings, ctx: ExecutionContext) {
+  const request = new Request('https://api-scheduled.capgo.internal/flush-plugin-notifications', { method: 'POST' })
+  const response = await appScheduled.fetch(request, env, ctx)
+  if (!response.ok)
+    throw new Error(`flush-plugin-notifications HTTP ${response.status} ${response.statusText}`)
+
+  const body = await response.json().catch(() => null) as { failed?: unknown } | null
+  if (body && typeof body.failed === 'number' && body.failed > 0)
+    throw new Error(`flush-plugin-notifications had ${body.failed} failed transfers`)
+}
+
 createAllCatch(app, functionName)
 createAllCatch(appPrivate, functionNamePrivate)
 createAllCatch(appTriggers, functionNameTriggers)
+createAllCatch(appScheduled, functionNameScheduled)
 
 export default {
   fetch: app.fetch,
+  queue: processNativeNotificationQueueBatch,
+  scheduled(_controller: ScheduledController, env: Bindings, ctx: ExecutionContext) {
+    ctx.waitUntil(runScheduledPluginNotificationFlush(env, ctx))
+  },
 }

@@ -39,6 +39,13 @@ export const defaultHost = 'https://capgo.app'
 export const defaultFileHost = 'https://files.capgo.app'
 export const defaultApiHost = 'https://api.capgo.app'
 export const defaultHostWeb = 'https://console.capgo.app'
+
+/** Build a console web-app URL (settings, builds, connect, etc.). */
+export function consoleWebUrl(path = ''): string {
+  if (!path)
+    return defaultHostWeb
+  return `${defaultHostWeb}${path.startsWith('/') ? path : `/${path}`}`
+}
 export const UPLOAD_TIMEOUT = 120000
 export const ALERT_UPLOAD_SIZE_BYTES = 1024 * 1024 * 20 // 20MB
 export const MAX_UPLOAD_LENGTH_BYTES = 1024 * 1024 * 1024 // 1GB
@@ -129,7 +136,7 @@ export async function check2FAAccessForOrg(supabase: SupabaseClient<Database>, o
   }
   if (reject2fa) {
     if (!silent)
-      log.error(`🔐 Access Denied: 2FA Required. Enable 2FA at https://web.capgo.app/settings/account`)
+      log.error(`🔐 Access Denied: 2FA Required. Enable 2FA at ${consoleWebUrl('/settings/account')}`)
     throw new Error('2FA required for this organization')
   }
 }
@@ -603,6 +610,37 @@ export async function getLocalConfig(silent = false) {
 }
 // eslint-disable-next-line regexp/no-unused-capturing-group
 const nativeFileRegex = /([A-Za-z0-9]+)\.(java|swift|kt|scala)$/
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function packageDeclaresNativePlugin(packageJson: unknown): boolean {
+  if (!isRecord(packageJson))
+    return false
+
+  const capacitor = packageJson.capacitor
+  if (isRecord(capacitor) && (capacitor.ios !== undefined || capacitor.android !== undefined))
+    return true
+
+  return false
+}
+
+function dependencyDeclaresNativePlugin(dependencyFolderPath: string): boolean {
+  if (existsSync(join(dependencyFolderPath, 'plugin.xml')))
+    return true
+
+  const packageJsonPath = join(dependencyFolderPath, PACKNAME)
+  if (!existsSync(packageJsonPath))
+    return false
+
+  try {
+    return packageDeclaresNativePlugin(JSON.parse(readFileSync(packageJsonPath, 'utf-8')))
+  }
+  catch {
+    return false
+  }
+}
 
 interface CapgoConfig {
   supaHost?: string
@@ -1634,7 +1672,7 @@ export function show2FADeniedError(organizationName?: string): never {
     log.error(`\nThis organization requires all members to have 2FA enabled.`)
   }
   log.error(`\nTo regain access:`)
-  log.error(`  1. Go to https://web.capgo.app/settings/account`)
+  log.error(`  1. Go to ${consoleWebUrl('/settings/account')}`)
   log.error(`  2. Enable Two-Factor Authentication on your account`)
   log.error(`  3. Try your command again`)
   log.error(`\nFor more information, visit: https://capgo.app/docs/webapp/2fa-enforcement/\n`)
@@ -2044,6 +2082,9 @@ export async function getLocalDependencies(packageJsonPath: string | undefined, 
           catch {
             // If we can't read the package.json, fall back to declared version
           }
+          if (!dependencyDeclaresNativePlugin(dependencyFolderPath))
+            continue
+
           try {
             const files = readDirRecursively(dependencyFolderPath)
             if (files.some(fileName => nativeFileRegex.test(fileName))) {
@@ -2104,7 +2145,7 @@ interface ChannelChecksum {
 export async function getRemoteChecksums(supabase: SupabaseClient<Database>, appId: string, channel: string) {
   const { data, error } = await supabase
     .from('channels')
-    .select(`version(checksum)`)
+    .select(`version:app_versions!channels_version_fkey(checksum)`)
     .eq('name', channel)
     .eq('app_id', appId)
     .single()
@@ -2147,7 +2188,7 @@ export function convertNativePackages(nativePackages: NativePackage[]): Map<stri
 export async function getRemoteDependencies(supabase: SupabaseClient<Database>, appId: string, channel: string) {
   const { data: remoteNativePackages, error } = await supabase
     .from('channels')
-    .select(`version ( 
+    .select(`version:app_versions!channels_version_fkey(
             native_packages 
         )`)
     .eq('name', channel)

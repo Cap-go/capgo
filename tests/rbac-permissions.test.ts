@@ -325,6 +325,62 @@ describe('rbac permission system', () => {
         expect(result.rows[0].perm).toBe('perm_owner')
       })
 
+      it('should allow notification-only API keys without device or settings access', async () => {
+        const testSlug = randomUUID().slice(0, 8)
+        const orgId = randomUUID()
+        const appId = `com.rbac.notifications.${testSlug}`
+        const apiKey = `notifications-key-${testSlug}`
+
+        await query(`
+          INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
+          VALUES ($1::uuid, $2, $3, $4::uuid, true)
+        `, [orgId, `Notifications RBAC Org ${testSlug}`, `notifications-rbac-${testSlug}@capgo.app`, USER_ID])
+
+        const appResult = await query(`
+          INSERT INTO public.apps (app_id, name, icon_url, owner_org)
+          VALUES ($1, $2, $3, $4::uuid)
+          RETURNING id
+        `, [appId, `Notifications RBAC App ${testSlug}`, 'https://example.com/icon.png', orgId])
+        const appUuid = appResult.rows[0]?.id
+        expect(appUuid).toBeTruthy()
+
+        const apiKeyResult = await query(`
+          INSERT INTO public.apikeys (user_id, key, name)
+          VALUES ($1::uuid, $2, $3)
+          RETURNING rbac_id
+        `, [USER_ID, apiKey, `notifications-key-${testSlug}`])
+        const apiKeyRbacId = apiKeyResult.rows[0]?.rbac_id
+        expect(apiKeyRbacId).toBeTruthy()
+
+        const bindingResult = await query(`
+          INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, app_id, granted_by)
+          SELECT
+            public.rbac_principal_apikey(),
+            $1::uuid,
+            roles.id,
+            public.rbac_scope_app(),
+            $2::uuid,
+            $3::uuid,
+            $4::uuid
+          FROM public.roles
+          WHERE roles.name = 'app_notifications'
+          LIMIT 1
+          RETURNING id
+        `, [apiKeyRbacId, orgId, appUuid, USER_ID])
+        expect(bindingResult.rowCount).toBe(1)
+
+        const result = await query(`
+          SELECT
+            public.rbac_check_permission_direct('app.manage_notifications', $1::uuid, $2::uuid, $3, NULL::bigint, $4) AS notifications_allowed,
+            public.rbac_check_permission_direct('app.manage_devices', $1::uuid, $2::uuid, $3, NULL::bigint, $4) AS devices_allowed,
+            public.rbac_check_permission_direct('app.update_settings', $1::uuid, $2::uuid, $3, NULL::bigint, $4) AS settings_allowed
+        `, [USER_ID, orgId, appId, apiKey])
+
+        expect(result.rows[0].notifications_allowed).toBe(true)
+        expect(result.rows[0].devices_allowed).toBe(false)
+        expect(result.rows[0].settings_allowed).toBe(false)
+      })
+
       it('should ignore role bindings whose role scope does not match the binding scope', async () => {
         const fakeUserId = '11111111-1111-4111-8111-111111111111'
 
@@ -1047,6 +1103,7 @@ describe('rbac permission system', () => {
         { permission: 'app.upload_bundle', expectedRight: 'upload' },
         // Write permissions
         { permission: 'app.update_settings', expectedRight: 'write' },
+        { permission: 'app.manage_notifications', expectedRight: 'write' },
         { permission: 'channel.promote_bundle', expectedRight: 'write' },
         // Admin permissions
         { permission: 'org.invite_user', expectedRight: 'admin' },

@@ -119,6 +119,9 @@ CREATE TABLE public.apps (
     build_timeout_updated_at timestamp with time zone DEFAULT now() NOT NULL,
     created_from_onboarding boolean DEFAULT false NOT NULL,
     onboarding_completed_at timestamp with time zone,
+    block_provider_infra_requests boolean DEFAULT true NOT NULL,
+    rollout_channel_count bigint DEFAULT 0 NOT NULL,
+    rollout_paused_version_names character varying[] DEFAULT '{}'::character varying[] NOT NULL,
     CONSTRAINT apps_build_timeout_seconds_check CHECK (((build_timeout_seconds >= 300) AND (build_timeout_seconds <= 21600)))
 );
 
@@ -221,7 +224,33 @@ CREATE TABLE public.channels (
     owner_org uuid NOT NULL,
     created_by uuid NOT NULL,
     rbac_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    electron boolean DEFAULT true NOT NULL
+    electron boolean DEFAULT true NOT NULL,
+    rollout_version bigint,
+    rollout_percentage_bps integer DEFAULT 0 NOT NULL,
+    rollout_enabled boolean DEFAULT false NOT NULL,
+    rollout_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    rollout_paused_at timestamp with time zone,
+    rollout_pause_reason text,
+    rollout_cache_ttl_seconds integer DEFAULT 2592000 NOT NULL,
+    auto_pause_enabled boolean DEFAULT false NOT NULL,
+    auto_pause_window_minutes integer DEFAULT 60 NOT NULL,
+    auto_pause_failure_rate_bps integer,
+    auto_pause_confidence numeric(5,4) DEFAULT 0.9500 NOT NULL,
+    auto_pause_min_attempts integer,
+    auto_pause_min_failures integer,
+    auto_pause_action text DEFAULT 'pause'::text NOT NULL,
+    auto_pause_cooldown_minutes integer DEFAULT 60 NOT NULL,
+    auto_pause_last_triggered_at timestamp with time zone,
+    auto_pause_last_checked_at timestamp with time zone,
+    CONSTRAINT channels_auto_pause_action_check CHECK ((auto_pause_action = ANY (ARRAY['pause'::text, 'rollback'::text, 'notify'::text]))),
+    CONSTRAINT channels_auto_pause_confidence_check CHECK (((auto_pause_confidence > (0)::numeric) AND (auto_pause_confidence < (1)::numeric))),
+    CONSTRAINT channels_auto_pause_cooldown_minutes_check CHECK (((auto_pause_cooldown_minutes >= 0) AND (auto_pause_cooldown_minutes <= 10080))),
+    CONSTRAINT channels_auto_pause_failure_rate_bps_check CHECK (((auto_pause_failure_rate_bps IS NULL) OR ((auto_pause_failure_rate_bps >= 0) AND (auto_pause_failure_rate_bps <= 10000)))),
+    CONSTRAINT channels_auto_pause_min_attempts_check CHECK (((auto_pause_min_attempts IS NULL) OR (auto_pause_min_attempts >= 0))),
+    CONSTRAINT channels_auto_pause_min_failures_check CHECK (((auto_pause_min_failures IS NULL) OR (auto_pause_min_failures >= 0))),
+    CONSTRAINT channels_auto_pause_window_minutes_check CHECK (((auto_pause_window_minutes > 0) AND (auto_pause_window_minutes <= 10080))),
+    CONSTRAINT channels_rollout_cache_ttl_seconds_check CHECK (((rollout_cache_ttl_seconds >= 60) AND (rollout_cache_ttl_seconds <= 31536000))),
+    CONSTRAINT channels_rollout_percentage_bps_check CHECK (((rollout_percentage_bps >= 0) AND (rollout_percentage_bps <= 10000)))
 );
 
 
@@ -805,6 +834,13 @@ CREATE INDEX idx_apps_default_upload_channel ON public.apps USING btree (default
 
 
 --
+-- Name: idx_apps_owner_org_app_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_apps_owner_org_app_id ON public.apps USING btree (owner_org, app_id);
+
+
+--
 -- Name: idx_channels_app_id_name; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -830,6 +866,20 @@ CREATE INDEX idx_channels_public_app_id_android ON public.channels USING btree (
 --
 
 CREATE INDEX idx_channels_public_app_id_ios ON public.channels USING btree (public, app_id, ios);
+
+
+--
+-- Name: idx_channels_rollout_targets; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_channels_rollout_targets ON public.channels USING btree (app_id, rollout_version) WHERE (rollout_version IS NOT NULL);
+
+
+--
+-- Name: idx_channels_rollout_version; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_channels_rollout_version ON public.channels USING btree (rollout_version) WHERE (rollout_version IS NOT NULL);
 
 
 --

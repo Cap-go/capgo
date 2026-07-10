@@ -24,6 +24,7 @@ interface publicDevice {
   custom_id: string
   is_prod: boolean
   is_emulator: boolean
+  install_source: string | null
   version_name: string | null
   app_id: string
   platform: Database['public']['Enums']['platform_os']
@@ -31,14 +32,15 @@ interface publicDevice {
   os_version: string
   version_build: string
   key_id: string | null
+  country_code: string | null
   version?: number
   channel?: string
 }
 
 export function filterDeviceKeys(devices: DeviceRes[]) {
   return devices.map((device) => {
-    const { updated_at, device_id, custom_id, is_prod, is_emulator, version_name, version, app_id, platform, plugin_version, os_version, version_build, key_id } = device
-    return { updated_at, device_id, custom_id, is_prod, is_emulator, version_name, version, app_id, platform, plugin_version, os_version, version_build, key_id }
+    const { updated_at, device_id, custom_id, is_prod, is_emulator, install_source, version_name, version, app_id, platform, plugin_version, os_version, version_build, key_id, country_code } = device
+    return { updated_at, device_id, custom_id, is_prod, is_emulator, install_source, version_name, version, app_id, platform, plugin_version, os_version, version_build, key_id, country_code }
   })
 }
 

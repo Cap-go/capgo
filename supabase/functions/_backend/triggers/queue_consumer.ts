@@ -16,6 +16,7 @@ import { updateManifestSize } from './on_manifest_create.ts'
 const DEFAULT_BATCH_SIZE = 950 // Default batch size for queue reads limit of CF is 1000 fetches so we take a safe margin
 const DEFAULT_QUEUE_HTTP_CONCURRENCY = 25
 const MANIFEST_QUEUE_HTTP_CONCURRENCY = 100
+const MANIFEST_QUEUE_ACK_CHUNK_SIZE = 100
 const DEFAULT_QUEUE_VISIBILITY_TIMEOUT_SECONDS = 120
 const MANIFEST_QUEUE_VISIBILITY_TIMEOUT_SECONDS = 900
 const QUEUE_HTTP_TIMEOUT_MS = 15_000
@@ -76,6 +77,7 @@ interface ProcessedQueueMessage extends Message {
   cfId: string
   payloadSize: number
   durationMs: number
+  deletedFromQueue?: boolean
   targetUrl: string | null
 }
 
@@ -481,6 +483,20 @@ function getQueueVisibilityTimeout(queueName: string): number {
   return DEFAULT_QUEUE_VISIBILITY_TIMEOUT_SECONDS
 }
 
+function getQueueAckChunkSize(queueName: string): number | null {
+  if (queueName === 'on_manifest_create')
+    return MANIFEST_QUEUE_ACK_CHUNK_SIZE
+  return null
+}
+
+function chunkArray<T>(items: T[], chunkSize: number): T[][] {
+  const chunks: T[][] = []
+  for (let i = 0; i < items.length; i += chunkSize) {
+    chunks.push(items.slice(i, i + chunkSize))
+  }
+  return chunks
+}
+
 async function mapWithConcurrency<T, R>(
   items: T[],
   concurrency: number,
@@ -499,6 +515,203 @@ async function mapWithConcurrency<T, R>(
   const workerCount = Math.min(Math.max(1, concurrency), items.length)
   await Promise.all(Array.from({ length: workerCount }, () => worker()))
   return results
+}
+
+function isSuccessfulQueueResult(result: ProcessedQueueMessage): boolean {
+  return result.httpResponse.status >= 200 && result.httpResponse.status < 300
+}
+
+async function deleteSuccessfulChunkMessages(
+  c: Context,
+  db: ReturnType<typeof getPgClient>,
+  queueName: string,
+  chunkResults: ProcessedQueueMessage[],
+): Promise<void> {
+  const successfulChunkMessages = chunkResults.filter(isSuccessfulQueueResult)
+  if (successfulChunkMessages.length === 0)
+    return
+
+  cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Deleting ${successfulChunkMessages.length} successful messages from queue checkpoint.` })
+  await delete_queue_message_batch(c, db, queueName, successfulChunkMessages.map(msg => msg.msg_id))
+  for (const result of successfulChunkMessages) {
+    result.deletedFromQueue = true
+  }
+}
+
+async function processQueueMessageChunks(
+  c: Context,
+  db: ReturnType<typeof getPgClient>,
+  queueName: string,
+  messagesToProcess: Message[],
+  processConcurrency: number,
+): Promise<ProcessedQueueMessage[]> {
+  const ackChunkSize = getQueueAckChunkSize(queueName)
+  const processChunks = ackChunkSize ? chunkArray(messagesToProcess, ackChunkSize) : [messagesToProcess]
+  const results: ProcessedQueueMessage[] = []
+
+  for (const chunk of processChunks) {
+    const chunkResults = await mapWithConcurrency(chunk, processConcurrency, async message => processQueueMessage(c, queueName, message))
+    results.push(...chunkResults)
+
+    if (ackChunkSize) {
+      await deleteSuccessfulChunkMessages(c, db, queueName, chunkResults)
+    }
+  }
+
+  return results
+}
+
+async function persistQueueCfIds(
+  c: Context,
+  db: ReturnType<typeof getPgClient>,
+  queueName: string,
+  results: ProcessedQueueMessage[],
+): Promise<void> {
+  const cfIdUpdates = results.map(result => ({
+    msg_id: result.msg_id,
+    cf_id: result.cfId,
+    queue: queueName,
+  }))
+
+  if (cfIdUpdates.length === 0)
+    return
+
+  cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Updating ${cfIdUpdates.length} messages with CF IDs.` })
+  try {
+    await mass_edit_queue_messages_cf_ids(c, db, cfIdUpdates)
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Failed to persist queue CF IDs. Continuing queue cleanup.`,
+      error: serializeError(error),
+      queueName,
+      updateCount: cfIdUpdates.length,
+    })
+  }
+}
+
+async function deleteUncheckpointedSuccessMessages(
+  c: Context,
+  db: ReturnType<typeof getPgClient>,
+  queueName: string,
+  successMessages: ProcessedQueueMessage[],
+): Promise<void> {
+  const successMessagesPendingDelete = successMessages.filter(msg => !msg.deletedFromQueue)
+  if (successMessagesPendingDelete.length === 0)
+    return
+
+  cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Deleting ${successMessagesPendingDelete.length} successful messages from queue.` })
+  await delete_queue_message_batch(c, db, queueName, successMessagesPendingDelete.map(msg => msg.msg_id))
+}
+
+async function reportQueueFailures(c: Context, queueName: string, messagesFailed: ProcessedQueueMessage[]): Promise<number> {
+  if (messagesFailed.length === 0)
+    return 0
+
+  cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Failed to process ${messagesFailed.length} messages.` })
+
+  const timestamp = new Date().toISOString()
+  const failureDetails = messagesFailed.map(msg => ({
+    function_name: msg.message?.function_name ?? 'unknown',
+    function_type: msg.message?.function_type ?? 'supabase',
+    msg_id: msg.msg_id,
+    read_count: msg.read_ct,
+    status: msg.httpResponse.status,
+    status_text: msg.httpResponse.statusText,
+    error_code: msg.errorDetails.errorCode ?? undefined,
+    error_message: msg.errorDetails.errorMessage ?? undefined,
+    response_body: msg.errorDetails.bodyPreview ?? undefined,
+    payload_size: msg.payloadSize,
+    cf_id: msg.cfId,
+    duration_ms: msg.durationMs,
+    target_url: msg.targetUrl ?? undefined,
+  }))
+
+  const actionableFailures = getActionableQueueFailures(failureDetails)
+  const groupedByFunction = actionableFailures.reduce((acc, detail) => {
+    const key = detail.function_name
+    acc[key] ??= []
+    acc[key].push(detail)
+    return acc
+  }, {} as Record<string, typeof actionableFailures>)
+
+  if (actionableFailures.length > 0) {
+    await sendDiscordAlert(c, {
+      content: `🚨 **Queue Processing Failures** - ${queueName}`,
+      embeds: [
+        {
+          title: `❌ ${actionableFailures.length} Messages Failed Processing`,
+          description: `**Queue:** ${queueName}\n**Failed Functions:** ${Object.keys(groupedByFunction).length}\n**Total Failures:** ${actionableFailures.length}`,
+          color: 0xFF6B35, // Orange color for warnings
+          timestamp,
+          fields: [
+            {
+              name: '📊 Failure Summary',
+              value: Object.entries(groupedByFunction)
+                .map(([funcName, failures]) =>
+                  `**${funcName}** (${failures[0].function_type}): ${failures.length} failures`,
+                )
+                .join('\n'),
+              inline: false,
+            },
+            {
+              name: '🔍 Detailed Failures',
+              value: truncateDiscordField(actionableFailures.slice(0, 10).map((detail) => {
+                const cfLogUrl = `https://dash.cloudflare.com/${getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')}/workers/services/view/capgo_api-prod/production/observability/logs?workers-observability-view=%22invocations%22&filters=%5B%7B%22key%22%3A%22%24workers.event.request.headers.x-capgo-cf-id%22%2C%22type%22%3A%22string%22%2C%22value%22%3A%22${detail.cf_id}%22%2C%22operation%22%3A%22eq%22%7D%5D`
+                const errorInfo = detail.error_code ? ` | Error: ${detail.error_code}` : ''
+                const messageInfo = detail.error_message ? ` | ${truncateDiscordField(detail.error_message.replace(/\s+/g, ' ').trim(), 180)}` : ''
+                const durationInfo = typeof detail.duration_ms === 'number' ? ` | ${detail.duration_ms}ms` : ''
+                const targetInfo = detail.target_url ? ` | Target: ${truncateDiscordField(detail.target_url, 120)}` : ''
+                return `**${detail.function_name}** | Status: ${detail.status} | Read: ${detail.read_count}/${MAX_QUEUE_READS}${durationInfo}${errorInfo}${messageInfo}${targetInfo} | [CF Logs](${cfLogUrl})`
+              }).join('\n')),
+              inline: false,
+            },
+            {
+              name: '📈 Status Code Distribution',
+              value: Object.entries(
+                actionableFailures.reduce((acc, detail) => {
+                  acc[detail.status] = (acc[detail.status] ?? 0) + 1
+                  return acc
+                }, {} as Record<number, number>),
+              ).map(([status, count]) => `**${status}:** ${count}`).join(' | '),
+              inline: false,
+            },
+            {
+              name: '⚠️ Retry Analysis',
+              value: `**Retry Budget Exhausted:** ${actionableFailures.length}\n**Will Archive:** ${actionableFailures.length}`,
+              inline: true,
+            },
+            {
+              name: '📦 Payload Info',
+              value: `**Avg Size:** ${Math.round(actionableFailures.reduce((sum, d) => sum + d.payload_size, 0) / actionableFailures.length)} bytes\n**Max Size:** ${Math.max(...actionableFailures.map(d => d.payload_size))} bytes`,
+              inline: true,
+            },
+            {
+              name: '🧾 Sanitized Response Body',
+              value: truncateDiscordField(actionableFailures
+                .map(detail => detail.response_body ? `**${detail.function_name}:** ${sanitizeDiscordResponseBody(detail.response_body)}` : `**${detail.function_name}:** (empty)`)
+                .join('\n')),
+              inline: false,
+            },
+          ],
+          footer: {
+            text: `Queue: ${queueName} | Environment: ${getEnv(c, 'ENVIRONMENT') ?? 'unknown'}`,
+          },
+        },
+      ],
+    })
+  }
+  else {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Suppressed Discord alert for retryable or ignored queue failures.`,
+      retryingFailures: failureDetails.filter(detail => detail.read_count < MAX_QUEUE_READS).length,
+      ignoredErrors: Array.from(DISCORD_IGNORED_ERROR_CODES),
+    })
+  }
+
+  return actionableFailures.length
 }
 
 async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE): Promise<QueueProcessResult> {
@@ -550,149 +763,17 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
     await archive_queue_messages(c, db, queueName, messagesToSkip.map(msg => msg.msg_id))
   }
 
-  // Process messages that are still within the retry budget.
-  const results = await mapWithConcurrency(messagesToProcess, processConcurrency, async message => processQueueMessage(c, queueName, message))
-  let actionableFailureCount = 0
+  const results = await processQueueMessageChunks(c, db, queueName, messagesToProcess, processConcurrency)
+  await persistQueueCfIds(c, db, queueName, results)
 
-  // Update all messages with their CF IDs
-  const cfIdUpdates = results.map(result => ({
-    msg_id: result.msg_id,
-    cf_id: result.cfId,
-    queue: queueName,
-  }))
-
-  if (cfIdUpdates.length > 0) {
-    cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Updating ${cfIdUpdates.length} messages with CF IDs.` })
-    try {
-      await mass_edit_queue_messages_cf_ids(c, db, cfIdUpdates)
-    }
-    catch (error) {
-      cloudlogErr({
-        requestId: c.get('requestId'),
-        message: `[${queueName}] Failed to persist queue CF IDs. Continuing queue cleanup.`,
-        error: serializeError(error),
-        queueName,
-        updateCount: cfIdUpdates.length,
-      })
-    }
-  }
-
-  // Batch remove all messages that have succeeded
-  // const successMessages = results.filter(result => result.httpResponse.status >= 200 && result.httpResponse.status < 300)
+  // Batch remove all messages that have succeeded.
   const [successMessages, messagesFailed] = results.reduce((acc, result) => {
-    acc[(result.httpResponse.status >= 200 && result.httpResponse.status < 300) ? 0 : 1].push(result)
+    acc[isSuccessfulQueueResult(result) ? 0 : 1].push(result)
     return acc
   }, [[], []] as [typeof results, typeof results])
-  if (successMessages.length > 0) {
-    cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Deleting ${successMessages.length} successful messages from queue.` })
-    await delete_queue_message_batch(c, db, queueName, successMessages.map(msg => msg.msg_id))
-  }
-  if (messagesFailed.length > 0) {
-    cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Failed to process ${messagesFailed.length} messages.` })
 
-    const timestamp = new Date().toISOString()
-    const failureDetails = messagesFailed.map(msg => ({
-      function_name: msg.message?.function_name ?? 'unknown',
-      function_type: msg.message?.function_type ?? 'supabase',
-      msg_id: msg.msg_id,
-      read_count: msg.read_ct,
-      status: msg.httpResponse.status,
-      status_text: msg.httpResponse.statusText,
-      error_code: msg.errorDetails.errorCode ?? undefined,
-      error_message: msg.errorDetails.errorMessage ?? undefined,
-      response_body: msg.errorDetails.bodyPreview ?? undefined,
-      payload_size: msg.payloadSize,
-      cf_id: msg.cfId,
-      duration_ms: msg.durationMs,
-      target_url: msg.targetUrl ?? undefined,
-    }))
-
-    const actionableFailures = getActionableQueueFailures(failureDetails)
-    actionableFailureCount = actionableFailures.length
-
-    const groupedByFunction = actionableFailures.reduce((acc, detail) => {
-      const key = detail.function_name
-      acc[key] ??= []
-      acc[key].push(detail)
-      return acc
-    }, {} as Record<string, typeof actionableFailures>)
-
-    if (actionableFailures.length > 0) {
-      await sendDiscordAlert(c, {
-        content: `🚨 **Queue Processing Failures** - ${queueName}`,
-        embeds: [
-          {
-            title: `❌ ${actionableFailures.length} Messages Failed Processing`,
-            description: `**Queue:** ${queueName}\n**Failed Functions:** ${Object.keys(groupedByFunction).length}\n**Total Failures:** ${actionableFailures.length}`,
-            color: 0xFF6B35, // Orange color for warnings
-            timestamp,
-            fields: [
-              {
-                name: '📊 Failure Summary',
-                value: Object.entries(groupedByFunction)
-                  .map(([funcName, failures]) =>
-                    `**${funcName}** (${failures[0].function_type}): ${failures.length} failures`,
-                  )
-                  .join('\n'),
-                inline: false,
-              },
-              {
-                name: '🔍 Detailed Failures',
-                value: truncateDiscordField(actionableFailures.slice(0, 10).map((detail) => {
-                  const cfLogUrl = `https://dash.cloudflare.com/${getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')}/workers/services/view/capgo_api-prod/production/observability/logs?workers-observability-view=%22invocations%22&filters=%5B%7B%22key%22%3A%22%24workers.event.request.headers.x-capgo-cf-id%22%2C%22type%22%3A%22string%22%2C%22value%22%3A%22${detail.cf_id}%22%2C%22operation%22%3A%22eq%22%7D%5D`
-                  const errorInfo = detail.error_code ? ` | Error: ${detail.error_code}` : ''
-                  const messageInfo = detail.error_message ? ` | ${truncateDiscordField(detail.error_message.replace(/\s+/g, ' ').trim(), 180)}` : ''
-                  const durationInfo = typeof detail.duration_ms === 'number' ? ` | ${detail.duration_ms}ms` : ''
-                  const targetInfo = detail.target_url ? ` | Target: ${truncateDiscordField(detail.target_url, 120)}` : ''
-                  return `**${detail.function_name}** | Status: ${detail.status} | Read: ${detail.read_count}/${MAX_QUEUE_READS}${durationInfo}${errorInfo}${messageInfo}${targetInfo} | [CF Logs](${cfLogUrl})`
-                }).join('\n')),
-                inline: false,
-              },
-              {
-                name: '📈 Status Code Distribution',
-                value: Object.entries(
-                  actionableFailures.reduce((acc, detail) => {
-                    acc[detail.status] = (acc[detail.status] ?? 0) + 1
-                    return acc
-                  }, {} as Record<number, number>),
-                ).map(([status, count]) => `**${status}:** ${count}`).join(' | '),
-                inline: false,
-              },
-              {
-                name: '⚠️ Retry Analysis',
-                value: `**Retry Budget Exhausted:** ${actionableFailures.length}\n**Will Archive:** ${actionableFailures.length}`,
-                inline: true,
-              },
-              {
-                name: '📦 Payload Info',
-                value: `**Avg Size:** ${Math.round(actionableFailures.reduce((sum, d) => sum + d.payload_size, 0) / actionableFailures.length)} bytes\n**Max Size:** ${Math.max(...actionableFailures.map(d => d.payload_size))} bytes`,
-                inline: true,
-              },
-              {
-                name: '🧾 Sanitized Response Body',
-                value: truncateDiscordField(actionableFailures
-                  .map(detail => detail.response_body ? `**${detail.function_name}:** ${sanitizeDiscordResponseBody(detail.response_body)}` : `**${detail.function_name}:** (empty)`)
-                  .join('\n')),
-                inline: false,
-              },
-            ],
-            footer: {
-              text: `Queue: ${queueName} | Environment: ${getEnv(c, 'ENVIRONMENT') ?? 'unknown'}`,
-            },
-          },
-        ],
-      })
-    }
-    else {
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: `[${queueName}] Suppressed Discord alert for retryable or ignored queue failures.`,
-        retryingFailures: failureDetails.filter(detail => detail.read_count < MAX_QUEUE_READS).length,
-        ignoredErrors: Array.from(DISCORD_IGNORED_ERROR_CODES),
-      })
-    }
-    // set visibility timeout to random number to prevent Auto DDOS
-  }
+  await deleteUncheckpointedSuccessMessages(c, db, queueName, successMessages)
+  const actionableFailureCount = await reportQueueFailures(c, queueName, messagesFailed)
 
   if (successMessages.length !== messagesToProcess.length) {
     cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] ${successMessages.length} messages were processed successfully, ${messagesToProcess.length - successMessages.length} messages failed.` })
@@ -832,6 +913,7 @@ export async function http_post_helper(
     headers['x-capgo-queue-name'] = metadata.queueName
     headers['x-capgo-queue-msg-id'] = String(metadata.msgId)
     headers['x-capgo-queue-read-count'] = String(metadata.readCount)
+    headers['x-capgo-queue-max-reads'] = String(MAX_QUEUE_READS)
   }
 
   const controller = new AbortController()
@@ -1084,6 +1166,7 @@ export const __queueConsumerTestUtils__ = {
   getActionableQueueFailures,
   getCronHealthcheckStartUrl,
   getQueueBatchSize,
+  getQueueAckChunkSize,
   getQueueHttpConcurrency,
   httpExceptionToQueueResponse,
   getQueueVisibilityTimeout,

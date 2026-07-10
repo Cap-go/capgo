@@ -126,7 +126,10 @@ window.addEventListener('vite:preloadError', (event) => {
   handleChunkError(message)
 })
 
-const guestPath = ['/login', '/delete_account', '/confirm-signup', '/forgot_password', '/resend_email', '/onboarding', '/register', '/invitation', '/scan', '/preview/channel', '/sso-callback']
+const guestPath = ['/login', '/delete_account', '/confirm-signup', '/forgot_password', '/resend_email', '/onboarding', '/register', '/invitation', '/scan', '/sso-callback']
+function isGuestRoutePath(path: string) {
+  return guestPath.includes(path) || path === '/preview' || path.startsWith('/preview/')
+}
 
 getRemoteConfig()
 const app = createApp(App)
@@ -134,7 +137,7 @@ CapacitorUpdater.notifyAppReady()
 console.log(`Capgo Version : "${import.meta.env.VITE_APP_VERSION}"`)
 // setup up pages with layouts
 const newRoutes = routes.map((route) => {
-  if (guestPath.includes(route.path)) {
+  if (isGuestRoutePath(route.path)) {
     route.meta ??= {}
     route.meta.layout = 'naked'
   }

@@ -30,7 +30,7 @@ import { copyToClipboard, revealInFinder } from '../support/clipboard'
 import { appendInternalLog, getInternalLogPath, startInternalLog } from '../support/internal-log'
 import { showReplicationProgress } from '../replicationProgress'
 import { formatRunnerCommand, splitRunnerCommand } from '../runner-command'
-import { createSupabaseClient, defaultApiHost, findBuildCommandForProjectType, findMainFile, findMainFileForProjectType, findProjectType, findRoot, findSavedKey, findSavedKeySilent, formatError, getAllPackagesDependencies, getAppId, getBundleVersion, getConfig, getLocalConfig, getNativeProjectResetAdvice, getOrganizationListWithPermission, getPackageScripts, getPMAndCommand, hasCliPermission, PACKNAME, projectIsMonorepo, resolveUserIdFromApiKey, updateConfigbyKey, updateConfigUpdater, validateIosUpdaterSync } from '../utils'
+import { consoleWebUrl, createSupabaseClient, defaultApiHost, findBuildCommandForProjectType, findMainFile, findMainFileForProjectType, findProjectType, findRoot, findSavedKey, findSavedKeySilent, formatError, getAllPackagesDependencies, getAppId, getBundleVersion, getConfig, getLocalConfig, getNativeProjectResetAdvice, getOrganizationListWithPermission, getPackageScripts, getPMAndCommand, hasCliPermission, PACKNAME, projectIsMonorepo, resolveUserIdFromApiKey, updateConfigbyKey, updateConfigUpdater, validateIosUpdaterSync } from '../utils'
 import { buildAppIdConflictSuggestions, isAppAlreadyExistsError } from './app-conflict'
 import { cancel as pCancel, confirm as pConfirm, intro as pIntro, isCancel as pIsCancel, log as pLog, outro as pOutro, select as pSelect, spinner as pSpinner, text as pText } from './prompts'
 import { appendInitStreamingLine, clearInitStreamingOutput, setInitCodeDiff, setInitEncryptionSummary, setInitVersionWarning, startInitStreamingOutput, stopInitInkSession, updateInitStreamingStatus } from './runtime'
@@ -525,7 +525,7 @@ function readInitInternalLogLines(): string[] {
 // .log.gz path → reveal in Finder (macOS) → open a pre-filled mailto. There's
 // no build log in init, so the support bundle carries diagnostics + the
 // internal log only. Every step but "write the bundle" is best-effort.
-async function runInitContactSupport(failureText: string): Promise<void> {
+async function runInitContactSupport(failureText: string, supportPlatform?: PlatformChoice): Promise<void> {
   await contactSupport({
     subject: `Capgo Builder onboarding support — ${globalAppId ?? 'unknown'}`,
     body: `Hi Capgo team,\n\nI hit an error during Capgo Builder onboarding.\n\nApp: ${globalAppId ?? 'unknown'}\nError: ${failureText}`,
@@ -566,7 +566,7 @@ async function runInitContactSupport(failureText: string): Promise<void> {
         return null
       const spinner = pSpinner()
       spinner.start('Uploading your logs to Capgo support…')
-      const r = await uploadSupportLogs({ apiHost: globalSupaHost ?? defaultApiHost, apikey: key, appId: globalAppId, gzPath })
+      const r = await uploadSupportLogs({ apiHost: globalSupaHost ?? defaultApiHost, apikey: key, appId: globalAppId, platform: supportPlatform, gzPath })
       spinner.stop(r ? 'Logs uploaded.' : 'Logs upload unavailable — falling back to attaching the file.')
       return r
     },
@@ -1246,6 +1246,7 @@ async function selectRecoveryOption<T extends string>(
   message: string,
   options: RecoveryOption<T>[],
   failureText = message,
+  supportPlatform?: PlatformChoice,
 ): Promise<T> {
   type RecoveryChoice = T | '__doctor__' | '__email_support__' | '__support__' | '__cancel__'
 
@@ -1278,7 +1279,7 @@ async function selectRecoveryOption<T extends string>(
     }
 
     if (choice === '__email_support__') {
-      await runInitContactSupport(failureText)
+      await runInitContactSupport(failureText, supportPlatform)
       continue
     }
 
@@ -1791,7 +1792,7 @@ async function selectOrganizationForInit(
 
   if (organization.enforcing_2fa && !organization['2fa_has_access']) {
     pLog.error(`The organization "${organization.name}" requires all members to have 2FA enabled.`)
-    pLog.error('Enable 2FA at https://web.capgo.app/settings/account and try again.')
+    pLog.error(`Enable 2FA at ${consoleWebUrl('/settings/account')} and try again.`)
     throw new Error('2FA required for selected organization')
   }
 
@@ -2339,7 +2340,7 @@ async function waitForVerifiedUpdaterInstall(
   packageJsonPath: string,
   pm: PackageManagerInfo,
   versionToInstall: string,
-  options: { allowAutoRetry?: boolean, failureText?: string } = {},
+  options: { allowAutoRetry?: boolean, failureText?: string, supportPlatform?: PlatformChoice } = {},
 ) {
   const manualCommand = getUpdaterInstallCommand(pm, versionToInstall)
 
@@ -2356,8 +2357,7 @@ async function waitForVerifiedUpdaterInstall(
       const recoveryChoice = await selectRecoveryOption(orgId, apikey, 'Updater install is not complete yet. What do you want to do?', [
         { value: 'retry-auto', label: 'Retry automatic updater install' },
         { value: 'manual', label: 'Install it manually, then continue' },
-      ], options.failureText ?? state.details.join('\n'))
-
+      ], options.failureText ?? state.details.join('\n'), options.supportPlatform)
       if (recoveryChoice === 'retry-auto') {
         const s = pSpinner()
         try {
@@ -3113,6 +3113,7 @@ async function handleBuildAndSyncFailure(
     const versionToInstall = await getCompatibleUpdaterVersionForPackage(packageJsonPath, pm)
     await waitForVerifiedUpdaterInstall(orgId, apikey, packageJsonPath, pm, versionToInstall, {
       failureText: formattedError,
+      supportPlatform: platform,
     })
     return 'retry'
   }
@@ -3120,7 +3121,7 @@ async function handleBuildAndSyncFailure(
   const recoveryChoice = await selectRecoveryOption(orgId, apikey, 'Build or sync failed. What do you want to do?', [
     { value: 'retry', label: 'Retry build and sync' },
     { value: 'manual', label: 'Fix it manually, then continue' },
-  ], formattedError)
+  ], formattedError, platform)
 
   if (recoveryChoice === 'retry')
     return 'retry'
@@ -4273,7 +4274,7 @@ async function maybeOfferAutoTestCleanup(orgId: string, apikey: string, appId: s
   pLog.warn(`Do not run "${pm.runner} cap sync ${platform}" before this cleanup upload.`)
 }
 
-async function uploadStep(orgId: string, apikey: string, appId: string, newVersion: string, delta: boolean) {
+async function uploadStep(orgId: string, apikey: string, appId: string, newVersion: string, delta: boolean, supportPlatform: PlatformChoice) {
   const pm = getPMAndCommand()
   const selectedPackageJsonPath = globalPathToPackageJson ? path.resolve(globalPathToPackageJson) : undefined
   const selectedProjectDir = selectedPackageJsonPath ? dirname(selectedPackageJsonPath) : cwd()
@@ -4326,14 +4327,14 @@ async function uploadStep(orgId: string, apikey: string, appId: string, newVersi
         pLog.error(formatError(error))
         await selectRecoveryOption(orgId, apikey, 'Bundle upload failed. What do you want to do?', [
           { value: 'retry', label: 'Retry bundle upload' },
-        ], formatError(error))
+        ], formatError(error), supportPlatform)
         continue
       }
       if (!uploadRes?.success) {
         s.stop('Upload failed ❌')
         await selectRecoveryOption(orgId, apikey, 'Bundle upload failed. What do you want to do?', [
           { value: 'retry', label: 'Retry bundle upload' },
-        ], 'Bundle upload did not complete successfully.')
+        ], 'Bundle upload did not complete successfully.', supportPlatform)
         continue
       }
 
@@ -4748,7 +4749,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
         discardResumedState()
       }
       else if (blocked2fa) {
-        pLog.warn(`Organization "${savedOrg.name}" now requires 2FA. Enable it at https://web.capgo.app/settings/account`)
+        pLog.warn(`Organization "${savedOrg.name}" now requires 2FA. Enable it at ${consoleWebUrl('/settings/account')}`)
         pLog.warn('Please select a different organization or enable 2FA and try again.')
         organization = await selectOrganizationForInit(supabase, options.apikey)
         discardResumedState()
@@ -4898,7 +4899,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
 
     if (stepToSkip < 10) {
       renderCurrentStep(10)
-      await uploadStep(orgId, options.apikey, appId, currentVersion, delta)
+      await uploadStep(orgId, options.apikey, appId, currentVersion, delta, platform)
       markStepDone(10)
     }
 
