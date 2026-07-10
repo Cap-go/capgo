@@ -2,17 +2,18 @@ import type { Context } from 'hono'
 import type { CreateBindingParams } from '../../private/role_bindings.ts'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
+import type { ClientBindingInput } from './scope.ts'
 import { sql } from 'drizzle-orm'
-import { createRoleBindingForPrincipal } from '../../private/role_bindings.ts'
+import { createRoleBindingForPrincipal, lockRbacOrgs } from '../../private/role_bindings.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareAuth } from '../../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
 import { schema } from '../../utils/postgres_schema.ts'
-import { checkPermission } from '../../utils/rbac.ts'
+import { checkPermission, checkPermissionPg } from '../../utils/rbac.ts'
 import { supabaseAdmin, supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { apiKeyBindingsAllowOrgCreate, assertApiKeyCanKeepOrgCreateGrant, parseApiKeyGlobalPermissions, replaceApiKeyGlobalPermissions, validateApiKeyGlobalPermissionsForBindings } from './global_permissions.ts'
-import { assertApiKeyManagerCanAssignBindings, ensureApiKeyCanManageTargetOrgIds, ensureApiKeyManagementAllowed, getApiKeyBindingOrgIds, isValidApiKeyIdFormat, requireApiKeyManagementAuth, sanitizeClientBindings, selectOwnedApiKeyByIdentifier, type ClientBindingInput } from './scope.ts'
+import { assertApiKeyManagerCanAssignBindings, ensureApiKeyCanManageTargetOrgIds, ensureApiKeyManagementAllowed, getApiKeyBindingOrgIds, isValidApiKeyIdFormat, requireApiKeyManagementAuth, sanitizeClientBindings, selectOwnedApiKeyByIdentifier } from './scope.ts'
 
 const app = honoFactory.createApp()
 const APIKEY_ORG_READER_ROLE = 'apikey_org_reader'
@@ -129,6 +130,14 @@ async function replaceApiKeyBindings(
     }
 
     await drizzle.transaction(async (tx) => {
+      const txDrizzle = tx as unknown as ReturnType<typeof getDrizzleClient>
+      await lockRbacOrgs(txDrizzle, affectedOrgIds)
+
+      for (const orgId of affectedOrgIds) {
+        if (!(await checkPermissionPg(c, 'org.update_user_roles', { orgId }, txDrizzle, auth.userId))) {
+          throw quickError(403, 'forbidden_binding', `Forbidden - Admin rights required for org ${orgId}`, { requestId: c.get('requestId'), orgId })
+        }
+      }
       if (updateData && Object.keys(updateData).length > 0) {
         const result = await tx
           .update(schema.apikeys)
@@ -159,7 +168,7 @@ async function replaceApiKeyBindings(
         }
 
         const result = await createRoleBindingForPrincipal(
-          tx as unknown as ReturnType<typeof getDrizzleClient>,
+          txDrizzle,
           bindingParams,
           auth.userId,
           'jwt',
@@ -240,6 +249,14 @@ async function replaceApiKeyGlobalPermissionsForExistingBindings(
     const drizzle = getDrizzleClient(pgClient)
 
     await drizzle.transaction(async (tx) => {
+      const txDrizzle = tx as unknown as ReturnType<typeof getDrizzleClient>
+      await lockRbacOrgs(txDrizzle, currentBindingOrgIds)
+
+      for (const orgId of currentBindingOrgIds) {
+        if (!(await checkPermissionPg(c, 'org.update_user_roles', { orgId }, txDrizzle, auth.userId))) {
+          throw quickError(403, 'forbidden_binding', `Forbidden - Admin rights required for org ${orgId}`, { requestId: c.get('requestId'), orgId })
+        }
+      }
       if (updateData && Object.keys(updateData).length > 0) {
         const result = await tx
           .update(schema.apikeys)

@@ -1,11 +1,12 @@
+import type { AuthInfo } from '../utils/hono.ts'
 import { sValidator } from '@hono/standard-validator'
+import { and, eq, sql } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
-import { and, eq } from 'drizzle-orm'
 import { createHono, middlewareAuth, quickError, useCors } from '../utils/hono.ts'
 import { cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { schema } from '../utils/postgres_schema.ts'
-import { checkPermission } from '../utils/rbac.ts'
+import { checkPermission, checkPermissionPg } from '../utils/rbac.ts'
 import { version } from '../utils/version.ts'
 import {
   addGroupMemberBodyHook,
@@ -22,11 +23,94 @@ import {
   updateGroupBodySchema,
   validateJsonBody,
 } from './rbac_validation.ts'
+import { lockRbacOrgs } from './role_bindings.ts'
 
 export const app = createHono('', version)
 
 app.use('*', useCors)
 app.use('*', middlewareAuth)
+
+type DrizzleClient = ReturnType<typeof getDrizzleClient>
+
+interface GroupRankPrincipal {
+  principalType: 'user' | 'apikey'
+  principalId: string
+}
+
+function getGroupRankPrincipal(auth: AuthInfo): GroupRankPrincipal | null {
+  if (auth.authType === 'apikey') {
+    if (!auth.apikey?.rbac_id)
+      return null
+
+    return {
+      principalType: 'apikey',
+      principalId: auth.apikey.rbac_id,
+    }
+  }
+
+  return {
+    principalType: 'user',
+    principalId: auth.userId,
+  }
+}
+
+async function canManageGroupRank(
+  drizzle: DrizzleClient,
+  auth: AuthInfo,
+  groupId: string,
+): Promise<boolean> {
+  const principal = getGroupRankPrincipal(auth)
+  if (!principal)
+    return false
+
+  const result = await drizzle.execute(sql`
+    SELECT public.principal_can_manage_group_rank(
+      ${principal.principalType}::text,
+      ${principal.principalId}::uuid,
+      ${groupId}::uuid
+    ) AS allowed
+  `)
+
+  return (result.rows[0] as { allowed?: boolean } | undefined)?.allowed === true
+}
+
+async function canManageGroupRoles(
+  c: Parameters<typeof checkPermission>[0],
+  drizzle: DrizzleClient,
+  orgId: string,
+): Promise<boolean> {
+  const auth = c.get('auth')
+  if (!auth?.userId) {
+    return false
+  }
+
+  return await checkPermissionPg(
+    c,
+    'org.update_user_roles',
+    { orgId },
+    drizzle,
+    auth.userId,
+    auth.apikey?.key ?? c.get('capgkey') ?? null,
+  )
+}
+
+async function loadGroupLockOrgId(
+  drizzle: DrizzleClient,
+  groupId: string,
+): Promise<string | null> {
+  const [group] = await drizzle
+    .select({ orgId: schema.groups.org_id })
+    .from(schema.groups)
+    .where(eq(schema.groups.id, groupId))
+    .limit(1)
+
+  return group?.orgId ?? null
+}
+
+function isLastEffectiveSuperAdminError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return message.includes('CANNOT_REMOVE_LAST_EFFECTIVE_SUPER_ADMIN')
+}
 
 // GET /private/groups/:org_id - List groups for an org
 app.get('/:org_id', sValidator('param', orgIdParamSchema, invalidOrgIdHook), async (c) => {
@@ -142,9 +226,10 @@ app.put(
   sValidator('param', groupIdParamSchema, invalidGroupIdHook),
   async (c) => {
     const { group_id: groupId } = c.req.valid('param')
-    const userId = c.get('auth')?.userId
+    const auth = c.get('auth')
+    const userId = auth?.userId
 
-    if (!userId) {
+    if (!auth || !userId) {
       return c.json({ error: 'Unauthorized' }, 401)
     }
 
@@ -152,44 +237,59 @@ app.put(
     try {
       pgClient = getPgClient(c)
       const drizzle = getDrizzleClient(pgClient)
-
-      // Fetch the group and verify access
-      const [group] = await drizzle
-        .select()
-        .from(schema.groups)
-        .where(eq(schema.groups.id, groupId))
-        .limit(1)
-
-      if (!group) {
+      const lockOrgId = await loadGroupLockOrgId(drizzle, groupId)
+      if (!lockOrgId) {
         return c.json({ error: 'Group not found' }, 404)
       }
 
-      if (group.is_system) {
-        return c.json({ error: 'Cannot modify system group' }, 403)
+      const result = await drizzle.transaction(async (tx) => {
+        const txDrizzle = tx as unknown as DrizzleClient
+        await lockRbacOrgs(txDrizzle, [lockOrgId])
+
+        const [group] = await txDrizzle
+          .select()
+          .from(schema.groups)
+          .where(eq(schema.groups.id, groupId))
+          .limit(1)
+        if (!group) {
+          return { ok: false as const, response: c.json({ error: 'Group not found' }, 404) }
+        }
+
+        if (group.is_system) {
+          return { ok: false as const, response: c.json({ error: 'Cannot modify system group' }, 403) }
+        }
+
+        if (!(await canManageGroupRoles(c, txDrizzle, group.org_id))) {
+          return { ok: false as const, response: c.json({ error: 'Forbidden - Admin rights required' }, 403) }
+        }
+
+        if (!(await canManageGroupRank(txDrizzle, auth, groupId))) {
+          return { ok: false as const, response: c.json({ error: 'Forbidden - Cannot manage a group with higher privileges than your own' }, 403) }
+        }
+
+        const bodyResult = await validateJsonBody(c, updateGroupBodySchema, updateGroupBodyHook)
+        if (!bodyResult.ok) {
+          return { ok: false as const, response: bodyResult.response }
+        }
+
+        const { name, description } = bodyResult.data
+        const [updated] = await tx
+          .update(schema.groups)
+          .set({
+            name: name || group.name,
+            description: description !== undefined ? description : group.description,
+          })
+          .where(eq(schema.groups.id, groupId))
+          .returning()
+
+        return { ok: true as const, data: updated }
+      })
+
+      if (!result.ok) {
+        return result.response
       }
 
-      if (!(await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id }))) {
-        return c.json({ error: 'Forbidden - Admin rights required' }, 403)
-      }
-
-      const bodyResult = await validateJsonBody(c, updateGroupBodySchema, updateGroupBodyHook)
-      if (!bodyResult.ok) {
-        return bodyResult.response
-      }
-
-      const { name, description } = bodyResult.data
-
-      // Update
-      const [updated] = await drizzle
-        .update(schema.groups)
-        .set({
-          name: name || group.name,
-          description: description !== undefined ? description : group.description,
-        })
-        .where(eq(schema.groups.id, groupId))
-        .returning()
-
-      return c.json(updated)
+      return c.json(result.data)
     }
     catch (error) {
       cloudlogErr({
@@ -211,9 +311,10 @@ app.put(
 // DELETE /private/groups/:group_id - Delete a group
 app.delete('/:group_id', sValidator('param', groupIdParamSchema, invalidGroupIdHook), async (c) => {
   const { group_id: groupId } = c.req.valid('param')
-  const userId = c.get('auth')?.userId
+  const auth = c.get('auth')
+  const userId = auth?.userId
 
-  if (!userId) {
+  if (!auth || !userId) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
@@ -221,28 +322,36 @@ app.delete('/:group_id', sValidator('param', groupIdParamSchema, invalidGroupIdH
   try {
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
-
-    // Fetch the group and verify access
-    const [group] = await drizzle
-      .select()
-      .from(schema.groups)
-      .where(eq(schema.groups.id, groupId))
-      .limit(1)
-
-    if (!group) {
+    const lockOrgId = await loadGroupLockOrgId(drizzle, groupId)
+    if (!lockOrgId) {
       return c.json({ error: 'Group not found' }, 404)
     }
 
-    if (group.is_system) {
-      return c.json({ error: 'Cannot delete system group' }, 403)
-    }
+    const result = await drizzle.transaction(async (tx) => {
+      const txDrizzle = tx as unknown as DrizzleClient
+      await lockRbacOrgs(txDrizzle, [lockOrgId])
 
-    if (!(await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id }))) {
-      return c.json({ error: 'Forbidden - Admin rights required' }, 403)
-    }
+      const [group] = await txDrizzle
+        .select()
+        .from(schema.groups)
+        .where(eq(schema.groups.id, groupId))
+        .limit(1)
+      if (!group) {
+        return { ok: false as const, response: c.json({ error: 'Group not found' }, 404) }
+      }
 
-    // Delete atomically (cascade removes group_members)
-    await drizzle.transaction(async (tx) => {
+      if (group.is_system) {
+        return { ok: false as const, response: c.json({ error: 'Cannot delete system group' }, 403) }
+      }
+
+      if (!(await canManageGroupRoles(c, txDrizzle, group.org_id))) {
+        return { ok: false as const, response: c.json({ error: 'Forbidden - Admin rights required' }, 403) }
+      }
+
+      if (!(await canManageGroupRank(txDrizzle, auth, groupId))) {
+        return { ok: false as const, response: c.json({ error: 'Forbidden - Cannot manage a group with higher privileges than your own' }, 403) }
+      }
+
       await tx
         .delete(schema.role_bindings)
         .where(
@@ -255,7 +364,13 @@ app.delete('/:group_id', sValidator('param', groupIdParamSchema, invalidGroupIdH
       await tx
         .delete(schema.groups)
         .where(eq(schema.groups.id, groupId))
+
+      return { ok: true as const }
     })
+
+    if (!result.ok) {
+      return result.response
+    }
 
     return c.json({ success: true })
   }
@@ -266,6 +381,8 @@ app.delete('/:group_id', sValidator('param', groupIdParamSchema, invalidGroupIdH
       groupId,
       error,
     })
+    if (isLastEffectiveSuperAdminError(error))
+      return c.json({ error: 'Cannot remove the last org_super_admin' }, 409)
     return c.json({ error: 'Internal server error' }, 500)
   }
   finally {
@@ -357,9 +474,10 @@ app.post(
   sValidator('param', groupIdParamSchema, invalidGroupIdHook),
   async (c) => {
     const { group_id: groupId } = c.req.valid('param')
-    const userId = c.get('auth')?.userId
+    const auth = c.get('auth')
+    const userId = auth?.userId
 
-    if (!userId) {
+    if (!auth || !userId) {
       return c.json({ error: 'Unauthorized' }, 401)
     }
 
@@ -368,58 +486,73 @@ app.post(
     try {
       pgClient = getPgClient(c)
       const drizzle = getDrizzleClient(pgClient)
-
-      // Fetch the group and verify access
-      const [group] = await drizzle
-        .select()
-        .from(schema.groups)
-        .where(eq(schema.groups.id, groupId))
-        .limit(1)
-
-      if (!group) {
+      const lockOrgId = await loadGroupLockOrgId(drizzle, groupId)
+      if (!lockOrgId) {
         return c.json({ error: 'Group not found' }, 404)
       }
 
-      if (!(await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id }))) {
-        return c.json({ error: 'Forbidden - Admin rights required' }, 403)
+      const result = await drizzle.transaction(async (tx) => {
+        const txDrizzle = tx as unknown as DrizzleClient
+        await lockRbacOrgs(txDrizzle, [lockOrgId])
+
+        const [group] = await txDrizzle
+          .select()
+          .from(schema.groups)
+          .where(eq(schema.groups.id, groupId))
+          .limit(1)
+        if (!group) {
+          return { ok: false as const, response: c.json({ error: 'Group not found' }, 404) }
+        }
+
+        if (!(await canManageGroupRoles(c, txDrizzle, group.org_id))) {
+          return { ok: false as const, response: c.json({ error: 'Forbidden - Admin rights required' }, 403) }
+        }
+
+        const bodyResult = await validateJsonBody(c, addGroupMemberBodySchema, addGroupMemberBodyHook)
+        if (!bodyResult.ok) {
+          return { ok: false as const, response: bodyResult.response }
+        }
+
+        targetUserId = bodyResult.data.user_id
+        const targetRbacAccess = await txDrizzle
+          .select({ id: schema.role_bindings.id })
+          .from(schema.role_bindings)
+          .where(
+            and(
+              eq(schema.role_bindings.principal_type, 'user'),
+              eq(schema.role_bindings.principal_id, targetUserId),
+              eq(schema.role_bindings.org_id, group.org_id),
+              sql`(${schema.role_bindings.expires_at} IS NULL OR ${schema.role_bindings.expires_at} > now())`,
+            ),
+          )
+          .limit(1)
+
+        if (!targetRbacAccess.length) {
+          return { ok: false as const, response: c.json({ error: 'User is not a member of this org' }, 400) }
+        }
+
+        if (!(await canManageGroupRank(txDrizzle, auth, groupId))) {
+          return { ok: false as const, response: c.json({ error: 'Forbidden - Cannot manage a group with higher privileges than your own' }, 403) }
+        }
+
+        const [member] = await tx
+          .insert(schema.group_members)
+          .values({
+            group_id: groupId,
+            user_id: targetUserId,
+            added_by: userId,
+          })
+          .onConflictDoNothing()
+          .returning()
+
+        return { ok: true as const, data: member || { message: 'User already in group' } }
+      })
+
+      if (!result.ok) {
+        return result.response
       }
 
-      const bodyResult = await validateJsonBody(c, addGroupMemberBodySchema, addGroupMemberBodyHook)
-      if (!bodyResult.ok) {
-        return bodyResult.response
-      }
-
-      targetUserId = bodyResult.data.user_id
-
-      // Verify the target user belongs to the org
-      const targetRbacAccess = await drizzle
-        .select({ id: schema.role_bindings.id })
-        .from(schema.role_bindings)
-        .where(
-          and(
-            eq(schema.role_bindings.principal_type, 'user'),
-            eq(schema.role_bindings.principal_id, targetUserId),
-            eq(schema.role_bindings.org_id, group.org_id),
-          ),
-        )
-        .limit(1)
-
-      if (!targetRbacAccess.length) {
-        return c.json({ error: 'User is not a member of this org' }, 400)
-      }
-
-      // Add member (ON CONFLICT DO NOTHING for idempotency)
-      const [member] = await drizzle
-        .insert(schema.group_members)
-        .values({
-          group_id: groupId,
-          user_id: targetUserId,
-          added_by: userId,
-        })
-        .onConflictDoNothing()
-        .returning()
-
-      return c.json(member || { message: 'User already in group' })
+      return c.json(result.data)
     }
     catch (error) {
       cloudlogErr({
@@ -442,9 +575,10 @@ app.post(
 // DELETE /private/groups/:group_id/members/:user_id - Remove a member
 app.delete('/:group_id/members/:user_id', sValidator('param', groupMemberParamSchema, invalidGroupMemberParamHook), async (c) => {
   const { group_id: groupId, user_id: targetUserId } = c.req.valid('param')
-  const userId = c.get('auth')?.userId
+  const auth = c.get('auth')
+  const userId = auth?.userId
 
-  if (!userId) {
+  if (!auth || !userId) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
@@ -452,31 +586,47 @@ app.delete('/:group_id/members/:user_id', sValidator('param', groupMemberParamSc
   try {
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
-
-    // Fetch the group and verify access
-    const [group] = await drizzle
-      .select()
-      .from(schema.groups)
-      .where(eq(schema.groups.id, groupId))
-      .limit(1)
-
-    if (!group) {
+    const lockOrgId = await loadGroupLockOrgId(drizzle, groupId)
+    if (!lockOrgId) {
       return c.json({ error: 'Group not found' }, 404)
     }
 
-    if (!(await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id }))) {
-      return c.json({ error: 'Forbidden - Admin rights required' }, 403)
-    }
+    const result = await drizzle.transaction(async (tx) => {
+      const txDrizzle = tx as unknown as DrizzleClient
+      await lockRbacOrgs(txDrizzle, [lockOrgId])
 
-    // Remove the member
-    await drizzle
-      .delete(schema.group_members)
-      .where(
-        and(
-          eq(schema.group_members.group_id, groupId),
-          eq(schema.group_members.user_id, targetUserId),
-        ),
-      )
+      const [group] = await txDrizzle
+        .select()
+        .from(schema.groups)
+        .where(eq(schema.groups.id, groupId))
+        .limit(1)
+      if (!group) {
+        return { ok: false as const, response: c.json({ error: 'Group not found' }, 404) }
+      }
+
+      if (!(await canManageGroupRoles(c, txDrizzle, group.org_id))) {
+        return { ok: false as const, response: c.json({ error: 'Forbidden - Admin rights required' }, 403) }
+      }
+
+      if (!(await canManageGroupRank(txDrizzle, auth, groupId))) {
+        return { ok: false as const, response: c.json({ error: 'Forbidden - Cannot manage a group with higher privileges than your own' }, 403) }
+      }
+
+      await tx
+        .delete(schema.group_members)
+        .where(
+          and(
+            eq(schema.group_members.group_id, groupId),
+            eq(schema.group_members.user_id, targetUserId),
+          ),
+        )
+
+      return { ok: true as const }
+    })
+
+    if (!result.ok) {
+      return result.response
+    }
 
     return c.json({ success: true })
   }
@@ -488,6 +638,8 @@ app.delete('/:group_id/members/:user_id', sValidator('param', groupMemberParamSc
       targetUserId,
       error,
     })
+    if (isLastEffectiveSuperAdminError(error))
+      return c.json({ error: 'Cannot remove the last org_super_admin' }, 409)
     return c.json({ error: 'Internal server error' }, 500)
   }
   finally {

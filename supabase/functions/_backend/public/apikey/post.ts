@@ -1,15 +1,16 @@
 import type { CreateBindingParams } from '../../private/role_bindings.ts'
 import type { Database } from '../../utils/supabase.types.ts'
+import type { ClientBindingInput } from './scope.ts'
 import { sql } from 'drizzle-orm'
-import { createRoleBindingForPrincipal } from '../../private/role_bindings.ts'
+import { createRoleBindingForPrincipal, lockRbacOrgs } from '../../private/role_bindings.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareAuth } from '../../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
-import { checkPermission } from '../../utils/rbac.ts'
+import { checkPermission, checkPermissionPg } from '../../utils/rbac.ts'
 import { supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { parseApiKeyGlobalPermissions, replaceApiKeyGlobalPermissions, validateApiKeyGlobalPermissionsForBindings } from './global_permissions.ts'
-import { assertApiKeyManagerCanAssignBindings, ensureApiKeyManagementAllowed, requireApiKeyManagementAuth, sanitizeClientBindings, type ClientBindingInput } from './scope.ts'
+import { assertApiKeyManagerCanAssignBindings, ensureApiKeyManagementAllowed, requireApiKeyManagementAuth, sanitizeClientBindings } from './scope.ts'
 
 type BindingInput = ClientBindingInput
 type EnrichedBindingInput = BindingInput & { allowSystemRole?: boolean }
@@ -60,17 +61,19 @@ async function createApiKeyRecord(
 
 app.post('/', middlewareAuth(), async (c) => {
   const auth = requireApiKeyManagementAuth(c, 'not_authorized', 'API key management requires authentication')
-  const authApikey = c.get('apikey') as ApiKeyRow | undefined
+  if (auth.authType !== 'jwt' || !auth.userId) {
+    if (auth.authType === 'apikey') {
+      throw simpleError('cannot_create_apikey', 'API keys cannot create other API keys')
+    }
+    throw simpleError('not_authorized', 'Only user sessions can create API keys')
+  }
 
+  const authApikey = c.get('apikey') as ApiKeyRow | undefined
   await ensureApiKeyManagementAllowed(c, auth, authApikey, 'cannot_create_apikey')
 
   const body = await parseBody<any>(c)
 
   const name = body.name ?? ''
-
-  if (!auth.userId) {
-    throw simpleError('not_authorized', 'API key management requires authentication')
-  }
   const expiresAt = body.expires_at ?? null
   const isHashed = body.hashed === true
 
@@ -119,10 +122,19 @@ app.post('/', middlewareAuth(), async (c) => {
     const drizzle = getDrizzleClient(pgClient)
     const createdBindings: unknown[] = []
     const callerPrincipalId = auth.userId
-    const bindingAuthType = auth.authType === 'apikey' ? 'apikey' : 'jwt'
-    const callerApikeyRbacId = auth.authType === 'apikey' ? auth.apikey?.rbac_id : undefined
 
     await drizzle.transaction(async (tx) => {
+      const txDrizzle = tx as unknown as ReturnType<typeof getDrizzleClient>
+      await lockRbacOrgs(txDrizzle, allOrgIds)
+
+      const apikeyString = auth.apikey?.key ?? c.get('capgkey') ?? null
+      for (const bindingOrgId of allOrgIds) {
+        if (!(await checkPermissionPg(c, 'org.manage_apikeys', { orgId: bindingOrgId }, txDrizzle, auth.userId, apikeyString))) {
+          throw quickError(403, 'forbidden_binding', `Forbidden - API key management rights required for org ${bindingOrgId}`)
+        }
+      }
+      await assertApiKeyManagerCanAssignBindings(c, auth, resolvedBindings, txDrizzle)
+
       apikeyData = await createApiKeyRecord(tx, {
         userId: auth.userId,
         name,
@@ -167,11 +179,11 @@ app.post('/', middlewareAuth(), async (c) => {
         }
 
         const result = await createRoleBindingForPrincipal(
-          tx as unknown as ReturnType<typeof getDrizzleClient>,
+          txDrizzle,
           bindingParams,
           auth.userId,
-          bindingAuthType,
-          bindingAuthType === 'apikey' && callerApikeyRbacId ? callerApikeyRbacId : callerPrincipalId,
+          'jwt',
+          callerPrincipalId,
         )
 
         if (!result.ok) {

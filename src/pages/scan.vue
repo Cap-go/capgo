@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { HttpResponse, PluginListenerHandle } from '@capacitor/core'
 import type { BarcodeScanErrorEvent, BarcodeScannedEvent, BarcodeScannerOptions } from '@capgo/camera-preview'
-import type { BundleInfo, DownloadEvent, DownloadOptions, PreviewInfo, StartPreviewSessionOptions } from '@capgo/capacitor-updater'
+import type { BundleInfo, DownloadEvent, DownloadOptions, StartPreviewSessionOptions } from '@capgo/capacitor-updater'
 import type { PreviewDeepLink } from '~/services/previewLinks'
 import { Clipboard } from '@capacitor/clipboard'
 import { Capacitor, CapacitorHttp } from '@capacitor/core'
@@ -84,6 +84,27 @@ interface PreviewSessionMetadata {
   name?: string
   source?: string
 }
+
+interface PreviewInfo {
+  bundle?: BundleInfo | null
+  id: string
+  isActive?: boolean
+  name?: string
+  payloadUrl?: string
+  source?: string
+}
+
+interface PreviewManagerUpdater {
+  deletePreview?: (options: { id: string }) => Promise<{ deleted?: boolean }>
+  listPreviews?: () => Promise<{ current?: PreviewInfo | null, liveBundle?: BundleInfo | null, previews: PreviewInfo[] }>
+  resetPreview?: () => Promise<void>
+  setPreview?: (options: { id: string }) => Promise<void>
+  updatePreview?: (options: { id: string }) => Promise<{ preview: PreviewInfo, updated?: boolean }>
+}
+
+type PreviewStartOptions = StartPreviewSessionOptions & Pick<PreviewSessionMetadata, 'name' | 'source'>
+
+const previewManagerUpdater = CapacitorUpdater as typeof CapacitorUpdater & PreviewManagerUpdater
 
 type PreviewLoadSource = 'camera' | 'link'
 
@@ -432,9 +453,14 @@ async function refreshSavedPreviews(silent = false) {
   if (!isNativePlatform || !previewManagerAvailable.value)
     return
 
+  if (typeof previewManagerUpdater.listPreviews !== 'function') {
+    previewManagerAvailable.value = false
+    return
+  }
+
   isLoadingPreviews.value = true
   try {
-    const result = await CapacitorUpdater.listPreviews()
+    const result = await previewManagerUpdater.listPreviews()
     savedPreviews.value = result.previews
     savedPreviewCurrent.value = result.current ?? null
     savedPreviewLiveBundle.value = result.liveBundle ?? null
@@ -480,8 +506,11 @@ async function runPreviewAction(preview: PreviewInfo | null, actionName: string,
 
 async function switchSavedPreview(preview: PreviewInfo) {
   await runPreviewAction(preview, 'switch', async () => {
+    if (typeof previewManagerUpdater.setPreview !== 'function')
+      throw new Error('Preview manager is not available in this app version')
+
     toast.success(`Opening ${previewLabel(preview)}`)
-    await CapacitorUpdater.setPreview({ id: preview.id })
+    await previewManagerUpdater.setPreview({ id: preview.id })
   })
 }
 
@@ -492,7 +521,10 @@ async function updateSavedPreview(preview: PreviewInfo) {
   }
 
   await runPreviewAction(preview, 'update', async () => {
-    const result = await CapacitorUpdater.updatePreview({ id: preview.id })
+    if (typeof previewManagerUpdater.updatePreview !== 'function')
+      throw new Error('Preview manager is not available in this app version')
+
+    const result = await previewManagerUpdater.updatePreview({ id: preview.id })
     toast.success(result.updated ? `Updated ${previewLabel(result.preview)}` : `${previewLabel(result.preview)} is up to date`)
   })
 }
@@ -504,15 +536,21 @@ async function deleteSavedPreview(preview: PreviewInfo) {
   }
 
   await runPreviewAction(preview, 'delete', async () => {
-    const result = await CapacitorUpdater.deletePreview({ id: preview.id })
+    if (typeof previewManagerUpdater.deletePreview !== 'function')
+      throw new Error('Preview manager is not available in this app version')
+
+    const result = await previewManagerUpdater.deletePreview({ id: preview.id })
     toast.success(result.deleted ? `Deleted ${previewLabel(preview)}` : `Removed ${previewLabel(preview)}`)
   })
 }
 
 async function resetToMainApp() {
   await runPreviewAction(null, 'reset', async () => {
+    if (typeof previewManagerUpdater.resetPreview !== 'function')
+      throw new Error('Preview manager is not available in this app version')
+
     toast.success('Returning to main app')
-    await CapacitorUpdater.resetPreview()
+    await previewManagerUpdater.resetPreview()
   })
 }
 
@@ -833,7 +871,7 @@ async function handleBarcodeScan(scannedValue: string, source: PreviewLoadSource
 }
 
 async function startPreviewSession(metadata: PreviewSessionMetadata = {}) {
-  const options: StartPreviewSessionOptions = {}
+  const options: PreviewStartOptions = {}
   if (metadata.appId)
     options.appId = metadata.appId
   if (metadata.payloadUrl)

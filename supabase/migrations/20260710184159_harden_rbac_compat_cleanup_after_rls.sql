@@ -4417,6 +4417,19 @@ ALTER FUNCTION public.read_native_version_usage(character varying, timestamp wit
 ALTER FUNCTION public.record_build_time(uuid, uuid, character varying, character varying, bigint, character varying) OWNER TO postgres;
 ALTER FUNCTION public.rescind_invitation(text, uuid) OWNER TO postgres;
 
+-- 20260709181245 introduced statement-level RLS helpers whose legacy
+-- signatures and user_right dependency must be removed before the old schema.
+-- Drop their dependent policies now; RBAC-only replacements are installed below.
+DROP FUNCTION IF EXISTS public.orgs_with_min_right(public.user_min_right) CASCADE;
+DROP FUNCTION IF EXISTS public.orgs_readable_org_ids() CASCADE;
+DROP FUNCTION IF EXISTS public.org_member_readable_org_ids() CASCADE;
+DROP FUNCTION IF EXISTS public.app_versions_readable_app_ids() CASCADE;
+DROP FUNCTION IF EXISTS public.readable_app_version_ids() CASCADE;
+DROP FUNCTION IF EXISTS public.readable_group_ids() CASCADE;
+DROP FUNCTION IF EXISTS public.readable_org_customer_ids() CASCADE;
+DROP FUNCTION IF EXISTS public.current_user_member_org_ids() CASCADE;
+DROP FUNCTION IF EXISTS public.role_bindings_readable_ids() CASCADE;
+DROP FUNCTION IF EXISTS public.channel_permission_override_readable_channel_ids() CASCADE;
 DROP FUNCTION IF EXISTS public.app_versions_has_app_permission(public.user_min_right, uuid, character varying, uuid, text);
 DROP FUNCTION IF EXISTS capgo_private.matches_app_storage_apikey_owner(text, character varying, public.key_mode[]);
 
@@ -5454,8 +5467,14 @@ BEGIN
     OR ('write' = ANY(v_modes) AND (
       public.rbac_check_permission_direct(public.rbac_perm_app_update_settings(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
       OR public.rbac_check_permission_direct(public.rbac_perm_app_create_channel(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
+      OR public.rbac_check_permission_direct('app.manage_notifications', v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
+      OR public.rbac_check_permission_direct(public.rbac_perm_app_manage_devices(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
+      OR public.rbac_check_permission_direct(public.rbac_perm_app_build_native(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
       OR public.rbac_check_permission_direct(public.rbac_perm_bundle_update(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
       OR public.rbac_check_permission_direct(public.rbac_perm_channel_update_settings(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
+      OR public.rbac_check_permission_direct(public.rbac_perm_channel_promote_bundle(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
+      OR public.rbac_check_permission_direct(public.rbac_perm_channel_rollback_bundle(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
+      OR public.rbac_check_permission_direct(public.rbac_perm_channel_manage_forced_devices(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
     ))
     OR ('all' = ANY(v_modes) AND (
       public.rbac_check_permission_direct(public.rbac_perm_org_delete(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
@@ -5518,14 +5537,23 @@ BEGIN
 
   IF public.rbac_check_permission_direct(public.rbac_perm_org_update_user_roles(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
     OR public.rbac_check_permission_direct(public.rbac_perm_app_update_user_roles(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
-    OR public.rbac_check_permission_direct(public.rbac_perm_app_update_settings(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
-    OR public.rbac_check_permission_direct(public.rbac_perm_app_create_channel(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
-    OR public.rbac_check_permission_direct(public.rbac_perm_channel_update_settings(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
   THEN
     RETURN 'perm_admin';
   END IF;
 
-  IF public.rbac_check_permission_direct(public.rbac_perm_bundle_update(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey) THEN
+  -- Keep this list aligned with the write entries from the former
+  -- rbac_legacy_right_for_permission mapping used by legacy CLI clients.
+  IF public.rbac_check_permission_direct(public.rbac_perm_app_update_settings(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct(public.rbac_perm_app_create_channel(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct('app.manage_notifications', v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct(public.rbac_perm_app_manage_devices(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct(public.rbac_perm_app_build_native(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct(public.rbac_perm_bundle_update(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct(public.rbac_perm_channel_update_settings(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct(public.rbac_perm_channel_promote_bundle(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct(public.rbac_perm_channel_rollback_bundle(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct(public.rbac_perm_channel_manage_forced_devices(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+  THEN
     RETURN 'perm_write';
   END IF;
 
@@ -6429,3 +6457,2734 @@ GRANT EXECUTE ON FUNCTION public.get_channel_current_bundle_rbac(character varyi
 GRANT EXECUTE ON FUNCTION public.get_channel_current_bundle_rbac(character varying, bigint) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_channel_current_bundle_rbac(character varying, bigint) TO service_role;
 COMMENT ON FUNCTION public.get_channel_current_bundle_rbac(character varying, bigint) IS 'Returns only the current bundle name for a channel the caller can read, allowing channel-scoped CLI access without granting app.read_bundles.';
+
+-- RBAC-only statement-level RLS helpers. These supersede the legacy helpers
+-- removed above while retaining the bounded candidate-set execution model from
+-- 20260709181245.
+CREATE OR REPLACE FUNCTION public.rbac_org_ids_for_permission(p_permission_key text)
+RETURNS uuid[]
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_auth_user_id uuid;
+  v_api_key_text text;
+  v_api_key public.apikeys%ROWTYPE;
+  v_allowed uuid[] := '{}'::uuid[];
+BEGIN
+  SELECT auth.uid() INTO v_auth_user_id;
+  SELECT public.get_apikey_header() INTO v_api_key_text;
+
+  IF v_auth_user_id IS NULL AND v_api_key_text IS NOT NULL THEN
+    SELECT *
+    INTO v_api_key
+    FROM public.find_apikey_by_value(v_api_key_text)
+    LIMIT 1;
+
+    IF v_api_key.id IS NULL OR public.is_apikey_expired(v_api_key.expires_at) THEN
+      RETURN v_allowed;
+    END IF;
+
+    SELECT COALESCE(array_agg(DISTINCT candidate_orgs.org_id), '{}'::uuid[])
+    INTO v_allowed
+    FROM (
+      SELECT role_bindings.org_id
+      FROM public.role_bindings
+      WHERE role_bindings.principal_type = public.rbac_principal_apikey()
+        AND role_bindings.principal_id = v_api_key.rbac_id
+        AND role_bindings.scope_type = public.rbac_scope_org()
+        AND role_bindings.org_id IS NOT NULL
+        AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+    ) candidate_orgs
+    WHERE public.rbac_check_permission_direct(
+      p_permission_key,
+      v_api_key.user_id,
+      candidate_orgs.org_id,
+      NULL::character varying,
+      NULL::bigint,
+      v_api_key_text
+    );
+
+    RETURN v_allowed;
+  END IF;
+
+  IF v_auth_user_id IS NULL THEN
+    RETURN v_allowed;
+  END IF;
+
+  WITH candidate_orgs AS (
+    SELECT role_bindings.org_id
+    FROM public.role_bindings
+    WHERE role_bindings.principal_type = public.rbac_principal_user()
+      AND role_bindings.principal_id = v_auth_user_id
+      AND role_bindings.scope_type = public.rbac_scope_org()
+      AND role_bindings.org_id IS NOT NULL
+      AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+
+    UNION
+
+    SELECT role_bindings.org_id
+    FROM public.group_members
+    INNER JOIN public.groups
+      ON groups.id = group_members.group_id
+    INNER JOIN public.role_bindings
+      ON role_bindings.principal_type = public.rbac_principal_group()
+      AND role_bindings.principal_id = group_members.group_id
+      AND role_bindings.scope_type = public.rbac_scope_org()
+      AND role_bindings.org_id = groups.org_id
+    WHERE group_members.user_id = v_auth_user_id
+      AND role_bindings.org_id IS NOT NULL
+      AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+  )
+  SELECT COALESCE(array_agg(DISTINCT candidate_orgs.org_id), '{}'::uuid[])
+  INTO v_allowed
+  FROM candidate_orgs
+  WHERE public.rbac_check_permission_direct(
+    p_permission_key,
+    v_auth_user_id,
+    candidate_orgs.org_id,
+    NULL::character varying,
+    NULL::bigint,
+    NULL::text
+  );
+
+  RETURN v_allowed;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.orgs_readable_org_ids()
+RETURNS uuid[]
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT public.rbac_org_ids_for_permission(public.rbac_perm_org_read())
+$$;
+
+-- This helper is granted only for RLS evaluation. It exposes the same org IDs
+-- for which the caller already has the org-admin permission enforced by its policies.
+CREATE OR REPLACE FUNCTION public.orgs_admin_org_ids()
+RETURNS uuid[]
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT public.rbac_org_ids_for_permission(public.rbac_perm_org_update_user_roles())
+$$;
+
+CREATE OR REPLACE FUNCTION public.org_member_readable_org_ids()
+RETURNS uuid[]
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_user_id uuid;
+  v_api_key_text text;
+  v_api_key public.apikeys%ROWTYPE;
+BEGIN
+  SELECT auth.uid() INTO v_user_id;
+
+  IF v_user_id IS NULL THEN
+    SELECT public.get_apikey_header() INTO v_api_key_text;
+
+    IF v_api_key_text IS NULL THEN
+      RETURN '{}'::uuid[];
+    END IF;
+
+    SELECT *
+    INTO v_api_key
+    FROM public.find_apikey_by_value(v_api_key_text)
+    LIMIT 1;
+
+    IF v_api_key.id IS NULL OR public.is_apikey_expired(v_api_key.expires_at) THEN
+      RETURN '{}'::uuid[];
+    END IF;
+
+    v_user_id := v_api_key.user_id;
+  END IF;
+
+  RETURN (
+    SELECT COALESCE(array_agg(DISTINCT org_users.org_id), '{}'::uuid[])
+    FROM public.org_users
+    WHERE org_users.user_id = v_user_id
+      AND org_users.org_id = ANY(
+        COALESCE((SELECT public.orgs_readable_org_ids()), '{}'::uuid[])
+      )
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.apps_readable_app_ids()
+RETURNS character varying[]
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_user_id uuid;
+  v_api_key_text text;
+  v_api_key public.apikeys%ROWTYPE;
+  v_principal_type text;
+  v_principal_id uuid;
+  v_allowed character varying[] := '{}'::character varying[];
+BEGIN
+  SELECT auth.uid() INTO v_user_id;
+  SELECT public.get_apikey_header() INTO v_api_key_text;
+
+  IF v_user_id IS NOT NULL THEN
+    v_api_key_text := NULL;
+    v_principal_type := public.rbac_principal_user();
+    v_principal_id := v_user_id;
+  ELSIF v_api_key_text IS NOT NULL THEN
+    SELECT *
+    INTO v_api_key
+    FROM public.find_apikey_by_value(v_api_key_text)
+    LIMIT 1;
+
+    IF v_api_key.id IS NULL OR public.is_apikey_expired(v_api_key.expires_at) THEN
+      RETURN v_allowed;
+    END IF;
+
+    v_user_id := v_api_key.user_id;
+    v_principal_type := public.rbac_principal_apikey();
+    v_principal_id := v_api_key.rbac_id;
+  ELSE
+    RETURN v_allowed;
+  END IF;
+
+  IF v_principal_id IS NULL THEN
+    RETURN v_allowed;
+  END IF;
+
+  WITH RECURSIVE direct_bindings AS (
+    SELECT rb.role_id, rb.scope_type, rb.org_id, rb.app_id
+    FROM public.role_bindings rb
+    WHERE rb.principal_type = v_principal_type
+      AND rb.principal_id = v_principal_id
+      AND rb.scope_type IN (public.rbac_scope_org(), public.rbac_scope_app())
+      AND rb.org_id IS NOT NULL
+      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+
+    UNION
+
+    SELECT rb.role_id, rb.scope_type, rb.org_id, rb.app_id
+    FROM public.group_members gm
+    INNER JOIN public.groups g ON g.id = gm.group_id
+    INNER JOIN public.role_bindings rb
+      ON rb.principal_type = public.rbac_principal_group()
+      AND rb.principal_id = gm.group_id
+      AND rb.org_id = g.org_id
+    WHERE v_principal_type = public.rbac_principal_user()
+      AND gm.user_id = v_principal_id
+      AND rb.scope_type IN (public.rbac_scope_org(), public.rbac_scope_app())
+      AND rb.org_id IS NOT NULL
+      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+  ),
+  role_closure AS (
+    SELECT
+      direct_bindings.role_id,
+      direct_bindings.role_id AS effective_role_id,
+      direct_bindings.scope_type,
+      direct_bindings.org_id,
+      direct_bindings.app_id
+    FROM direct_bindings
+
+    UNION
+
+    SELECT
+      role_closure.role_id,
+      role_hierarchy.child_role_id,
+      role_closure.scope_type,
+      role_closure.org_id,
+      role_closure.app_id
+    FROM role_closure
+    INNER JOIN public.role_hierarchy
+      ON role_hierarchy.parent_role_id = role_closure.effective_role_id
+    INNER JOIN public.roles child_role
+      ON child_role.id = role_hierarchy.child_role_id
+      AND child_role.scope_type = role_closure.scope_type
+  ),
+  readable_scopes AS (
+    SELECT DISTINCT role_closure.scope_type, role_closure.org_id, role_closure.app_id
+    FROM role_closure
+    INNER JOIN public.role_permissions
+      ON role_permissions.role_id = role_closure.effective_role_id
+    INNER JOIN public.permissions
+      ON permissions.id = role_permissions.permission_id
+    WHERE permissions.key = public.rbac_perm_app_read()
+  ),
+  scoped_apps AS (
+    SELECT apps.app_id, apps.owner_org
+    FROM readable_scopes
+    INNER JOIN public.apps
+      ON apps.owner_org = readable_scopes.org_id
+    WHERE readable_scopes.scope_type = public.rbac_scope_org()
+
+    UNION
+
+    SELECT apps.app_id, apps.owner_org
+    FROM readable_scopes
+    INNER JOIN public.apps
+      ON apps.id = readable_scopes.app_id
+      AND apps.owner_org = readable_scopes.org_id
+    WHERE readable_scopes.scope_type = public.rbac_scope_app()
+      AND readable_scopes.app_id IS NOT NULL
+  ),
+  candidate_orgs AS (
+    SELECT DISTINCT scoped_apps.owner_org
+    FROM scoped_apps
+  ),
+  readable_orgs AS (
+    SELECT orgs.id
+    FROM candidate_orgs
+    INNER JOIN public.orgs ON orgs.id = candidate_orgs.owner_org
+    WHERE (
+        orgs.enforcing_2fa IS NOT TRUE
+        OR (v_user_id IS NOT NULL AND public.has_2fa_enabled(v_user_id))
+      )
+      AND public.user_meets_password_policy(v_user_id, orgs.id) IS DISTINCT FROM false
+  )
+  SELECT COALESCE(array_agg(DISTINCT scoped_apps.app_id), '{}'::character varying[])
+  INTO v_allowed
+  FROM scoped_apps
+  INNER JOIN readable_orgs ON readable_orgs.id = scoped_apps.owner_org
+  WHERE v_api_key_text IS NULL
+    OR public.rbac_check_permission_direct(
+      public.rbac_perm_app_read(),
+      v_user_id,
+      scoped_apps.owner_org,
+      scoped_apps.app_id,
+      NULL::bigint,
+      v_api_key_text
+    );
+
+  RETURN v_allowed;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.readable_app_version_ids()
+RETURNS bigint[]
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT COALESCE(array_agg(DISTINCT app_versions.id), '{}'::bigint[])
+  FROM public.app_versions
+  WHERE app_versions.app_id = ANY(
+    COALESCE((SELECT public.app_versions_readable_app_ids()), '{}'::character varying[])
+  )
+$$;
+
+CREATE OR REPLACE FUNCTION public.readable_group_ids()
+RETURNS uuid[]
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT COALESCE(array_agg(DISTINCT allowed_groups.group_id), '{}'::uuid[])
+  FROM (
+    SELECT group_members.group_id
+    FROM public.group_members
+    WHERE group_members.user_id = (SELECT auth.uid())
+
+    UNION
+
+    SELECT groups.id AS group_id
+    FROM public.groups
+    WHERE groups.org_id = ANY(
+      COALESCE((SELECT public.orgs_admin_org_ids()), '{}'::uuid[])
+    )
+  ) allowed_groups
+$$;
+
+CREATE OR REPLACE FUNCTION public.readable_org_customer_ids()
+RETURNS text[]
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT COALESCE(array_agg(DISTINCT orgs.customer_id::text), '{}'::text[])
+  FROM public.orgs
+  WHERE orgs.customer_id IS NOT NULL
+    AND orgs.id = ANY(COALESCE((SELECT public.orgs_readable_org_ids()), '{}'::uuid[]))
+$$;
+
+CREATE OR REPLACE FUNCTION public.current_user_member_org_ids()
+RETURNS uuid[]
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT COALESCE(array_agg(DISTINCT org_users.org_id), '{}'::uuid[])
+  FROM public.org_users
+  WHERE org_users.user_id = (SELECT auth.uid())
+$$;
+CREATE OR REPLACE FUNCTION "public"."role_bindings_readable_ids"()
+RETURNS "uuid"[]
+LANGUAGE "sql" STABLE SECURITY DEFINER
+SET "search_path" TO ''
+AS $$
+  WITH actor AS (
+    SELECT (SELECT "auth"."uid"()) AS user_id
+  ),
+  candidate_orgs AS (
+    SELECT org_users.org_id
+    FROM "public"."org_users"
+    INNER JOIN actor ON actor.user_id IS NOT NULL
+    WHERE org_users.user_id = actor.user_id
+      AND org_users.org_id IS NOT NULL
+
+    UNION
+
+    SELECT role_bindings.org_id
+    FROM "public"."role_bindings"
+    INNER JOIN actor ON actor.user_id IS NOT NULL
+    WHERE role_bindings.principal_type = "public"."rbac_principal_user"()
+      AND role_bindings.principal_id = actor.user_id
+      AND role_bindings.scope_type = "public"."rbac_scope_org"()
+      AND role_bindings.org_id IS NOT NULL
+      AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+
+    UNION
+
+    SELECT role_bindings.org_id
+    FROM "public"."group_members"
+    INNER JOIN actor ON actor.user_id IS NOT NULL
+    INNER JOIN "public"."groups" ON groups.id = group_members.group_id
+    INNER JOIN "public"."role_bindings"
+      ON role_bindings.principal_type = "public"."rbac_principal_group"()
+      AND role_bindings.principal_id = group_members.group_id
+      AND role_bindings.scope_type = "public"."rbac_scope_org"()
+      AND role_bindings.org_id = groups.org_id
+    WHERE group_members.user_id = actor.user_id
+      AND role_bindings.org_id IS NOT NULL
+      AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+  ),
+  admin_orgs AS (
+    SELECT DISTINCT candidate_orgs.org_id
+    FROM candidate_orgs
+    INNER JOIN actor ON actor.user_id IS NOT NULL
+    WHERE "public"."rbac_check_permission_direct"(
+      "public"."rbac_perm_org_update_user_roles"(),
+      actor.user_id,
+      candidate_orgs.org_id,
+      NULL::character varying,
+      NULL::bigint,
+      NULL::text
+    )
+  ),
+  candidate_apps AS (
+    SELECT apps.id, apps.app_id, apps.owner_org
+    FROM "public"."apps"
+    WHERE apps.owner_org IN (SELECT admin_orgs.org_id FROM admin_orgs)
+
+    UNION
+
+    SELECT apps.id, apps.app_id, apps.owner_org
+    FROM "public"."role_bindings"
+    INNER JOIN actor ON actor.user_id IS NOT NULL
+    INNER JOIN "public"."apps"
+      ON apps.id = role_bindings.app_id
+      AND apps.owner_org = role_bindings.org_id
+    WHERE role_bindings.principal_type = "public"."rbac_principal_user"()
+      AND role_bindings.principal_id = actor.user_id
+      AND role_bindings.scope_type = "public"."rbac_scope_app"()
+      AND role_bindings.app_id IS NOT NULL
+      AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+
+    UNION
+
+    SELECT apps.id, apps.app_id, apps.owner_org
+    FROM "public"."group_members"
+    INNER JOIN actor ON actor.user_id IS NOT NULL
+    INNER JOIN "public"."groups" ON groups.id = group_members.group_id
+    INNER JOIN "public"."role_bindings"
+      ON role_bindings.principal_type = "public"."rbac_principal_group"()
+      AND role_bindings.principal_id = group_members.group_id
+      AND role_bindings.scope_type = "public"."rbac_scope_app"()
+      AND role_bindings.org_id = groups.org_id
+    INNER JOIN "public"."apps"
+      ON apps.id = role_bindings.app_id
+      AND apps.owner_org = role_bindings.org_id
+    WHERE group_members.user_id = actor.user_id
+      AND role_bindings.app_id IS NOT NULL
+      AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+  ),
+  manager_apps AS (
+    SELECT DISTINCT candidate_apps.id, candidate_apps.app_id, candidate_apps.owner_org
+    FROM candidate_apps
+    INNER JOIN actor ON actor.user_id IS NOT NULL
+    WHERE "public"."rbac_check_permission_direct"(
+      "public"."rbac_perm_app_update_user_roles"(),
+      actor.user_id,
+      candidate_apps.owner_org,
+      candidate_apps.app_id,
+      NULL::bigint,
+      NULL::text
+    )
+  ),
+  member_apps AS (
+    SELECT DISTINCT candidate_apps.id
+    FROM candidate_apps
+    INNER JOIN actor ON actor.user_id IS NOT NULL
+    WHERE EXISTS (
+      SELECT 1
+      FROM "public"."role_bindings"
+      WHERE role_bindings.principal_type = "public"."rbac_principal_user"()
+        AND role_bindings.principal_id = actor.user_id
+        AND role_bindings.scope_type = "public"."rbac_scope_app"()
+        AND role_bindings.app_id = candidate_apps.id
+        AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+    )
+      OR EXISTS (
+        SELECT 1
+        FROM "public"."group_members"
+        INNER JOIN "public"."groups" ON groups.id = group_members.group_id
+        INNER JOIN "public"."role_bindings"
+          ON role_bindings.principal_type = "public"."rbac_principal_group"()
+          AND role_bindings.principal_id = group_members.group_id
+          AND role_bindings.scope_type = "public"."rbac_scope_app"()
+          AND role_bindings.org_id = groups.org_id
+        WHERE group_members.user_id = actor.user_id
+          AND role_bindings.app_id = candidate_apps.id
+          AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+      )
+  ),
+  manager_channels AS (
+    SELECT DISTINCT channels.rbac_id AS channel_id
+    FROM "public"."channels"
+    INNER JOIN manager_apps ON manager_apps.app_id = channels.app_id
+    WHERE channels.rbac_id IS NOT NULL
+  )
+  SELECT COALESCE(array_agg(DISTINCT role_bindings.id), '{}'::uuid[])
+  FROM "public"."role_bindings"
+  WHERE role_bindings.org_id IN (SELECT admin_orgs.org_id FROM admin_orgs)
+    OR (
+      role_bindings.scope_type = "public"."rbac_scope_app"()
+      AND role_bindings.app_id IN (SELECT manager_apps.id FROM manager_apps)
+    )
+    OR (
+      role_bindings.scope_type = "public"."rbac_scope_app"()
+      AND role_bindings.app_id IN (SELECT member_apps.id FROM member_apps)
+    )
+    OR (
+      role_bindings.scope_type = "public"."rbac_scope_channel"()
+      AND role_bindings.channel_id IN (SELECT manager_channels.channel_id FROM manager_channels)
+    )
+$$;
+
+CREATE OR REPLACE FUNCTION "public"."channel_permission_override_readable_channel_ids"()
+RETURNS bigint[]
+LANGUAGE "sql" STABLE SECURITY DEFINER
+SET "search_path" TO ''
+AS $$
+  WITH actor AS (
+    SELECT (SELECT "auth"."uid"()) AS user_id
+  ),
+  candidate_apps AS (
+    SELECT apps.app_id, apps.owner_org
+    FROM "public"."org_users"
+    INNER JOIN actor ON actor.user_id IS NOT NULL
+    INNER JOIN "public"."apps" ON apps.owner_org = org_users.org_id
+    WHERE org_users.user_id = actor.user_id
+      AND org_users.app_id IS NULL
+      AND org_users.channel_id IS NULL
+
+    UNION
+
+    SELECT apps.app_id, apps.owner_org
+    FROM "public"."org_users"
+    INNER JOIN actor ON actor.user_id IS NOT NULL
+    INNER JOIN "public"."apps"
+      ON apps.app_id = org_users.app_id
+      AND apps.owner_org = org_users.org_id
+    WHERE org_users.user_id = actor.user_id
+      AND org_users.app_id IS NOT NULL
+      AND org_users.channel_id IS NULL
+
+    UNION
+
+    SELECT apps.app_id, apps.owner_org
+    FROM "public"."role_bindings"
+    INNER JOIN actor ON actor.user_id IS NOT NULL
+    INNER JOIN "public"."apps" ON apps.owner_org = role_bindings.org_id
+    WHERE role_bindings.principal_type = "public"."rbac_principal_user"()
+      AND role_bindings.principal_id = actor.user_id
+      AND role_bindings.scope_type = "public"."rbac_scope_org"()
+      AND role_bindings.org_id IS NOT NULL
+      AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+
+    UNION
+
+    SELECT apps.app_id, apps.owner_org
+    FROM "public"."role_bindings"
+    INNER JOIN actor ON actor.user_id IS NOT NULL
+    INNER JOIN "public"."apps"
+      ON apps.id = role_bindings.app_id
+      AND apps.owner_org = role_bindings.org_id
+    WHERE role_bindings.principal_type = "public"."rbac_principal_user"()
+      AND role_bindings.principal_id = actor.user_id
+      AND role_bindings.scope_type = "public"."rbac_scope_app"()
+      AND role_bindings.app_id IS NOT NULL
+      AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+
+    UNION
+
+    SELECT apps.app_id, apps.owner_org
+    FROM "public"."group_members"
+    INNER JOIN actor ON actor.user_id IS NOT NULL
+    INNER JOIN "public"."groups" ON groups.id = group_members.group_id
+    INNER JOIN "public"."role_bindings"
+      ON role_bindings.principal_type = "public"."rbac_principal_group"()
+      AND role_bindings.principal_id = group_members.group_id
+      AND role_bindings.org_id = groups.org_id
+    INNER JOIN "public"."apps" ON apps.owner_org = role_bindings.org_id
+    WHERE group_members.user_id = actor.user_id
+      AND role_bindings.scope_type = "public"."rbac_scope_org"()
+      AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+
+    UNION
+
+    SELECT apps.app_id, apps.owner_org
+    FROM "public"."group_members"
+    INNER JOIN actor ON actor.user_id IS NOT NULL
+    INNER JOIN "public"."groups" ON groups.id = group_members.group_id
+    INNER JOIN "public"."role_bindings"
+      ON role_bindings.principal_type = "public"."rbac_principal_group"()
+      AND role_bindings.principal_id = group_members.group_id
+      AND role_bindings.scope_type = "public"."rbac_scope_app"()
+      AND role_bindings.org_id = groups.org_id
+    INNER JOIN "public"."apps"
+      ON apps.id = role_bindings.app_id
+      AND apps.owner_org = role_bindings.org_id
+    WHERE group_members.user_id = actor.user_id
+      AND role_bindings.app_id IS NOT NULL
+      AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+  ),
+  manager_apps AS (
+    SELECT DISTINCT candidate_apps.app_id
+    FROM candidate_apps
+    INNER JOIN actor ON actor.user_id IS NOT NULL
+    WHERE "public"."rbac_check_permission_direct"(
+      "public"."rbac_perm_app_update_user_roles"(),
+      actor.user_id,
+      candidate_apps.owner_org,
+      candidate_apps.app_id,
+      NULL::bigint,
+      NULL::text
+    )
+  )
+  SELECT COALESCE(array_agg(DISTINCT channels.id), '{}'::bigint[])
+  FROM "public"."channels"
+  WHERE channels.app_id IN (SELECT manager_apps.app_id FROM manager_apps)
+$$;
+
+CREATE OR REPLACE FUNCTION public.rbac_direct_channel_ids_for_permission(p_permission_key text)
+RETURNS bigint[]
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_user_id uuid;
+  v_api_key_text text;
+  v_api_key public.apikeys%ROWTYPE;
+  v_principal_type text;
+  v_principal_id uuid;
+  v_allowed bigint[] := '{}'::bigint[];
+BEGIN
+  IF p_permission_key IS NULL OR p_permission_key = '' THEN
+    RETURN v_allowed;
+  END IF;
+
+  SELECT auth.uid() INTO v_user_id;
+  SELECT public.get_apikey_header() INTO v_api_key_text;
+
+  IF v_api_key_text IS NOT NULL THEN
+    SELECT *
+    INTO v_api_key
+    FROM public.find_apikey_by_value(v_api_key_text)
+    LIMIT 1;
+
+    IF v_api_key.id IS NULL
+      OR public.is_apikey_expired(v_api_key.expires_at)
+      OR (v_user_id IS NOT NULL AND v_user_id IS DISTINCT FROM v_api_key.user_id)
+    THEN
+      RETURN v_allowed;
+    END IF;
+
+    v_user_id := v_api_key.user_id;
+    v_principal_type := public.rbac_principal_apikey();
+    v_principal_id := v_api_key.rbac_id;
+  ELSIF v_user_id IS NOT NULL THEN
+    v_principal_type := public.rbac_principal_user();
+    v_principal_id := v_user_id;
+  ELSE
+    RETURN v_allowed;
+  END IF;
+
+  IF v_principal_id IS NULL THEN
+    RETURN v_allowed;
+  END IF;
+
+  WITH direct_bindings AS (
+    SELECT rb.channel_id AS channel_rbac_id
+    FROM public.role_bindings rb
+    WHERE rb.principal_type = v_principal_type
+      AND rb.principal_id = v_principal_id
+      AND rb.scope_type = public.rbac_scope_channel()
+      AND rb.channel_id IS NOT NULL
+      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+
+    UNION
+
+    SELECT rb.channel_id AS channel_rbac_id
+    FROM public.group_members gm
+    INNER JOIN public.groups g ON g.id = gm.group_id
+    INNER JOIN public.role_bindings rb
+      ON rb.principal_type = public.rbac_principal_group()
+      AND rb.principal_id = gm.group_id
+      AND rb.scope_type = public.rbac_scope_channel()
+      AND rb.org_id = g.org_id
+    WHERE v_principal_type = public.rbac_principal_user()
+      AND gm.user_id = v_principal_id
+      AND rb.channel_id IS NOT NULL
+      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+  ),
+  candidate_channels AS (
+    SELECT DISTINCT channels.id, channels.owner_org, channels.app_id
+    FROM direct_bindings
+    INNER JOIN public.channels
+      ON channels.rbac_id = direct_bindings.channel_rbac_id
+
+    UNION
+
+    SELECT channels.id, channels.owner_org, channels.app_id
+    FROM public.channel_permission_overrides overrides
+    INNER JOIN public.channels
+      ON channels.id = overrides.channel_id
+    WHERE overrides.principal_type = v_principal_type
+      AND overrides.principal_id = v_principal_id
+      AND overrides.permission_key = p_permission_key
+      AND overrides.is_allowed
+  )
+  SELECT COALESCE(array_agg(DISTINCT candidate_channels.id), '{}'::bigint[])
+  INTO v_allowed
+  FROM candidate_channels
+  WHERE public.rbac_check_permission_direct(
+    p_permission_key,
+    v_user_id,
+    candidate_channels.owner_org,
+    candidate_channels.app_id,
+    candidate_channels.id,
+    v_api_key_text
+  );
+
+  RETURN v_allowed;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.channel_readable_channel_ids()
+RETURNS bigint[]
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT public.rbac_direct_channel_ids_for_permission(public.rbac_perm_channel_read())
+$$;
+
+CREATE OR REPLACE FUNCTION public.channel_forced_devices_readable_channel_ids()
+RETURNS bigint[]
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT public.rbac_direct_channel_ids_for_permission(public.rbac_perm_channel_read_forced_devices())
+$$;
+
+CREATE OR REPLACE FUNCTION public.rbac_denied_channel_ids_for_permission(p_permission_key text)
+RETURNS bigint[]
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_user_id uuid;
+  v_api_key_text text;
+  v_api_key public.apikeys%ROWTYPE;
+  v_allowed bigint[] := '{}'::bigint[];
+BEGIN
+  IF p_permission_key IS NULL OR p_permission_key = '' THEN
+    RETURN v_allowed;
+  END IF;
+
+  SELECT auth.uid() INTO v_user_id;
+
+  -- Match apps_readable_app_ids(): an authenticated request is evaluated as its user,
+  -- while an anonymous request with capgkey is evaluated as the API-key principal.
+  IF v_user_id IS NOT NULL THEN
+    SELECT COALESCE(array_agg(DISTINCT overrides.channel_id), '{}'::bigint[])
+    INTO v_allowed
+    FROM public.channel_permission_overrides overrides
+    WHERE overrides.principal_type = public.rbac_principal_user()
+      AND overrides.principal_id = v_user_id
+      AND overrides.permission_key = p_permission_key
+      AND overrides.is_allowed = false;
+
+    RETURN v_allowed;
+  END IF;
+
+  SELECT public.get_apikey_header() INTO v_api_key_text;
+
+  IF v_api_key_text IS NULL THEN
+    RETURN v_allowed;
+  END IF;
+
+  SELECT *
+  INTO v_api_key
+  FROM public.find_apikey_by_value(v_api_key_text)
+  LIMIT 1;
+
+  IF v_api_key.id IS NULL OR public.is_apikey_expired(v_api_key.expires_at) THEN
+    RETURN v_allowed;
+  END IF;
+
+  SELECT COALESCE(array_agg(DISTINCT overrides.channel_id), '{}'::bigint[])
+  INTO v_allowed
+  FROM public.channel_permission_overrides overrides
+  WHERE overrides.principal_type = public.rbac_principal_apikey()
+    AND overrides.principal_id = v_api_key.rbac_id
+    AND overrides.permission_key = p_permission_key
+    AND overrides.is_allowed = false;
+
+  RETURN v_allowed;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.channel_read_denied_channel_ids()
+RETURNS bigint[]
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT public.rbac_denied_channel_ids_for_permission(public.rbac_perm_channel_read())
+$$;
+
+CREATE OR REPLACE FUNCTION public.channel_forced_devices_denied_channel_ids()
+RETURNS bigint[]
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT public.rbac_denied_channel_ids_for_permission(public.rbac_perm_channel_read_forced_devices())
+$$;
+
+ALTER FUNCTION public.rbac_org_ids_for_permission(text) OWNER TO postgres;
+ALTER FUNCTION public.orgs_readable_org_ids() OWNER TO postgres;
+ALTER FUNCTION public.orgs_admin_org_ids() OWNER TO postgres;
+ALTER FUNCTION public.org_member_readable_org_ids() OWNER TO postgres;
+ALTER FUNCTION public.app_versions_readable_app_ids() OWNER TO postgres;
+ALTER FUNCTION public.apps_readable_app_ids() OWNER TO postgres;
+ALTER FUNCTION public.readable_app_version_ids() OWNER TO postgres;
+ALTER FUNCTION public.readable_group_ids() OWNER TO postgres;
+ALTER FUNCTION public.readable_org_customer_ids() OWNER TO postgres;
+ALTER FUNCTION public.current_user_member_org_ids() OWNER TO postgres;
+ALTER FUNCTION public.role_bindings_readable_ids() OWNER TO postgres;
+ALTER FUNCTION public.channel_permission_override_readable_channel_ids() OWNER TO postgres;
+ALTER FUNCTION public.rbac_direct_channel_ids_for_permission(text) OWNER TO postgres;
+ALTER FUNCTION public.channel_readable_channel_ids() OWNER TO postgres;
+ALTER FUNCTION public.channel_forced_devices_readable_channel_ids() OWNER TO postgres;
+ALTER FUNCTION public.rbac_denied_channel_ids_for_permission(text) OWNER TO postgres;
+ALTER FUNCTION public.channel_read_denied_channel_ids() OWNER TO postgres;
+ALTER FUNCTION public.channel_forced_devices_denied_channel_ids() OWNER TO postgres;
+ALTER FUNCTION public.app_versions_readable_app_ids() STABLE;
+ALTER FUNCTION public.apps_readable_app_ids() STABLE;
+
+REVOKE ALL ON FUNCTION public.rbac_org_ids_for_permission(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.orgs_readable_org_ids() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.orgs_admin_org_ids() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.org_member_readable_org_ids() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.app_versions_readable_app_ids() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.apps_readable_app_ids() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.readable_app_version_ids() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.readable_group_ids() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.readable_org_customer_ids() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.current_user_member_org_ids() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.role_bindings_readable_ids() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.channel_permission_override_readable_channel_ids() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.rbac_direct_channel_ids_for_permission(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.channel_readable_channel_ids() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.channel_forced_devices_readable_channel_ids() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.rbac_denied_channel_ids_for_permission(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.channel_read_denied_channel_ids() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.channel_forced_devices_denied_channel_ids() FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION public.rbac_org_ids_for_permission(text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.orgs_readable_org_ids() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.orgs_admin_org_ids() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.org_member_readable_org_ids() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.app_versions_readable_app_ids() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.apps_readable_app_ids() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.readable_app_version_ids() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.readable_group_ids() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.readable_org_customer_ids() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.current_user_member_org_ids() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.role_bindings_readable_ids() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.channel_permission_override_readable_channel_ids() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.rbac_direct_channel_ids_for_permission(text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.channel_readable_channel_ids() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.channel_forced_devices_readable_channel_ids() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.rbac_denied_channel_ids_for_permission(text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.channel_read_denied_channel_ids() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.channel_forced_devices_denied_channel_ids() TO anon, authenticated, service_role;
+
+COMMENT ON FUNCTION public.orgs_readable_org_ids() IS
+  'Returns org IDs readable by the current authenticated user or API key through RBAC. RLS computes the bounded set once per statement before filtering rows.';
+COMMENT ON FUNCTION public.orgs_admin_org_ids() IS
+  'Returns org IDs where the caller has RBAC permission to manage org user roles. RLS uses this bounded set for admin-only rows.';
+COMMENT ON FUNCTION public.app_versions_readable_app_ids() IS
+  'Returns app IDs with RBAC bundle-read permission for statement-level app-version and manifest RLS.';
+COMMENT ON FUNCTION public.apps_readable_app_ids() IS
+  'Returns app IDs with RBAC app-read permission so non-bundle RLS computes a bounded set once per statement.';
+COMMENT ON FUNCTION public.readable_app_version_ids() IS
+  'Returns app-version IDs readable through the RBAC bundle-read set so manifest RLS avoids per-row authorization work.';
+COMMENT ON FUNCTION public.role_bindings_readable_ids() IS
+  'Returns role-binding IDs visible through bounded RBAC org, app, and channel scope calculations.';
+COMMENT ON FUNCTION public.channel_permission_override_readable_channel_ids() IS
+  'Returns channel IDs whose permission overrides are manageable through RBAC without per-row role checks.';
+COMMENT ON FUNCTION public.rbac_direct_channel_ids_for_permission(text) IS
+  'Internal bounded candidate evaluator. It verifies role-bound and explicitly allowed channels with concrete channel IDs before RLS permits a row.';
+COMMENT ON FUNCTION public.channel_readable_channel_ids() IS
+  'Returns role-bound or explicitly allowed channel IDs with channel.read after concrete-ID evaluation, so explicit channel denies win.';
+COMMENT ON FUNCTION public.channel_forced_devices_readable_channel_ids() IS
+  'Returns role-bound or explicitly allowed channel IDs with channel.read_forced_devices after concrete-ID evaluation.';
+COMMENT ON FUNCTION public.rbac_denied_channel_ids_for_permission(text) IS
+  'Internal bounded lookup of explicit false channel overrides for the effective request principal.';
+COMMENT ON FUNCTION public.channel_read_denied_channel_ids() IS
+  'Returns explicit false channel.read overrides so app-level channel visibility excludes denied channels.';
+COMMENT ON FUNCTION public.channel_forced_devices_denied_channel_ids() IS
+  'Returns explicit false channel.read_forced_devices overrides so app-level device visibility excludes denied channels.';
+
+DROP POLICY IF EXISTS "Allow RBAC orgs select" ON public.orgs;
+DROP POLICY IF EXISTS "Allow select for auth, api keys (read+)" ON public.orgs;
+DROP POLICY IF EXISTS "Allow RBAC apps select" ON public.apps;
+DROP POLICY IF EXISTS "Allow for auth, api keys (read+)" ON public.apps;
+DROP POLICY IF EXISTS "Allow RBAC app_versions select" ON public.app_versions;
+DROP POLICY IF EXISTS "Allow for auth, api keys (read+)" ON public.app_versions;
+DROP POLICY IF EXISTS "Allow RBAC app_versions_meta select" ON public.app_versions_meta;
+DROP POLICY IF EXISTS "Allow read for auth (read+)" ON public.app_versions_meta;
+DROP POLICY IF EXISTS "Allow RBAC channel_devices select" ON public.channel_devices;
+DROP POLICY IF EXISTS "Allow read for auth, api keys (read+)" ON public.channel_devices;
+DROP POLICY IF EXISTS "Allow RBAC channels select" ON public.channels;
+DROP POLICY IF EXISTS "Allow select for auth, api keys (read+)" ON public.channels;
+-- #2349 introduced transitional channel DML policies. The final RBAC policies
+-- above supersede them; keeping both would OR their authorization conditions.
+DROP POLICY IF EXISTS "Allow insert for auth, api keys (create_channel)" ON public.channels;
+DROP POLICY IF EXISTS "Allow update for auth, api keys (channel write)" ON public.channels;
+DROP POLICY IF EXISTS "Allow delete for auth, api keys (channel.delete)" ON public.channels;
+DROP POLICY IF EXISTS "Allow RBAC daily_bandwidth select" ON public.daily_bandwidth;
+DROP POLICY IF EXISTS "Allow read for auth (read+)" ON public.daily_bandwidth;
+DROP POLICY IF EXISTS "Allow RBAC daily_mau select" ON public.daily_mau;
+DROP POLICY IF EXISTS "Allow read for auth (read+)" ON public.daily_mau;
+DROP POLICY IF EXISTS "Allow RBAC daily_storage select" ON public.daily_storage;
+DROP POLICY IF EXISTS "Allow read for auth (read+)" ON public.daily_storage;
+DROP POLICY IF EXISTS "Allow RBAC daily_storage_hourly select" ON public.daily_storage_hourly;
+DROP POLICY IF EXISTS "Allow read for auth (read+)" ON public.daily_storage_hourly;
+DROP POLICY IF EXISTS "Allow RBAC daily_version select" ON public.daily_version;
+DROP POLICY IF EXISTS "Allow read for auth (read+)" ON public.daily_version;
+DROP POLICY IF EXISTS "Allow RBAC manifest select" ON public.manifest;
+DROP POLICY IF EXISTS "Allow select for auth, api keys (read+)" ON public.manifest;
+DROP POLICY IF EXISTS "Allow RBAC stats select" ON public.stats;
+DROP POLICY IF EXISTS "Allow read for auth (read+)" ON public.stats;
+
+CREATE POLICY "Allow select for auth, api keys (read+)"
+ON public.orgs
+FOR SELECT
+TO anon, authenticated
+USING (
+  ((SELECT auth.uid()) IS NOT NULL OR (SELECT public.get_apikey_header()) IS NOT NULL)
+  AND id = ANY(COALESCE((SELECT public.orgs_readable_org_ids()), '{}'::uuid[]))
+);
+
+CREATE POLICY "Allow for auth, api keys (read+)"
+ON public.apps
+FOR SELECT
+TO anon, authenticated
+USING (
+  app_id = ANY(COALESCE((SELECT public.apps_readable_app_ids()), '{}'::character varying[]))
+);
+
+CREATE POLICY "Allow for auth, api keys (read+)"
+ON public.app_versions
+FOR SELECT
+TO anon, authenticated
+USING (
+  CASE
+    WHEN COALESCE((SELECT current_setting('request.method', true)), '') = ANY('{PATCH,PUT,DELETE}'::text[])
+      THEN (
+        (((SELECT auth.uid()) IS NOT NULL) OR ((SELECT public.get_apikey_header()) IS NOT NULL))
+        AND public.rbac_check_permission_request(
+          public.rbac_perm_app_read_bundles(),
+          owner_org,
+          app_id,
+          NULL::bigint
+        )
+      )
+    ELSE app_id = ANY(COALESCE((SELECT public.app_versions_readable_app_ids()), '{}'::character varying[]))
+  END
+);
+DROP POLICY IF EXISTS "Allow read for auth (read+)"
+ON "public"."app_versions_meta";
+
+CREATE POLICY "Allow read for auth (read+)"
+ON "public"."app_versions_meta"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "app_id" = ANY(COALESCE((SELECT "public"."app_versions_readable_app_ids"()), '{}'::character varying[]))
+);
+
+DROP POLICY IF EXISTS "Allow org members to select build_logs"
+ON "public"."build_logs";
+
+CREATE POLICY "Allow org members to select build_logs"
+ON "public"."build_logs"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "org_id" = ANY(COALESCE((SELECT "public"."orgs_readable_org_ids"()), '{}'::uuid[]))
+  OR "app_id" = ANY(COALESCE((SELECT "public"."apps_readable_app_ids"()), '{}'::character varying[]))
+);
+
+DROP POLICY IF EXISTS "Allow org members to select build_requests"
+ON "public"."build_requests";
+
+CREATE POLICY "Allow org members to select build_requests"
+ON "public"."build_requests"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "app_id" = ANY(COALESCE((SELECT "public"."apps_readable_app_ids"()), '{}'::character varying[]))
+);
+
+DROP POLICY IF EXISTS "compatibility_events_select"
+ON "public"."compatibility_events";
+
+CREATE POLICY "compatibility_events_select"
+ON "public"."compatibility_events"
+FOR SELECT
+TO "authenticated"
+USING (
+  "app_id" = ANY(COALESCE((SELECT "public"."apps_readable_app_ids"()), '{}'::character varying[]))
+);
+
+DROP POLICY IF EXISTS "Allow read for auth, api keys (read+)"
+ON "public"."channel_devices";
+
+CREATE POLICY "Allow read for auth, api keys (read+)"
+ON "public"."channel_devices"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "channel_id" = ANY(COALESCE((SELECT "public"."channel_forced_devices_readable_channel_ids"()), '{}'::bigint[]))
+  OR (
+    "app_id" = ANY(COALESCE((SELECT "public"."apps_readable_app_ids"()), '{}'::character varying[]))
+    AND NOT ("channel_id" = ANY(COALESCE((SELECT "public"."channel_forced_devices_denied_channel_ids"()), '{}'::bigint[])))
+  )
+);
+
+DROP POLICY IF EXISTS "channel_permission_overrides_admin_select"
+ON "public"."channel_permission_overrides";
+
+CREATE POLICY "channel_permission_overrides_admin_select"
+ON "public"."channel_permission_overrides"
+FOR SELECT
+TO "authenticated"
+USING (
+  "channel_id" = ANY(COALESCE((SELECT "public"."channel_permission_override_readable_channel_ids"()), '{}'::bigint[]))
+);
+
+DROP POLICY IF EXISTS "Allow select for auth, api keys (read+)"
+ON "public"."channels";
+
+CREATE POLICY "Allow select for auth, api keys (read+)"
+ON "public"."channels"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "id" = ANY(COALESCE((SELECT "public"."channel_readable_channel_ids"()), '{}'::bigint[]))
+  OR (
+    "app_id" = ANY(COALESCE((SELECT "public"."apps_readable_app_ids"()), '{}'::character varying[]))
+    AND NOT ("id" = ANY(COALESCE((SELECT "public"."channel_read_denied_channel_ids"()), '{}'::bigint[])))
+  )
+);
+
+DROP POLICY IF EXISTS "Allow read for auth (read+)"
+ON "public"."daily_bandwidth";
+
+CREATE POLICY "Allow read for auth (read+)"
+ON "public"."daily_bandwidth"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "app_id" = ANY(COALESCE((SELECT "public"."apps_readable_app_ids"()), '{}'::character varying[]))
+);
+
+DROP POLICY IF EXISTS "Allow org members to select daily_build_time"
+ON "public"."daily_build_time";
+
+CREATE POLICY "Allow org members to select daily_build_time"
+ON "public"."daily_build_time"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "app_id" = ANY(COALESCE((SELECT "public"."apps_readable_app_ids"()), '{}'::character varying[]))
+);
+
+DROP POLICY IF EXISTS "Allow read for auth (read+)"
+ON "public"."daily_mau";
+
+CREATE POLICY "Allow read for auth (read+)"
+ON "public"."daily_mau"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "app_id" = ANY(COALESCE((SELECT "public"."apps_readable_app_ids"()), '{}'::character varying[]))
+);
+
+DROP POLICY IF EXISTS "Allow read for auth (read+)"
+ON "public"."daily_storage";
+
+CREATE POLICY "Allow read for auth (read+)"
+ON "public"."daily_storage"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "app_id" = ANY(COALESCE((SELECT "public"."apps_readable_app_ids"()), '{}'::character varying[]))
+);
+
+DROP POLICY IF EXISTS "Allow read for auth (read+)"
+ON "public"."daily_storage_hourly";
+
+CREATE POLICY "Allow read for auth (read+)"
+ON "public"."daily_storage_hourly"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "app_id" = ANY(COALESCE((SELECT "public"."apps_readable_app_ids"()), '{}'::character varying[]))
+);
+
+DROP POLICY IF EXISTS "Allow read for auth (read+)"
+ON "public"."daily_version";
+
+CREATE POLICY "Allow read for auth (read+)"
+ON "public"."daily_version"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "app_id" = ANY(COALESCE((SELECT "public"."apps_readable_app_ids"()), '{}'::character varying[]))
+);
+
+DROP POLICY IF EXISTS "Allow org member to select devices"
+ON "public"."devices";
+
+CREATE POLICY "Allow org member to select devices"
+ON "public"."devices"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "app_id" = ANY(COALESCE((SELECT "public"."apps_readable_app_ids"()), '{}'::character varying[]))
+);
+
+DROP POLICY IF EXISTS "Allow users to view deploy history for their org"
+ON "public"."deploy_history";
+
+CREATE POLICY "Allow users to view deploy history for their org"
+ON "public"."deploy_history"
+FOR SELECT
+TO "authenticated"
+USING (
+  "owner_org" = ANY(COALESCE((SELECT "public"."current_user_member_org_ids"()), '{}'::uuid[]))
+);
+
+DROP POLICY IF EXISTS "groups_select"
+ON "public"."groups";
+
+CREATE POLICY "groups_select"
+ON "public"."groups"
+FOR SELECT
+TO "authenticated"
+USING (
+  "id" = ANY(COALESCE((SELECT "public"."readable_group_ids"()), '{}'::uuid[]))
+);
+
+DROP POLICY IF EXISTS "group_members_select"
+ON "public"."group_members";
+
+CREATE POLICY "group_members_select"
+ON "public"."group_members"
+FOR SELECT
+TO "authenticated"
+USING (
+  "group_id" = ANY(COALESCE((SELECT "public"."readable_group_ids"()), '{}'::uuid[]))
+);
+
+DROP POLICY IF EXISTS "Allow select for auth, api keys (read+)"
+ON "public"."manifest";
+
+CREATE POLICY "Allow select for auth, api keys (read+)"
+ON "public"."manifest"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "app_version_id" = ANY(COALESCE((SELECT "public"."readable_app_version_ids"()), '{}'::bigint[]))
+);
+
+DROP POLICY IF EXISTS "Allow member and owner to select"
+ON "public"."org_users";
+
+CREATE POLICY "Allow member and owner to select"
+ON "public"."org_users"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "org_id" = ANY(COALESCE((SELECT "public"."org_member_readable_org_ids"()), '{}'::uuid[]))
+);
+
+DROP POLICY IF EXISTS "Allow viewing role bindings with permission"
+ON "public"."role_bindings";
+
+DROP POLICY IF EXISTS "role_bindings_select"
+ON "public"."role_bindings";
+
+CREATE POLICY "role_bindings_select"
+ON "public"."role_bindings"
+FOR SELECT
+TO "authenticated"
+USING (
+  "id" = ANY(COALESCE((SELECT "public"."role_bindings_readable_ids"()), '{}'::uuid[]))
+);
+
+DROP POLICY IF EXISTS "Allow admin to select webhooks"
+ON "public"."webhooks";
+
+CREATE POLICY "Allow admin to select webhooks"
+ON "public"."webhooks"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "org_id" = ANY(COALESCE((SELECT "public"."orgs_admin_org_ids"()), '{}'::uuid[]))
+);
+
+DROP POLICY IF EXISTS "Allow org members to select webhook_deliveries"
+ON "public"."webhook_deliveries";
+
+CREATE POLICY "Allow org members to select webhook_deliveries"
+ON "public"."webhook_deliveries"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "org_id" = ANY(COALESCE((SELECT "public"."orgs_readable_org_ids"()), '{}'::uuid[]))
+);
+
+DROP POLICY IF EXISTS "allow_org_admins_select_sso_providers"
+ON "public"."sso_providers";
+
+CREATE POLICY "allow_org_admins_select_sso_providers"
+ON "public"."sso_providers"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "org_id" = ANY(COALESCE((SELECT "public"."orgs_admin_org_ids"()), '{}'::uuid[]))
+);
+
+DROP POLICY IF EXISTS "Allow read for auth (read+)"
+ON "public"."stats";
+
+CREATE POLICY "Allow read for auth (read+)"
+ON "public"."stats"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "app_id" = ANY(COALESCE((SELECT "public"."apps_readable_app_ids"()), '{}'::character varying[]))
+);
+
+DROP POLICY IF EXISTS "Allow org member to select stripe_info"
+ON "public"."stripe_info";
+
+CREATE POLICY "Allow org member to select stripe_info"
+ON "public"."stripe_info"
+FOR SELECT
+TO "anon", "authenticated"
+USING (
+  "customer_id" = ANY(COALESCE((SELECT "public"."readable_org_customer_ids"()), '{}'::text[]))
+);
+
+-- Keep direct RBAC mutations bounded by the caller principal's effective rank.
+CREATE OR REPLACE FUNCTION public.principal_max_role_priority(
+  p_org_id uuid,
+  p_principal_type text,
+  p_principal_id uuid
+)
+RETURNS integer
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_rank integer;
+BEGIN
+  IF p_org_id IS NULL OR p_principal_id IS NULL THEN
+    RETURN 0;
+  END IF;
+
+  IF p_principal_type = public.rbac_principal_apikey() THEN
+    SELECT COALESCE(MAX(roles.priority_rank), 0)
+    INTO v_rank
+    FROM public.role_bindings
+    INNER JOIN public.roles
+      ON roles.id = role_bindings.role_id
+      AND roles.scope_type = role_bindings.scope_type
+    WHERE role_bindings.principal_type = public.rbac_principal_apikey()
+      AND role_bindings.principal_id = p_principal_id
+      AND role_bindings.org_id = p_org_id
+      AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > pg_catalog.now());
+
+    RETURN v_rank;
+  END IF;
+
+  IF p_principal_type = public.rbac_principal_user() THEN
+    SELECT COALESCE(MAX(roles.priority_rank), 0)
+    INTO v_rank
+    FROM (
+      SELECT role_bindings.role_id, role_bindings.scope_type
+      FROM public.role_bindings
+      WHERE role_bindings.principal_type = public.rbac_principal_user()
+        AND role_bindings.principal_id = p_principal_id
+        AND role_bindings.org_id = p_org_id
+        AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > pg_catalog.now())
+
+      UNION ALL
+
+      SELECT role_bindings.role_id, role_bindings.scope_type
+      FROM public.group_members
+      INNER JOIN public.groups
+        ON groups.id = group_members.group_id
+        AND groups.org_id = p_org_id
+      INNER JOIN public.role_bindings
+        ON role_bindings.principal_type = public.rbac_principal_group()
+        AND role_bindings.principal_id = group_members.group_id
+        AND role_bindings.org_id = groups.org_id
+      WHERE group_members.user_id = p_principal_id
+        AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > pg_catalog.now())
+    ) active_bindings
+    INNER JOIN public.roles
+      ON roles.id = active_bindings.role_id
+      AND roles.scope_type = active_bindings.scope_type;
+
+    RETURN v_rank;
+  END IF;
+
+  RETURN 0;
+END;
+$$;
+
+ALTER FUNCTION public.principal_max_role_priority(uuid, text, uuid) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.principal_max_role_priority(uuid, text, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.principal_max_role_priority(uuid, text, uuid) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.request_principal_max_role_priority(p_org_id uuid)
+RETURNS integer
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_api_key_text text;
+  v_api_key public.apikeys%ROWTYPE;
+  v_actor_id uuid;
+BEGIN
+  v_api_key_text := public.get_apikey_header();
+  IF v_api_key_text IS NOT NULL THEN
+    SELECT *
+    INTO v_api_key
+    FROM public.find_apikey_by_value(v_api_key_text)
+    LIMIT 1;
+
+    IF v_api_key.id IS NULL OR public.is_apikey_expired(v_api_key.expires_at) THEN
+      RETURN NULL;
+    END IF;
+
+    RETURN public.principal_max_role_priority(
+      p_org_id,
+      public.rbac_principal_apikey(),
+      v_api_key.rbac_id
+    );
+  END IF;
+
+  v_actor_id := public.request_actor_user_id();
+  IF v_actor_id IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  RETURN public.principal_max_role_priority(
+    p_org_id,
+    public.rbac_principal_user(),
+    v_actor_id
+  );
+END;
+$$;
+
+ALTER FUNCTION public.request_principal_max_role_priority(uuid) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.request_principal_max_role_priority(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.request_principal_max_role_priority(uuid) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.group_max_role_priority(p_group_id uuid)
+RETURNS integer
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT COALESCE(MAX(roles.priority_rank), 0)
+  FROM public.groups
+  INNER JOIN public.role_bindings
+    ON role_bindings.principal_type = public.rbac_principal_group()
+    AND role_bindings.principal_id = groups.id
+    AND role_bindings.org_id = groups.org_id
+    AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > pg_catalog.now())
+  INNER JOIN public.roles
+    ON roles.id = role_bindings.role_id
+    AND roles.scope_type = role_bindings.scope_type
+  WHERE groups.id = p_group_id
+$$;
+
+ALTER FUNCTION public.group_max_role_priority(uuid) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.group_max_role_priority(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.group_max_role_priority(uuid) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.principal_can_manage_group_rank(
+  p_principal_type text,
+  p_principal_id uuid,
+  p_group_id uuid
+)
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_org_id uuid;
+BEGIN
+  SELECT groups.org_id
+  INTO v_org_id
+  FROM public.groups
+  WHERE groups.id = p_group_id;
+
+  IF v_org_id IS NULL THEN
+    RETURN false;
+  END IF;
+
+  RETURN public.principal_max_role_priority(v_org_id, p_principal_type, p_principal_id)
+    >= public.group_max_role_priority(p_group_id);
+END;
+$$;
+
+ALTER FUNCTION public.principal_can_manage_group_rank(text, uuid, uuid) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.principal_can_manage_group_rank(text, uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.principal_can_manage_group_rank(text, uuid, uuid) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.assert_request_principal_rank(
+  p_org_id uuid,
+  p_target_priority integer,
+  p_mutation text
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_caller_priority integer;
+BEGIN
+  IF p_org_id IS NULL OR p_target_priority IS NULL THEN
+    PERFORM public.pg_log(
+      'deny: RBAC_MUTATION_UNKNOWN_TARGET',
+      pg_catalog.jsonb_build_object('org_id', p_org_id, 'mutation', p_mutation)
+    );
+    RAISE EXCEPTION 'Admins cannot elevate privileges!';
+  END IF;
+
+  v_caller_priority := public.request_principal_max_role_priority(p_org_id);
+  IF v_caller_priority IS NULL OR v_caller_priority < p_target_priority THEN
+    PERFORM public.pg_log(
+      'deny: RBAC_MUTATION_PRIORITY_ESCALATION',
+      pg_catalog.jsonb_build_object(
+        'org_id', p_org_id,
+        'mutation', p_mutation,
+        'caller_max_priority', v_caller_priority,
+        'target_role_priority', p_target_priority
+      )
+    );
+    RAISE EXCEPTION 'Admins cannot elevate privileges!';
+  END IF;
+END;
+$$;
+
+ALTER FUNCTION public.assert_request_principal_rank(uuid, integer, text) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.assert_request_principal_rank(uuid, integer, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.assert_request_principal_rank(uuid, integer, text) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.assert_group_member_is_org_member(
+  p_group_id uuid,
+  p_user_id uuid
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_org_id uuid;
+BEGIN
+  SELECT groups.org_id
+  INTO v_org_id
+  FROM public.groups
+  WHERE groups.id = p_group_id;
+
+  IF v_org_id IS NULL THEN
+    RAISE EXCEPTION 'GROUP_MEMBER_GROUP_NOT_FOUND';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.role_bindings
+    WHERE role_bindings.principal_type = public.rbac_principal_user()
+      AND role_bindings.principal_id = p_user_id
+      AND role_bindings.org_id = v_org_id
+      AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > pg_catalog.now())
+  ) THEN
+    RAISE EXCEPTION 'GROUP_MEMBER_NOT_IN_ORG';
+  END IF;
+END;
+$$;
+
+ALTER FUNCTION public.assert_group_member_is_org_member(uuid, uuid) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.assert_group_member_is_org_member(uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.assert_group_member_is_org_member(uuid, uuid) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.prevent_external_group_structure_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF public.is_internal_request_role(public.current_request_role()) THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.org_id IS DISTINCT FROM OLD.org_id
+    OR NEW.is_system IS DISTINCT FROM OLD.is_system
+    OR NEW.created_by IS DISTINCT FROM OLD.created_by
+  THEN
+    RAISE EXCEPTION 'GROUP_STRUCTURE_MUTATION_FORBIDDEN';
+  END IF;
+
+  PERFORM public.assert_request_principal_rank(
+    OLD.org_id,
+    public.group_max_role_priority(OLD.id),
+    'group_update'
+  );
+
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION public.prevent_external_group_structure_mutation() OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.prevent_external_group_structure_mutation() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.prevent_external_group_structure_mutation() TO service_role;
+
+DROP TRIGGER IF EXISTS prevent_external_group_structure_mutation ON public.groups;
+CREATE TRIGGER prevent_external_group_structure_mutation
+BEFORE UPDATE ON public.groups
+FOR EACH ROW
+EXECUTE FUNCTION public.prevent_external_group_structure_mutation();
+
+CREATE OR REPLACE FUNCTION public.prevent_group_member_priority_escalation()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_old_org_id uuid;
+  v_new_org_id uuid;
+BEGIN
+  IF public.is_internal_request_role(public.current_request_role()) THEN
+    IF TG_OP = 'DELETE' THEN
+      RETURN OLD;
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'INSERT' THEN
+    PERFORM public.assert_group_member_is_org_member(NEW.group_id, NEW.user_id);
+
+    SELECT groups.org_id
+    INTO v_new_org_id
+    FROM public.groups
+    WHERE groups.id = NEW.group_id;
+
+    PERFORM public.assert_request_principal_rank(
+      v_new_org_id,
+      public.group_max_role_priority(NEW.group_id),
+      'group_member_insert'
+    );
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'DELETE' THEN
+    SELECT groups.org_id
+    INTO v_old_org_id
+    FROM public.groups
+    WHERE groups.id = OLD.group_id;
+
+    PERFORM public.assert_request_principal_rank(
+      v_old_org_id,
+      public.group_max_role_priority(OLD.group_id),
+      'group_member_delete'
+    );
+    RETURN OLD;
+  END IF;
+
+  IF NEW.group_id IS NOT DISTINCT FROM OLD.group_id
+    AND NEW.user_id IS NOT DISTINCT FROM OLD.user_id
+  THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT groups.org_id
+  INTO v_old_org_id
+  FROM public.groups
+  WHERE groups.id = OLD.group_id;
+
+  PERFORM public.assert_request_principal_rank(
+    v_old_org_id,
+    public.group_max_role_priority(OLD.group_id),
+    'group_member_update_old'
+  );
+
+  PERFORM public.assert_group_member_is_org_member(NEW.group_id, NEW.user_id);
+
+  IF NEW.group_id IS DISTINCT FROM OLD.group_id THEN
+    SELECT groups.org_id
+    INTO v_new_org_id
+    FROM public.groups
+    WHERE groups.id = NEW.group_id;
+
+    PERFORM public.assert_request_principal_rank(
+      v_new_org_id,
+      public.group_max_role_priority(NEW.group_id),
+      'group_member_update_new'
+    );
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION public.prevent_group_member_priority_escalation() OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.prevent_group_member_priority_escalation() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.prevent_group_member_priority_escalation() TO service_role;
+
+DROP TRIGGER IF EXISTS prevent_group_member_priority_escalation ON public.group_members;
+CREATE TRIGGER prevent_group_member_priority_escalation
+BEFORE INSERT OR UPDATE OR DELETE ON public.group_members
+FOR EACH ROW
+EXECUTE FUNCTION public.prevent_group_member_priority_escalation();
+
+CREATE OR REPLACE FUNCTION public.prevent_role_binding_priority_escalation()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_old_role_priority integer;
+  v_new_role_priority integer;
+BEGIN
+  IF public.is_internal_request_role(public.current_request_role()) THEN
+    IF TG_OP = 'DELETE' THEN
+      RETURN OLD;
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP <> 'DELETE'
+    AND pg_trigger_depth() > 1
+    AND current_setting('capgo.org_creation_bootstrap_org_id', true) = NEW.org_id::text
+    AND NEW.principal_type = public.rbac_principal_user()
+    AND NEW.scope_type = public.rbac_scope_org()
+    AND NEW.principal_id = NEW.granted_by
+    AND NEW.app_id IS NULL
+    AND NEW.bundle_id IS NULL
+    AND NEW.channel_id IS NULL
+    AND EXISTS (
+      SELECT 1
+      FROM public.orgs
+      WHERE orgs.id = NEW.org_id
+        AND orgs.created_by = NEW.principal_id
+    )
+    AND EXISTS (
+      SELECT 1
+      FROM public.roles
+      WHERE roles.id = NEW.role_id
+        AND roles.scope_type = public.rbac_scope_org()
+        AND roles.name = public.rbac_role_org_super_admin()
+    )
+  THEN
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP <> 'INSERT' THEN
+    SELECT roles.priority_rank
+    INTO v_old_role_priority
+    FROM public.roles
+    WHERE roles.id = OLD.role_id
+      AND roles.scope_type = OLD.scope_type
+    LIMIT 1;
+
+    PERFORM public.assert_request_principal_rank(
+      OLD.org_id,
+      v_old_role_priority,
+      'role_binding_old'
+    );
+  END IF;
+
+  IF TG_OP <> 'DELETE' THEN
+    SELECT roles.priority_rank
+    INTO v_new_role_priority
+    FROM public.roles
+    WHERE roles.id = NEW.role_id
+      AND roles.scope_type = NEW.scope_type
+      AND roles.is_assignable IS TRUE
+    LIMIT 1;
+
+    IF v_new_role_priority IS NULL THEN
+      PERFORM public.pg_log(
+        'deny: ROLE_BINDING_ROLE_UNKNOWN',
+        pg_catalog.jsonb_build_object('org_id', NEW.org_id, 'role_id', NEW.role_id)
+      );
+      RAISE EXCEPTION 'Admins cannot assign this role!';
+    END IF;
+
+    PERFORM public.assert_request_principal_rank(
+      NEW.org_id,
+      v_new_role_priority,
+      'role_binding_new'
+    );
+  END IF;
+
+  IF TG_OP = 'DELETE' THEN
+    RETURN OLD;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION public.prevent_role_binding_priority_escalation() IS
+  'Prevents direct role binding inserts, updates, expiry changes, and deletes above the caller principal rank.';
+
+ALTER FUNCTION public.prevent_role_binding_priority_escalation() OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.prevent_role_binding_priority_escalation() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.prevent_role_binding_priority_escalation() TO service_role;
+
+DROP TRIGGER IF EXISTS prevent_role_binding_priority_escalation ON public.role_bindings;
+CREATE TRIGGER prevent_role_binding_priority_escalation
+BEFORE INSERT OR UPDATE OR DELETE ON public.role_bindings
+FOR EACH ROW
+EXECUTE FUNCTION public.prevent_role_binding_priority_escalation();
+
+-- Direct PostgREST deletion may only remove the authenticated caller's own membership.
+DROP POLICY IF EXISTS "Allow to self delete" ON public.org_users;
+CREATE POLICY "Allow to self delete"
+ON public.org_users
+FOR DELETE
+TO authenticated
+USING (user_id = (SELECT auth.uid()));
+
+-- Group removal has a service-backed, rank-checked private route; raw table deletes stay denied.
+DROP POLICY IF EXISTS groups_delete ON public.groups;
+DROP POLICY IF EXISTS "Deny direct group delete" ON public.groups;
+CREATE POLICY "Deny direct group delete"
+ON public.groups
+AS RESTRICTIVE
+FOR DELETE
+TO anon, authenticated
+USING (false);
+
+-- Final RBAC cleanup and serialization guards. All role and group mutations share one
+-- transaction-scoped organization lock so authorization checks cannot race a concurrent elevation.
+CREATE OR REPLACE FUNCTION public.lock_rbac_orgs(
+  p_first_org_id uuid,
+  p_second_org_id uuid DEFAULT NULL
+)
+RETURNS void
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF p_first_org_id IS NULL AND p_second_org_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  IF p_second_org_id IS NULL OR p_first_org_id IS NULL OR p_first_org_id = p_second_org_id THEN
+    PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(COALESCE(p_first_org_id, p_second_org_id)::text));
+    RETURN;
+  END IF;
+
+  IF p_first_org_id::text < p_second_org_id::text THEN
+    PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(p_first_org_id::text));
+    PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(p_second_org_id::text));
+  ELSE
+    PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(p_second_org_id::text));
+    PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(p_first_org_id::text));
+  END IF;
+END;
+$$;
+
+ALTER FUNCTION public.lock_rbac_orgs(uuid, uuid) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.lock_rbac_orgs(uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.lock_rbac_orgs(uuid, uuid) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.has_effective_active_org_super_admin(
+  p_org_id uuid,
+  p_excluded_user_id uuid DEFAULT NULL
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.role_bindings AS bindings
+    INNER JOIN public.roles AS roles
+      ON roles.id = bindings.role_id
+      AND roles.scope_type = bindings.scope_type
+    WHERE bindings.org_id = p_org_id
+      AND bindings.scope_type = public.rbac_scope_org()
+      AND roles.name = public.rbac_role_org_super_admin()
+      AND (bindings.expires_at IS NULL OR bindings.expires_at > pg_catalog.now())
+      AND (
+        (
+          bindings.principal_type = public.rbac_principal_user()
+          AND (p_excluded_user_id IS NULL OR bindings.principal_id <> p_excluded_user_id)
+        )
+        OR (
+          bindings.principal_type = public.rbac_principal_group()
+          AND EXISTS (
+            SELECT 1
+            FROM public.groups AS groups
+            INNER JOIN public.group_members AS members
+              ON members.group_id = groups.id
+            WHERE groups.id = bindings.principal_id
+              AND groups.org_id = p_org_id
+              AND (p_excluded_user_id IS NULL OR members.user_id <> p_excluded_user_id)
+          )
+        )
+      )
+  );
+$$;
+
+ALTER FUNCTION public.has_effective_active_org_super_admin(uuid, uuid) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.has_effective_active_org_super_admin(uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.has_effective_active_org_super_admin(uuid, uuid) TO service_role;
+
+-- Last-admin mutations require a durable successor. Expiring bindings can be
+-- useful, but they must never be the final effective organization administrator.
+CREATE OR REPLACE FUNCTION public.has_effective_non_expiring_org_super_admin_after_removal(
+  p_org_id uuid,
+  p_excluded_binding_id uuid DEFAULT NULL,
+  p_excluded_group_id uuid DEFAULT NULL,
+  p_excluded_group_member_group_id uuid DEFAULT NULL,
+  p_excluded_group_member_user_id uuid DEFAULT NULL,
+  p_excluded_user_id uuid DEFAULT NULL
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  WITH effective_admins AS (
+    SELECT bindings.principal_id AS user_id
+    FROM public.role_bindings AS bindings
+    INNER JOIN public.roles AS roles
+      ON roles.id = bindings.role_id
+      AND roles.scope_type = bindings.scope_type
+    WHERE bindings.org_id = p_org_id
+      AND bindings.scope_type = public.rbac_scope_org()
+      AND bindings.principal_type = public.rbac_principal_user()
+      AND roles.name = public.rbac_role_org_super_admin()
+      AND bindings.expires_at IS NULL
+      AND bindings.id IS DISTINCT FROM p_excluded_binding_id
+      AND bindings.principal_id IS DISTINCT FROM p_excluded_user_id
+
+    UNION
+
+    SELECT members.user_id
+    FROM public.role_bindings AS bindings
+    INNER JOIN public.roles AS roles
+      ON roles.id = bindings.role_id
+      AND roles.scope_type = bindings.scope_type
+    INNER JOIN public.groups AS groups
+      ON groups.id = bindings.principal_id
+      AND groups.org_id = bindings.org_id
+    INNER JOIN public.group_members AS members
+      ON members.group_id = groups.id
+    WHERE bindings.org_id = p_org_id
+      AND bindings.scope_type = public.rbac_scope_org()
+      AND bindings.principal_type = public.rbac_principal_group()
+      AND roles.name = public.rbac_role_org_super_admin()
+      AND bindings.expires_at IS NULL
+      AND bindings.id IS DISTINCT FROM p_excluded_binding_id
+      AND bindings.principal_id IS DISTINCT FROM p_excluded_group_id
+      AND members.user_id IS DISTINCT FROM p_excluded_user_id
+      AND NOT (
+        members.group_id IS NOT DISTINCT FROM p_excluded_group_member_group_id
+        AND members.user_id IS NOT DISTINCT FROM p_excluded_group_member_user_id
+      )
+  )
+  SELECT EXISTS (SELECT 1 FROM effective_admins);
+$$;
+
+ALTER FUNCTION public.has_effective_non_expiring_org_super_admin_after_removal(uuid, uuid, uuid, uuid, uuid, uuid) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.has_effective_non_expiring_org_super_admin_after_removal(uuid, uuid, uuid, uuid, uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.has_effective_non_expiring_org_super_admin_after_removal(uuid, uuid, uuid, uuid, uuid, uuid) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.is_effective_active_org_super_admin_user(
+  p_org_id uuid,
+  p_user_id uuid
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.role_bindings AS bindings
+    INNER JOIN public.roles AS roles
+      ON roles.id = bindings.role_id
+      AND roles.scope_type = bindings.scope_type
+    WHERE bindings.org_id = p_org_id
+      AND bindings.scope_type = public.rbac_scope_org()
+      AND roles.name = public.rbac_role_org_super_admin()
+      AND (bindings.expires_at IS NULL OR bindings.expires_at > pg_catalog.now())
+      AND (
+        (
+          bindings.principal_type = public.rbac_principal_user()
+          AND bindings.principal_id = p_user_id
+        )
+        OR (
+          bindings.principal_type = public.rbac_principal_group()
+          AND EXISTS (
+            SELECT 1
+            FROM public.groups AS groups
+            INNER JOIN public.group_members AS members
+              ON members.group_id = groups.id
+            WHERE groups.id = bindings.principal_id
+              AND groups.org_id = p_org_id
+              AND members.user_id = p_user_id
+          )
+        )
+      )
+  );
+$$;
+
+ALTER FUNCTION public.is_effective_active_org_super_admin_user(uuid, uuid) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.is_effective_active_org_super_admin_user(uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_effective_active_org_super_admin_user(uuid, uuid) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.is_org_delete_cascade(p_org_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT p_org_id::text = ANY(
+    COALESCE(
+      pg_catalog.string_to_array(pg_catalog.current_setting('capgo.org_delete_cascade_org_ids', true), ','),
+      '{}'::text[]
+    )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM public.orgs
+    WHERE orgs.id = p_org_id
+  );
+$$;
+
+ALTER FUNCTION public.is_org_delete_cascade(uuid) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.is_org_delete_cascade(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_org_delete_cascade(uuid) TO service_role;
+
+-- This is reachable only while the trusted AFTER DELETE org_users trigger is
+-- revoking the authenticated user's own departed-org access.
+CREATE OR REPLACE FUNCTION public.is_nested_self_org_departure_cleanup(
+  p_org_id uuid,
+  p_user_id uuid
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT pg_catalog.pg_trigger_depth() > 1
+    AND p_user_id = public.request_actor_user_id()
+    AND NOT EXISTS (
+      SELECT 1
+      FROM public.org_users
+      WHERE org_users.user_id = p_user_id
+        AND org_users.org_id = p_org_id
+        AND org_users.app_id IS NULL
+        AND org_users.channel_id IS NULL
+    );
+$$;
+
+ALTER FUNCTION public.is_nested_self_org_departure_cleanup(uuid, uuid) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.is_nested_self_org_departure_cleanup(uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_nested_self_org_departure_cleanup(uuid, uuid) TO service_role;
+
+-- This existing AFTER DELETE trigger is the single departure cleanup path. App/channel
+-- membership rows are metadata only and must never trigger organization teardown.
+CREATE OR REPLACE FUNCTION public.check_if_org_can_exist()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF public.is_org_delete_cascade(OLD.org_id) THEN
+    RETURN OLD;
+  END IF;
+
+  IF OLD.app_id IS NOT NULL OR OLD.channel_id IS NOT NULL THEN
+    RETURN OLD;
+  END IF;
+
+  PERFORM public.lock_rbac_orgs(OLD.org_id);
+
+  IF NOT public.has_effective_active_org_super_admin(OLD.org_id, OLD.user_id) THEN
+    DELETE FROM public.orgs
+    WHERE orgs.id = OLD.org_id;
+    RETURN OLD;
+  END IF;
+
+  -- Self-departure deletes nested bindings under a trusted trigger path. Require
+  -- a durable successor before that nested cleanup can bypass row-level guards.
+  IF public.is_effective_active_org_super_admin_user(OLD.org_id, OLD.user_id) AND NOT public.has_effective_non_expiring_org_super_admin_after_removal(
+    OLD.org_id,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    OLD.user_id
+  ) THEN
+    RAISE EXCEPTION 'CANNOT_REMOVE_LAST_EFFECTIVE_SUPER_ADMIN'
+      USING HINT = 'At least one non-expiring effective organization super admin must remain.';
+  END IF;
+
+  DELETE FROM public.group_members
+  USING public.groups
+  WHERE group_members.group_id = groups.id
+    AND groups.org_id = OLD.org_id
+    AND group_members.user_id = OLD.user_id;
+
+  DELETE FROM public.channel_permission_overrides AS overrides
+  USING public.channels AS channels
+  WHERE overrides.channel_id = channels.id
+    AND channels.owner_org = OLD.org_id
+    AND (
+      (
+        overrides.principal_type = public.rbac_principal_user()
+        AND overrides.principal_id = OLD.user_id
+      )
+      OR (
+        overrides.principal_type = public.rbac_principal_apikey()
+        AND EXISTS (
+          SELECT 1
+          FROM public.apikeys
+          WHERE apikeys.rbac_id = overrides.principal_id
+            AND apikeys.user_id = OLD.user_id
+        )
+      )
+    );
+
+  DELETE FROM public.role_bindings
+  WHERE role_bindings.principal_type = public.rbac_principal_user()
+    AND role_bindings.principal_id = OLD.user_id
+    AND role_bindings.org_id = OLD.org_id;
+
+  DELETE FROM public.role_bindings AS bindings
+  USING public.apikeys
+  WHERE bindings.principal_type = public.rbac_principal_apikey()
+    AND bindings.principal_id = apikeys.rbac_id
+    AND apikeys.user_id = OLD.user_id
+    AND bindings.org_id = OLD.org_id;
+
+  DELETE FROM public.org_users
+  WHERE org_users.user_id = OLD.user_id
+    AND org_users.org_id = OLD.org_id
+    AND (org_users.app_id IS NOT NULL OR org_users.channel_id IS NOT NULL);
+
+  RETURN OLD;
+END;
+$$;
+
+ALTER FUNCTION public.check_if_org_can_exist() OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.check_if_org_can_exist() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.check_if_org_can_exist() TO service_role;
+
+DROP POLICY IF EXISTS "Allow to self delete" ON public.org_users;
+CREATE POLICY "Allow to self delete"
+ON public.org_users
+FOR DELETE
+TO authenticated
+USING (
+  user_id = (SELECT auth.uid())
+  AND app_id IS NULL
+  AND channel_id IS NULL
+);
+
+-- Direct-only guards predate group RBAC. The immediate checks below cover every
+-- effective-admin removal while allowing intentional organization teardown first.
+DROP TRIGGER IF EXISTS prevent_last_super_admin_delete ON public.role_bindings;
+DROP TRIGGER IF EXISTS prevent_last_super_admin_update ON public.role_bindings;
+-- Immediate removal checks keep the organization-admin invariant valid even for
+-- service-backed routes, where direct PostgREST rank triggers are intentionally bypassed.
+CREATE OR REPLACE FUNCTION public.is_active_org_super_admin_binding(
+  p_role_id uuid,
+  p_scope_type text,
+  p_principal_type text,
+  p_org_id uuid,
+  p_expires_at timestamptz
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT COALESCE(
+    p_org_id IS NOT NULL
+    AND p_scope_type = public.rbac_scope_org()
+    AND p_principal_type IN (public.rbac_principal_user(), public.rbac_principal_group())
+    AND (p_expires_at IS NULL OR p_expires_at > pg_catalog.now())
+    AND EXISTS (
+      SELECT 1
+      FROM public.roles
+      WHERE roles.id = p_role_id
+        AND roles.scope_type = p_scope_type
+        AND roles.name = public.rbac_role_org_super_admin()
+    ),
+    false
+  );
+$$;
+
+ALTER FUNCTION public.is_active_org_super_admin_binding(uuid, text, text, uuid, timestamptz) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.is_active_org_super_admin_binding(uuid, text, text, uuid, timestamptz) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_active_org_super_admin_binding(uuid, text, text, uuid, timestamptz) TO service_role;
+
+
+
+CREATE OR REPLACE FUNCTION public.assert_effective_super_admin_binding_removal(p_binding_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_binding public.role_bindings%ROWTYPE;
+BEGIN
+  SELECT *
+  INTO v_binding
+  FROM public.role_bindings
+  WHERE role_bindings.id = p_binding_id;
+
+  IF NOT FOUND
+    OR NOT public.is_active_org_super_admin_binding(
+      v_binding.role_id,
+      v_binding.scope_type,
+      v_binding.principal_type,
+      v_binding.org_id,
+      v_binding.expires_at
+    )
+  THEN
+    RETURN;
+  END IF;
+
+  IF v_binding.principal_type = public.rbac_principal_group()
+    AND NOT EXISTS (
+      SELECT 1
+      FROM public.group_members
+      WHERE group_members.group_id = v_binding.principal_id
+    )
+  THEN
+    RETURN;
+  END IF;
+
+  IF NOT public.has_effective_non_expiring_org_super_admin_after_removal(
+    v_binding.org_id,
+    v_binding.id
+  ) THEN
+    RAISE EXCEPTION 'CANNOT_REMOVE_LAST_EFFECTIVE_SUPER_ADMIN'
+      USING HINT = 'At least one effective active organization super admin must remain.';
+  END IF;
+END;
+$$;
+
+ALTER FUNCTION public.assert_effective_super_admin_binding_removal(uuid) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.assert_effective_super_admin_binding_removal(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.assert_effective_super_admin_binding_removal(uuid) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.assert_effective_super_admin_group_member_removal(
+  p_group_id uuid,
+  p_user_id uuid
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_org_id uuid;
+BEGIN
+  SELECT groups.org_id
+  INTO v_org_id
+  FROM public.groups
+  WHERE groups.id = p_group_id;
+
+  IF v_org_id IS NULL
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.role_bindings AS bindings
+      INNER JOIN public.roles AS roles
+        ON roles.id = bindings.role_id
+        AND roles.scope_type = bindings.scope_type
+      WHERE bindings.principal_type = public.rbac_principal_group()
+        AND bindings.principal_id = p_group_id
+        AND bindings.org_id = v_org_id
+        AND bindings.scope_type = public.rbac_scope_org()
+        AND roles.name = public.rbac_role_org_super_admin()
+        AND (bindings.expires_at IS NULL OR bindings.expires_at > pg_catalog.now())
+    )
+  THEN
+    RETURN;
+  END IF;
+
+  IF NOT public.has_effective_non_expiring_org_super_admin_after_removal(
+    v_org_id,
+    NULL,
+    NULL,
+    p_group_id,
+    p_user_id
+  ) THEN
+    RAISE EXCEPTION 'CANNOT_REMOVE_LAST_EFFECTIVE_SUPER_ADMIN'
+      USING HINT = 'At least one effective active organization super admin must remain.';
+  END IF;
+END;
+$$;
+
+ALTER FUNCTION public.assert_effective_super_admin_group_member_removal(uuid, uuid) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.assert_effective_super_admin_group_member_removal(uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.assert_effective_super_admin_group_member_removal(uuid, uuid) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.assert_effective_super_admin_group_removal(
+  p_group_id uuid,
+  p_org_id uuid
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF p_org_id IS NULL
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.role_bindings AS bindings
+      INNER JOIN public.roles AS roles
+        ON roles.id = bindings.role_id
+        AND roles.scope_type = bindings.scope_type
+      WHERE bindings.principal_type = public.rbac_principal_group()
+        AND bindings.principal_id = p_group_id
+        AND bindings.org_id = p_org_id
+        AND bindings.scope_type = public.rbac_scope_org()
+        AND roles.name = public.rbac_role_org_super_admin()
+        AND (bindings.expires_at IS NULL OR bindings.expires_at > pg_catalog.now())
+    )
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.group_members
+      WHERE group_members.group_id = p_group_id
+    )
+  THEN
+    RETURN;
+  END IF;
+
+  IF NOT public.has_effective_non_expiring_org_super_admin_after_removal(
+    p_org_id,
+    NULL,
+    p_group_id
+  ) THEN
+    RAISE EXCEPTION 'CANNOT_REMOVE_LAST_EFFECTIVE_SUPER_ADMIN'
+      USING HINT = 'At least one effective active organization super admin must remain.';
+  END IF;
+END;
+$$;
+
+ALTER FUNCTION public.assert_effective_super_admin_group_removal(uuid, uuid) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.assert_effective_super_admin_group_removal(uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.assert_effective_super_admin_group_removal(uuid, uuid) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.prevent_external_group_structure_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_actor_id uuid;
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    PERFORM public.lock_rbac_orgs(NEW.org_id);
+  ELSIF TG_OP = 'UPDATE' THEN
+    PERFORM public.lock_rbac_orgs(OLD.org_id, NEW.org_id);
+  ELSE
+    PERFORM public.lock_rbac_orgs(OLD.org_id);
+  END IF;
+
+  IF TG_OP = 'DELETE' THEN
+    IF public.is_org_delete_cascade(OLD.org_id) THEN
+      RETURN OLD;
+    END IF;
+  ELSIF TG_OP = 'INSERT' THEN
+    IF public.is_org_delete_cascade(NEW.org_id) THEN
+      RETURN NEW;
+    END IF;
+  ELSIF public.is_org_delete_cascade(OLD.org_id) OR public.is_org_delete_cascade(NEW.org_id) THEN
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'DELETE' THEN
+    PERFORM public.assert_effective_super_admin_group_removal(OLD.id, OLD.org_id);
+  END IF;
+
+  IF public.is_internal_request_role(public.current_request_role()) THEN
+    IF TG_OP = 'DELETE' THEN
+      RETURN OLD;
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'INSERT' THEN
+    v_actor_id := public.request_actor_user_id();
+    IF NEW.is_system
+      OR v_actor_id IS NULL
+      OR NEW.created_by IS DISTINCT FROM v_actor_id
+    THEN
+      RAISE EXCEPTION 'GROUP_STRUCTURE_MUTATION_FORBIDDEN';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'GROUP_DELETE_FORBIDDEN';
+  END IF;
+
+  IF NEW.org_id IS DISTINCT FROM OLD.org_id
+    OR NEW.is_system IS DISTINCT FROM OLD.is_system
+    OR NEW.created_by IS DISTINCT FROM OLD.created_by
+  THEN
+    RAISE EXCEPTION 'GROUP_STRUCTURE_MUTATION_FORBIDDEN';
+  END IF;
+
+  PERFORM public.assert_request_principal_rank(
+    OLD.org_id,
+    public.group_max_role_priority(OLD.id),
+    'group_update'
+  );
+
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION public.prevent_external_group_structure_mutation() OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.prevent_external_group_structure_mutation() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.prevent_external_group_structure_mutation() TO service_role;
+
+DROP TRIGGER IF EXISTS prevent_external_group_structure_mutation ON public.groups;
+CREATE TRIGGER prevent_external_group_structure_mutation
+BEFORE INSERT OR UPDATE OR DELETE ON public.groups
+FOR EACH ROW
+EXECUTE FUNCTION public.prevent_external_group_structure_mutation();
+
+CREATE OR REPLACE FUNCTION public.prevent_group_member_priority_escalation()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_old_org_id uuid;
+  v_new_org_id uuid;
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    SELECT groups.org_id
+    INTO v_new_org_id
+    FROM public.groups
+    WHERE groups.id = NEW.group_id;
+    PERFORM public.lock_rbac_orgs(v_new_org_id);
+  ELSIF TG_OP = 'DELETE' THEN
+    SELECT groups.org_id
+    INTO v_old_org_id
+    FROM public.groups
+    WHERE groups.id = OLD.group_id;
+    PERFORM public.lock_rbac_orgs(v_old_org_id);
+  ELSE
+    SELECT groups.org_id
+    INTO v_old_org_id
+    FROM public.groups
+    WHERE groups.id = OLD.group_id;
+
+    SELECT groups.org_id
+    INTO v_new_org_id
+    FROM public.groups
+    WHERE groups.id = NEW.group_id;
+
+    PERFORM public.lock_rbac_orgs(v_old_org_id, v_new_org_id);
+  END IF;
+
+  IF (TG_OP = 'DELETE' AND public.is_org_delete_cascade(v_old_org_id))
+    OR (TG_OP = 'INSERT' AND public.is_org_delete_cascade(v_new_org_id))
+    OR (TG_OP = 'UPDATE' AND (public.is_org_delete_cascade(v_old_org_id) OR public.is_org_delete_cascade(v_new_org_id)))
+  THEN
+    IF TG_OP = 'DELETE' THEN
+      RETURN OLD;
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF (
+    TG_OP = 'DELETE'
+    OR (
+      TG_OP = 'UPDATE'
+      AND (
+        NEW.group_id IS DISTINCT FROM OLD.group_id
+        OR NEW.user_id IS DISTINCT FROM OLD.user_id
+      )
+    )
+  )
+  AND NOT (
+    TG_OP = 'DELETE'
+    AND public.is_nested_self_org_departure_cleanup(v_old_org_id, OLD.user_id)
+  ) THEN
+    PERFORM public.assert_effective_super_admin_group_member_removal(OLD.group_id, OLD.user_id);
+  END IF;
+
+  IF public.is_internal_request_role(public.current_request_role()) THEN
+    IF TG_OP = 'DELETE' THEN
+      RETURN OLD;
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'DELETE'
+    AND public.is_nested_self_org_departure_cleanup(v_old_org_id, OLD.user_id)
+  THEN
+    RETURN OLD;
+  END IF;
+
+  IF TG_OP = 'INSERT' THEN
+    PERFORM public.assert_group_member_is_org_member(NEW.group_id, NEW.user_id);
+    PERFORM public.assert_request_principal_rank(
+      v_new_org_id,
+      public.group_max_role_priority(NEW.group_id),
+      'group_member_insert'
+    );
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'DELETE' THEN
+    PERFORM public.assert_request_principal_rank(
+      v_old_org_id,
+      public.group_max_role_priority(OLD.group_id),
+      'group_member_delete'
+    );
+    RETURN OLD;
+  END IF;
+
+  IF NEW.group_id IS NOT DISTINCT FROM OLD.group_id
+    AND NEW.user_id IS NOT DISTINCT FROM OLD.user_id
+  THEN
+    RETURN NEW;
+  END IF;
+
+  PERFORM public.assert_request_principal_rank(
+    v_old_org_id,
+    public.group_max_role_priority(OLD.group_id),
+    'group_member_update_old'
+  );
+
+  PERFORM public.assert_group_member_is_org_member(NEW.group_id, NEW.user_id);
+
+  IF NEW.group_id IS DISTINCT FROM OLD.group_id THEN
+    PERFORM public.assert_request_principal_rank(
+      v_new_org_id,
+      public.group_max_role_priority(NEW.group_id),
+      'group_member_update_new'
+    );
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION public.prevent_group_member_priority_escalation() OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.prevent_group_member_priority_escalation() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.prevent_group_member_priority_escalation() TO service_role;
+
+DROP TRIGGER IF EXISTS prevent_group_member_priority_escalation ON public.group_members;
+CREATE TRIGGER prevent_group_member_priority_escalation
+BEFORE INSERT OR UPDATE OR DELETE ON public.group_members
+FOR EACH ROW
+EXECUTE FUNCTION public.prevent_group_member_priority_escalation();
+
+CREATE OR REPLACE FUNCTION public.prevent_role_binding_priority_escalation()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_old_role_priority integer;
+  v_new_role_priority integer;
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    PERFORM public.lock_rbac_orgs(OLD.org_id);
+  ELSIF TG_OP = 'INSERT' THEN
+    PERFORM public.lock_rbac_orgs(NEW.org_id);
+  ELSE
+    PERFORM public.lock_rbac_orgs(OLD.org_id, NEW.org_id);
+  END IF;
+
+  IF (TG_OP = 'DELETE' AND public.is_org_delete_cascade(OLD.org_id))
+    OR (TG_OP = 'INSERT' AND public.is_org_delete_cascade(NEW.org_id))
+    OR (TG_OP = 'UPDATE' AND (public.is_org_delete_cascade(OLD.org_id) OR public.is_org_delete_cascade(NEW.org_id)))
+  THEN
+    IF TG_OP = 'DELETE' THEN
+      RETURN OLD;
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'DELETE' THEN
+    IF NOT (
+      (
+        OLD.principal_type = public.rbac_principal_user()
+        AND public.is_nested_self_org_departure_cleanup(OLD.org_id, OLD.principal_id)
+      )
+      OR (
+        OLD.principal_type = public.rbac_principal_apikey()
+        AND EXISTS (
+          SELECT 1
+          FROM public.apikeys
+          WHERE apikeys.rbac_id = OLD.principal_id
+            AND public.is_nested_self_org_departure_cleanup(OLD.org_id, apikeys.user_id)
+        )
+      )
+    ) THEN
+      PERFORM public.assert_effective_super_admin_binding_removal(OLD.id);
+    END IF;
+  ELSIF TG_OP = 'UPDATE'
+    AND NOT (
+      NEW.org_id IS NOT DISTINCT FROM OLD.org_id
+      AND NEW.principal_type IS NOT DISTINCT FROM OLD.principal_type
+      AND NEW.principal_id IS NOT DISTINCT FROM OLD.principal_id
+      AND public.is_active_org_super_admin_binding(
+        NEW.role_id,
+        NEW.scope_type,
+        NEW.principal_type,
+        NEW.org_id,
+        NEW.expires_at
+      )
+    )
+  THEN
+    PERFORM public.assert_effective_super_admin_binding_removal(OLD.id);
+  END IF;
+
+  -- A future expiry removes this binding. Keep another non-expiring effective
+  -- administrator so a chain of scheduled expirations cannot orphan the org.
+  IF TG_OP = 'UPDATE'
+    AND NEW.expires_at IS NOT NULL
+    AND NEW.expires_at IS DISTINCT FROM OLD.expires_at
+    AND public.is_active_org_super_admin_binding(
+      OLD.role_id,
+      OLD.scope_type,
+      OLD.principal_type,
+      OLD.org_id,
+      OLD.expires_at
+    )
+    AND public.is_active_org_super_admin_binding(
+      NEW.role_id,
+      NEW.scope_type,
+      NEW.principal_type,
+      NEW.org_id,
+      NEW.expires_at
+    )
+    AND NOT public.has_effective_non_expiring_org_super_admin_after_removal(
+      NEW.org_id,
+      OLD.id
+    )
+  THEN
+    RAISE EXCEPTION 'CANNOT_REMOVE_LAST_EFFECTIVE_SUPER_ADMIN'
+      USING HINT = 'At least one effective active organization super admin must remain after this binding expires.';
+  END IF;
+
+  IF public.is_internal_request_role(public.current_request_role()) THEN
+    IF TG_OP = 'DELETE' THEN
+      RETURN OLD;
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'DELETE'
+    AND (
+      (
+        OLD.principal_type = public.rbac_principal_user()
+        AND public.is_nested_self_org_departure_cleanup(OLD.org_id, OLD.principal_id)
+      )
+      OR (
+        OLD.principal_type = public.rbac_principal_apikey()
+        AND EXISTS (
+          SELECT 1
+          FROM public.apikeys
+          WHERE apikeys.rbac_id = OLD.principal_id
+            AND public.is_nested_self_org_departure_cleanup(OLD.org_id, apikeys.user_id)
+        )
+      )
+    )
+  THEN
+    RETURN OLD;
+  END IF;
+
+  IF TG_OP <> 'DELETE'
+    AND pg_trigger_depth() > 1
+    AND current_setting('capgo.org_creation_bootstrap_org_id', true) = NEW.org_id::text
+    AND NEW.principal_type = public.rbac_principal_user()
+    AND NEW.scope_type = public.rbac_scope_org()
+    AND NEW.principal_id = NEW.granted_by
+    AND NEW.app_id IS NULL
+    AND NEW.bundle_id IS NULL
+    AND NEW.channel_id IS NULL
+    AND EXISTS (
+      SELECT 1
+      FROM public.orgs
+      WHERE orgs.id = NEW.org_id
+        AND orgs.created_by = NEW.principal_id
+    )
+    AND EXISTS (
+      SELECT 1
+      FROM public.roles
+      WHERE roles.id = NEW.role_id
+        AND roles.scope_type = public.rbac_scope_org()
+        AND roles.name = public.rbac_role_org_super_admin()
+    )
+  THEN
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP <> 'INSERT' THEN
+    SELECT roles.priority_rank
+    INTO v_old_role_priority
+    FROM public.roles
+    WHERE roles.id = OLD.role_id
+      AND roles.scope_type = OLD.scope_type
+    LIMIT 1;
+
+    PERFORM public.assert_request_principal_rank(
+      OLD.org_id,
+      v_old_role_priority,
+      'role_binding_old'
+    );
+  END IF;
+
+  IF TG_OP <> 'DELETE' THEN
+    SELECT roles.priority_rank
+    INTO v_new_role_priority
+    FROM public.roles
+    WHERE roles.id = NEW.role_id
+      AND roles.scope_type = NEW.scope_type
+      AND roles.is_assignable IS TRUE
+    LIMIT 1;
+
+    IF v_new_role_priority IS NULL THEN
+      PERFORM public.pg_log(
+        'deny: ROLE_BINDING_ROLE_UNKNOWN',
+        pg_catalog.jsonb_build_object('org_id', NEW.org_id, 'role_id', NEW.role_id)
+      );
+      RAISE EXCEPTION 'Admins cannot assign this role!';
+    END IF;
+
+    PERFORM public.assert_request_principal_rank(
+      NEW.org_id,
+      v_new_role_priority,
+      'role_binding_new'
+    );
+  END IF;
+
+  IF TG_OP = 'DELETE' THEN
+    RETURN OLD;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION public.prevent_role_binding_priority_escalation() OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.prevent_role_binding_priority_escalation() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.prevent_role_binding_priority_escalation() TO service_role;
+
+DROP TRIGGER IF EXISTS prevent_role_binding_priority_escalation ON public.role_bindings;
+CREATE TRIGGER prevent_role_binding_priority_escalation
+BEFORE INSERT OR UPDATE OR DELETE ON public.role_bindings
+FOR EACH ROW
+EXECUTE FUNCTION public.prevent_role_binding_priority_escalation();

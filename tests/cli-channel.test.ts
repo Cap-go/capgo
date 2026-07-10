@@ -1,7 +1,9 @@
+import type { Database } from '../src/types/supabase.types'
 import { randomUUID } from 'node:crypto'
+import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createTestSDK } from './cli-sdk-utils'
-import { createDirectApiKeyWithBindings, getSupabaseClient, ORG_ID, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils'
+import { BASE_URL, createDirectApiKeyWithBindings, getSupabaseClient, ORG_ID, resetAndSeedAppData, resetAppData, SUPABASE_ANON_KEY, SUPABASE_BASE_URL, USER_ID } from './test-utils'
 
 // Helper to generate unique channel names for concurrent tests
 const generateChannelName = () => `test-channel-${randomUUID().slice(0, 8)}`
@@ -882,6 +884,138 @@ describe('tests CLI channel commands', () => {
       const result = await createTestSDK().deleteChannel(testChannelName, testInvalidApp, false)
       expect(result.success).toBe(false)
       expect(result.error).toContain('does not exist')
+    })
+  })
+
+  describe('channel-admin HTTP and PostgREST isolation', () => {
+    it('allows settings-only POST and DELETE for the target channel while RLS hides its sibling', async () => {
+      const targetChannelName = generateChannelName()
+      const siblingChannelName = generateChannelName()
+      await createChannel(targetChannelName, APPNAME)
+      await createChannel(siblingChannelName, APPNAME)
+
+      const supabase = getSupabaseClient()
+      const [{ data: app, error: appError }, { data: target, error: targetError }, { data: sibling, error: siblingError }, { data: channelAdminRole, error: roleError }] = await Promise.all([
+        supabase.from('apps').select('id').eq('app_id', APPNAME).single(),
+        supabase.from('channels').select('id, rbac_id, version').eq('app_id', APPNAME).eq('name', targetChannelName).single(),
+        supabase.from('channels').select('id, rbac_id').eq('app_id', APPNAME).eq('name', siblingChannelName).single(),
+        supabase.from('roles').select('id').eq('name', 'channel_admin').eq('scope_type', 'channel').single(),
+      ])
+      expect(appError).toBeNull()
+      expect(targetError).toBeNull()
+      expect(siblingError).toBeNull()
+      expect(roleError).toBeNull()
+      expect(app?.id).toBeTruthy()
+      expect(target?.rbac_id).toBeTruthy()
+      expect(channelAdminRole?.id).toBeTruthy()
+
+      const key = `channel-http-admin-${randomUUID()}`
+      const apiKey = await createDirectApiKeyWithBindings({
+        key,
+        name: `Channel HTTP admin ${targetChannelName}`,
+        orgId: ORG_ID,
+        roleName: 'org_billing_admin',
+      })
+      const resolvedKey = apiKey.key ?? key
+
+      try {
+        const { error: bindingError } = await supabase
+          .from('role_bindings')
+          .insert({
+            principal_type: 'apikey',
+            principal_id: apiKey.rbac_id,
+            role_id: channelAdminRole!.id,
+            scope_type: 'channel',
+            org_id: ORG_ID,
+            app_id: app!.id,
+            channel_id: target!.rbac_id,
+            granted_by: apiKey.user_id,
+            reason: 'Channel HTTP and RLS isolation regression test',
+            is_direct: true,
+          })
+        expect(bindingError).toBeNull()
+
+        const scopedSupabase = createClient<Database>(SUPABASE_BASE_URL, SUPABASE_ANON_KEY, {
+          auth: { persistSession: false },
+          global: { headers: { capgkey: resolvedKey } },
+        })
+        const { data: scopedApps, error: scopedAppsError } = await scopedSupabase
+          .from('apps')
+          .select('app_id')
+          .eq('app_id', APPNAME)
+        expect(scopedAppsError).toBeNull()
+        expect(scopedApps).toHaveLength(0)
+        const { data: scopedChannels, error: scopedChannelsError } = await scopedSupabase
+          .from('channels')
+          .select('id, name')
+          .eq('app_id', APPNAME)
+          .in('name', [targetChannelName, siblingChannelName])
+        expect(scopedChannelsError).toBeNull()
+        expect(scopedChannels).toEqual([{ id: target!.id, name: targetChannelName }])
+
+        const { error: targetUpdateError } = await scopedSupabase
+          .from('channels')
+          .update({ public: true })
+          .eq('id', target!.id)
+        expect(targetUpdateError).toBeNull()
+
+        const { error: siblingUpdateError } = await scopedSupabase
+          .from('channels')
+          .update({ public: true })
+          .eq('id', sibling!.id)
+        expect(siblingUpdateError).toBeNull()
+
+        const { data: siblingAfterDirectUpdate, error: siblingAfterDirectUpdateError } = await supabase
+          .from('channels')
+          .select('public')
+          .eq('id', sibling!.id)
+          .single()
+        expect(siblingAfterDirectUpdateError).toBeNull()
+        expect(siblingAfterDirectUpdate?.public).toBe(false)
+
+        const postResponse = await fetch(`${BASE_URL}/channel`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'capgkey': resolvedKey,
+          },
+          body: JSON.stringify({
+            app_id: APPNAME,
+            channel: targetChannelName,
+            public: false,
+          }),
+        })
+        expect(postResponse.status).toBe(200)
+
+        const { data: targetAfterPost, error: targetAfterPostError } = await supabase
+          .from('channels')
+          .select('version, public')
+          .eq('id', target!.id)
+          .single()
+        expect(targetAfterPostError).toBeNull()
+        expect(targetAfterPost).toEqual({ version: target!.version, public: false })
+
+        const deleteResponse = await fetch(`${BASE_URL}/channel?app_id=${encodeURIComponent(APPNAME)}&channel=${encodeURIComponent(targetChannelName)}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'capgkey': resolvedKey,
+          },
+        })
+        expect(deleteResponse.status).toBe(200)
+
+        const { data: targetAfterDelete, error: targetAfterDeleteError } = await supabase
+          .from('channels')
+          .select('id')
+          .eq('id', target!.id)
+          .maybeSingle()
+        expect(targetAfterDeleteError).toBeNull()
+        expect(targetAfterDelete).toBeNull()
+      }
+      finally {
+        await supabase.from('role_bindings').delete().eq('principal_id', apiKey.rbac_id)
+        await supabase.from('apikeys').delete().eq('id', apiKey.id)
+      }
     })
   })
 })

@@ -419,6 +419,7 @@ describe('rbac permission system', () => {
         const result = await query(`
           SELECT
             public.get_org_perm_for_apikey($1, $3) AS developer_perm,
+            public.is_allowed_capgkey($1, ARRAY['write']::text[], $3::character varying) AS developer_write_allowed,
             public.rbac_check_permission_direct(
               public.rbac_perm_app_create_channel(),
               $4::uuid,
@@ -445,12 +446,91 @@ describe('rbac permission system', () => {
               $2
             ) AS admin_can_delete_channel
         `, [developerKey, adminKey, TEST_APP_ID, USER_ID, ORG_ID])
-
         expect(result.rows[0].developer_perm).toBe('perm_write')
+        expect(result.rows[0].developer_write_allowed).toBe(true)
         expect(result.rows[0].developer_can_create_channel).toBe(true)
         expect(result.rows[0].developer_can_delete_channel).toBe(false)
         expect(result.rows[0].admin_perm).toBe('perm_admin')
         expect(result.rows[0].admin_can_delete_channel).toBe(true)
+      })
+
+      it('maps every legacy write-class permission through both API key compatibility helpers', async () => {
+        const testId = randomUUID()
+        const writePermissionKeys = [
+          'app.update_settings',
+          'app.create_channel',
+          'app.manage_notifications',
+          'app.manage_devices',
+          'app.build_native',
+          'channel.update_settings',
+          'channel.promote_bundle',
+          'channel.rollback_bundle',
+          'channel.manage_forced_devices',
+        ]
+
+        for (const permissionKey of writePermissionKeys) {
+          const apiKey = `rbac-write-${testId}-${permissionKey}`
+          const apiKeyResult = await query(`
+            INSERT INTO public.apikeys (user_id, key, name)
+            VALUES ($1::uuid, $2, $3)
+            RETURNING rbac_id
+          `, [USER_ID, apiKey, `RBAC write ${permissionKey} ${testId}`])
+          const apiKeyRbacId = apiKeyResult.rows[0]?.rbac_id
+          expect(apiKeyRbacId).toBeTruthy()
+
+          const roleResult = await query(`
+            INSERT INTO public.roles (name, scope_type, description, priority_rank, is_assignable)
+            VALUES ($1, public.rbac_scope_app(), $2, 0, false)
+            RETURNING id
+          `, [`legacy-write-${testId}-${permissionKey}`, `Isolated legacy write permission ${permissionKey}`])
+          const roleId = roleResult.rows[0]?.id
+          expect(roleId).toBeTruthy()
+
+          const rolePermissionResult = await query(`
+            INSERT INTO public.role_permissions (role_id, permission_id)
+            SELECT $1::uuid, permissions.id
+            FROM public.permissions
+            WHERE permissions.key = $2
+            RETURNING role_id
+          `, [roleId, permissionKey])
+          expect(rolePermissionResult.rowCount).toBe(1)
+
+          const bindingResult = await query(`
+            INSERT INTO public.role_bindings (
+              principal_type,
+              principal_id,
+              role_id,
+              scope_type,
+              org_id,
+              app_id,
+              granted_by,
+              is_direct
+            )
+            SELECT
+              public.rbac_principal_apikey(),
+              $1::uuid,
+              $2::uuid,
+              public.rbac_scope_app(),
+              $3::uuid,
+              apps.id,
+              $4::uuid,
+              true
+            FROM public.apps
+            WHERE apps.app_id = $5
+            RETURNING id
+          `, [apiKeyRbacId, roleId, ORG_ID, USER_ID, TEST_APP_ID])
+          expect(bindingResult.rowCount).toBe(1)
+
+          const compatibility = await query(`
+            SELECT
+              public.get_org_perm_for_apikey($1, $2) AS legacy_rank,
+              public.is_allowed_capgkey($1, ARRAY['write']::text[], $2::character varying) AS write_allowed
+          `, [apiKey, TEST_APP_ID])
+          expect(compatibility.rows[0]).toMatchObject({
+            legacy_rank: 'perm_write',
+            write_allowed: true,
+          })
+        }
       })
 
       it('should ignore role bindings whose role scope does not match the binding scope', async () => {
@@ -1111,7 +1191,7 @@ describe('rbac permission system', () => {
         })
       })
 
-      it('should bypass org 2FA enforcement for channel-scoped api keys without app read', async () => {
+      it('allows channel-scoped admin API keys to look up, update, and delete their bound channel without app read', async () => {
         const testId = randomUUID()
         const channelKeyOwnerId = randomUUID()
         const orgId = randomUUID()
@@ -1174,7 +1254,7 @@ describe('rbac permission system', () => {
             $5::uuid,
             true
           FROM public.roles r
-          WHERE r.name = public.rbac_role_channel_reader()
+          WHERE r.name = public.rbac_role_channel_admin()
         `, [apiKeyResult.rows[0].rbac_id, orgId, appUuid, channel.rows[0].rbac_id, USER_ID])
 
         const rawAccess = await query(`
@@ -1200,6 +1280,24 @@ describe('rbac permission system', () => {
           can_read_channel_after_2fa_gate: true,
           rejects_for_2fa: true,
         })
+
+        const visibleChannel = await query(
+          'SELECT id FROM public.channels WHERE id = $1::bigint',
+          [channel.rows[0].id],
+        )
+        expect(visibleChannel.rowCount).toBe(1)
+
+        const updatedChannel = await query(
+          'UPDATE public.channels SET allow_emulator = true WHERE id = $1::bigint RETURNING id, allow_emulator',
+          [channel.rows[0].id],
+        )
+        expect(updatedChannel.rows).toEqual([{ id: channel.rows[0].id, allow_emulator: true }])
+
+        const deletedChannel = await query(
+          'DELETE FROM public.channels WHERE id = $1::bigint RETURNING id',
+          [channel.rows[0].id],
+        )
+        expect(deletedChannel.rows).toEqual([{ id: channel.rows[0].id }])
       })
 
       it('should deny org permissions outside bound org for api keys', async () => {
@@ -1451,6 +1549,152 @@ describe('rbac permission system', () => {
         `, [USER_ID, orgId, appId, channel.rows[0].id, apiKey])
 
         expect(allowedAfterOverride.rows[0].allowed).toBe(false)
+      })
+
+      it('hides denied channels and forced devices from an app-reader API key', async () => {
+        const testId = randomUUID()
+        const orgId = randomUUID()
+        const appUuid = randomUUID()
+        const appId = `com.rbac.apikey.channel-read-deny.${testId}`
+        const apiKey = `apikey-channel-read-deny-${testId}`
+
+        await query(`
+          INSERT INTO public.orgs (id, name, management_email, created_by)
+          VALUES ($1::uuid, $2, $3, $4::uuid)
+        `, [orgId, `RBAC API Key Channel Read Deny ${testId}`, `rbac-apikey-channel-read-deny-${testId}@capgo.app`, USER_ID])
+
+        await query(`
+          INSERT INTO public.apps (id, app_id, name, icon_url, owner_org)
+          VALUES ($1::uuid, $2, $3, $4, $5::uuid)
+        `, [appUuid, appId, `RBAC API Key Channel Read Deny App ${testId}`, 'rbac-apikey-channel-read-deny-icon', orgId])
+
+        const channels = await query(`
+          INSERT INTO public.channels (name, app_id, created_by, owner_org)
+          VALUES
+            ($1, $2, $3::uuid, $4::uuid),
+            ($5, $2, $3::uuid, $4::uuid)
+          RETURNING id, name
+        `, [`denied-${testId}`, appId, USER_ID, orgId, `allowed-${testId}`])
+        const deniedChannel = channels.rows.find(channel => channel.name === `denied-${testId}`)
+        const allowedChannel = channels.rows.find(channel => channel.name === `allowed-${testId}`)
+        expect(deniedChannel).toBeTruthy()
+        expect(allowedChannel).toBeTruthy()
+
+        await query(`
+          INSERT INTO public.channel_devices (channel_id, app_id, device_id, owner_org)
+          VALUES
+            ($1::bigint, $2, $3, $4::uuid),
+            ($5::bigint, $2, $6, $4::uuid)
+        `, [deniedChannel.id, appId, `denied-device-${testId}`, orgId, allowedChannel.id, `allowed-device-${testId}`])
+
+        const apiKeyResult = await query(`
+          INSERT INTO public.apikeys (user_id, key, name)
+          VALUES ($1::uuid, $2, $3)
+          RETURNING rbac_id
+        `, [USER_ID, apiKey, `API Key Channel Read Deny ${testId}`])
+        const apiKeyRbacId = apiKeyResult.rows[0]?.rbac_id
+        expect(apiKeyRbacId).toBeTruthy()
+
+        await query(`
+          INSERT INTO public.role_bindings (
+            principal_type,
+            principal_id,
+            role_id,
+            scope_type,
+            org_id,
+            app_id,
+            granted_by,
+            is_direct
+          )
+          SELECT
+            public.rbac_principal_apikey(),
+            $1::uuid,
+            roles.id,
+            public.rbac_scope_app(),
+            $2::uuid,
+            $3::uuid,
+            $4::uuid,
+            true
+          FROM public.roles
+          WHERE roles.name = public.rbac_role_app_reader()
+        `, [apiKeyRbacId, orgId, appUuid, USER_ID])
+
+        await query(`
+          INSERT INTO public.channel_permission_overrides (
+            principal_type,
+            principal_id,
+            channel_id,
+            permission_key,
+            is_allowed
+          )
+          VALUES
+            (
+              public.rbac_principal_apikey(),
+              $1::uuid,
+              $2::bigint,
+              public.rbac_perm_channel_read(),
+              false
+            ),
+            (
+              public.rbac_principal_apikey(),
+              $1::uuid,
+              $2::bigint,
+              public.rbac_perm_channel_read_forced_devices(),
+              false
+            )
+        `, [apiKeyRbacId, deniedChannel.id])
+
+        const effectivePermissions = await query(`
+          SELECT
+            public.rbac_check_permission_direct(
+              public.rbac_perm_app_read(),
+              $1::uuid,
+              $2::uuid,
+              $3,
+              NULL::bigint,
+              $4
+            ) AS can_read_app,
+            public.rbac_check_permission_direct(
+              public.rbac_perm_channel_read(),
+              $1::uuid,
+              $2::uuid,
+              $3,
+              $5::bigint,
+              $4
+            ) AS can_read_denied_channel,
+            public.rbac_check_permission_direct(
+              public.rbac_perm_channel_read_forced_devices(),
+              $1::uuid,
+              $2::uuid,
+              $3,
+              $5::bigint,
+              $4
+            ) AS can_read_denied_forced_devices
+        `, [USER_ID, orgId, appId, apiKey, deniedChannel.id])
+        expect(effectivePermissions.rows[0]).toMatchObject({
+          can_read_app: true,
+          can_read_denied_channel: false,
+          can_read_denied_forced_devices: false,
+        })
+
+        await query(`SELECT set_config('request.headers', $1, true)`, [JSON.stringify({ capgkey: apiKey })])
+        await query('SET LOCAL ROLE anon')
+
+        const visibleChannels = await query(`
+          SELECT id
+          FROM public.channels
+          WHERE app_id = $1
+          ORDER BY id
+        `, [appId])
+        expect(visibleChannels.rows).toEqual([{ id: allowedChannel.id }])
+
+        const visibleDevices = await query(`
+          SELECT channel_id
+          FROM public.channel_devices
+          WHERE app_id = $1
+          ORDER BY channel_id
+        `, [appId])
+        expect(visibleDevices.rows).toEqual([{ channel_id: allowedChannel.id }])
       })
     })
 

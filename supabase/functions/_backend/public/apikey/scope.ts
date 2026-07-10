@@ -1,9 +1,10 @@
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
+import type { getDrizzleClient } from '../../utils/pg.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError } from '../../utils/hono.ts'
 import { closeClient, getPgClient } from '../../utils/pg.ts'
-import { checkPermission } from '../../utils/rbac.ts'
+import { checkPermission, checkPermissionPg } from '../../utils/rbac.ts'
 import { supabaseAdmin, supabaseWithAuth } from '../../utils/supabase.ts'
 
 type ApiKeyRow = Database['public']['Tables']['apikeys']['Row']
@@ -100,8 +101,6 @@ function assertTargetOrgIdsAreManageable(
   return targetOrgIds.length > 0 && targetOrgIds.every(orgId => manageableOrgIds.has(orgId))
 }
 
-
-
 export interface ClientBindingInput {
   role_name: string
   scope_type: 'org' | 'app' | 'channel'
@@ -161,14 +160,19 @@ export async function assertApiKeyManagerCanAssignBindings(
   c: Parameters<typeof checkPermission>[0],
   auth: AuthInfo,
   bindings: Array<{ role_name: string, org_id: string }>,
+  drizzle?: ReturnType<typeof getDrizzleClient>,
 ) {
   if (auth.authType !== 'apikey') {
     return
   }
 
+  const apikeyString = auth.apikey?.key ?? c.get('capgkey') ?? null
   const orgIds = [...new Set(bindings.map(binding => binding.org_id))]
   for (const orgId of orgIds) {
-    if (await checkPermission(c, 'org.update_user_roles', { orgId })) {
+    const canUpdateUserRoles = drizzle
+      ? await checkPermissionPg(c, 'org.update_user_roles', { orgId }, drizzle, auth.userId, apikeyString)
+      : await checkPermission(c, 'org.update_user_roles', { orgId })
+    if (canUpdateUserRoles) {
       continue
     }
 

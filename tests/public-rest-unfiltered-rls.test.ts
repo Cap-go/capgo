@@ -76,10 +76,10 @@ WHERE COALESCE(using_expr, '') ~ $1
     AND position('PATCH' in normalized_expr) > 0
     AND position('THEN' in normalized_expr) > 0
     AND position('ELSE' in normalized_expr) > position('THEN' in normalized_expr)
-    AND position('app_versions_has_app_permission' in normalized_expr) > position('THEN' in normalized_expr)
-    AND position('app_versions_has_app_permission' in normalized_expr) < position('ELSE' in normalized_expr)
+    AND position('rbac_check_permission_request' in normalized_expr) > position('THEN' in normalized_expr)
+    AND position('rbac_check_permission_request' in normalized_expr) < position('ELSE' in normalized_expr)
     AND position('app_versions_readable_app_ids' in substring(normalized_expr from position('ELSE' in normalized_expr))) > 0
-    AND position('app_versions_has_app_permission' in substring(normalized_expr from position('ELSE' in normalized_expr))) = 0
+    AND position('rbac_check_permission_request' in substring(normalized_expr from position('ELSE' in normalized_expr))) = 0
   )
 ORDER BY table_name, policy_name
 `
@@ -123,7 +123,7 @@ FROM index_columns
 WHERE columns[1] IS NOT NULL
 `
 
-const statementLevelHelperFilterRegex = /(?:\b([a-zA-Z_][a-zA-Z0-9_]*)\b|\(([a-zA-Z_][a-zA-Z0-9_]*)\)::text)\s*=\s*ANY\s*\(.*?SELECT\s+([a-zA-Z_][a-zA-Z0-9_]*)\(\)/g
+const statementLevelHelperFilterRegex = /(?:\b([a-zA-Z_]\w*)|\(([a-zA-Z_]\w*)\)::text)\s*=\s*ANY\s*\(.*?SELECT\s+([a-zA-Z_]\w*)\(\)/g
 
 function getAnonHeaders() {
   if (!SUPABASE_BASE_URL || !SUPABASE_ANON_KEY)
@@ -171,7 +171,7 @@ function buildRestProbeRequest(probe: RestProbeRow, headers: Record<string, stri
       url: `${SUPABASE_BASE_URL}/rest/v1/${encodeURIComponent(probe.table_name)}`,
       headers: {
         ...headers,
-        Range: '0-0',
+        'Range': '0-0',
         'Range-Unit': 'items',
       },
     }
@@ -211,7 +211,7 @@ async function fetchRestProbe(probe: RestProbeRow, headers: Record<string, strin
 describe('public REST unfiltered RLS regression guard', () => {
   it('does not run direct per-row identity helpers in exposed SELECT policies', async () => {
     const riskyRows = await executeSQL(riskySelectPolicySql, [
-      '\\m(check_min_rights|get_identity|get_identity_org_allowed|get_identity_org_appid|get_user_main_org_id_by_app_id|is_member_of_org|is_current_user_group_member|rbac_check_permission|app_versions_has_app_permission|is_user_org_admin|is_user_app_admin|user_has_role_in_app|user_has_app_update_user_roles)\\M',
+      '\\m(check_min_rights|get_identity|get_identity_org_allowed|get_identity_org_appid|get_user_main_org_id_by_app_id|is_member_of_org|is_current_user_group_member|rbac_check_permission|rbac_check_permission_request|app_versions_has_app_permission|is_user_org_admin|is_user_app_admin|user_has_role_in_app|user_has_app_update_user_roles)\\M',
     ])
 
     expect(riskyRows.map((row: any) => ({

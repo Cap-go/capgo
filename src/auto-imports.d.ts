@@ -48,6 +48,7 @@ declare global {
   const injectLocal: typeof import('@vueuse/core').injectLocal
   const isAdminRole: typeof import('./stores/organization').isAdminRole
   const isDefined: typeof import('@vueuse/core').isDefined
+  const isPendingOrganizationInvite: typeof import('./stores/organization').isPendingOrganizationInvite
   const isProxy: typeof import('vue').isProxy
   const isReactive: typeof import('vue').isReactive
   const isReadonly: typeof import('vue').isReadonly
@@ -399,6 +400,7 @@ declare module 'vue' {
     readonly injectLocal: UnwrapRef<typeof import('@vueuse/core')['injectLocal']>
     readonly isAdminRole: UnwrapRef<typeof import('./stores/organization')['isAdminRole']>
     readonly isDefined: UnwrapRef<typeof import('@vueuse/core')['isDefined']>
+    readonly isPendingOrganizationInvite: UnwrapRef<typeof import('./stores/organization')['isPendingOrganizationInvite']>
     readonly isProxy: UnwrapRef<typeof import('vue')['isProxy']>
     readonly isReactive: UnwrapRef<typeof import('vue')['isReactive']>
     readonly isReadonly: UnwrapRef<typeof import('vue')['isReadonly']>

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { env } from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
+  createDirectApiKeyWithBindings,
   getAuthHeaders,
   getAuthHeadersForCredentials,
   getEndpointUrl,
@@ -14,10 +15,65 @@ import {
 const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
 const fixtureId = randomUUID()
 const orgId = randomUUID()
+const lowRankApiKey = randomUUID()
+const rankGuardError = 'Forbidden - Cannot manage a group with higher privileges than your own'
 
 let adminAuthHeaders: Record<string, string>
 let memberAuthHeaders: Record<string, string>
 let groupId: string
+let lowRankApiKeyId: number | null = null
+
+async function getOrgRoleId(roleName: string) {
+  const { data: role, error } = await getSupabaseClient()
+    .from('roles')
+    .select('id')
+    .eq('name', roleName)
+    .eq('scope_type', 'org')
+    .single()
+
+  if (error || !role)
+    throw error ?? new Error(`Unable to resolve ${roleName}`)
+
+  return role.id
+}
+
+async function createUserOrgBinding(userId: string, roleName: string) {
+  const { error } = await getSupabaseClient().from('role_bindings').insert({
+    principal_type: 'user',
+    principal_id: userId,
+    role_id: await getOrgRoleId(roleName),
+    scope_type: 'org',
+    org_id: orgId,
+    granted_by: USER_ID,
+    reason: 'Private groups rank regression',
+    is_direct: true,
+  })
+
+  if (error && error.code !== '23505')
+    throw error
+}
+
+async function createGroupOrgBinding(groupId: string, roleName: string) {
+  const { error } = await getSupabaseClient().from('role_bindings').insert({
+    principal_type: 'group',
+    principal_id: groupId,
+    role_id: await getOrgRoleId(roleName),
+    scope_type: 'org',
+    org_id: orgId,
+    granted_by: USER_ID,
+    reason: 'Private groups high-rank regression',
+    is_direct: true,
+  })
+
+  if (error)
+    throw error
+}
+
+async function expectRankGuard(response: Response) {
+  expect(response.status).toBe(403)
+  const body = await response.json() as { error: string }
+  expect(body.error).toBe(rankGuardError)
+}
 
 beforeAll(async () => {
   if (USE_CLOUDFLARE)
@@ -37,6 +93,8 @@ beforeAll(async () => {
   if (orgError)
     throw orgError
 
+  await createUserOrgBinding(USER_ID, 'org_super_admin')
+
   const { error: orgUsersError } = await supabase.from('org_users').insert({
     org_id: orgId,
     user_id: USER_ID_2,
@@ -44,6 +102,8 @@ beforeAll(async () => {
   })
   if (orgUsersError)
     throw orgUsersError
+
+  await createUserOrgBinding(USER_ID_2, 'org_admin')
 
   const { data: group, error: groupError } = await supabase
     .from('groups')
@@ -60,6 +120,8 @@ beforeAll(async () => {
 
   groupId = group.id
 
+  await createGroupOrgBinding(groupId, 'org_super_admin')
+
   const { error: groupMemberError } = await supabase.from('group_members').insert({
     group_id: groupId,
     user_id: USER_ID,
@@ -67,13 +129,28 @@ beforeAll(async () => {
   })
   if (groupMemberError)
     throw groupMemberError
+
+  const apiKey = await createDirectApiKeyWithBindings({
+    key: lowRankApiKey,
+    name: `Private groups rank regression ${fixtureId}`,
+    orgId,
+    roleName: 'org_admin',
+  })
+  if (!apiKey.key)
+    throw new Error('Unable to create private groups rank API key')
+
+  lowRankApiKeyId = apiKey.id
 })
 
 afterAll(async () => {
   if (USE_CLOUDFLARE)
     return
 
-  await getSupabaseClient().from('orgs').delete().eq('id', orgId)
+  const supabase = getSupabaseClient()
+  if (lowRankApiKeyId !== null)
+    await supabase.from('apikeys').delete().eq('id', lowRankApiKeyId)
+
+  await supabase.from('orgs').delete().eq('id', orgId)
 })
 
 describe.skipIf(USE_CLOUDFLARE)('/private/groups access', () => {
@@ -97,5 +174,68 @@ describe.skipIf(USE_CLOUDFLARE)('/private/groups access', () => {
     const data = await response.json() as Array<{ user_id: string }>
     expect(data.every(row => row.user_id === USER_ID)).toBe(true)
     expect(data).toHaveLength(1)
+  })
+
+  it('blocks lower-rank principals from updating high-role groups, changing membership, or deleting the group', async () => {
+    const headers = { ...memberAuthHeaders, 'Content-Type': 'application/json' }
+
+    const addResponse = await fetch(getEndpointUrl(`/private/groups/${groupId}/members`), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ user_id: USER_ID }),
+    })
+    await expectRankGuard(addResponse)
+
+    const removeResponse = await fetch(getEndpointUrl(`/private/groups/${groupId}/members/${USER_ID}`), {
+      method: 'DELETE',
+      headers,
+    })
+    await expectRankGuard(removeResponse)
+
+    const updateResponse = await fetch(getEndpointUrl(`/private/groups/${groupId}`), {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ description: 'lower-rank update' }),
+    })
+    await expectRankGuard(updateResponse)
+
+    const deleteResponse = await fetch(getEndpointUrl(`/private/groups/${groupId}`), {
+      method: 'DELETE',
+      headers,
+    })
+    await expectRankGuard(deleteResponse)
+  })
+
+  it('uses the API key RBAC principal instead of its higher-rank owner', async () => {
+    const headers = {
+      'Content-Type': 'application/json',
+      'capgkey': lowRankApiKey,
+    }
+
+    const addResponse = await fetch(getEndpointUrl(`/private/groups/${groupId}/members`), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ user_id: USER_ID }),
+    })
+    await expectRankGuard(addResponse)
+
+    const removeResponse = await fetch(getEndpointUrl(`/private/groups/${groupId}/members/${USER_ID}`), {
+      method: 'DELETE',
+      headers,
+    })
+    await expectRankGuard(removeResponse)
+
+    const updateResponse = await fetch(getEndpointUrl(`/private/groups/${groupId}`), {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ description: 'API key lower-rank update' }),
+    })
+    await expectRankGuard(updateResponse)
+
+    const deleteResponse = await fetch(getEndpointUrl(`/private/groups/${groupId}`), {
+      method: 'DELETE',
+      headers,
+    })
+    await expectRankGuard(deleteResponse)
   })
 })

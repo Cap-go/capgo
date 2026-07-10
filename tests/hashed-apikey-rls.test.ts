@@ -1237,9 +1237,6 @@ describe('channels rls blocks direct api-key updates', () => {
     if (!allKey || !allKey.rbac_id || !appRbacId || !channelId || !versionId)
       throw new Error('RLS channel test setup did not complete')
 
-    const orgResult = await pool.query('SELECT use_new_rbac FROM public.orgs WHERE id = $1', [ORG_ID_RLS])
-    const previousUseNewRbac = orgResult.rows[0]?.use_new_rbac ?? false
-    await pool.query('UPDATE public.orgs SET use_new_rbac = true WHERE id = $1', [ORG_ID_RLS])
     await pool.query(
       `INSERT INTO public.channel_permission_overrides (
         principal_type, principal_id, channel_id, permission_key, is_allowed
@@ -1302,7 +1299,6 @@ describe('channels rls blocks direct api-key updates', () => {
            AND scope_type = public.rbac_scope_app()`,
         [allKey.rbac_id, appRbacId],
       )
-      await pool.query('UPDATE public.orgs SET use_new_rbac = $1 WHERE id = $2', [previousUseNewRbac, ORG_ID_RLS])
       await pool.query(
         'UPDATE public.channels SET allow_emulator = false, rollout_version = NULL WHERE id = $1',
         [channelId],

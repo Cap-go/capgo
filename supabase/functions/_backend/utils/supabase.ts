@@ -209,38 +209,41 @@ export async function getAppsFromSB(c: Context, referenceDate?: Date): Promise<s
   return Array.from(new Set(apps))
 }
 
-export async function updateOrCreateChannel(c: Context, update: Database['public']['Tables']['channels']['Insert']) {
+export async function updateOrCreateChannel(
+  c: Context,
+  update: Database['public']['Tables']['channels']['Insert'],
+  existingChannelId: number | null,
+  preserveVersion = false,
+) {
   cloudlog({ requestId: c.get('requestId'), message: 'updateOrCreateChannel', update })
   if (!update.app_id || !update.name || !update.created_by) {
     cloudlog({ requestId: c.get('requestId'), message: 'missing app_id, name, or created_by' })
     return Promise.reject(new Error('missing app_id, name, or created_by'))
   }
 
-  const { data: existingChannel } = await supabaseAdmin(c)
+  const auth = c.get('auth')
+  if (!auth) {
+    return Promise.reject(new Error('missing request auth'))
+  }
+
+  const supabase = supabaseWithAuth(c, auth)
+  if (existingChannelId === null) {
+    return supabase
+      .from('channels')
+      .insert(update)
+      .throwOnError()
+  }
+
+  // Keep the original creator immutable. Omitted stable versions are read only
+  // for the response shape and must not overwrite a concurrent promotion.
+  const { created_by: _createdBy, version, ...channelUpdate } = update
+  const requestUpdate = preserveVersion ? channelUpdate : { ...channelUpdate, version }
+  return supabase
     .from('channels')
-    .select('*')
+    .update(requestUpdate)
+    .eq('id', existingChannelId)
     .eq('app_id', update.app_id)
     .eq('name', update.name)
-    .single()
-
-  const upsertPayload = {
-    ...update,
-    created_by: existingChannel?.created_by || update.created_by,
-  }
-
-  if (existingChannel) {
-    const fieldsDiffer = Object.keys(upsertPayload).some(key =>
-      (upsertPayload as any)[key] !== (existingChannel as any)[key] && key !== 'created_at' && key !== 'updated_at',
-    )
-    if (!fieldsDiffer) {
-      cloudlog({ requestId: c.get('requestId'), message: 'No fields differ, no update needed' })
-      return Promise.resolve({ error: null, requestId: c.get('requestId') })
-    }
-  }
-
-  return supabaseAdmin(c)
-    .from('channels')
-    .upsert(upsertPayload, { onConflict: 'app_id, name' })
     .throwOnError()
 }
 

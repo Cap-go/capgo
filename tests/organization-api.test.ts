@@ -2252,6 +2252,234 @@ describe('rbac mode - organization member operations', () => {
     expect(bindingsAfter).toHaveLength(0)
   })
 
+  it('[DELETE] /organization/members - removes group membership and inherited organization access', async () => {
+    const supabase = getSupabaseClient()
+    const targetGroupId = randomUUID()
+    const { data: targetUser, error: targetUserError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', USER_ADMIN_EMAIL)
+      .single()
+    if (targetUserError || !targetUser)
+      throw targetUserError ?? new Error('Expected target user')
+
+    try {
+      await supabase.from('role_bindings').delete().eq('principal_type', 'user').eq('principal_id', targetUser.id).eq('org_id', ORG_ID_RBAC)
+      await supabase.from('org_users').delete().eq('org_id', ORG_ID_RBAC).eq('user_id', targetUser.id)
+
+      const { error: memberError } = await supabase.from('org_users').insert({
+        org_id: ORG_ID_RBAC,
+        user_id: targetUser.id,
+        rbac_role_name: 'org_member',
+      })
+      expect(memberError).toBeNull()
+      await createUserOrgBinding(ORG_ID_RBAC, targetUser.id, 'org_member')
+
+      const { data: orgMemberRole, error: orgMemberRoleError } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('name', 'org_member')
+        .eq('scope_type', 'org')
+        .single()
+      expect(orgMemberRoleError).toBeNull()
+      expect(orgMemberRole?.id).toBeTruthy()
+
+      const { error: groupError } = await supabase.from('groups').insert({
+        id: targetGroupId,
+        org_id: ORG_ID_RBAC,
+        name: `Removal access group ${targetGroupId}`,
+        description: 'Member removal group membership regression',
+        created_by: USER_ID,
+      })
+      expect(groupError).toBeNull()
+      const { error: groupMemberError } = await supabase.from('group_members').insert({
+        group_id: targetGroupId,
+        user_id: targetUser.id,
+        added_by: USER_ID,
+      })
+      expect(groupMemberError).toBeNull()
+      const { error: groupBindingError } = await supabase.from('role_bindings').insert({
+        principal_type: 'group',
+        principal_id: targetGroupId,
+        role_id: orgMemberRole!.id,
+        scope_type: 'org',
+        org_id: ORG_ID_RBAC,
+        granted_by: USER_ID,
+        reason: 'Member removal group access regression',
+        is_direct: true,
+      })
+      expect(groupBindingError).toBeNull()
+
+      const { data: accessBefore, error: accessBeforeError } = await supabase.rpc('rbac_check_permission_direct' as any, {
+        p_permission_key: 'org.read',
+        p_user_id: targetUser.id,
+        p_org_id: ORG_ID_RBAC,
+        p_app_id: null,
+        p_channel_id: null,
+        p_apikey: null,
+      })
+      expect(accessBeforeError).toBeNull()
+      expect(accessBefore).toBe(true)
+
+      const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID_RBAC}&email=${USER_ADMIN_EMAIL}`, {
+        headers: rbacHeaders,
+        method: 'DELETE',
+      })
+      expect(response.status).toBe(200)
+
+      const { data: groupMembershipAfter, error: groupMembershipAfterError } = await supabase
+        .from('group_members')
+        .select('group_id')
+        .eq('group_id', targetGroupId)
+        .eq('user_id', targetUser.id)
+      expect(groupMembershipAfterError).toBeNull()
+      expect(groupMembershipAfter).toHaveLength(0)
+
+      const { data: accessAfter, error: accessAfterError } = await supabase.rpc('rbac_check_permission_direct' as any, {
+        p_permission_key: 'org.read',
+        p_user_id: targetUser.id,
+        p_org_id: ORG_ID_RBAC,
+        p_app_id: null,
+        p_channel_id: null,
+        p_apikey: null,
+      })
+      expect(accessAfterError).toBeNull()
+      expect(accessAfter).toBe(false)
+    }
+    finally {
+      await supabase.from('role_bindings').delete().eq('principal_type', 'group').eq('principal_id', targetGroupId)
+      await supabase.from('group_members').delete().eq('group_id', targetGroupId)
+      await supabase.from('groups').delete().eq('id', targetGroupId)
+      await supabase.from('role_bindings').delete().eq('principal_type', 'user').eq('principal_id', targetUser.id).eq('org_id', ORG_ID_RBAC)
+      await supabase.from('org_users').delete().eq('org_id', ORG_ID_RBAC).eq('user_id', targetUser.id)
+    }
+  })
+
+  it('[DELETE] /organization/members - lower-priority org admin cannot remove member with a higher group role', async () => {
+    const supabase = getSupabaseClient()
+    const targetGroupId = randomUUID()
+    const { data: targetUser, error: targetUserError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', USER_ADMIN_EMAIL)
+      .single()
+    if (targetUserError || !targetUser)
+      throw targetUserError ?? new Error('Expected target user')
+
+    let lowerPriorityKeyId = 0
+    let lowerPriorityKeyRbacId = ''
+    try {
+      await supabase.from('role_bindings').delete().eq('principal_type', 'user').eq('principal_id', targetUser.id).eq('org_id', ORG_ID_RBAC)
+      await supabase.from('org_users').delete().eq('org_id', ORG_ID_RBAC).eq('user_id', targetUser.id)
+
+      const { error: memberError } = await supabase.from('org_users').insert({
+        org_id: ORG_ID_RBAC,
+        user_id: targetUser.id,
+        rbac_role_name: 'org_member',
+      })
+      if (memberError)
+        throw memberError
+      await createUserOrgBinding(ORG_ID_RBAC, targetUser.id, 'org_member')
+
+      const { error: groupError } = await supabase.from('groups').insert({
+        id: targetGroupId,
+        org_id: ORG_ID_RBAC,
+        name: `Higher-priority member group ${targetGroupId}`,
+        description: 'Member removal rank regression',
+        created_by: USER_ID,
+      })
+      if (groupError)
+        throw groupError
+      const { error: groupMemberError } = await supabase.from('group_members').insert({
+        group_id: targetGroupId,
+        user_id: targetUser.id,
+        added_by: USER_ID,
+      })
+      if (groupMemberError)
+        throw groupMemberError
+
+      const { data: superAdminRole, error: superAdminRoleError } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('name', 'org_super_admin')
+        .eq('scope_type', 'org')
+        .single()
+      if (superAdminRoleError || !superAdminRole)
+        throw superAdminRoleError ?? new Error('Expected org_super_admin role')
+      const { error: groupBindingError } = await supabase.from('role_bindings').insert({
+        principal_type: 'group',
+        principal_id: targetGroupId,
+        role_id: superAdminRole.id,
+        scope_type: 'org',
+        org_id: ORG_ID_RBAC,
+        granted_by: USER_ID,
+        reason: 'Member removal rank regression',
+        is_direct: true,
+      })
+      if (groupBindingError)
+        throw groupBindingError
+
+      const lowerPriorityKey = await createDirectApiKeyWithBindings({
+        userId: USER_ID,
+        key: randomUUID(),
+        name: `Lower-priority member removal ${randomUUID()}`,
+        orgId: ORG_ID_RBAC,
+        roleName: 'org_admin',
+      })
+      lowerPriorityKeyId = lowerPriorityKey.id
+      lowerPriorityKeyRbacId = lowerPriorityKey.rbac_id
+
+      const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID_RBAC}&email=${USER_ADMIN_EMAIL}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'capgkey': lowerPriorityKey.key!,
+        },
+        method: 'DELETE',
+      })
+      expect(response.status).toBe(403)
+      expect(await response.json()).toEqual(expect.objectContaining({ error: 'cannot_delete_higher_priority_role' }))
+
+      const { data: memberAfter, error: memberAfterError } = await supabase
+        .from('org_users')
+        .select('user_id')
+        .eq('org_id', ORG_ID_RBAC)
+        .eq('user_id', targetUser.id)
+        .maybeSingle()
+      expect(memberAfterError).toBeNull()
+      expect(memberAfter?.user_id).toBe(targetUser.id)
+
+      const { data: groupBindingAfter, error: groupBindingAfterError } = await supabase
+        .from('role_bindings')
+        .select('id')
+        .eq('principal_type', 'group')
+        .eq('principal_id', targetGroupId)
+        .eq('org_id', ORG_ID_RBAC)
+      expect(groupBindingAfterError).toBeNull()
+      expect(groupBindingAfter?.length).toBeGreaterThan(0)
+
+      const { data: groupMembershipAfter, error: groupMembershipAfterError } = await supabase
+        .from('group_members')
+        .select('group_id')
+        .eq('group_id', targetGroupId)
+        .eq('user_id', targetUser.id)
+      expect(groupMembershipAfterError).toBeNull()
+      expect(groupMembershipAfter?.length).toBe(1)
+    }
+    finally {
+      if (lowerPriorityKeyRbacId) {
+        await supabase.from('role_bindings').delete().eq('principal_type', 'apikey').eq('principal_id', lowerPriorityKeyRbacId)
+      }
+      if (lowerPriorityKeyId) {
+        await supabase.from('apikeys').delete().eq('id', lowerPriorityKeyId)
+      }
+      await supabase.from('role_bindings').delete().eq('principal_type', 'group').eq('principal_id', targetGroupId)
+      await supabase.from('group_members').delete().eq('group_id', targetGroupId)
+      await supabase.from('groups').delete().eq('id', targetGroupId)
+      await supabase.from('role_bindings').delete().eq('principal_type', 'user').eq('principal_id', targetUser.id).eq('org_id', ORG_ID_RBAC)
+      await supabase.from('org_users').delete().eq('org_id', ORG_ID_RBAC).eq('user_id', targetUser.id)
+    }
+  })
+
   it('[DELETE] /organization/members - org member can leave self and cleans role_bindings', async () => {
     const { data: userData } = await getSupabaseClient().from('users').select('id').eq('email', USER_EMAIL_NONMEMBER).single()
     expect(userData).toBeTruthy()

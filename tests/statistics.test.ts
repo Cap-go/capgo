@@ -364,7 +364,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
           }],
         }),
       })
-      expect(createSubkey.status).toBe(401)
+      expect(createSubkey.status).toBe(400)
       const subkeyData = await createSubkey.json<{ error: string }>()
       expect(subkeyData.error).toBe('cannot_create_apikey')
     }
@@ -400,7 +400,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
           bindings: await appApiKeyBindings(APPNAME, 'app_reader'),
         }),
       })
-      expect(createSubkey.status).toBe(401)
+      expect(createSubkey.status).toBe(400)
       const subkeyData = await createSubkey.json<{ error: string }>()
       expect(subkeyData.error).toBe('cannot_create_apikey')
     }

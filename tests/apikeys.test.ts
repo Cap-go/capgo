@@ -165,7 +165,7 @@ describe('[POST] /apikey operations', () => {
       body: JSON.stringify(await appKeyBody('blocked-key-creation')),
     })
     const escalationData = await escalationResponse.json() as { error: string }
-    expect(escalationResponse.status).toBe(401)
+    expect(escalationResponse.status).toBe(400)
     expect(escalationData).toHaveProperty('error', 'cannot_create_apikey')
 
     await fetch(`${BASE_URL}/apikey/${limitedCreatorData.id}`, {
@@ -460,8 +460,7 @@ describe('[POST] /apikey operations', () => {
     }
   })
 
-
-  it.concurrent('apikey_manager API key can manage sibling keys without role escalation', async () => {
+  it.concurrent('apikey_manager API key can manage sibling keys but cannot create them', async () => {
     const dedicatedAuthHeaders = await getAuthHeadersForCredentials(USER_EMAIL_APIKEY_MANAGEMENT, USER_PASSWORD)
     const managerKeyHeaders = {
       'Content-Type': 'application/json',
@@ -493,9 +492,8 @@ describe('[POST] /apikey operations', () => {
           bindings: orgApiKeyBindings(ORG_ID_APIKEY_MANAGEMENT, 'org_member'),
         })),
       })
-      expect(createResponse.status).toBe(200)
-      const createdData = await createResponse.json<{ id: number, key: string }>()
-      createdKeyIds.push(createdData.id)
+      expect(createResponse.status).toBe(400)
+      await expect(createResponse.json()).resolves.toHaveProperty('error', 'cannot_create_apikey')
 
       const updateResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
         method: 'PUT',
@@ -521,7 +519,8 @@ describe('[POST] /apikey operations', () => {
           bindings: orgApiKeyBindings(ORG_ID_APIKEY_MANAGEMENT, 'org_super_admin'),
         })),
       })
-      expect(privilegedCreateResponse.status).toBe(403)
+      expect(privilegedCreateResponse.status).toBe(400)
+      await expect(privilegedCreateResponse.json()).resolves.toHaveProperty('error', 'cannot_create_apikey')
 
       const appAdminCreateResponse = await fetch(`${BASE_URL}/apikey`, {
         method: 'POST',
@@ -536,7 +535,8 @@ describe('[POST] /apikey operations', () => {
           }],
         }),
       })
-      expect(appAdminCreateResponse.status).toBe(403)
+      expect(appAdminCreateResponse.status).toBe(400)
+      await expect(appAdminCreateResponse.json()).resolves.toHaveProperty('error', 'cannot_create_apikey')
 
       const allowSystemRoleBypassResponse = await fetch(`${BASE_URL}/apikey`, {
         method: 'POST',
@@ -552,7 +552,8 @@ describe('[POST] /apikey operations', () => {
           }],
         }),
       })
-      expect(allowSystemRoleBypassResponse.status).toBe(403)
+      expect(allowSystemRoleBypassResponse.status).toBe(400)
+      await expect(allowSystemRoleBypassResponse.json()).resolves.toHaveProperty('error', 'cannot_create_apikey')
 
       const selfUpdateResponse = await fetch(`${BASE_URL}/apikey/${APIKEY_MANAGEMENT_APIKEY_MANAGER_ID}`, {
         method: 'PUT',
@@ -579,8 +580,7 @@ describe('[POST] /apikey operations', () => {
     }
   })
 
-  it.concurrent('org super admin API key can create sibling API keys', async () => {
-    const dedicatedAuthHeaders = await getAuthHeadersForCredentials(USER_EMAIL_APIKEY_MANAGEMENT, USER_PASSWORD)
+  it.concurrent('rejects API key POST creation even for an org super admin key', async () => {
     const superAdminKeyHeaders = {
       'Content-Type': 'application/json',
       'capgkey': APIKEY_MANAGEMENT_ORG_SUPER_ADMIN,
@@ -589,29 +589,16 @@ describe('[POST] /apikey operations', () => {
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
       headers: superAdminKeyHeaders,
-      body: JSON.stringify(orgKeyBody('org-super-admin-key-created-by-apikey', {
+      body: JSON.stringify(orgKeyBody('org-super-admin-key-creation-blocked', {
         bindings: orgApiKeyBindings(ORG_ID_APIKEY_MANAGEMENT, 'org_member'),
       })),
     })
-    expect(createResponse.status).toBe(200)
-    const createdData = await createResponse.json<{ id: number, key: string }>()
-    expect(createdData).toHaveProperty('key')
 
-    try {
-      const verifyResponse = await fetch(`${BASE_URL}/apikey/${createdData.id}`, {
-        headers: dedicatedAuthHeaders,
-      })
-      expect(verifyResponse.status).toBe(200)
-    }
-    finally {
-      await fetch(`${BASE_URL}/apikey/${createdData.id}`, {
-        method: 'DELETE',
-        headers: dedicatedAuthHeaders,
-      })
-    }
+    expect(createResponse.status).toBe(400)
+    await expect(createResponse.json()).resolves.toHaveProperty('error', 'cannot_create_apikey')
   })
 
-    it('create api key with missing name', async () => {
+  it('create api key with missing name', async () => {
     const response = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
       headers: authHeaders,

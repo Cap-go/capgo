@@ -34,7 +34,7 @@ import { formatUploadChannels, getChannelsToAssignByChecksum, parseUploadChannel
 type SupabaseType = Awaited<ReturnType<typeof createSupabaseClient>>
 type pmType = ReturnType<typeof getPMAndCommand>
 type localConfigType = Awaited<ReturnType<typeof getLocalConfig>>
-type UploadTargetChannel = Pick<Database['public']['Tables']['channels']['Row'], 'id' | 'public'>
+type UploadTargetChannel = Pick<Database['public']['Tables']['channels']['Row'], 'id' | 'public' | 'version' | 'rollout_version'>
 
 export type { UploadBundleResult }
 
@@ -715,6 +715,31 @@ type LinkedChannelVersion = {
   name: string
 } | null
 
+function getUploadRolloutPercentageBps(options: OptionsUpload) {
+  if (options.rollout == null && options.rolloutPercentageBps == null)
+    return undefined
+
+  if (options.rolloutPercentageBps != null)
+    return options.rolloutPercentageBps
+
+  return Math.round((options.rollout ?? 0) * 100)
+}
+
+function formatRolloutPercentage(bps: number) {
+  return `${Number((bps / 100).toFixed(2))}%`
+}
+
+async function getVersionIdForChannelUpdate(supabase: SupabaseType, apikey: string, appid: string, bundle: string) {
+  const { data: versionId } = await supabase
+    .rpc('get_app_versions', { apikey, name_version: bundle, appid })
+    .single()
+
+  if (!versionId)
+    uploadFail('Cannot get version id, cannot set channel')
+
+  return versionId
+}
+
 // It is really important that this function never terminates the program, it should always return.
 async function getLinkedBundleOnChannel(supabase: SupabaseType, appid: string, channel: string): Promise<LinkedChannelVersion> {
   const { data, error } = await supabase
@@ -767,7 +792,7 @@ async function deleteLinkedBundleOnUpload(supabase: SupabaseType, version: Linke
 async function findUploadTargetChannel(supabase: SupabaseType, appid: string, channel: string): Promise<UploadTargetChannel | null> {
   const { data, error } = await supabase
     .from('channels')
-    .select('id, public')
+    .select('id, public, version, rollout_version')
     .eq('app_id', appid)
     .eq('name', channel)
     .maybeSingle()
@@ -784,6 +809,7 @@ async function preflightRequiredChannelAssignments(
   appid: string,
   channels: string[],
   selfAssign = false,
+  rolloutPercentageBps?: number,
 ): Promise<Map<string, UploadTargetChannel | null>> {
   const uploadTargetChannels = new Map<string, UploadTargetChannel | null>()
 
@@ -795,13 +821,25 @@ async function preflightRequiredChannelAssignments(
       const canPromoteTargetChannel = await hasCliPermission(supabase, apikey, 'channel.promote_bundle', { appId: appid, channelId: targetChannel.id })
       if (!canPromoteTargetChannel)
         uploadFail('Cannot set channel because this API key lacks channel.promote_bundle for the target channel')
-      if (selfAssign) {
+
+      const requiresSettingsUpdate = selfAssign || rolloutPercentageBps != null
+      if (requiresSettingsUpdate) {
         const canUpdateChannelSettings = await hasCliPermission(supabase, apikey, 'channel.update_settings', { appId: appid, channelId: targetChannel.id })
-        if (!canUpdateChannelSettings)
-          uploadFail('Cannot enable device self-assign because this API key lacks channel.update_settings')
+        if (!canUpdateChannelSettings) {
+          uploadFail(selfAssign
+            ? 'Cannot enable device self-assign because this API key lacks channel.update_settings'
+            : 'Cannot set rollout because this API key lacks channel.update_settings for the target channel')
+        }
       }
+
+      if (rolloutPercentageBps != null && !targetChannel.version)
+        uploadFail(`Cannot set rollout, channel ${channel} needs a stable bundle before using progressive rollout`)
+
       continue
     }
+
+    if (rolloutPercentageBps != null)
+      uploadFail(`Cannot set rollout, channel ${channel} must already exist with a stable bundle`)
 
     const canCreateChannel = await hasCliPermission(supabase, apikey, 'app.create_channel', { appId: appid })
     if (!canCreateChannel)
@@ -934,6 +972,59 @@ async function setVersionInChannel(
     uploadFail(message)
   log.warn(message)
   return false
+}
+
+async function setRolloutVersionInChannel(
+  supabase: SupabaseType,
+  apikey: string,
+  displayBundleUrl: boolean,
+  bundle: string,
+  channel: string,
+  appid: string,
+  localConfig: localConfigType,
+  targetChannel: UploadTargetChannel | null,
+  rolloutPercentageBps: number,
+  rolloutCacheTtlSeconds?: number,
+  selfAssign?: boolean,
+): Promise<boolean> {
+  if (!targetChannel)
+    uploadFail(`Cannot set rollout, channel ${channel} must already exist with a stable bundle`)
+  if (!targetChannel.version)
+    uploadFail(`Cannot set rollout, channel ${channel} needs a stable bundle before using progressive rollout`)
+
+  const versionId = await getVersionIdForChannelUpdate(supabase, apikey, appid, bundle)
+  const [canPromote, canUpdateSettings] = await Promise.all([
+    hasCliPermission(supabase, apikey, 'channel.promote_bundle', { appId: appid, channelId: targetChannel.id }),
+    hasCliPermission(supabase, apikey, 'channel.update_settings', { appId: appid, channelId: targetChannel.id }),
+  ])
+  if (!canPromote)
+    uploadFail('Cannot set rollout because this API key lacks channel.promote_bundle for the target channel')
+  if (!canUpdateSettings)
+    uploadFail('Cannot set rollout because this API key lacks channel.update_settings for the target channel')
+
+  const shouldResumeSameRollout = targetChannel.rollout_version === versionId && rolloutPercentageBps > 0
+  const { error: rolloutError } = await supabase.functions.invoke('channel', {
+    method: 'POST',
+    body: JSON.stringify({
+      app_id: appid,
+      channel,
+      rolloutVersion: bundle,
+      rolloutPercentageBps,
+      rolloutEnabled: rolloutPercentageBps > 0,
+      ...(shouldResumeSameRollout ? { rolloutPaused: false } : {}),
+      ...(rolloutCacheTtlSeconds != null ? { rolloutCacheTtlSeconds } : {}),
+      ...(selfAssign ? { allow_device_self_set: true } : {}),
+    }),
+  })
+
+  if (rolloutError)
+    uploadFail(`Cannot set rollout in channel ${await formatFunctionInvokeError(rolloutError)}`)
+
+  const bundleUrl = `${localConfig.hostWeb}/app/${appid}/channel/${targetChannel.id}`
+  log.info(`Set ${appid} channel ${channel} rollout target to @${bundle} (${formatRolloutPercentage(rolloutPercentageBps)})`)
+  if (displayBundleUrl)
+    log.info(`Bundle url: ${bundleUrl}`)
+  return true
 }
 export async function getDefaultUploadChannel(appId: string, supabase: SupabaseType, hostWeb: string) {
   const { error, data } = await supabase.from('apps')
@@ -1072,6 +1163,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
 
   const channelLabel = formatUploadChannels(channels)
   let channelsToAssign = channels
+  const rolloutPercentageBps = getUploadRolloutPercentageBps(options)
   if (options.verbose)
     log.info(`[Verbose] Target channel${channels.length > 1 ? 's' : ''}: ${channelLabel}`)
 
@@ -1103,6 +1195,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   if (versionExistsResult === true) {
     return {
       success: true,
+      appId: appid,
       skipped: true,
       reason: 'VERSION_EXISTS',
       bundle,
@@ -1144,8 +1237,8 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
       log.info(`  - IV Session Key: ${preparedBundle.ivSessionKey ? 'present' : 'none'}`)
       log.info(`  - Key ID: ${preparedBundle.keyId || 'none'}`)
     }
-
-    if (!options.ignoreChecksumCheck) {
+    const shouldCheckChecksum = !options.ignoreChecksumCheck && rolloutPercentageBps == null
+    if (shouldCheckChecksum) {
       if (options.verbose)
         log.info(`[Verbose] Checking for duplicate checksum...`)
       channelsToAssign = await getChannelsToAssignAfterChecksumCheck(supabase, appid, channels, preparedBundle.checksum)
@@ -1214,6 +1307,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
       // programmatic SDK bundle (which also imports this module).
       return {
         success: true,
+        appId: appid,
         skipped: true,
         reason: 'NATIVE_BUILD',
         builderAction,
@@ -1238,10 +1332,9 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     log.warn(`Deleting linked bundle on upload is destructive, it will delete the currently linked bundle in the target channel${channelsToAssign.length > 1 ? 's' : ''}: ${assignmentChannelLabel}.`)
     log.warn('Please make sure you want to do this, if you are not sure, please do not use this option.')
   }
-
   const channelAssignmentRequired = channelsToAssign.length > 0
   const uploadTargetChannels = channelAssignmentRequired
-    ? await preflightRequiredChannelAssignments(supabase, apikey, appid, channelsToAssign, !!options.selfAssign)
+    ? await preflightRequiredChannelAssignments(supabase, apikey, appid, channelsToAssign, !!options.selfAssign, rolloutPercentageBps)
     : new Map<string, UploadTargetChannel | null>()
   const versionData = {
     name: bundle,
@@ -1387,13 +1480,13 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
       outro('Dry upload saved bundle metadata without uploading files or updating channels')
     return {
       success: true,
+      appId: appid,
       bundle,
       checksum: versionData.checksum ?? null,
       encryptionMethod,
       sessionKey: sessionKey ? sessionKey.toString('base64') : undefined,
       ivSessionKey: typeof versionData.session_key === 'string' ? versionData.session_key : undefined,
       storageProvider: versionData.storage_provider,
-      skipped: true,
       reason: 'DRY_UPLOAD',
     }
   }
@@ -1558,7 +1651,9 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     const uploadTargetChannel = uploadTargetChannels.has(targetChannel)
       ? uploadTargetChannels.get(targetChannel) ?? null
       : await findUploadTargetChannel(supabase, appid, targetChannel)
-    const targetChannelVersionSet = await setVersionInChannel(supabase, apikey, !!options.bundleUrl, bundle, targetChannel, userId, orgId, appid, localConfig, uploadTargetChannel, channelAssignmentRequired, options.selfAssign)
+    const targetChannelVersionSet = rolloutPercentageBps != null
+      ? await setRolloutVersionInChannel(supabase, apikey, !!options.bundleUrl, bundle, targetChannel, appid, localConfig, uploadTargetChannel, rolloutPercentageBps, options.rolloutCacheTtlSeconds, options.selfAssign)
+      : await setVersionInChannel(supabase, apikey, !!options.bundleUrl, bundle, targetChannel, userId, orgId, appid, localConfig, uploadTargetChannel, channelAssignmentRequired, options.selfAssign)
     if (targetChannelVersionSet)
       channelVersionSet.add(targetChannel)
     if (options.verbose)
@@ -1643,7 +1738,9 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
 
   const result: UploadBundleResult = {
     success: true,
+    appId: appid,
     bundle,
+    updatedChannels: Array.from(channelVersionSet),
     checksum: versionData.checksum ?? null,
     encryptionMethod,
     sessionKey: sessionKey ? sessionKey.toString('base64') : undefined,
@@ -1693,6 +1790,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
  */
 export function checkValidOptions(options: OptionsUpload) {
   const noKey = options.key === false
+  const hasUploadRollout = options.rollout != null || options.rolloutPercentageBps != null
   const forceCrc32 = options.forceCrc32Checksum === true
   const hasEncryptionKey = (options.keyV2 || options.keyDataV2 || existsSync(baseKeyV2))
 
@@ -1733,6 +1831,21 @@ export function checkValidOptions(options: OptionsUpload) {
   // cannot set min-update-version and auto-min-update-version
   if (options.minUpdateVersion && options.autoMinUpdateVersion) {
     uploadFail('You cannot set both min-update-version and auto-min-update-version, use only one of them')
+  }
+  if (options.rollout != null && (!Number.isFinite(options.rollout) || options.rollout < 0 || options.rollout > 100)) {
+    uploadFail('Rollout percentage must be between 0 and 100')
+  }
+  if (options.rolloutPercentageBps != null && (!Number.isInteger(options.rolloutPercentageBps) || options.rolloutPercentageBps < 0 || options.rolloutPercentageBps > 10000)) {
+    uploadFail('Rollout percentage basis points must be between 0 and 10000')
+  }
+  if (options.rolloutCacheTtlSeconds != null && (!Number.isInteger(options.rolloutCacheTtlSeconds) || options.rolloutCacheTtlSeconds < 60 || options.rolloutCacheTtlSeconds > 31536000)) {
+    uploadFail('Rollout cache TTL seconds must be between 60 and 31536000')
+  }
+  if (hasUploadRollout && options.dryUpload) {
+    uploadFail('You cannot use --rollout with --dry-upload because dry upload does not update channels')
+  }
+  if (hasUploadRollout && options.deleteLinkedBundleOnUpload) {
+    uploadFail('You cannot use --rollout with --delete-linked-bundle-on-upload because rollout needs the stable channel bundle as fallback')
   }
   if (forceCrc32 && hasEncryptionKey && !noKey) {
     uploadFail('You cannot use --force-crc32-checksum when encryption is enabled. Remove the flag or disable encryption.')

@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const updateOrCreateChannel = vi.fn()
 const checkPermission = vi.fn()
 const supabaseAdmin = vi.fn()
-const supabaseApikey = vi.fn()
 const isValidAppId = vi.fn()
 
 vi.mock('../supabase/functions/_backend/utils/hono.ts', () => ({
@@ -25,7 +24,6 @@ vi.mock('../supabase/functions/_backend/utils/rbac.ts', () => ({
 
 vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
   supabaseAdmin,
-  supabaseApikey,
   updateOrCreateChannel,
 }))
 
@@ -34,9 +32,18 @@ vi.mock('../supabase/functions/_backend/utils/utils.ts', () => ({
   isValidAppId,
 }))
 
-function buildSupabaseChain(body: { existingChannelId?: number | null, existingChannelVersion?: number | null, existingRolloutVersion?: number | null, ownerOrg?: string, versionId?: number, eqCalls?: Array<[string, unknown]> }) {
+function buildAdminChain(body: {
+  existingChannelId?: number | null
+  existingChannelVersion?: number | null
+  existingRolloutVersion?: number | null
+  ownerOrg?: string
+  versionId?: number
+  eqCalls?: Array<[string, unknown]>
+  fromCalls?: string[]
+} = {}) {
   return {
     from(table: string) {
+      body.fromCalls?.push(table)
       if (table === 'apps') {
         return {
           select: () => ({
@@ -50,19 +57,18 @@ function buildSupabaseChain(body: { existingChannelId?: number | null, existingC
       if (table === 'channels') {
         return {
           select: () => ({
-            eq: () => ({
-              eq: () => ({
-                maybeSingle: async () => ({
-                  data: body.existingChannelId == null && body.existingChannelVersion == null && body.existingRolloutVersion == null
-                    ? null
-                    : {
-                        id: body.existingChannelId ?? 99,
-                        version: body.existingChannelVersion ?? null,
-                        rollout_version: body.existingRolloutVersion ?? null,
-                      },
-                  error: null,
-                }),
-              }),
+            eq() {
+              return this
+            },
+            maybeSingle: async () => ({
+              data: body.existingChannelId == null
+                ? null
+                : {
+                    id: body.existingChannelId,
+                    version: body.existingChannelVersion ?? null,
+                    rollout_version: body.existingRolloutVersion ?? null,
+                  },
+              error: null,
             }),
           }),
         }
@@ -80,31 +86,17 @@ function buildSupabaseChain(body: { existingChannelId?: number | null, existingC
         }
       }
 
-      throw new Error(`Unexpected table: ${table}`)
+      throw new Error(`Unexpected admin table: ${table}`)
     },
   }
 }
 
-function buildAdminChain(body: { existingChannelId?: number | null } = {}) {
-  return {
-    from(table: string) {
-      if (table === 'channels') {
-        return {
-          select: () => ({
-            eq() {
-              return this
-            },
-            maybeSingle: async () => ({
-              data: body.existingChannelId == null ? null : { id: body.existingChannelId },
-              error: null,
-            }),
-          }),
-        }
-      }
+function apiKey() {
+  return { user_id: 'user-test', key: 'capg-key' } as any
+}
 
-      throw new Error(`Unexpected admin table: ${table}`)
-    },
-  }
+function context() {
+  return { json: vi.fn().mockReturnValue({ ok: true }) } as any
 }
 
 describe('public channel post', () => {
@@ -113,29 +105,24 @@ describe('public channel post', () => {
     checkPermission.mockResolvedValue(true)
     isValidAppId.mockReturnValue(true)
     supabaseAdmin.mockImplementation(() => buildAdminChain())
-    supabaseApikey.mockImplementation(() => buildSupabaseChain({}))
     updateOrCreateChannel.mockResolvedValue({ error: null })
   })
 
   it('defaults legacy public mobile channel writes to electron false', async () => {
     const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
+    const c = context()
 
-    const json = vi.fn().mockReturnValue({ ok: true })
-    await post(
-      { json } as any,
-      {
-        app_id: 'com.test.legacy-mobile',
-        channel: 'ios-default',
-        version: '1.0.0',
-        public: true,
-        ios: true,
-        android: false,
-      },
-      { user_id: 'user-test', key: 'capg-key' } as any,
-    )
+    await post(c, {
+      app_id: 'com.test.legacy-mobile',
+      channel: 'ios-default',
+      version: '1.0.0',
+      public: true,
+      ios: true,
+      android: false,
+    }, apiKey())
 
     expect(updateOrCreateChannel).toHaveBeenCalledWith(
-      expect.anything(),
+      c,
       expect.objectContaining({
         app_id: 'com.test.legacy-mobile',
         name: 'ios-default',
@@ -144,74 +131,184 @@ describe('public channel post', () => {
         android: false,
         electron: false,
       }),
+      null,
+      false,
     )
-    expect(json).toHaveBeenCalledWith({ status: 'ok' })
+    expect(c.json).toHaveBeenCalledWith({ status: 'ok' })
   })
 
   it('preserves explicit electron platform selection', async () => {
     const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
+    const c = context()
 
-    await post(
-      { json: vi.fn() } as any,
-      {
-        app_id: 'com.test.explicit-electron',
-        channel: 'all-platforms',
-        version: '1.0.0',
-        public: true,
-        ios: true,
-        android: true,
-        electron: true,
-      },
-      { user_id: 'user-test', key: 'capg-key' } as any,
-    )
+    await post(c, {
+      app_id: 'com.test.explicit-electron',
+      channel: 'all-platforms',
+      version: '1.0.0',
+      public: true,
+      ios: true,
+      android: true,
+      electron: true,
+    }, apiKey())
 
-    expect(updateOrCreateChannel).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        electron: true,
-      }),
-    )
+    expect(updateOrCreateChannel).toHaveBeenCalledWith(c, expect.objectContaining({ electron: true }), null, false)
   })
 
   it('keeps legacy all-platform public writes electron-compatible when both mobile flags are true', async () => {
     const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
+    const c = context()
 
-    await post(
-      { json: vi.fn() } as any,
-      {
-        app_id: 'com.test.legacy-all-platforms',
-        channel: 'production',
-        version: '1.0.0',
-        public: true,
-        ios: true,
-        android: true,
-      },
-      { user_id: 'user-test', key: 'capg-key' } as any,
-    )
+    await post(c, {
+      app_id: 'com.test.legacy-all-platforms',
+      channel: 'production',
+      version: '1.0.0',
+      public: true,
+      ios: true,
+      android: true,
+    }, apiKey())
 
-    expect(updateOrCreateChannel).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.not.objectContaining({
-        electron: false,
-      }),
-    )
+    expect(updateOrCreateChannel).toHaveBeenCalledWith(c, expect.not.objectContaining({ electron: false }), null, false)
+  })
+
+  it('preserves the stable version for a settings-only update without channel.read or bundle lookup', async () => {
+    const fromCalls: string[] = []
+    supabaseAdmin.mockImplementation(() => buildAdminChain({
+      existingChannelId: 42,
+      existingChannelVersion: 123,
+      fromCalls,
+    }))
+    const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
+    const c = context()
+
+    await post(c, {
+      app_id: 'com.test.settings-only',
+      channel: 'production',
+      public: false,
+    }, apiKey())
+
+    expect(checkPermission).toHaveBeenCalledTimes(1)
+    expect(checkPermission).toHaveBeenCalledWith(c, 'channel.update_settings', { appId: 'com.test.settings-only', channelId: 42 })
+    expect(fromCalls).toEqual(['channels', 'apps'])
+    expect(updateOrCreateChannel).toHaveBeenCalledWith(c, expect.objectContaining({ version: 123, public: false }), 42, true)
+  })
+
+  it('requires promote permission before explicit version lookup, even when the name is current', async () => {
+    const fromCalls: string[] = []
+    supabaseAdmin.mockImplementation(() => buildAdminChain({
+      existingChannelId: 42,
+      existingChannelVersion: 123,
+      fromCalls,
+    }))
+    checkPermission
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
+    const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
+
+    await expect(post(context(), {
+      app_id: 'com.test.same-version',
+      channel: 'production',
+      version: '1.0.0',
+    }, apiKey())).rejects.toMatchObject({
+      cause: expect.objectContaining({ error: 'cannot_access_app' }),
+    })
+
+    expect(checkPermission).toHaveBeenNthCalledWith(1, expect.anything(), 'channel.update_settings', { appId: 'com.test.same-version', channelId: 42 })
+    expect(checkPermission).toHaveBeenNthCalledWith(2, expect.anything(), 'channel.promote_bundle', { appId: 'com.test.same-version', channelId: 42 })
+    expect(fromCalls).toEqual(['channels', 'apps'])
+    expect(updateOrCreateChannel).not.toHaveBeenCalled()
+  })
+
+  it('uses the admin version lookup after a scoped channel key proves settings and promote permissions', async () => {
+    supabaseAdmin.mockImplementation(() => buildAdminChain({
+      existingChannelId: 42,
+      existingChannelVersion: 123,
+      versionId: 456,
+    }))
+    const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
+    const c = context()
+
+    await post(c, {
+      app_id: 'com.test.channel-admin-version',
+      channel: 'production',
+      version: '2.0.0',
+    }, apiKey())
+
+    expect(checkPermission).toHaveBeenNthCalledWith(1, c, 'channel.update_settings', { appId: 'com.test.channel-admin-version', channelId: 42 })
+    expect(checkPermission).toHaveBeenNthCalledWith(2, c, 'channel.promote_bundle', { appId: 'com.test.channel-admin-version', channelId: 42 })
+    expect(updateOrCreateChannel).toHaveBeenCalledWith(c, expect.objectContaining({ version: 456 }), 42, false)
+  })
+
+  it('writes a rollout promotion as the stable version when body.version is omitted', async () => {
+    supabaseAdmin.mockImplementation(() => buildAdminChain({
+      existingChannelId: 42,
+      existingChannelVersion: 123,
+      existingRolloutVersion: 456,
+    }))
+    const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
+    const c = context()
+
+    await post(c, {
+      app_id: 'com.test.promote-rollout',
+      channel: 'production',
+      promoteToStable: true,
+    }, apiKey())
+
+    expect(checkPermission).toHaveBeenCalledWith(c, 'channel.promote_bundle', { appId: 'com.test.promote-rollout', channelId: 42 })
+    expect(updateOrCreateChannel).toHaveBeenCalledWith(c, expect.objectContaining({ version: 456, rollout_version: null }), 42, false)
+  })
+
+  it('requires app-scoped promote permission to create a channel with a bundle', async () => {
+    checkPermission
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
+    const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
+
+    await expect(post(context(), {
+      app_id: 'com.test.new-channel-version',
+      channel: 'production',
+      version: '1.0.0',
+    }, apiKey())).rejects.toMatchObject({
+      cause: expect.objectContaining({ error: 'cannot_access_app' }),
+    })
+
+    expect(checkPermission).toHaveBeenNthCalledWith(1, expect.anything(), 'app.create_channel', { appId: 'com.test.new-channel-version' })
+    expect(checkPermission).toHaveBeenNthCalledWith(2, expect.anything(), 'channel.promote_bundle', { appId: 'com.test.new-channel-version' })
+    expect(updateOrCreateChannel).not.toHaveBeenCalled()
+  })
+
+  it('requires promote bundle permission to explicitly clear a channel version', async () => {
+    supabaseAdmin.mockImplementation(() => buildAdminChain({ existingChannelId: 42, existingChannelVersion: 123 }))
+    checkPermission
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
+    const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
+
+    await expect(post(context(), {
+      app_id: 'com.test.clear-version',
+      channel: 'production',
+      version: null,
+    }, apiKey())).rejects.toMatchObject({
+      cause: expect.objectContaining({ error: 'cannot_access_app' }),
+    })
+
+    expect(updateOrCreateChannel).not.toHaveBeenCalled()
   })
 
   it('filters numeric rollout target ids to active bundles', async () => {
     const eqCalls: Array<[string, unknown]> = []
-    supabaseApikey.mockImplementation(() => buildSupabaseChain({ existingChannelId: 42, existingChannelVersion: 123, versionId: 456, eqCalls }))
+    supabaseAdmin.mockImplementation(() => buildAdminChain({
+      existingChannelId: 42,
+      existingChannelVersion: 123,
+      versionId: 456,
+      eqCalls,
+    }))
     const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
 
-    await post(
-      { json: vi.fn() } as any,
-      {
-        app_id: 'com.test.rollout-id',
-        channel: 'production',
-        version: '1.0.0',
-        rolloutVersion: 456,
-      },
-      { user_id: 'user-test', key: 'capg-key' } as any,
-    )
+    await post(context(), {
+      app_id: 'com.test.rollout-id',
+      channel: 'production',
+      rolloutVersion: 456,
+    }, apiKey())
 
     const rolloutIdCallIndex = eqCalls.findIndex(([column, value]) => column === 'id' && value === 456)
     expect(rolloutIdCallIndex).toBeGreaterThanOrEqual(0)
@@ -220,21 +317,17 @@ describe('public channel post', () => {
   })
 
   it('rejects rollout target changes without channel promote permission', async () => {
-    supabaseApikey.mockImplementation(() => buildSupabaseChain({ existingChannelId: 42, existingChannelVersion: 123 }))
+    supabaseAdmin.mockImplementation(() => buildAdminChain({ existingChannelId: 42, existingChannelVersion: 123 }))
     checkPermission
       .mockResolvedValueOnce(true)
       .mockResolvedValueOnce(false)
     const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
 
-    await expect(post(
-      { json: vi.fn() } as any,
-      {
-        app_id: 'com.test.rollout-auth',
-        channel: 'production',
-        rolloutVersion: '2.0.0',
-      },
-      { user_id: 'user-test', key: 'capg-key' } as any,
-    )).rejects.toMatchObject({
+    await expect(post(context(), {
+      app_id: 'com.test.rollout-auth',
+      channel: 'production',
+      rolloutVersion: '2.0.0',
+    }, apiKey())).rejects.toMatchObject({
       cause: expect.objectContaining({ error: 'cannot_promote_bundle' }),
     })
 
@@ -242,18 +335,14 @@ describe('public channel post', () => {
   })
 
   it('rejects rollout targets when a channel has no stable bundle', async () => {
-    supabaseApikey.mockImplementation(() => buildSupabaseChain({ existingChannelId: 42, existingChannelVersion: null }))
+    supabaseAdmin.mockImplementation(() => buildAdminChain({ existingChannelId: 42, existingChannelVersion: null }))
     const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
 
-    await expect(post(
-      { json: vi.fn() } as any,
-      {
-        app_id: 'com.test.rollout-no-stable',
-        channel: 'new-rollout-channel',
-        rolloutVersion: '2.0.0',
-      },
-      { user_id: 'user-test', key: 'capg-key' } as any,
-    )).rejects.toMatchObject({
+    await expect(post(context(), {
+      app_id: 'com.test.rollout-no-stable',
+      channel: 'new-rollout-channel',
+      rolloutVersion: '2.0.0',
+    }, apiKey())).rejects.toMatchObject({
       cause: expect.objectContaining({ error: 'missing_stable_version' }),
     })
 
