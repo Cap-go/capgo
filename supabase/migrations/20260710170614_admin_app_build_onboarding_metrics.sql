@@ -90,6 +90,7 @@ RETURNS TABLE(
     "stats_refresh_requested_at" timestamp without time zone,
     "build_timeout_seconds" bigint,
     "build_timeout_updated_at" timestamp with time zone,
+    "block_provider_infra_requests" boolean,
     "last_upload_at" timestamp with time zone,
     "total_count" bigint
 )
@@ -135,6 +136,7 @@ BEGIN
             a.stats_updated_at,
             a.stats_refresh_requested_at,
             a.build_timeout_seconds,
+            a.block_provider_infra_requests,
             a.build_timeout_updated_at,
             lv.created_at AS last_upload_at
         FROM public.apps a
