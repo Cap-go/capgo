@@ -53,7 +53,7 @@ const ONBOARDING_LATE_SUBSCRIPTION_APP_CREATED_AT = '2026-02-02T14:00:00.000Z'
 const ONBOARDING_LATE_SUBSCRIPTION_CHANNEL_CREATED_AT = '2026-02-03T14:00:00.000Z'
 const ONBOARDING_LATE_SUBSCRIPTION_BUNDLE_CREATED_AT = '2026-02-04T14:00:00.000Z'
 const ONBOARDING_LATE_SUBSCRIPTION_PAID_AT = '2026-02-10T14:00:00.000Z'
-const GLOBAL_STATS_TREND_DATES = ['2099-12-30', '2099-12-31'] as const
+const GLOBAL_STATS_TREND_DATES = ['2099-12-30', '2099-12-31', '2100-01-01'] as const
 
 let adminHeaders: Record<string, string>
 let soloPlan: {
@@ -90,6 +90,9 @@ beforeAll(async () => {
     {
       date_id: GLOBAL_STATS_TREND_DATES[0],
       apps: 10,
+      apps_created: 2,
+      apps_with_cli_onboarding_builds_24h: 1,
+      apps_with_manual_builds_24h: 0,
       apps_active: 7,
       users: 20,
       users_active: 8,
@@ -128,6 +131,9 @@ beforeAll(async () => {
     {
       date_id: GLOBAL_STATS_TREND_DATES[1],
       apps: 11,
+      apps_created: 3,
+      apps_with_cli_onboarding_builds_24h: 2,
+      apps_with_manual_builds_24h: 1,
       apps_active: 8,
       users: 22,
       users_active: 9,
@@ -161,6 +167,47 @@ beforeAll(async () => {
       revenue_solo: 240,
       revenue_maker: 480,
       revenue_team: 2160,
+      revenue_enterprise: 0,
+    },
+    {
+      date_id: GLOBAL_STATS_TREND_DATES[2],
+      apps: 12,
+      apps_created: 0,
+      apps_with_cli_onboarding_builds_24h: 0,
+      apps_with_manual_builds_24h: 0,
+      apps_active: 0,
+      users: 0,
+      users_active: 0,
+      paying: 0,
+      org_conversion_rate: 0,
+      trial: 0,
+      not_paying: 0,
+      updates: 160,
+      updates_external: 0,
+      success_rate: 0,
+      bundle_storage_gb: 0,
+      plan_solo: 0,
+      plan_maker: 0,
+      plan_team: 0,
+      plan_enterprise: 0,
+      registers_today: 0,
+      devices_last_month: 0,
+      stars: 3,
+      need_upgrade: 0,
+      paying_yearly: 0,
+      paying_monthly: 0,
+      new_paying_orgs: 0,
+      canceled_orgs: 0,
+      upgraded_orgs: 0,
+      trial_extended_orgs: 0,
+      trial_extended_subscribed_orgs: 0,
+      past_due_orgs: 0,
+      past_due_orgs_average_days: 0,
+      mrr: 0,
+      total_revenue: 0,
+      revenue_solo: 0,
+      revenue_maker: 0,
+      revenue_team: 0,
       revenue_enterprise: 0,
     },
   ], { onConflict: 'date_id' })
@@ -510,6 +557,10 @@ describe('/private/admin_stats', () => {
       data: Array<{
         date: string
         apps: number
+        apps_created: number
+        apps_with_cli_onboarding_builds_24h: number
+        apps_with_manual_builds_24h: number
+        app_build_onboarding_finalized: boolean
         updates: number
         updates_external: number
         previous_mrr: number
@@ -526,6 +577,10 @@ describe('/private/admin_stats', () => {
     const latest = payload.data.find(row => row.date === GLOBAL_STATS_TREND_DATES[1])
     expect(latest).toBeTruthy()
     expect(latest?.apps).toBe(11)
+    expect(latest?.apps_created).toBe(3)
+    expect(latest?.apps_with_cli_onboarding_builds_24h).toBe(2)
+    expect(latest?.app_build_onboarding_finalized).toBe(true)
+    expect(latest?.apps_with_manual_builds_24h).toBe(1)
     expect(latest?.updates).toBe(150)
     expect(latest?.past_due_orgs).toBe(2)
     expect(latest?.past_due_orgs_average_days).toBe(3.75)
