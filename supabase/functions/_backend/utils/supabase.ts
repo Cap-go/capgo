@@ -1182,8 +1182,10 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
       customer_id: customer.id,
       trial_at: trial_at.toISOString(),
     })
-  if (createInfoError)
+  if (createInfoError) {
     cloudlog({ requestId: c.get('requestId'), message: 'createInfoError', createInfoError })
+    return null
+  }
 
   const { error: updateUserError } = await supabaseAdmin(c)
     .from('orgs')
@@ -1191,8 +1193,10 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
       customer_id: customer.id,
     })
     .eq('id', org.id)
-  if (updateUserError)
+  if (updateUserError) {
     cloudlog({ requestId: c.get('requestId'), message: 'updateUserError', updateUserError })
+    return null
+  }
   cloudlog({ requestId: c.get('requestId'), message: 'stripe_info done' })
   return selectedPlan.name
 }
@@ -1214,7 +1218,7 @@ export async function finalizePendingStripeCustomer(c: Context, org: Database['p
 
   if (!updatedOrg?.customer_id || updatedOrg.customer_id.startsWith('pending_')) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'finalizePendingStripeCustomer: org still has pending customer_id, skipping delete' })
-    return trialPlanName
+    return
   }
 
   const { error: deleteError } = await supabaseAdmin(c)
