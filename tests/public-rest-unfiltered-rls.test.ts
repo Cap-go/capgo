@@ -7,17 +7,13 @@ interface RestProbeRow {
   probe_column: string
 }
 
-const exposedTableProbeSql = `
-WITH exposed_tables AS (
+const restRelationProbeSql = `
+WITH rest_relations AS (
   SELECT c.oid, c.relname AS table_name
   FROM pg_class c
   INNER JOIN pg_namespace n ON n.oid = c.relnamespace
   WHERE n.nspname = 'public'
     AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
-    AND (
-      has_table_privilege('anon', c.oid, 'SELECT')
-      OR has_table_privilege('authenticated', c.oid, 'SELECT')
-    )
 ),
 primary_key_columns AS (
   SELECT DISTINCT ON (i.indrelid) i.indrelid, a.attname
@@ -33,13 +29,23 @@ first_columns AS (
     AND NOT attisdropped
   ORDER BY attrelid, attnum
 )
-SELECT exposed_tables.table_name, COALESCE(primary_key_columns.attname, first_columns.attname) AS probe_column
-FROM exposed_tables
-LEFT JOIN primary_key_columns ON primary_key_columns.indrelid = exposed_tables.oid
-LEFT JOIN first_columns ON first_columns.attrelid = exposed_tables.oid
+SELECT rest_relations.table_name, COALESCE(primary_key_columns.attname, first_columns.attname) AS probe_column
+FROM rest_relations
+LEFT JOIN primary_key_columns ON primary_key_columns.indrelid = rest_relations.oid
+LEFT JOIN first_columns ON first_columns.attrelid = rest_relations.oid
 WHERE COALESCE(primary_key_columns.attname, first_columns.attname) IS NOT NULL
-ORDER BY exposed_tables.table_name
+ORDER BY rest_relations.table_name
 `
+
+const coreUnfilteredRestTables = [
+  'app_versions',
+  'apps',
+  'channels',
+  'devices',
+  'manifest',
+  'org_users',
+  'orgs',
+]
 
 const riskySelectPolicySql = `
 SELECT
@@ -148,8 +154,13 @@ describe('public REST unfiltered RLS regression guard', () => {
     ])
   })
 
-  it('does not raise or timeout on unfiltered reads for exposed tables', async () => {
-    const probes = await executeSQL(exposedTableProbeSql) as RestProbeRow[]
+  it('does not raise or timeout on unfiltered reads for every public REST relation', async () => {
+    const probes = await executeSQL(restRelationProbeSql) as RestProbeRow[]
+    const probedTables = new Set(probes.map(probe => probe.table_name))
+    const missingCoreTables = coreUnfilteredRestTables.filter(table => !probedTables.has(table))
+
+    expect(missingCoreTables).toEqual([])
+
     const scenarios = [
       { name: 'anonymous', headers: getAnonHeaders() },
       { name: 'invalid API key', headers: getInvalidApiKeyHeaders() },
