@@ -1214,7 +1214,7 @@ export async function finalizePendingStripeCustomer(c: Context, org: Database['p
 
   if (!updatedOrg?.customer_id || updatedOrg.customer_id.startsWith('pending_')) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'finalizePendingStripeCustomer: org still has pending customer_id, skipping delete' })
-    return
+    return trialPlanName
   }
 
   const { error: deleteError } = await supabaseAdmin(c)

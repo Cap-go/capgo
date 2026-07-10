@@ -341,7 +341,7 @@ async function getBillingPlans(c: Context): Promise<PlanRow[]> {
 
   if (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getBillingPlans error', error })
-    return []
+    throw error
   }
 
   return plans ?? []

@@ -23,6 +23,13 @@ describe('billing plan Bento tags', () => {
     })
   })
 
+  it.concurrent('clears trial tags even when the current paid plan is unavailable', () => {
+    expect(buildBillingPlanBentoTags(null, 'paying', ['Solo', 'Team'])).toEqual({
+      segments: [],
+      deleteSegments: ['trial-plan:Solo', 'trial-plan:Team'],
+    })
+  })
+
   it.concurrent('does not create a plan tag outside a trial or paid subscription', () => {
     expect(buildBillingPlanBentoTags('Solo', 'none')).toEqual({
       segments: [],

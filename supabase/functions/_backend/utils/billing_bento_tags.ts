@@ -5,22 +5,22 @@ export function buildBillingPlanBentoTags(
   state: BillingPlanBentoState,
   trialPlanNamesToRemove?: readonly string[] | null,
 ): { segments: string[], deleteSegments: string[] } {
-  if (!planName || state === 'none')
+  if (state === 'none')
     return { segments: [], deleteSegments: [] }
-
-  const paidPlanTag = `plan:${planName}`
-  const trialPlanTag = `trial-plan:${planName}`
 
   if (state === 'trial') {
     return {
-      segments: [trialPlanTag],
+      segments: planName ? [`trial-plan:${planName}`] : [],
       deleteSegments: [],
     }
   }
-
-  const trialPlanNames = trialPlanNamesToRemove?.length ? trialPlanNamesToRemove : [planName]
+  let trialPlanNames: readonly string[] = []
+  if (trialPlanNamesToRemove?.length)
+    trialPlanNames = trialPlanNamesToRemove
+  else if (planName)
+    trialPlanNames = [planName]
   return {
-    segments: [paidPlanTag],
+    segments: planName ? [`plan:${planName}`] : [],
     deleteSegments: Array.from(new Set(trialPlanNames.map(name => `trial-plan:${name}`))),
   }
 }
