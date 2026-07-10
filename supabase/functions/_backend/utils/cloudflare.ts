@@ -389,9 +389,17 @@ export async function runQueryToCFA<T>(c: Context, query: string) {
     })
 
     if (!response.ok) {
-      const errorJson = await response.json()
-      cloudlogErr({ requestId: c.get('requestId'), message: 'runQueryToCFA HTTPError', status: response.status, error: errorJson })
-      throw new Error('runQueryToCFA encountered an error')
+      const errorText = await response.text()
+      let errorForLog: unknown = errorText
+      try {
+        errorForLog = JSON.parse(errorText)
+      }
+      catch {
+        // Keep the raw text body when Cloudflare returns HTML or plain text.
+      }
+      const errorPreview = (errorText || response.statusText).replace(/\s+/g, ' ').trim().slice(0, 500)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'runQueryToCFA HTTPError', status: response.status, error: errorForLog })
+      throw new Error(`runQueryToCFA HTTP ${response.status}: ${errorPreview}`)
     }
 
     const res = await response.json() as AnalyticsApiResponse & { data: T[] }
@@ -399,7 +407,10 @@ export async function runQueryToCFA<T>(c: Context, query: string) {
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'runQueryToCFA error', error: serializeError(e) })
-    throw new Error('runQueryToCFA encountered an error')
+    if (e instanceof Error && e.message.startsWith('runQueryToCFA HTTP '))
+      throw e
+    const errorMessage = e instanceof Error ? e.message : String(e)
+    throw new Error(`runQueryToCFA encountered an error: ${errorMessage}`, { cause: e })
   }
 }
 

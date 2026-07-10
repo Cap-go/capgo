@@ -913,6 +913,7 @@ export async function http_post_helper(
     headers['x-capgo-queue-name'] = metadata.queueName
     headers['x-capgo-queue-msg-id'] = String(metadata.msgId)
     headers['x-capgo-queue-read-count'] = String(metadata.readCount)
+    headers['x-capgo-queue-max-reads'] = String(MAX_QUEUE_READS)
   }
 
   const controller = new AbortController()
