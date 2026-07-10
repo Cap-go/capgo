@@ -6,12 +6,6 @@ export type ReleaseAs = 'patch' | 'minor' | 'major'
 type GitRunner = (args: string[]) => string
 
 const sharedMatchers = [
-  /^\.github\/workflows\/bump_version\.yml$/,
-  /^\.github\/workflows\/tests\.yml$/,
-  /^\.github\/scripts\//,
-  /^scripts\/sync-notifications-package-version\.ts$/,
-  /^scripts\/setup-bun\.sh$/,
-  /^scripts\/setup-bun\.ps1$/,
   /^package\.json$/,
   /^bun\.lock$/,
   /^\.npmrc$/,
@@ -59,7 +53,6 @@ export const componentMatchers: Record<Component, RegExp[]> = {
   ],
   cli: [
     ...sharedMatchers,
-    /^\.github\/workflows\/publish_cli\.yml$/,
     /^cli\/src\//,
     /^cli\/skills\/[^/]+\/SKILL\.md$/,
     /^cli\/skills\/(?!.*\.(md|mdx)$)/,
@@ -70,7 +63,6 @@ export const componentMatchers: Record<Component, RegExp[]> = {
   ],
   notifications: [
     ...sharedMatchers,
-    /^\.github\/workflows\/publish_notifications\.yml$/,
     /^packages\/capacitor-notifications\//,
   ],
 }
