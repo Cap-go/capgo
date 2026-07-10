@@ -54,6 +54,8 @@ ON public.build_requests (app_id, created_at);
 -- Keep the app-list RPC stable after adding app metadata columns. The function
 -- intentionally returns its original column contract, so it must not select
 -- apps.* because future app columns would shift last_upload_at/total_count.
+DROP FUNCTION IF EXISTS public.get_org_apps_with_last_upload(uuid, text, text, boolean, integer, integer);
+
 CREATE OR REPLACE FUNCTION "public"."get_org_apps_with_last_upload"(
     "p_org_id" "uuid",
     "p_search" "text" DEFAULT NULL,
