@@ -4,6 +4,7 @@ import type { AuthInfo, MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, NativeVersionUsage, Order, ReadDevicesParams, ReadStatsInsightsParams, ReadStatsParams, StatsInsightsResult, StatsMetadata, VersionUsage, VersionUsageChannel } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
+import { type BillingPlanBentoState, buildBillingPlanBentoTags } from './billing_bento_tags.ts'
 import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged, nullableString } from './deviceComparison.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
@@ -1047,6 +1048,7 @@ export async function customerToSegmentOrg(
   orgId: string,
   price_id?: string | null,
   plan?: Database['public']['Tables']['plans']['Row'] | null,
+  trialPlanNamesToRemove?: readonly string[] | null,
 ): Promise<{ segments: string[], deleteSegments: string[] }> {
   const segmentsObj = {
     capgo: true,
@@ -1057,7 +1059,6 @@ export async function customerToSegmentOrg(
     trial0: false,
     paying: false,
     payingMonthly: plan?.price_m_id === price_id,
-    plan: plan?.name ?? '',
     overuse: false,
     canceled: await isCanceledOrg(c, orgId),
     issueSegment: false,
@@ -1066,9 +1067,23 @@ export async function customerToSegmentOrg(
   const trialDaysLeft = await isTrialOrg(c, orgId)
   const paying = await isPayingOrg(c, orgId)
   const canUseMore = await isGoodPlanOrg(c, orgId)
+  let billingPlanState: BillingPlanBentoState = 'none'
+  if (paying)
+    billingPlanState = 'paying'
+  else if (trialDaysLeft > 0)
+    billingPlanState = 'trial'
+  const planTags = buildBillingPlanBentoTags(
+    plan?.name,
+    billingPlanState,
+    trialPlanNamesToRemove,
+  )
 
   if (!segmentsObj.onboarded) {
-    return processSegments(segmentsObj)
+    const segments = processSegments(segmentsObj)
+    return {
+      segments: [...segments.segments, ...planTags.segments],
+      deleteSegments: [...segments.deleteSegments, ...planTags.deleteSegments],
+    }
   }
 
   if (!paying && trialDaysLeft > 1 && trialDaysLeft <= 7) {
@@ -1094,7 +1109,11 @@ export async function customerToSegmentOrg(
     segmentsObj.issueSegment = true
   }
 
-  return processSegments(segmentsObj)
+  const segments = processSegments(segmentsObj)
+  return {
+    segments: [...segments.segments, ...planTags.segments],
+    deleteSegments: [...segments.deleteSegments, ...planTags.deleteSegments],
+  }
 }
 
 function processSegments(segmentsObj: any): { segments: string[], deleteSegments: string[] } {
@@ -1163,8 +1182,10 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
       customer_id: customer.id,
       trial_at: trial_at.toISOString(),
     })
-  if (createInfoError)
+  if (createInfoError) {
     cloudlog({ requestId: c.get('requestId'), message: 'createInfoError', createInfoError })
+    return null
+  }
 
   const { error: updateUserError } = await supabaseAdmin(c)
     .from('orgs')
@@ -1172,9 +1193,12 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
       customer_id: customer.id,
     })
     .eq('id', org.id)
-  if (updateUserError)
+  if (updateUserError) {
     cloudlog({ requestId: c.get('requestId'), message: 'updateUserError', updateUserError })
+    return null
+  }
   cloudlog({ requestId: c.get('requestId'), message: 'stripe_info done' })
+  return selectedPlan.name
 }
 
 export async function finalizePendingStripeCustomer(c: Context, org: Database['public']['Tables']['orgs']['Row']) {
@@ -1184,7 +1208,7 @@ export async function finalizePendingStripeCustomer(c: Context, org: Database['p
     return
   }
 
-  await createStripeCustomer(c, org)
+  const trialPlanName = await createStripeCustomer(c, org)
 
   const { data: updatedOrg } = await supabaseAdmin(c)
     .from('orgs')
@@ -1203,6 +1227,8 @@ export async function finalizePendingStripeCustomer(c: Context, org: Database['p
     .eq('customer_id', pendingCustomerId)
   if (deleteError)
     cloudlogErr({ requestId: c.get('requestId'), message: 'finalizePendingStripeCustomer: orphan pending stripe_info', deleteError })
+
+  return trialPlanName
 }
 
 export function trackBandwidthUsageSB(
