@@ -3,22 +3,16 @@ import { describe, expect, it } from 'vitest'
 import { matchesComponent, resolveReleaseScope } from '../scripts/release-scope.ts'
 
 describe('release scope matching', () => {
-  it.concurrent('treats shared release infrastructure as affecting all components', () => {
+  it.concurrent('does not publish packages for release infrastructure changes', () => {
     const files = [
       '.github/workflows/tests.yml',
       '.github/workflows/bump_version.yml',
+      '.github/workflows/publish_cli.yml',
+      '.github/workflows/publish_notifications.yml',
       '.github/scripts/start-background-service.sh',
       'scripts/setup-bun.sh',
+      'scripts/setup-bun.ps1',
       'scripts/sync-notifications-package-version.ts',
-    ]
-
-    expect(matchesComponent('capgo', files)).toBe(true)
-    expect(matchesComponent('cli', files)).toBe(true)
-    expect(matchesComponent('notifications', files)).toBe(true)
-  })
-
-  it.concurrent('does not publish packages for release scope logic changes', () => {
-    const files = [
       'scripts/release-scope.ts',
       'tests/release-scope.test.ts',
     ]
@@ -27,26 +21,55 @@ describe('release scope matching', () => {
     expect(matchesComponent('cli', files)).toBe(false)
     expect(matchesComponent('notifications', files)).toBe(false)
   })
+
+  it.concurrent('does not release the packages changed only by the release-scope fix', () => {
+    const files = [
+      '.github/workflows/publish_cli.yml',
+      '.github/workflows/publish_notifications.yml',
+      'scripts/release-scope.ts',
+      'tests/release-scope.test.ts',
+    ]
+
+    const run = (args: string[]) => {
+      const key = args.join(' ')
+      const responses: Record<string, string> = {
+        'rev-list --reverse release-parent..release-fix': 'release-fix',
+        'show --format= --name-only release-fix': files.join('\n'),
+      }
+
+      if (key in responses) {
+        return responses[key]
+      }
+
+      throw new Error(`Unexpected git call: ${key}`)
+    }
+
+    for (const component of ['capgo', 'cli', 'notifications'] as const) {
+      expect(resolveReleaseScope(component, 'release-parent', 'release-fix', run)).toEqual({
+        shouldRelease: false,
+        releaseAs: 'patch',
+      })
+    }
+  })
+
+  it.concurrent('treats shared package inputs as affecting all components', () => {
+    const files = ['package.json', 'bun.lock', 'tsconfig.json']
+
+    expect(matchesComponent('capgo', files)).toBe(true)
+    expect(matchesComponent('cli', files)).toBe(true)
+    expect(matchesComponent('notifications', files)).toBe(true)
+  })
+
   it.concurrent('treats capgo deploy workflow changes as capgo-only releases', () => {
     const files = ['.github/workflows/build_and_deploy.yml', 'scripts/deploy-scope.ts']
 
     expect(matchesComponent('capgo', files)).toBe(true)
     expect(matchesComponent('cli', files)).toBe(false)
-  })
-
-  it.concurrent('treats cli publish workflow changes as cli-only releases', () => {
-    const files = ['.github/workflows/publish_cli.yml']
-
-    expect(matchesComponent('capgo', files)).toBe(false)
-    expect(matchesComponent('cli', files)).toBe(true)
     expect(matchesComponent('notifications', files)).toBe(false)
   })
 
   it.concurrent('treats notifications package changes as notifications-only releases', () => {
-    const files = [
-      'packages/capacitor-notifications/src/index.ts',
-      '.github/workflows/publish_notifications.yml',
-    ]
+    const files = ['packages/capacitor-notifications/src/index.ts']
 
     expect(matchesComponent('capgo', files)).toBe(false)
     expect(matchesComponent('cli', files)).toBe(false)
