@@ -4,7 +4,7 @@ import type { AuthInfo, MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, NativeVersionUsage, Order, ReadDevicesParams, ReadStatsInsightsParams, ReadStatsParams, StatsInsightsResult, StatsMetadata, VersionUsage, VersionUsageChannel } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
-import { buildBillingPlanBentoTags } from './billing_bento_tags.ts'
+import { type BillingPlanBentoState, buildBillingPlanBentoTags } from './billing_bento_tags.ts'
 import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged, nullableString } from './deviceComparison.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
@@ -1067,9 +1067,14 @@ export async function customerToSegmentOrg(
   const trialDaysLeft = await isTrialOrg(c, orgId)
   const paying = await isPayingOrg(c, orgId)
   const canUseMore = await isGoodPlanOrg(c, orgId)
+  let billingPlanState: BillingPlanBentoState = 'none'
+  if (paying)
+    billingPlanState = 'paying'
+  else if (trialDaysLeft > 0)
+    billingPlanState = 'trial'
   const planTags = buildBillingPlanBentoTags(
     plan?.name,
-    paying ? 'paying' : trialDaysLeft > 0 ? 'trial' : 'none',
+    billingPlanState,
     trialPlanNamesToRemove,
   )
 
