@@ -4,14 +4,37 @@ set -euo pipefail
 
 extract_timestamp() {
   local file_name="$1"
+  local out_var="${2:-}"
   local base_name
-  base_name="$(basename "$file_name")"
+  base_name="${file_name##*/}"
 
   if [[ "$base_name" =~ ^([0-9]{14})_.+\.sql$ ]]; then
-    echo "${BASH_REMATCH[1]}"
+    if [[ -n "$out_var" ]]; then
+      printf -v "$out_var" '%s' "${BASH_REMATCH[1]}"
+    else
+      printf '%s\n' "${BASH_REMATCH[1]}"
+    fi
   else
+    if [[ -n "$out_var" ]]; then
+      printf -v "$out_var" ''
+    fi
     return 1
   fi
+}
+
+resolve_github_merge_base_ref() {
+  case "${GITHUB_EVENT_NAME:-}" in
+    pull_request | merge_group) ;;
+    *) return 1 ;;
+  esac
+
+  if git rev-parse --verify --quiet "HEAD^1^{commit}" >/dev/null \
+    && git rev-parse --verify --quiet "HEAD^2^{commit}" >/dev/null; then
+    echo 'HEAD^1'
+    return
+  fi
+
+  return 1
 }
 
 resolve_target_branch() {
@@ -48,42 +71,59 @@ resolve_target_branch() {
 
 target_branch="$(resolve_target_branch)"
 base_ref="origin/${target_branch}"
+base_label="${base_ref}"
 tmp_dir="$(mktemp -d)"
 base_timestamps_file="${tmp_dir}/base_timestamps.tsv"
 added_timestamps_file="${tmp_dir}/added_timestamps.tsv"
 
 trap 'rm -rf "${tmp_dir}"' EXIT
 
-echo "Checking Supabase migrations against ${base_ref}"
-if ! git fetch --no-tags origin "${target_branch}"; then
-  if git rev-parse --verify --quiet "${base_ref}^{commit}" >/dev/null; then
-    echo "⚠️  Could not fetch ${base_ref}; using existing local ref."
-  elif git rev-parse --verify --quiet "HEAD^1^{commit}" >/dev/null \
+local_base_ref=''
+if local_base_ref="$(resolve_github_merge_base_ref)"; then
+  base_ref="${local_base_ref}"
+  base_label="local merge base parent (${target_branch})"
+  echo "Checking Supabase migrations against ${base_label}"
+else
+  echo "Checking Supabase migrations against ${base_ref}"
+  if ! git fetch --no-tags origin "+refs/heads/${target_branch}:refs/remotes/origin/${target_branch}"; then
+    if git rev-parse --verify --quiet "${base_ref}^{commit}" >/dev/null; then
+      echo "⚠️  Could not fetch ${base_ref}; using existing local ref."
+    elif git rev-parse --verify --quiet "HEAD^1^{commit}" >/dev/null \
+      && git rev-parse --verify --quiet "HEAD^2^{commit}" >/dev/null; then
+      base_ref='HEAD^1'
+      base_label="local merge base parent (${target_branch})"
+      echo "⚠️  Could not fetch origin/${target_branch}; using PR merge base parent."
+    else
+      echo "❌ Could not fetch ${base_ref} and no local fallback was available."
+      exit 1
+    fi
+  fi
+fi
+
+if ! git merge-base "${base_ref}" HEAD >/dev/null; then
+  if git rev-parse --verify --quiet "HEAD^1^{commit}" >/dev/null \
     && git rev-parse --verify --quiet "HEAD^2^{commit}" >/dev/null; then
     base_ref='HEAD^1'
-    echo "⚠️  Could not fetch origin/${target_branch}; using PR merge base parent."
+    base_label="local merge base parent (${target_branch})"
+    echo "⚠️  Could not find a merge base for ${target_branch}; using PR merge base parent."
   else
-    echo "❌ Could not fetch ${base_ref} and no local fallback was available."
+    echo "❌ Could not find a merge base between ${base_ref} and HEAD."
     exit 1
   fi
 fi
 
 : > "${base_timestamps_file}"
+latest_base_timestamp='00000000000000'
 while IFS= read -r file; do
   [[ "$file" != supabase/migrations/*.sql ]] && continue
-  ts="$(extract_timestamp "$file" || true)"
-  [[ -z "$ts" ]] && continue
+  if ! extract_timestamp "$file" ts; then
+    continue
+  fi
   printf '%s\t%s\n' "$ts" "$file" >> "${base_timestamps_file}"
+  if [[ "$ts" > "$latest_base_timestamp" ]]; then
+    latest_base_timestamp="$ts"
+  fi
 done < <(git ls-tree -r --name-only "${base_ref}" -- supabase/migrations)
-
-latest_base_timestamp='00000000000000'
-if [[ -s "${base_timestamps_file}" ]]; then
-  latest_base_timestamp="$(awk -F '\t' '
-    BEGIN { max = "00000000000000" }
-    $1 > max { max = $1 }
-    END { print max }
-  ' "${base_timestamps_file}")"
-fi
 
 status=0
 
@@ -96,8 +136,9 @@ restamped_files=''
 while IFS=$'\t' read -r similarity _old_path new_path; do
   [[ -z "${new_path:-}" ]] && continue
   [[ "$similarity" != "R100" ]] && continue
-  new_ts="$(extract_timestamp "$new_path" || true)"
-  [[ -z "$new_ts" ]] && continue
+  if ! extract_timestamp "$new_path" new_ts; then
+    continue
+  fi
   if (( 10#$new_ts > 10#$latest_base_timestamp )); then
     restamped_files+="${new_path}"$'\n'
   fi
@@ -110,7 +151,8 @@ if [[ -n "$modified_files" ]]; then
   while IFS= read -r file; do
     [[ -z "$file" ]] && continue
 
-    ts="$(extract_timestamp "$file" || true)"
+    ts=''
+    extract_timestamp "$file" ts || true
     if [[ -n "$ts" && "$ts" == "$latest_base_timestamp" ]]; then
       echo "⚠️  Allowing fix to latest Supabase migration: $file"
       continue
@@ -153,8 +195,7 @@ if [[ -n "$added_files" ]]; then
   while IFS= read -r file; do
     [[ -z "$file" ]] && continue
 
-    ts="$(extract_timestamp "$file" || true)"
-    if [[ -z "$ts" ]]; then
+    if ! extract_timestamp "$file" ts; then
       echo "❌ Invalid Supabase migration filename: $file"
       echo '  Expected format: YYYYMMDDHHMMSS_description.sql'
       status=1
