@@ -19,7 +19,7 @@ BEGIN
   SELECT "public"."get_apikey_header"() INTO v_api_key_text;
   v_permission := "public"."rbac_permission_for_legacy"("p_min_right", "public"."rbac_scope_org"());
 
-  IF v_api_key_text IS NOT NULL THEN
+  IF v_auth_user_id IS NULL AND v_api_key_text IS NOT NULL THEN
     SELECT *
     FROM "public"."find_apikey_by_value"(v_api_key_text)
     INTO v_api_key;
@@ -129,7 +129,7 @@ BEGIN
   SELECT "public"."get_apikey_header"() INTO v_api_key_text;
   v_permission := "public"."rbac_permission_for_legacy"('read'::"public"."user_min_right", "public"."rbac_scope_org"());
 
-  IF v_api_key_text IS NOT NULL THEN
+  IF v_auth_user_id IS NULL AND v_api_key_text IS NOT NULL THEN
     SELECT *
     FROM "public"."find_apikey_by_value"(v_api_key_text)
     INTO v_api_key;
@@ -206,28 +206,22 @@ BEGIN
   SELECT "auth"."uid"() INTO v_user_id;
   SELECT "public"."get_apikey_header"() INTO v_api_key_text;
 
-  IF v_api_key_text IS NOT NULL THEN
+  IF v_user_id IS NOT NULL THEN
+    v_api_key_text := NULL;
+    v_principal_type := "public"."rbac_principal_user"();
+    v_principal_id := v_user_id;
+  ELSIF v_api_key_text IS NOT NULL THEN
     SELECT * INTO v_api_key
     FROM "public"."find_apikey_by_value"(v_api_key_text)
     LIMIT 1;
 
-    IF v_api_key.id IS NOT NULL AND NOT "public"."is_apikey_expired"(v_api_key.expires_at) THEN
-      v_user_id := v_api_key.user_id;
-      v_principal_type := "public"."rbac_principal_apikey"();
-      v_principal_id := v_api_key.rbac_id;
-    ELSE
-      v_api_key_text := NULL;
-
-      IF v_user_id IS NULL THEN
-        RETURN v_allowed;
-      END IF;
-
-      v_principal_type := "public"."rbac_principal_user"();
-      v_principal_id := v_user_id;
+    IF v_api_key.id IS NULL OR "public"."is_apikey_expired"(v_api_key.expires_at) THEN
+      RETURN v_allowed;
     END IF;
-  ELSIF v_user_id IS NOT NULL THEN
-    v_principal_type := "public"."rbac_principal_user"();
-    v_principal_id := v_user_id;
+
+    v_user_id := v_api_key.user_id;
+    v_principal_type := "public"."rbac_principal_apikey"();
+    v_principal_id := v_api_key.rbac_id;
   ELSE
     RETURN v_allowed;
   END IF;
@@ -363,7 +357,16 @@ BEGIN
   SELECT COALESCE(array_agg(DISTINCT scoped_apps.app_id), '{}'::character varying[])
   INTO v_allowed
   FROM scoped_apps
-  INNER JOIN readable_orgs ON readable_orgs.id = scoped_apps.owner_org;
+  INNER JOIN readable_orgs ON readable_orgs.id = scoped_apps.owner_org
+  WHERE v_api_key_text IS NULL
+    OR "public"."rbac_check_permission_direct"(
+      "public"."rbac_perm_app_read"(),
+      v_user_id,
+      scoped_apps.owner_org,
+      scoped_apps.app_id,
+      NULL::bigint,
+      v_api_key_text
+    );
 
   RETURN v_allowed;
 END;

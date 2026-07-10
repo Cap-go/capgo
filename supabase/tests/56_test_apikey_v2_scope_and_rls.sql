@@ -572,11 +572,20 @@ SELECT is(
 SELECT set_config('request.method', '', true);
 
 SELECT ok(
-  position(
-    'rbac_check_permission_direct'
-    in pg_get_functiondef('public.app_versions_readable_app_ids()'::regprocedure)
-  ) = 0,
-  'app_versions readable app helper does not use per-app RBAC checks'
+  (
+    SELECT position('WHERE v_api_key_text IS NULL OR "public"."rbac_check_permission_direct"' in helper_def) > 0
+      AND position('"public"."rbac_perm_app_read"()' in helper_def) > 0
+      AND position('v_user_id IS NOT NULL THEN v_api_key_text := NULL' in helper_def) > 0
+    FROM (
+      SELECT regexp_replace(
+        pg_get_functiondef('public.app_versions_readable_app_ids()'::regprocedure),
+        '\s+',
+        ' ',
+        'g'
+      ) AS helper_def
+    ) helper
+  ),
+  'app_versions readable app helper lets JWT win and exact-checks API-key app candidates'
 );
 
 SELECT ok(

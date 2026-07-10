@@ -122,18 +122,40 @@ async function getAuthenticatedWithInvalidApiKeyHeaders() {
   }
 }
 
-async function fetchRestProbe(probe: RestProbeRow, headers: Record<string, string>) {
+type RestProbeMode = 'selected limit' | 'bare range'
+
+function buildRestProbeRequest(probe: RestProbeRow, headers: Record<string, string>, mode: RestProbeMode) {
+  if (mode === 'bare range') {
+    return {
+      url: `${SUPABASE_BASE_URL}/rest/v1/${encodeURIComponent(probe.table_name)}`,
+      headers: {
+        ...headers,
+        Range: '0-0',
+        'Range-Unit': 'items',
+      },
+    }
+  }
+
   const params = new URLSearchParams({
     select: probe.probe_column,
     limit: '1',
   })
+
+  return {
+    url: `${SUPABASE_BASE_URL}/rest/v1/${encodeURIComponent(probe.table_name)}?${params.toString()}`,
+    headers,
+  }
+}
+
+async function fetchRestProbe(probe: RestProbeRow, headers: Record<string, string>, mode: RestProbeMode) {
+  const request = buildRestProbeRequest(probe, headers, mode)
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 5000)
 
   try {
     const response = await fetchWithRetry(
-      `${SUPABASE_BASE_URL}/rest/v1/${encodeURIComponent(probe.table_name)}?${params.toString()}`,
-      { headers, signal: controller.signal },
+      request.url,
+      { headers: request.headers, signal: controller.signal },
       1,
     )
     const body = await response.text()
@@ -189,23 +211,25 @@ describe('public REST unfiltered RLS regression guard', () => {
       { name: 'authenticated with invalid API key', headers: await getAuthenticatedWithInvalidApiKeyHeaders() },
       { name: 'valid API key', headers: getValidApiKeyHeaders() },
     ]
+
+    const probeModes: RestProbeMode[] = ['selected limit', 'bare range']
     const failures: string[] = []
 
-    for (let index = 0; index < probes.length; index += 8) {
-      const batch = probes.slice(index, index + 8)
-      const results = await Promise.all(batch.flatMap(probe => scenarios.map(async (scenario) => {
+    for (let index = 0; index < probes.length; index += 4) {
+      const batch = probes.slice(index, index + 4)
+      const results = await Promise.all(batch.flatMap(probe => scenarios.flatMap(scenario => probeModes.map(async (mode) => {
         try {
-          const { response, body } = await fetchRestProbe(probe, scenario.headers)
+          const { response, body } = await fetchRestProbe(probe, scenario.headers, mode)
 
           if (response.status >= 500)
-            return `${probe.table_name} ${scenario.name}: ${response.status} ${body}`
+            return `${probe.table_name} ${scenario.name} ${mode}: ${response.status} ${body}`
         }
         catch (error) {
-          return `${probe.table_name} ${scenario.name}: ${(error as Error).message}`
+          return `${probe.table_name} ${scenario.name} ${mode}: ${(error as Error).message}`
         }
 
         return null
-      })))
+      }))))
 
       failures.push(...results.filter((result): result is string => result !== null))
     }
