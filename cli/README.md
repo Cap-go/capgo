@@ -416,6 +416,7 @@ npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel prod
 | **--version-exists-ok** | <code>boolean</code> | Exit successfully if bundle version already exists, useful for CI/CD workflows with monorepos |
 | **--self-assign** | <code>boolean</code> | Allow devices to auto-join this channel (updates channel setting) |
 | **--qr-preview** | <code>boolean</code> | Print a terminal QR code for this bundle preview after upload |
+| **--send-update-notification** | <code>boolean</code> | Send a native update-check notification to devices after updating linked channel bundles |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 | **--verbose** | <code>boolean</code> | Enable verbose output with detailed logging |
@@ -956,6 +957,7 @@ npx @capgo/cli@latest channel set production com.example.app --bundle 1.0.0 --st
 | **--device** | <code>boolean</code> | Allow sending update to physical devices |
 | **--no-device** | <code>boolean</code> | Disable sending update to physical devices |
 | **--qr-preview** | <code>boolean</code> | Print a terminal QR code for this channel preview after updating it |
+| **--send-update-notification** | <code>boolean</code> | Send a native update-check notification to devices after updating the linked channel bundle |
 | **--package-json** | <code>string</code> | Paths to package.json files for monorepos (comma-separated) |
 | **--ignore-metadata-check** | <code>boolean</code> | Ignore checking node_modules compatibility if present in the bundle |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
