@@ -580,12 +580,11 @@ jobs:
             bun run supabase:with-env -- bun scripts/playwright-frontend-preview.ts' \
             > "${RUNNER_TEMP}/playwright-frontend.log" 2>&1 &
           echo "frontend_pid=$!" >> "$GITHUB_OUTPUT"
+      # On cache hit nothing is installed: ubuntu-latest already ships Chromium's
+      # system libraries, so install-deps was ~28s of apt for packages already present.
       - name: Install Playwright browser
         if: steps.playwright_browser_cache.outputs.cache-hit != 'true'
         run: bunx playwright install --with-deps chromium
-      - name: Install Playwright system dependencies
-        if: steps.playwright_browser_cache.outputs.cache-hit == 'true'
-        run: bunx playwright install-deps chromium
       - name: Wait for Playwright services
         run: |
           bunx wait-on@8.0.1 \
