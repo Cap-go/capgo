@@ -599,26 +599,30 @@ async function saveAutoPauseConfidence(value: string) {
 }
 
 async function rollbackRollout() {
-  await saveChannelChanges({
+  if (await saveChannelChanges({
     rollout_version: null,
     rollout_enabled: false,
     rollout_percentage_bps: 0,
     rollout_paused_at: null,
     rollout_pause_reason: null,
-  })
+  })) {
+    await askUpdateNotificationAfterBundleChange()
+  }
 }
 
 async function promoteRollout() {
   if (!channel.value?.rollout_version)
     return
-  await saveChannelChanges({
+  if (await saveChannelChanges({
     version: channel.value.rollout_version,
     rollout_version: null,
     rollout_enabled: false,
     rollout_percentage_bps: 0,
     rollout_paused_at: null,
     rollout_pause_reason: null,
-  })
+  })) {
+    await askUpdateNotificationAfterBundleChange()
+  }
 }
 
 async function toggleRolloutPause() {
