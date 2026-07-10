@@ -136,8 +136,8 @@ BEGIN
             a.stats_updated_at,
             a.stats_refresh_requested_at,
             a.build_timeout_seconds,
-            a.block_provider_infra_requests,
             a.build_timeout_updated_at,
+            a.block_provider_infra_requests,
             lv.created_at AS last_upload_at
         FROM public.apps a
         LEFT JOIN LATERAL (
