@@ -29,6 +29,10 @@ interface Channel {
   rollout_version_info?: Pick<Database['public']['Tables']['app_versions']['Row'], 'id' | 'name'> | null
 }
 
+interface NotificationQueueResponse {
+  queued?: boolean
+}
+
 type ChannelUpdate = Database['public']['Tables']['channels']['Update']
 type EditableChannelKey = 'allow_dev'
   | 'allow_device'
@@ -278,6 +282,79 @@ async function saveChannelChange<K extends EditableChannelKey>(key: K, val: Chan
   return await saveChannelChanges({ [key]: val } as ChannelUpdate)
 }
 
+async function notificationAuthHeaders() {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  if (!token)
+    throw new Error(t('not-authenticated'))
+  return Object.fromEntries([
+    ['Authorization', `Bearer ${token}`],
+    ['Content-Type', 'application/json'],
+  ])
+}
+
+async function notificationFetch<T>(path: string, init: RequestInit = {}) {
+  const response = await fetch(`${defaultApiHost}/notifications${path}`, {
+    ...init,
+    headers: {
+      ...(await notificationAuthHeaders()),
+      ...(init.headers || {}),
+    },
+  })
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({})) as { error?: string, message?: string }
+    throw new Error(body.message || body.error || t('notification-action-error'))
+  }
+  return await response.json() as T
+}
+
+async function queueChannelUpdateNotification() {
+  if (!channel.value)
+    return
+
+  const response = await notificationFetch<NotificationQueueResponse>('/update-check', {
+    method: 'POST',
+    body: JSON.stringify({
+      appId: packageId.value,
+      target: { broadcast: true },
+      channel: channel.value.name,
+    }),
+  })
+  if (!response.queued)
+    throw new Error(t('notification-queue-unavailable'))
+  toast.success(t('notification-update-push-success'))
+}
+
+async function askUpdateNotificationAfterBundleChange() {
+  if (!channel.value)
+    return
+
+  dialogStore.openDialog({
+    title: t('notification-send-update-title'),
+    description: t('notification-send-update-description', { channel: channel.value.name }),
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('notification-send-update-action'),
+        role: 'primary',
+        handler: async () => {
+          try {
+            await queueChannelUpdateNotification()
+          }
+          catch (error) {
+            console.error(error)
+            toast.error(error instanceof Error ? error.message : t('notification-action-error'))
+          }
+        },
+      },
+    ],
+  })
+  await dialogStore.onDialogDismiss()
+}
+
 watchEffect(async () => {
   if (route.path.includes('/channel/')) {
     loading.value = true
@@ -354,13 +431,17 @@ async function handleVersionLink(appVersion: Database['public']['Tables']['app_v
       rollout_version: appVersion.id,
       rollout_enabled: true,
     })
-    if (saved)
+    if (saved) {
       toast.success(t('rollout-target-linked'))
+      await askUpdateNotificationAfterBundleChange()
+    }
     return
   }
 
-  if (await saveChannelChange('version', appVersion.id))
+  if (await saveChannelChange('version', appVersion.id)) {
     toast.success(t('linked-bundle'))
+    await askUpdateNotificationAfterBundleChange()
+  }
 }
 
 async function handleUnlink() {
@@ -381,7 +462,8 @@ async function handleUnlink() {
         text: t('continue'),
         role: 'primary',
         handler: async () => {
-          await saveChannelChange('version', null)
+          if (await saveChannelChange('version', null))
+            await askUpdateNotificationAfterBundleChange()
         },
       },
     ],
@@ -406,7 +488,8 @@ async function handleRevert() {
         text: t('confirm'),
         role: 'primary',
         handler: async () => {
-          await saveChannelChange('version', null)
+          if (await saveChannelChange('version', null))
+            await askUpdateNotificationAfterBundleChange()
         },
       },
     ],
@@ -516,26 +599,30 @@ async function saveAutoPauseConfidence(value: string) {
 }
 
 async function rollbackRollout() {
-  await saveChannelChanges({
+  if (await saveChannelChanges({
     rollout_version: null,
     rollout_enabled: false,
     rollout_percentage_bps: 0,
     rollout_paused_at: null,
     rollout_pause_reason: null,
-  })
+  })) {
+    await askUpdateNotificationAfterBundleChange()
+  }
 }
 
 async function promoteRollout() {
   if (!channel.value?.rollout_version)
     return
-  await saveChannelChanges({
+  if (await saveChannelChanges({
     version: channel.value.rollout_version,
     rollout_version: null,
     rollout_enabled: false,
     rollout_percentage_bps: 0,
     rollout_paused_at: null,
     rollout_pause_reason: null,
-  })
+  })) {
+    await askUpdateNotificationAfterBundleChange()
+  }
 }
 
 async function toggleRolloutPause() {

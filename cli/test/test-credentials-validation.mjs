@@ -96,8 +96,8 @@ function validateIosCredentials(credentials) {
     else if (credentials.BUILD_OUTPUT_UPLOAD_ENABLED !== 'true') {
       missingCreds.push('APPLE_KEY_ID/APPLE_ISSUER_ID/APPLE_KEY_CONTENT or app-specific password or BUILD_OUTPUT_UPLOAD_ENABLED=true')
     }
-    else if (credentials.SKIP_BUILD_NUMBER_BUMP !== 'true') {
-      missingCreds.push('APPLE_KEY_ID/APPLE_ISSUER_ID/APPLE_KEY_CONTENT or app-specific password or --skip-build-number-bump')
+    else if (credentials.SKIP_BUILD_NUMBER_BUMP !== 'true' || credentials.SKIP_MARKETING_VERSION_BUMP !== 'true') {
+      missingCreds.push('APPLE_KEY_ID/APPLE_ISSUER_ID/APPLE_KEY_CONTENT or app-specific password or --skip-build-number-bump and --skip-marketing-version-bump')
     }
     // else: warn only, no error
   }
@@ -159,8 +159,8 @@ await test('iOS validation errors when no API key with output upload but no skip
   assert(missingCreds[0].includes('skip-build-number-bump'), 'Should require skip-build-number-bump')
 })
 
-// Test 2c: iOS - no API key + output upload + skip-build-number-bump → allow (warn only)
-await test('iOS validation allows no API key when output upload and skip-build-number-bump are set', () => {
+// Test 2c: iOS - no API key + output upload + only skip-build-number-bump → error
+await test('iOS validation requires skip-marketing-version-bump without App Store Connect credentials', () => {
   const credentials = {
     BUILD_CERTIFICATE_BASE64: 'cert',
     P12_PASSWORD: 'pass',
@@ -168,7 +168,23 @@ await test('iOS validation allows no API key when output upload and skip-build-n
     APP_STORE_CONNECT_TEAM_ID: 'teamid',
     BUILD_OUTPUT_UPLOAD_ENABLED: 'true',
     SKIP_BUILD_NUMBER_BUMP: 'true',
-    // No API key - should be allowed
+  }
+
+  const missingCreds = validateIosCredentials(credentials)
+  assert(missingCreds.length === 1, `Should have 1 missing credential, got ${missingCreds.length}: ${missingCreds.join(', ')}`)
+  assert(missingCreds[0].includes('skip-marketing-version-bump'), 'Should require skip-marketing-version-bump')
+})
+
+// Test 2d: iOS - no API key + output upload + both skip flags → allow (warn only)
+await test('iOS validation allows output upload without App Store Connect credentials when both version bumps are skipped', () => {
+  const credentials = {
+    BUILD_CERTIFICATE_BASE64: 'cert',
+    P12_PASSWORD: 'pass',
+    CAPGO_IOS_PROVISIONING_MAP: '{"com.test.app":{"profile":"base64","name":"test"}}',
+    APP_STORE_CONNECT_TEAM_ID: 'teamid',
+    BUILD_OUTPUT_UPLOAD_ENABLED: 'true',
+    SKIP_BUILD_NUMBER_BUMP: 'true',
+    SKIP_MARKETING_VERSION_BUMP: 'true',
   }
 
   const missingCreds = validateIosCredentials(credentials)

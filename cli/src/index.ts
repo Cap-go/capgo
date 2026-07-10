@@ -262,6 +262,7 @@ Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --cha
   .option('--version-exists-ok', `Exit successfully if bundle version already exists, useful for CI/CD workflows with monorepos`)
   .option('--self-assign', `Allow devices to auto-join this channel (updates channel setting)`)
   .option('--qr-preview', `Print a terminal QR code for this bundle preview after upload`)
+  .option('--send-update-notification', `Send a native update-check notification to devices after updating linked channel bundles`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
   .option('--verbose', optionDescriptions.verbose)
@@ -591,6 +592,7 @@ Example: npx @capgo/cli@latest channel set production com.example.app --bundle 1
   .option('--device', `Allow sending update to physical devices`)
   .option('--no-device', `Disable sending update to physical devices`)
   .option('--qr-preview', `Print a terminal QR code for this channel preview after updating it`)
+  .option('--send-update-notification', `Send a native update-check notification to devices after updating the linked channel bundle`)
   .option('--package-json <packageJson>', optionDescriptions.packageJson)
   .option('--ignore-metadata-check', `Ignore checking node_modules compatibility if present in the bundle`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
@@ -928,6 +930,8 @@ Example: npx @capgo/cli@latest build request com.example.app --platform ios --pa
   .option('--output-record <path>', 'After a successful build, write a JSON record (jobId, status, outputUrl, qrCodeAscii, qrCodePngPath, finishedAt) to <path>. A PNG QR code is also written next to it as <path>.qr.png. Read fields back with `build last-output`.')
   .option('--skip-build-number-bump', 'Skip automatic build number/version code incrementing. Uses whatever version is already in the project files.')
   .option('--no-skip-build-number-bump', 'Override saved credentials to re-enable automatic build number incrementing for this build only.')
+  .option('--skip-marketing-version-bump', 'Skip automatic marketing version (CFBundleShortVersionString / versionName) bump when the app is already released.')
+  .option('--no-skip-marketing-version-bump', 'Override saved credentials to re-enable automatic marketing version bump for this build only.')
   .option('--sync-ios-version', 'iOS: sync Xcode MARKETING_VERSION from package.json before uploading the project.')
   .option('--ai-analytics', 'On build failure, send logs to Capgo AI for diagnosis. In interactive terminals this skips the upfront confirmation; in CI this auto-uploads and prints the analysis to stderr.')
   .option('--no-prescan', 'Skip the automatic pre-build scan')
@@ -1084,6 +1088,8 @@ Local storage (per-project):
   .option('--output-retention <duration>', 'Output link TTL: 1h to 7d (default: 1h). Examples: 1h, 6h, 2d')
   .option('--skip-build-number-bump', 'Skip automatic build number/version code incrementing on future builds')
   .option('--no-skip-build-number-bump', 'Re-enable automatic build number incrementing (default behavior)')
+  .option('--skip-marketing-version-bump', 'Skip automatic marketing version bump on future builds when the app is already released')
+  .option('--no-skip-marketing-version-bump', 'Re-enable automatic marketing version bump (default behavior)')
 
 buildCredentials
   .command('list')
@@ -1154,6 +1160,8 @@ Examples:
   .option('--output-retention <duration>', 'Output link TTL: 1h to 7d. Examples: 1h, 6h, 2d')
   .option('--skip-build-number-bump', 'Skip automatic build number/version code incrementing on future builds')
   .option('--no-skip-build-number-bump', 'Re-enable automatic build number incrementing (default behavior)')
+  .option('--skip-marketing-version-bump', 'Skip automatic marketing version bump on future builds when the app is already released')
+  .option('--no-skip-marketing-version-bump', 'Re-enable automatic marketing version bump (default behavior)')
 
 buildCredentials
   .command('manage')

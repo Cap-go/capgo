@@ -80,6 +80,7 @@ export const optionsSetChannelSchema = optionsBaseSchema.extend({
   packageJson: z.string().optional(),
   ignoreMetadataCheck: z.boolean().optional(),
   qrPreview: z.boolean().optional(),
+  sendUpdateNotification: z.boolean().optional(),
   rolloutBundle: z.string().optional(),
   rolloutPercentage: z.number().finite().min(0).max(100).optional(),
   rolloutPercentageBps: z.number().int().min(0).max(10000).optional(),
