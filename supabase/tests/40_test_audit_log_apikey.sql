@@ -10,7 +10,7 @@ BEGIN;
 -- Org: 046a36ac-e03c-4590-9257-bd6c9dba9ee8
 -- App: com.demo.app
 
-SELECT plan(18);
+SELECT plan(19);
 
 -- Test 1: audit_logs_allowed_orgs should fail fast when no auth and no
 -- API key header is set
@@ -429,39 +429,70 @@ SELECT throws_ok(
 );
 
 
--- Test 18: system/background writes must not create audit or webhook work.
+-- Test 18: background counter updates must not create audit or webhook work.
+DO $$
+DECLARE
+    v_before_audit_id bigint;
+BEGIN
+    PERFORM set_config('request.headers', '{}', true);
+    PERFORM set_config('request.jwt.claim.sub', '', true);
+    PERFORM set_config('request.jwt.claims', '{}', true);
+
+    SELECT COALESCE(MAX(id), 0) INTO v_before_audit_id
+    FROM public.audit_logs;
+
+    UPDATE public.apps
+    SET channel_device_count = channel_device_count + 1,
+        updated_at = now()
+    WHERE app_id = 'com.demo.app';
+
+    IF EXISTS (
+        SELECT 1
+        FROM public.audit_logs
+        WHERE id > v_before_audit_id
+    ) THEN
+        RAISE EXCEPTION 'background counter update created an audit log';
+    END IF;
+END $$;
+
+SELECT ok(TRUE, 'background counter updates do not create audit logs');
+
+-- Test 19: read-only keys cannot be attributed to a mutation.
 DO $$
 DECLARE
     v_version_id bigint;
+    v_actor_type text;
 BEGIN
-    PERFORM set_config('request.headers', '{}', true);
+    PERFORM set_config('request.headers', '{"capgkey": "67eeaff4-ae4c-49a6-8eb1-0875f5369de0"}', true);
     PERFORM set_config('request.jwt.claim.sub', '', true);
     PERFORM set_config('request.jwt.claims', '{}', true);
 
     INSERT INTO public.app_versions (app_id, name, owner_org, user_id, storage_provider)
     VALUES (
         'com.demo.app',
-        '99.0.2-test-system-audit',
+        '99.0.3-test-read-key-audit',
         '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
         '6aa76066-55ef-4238-ade6-0b32334a4097',
         'r2'
     )
     RETURNING id INTO v_version_id;
 
-    IF EXISTS (
-        SELECT 1
-        FROM public.audit_logs
-        WHERE table_name = 'app_versions'
-          AND record_id = v_version_id::text
-          AND operation = 'INSERT'
-    ) THEN
-        RAISE EXCEPTION 'unattributed system write created an audit log';
+    SELECT actor_type INTO v_actor_type
+    FROM public.audit_logs
+    WHERE table_name = 'app_versions'
+      AND record_id = v_version_id::text
+      AND operation = 'INSERT'
+    ORDER BY id DESC
+    LIMIT 1;
+
+    IF v_actor_type IS DISTINCT FROM 'system' THEN
+        RAISE EXCEPTION 'read-only key was attributed to a mutation';
     END IF;
 
     DELETE FROM public.app_versions WHERE id = v_version_id;
 END $$;
 
-SELECT ok(TRUE, 'unattributed system writes do not create audit logs');
+SELECT ok(TRUE, 'read-only API keys are not attributed to mutations');
 SELECT is(
     has_function_privilege(
         'anon',

@@ -211,6 +211,7 @@ DECLARE
   v_actor_apikey_id BIGINT;
   v_actor_apikey_name TEXT;
   v_stats_refresh_fields CONSTANT TEXT[] := ARRAY['stats_refresh_requested_at', 'stats_updated_at', 'updated_at'];
+  v_background_counter_fields CONSTANT TEXT[] := ARRAY['channel_device_count', 'manifest_bundle_count', 'updated_at'];
 BEGIN
   SELECT auth.uid() INTO v_actor_user_id;
 
@@ -225,7 +226,15 @@ BEGIN
       FROM public.find_apikey_by_value(v_api_key_text)
       LIMIT 1;
 
-      IF v_api_key.id IS NOT NULL AND NOT public.is_apikey_expired(v_api_key.expires_at) THEN
+      -- Only write-capable RBAC keys identify mutation actors. A read-only key
+      -- present in a request must not be recorded as the caller of a write.
+      IF v_api_key.id IS NOT NULL
+        AND NOT public.is_apikey_expired(v_api_key.expires_at)
+        AND (
+          public.is_allowed_capgkey(v_api_key_text, '{upload}'::public.key_mode[])
+          OR public.is_allowed_capgkey(v_api_key_text, '{write}'::public.key_mode[])
+          OR public.is_allowed_capgkey(v_api_key_text, '{all}'::public.key_mode[])
+        ) THEN
         v_actor_type := 'apikey';
         v_actor_user_id := v_api_key.user_id;
         v_actor_apikey_id := v_api_key.id;
@@ -233,13 +242,6 @@ BEGIN
       END IF;
     END IF;
   END IF;
-
-  -- Preserve the existing volume contract: background workers mutate audited
-  -- tables continuously, so only user- or API-key-attributed writes are logged.
-  IF v_actor_type = 'system' THEN
-    RETURN COALESCE(NEW, OLD);
-  END IF;
-
   IF v_actor_user_id IS NOT NULL THEN
     SELECT "email"
     INTO v_actor_user_email
@@ -276,6 +278,19 @@ BEGIN
         SELECT 1
         FROM pg_catalog.unnest(v_changed_fields) AS changed_field(field_name)
         WHERE changed_field.field_name <> ALL(v_stats_refresh_fields)
+      ) THEN
+      RETURN NEW;
+    END IF;
+
+    -- Counter queues mutate these fields continuously. Keep meaningful system
+    -- events while suppressing counter churn and its derived webhook work.
+    IF v_actor_type = 'system'
+      AND TG_TABLE_NAME = 'apps'
+      AND v_changed_fields && ARRAY['channel_device_count', 'manifest_bundle_count']
+      AND NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.unnest(v_changed_fields) AS changed_field(field_name)
+        WHERE changed_field.field_name <> ALL(v_background_counter_fields)
       ) THEN
       RETURN NEW;
     END IF;
