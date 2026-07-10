@@ -8,12 +8,15 @@ import { getRuntimeKey } from 'hono/adapter'
 import { Pool } from 'pg'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { CacheHelper } from './cache.ts'
+import { getChannelSelfOverride, isChannelSelfStoreEnabled } from './channelSelfStore.ts'
 import { DISPOSABLE_EMAIL_DOMAINS, PERSONAL_EMAIL_DOMAINS } from './emailClassification.ts'
 import { getClientDbRegionSB } from './geolocation.ts'
 import { REQUIRED_GLOBAL_STATS_SHARDS } from './global_stats.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import * as schema from './postgres_schema.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
+import { getRolloutDecision } from './rollout.ts'
+import { shouldRequireReadReplica, shouldSkipDirectHyperdriveFallback } from './supabase_write_guard.ts'
 
 const REPLICATION_LAG_THRESHOLD_SECONDS = 180
 const REPLICATION_LAG_CACHE_TTL_SECONDS = 60
@@ -296,6 +299,19 @@ function getReadOnlyDatabaseURL(c: Context, dbRegion: string | undefined): strin
   return c.env[selectedRoute.binding].connectionString
 }
 
+function isLocalWorkerEnv(c: Context): boolean {
+  return existInEnv(c, 'ENV_NAME') && getEnv(c, 'ENV_NAME').endsWith('-local')
+}
+
+function getLocalReadOnlyDatabaseURL(c: Context): string | null {
+  if (!isLocalWorkerEnv(c) || !existInEnv(c, 'LOCAL_READ_REPLICA_SUPABASE_DB_URL'))
+    return null
+
+  setDatabaseSource(c, 'local_read_replica')
+  cloudlog({ requestId: c.get('requestId'), message: 'Using LOCAL_READ_REPLICA_SUPABASE_DB_URL for read-only' })
+  return fixSupabaseHost(getEnv(c, 'LOCAL_READ_REPLICA_SUPABASE_DB_URL'))
+}
+
 export function getDatabaseURL(c: Context, readOnly = false): string {
   const dbRegion = getClientDbRegionSB(c)
 
@@ -304,13 +320,25 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
     const readOnlyDatabaseURL = getReadOnlyDatabaseURL(c, dbRegion)
     if (readOnlyDatabaseURL)
       return readOnlyDatabaseURL
+
+    const localReadOnlyDatabaseURL = getLocalReadOnlyDatabaseURL(c)
+    if (localReadOnlyDatabaseURL)
+      return localReadOnlyDatabaseURL
   }
 
-  // Fallback to single Hyperdrive if available
-  if (c.env.HYPERDRIVE_CAPGO_DIRECT_EU) {
+  if (readOnly && shouldRequireReadReplica(c)) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Read replica is required for this endpoint' })
+    throw new Error('Read replica is required for this endpoint')
+  }
+
+  if (c.env.HYPERDRIVE_CAPGO_DIRECT_EU && !shouldSkipDirectHyperdriveFallback(c)) {
     setDatabaseSource(c, 'HYPERDRIVE_CAPGO_DIRECT_EU')
     cloudlog({ requestId: c.get('requestId'), message: `Using HYPERDRIVE_CAPGO_DIRECT_EU for ${readOnly ? 'read-only' : 'read-write'}` })
     return c.env.HYPERDRIVE_CAPGO_DIRECT_EU.connectionString
+  }
+
+  if (c.env.HYPERDRIVE_CAPGO_DIRECT_EU) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Skipping HYPERDRIVE_CAPGO_DIRECT_EU fallback for this endpoint' })
   }
 
   // Main DB write poller EU region in supabase
@@ -423,31 +451,45 @@ export function closeClient(c: Context, db: ReturnType<typeof getPgClient>) {
 
 export function getAlias() {
   const versionAlias = alias(schema.app_versions, 'version')
+  const rolloutVersionAlias = alias(schema.app_versions, 'rollout_version')
   const channelDevicesAlias = alias(schema.channel_devices, 'channel_devices')
   const channelAlias = alias(schema.channels, 'channels')
-  return { versionAlias, channelDevicesAlias, channelAlias }
+  return { versionAlias, rolloutVersionAlias, channelDevicesAlias, channelAlias }
+}
+
+function getVersionSelect(
+  versionAlias: any,
+  prefix: string,
+  includeMetadata = false,
+  channelVersionColumn?: any,
+) {
+  const versionSelect: any = {
+    id: sql<number | null>`${versionAlias.id}`.as(`${prefix}id`),
+    name: channelVersionColumn
+      ? sql<string>`CASE WHEN ${channelVersionColumn} IS NULL THEN 'builtin' ELSE ${versionAlias.name} END`.as(`${prefix}name`)
+      : sql<string>`${versionAlias.name}`.as(`${prefix}name`),
+    checksum: sql<string | null>`${versionAlias.checksum}`.as(`${prefix}checksum`),
+    session_key: sql<string | null>`${versionAlias.session_key}`.as(`${prefix}session_key`),
+    key_id: sql<string | null>`${versionAlias.key_id}`.as(`${prefix}key_id`),
+    storage_provider: sql<string>`COALESCE(${versionAlias.storage_provider}, 'r2')`.as(`${prefix}storage_provider`),
+    external_url: sql<string | null>`${versionAlias.external_url}`.as(`${prefix}external_url`),
+    min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as(`${prefix}minUpdateVersion`),
+    manifest_count: sql<number>`${versionAlias.manifest_count}`.as(`${prefix}manifest_count`),
+    r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as(`${prefix}r2_path`),
+  }
+
+  if (includeMetadata) {
+    versionSelect.link = sql<string | null>`${versionAlias.link}`.as(`${prefix}link`)
+    versionSelect.comment = sql<string | null>`${versionAlias.comment}`.as(`${prefix}comment`)
+  }
+
+  return versionSelect
 }
 
 function getSchemaUpdatesAlias(includeMetadata = false) {
-  const { versionAlias, channelDevicesAlias, channelAlias } = getAlias()
-
-  const versionSelect: any = {
-    id: sql<number | null>`${versionAlias.id}`.as('vid'),
-    name: sql<string>`CASE WHEN ${channelAlias.version} IS NULL THEN 'builtin' ELSE ${versionAlias.name} END`.as('vname'),
-    checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
-    session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
-    key_id: sql<string | null>`${versionAlias.key_id}`.as('vkey_id'),
-    storage_provider: sql<string>`COALESCE(${versionAlias.storage_provider}, 'r2')`.as('vstorage_provider'),
-    external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
-    min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
-    r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
-  }
-
-  // Only include link and comment when needed (for plugin v7.35.0+ with expose_metadata enabled)
-  if (includeMetadata) {
-    versionSelect.link = sql<string | null>`${versionAlias.link}`.as('vlink')
-    versionSelect.comment = sql<string | null>`${versionAlias.comment}`.as('vcomment')
-  }
+  const { versionAlias, rolloutVersionAlias, channelDevicesAlias, channelAlias } = getAlias()
+  const versionSelect = getVersionSelect(versionAlias, 'v', includeMetadata, channelAlias.version)
+  const rolloutVersionSelect = getVersionSelect(rolloutVersionAlias, 'rv', includeMetadata)
   const channelSelect = {
     id: channelAlias.id,
     name: channelAlias.name,
@@ -463,6 +505,13 @@ function getSchemaUpdatesAlias(includeMetadata = false) {
     electron: channelAlias.electron,
     allow_device_self_set: channelAlias.allow_device_self_set,
     public: channelAlias.public,
+    rollout_version: channelAlias.rollout_version,
+    rollout_percentage_bps: channelAlias.rollout_percentage_bps,
+    rollout_enabled: channelAlias.rollout_enabled,
+    rollout_id: channelAlias.rollout_id,
+    rollout_paused_at: channelAlias.rollout_paused_at,
+    rollout_pause_reason: channelAlias.rollout_pause_reason,
+    rollout_cache_ttl_seconds: channelAlias.rollout_cache_ttl_seconds,
   }
   const manifestSelect = sql<{ file_name: string, file_hash: string, s3_path: string }[]>`COALESCE(json_agg(
         json_build_object(
@@ -471,19 +520,23 @@ function getSchemaUpdatesAlias(includeMetadata = false) {
           's3_path', ${schema.manifest.s3_path}
         )
       ) FILTER (WHERE ${schema.manifest.file_name} IS NOT NULL), '[]'::json)`
-  return { versionSelect, channelDevicesAlias, channelAlias, channelSelect, manifestSelect, versionAlias }
+  return { versionSelect, rolloutVersionSelect, channelDevicesAlias, channelAlias, channelSelect, manifestSelect, versionAlias, rolloutVersionAlias }
 }
 
 function activeChannelVersionJoin(
-  channelVersionColumn: typeof schema.channels.version,
-  versionAlias: ReturnType<typeof getAlias>['versionAlias'],
+  channelVersionColumn: any,
+  versionAlias: any,
+  channelAppIdColumn?: any,
 ) {
-  // /updates still reaches app_versions through the channel/version PK join.
-  // The deleted filter is only applied to that single matched row, so it does not widen the hot-path scan.
-  return and(
+  const conditions = [
     eq(channelVersionColumn, versionAlias.id),
     or(eq(versionAlias.deleted, false), eq(versionAlias.name, 'builtin')),
-  )
+  ]
+
+  if (channelAppIdColumn)
+    conditions.push(eq(versionAlias.app_id, channelAppIdColumn))
+
+  return and(...conditions)
 }
 
 export function requestInfosChannelDevicePostgres(
@@ -524,6 +577,101 @@ export function requestInfosChannelDevicePostgres(
   cloudlog({ requestId: c.get('requestId'), message: 'channelDevice Query:', channelDeviceQuery: channelDevice.toSQL() })
 
   return channelDevice.then(data => data.at(0))
+}
+
+export async function getEffectiveDeviceChannelNamePostgres(
+  c: Context,
+  app_id: string,
+  device_id: string,
+  fallbackChannelName: string | null | undefined,
+  platform: string,
+  hasChannelDeviceOverrides: boolean,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+) {
+  const fallback = typeof fallbackChannelName === 'string' && fallbackChannelName.trim() !== ''
+    ? fallbackChannelName.trim()
+    : null
+  const { channelDevicesAlias, channelAlias } = getAlias()
+  const platformQuery = platform === 'android' ? channelAlias.android : platform === 'electron' ? channelAlias.electron : channelAlias.ios
+
+  const getChannelById = async (channelId: number) => {
+    const channelQuery = drizzleClient
+      .select({ id: channelAlias.id, name: channelAlias.name })
+      .from(channelAlias)
+      .where(and(
+        eq(channelAlias.app_id, app_id),
+        eq(channelAlias.id, channelId),
+        eq(platformQuery, true),
+        or(
+          eq(channelAlias.public, true),
+          eq(channelAlias.allow_device_self_set, true),
+        ),
+      ))
+      .limit(1)
+
+    cloudlog({ requestId: c.get('requestId'), message: 'stats channel self override Query:', channelQuery: channelQuery.toSQL() })
+    const channel = await channelQuery.then(data => data.at(0))
+    return channel?.name ? channel : null
+  }
+
+  if (isChannelSelfStoreEnabled(c as any)) {
+    const storedOverride = await getChannelSelfOverride(c as any, app_id, device_id.toLowerCase())
+    if (storedOverride?.channel_id.id) {
+      const channel = await getChannelById(storedOverride.channel_id.id)
+      if (channel?.name)
+        return channel
+    }
+  }
+
+  if (hasChannelDeviceOverrides) {
+    const channelQuery = drizzleClient
+      .select({ id: channelAlias.id, name: channelAlias.name })
+      .from(channelDevicesAlias)
+      .innerJoin(channelAlias, and(eq(channelDevicesAlias.channel_id, channelAlias.id), eq(channelAlias.app_id, app_id)))
+      .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
+      .limit(1)
+
+    cloudlog({ requestId: c.get('requestId'), message: 'stats channel override Query:', channelQuery: channelQuery.toSQL() })
+    const channel = await channelQuery.then(data => data.at(0))
+    if (channel?.name)
+      return channel
+  }
+  const getChannelByName = async (channelName: string | null) => {
+    const channelQuery = drizzleClient
+      .select({ id: channelAlias.id, name: channelAlias.name })
+      .from(channelAlias)
+      .where(
+        channelName
+          ? and(
+              eq(channelAlias.app_id, app_id),
+              eq(channelAlias.name, channelName),
+              eq(platformQuery, true),
+              or(
+                eq(channelAlias.public, true),
+                eq(channelAlias.allow_device_self_set, true),
+              ),
+            )
+          : and(
+              eq(channelAlias.public, true),
+              eq(channelAlias.app_id, app_id),
+              eq(platformQuery, true),
+            ),
+      )
+      .orderBy(channelAlias.name, channelAlias.id)
+      .limit(1)
+
+    cloudlog({ requestId: c.get('requestId'), message: 'stats channel Query:', channelQuery: channelQuery.toSQL(), fallbackChannelName: channelName })
+    const channel = await channelQuery.then(data => data.at(0))
+    return channel?.name ? channel : null
+  }
+
+  if (fallback) {
+    const channelName = await getChannelByName(fallback)
+    if (channelName)
+      return channelName
+  }
+
+  return getChannelByName(null)
 }
 
 export function requestInfosChannelByIdPostgres(
@@ -608,11 +756,182 @@ export function requestInfosChannelPostgres(
       or(isNull(channelAlias.version), isNotNull(versionAlias.id)),
     ))
     .groupBy(channelAlias.id, versionAlias.id)
+    .orderBy(channelAlias.name, channelAlias.id)
     .limit(1)
   cloudlog({ requestId: c.get('requestId'), message: 'channel Query:', channelQuery: channelQuery.toSQL() })
   const channel = channelQuery.then(data => data.at(0))
 
   return channel
+}
+
+export function requestManifestEntriesPostgres(
+  c: Context,
+  versionId: number,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+) {
+  const manifestQuery = drizzleClient
+    .select({
+      file_name: schema.manifest.file_name,
+      file_hash: schema.manifest.file_hash,
+      s3_path: schema.manifest.s3_path,
+    })
+    .from(schema.manifest)
+    .where(eq(schema.manifest.app_version_id, versionId))
+
+  cloudlog({ requestId: c.get('requestId'), message: 'rollout manifest Query:', manifestQuery: manifestQuery.toSQL() })
+  return manifestQuery
+}
+
+export function requestInfosChannelByIdPostgresRollout(
+  c: Context,
+  app_id: string,
+  channelId: number,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  includeMetadata = false,
+) {
+  const { versionSelect, rolloutVersionSelect, channelAlias, channelSelect, versionAlias, rolloutVersionAlias } = getSchemaUpdatesAlias(includeMetadata)
+  const channel = drizzleClient
+    .select({
+      version: versionSelect,
+      rolloutVersion: rolloutVersionSelect,
+      channels: channelSelect,
+    })
+    .from(channelAlias)
+    .leftJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
+    .leftJoin(rolloutVersionAlias, activeChannelVersionJoin(channelAlias.rollout_version, rolloutVersionAlias, channelAlias.app_id))
+    .where(and(
+      eq(channelAlias.app_id, app_id),
+      eq(channelAlias.id, channelId),
+      or(isNull(channelAlias.version), isNotNull(versionAlias.id)),
+    ))
+    .limit(1)
+
+  cloudlog({ requestId: c.get('requestId'), message: 'channel self override rollout Query:', channelSelfOverrideQuery: channel.toSQL() })
+  return channel.then(data => data.at(0))
+}
+
+export function requestInfosChannelDevicePostgresRollout(
+  c: Context,
+  app_id: string,
+  device_id: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  includeMetadata = false,
+) {
+  const { versionSelect, rolloutVersionSelect, channelDevicesAlias, channelAlias, channelSelect, versionAlias, rolloutVersionAlias } = getSchemaUpdatesAlias(includeMetadata)
+  const channelDevice = drizzleClient
+    .select({
+      version: versionSelect,
+      rolloutVersion: rolloutVersionSelect,
+      channels: channelSelect,
+    })
+    .from(channelDevicesAlias)
+    .innerJoin(channelAlias, eq(channelDevicesAlias.channel_id, channelAlias.id))
+    .leftJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
+    .leftJoin(rolloutVersionAlias, activeChannelVersionJoin(channelAlias.rollout_version, rolloutVersionAlias, channelAlias.app_id))
+    .where(and(
+      eq(channelDevicesAlias.device_id, device_id),
+      eq(channelDevicesAlias.app_id, app_id),
+      or(isNull(channelAlias.version), isNotNull(versionAlias.id)),
+    ))
+    .limit(1)
+
+  cloudlog({ requestId: c.get('requestId'), message: 'channelDevice rollout Query:', channelDeviceQuery: channelDevice.toSQL() })
+  return channelDevice.then(data => data.at(0))
+}
+
+export function requestInfosChannelPostgresRollout(
+  c: Context,
+  platform: string,
+  app_id: string,
+  defaultChannel: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  includeMetadata = false,
+) {
+  const { versionSelect, rolloutVersionSelect, channelAlias, channelSelect, versionAlias, rolloutVersionAlias } = getSchemaUpdatesAlias(includeMetadata)
+  const platformQuery = platform === 'android' ? channelAlias.android : platform === 'electron' ? channelAlias.electron : channelAlias.ios
+
+  const channelFilter = defaultChannel
+    ? and(
+        eq(channelAlias.app_id, app_id),
+        eq(channelAlias.name, defaultChannel),
+        eq(platformQuery, true),
+        or(
+          eq(channelAlias.public, true),
+          eq(channelAlias.allow_device_self_set, true),
+        ),
+      )
+    : and(
+        eq(channelAlias.public, true),
+        eq(channelAlias.app_id, app_id),
+        eq(platformQuery, true),
+      )
+
+  const channelQuery = drizzleClient
+    .select({
+      version: versionSelect,
+      rolloutVersion: rolloutVersionSelect,
+      channels: channelSelect,
+    })
+    .from(channelAlias)
+    .leftJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
+    .leftJoin(rolloutVersionAlias, activeChannelVersionJoin(channelAlias.rollout_version, rolloutVersionAlias, channelAlias.app_id))
+    .where(and(
+      channelFilter,
+      or(isNull(channelAlias.version), isNotNull(versionAlias.id)),
+    ))
+    .orderBy(channelAlias.name, channelAlias.id)
+    .limit(1)
+
+  cloudlog({ requestId: c.get('requestId'), message: 'channel rollout Query:', channelQuery: channelQuery.toSQL() })
+  return channelQuery.then(data => data.at(0))
+}
+
+async function resolveRolloutChannelDataPostgres(
+  c: Context,
+  channelData: any,
+  appId: string,
+  deviceId: string,
+  currentVersionName: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  includeManifest: boolean,
+) {
+  if (!channelData)
+    return channelData
+
+  const stableVersion = channelData.version
+  const rolloutVersion = channelData.rolloutVersion
+  let selectedVersion = stableVersion
+
+  if (rolloutVersion?.id && channelData.channels?.rollout_version) {
+    const decision = await getRolloutDecision(c, {
+      appId,
+      channelId: channelData.channels.id,
+      currentVersionName,
+      deviceId,
+      rolloutCacheTtlSeconds: channelData.channels.rollout_cache_ttl_seconds,
+      rolloutEnabled: channelData.channels.rollout_enabled,
+      rolloutId: channelData.channels.rollout_id,
+      rolloutPausedAt: channelData.channels.rollout_paused_at,
+      rolloutPercentageBps: channelData.channels.rollout_percentage_bps,
+      rolloutVersionId: rolloutVersion.id,
+      rolloutVersionName: rolloutVersion.name,
+    })
+
+    if (decision.selected)
+      selectedVersion = rolloutVersion
+
+    cloudlog({ requestId: c.get('requestId'), message: 'rollout decision', appId, channelId: channelData.channels.id, selected: decision.selected, reason: decision.reason })
+  }
+
+  const manifestEntries = includeManifest && selectedVersion?.manifest_count > 0
+    ? await requestManifestEntriesPostgres(c, selectedVersion.id, drizzleClient)
+    : []
+
+  return {
+    ...channelData,
+    version: selectedVersion,
+    manifestEntries,
+  }
 }
 
 interface RequestInfosPostgresOptions {
@@ -624,6 +943,9 @@ interface RequestInfosPostgresOptions {
   drizzleClient: ReturnType<typeof getDrizzleClient>
   channelDeviceCount?: number | null
   manifestBundleCount?: number | null
+  rolloutChannelCount?: number | null
+  rolloutPausedVersionNames?: string[] | null
+  currentVersionName: string
   includeMetadata?: boolean
   channelSelfOverrideChannelId?: number | null
 }
@@ -638,27 +960,61 @@ export function requestInfosPostgres(options: RequestInfosPostgresOptions) {
     drizzleClient,
     channelDeviceCount,
     manifestBundleCount,
+    rolloutChannelCount,
+    rolloutPausedVersionNames,
+    currentVersionName,
     includeMetadata = false,
     channelSelfOverrideChannelId,
   } = options
   const shouldQueryChannelOverride = channelDeviceCount === undefined || channelDeviceCount === null ? true : channelDeviceCount > 0
   const shouldFetchManifest = manifestBundleCount === undefined || manifestBundleCount === null ? true : manifestBundleCount > 0
-  let channelDevice: ReturnType<typeof requestInfosChannelByIdPostgres> | ReturnType<typeof requestInfosChannelDevicePostgres> | Promise<null>
+  const isPausedRolloutVersion = Array.isArray(rolloutPausedVersionNames) && rolloutPausedVersionNames.includes(currentVersionName)
+  const shouldUseRolloutPath = (rolloutChannelCount ?? 0) > 0 || isPausedRolloutVersion
 
+  if (!shouldUseRolloutPath) {
+    let channelDevice: ReturnType<typeof requestInfosChannelByIdPostgres> | ReturnType<typeof requestInfosChannelDevicePostgres> | Promise<null>
+
+    if (typeof channelSelfOverrideChannelId === 'number') {
+      channelDevice = requestInfosChannelByIdPostgres(c, app_id, channelSelfOverrideChannelId, drizzleClient, shouldFetchManifest, includeMetadata)
+    }
+    else if (shouldQueryChannelOverride) {
+      channelDevice = requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient, shouldFetchManifest, includeMetadata)
+    }
+    else {
+      cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
+      channelDevice = Promise.resolve(null)
+    }
+    const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest, includeMetadata)
+
+    return Promise.all([channelDevice, channel])
+      .then(([channelOverride, channelData]) => ({ channelData, channelOverride }))
+      .catch((e) => {
+        logPgError(c, 'requestInfosPostgres', e)
+        throw e
+      })
+  }
+
+  let channelDevice: ReturnType<typeof requestInfosChannelByIdPostgresRollout> | ReturnType<typeof requestInfosChannelDevicePostgresRollout> | Promise<null>
   if (typeof channelSelfOverrideChannelId === 'number') {
-    channelDevice = requestInfosChannelByIdPostgres(c, app_id, channelSelfOverrideChannelId, drizzleClient, shouldFetchManifest, includeMetadata)
+    channelDevice = requestInfosChannelByIdPostgresRollout(c, app_id, channelSelfOverrideChannelId, drizzleClient, includeMetadata)
   }
   else if (shouldQueryChannelOverride) {
-    channelDevice = requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient, shouldFetchManifest, includeMetadata)
+    channelDevice = requestInfosChannelDevicePostgresRollout(c, app_id, device_id, drizzleClient, includeMetadata)
   }
   else {
-    cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
+    cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override rollout query' })
     channelDevice = Promise.resolve(null)
   }
-  const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest, includeMetadata)
+  const channel = requestInfosChannelPostgresRollout(c, platform, app_id, defaultChannel, drizzleClient, includeMetadata)
 
   return Promise.all([channelDevice, channel])
-    .then(([channelOverride, channelData]) => ({ channelData, channelOverride }))
+    .then(async ([channelOverride, channelData]) => {
+      const resolvedChannelOverride = await resolveRolloutChannelDataPostgres(c, channelOverride, app_id, device_id, currentVersionName, drizzleClient, shouldFetchManifest)
+      const resolvedChannelData = resolvedChannelOverride
+        ? channelData
+        : await resolveRolloutChannelDataPostgres(c, channelData, app_id, device_id, currentVersionName, drizzleClient, shouldFetchManifest)
+      return { channelOverride: resolvedChannelOverride, channelData: resolvedChannelData }
+    })
     .catch((e) => {
       logPgError(c, 'requestInfosPostgres', e)
       throw e
@@ -671,6 +1027,8 @@ export interface AppOwnerPostgresResult {
   plan_valid: boolean
   channel_device_count: number
   manifest_bundle_count: number
+  rollout_channel_count: number
+  rollout_paused_version_names: string[]
   expose_metadata: boolean
   allow_device_custom_id: boolean
   block_provider_infra_requests: boolean
@@ -694,6 +1052,8 @@ export async function getAppOwnerPostgres(
         plan_valid: planExpression,
         channel_device_count: schema.apps.channel_device_count,
         manifest_bundle_count: schema.apps.manifest_bundle_count,
+        rollout_channel_count: schema.apps.rollout_channel_count,
+        rollout_paused_version_names: schema.apps.rollout_paused_version_names,
         expose_metadata: schema.apps.expose_metadata,
         allow_device_custom_id: schema.apps.allow_device_custom_id,
         block_provider_infra_requests: schema.apps.block_provider_infra_requests,

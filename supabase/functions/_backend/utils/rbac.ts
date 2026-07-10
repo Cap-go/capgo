@@ -52,6 +52,7 @@ export type Permission
     | 'app.create_channel'
     | 'app.read_channels'
     | 'app.read_logs'
+    | 'app.manage_notifications'
     | 'app.manage_devices'
     | 'app.read_devices'
     | 'app.build_native'
@@ -124,6 +125,7 @@ const PERMISSION_TO_LEGACY_RIGHT: Record<Permission, Database['public']['Enums']
   'app.create_channel': 'write',
   'app.read_channels': 'read',
   'app.read_logs': 'read',
+  'app.manage_notifications': 'write',
   'app.manage_devices': 'write',
   'app.read_devices': 'read',
   'app.build_native': 'write',

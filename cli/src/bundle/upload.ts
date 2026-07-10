@@ -714,11 +714,36 @@ type LinkedChannelVersion = {
   name: string
 } | null
 
+function getUploadRolloutPercentageBps(options: OptionsUpload) {
+  if (options.rollout == null && options.rolloutPercentageBps == null)
+    return undefined
+
+  if (options.rolloutPercentageBps != null)
+    return options.rolloutPercentageBps
+
+  return Math.round((options.rollout ?? 0) * 100)
+}
+
+function formatRolloutPercentage(bps: number) {
+  return `${Number((bps / 100).toFixed(2))}%`
+}
+
+async function getVersionIdForChannelUpdate(supabase: SupabaseType, apikey: string, appid: string, bundle: string) {
+  const { data: versionId } = await supabase
+    .rpc('get_app_versions', { apikey, name_version: bundle, appid })
+    .single()
+
+  if (!versionId)
+    uploadFail('Cannot get version id, cannot set channel')
+
+  return versionId
+}
+
 // It is really important that this function never terminates the program, it should always return.
 async function getLinkedBundleOnChannel(supabase: SupabaseType, appid: string, channel: string): Promise<LinkedChannelVersion> {
   const { data, error } = await supabase
     .from('channels')
-    .select('version ( id, name, deleted )')
+    .select('version:app_versions!channels_version_fkey( id, name, deleted )')
     .eq('app_id', appid)
     .eq('name', channel)
 
@@ -775,12 +800,7 @@ async function setVersionInChannel(
   localConfig: localConfigType,
   selfAssign?: boolean,
 ): Promise<boolean> {
-  const { data: versionId } = await supabase
-    .rpc('get_app_versions', { apikey, name_version: bundle, appid })
-    .single()
-
-  if (!versionId)
-    uploadFail('Cannot get version id, cannot set channel')
+  const versionId = await getVersionIdForChannelUpdate(supabase, apikey, appid, bundle)
 
   const apiAccess = await hasCliPermission(supabase, apikey, 'app.create_channel', { appId: appid })
 
@@ -808,6 +828,70 @@ async function setVersionInChannel(
 
   log.warn('The upload key is not allowed to set the version in the channel')
   return false
+}
+
+async function setRolloutVersionInChannel(
+  supabase: SupabaseType,
+  apikey: string,
+  displayBundleUrl: boolean,
+  bundle: string,
+  channel: string,
+  appid: string,
+  localConfig: localConfigType,
+  rolloutPercentageBps: number,
+  rolloutCacheTtlSeconds?: number,
+  selfAssign?: boolean,
+): Promise<boolean> {
+  const versionId = await getVersionIdForChannelUpdate(supabase, apikey, appid, bundle)
+
+  const apiAccess = await hasCliPermission(supabase, apikey, 'app.create_channel', { appId: appid })
+  if (!apiAccess) {
+    log.warn('The upload key is not allowed to set the rollout version in the channel')
+    return false
+  }
+
+  const { data: existingChannel, error: channelError } = await supabase
+    .from('channels')
+    .select('id, version, rollout_version')
+    .eq('app_id', appid)
+    .eq('name', channel)
+    .single()
+
+  if (channelError || !existingChannel) {
+    uploadFail(`Cannot set rollout, channel ${channel} must already exist with a stable bundle`)
+  }
+  if (!existingChannel.version) {
+    uploadFail(`Cannot set rollout, channel ${channel} needs a stable bundle before using progressive rollout`)
+  }
+
+  const shouldResumeSameRollout = existingChannel.rollout_version === versionId && rolloutPercentageBps > 0
+  const channelPayload: Database['public']['Tables']['channels']['Update'] = {
+    rollout_version: versionId,
+    rollout_percentage_bps: rolloutPercentageBps,
+    rollout_enabled: rolloutPercentageBps > 0,
+    ...(shouldResumeSameRollout ? { rollout_paused_at: null, rollout_pause_reason: null } : {}),
+    ...(selfAssign ? { allow_device_self_set: true } : {}),
+  }
+  if (rolloutCacheTtlSeconds != null)
+    channelPayload.rollout_cache_ttl_seconds = rolloutCacheTtlSeconds
+
+  const { error: rolloutError, data } = await supabase
+    .from('channels')
+    .update(channelPayload)
+    .eq('app_id', appid)
+    .eq('name', channel)
+    .select('id')
+    .single()
+
+  if (rolloutError)
+    uploadFail(`Cannot set rollout in channel ${formatError(rolloutError)}`)
+
+  const bundleUrl = `${localConfig.hostWeb}/app/${appid}/channel/${data.id}`
+  log.info(`Set ${appid} channel ${channel} rollout target to @${bundle} (${formatRolloutPercentage(rolloutPercentageBps)})`)
+
+  if (displayBundleUrl)
+    log.info(`Bundle url: ${bundleUrl}`)
+  return true
 }
 
 export async function getDefaultUploadChannel(appId: string, supabase: SupabaseType, hostWeb: string) {
@@ -947,6 +1031,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
 
   const channelLabel = formatUploadChannels(channels)
   let channelsToAssign = channels
+  const rolloutPercentageBps = getUploadRolloutPercentageBps(options)
   if (options.verbose)
     log.info(`[Verbose] Target channel${channels.length > 1 ? 's' : ''}: ${channelLabel}`)
 
@@ -1020,7 +1105,8 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
       log.info(`  - Key ID: ${preparedBundle.keyId || 'none'}`)
     }
 
-    if (!options.ignoreChecksumCheck) {
+    const shouldCheckChecksum = !options.ignoreChecksumCheck && rolloutPercentageBps == null
+    if (shouldCheckChecksum) {
       if (options.verbose)
         log.info(`[Verbose] Checking for duplicate checksum...`)
       channelsToAssign = await getChannelsToAssignAfterChecksumCheck(supabase, appid, channels, preparedBundle.checksum)
@@ -1422,13 +1508,21 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   const channelVersionSet = new Set<string>()
   if (hasOrganizationPerm(permissions, OrganizationPerm.write)) {
     for (const targetChannel of channelsToAssign) {
-      if (options.verbose)
-        log.info(`[Verbose] Setting bundle ${bundle} to channel ${targetChannel}...`)
-      const targetChannelVersionSet = await setVersionInChannel(supabase, apikey, !!options.bundleUrl, bundle, targetChannel, userId, orgId, appid, localConfig, options.selfAssign)
-      if (targetChannelVersionSet)
+      if (options.verbose) {
+        const targetDescription = rolloutPercentageBps != null ? 'as rollout target for' : 'to'
+        log.info(`[Verbose] Setting bundle ${bundle} ${targetDescription} channel ${targetChannel}...`)
+      }
+      const targetChannelVersionSet = rolloutPercentageBps != null
+        ? await setRolloutVersionInChannel(supabase, apikey, !!options.bundleUrl, bundle, targetChannel, appid, localConfig, rolloutPercentageBps, options.rolloutCacheTtlSeconds, options.selfAssign)
+        : await setVersionInChannel(supabase, apikey, !!options.bundleUrl, bundle, targetChannel, userId, orgId, appid, localConfig, options.selfAssign)
+      if (targetChannelVersionSet) {
         channelVersionSet.add(targetChannel)
-      if (options.verbose)
-        log.info(`[Verbose] Channel ${targetChannel} updated successfully`)
+        if (options.verbose)
+          log.info(`[Verbose] Channel ${targetChannel} updated successfully`)
+      }
+      else if (options.verbose) {
+        log.info(`[Verbose] Channel ${targetChannel} was not updated`)
+      }
     }
 
     if (shouldDeleteLinkedBundle) {
@@ -1559,6 +1653,7 @@ export function checkValidOptions(options: OptionsUpload) {
   const noKey = options.key === false
   const forceCrc32 = options.forceCrc32Checksum === true
   const hasEncryptionKey = (options.keyV2 || options.keyDataV2 || existsSync(baseKeyV2))
+  const hasUploadRollout = options.rollout != null || options.rolloutPercentageBps != null
 
   if (options.ivSessionKey && !options.external) {
     uploadFail('You need to provide an external url if you want to use the --iv-session-key option')
@@ -1600,6 +1695,21 @@ export function checkValidOptions(options: OptionsUpload) {
   }
   if (forceCrc32 && hasEncryptionKey && !noKey) {
     uploadFail('You cannot use --force-crc32-checksum when encryption is enabled. Remove the flag or disable encryption.')
+  }
+  if (options.rollout != null && (!Number.isFinite(options.rollout) || options.rollout < 0 || options.rollout > 100)) {
+    uploadFail('Rollout percentage must be between 0 and 100')
+  }
+  if (options.rolloutPercentageBps != null && (!Number.isInteger(options.rolloutPercentageBps) || options.rolloutPercentageBps < 0 || options.rolloutPercentageBps > 10000)) {
+    uploadFail('Rollout percentage basis points must be between 0 and 10000')
+  }
+  if (options.rolloutCacheTtlSeconds != null && (!Number.isInteger(options.rolloutCacheTtlSeconds) || options.rolloutCacheTtlSeconds < 60 || options.rolloutCacheTtlSeconds > 31536000)) {
+    uploadFail('Rollout cache TTL seconds must be between 60 and 31536000')
+  }
+  if (hasUploadRollout && options.dryUpload) {
+    uploadFail('You cannot use --rollout with --dry-upload because dry upload does not update channels')
+  }
+  if (hasUploadRollout && options.deleteLinkedBundleOnUpload) {
+    uploadFail('You cannot use --rollout with --delete-linked-bundle-on-upload because rollout needs the stable channel bundle as fallback')
   }
   if (options.failOnIncompatible && options.ignoreMetadataCheck) {
     uploadFail('You cannot use --fail-on-incompatible together with --ignore-metadata-check — the metadata check is exactly what --fail-on-incompatible enforces. Remove one of them.')

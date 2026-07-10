@@ -331,6 +331,8 @@ export type Database = {
           need_onboarding: boolean
           owner_org: string
           retention: number
+          rollout_channel_count: number
+          rollout_paused_version_names: string[]
           stats_refresh_requested_at: string | null
           stats_updated_at: string | null
           transfer_history: Json[] | null
@@ -359,6 +361,8 @@ export type Database = {
           need_onboarding?: boolean
           owner_org: string
           retention?: number
+          rollout_channel_count?: number
+          rollout_paused_version_names?: string[]
           stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
           transfer_history?: Json[] | null
@@ -387,6 +391,8 @@ export type Database = {
           need_onboarding?: boolean
           owner_org?: string
           retention?: number
+          rollout_channel_count?: number
+          rollout_paused_version_names?: string[]
           stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
           transfer_history?: Json[] | null
@@ -797,6 +803,16 @@ export type Database = {
           allow_prod: boolean
           android: boolean
           app_id: string
+          auto_pause_action: string
+          auto_pause_confidence: number
+          auto_pause_cooldown_minutes: number
+          auto_pause_enabled: boolean
+          auto_pause_failure_rate_bps: number | null
+          auto_pause_last_checked_at: string | null
+          auto_pause_last_triggered_at: string | null
+          auto_pause_min_attempts: number | null
+          auto_pause_min_failures: number | null
+          auto_pause_window_minutes: number
           created_at: string
           created_by: string
           disable_auto_update: Database["public"]["Enums"]["disable_update"]
@@ -808,6 +824,13 @@ export type Database = {
           owner_org: string
           public: boolean
           rbac_id: string
+          rollout_cache_ttl_seconds: number
+          rollout_enabled: boolean
+          rollout_id: string
+          rollout_pause_reason: string | null
+          rollout_paused_at: string | null
+          rollout_percentage_bps: number
+          rollout_version: number | null
           updated_at: string
           version: number | null
         }
@@ -819,6 +842,16 @@ export type Database = {
           allow_prod?: boolean
           android?: boolean
           app_id: string
+          auto_pause_action?: string
+          auto_pause_confidence?: number
+          auto_pause_cooldown_minutes?: number
+          auto_pause_enabled?: boolean
+          auto_pause_failure_rate_bps?: number | null
+          auto_pause_last_checked_at?: string | null
+          auto_pause_last_triggered_at?: string | null
+          auto_pause_min_attempts?: number | null
+          auto_pause_min_failures?: number | null
+          auto_pause_window_minutes?: number
           created_at?: string
           created_by: string
           disable_auto_update?: Database["public"]["Enums"]["disable_update"]
@@ -830,6 +863,13 @@ export type Database = {
           owner_org: string
           public?: boolean
           rbac_id?: string
+          rollout_cache_ttl_seconds?: number
+          rollout_enabled?: boolean
+          rollout_id?: string
+          rollout_pause_reason?: string | null
+          rollout_paused_at?: string | null
+          rollout_percentage_bps?: number
+          rollout_version?: number | null
           updated_at?: string
           version?: number | null
         }
@@ -841,6 +881,16 @@ export type Database = {
           allow_prod?: boolean
           android?: boolean
           app_id?: string
+          auto_pause_action?: string
+          auto_pause_confidence?: number
+          auto_pause_cooldown_minutes?: number
+          auto_pause_enabled?: boolean
+          auto_pause_failure_rate_bps?: number | null
+          auto_pause_last_checked_at?: string | null
+          auto_pause_last_triggered_at?: string | null
+          auto_pause_min_attempts?: number | null
+          auto_pause_min_failures?: number | null
+          auto_pause_window_minutes?: number
           created_at?: string
           created_by?: string
           disable_auto_update?: Database["public"]["Enums"]["disable_update"]
@@ -852,6 +902,13 @@ export type Database = {
           owner_org?: string
           public?: boolean
           rbac_id?: string
+          rollout_cache_ttl_seconds?: number
+          rollout_enabled?: boolean
+          rollout_id?: string
+          rollout_pause_reason?: string | null
+          rollout_paused_at?: string | null
+          rollout_percentage_bps?: number
+          rollout_version?: number | null
           updated_at?: string
           version?: number | null
         }
@@ -862,6 +919,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "apps"
             referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "channels_rollout_version_fkey"
+            columns: ["rollout_version"]
+            isOneToOne: false
+            referencedRelation: "app_versions"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "channels_version_fkey"
@@ -1399,6 +1463,7 @@ export type Database = {
       devices: {
         Row: {
           app_id: string
+          country_code: string | null
           custom_id: string
           default_channel: string | null
           device_id: string
@@ -1417,6 +1482,7 @@ export type Database = {
         }
         Insert: {
           app_id: string
+          country_code?: string | null
           custom_id?: string
           default_channel?: string | null
           device_id: string
@@ -1435,6 +1501,7 @@ export type Database = {
         }
         Update: {
           app_id?: string
+          country_code?: string | null
           custom_id?: string
           default_channel?: string | null
           device_id?: string
@@ -1837,6 +1904,201 @@ export type Database = {
             columns: ["app_version_id"]
             isOneToOne: false
             referencedRelation: "app_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_app_settings: {
+        Row: {
+          app_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          owner_org: string
+          push_update_channel: string | null
+          push_update_enabled: boolean
+          push_update_install_mode: string
+          updated_at: string
+        }
+        Insert: {
+          app_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          owner_org: string
+          push_update_channel?: string | null
+          push_update_enabled?: boolean
+          push_update_install_mode?: string
+          updated_at?: string
+        }
+        Update: {
+          app_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          owner_org?: string
+          push_update_channel?: string | null
+          push_update_enabled?: boolean
+          push_update_install_mode?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_app_settings_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: true
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "notification_app_settings_owner_org_app_id_fkey"
+            columns: ["owner_org", "app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["owner_org", "app_id"]
+          },
+          {
+            foreignKeyName: "notification_app_settings_owner_org_fkey"
+            columns: ["owner_org"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_campaigns: {
+        Row: {
+          app_id: string
+          audience: Json
+          completed_at: string | null
+          counters: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          name: string
+          owner_org: string
+          payload: Json
+          queued_at: string | null
+          scheduled_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          app_id: string
+          audience?: Json
+          completed_at?: string | null
+          counters?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          name: string
+          owner_org: string
+          payload?: Json
+          queued_at?: string | null
+          scheduled_at?: string | null
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          app_id?: string
+          audience?: Json
+          completed_at?: string | null
+          counters?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          name?: string
+          owner_org?: string
+          payload?: Json
+          queued_at?: string | null
+          scheduled_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_campaigns_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "notification_campaigns_owner_org_app_id_fkey"
+            columns: ["owner_org", "app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["owner_org", "app_id"]
+          },
+          {
+            foreignKeyName: "notification_campaigns_owner_org_fkey"
+            columns: ["owner_org"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_provider_configs: {
+        Row: {
+          app_id: string
+          config: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          owner_org: string
+          provider: string
+          secret_ref: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          app_id: string
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          owner_org: string
+          provider: string
+          secret_ref?: string | null
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          app_id?: string
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          owner_org?: string
+          provider?: string
+          secret_ref?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_provider_configs_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "notification_provider_configs_owner_org_app_id_fkey"
+            columns: ["owner_org", "app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["owner_org", "app_id"]
+          },
+          {
+            foreignKeyName: "notification_provider_configs_owner_org_fkey"
+            columns: ["owner_org"]
+            isOneToOne: false
+            referencedRelation: "orgs"
             referencedColumns: ["id"]
           },
         ]
@@ -3099,6 +3361,8 @@ export type Database = {
         Row: {
           action: Database["public"]["Enums"]["version_action"]
           app_id: string
+          channel_id: number | null
+          channel_name: string | null
           timestamp: string
           version_id: number | null
           version_name: string | null
@@ -3106,6 +3370,8 @@ export type Database = {
         Insert: {
           action: Database["public"]["Enums"]["version_action"]
           app_id: string
+          channel_id?: number | null
+          channel_name?: string | null
           timestamp?: string
           version_id?: number | null
           version_name?: string | null
@@ -3113,6 +3379,8 @@ export type Database = {
         Update: {
           action?: Database["public"]["Enums"]["version_action"]
           app_id?: string
+          channel_id?: number | null
+          channel_name?: string | null
           timestamp?: string
           version_id?: number | null
           version_name?: string | null
@@ -3617,6 +3885,8 @@ export type Database = {
           need_onboarding: boolean
           owner_org: string
           retention: number
+          rollout_channel_count: number
+          rollout_paused_version_names: string[]
           stats_refresh_requested_at: string | null
           stats_updated_at: string | null
           transfer_history: Json[] | null
@@ -3854,6 +4124,8 @@ export type Database = {
           need_onboarding: boolean
           owner_org: string
           retention: number
+          rollout_channel_count: number
+          rollout_paused_version_names: string[]
           stats_refresh_requested_at: string
           stats_updated_at: string
           total_count: number
@@ -4696,7 +4968,13 @@ export type Database = {
         }[]
       }
       read_version_usage: {
-        Args: { p_app_id: string; p_period_end: string; p_period_start: string }
+        Args: {
+          p_app_id: string
+          p_channel_id?: number
+          p_channel_name?: string
+          p_period_end: string
+          p_period_start: string
+        }
         Returns: {
           app_id: string
           date: string
@@ -4721,6 +4999,10 @@ export type Database = {
       record_email_otp_verified: {
         Args: { p_user_id: string }
         Returns: string
+      }
+      refresh_app_rollout_channel_count_for_app: {
+        Args: { p_app_id: string }
+        Returns: undefined
       }
       refresh_app_rollups_after_demo_reset: {
         Args: { p_app_id: string; p_app_uuid: string; p_owner_org: string }
@@ -5040,6 +5322,17 @@ export type Database = {
         | "webview_content_process_terminated"
         | "os_version_changed"
         | "native_app_version_changed"
+        | "finish_download_fail"
+        | "checksum_required"
+        | "manifest_path_fail"
+        | "rate_limit_reached"
+        | "set_next"
+        | "insufficient_disk_space"
+        | "app_launch_start"
+        | "app_launch_ready"
+        | "app_launch_timeout"
+        | "webview_dom_content_loaded"
+        | "webview_page_loaded"
       stripe_status:
         | "created"
         | "succeeded"
@@ -5314,6 +5607,17 @@ export const Constants = {
         "webview_content_process_terminated",
         "os_version_changed",
         "native_app_version_changed",
+        "finish_download_fail",
+        "checksum_required",
+        "manifest_path_fail",
+        "rate_limit_reached",
+        "set_next",
+        "insufficient_disk_space",
+        "app_launch_start",
+        "app_launch_ready",
+        "app_launch_timeout",
+        "webview_dom_content_loaded",
+        "webview_page_loaded",
       ],
       stripe_status: [
         "created",

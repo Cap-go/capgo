@@ -5,6 +5,7 @@ import { getClaimsFromJWT, honoFactory, quickError, simpleRateLimit } from './ho
 import { cloudlog } from './logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
+import type { APIKeyRateLimitScope } from './rate_limit.ts'
 import { isAPIKeyRateLimited, isIPRateLimited, recordAPIKeyUsage, recordFailedAuth } from './rate_limit.ts'
 import { buildRateLimitInfo } from './rateLimitInfo.ts'
 import { checkKey, checkKeyById, supabaseAdmin } from './supabase.ts'
@@ -678,8 +679,9 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
  * @param rights - Required key modes for the route.
  * @param usePostgres - When true, performs key lookups via Postgres instead of Supabase client.
  * @param readOnly - When using Postgres, choose replica-safe read-only connections by default; latency-sensitive write flows can force primary auth.
+ * @param rateLimitScope - Selects the API-key rate-limit bucket for this route.
  */
-export function middlewareKey(rights: Database['public']['Enums']['key_mode'][], usePostgres = false, readOnly = true) {
+export function middlewareKey(rights: Database['public']['Enums']['key_mode'][], usePostgres = false, readOnly = true, rateLimitScope: APIKeyRateLimitScope = 'default') {
   const subMiddlewareKey = honoFactory.createMiddleware(async (c, next) => {
     // Check if IP is rate limited due to failed auth attempts
     const ipRateLimited = await isIPRateLimited(c)
@@ -717,12 +719,13 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
     }
 
     // Record API usage first, then check if rate limited
-    await recordAPIKeyUsage(c, apikey.id)
+    await recordAPIKeyUsage(c, apikey.id, rateLimitScope)
 
     // Check if API key is rate limited after recording usage
-    const apiKeyRateLimited = await isAPIKeyRateLimited(c, apikey.id)
+    const apiKeyRateLimited = await isAPIKeyRateLimited(c, apikey.id, rateLimitScope)
     if (apiKeyRateLimited.limited) {
-      return simpleRateLimit({ reason: 'api_key_rate_limit_exceeded', apikey_id: apikey.id, ...buildRateLimitInfo(apiKeyRateLimited.resetAt) })
+      const reason = rateLimitScope === 'upload' ? 'api_key_upload_rate_limit_exceeded' : 'api_key_rate_limit_exceeded'
+      return simpleRateLimit({ reason, apikey_id: apikey.id, ...buildRateLimitInfo(apiKeyRateLimited.resetAt) })
     }
 
     // Set auth context for RBAC (can be overridden by subkey below)

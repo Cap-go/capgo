@@ -68,6 +68,7 @@ import { assertCliPermission, canPromptInteractively, createSupabaseClient, find
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
 import { withCwd } from './cwd'
+import { syncIosMarketingVersion } from './ios-marketing-version'
 import { writeBuildOutputRecord } from './output-record'
 import { getPlatformDirFromCapacitorConfig, normalizeNativeDependencyPathsInText } from './platform-paths'
 import { handleCustomMsg } from './qr.js'
@@ -1364,6 +1365,13 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     }
 
     const platform = await resolveBuildPlatform(options.platform, { silent })
+
+    if (platform === 'ios' && options.syncIosVersion) {
+      const syncResult = syncIosMarketingVersion({ path: projectDir })
+      log.info(syncResult.changed
+        ? `Synced iOS MARKETING_VERSION to ${syncResult.marketingVersion}`
+        : `iOS MARKETING_VERSION is already ${syncResult.marketingVersion}`)
+    }
 
     const host = options.supaHost || 'https://api.capgo.app'
 

@@ -21,6 +21,11 @@ when working with code in this repository.
 #### Supabase Edge Functions (Default)
 
 - `bun test:all` - Run all backend tests
+- `bun test:unit` - Run unit tests only (`tests/*.unit.test.ts`, no Supabase or
+  Docker required)
+- `bun test:backend:integration` - Run backend tests excluding unit and CLI
+  tests (requires running Supabase; this is what CI shards across runners; CLI
+  integration tests run via `bun test:cli`)
 - `bun test:backend` - Run backend tests excluding CLI tests
 - `bun test:cli` - Run CLI-specific tests
 - `bun test:local` - Legacy alias for the default monorepo backend test run
@@ -738,6 +743,37 @@ Key points:
   (`--color-azure-500: #119eff`) and soft radii; mirror the palette from
   `src/styles/style.css` (e.g., `--color-primary-500: #515271`) when introducing
   new UI.
+
+### Form accessibility (WCAG 2.0 A)
+
+SonarQube flags any `<input>`, `<select>`, or `<textarea>` without an associated
+label. Treat this as a default requirement for every new or touched form control —
+do not wait for the scanner to catch it later.
+
+Every form control must have **one** of these associations before shipping:
+
+1. **Visible label + `for`/`id`** — when label text is shown next to the field:
+   ```vue
+   <label for="field-id" class="label">...</label>
+   <input id="field-id" ...>
+   ```
+2. **Wrapping `<label>`** — for radios, checkboxes, and toggle rows where the
+   label already wraps the control.
+3. **`sr-only` label + matching `id`** — for search/icon-only fields that only
+   show a placeholder:
+   ```vue
+   <label for="search-id" class="sr-only">{{ t('search') }}</label>
+   <input id="search-id" :aria-label="t('search')" ...>
+   ```
+4. **`aria-label`** — acceptable alongside (1) or (3); required when the only
+   cue is placeholder text.
+
+Reusable components must generate stable ids (`useId()` or an `inputId` prop) and
+expose accessible names by default. Follow `SearchInput.vue` and `RoleSelect.vue`.
+
+Also applies to dialog/Teleport content, admin filters, and hidden utility inputs
+(e.g. file pickers): they still need `aria-label` or an associated label.
+
 
 ## Auth Redirect Guardrails
 

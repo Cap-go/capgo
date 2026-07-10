@@ -359,15 +359,21 @@ displayStore.defaultBack = '/dashboard'
             </h3>
 
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:min-w-[840px] lg:grid-cols-[minmax(180px,1fr)_minmax(140px,0.7fr)_minmax(150px,0.8fr)_auto] lg:items-center">
+              <label for="admin-orgs-search" class="sr-only">{{ t('search-organizations') }}</label>
               <input
+                id="admin-orgs-search"
                 v-model="searchQuery"
                 type="search"
                 class="w-full d-input d-input-bordered d-input-sm"
                 :placeholder="t('search-organizations')"
+                :aria-label="t('search-organizations')"
               >
 
+              <label for="admin-orgs-plan-filter" class="sr-only">{{ t('all-plans') }}</label>
               <select
+                id="admin-orgs-plan-filter"
                 v-model="selectedPlan"
+                :aria-label="t('all-plans')"
                 class="w-full d-select d-select-bordered d-select-sm"
               >
                 <option value="">
@@ -378,9 +384,12 @@ displayStore.defaultBack = '/dashboard'
                 </option>
               </select>
 
+              <label for="admin-orgs-billing-filter" class="sr-only">{{ t('all-billing-cycles') }}</label>
               <select
+                id="admin-orgs-billing-filter"
                 v-model="selectedBilling"
                 class="w-full d-select d-select-bordered d-select-sm"
+                :aria-label="t('all-billing-cycles')"
               >
                 <option value="all">
                   {{ t('all-billing-cycles') }}

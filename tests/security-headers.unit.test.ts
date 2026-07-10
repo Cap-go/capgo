@@ -9,10 +9,11 @@ const consoleHeaders = readFileSync(new URL('../public/_headers', import.meta.ur
 describe('security response headers', () => {
   it.concurrent('declares a CSP for the console app static responses', () => {
     expect(consoleHeaders).toContain('Content-Security-Policy: default-src \'self\'')
-    expect(consoleHeaders).toContain('script-src \'self\' \'unsafe-inline\' https://challenges.cloudflare.com')
+    expect(consoleHeaders).toContain('script-src \'self\' \'unsafe-inline\' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://psthg.capgo.app')
     expect(consoleHeaders).toContain('style-src \'self\' \'unsafe-inline\' https://fonts.bunny.net')
     expect(consoleHeaders).toContain('frame-src \'self\' https://challenges.cloudflare.com')
     expect(consoleHeaders).toContain('frame-ancestors \'none\'')
+    expect(consoleHeaders).toContain('connect-src \'self\' blob: https: wss:')
   })
 
   it.concurrent.each([

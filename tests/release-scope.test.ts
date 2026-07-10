@@ -1,18 +1,21 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { getReleaseRangeBase, matchesComponent, resolveReleaseScope } from '../scripts/release-scope.ts'
 
 describe('release scope matching', () => {
-  it.concurrent('treats shared release infrastructure as affecting both components', () => {
+  it.concurrent('treats shared release infrastructure as affecting all components', () => {
     const files = [
       '.github/workflows/tests.yml',
       '.github/workflows/bump_version.yml',
       '.github/scripts/start-background-service.sh',
       'scripts/setup-bun.sh',
       'scripts/release-scope.ts',
+      'scripts/sync-notifications-package-version.ts',
     ]
 
     expect(matchesComponent('capgo', files)).toBe(true)
     expect(matchesComponent('cli', files)).toBe(true)
+    expect(matchesComponent('notifications', files)).toBe(true)
   })
 
   it.concurrent('treats capgo deploy workflow changes as capgo-only releases', () => {
@@ -27,13 +30,56 @@ describe('release scope matching', () => {
 
     expect(matchesComponent('capgo', files)).toBe(false)
     expect(matchesComponent('cli', files)).toBe(true)
+    expect(matchesComponent('notifications', files)).toBe(false)
+  })
+
+  it.concurrent('treats notifications package changes as notifications-only releases', () => {
+    const files = [
+      'packages/capacitor-notifications/src/index.ts',
+      '.github/workflows/publish_notifications.yml',
+    ]
+
+    expect(matchesComponent('capgo', files)).toBe(false)
+    expect(matchesComponent('cli', files)).toBe(false)
+    expect(matchesComponent('notifications', files)).toBe(true)
+  })
+
+  it.concurrent('publishes notifications as a public npm package', () => {
+    const packageJson = JSON.parse(
+      readFileSync('packages/capacitor-notifications/package.json', 'utf8'),
+    ) as { publishConfig?: { access?: string } }
+    const workflow = readFileSync('.github/workflows/publish_notifications.yml', 'utf8')
+
+    expect(packageJson.publishConfig?.access).toBe('public')
+    expect(workflow).toContain('--access public')
+    expect(workflow).not.toContain('--access restricted')
+  })
+
+  it.concurrent('uses the released package in Discord release footers', () => {
+    const workflow = readFileSync('.github/workflows/github-releases-to-discord.yml', 'utf8')
+    const cliPackage = JSON.parse(readFileSync('cli/package.json', 'utf8')) as { name: string }
+    const notificationsPackage = JSON.parse(
+      readFileSync('packages/capacitor-notifications/package.json', 'utf8'),
+    ) as { name: string }
+
+    expect(workflow).toContain('id: release_metadata')
+    expect(workflow).toContain(`cli-[0-9]*) footer_title="Release $(node -p 'require("./cli/package.json").name')"`)
+    expect(workflow).toContain(
+      `notifications-[0-9]*) footer_title="Release $(node -p 'require("./packages/capacitor-notifications/package.json").name')"`,
+    )
+    expect(workflow).not.toContain('cli-*) footer_title=')
+    expect(workflow).toContain('footer_title: $' + '{{ steps.release_metadata.outputs.footer_title }}')
+    expect(cliPackage.name).toBe('@capgo/cli')
+    expect(notificationsPackage.name).toBe('@capgo/capacitor-notifications')
   })
 
   it.concurrent('keeps runtime code scoped to the matching component', () => {
     expect(matchesComponent('capgo', ['src/pages/index.vue'])).toBe(true)
     expect(matchesComponent('cli', ['src/pages/index.vue'])).toBe(false)
+    expect(matchesComponent('notifications', ['src/pages/index.vue'])).toBe(false)
     expect(matchesComponent('capgo', ['cli/src/index.ts'])).toBe(false)
     expect(matchesComponent('cli', ['cli/src/index.ts'])).toBe(true)
+    expect(matchesComponent('notifications', ['cli/src/index.ts'])).toBe(false)
   })
 
   it.concurrent('does not release on unrelated changes', () => {
@@ -41,6 +87,7 @@ describe('release scope matching', () => {
 
     expect(matchesComponent('capgo', files)).toBe(false)
     expect(matchesComponent('cli', files)).toBe(false)
+    expect(matchesComponent('notifications', files)).toBe(false)
   })
 
   it.concurrent('uses the latest component tag instead of only the pushed range', () => {

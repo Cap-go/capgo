@@ -1,6 +1,7 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import type { RequestBuildBody } from './request.ts'
 import type { BuildStatusParams } from './status.ts'
+import type { SupportLogsBody } from './support_logs.ts'
 import {
   ALLOWED_HEADERS,
   ALLOWED_METHODS,
@@ -91,7 +92,7 @@ app.post('/ai_analyze_stream', middlewareKey(['all', 'write']), async (c) => {
 // (No app-ownership check on purpose: onboarding failures can reference apps that
 // were never registered — the authenticated account is the abuse anchor.)
 app.post('/support_logs', middlewareKey(['all', 'write']), async (c) => {
-  const body = await getBodyOrQuery<{ appId?: string, jobId?: string, gzB64: string }>(c)
+  const body = await getBodyOrQuery<SupportLogsBody>(c)
   if (!body || typeof body.gzB64 !== 'string' || body.gzB64.length === 0) {
     throw new Error('gzB64 is required in request body')
   }

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict'
+import { resolveAppSetIconPath } from '../src/api/app.ts'
 import { normalizeStoreUrl } from '../src/app/store-url.ts'
 
 let failures = 0
@@ -43,6 +44,14 @@ await test('rejects invalid store hosts', () => {
     () => normalizeStoreUrl('https://example.com/app', 'apps.apple.com'),
     /apps\.apple\.com/,
   )
+})
+
+await test('does not resolve app set icon without --icon', () => {
+  assert.equal(resolveAppSetIconPath(undefined), undefined)
+})
+
+await test('resolves app set icon only when --icon is passed', () => {
+  assert.equal(resolveAppSetIconPath('./assets/capgo-icon.png'), './assets/capgo-icon.png')
 })
 
 if (failures > 0) {

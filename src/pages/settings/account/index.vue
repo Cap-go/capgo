@@ -690,16 +690,19 @@ onMounted(async () => {
           Your account will be deleted after 30 days
         </p>
         <div class="mt-6">
-          <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label for="delete-account-password" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
             {{ t('current-password') }}
           </label>
           <input
+            id="delete-account-password"
             v-model="deleteAccountPassword"
             type="password"
             :placeholder="t('password-placeholder')"
+            :aria-label="t('current-password')"
             class="w-full p-3 border border-gray-300 rounded-lg dark:text-white dark:bg-gray-800 dark:border-gray-600"
             autocomplete="current-password"
             @keydown.enter="$event.preventDefault()"
+          >
           >
         </div>
         <div v-if="captchaKey" class="mt-4">

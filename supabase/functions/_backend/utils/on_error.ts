@@ -8,6 +8,11 @@ import { backgroundTask } from './utils.ts'
 
 const drizzleErrorNames = new Set(['DrizzleError', 'DrizzleQueryError', 'TransactionRollbackError'])
 const filesUploadFunctionNames = new Set(['files', 'TUS handler'])
+const queueRetryHeaderNames = {
+  maxReads: 'x-capgo-queue-max-reads',
+  name: 'x-capgo-queue-name',
+  readCount: 'x-capgo-queue-read-count',
+}
 const sensitiveRequestBodyKeys = new Set([
   'captchaToken',
   'captcha_token',
@@ -40,6 +45,29 @@ function isFilesDurableObjectStorageTimeout(functionName: string, error: unknown
   const normalizedMessage = message.toLowerCase()
   return normalizedMessage.includes('storage operation exceeded timeout')
     && normalizedMessage.includes('object to be reset')
+}
+
+function readRequestHeader(c: Context, name: string): string | undefined {
+  const fromHono = c.req.header?.(name)
+  if (fromHono)
+    return fromHono
+  return c.req.raw.headers.get(name) ?? undefined
+}
+
+function parsePositiveInteger(value: string | undefined): number | null {
+  if (!value)
+    return null
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed <= 0)
+    return null
+  return parsed
+}
+
+function shouldSuppressQueueRetryAlert(c: Context): boolean {
+  const queueName = readRequestHeader(c, queueRetryHeaderNames.name)
+  const readCount = parsePositiveInteger(readRequestHeader(c, queueRetryHeaderNames.readCount))
+  const maxReads = parsePositiveInteger(readRequestHeader(c, queueRetryHeaderNames.maxReads))
+  return Boolean(queueName) && readCount !== null && maxReads !== null && readCount < maxReads
 }
 
 export function onError(functionName: string) {
@@ -138,6 +166,7 @@ export function onError(functionName: string) {
       const suppressDiscordAlert = e.cause
         && typeof e.cause === 'object'
         && (e.cause as { suppressDiscordAlert?: unknown }).suppressDiscordAlert === true
+      const suppressBackendAlert = suppressDiscordAlert || shouldSuppressQueueRetryAlert(c)
       if (e.status === 429) {
         // Set rate-limit headers from moreInfo when available, but DO NOT
         // overwrite the response body. Several distinct conditions reach this
@@ -161,7 +190,7 @@ export function onError(functionName: string) {
           c.header('Retry-After', String(Math.max(0, Math.floor(retryAfterSeconds))))
         }
       }
-      if (e.status >= 500 && !suppressDiscordAlert) {
+      if (e.status >= 500 && !suppressBackendAlert) {
         await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
         void backgroundTask(c, capturePosthogException(c, {
           error: e,
@@ -196,7 +225,8 @@ export function onError(functionName: string) {
       return c.json(defaultResponse, 500)
     }
     // Non-HTTP errors: log with stack and return 500
-    const suppressDiscordAlert = isFilesDurableObjectStorageTimeout(functionName, e)
+    const suppressQueueRetryAlert = shouldSuppressQueueRetryAlert(c)
+    const suppressDiscordAlert = suppressQueueRetryAlert || isFilesDurableObjectStorageTimeout(functionName, e)
     cloudlogErr({
       requestId: c.get('requestId'),
       functionName,
@@ -209,12 +239,14 @@ export function onError(functionName: string) {
     if (!suppressDiscordAlert)
       await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
 
-    void backgroundTask(c, capturePosthogException(c, {
-      error: e,
-      functionName,
-      kind: 'unhandled_error',
-      status: 500,
-    }))
+    if (!suppressQueueRetryAlert) {
+      void backgroundTask(c, capturePosthogException(c, {
+        error: e,
+        functionName,
+        kind: 'unhandled_error',
+        status: 500,
+      }))
+    }
     return c.json(defaultResponse, 500)
   }
 }
