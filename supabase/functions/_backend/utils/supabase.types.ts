@@ -1469,6 +1469,7 @@ export type Database = {
       devices: {
         Row: {
           app_id: string
+          country_code: string | null
           custom_id: string
           default_channel: string | null
           device_id: string
@@ -1487,6 +1488,7 @@ export type Database = {
         }
         Insert: {
           app_id: string
+          country_code?: string | null
           custom_id?: string
           default_channel?: string | null
           device_id: string
@@ -1505,6 +1507,7 @@ export type Database = {
         }
         Update: {
           app_id?: string
+          country_code?: string | null
           custom_id?: string
           default_channel?: string | null
           device_id?: string
