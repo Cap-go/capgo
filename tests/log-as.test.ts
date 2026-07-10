@@ -48,7 +48,7 @@ async function seedStaleCreatedByOrg() {
     .insert({
       id: staleCreatedByOrgId,
       created_by: USER_ID,
-      name: 'Log as stale created_by org',
+      name: `Log as stale created_by org ${staleCreatedByOrgId}`,
       management_email: `log-as-stale-owner-${staleCreatedByOrgId}@capgo.app`,
       use_new_rbac: true,
     })
