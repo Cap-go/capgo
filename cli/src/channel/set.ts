@@ -577,14 +577,16 @@ export async function setChannelInternal(channel: string, appId: string, options
       log.error('Cannot set channel the upload key is not allowed to do that, use the "all" for this.')
     throw new Error('Upload key is not allowed to set this channel')
   }
-
-  if (sendUpdateNotification) {
-    await sendUpdateNotificationsForChannels({
-      appId,
-      apikey: options.apikey,
-      channels: bundleLinkChanged ? [channel] : [],
-      silent,
-    })
+  if (sendUpdateNotification && bundleLinkChanged) {
+    try {
+      await sendUpdateNotificationsForChannels({
+        appId,
+        apikey: options.apikey,
+        channels: [channel],
+        silent,
+      })
+    }
+    catch {}
   }
 
   if (options.qrPreview && !silent) {
