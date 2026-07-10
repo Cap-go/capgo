@@ -75,6 +75,25 @@ async function ensureAppDoesNotExist(
 
 export type AppCreateSource = 'cli-direct' | 'onboarding' | 'mcp'
 
+function isMissingAppBuildOnboardingSchemaError(error: { message?: string, details?: string, hint?: string, code?: string | null } | null) {
+  if (!error)
+    return false
+
+  const text = [error.message, error.details, error.hint, error.code]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+
+  return [
+    'created_from_onboarding',
+    'onboarding_completed_at',
+    'column',
+    'schema cache',
+    'pgrst204',
+    '42703',
+  ].some(token => text.includes(token))
+}
+
 export function resolveAppCreateSource(explicit?: AppCreateSource): AppCreateSource {
   if (explicit)
     return explicit
@@ -169,15 +188,32 @@ export async function addAppInternal(
     iconUrl = iconPath
   }
 
-  const { error: dbError } = await supabase
+  const appCreateSource = resolveAppCreateSource(source)
+  const baseAppInsert = {
+    icon_url: iconUrl,
+    owner_org: organizationUid,
+    user_id: userId,
+    name,
+    app_id: appId,
+  }
+  const insertApp = (withOnboardingMetrics: boolean) => supabase
     .from('apps')
     .insert({
-      icon_url: iconUrl,
-      owner_org: organizationUid,
-      user_id: userId,
-      name,
-      app_id: appId,
+      ...baseAppInsert,
+      ...(withOnboardingMetrics
+        ? {
+            created_from_onboarding: true,
+            onboarding_completed_at: new Date().toISOString(),
+          }
+        : {}),
     })
+
+  const insertResult = await insertApp(appCreateSource === 'onboarding')
+  let dbError = insertResult.error
+  if (dbError && appCreateSource === 'onboarding' && isMissingAppBuildOnboardingSchemaError(dbError)) {
+    const fallbackInsertResult = await insertApp(false)
+    dbError = fallbackInsertResult.error
+  }
 
   if (dbError) {
     if (!silent)
@@ -191,7 +227,7 @@ export async function addAppInternal(
     icon: '🆕',
     org_id: organizationUid,
     tracking_version: 2,
-    tags: { 'app-id': appId, 'source': resolveAppCreateSource(source) },
+    tags: { 'app-id': appId, 'source': appCreateSource },
     notify: false,
     notifyConsole: true,
   }).catch(() => {})

@@ -30,6 +30,7 @@ const globalStatsTrendData = ref<Array<{
   apps_created: number
   apps_with_cli_onboarding_builds_24h: number
   apps_with_manual_builds_24h: number
+  app_build_onboarding_finalized: boolean
   apps_active: number
   users: number
   users_active: number
@@ -116,14 +117,17 @@ const appsTrendSeries = computed(() => {
   ]
 })
 
+const finalizedAppBuildOnboardingTrendData = computed(() => globalStatsTrendData.value.filter(item => item.app_build_onboarding_finalized))
+
 const appBuildOnboardingSeries = computed(() => {
-  if (globalStatsTrendData.value.length === 0)
+  const finalizedData = finalizedAppBuildOnboardingTrendData.value
+  if (finalizedData.length === 0)
     return []
 
   return [
     {
       label: t('admin-app-build-onboarding-total-apps-created'),
-      data: globalStatsTrendData.value.map(item => ({
+      data: finalizedData.map(item => ({
         date: item.date,
         value: item.apps_created,
       })),
@@ -131,7 +135,7 @@ const appBuildOnboardingSeries = computed(() => {
     },
     {
       label: t('admin-app-build-onboarding-cli-builds'),
-      data: globalStatsTrendData.value.map(item => ({
+      data: finalizedData.map(item => ({
         date: item.date,
         value: item.apps_with_cli_onboarding_builds_24h,
       })),
@@ -139,7 +143,7 @@ const appBuildOnboardingSeries = computed(() => {
     },
     {
       label: t('admin-app-build-onboarding-manual-builds'),
-      data: globalStatsTrendData.value.map(item => ({
+      data: finalizedData.map(item => ({
         date: item.date,
         value: item.apps_with_manual_builds_24h,
       })),

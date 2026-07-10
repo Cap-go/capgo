@@ -45,10 +45,10 @@ COMMENT ON COLUMN public.global_stats.apps_created IS 'Number of apps created du
 COMMENT ON COLUMN public.global_stats.apps_with_cli_onboarding_builds_24h IS 'Number of apps created during the UTC day, created from onboarding, completed onboarding within 24 hours, and created more than two native build requests in the first 24 hours after app creation.';
 COMMENT ON COLUMN public.global_stats.apps_with_manual_builds_24h IS 'Number of apps created during the UTC day, not created from onboarding, and created more than two native build requests in the first 24 hours after app creation.';
 
-CREATE INDEX IF NOT EXISTS idx_apps_created_at
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_apps_created_at
 ON public.apps (created_at);
 
-CREATE INDEX IF NOT EXISTS idx_build_requests_app_created_at
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_build_requests_app_created_at
 ON public.build_requests (app_id, created_at);
 
 -- Keep the app-list RPC stable after adding app metadata columns. The function

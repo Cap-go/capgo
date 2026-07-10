@@ -1430,6 +1430,7 @@ async function getAppBuildOnboardingMetrics(c: Context, window: DailyWindow): Pr
         ON br.app_id = ca.app_id
         AND br.created_at >= ca.created_at
         AND br.created_at < ca.created_at + INTERVAL '24 hours'
+        AND br.status = 'succeeded'
       GROUP BY ca.app_id, ca.created_at, ca.created_from_onboarding, ca.onboarding_completed_at
     `)
 

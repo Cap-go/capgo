@@ -1530,6 +1530,7 @@ export interface AdminGlobalStatsTrend {
   apps_created: number
   apps_with_cli_onboarding_builds_24h: number
   apps_with_manual_builds_24h: number
+  app_build_onboarding_finalized: boolean
   apps_active: number
   users: number
   users_active: number
@@ -1640,6 +1641,11 @@ export async function getAdminGlobalStatsTrend(
         FROM global_stats
         WHERE completed_shards @> ${requiredCompletedShardsJson}::jsonb
       ),
+      core_completed_stats AS (
+        SELECT date_id
+        FROM global_stats
+        WHERE completed_shards @> '["core"]'::jsonb
+      ),
       stats AS (
         SELECT
         gs.date_id AS date,
@@ -1647,6 +1653,7 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(NULLIF(to_jsonb(gs) ->> 'apps_created', '')::int, 0)::int AS apps_created,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'apps_with_cli_onboarding_builds_24h', '')::int, 0)::int AS apps_with_cli_onboarding_builds_24h,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'apps_with_manual_builds_24h', '')::int, 0)::int AS apps_with_manual_builds_24h,
+        (onboarding_next.date_id IS NOT NULL)::boolean AS app_build_onboarding_finalized,
         gs.apps_active::int AS apps_active,
         gs.users::int AS users,
         gs.users_active::int AS users_active,
@@ -1767,6 +1774,17 @@ export async function getAdminGlobalStatsTrend(
           ELSE NULL
         END
       )
+      LEFT JOIN core_completed_stats onboarding_next ON onboarding_next.date_id = (
+        CASE
+          WHEN gs.date_id ~ '^\d{4}-\d{2}-\d{2}$' THEN
+            CASE
+              WHEN to_char(to_date(gs.date_id, 'YYYY-MM-DD'), 'YYYY-MM-DD') = gs.date_id
+                THEN (to_date(gs.date_id, 'YYYY-MM-DD') + 1)::text
+              ELSE NULL
+            END
+          ELSE NULL
+        END
+      )
       WHERE CASE
           WHEN gs.date_id ~ '^\\d{4}-\\d{2}-\\d{2}$'
             THEN to_char(to_date(gs.date_id, 'YYYY-MM-DD'), 'YYYY-MM-DD') = gs.date_id
@@ -1787,6 +1805,7 @@ export async function getAdminGlobalStatsTrend(
       apps_created: Number(row.apps_created) || 0,
       apps_with_cli_onboarding_builds_24h: Number(row.apps_with_cli_onboarding_builds_24h) || 0,
       apps_with_manual_builds_24h: Number(row.apps_with_manual_builds_24h) || 0,
+      app_build_onboarding_finalized: row.app_build_onboarding_finalized === true || row.app_build_onboarding_finalized === 'true',
       apps_active: Number(row.apps_active) || 0,
       users: Number(row.users) || 0,
       users_active: Number(row.users_active) || 0,

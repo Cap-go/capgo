@@ -53,7 +53,7 @@ const ONBOARDING_LATE_SUBSCRIPTION_APP_CREATED_AT = '2026-02-02T14:00:00.000Z'
 const ONBOARDING_LATE_SUBSCRIPTION_CHANNEL_CREATED_AT = '2026-02-03T14:00:00.000Z'
 const ONBOARDING_LATE_SUBSCRIPTION_BUNDLE_CREATED_AT = '2026-02-04T14:00:00.000Z'
 const ONBOARDING_LATE_SUBSCRIPTION_PAID_AT = '2026-02-10T14:00:00.000Z'
-const GLOBAL_STATS_TREND_DATES = ['2099-12-30', '2099-12-31'] as const
+const GLOBAL_STATS_TREND_DATES = ['2099-12-30', '2099-12-31', '2100-01-01'] as const
 
 let adminHeaders: Record<string, string>
 let soloPlan: {
@@ -168,6 +168,12 @@ beforeAll(async () => {
       revenue_maker: 480,
       revenue_team: 2160,
       revenue_enterprise: 0,
+    },
+    {
+      date_id: GLOBAL_STATS_TREND_DATES[2],
+      apps: 12,
+      updates: 160,
+      stars: 3,
     },
   ], { onConflict: 'date_id' })
   if (globalStatsError)
@@ -519,6 +525,7 @@ describe('/private/admin_stats', () => {
         apps_created: number
         apps_with_cli_onboarding_builds_24h: number
         apps_with_manual_builds_24h: number
+        app_build_onboarding_finalized: boolean
         updates: number
         updates_external: number
         previous_mrr: number
@@ -537,6 +544,7 @@ describe('/private/admin_stats', () => {
     expect(latest?.apps).toBe(11)
     expect(latest?.apps_created).toBe(3)
     expect(latest?.apps_with_cli_onboarding_builds_24h).toBe(2)
+    expect(latest?.app_build_onboarding_finalized).toBe(true)
     expect(latest?.apps_with_manual_builds_24h).toBe(1)
     expect(latest?.updates).toBe(150)
     expect(latest?.past_due_orgs).toBe(2)
