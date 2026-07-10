@@ -3,6 +3,6 @@ import IconChartBar from '~icons/heroicons/chart-bar'
 import IconHistory from '~icons/heroicons/clock'
 
 export const logTabs: Tab[] = [
-  { label: 'log-insights', icon: IconChartBar, key: '' },
-  { label: 'raw-logs', icon: IconHistory, key: '/raw' },
+  { label: 'raw-logs', icon: IconHistory, key: '' },
+  { label: 'log-insights', icon: IconChartBar, key: '/insights' },
 ]
