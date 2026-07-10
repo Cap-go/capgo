@@ -4,9 +4,12 @@ import { BASE_URL, getEndpointUrl, headers, resetAndSeedAppData, resetAppData } 
 
 const id = randomUUID()
 const APPNAME = `com.error.test.${id}`
+// Own org: seeding into the shared Demo org exposes this file's permission checks
+// to concurrent files mutating that org (seen as flaky cannot_access_app on delete).
+const ORG_ID = randomUUID()
 
 beforeAll(async () => {
-  await resetAndSeedAppData(APPNAME)
+  await resetAndSeedAppData(APPNAME, { orgId: ORG_ID })
 })
 
 afterAll(async () => {
