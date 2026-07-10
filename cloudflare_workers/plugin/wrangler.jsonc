@@ -14,8 +14,7 @@
     "prod_eu": {
       "name": "capgo_plugin-eu-prod",
       "vars": {
-        // Colo cache for /updates: flip to "on" per region to enable
-        // (secrets CACHE_INVALIDATE_SECRET via wrangler secret bulk).
+        // Colo cache for /updates: flip to "on" per region to enable.
         "UPDATES_CACHE_MODE": "off",
         "ENV_NAME": "capgo_plugin-eu-prod"
       },
@@ -146,8 +145,7 @@
     "prod_me": {
       "name": "capgo_plugin-me-prod",
       "vars": {
-        // Colo cache for /updates: flip to "on" per region to enable
-        // (secrets CACHE_INVALIDATE_SECRET via wrangler secret bulk).
+        // Colo cache for /updates: flip to "on" per region to enable.
         "UPDATES_CACHE_MODE": "off",
         "ENV_NAME": "capgo_plugin-me-prod"
       },
@@ -244,8 +242,7 @@
     "prod_hk": {
       "name": "capgo_plugin-hk-prod",
       "vars": {
-        // Colo cache for /updates: flip to "on" per region to enable
-        // (secrets CACHE_INVALIDATE_SECRET via wrangler secret bulk).
+        // Colo cache for /updates: flip to "on" per region to enable.
         "UPDATES_CACHE_MODE": "off",
         "ENV_NAME": "capgo_plugin-hk-prod"
       },
@@ -342,8 +339,7 @@
     "prod_jp": {
       "name": "capgo_plugin-jp-prod",
       "vars": {
-        // Colo cache for /updates: flip to "on" per region to enable
-        // (secrets CACHE_INVALIDATE_SECRET via wrangler secret bulk).
+        // Colo cache for /updates: flip to "on" per region to enable.
         "UPDATES_CACHE_MODE": "off",
         "ENV_NAME": "capgo_plugin-jp-prod"
       },
@@ -440,8 +436,7 @@
     "prod_as": {
       "name": "capgo_plugin-as-prod",
       "vars": {
-        // Colo cache for /updates: flip to "on" per region to enable
-        // (secrets CACHE_INVALIDATE_SECRET via wrangler secret bulk).
+        // Colo cache for /updates: flip to "on" per region to enable.
         "UPDATES_CACHE_MODE": "off",
         "ENV_NAME": "capgo_plugin-as-prod"
       },
@@ -538,8 +533,7 @@
     "prod_na": {
       "name": "capgo_plugin-na-prod",
       "vars": {
-        // Colo cache for /updates: flip to "on" per region to enable
-        // (secrets CACHE_INVALIDATE_SECRET via wrangler secret bulk).
+        // Colo cache for /updates: flip to "on" per region to enable.
         "UPDATES_CACHE_MODE": "off",
         "ENV_NAME": "capgo_plugin-na-prod"
       },
@@ -636,8 +630,7 @@
     "prod_af": {
       "name": "capgo_plugin-af-prod",
       "vars": {
-        // Colo cache for /updates: flip to "on" per region to enable
-        // (secrets CACHE_INVALIDATE_SECRET via wrangler secret bulk).
+        // Colo cache for /updates: flip to "on" per region to enable.
         "UPDATES_CACHE_MODE": "off",
         "ENV_NAME": "capgo_plugin-af-prod"
       },
@@ -734,8 +727,7 @@
     "prod_oc": {
       "name": "capgo_plugin-oc-prod",
       "vars": {
-        // Colo cache for /updates: flip to "on" per region to enable
-        // (secrets CACHE_INVALIDATE_SECRET via wrangler secret bulk).
+        // Colo cache for /updates: flip to "on" per region to enable.
         "UPDATES_CACHE_MODE": "off",
         "ENV_NAME": "capgo_plugin-oc-prod"
       },
@@ -832,8 +824,7 @@
     "prod_sa": {
       "name": "capgo_plugin-sa-prod",
       "vars": {
-        // Colo cache for /updates: flip to "on" per region to enable
-        // (secrets CACHE_INVALIDATE_SECRET via wrangler secret bulk).
+        // Colo cache for /updates: flip to "on" per region to enable.
         "UPDATES_CACHE_MODE": "off",
         "ENV_NAME": "capgo_plugin-sa-prod"
       },
@@ -918,8 +909,7 @@
     "preprod": {
       "name": "capgo_plugin-eu-preprod",
       "vars": {
-        // Colo cache for /updates: flip to "on" per region to enable
-        // (secrets CACHE_INVALIDATE_SECRET via wrangler secret bulk).
+        // Colo cache for /updates: flip to "on" per region to enable.
         "UPDATES_CACHE_MODE": "off",
         "ENV_NAME": "capgo_plugin-eu-preprod"
       },
@@ -1012,8 +1002,7 @@
     "alpha": {
       "name": "capgo_plugin-alpha",
       "vars": {
-        // Colo cache for /updates: flip to "on" per region to enable
-        // (secrets CACHE_INVALIDATE_SECRET via wrangler secret bulk).
+        // Colo cache for /updates: flip to "on" per region to enable.
         "UPDATES_CACHE_MODE": "off",
         "ENV_NAME": "capgo_plugin-alpha"
       },
@@ -1110,8 +1099,7 @@
     "local": {
       "name": "capgo_plugin-local",
       "vars": {
-        // Colo cache for /updates: flip to "on" per region to enable
-        // (secrets CACHE_INVALIDATE_SECRET via wrangler secret bulk).
+        // Colo cache for /updates: flip to "on" per region to enable.
         "UPDATES_CACHE_MODE": "off",
         "ENV_NAME": "capgo_plugin-local",
         "CAPGO_PREVENT_BACKGROUND_FUNCTIONS": "true"
