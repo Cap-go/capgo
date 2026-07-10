@@ -672,7 +672,9 @@ displayStore.defaultBack = '/dashboard'
                     <td class="px-4 py-3">
                       <span class="font-medium text-slate-900 dark:text-white">{{ o.org_name }}</span>
                       <span v-if="o.used_ai" class="ml-1.5 text-[10px] text-purple-500">AI</span>
-                      <button v-if="o.org_id && !o.org_id.startsWith('app:')" type="button" class="ml-2 text-[11px] font-medium text-blue-500 hover:underline" @click="spoof(o.org_id)">Spoof</button>
+                      <button v-if="o.org_id && !o.org_id.startsWith('app:')" type="button" class="ml-2 text-[11px] font-medium text-blue-500 hover:underline" @click="spoof(o.org_id)">
+                        Spoof
+                      </button>
                     </td>
                     <td class="px-4 py-3 text-right text-slate-700 dark:text-slate-200">
                       {{ formatNumberValue(o.completed) }}/{{ formatNumberValue(o.attempts) }}
@@ -730,9 +732,15 @@ displayStore.defaultBack = '/dashboard'
                     aria-label="Filter journeys by platform"
                     class="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
                   >
-                    <option value="">All platforms</option>
-                    <option value="ios">iOS</option>
-                    <option value="android">Android</option>
+                    <option value="">
+                      All platforms
+                    </option>
+                    <option value="ios">
+                      iOS
+                    </option>
+                    <option value="android">
+                      Android
+                    </option>
                   </select>
                   <label class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                     <input v-model="journeyQuitOnly" type="checkbox" class="rounded"> Quit only
@@ -744,14 +752,30 @@ displayStore.defaultBack = '/dashboard'
               <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
                 <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-900 dark:text-slate-400">
                   <tr>
-                    <th class="px-3 py-3">Org</th>
-                    <th class="px-3 py-3">App</th>
-                    <th class="px-3 py-3">Platform</th>
-                    <th class="px-3 py-3">Furthest</th>
-                    <th class="px-3 py-3">Last step (where)</th>
-                    <th class="px-3 py-3">Outcome</th>
-                    <th class="px-3 py-3 text-right">Duration</th>
-                    <th class="px-3 py-3 text-right">Started</th>
+                    <th class="px-3 py-3">
+                      Org
+                    </th>
+                    <th class="px-3 py-3">
+                      App
+                    </th>
+                    <th class="px-3 py-3">
+                      Platform
+                    </th>
+                    <th class="px-3 py-3">
+                      Furthest
+                    </th>
+                    <th class="px-3 py-3">
+                      Last step (where)
+                    </th>
+                    <th class="px-3 py-3">
+                      Outcome
+                    </th>
+                    <th class="px-3 py-3 text-right">
+                      Duration
+                    </th>
+                    <th class="px-3 py-3 text-right">
+                      Started
+                    </th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
@@ -759,12 +783,22 @@ displayStore.defaultBack = '/dashboard'
                     <td class="px-3 py-3">
                       <span class="font-medium text-slate-900 dark:text-white">{{ j.org_name }}</span>
                       <span v-if="j.used_ai" class="ml-1.5 text-[10px] text-purple-500">AI</span>
-                      <button v-if="j.org_id && !j.org_id.startsWith('app:')" type="button" class="ml-2 text-[11px] font-medium text-blue-500 hover:underline" @click="spoof(j.org_id)">Spoof</button>
+                      <button v-if="j.org_id && !j.org_id.startsWith('app:')" type="button" class="ml-2 text-[11px] font-medium text-blue-500 hover:underline" @click="spoof(j.org_id)">
+                        Spoof
+                      </button>
                     </td>
-                    <td class="px-3 py-3 text-slate-500 dark:text-slate-400">{{ j.app_id }}</td>
-                    <td class="px-3 py-3 capitalize text-slate-500 dark:text-slate-400">{{ j.platform }}</td>
-                    <td class="px-3 py-3 text-slate-700 dark:text-slate-200">{{ j.milestone_label }}</td>
-                    <td class="px-3 py-3 text-slate-700 dark:text-slate-200">{{ humanStep(j.last_step) }}</td>
+                    <td class="px-3 py-3 text-slate-500 dark:text-slate-400">
+                      {{ j.app_id }}
+                    </td>
+                    <td class="px-3 py-3 capitalize text-slate-500 dark:text-slate-400">
+                      {{ j.platform }}
+                    </td>
+                    <td class="px-3 py-3 text-slate-700 dark:text-slate-200">
+                      {{ j.milestone_label }}
+                    </td>
+                    <td class="px-3 py-3 text-slate-700 dark:text-slate-200">
+                      {{ humanStep(j.last_step) }}
+                    </td>
                     <td class="px-3 py-3">
                       <span
                         class="rounded px-2 py-0.5 text-xs font-medium"
@@ -773,8 +807,12 @@ displayStore.defaultBack = '/dashboard'
                         {{ j.outcome === 'completed' ? 'Completed' : 'Quit' }}
                       </span>
                     </td>
-                    <td class="px-3 py-3 text-right text-slate-500 dark:text-slate-400">{{ fmtDuration(j.duration_ms) }}</td>
-                    <td class="px-3 py-3 text-right text-slate-500 dark:text-slate-400">{{ ago(j.started_at) }}</td>
+                    <td class="px-3 py-3 text-right text-slate-500 dark:text-slate-400">
+                      {{ fmtDuration(j.duration_ms) }}
+                    </td>
+                    <td class="px-3 py-3 text-right text-slate-500 dark:text-slate-400">
+                      {{ ago(j.started_at) }}
+                    </td>
                   </tr>
                 </tbody>
               </table>
