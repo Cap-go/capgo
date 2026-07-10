@@ -122,7 +122,6 @@ CREATE TABLE public.apps (
     rollout_paused_version_names character varying[] DEFAULT '{}'::character varying[] NOT NULL,
     created_from_onboarding boolean DEFAULT false NOT NULL,
     onboarding_completed_at timestamp with time zone,
-    rollout_paused_version_names character varying[] DEFAULT '{}'::character varying[] NOT NULL,
     CONSTRAINT apps_build_timeout_seconds_check CHECK (((build_timeout_seconds >= 300) AND (build_timeout_seconds <= 21600)))
 );
 
