@@ -55,6 +55,24 @@ describe('release scope matching', () => {
     expect(workflow).not.toContain('--access restricted')
   })
 
+  it.concurrent('uses the released package in Discord release footers', () => {
+    const workflow = readFileSync('.github/workflows/github-releases-to-discord.yml', 'utf8')
+    const cliPackage = JSON.parse(readFileSync('cli/package.json', 'utf8')) as { name: string }
+    const notificationsPackage = JSON.parse(
+      readFileSync('packages/capacitor-notifications/package.json', 'utf8'),
+    ) as { name: string }
+
+    expect(workflow).toContain('id: release_metadata')
+    expect(workflow).toContain(`cli-[0-9]*) footer_title="Release $(node -p 'require("./cli/package.json").name')"`)
+    expect(workflow).toContain(
+      `notifications-[0-9]*) footer_title="Release $(node -p 'require("./packages/capacitor-notifications/package.json").name')"`,
+    )
+    expect(workflow).not.toContain('cli-*) footer_title=')
+    expect(workflow).toContain('footer_title: $' + '{{ steps.release_metadata.outputs.footer_title }}')
+    expect(cliPackage.name).toBe('@capgo/cli')
+    expect(notificationsPackage.name).toBe('@capgo/capacitor-notifications')
+  })
+
   it.concurrent('keeps runtime code scoped to the matching component', () => {
     expect(matchesComponent('capgo', ['src/pages/index.vue'])).toBe(true)
     expect(matchesComponent('cli', ['src/pages/index.vue'])).toBe(false)
