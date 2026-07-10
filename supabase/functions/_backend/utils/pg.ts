@@ -1055,13 +1055,15 @@ export interface AppOwnerPostgresResult {
   block_provider_infra_requests: boolean
 }
 
-export async function getAppOwnerPostgres(
+// Throwing variant: lets callers (the colo cache) distinguish a missing app
+// (null, safe to cache) from a query failure (throws, must not be cached).
+export async function queryAppOwnerPostgres(
   c: Context,
   appId: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   actions: PlanAction[] = [],
 ): Promise<AppOwnerPostgresResult | null> {
-  try {
+  {
     if (actions.length === 0)
       return null
     const orgAlias = alias(schema.orgs, 'orgs')
@@ -1111,6 +1113,17 @@ export async function getAppOwnerPostgres(
     }
 
     return appOwner as AppOwnerPostgresResult
+  }
+}
+
+export async function getAppOwnerPostgres(
+  c: Context,
+  appId: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  actions: PlanAction[] = [],
+): Promise<AppOwnerPostgresResult | null> {
+  try {
+    return await queryAppOwnerPostgres(c, appId, drizzleClient, actions)
   }
   catch (e: unknown) {
     logPgError(c, 'getAppOwnerPostgres', e)
