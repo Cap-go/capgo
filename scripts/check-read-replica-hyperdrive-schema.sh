@@ -11,6 +11,11 @@ SYNC_RESPONSE="$(mktemp)"
 WRANGLER_LOG="$(mktemp)"
 PORT="${READ_REPLICA_SCHEMA_CHECK_PORT:-8799}"
 SYNC_MAX_TIME="${READ_REPLICA_SCHEMA_SYNC_MAX_TIME:-1800}"
+if [[ -n "${READ_REPLICA_WRANGLER_CMD:-}" ]]; then
+  read -r -a WRANGLER_CMD <<< "$READ_REPLICA_WRANGLER_CMD"
+else
+  WRANGLER_CMD=(bunx wrangler@4.107.0)
+fi
 if ! [[ "$SYNC_MAX_TIME" =~ ^[0-9]+$ ]] || (( SYNC_MAX_TIME <= 30 )); then
   echo '::error title=Invalid read-replica schema sync timeout::READ_REPLICA_SCHEMA_SYNC_MAX_TIME must be an integer greater than 30 seconds.'
   exit 1
@@ -33,7 +38,7 @@ if [[ ! -f "$EXPECTED_SCHEMA_CATALOG" ]]; then
   exit 1
 fi
 
-bunx wrangler dev \
+"${WRANGLER_CMD[@]}" dev \
   --remote \
   --config cloudflare_workers/read-replica-schema-check/wrangler.jsonc \
   --env=prod \
