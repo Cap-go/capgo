@@ -245,7 +245,7 @@ async function selectPeriod(option: PeriodDayOption) {
   await fetchInsights()
 }
 
-function rawLogQuery(action?: string) {
+function logQuery(action?: string) {
   const period = insights.value?.period
   return {
     ...(period ? { start: period.start, end: period.end } : {}),
@@ -253,12 +253,12 @@ function rawLogQuery(action?: string) {
   }
 }
 
-function openRawLogs(action?: string) {
-  router.push({ path: `/app/${appRouteSegment.value}/logs`, query: rawLogQuery(action) })
+function openLogs(action?: string) {
+  router.push({ path: `/app/${appRouteSegment.value}/logs`, query: logQuery(action) })
 }
 
 function openDeviceLogs(device: LogInsightDevice) {
-  router.push({ path: `/app/${appRouteSegment.value}/device/${device.device_id}/logs`, query: rawLogQuery(device.action) })
+  router.push({ path: `/app/${appRouteSegment.value}/device/${device.device_id}/logs`, query: logQuery(device.action) })
 }
 
 watchEffect(async () => {
@@ -332,9 +332,9 @@ watchEffect(async () => {
                 </p>
               </div>
             </div>
-            <button type="button" class="gap-2 d-btn d-btn-sm d-btn-outline shrink-0" @click="openRawLogs(topAction?.action)">
+            <button type="button" class="gap-2 d-btn d-btn-sm d-btn-outline shrink-0" @click="openLogs(topAction?.action)">
               <IconExternalLink class="w-4 h-4" />
-              {{ topAction ? t('view-action-logs') : t('view-raw-logs') }}
+              {{ topAction ? t('view-action-logs') : t('view-logs') }}
             </button>
           </div>
         </div>
@@ -407,7 +407,7 @@ watchEffect(async () => {
                   :key="action.action"
                   type="button"
                   class="w-full text-left group"
-                  @click="openRawLogs(action.action)"
+                  @click="openLogs(action.action)"
                 >
                   <div class="flex items-center justify-between gap-3 text-sm">
                     <span class="font-medium text-slate-800 dark:text-slate-100 truncate">{{ formatAction(action.action) }}</span>

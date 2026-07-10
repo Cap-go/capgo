@@ -179,17 +179,6 @@ const router = createRouter({
     { path: '/dashboard/settings/organization/members', redirect: '/settings/organization/members' },
     { path: '/dashboard/settings/organization/plans', redirect: '/settings/organization/plans' },
     { path: '/dashboard/settings/organization/usage', redirect: '/settings/organization/usage' },
-    {
-      path: '/app/:app/logs/raw',
-      redirect: (to) => {
-        const { tab: _, ...query } = to.query
-        return {
-          path: `/app/${encodeURIComponent(String((to.params as { app: string }).app))}/logs`,
-          query,
-          hash: to.hash,
-        }
-      },
-    },
     { path: '/app/p/:package', redirect: to => `/app/${(to.params as { package: string }).package}` },
     { path: '/app/p/:package/bundles', redirect: to => `/app/${(to.params as { package: string }).package}` },
     { path: '/app/p/:package/channels', redirect: to => `/app/${(to.params as { package: string }).package}` },
