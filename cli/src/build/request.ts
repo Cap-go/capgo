@@ -1666,8 +1666,8 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         else if (mergedCredentials.BUILD_OUTPUT_UPLOAD_ENABLED !== 'true') {
           missingCreds.push('App Store Connect API key (APPLE_KEY_ID/APPLE_ISSUER_ID/APPLE_KEY_CONTENT) or app-specific password (FASTLANE_USER + FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD + APPLE_APP_ID) or BUILD_OUTPUT_UPLOAD_ENABLED=true (or --output-upload) (build has no output destination - enable either TestFlight upload or Capgo download link)')
         }
-        else if (mergedCredentials.SKIP_BUILD_NUMBER_BUMP !== 'true') {
-          missingCreds.push('App Store Connect API key (APPLE_KEY_ID/APPLE_ISSUER_ID/APPLE_KEY_CONTENT) or app-specific password or --skip-build-number-bump (build numbers cannot be auto-incremented without an App Store Connect API key)')
+        else if (mergedCredentials.SKIP_BUILD_NUMBER_BUMP !== 'true' || mergedCredentials.SKIP_MARKETING_VERSION_BUMP !== 'true') {
+          missingCreds.push('App Store Connect API key (APPLE_KEY_ID/APPLE_ISSUER_ID/APPLE_KEY_CONTENT) or app-specific password or --skip-build-number-bump and --skip-marketing-version-bump (iOS versions cannot be auto-incremented without App Store Connect credentials)')
         }
         else {
           log.warn('⚠️  No App Store Connect API key or app-specific password provided - build will succeed but cannot auto-upload to TestFlight')

@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(7);
+SELECT plan(8);
 
 SELECT tests.create_supabase_user('org_owner_self_owner', 'org_owner_self_owner@test.local');
 SELECT tests.create_supabase_user('org_owner_self_successor', 'org_owner_self_successor@test.local');
@@ -13,27 +13,38 @@ VALUES
   (tests.get_supabase_uid('org_owner_self_peer'), 'org_owner_self_peer@test.local', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.orgs (id, created_by, name, management_email, use_new_rbac)
+INSERT INTO public.orgs (id, created_by, name, management_email, use_new_rbac, enforcing_2fa)
 VALUES
   (
     '70000000-0000-4000-8000-000000000061',
     tests.get_supabase_uid('org_owner_self_owner'),
     'Org owner self removal transfer',
     'org-owner-self-transfer@test.local',
-    true
+    true,
+    false
   ),
   (
     '70000000-0000-4000-8000-000000000062',
     tests.get_supabase_uid('org_owner_self_owner'),
     'Org owner protected from peer removal',
     'org-owner-self-protected@test.local',
-    true
+    true,
+    false
   ),
   (
     '70000000-0000-4000-8000-000000000063',
     tests.get_supabase_uid('org_owner_self_owner'),
     'Org owner last super admin guard',
     'org-owner-self-last-super@test.local',
+    true,
+    false
+  ),
+  (
+    '70000000-0000-4000-8000-000000000064',
+    tests.get_supabase_uid('org_owner_self_owner'),
+    'Org owner requires two factor authentication',
+    'org-owner-self-2fa@test.local',
+    true,
     true
   )
 ON CONFLICT (id) DO NOTHING;
@@ -123,6 +134,17 @@ SELECT tests.authenticate_as('org_owner_self_peer');
 
 SELECT tests.clear_authentication();
 SELECT tests.authenticate_as('org_owner_self_owner');
+
+SELECT throws_like(
+  $$
+    SELECT public.delete_org_member_role(
+      '70000000-0000-4000-8000-000000000064'::uuid,
+      tests.get_supabase_uid('org_owner_self_owner')
+    )
+  $$,
+  '%NO_PERMISSION_TO_UPDATE_ROLES%',
+  'enforcing 2FA blocks owner removal when the caller has no second factor'
+);
 
 SELECT throws_like(
   $$
