@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.193.4",
+  "version": "12.194.2",
   "private": true,
   "workspaces": [
     "cli",
@@ -81,6 +81,7 @@
     "test:coverage:all": "bun run cli:build && bun run supabase:with-env -- bunx vitest run --coverage.enabled=true tests/*",
     "test:all": "bun run cli:build && bun run supabase:with-env -- bunx vitest run tests/*",
     "test:unit": "vitest run tests/*.unit.test.ts",
+    "test:db": "bash scripts/test-db-tinbase.sh",
     "test:backend:integration": "bun run supabase:with-env -- bunx vitest run --exclude=tests/*.unit.test.ts --exclude=tests/cli*",
     "test:cloudflare:integration": "vitest run --exclude=tests/cli* --exclude=tests/*.unit.test.ts --config vitest.config.cloudflare.ts",
     "test:updates": "bun run supabase:with-env -- bunx vitest run tests/updates*",
@@ -376,6 +377,7 @@
     "simple-git-hooks": "^2.13.1",
     "supabase": "^2.106.0",
     "tailwindcss": "^4.3.1",
+    "tinbase": "^0.7.1",
     "typescript": "6.0.3",
     "unplugin-auto-import": "^21.0.0",
     "unplugin-formkit": "^0.3.0",

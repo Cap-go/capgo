@@ -1,19 +1,11 @@
 import { execFileSync } from 'node:child_process'
 import process from 'node:process'
-import { TextDecoder } from 'node:util'
 
 export type Component = 'capgo' | 'cli' | 'notifications'
 export type ReleaseAs = 'patch' | 'minor' | 'major'
 type GitRunner = (args: string[]) => string
 
 const sharedMatchers = [
-  /^\.github\/workflows\/bump_version\.yml$/,
-  /^\.github\/workflows\/tests\.yml$/,
-  /^\.github\/scripts\//,
-  /^scripts\/release-scope\.ts$/,
-  /^scripts\/sync-notifications-package-version\.ts$/,
-  /^scripts\/setup-bun\.sh$/,
-  /^scripts\/setup-bun\.ps1$/,
   /^package\.json$/,
   /^bun\.lock$/,
   /^\.npmrc$/,
@@ -61,7 +53,6 @@ export const componentMatchers: Record<Component, RegExp[]> = {
   ],
   cli: [
     ...sharedMatchers,
-    /^\.github\/workflows\/publish_cli\.yml$/,
     /^cli\/src\//,
     /^cli\/skills\/[^/]+\/SKILL\.md$/,
     /^cli\/skills\/(?!.*\.(md|mdx)$)/,
@@ -72,7 +63,6 @@ export const componentMatchers: Record<Component, RegExp[]> = {
   ],
   notifications: [
     ...sharedMatchers,
-    /^\.github\/workflows\/publish_notifications\.yml$/,
     /^packages\/capacitor-notifications\//,
   ],
 }
@@ -82,60 +72,6 @@ function runGit(args: string[]): string {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   }).trim()
-}
-
-function stringifyGitErrorOutput(value: unknown): string {
-  if (typeof value === 'string') {
-    return value
-  }
-
-  if (value instanceof Uint8Array) {
-    return new TextDecoder().decode(value)
-  }
-
-  return ''
-}
-
-function getGitErrorText(error: unknown): string {
-  const parts = []
-
-  if (error instanceof Error) {
-    parts.push(error.message)
-  }
-
-  if (typeof error === 'object' && error !== null) {
-    const outputs = error as { stdout?: unknown, stderr?: unknown }
-    parts.push(stringifyGitErrorOutput(outputs.stdout))
-    parts.push(stringifyGitErrorOutput(outputs.stderr))
-  }
-
-  return parts.filter(Boolean).join('\n')
-}
-
-function isNoMatchingTagError(error: unknown): boolean {
-  return /no matching tag|no names found|no tags can describe|fatal: no tag/i.test(getGitErrorText(error))
-}
-
-export function getComponentTagPattern(component: Component): string {
-  return `${component}-[0-9]*`
-}
-
-export function getLatestComponentTag(component: Component, after: string, run: GitRunner = runGit): string | null {
-  try {
-    const tag = run(['describe', '--tags', '--match', getComponentTagPattern(component), '--abbrev=0', after])
-    return tag || null
-  }
-  catch (error) {
-    if (!isNoMatchingTagError(error)) {
-      throw error
-    }
-
-    return null
-  }
-}
-
-export function getReleaseRangeBase(component: Component, before: string, after: string, run: GitRunner = runGit): string {
-  return getLatestComponentTag(component, after, run) ?? before
 }
 
 function getCommitShas(before: string, after: string, run: GitRunner = runGit): string[] {
@@ -197,10 +133,8 @@ export function toReleaseAs(severity: number): ReleaseAs {
 
   return 'patch'
 }
-
 export function resolveReleaseScope(component: Component, before: string, after: string, run: GitRunner = runGit) {
-  const releaseBase = getReleaseRangeBase(component, before, after, run)
-  const commits = getCommitShas(releaseBase, after, run)
+  const commits = getCommitShas(before, after, run)
 
   let shouldRelease = false
   let highestSeverity = 0

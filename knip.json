@@ -1,6 +1,9 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreExportsUsedInFile": true,
+  "ignoreDependencies": [
+    "tinbase"
+  ],
   "ignoreIssues": {
     "src/auto-imports.d.ts": [
       "types"

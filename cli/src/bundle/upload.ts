@@ -1175,6 +1175,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
       // programmatic SDK bundle (which also imports this module).
       return {
         success: true,
+        appId: appid,
         skipped: true,
         reason: 'NATIVE_BUILD',
         builderAction,
@@ -1343,6 +1344,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     if (!silent)
       outro('Dry upload saved bundle metadata without uploading files or updating channels')
     return {
+      appId: appid,
       success: true,
       bundle,
       checksum: versionData.checksum ?? null,
@@ -1602,6 +1604,8 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   const result: UploadBundleResult = {
     success: true,
     bundle,
+    appId: appid,
+    updatedChannels: Array.from(channelVersionSet),
     checksum: versionData.checksum ?? null,
     encryptionMethod,
     sessionKey: sessionKey ? sessionKey.toString('base64') : undefined,

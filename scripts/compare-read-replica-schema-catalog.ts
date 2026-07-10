@@ -1,8 +1,6 @@
-import { spawnSync } from 'node:child_process'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { stableStringify } from '../read_replicate/schema_catalog.ts'
+import { readFile } from 'node:fs/promises'
+import process from 'node:process'
+import { readReplicaSchemaCompatibilityIssues } from '../read_replicate/schema_compatibility.ts'
 
 const [expectedPath, actualPath] = process.argv.slice(2)
 
@@ -13,44 +11,24 @@ async function main() {
     return
   }
 
-  const tempDir = await mkdtemp(join(tmpdir(), 'read-replica-schema-'))
+  const expected = JSON.parse(await readFile(expectedPath, 'utf8'))
+  const actual = JSON.parse(await readFile(actualPath, 'utf8'))
+  const issues = readReplicaSchemaCompatibilityIssues(expected, actual)
 
-  try {
-    const expected = JSON.parse(await readFile(expectedPath, 'utf8'))
-    const actual = JSON.parse(await readFile(actualPath, 'utf8'))
-    const expectedText = `${stableStringify(expected)}\n`
-    const actualText = `${stableStringify(actual)}\n`
-
-    if (expectedText === actualText) {
-      console.log('Read-replica schema catalog matches the committed snapshot.')
-      return
-    }
-
-    const normalizedExpectedPath = join(tempDir, 'expected.json')
-    const normalizedActualPath = join(tempDir, 'actual.json')
-    await writeFile(normalizedExpectedPath, expectedText)
-    await writeFile(normalizedActualPath, actualText)
-
-    console.error('::error title=Read-replica schema is out of date::Hyperdrive read replica does not match read_replicate/schema_replicate.catalog.json after additive sync.')
-    console.error('')
-    console.error('The production source schema was updated, but the read replica visible through Hyperdrive still differs from the committed replica schema catalog.')
-    console.error('Automatic sync only applies safe missing columns and indexes. Apply any remaining non-additive DDL or maintenance flow, then retry the release.')
-    console.error('')
-    console.error('Diff:')
-
-    const diff = spawnSync('diff', ['-u', normalizedExpectedPath, normalizedActualPath], {
-      encoding: 'utf8',
-    })
-    if (diff.stdout)
-      console.error(diff.stdout)
-    if (diff.stderr)
-      console.error(diff.stderr)
-
-    process.exitCode = 1
+  if (!issues.length) {
+    console.log('Read-replica schema is compatible with the committed snapshot.')
+    return
   }
-  finally {
-    await rm(tempDir, { recursive: true, force: true })
-  }
+
+  console.error('::error title=Read-replica schema is incompatible::Hyperdrive read replica is not compatible with read_replicate/schema_replicate.catalog.json after additive sync.')
+  console.error('')
+  console.error('The check ignores column order, defaults, constraints, sequences, and functions because they do not prevent logical replication.')
+  console.error('Indexes still require exact parity because unexpected indexes add storage and write-maintenance cost.')
+  console.error('')
+  console.error('Incompatible objects:')
+  for (const issue of issues)
+    console.error(`- ${issue.kind} ${issue.object}: ${issue.reason}`)
+  process.exitCode = 1
 }
 
 await main()

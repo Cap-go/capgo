@@ -50,7 +50,7 @@ bun run readreplicate:check-schema
 ```
 
 Sync safe additive changes through Hyperdrive, then check that the live read
-replica matches the committed replica schema catalog:
+replica is operationally compatible with the committed replica schema catalog:
 
 ```bash
 bun run readreplicate:check-hyperdrive-schema
@@ -97,10 +97,13 @@ READ_REPLICA_PASSWORD='new-password' bash read_replicate/update_readreplica_pass
 - `schema_replicate.sql` is intentionally limited to tables replicated into the
   Google subscriber. It excludes foreign keys, triggers, and RLS policies.
 - `schema_replicate.catalog.json` is the machine-readable catalog snapshot used
-  by release CI to sync missing additive schema changes and compare the committed
-  schema against the live read replica through Hyperdrive.
+  by release CI to sync missing additive schema changes and verify compatible
+  tables, columns, types, and exact index parity through Hyperdrive. The check
+  ignores column order, defaults, constraints, sequences, and functions because
+  they do not prevent logical replication. Unexpected indexes still fail the
+  check because they add storage and write-maintenance cost.
 - Production Supabase deploys run `bun run readreplicate:check-hyperdrive-schema`
-  before migrations, functions, or workers publish. The check first applies safe
-  missing columns and indexes on the Google subscriber, reindexes invalid
-  same-name indexes left by interrupted concurrent builds, then fails if any
-  unsupported drift remains.
+  before migrations, functions, or workers publish. Each check deploys a uniquely
+  named, token-protected Worker, applies safe missing columns and indexes on the
+  Google subscriber, verifies the live catalog, and deletes the Worker before
+  exiting. Concurrent CI runs therefore never share or replace a checker Worker.
