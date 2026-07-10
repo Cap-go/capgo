@@ -20,7 +20,7 @@ import type { MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import { sql } from 'drizzle-orm'
 import { cloudlog, cloudlogErr } from './logging.ts'
-import { closeClient, getDrizzleClient, getPgClient } from './pg.ts'
+import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 
 // =============================================================================
 // Types
@@ -150,22 +150,46 @@ const PERMISSION_TO_LEGACY_RIGHT: Record<Permission, Database['public']['Enums']
 // =============================================================================
 
 /**
- * Check if RBAC applies to an organization.
- * RBAC is always enabled for resolved organizations; this helper only preserves
- * the old call site contract.
+ * Check if RBAC is enabled for an organization.
+ * Caches the result in context to avoid repeated queries.
  */
 export async function isRbacEnabledForOrg(
   c: Context<MiddlewareKeyVariables>,
   orgId: string | null,
 ): Promise<boolean> {
+  // Check cache first
   const cached = c.get('rbacEnabled')
   if (cached !== undefined) {
     return cached
   }
 
-  c.set('rbacEnabled', true)
-  void orgId
-  return true
+  if (!orgId) {
+    return false
+  }
+
+  let pgClient
+  try {
+    pgClient = getPgClient(c)
+    const drizzleClient = getDrizzleClient(pgClient)
+
+    const result = await drizzleClient.execute(
+      sql`SELECT public.rbac_is_enabled_for_org(${orgId}::uuid) as enabled`,
+    )
+
+    const enabled = (result.rows[0] as any)?.enabled === true
+    // Cache the result
+    c.set('rbacEnabled', enabled)
+    return enabled
+  }
+  catch (e) {
+    logPgError(c, 'isRbacEnabledForOrg', e)
+    return false
+  }
+  finally {
+    if (pgClient) {
+      closeClient(c, pgClient)
+    }
+  }
 }
 
 /**
