@@ -2027,12 +2027,12 @@
       "definition": "CREATE UNIQUE INDEX apps_id_unique ON public.apps USING btree (id)",
       "name": "apps_id_unique",
       "table": "apps",
+      "valid": true
+    },
     {
       "definition": "CREATE INDEX idx_apps_created_at ON public.apps USING btree (created_at)",
       "name": "idx_apps_created_at",
       "table": "apps",
-      "valid": true
-    },
       "valid": true
     },
     {
