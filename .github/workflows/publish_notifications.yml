@@ -77,7 +77,7 @@ jobs:
 
             ---
 
-            Full changelog: https://github.com/${{ github.repository }}/compare/${{ steps.changelog.outputs.from_tag || github.ref_name }}...${{ steps.changelog.outputs.to_tag || github.ref_name }}
+            Full changelog: https://github.com/${{ github.repository }}/compare/${{ steps.changelog_base.outputs.from_tag }}...${{ github.ref_name }}
           make_latest: false
           token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
           prerelease: ${{ contains(github.ref, '-alpha.') }}
