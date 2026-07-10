@@ -221,6 +221,7 @@ export function loadCredentialsFromEnv(): Partial<BuildCredentials> {
   const buildOutputUploadEnabled = readRuntimeEnv('BUILD_OUTPUT_UPLOAD_ENABLED')
   const buildOutputRetentionSeconds = readRuntimeEnv('BUILD_OUTPUT_RETENTION_SECONDS')
   const skipBuildNumberBump = readRuntimeEnv('SKIP_BUILD_NUMBER_BUMP')
+  const skipMarketingVersionBump = readRuntimeEnv('SKIP_MARKETING_VERSION_BUMP')
   const capgoIosDistribution = readRuntimeEnv('CAPGO_IOS_DISTRIBUTION')
   const capgoStoreSubmitReview = readRuntimeEnv('CAPGO_STORE_SUBMIT_REVIEW')
   const capgoStoreReleaseName = readRuntimeEnv('CAPGO_STORE_RELEASE_NAME')
@@ -294,6 +295,9 @@ export function loadCredentialsFromEnv(): Partial<BuildCredentials> {
   }
   if (skipBuildNumberBump) {
     credentials.SKIP_BUILD_NUMBER_BUMP = parseOptionalBoolean(skipBuildNumberBump) ? 'true' : 'false'
+  }
+  if (skipMarketingVersionBump) {
+    credentials.SKIP_MARKETING_VERSION_BUMP = parseOptionalBoolean(skipMarketingVersionBump) ? 'true' : 'false'
   }
 
   return credentials

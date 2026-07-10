@@ -1188,6 +1188,7 @@ export const NON_CREDENTIAL_KEYS = new Set([
   'BUILD_OUTPUT_UPLOAD_ENABLED',
   'BUILD_OUTPUT_RETENTION_SECONDS',
   'SKIP_BUILD_NUMBER_BUMP',
+  'SKIP_MARKETING_VERSION_BUMP',
   'CAPGO_STORE_SUBMIT_REVIEW',
   'CAPGO_STORE_RELEASE_NAME',
   'CAPGO_STORE_RELEASE_NOTES',
@@ -1297,6 +1298,7 @@ export function splitPayload(
       ? Number.parseInt(mergedCredentials.BUILD_OUTPUT_RETENTION_SECONDS, 10) || MIN_OUTPUT_RETENTION_SECONDS
       : MIN_OUTPUT_RETENTION_SECONDS,
     skipBuildNumberBump: mergedCredentials.SKIP_BUILD_NUMBER_BUMP === 'true',
+    skipMarketingVersionBump: mergedCredentials.SKIP_MARKETING_VERSION_BUMP === 'true',
     submitToStoreReview: mergedCredentials.CAPGO_STORE_SUBMIT_REVIEW === 'true',
     storeReleaseName: mergedCredentials.CAPGO_STORE_RELEASE_NAME,
     storeReleaseNotes: mergedCredentials.CAPGO_STORE_RELEASE_NOTES,
@@ -1475,6 +1477,9 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     }
     if (options.skipBuildNumberBump !== undefined) {
       cliCredentials.SKIP_BUILD_NUMBER_BUMP = parseOptionalBoolean(options.skipBuildNumberBump) ? 'true' : 'false'
+    }
+    if (options.skipMarketingVersionBump !== undefined) {
+      cliCredentials.SKIP_MARKETING_VERSION_BUMP = parseOptionalBoolean(options.skipMarketingVersionBump) ? 'true' : 'false'
     }
     if (options.submitToStoreReview !== undefined) {
       cliCredentials.CAPGO_STORE_SUBMIT_REVIEW = parseOptionalBoolean(options.submitToStoreReview) ? 'true' : 'false'
@@ -1661,8 +1666,8 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         else if (mergedCredentials.BUILD_OUTPUT_UPLOAD_ENABLED !== 'true') {
           missingCreds.push('App Store Connect API key (APPLE_KEY_ID/APPLE_ISSUER_ID/APPLE_KEY_CONTENT) or app-specific password (FASTLANE_USER + FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD + APPLE_APP_ID) or BUILD_OUTPUT_UPLOAD_ENABLED=true (or --output-upload) (build has no output destination - enable either TestFlight upload or Capgo download link)')
         }
-        else if (mergedCredentials.SKIP_BUILD_NUMBER_BUMP !== 'true') {
-          missingCreds.push('App Store Connect API key (APPLE_KEY_ID/APPLE_ISSUER_ID/APPLE_KEY_CONTENT) or app-specific password or --skip-build-number-bump (build numbers cannot be auto-incremented without an App Store Connect API key)')
+        else if (mergedCredentials.SKIP_BUILD_NUMBER_BUMP !== 'true' || mergedCredentials.SKIP_MARKETING_VERSION_BUMP !== 'true') {
+          missingCreds.push('App Store Connect API key (APPLE_KEY_ID/APPLE_ISSUER_ID/APPLE_KEY_CONTENT) or app-specific password or --skip-build-number-bump and --skip-marketing-version-bump (iOS versions cannot be auto-incremented without App Store Connect credentials)')
         }
         else {
           log.warn('⚠️  No App Store Connect API key or app-specific password provided - build will succeed but cannot auto-upload to TestFlight')
@@ -1739,6 +1744,9 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       && !(mergedCredentials.APPLE_KEY_ID && mergedCredentials.APPLE_ISSUER_ID && mergedCredentials.APPLE_KEY_CONTENT)
     if (!mergedCredentials.SKIP_BUILD_NUMBER_BUMP && !iosWithoutApiKey) {
       log.info('ℹ️  --skip-build-number-bump not specified, build number will be auto-incremented (default)')
+    }
+    if (!mergedCredentials.SKIP_MARKETING_VERSION_BUMP && platform === 'ios' && !iosWithoutApiKey) {
+      log.info('ℹ️  --skip-marketing-version-bump not specified, marketing version will be auto-bumped when already released (default)')
     }
 
     const { buildOptions: buildOptionsPayload, buildCredentials: buildCredentialsPayload } = splitPayload(
