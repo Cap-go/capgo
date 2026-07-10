@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { syncUserPreferenceTags } from '../supabase/functions/_backend/utils/user_preferences.ts'
+
 const syncBentoSubscriberTagsMock = vi.hoisted(() => vi.fn(async () => true))
 
 vi.mock('../supabase/functions/_backend/utils/bento.ts', () => ({
   syncBentoSubscriberTags: syncBentoSubscriberTagsMock,
 }))
-
-import { syncUserPreferenceTags } from '../supabase/functions/_backend/utils/user_preferences.ts'
 
 function createContext() {
   return {
@@ -59,6 +59,22 @@ describe('syncUserPreferenceTags email type', () => {
       email: 'developer@company.com',
       segments: ['email_type:professional'],
       deleteSegments: expect.arrayContaining(['email_type:personal', 'email_type:disposable']),
+    }))
+  })
+
+  it('backfills the email type tag for a same-address preference update', async () => {
+    const context = createContext()
+
+    await syncUserPreferenceTags(context, 'developer@gmail.com', {
+      email_preferences: {},
+      enable_notifications: true,
+      opt_for_newsletters: false,
+    } as never, record, 'developer@gmail.com')
+
+    expect(syncBentoSubscriberTagsMock).toHaveBeenCalledWith(context, expect.objectContaining({
+      email: 'developer@gmail.com',
+      segments: expect.arrayContaining(['email_type:personal', 'notifications_opt_in']),
+      deleteSegments: expect.arrayContaining(['email_type:professional', 'email_type:disposable']),
     }))
   })
 })

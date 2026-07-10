@@ -1,8 +1,9 @@
 import type { Context } from 'hono'
+import type { EmailType } from './emailClassification.ts'
 import type { EmailPreferenceKey, EmailPreferences } from './org_email_notifications.ts'
 import type { Database } from './supabase.types.ts'
 import { syncBentoSubscriberTags } from './bento.ts'
-import { classifyEmailAddress, type EmailType } from './emailClassification.ts'
+import { classifyEmailAddress } from './emailClassification.ts'
 import { cloudlog } from './logging.ts'
 
 // Legacy tags for general notifications and newsletters
@@ -96,6 +97,14 @@ export async function syncUserPreferenceTags(
     const currentTags = buildDesiredTags(email, record)
     const previousTags = previousEmail === email && previousRecord ? buildDesiredTags(email, previousRecord) : undefined
     const segments = buildTagDelta(currentTags, previousTags)
+    if (previousTags) {
+      const emailTypeTag = EMAIL_TYPE_TAGS[classifyEmailAddress(email)]
+      segments.segments = [...new Set([...segments.segments, emailTypeTag])]
+      segments.deleteSegments = [...new Set([
+        ...segments.deleteSegments,
+        ...ALL_EMAIL_TYPE_TAGS.filter(tag => tag !== emailTypeTag),
+      ])]
+    }
     if (segments.segments.length === 0 && segments.deleteSegments.length === 0)
       return
     await syncBentoSubscriberTags(c, { email, ...segments })
