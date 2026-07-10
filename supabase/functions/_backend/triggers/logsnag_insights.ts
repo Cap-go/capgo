@@ -1438,7 +1438,11 @@ async function getAppBuildOnboardingMetrics(c: Context, window: DailyWindow): Pr
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getAppBuildOnboardingMetrics error', dateId: window.prevDayDateId, error })
-    throw error
+    return {
+      apps_created: 0,
+      apps_with_cli_onboarding_builds_24h: 0,
+      apps_with_manual_builds_24h: 0,
+    }
   }
   finally {
     closeClient(c, pgClient)

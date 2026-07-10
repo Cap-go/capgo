@@ -84,14 +84,8 @@ function isMissingAppBuildOnboardingSchemaError(error: { message?: string, detai
     .join(' ')
     .toLowerCase()
 
-  return [
-    'created_from_onboarding',
-    'onboarding_completed_at',
-    'column',
-    'schema cache',
-    'pgrst204',
-    '42703',
-  ].some(token => text.includes(token))
+  return text.includes('created_from_onboarding')
+    || text.includes('onboarding_completed_at')
 }
 
 export function resolveAppCreateSource(explicit?: AppCreateSource): AppCreateSource {
@@ -203,7 +197,6 @@ export async function addAppInternal(
       ...(withOnboardingMetrics
         ? {
             created_from_onboarding: true,
-            onboarding_completed_at: new Date().toISOString(),
           }
         : {}),
     })
@@ -214,7 +207,6 @@ export async function addAppInternal(
     const fallbackInsertResult = await insertApp(false)
     dbError = fallbackInsertResult.error
   }
-
   if (dbError) {
     if (!silent)
       log.error(`Could not add app ${formatError(dbError)}`)

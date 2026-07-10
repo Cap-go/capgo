@@ -1776,7 +1776,7 @@ export async function getAdminGlobalStatsTrend(
       )
       LEFT JOIN core_completed_stats onboarding_next ON onboarding_next.date_id = (
         CASE
-          WHEN gs.date_id ~ '^\d{4}-\d{2}-\d{2}$' THEN
+          WHEN gs.date_id ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN
             CASE
               WHEN to_char(to_date(gs.date_id, 'YYYY-MM-DD'), 'YYYY-MM-DD') = gs.date_id
                 THEN (to_date(gs.date_id, 'YYYY-MM-DD') + 1)::text

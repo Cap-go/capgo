@@ -579,6 +579,7 @@ describe('/private/admin_stats', () => {
     expect(latest?.apps).toBe(11)
     expect(latest?.apps_created).toBe(3)
     expect(latest?.apps_with_cli_onboarding_builds_24h).toBe(2)
+    expect(latest?.app_build_onboarding_finalized).toBe(true)
     expect(latest?.apps_with_manual_builds_24h).toBe(1)
     expect(latest?.updates).toBe(150)
     expect(latest?.past_due_orgs).toBe(2)
