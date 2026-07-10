@@ -91,7 +91,7 @@ COMMENT ON COLUMN "public"."audit_logs"."actor_apikey_name" IS 'Snapshot of the 
 
 UPDATE "public"."audit_logs"
 SET
-  "actor_type" = CASE WHEN "user_id" IS NULL THEN 'unknown' ELSE 'user' END,
+  "actor_type" = 'unknown',
   "actor_user_id" = "user_id"
 WHERE "actor_user_id" IS NULL
   AND "actor_apikey_id" IS NULL;
@@ -212,27 +212,25 @@ DECLARE
   v_actor_apikey_name TEXT;
   v_stats_refresh_fields CONSTANT TEXT[] := ARRAY['stats_refresh_requested_at', 'stats_updated_at', 'updated_at'];
 BEGIN
-  SELECT public.get_apikey_header() INTO v_api_key_text;
+  SELECT auth.uid() INTO v_actor_user_id;
 
-  IF v_api_key_text IS NOT NULL THEN
-    SELECT *
-    INTO v_api_key
-    FROM public.find_apikey_by_value(v_api_key_text)
-    LIMIT 1;
+  IF v_actor_user_id IS NOT NULL THEN
+    v_actor_type := 'user';
+  ELSE
+    SELECT public.get_apikey_header() INTO v_api_key_text;
 
-    IF v_api_key.id IS NOT NULL AND NOT public.is_apikey_expired(v_api_key.expires_at) THEN
-      v_actor_type := 'apikey';
-      v_actor_user_id := v_api_key.user_id;
-      v_actor_apikey_id := v_api_key.id;
-      v_actor_apikey_name := v_api_key.name;
-    END IF;
-  END IF;
+    IF v_api_key_text IS NOT NULL THEN
+      SELECT *
+      INTO v_api_key
+      FROM public.find_apikey_by_value(v_api_key_text)
+      LIMIT 1;
 
-  IF v_actor_type = 'system' THEN
-    SELECT auth.uid() INTO v_actor_user_id;
-
-    IF v_actor_user_id IS NOT NULL THEN
-      v_actor_type := 'user';
+      IF v_api_key.id IS NOT NULL AND NOT public.is_apikey_expired(v_api_key.expires_at) THEN
+        v_actor_type := 'apikey';
+        v_actor_user_id := v_api_key.user_id;
+        v_actor_apikey_id := v_api_key.id;
+        v_actor_apikey_name := v_api_key.name;
+      END IF;
     END IF;
   END IF;
 
@@ -498,3 +496,7 @@ END;
 $$;
 
 ALTER FUNCTION "public"."delete_accounts_marked_for_deletion"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."delete_accounts_marked_for_deletion"() FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."delete_accounts_marked_for_deletion"() FROM "anon";
+REVOKE ALL ON FUNCTION "public"."delete_accounts_marked_for_deletion"() FROM "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."delete_accounts_marked_for_deletion"() TO "service_role";

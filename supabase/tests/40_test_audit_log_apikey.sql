@@ -10,7 +10,7 @@ BEGIN;
 -- Org: 046a36ac-e03c-4590-9257-bd6c9dba9ee8
 -- App: com.demo.app
 
-SELECT plan(16);
+SELECT plan(17);
 
 -- Test 1: audit_logs_allowed_orgs should fail fast when no auth and no
 -- API key header is set
@@ -426,6 +426,16 @@ SELECT throws_ok(
     'P0001',
     'org_id_reuse_forbidden',
     'deleted org id cannot be reused'
+);
+
+SELECT is(
+    has_function_privilege(
+        'anon',
+        'public.delete_accounts_marked_for_deletion()'::regprocedure,
+        'EXECUTE'
+    ),
+    false,
+    'anon cannot execute delete_accounts_marked_for_deletion'
 );
 
 -- Finish

@@ -251,6 +251,9 @@ function getActorTypeLabel(actorType: AuditActorType): string {
 }
 
 function getActorUserEmail(item: ExtendedAuditLog): string | null {
+  if (item.actor_type !== 'user')
+    return null
+
   return item.actor_user_email || item.user?.email || null
 }
 
@@ -353,7 +356,9 @@ async function fetchAuditLogs() {
     const rows = (data ?? []) as ExtendedAuditLog[]
 
     for (const item of rows) {
-      const memberId = item.actor_user_id || item.user_id
+      const memberId = item.actor_type === 'user'
+        ? (item.actor_user_id || item.user_id)
+        : null
       if (memberId) {
         const member = membersMap.value.get(memberId)
         if (member) {
