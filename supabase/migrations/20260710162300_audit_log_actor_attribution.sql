@@ -234,6 +234,12 @@ BEGIN
     END IF;
   END IF;
 
+  -- Preserve the existing volume contract: background workers mutate audited
+  -- tables continuously, so only user- or API-key-attributed writes are logged.
+  IF v_actor_type = 'system' THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+
   IF v_actor_user_id IS NOT NULL THEN
     SELECT "email"
     INTO v_actor_user_email

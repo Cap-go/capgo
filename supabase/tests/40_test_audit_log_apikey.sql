@@ -10,7 +10,7 @@ BEGIN;
 -- Org: 046a36ac-e03c-4590-9257-bd6c9dba9ee8
 -- App: com.demo.app
 
-SELECT plan(17);
+SELECT plan(18);
 
 -- Test 1: audit_logs_allowed_orgs should fail fast when no auth and no
 -- API key header is set
@@ -428,6 +428,40 @@ SELECT throws_ok(
     'deleted org id cannot be reused'
 );
 
+
+-- Test 18: system/background writes must not create audit or webhook work.
+DO $$
+DECLARE
+    v_version_id bigint;
+BEGIN
+    PERFORM set_config('request.headers', '{}', true);
+    PERFORM set_config('request.jwt.claim.sub', '', true);
+    PERFORM set_config('request.jwt.claims', '{}', true);
+
+    INSERT INTO public.app_versions (app_id, name, owner_org, user_id, storage_provider)
+    VALUES (
+        'com.demo.app',
+        '99.0.2-test-system-audit',
+        '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+        '6aa76066-55ef-4238-ade6-0b32334a4097',
+        'r2'
+    )
+    RETURNING id INTO v_version_id;
+
+    IF EXISTS (
+        SELECT 1
+        FROM public.audit_logs
+        WHERE table_name = 'app_versions'
+          AND record_id = v_version_id::text
+          AND operation = 'INSERT'
+    ) THEN
+        RAISE EXCEPTION 'unattributed system write created an audit log';
+    END IF;
+
+    DELETE FROM public.app_versions WHERE id = v_version_id;
+END $$;
+
+SELECT ok(TRUE, 'unattributed system writes do not create audit logs');
 SELECT is(
     has_function_privilege(
         'anon',

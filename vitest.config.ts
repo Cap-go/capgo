@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { cwd } from 'node:process'
+import { cwd, env } from 'node:process'
 import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
 
@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => ({
     // This was causing CI to exit 1 with "passed" summary but canceled test files.
     bail: 0,
     testTimeout: 30_000, // Increased from 20s to handle slow edge function responses
-    hookTimeout: 15_000, // Increased from 8s to handle slow setup/teardown
+    hookTimeout: env.CI ? 60_000 : 15_000, // CI shares a local database across integration suites
     retry: 3, // Increased retries for network flakiness
     maxConcurrency: 5, // Reduced to prevent connection exhaustion
     // Vitest 4: pool options are now top-level
