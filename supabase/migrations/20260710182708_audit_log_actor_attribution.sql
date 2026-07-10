@@ -77,9 +77,10 @@ ALTER TABLE "public"."audit_logs"
 ALTER TABLE "public"."audit_logs"
   DROP CONSTRAINT IF EXISTS "audit_logs_actor_type_check";
 
+-- Enforce attribution on new writes without scanning the retained audit history.
 ALTER TABLE "public"."audit_logs"
   ADD CONSTRAINT "audit_logs_actor_type_check"
-  CHECK ("actor_type" IN ('user', 'apikey', 'system', 'unknown'));
+  CHECK ("actor_type" IN ('user', 'apikey', 'system', 'unknown')) NOT VALID;
 
 COMMENT ON COLUMN "public"."audit_logs"."user_id" IS 'Legacy actor user id. Kept without a foreign key so audit history survives user deletion.';
 COMMENT ON COLUMN "public"."audit_logs"."org_id" IS 'Organization context for filtering. Kept without a foreign key so audit history survives organization deletion.';
@@ -144,6 +145,10 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 BEGIN
+  -- Set before cascading child deletes so no webhook work targets an org whose
+  -- webhooks are removed by this same transaction.
+  PERFORM pg_catalog.set_config('capgo.deleting_org_id', OLD."id"::text, true);
+
   INSERT INTO "public"."org_id_tombstones" ("org_id", "deleted_at")
   VALUES (OLD."id", now())
   ON CONFLICT ("org_id") DO NOTHING;
@@ -324,9 +329,10 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 BEGIN
-  -- Organization deletion cascades to webhooks in the same transaction. Do not
-  -- enqueue an event that the asynchronous dispatcher can no longer deliver.
-  IF NEW.table_name = 'orgs' AND NEW.operation = 'DELETE' THEN
+  -- Account deletion removes org webhooks in the same transaction. Do not queue
+  -- the final org event or its child resource events with no surviving recipient.
+  IF pg_catalog.current_setting('capgo.deleting_org_id', true) = NEW.org_id::text
+    OR (NEW.table_name = 'orgs' AND NEW.operation = 'DELETE') THEN
     RETURN NEW;
   END IF;
   -- Queue the audit log event for webhook dispatch
@@ -402,24 +408,29 @@ BEGIN
             RAISE NOTICE 'User % is last super_admin of org %. Deleting all org resources.',
               account_record.account_id, org_record.org_id;
 
-          -- Delete deploy_history for this org
-          DELETE FROM "public"."deploy_history" WHERE "owner_org" = org_record.org_id;
+            -- Mark this transaction so retained child audit logs do not enqueue
+            -- webhooks that the final org delete will remove recipients for.
+            PERFORM pg_catalog.set_config('capgo.deleting_org_id', org_record.org_id::text, true);
 
-          -- Delete channel_devices for this org
-          DELETE FROM "public"."channel_devices" WHERE "owner_org" = org_record.org_id;
+            -- Delete deploy_history for this org
+            DELETE FROM "public"."deploy_history" WHERE "owner_org" = org_record.org_id;
 
-          -- Delete channels for this org
-          DELETE FROM "public"."channels" WHERE "owner_org" = org_record.org_id;
+            -- Delete channel_devices for this org
+            DELETE FROM "public"."channel_devices" WHERE "owner_org" = org_record.org_id;
 
-          -- Delete app_versions for this org
-          DELETE FROM "public"."app_versions" WHERE "owner_org" = org_record.org_id;
+            -- Delete channels for this org
+            DELETE FROM "public"."channels" WHERE "owner_org" = org_record.org_id;
 
-          -- Delete apps for this org
-          DELETE FROM "public"."apps" WHERE "owner_org" = org_record.org_id;
+            -- Delete app_versions for this org
+            DELETE FROM "public"."app_versions" WHERE "owner_org" = org_record.org_id;
 
-          -- Delete the org itself since user is last super_admin. Audit logs
-          -- intentionally keep their org_id snapshot without a foreign key.
-          DELETE FROM "public"."orgs" WHERE "id" = org_record.org_id;
+            -- Delete apps for this org
+            DELETE FROM "public"."apps" WHERE "owner_org" = org_record.org_id;
+
+            -- Delete the org itself since user is last super_admin. Audit logs
+            -- intentionally keep their org_id snapshot without a foreign key.
+            DELETE FROM "public"."orgs" WHERE "id" = org_record.org_id;
+            PERFORM pg_catalog.set_config('capgo.deleting_org_id', '', true);
 
             -- Skip ownership transfer since all resources are deleted
             CONTINUE;

@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(47);
+SELECT plan(49);
 
 -- Test helper function to create test users in both auth.users and public.users tables
 CREATE OR REPLACE FUNCTION create_test_user_for_deletion(
@@ -545,6 +545,10 @@ VALUES
     '{"email": "last_admin@test.com", "apikeys": []}'::JSONB
 );
 
+-- Ignore setup events so this test only observes deletion-time queue work.
+DELETE FROM pgmq.q_webhook_dispatcher
+WHERE message->'payload'->>'org_id' = '88888888-8888-8888-8888-888888888888';
+
 -- Verify resources exist before deletion
 SELECT
     ok(
@@ -614,6 +618,17 @@ SELECT
         'Last super_admin user deleted successfully'
     );
 
+
+-- Child audit logs are retained, but no webhook work can outlive this org.
+SELECT
+    ok(
+        NOT EXISTS (
+            SELECT 1
+            FROM pgmq.q_webhook_dispatcher
+            WHERE message->'payload'->>'org_id' = '88888888-8888-8888-8888-888888888888'
+        ),
+        'Last super_admin deletion does not queue orphaned child webhooks'
+    );
 -- Verify user is deleted
 SELECT
     ok(
@@ -976,30 +991,28 @@ SELECT
         'Deploy history ownership transferred to remaining super_admin'
     );
 
--- Clean up
+-- Clean up. A direct org delete cascades resources and must not enqueue
+-- webhooks that disappear with the organization.
 DELETE FROM public.deploy_history
 WHERE
     id = 2001;
 
-DELETE FROM public.channels
-WHERE
-    id = 2001;
-
-DELETE FROM public.app_versions
-WHERE
-    id = 2001;
-
-DELETE FROM public.apps
-WHERE
-    app_id = 'com.shared.app';
-
-DELETE FROM public.org_users
-WHERE
-    org_id = '99999999-9999-9999-9999-999999999999'::UUID;
+DELETE FROM pgmq.q_webhook_dispatcher
+WHERE message->'payload'->>'org_id' = '99999999-9999-9999-9999-999999999999';
 
 DELETE FROM public.orgs
 WHERE
     id = '99999999-9999-9999-9999-999999999999'::UUID;
+
+SELECT
+    ok(
+        NOT EXISTS (
+            SELECT 1
+            FROM pgmq.q_webhook_dispatcher
+            WHERE message->'payload'->>'org_id' = '99999999-9999-9999-9999-999999999999'
+        ),
+        'Direct org deletion does not queue orphaned child webhooks'
+    );
 
 DELETE FROM public.users
 WHERE
