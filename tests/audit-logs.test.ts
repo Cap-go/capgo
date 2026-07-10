@@ -3,7 +3,7 @@ import { type } from 'arktype'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { safeParseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
 
-import { BASE_URL, createDirectApiKeyWithBindings, fetchWithRetry, getAuthHeaders, getSupabaseClient, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, createDirectApiKeyWithBindings, executeSQL, fetchWithRetry, getAuthHeaders, getSupabaseClient, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
@@ -23,6 +23,11 @@ const auditLogSchema = type({
   old_record: 'unknown',
   new_record: 'unknown',
   changed_fields: 'string[] | null',
+  actor_type: '"user" | "apikey" | "system" | "unknown"',
+  actor_user_id: 'string | null',
+  actor_user_email: 'string | null',
+  actor_apikey_id: 'number | null',
+  actor_apikey_name: 'string | null',
 })
 
 const auditLogsResponseSchema = type({
@@ -43,6 +48,11 @@ interface AuditLog {
   old_record: unknown
   new_record: unknown
   changed_fields: string[] | null
+  actor_type: 'user' | 'apikey' | 'system' | 'unknown'
+  actor_user_id: string | null
+  actor_user_email: string | null
+  actor_apikey_id: number | null
+  actor_apikey_name: string | null
 }
 
 function parseAuditLogsResponse(value: unknown) {
@@ -52,6 +62,7 @@ function parseAuditLogsResponse(value: unknown) {
 let authHeaders: Record<string, string>
 let apiKeyAuthHeaders: Record<string, string>
 let apiKeyId: number | null = null
+let actorUserEmail: string
 
 async function waitForAuditLog(
   url: string,
@@ -87,6 +98,15 @@ async function waitForAuditLog(
 
 beforeAll(async () => {
   authHeaders = await getAuthHeaders()
+
+  const { data: actorUser, error: actorUserError } = await getSupabaseClient()
+    .from('users')
+    .select('email')
+    .eq('id', USER_ID)
+    .single()
+  if (actorUserError || !actorUser)
+    throw actorUserError ?? new Error('Failed to load audit actor user')
+  actorUserEmail = actorUser.email
 
   // Create stripe_info for this test org
   const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
@@ -275,6 +295,36 @@ describe('[GET] /organization/audit', () => {
     const responseData = await response.json() as { error: string }
     expect(responseData.error).toBe('invalid_org_id')
   })
+
+  it('audit logs keep org and user snapshots without foreign keys', async () => {
+    const orphanOrgId = randomUUID()
+    const orphanUserId = randomUUID()
+    const rows = await executeSQL(
+      `
+      INSERT INTO public.audit_logs (
+        table_name,
+        record_id,
+        operation,
+        user_id,
+        org_id,
+        actor_type,
+        actor_user_id,
+        actor_user_email
+      )
+      VALUES ('orgs', $1::text, 'DELETE', $2::uuid, $1::uuid, 'user', $2::uuid, $3::text)
+      RETURNING id, org_id, user_id, actor_type, actor_user_email
+      `,
+      [orphanOrgId, orphanUserId, 'deleted-user@example.com'],
+    )
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0].org_id).toBe(orphanOrgId)
+    expect(rows[0].user_id).toBe(orphanUserId)
+    expect(rows[0].actor_type).toBe('user')
+    expect(rows[0].actor_user_email).toBe('deleted-user@example.com')
+
+    await executeSQL('DELETE FROM public.audit_logs WHERE id = $1', [rows[0].id])
+  })
 })
 
 describe('audit log triggers', () => {
@@ -299,6 +349,8 @@ describe('audit log triggers', () => {
     const responseData = await response.json()
     const safe = parseAuditLogsResponse(responseData)
     expect(safe.success).toBe(true)
+    if (safe.success)
+      expect(safe.data.data.length).toBeGreaterThan(0)
 
     if (safe.success && safe.data.data.length > 0) {
       const latestUpdate = safe.data.data[0]
@@ -306,6 +358,9 @@ describe('audit log triggers', () => {
       expect(latestUpdate.table_name).toBe('orgs')
       expect(latestUpdate.record_id).toBe(ORG_ID)
       expect(latestUpdate.org_id).toBe(ORG_ID)
+      expect(latestUpdate.actor_type).toBe('system')
+      expect(latestUpdate.actor_user_id).toBeNull()
+      expect(latestUpdate.actor_user_email).toBeNull()
       // Changed fields should include 'name' and 'updated_at'
       expect(Array.isArray(latestUpdate.changed_fields)).toBe(true)
       expect(latestUpdate.changed_fields).toContain('name')
@@ -495,6 +550,11 @@ describe('audit logs for app_versions via API key', () => {
         expect(versionAuditLog.org_id).toBe(ORG_ID)
         // This is the key assertion: user_id should be set from the API key
         expect(versionAuditLog.user_id).toBe(USER_ID)
+        expect(versionAuditLog.actor_type).toBe('apikey')
+        expect(versionAuditLog.actor_user_id).toBe(USER_ID)
+        expect(versionAuditLog.actor_user_email).toBe(actorUserEmail)
+        expect(versionAuditLog.actor_apikey_id).toBe(apiKeyId)
+        expect(versionAuditLog.actor_apikey_name).toContain('audit-api-key-')
         expect(versionAuditLog.old_record).toBeNull()
         expect(versionAuditLog.new_record).toBeTruthy()
         if (versionAuditLog.new_record && typeof versionAuditLog.new_record === 'object') {
@@ -534,6 +594,10 @@ describe('audit logs for app_versions via API key', () => {
     expect(updateAuditLog.org_id).toBe(ORG_ID)
     // user_id should be set from the API key
     expect(updateAuditLog.user_id).toBe(USER_ID)
+    expect(updateAuditLog.actor_type).toBe('apikey')
+    expect(updateAuditLog.actor_user_id).toBe(USER_ID)
+    expect(updateAuditLog.actor_user_email).toBe(actorUserEmail)
+    expect(updateAuditLog.actor_apikey_id).toBe(apiKeyId)
     expect(updateAuditLog.old_record).toBeTruthy()
     expect(updateAuditLog.new_record).toBeTruthy()
     // changed_fields should include 'comment'
@@ -588,6 +652,10 @@ describe('audit logs for app_versions via API key', () => {
         expect(deleteAuditLog.org_id).toBe(ORG_ID)
         // user_id should be set from the API key
         expect(deleteAuditLog.user_id).toBe(USER_ID)
+        expect(deleteAuditLog.actor_type).toBe('apikey')
+        expect(deleteAuditLog.actor_user_id).toBe(USER_ID)
+        expect(deleteAuditLog.actor_user_email).toBe(actorUserEmail)
+        expect(deleteAuditLog.actor_apikey_id).toBe(apiKeyId)
         // Both old and new record should exist for UPDATE
         expect(deleteAuditLog.old_record).toBeTruthy()
         expect(deleteAuditLog.new_record).toBeTruthy()
@@ -702,6 +770,10 @@ describe('audit logs for channel promotions via API key bundle flow', () => {
     expect(promotionAuditLog.table_name).toBe('channels')
     expect(promotionAuditLog.org_id).toBe(ORG_ID)
     expect(promotionAuditLog.user_id).toBe(USER_ID)
+    expect(promotionAuditLog.actor_type).toBe('apikey')
+    expect(promotionAuditLog.actor_user_id).toBe(USER_ID)
+    expect(promotionAuditLog.actor_user_email).toBe(actorUserEmail)
+    expect(promotionAuditLog.actor_apikey_id).toBe(apiKeyId)
     expect(promotionAuditLog.changed_fields).toContain('version')
 
     if (promotionAuditLog.new_record && typeof promotionAuditLog.new_record === 'object') {

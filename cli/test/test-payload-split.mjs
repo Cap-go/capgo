@@ -133,6 +133,7 @@ await test('Output and store release fields go to buildOptions, not buildCredent
     BUILD_OUTPUT_UPLOAD_ENABLED: 'true',
     BUILD_OUTPUT_RETENTION_SECONDS: '7200',
     SKIP_BUILD_NUMBER_BUMP: 'true',
+    SKIP_MARKETING_VERSION_BUMP: 'true',
     CAPGO_STORE_SUBMIT_REVIEW: 'true',
     CAPGO_STORE_RELEASE_NAME: '1.2.3',
     CAPGO_STORE_RELEASE_NOTES: 'Fix login and improve onboarding',
@@ -148,6 +149,7 @@ await test('Output and store release fields go to buildOptions, not buildCredent
   assertEquals(buildOptions.outputUploadEnabled, true, 'outputUploadEnabled should be true')
   assertEquals(buildOptions.outputRetentionSeconds, 7200, 'outputRetentionSeconds should be 7200')
   assertEquals(buildOptions.skipBuildNumberBump, true, 'skipBuildNumberBump should be true')
+  assertEquals(buildOptions.skipMarketingVersionBump, true, 'skipMarketingVersionBump should be true')
   assertEquals(buildOptions.submitToStoreReview, true, 'submitToStoreReview should be true')
   assertEquals(buildOptions.storeReleaseName, '1.2.3', 'storeReleaseName should be in options')
   assertEquals(buildOptions.storeReleaseNotes, 'Fix login and improve onboarding', 'storeReleaseNotes should be in options')
@@ -159,6 +161,7 @@ await test('Output and store release fields go to buildOptions, not buildCredent
   assert(!('BUILD_OUTPUT_UPLOAD_ENABLED' in buildCredentials), 'Output upload should not be in credentials')
   assert(!('BUILD_OUTPUT_RETENTION_SECONDS' in buildCredentials), 'Output retention should not be in credentials')
   assert(!('SKIP_BUILD_NUMBER_BUMP' in buildCredentials), 'Skip bump should not be in credentials')
+  assert(!('SKIP_MARKETING_VERSION_BUMP' in buildCredentials), 'Skip marketing bump should not be in credentials')
   assert(!('CAPGO_STORE_SUBMIT_REVIEW' in buildCredentials), 'Store review flag should not be in credentials')
   assert(!('CAPGO_STORE_RELEASE_NAME' in buildCredentials), 'Store release name should not be in credentials')
   assert(!('CAPGO_STORE_RELEASE_NOTES' in buildCredentials), 'Store release notes should not be in credentials')
@@ -210,6 +213,7 @@ await test('Output control defaults when not provided', async () => {
   assertEquals(buildOptions.outputRetentionSeconds, MIN_OUTPUT_RETENTION_SECONDS,
     `outputRetentionSeconds should default to MIN_OUTPUT_RETENTION_SECONDS (${MIN_OUTPUT_RETENTION_SECONDS})`)
   assertEquals(buildOptions.skipBuildNumberBump, false, 'skipBuildNumberBump should default to false')
+  assertEquals(buildOptions.skipMarketingVersionBump, false, 'skipMarketingVersionBump should default to false')
   assertEquals(buildOptions.submitToStoreReview, false, 'submitToStoreReview should default to false')
 })
 
@@ -269,6 +273,7 @@ await test('NON_CREDENTIAL_KEYS covers all non-secret fields', async () => {
     'BUILD_OUTPUT_UPLOAD_ENABLED',
     'BUILD_OUTPUT_RETENTION_SECONDS',
     'SKIP_BUILD_NUMBER_BUMP',
+    'SKIP_MARKETING_VERSION_BUMP',
     'CAPGO_STORE_SUBMIT_REVIEW',
     'CAPGO_STORE_RELEASE_NAME',
     'CAPGO_STORE_RELEASE_NOTES',

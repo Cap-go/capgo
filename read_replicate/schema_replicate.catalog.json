@@ -501,6 +501,26 @@
       "type": "character varying[]"
     },
     {
+      "default": "false",
+      "generated": "",
+      "identity": "",
+      "name": "created_from_onboarding",
+      "notNull": true,
+      "position": 29,
+      "table": "apps",
+      "type": "boolean"
+    },
+    {
+      "default": null,
+      "generated": "",
+      "identity": "",
+      "name": "onboarding_completed_at",
+      "notNull": false,
+      "position": 30,
+      "table": "apps",
+      "type": "timestamp with time zone"
+    },
+    {
       "default": "now()",
       "generated": "",
       "identity": "",
@@ -2024,6 +2044,12 @@
     {
       "definition": "CREATE INDEX finx_apps_user_id ON public.apps USING btree (user_id)",
       "name": "finx_apps_user_id",
+      "table": "apps",
+      "valid": true
+    },
+    {
+      "definition": "CREATE INDEX idx_apps_created_at ON public.apps USING btree (created_at)",
+      "name": "idx_apps_created_at",
       "table": "apps",
       "valid": true
     },

@@ -55,6 +55,7 @@ BEGIN
     TRUNCATE TABLE "public"."usage_credit_transactions" CASCADE;
     TRUNCATE TABLE "public"."usage_credit_consumptions" CASCADE;
     TRUNCATE TABLE "public"."usage_overage_events" CASCADE;
+    TRUNCATE TABLE "public"."org_id_tombstones";
     -- RBAC tables: must truncate in order to respect foreign keys
     TRUNCATE TABLE "public"."role_bindings" RESTART IDENTITY CASCADE;
     TRUNCATE TABLE "public"."group_members" RESTART IDENTITY CASCADE;
@@ -943,6 +944,7 @@ DECLARE
   production_channel_id bigint; beta_channel_id bigint; development_channel_id bigint; no_access_channel_id bigint; electron_only_channel_id bigint;
 BEGIN
   PERFORM pg_advisory_xact_lock(hashtext(p_app_id));
+  EXECUTE 'DELETE FROM public.org_id_tombstones WHERE org_id = $1' USING org_id;
   PERFORM public.reset_app_data(p_app_id);
   -- Ensure the base Stripe customer and org exist so FK inserts are stable between tests
   INSERT INTO public.stripe_info (
