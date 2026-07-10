@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { getReleaseRangeBase, matchesComponent, resolveReleaseScope } from '../scripts/release-scope.ts'
+import { matchesComponent, resolveReleaseScope } from '../scripts/release-scope.ts'
 
 describe('release scope matching', () => {
   it.concurrent('treats shared release infrastructure as affecting all components', () => {
@@ -9,7 +9,6 @@ describe('release scope matching', () => {
       '.github/workflows/bump_version.yml',
       '.github/scripts/start-background-service.sh',
       'scripts/setup-bun.sh',
-      'scripts/release-scope.ts',
       'scripts/sync-notifications-package-version.ts',
     ]
 
@@ -18,6 +17,16 @@ describe('release scope matching', () => {
     expect(matchesComponent('notifications', files)).toBe(true)
   })
 
+  it.concurrent('does not publish packages for release scope logic changes', () => {
+    const files = [
+      'scripts/release-scope.ts',
+      'tests/release-scope.test.ts',
+    ]
+
+    expect(matchesComponent('capgo', files)).toBe(false)
+    expect(matchesComponent('cli', files)).toBe(false)
+    expect(matchesComponent('notifications', files)).toBe(false)
+  })
   it.concurrent('treats capgo deploy workflow changes as capgo-only releases', () => {
     const files = ['.github/workflows/build_and_deploy.yml', 'scripts/deploy-scope.ts']
 
@@ -55,6 +64,19 @@ describe('release scope matching', () => {
     expect(workflow).not.toContain('--access restricted')
   })
 
+  it.concurrent('builds package changelogs from the last successful component release', () => {
+    for (const [workflowPath, prefix] of [
+      ['.github/workflows/publish_cli.yml', 'cli-'],
+      ['.github/workflows/publish_notifications.yml', 'notifications-'],
+    ] as const) {
+      const workflow = readFileSync(workflowPath, 'utf8')
+
+      expect(workflow).toContain('gh release list')
+      expect(workflow).toContain(`--arg prefix "${prefix}"`)
+      expect(workflow).toContain('from_tag: $' + '{{ steps.changelog_base.outputs.from_tag }}')
+    }
+  })
+
   it.concurrent('uses the released package in Discord release footers', () => {
     const workflow = readFileSync('.github/workflows/github-releases-to-discord.yml', 'utf8')
     const cliPackage = JSON.parse(readFileSync('cli/package.json', 'utf8')) as { name: string }
@@ -90,67 +112,34 @@ describe('release scope matching', () => {
     expect(matchesComponent('notifications', files)).toBe(false)
   })
 
-  it.concurrent('uses the latest component tag instead of only the pushed range', () => {
-    const run = (args: string[]) => {
-      if (args[0] === 'describe') {
-        expect(args).toEqual(['describe', '--tags', '--match', 'cli-[0-9]*', '--abbrev=0', 'HEAD'])
-        return 'cli-7.95.15'
+  it.concurrent('only evaluates component paths from the current push', () => {
+    for (const [component, previousTag, componentFile] of [
+      ['cli', 'cli-8.25.11', 'cli/src/posthog.ts'],
+      ['notifications', 'notifications-0.1.10', 'packages/capacitor-notifications/src/index.ts'],
+    ] as const) {
+      const run = (args: string[]) => {
+        const key = args.join(' ')
+        const responses: Record<string, string> = {
+          [`describe --tags --match ${component}-[0-9]* --abbrev=0 head-capgo-only`]: previousTag,
+          [`rev-list --reverse ${previousTag}..head-capgo-only`]: `${component}-change\ncapgo-change`,
+          'rev-list --reverse current-push-parent..head-capgo-only': 'capgo-change',
+          [`show --format= --name-only ${component}-change`]: componentFile,
+          'show --format= --name-only capgo-change': 'src/pages/index.vue',
+          [`log -1 --format=%s ${component}-change`]: `feat(${component}): previous change`,
+          [`log -1 --format=%b ${component}-change`]: '',
+        }
+
+        if (key in responses) {
+          return responses[key]
+        }
+
+        throw new Error(`Unexpected git call: ${key}`)
       }
 
-      throw new Error(`Unexpected git call: ${args.join(' ')}`)
+      expect(resolveReleaseScope(component, 'current-push-parent', 'head-capgo-only', run)).toEqual({
+        shouldRelease: false,
+        releaseAs: 'patch',
+      })
     }
-
-    expect(getReleaseRangeBase('cli', 'previous-push-sha', 'HEAD', run)).toBe('cli-7.95.15')
-  })
-
-  it.concurrent('falls back to the pushed range when no component tag exists', () => {
-    const run = (args: string[]) => {
-      if (args[0] === 'describe') {
-        throw Object.assign(new Error('git describe failed'), {
-          stderr: 'fatal: No names found, cannot describe anything.',
-        })
-      }
-
-      throw new Error(`Unexpected git call: ${args.join(' ')}`)
-    }
-
-    expect(getReleaseRangeBase('capgo', 'previous-push-sha', 'HEAD', run)).toBe('previous-push-sha')
-  })
-
-  it.concurrent('rethrows unexpected git describe failures', () => {
-    const run = (args: string[]) => {
-      if (args[0] === 'describe') {
-        throw new Error('fatal: bad revision HEAD')
-      }
-
-      throw new Error(`Unexpected git call: ${args.join(' ')}`)
-    }
-
-    expect(() => getReleaseRangeBase('cli', 'previous-push-sha', 'HEAD', run)).toThrow('fatal: bad revision HEAD')
-  })
-
-  it.concurrent('keeps missed CLI changes releasable after a later Capgo-only push', () => {
-    const run = (args: string[]) => {
-      const key = args.join(' ')
-      const responses: Record<string, string> = {
-        'describe --tags --match cli-[0-9]* --abbrev=0 head-capgo-only': 'cli-7.95.15',
-        'rev-list --reverse cli-7.95.15..head-capgo-only': 'cli-change\ncapgo-change',
-        'show --format= --name-only cli-change': 'cli/src/posthog.ts',
-        'show --format= --name-only capgo-change': 'src/pages/index.vue',
-        'log -1 --format=%s cli-change': 'feat(cli): capture exceptions',
-        'log -1 --format=%b cli-change': '',
-      }
-
-      if (key in responses) {
-        return responses[key]
-      }
-
-      throw new Error(`Unexpected git call: ${key}`)
-    }
-
-    expect(resolveReleaseScope('cli', 'capgo-change-parent', 'head-capgo-only', run)).toEqual({
-      shouldRelease: true,
-      releaseAs: 'minor',
-    })
   })
 })
