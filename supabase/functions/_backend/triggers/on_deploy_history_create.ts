@@ -67,20 +67,22 @@ app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'),
       notify: false,
     })
 
-    const pgClient = getPgClient(c, true)
-    const drizzleClient = getDrizzleClient(pgClient)
-    try {
-      await backgroundTask(c, sendNotifToOrgMembersOnce(c, 'bundle:deployed', 'bundle_deployed', {
-        org_id: version.owner_org,
-        app_id: record.app_id,
-        bundle_name: version.name,
-        channel_id: record.channel_id,
-        version_id: record.version_id,
-      }, version.owner_org, `bundle:deployed:${record.version_id}`, drizzleClient))
-    }
-    finally {
-      closeClient(c, pgClient)
-    }
+    await backgroundTask(c, (async () => {
+      const pgClient = getPgClient(c, true)
+      const drizzleClient = getDrizzleClient(pgClient)
+      try {
+        await sendNotifToOrgMembersOnce(c, 'bundle:deployed', 'bundle_deployed', {
+          org_id: version.owner_org,
+          app_id: record.app_id,
+          bundle_name: version.name,
+          channel_id: record.channel_id,
+          version_id: record.version_id,
+        }, version.owner_org, `bundle:deployed:${record.version_id}:${record.channel_id}`, drizzleClient)
+      }
+      finally {
+        closeClient(c, pgClient)
+      }
+    })())
   }
 
   return c.json(BRES)
