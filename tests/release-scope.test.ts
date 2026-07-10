@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { getReleaseRangeBase, matchesComponent, resolveReleaseScope } from '../scripts/release-scope.ts'
 
@@ -41,6 +42,17 @@ describe('release scope matching', () => {
     expect(matchesComponent('capgo', files)).toBe(false)
     expect(matchesComponent('cli', files)).toBe(false)
     expect(matchesComponent('notifications', files)).toBe(true)
+  })
+
+  it.concurrent('publishes notifications as a public npm package', () => {
+    const packageJson = JSON.parse(
+      readFileSync('packages/capacitor-notifications/package.json', 'utf8'),
+    ) as { publishConfig?: { access?: string } }
+    const workflow = readFileSync('.github/workflows/publish_notifications.yml', 'utf8')
+
+    expect(packageJson.publishConfig?.access).toBe('public')
+    expect(workflow).toContain('--access public')
+    expect(workflow).not.toContain('--access restricted')
   })
 
   it.concurrent('keeps runtime code scoped to the matching component', () => {

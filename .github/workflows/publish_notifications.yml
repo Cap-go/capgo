@@ -44,16 +44,16 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ github.token }}
           model: claude-sonnet-4-5-20250929
-      - name: Publish notifications plugin privately
+      - name: Publish notifications plugin to npm
         if: ${{ !contains(github.ref, '-alpha.') }}
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: bun publish --cwd packages/capacitor-notifications --access restricted
-      - name: Publish notifications plugin privately with next tag
+        run: bun publish --cwd packages/capacitor-notifications --access public
+      - name: Publish notifications plugin to npm with next tag
         if: ${{ contains(github.ref, '-alpha.') }}
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: bun publish --cwd packages/capacitor-notifications --tag next --access restricted
+        run: bun publish --cwd packages/capacitor-notifications --tag next --access public
       - name: Create GitHub release
         id: create_release
         uses: softprops/action-gh-release@v2

@@ -202,6 +202,8 @@ jobs:
         run: bun run --cwd packages/capacitor-notifications typecheck
       - name: Build notifications plugin
         run: bun run --cwd packages/capacitor-notifications build
+      - name: Verify notifications publish access
+        run: bunx vitest run tests/release-scope.test.ts
 
   lint_typecheck:
     needs: changes

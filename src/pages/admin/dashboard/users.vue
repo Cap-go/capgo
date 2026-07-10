@@ -992,26 +992,50 @@ displayStore.defaultBack = '/dashboard'
           <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
             <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
               <div>
-                <p class="text-sm text-slate-600 dark:text-slate-400">Total Paid Organizations</p>
-                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-emerald-500">{{ formatNumberValue(latestGlobalStats.paying_orgs_total || latestGlobalStats.paying || 0) }}</p>
-                <p v-else class="mt-2 text-3xl font-bold text-emerald-500">0</p>
-                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Subscription and/or available credits</p>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  Total Paid Organizations
+                </p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-emerald-500">
+                  {{ formatNumberValue(latestGlobalStats.paying_orgs_total || latestGlobalStats.paying || 0) }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-emerald-500">
+                  0
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Subscription and/or available credits
+                </p>
               </div>
             </div>
             <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
               <div>
-                <p class="text-sm text-slate-600 dark:text-slate-400">Paid via Subscription</p>
-                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-primary">{{ formatNumberValue(latestGlobalStats.paying_orgs_subscription || latestGlobalStats.paying || 0) }}</p>
-                <p v-else class="mt-2 text-3xl font-bold text-primary">0</p>
-                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Active subscription organizations</p>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  Paid via Subscription
+                </p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-primary">
+                  {{ formatNumberValue(latestGlobalStats.paying_orgs_subscription || latestGlobalStats.paying || 0) }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-primary">
+                  0
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Active subscription organizations
+                </p>
               </div>
             </div>
             <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
               <div>
-                <p class="text-sm text-slate-600 dark:text-slate-400">Paid via Credits</p>
-                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-accent">{{ formatNumberValue(latestGlobalStats.paying_orgs_credits || 0) }}</p>
-                <p v-else class="mt-2 text-3xl font-bold text-accent">0</p>
-                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Organizations with available credits</p>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  Paid via Credits
+                </p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-accent">
+                  {{ formatNumberValue(latestGlobalStats.paying_orgs_credits || 0) }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-accent">
+                  0
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Organizations with available credits
+                </p>
               </div>
             </div>
 

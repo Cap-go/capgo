@@ -13,7 +13,7 @@ It handles:
 
 ## Setup
 
-This package is in private Capgo preview. Until the private package is enabled for your npm account, use this only from Capgo-managed workspaces or an internal registry token.
+Install the plugin from npm with the Capgo updater peer dependency when you want silent live-update checks from push notifications.
 
 ```bash
 npm install @capgo/capacitor-notifications @capgo/capacitor-updater
