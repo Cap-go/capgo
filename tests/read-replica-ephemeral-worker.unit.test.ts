@@ -89,7 +89,7 @@ esac
         },
       })
       expect(stderr).toBe('')
-      expect(stdout).toContain('Read-replica schema catalog matches the committed snapshot.')
+      expect(stdout).toContain('Read-replica schema is compatible with the committed snapshot.')
     }
 
     await Promise.all([runChecker(), runChecker()])
