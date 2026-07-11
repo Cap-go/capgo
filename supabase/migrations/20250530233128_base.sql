@@ -4362,6 +4362,10 @@ SELECT
     )
   );
 
+CREATE POLICY "Allow anon to select" ON "public"."global_stats" FOR
+SELECT
+  TO "anon" USING (true);
+
 CREATE POLICY "Allow apikey to read" ON "public"."stats" FOR
 SELECT
   TO "anon" USING (
@@ -6541,6 +6545,10 @@ GRANT ALL ON TABLE "public"."devices" TO "anon";
 GRANT ALL ON TABLE "public"."devices" TO "authenticated";
 
 GRANT ALL ON TABLE "public"."devices" TO "service_role";
+
+GRANT ALL ON TABLE "public"."global_stats" TO "anon";
+
+GRANT ALL ON TABLE "public"."global_stats" TO "authenticated";
 
 GRANT ALL ON TABLE "public"."global_stats" TO "service_role";
 
