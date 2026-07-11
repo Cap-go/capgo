@@ -714,29 +714,9 @@
       "default": "true",
       "generated": "",
       "identity": "",
-      "name": "allow_device",
-      "notNull": true,
-      "position": 13,
-      "table": "channels",
-      "type": "boolean"
-    },
-    {
-      "default": "true",
-      "generated": "",
-      "identity": "",
       "name": "allow_dev",
       "notNull": true,
-      "position": 14,
-      "table": "channels",
-      "type": "boolean"
-    },
-    {
-      "default": "true",
-      "generated": "",
-      "identity": "",
-      "name": "allow_prod",
-      "notNull": true,
-      "position": 15,
+      "position": 13,
       "table": "channels",
       "type": "boolean"
     },
@@ -746,7 +726,7 @@
       "identity": "",
       "name": "disable_auto_update",
       "notNull": true,
-      "position": 16,
+      "position": 14,
       "table": "channels",
       "type": "disable_update"
     },
@@ -756,7 +736,7 @@
       "identity": "",
       "name": "owner_org",
       "notNull": true,
-      "position": 17,
+      "position": 15,
       "table": "channels",
       "type": "uuid"
     },
@@ -766,17 +746,7 @@
       "identity": "",
       "name": "created_by",
       "notNull": true,
-      "position": 18,
-      "table": "channels",
-      "type": "uuid"
-    },
-    {
-      "default": "gen_random_uuid()",
-      "generated": "",
-      "identity": "",
-      "name": "rbac_id",
-      "notNull": true,
-      "position": 19,
+      "position": 16,
       "table": "channels",
       "type": "uuid"
     },
@@ -784,11 +754,41 @@
       "default": "true",
       "generated": "",
       "identity": "",
+      "name": "allow_device",
+      "notNull": true,
+      "position": 17,
+      "table": "channels",
+      "type": "boolean"
+    },
+    {
+      "default": "true",
+      "generated": "",
+      "identity": "",
+      "name": "allow_prod",
+      "notNull": true,
+      "position": 18,
+      "table": "channels",
+      "type": "boolean"
+    },
+    {
+      "default": "true",
+      "generated": "",
+      "identity": "",
       "name": "electron",
+      "notNull": true,
+      "position": 19,
+      "table": "channels",
+      "type": "boolean"
+    },
+    {
+      "default": "gen_random_uuid()",
+      "generated": "",
+      "identity": "",
+      "name": "rbac_id",
       "notNull": true,
       "position": 20,
       "table": "channels",
-      "type": "boolean"
+      "type": "uuid"
     },
     {
       "default": null,
@@ -1351,22 +1351,12 @@
       "type": "timestamp without time zone"
     },
     {
-      "default": "true",
-      "generated": "",
-      "identity": "",
-      "name": "use_new_rbac",
-      "notNull": true,
-      "position": 11,
-      "table": "orgs",
-      "type": "boolean"
-    },
-    {
       "default": "false",
       "generated": "",
       "identity": "",
       "name": "enforcing_2fa",
       "notNull": true,
-      "position": 12,
+      "position": 11,
       "table": "orgs",
       "type": "boolean"
     },
@@ -1376,6 +1366,16 @@
       "identity": "",
       "name": "email_preferences",
       "notNull": true,
+      "position": 12,
+      "table": "orgs",
+      "type": "jsonb"
+    },
+    {
+      "default": null,
+      "generated": "",
+      "identity": "",
+      "name": "password_policy_config",
+      "notNull": false,
       "position": 13,
       "table": "orgs",
       "type": "jsonb"
@@ -1411,22 +1411,12 @@
       "type": "integer"
     },
     {
-      "default": null,
-      "generated": "",
-      "identity": "",
-      "name": "password_policy_config",
-      "notNull": false,
-      "position": 17,
-      "table": "orgs",
-      "type": "jsonb"
-    },
-    {
       "default": "false",
       "generated": "",
       "identity": "",
       "name": "enforce_encrypted_bundles",
       "notNull": true,
-      "position": 18,
+      "position": 17,
       "table": "orgs",
       "type": "boolean"
     },
@@ -1436,9 +1426,19 @@
       "identity": "",
       "name": "required_encryption_key",
       "notNull": false,
-      "position": 19,
+      "position": 18,
       "table": "orgs",
       "type": "character varying(21)"
+    },
+    {
+      "default": "true",
+      "generated": "",
+      "identity": "",
+      "name": "use_new_rbac",
+      "notNull": true,
+      "position": 19,
+      "table": "orgs",
+      "type": "boolean"
     },
     {
       "default": "false",
@@ -1770,6 +1770,12 @@
     },
     {
       "definition": "PRIMARY KEY (id)",
+      "name": "channel_devices_pkey",
+      "table": "channel_devices",
+      "type": "p"
+    },
+    {
+      "definition": "PRIMARY KEY (id)",
       "name": "channel_pkey",
       "table": "channels",
       "type": "p"
@@ -2000,12 +2006,6 @@
       "valid": true
     },
     {
-      "definition": "CREATE INDEX idx_app_versions_key_id ON public.app_versions USING btree (key_id) WHERE (key_id IS NOT NULL)",
-      "name": "idx_app_versions_key_id",
-      "table": "app_versions",
-      "valid": true
-    },
-    {
       "definition": "CREATE INDEX idx_app_versions_name ON public.app_versions USING btree (name)",
       "name": "idx_app_versions_name",
       "table": "app_versions",
@@ -2078,20 +2078,14 @@
       "valid": true
     },
     {
-      "definition": "CREATE INDEX finx_channel_devices_app_id ON public.channel_devices USING btree (app_id)",
-      "name": "finx_channel_devices_app_id",
+      "definition": "CREATE UNIQUE INDEX channel_devices_pkey ON public.channel_devices USING btree (id)",
+      "name": "channel_devices_pkey",
       "table": "channel_devices",
       "valid": true
     },
     {
       "definition": "CREATE INDEX finx_channel_devices_channel_id ON public.channel_devices USING btree (channel_id)",
       "name": "finx_channel_devices_channel_id",
-      "table": "channel_devices",
-      "valid": true
-    },
-    {
-      "definition": "CREATE UNIQUE INDEX idx_app_id_device_id_channel_id_channel_devices ON public.channel_devices USING btree (app_id, device_id, channel_id)",
-      "name": "idx_app_id_device_id_channel_id_channel_devices",
       "table": "channel_devices",
       "valid": true
     },
@@ -2140,12 +2134,6 @@
     {
       "definition": "CREATE INDEX finx_channels_version ON public.channels USING btree (version)",
       "name": "finx_channels_version",
-      "table": "channels",
-      "valid": true
-    },
-    {
-      "definition": "CREATE INDEX idx_app_id_public_channel ON public.channels USING btree (app_id, public)",
-      "name": "idx_app_id_public_channel",
       "table": "channels",
       "valid": true
     },
@@ -2206,6 +2194,18 @@
     {
       "definition": "CREATE INDEX idx_manifest_file_name ON public.manifest USING btree (file_name)",
       "name": "idx_manifest_file_name",
+      "table": "manifest",
+      "valid": true
+    },
+    {
+      "definition": "CREATE INDEX manifest_file_hash_idx ON public.manifest USING btree (file_hash)",
+      "name": "manifest_file_hash_idx",
+      "table": "manifest",
+      "valid": true
+    },
+    {
+      "definition": "CREATE INDEX manifest_file_name_idx ON public.manifest USING btree (file_name)",
+      "name": "manifest_file_name_idx",
       "table": "manifest",
       "valid": true
     },
@@ -2306,12 +2306,6 @@
       "valid": true
     },
     {
-      "definition": "CREATE INDEX orgs_updated_at_id_idx ON public.orgs USING btree (updated_at DESC) INCLUDE (id) WHERE (customer_id IS NOT NULL)",
-      "name": "orgs_updated_at_id_idx",
-      "table": "orgs",
-      "valid": true
-    },
-    {
       "definition": "CREATE UNIQUE INDEX \"unique customer_id on orgs\" ON public.orgs USING btree (customer_id)",
       "name": "unique customer_id on orgs",
       "table": "orgs",
@@ -2342,14 +2336,14 @@
       "valid": true
     },
     {
-      "definition": "CREATE INDEX idx_stripe_info_status_plan ON public.stripe_info USING btree (status, is_good_plan) WHERE ((status = 'succeeded'::stripe_status) AND (is_good_plan = true))",
-      "name": "idx_stripe_info_status_plan",
+      "definition": "CREATE INDEX idx_stripe_info_trial ON public.stripe_info USING btree (trial_at) WHERE (trial_at IS NOT NULL)",
+      "name": "idx_stripe_info_trial",
       "table": "stripe_info",
       "valid": true
     },
     {
-      "definition": "CREATE INDEX idx_stripe_info_trial ON public.stripe_info USING btree (trial_at) WHERE (trial_at IS NOT NULL)",
-      "name": "idx_stripe_info_trial",
+      "definition": "CREATE UNIQUE INDEX si_customer_cover_uidx ON public.stripe_info USING btree (customer_id) INCLUDE (status, trial_at, mau_exceeded, storage_exceeded, bandwidth_exceeded)",
+      "name": "si_customer_cover_uidx",
       "table": "stripe_info",
       "valid": true
     },

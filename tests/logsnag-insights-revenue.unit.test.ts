@@ -132,10 +132,12 @@ describe('logsnag revenue metric helpers', () => {
   })
 
   it.concurrent('keeps total bundle storage on version metadata instead of manifest rows', () => {
-    const migration = readFileSync(new URL('../supabase/migrations/20260630010932_optimize_global_stats_storage_repair.sql', import.meta.url), 'utf8')
-    const definition = migration.match(/CREATE OR REPLACE FUNCTION "public"\."total_bundle_storage_bytes"\(\) RETURNS bigint[\s\S]*?GRANT EXECUTE ON FUNCTION "public"\."total_bundle_storage_bytes"\(\) TO "service_role";/)?.[0]
+    const migration = readFileSync(new URL('../supabase/migrations/20260708000000_prod_baseline.sql', import.meta.url), 'utf8')
+    const definition = migration.match(/CREATE OR REPLACE FUNCTION "public"\."total_bundle_storage_bytes"\(\) RETURNS bigint[\s\S]*?\$\$;/)?.[0]
+    const grant = migration.match(/GRANT (?:ALL|EXECUTE) ON FUNCTION "public"\."total_bundle_storage_bytes"\(\) TO "service_role";/)?.[0]
 
     expect(definition).toBeDefined()
+    expect(grant).toBeDefined()
     expect(definition!).toContain('public.app_versions_meta')
     expect(definition!).toContain('public.app_versions')
     expect(definition!).not.toContain('public.manifest')
