@@ -230,7 +230,6 @@ export async function deleteMember(c: Context<MiddlewareKeyVariables>, bodyRaw: 
     }
 
     await dbClient.query('COMMIT')
-    transactionOpen = false
   }
   catch (error) {
     if (dbClient && transactionOpen)
