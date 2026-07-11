@@ -56,7 +56,7 @@ async function runChecker(binDir: string, env: Record<string, string>) {
       ...process.env,
       ...env,
       PATH: `${binDir}:${process.env.PATH}`,
-      READ_REPLICA_SCHEMA_SYNC_MAX_TIME: '31',
+      READ_REPLICA_SCHEMA_CHECK_MAX_TIME: '46',
       READ_REPLICA_WRANGLER_CMD: join(binDir, 'wrangler'),
     },
   })
@@ -64,14 +64,14 @@ async function runChecker(binDir: string, env: Record<string, string>) {
 
 describe('read-replica ephemeral schema checker', () => {
   it.concurrent(
-    'deploys the token with one Worker version and uses the authenticated primary catalog for readiness',
+    'deploys the token with one Worker version and verifies the live primary through Hyperdrive',
     async () => {
       const testDir = await mkdtemp(
         join(tmpdir(), 'capgo-read-replica-worker-'),
       )
       const binDir = join(testDir, 'bin')
       const wranglerLog = join(testDir, 'wrangler.log')
-      const sourceCatalogCalls = join(testDir, 'source-catalog-calls')
+      const verifyCalls = join(testDir, 'verify-calls')
       const mockCurl = join(binDir, 'curl')
 
       await mkdir(binDir)
@@ -98,19 +98,19 @@ done
 token="\${authorization#authorization: Bearer }"
 [[ "$token" =~ ^[0-9a-f]{64}$ ]]
 case "$url" in
-  */source-catalog)
-    calls=0
-    if [[ -f "$MOCK_SOURCE_CATALOG_CALLS" ]]; then
-      calls="$(<"$MOCK_SOURCE_CATALOG_CALLS")"
-    fi
-    calls=$((calls + 1))
-    printf '%s' "$calls" > "$MOCK_SOURCE_CATALOG_CALLS"
-    [[ "$calls" == '1' ]]
-    printf '{"version":1}' > "$output"
+  */ok)
+    printf '{"status":"ok"}' > "$output"
     printf '200'
     ;;
-  */sync-from-master)
-    printf '{"applied":[],"skipped":[],"issues":[]}' > "$output"
+  */verify-master)
+    calls=0
+    if [[ -f "$MOCK_VERIFY_CALLS" ]]; then
+      calls="$(<"$MOCK_VERIFY_CALLS")"
+    fi
+    calls=$((calls + 1))
+    printf '%s' "$calls" > "$MOCK_VERIFY_CALLS"
+    [[ "$calls" == '1' ]]
+    printf '{"status":"ok","issues":[]}' > "$output"
     printf '200'
     ;;
   *)
@@ -124,16 +124,16 @@ esac
       const { stderr, stdout } = await runChecker(binDir, {
         GITHUB_RUN_ATTEMPT: '2',
         GITHUB_RUN_ID: '12345',
-        MOCK_SOURCE_CATALOG_CALLS: sourceCatalogCalls,
+        MOCK_VERIFY_CALLS: verifyCalls,
         MOCK_WRANGLER_LOG: wranglerLog,
         READ_REPLICA_SCHEMA_CHECK_READY_ATTEMPTS: '1',
       })
 
       expect(stderr).toBe('')
       expect(stdout).toContain(
-        'Read replica matches the live primary schema for the selected tables.',
+        'Read replica matches the live primary schema for the selected tables through Hyperdrive.',
       )
-      expect(await readFile(sourceCatalogCalls, 'utf8')).toBe('1')
+      expect(await readFile(verifyCalls, 'utf8')).toBe('1')
 
       const invocations = (await readFile(wranglerLog, 'utf8'))
         .trim()
@@ -158,10 +158,10 @@ esac
   )
 
   it.concurrent(
-    'prints the last readiness status and Worker response',
+    'prints the last Hyperdrive verification response',
     async () => {
       const testDir = await mkdtemp(
-        join(tmpdir(), 'capgo-read-replica-readiness-'),
+        join(tmpdir(), 'capgo-read-replica-verification-'),
       )
       const binDir = join(testDir, 'bin')
       const wranglerLog = join(testDir, 'wrangler.log')
@@ -184,9 +184,13 @@ for argument in "$@"; do
   url="$argument"
 done
 case "$url" in
-  */source-catalog)
+  */ok)
+    printf '{"status":"ok"}' > "$output"
+    printf '200'
+    ;;
+  */verify-master)
     printf '{"error":"missing_master_hyperdrive_binding"}' > "$output"
-    printf '503'
+    printf '500'
     ;;
   *)
     exit 1
@@ -203,7 +207,7 @@ esac
         READ_REPLICA_SCHEMA_CHECK_READY_ATTEMPTS: '1',
       }).catch(error => error as { stdout: string, stderr: string })
 
-      expect(failure.stdout).toContain('last HTTP status was 503')
+      expect(failure.stdout).toContain('last HTTP status was 500')
       expect(failure.stdout).toContain('Last Worker response:')
       expect(failure.stdout).toContain(
         '{"error":"missing_master_hyperdrive_binding"}',
@@ -215,67 +219,9 @@ esac
     15_000,
   )
 
-  it.concurrent(
-    'preflights the committed catalog before the primary migration',
-    async () => {
-      const testDir = await mkdtemp(
-        join(tmpdir(), 'capgo-read-replica-catalog-preflight-'),
-      )
-      const binDir = join(testDir, 'bin')
-      const wranglerLog = join(testDir, 'wrangler.log')
-      const mockCurl = join(binDir, 'curl')
-
-      await mkdir(binDir)
-      await writeMockWrangler(binDir)
-      await writeFile(
-        mockCurl,
-        `#!/usr/bin/env bash
-set -euo pipefail
-output=''
-previous=''
-url=''
-for argument in "$@"; do
-  if [[ "$previous" == '-o' ]]; then
-    output="$argument"
-  fi
-  previous="$argument"
-  url="$argument"
-done
-case "$url" in
-  */catalog)
-    printf '{"version":1}' > "$output"
-    printf '200'
-    ;;
-  */sync-from-catalog)
-    printf '{"applied":[],"skipped":[],"issues":[]}' > "$output"
-    printf '200'
-    ;;
-  *)
-    exit 1
-    ;;
-esac
-`,
-      )
-      await chmod(mockCurl, 0o755)
-
-      const { stdout } = await runChecker(binDir, {
-        GITHUB_RUN_ATTEMPT: '2',
-        GITHUB_RUN_ID: '12345',
-        MOCK_WRANGLER_LOG: wranglerLog,
-        READ_REPLICA_SCHEMA_CHECK_READY_ATTEMPTS: '1',
-        READ_REPLICA_SCHEMA_SYNC_SOURCE: 'catalog',
-      })
-
-      expect(stdout).toContain(
-        'Read replica preflight matches the committed selected-table catalog.',
-      )
-    },
-    15_000,
-  )
-
-  it.concurrent('prints the sync transport error instead of only timing out', async () => {
+  it.concurrent('prints the verification transport error instead of only timing out', async () => {
     const testDir = await mkdtemp(
-      join(tmpdir(), 'capgo-read-replica-sync-error-'),
+      join(tmpdir(), 'capgo-read-replica-verification-error-'),
     )
     const binDir = join(testDir, 'bin')
     const wranglerLog = join(testDir, 'wrangler.log')
@@ -298,11 +244,11 @@ for argument in "$@"; do
   url="$argument"
 done
 case "$url" in
-  */source-catalog)
-    printf '{"version":1}' > "$output"
+  */ok)
+    printf '{"status":"ok"}' > "$output"
     printf '200'
     ;;
-  */sync-from-master)
+  */verify-master)
     printf 'curl: (28) Operation timed out after 31 milliseconds' >&2
     printf '000'
     exit 28
@@ -322,7 +268,7 @@ esac
       READ_REPLICA_SCHEMA_CHECK_READY_ATTEMPTS: '1',
     }).catch(error => error as { stdout: string, stderr: string })
 
-    expect(failure.stdout).toContain('returned HTTP 000')
+    expect(failure.stdout).toContain('last HTTP status was 000')
     expect(failure.stdout).toContain('Last curl error:')
     expect(failure.stdout).toContain('curl: (28) Operation timed out')
   }, 15_000)

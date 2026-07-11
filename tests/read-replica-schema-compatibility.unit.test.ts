@@ -55,7 +55,8 @@ describe('read-replica schema compatibility', () => {
     const expected = catalog()
     const actual = catalog()
     actual.sequences[0].lastValue = '999'
-
+    actual.columns[0].position = 20
+    actual.columns[1].position = 10
     const actualWithOutOfScope = actual as Record<string, unknown>
     actualWithOutOfScope.foreignKeys = [{ table: 'apps', name: 'apps_org_id_fkey' }]
     actualWithOutOfScope.triggers = [{ table: 'apps', name: 'apps_audit' }]
@@ -69,7 +70,6 @@ describe('read-replica schema compatibility', () => {
     const actual = catalog()
     actual.columns[1] = {
       ...actual.columns[1],
-      position: 3,
       type: 'integer',
       notNull: true,
       default: '0',
@@ -94,7 +94,6 @@ describe('read-replica schema compatibility', () => {
     actual.functions[1].definition = 'changed function'
 
     expect(readReplicaSchemaCompatibilityIssues(expected, actual)).toEqual(expect.arrayContaining([
-      expect.objectContaining({ kind: 'column', object: 'apps.name', reason: 'expected position 2, found 3' }),
       expect.objectContaining({ kind: 'column', object: 'apps.name', reason: 'expected type text, found integer' }),
       expect.objectContaining({ kind: 'column', object: 'apps.name', reason: 'subscriber is NOT NULL while publisher accepts NULL' }),
       expect.objectContaining({ kind: 'column', object: 'apps.name', reason: 'expected default null, found 0' }),

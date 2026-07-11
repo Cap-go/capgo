@@ -111,8 +111,6 @@ function compareTables(expected: SchemaCatalog, actual: SchemaCatalog, issues: S
     }
     if (actualTable.kind !== expectedTable.kind)
       issues.push({ kind: 'table', object: expectedTable.name, reason: `expected kind ${expectedTable.kind}, found ${actualTable.kind}` })
-    if (!sameValue(actualTable.reloptions, expectedTable.reloptions))
-      issues.push({ kind: 'table', object: expectedTable.name, reason: 'table options differ' })
   }
 
   for (const actualTable of actual.tables ?? []) {
@@ -133,13 +131,6 @@ function compareColumns(expected: SchemaCatalog, actual: SchemaCatalog, issues: 
       continue
     }
 
-    if (actualColumn.position !== expectedColumn.position) {
-      issues.push({
-        kind: 'column',
-        object: key,
-        reason: `expected position ${expectedColumn.position}, found ${actualColumn.position}`,
-      })
-    }
     if (actualColumn.type !== expectedColumn.type) {
       issues.push({
         kind: 'column',

@@ -39,6 +39,9 @@ export const deployMatchers: Record<DeployTarget, RegExp[]> = {
     /^supabase\/migrations\//,
     /^messages\/en\.json$/,
     /^supabase\/functions\/shared\/preview-subdomain\.ts$/,
+    /^cloudflare_workers\/read-replica-schema-check\//,
+    /^read_replicate\//,
+    /^scripts\/(check-read-replica-hyperdrive-schema\.sh|sync-read-replica-schema\.ts)$/,
   ],
   api: [
     ...workerDependencyMatchers,

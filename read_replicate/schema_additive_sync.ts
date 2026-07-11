@@ -33,6 +33,23 @@ interface SchemaIndex {
   constraintOwned?: boolean
 }
 
+interface SchemaCompositeAttribute {
+  position: number
+  name: string
+  type: string
+}
+
+interface SchemaType {
+  name: string
+  kind: string
+  definition: unknown
+}
+
+interface TypeSyncPlan {
+  statements: string[]
+  reason: string | null
+}
+
 interface SchemaSequence {
   name: string
   type: string
@@ -63,6 +80,7 @@ interface SchemaCatalog {
   indexes?: SchemaIndex[]
   sequences?: SchemaSequence[]
   tables?: SchemaTable[]
+  types?: SchemaType[]
 }
 
 type SyncStatementKind
@@ -75,8 +93,9 @@ type SyncStatementKind
     | 'invalid_index'
     | 'drop_index'
     | 'sequence'
+    | 'type'
 
-type SyncObjectKind = 'column' | 'constraint' | 'function' | 'index' | 'sequence'
+type SyncObjectKind = 'column' | 'constraint' | 'function' | 'index' | 'sequence' | 'type'
 
 interface SyncStatement {
   kind: SyncStatementKind
@@ -109,6 +128,7 @@ export type AdditiveSchemaSyncResult = ReadReplicaSchemaSyncResult
 export interface ReadReplicaSchemaSyncOptions {
   statementTimeoutMs?: number
   maxDurationMs?: number
+  deadline?: number
 }
 
 export type AdditiveSchemaSyncOptions = ReadReplicaSchemaSyncOptions
@@ -117,7 +137,6 @@ export interface ReadReplicaSchemaReconciliationResult
   extends ReadReplicaSchemaSyncResult {
   issues: SchemaCompatibilityIssue[]
 }
-
 const SAFE_IDENTIFIER_RE = /^[A-Z_]\w*$/i
 const SAFE_SQL_FRAGMENT_RE = /^[\w .()[\],:'"{}+\-=<>!]+$/
 const REPLICA_TABLE_SET = new Set<string>(REPLICA_TABLES)
@@ -159,9 +178,37 @@ export function planReadReplicaSchemaSync(
   const actualFunctionsByKey = new Map(
     (actualCatalog.functions ?? []).map(fn => [functionKey(fn), fn]),
   )
+  const actualTypesByName = new Map(
+    (actualCatalog.types ?? []).map(type => [type.name, type]),
+  )
   const skippedColumnsByTable = new Map<string, Set<string>>()
   const statements: SyncStatement[] = []
   const skipped: SkippedChange[] = []
+
+  for (const type of expectedCatalog.types ?? []) {
+    if (typeMatches(type, actualTypesByName.get(type.name)))
+      continue
+
+    const typeSync = planTypeSync(type, actualTypesByName.get(type.name))
+    if (typeSync.reason) {
+      skipped.push({
+        kind: 'type',
+        table: 'public',
+        name: type.name,
+        reason: typeSync.reason,
+      })
+      continue
+    }
+
+    for (const sql of typeSync.statements) {
+      statements.push({
+        kind: 'type',
+        table: 'public',
+        name: type.name,
+        sql,
+      })
+    }
+  }
 
   for (const fn of expectedCatalog.functions ?? []) {
     if (functionMatches(fn, actualFunctionsByKey.get(functionKey(fn))))
@@ -519,18 +566,21 @@ export async function applyReadReplicaSchemaSync(
   expected: unknown,
   options: ReadReplicaSchemaSyncOptions = {},
 ): Promise<ReadReplicaSchemaSyncResult> {
+  const deadline = options.deadline ?? (
+    Date.now()
+      + positiveIntegerOrDefault(
+        options.maxDurationMs,
+        DEFAULT_SCHEMA_SYNC_MAX_DURATION_MS,
+      )
+  )
+  assertTimeRemaining(deadline, 'read the subscriber schema catalog')
   const actual = await readReplicaSchemaCatalog(client)
+  assertTimeRemaining(deadline, 'plan subscriber schema reconciliation')
   const plan = planReadReplicaSchemaSync(expected, actual)
   const statementTimeoutMs = positiveIntegerOrDefault(
     options.statementTimeoutMs,
     DEFAULT_SCHEMA_SYNC_STATEMENT_TIMEOUT_MS,
   )
-  const deadline
-    = Date.now()
-      + positiveIntegerOrDefault(
-        options.maxDurationMs,
-        DEFAULT_SCHEMA_SYNC_MAX_DURATION_MS,
-      )
 
   try {
     for (const statement of plan.statements) {
@@ -541,17 +591,20 @@ export async function applyReadReplicaSchemaSync(
         statement,
       )
       await client.query(statement.sql)
+      assertTimeRemaining(
+        deadline,
+        `finish ${statement.kind} ${statement.table}.${statement.name}`,
+      )
     }
   }
   finally {
     await client.query('RESET statement_timeout')
   }
 
-  assertAppliedStatementsVisible(
-    plan.statements,
-    expected,
-    await readReplicaSchemaCatalog(client),
-  )
+  assertTimeRemaining(deadline, 'read the post-DDL subscriber schema catalog')
+  const finalActual = await readReplicaSchemaCatalog(client)
+  assertTimeRemaining(deadline, 'validate applied subscriber schema changes')
+  assertAppliedStatementsVisible(plan.statements, expected, finalActual)
 
   return {
     applied: plan.statements.map(({ kind, table, name }) => ({
@@ -570,10 +623,25 @@ export async function reconcileReadReplicaSchema(
   replica: Queryable,
   options: ReadReplicaSchemaSyncOptions = {},
 ): Promise<ReadReplicaSchemaReconciliationResult> {
+  const deadline = options.deadline ?? (
+    Date.now()
+      + positiveIntegerOrDefault(
+        options.maxDurationMs,
+        DEFAULT_SCHEMA_SYNC_MAX_DURATION_MS,
+      )
+  )
+  assertTimeRemaining(deadline, 'read the primary schema catalog')
   const expected = await readReplicaSchemaCatalog(master)
-  const result = await applyReadReplicaSchemaSync(replica, expected, options)
+  assertTimeRemaining(deadline, 'reconcile the subscriber schema')
+  const result = await applyReadReplicaSchemaSync(replica, expected, {
+    ...options,
+    deadline,
+  })
+  assertTimeRemaining(deadline, 'read the final primary schema catalog')
   const finalExpected = await readReplicaSchemaCatalog(master)
+  assertTimeRemaining(deadline, 'read the final subscriber schema catalog')
   const finalActual = await readReplicaSchemaCatalog(replica)
+  assertTimeRemaining(deadline, 'compare the final selected schemas')
 
   return {
     ...result,
@@ -636,6 +704,14 @@ async function setStatementTimeoutForRemainingBudget(
   )
 }
 
+function assertTimeRemaining(deadline: number, action: string): void {
+  if (Date.now() >= deadline) {
+    throw new Error(
+      `Read-replica schema sync exceeded max duration before it could ${action}`,
+    )
+  }
+}
+
 function positiveIntegerOrDefault(
   value: number | undefined,
   fallback: number,
@@ -658,6 +734,7 @@ function assertSchemaCatalog(value: unknown): SchemaCatalog {
     'indexes',
     'sequences',
     'tables',
+    'types',
   ] as const) {
     if (catalog[collection] && !Array.isArray(catalog[collection]))
       throw new Error(`Read-replica schema catalog ${collection} must be an array`)
@@ -670,7 +747,7 @@ function assertSchemaCatalog(value: unknown): SchemaCatalog {
   for (const index of catalog.indexes ?? []) assertSchemaIndex(index)
   for (const sequence of catalog.sequences ?? []) assertSchemaSequence(sequence)
   for (const table of catalog.tables ?? []) assertSchemaTable(table)
-
+  for (const type of catalog.types ?? []) assertSchemaType(type)
   return catalog
 }
 
@@ -811,6 +888,68 @@ function assertSchemaTable(value: unknown): asserts value is SchemaTable {
   }
 }
 
+function assertSchemaType(value: unknown): asserts value is SchemaType {
+  const type = assertCatalogObject(value, 'types') as Partial<SchemaType>
+  if (typeof type.name !== 'string' || typeof type.kind !== 'string') {
+    throw new TypeError(
+      'Read-replica schema catalog types must include string name and kind',
+    )
+  }
+  if (type.kind === 'e') {
+    if (
+      !Array.isArray(type.definition)
+      || !type.definition.every(label => typeof label === 'string')
+      || new Set(type.definition).size !== type.definition.length
+    ) {
+      throw new TypeError(
+        'Read-replica enum types must include unique string labels',
+      )
+    }
+    return
+  }
+  if (type.kind !== 'c')
+    return
+
+  if (!Array.isArray(type.definition)) {
+    throw new TypeError(
+      'Read-replica composite types must include attribute definitions',
+    )
+  }
+
+  const names = new Set<string>()
+  const positions = new Set<number>()
+  for (const value of type.definition) {
+    assertSchemaCompositeAttribute(value)
+    if (names.has(value.name) || positions.has(value.position)) {
+      throw new TypeError(
+        'Read-replica composite types must include unique attributes',
+      )
+    }
+    names.add(value.name)
+    positions.add(value.position)
+  }
+}
+
+function assertSchemaCompositeAttribute(
+  value: unknown,
+): asserts value is SchemaCompositeAttribute {
+  const attribute = assertCatalogObject(
+    value,
+    'types',
+  ) as Partial<SchemaCompositeAttribute>
+  if (
+    typeof attribute.position !== 'number'
+    || !Number.isSafeInteger(attribute.position)
+    || attribute.position <= 0
+    || typeof attribute.name !== 'string'
+    || typeof attribute.type !== 'string'
+  ) {
+    throw new TypeError(
+      'Read-replica composite type attributes must include position, name, and type',
+    )
+  }
+}
+
 function assertCatalogObject(value: unknown, collection: string): object {
   if (!value || typeof value !== 'object') {
     throw new Error(
@@ -819,6 +958,214 @@ function assertCatalogObject(value: unknown, collection: string): object {
   }
 
   return value
+}
+
+function typeMatches(
+  expected: SchemaType,
+  actual: SchemaType | undefined,
+): boolean {
+  if (!actual || actual.kind !== expected.kind)
+    return false
+
+  return JSON.stringify(actual.definition) === JSON.stringify(expected.definition)
+}
+
+function planTypeSync(
+  expected: SchemaType,
+  actual: SchemaType | undefined,
+): TypeSyncPlan {
+  if (!isSafeIdentifier(expected.name))
+    return { statements: [], reason: 'unsafe_type_name' }
+  if (!actual) {
+    const statement = buildCreateTypeStatement(expected)
+    return statement
+      ? { statements: [statement], reason: null }
+      : { statements: [], reason: 'unsupported_type_creation' }
+  }
+  if (actual.kind !== expected.kind)
+    return { statements: [], reason: 'type_kind_conflict' }
+  if (expected.kind === 'e')
+    return planEnumTypeSync(expected, actual)
+  if (expected.kind === 'c')
+    return planCompositeTypeSync(expected, actual)
+
+  return { statements: [], reason: 'unsupported_type_reconciliation' }
+}
+
+function buildCreateTypeStatement(type: SchemaType): string | null {
+  if (type.kind === 'e') {
+    const labels = enumLabels(type)
+    const values = labels && quoteEnumValues(labels)
+    if (!values?.length)
+      return null
+
+    return `CREATE TYPE public.${quoteIdent(type.name)} AS ENUM (${values.join(', ')})`
+  }
+  if (type.kind !== 'c')
+    return null
+
+  const attributes = compositeTypeAttributes(type)
+  if (!attributes?.length || !hasSequentialCompositePositions(attributes))
+    return null
+
+  const definitions = compositeAttributeDefinitions(attributes)
+  if (!definitions)
+    return null
+
+  return `CREATE TYPE public.${quoteIdent(type.name)} AS (${definitions.join(', ')})`
+}
+
+function planEnumTypeSync(
+  expected: SchemaType,
+  actual: SchemaType,
+): TypeSyncPlan {
+  const expectedLabels = enumLabels(expected)
+  const actualLabels = enumLabels(actual)
+  if (!expectedLabels || !actualLabels) {
+    return { statements: [], reason: 'unsupported_enum_reconciliation' }
+  }
+  if (!isEnumPrefix(actualLabels, expectedLabels)) {
+    return { statements: [], reason: 'unsafe_enum_reconciliation' }
+  }
+
+  const values = quoteEnumValues(expectedLabels.slice(actualLabels.length))
+  if (!values)
+    return { statements: [], reason: 'unsupported_enum_reconciliation' }
+
+  return {
+    statements: values.map(
+      value => `ALTER TYPE public.${quoteIdent(expected.name)} ADD VALUE IF NOT EXISTS ${value}`,
+    ),
+    reason: null,
+  }
+}
+
+function planCompositeTypeSync(
+  expected: SchemaType,
+  actual: SchemaType,
+): TypeSyncPlan {
+  const expectedAttributes = compositeTypeAttributes(expected)
+  const actualAttributes = compositeTypeAttributes(actual)
+  if (!expectedAttributes || !actualAttributes) {
+    return { statements: [], reason: 'unsupported_composite_reconciliation' }
+  }
+  if (
+    !hasSequentialCompositePositions(expectedAttributes)
+    || !hasSequentialCompositePositions(actualAttributes)
+    || !isCompositePrefix(actualAttributes, expectedAttributes)
+  ) {
+    return { statements: [], reason: 'unsafe_composite_reconciliation' }
+  }
+
+  const definitions = compositeAttributeDefinitions(
+    expectedAttributes.slice(actualAttributes.length),
+  )
+  if (!definitions) {
+    return { statements: [], reason: 'unsupported_composite_reconciliation' }
+  }
+
+  return {
+    statements: definitions.map(
+      definition => `ALTER TYPE public.${quoteIdent(expected.name)} ADD ATTRIBUTE ${definition}`,
+    ),
+    reason: null,
+  }
+}
+
+function enumLabels(type: SchemaType): string[] | null {
+  if (
+    type.kind !== 'e'
+    || !Array.isArray(type.definition)
+    || !type.definition.every(label => typeof label === 'string')
+  ) {
+    return null
+  }
+
+  return type.definition as string[]
+}
+
+function compositeTypeAttributes(
+  type: SchemaType,
+): SchemaCompositeAttribute[] | null {
+  if (
+    type.kind !== 'c'
+    || !Array.isArray(type.definition)
+    || !type.definition.every(isSchemaCompositeAttribute)
+  ) {
+    return null
+  }
+
+  return type.definition as SchemaCompositeAttribute[]
+}
+
+function isSchemaCompositeAttribute(
+  value: unknown,
+): value is SchemaCompositeAttribute {
+  if (!value || typeof value !== 'object')
+    return false
+
+  const attribute = value as Partial<SchemaCompositeAttribute>
+  return (
+    typeof attribute.position === 'number'
+    && Number.isSafeInteger(attribute.position)
+    && attribute.position > 0
+    && typeof attribute.name === 'string'
+    && typeof attribute.type === 'string'
+  )
+}
+
+function isEnumPrefix(actual: readonly string[], expected: readonly string[]): boolean {
+  return actual.length <= expected.length
+    && actual.every((label, index) => label === expected[index])
+}
+
+function isCompositePrefix(
+  actual: readonly SchemaCompositeAttribute[],
+  expected: readonly SchemaCompositeAttribute[],
+): boolean {
+  return actual.length <= expected.length
+    && actual.every((attribute, index) => {
+      const expectedAttribute = expected[index]
+      return attribute.position === expectedAttribute.position
+        && attribute.name === expectedAttribute.name
+        && attribute.type === expectedAttribute.type
+    })
+}
+
+function hasSequentialCompositePositions(
+  attributes: readonly SchemaCompositeAttribute[],
+): boolean {
+  return attributes.every(
+    (attribute, index) => attribute.position === index + 1,
+  )
+}
+
+function compositeAttributeDefinitions(
+  attributes: readonly SchemaCompositeAttribute[],
+): string[] | null {
+  const definitions: string[] = []
+  for (const attribute of attributes) {
+    if (!isSafeIdentifier(attribute.name) || !isSafeSqlFragment(attribute.type))
+      return null
+
+    definitions.push(`${quoteIdent(attribute.name)} ${attribute.type}`)
+  }
+
+  return definitions
+}
+
+function quoteEnumValues(values: readonly string[]): string[] | null {
+  const quotedValues: string[] = []
+  for (const value of values) {
+    if (value.includes('\0'))
+      return null
+
+    quotedValues.push(
+      `E'${value.replaceAll('\\', '\\\\').replaceAll("'", "''")}'`,
+    )
+  }
+
+  return quotedValues
 }
 
 function buildAddColumnStatement(

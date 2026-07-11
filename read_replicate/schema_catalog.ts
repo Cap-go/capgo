@@ -56,9 +56,6 @@ export const READ_REPLICA_SCHEMA_CATALOG_SQL = `
 WITH replica_tables(table_name) AS (
   SELECT unnest($1::text[])
 ),
-replica_types(type_name) AS (
-  SELECT unnest($2::text[])
-),
 replica_sequences(sequence_name) AS (
   SELECT unnest($3::text[])
 ),
@@ -82,6 +79,27 @@ tables AS (
   JOIN replica_tables rt ON rt.table_name = c.relname
   WHERE n.nspname = 'public'
     AND c.relkind IN ('r', 'p')
+),
+selected_type_names(type_name) AS (
+  SELECT unnest($2::text[])
+  UNION
+  SELECT DISTINCT base_type.typname
+  FROM tables t
+  JOIN pg_attribute a ON a.attrelid = t.table_oid
+  JOIN pg_type declared_type ON declared_type.oid = a.atttypid
+  JOIN pg_type element_type ON element_type.oid = CASE
+    WHEN declared_type.typelem <> 0 THEN declared_type.typelem
+    ELSE declared_type.oid
+  END
+  JOIN pg_type base_type ON base_type.oid = CASE
+    WHEN element_type.typbasetype <> 0 THEN element_type.typbasetype
+    ELSE element_type.oid
+  END
+  JOIN pg_namespace type_namespace ON type_namespace.oid = base_type.typnamespace
+  WHERE a.attnum > 0
+    AND NOT a.attisdropped
+    AND type_namespace.nspname = 'public'
+    AND base_type.typtype IN ('e', 'c')
 ),
 columns AS (
   SELECT
@@ -155,7 +173,7 @@ types AS (
     END AS definition
   FROM pg_type typ
   JOIN pg_namespace n ON n.oid = typ.typnamespace
-  JOIN replica_types rt ON rt.type_name = typ.typname
+  JOIN selected_type_names rt ON rt.type_name = typ.typname
   WHERE n.nspname = 'public'
 ),
 sequences AS (

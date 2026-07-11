@@ -18,6 +18,20 @@ describe('deploy scope matching', () => {
     expect(resolveDeployScopeFromFiles(['bun.lock', 'cli/src/index.ts'])).toEqual(noBackendDeploys)
   })
 
+  it.concurrent('runs the subscriber reconciliation for replica schema code changes', () => {
+    expect(resolveDeployScopeFromFiles([
+      'read_replicate/direct_schema_sync.ts',
+      'scripts/check-read-replica-hyperdrive-schema.sh',
+      'cloudflare_workers/read-replica-schema-check/index.ts',
+    ])).toEqual({
+      api: false,
+      files: false,
+      plugins: false,
+      supabase: true,
+      translation: false,
+    })
+  })
+
   it.concurrent('deploys translation plus API surfaces when source messages change', () => {
     expect(resolveDeployScopeFromFiles(['messages/en.json'])).toEqual({
       api: true,

@@ -45,7 +45,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.supabase == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     name: Build code and deploy to Supabase
     permissions:
       contents: read
@@ -96,26 +96,23 @@ jobs:
         run: supabase link --project-ref ${{ env.SUPABASE_PROJECT_ID }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
-      - name: Preflight read-replica schema from the committed selected-table catalog
-        if: env.SUPA_ENV == 'PROD'
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          READ_REPLICA_SCHEMA_SYNC_SOURCE: catalog
-          READ_REPLICA_SCHEMA_CHECK_MAX_TIME: 780
-          READ_REPLICA_SCHEMA_SYNC_MAX_TIME: 600
-          READ_REPLICA_SCHEMA_CHECK_READY_ATTEMPTS: 12
-        run: bun run readreplicate:check-hyperdrive-schema
       - name: Apply Supabase Migrations
         run: supabase db push
-      - name: Verify read-replica schema against the live primary through Hyperdrive
+      - name: Reconcile the selected Google subscriber schema from the live primary
+        if: env.SUPA_ENV == 'PROD'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+          READ_REPLICATE_GOOGLE_EU1: ${{ secrets.READ_REPLICATE_GOOGLE_EU1 }}
+          READ_REPLICA_SCHEMA_SYNC_MAX_TIME: 1800
+          READ_REPLICA_SCHEMA_LOCK_WAIT_SECONDS: 120
+        run: bun scripts/sync-read-replica-schema.ts
+      - name: Verify the read-replica schema through Hyperdrive
         if: env.SUPA_ENV == 'PROD'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          READ_REPLICA_SCHEMA_CHECK_MAX_TIME: 780
-          READ_REPLICA_SCHEMA_SYNC_MAX_TIME: 600
-          READ_REPLICA_SCHEMA_CHECK_READY_ATTEMPTS: 12
+          READ_REPLICA_SCHEMA_CHECK_MAX_TIME: 300
+          READ_REPLICA_SCHEMA_CHECK_READY_ATTEMPTS: 20
         run: bun run readreplicate:check-hyperdrive-schema
       - name: Update functions
         env:
