@@ -339,13 +339,23 @@ SELECT ok(
             AND c.relname = 'orgs'
             AND t.tgname = 'lock_org_tombstone_guard'
             AND NOT t.tgisinternal
-            AND (t.tgtype & 1) = 0
+            AND (t.tgtype & 1) = 1
             AND (t.tgtype & 2) = 2
             AND (t.tgtype & 4) = 4
             AND (t.tgtype & 8) = 8
             AND (t.tgtype & 16) = 16
-    ),
-    'org tombstone guard serializes insert/delete/id-update statements'
+    )
+    AND position(
+        'lock_rbac_orgs' IN pg_get_functiondef(
+            'public.lock_org_tombstone_guard()'::regprocedure
+        )
+    ) > 0
+    AND position(
+        'LOCK TABLE' IN pg_get_functiondef(
+            'public.lock_org_tombstone_guard()'::regprocedure
+        )
+    ) = 0,
+    'org tombstone guard serializes matching org ids with a row-level lock'
 );
 
 INSERT INTO public.orgs (

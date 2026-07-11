@@ -1073,13 +1073,9 @@ VALUES
     'audit_admin1@test.com'
 );
 
--- Add both users as RBAC org super_admins.
+-- Org creation grants the creator org_super_admin; add the second admin only.
 WITH admins (principal_id, granted_by) AS (
     VALUES
-    (
-        'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
-        'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID
-    ),
     (
         'cccccccc-cccc-cccc-cccc-cccccccccccc'::UUID,
         'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID
