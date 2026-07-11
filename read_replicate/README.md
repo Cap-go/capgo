@@ -115,10 +115,11 @@ READ_REPLICA_PASSWORD='new-password' bash read_replicate/update_readreplica_pass
 - `schema_replicate.catalog.json` is a checked-in local snapshot used by PR CI to
   keep migrations and the selected replica schema in sync. It is never used as a
   production DDL source.
-- Production release CI applies primary migrations, reads the selected catalog from
-  that live primary through the Supabase Management API, and reconciles the Google
-  subscriber through its direct Cloud SQL connection. It then verifies the same
-  selected schema through the deployed Hyperdrive read path.
+- Every stable production release waits for primary migrations when they are in scope,
+  then reads the selected catalog from that live primary through the Supabase Management
+  API and reconciles the Google subscriber through its direct Cloud SQL connection.
+  This gate runs even for frontend-only releases and blocks downstream publishing until
+  the same selected schema verifies through the deployed Hyperdrive read path.
 - The reconciliation applies safe selected-schema changes: missing columns, column
   defaults/nullability, selected function definitions, structural sequence options,
   primary/unique/check constraints, enums and composites referenced by selected
