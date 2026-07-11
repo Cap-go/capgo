@@ -1076,6 +1076,9 @@ USING (
   "org_id" = ANY(COALESCE((SELECT "public"."orgs_readable_org_ids"()), '{}'::uuid[]))
 );
 
+DROP POLICY IF EXISTS "Allow org admins to select sso_providers"
+ON "public"."sso_providers";
+
 DROP POLICY IF EXISTS "allow_org_admins_select_sso_providers"
 ON "public"."sso_providers";
 

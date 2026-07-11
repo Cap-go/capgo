@@ -24484,3 +24484,169 @@ INSERT INTO "public"."cron_tasks" ("id", "name", "description", "task_type", "ta
 	(25, 'cleanup_old_channel_devices', 'Delete channel_devices older than one month', 'function', 'public.cleanup_old_channel_devices()', NULL, NULL, NULL, NULL, NULL, 2, 30, 0, NULL, NULL, true, '2026-01-15 18:20:42.885942+00', '2026-05-26 20:41:47.129+00', NULL),
 	(33, 'cleanup_completed_onboarding_apps', 'Daily: clear apps.need_onboarding for apps that finished real onboarding (upload-ready bundle, created >15 days ago, no seeded demo data)', 'function', 'public.cleanup_completed_onboarding_apps()', NULL, NULL, NULL, NULL, NULL, 4, 0, 0, NULL, NULL, true, '2026-06-17 12:01:32.508828+00', '2026-06-17 12:01:32.508828+00', NULL);
 RESET session_replication_role;
+
+-- Baseline post-dump cleanup for local/CI parity
+-- Prod still has leftover/renamed policies that later main migrations already
+-- cleaned up under different names. Normalize here so pending migrations and
+-- pgTAP expectations match a fresh local install.
+
+DROP POLICY IF EXISTS " allow anon to select" ON "public"."global_stats";
+DROP POLICY IF EXISTS "Allow anon to select" ON "public"."global_stats";
+
+DROP POLICY IF EXISTS "Allow read for auth (read+)" ON "public"."channel_devices";
+
+DROP POLICY IF EXISTS "Allow org admins to select sso_providers" ON "public"."sso_providers";
+DROP POLICY IF EXISTS "allow_org_admins_select_sso_providers" ON "public"."sso_providers";
+
+DROP POLICY IF EXISTS "Enable select for authenticated users only" ON "public"."plans";
+DROP POLICY IF EXISTS "Enable select for anyone" ON "public"."plans";
+CREATE POLICY "Enable select for anyone" ON "public"."plans" FOR SELECT TO "anon", "authenticated" USING (true);
+
+-- Storage policies from production (storage schema excluded from public dump)
+-- Created as postgres (superuser locally / migration role).
+-- Storage policies from production (storage schema excluded from public dump)
+
+CREATE POLICY "Allow user or apikey to delete they own folder in apps" ON "storage"."objects" FOR DELETE USING ((("bucket_id" = 'apps'::"text") AND (((( SELECT "auth"."uid"() AS "auth_user_id"))::"text" = ("storage"."foldername"("name"))[1]) OR "capgo_private"."matches_app_storage_apikey_owner"(("storage"."foldername"("name"))[1], (("storage"."foldername"("name"))[2])::character varying, '{all}'::"public"."key_mode"[]))));
+
+CREATE POLICY "Allow user or apikey to delete they own folder in images" ON "storage"."objects" FOR DELETE TO "anon", "authenticated" USING ((("bucket_id" = 'images'::"text") AND (
+CASE
+    WHEN ((("storage"."foldername"("name"))[1] = 'org'::"text") AND (("storage"."foldername"("name"))[3] IS NOT NULL) AND (("storage"."foldername"("name"))[3] <> 'logo'::"text")) THEN "public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity_org_appid"('{write,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[2])::"uuid", (("storage"."foldername"("name"))[3])::character varying), (("storage"."foldername"("name"))[2])::"uuid", (("storage"."foldername"("name"))[3])::character varying, NULL::bigint)
+    ELSE false
+END OR ((("storage"."foldername"("name"))[1] = 'org'::"text") AND (("storage"."foldername"("name"))[3] = 'logo'::"text") AND "public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity_org_allowed"('{write,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[2])::"uuid"), (("storage"."foldername"("name"))[2])::"uuid", NULL::character varying, NULL::bigint)) OR (EXISTS ( SELECT 1
+   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
+  WHERE (("auth_user"."uid" IS NOT NULL) AND (("auth_user"."uid")::"text" = ("storage"."foldername"("objects"."name"))[1])))))));
+
+CREATE POLICY "Allow user or apikey to insert they own folder in apps" ON "storage"."objects" FOR INSERT WITH CHECK ((("bucket_id" = 'apps'::"text") AND (((( SELECT "auth"."uid"() AS "auth_user_id"))::"text" = ("storage"."foldername"("name"))[1]) OR "capgo_private"."matches_app_storage_apikey_owner"(("storage"."foldername"("name"))[1], (("storage"."foldername"("name"))[2])::character varying, '{write,all}'::"public"."key_mode"[]))));
+
+CREATE POLICY "Allow user or apikey to insert they own folder in images" ON "storage"."objects" FOR INSERT TO "anon", "authenticated" WITH CHECK ((("bucket_id" = 'images'::"text") AND (
+CASE
+    WHEN (("storage"."foldername"("name"))[1] = 'org'::"text") THEN (((EXISTS ( SELECT 1
+       FROM "public"."apps"
+      WHERE (("apps"."owner_org" = (("storage"."foldername"(("apps"."name")::"text"))[2])::"uuid") AND (("apps"."app_id")::"text" = ("storage"."foldername"(("apps"."name")::"text"))[3])))) AND "public"."rbac_check_permission_request"("public"."rbac_perm_app_update_settings"(), (("storage"."foldername"("name"))[2])::"uuid", (("storage"."foldername"("name"))[3])::character varying, NULL::bigint)) OR ((NOT (EXISTS ( SELECT 1
+       FROM "public"."apps"
+      WHERE (("apps"."owner_org" = (("storage"."foldername"(("apps"."name")::"text"))[2])::"uuid") AND (("apps"."app_id")::"text" = ("storage"."foldername"(("apps"."name")::"text"))[3]))))) AND "public"."rbac_check_permission_request"("public"."rbac_perm_org_create_app"(), (("storage"."foldername"("name"))[2])::"uuid", NULL::character varying, NULL::bigint)))
+    ELSE false
+END OR (EXISTS ( SELECT 1
+   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
+  WHERE (("auth_user"."uid" IS NOT NULL) AND (("auth_user"."uid")::"text" = ("storage"."foldername"("objects"."name"))[1])))))));
+
+CREATE POLICY "Allow user or apikey to read they own folder in apps" ON "storage"."objects" FOR SELECT USING ((("bucket_id" = 'apps'::"text") AND (((( SELECT "auth"."uid"() AS "auth_user_id"))::"text" = ("storage"."foldername"("name"))[1]) OR "capgo_private"."matches_app_storage_apikey_owner"(("storage"."foldername"("name"))[1], (("storage"."foldername"("name"))[2])::character varying, '{read,all}'::"public"."key_mode"[]))));
+
+CREATE POLICY "Allow user or apikey to read they own folder in images" ON "storage"."objects" FOR SELECT TO "anon", "authenticated" USING ((("bucket_id" = 'images'::"text") AND ((("storage"."foldername"("name"))[1] = 'public'::"text") OR
+CASE
+    WHEN ((("storage"."foldername"("name"))[1] = 'org'::"text") AND (("storage"."foldername"("name"))[3] IS NOT NULL) AND (("storage"."foldername"("name"))[3] <> 'logo'::"text")) THEN "public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity_org_appid"('{read,upload,write,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[2])::"uuid", (("storage"."foldername"("name"))[3])::character varying), (("storage"."foldername"("name"))[2])::"uuid", (("storage"."foldername"("name"))[3])::character varying, NULL::bigint)
+    ELSE false
+END OR ((("storage"."foldername"("name"))[1] = 'org'::"text") AND (("storage"."foldername"("name"))[3] = 'logo'::"text") AND "public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity_org_allowed"('{read,upload,write,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[2])::"uuid"), (("storage"."foldername"("name"))[2])::"uuid", NULL::character varying, NULL::bigint)) OR ((("storage"."foldername"("name"))[1] <> 'org'::"text") AND (("storage"."foldername"("name"))[1] <> 'public'::"text") AND (EXISTS ( SELECT 1
+   FROM "public"."org_users" "ou"
+  WHERE ((("ou"."user_id")::"text" = ("storage"."foldername"("objects"."name"))[1]) AND "public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity_org_allowed"('{read,upload,write,all}'::"public"."key_mode"[], "ou"."org_id"), "ou"."org_id", NULL::character varying, NULL::bigint))))))));
+
+CREATE POLICY "Allow user or apikey to update they own folder in apps" ON "storage"."objects" FOR UPDATE USING ((("bucket_id" = 'apps'::"text") AND (((( SELECT "auth"."uid"() AS "auth_user_id"))::"text" = ("storage"."foldername"("name"))[1]) OR "capgo_private"."matches_app_storage_apikey_owner"(("storage"."foldername"("name"))[1], (("storage"."foldername"("name"))[2])::character varying, '{write,all}'::"public"."key_mode"[]))));
+
+CREATE POLICY "Allow user or apikey to update they own folder in images" ON "storage"."objects" FOR UPDATE TO "anon", "authenticated" USING ((("bucket_id" = 'images'::"text") AND (
+CASE
+    WHEN ((("storage"."foldername"("name"))[1] = 'org'::"text") AND (("storage"."foldername"("name"))[3] IS NOT NULL) AND (("storage"."foldername"("name"))[3] <> 'logo'::"text")) THEN "public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity_org_appid"('{write,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[2])::"uuid", (("storage"."foldername"("name"))[3])::character varying), (("storage"."foldername"("name"))[2])::"uuid", (("storage"."foldername"("name"))[3])::character varying, NULL::bigint)
+    ELSE false
+END OR ((("storage"."foldername"("name"))[1] = 'org'::"text") AND (("storage"."foldername"("name"))[3] = 'logo'::"text") AND "public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity_org_allowed"('{write,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[2])::"uuid"), (("storage"."foldername"("name"))[2])::"uuid", NULL::character varying, NULL::bigint)) OR (EXISTS ( SELECT 1
+   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
+  WHERE (("auth_user"."uid" IS NOT NULL) AND (("auth_user"."uid")::"text" = ("storage"."foldername"("objects"."name"))[1]))))))) WITH CHECK ((("bucket_id" = 'images'::"text") AND (
+CASE
+    WHEN ((("storage"."foldername"("name"))[1] = 'org'::"text") AND (("storage"."foldername"("name"))[3] IS NOT NULL) AND (("storage"."foldername"("name"))[3] <> 'logo'::"text")) THEN "public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity_org_appid"('{write,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[2])::"uuid", (("storage"."foldername"("name"))[3])::character varying), (("storage"."foldername"("name"))[2])::"uuid", (("storage"."foldername"("name"))[3])::character varying, NULL::bigint)
+    ELSE false
+END OR ((("storage"."foldername"("name"))[1] = 'org'::"text") AND (("storage"."foldername"("name"))[3] = 'logo'::"text") AND "public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity_org_allowed"('{write,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[2])::"uuid"), (("storage"."foldername"("name"))[2])::"uuid", NULL::character varying, NULL::bigint)) OR (EXISTS ( SELECT 1
+   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
+  WHERE (("auth_user"."uid" IS NOT NULL) AND (("auth_user"."uid")::"text" = ("storage"."foldername"("objects"."name"))[1])))))));
+
+CREATE POLICY "Disable act bucket for users" ON "storage"."buckets" USING (false) WITH CHECK (false);
+
+
+-- Explicit client-role denies for admin/oracle RPCs. CREATE FUNCTION defaults
+-- grant EXECUTE to PUBLIC; some CI images also widen grants after migrate.
+REVOKE ALL ON FUNCTION "public"."delete_old_deleted_apps"() FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."delete_old_deleted_apps"() FROM "anon";
+REVOKE ALL ON FUNCTION "public"."delete_old_deleted_apps"() FROM "authenticated";
+GRANT ALL ON FUNCTION "public"."delete_old_deleted_apps"() TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."cleanup_frequent_job_details"() FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."cleanup_frequent_job_details"() FROM "anon";
+REVOKE ALL ON FUNCTION "public"."cleanup_frequent_job_details"() FROM "authenticated";
+GRANT ALL ON FUNCTION "public"."cleanup_frequent_job_details"() TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."remove_old_jobs"() FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."remove_old_jobs"() FROM "anon";
+REVOKE ALL ON FUNCTION "public"."remove_old_jobs"() FROM "authenticated";
+GRANT ALL ON FUNCTION "public"."remove_old_jobs"() TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."delete_http_response"("request_id" bigint) FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."delete_http_response"("request_id" bigint) FROM "anon";
+REVOKE ALL ON FUNCTION "public"."delete_http_response"("request_id" bigint) FROM "authenticated";
+GRANT ALL ON FUNCTION "public"."delete_http_response"("request_id" bigint) TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."get_current_plan_max_org"("orgid" "uuid") FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."get_current_plan_max_org"("orgid" "uuid") FROM "anon";
+GRANT ALL ON FUNCTION "public"."get_current_plan_max_org"("orgid" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_current_plan_max_org"("orgid" "uuid") TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."get_user_main_org_id"("user_id" "uuid") FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."get_user_main_org_id"("user_id" "uuid") FROM "anon";
+GRANT ALL ON FUNCTION "public"."get_user_main_org_id"("user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_user_main_org_id"("user_id" "uuid") TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."is_account_disabled"("user_id" "uuid") FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."is_account_disabled"("user_id" "uuid") FROM "anon";
+GRANT ALL ON FUNCTION "public"."is_account_disabled"("user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."is_account_disabled"("user_id" "uuid") TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."restore_deleted_account"() FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."restore_deleted_account"() FROM "anon";
+GRANT ALL ON FUNCTION "public"."restore_deleted_account"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."restore_deleted_account"() TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."rescind_invitation"("email" "text", "org_id" "uuid") FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."rescind_invitation"("email" "text", "org_id" "uuid") FROM "anon";
+GRANT ALL ON FUNCTION "public"."rescind_invitation"("email" "text", "org_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."rescind_invitation"("email" "text", "org_id" "uuid") TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."has_2fa_enabled"("user_id" "uuid") FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."has_2fa_enabled"("user_id" "uuid") FROM "anon";
+REVOKE ALL ON FUNCTION "public"."has_2fa_enabled"("user_id" "uuid") FROM "authenticated";
+GRANT ALL ON FUNCTION "public"."has_2fa_enabled"("user_id" "uuid") TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."reject_access_due_to_2fa"("org_id" "uuid", "user_id" "uuid") FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."reject_access_due_to_2fa"("org_id" "uuid", "user_id" "uuid") FROM "anon";
+REVOKE ALL ON FUNCTION "public"."reject_access_due_to_2fa"("org_id" "uuid", "user_id" "uuid") FROM "authenticated";
+GRANT ALL ON FUNCTION "public"."reject_access_due_to_2fa"("org_id" "uuid", "user_id" "uuid") TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."get_total_metrics"("org_id" "uuid", "start_date" "date", "end_date" "date") FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."get_total_metrics"("org_id" "uuid", "start_date" "date", "end_date" "date") FROM "anon";
+REVOKE ALL ON FUNCTION "public"."get_total_metrics"("org_id" "uuid", "start_date" "date", "end_date" "date") FROM "authenticated";
+GRANT ALL ON FUNCTION "public"."get_total_metrics"("org_id" "uuid", "start_date" "date", "end_date" "date") TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."is_paying_and_good_plan_org_action"("orgid" "uuid", "actions" "public"."action_type"[]) FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."is_paying_and_good_plan_org_action"("orgid" "uuid", "actions" "public"."action_type"[]) FROM "anon";
+GRANT ALL ON FUNCTION "public"."is_paying_and_good_plan_org_action"("orgid" "uuid", "actions" "public"."action_type"[]) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."is_paying_and_good_plan_org_action"("orgid" "uuid", "actions" "public"."action_type"[]) TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."rbac_migrate_org_users_to_bindings"("p_org_id" "uuid", "p_granted_by" "uuid") FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."rbac_migrate_org_users_to_bindings"("p_org_id" "uuid", "p_granted_by" "uuid") FROM "anon";
+REVOKE ALL ON FUNCTION "public"."rbac_migrate_org_users_to_bindings"("p_org_id" "uuid", "p_granted_by" "uuid") FROM "authenticated";
+GRANT ALL ON FUNCTION "public"."rbac_migrate_org_users_to_bindings"("p_org_id" "uuid", "p_granted_by" "uuid") TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."rbac_enable_for_org"("p_org_id" "uuid", "p_granted_by" "uuid") FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."rbac_enable_for_org"("p_org_id" "uuid", "p_granted_by" "uuid") FROM "anon";
+REVOKE ALL ON FUNCTION "public"."rbac_enable_for_org"("p_org_id" "uuid", "p_granted_by" "uuid") FROM "authenticated";
+GRANT ALL ON FUNCTION "public"."rbac_enable_for_org"("p_org_id" "uuid", "p_granted_by" "uuid") TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."rbac_rollback_org"("p_org_id" "uuid") FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."rbac_rollback_org"("p_org_id" "uuid") FROM "anon";
+REVOKE ALL ON FUNCTION "public"."rbac_rollback_org"("p_org_id" "uuid") FROM "authenticated";
+GRANT ALL ON FUNCTION "public"."rbac_rollback_org"("p_org_id" "uuid") TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."get_orgs_v7"("userid" "uuid") FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."get_orgs_v7"("userid" "uuid") FROM "anon";
+REVOKE ALL ON FUNCTION "public"."get_orgs_v7"("userid" "uuid") FROM "authenticated";
+GRANT ALL ON FUNCTION "public"."get_orgs_v7"("userid" "uuid") TO "service_role";
+
+-- Oracle APIs: dump still grants anon EXECUTE; revoke anon only, keep authenticated for PostgREST.
+REVOKE ALL ON FUNCTION "public"."get_user_id"("apikey" "text") FROM "anon";
+REVOKE ALL ON FUNCTION "public"."get_user_id"("apikey" "text", "app_id" "text") FROM "anon";
+REVOKE ALL ON FUNCTION "public"."get_org_perm_for_apikey"("apikey" "text", "app_id" "text") FROM "anon";
