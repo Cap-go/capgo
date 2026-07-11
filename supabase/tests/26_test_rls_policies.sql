@@ -40,8 +40,8 @@ SELECT
     policies_are(
         'public',
         'global_stats',
-        ARRAY[]::text [],
-        'global_stats should have correct policies'
+        ARRAY[' allow anon to select'],
+        'global_stats should keep the production anon select policy shell'
     );
 
 -- Test stats policies
