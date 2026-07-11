@@ -1736,187 +1736,225 @@
       "definition": "UNIQUE (name, app_id)",
       "name": "app_versions_name_app_id_key",
       "table": "app_versions",
-      "type": "u"
+      "type": "u",
+      "valid": true
     },
     {
       "definition": "PRIMARY KEY (id)",
       "name": "app_versions_pkey",
       "table": "app_versions",
-      "type": "p"
+      "type": "p",
+      "valid": true
     },
     {
       "definition": "CHECK (build_timeout_seconds >= 300 AND build_timeout_seconds <= 21600)",
       "name": "apps_build_timeout_seconds_check",
       "table": "apps",
-      "type": "c"
+      "type": "c",
+      "valid": true
     },
     {
       "definition": "UNIQUE (id)",
       "name": "apps_id_unique",
       "table": "apps",
-      "type": "u"
+      "type": "u",
+      "valid": true
     },
     {
       "definition": "PRIMARY KEY (app_id)",
       "name": "apps_pkey",
       "table": "apps",
-      "type": "p"
+      "type": "p",
+      "valid": true
     },
     {
       "definition": "UNIQUE (app_id, device_id)",
       "name": "channel_devices_app_id_device_id_key",
       "table": "channel_devices",
-      "type": "u"
+      "type": "u",
+      "valid": true
+    },
+    {
+      "definition": "PRIMARY KEY (id)",
+      "name": "channel_devices_pkey",
+      "table": "channel_devices",
+      "type": "p",
+      "valid": true
     },
     {
       "definition": "PRIMARY KEY (id)",
       "name": "channel_pkey",
       "table": "channels",
-      "type": "p"
+      "type": "p",
+      "valid": true
     },
     {
       "definition": "CHECK (auto_pause_action = ANY (ARRAY['pause'::text, 'rollback'::text, 'notify'::text]))",
       "name": "channels_auto_pause_action_check",
       "table": "channels",
-      "type": "c"
+      "type": "c",
+      "valid": true
     },
     {
       "definition": "CHECK (auto_pause_confidence > 0::numeric AND auto_pause_confidence < 1::numeric)",
       "name": "channels_auto_pause_confidence_check",
       "table": "channels",
-      "type": "c"
+      "type": "c",
+      "valid": true
     },
     {
       "definition": "CHECK (auto_pause_cooldown_minutes >= 0 AND auto_pause_cooldown_minutes <= 10080)",
       "name": "channels_auto_pause_cooldown_minutes_check",
       "table": "channels",
-      "type": "c"
+      "type": "c",
+      "valid": true
     },
     {
       "definition": "CHECK (auto_pause_failure_rate_bps IS NULL OR auto_pause_failure_rate_bps >= 0 AND auto_pause_failure_rate_bps <= 10000)",
       "name": "channels_auto_pause_failure_rate_bps_check",
       "table": "channels",
-      "type": "c"
+      "type": "c",
+      "valid": true
     },
     {
       "definition": "CHECK (auto_pause_min_attempts IS NULL OR auto_pause_min_attempts >= 0)",
       "name": "channels_auto_pause_min_attempts_check",
       "table": "channels",
-      "type": "c"
+      "type": "c",
+      "valid": true
     },
     {
       "definition": "CHECK (auto_pause_min_failures IS NULL OR auto_pause_min_failures >= 0)",
       "name": "channels_auto_pause_min_failures_check",
       "table": "channels",
-      "type": "c"
+      "type": "c",
+      "valid": true
     },
     {
       "definition": "CHECK (auto_pause_window_minutes > 0 AND auto_pause_window_minutes <= 10080)",
       "name": "channels_auto_pause_window_minutes_check",
       "table": "channels",
-      "type": "c"
+      "type": "c",
+      "valid": true
     },
     {
       "definition": "UNIQUE (rbac_id)",
       "name": "channels_rbac_id_key",
       "table": "channels",
-      "type": "u"
+      "type": "u",
+      "valid": true
     },
     {
       "definition": "CHECK (rollout_cache_ttl_seconds >= 60 AND rollout_cache_ttl_seconds <= 31536000)",
       "name": "channels_rollout_cache_ttl_seconds_check",
       "table": "channels",
-      "type": "c"
+      "type": "c",
+      "valid": true
     },
     {
       "definition": "CHECK (rollout_percentage_bps >= 0 AND rollout_percentage_bps <= 10000)",
       "name": "channels_rollout_percentage_bps_check",
       "table": "channels",
-      "type": "c"
+      "type": "c",
+      "valid": true
     },
     {
       "definition": "UNIQUE (name, app_id)",
       "name": "unique_name_app_id",
       "table": "channels",
-      "type": "u"
+      "type": "u",
+      "valid": true
     },
     {
       "definition": "PRIMARY KEY (id)",
       "name": "manifest_pkey",
       "table": "manifest",
-      "type": "p"
+      "type": "p",
+      "valid": true
     },
     {
       "definition": "PRIMARY KEY (owner_org, event, uniq_id)",
       "name": "notifications_pkey",
       "table": "notifications",
-      "type": "p"
+      "type": "p",
+      "valid": true
     },
     {
       "definition": "PRIMARY KEY (id)",
       "name": "onboarding_demo_data_pkey",
       "table": "onboarding_demo_data",
-      "type": "p"
+      "type": "p",
+      "valid": true
     },
     {
       "definition": "CHECK (relation_name = ANY (ARRAY['app_versions'::text, 'app_versions_meta'::text, 'manifest'::text, 'channels'::text, 'channel_devices'::text, 'deploy_history'::text, 'devices'::text, 'build_requests'::text]))",
       "name": "onboarding_demo_data_relation_name_check",
       "table": "onboarding_demo_data",
-      "type": "c"
+      "type": "c",
+      "valid": true
     },
     {
       "definition": "PRIMARY KEY (id)",
       "name": "org_users_pkey",
       "table": "org_users",
-      "type": "p"
+      "type": "p",
+      "valid": true
     },
     {
       "definition": "CHECK (max_apikey_expiration_days IS NULL OR max_apikey_expiration_days >= 1 AND max_apikey_expiration_days <= 365)",
       "name": "orgs_max_apikey_expiration_days_valid",
       "table": "orgs",
-      "type": "c"
+      "type": "c",
+      "valid": true
     },
     {
       "definition": "CHECK (jsonb_typeof(onboarding) = 'object'::text AND (NOT onboarding ? 'intent'::text OR ((onboarding ->> 'intent'::text) = ANY (ARRAY['unknown'::text, 'ota'::text, 'builder'::text, 'both'::text, 'exploring'::text]))))",
       "name": "orgs_onboarding_valid",
       "table": "orgs",
-      "type": "c"
+      "type": "c",
+      "valid": true
     },
     {
       "definition": "CHECK (password_policy_config IS NULL OR jsonb_typeof(password_policy_config) = 'object'::text AND (NOT password_policy_config ? 'min_length'::text OR jsonb_typeof(password_policy_config -> 'min_length'::text) = 'number'::text AND ((password_policy_config ->> 'min_length'::text)::numeric) = trunc((password_policy_config ->> 'min_length'::text)::numeric) AND ((password_policy_config ->> 'min_length'::text)::numeric) >= 6::numeric AND ((password_policy_config ->> 'min_length'::text)::numeric) <= 72::numeric))",
       "name": "orgs_password_policy_config_min_length_check",
       "table": "orgs",
-      "type": "c"
+      "type": "c",
+      "valid": true
     },
     {
       "definition": "PRIMARY KEY (id)",
       "name": "orgs_pkey",
       "table": "orgs",
-      "type": "p"
+      "type": "p",
+      "valid": true
     },
     {
       "definition": "CHECK (required_encryption_key IS NULL OR (length(required_encryption_key::text) = ANY (ARRAY[20, 21])))",
       "name": "orgs_required_encryption_key_valid",
       "table": "orgs",
-      "type": "c"
+      "type": "c",
+      "valid": true
     },
     {
       "definition": "UNIQUE (customer_id)",
       "name": "unique customer_id on orgs",
       "table": "orgs",
-      "type": "u"
+      "type": "u",
+      "valid": true
     },
     {
       "definition": "UNIQUE (name, created_by)",
       "name": "unique_name_created_by",
       "table": "orgs",
-      "type": "u"
+      "type": "u",
+      "valid": true
     },
     {
       "definition": "PRIMARY KEY (customer_id)",
       "name": "stripe_info_pkey",
       "table": "stripe_info",
-      "type": "p"
+      "type": "p",
+      "valid": true
     }
   ],
   "functions": [
@@ -1928,444 +1966,532 @@
   ],
   "indexes": [
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX app_versions_cli_version_idx ON public.app_versions USING btree (cli_version)",
       "name": "app_versions_cli_version_idx",
       "table": "app_versions",
       "valid": true
     },
     {
+      "constraintOwned": true,
       "definition": "CREATE UNIQUE INDEX app_versions_name_app_id_key ON public.app_versions USING btree (name, app_id)",
       "name": "app_versions_name_app_id_key",
       "table": "app_versions",
       "valid": true
     },
     {
+      "constraintOwned": true,
       "definition": "CREATE UNIQUE INDEX app_versions_pkey ON public.app_versions USING btree (id)",
       "name": "app_versions_pkey",
       "table": "app_versions",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX app_versions_r2_path_idx ON public.app_versions USING btree (r2_path)",
       "name": "app_versions_r2_path_idx",
       "table": "app_versions",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX finx_app_versions_owner_org ON public.app_versions USING btree (owner_org)",
       "name": "finx_app_versions_owner_org",
       "table": "app_versions",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_app_id_app_versions ON public.app_versions USING btree (app_id)",
       "name": "idx_app_id_app_versions",
       "table": "app_versions",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_app_id_name_app_versions ON public.app_versions USING btree (app_id, name)",
       "name": "idx_app_id_name_app_versions",
       "table": "app_versions",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_app_versions_created_at ON public.app_versions USING btree (created_at)",
       "name": "idx_app_versions_created_at",
       "table": "app_versions",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_app_versions_created_at_app_id ON public.app_versions USING btree (created_at, app_id)",
       "name": "idx_app_versions_created_at_app_id",
       "table": "app_versions",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_app_versions_deleted ON public.app_versions USING btree (deleted)",
       "name": "idx_app_versions_deleted",
       "table": "app_versions",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_app_versions_deleted_at ON public.app_versions USING btree (deleted_at) WHERE (deleted_at IS NOT NULL)",
       "name": "idx_app_versions_deleted_at",
       "table": "app_versions",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_app_versions_id ON public.app_versions USING btree (id)",
       "name": "idx_app_versions_id",
       "table": "app_versions",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_app_versions_key_id ON public.app_versions USING btree (key_id) WHERE (key_id IS NOT NULL)",
       "name": "idx_app_versions_key_id",
       "table": "app_versions",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_app_versions_name ON public.app_versions USING btree (name)",
       "name": "idx_app_versions_name",
       "table": "app_versions",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_app_versions_owner_org_not_deleted ON public.app_versions USING btree (owner_org) WHERE (deleted = false)",
       "name": "idx_app_versions_owner_org_not_deleted",
       "table": "app_versions",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_app_versions_retention_cleanup ON public.app_versions USING btree (deleted, created_at, app_id) WHERE (deleted = false)",
       "name": "idx_app_versions_retention_cleanup",
       "table": "app_versions",
       "valid": true
     },
     {
+      "constraintOwned": true,
       "definition": "CREATE UNIQUE INDEX apps_id_unique ON public.apps USING btree (id)",
       "name": "apps_id_unique",
       "table": "apps",
       "valid": true
     },
     {
+      "constraintOwned": true,
       "definition": "CREATE UNIQUE INDEX apps_pkey ON public.apps USING btree (app_id)",
       "name": "apps_pkey",
       "table": "apps",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX finx_apps_owner_org ON public.apps USING btree (owner_org)",
       "name": "finx_apps_owner_org",
       "table": "apps",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX finx_apps_user_id ON public.apps USING btree (user_id)",
       "name": "finx_apps_user_id",
       "table": "apps",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_apps_created_at ON public.apps USING btree (created_at)",
       "name": "idx_apps_created_at",
       "table": "apps",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_apps_default_upload_channel ON public.apps USING btree (default_upload_channel)",
       "name": "idx_apps_default_upload_channel",
       "table": "apps",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE UNIQUE INDEX idx_apps_owner_org_app_id ON public.apps USING btree (owner_org, app_id)",
       "name": "idx_apps_owner_org_app_id",
       "table": "apps",
       "valid": true
     },
     {
+      "constraintOwned": true,
       "definition": "CREATE UNIQUE INDEX channel_devices_app_id_device_id_key ON public.channel_devices USING btree (app_id, device_id)",
       "name": "channel_devices_app_id_device_id_key",
       "table": "channel_devices",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX channel_devices_device_id_idx ON public.channel_devices USING btree (device_id)",
       "name": "channel_devices_device_id_idx",
       "table": "channel_devices",
       "valid": true
     },
     {
+      "constraintOwned": true,
+      "definition": "CREATE UNIQUE INDEX channel_devices_pkey ON public.channel_devices USING btree (id)",
+      "name": "channel_devices_pkey",
+      "table": "channel_devices",
+      "valid": true
+    },
+    {
+      "constraintOwned": false,
       "definition": "CREATE INDEX finx_channel_devices_app_id ON public.channel_devices USING btree (app_id)",
       "name": "finx_channel_devices_app_id",
       "table": "channel_devices",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX finx_channel_devices_channel_id ON public.channel_devices USING btree (channel_id)",
       "name": "finx_channel_devices_channel_id",
       "table": "channel_devices",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE UNIQUE INDEX idx_app_id_device_id_channel_id_channel_devices ON public.channel_devices USING btree (app_id, device_id, channel_id)",
       "name": "idx_app_id_device_id_channel_id_channel_devices",
       "table": "channel_devices",
       "valid": true
     },
     {
+      "constraintOwned": true,
       "definition": "CREATE UNIQUE INDEX channel_pkey ON public.channels USING btree (id)",
       "name": "channel_pkey",
       "table": "channels",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE UNIQUE INDEX channels_one_public_android_per_app_key ON public.channels USING btree (app_id) WHERE ((public = true) AND (android = true))",
       "name": "channels_one_public_android_per_app_key",
       "table": "channels",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE UNIQUE INDEX channels_one_public_electron_per_app_key ON public.channels USING btree (app_id) WHERE ((public = true) AND (electron = true))",
       "name": "channels_one_public_electron_per_app_key",
       "table": "channels",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE UNIQUE INDEX channels_one_public_ios_per_app_key ON public.channels USING btree (app_id) WHERE ((public = true) AND (ios = true))",
       "name": "channels_one_public_ios_per_app_key",
       "table": "channels",
       "valid": true
     },
     {
+      "constraintOwned": true,
       "definition": "CREATE UNIQUE INDEX channels_rbac_id_key ON public.channels USING btree (rbac_id)",
       "name": "channels_rbac_id_key",
       "table": "channels",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX finx_channels_app_id ON public.channels USING btree (app_id)",
       "name": "finx_channels_app_id",
       "table": "channels",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX finx_channels_owner_org ON public.channels USING btree (owner_org)",
       "name": "finx_channels_owner_org",
       "table": "channels",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX finx_channels_version ON public.channels USING btree (version)",
       "name": "finx_channels_version",
       "table": "channels",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_app_id_public_channel ON public.channels USING btree (app_id, public)",
       "name": "idx_app_id_public_channel",
       "table": "channels",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_channels_app_id_name ON public.channels USING btree (app_id, name)",
       "name": "idx_channels_app_id_name",
       "table": "channels",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_channels_app_id_version ON public.channels USING btree (app_id, version)",
       "name": "idx_channels_app_id_version",
       "table": "channels",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_channels_public_app_id_android ON public.channels USING btree (public, app_id, android)",
       "name": "idx_channels_public_app_id_android",
       "table": "channels",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_channels_public_app_id_ios ON public.channels USING btree (public, app_id, ios)",
       "name": "idx_channels_public_app_id_ios",
       "table": "channels",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_channels_rollout_targets ON public.channels USING btree (app_id, rollout_version) WHERE (rollout_version IS NOT NULL)",
       "name": "idx_channels_rollout_targets",
       "table": "channels",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_channels_rollout_version ON public.channels USING btree (rollout_version) WHERE (rollout_version IS NOT NULL)",
       "name": "idx_channels_rollout_version",
       "table": "channels",
       "valid": true
     },
     {
+      "constraintOwned": true,
       "definition": "CREATE UNIQUE INDEX unique_name_app_id ON public.channels USING btree (name, app_id)",
       "name": "unique_name_app_id",
       "table": "channels",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_manifest_app_version_id ON public.manifest USING btree (app_version_id)",
       "name": "idx_manifest_app_version_id",
       "table": "manifest",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_manifest_file_hash ON public.manifest USING btree (file_hash)",
       "name": "idx_manifest_file_hash",
       "table": "manifest",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_manifest_file_name ON public.manifest USING btree (file_name)",
       "name": "idx_manifest_file_name",
       "table": "manifest",
       "valid": true
     },
     {
+      "constraintOwned": true,
       "definition": "CREATE UNIQUE INDEX manifest_pkey ON public.manifest USING btree (id)",
       "name": "manifest_pkey",
       "table": "manifest",
       "valid": true
     },
     {
+      "constraintOwned": true,
       "definition": "CREATE UNIQUE INDEX notifications_pkey ON public.notifications USING btree (owner_org, event, uniq_id)",
       "name": "notifications_pkey",
       "table": "notifications",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX notifications_uniq_id_idx ON public.notifications USING btree (uniq_id)",
       "name": "notifications_uniq_id_idx",
       "table": "notifications",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE UNIQUE INDEX onboarding_demo_data_app_relation_row_key_idx ON public.onboarding_demo_data USING btree (app_id, relation_name, row_key)",
       "name": "onboarding_demo_data_app_relation_row_key_idx",
       "table": "onboarding_demo_data",
       "valid": true
     },
     {
+      "constraintOwned": true,
       "definition": "CREATE UNIQUE INDEX onboarding_demo_data_pkey ON public.onboarding_demo_data USING btree (id)",
       "name": "onboarding_demo_data_pkey",
       "table": "onboarding_demo_data",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX onboarding_demo_data_seed_id_idx ON public.onboarding_demo_data USING btree (seed_id)",
       "name": "onboarding_demo_data_seed_id_idx",
       "table": "onboarding_demo_data",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX finx_org_users_channel_id ON public.org_users USING btree (channel_id)",
       "name": "finx_org_users_channel_id",
       "table": "org_users",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX finx_org_users_org_id ON public.org_users USING btree (org_id)",
       "name": "finx_org_users_org_id",
       "table": "org_users",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX finx_org_users_user_id ON public.org_users USING btree (user_id)",
       "name": "finx_org_users_user_id",
       "table": "org_users",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX org_users_app_id_idx ON public.org_users USING btree (app_id)",
       "name": "org_users_app_id_idx",
       "table": "org_users",
       "valid": true
     },
     {
+      "constraintOwned": true,
       "definition": "CREATE UNIQUE INDEX org_users_pkey ON public.org_users USING btree (id)",
       "name": "org_users_pkey",
       "table": "org_users",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX finx_orgs_created_by ON public.orgs USING btree (created_by)",
       "name": "finx_orgs_created_by",
       "table": "orgs",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_orgs_customer_id ON public.orgs USING btree (customer_id)",
       "name": "idx_orgs_customer_id",
       "table": "orgs",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_orgs_email_preferences ON public.orgs USING gin (email_preferences)",
       "name": "idx_orgs_email_preferences",
       "table": "orgs",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX orgs_enforce_hashed_api_keys_true_idx ON public.orgs USING btree (id) WHERE (enforce_hashed_api_keys = true)",
       "name": "orgs_enforce_hashed_api_keys_true_idx",
       "table": "orgs",
       "valid": true
     },
     {
+      "constraintOwned": true,
       "definition": "CREATE UNIQUE INDEX orgs_pkey ON public.orgs USING btree (id)",
       "name": "orgs_pkey",
       "table": "orgs",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX orgs_updated_at_id_idx ON public.orgs USING btree (updated_at DESC) INCLUDE (id) WHERE (customer_id IS NOT NULL)",
       "name": "orgs_updated_at_id_idx",
       "table": "orgs",
       "valid": true
     },
     {
+      "constraintOwned": true,
       "definition": "CREATE UNIQUE INDEX \"unique customer_id on orgs\" ON public.orgs USING btree (customer_id)",
       "name": "unique customer_id on orgs",
       "table": "orgs",
       "valid": true
     },
     {
+      "constraintOwned": true,
       "definition": "CREATE UNIQUE INDEX unique_name_created_by ON public.orgs USING btree (name, created_by)",
       "name": "unique_name_created_by",
       "table": "orgs",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX finx_orgs_stripe_info ON public.stripe_info USING btree (product_id)",
       "name": "finx_orgs_stripe_info",
       "table": "stripe_info",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_stripe_info_customer_covering ON public.stripe_info USING btree (customer_id) INCLUDE (product_id, subscription_anchor_start, subscription_anchor_end)",
       "name": "idx_stripe_info_customer_covering",
       "table": "stripe_info",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_stripe_info_past_due_at ON public.stripe_info USING btree (past_due_at) WHERE (past_due_at IS NOT NULL)",
       "name": "idx_stripe_info_past_due_at",
       "table": "stripe_info",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_stripe_info_status_plan ON public.stripe_info USING btree (status, is_good_plan) WHERE ((status = 'succeeded'::stripe_status) AND (is_good_plan = true))",
       "name": "idx_stripe_info_status_plan",
       "table": "stripe_info",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX idx_stripe_info_trial ON public.stripe_info USING btree (trial_at) WHERE (trial_at IS NOT NULL)",
       "name": "idx_stripe_info_trial",
       "table": "stripe_info",
       "valid": true
     },
     {
+      "constraintOwned": false,
+      "definition": "CREATE UNIQUE INDEX si_customer_cover_uidx ON public.stripe_info USING btree (customer_id) INCLUDE (status, trial_at, mau_exceeded, storage_exceeded, bandwidth_exceeded)",
+      "name": "si_customer_cover_uidx",
+      "table": "stripe_info",
+      "valid": true
+    },
+    {
+      "constraintOwned": false,
       "definition": "CREATE INDEX si_customer_status_trial_idx ON public.stripe_info USING btree (customer_id, status, trial_at) INCLUDE (mau_exceeded, storage_exceeded, bandwidth_exceeded)",
       "name": "si_customer_status_trial_idx",
       "table": "stripe_info",
       "valid": true
     },
     {
+      "constraintOwned": false,
       "definition": "CREATE INDEX stripe_info_paid_at_idx ON public.stripe_info USING btree (paid_at) WHERE (paid_at IS NOT NULL)",
       "name": "stripe_info_paid_at_idx",
       "table": "stripe_info",
       "valid": true
     },
     {
+      "constraintOwned": true,
       "definition": "CREATE UNIQUE INDEX stripe_info_pkey ON public.stripe_info USING btree (customer_id)",
       "name": "stripe_info_pkey",
       "table": "stripe_info",
@@ -2380,8 +2506,8 @@
       "max": "9223372036854775807",
       "min": "1",
       "name": "app_versions_id_seq",
-      "ownedColumn": null,
-      "ownedTable": null,
+      "ownedColumn": "id",
+      "ownedTable": "app_versions",
       "start": "1",
       "type": "bigint"
     },
@@ -2392,8 +2518,8 @@
       "max": "9223372036854775807",
       "min": "1",
       "name": "channel_devices_id_seq",
-      "ownedColumn": null,
-      "ownedTable": null,
+      "ownedColumn": "id",
+      "ownedTable": "channel_devices",
       "start": "1",
       "type": "bigint"
     },
@@ -2404,8 +2530,8 @@
       "max": "9223372036854775807",
       "min": "1",
       "name": "channel_id_seq",
-      "ownedColumn": null,
-      "ownedTable": null,
+      "ownedColumn": "id",
+      "ownedTable": "channels",
       "start": "1",
       "type": "bigint"
     },
@@ -2428,8 +2554,8 @@
       "max": "9223372036854775807",
       "min": "1",
       "name": "org_users_id_seq",
-      "ownedColumn": null,
-      "ownedTable": null,
+      "ownedColumn": "id",
+      "ownedTable": "org_users",
       "start": "1",
       "type": "bigint"
     },

@@ -27,9 +27,7 @@ const REPLICA_SEQUENCES = [
   'stripe_info_id_seq',
 ] as const
 
-export const REPLICA_FUNCTIONS = [
-  'one_month_ahead',
-] as const
+export const REPLICA_FUNCTIONS = ['one_month_ahead'] as const
 
 export const REPLICA_EXCLUDED_INDEXES = [
   // replicate_prepare.sh intentionally omits this source-only customer lookup index from the replica DDL.
@@ -45,7 +43,10 @@ function escapeRegex(value: string): string {
 }
 
 export interface Queryable {
-  query: (queryText: string, values?: unknown[]) => Promise<{ rows: Record<string, any>[] }>
+  query: (
+    queryText: string,
+    values?: unknown[],
+  ) => Promise<{ rows: Record<string, any>[] }>
 }
 
 // The release checker reads this catalog before and after schema DDL. The explicit
@@ -54,9 +55,6 @@ export interface Queryable {
 export const READ_REPLICA_SCHEMA_CATALOG_SQL = `
 WITH replica_tables(table_name) AS (
   SELECT unnest($1::text[])
-),
-replica_types(type_name) AS (
-  SELECT unnest($2::text[])
 ),
 replica_sequences(sequence_name) AS (
   SELECT unnest($3::text[])
@@ -82,6 +80,27 @@ tables AS (
   WHERE n.nspname = 'public'
     AND c.relkind IN ('r', 'p')
 ),
+selected_type_names(type_name) AS (
+  SELECT unnest($2::text[])
+  UNION
+  SELECT DISTINCT base_type.typname
+  FROM tables t
+  JOIN pg_attribute a ON a.attrelid = t.table_oid
+  JOIN pg_type declared_type ON declared_type.oid = a.atttypid
+  JOIN pg_type element_type ON element_type.oid = CASE
+    WHEN declared_type.typelem <> 0 THEN declared_type.typelem
+    ELSE declared_type.oid
+  END
+  JOIN pg_type base_type ON base_type.oid = CASE
+    WHEN element_type.typbasetype <> 0 THEN element_type.typbasetype
+    ELSE element_type.oid
+  END
+  JOIN pg_namespace type_namespace ON type_namespace.oid = base_type.typnamespace
+  WHERE a.attnum > 0
+    AND NOT a.attisdropped
+    AND type_namespace.nspname = 'public'
+    AND base_type.typtype IN ('e', 'c')
+),
 columns AS (
   SELECT
     t.table_name,
@@ -103,6 +122,7 @@ constraints AS (
     t.table_name,
     con.conname AS constraint_name,
     con.contype AS constraint_type,
+    con.convalidated AS is_valid,
     pg_get_constraintdef(con.oid, true) AS definition
   FROM tables t
   JOIN pg_constraint con ON con.conrelid = t.table_oid
@@ -113,10 +133,14 @@ indexes AS (
     t.table_name,
     idx.relname AS index_name,
     pg_get_indexdef(idx.oid) AS definition,
-    ix.indisvalid AS is_valid
+    ix.indisvalid AS is_valid,
+    (constraint_owner.oid IS NOT NULL) AS constraint_owned
   FROM tables t
   JOIN pg_index ix ON ix.indrelid = t.table_oid
   JOIN pg_class idx ON idx.oid = ix.indexrelid
+  LEFT JOIN pg_constraint constraint_owner
+    ON constraint_owner.conindid = ix.indexrelid
+    AND constraint_owner.contype IN ('p', 'u', 'x')
   WHERE NOT EXISTS (
     SELECT 1
     FROM replica_excluded_indexes rei
@@ -151,7 +175,7 @@ types AS (
     END AS definition
   FROM pg_type typ
   JOIN pg_namespace n ON n.oid = typ.typnamespace
-  JOIN replica_types rt ON rt.type_name = typ.typname
+  JOIN selected_type_names rt ON rt.type_name = typ.typname
   WHERE n.nspname = 'public'
 ),
 sequences AS (
@@ -170,7 +194,7 @@ sequences AS (
   JOIN pg_namespace n ON n.oid = seq.relnamespace
   JOIN pg_sequence s ON s.seqrelid = seq.oid
   JOIN replica_sequences rs ON rs.sequence_name = seq.relname
-  LEFT JOIN pg_depend dep ON dep.objid = seq.oid AND dep.deptype = 'a'
+  LEFT JOIN pg_depend dep ON dep.objid = seq.oid AND dep.deptype IN ('a', 'i')
   LEFT JOIN pg_class owned_table ON owned_table.oid = dep.refobjid
   LEFT JOIN pg_attribute owned_attr ON owned_attr.attrelid = dep.refobjid AND owned_attr.attnum = dep.refobjsubid
   WHERE n.nspname = 'public'
@@ -214,6 +238,7 @@ SELECT jsonb_build_object(
       'table', table_name,
       'name', constraint_name,
       'type', constraint_type,
+      'valid', is_valid,
       'definition', definition
     ) ORDER BY table_name, constraint_name)
     FROM constraints
@@ -223,7 +248,8 @@ SELECT jsonb_build_object(
       'table', table_name,
       'name', index_name,
       'definition', definition,
-      'valid', is_valid
+      'valid', is_valid,
+      'constraintOwned', constraint_owned
     ) ORDER BY table_name, index_name)
     FROM indexes
   ), '[]'::jsonb),
@@ -267,7 +293,9 @@ export function stableStringify(value: unknown): string {
   return JSON.stringify(sortJson(value), null, 2)
 }
 
-export async function readReplicaSchemaCatalog(client: Queryable): Promise<unknown> {
+export async function readReplicaSchemaCatalog(
+  client: Queryable,
+): Promise<unknown> {
   const result = await client.query(READ_REPLICA_SCHEMA_CATALOG_SQL, [
     REPLICA_TABLES,
     REPLICA_TYPES,
