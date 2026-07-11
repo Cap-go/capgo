@@ -125,6 +125,7 @@ RESET ROLE;
 SELECT ok(TRUE, 'anon without capgkey cannot read audit_logs directly');
 
 -- Test 6: Verify the current request identity helper resolves the API-key user.
+SELECT set_config('request.headers', '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520ea"}', true);
 SELECT
   is(
     public.request_actor_user_id(),

@@ -218,12 +218,12 @@ export async function updateOrCreateChannel(
   cloudlog({ requestId: c.get('requestId'), message: 'updateOrCreateChannel', update })
   if (!update.app_id || !update.name || !update.created_by) {
     cloudlog({ requestId: c.get('requestId'), message: 'missing app_id, name, or created_by' })
-    return Promise.reject(new Error('missing app_id, name, or created_by'))
+    throw new Error('missing app_id, name, or created_by')
   }
 
   const auth = c.get('auth')
   if (!auth) {
-    return Promise.reject(new Error('missing request auth'))
+    throw new Error('missing request auth')
   }
 
   const supabase = supabaseWithAuth(c, auth)

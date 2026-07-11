@@ -454,27 +454,27 @@ describe('rbac permission system', () => {
         expect(result.rows[0].admin_can_delete_channel).toBe(true)
       })
 
-      it('maps every legacy write-class permission through both API key compatibility helpers', async () => {
+      it('maps every legacy mutation permission through both API key compatibility helpers', async () => {
         const testId = randomUUID()
-        const writePermissionKeys = [
-          'app.update_settings',
-          'app.create_channel',
-          'app.manage_notifications',
-          'app.manage_devices',
-          'app.build_native',
-          'channel.update_settings',
-          'channel.promote_bundle',
-          'channel.rollback_bundle',
-          'channel.manage_forced_devices',
+        const compatibilityCases = [
+          { permissionKey: 'app.update_settings', legacyRank: 'perm_write', compatibilityMode: 'write' },
+          { permissionKey: 'app.create_channel', legacyRank: 'perm_write', compatibilityMode: 'write' },
+          { permissionKey: 'app.manage_notifications', legacyRank: 'perm_write', compatibilityMode: 'write' },
+          { permissionKey: 'app.manage_devices', legacyRank: 'perm_write', compatibilityMode: 'write' },
+          { permissionKey: 'app.build_native', legacyRank: 'perm_write', compatibilityMode: 'write' },
+          { permissionKey: 'channel.update_settings', legacyRank: 'perm_write', compatibilityMode: 'write' },
+          { permissionKey: 'channel.promote_bundle', legacyRank: 'perm_upload', compatibilityMode: 'upload' },
+          { permissionKey: 'channel.rollback_bundle', legacyRank: 'perm_write', compatibilityMode: 'write' },
+          { permissionKey: 'channel.manage_forced_devices', legacyRank: 'perm_write', compatibilityMode: 'write' },
         ]
 
-        for (const permissionKey of writePermissionKeys) {
-          const apiKey = `rbac-write-${testId}-${permissionKey}`
+        for (const { permissionKey, legacyRank, compatibilityMode } of compatibilityCases) {
+          const apiKey = `rbac-compatibility-${testId}-${permissionKey}`
           const apiKeyResult = await query(`
             INSERT INTO public.apikeys (user_id, key, name)
             VALUES ($1::uuid, $2, $3)
             RETURNING rbac_id
-          `, [USER_ID, apiKey, `RBAC write ${permissionKey} ${testId}`])
+          `, [USER_ID, apiKey, `RBAC compatibility ${permissionKey} ${testId}`])
           const apiKeyRbacId = apiKeyResult.rows[0]?.rbac_id
           expect(apiKeyRbacId).toBeTruthy()
 
@@ -482,7 +482,7 @@ describe('rbac permission system', () => {
             INSERT INTO public.roles (name, scope_type, description, priority_rank, is_assignable)
             VALUES ($1, public.rbac_scope_app(), $2, 0, false)
             RETURNING id
-          `, [`legacy-write-${testId}-${permissionKey}`, `Isolated legacy write permission ${permissionKey}`])
+          `, [`legacy-compatibility-${testId}-${permissionKey}`, `Isolated compatibility permission ${permissionKey}`])
           const roleId = roleResult.rows[0]?.id
           expect(roleId).toBeTruthy()
 
@@ -524,11 +524,11 @@ describe('rbac permission system', () => {
           const compatibility = await query(`
             SELECT
               public.get_org_perm_for_apikey($1, $2) AS legacy_rank,
-              public.is_allowed_capgkey($1, ARRAY['write']::text[], $2::character varying) AS write_allowed
-          `, [apiKey, TEST_APP_ID])
+              public.is_allowed_capgkey($1, ARRAY[$3::text], $2::character varying) AS allowed
+          `, [apiKey, TEST_APP_ID, compatibilityMode])
           expect(compatibility.rows[0]).toMatchObject({
-            legacy_rank: 'perm_write',
-            write_allowed: true,
+            legacy_rank: legacyRank,
+            allowed: true,
           })
         }
       })

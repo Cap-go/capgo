@@ -56,7 +56,7 @@ export async function lockRbacOrgs(
   drizzle: DrizzleExecutor,
   orgIds: Array<string | null | undefined>,
 ): Promise<void> {
-  const sortedOrgIds = [...new Set(orgIds.filter((orgId): orgId is string => Boolean(orgId)))].sort()
+  const sortedOrgIds = [...new Set(orgIds.filter((orgId): orgId is string => Boolean(orgId)))].sort((left, right) => left.localeCompare(right))
 
   for (let index = 0; index < sortedOrgIds.length; index += 2) {
     const firstOrgId = sortedOrgIds[index]!
@@ -681,9 +681,11 @@ function isLastSuperAdminDemotionError(error: unknown): boolean {
     const errorRecord = typeof currentError === 'object'
       ? currentError as { cause?: unknown, code?: unknown, message?: unknown }
       : null
-    const errorMessage = typeof errorRecord?.message === 'string'
-      ? errorRecord.message
-      : String(currentError)
+    let errorMessage = ''
+    if (typeof errorRecord?.message === 'string')
+      errorMessage = errorRecord.message
+    else if (typeof currentError === 'string')
+      errorMessage = currentError
     if (errorCodes.some(code => errorMessage.includes(code) || errorRecord?.code === code))
       return true
     currentError = errorRecord?.cause

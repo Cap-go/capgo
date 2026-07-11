@@ -1646,7 +1646,7 @@ describe('channels RLS direct insert separates creation from initial bundle prom
     }
   })
 
-  it('rejects raw API-key stable-version updates to foreign and deleted targets after promotion', async () => {
+  it('does not disclose or change stable targets when a raw API key cannot read the channel', async () => {
     if (!createOnlyKey || !createOnlyRoleId || !activeChannelId || !foreignVersionId || !deletedVersionId)
       throw new Error('Channel create-only fixture did not initialize')
 
@@ -1659,8 +1659,14 @@ describe('channels RLS direct insert separates creation from initial bundle prom
       [createOnlyRoleId],
     )
 
+    const before = await pool.query<{ version: number | null }>(
+      'SELECT version FROM public.channels WHERE id = $1',
+      [activeChannelId],
+    )
+    const stableVersion = before.rows[0]?.version
+
     for (const targetVersionId of [foreignVersionId, deletedVersionId]) {
-      await expect(execWithRoleClaims(
+      const result = await execWithRoleClaims(
         'UPDATE public.channels SET version = $1 WHERE id = $2',
         {
           role: 'anon',
@@ -1668,8 +1674,15 @@ describe('channels RLS direct insert separates creation from initial bundle prom
           headers: { capgkey: createOnlyKey.key },
           params: [targetVersionId, activeChannelId],
         },
-      )).rejects.toThrow(/INVALID_CHANNEL_VERSION/)
+      )
+      expect(result.rowCount).toBe(0)
     }
+
+    const after = await pool.query<{ version: number | null }>(
+      'SELECT version FROM public.channels WHERE id = $1',
+      [activeChannelId],
+    )
+    expect(after.rows[0]?.version).toBe(stableVersion)
   })
 })
 

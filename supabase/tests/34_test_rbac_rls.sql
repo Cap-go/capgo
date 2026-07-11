@@ -36,12 +36,13 @@ SELECT
 SELECT tests.authenticate_as('test_admin');
 
 INSERT INTO
-public.groups (org_id, name, description)
+public.groups (org_id, name, description, created_by)
 VALUES
 (
     '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
     'Test Group RLS',
-    'Test group for RLS'
+    'Test group for RLS',
+    'c591b04e-cf29-4945-b9a0-776d0672061a'
 );
 
 SELECT tests.authenticate_as('test_user2');
@@ -94,12 +95,13 @@ SELECT
 SELECT tests.authenticate_as('test_admin');
 
 INSERT INTO
-public.groups (org_id, name, description)
+public.groups (org_id, name, description, created_by)
 VALUES
 (
     '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
     'Admin Org Group',
-    'Should not be visible to test user'
+    'Should not be visible to test user',
+    'c591b04e-cf29-4945-b9a0-776d0672061a'
 );
 
 -- Check test user cannot see Admin org group

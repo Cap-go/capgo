@@ -10,7 +10,7 @@ SELECT
         'app_versions',
         ARRAY[
             'Allow RBAC app_versions super-admin access',
-            'Allow RBAC app_versions select',
+            'Allow for auth, api keys (read+)',
             'Allow RBAC app_versions insert',
             'Allow RBAC app_versions update',
             'Prevent non 2FA access'
@@ -25,7 +25,7 @@ SELECT
         'apps',
         ARRAY[
             'Allow RBAC apps super-admin access',
-            'Allow RBAC apps select',
+            'Allow for auth, api keys (read+)',
             'Allow RBAC apps insert',
             'Allow RBAC apps update',
             'Prevent non 2FA access'
@@ -48,7 +48,7 @@ SELECT
         'public',
         'stats',
         ARRAY[
-            'Allow RBAC stats select'
+            'Allow read for auth (read+)'
         ],
         'stats should have correct policies'
     );
@@ -61,7 +61,7 @@ SELECT
         ARRAY[
             'Allow RBAC channel_devices delete',
             'Allow RBAC channel_devices insert',
-            'Allow RBAC channel_devices select',
+            'Allow read for auth, api keys (read+)',
             'Allow RBAC channel_devices update',
             'Prevent non 2FA access'
         ],
@@ -156,7 +156,7 @@ SELECT
         ARRAY[
             'Allow insert org for user',
             'Allow org delete for super_admin',
-            'Allow RBAC orgs select',
+            'Allow select for auth, api keys (read+)',
             'Allow org settings update via RBAC',
             'Prevent non 2FA access'
         ],
@@ -239,7 +239,7 @@ SELECT
     policies_are(
         'public',
         'app_versions_meta',
-        ARRAY['Allow RBAC app_versions_meta select'],
+        ARRAY['Allow read for auth (read+)'],
         'app_versions_meta should have correct policies'
     );
 
@@ -248,7 +248,7 @@ SELECT
     policies_are(
         'public',
         'daily_bandwidth',
-        ARRAY['Allow RBAC daily_bandwidth select'],
+        ARRAY['Allow read for auth (read+)'],
         'daily_bandwidth should have correct policies'
     );
 
@@ -257,7 +257,7 @@ SELECT
     policies_are(
         'public',
         'daily_mau',
-        ARRAY['Allow RBAC daily_mau select'],
+        ARRAY['Allow read for auth (read+)'],
         'daily_mau should have correct policies'
     );
 
@@ -266,7 +266,7 @@ SELECT
     policies_are(
         'public',
         'daily_storage',
-        ARRAY['Allow RBAC daily_storage select'],
+        ARRAY['Allow read for auth (read+)'],
         'daily_storage should have correct policies'
     );
 
@@ -275,7 +275,7 @@ SELECT
     policies_are(
         'public',
         'daily_version',
-        ARRAY['Allow RBAC daily_version select'],
+        ARRAY['Allow read for auth (read+)'],
         'daily_version should have correct policies'
     );
 
@@ -316,7 +316,7 @@ SELECT
         ARRAY[
             'Allow RBAC channels delete',
             'Allow RBAC channels insert',
-            'Allow RBAC channels select',
+            'Allow select for auth, api keys (read+)',
             'Allow RBAC channels update',
             'Prevent non 2FA access'
         ],
@@ -418,7 +418,7 @@ SELECT
         'public',
         'manifest',
         ARRAY[
-            'Allow RBAC manifest select',
+            'Allow select for auth, api keys (read+)',
             'Prevent users from deleting manifest entries',
             'Prevent users from inserting manifest entries',
             'Prevent users from updating manifest entries'
@@ -648,7 +648,7 @@ SELECT
     policy_cmd_is(
         'public',
         'apps',
-        'Allow RBAC apps select',
+        'Allow for auth, api keys (read+)',
         'SELECT',
         'Read policy on apps should be for SELECT command'
     );

@@ -110,6 +110,22 @@ export interface ClientBindingInput {
   reason?: string
 }
 
+function parseOptionalAppId(value: unknown): string | null {
+  if (value === undefined || value === null)
+    return null
+  if (typeof value !== 'string')
+    throw quickError(400, 'invalid_bindings', 'app_id must be a string when provided')
+  return value
+}
+
+function parseOptionalChannelId(value: unknown): string | number | null {
+  if (value === undefined || value === null)
+    return null
+  if (typeof value !== 'string' && typeof value !== 'number')
+    throw quickError(400, 'invalid_bindings', 'channel_id must be a string or number when provided')
+  return value
+}
+
 export function sanitizeClientBindings(bindings: unknown[]): ClientBindingInput[] {
   return bindings.map((binding) => {
     if (!binding || typeof binding !== 'object') {
@@ -128,22 +144,12 @@ export function sanitizeClientBindings(bindings: unknown[]): ClientBindingInput[
     if (typeof org_id !== 'string' || !org_id) {
       throw quickError(400, 'invalid_bindings', 'Each binding must have an org_id')
     }
-    const app_id = value.app_id
-    const channel_id = value.channel_id
     return {
       role_name,
       scope_type,
       org_id,
-      app_id: app_id === undefined || app_id === null
-        ? null
-        : typeof app_id === 'string'
-          ? app_id
-          : (() => { throw quickError(400, 'invalid_bindings', 'app_id must be a string when provided') })(),
-      channel_id: channel_id === undefined || channel_id === null
-        ? null
-        : typeof channel_id === 'string' || typeof channel_id === 'number'
-          ? channel_id
-          : (() => { throw quickError(400, 'invalid_bindings', 'channel_id must be a string or number when provided') })(),
+      app_id: parseOptionalAppId(value.app_id),
+      channel_id: parseOptionalChannelId(value.channel_id),
       reason: typeof value.reason === 'string' ? value.reason : undefined,
     }
   })

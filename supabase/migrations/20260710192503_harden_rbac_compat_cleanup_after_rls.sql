@@ -9449,3 +9449,77 @@ EXECUTE FUNCTION public.enforce_channel_version_promotion_permission();
 
 COMMENT ON FUNCTION public.enforce_channel_version_promotion_permission() IS
   'Requires promotion permission for stable bundle targets and rejects deleted or cross-app bundle IDs in raw channel writes.';
+
+-- INSERT triggers run before PostgreSQL assigns channels.id. Initial rollout targets
+-- therefore use app-scoped promotion authorization; later changes remain channel-scoped.
+CREATE OR REPLACE FUNCTION public.refresh_channel_rollout_id()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  rollout_changed boolean;
+  v_channel_id bigint;
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    rollout_changed := NEW.rollout_version IS NOT NULL;
+    v_channel_id := NULL::bigint;
+  ELSE
+    rollout_changed := NEW.rollout_version IS DISTINCT FROM OLD.rollout_version;
+    v_channel_id := NEW.id;
+  END IF;
+
+  IF rollout_changed THEN
+    IF (auth.uid() IS NOT NULL OR public.get_apikey_header() IS NOT NULL)
+      AND NOT public.rbac_check_permission_request(
+        public.rbac_perm_channel_promote_bundle(),
+        NEW.owner_org,
+        NEW.app_id,
+        v_channel_id
+      )
+    THEN
+      RAISE EXCEPTION 'NO_RIGHTS';
+    END IF;
+
+    IF NEW.rollout_version IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.app_versions AS app_version
+        WHERE app_version.id = NEW.rollout_version
+          AND app_version.app_id = NEW.app_id
+          AND app_version.owner_org = NEW.owner_org
+          AND app_version.deleted = false
+      )
+    THEN
+      RAISE EXCEPTION 'INVALID_ROLLOUT_VERSION';
+    END IF;
+
+    NEW.rollout_id = gen_random_uuid();
+    IF NEW.rollout_version IS NULL THEN
+      NEW.rollout_paused_at = NULL;
+      IF TG_OP = 'INSERT' THEN
+        NEW.rollout_pause_reason = NULL;
+        NEW.auto_pause_last_triggered_at = NULL;
+      ELSE
+        IF NEW.rollout_pause_reason IS NOT DISTINCT FROM OLD.rollout_pause_reason THEN
+          NEW.rollout_pause_reason = NULL;
+        END IF;
+        IF NEW.auto_pause_last_triggered_at IS NOT DISTINCT FROM OLD.auto_pause_last_triggered_at THEN
+          NEW.auto_pause_last_triggered_at = NULL;
+        END IF;
+      END IF;
+    ELSE
+      NEW.rollout_paused_at = NULL;
+      NEW.rollout_pause_reason = NULL;
+      NEW.auto_pause_last_triggered_at = NULL;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION public.refresh_channel_rollout_id() OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.refresh_channel_rollout_id() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.refresh_channel_rollout_id() TO service_role;

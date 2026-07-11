@@ -379,15 +379,15 @@ describe('direct RBAC mutation priority guards', () => {
       'Admins cannot elevate privileges!',
     )
 
-    await expectRejected(
+    const hiddenDelete = await query(
       `
         DELETE FROM public.group_members
         WHERE group_id = $1::uuid
           AND user_id = $2::uuid
       `,
       [fixture.highGroupId, USER_ID],
-      'Admins cannot elevate privileges!',
     )
+    expect(hiddenDelete.rowCount).toBe(0)
 
     await expectRejected(
       `
@@ -649,7 +649,7 @@ describe('direct RBAC mutation priority guards', () => {
         WHERE id = $1::uuid
       `,
       [fixture.bindingId],
-      'CANNOT_REMOVE_LAST_EFFECTIVE_SUPER_ADMIN',
+      'CANNOT_DEMOTE_LAST_SUPER_ADMIN_BINDING',
     )
   })
 
@@ -682,7 +682,7 @@ describe('direct RBAC mutation priority guards', () => {
     await expectRejected(
       `DELETE FROM public.role_bindings WHERE id = $1::uuid`,
       [fixture.bindingId],
-      'CANNOT_REMOVE_LAST_EFFECTIVE_SUPER_ADMIN',
+      'CANNOT_DELETE_LAST_SUPER_ADMIN_BINDING',
     )
     await expectRejected(
       `
@@ -696,7 +696,7 @@ describe('direct RBAC mutation priority guards', () => {
         WHERE id = $1::uuid
       `,
       [fixture.bindingId],
-      'CANNOT_REMOVE_LAST_EFFECTIVE_SUPER_ADMIN',
+      'CANNOT_DEMOTE_LAST_SUPER_ADMIN_BINDING',
     )
   })
 
@@ -806,7 +806,7 @@ describe('direct RBAC mutation priority guards', () => {
     await expectRejected(
       `DELETE FROM public.role_bindings WHERE id = $1::uuid`,
       [fixture.bindingId],
-      'CANNOT_REMOVE_LAST_EFFECTIVE_SUPER_ADMIN',
+      'CANNOT_DELETE_LAST_SUPER_ADMIN_BINDING',
     )
   })
 

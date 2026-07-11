@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import type { MiddlewareKeyVariables } from '../../../utils/hono.ts'
+import type { AuthInfo, MiddlewareKeyVariables } from '../../../utils/hono.ts'
 import type { Database } from '../../../utils/supabase.types.ts'
 import { type } from 'arktype'
 import { HTTPException } from 'hono/http-exception'
@@ -28,9 +28,49 @@ interface PinnedPgClient {
   release: () => void
 }
 
+interface MemberRemovalRequest {
+  orgId: string
+  email: string
+}
+
+type DrizzleClient = ReturnType<typeof getDrizzleClient>
+
 function priorityRank(value: number | string | null | undefined): number {
   const rank = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(rank) ? rank : 0
+}
+
+async function resolveMemberRemovalTargetUserId(
+  c: Context<MiddlewareKeyVariables>,
+  auth: AuthInfo,
+  body: MemberRemovalRequest,
+  canManageRoles: boolean,
+): Promise<string> {
+  const adminClient = supabaseAdmin(c)
+  if (canManageRoles) {
+    const { data: userData, error: userError } = await adminClient
+      .from('users')
+      .select('id')
+      .eq('email', body.email)
+      .single()
+
+    if (userError || !userData)
+      throw quickError(404, 'user_not_found', 'User not found', { error: userError })
+    return userData.id
+  }
+
+  if (auth.authType !== 'jwt')
+    throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
+
+  const { data: callerData, error: callerError } = await adminClient
+    .from('users')
+    .select('id, email')
+    .eq('id', auth.userId)
+    .single()
+
+  if (callerError || !callerData || callerData.email?.toLowerCase() !== body.email.toLowerCase())
+    throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
+  return callerData.id
 }
 
 async function getMemberRemovalRanks(
@@ -112,6 +152,37 @@ async function getMemberRemovalRanks(
   return result.rows[0] ?? { caller_max_rank: 0, target_max_rank: 0 }
 }
 
+async function assertMemberRemovalAuthorizedAfterLock(
+  c: Context<MiddlewareKeyVariables>,
+  auth: AuthInfo,
+  body: MemberRemovalRequest,
+  targetUserId: string,
+  dbClient: PinnedPgClient,
+): Promise<void> {
+  const pinnedDrizzle = getDrizzleClient(dbClient as unknown as ReturnType<typeof getPgClient>) as DrizzleClient
+  const apikeyString = auth.apikey?.key ?? c.get('capgkey') ?? null
+  const canManageRoles = await checkPermissionPg(
+    c,
+    'org.update_user_roles',
+    { orgId: body.orgId },
+    pinnedDrizzle,
+    auth.userId,
+    apikeyString,
+  )
+  const isSelfRemoval = auth.authType === 'jwt' && targetUserId === auth.userId
+  if (!canManageRoles && !isSelfRemoval)
+    throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
+
+  if (!canManageRoles || isSelfRemoval)
+    return
+
+  const callerPrincipalId = auth.authType === 'apikey' ? auth.apikey!.rbac_id : auth.userId
+  const ranks = await getMemberRemovalRanks(dbClient, auth.authType, callerPrincipalId, body.orgId, targetUserId)
+  if (priorityRank(ranks.target_max_rank) > priorityRank(ranks.caller_max_rank)) {
+    throw quickError(403, 'cannot_delete_higher_priority_role', 'Cannot delete a member with a role higher than your own', { orgId: body.orgId })
+  }
+}
+
 export async function deleteMember(c: Context<MiddlewareKeyVariables>, bodyRaw: any, _apikey: Database['public']['Tables']['apikeys']['Row']) {
   const bodyParsed = safeParseSchema(deleteBodySchema, bodyRaw)
   if (!bodyParsed.success) {
@@ -124,38 +195,9 @@ export async function deleteMember(c: Context<MiddlewareKeyVariables>, bodyRaw: 
   }
 
   // Arbitrary target lookup stays behind role-management permission to avoid user enumeration.
-  const adminClient = supabaseAdmin(c)
   const canManageRoles = await checkPermission(c, 'org.update_user_roles', { orgId: body.orgId })
-  let targetUserId = ''
-
-  if (canManageRoles) {
-    const { data: userData, error: userError } = await adminClient
-      .from('users')
-      .select('id')
-      .eq('email', body.email)
-      .single()
-
-    if (userError || !userData) {
-      throw quickError(404, 'user_not_found', 'User not found', { error: userError })
-    }
-    targetUserId = userData.id
-  }
-  else {
-    if (auth.authType !== 'jwt') {
-      throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
-    }
-
-    const { data: callerData, error: callerError } = await adminClient
-      .from('users')
-      .select('id, email')
-      .eq('id', auth.userId)
-      .single()
-
-    if (callerError || !callerData || callerData.email?.toLowerCase() !== body.email.toLowerCase()) {
-      throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
-    }
-    targetUserId = callerData.id
-  }
+  const targetUserId = await resolveMemberRemovalTargetUserId(c, auth, body, canManageRoles)
+  const adminClient = supabaseAdmin(c)
 
   const { data: existingMembership, error: membershipLookupError } = await adminClient
     .from('org_users')
@@ -187,29 +229,7 @@ export async function deleteMember(c: Context<MiddlewareKeyVariables>, bodyRaw: 
     await dbClient.query('BEGIN')
     transactionOpen = true
     await dbClient.query('SELECT public.lock_rbac_orgs($1::uuid)', [body.orgId])
-
-    const pinnedDrizzle = getDrizzleClient(dbClient as unknown as ReturnType<typeof getPgClient>)
-    const apikeyString = auth.apikey?.key ?? c.get('capgkey') ?? null
-    const canManageRolesAfterLock = await checkPermissionPg(
-      c,
-      'org.update_user_roles',
-      { orgId: body.orgId },
-      pinnedDrizzle,
-      auth.userId,
-      apikeyString,
-    )
-    const isSelfRemoval = auth.authType === 'jwt' && targetUserId === auth.userId
-    if (!canManageRolesAfterLock && !isSelfRemoval) {
-      throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
-    }
-
-    if (canManageRolesAfterLock && !isSelfRemoval) {
-      const callerPrincipalId = auth.authType === 'apikey' ? auth.apikey!.rbac_id : auth.userId
-      const ranks = await getMemberRemovalRanks(dbClient, auth.authType, callerPrincipalId, body.orgId, targetUserId)
-      if (priorityRank(ranks.target_max_rank) > priorityRank(ranks.caller_max_rank)) {
-        throw quickError(403, 'cannot_delete_higher_priority_role', 'Cannot delete a member with a role higher than your own', { orgId: body.orgId })
-      }
-    }
+    await assertMemberRemovalAuthorizedAfterLock(c, auth, body, targetUserId, dbClient)
 
     // The base-row AFTER DELETE trigger atomically revokes direct/group/key access,
     // channel overrides, and any remaining scoped org_users rows in this org.

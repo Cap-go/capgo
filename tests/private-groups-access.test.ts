@@ -157,8 +157,9 @@ beforeAll(async () => {
     name: `Private groups rank regression ${fixtureId}`,
     orgId,
     roleName: 'org_admin',
+    hashed: true,
   })
-  if (!apiKey.key)
+  if (!apiKey.id || !apiKey.rbac_id)
     throw new Error('Unable to create private groups rank API key')
 
   const highRankKey = await createDirectApiKeyWithBindings({
@@ -166,8 +167,9 @@ beforeAll(async () => {
     name: `Private groups super-admin regression ${fixtureId}`,
     orgId,
     roleName: 'org_super_admin',
+    hashed: true,
   })
-  if (!highRankKey.key)
+  if (!highRankKey.id || !highRankKey.rbac_id)
     throw new Error('Unable to create private groups super-admin API key')
 
   lowRankApiKeyId = apiKey.id

@@ -94,6 +94,8 @@ async function canManageGroupRoles(
   )
 }
 
+type GroupRecord = typeof schema.groups.$inferSelect
+
 async function loadGroupLockOrgId(
   drizzle: DrizzleClient,
   groupId: string,
@@ -107,15 +109,40 @@ async function loadGroupLockOrgId(
   return group?.orgId ?? null
 }
 
+async function withLockedGroup<T>(
+  drizzle: DrizzleClient,
+  groupId: string,
+  operation: (txDrizzle: DrizzleClient, group: GroupRecord) => Promise<T>,
+): Promise<T | null> {
+  const lockOrgId = await loadGroupLockOrgId(drizzle, groupId)
+  if (!lockOrgId)
+    return null
+
+  return await drizzle.transaction(async (tx) => {
+    const txDrizzle = tx as unknown as DrizzleClient
+    await lockRbacOrgs(txDrizzle, [lockOrgId])
+    const [group] = await txDrizzle
+      .select()
+      .from(schema.groups)
+      .where(eq(schema.groups.id, groupId))
+      .limit(1)
+    if (!group)
+      return null
+    return await operation(txDrizzle, group)
+  })
+}
+
 function isLastEffectiveSuperAdminError(error: unknown): boolean {
   let currentError = error
   for (let depth = 0; depth < 4 && currentError !== null && currentError !== undefined; depth += 1) {
     const errorRecord = typeof currentError === 'object'
       ? currentError as { cause?: unknown, message?: unknown }
       : null
-    const errorMessage = typeof errorRecord?.message === 'string'
-      ? errorRecord.message
-      : String(currentError)
+    let errorMessage = ''
+    if (typeof errorRecord?.message === 'string')
+      errorMessage = errorRecord.message
+    else if (typeof currentError === 'string')
+      errorMessage = currentError
     if (errorMessage.includes('CANNOT_REMOVE_LAST_EFFECTIVE_SUPER_ADMIN'))
       return true
     currentError = errorRecord?.cause
@@ -248,24 +275,7 @@ app.put(
     try {
       pgClient = getPgClient(c)
       const drizzle = getDrizzleClient(pgClient)
-      const lockOrgId = await loadGroupLockOrgId(drizzle, groupId)
-      if (!lockOrgId) {
-        return c.json({ error: 'Group not found' }, 404)
-      }
-
-      const result = await drizzle.transaction(async (tx) => {
-        const txDrizzle = tx as unknown as DrizzleClient
-        await lockRbacOrgs(txDrizzle, [lockOrgId])
-
-        const [group] = await txDrizzle
-          .select()
-          .from(schema.groups)
-          .where(eq(schema.groups.id, groupId))
-          .limit(1)
-        if (!group) {
-          return { ok: false as const, response: c.json({ error: 'Group not found' }, 404) }
-        }
-
+      const result = await withLockedGroup(drizzle, groupId, async (txDrizzle, group) => {
         if (group.is_system) {
           return { ok: false as const, response: c.json({ error: 'Cannot modify system group' }, 403) }
         }
@@ -284,7 +294,7 @@ app.put(
         }
 
         const { name, description } = bodyResult.data
-        const [updated] = await tx
+        const [updated] = await txDrizzle
           .update(schema.groups)
           .set({
             name: name || group.name,
@@ -296,6 +306,9 @@ app.put(
         return { ok: true as const, data: updated }
       })
 
+      if (!result) {
+        return c.json({ error: 'Group not found' }, 404)
+      }
       if (!result.ok) {
         return result.response
       }
@@ -333,24 +346,7 @@ app.delete('/:group_id', sValidator('param', groupIdParamSchema, invalidGroupIdH
   try {
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
-    const lockOrgId = await loadGroupLockOrgId(drizzle, groupId)
-    if (!lockOrgId) {
-      return c.json({ error: 'Group not found' }, 404)
-    }
-
-    const result = await drizzle.transaction(async (tx) => {
-      const txDrizzle = tx as unknown as DrizzleClient
-      await lockRbacOrgs(txDrizzle, [lockOrgId])
-
-      const [group] = await txDrizzle
-        .select()
-        .from(schema.groups)
-        .where(eq(schema.groups.id, groupId))
-        .limit(1)
-      if (!group) {
-        return { ok: false as const, response: c.json({ error: 'Group not found' }, 404) }
-      }
-
+    const result = await withLockedGroup(drizzle, groupId, async (txDrizzle, group) => {
       if (group.is_system) {
         return { ok: false as const, response: c.json({ error: 'Cannot delete system group' }, 403) }
       }
@@ -363,7 +359,7 @@ app.delete('/:group_id', sValidator('param', groupIdParamSchema, invalidGroupIdH
         return { ok: false as const, response: c.json({ error: 'Forbidden - Cannot manage a group with higher privileges than your own' }, 403) }
       }
 
-      await tx
+      await txDrizzle
         .delete(schema.role_bindings)
         .where(
           and(
@@ -372,13 +368,16 @@ app.delete('/:group_id', sValidator('param', groupIdParamSchema, invalidGroupIdH
           ),
         )
 
-      await tx
+      await txDrizzle
         .delete(schema.groups)
         .where(eq(schema.groups.id, groupId))
 
       return { ok: true as const }
     })
 
+    if (!result) {
+      return c.json({ error: 'Group not found' }, 404)
+    }
     if (!result.ok) {
       return result.response
     }
@@ -499,24 +498,7 @@ app.post(
     try {
       pgClient = getPgClient(c)
       const drizzle = getDrizzleClient(pgClient)
-      const lockOrgId = await loadGroupLockOrgId(drizzle, groupId)
-      if (!lockOrgId) {
-        return c.json({ error: 'Group not found' }, 404)
-      }
-
-      const result = await drizzle.transaction(async (tx) => {
-        const txDrizzle = tx as unknown as DrizzleClient
-        await lockRbacOrgs(txDrizzle, [lockOrgId])
-
-        const [group] = await txDrizzle
-          .select()
-          .from(schema.groups)
-          .where(eq(schema.groups.id, groupId))
-          .limit(1)
-        if (!group) {
-          return { ok: false as const, response: c.json({ error: 'Group not found' }, 404) }
-        }
-
+      const result = await withLockedGroup(drizzle, groupId, async (txDrizzle, group) => {
         if (!(await canManageGroupRoles(c, txDrizzle, group.org_id))) {
           return { ok: false as const, response: c.json({ error: 'Forbidden - Admin rights required' }, 403) }
         }
@@ -548,7 +530,7 @@ app.post(
           return { ok: false as const, response: c.json({ error: 'Forbidden - Cannot manage a group with higher privileges than your own' }, 403) }
         }
 
-        const [member] = await tx
+        const [member] = await txDrizzle
           .insert(schema.group_members)
           .values({
             group_id: groupId,
@@ -561,6 +543,9 @@ app.post(
         return { ok: true as const, data: member || { message: 'User already in group' } }
       })
 
+      if (!result) {
+        return c.json({ error: 'Group not found' }, 404)
+      }
       if (!result.ok) {
         return result.response
       }
@@ -599,24 +584,7 @@ app.delete('/:group_id/members/:user_id', sValidator('param', groupMemberParamSc
   try {
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
-    const lockOrgId = await loadGroupLockOrgId(drizzle, groupId)
-    if (!lockOrgId) {
-      return c.json({ error: 'Group not found' }, 404)
-    }
-
-    const result = await drizzle.transaction(async (tx) => {
-      const txDrizzle = tx as unknown as DrizzleClient
-      await lockRbacOrgs(txDrizzle, [lockOrgId])
-
-      const [group] = await txDrizzle
-        .select()
-        .from(schema.groups)
-        .where(eq(schema.groups.id, groupId))
-        .limit(1)
-      if (!group) {
-        return { ok: false as const, response: c.json({ error: 'Group not found' }, 404) }
-      }
-
+    const result = await withLockedGroup(drizzle, groupId, async (txDrizzle, group) => {
       if (!(await canManageGroupRoles(c, txDrizzle, group.org_id))) {
         return { ok: false as const, response: c.json({ error: 'Forbidden - Admin rights required' }, 403) }
       }
@@ -625,7 +593,7 @@ app.delete('/:group_id/members/:user_id', sValidator('param', groupMemberParamSc
         return { ok: false as const, response: c.json({ error: 'Forbidden - Cannot manage a group with higher privileges than your own' }, 403) }
       }
 
-      await tx
+      await txDrizzle
         .delete(schema.group_members)
         .where(
           and(
@@ -637,6 +605,9 @@ app.delete('/:group_id/members/:user_id', sValidator('param', groupMemberParamSc
       return { ok: true as const }
     })
 
+    if (!result) {
+      return c.json({ error: 'Group not found' }, 404)
+    }
     if (!result.ok) {
       return result.response
     }

@@ -59,6 +59,17 @@ async function createApiKeyRecord(
   return apiKey
 }
 
+async function assertCanManageApiKeysForOrgs(
+  c: Parameters<typeof checkPermission>[0],
+  orgIds: string[],
+): Promise<void> {
+  for (const orgId of orgIds) {
+    if (!(await checkPermission(c, 'org.manage_apikeys', { orgId }))) {
+      throw quickError(403, 'forbidden_binding', `Forbidden - API key management rights required for org ${orgId}`)
+    }
+  }
+}
+
 app.post('/', middlewareAuth(), async (c) => {
   const auth = requireApiKeyManagementAuth(c, 'not_authorized', 'API key management requires authentication')
   if (auth.authType !== 'jwt' || !auth.userId) {
@@ -112,11 +123,7 @@ app.post('/', middlewareAuth(), async (c) => {
   let pgClient: ReturnType<typeof getPgClient> | undefined
   try {
     // Check RBAC permission for each unique org in the bindings before creating anything.
-    for (const bindingOrgId of allOrgIds) {
-      if (!(await checkPermission(c, 'org.manage_apikeys', { orgId: bindingOrgId }))) {
-        throw quickError(403, 'forbidden_binding', `Forbidden - API key management rights required for org ${bindingOrgId}`)
-      }
-    }
+    await assertCanManageApiKeysForOrgs(c, allOrgIds)
 
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)

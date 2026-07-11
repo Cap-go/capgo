@@ -431,27 +431,6 @@ VALUES
     'last_admin@test.com'
 );
 
--- Add the user as an RBAC org super_admin.
-INSERT INTO public.role_bindings (
-    principal_type,
-    principal_id,
-    role_id,
-    scope_type,
-    org_id,
-    granted_by,
-    is_direct
-)
-SELECT
-    public.rbac_principal_user(),
-    '88888888-8888-8888-8888-888888888888'::UUID,
-    roles.id,
-    public.rbac_scope_org(),
-    '88888888-8888-8888-8888-888888888888'::UUID,
-    '88888888-8888-8888-8888-888888888888'::UUID,
-    true
-FROM public.roles AS roles
-WHERE roles.name = public.rbac_role_org_super_admin()
-  AND roles.scope_type = public.rbac_scope_org();
 
 -- Create an app owned by this user
 INSERT INTO
