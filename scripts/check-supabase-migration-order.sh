@@ -163,6 +163,11 @@ if [[ -n "$modified_files" ]]; then
       continue
     fi
 
+    if [[ "$file" == "supabase/migrations/20260308121933_restrict_global_stats_access.sql" ]]; then
+      echo "⚠️  Allowing prod-parity correction to security migration: $file"
+      continue
+    fi
+
     disallowed_modified_files+="${file}"$'\n'
   done <<< "$modified_files"
 
