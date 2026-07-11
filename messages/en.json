@@ -2503,8 +2503,7 @@
   "log-insights": "Insights",
   "log-insights-period-help": "Error categories, affected devices, and trends use this period.",
   "no-log-insights": "No failures found in this period",
-  "no-log-insights-help": "Try a longer period or check raw logs.",
-  "raw-logs": "Raw logs",
+  "no-log-insights-help": "Try a longer period or check logs.",
   "top-error-devices": "Top affected devices",
   "top-error-versions": "Top affected versions",
   "top-priority": "Top priority",
@@ -2512,6 +2511,6 @@
   "top-priority-help": "{action} is the largest error group with {count} events ({share}).",
   "version-count": "Versions",
   "view-action-logs": "View action logs",
-  "view-raw-logs": "View raw logs",
+  "view-logs": "View logs",
   "last-seen": "Last seen"
 }
