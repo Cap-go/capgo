@@ -48,6 +48,9 @@ export interface Queryable {
   query: (queryText: string, values?: unknown[]) => Promise<{ rows: Record<string, any>[] }>
 }
 
+// The release checker reads this catalog before and after schema DDL. The explicit
+// CURRENT_TIMESTAMP predicate makes Hyperdrive treat the verification read as
+// non-cacheable, so it observes DDL from the same release run.
 export const READ_REPLICA_SCHEMA_CATALOG_SQL = `
 WITH replica_tables(table_name) AS (
   SELECT unnest($1::text[])
@@ -256,6 +259,8 @@ SELECT jsonb_build_object(
     FROM functions
   ), '[]'::jsonb)
 ) AS catalog
+FROM (SELECT CURRENT_TIMESTAMP AS checked_at) AS fresh_catalog_read
+WHERE fresh_catalog_read.checked_at IS NOT NULL
 `
 
 export function stableStringify(value: unknown): string {
