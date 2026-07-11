@@ -36,12 +36,14 @@ DECLARE
     'public.cleanup_onboarding_app_data_on_complete()',
     'public.cleanup_old_audit_logs()',
     'public.cleanup_frequent_job_details()',
+    'public.cleanup_expired_demo_apps()',
     'public.delete_http_response(bigint)',
     'public.delete_old_deleted_apps()',
     'public.delete_old_deleted_versions()',
     'public.enqueue_credit_usage_posthog_event()',
     'public.generate_org_user_stripe_info_on_org_create()',
     'public.get_apikey()',
+    'public.get_identity_apikey_only(public.key_mode[])',
     'public.get_org_perm_for_apikey_v2(text, text)',
     'public.get_orgs_v7(uuid)',
     'public.get_total_metrics(uuid, date, date)',
@@ -70,7 +72,8 @@ DECLARE
     'public.sync_org_user_role_binding_on_update()',
     'public.sync_org_user_to_role_binding()',
     'public.track_onboarding_demo_data(text, uuid, text, text[], uuid)',
-    'public.claim_legacy_onboarding_demo_data(uuid)'
+    'public.claim_legacy_onboarding_demo_data(uuid)',
+    'public.upsert_version_meta(character varying, bigint, bigint)'
   ];
   auth_only text[] := ARRAY[
     'public.accept_invitation_to_org(uuid)',
@@ -99,7 +102,10 @@ DECLARE
     'public.restore_deleted_account()',
     'public.update_org_invite_role_rbac(uuid, uuid, text)',
     'public.update_org_member_role(uuid, uuid, text)',
-    'public.update_tmp_invite_role_rbac(uuid, text, text)'
+    'public.update_tmp_invite_role_rbac(uuid, text, text)',
+    'public.get_current_plan_name_org(uuid)',
+    'public.get_cycle_info_org(uuid)',
+    'public.get_plan_usage_percent_detailed(uuid)'
   ];
   proc text;
   proc_oid regprocedure;
@@ -129,3 +135,36 @@ BEGIN
   END LOOP;
 END;
 $$;
+
+-- Schema-only dumps omit auth-schema triggers. Recreate the MFA email OTP guard.
+DO $$
+BEGIN
+  IF to_regclass('auth.mfa_factors') IS NULL THEN
+    RAISE NOTICE 'skip MFA trigger: auth.mfa_factors missing';
+    RETURN;
+  END IF;
+  IF to_regprocedure('public.enforce_email_otp_for_mfa()') IS NULL THEN
+    RAISE NOTICE 'skip MFA trigger: public.enforce_email_otp_for_mfa() missing';
+    RETURN;
+  END IF;
+  EXECUTE 'DROP TRIGGER IF EXISTS trg_enforce_email_otp_for_mfa ON auth.mfa_factors';
+  EXECUTE 'CREATE TRIGGER trg_enforce_email_otp_for_mfa BEFORE INSERT OR UPDATE ON auth.mfa_factors FOR EACH ROW EXECUTE FUNCTION public.enforce_email_otp_for_mfa()';
+END;
+$$;
+
+-- Trigger helper must not be directly executable by any API role
+DO $$
+DECLARE
+  proc_oid regprocedure := to_regprocedure('public.enforce_email_otp_for_mfa()');
+BEGIN
+  IF proc_oid IS NULL THEN
+    RAISE NOTICE 'skip missing enforce_email_otp_for_mfa()';
+    RETURN;
+  END IF;
+  EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', proc_oid);
+  EXECUTE format('REVOKE ALL ON FUNCTION %s FROM anon', proc_oid);
+  EXECUTE format('REVOKE ALL ON FUNCTION %s FROM authenticated', proc_oid);
+  EXECUTE format('REVOKE ALL ON FUNCTION %s FROM service_role', proc_oid);
+END;
+$$;
+

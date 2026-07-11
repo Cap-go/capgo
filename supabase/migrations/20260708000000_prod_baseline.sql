@@ -24485,6 +24485,12 @@ INSERT INTO "public"."cron_tasks" ("id", "name", "description", "task_type", "ta
 	(33, 'cleanup_completed_onboarding_apps', 'Daily: clear apps.need_onboarding for apps that finished real onboarding (upload-ready bundle, created >15 days ago, no seeded demo data)', 'function', 'public.cleanup_completed_onboarding_apps()', NULL, NULL, NULL, NULL, NULL, 4, 0, 0, NULL, NULL, true, '2026-06-17 12:01:32.508828+00', '2026-06-17 12:01:32.508828+00', NULL);
 RESET session_replication_role;
 
+-- Explicit ids above leave the serial stuck at 1; advance past MAX(id).
+SELECT setval(
+  pg_get_serial_sequence('public.cron_tasks', 'id'),
+  (SELECT COALESCE(MAX(id), 1) FROM public.cron_tasks)
+);
+
 -- Baseline post-dump cleanup for local/CI parity
 -- Prod still has leftover/renamed policies that later main migrations already
 -- cleaned up under different names. Normalize here so pending migrations and
