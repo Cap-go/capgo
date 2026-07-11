@@ -1335,6 +1335,324 @@ describe('channels rls blocks direct api-key updates', () => {
   })
 })
 
+describe('channels RLS direct insert separates creation from initial bundle promotion', () => {
+  let createOnlyKey: { id: number, key: string, rbacId: string } | null = null
+  let createOnlyRoleId: string | null = null
+  let ownerOrgId: string | null = null
+  let versionId: number | null = null
+  let rolloutVersionId: number | null = null
+  let foreignVersionId: number | null = null
+  let deletedVersionId: number | null = null
+  let activeChannelId: number | null = null
+  const createdChannelIds: number[] = []
+  const roleName = `channel_create_only_${randomUUID().replaceAll('-', '_')}`
+  const versionName = `rls-insert-version-${randomUUID().slice(0, 8)}`
+  const rolloutVersionName = `rls-insert-rollout-version-${randomUUID().slice(0, 8)}`
+  const foreignAppId = `com.rls.insert.foreign.${randomUUID().slice(0, 8)}`
+  const foreignVersionName = `rls-insert-foreign-version-${randomUUID().slice(0, 8)}`
+  const deletedVersionName = `rls-insert-deleted-version-${randomUUID().slice(0, 8)}`
+  const emptyChannelName = `rls-insert-empty-${randomUUID().slice(0, 8)}`
+  const versionedChannelName = `rls-insert-versioned-${randomUUID().slice(0, 8)}`
+  const rolloutChannelName = `rls-insert-rollout-${randomUUID().slice(0, 8)}`
+  const foreignVersionChannelName = `rls-insert-foreign-${randomUUID().slice(0, 8)}`
+  const deletedVersionChannelName = `rls-insert-deleted-${randomUUID().slice(0, 8)}`
+
+  beforeAll(async () => {
+    const appResult = await pool.query<{ id: string, owner_org: string }>(
+      'SELECT id, owner_org FROM public.apps WHERE app_id = $1 LIMIT 1',
+      [APP_NAME_RLS],
+    )
+    const app = appResult.rows[0]
+    if (!app)
+      throw new Error(`Unable to resolve app ${APP_NAME_RLS} for channel insert RLS test`)
+    ownerOrgId = app.owner_org
+
+    createOnlyRoleId = randomUUID()
+    const key = randomUUID()
+    const keyResult = await pool.query<{ id: number, rbac_id: string }>(
+      `INSERT INTO public.apikeys (user_id, key, name)
+       VALUES ($1, $2, $3)
+       RETURNING id, rbac_id`,
+      [RLS_TEST_USER_ID, key, `Channel create-only RLS ${roleName}`],
+    )
+    const apiKey = keyResult.rows[0]
+    if (!apiKey)
+      throw new Error('Unable to create channel create-only API key')
+
+    createOnlyKey = { id: Number(apiKey.id), key, rbacId: apiKey.rbac_id }
+
+    await pool.query(
+      `INSERT INTO public.roles (id, name, scope_type, description, priority_rank, is_assignable, created_by)
+       VALUES ($1::uuid, $2, public.rbac_scope_app(), $3, 1, true, $4::uuid)`,
+      [createOnlyRoleId, roleName, 'Test role with channel creation only', RLS_TEST_USER_ID],
+    )
+    await pool.query(
+      `INSERT INTO public.role_permissions (role_id, permission_id)
+       SELECT $1::uuid, id
+       FROM public.permissions
+       WHERE key = public.rbac_perm_app_create_channel()`,
+      [createOnlyRoleId],
+    )
+    await pool.query(
+      `INSERT INTO public.role_bindings (
+        principal_type, principal_id, role_id, scope_type, org_id, app_id, granted_by, reason, is_direct
+      )
+       SELECT
+         public.rbac_principal_apikey(),
+         $1::uuid,
+         roles.id,
+         public.rbac_scope_org(),
+         $2::uuid,
+         NULL::uuid,
+         $3::uuid,
+         'Channel insert RLS membership fixture',
+         true
+       FROM public.roles
+       WHERE roles.name = public.rbac_role_org_member()`,
+      [createOnlyKey.rbacId, app.owner_org, RLS_TEST_USER_ID],
+    )
+    await pool.query(
+      `INSERT INTO public.role_bindings (
+        principal_type, principal_id, role_id, scope_type, org_id, app_id, granted_by, reason, is_direct
+      ) VALUES (
+        public.rbac_principal_apikey(),
+        $1::uuid,
+        $2::uuid,
+        public.rbac_scope_app(),
+        $3::uuid,
+        $4::uuid,
+        $5::uuid,
+        'Channel insert RLS create-only fixture',
+        true
+      )`,
+      [createOnlyKey.rbacId, createOnlyRoleId, app.owner_org, app.id, RLS_TEST_USER_ID],
+    )
+
+    versionId = await insertRlsAppVersion({
+      appId: APP_NAME_RLS,
+      name: versionName,
+      orgId: app.owner_org,
+      userId: RLS_TEST_USER_ID,
+    })
+    rolloutVersionId = await insertRlsAppVersion({
+      appId: APP_NAME_RLS,
+      name: rolloutVersionName,
+      orgId: app.owner_org,
+      userId: RLS_TEST_USER_ID,
+    })
+    await pool.query(
+      `INSERT INTO public.apps (app_id, owner_org, name, icon_url)
+       VALUES ($1, $2::uuid, $3, $4)`,
+      [foreignAppId, app.owner_org, `Foreign channel version ${foreignVersionName}`, 'channel-insert-rls-icon'],
+    )
+    foreignVersionId = await insertRlsAppVersion({
+      appId: foreignAppId,
+      name: foreignVersionName,
+      orgId: app.owner_org,
+      userId: RLS_TEST_USER_ID,
+    })
+    deletedVersionId = await insertRlsAppVersion({
+      appId: APP_NAME_RLS,
+      name: deletedVersionName,
+      orgId: app.owner_org,
+      userId: RLS_TEST_USER_ID,
+    })
+    await pool.query('UPDATE public.app_versions SET deleted = true WHERE id = $1', [deletedVersionId])
+
+    const permissionResult = await pool.query<{ can_create: boolean, can_promote: boolean }>(
+      `SELECT
+        public.rbac_check_permission_direct(
+          public.rbac_perm_app_create_channel(),
+          $1::uuid,
+          $2::uuid,
+          $3,
+          NULL::bigint,
+          $4
+        ) AS can_create,
+        public.rbac_check_permission_direct(
+          public.rbac_perm_channel_promote_bundle(),
+          $1::uuid,
+          $2::uuid,
+          $3,
+          NULL::bigint,
+          $4
+        ) AS can_promote`,
+      [RLS_TEST_USER_ID, app.owner_org, APP_NAME_RLS, createOnlyKey.key],
+    )
+    expect(permissionResult.rows[0]).toEqual({ can_create: true, can_promote: false })
+  })
+
+  afterAll(async () => {
+    await pool.query('DELETE FROM public.channels WHERE id = ANY($1::bigint[])', [createdChannelIds])
+
+    const versionIds = [versionId, rolloutVersionId, foreignVersionId, deletedVersionId]
+      .filter((id): id is number => id != null)
+    if (versionIds.length > 0)
+      await pool.query('DELETE FROM public.app_versions WHERE id = ANY($1::bigint[])', [versionIds])
+
+    await pool.query('DELETE FROM public.apps WHERE app_id = $1', [foreignAppId])
+
+    if (createOnlyKey)
+      await pool.query('DELETE FROM public.role_bindings WHERE principal_id = $1::uuid', [createOnlyKey.rbacId])
+
+    if (createOnlyRoleId) {
+      await pool.query('DELETE FROM public.role_permissions WHERE role_id = $1::uuid', [createOnlyRoleId])
+      await pool.query('DELETE FROM public.roles WHERE id = $1::uuid', [createOnlyRoleId])
+    }
+
+    if (createOnlyKey)
+      await deleteApiKey(createOnlyKey.id)
+  })
+
+  it('allows a create-only API key to insert a channel without a version', async () => {
+    if (!createOnlyKey || !ownerOrgId)
+      throw new Error('Channel create-only API key fixture did not initialize')
+
+    const result = await execWithRoleClaims(
+      `INSERT INTO public.channels (app_id, name, version, owner_org, created_by, public)
+       VALUES ($1, $2, NULL, $3::uuid, $4::uuid, false)
+       RETURNING id, version`,
+      {
+        role: 'anon',
+        claims: { role: 'anon', aud: 'anon' },
+        headers: { capgkey: createOnlyKey.key },
+        params: [APP_NAME_RLS, emptyChannelName, ownerOrgId, RLS_TEST_USER_ID],
+      },
+    )
+
+    expect(result.rowCount).toBe(1)
+    expect(result.rows[0].version).toBeNull()
+    createdChannelIds.push(Number(result.rows[0].id))
+  })
+
+  it('denies a create-only API key from inserting a channel with an initial stable bundle', async () => {
+    if (!createOnlyKey || !ownerOrgId || !versionId)
+      throw new Error('Channel create-only fixture did not initialize')
+
+    await expect(execWithRoleClaims(
+      `INSERT INTO public.channels (app_id, name, version, owner_org, created_by, public)
+       VALUES ($1, $2, $3, $4::uuid, $5::uuid, false)
+       RETURNING id`,
+      {
+        role: 'anon',
+        claims: { role: 'anon', aud: 'anon' },
+        headers: { capgkey: createOnlyKey.key },
+        params: [APP_NAME_RLS, versionedChannelName, versionId, ownerOrgId, RLS_TEST_USER_ID],
+      },
+    )).rejects.toThrow(/PERMISSION_DENIED_CHANNEL_PROMOTE_BUNDLE|NO_RIGHTS|row-level security/i)
+  })
+
+  it('denies a create-only API key from inserting a channel with an initial rollout bundle', async () => {
+    if (!createOnlyKey || !ownerOrgId || !rolloutVersionId)
+      throw new Error('Channel create-only fixture did not initialize')
+
+    await expect(execWithRoleClaims(
+      `INSERT INTO public.channels (app_id, name, rollout_version, owner_org, created_by, public)
+       VALUES ($1, $2, $3, $4::uuid, $5::uuid, false)
+       RETURNING id`,
+      {
+        role: 'anon',
+        claims: { role: 'anon', aud: 'anon' },
+        headers: { capgkey: createOnlyKey.key },
+        params: [APP_NAME_RLS, rolloutChannelName, rolloutVersionId, ownerOrgId, RLS_TEST_USER_ID],
+      },
+    )).rejects.toThrow(/PERMISSION_DENIED_CHANNEL_PROMOTE_BUNDLE|NO_RIGHTS|row-level security/i)
+  })
+
+  it('allows active same-app targets after channel promote permission is granted', async () => {
+    if (!createOnlyKey || !createOnlyRoleId || !ownerOrgId || !versionId || !rolloutVersionId)
+      throw new Error('Channel create-only fixture did not initialize')
+
+    await pool.query(
+      `INSERT INTO public.role_permissions (role_id, permission_id)
+       SELECT $1::uuid, id
+       FROM public.permissions
+       WHERE key = public.rbac_perm_channel_promote_bundle()
+       ON CONFLICT DO NOTHING`,
+      [createOnlyRoleId],
+    )
+
+    const stableResult = await execWithRoleClaims(
+      `INSERT INTO public.channels (app_id, name, version, owner_org, created_by, public)
+       VALUES ($1, $2, $3, $4::uuid, $5::uuid, false)
+       RETURNING id, version`,
+      {
+        role: 'anon',
+        claims: { role: 'anon', aud: 'anon' },
+        headers: { capgkey: createOnlyKey.key },
+        params: [APP_NAME_RLS, versionedChannelName, versionId, ownerOrgId, RLS_TEST_USER_ID],
+      },
+    )
+    expect(stableResult.rowCount).toBe(1)
+    expect(Number(stableResult.rows[0].version)).toBe(versionId)
+    activeChannelId = Number(stableResult.rows[0].id)
+    createdChannelIds.push(activeChannelId)
+
+    const rolloutResult = await execWithRoleClaims(
+      `INSERT INTO public.channels (app_id, name, rollout_version, owner_org, created_by, public)
+       VALUES ($1, $2, $3, $4::uuid, $5::uuid, false)
+       RETURNING id, rollout_version`,
+      {
+        role: 'anon',
+        claims: { role: 'anon', aud: 'anon' },
+        headers: { capgkey: createOnlyKey.key },
+        params: [APP_NAME_RLS, rolloutChannelName, rolloutVersionId, ownerOrgId, RLS_TEST_USER_ID],
+      },
+    )
+    expect(rolloutResult.rowCount).toBe(1)
+    expect(Number(rolloutResult.rows[0].rollout_version)).toBe(rolloutVersionId)
+    createdChannelIds.push(Number(rolloutResult.rows[0].id))
+  })
+
+  it('rejects foreign and deleted stable targets even with channel promote permission', async () => {
+    if (!createOnlyKey || !ownerOrgId || !foreignVersionId || !deletedVersionId)
+      throw new Error('Channel create-only fixture did not initialize')
+
+    for (const [channelName, targetVersionId] of [
+      [foreignVersionChannelName, foreignVersionId],
+      [deletedVersionChannelName, deletedVersionId],
+    ] as const) {
+      await expect(execWithRoleClaims(
+        `INSERT INTO public.channels (app_id, name, version, owner_org, created_by, public)
+         VALUES ($1, $2, $3, $4::uuid, $5::uuid, false)
+         RETURNING id`,
+        {
+          role: 'anon',
+          claims: { role: 'anon', aud: 'anon' },
+          headers: { capgkey: createOnlyKey.key },
+          params: [APP_NAME_RLS, channelName, targetVersionId, ownerOrgId, RLS_TEST_USER_ID],
+        },
+      )).rejects.toThrow(/INVALID_CHANNEL_VERSION/)
+    }
+  })
+
+  it('rejects raw API-key stable-version updates to foreign and deleted targets after promotion', async () => {
+    if (!createOnlyKey || !createOnlyRoleId || !activeChannelId || !foreignVersionId || !deletedVersionId)
+      throw new Error('Channel create-only fixture did not initialize')
+
+    await pool.query(
+      `INSERT INTO public.role_permissions (role_id, permission_id)
+       SELECT $1::uuid, id
+       FROM public.permissions
+       WHERE key = public.rbac_perm_channel_update_settings()
+       ON CONFLICT DO NOTHING`,
+      [createOnlyRoleId],
+    )
+
+    for (const targetVersionId of [foreignVersionId, deletedVersionId]) {
+      await expect(execWithRoleClaims(
+        'UPDATE public.channels SET version = $1 WHERE id = $2 RETURNING id',
+        {
+          role: 'anon',
+          claims: { role: 'anon', aud: 'anon' },
+          headers: { capgkey: createOnlyKey.key },
+          params: [targetVersionId, activeChannelId],
+        },
+      )).rejects.toThrow(/INVALID_CHANNEL_VERSION/)
+    }
+  })
+})
+
 describe('webhook and webhook_delivery rls with api-key org bindings', () => {
   let unauthorizedKey: { id: number, key: string, key_hash: string }
   let authorizedKey: { id: number, key: string, key_hash: string }

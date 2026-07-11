@@ -1050,6 +1050,15 @@ WITH CHECK (
     app_id,
     NULL::bigint
   )
+  AND (
+    (version IS NULL AND rollout_version IS NULL)
+    OR public.rbac_check_permission_request(
+      public.rbac_perm_channel_promote_bundle(),
+      owner_org,
+      app_id,
+      NULL::bigint
+    )
+  )
 );
 
 DROP POLICY IF EXISTS "Allow select for auth, api keys (read+)" ON public.channels;
@@ -9188,3 +9197,77 @@ CREATE TRIGGER prevent_role_binding_priority_escalation
 BEFORE INSERT OR UPDATE OR DELETE ON public.role_bindings
 FOR EACH ROW
 EXECUTE FUNCTION public.prevent_role_binding_priority_escalation();
+
+-- Raw PostgREST writes bypass the channel endpoint. Keep stable bundle targets
+-- app-local and active while preserving the endpoint's promotion authorization.
+CREATE OR REPLACE FUNCTION public.enforce_channel_version_promotion_permission()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_request_role text := COALESCE(auth.role(), session_user);
+  v_owner_org uuid;
+  v_channel_id bigint;
+BEGIN
+  IF TG_OP = 'UPDATE' AND NEW.version IS NOT DISTINCT FROM OLD.version THEN
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'INSERT' THEN
+    v_owner_org := public.get_owner_org_by_app_id_internal(NEW.app_id);
+    v_channel_id := NULL::bigint;
+  ELSE
+    v_owner_org := OLD.owner_org;
+    v_channel_id := OLD.id;
+  END IF;
+
+  -- A blank target is the native/builtin channel state; an initial target needs
+  -- app-level promotion, while changing an existing target is channel-scoped.
+  IF v_request_role NOT IN ('service_role', 'postgres') THEN
+    IF v_request_role IS DISTINCT FROM 'anon' AND v_request_role IS DISTINCT FROM 'authenticated' THEN
+      RAISE EXCEPTION 'PERMISSION_DENIED_CHANNEL_PROMOTE_BUNDLE'
+        USING ERRCODE = '42501';
+    END IF;
+
+    IF NOT (TG_OP = 'INSERT' AND NEW.version IS NULL)
+      AND NOT public.rbac_check_permission_request(
+        public.rbac_perm_channel_promote_bundle(),
+        v_owner_org,
+        NEW.app_id,
+        v_channel_id
+      ) THEN
+      RAISE EXCEPTION 'PERMISSION_DENIED_CHANNEL_PROMOTE_BUNDLE'
+        USING ERRCODE = '42501';
+    END IF;
+  END IF;
+
+  IF NEW.version IS NOT NULL
+    AND NOT EXISTS (
+      SELECT 1
+      FROM public.app_versions AS app_version
+      WHERE app_version.id = NEW.version
+        AND app_version.app_id = NEW.app_id
+        AND app_version.owner_org = v_owner_org
+        AND app_version.deleted = false
+    ) THEN
+    RAISE EXCEPTION 'INVALID_CHANNEL_VERSION';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION public.enforce_channel_version_promotion_permission() OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.enforce_channel_version_promotion_permission() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.enforce_channel_version_promotion_permission() TO service_role;
+
+DROP TRIGGER IF EXISTS enforce_channel_version_promotion_permission ON public.channels;
+CREATE TRIGGER enforce_channel_version_promotion_permission
+BEFORE INSERT OR UPDATE OF version ON public.channels
+FOR EACH ROW
+EXECUTE FUNCTION public.enforce_channel_version_promotion_permission();
+
+COMMENT ON FUNCTION public.enforce_channel_version_promotion_permission() IS
+  'Requires promotion permission for stable bundle targets and rejects deleted or cross-app bundle IDs in raw channel writes.';

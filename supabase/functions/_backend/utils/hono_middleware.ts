@@ -551,7 +551,7 @@ export function middlewareAuth() {
  * RBAC authorizes requests after authentication, so the former key-mode
  * argument is intentionally no longer enforced here.
  */
-export function middlewareV2(_rights: Database['public']['Enums']['key_mode'][]) {
+export function middlewareV2(_rights: string[]) {
   return middlewareAuth()
 }
 
@@ -562,7 +562,7 @@ interface MiddlewareKeyOptions {
 }
 
 function resolveMiddlewareKeyOptions(
-  optionsOrRights: MiddlewareKeyOptions | Database['public']['Enums']['key_mode'][] | undefined,
+  optionsOrRights: MiddlewareKeyOptions | string[] | undefined,
   legacyUsePostgres: boolean,
   legacyReadOnly: boolean,
   legacyRateLimitScope: APIKeyRateLimitScope,
@@ -589,7 +589,7 @@ function resolveMiddlewareKeyOptions(
  * Route handlers and RLS authorize with RBAC after authentication succeeds.
  */
 export function middlewareKey(
-  optionsOrRights?: MiddlewareKeyOptions | Database['public']['Enums']['key_mode'][],
+  optionsOrRights?: MiddlewareKeyOptions | string[],
   legacyUsePostgres = false,
   legacyReadOnly = true,
   legacyRateLimitScope: APIKeyRateLimitScope = 'default',

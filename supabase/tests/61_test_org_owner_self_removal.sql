@@ -13,14 +13,13 @@ VALUES
   (tests.get_supabase_uid('org_owner_self_peer'), 'org_owner_self_peer@test.local', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.orgs (id, created_by, name, management_email, use_new_rbac, enforcing_2fa)
+INSERT INTO public.orgs (id, created_by, name, management_email, enforcing_2fa)
 VALUES
   (
     '70000000-0000-4000-8000-000000000061',
     tests.get_supabase_uid('org_owner_self_owner'),
     'Org owner self removal transfer',
     'org-owner-self-transfer@test.local',
-    true,
     false
   ),
   (
@@ -28,7 +27,6 @@ VALUES
     tests.get_supabase_uid('org_owner_self_owner'),
     'Org owner protected from peer removal',
     'org-owner-self-protected@test.local',
-    true,
     false
   ),
   (
@@ -36,7 +34,6 @@ VALUES
     tests.get_supabase_uid('org_owner_self_owner'),
     'Org owner last super admin guard',
     'org-owner-self-last-super@test.local',
-    true,
     false
   ),
   (
@@ -44,15 +41,43 @@ VALUES
     tests.get_supabase_uid('org_owner_self_owner'),
     'Org owner requires two factor authentication',
     'org-owner-self-2fa@test.local',
-    true,
     true
   )
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.org_users (user_id, org_id, user_right)
+INSERT INTO public.org_users (user_id, org_id, rbac_role_name, is_invite)
 VALUES
-  (tests.get_supabase_uid('org_owner_self_successor'), '70000000-0000-4000-8000-000000000061', 'read'::public.user_min_right),
-  (tests.get_supabase_uid('org_owner_self_peer'), '70000000-0000-4000-8000-000000000062', 'read'::public.user_min_right)
+  (tests.get_supabase_uid('org_owner_self_successor'), '70000000-0000-4000-8000-000000000061', public.rbac_role_org_member(), false),
+  (tests.get_supabase_uid('org_owner_self_peer'), '70000000-0000-4000-8000-000000000062', public.rbac_role_org_member(), false)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.role_bindings (
+  principal_type,
+  principal_id,
+  role_id,
+  scope_type,
+  org_id,
+  granted_by,
+  reason,
+  is_direct
+)
+SELECT
+  public.rbac_principal_user(),
+  members.user_id,
+  roles.id,
+  public.rbac_scope_org(),
+  members.org_id,
+  tests.get_supabase_uid('org_owner_self_owner'),
+  'pgTAP org ownership transfer member fixture',
+  true
+FROM (
+  VALUES
+    (tests.get_supabase_uid('org_owner_self_successor'), '70000000-0000-4000-8000-000000000061'::uuid),
+    (tests.get_supabase_uid('org_owner_self_peer'), '70000000-0000-4000-8000-000000000062'::uuid)
+) AS members(user_id, org_id)
+CROSS JOIN public.roles AS roles
+WHERE roles.name = public.rbac_role_org_member()
+  AND roles.scope_type = public.rbac_scope_org()
 ON CONFLICT DO NOTHING;
 
 SELECT tests.authenticate_as('org_owner_self_owner');

@@ -203,19 +203,45 @@ INSERT INTO public.org_users (
   user_id,
   org_id,
   app_id,
-  user_right
+  rbac_role_name,
+  is_invite
 )
 VALUES (
   tests.get_supabase_uid('apikey_v2_scope_legacy_user'),
   '71000000-0000-4000-8000-000000000056'::uuid,
   'com.test.apikeyv2scope.target',
-  'upload'::public.user_min_right
-);
+  public.rbac_role_app_uploader(),
+  false
+)
+ON CONFLICT DO NOTHING;
 
-DELETE FROM public.role_bindings
-WHERE principal_type = public.rbac_principal_user()
-  AND principal_id = tests.get_supabase_uid('apikey_v2_scope_legacy_user')
-  AND org_id = '71000000-0000-4000-8000-000000000056'::uuid;
+INSERT INTO public.role_bindings (
+  principal_type,
+  principal_id,
+  role_id,
+  scope_type,
+  org_id,
+  app_id,
+  granted_by,
+  reason,
+  is_direct
+)
+SELECT
+  public.rbac_principal_user(),
+  tests.get_supabase_uid('apikey_v2_scope_legacy_user'),
+  roles.id,
+  public.rbac_scope_app(),
+  apps.owner_org,
+  apps.id,
+  tests.get_supabase_uid('apikey_v2_scope_owner'),
+  'pgTAP app uploader role binding',
+  true
+FROM public.roles
+INNER JOIN public.apps
+  ON apps.app_id = 'com.test.apikeyv2scope.target'
+WHERE roles.name = public.rbac_role_app_uploader()
+  AND roles.scope_type = public.rbac_scope_app()
+ON CONFLICT DO NOTHING;
 
 INSERT INTO public.app_versions (
   id,
