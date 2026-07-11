@@ -5,7 +5,7 @@ export type Component = 'capgo' | 'cli' | 'notifications'
 export type ReleaseAs = 'patch' | 'minor' | 'major'
 type GitRunner = (args: string[]) => string
 
-const sharedMatchers = [
+const capgoRootMatchers = [
   /^package\.json$/,
   /^bun\.lock$/,
   /^\.npmrc$/,
@@ -19,7 +19,7 @@ const sharedMatchers = [
 
 export const componentMatchers: Record<Component, RegExp[]> = {
   capgo: [
-    ...sharedMatchers,
+    ...capgoRootMatchers,
     /^\.github\/workflows\/build_and_deploy\.yml$/,
     /^\.github\/workflows\/build_mobile_ios\.yml$/,
     /^scripts\/deploy-scope\.ts$/,
@@ -52,7 +52,6 @@ export const componentMatchers: Record<Component, RegExp[]> = {
     /^wrangler\.jsonc$/,
   ],
   cli: [
-    ...sharedMatchers,
     /^cli\/src\//,
     /^cli\/skills\/[^/]+\/SKILL\.md$/,
     /^cli\/skills\/(?!.*\.(md|mdx)$)/,
@@ -62,7 +61,6 @@ export const componentMatchers: Record<Component, RegExp[]> = {
     /^cli\/\.npmrc$/,
   ],
   notifications: [
-    ...sharedMatchers,
     /^packages\/capacitor-notifications\//,
   ],
 }

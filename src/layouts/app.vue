@@ -161,6 +161,8 @@ const activeTab = computed(() => {
   if (!appRouteSegment.value)
     return tabs.value[0]?.key ?? ''
 
+  if (appSectionType.value === 'logs')
+    return `/app/${appRouteSegment.value}/logs/insights`
   // If on a resource detail page (bundle/channel/device), keep parent tab active
   if (resourceType.value) {
     const parentTab = parentTabMap[resourceType.value]

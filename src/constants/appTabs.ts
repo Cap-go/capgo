@@ -19,7 +19,7 @@ export const appTabs: Tab[] = [
   { label: 'channels', icon: IconChannel, key: '/channels' },
   { label: 'devices', icon: IconDevice, key: '/devices' },
   { label: 'notifications', icon: IconBell, key: '/notifications', badge: 'beta' },
-  { label: 'logs', icon: IconHistory, key: '/logs' },
+  { label: 'logs', icon: IconHistory, key: '/logs/insights' },
   { label: 'compatibility', icon: IconCompatibility, key: '/compatibility' },
   { label: 'builds', icon: IconBuild, key: '/builds' },
   { label: 'access', icon: IconShield, key: '/access' },
