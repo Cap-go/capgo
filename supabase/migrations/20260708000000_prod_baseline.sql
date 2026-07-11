@@ -19735,7 +19735,7 @@ CREATE OR REPLACE TRIGGER "check_if_org_can_exist_org_users" AFTER DELETE ON "pu
 
 
 
-CREATE OR REPLACE TRIGGER "check_privileges" BEFORE INSERT OR UPDATE OF "user_id", "org_id", "user_right" ON "public"."org_users" FOR EACH ROW WHEN ((("current_setting"('"request.jwt.claim.role"'::"text", true) = 'authenticated'::"text") AND (NOT ("current_setting"('"request.jwt.claim.email"'::"text", true) = ANY (ARRAY['bot@capgo.app'::"text", 'test@capgo.app'::"text"]))))) EXECUTE FUNCTION "public"."check_org_user_privileges"();
+CREATE OR REPLACE TRIGGER "check_privileges" BEFORE INSERT OR UPDATE OF "user_id", "org_id", "user_right" ON "public"."org_users" FOR EACH ROW WHEN ((("current_setting"('request.jwt.claim.role'::"text", true) = 'authenticated'::"text") AND (NOT ("current_setting"('request.jwt.claim.email'::"text", true) = ANY (ARRAY['bot@capgo.app'::"text", 'test@capgo.app'::"text"]))))) EXECUTE FUNCTION "public"."check_org_user_privileges"();
 
 
 
@@ -24410,7 +24410,7 @@ SELECT pgmq.create('on_user_update');
 SELECT pgmq.create('on_version_create');
 SELECT pgmq.create('on_version_delete');
 SELECT pgmq.create('on_version_update');
-SELECT pgmq.create('replicate_data');
+-- replicate_data intentionally omitted (obsolete leftover on prod; tests expect absence)
 SELECT pgmq.create('webhook_delivery');
 SELECT pgmq.create('webhook_dispatcher');
 
@@ -24444,4 +24444,43 @@ INSERT INTO "public"."role_hierarchy" ("parent_role_id", "child_role_id") VALUES
 	('bf04a281-6fca-4419-9f24-10196f461785', 'be69fcfc-dc66-4d07-9d85-4afa7f06f5df'),
 	('dd5add0a-2410-4c62-b98e-97d6cbbb7542', '9bccecde-7fc3-4a95-a318-80d1d498f5c4');
 
+RESET session_replication_role;
+
+-- Reference cron_tasks data from production
+-- Schema-only dump omitted table data required by cron registration tests.
+SET session_replication_role = replica;
+INSERT INTO "public"."cron_tasks" ("id", "name", "description", "task_type", "target", "batch_size", "payload", "second_interval", "minute_interval", "hour_interval", "run_at_hour", "run_at_minute", "run_at_second", "run_on_dow", "run_on_day", "enabled", "created_at", "updated_at", "healthcheck_url") VALUES
+	(9, 'deploy_install_stats_email', 'Process deploy install stats email', 'function', 'public.process_deploy_install_stats_email()', NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, NULL, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:45.91+00', NULL),
+	(10, 'low_frequency_queues', 'Process low-frequency queues', 'function_queue', '["admin_stats", "cron_email", "on_organization_delete", "on_deploy_history_create", "cron_clear_versions"]', NULL, NULL, NULL, NULL, 2, NULL, 0, 0, NULL, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:45.953+00', NULL),
+	(17, 'free_trial_expired', 'Process free trial expired', 'function', 'public.process_free_trial_expired()', NULL, NULL, NULL, NULL, NULL, 3, 0, 0, NULL, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:46.561+00', NULL),
+	(4, 'per_minute_queues', 'Process per-minute queues', 'function_queue', '["cron_sync_sub", "cron_stat_app"]', 10, NULL, NULL, 1, NULL, NULL, NULL, 0, NULL, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:45.549+00', NULL),
+	(31, 'reconcile_build_status_queue', 'Process build status reconciliation queue', 'function_queue', '["cron_reconcile_build_status"]', NULL, NULL, NULL, 1, NULL, NULL, NULL, 0, NULL, NULL, true, '2026-02-16 18:00:40.926767+00', '2026-05-26 20:41:47.54+00', NULL),
+	(12, 'cleanup_queue_messages', 'Cleanup old queue messages', 'function', 'public.cleanup_queue_messages()', NULL, NULL, NULL, NULL, NULL, 0, 0, 0, NULL, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:46.115+00', NULL),
+	(16, 'admin_stats', 'Process admin stats', 'function', 'public.process_admin_stats()', NULL, NULL, NULL, NULL, NULL, 1, 1, 0, NULL, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:46.569+00', NULL),
+	(24, 'delete_old_versions', 'Permanently delete app versions 90 days after soft delete', 'function', 'public.delete_old_deleted_versions()', NULL, NULL, NULL, NULL, NULL, 3, 0, 0, NULL, NULL, true, '2026-01-14 21:04:24.779905+00', '2026-05-26 20:41:46.953+00', NULL),
+	(27, 'cleanup_expired_demo_apps', 'Delete demo apps (app_id starts with com.capdemo.) older than 14 days', 'function', 'public.cleanup_expired_demo_apps()', NULL, NULL, NULL, NULL, NULL, 3, 0, 0, NULL, NULL, true, '2026-01-22 03:12:02.055012+00', '2026-05-26 20:41:47.134+00', NULL),
+	(32, 'cleanup_old_audit_logs', 'Delete audit_logs older than 90 days', 'function', 'public.cleanup_old_audit_logs()', NULL, NULL, NULL, NULL, NULL, 3, 0, 0, NULL, NULL, true, '2026-05-13 09:53:04.565519+00', '2026-05-26 20:41:47.552+00', NULL),
+	(1, 'high_frequency_queues', 'Process high-frequency event queues', 'function_queue', '["credit_usage_alerts", "on_app_create", "on_app_delete", "on_app_update", "on_channel_update", "on_org_update", "on_organization_create", "on_user_create", "on_user_delete", "on_user_update", "on_version_create", "on_version_delete", "on_version_update", "webhook_dispatcher", "webhook_delivery", "credit_usage_posthog"]', 100, NULL, 10, NULL, NULL, NULL, NULL, NULL, NULL, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:45.606+00', NULL),
+	(3, 'delete_marked_accounts', 'Delete accounts marked for deletion', 'function', 'public.delete_accounts_marked_for_deletion()', NULL, NULL, NULL, 1, NULL, NULL, NULL, 0, NULL, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:45.385+00', NULL),
+	(6, 'orphan_images_queue', 'Process orphan images cleanup queue', 'function_queue', '["cron_clean_orphan_images"]', NULL, NULL, NULL, 1, NULL, NULL, NULL, 0, NULL, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:45.715+00', NULL),
+	(7, 'org_stats_queue', 'Process org stats queue', 'function_queue', '["cron_stat_org"]', 10, NULL, NULL, 5, NULL, NULL, NULL, 0, NULL, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:45.778+00', NULL),
+	(11, 'stats_jobs', 'Process cron stats jobs', 'function', 'public.process_cron_stats_jobs()', NULL, NULL, NULL, NULL, 6, NULL, 0, 0, NULL, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:46.115+00', NULL),
+	(8, 'cleanup_job_details', 'Cleanup frequent job details', 'function', 'public.cleanup_frequent_job_details()', NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, NULL, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:45.9+00', NULL),
+	(13, 'delete_old_apps', 'Delete old deleted apps', 'function', 'public.delete_old_deleted_apps()', NULL, NULL, NULL, NULL, NULL, 0, 0, 0, NULL, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:46.126+00', NULL),
+	(14, 'remove_old_jobs', 'Remove old cron jobs', 'function', 'public.remove_old_jobs()', NULL, NULL, NULL, NULL, NULL, 0, 0, 0, NULL, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:46.277+00', NULL),
+	(15, 'version_retention', 'Update app versions retention', 'function', 'public.update_app_versions_retention()', NULL, NULL, NULL, NULL, NULL, 0, 40, 0, NULL, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:46.411+00', NULL),
+	(28, 'refresh_org_usage_credits_flag', 'Refresh active credit flag for replica plugin gates', 'function', 'public.refresh_orgs_has_usage_credits()', NULL, NULL, NULL, NULL, NULL, 3, 0, 30, NULL, NULL, true, '2026-02-06 23:03:37.702483+00', '2026-05-26 20:41:47.295+00', NULL),
+	(29, 'cleanup_tmp_users', 'Cleanup expired tmp_users invitations (7 days)', 'function', 'public.cleanup_tmp_users()', NULL, NULL, NULL, 1, NULL, NULL, NULL, 0, NULL, NULL, true, '2026-02-08 13:22:32.802215+00', '2026-05-26 20:41:47.299+00', NULL),
+	(30, 'reconcile_build_status', 'Send build status reconciliation job to queue every 15 minutes', 'queue', 'cron_reconcile_build_status', NULL, NULL, NULL, 15, NULL, NULL, NULL, 0, NULL, NULL, true, '2026-02-16 18:00:40.926767+00', '2026-05-26 20:41:47.302+00', NULL),
+	(5, 'manifest_create_queue', 'Process manifest create queue', 'function_queue', '["on_manifest_create"]', 950, NULL, 10, NULL, NULL, NULL, NULL, 0, NULL, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-06-17 12:01:31.512918+00', NULL),
+	(2, 'channel_device_counts', 'Process channel device counts queue', 'function', 'public.process_channel_device_counts_queue(1000)', NULL, NULL, 10, NULL, NULL, NULL, NULL, NULL, NULL, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:45.387+00', NULL),
+	(18, 'expire_credits', 'Expire usage credits', 'function', 'public.expire_usage_credits()', NULL, NULL, NULL, NULL, NULL, 3, 0, 0, NULL, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:46.617+00', NULL),
+	(20, 'sync_sub_jobs', 'Process cron sync sub jobs', 'function', 'public.process_cron_sync_sub_jobs()', NULL, NULL, NULL, NULL, NULL, 4, 0, 0, NULL, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:46.747+00', NULL),
+	(19, 'orphan_images_cleanup', 'Queue orphan images cleanup job', 'queue', 'cron_clean_orphan_images', NULL, NULL, NULL, NULL, NULL, 3, 0, 0, 0, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:46.747+00', NULL),
+	(21, 'cleanup_job_run_details', 'Cleanup old job run details', 'function', 'public.cleanup_job_run_details_7days()', NULL, NULL, NULL, NULL, NULL, 12, 0, 0, NULL, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:46.775+00', NULL),
+	(23, 'monthly_stats_email', 'Process monthly stats email', 'function', 'public.process_stats_email_monthly()', NULL, NULL, NULL, NULL, NULL, 12, 0, 0, NULL, 1, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:46.929+00', NULL),
+	(22, 'weekly_stats_email', 'Process weekly stats email', 'function', 'public.process_stats_email_weekly()', NULL, NULL, NULL, NULL, NULL, 12, 0, 0, 6, NULL, true, '2025-12-29 01:10:18.382122+00', '2026-05-26 20:41:46.925+00', NULL),
+	(26, 'daily_fail_ratio_email', 'Send daily email alerts for apps with high install failure rates (>30%)', 'function', 'public.process_daily_fail_ratio_email()', NULL, NULL, NULL, NULL, NULL, 8, 0, 0, NULL, NULL, true, '2026-01-18 03:22:17.816217+00', '2026-05-26 20:41:47.121+00', NULL),
+	(25, 'cleanup_old_channel_devices', 'Delete channel_devices older than one month', 'function', 'public.cleanup_old_channel_devices()', NULL, NULL, NULL, NULL, NULL, 2, 30, 0, NULL, NULL, true, '2026-01-15 18:20:42.885942+00', '2026-05-26 20:41:47.129+00', NULL),
+	(33, 'cleanup_completed_onboarding_apps', 'Daily: clear apps.need_onboarding for apps that finished real onboarding (upload-ready bundle, created >15 days ago, no seeded demo data)', 'function', 'public.cleanup_completed_onboarding_apps()', NULL, NULL, NULL, NULL, NULL, 4, 0, 0, NULL, NULL, true, '2026-06-17 12:01:32.508828+00', '2026-06-17 12:01:32.508828+00', NULL);
 RESET session_replication_role;
