@@ -508,6 +508,14 @@ ALTER TABLE ONLY public.channel_devices
 
 
 --
+-- Name: channel_devices channel_devices_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_devices
+    ADD CONSTRAINT channel_devices_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: channels channel_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -985,6 +993,13 @@ CREATE INDEX orgs_enforce_hashed_api_keys_true_idx ON public.orgs USING btree (i
 --
 
 CREATE INDEX orgs_updated_at_id_idx ON public.orgs USING btree (updated_at DESC) INCLUDE (id) WHERE (customer_id IS NOT NULL);
+
+
+--
+-- Name: si_customer_cover_uidx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX si_customer_cover_uidx ON public.stripe_info USING btree (customer_id) INCLUDE (status, trial_at, mau_exceeded, storage_exceeded, bandwidth_exceeded);
 
 
 --

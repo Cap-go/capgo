@@ -16,14 +16,14 @@ async function main() {
   const issues = readReplicaSchemaCompatibilityIssues(expected, actual)
 
   if (!issues.length) {
-    console.log('Read-replica schema is compatible with the committed snapshot.')
+    console.log('Read-replica selected schema matches the committed snapshot.')
     return
   }
 
-  console.error('::error title=Read-replica schema is incompatible::Hyperdrive read replica is not compatible with read_replicate/schema_replicate.catalog.json after additive sync.')
+  console.error('::error title=Read-replica schema differs::The selected read-replica schema differs from read_replicate/schema_replicate.catalog.json.')
   console.error('')
-  console.error('The check ignores column order, defaults, constraints, sequences, and functions because they do not prevent logical replication.')
-  console.error('Indexes still require exact parity because unexpected indexes add storage and write-maintenance cost.')
+  console.error('The selected contract checks table shape, columns, primary/unique/check constraints, indexes, types, sequence definitions, and selected function definitions.')
+  console.error('Foreign keys, triggers, RLS policies, and runtime sequence values are intentionally outside this read-only replica contract.')
   console.error('')
   console.error('Incompatible objects:')
   for (const issue of issues)

@@ -20,8 +20,8 @@ echo ''
 echo "The PR changes the schema replicated to Google read replicas."
 echo "Before merge:"
 echo "  1. Run: bun run readreplicate:prepare"
-echo "  2. Apply the matching migration to the Google read replica."
-echo "  3. Commit the updated read_replicate/schema_replicate.sql and read_replicate/schema_replicate.catalog.json."
+echo "  2. Commit the updated read_replicate/schema_replicate.sql and read_replicate/schema_replicate.catalog.json."
+echo "Release CI preflights the Google subscriber from this catalog, then verifies it against the live primary after migrations."
 echo ''
 echo "Diff:"
 git --no-pager diff -- "${SCHEMA_FILES[@]}"

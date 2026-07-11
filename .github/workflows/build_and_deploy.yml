@@ -45,7 +45,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.supabase == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     name: Build code and deploy to Supabase
     permissions:
       contents: read
@@ -96,14 +96,27 @@ jobs:
         run: supabase link --project-ref ${{ env.SUPABASE_PROJECT_ID }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
-      - name: Sync and check read-replica schema through Hyperdrive
+      - name: Preflight read-replica schema from the committed selected-table catalog
         if: env.SUPA_ENV == 'PROD'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          READ_REPLICA_SCHEMA_SYNC_SOURCE: catalog
+          READ_REPLICA_SCHEMA_CHECK_MAX_TIME: 780
+          READ_REPLICA_SCHEMA_SYNC_MAX_TIME: 600
+          READ_REPLICA_SCHEMA_CHECK_READY_ATTEMPTS: 12
         run: bun run readreplicate:check-hyperdrive-schema
       - name: Apply Supabase Migrations
         run: supabase db push
+      - name: Verify read-replica schema against the live primary through Hyperdrive
+        if: env.SUPA_ENV == 'PROD'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          READ_REPLICA_SCHEMA_CHECK_MAX_TIME: 780
+          READ_REPLICA_SCHEMA_SYNC_MAX_TIME: 600
+          READ_REPLICA_SCHEMA_CHECK_READY_ATTEMPTS: 12
+        run: bun run readreplicate:check-hyperdrive-schema
       - name: Update functions
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
@@ -441,4 +454,3 @@ jobs:
           BUILD_OUTPUT_UPLOAD_ENABLED: "true"
           BUILD_OUTPUT_RETENTION_SECONDS: "604800"
         run: bunx @capgo/cli@latest build request --platform android --path . --ai-analytics
-
