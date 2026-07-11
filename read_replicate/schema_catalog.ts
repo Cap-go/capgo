@@ -138,7 +138,9 @@ indexes AS (
   FROM tables t
   JOIN pg_index ix ON ix.indrelid = t.table_oid
   JOIN pg_class idx ON idx.oid = ix.indexrelid
-  LEFT JOIN pg_constraint constraint_owner ON constraint_owner.conindid = ix.indexrelid
+  LEFT JOIN pg_constraint constraint_owner
+    ON constraint_owner.conindid = ix.indexrelid
+    AND constraint_owner.contype IN ('p', 'u', 'x')
   WHERE NOT EXISTS (
     SELECT 1
     FROM replica_excluded_indexes rei

@@ -22,6 +22,9 @@ describe('read-replica schema catalog', () => {
       expect(queries[0]?.text).toContain(
         'constraint_owner.conindid = ix.indexrelid',
       )
+      expect(queries[0]?.text).toContain(
+        "constraint_owner.contype IN ('p', 'u', 'x')",
+      )
       expect(queries[0]?.text).toContain('con.convalidated AS is_valid')
       expect(queries[0]?.text).toContain('dep.deptype IN (\'a\', \'i\')')
       expect(queries[0]?.text).toContain("'valid', is_valid")
