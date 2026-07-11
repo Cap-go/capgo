@@ -24380,3 +24380,37 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INS
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "service_role";
+
+-- Recreate pgmq queues (pgmq schema is excluded from supabase db dump)
+
+SELECT pgmq.create('admin_stats');
+SELECT pgmq.create('channel_device_counts');
+SELECT pgmq.create('credit_usage_alerts');
+SELECT pgmq.create('credit_usage_posthog');
+SELECT pgmq.create('cron_clean_orphan_images');
+SELECT pgmq.create('cron_clear_versions');
+SELECT pgmq.create('cron_email');
+SELECT pgmq.create('cron_reconcile_build_status');
+SELECT pgmq.create('cron_rollout_auto_pause');
+SELECT pgmq.create('cron_stat_app');
+SELECT pgmq.create('cron_stat_org');
+SELECT pgmq.create('cron_sync_sub');
+SELECT pgmq.create('on_app_create');
+SELECT pgmq.create('on_app_delete');
+SELECT pgmq.create('on_app_update');
+SELECT pgmq.create('on_channel_update');
+SELECT pgmq.create('on_deploy_history_create');
+SELECT pgmq.create('on_manifest_create');
+SELECT pgmq.create('on_org_update');
+SELECT pgmq.create('on_organization_create');
+SELECT pgmq.create('on_organization_delete');
+SELECT pgmq.create('on_user_create');
+SELECT pgmq.create('on_user_delete');
+SELECT pgmq.create('on_user_update');
+SELECT pgmq.create('on_version_create');
+SELECT pgmq.create('on_version_delete');
+SELECT pgmq.create('on_version_update');
+SELECT pgmq.create('replicate_data');
+SELECT pgmq.create('webhook_delivery');
+SELECT pgmq.create('webhook_dispatcher');
+
