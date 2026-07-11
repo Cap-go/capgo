@@ -671,12 +671,24 @@ async function updateRoleBindingRole(
 }
 
 function isLastSuperAdminDemotionError(error: unknown): boolean {
-  const errorMessage = error instanceof Error ? error.message : String(error)
-  const errorCode = typeof error === 'object' && error !== null && 'code' in error ? (error as { code?: string }).code : undefined
-  return [
+  const errorCodes = [
     'CANNOT_DEMOTE_LAST_SUPER_ADMIN_BINDING',
+    'CANNOT_DELETE_LAST_SUPER_ADMIN_BINDING',
     'CANNOT_REMOVE_LAST_EFFECTIVE_SUPER_ADMIN',
-  ].some(code => errorMessage.includes(code) || errorCode === code)
+  ]
+  let currentError = error
+  for (let depth = 0; depth < 4 && currentError !== null && currentError !== undefined; depth += 1) {
+    const errorRecord = typeof currentError === 'object'
+      ? currentError as { cause?: unknown, code?: unknown, message?: unknown }
+      : null
+    const errorMessage = typeof errorRecord?.message === 'string'
+      ? errorRecord.message
+      : String(currentError)
+    if (errorCodes.some(code => errorMessage.includes(code) || errorRecord?.code === code))
+      return true
+    currentError = errorRecord?.cause
+  }
+  return false
 }
 
 async function deleteChannelPermissionOverridesForBinding(

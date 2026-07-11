@@ -2,7 +2,8 @@ import type { AuthInfo } from '../utils/hono.ts'
 import { sValidator } from '@hono/standard-validator'
 import { and, eq, sql } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
-import { createHono, middlewareAuth, quickError, useCors } from '../utils/hono.ts'
+import { createHono, quickError, useCors } from '../utils/hono.ts'
+import { middlewareAuth } from '../utils/hono_middleware.ts'
 import { cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { schema } from '../utils/postgres_schema.ts'
@@ -28,8 +29,7 @@ import { lockRbacOrgs } from './role_bindings.ts'
 export const app = createHono('', version)
 
 app.use('*', useCors)
-app.use('*', middlewareAuth)
-
+app.use('*', middlewareAuth())
 type DrizzleClient = ReturnType<typeof getDrizzleClient>
 
 interface GroupRankPrincipal {
@@ -108,8 +108,19 @@ async function loadGroupLockOrgId(
 }
 
 function isLastEffectiveSuperAdminError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error)
-  return message.includes('CANNOT_REMOVE_LAST_EFFECTIVE_SUPER_ADMIN')
+  let currentError = error
+  for (let depth = 0; depth < 4 && currentError !== null && currentError !== undefined; depth += 1) {
+    const errorRecord = typeof currentError === 'object'
+      ? currentError as { cause?: unknown, message?: unknown }
+      : null
+    const errorMessage = typeof errorRecord?.message === 'string'
+      ? errorRecord.message
+      : String(currentError)
+    if (errorMessage.includes('CANNOT_REMOVE_LAST_EFFECTIVE_SUPER_ADMIN'))
+      return true
+    currentError = errorRecord?.cause
+  }
+  return false
 }
 
 // GET /private/groups/:org_id - List groups for an org
@@ -395,9 +406,10 @@ app.delete('/:group_id', sValidator('param', groupIdParamSchema, invalidGroupIdH
 // GET /private/groups/:group_id/members - Group members
 app.get('/:group_id/members', sValidator('param', groupIdParamSchema, invalidGroupIdHook), async (c) => {
   const { group_id: groupId } = c.req.valid('param')
-  const userId = c.get('auth')?.userId
+  const auth = c.get('auth')
+  const userId = auth?.userId
 
-  if (!userId) {
+  if (!auth || !userId) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
@@ -416,21 +428,22 @@ app.get('/:group_id/members', sValidator('param', groupIdParamSchema, invalidGro
     if (!group) {
       return c.json({ error: 'Group not found' }, 404)
     }
-
-    const canManageGroup = await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id })
-    if (!canManageGroup) {
-      const [membership] = await drizzle
+    const isDirectMember = auth.authType === 'jwt'
+      && await drizzle
         .select({ userId: schema.group_members.user_id })
         .from(schema.group_members)
         .where(
           and(
             eq(schema.group_members.group_id, groupId),
-            eq(schema.group_members.user_id, userId),
+            eq(schema.group_members.user_id, auth.userId),
           ),
         )
         .limit(1)
+        .then(rows => rows.length > 0)
 
-      if (!membership) {
+    if (!isDirectMember) {
+      const canManageGroup = await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id })
+      if (!canManageGroup || !(await canManageGroupRank(drizzle, auth, groupId))) {
         throw quickError(403, 'forbidden', 'Forbidden')
       }
     }

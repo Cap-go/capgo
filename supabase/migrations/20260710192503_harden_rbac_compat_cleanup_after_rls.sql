@@ -2394,6 +2394,7 @@ GRANT EXECUTE ON FUNCTION public.request_actor_user_id() TO anon;
 GRANT EXECUTE ON FUNCTION public.request_actor_user_id() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.request_actor_user_id() TO service_role;
 
+-- Preserve actor attribution after the RBAC cleanup replaces legacy API-key modes.
 CREATE OR REPLACE FUNCTION public.audit_log_trigger()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -2408,32 +2409,69 @@ DECLARE
   v_record_id text;
   v_user_id uuid;
   v_key text;
-  v_org_exists boolean;
+  v_api_key_text text;
+  v_api_key public.apikeys%ROWTYPE;
+  v_actor_type text := 'system';
+  v_actor_user_id uuid;
+  v_actor_user_email text;
+  v_actor_apikey_id bigint;
+  v_actor_apikey_name text;
   v_stats_refresh_fields constant text[] := ARRAY['stats_refresh_requested_at', 'stats_updated_at', 'updated_at'];
+  v_background_counter_fields constant text[] := ARRAY['channel_device_count', 'manifest_bundle_count', 'updated_at'];
 BEGIN
-  IF TG_TABLE_NAME = 'orgs' AND TG_OP = 'DELETE' THEN
-    RETURN OLD;
+  SELECT auth.uid() INTO v_actor_user_id;
+
+  IF v_actor_user_id IS NOT NULL THEN
+    v_actor_type := 'user';
+  ELSE
+    SELECT public.get_apikey_header() INTO v_api_key_text;
+
+    IF v_api_key_text IS NOT NULL THEN
+      SELECT *
+      INTO v_api_key
+      FROM public.find_apikey_by_value(v_api_key_text)
+      LIMIT 1;
+
+      -- Attribute only valid, write-capable API keys; a read-only key present on
+      -- a request must not be recorded as the actor of a mutation.
+      IF v_api_key.id IS NOT NULL
+        AND NOT public.is_apikey_expired(v_api_key.expires_at)
+        AND (
+          public.is_allowed_capgkey(v_api_key_text, '{upload}'::text[])
+          OR public.is_allowed_capgkey(v_api_key_text, '{write}'::text[])
+          OR public.is_allowed_capgkey(v_api_key_text, '{all}'::text[])
+        ) THEN
+        v_actor_type := 'apikey';
+        v_actor_user_id := v_api_key.user_id;
+        v_actor_apikey_id := v_api_key.id;
+        v_actor_apikey_name := v_api_key.name;
+      END IF;
+    END IF;
   END IF;
 
-  v_user_id := public.request_actor_user_id();
-  IF v_user_id IS NULL THEN
-    RETURN COALESCE(NEW, OLD);
+  IF v_actor_user_id IS NOT NULL THEN
+    SELECT users.email
+    INTO v_actor_user_email
+    FROM public.users AS users
+    WHERE users.id = v_actor_user_id;
   END IF;
+
+  v_user_id := v_actor_user_id;
 
   IF TG_OP = 'DELETE' THEN
-    v_old_record := to_jsonb(OLD);
+    v_old_record := pg_catalog.to_jsonb(OLD);
     v_new_record := NULL;
   ELSIF TG_OP = 'INSERT' THEN
     v_old_record := NULL;
-    v_new_record := to_jsonb(NEW);
+    v_new_record := pg_catalog.to_jsonb(NEW);
   ELSE
-    v_old_record := to_jsonb(OLD);
-    v_new_record := to_jsonb(NEW);
+    v_old_record := pg_catalog.to_jsonb(OLD);
+    v_new_record := pg_catalog.to_jsonb(NEW);
 
-    FOR v_key IN SELECT jsonb_object_keys(v_new_record)
+    FOR v_key IN SELECT pg_catalog.jsonb_object_keys(v_new_record)
     LOOP
       IF v_old_record->v_key IS DISTINCT FROM v_new_record->v_key THEN
-        v_changed_fields := array_append(v_changed_fields, v_key);
+        v_changed_fields := pg_catalog.array_append(v_changed_fields, v_key);
       END IF;
     END LOOP;
 
@@ -2443,8 +2481,18 @@ BEGIN
         SELECT 1
         FROM pg_catalog.unnest(v_changed_fields) AS changed_field(field_name)
         WHERE changed_field.field_name <> ALL(v_stats_refresh_fields)
-      )
-    THEN
+      ) THEN
+      RETURN NEW;
+    END IF;
+
+    IF v_actor_type = 'system'
+      AND TG_TABLE_NAME = 'apps'
+      AND v_changed_fields && ARRAY['channel_device_count', 'manifest_bundle_count']
+      AND NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.unnest(v_changed_fields) AS changed_field(field_name)
+        WHERE changed_field.field_name <> ALL(v_background_counter_fields)
+      ) THEN
       RETURN NEW;
     END IF;
   END IF;
@@ -2471,17 +2519,35 @@ BEGIN
   END CASE;
 
   IF v_org_id IS NOT NULL THEN
-    SELECT EXISTS(SELECT 1 FROM public.orgs WHERE id = v_org_id) INTO v_org_exists;
-
-    IF v_org_exists THEN
-      INSERT INTO public.audit_logs (
-        table_name, record_id, operation, user_id, org_id,
-        old_record, new_record, changed_fields
-      ) VALUES (
-        TG_TABLE_NAME, v_record_id, TG_OP, v_user_id, v_org_id,
-        v_old_record, v_new_record, v_changed_fields
-      );
-    END IF;
+    INSERT INTO public.audit_logs (
+      table_name,
+      record_id,
+      operation,
+      user_id,
+      org_id,
+      old_record,
+      new_record,
+      changed_fields,
+      actor_type,
+      actor_user_id,
+      actor_user_email,
+      actor_apikey_id,
+      actor_apikey_name
+    ) VALUES (
+      TG_TABLE_NAME,
+      v_record_id,
+      TG_OP,
+      v_user_id,
+      v_org_id,
+      v_old_record,
+      v_new_record,
+      v_changed_fields,
+      v_actor_type,
+      v_actor_user_id,
+      v_actor_user_email,
+      v_actor_apikey_id,
+      v_actor_apikey_name
+    );
   END IF;
 
   RETURN COALESCE(NEW, OLD);
@@ -5402,7 +5468,10 @@ BEGIN
           public.rbac_perm_app_read_bundles(),
           public.rbac_perm_channel_read()
         ))
-        OR ('upload' = ANY(v_modes) AND p.key = public.rbac_perm_app_upload_bundle())
+        OR ('upload' = ANY(v_modes) AND p.key IN (
+          public.rbac_perm_app_upload_bundle(),
+          public.rbac_perm_channel_promote_bundle()
+        ))
         OR ('write' = ANY(v_modes) AND p.key IN (
           public.rbac_perm_app_update_settings(),
           public.rbac_perm_app_create_channel(),
@@ -5472,7 +5541,10 @@ BEGIN
       OR public.rbac_check_permission_direct(public.rbac_perm_app_read_bundles(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
       OR public.rbac_check_permission_direct(public.rbac_perm_channel_read(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
     ))
-    OR ('upload' = ANY(v_modes) AND public.rbac_check_permission_direct(public.rbac_perm_app_upload_bundle(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey))
+    OR ('upload' = ANY(v_modes) AND (
+      public.rbac_check_permission_direct(public.rbac_perm_app_upload_bundle(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
+      OR public.rbac_check_permission_direct(public.rbac_perm_channel_promote_bundle(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
+    ))
     OR ('write' = ANY(v_modes) AND (
       public.rbac_check_permission_direct(public.rbac_perm_app_update_settings(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
       OR public.rbac_check_permission_direct(public.rbac_perm_app_create_channel(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
@@ -5481,7 +5553,6 @@ BEGIN
       OR public.rbac_check_permission_direct(public.rbac_perm_app_build_native(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
       OR public.rbac_check_permission_direct(public.rbac_perm_bundle_update(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
       OR public.rbac_check_permission_direct(public.rbac_perm_channel_update_settings(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
-      OR public.rbac_check_permission_direct(public.rbac_perm_channel_promote_bundle(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
       OR public.rbac_check_permission_direct(public.rbac_perm_channel_rollback_bundle(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
       OR public.rbac_check_permission_direct(public.rbac_perm_channel_manage_forced_devices(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
     ))
@@ -5550,8 +5621,7 @@ BEGIN
     RETURN 'perm_admin';
   END IF;
 
-  -- Keep this list aligned with the write entries from the former
-  -- rbac_legacy_right_for_permission mapping used by legacy CLI clients.
+  -- Keep this hierarchy aligned with legacy CLI permission vocabulary.
   IF public.rbac_check_permission_direct(public.rbac_perm_app_update_settings(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
     OR public.rbac_check_permission_direct(public.rbac_perm_app_create_channel(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
     OR public.rbac_check_permission_direct('app.manage_notifications', v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
@@ -5559,14 +5629,15 @@ BEGIN
     OR public.rbac_check_permission_direct(public.rbac_perm_app_build_native(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
     OR public.rbac_check_permission_direct(public.rbac_perm_bundle_update(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
     OR public.rbac_check_permission_direct(public.rbac_perm_channel_update_settings(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
-    OR public.rbac_check_permission_direct(public.rbac_perm_channel_promote_bundle(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
     OR public.rbac_check_permission_direct(public.rbac_perm_channel_rollback_bundle(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
     OR public.rbac_check_permission_direct(public.rbac_perm_channel_manage_forced_devices(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
   THEN
     RETURN 'perm_write';
   END IF;
 
-  IF public.rbac_check_permission_direct(public.rbac_perm_app_upload_bundle(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey) THEN
+  IF public.rbac_check_permission_direct(public.rbac_perm_app_upload_bundle(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct(public.rbac_perm_channel_promote_bundle(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+  THEN
     RETURN 'perm_upload';
   END IF;
 
@@ -5815,24 +5886,22 @@ BEGIN
   SELECT auth.uid() INTO v_user_id;
   SELECT public.get_apikey_header() INTO v_api_key_text;
 
-  IF v_api_key_text IS NOT NULL THEN
+  IF v_user_id IS NOT NULL THEN
+    v_api_key_text := NULL;
+    v_principal_type := public.rbac_principal_user();
+    v_principal_id := v_user_id;
+  ELSIF v_api_key_text IS NOT NULL THEN
     SELECT * INTO v_api_key
     FROM public.find_apikey_by_value(v_api_key_text)
     LIMIT 1;
 
-    IF v_api_key.id IS NULL
-      OR public.is_apikey_expired(v_api_key.expires_at)
-      OR (v_user_id IS NOT NULL AND v_user_id IS DISTINCT FROM v_api_key.user_id)
-    THEN
+    IF v_api_key.id IS NULL OR public.is_apikey_expired(v_api_key.expires_at) THEN
       RETURN v_allowed;
     END IF;
 
     v_user_id := v_api_key.user_id;
     v_principal_type := public.rbac_principal_apikey();
     v_principal_id := v_api_key.rbac_id;
-  ELSIF v_user_id IS NOT NULL THEN
-    v_principal_type := public.rbac_principal_user();
-    v_principal_id := v_user_id;
   ELSE
     RETURN v_allowed;
   END IF;
@@ -7121,25 +7190,23 @@ BEGIN
   SELECT auth.uid() INTO v_user_id;
   SELECT public.get_apikey_header() INTO v_api_key_text;
 
-  IF v_api_key_text IS NOT NULL THEN
+  IF v_user_id IS NOT NULL THEN
+    v_api_key_text := NULL;
+    v_principal_type := public.rbac_principal_user();
+    v_principal_id := v_user_id;
+  ELSIF v_api_key_text IS NOT NULL THEN
     SELECT *
     INTO v_api_key
     FROM public.find_apikey_by_value(v_api_key_text)
     LIMIT 1;
 
-    IF v_api_key.id IS NULL
-      OR public.is_apikey_expired(v_api_key.expires_at)
-      OR (v_user_id IS NOT NULL AND v_user_id IS DISTINCT FROM v_api_key.user_id)
-    THEN
+    IF v_api_key.id IS NULL OR public.is_apikey_expired(v_api_key.expires_at) THEN
       RETURN v_allowed;
     END IF;
 
     v_user_id := v_api_key.user_id;
     v_principal_type := public.rbac_principal_apikey();
     v_principal_id := v_api_key.rbac_id;
-  ELSIF v_user_id IS NOT NULL THEN
-    v_principal_type := public.rbac_principal_user();
-    v_principal_id := v_user_id;
   ELSE
     RETURN v_allowed;
   END IF;
@@ -7639,7 +7706,7 @@ ON "public"."groups";
 CREATE POLICY "groups_select"
 ON "public"."groups"
 FOR SELECT
-TO "authenticated"
+TO "anon", "authenticated"
 USING (
   "id" = ANY(COALESCE((SELECT "public"."readable_group_ids"()), '{}'::uuid[]))
 );
@@ -7650,7 +7717,7 @@ ON "public"."group_members";
 CREATE POLICY "group_members_select"
 ON "public"."group_members"
 FOR SELECT
-TO "authenticated"
+TO "anon", "authenticated"
 USING (
   "group_id" = ANY(COALESCE((SELECT "public"."readable_group_ids"()), '{}'::uuid[]))
 );
@@ -7832,40 +7899,96 @@ DECLARE
   v_api_key public.apikeys%ROWTYPE;
   v_actor_id uuid;
 BEGIN
-  v_api_key_text := public.get_apikey_header();
-  IF v_api_key_text IS NOT NULL THEN
-    SELECT *
-    INTO v_api_key
-    FROM public.find_apikey_by_value(v_api_key_text)
-    LIMIT 1;
-
-    IF v_api_key.id IS NULL OR public.is_apikey_expired(v_api_key.expires_at) THEN
-      RETURN NULL;
-    END IF;
-
+  SELECT auth.uid() INTO v_actor_id;
+  IF v_actor_id IS NOT NULL THEN
     RETURN public.principal_max_role_priority(
       p_org_id,
-      public.rbac_principal_apikey(),
-      v_api_key.rbac_id
+      public.rbac_principal_user(),
+      v_actor_id
     );
   END IF;
 
-  v_actor_id := public.request_actor_user_id();
-  IF v_actor_id IS NULL THEN
+  v_api_key_text := public.get_apikey_header();
+  IF v_api_key_text IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT *
+  INTO v_api_key
+  FROM public.find_apikey_by_value(v_api_key_text)
+  LIMIT 1;
+
+  IF v_api_key.id IS NULL OR public.is_apikey_expired(v_api_key.expires_at) THEN
     RETURN NULL;
   END IF;
 
   RETURN public.principal_max_role_priority(
     p_org_id,
-    public.rbac_principal_user(),
-    v_actor_id
+    public.rbac_principal_apikey(),
+    v_api_key.rbac_id
   );
 END;
 $$;
-
 ALTER FUNCTION public.request_principal_max_role_priority(uuid) OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.request_principal_max_role_priority(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.request_principal_max_role_priority(uuid) TO service_role;
+
+-- Group and group-member RLS computes the caller's bounded, rank-manageable
+-- groups once per statement. Direct JWT membership remains readable, but API
+-- keys never inherit their owner's group membership.
+CREATE OR REPLACE FUNCTION public.readable_group_ids()
+RETURNS uuid[]
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  WITH direct_group_ids AS (
+    SELECT group_members.group_id
+    FROM public.group_members
+    WHERE group_members.user_id = (SELECT auth.uid())
+  ),
+  admin_orgs AS MATERIALIZED (
+    SELECT ids.org_id
+    FROM pg_catalog.unnest(
+      COALESCE((SELECT public.orgs_admin_org_ids()), '{}'::uuid[])
+    ) AS ids(org_id)
+  ),
+  caller_ranks AS MATERIALIZED (
+    SELECT admin_orgs.org_id,
+      public.request_principal_max_role_priority(admin_orgs.org_id) AS max_priority
+    FROM admin_orgs
+  ),
+  rank_manageable_group_ids AS (
+    SELECT groups.id AS group_id
+    FROM public.groups
+    INNER JOIN caller_ranks
+      ON caller_ranks.org_id = groups.org_id
+    LEFT JOIN public.role_bindings
+      ON role_bindings.principal_type = public.rbac_principal_group()
+      AND role_bindings.principal_id = groups.id
+      AND role_bindings.org_id = groups.org_id
+      AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > pg_catalog.now())
+    LEFT JOIN public.roles
+      ON roles.id = role_bindings.role_id
+      AND roles.scope_type = role_bindings.scope_type
+    GROUP BY groups.id, caller_ranks.max_priority
+    HAVING caller_ranks.max_priority >= COALESCE(MAX(roles.priority_rank), 0)
+  ),
+  allowed_group_ids AS (
+    SELECT group_id FROM direct_group_ids
+    UNION
+    SELECT group_id FROM rank_manageable_group_ids
+  )
+  SELECT COALESCE(array_agg(DISTINCT allowed_group_ids.group_id), '{}'::uuid[])
+  FROM allowed_group_ids
+$$;
+
+ALTER FUNCTION public.readable_group_ids() OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.readable_group_ids() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.readable_group_ids() TO anon, authenticated, service_role;
+COMMENT ON FUNCTION public.readable_group_ids() IS
+  'Returns direct JWT-member groups plus rank-manageable groups from bounded caller-scoped orgs for statement-level RLS.';
 
 CREATE OR REPLACE FUNCTION public.group_max_role_priority(p_group_id uuid)
 RETURNS integer
@@ -8685,6 +8808,59 @@ ALTER FUNCTION public.assert_effective_super_admin_binding_removal(uuid) OWNER T
 REVOKE ALL ON FUNCTION public.assert_effective_super_admin_binding_removal(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.assert_effective_super_admin_binding_removal(uuid) TO service_role;
 
+CREATE OR REPLACE FUNCTION public.assert_effective_super_admin_binding_removal(
+  p_binding_id uuid,
+  p_error_code text
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_binding public.role_bindings%ROWTYPE;
+BEGIN
+  SELECT *
+  INTO v_binding
+  FROM public.role_bindings
+  WHERE role_bindings.id = p_binding_id;
+
+  IF NOT FOUND
+    OR NOT public.is_active_org_super_admin_binding(
+      v_binding.role_id,
+      v_binding.scope_type,
+      v_binding.principal_type,
+      v_binding.org_id,
+      v_binding.expires_at
+    )
+  THEN
+    RETURN;
+  END IF;
+
+  IF v_binding.principal_type = public.rbac_principal_group()
+    AND NOT EXISTS (
+      SELECT 1
+      FROM public.group_members
+      WHERE group_members.group_id = v_binding.principal_id
+    )
+  THEN
+    RETURN;
+  END IF;
+
+  IF NOT public.has_effective_non_expiring_org_super_admin_after_removal(
+    v_binding.org_id,
+    v_binding.id
+  ) THEN
+    RAISE EXCEPTION '%', p_error_code
+      USING HINT = 'At least one effective active organization super admin must remain.';
+  END IF;
+END;
+$$;
+
+ALTER FUNCTION public.assert_effective_super_admin_binding_removal(uuid, text) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.assert_effective_super_admin_binding_removal(uuid, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.assert_effective_super_admin_binding_removal(uuid, text) TO service_role;
+
 CREATE OR REPLACE FUNCTION public.assert_effective_super_admin_group_member_removal(
   p_group_id uuid,
   p_user_id uuid
@@ -9042,7 +9218,7 @@ BEGIN
         )
       )
     ) THEN
-      PERFORM public.assert_effective_super_admin_binding_removal(OLD.id);
+      PERFORM public.assert_effective_super_admin_binding_removal(OLD.id, 'CANNOT_DELETE_LAST_SUPER_ADMIN_BINDING');
     END IF;
   ELSIF TG_OP = 'UPDATE'
     AND NOT (
@@ -9058,7 +9234,7 @@ BEGIN
       )
     )
   THEN
-    PERFORM public.assert_effective_super_admin_binding_removal(OLD.id);
+    PERFORM public.assert_effective_super_admin_binding_removal(OLD.id, 'CANNOT_DEMOTE_LAST_SUPER_ADMIN_BINDING');
   END IF;
 
   -- A future expiry removes this binding. Keep another non-expiring effective
@@ -9085,7 +9261,7 @@ BEGIN
       OLD.id
     )
   THEN
-    RAISE EXCEPTION 'CANNOT_REMOVE_LAST_EFFECTIVE_SUPER_ADMIN'
+    RAISE EXCEPTION 'CANNOT_DEMOTE_LAST_SUPER_ADMIN_BINDING'
       USING HINT = 'At least one effective active organization super admin must remain after this binding expires.';
   END IF;
 
@@ -9225,7 +9401,9 @@ BEGIN
 
   -- A blank target is the native/builtin channel state; an initial target needs
   -- app-level promotion, while changing an existing target is channel-scoped.
-  IF v_request_role NOT IN ('service_role', 'postgres') THEN
+  IF v_request_role NOT IN ('service_role', 'postgres')
+    AND pg_catalog.current_setting('capgo.seed_channel_targets', true) IS DISTINCT FROM 'true'
+  THEN
     IF v_request_role IS DISTINCT FROM 'anon' AND v_request_role IS DISTINCT FROM 'authenticated' THEN
       RAISE EXCEPTION 'PERMISSION_DENIED_CHANNEL_PROMOTE_BUNDLE'
         USING ERRCODE = '42501';

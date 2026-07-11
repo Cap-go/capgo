@@ -1510,8 +1510,7 @@ describe('channels RLS direct insert separates creation from initial bundle prom
 
     const result = await execWithRoleClaims(
       `INSERT INTO public.channels (app_id, name, version, owner_org, created_by, public)
-       VALUES ($1, $2, NULL, $3::uuid, $4::uuid, false)
-       RETURNING id, version`,
+       VALUES ($1, $2, NULL, $3::uuid, $4::uuid, false)`,
       {
         role: 'anon',
         claims: { role: 'anon', aud: 'anon' },
@@ -1521,8 +1520,16 @@ describe('channels RLS direct insert separates creation from initial bundle prom
     )
 
     expect(result.rowCount).toBe(1)
-    expect(result.rows[0].version).toBeNull()
-    createdChannelIds.push(Number(result.rows[0].id))
+    const insertedChannelResult = await pool.query<{ id: number, version: number | null }>(
+      'SELECT id, version FROM public.channels WHERE app_id = $1 AND name = $2',
+      [APP_NAME_RLS, emptyChannelName],
+    )
+    const insertedChannel = insertedChannelResult.rows[0]
+    if (!insertedChannel)
+      throw new Error('Channel create-only insert did not persist')
+
+    expect(insertedChannel.version).toBeNull()
+    createdChannelIds.push(Number(insertedChannel.id))
   })
 
   it('denies a create-only API key from inserting a channel with an initial stable bundle', async () => {
@@ -1574,8 +1581,7 @@ describe('channels RLS direct insert separates creation from initial bundle prom
 
     const stableResult = await execWithRoleClaims(
       `INSERT INTO public.channels (app_id, name, version, owner_org, created_by, public)
-       VALUES ($1, $2, $3, $4::uuid, $5::uuid, false)
-       RETURNING id, version`,
+       VALUES ($1, $2, $3, $4::uuid, $5::uuid, false)`,
       {
         role: 'anon',
         claims: { role: 'anon', aud: 'anon' },
@@ -1584,14 +1590,21 @@ describe('channels RLS direct insert separates creation from initial bundle prom
       },
     )
     expect(stableResult.rowCount).toBe(1)
-    expect(Number(stableResult.rows[0].version)).toBe(versionId)
-    activeChannelId = Number(stableResult.rows[0].id)
+    const stableChannelResult = await pool.query<{ id: number, version: number | null }>(
+      'SELECT id, version FROM public.channels WHERE app_id = $1 AND name = $2',
+      [APP_NAME_RLS, versionedChannelName],
+    )
+    const stableChannel = stableChannelResult.rows[0]
+    if (!stableChannel)
+      throw new Error('Channel promotion insert did not persist')
+
+    expect(Number(stableChannel.version)).toBe(versionId)
+    activeChannelId = Number(stableChannel.id)
     createdChannelIds.push(activeChannelId)
 
     const rolloutResult = await execWithRoleClaims(
       `INSERT INTO public.channels (app_id, name, rollout_version, owner_org, created_by, public)
-       VALUES ($1, $2, $3, $4::uuid, $5::uuid, false)
-       RETURNING id, rollout_version`,
+       VALUES ($1, $2, $3, $4::uuid, $5::uuid, false)`,
       {
         role: 'anon',
         claims: { role: 'anon', aud: 'anon' },
@@ -1600,8 +1613,16 @@ describe('channels RLS direct insert separates creation from initial bundle prom
       },
     )
     expect(rolloutResult.rowCount).toBe(1)
-    expect(Number(rolloutResult.rows[0].rollout_version)).toBe(rolloutVersionId)
-    createdChannelIds.push(Number(rolloutResult.rows[0].id))
+    const rolloutChannelResult = await pool.query<{ id: number, rollout_version: number | null }>(
+      'SELECT id, rollout_version FROM public.channels WHERE app_id = $1 AND name = $2',
+      [APP_NAME_RLS, rolloutChannelName],
+    )
+    const rolloutChannel = rolloutChannelResult.rows[0]
+    if (!rolloutChannel)
+      throw new Error('Channel rollout promotion insert did not persist')
+
+    expect(Number(rolloutChannel.rollout_version)).toBe(rolloutVersionId)
+    createdChannelIds.push(Number(rolloutChannel.id))
   })
 
   it('rejects foreign and deleted stable targets even with channel promote permission', async () => {
@@ -1614,8 +1635,7 @@ describe('channels RLS direct insert separates creation from initial bundle prom
     ] as const) {
       await expect(execWithRoleClaims(
         `INSERT INTO public.channels (app_id, name, version, owner_org, created_by, public)
-         VALUES ($1, $2, $3, $4::uuid, $5::uuid, false)
-         RETURNING id`,
+         VALUES ($1, $2, $3, $4::uuid, $5::uuid, false)`,
         {
           role: 'anon',
           claims: { role: 'anon', aud: 'anon' },
@@ -1641,7 +1661,7 @@ describe('channels RLS direct insert separates creation from initial bundle prom
 
     for (const targetVersionId of [foreignVersionId, deletedVersionId]) {
       await expect(execWithRoleClaims(
-        'UPDATE public.channels SET version = $1 WHERE id = $2 RETURNING id',
+        'UPDATE public.channels SET version = $1 WHERE id = $2',
         {
           role: 'anon',
           claims: { role: 'anon', aud: 'anon' },

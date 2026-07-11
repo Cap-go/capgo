@@ -42,6 +42,9 @@ DECLARE
     admin_bandwidth_overage_id uuid;
     demo_mau_overage_id uuid;
 BEGIN
+    -- Tinbase evaluates seed statements as anon. This service-role-only seed
+    -- helper marks its trusted channel targets for the promotion trigger.
+    PERFORM pg_catalog.set_config('capgo.seed_channel_targets', 'true', true);
     -- Suppress cascade notices during truncation
     SET LOCAL client_min_messages = WARNING;
 

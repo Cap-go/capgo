@@ -96,7 +96,7 @@ describe('release scope matching', () => {
 
       expect(workflow).toContain('gh release list')
       expect(workflow).toContain(`--arg prefix "${prefix}"`)
-      expect(workflow).toContain('from_tag: $' + '{{ steps.changelog_base.outputs.from_tag }}')
+      expect(workflow).toContain('FROM_TAG: $' + '{{ steps.changelog_base.outputs.from_tag }}')
     }
   })
 

@@ -7,6 +7,8 @@ import {
   getAuthHeadersForCredentials,
   getEndpointUrl,
   getSupabaseClient,
+  SUPABASE_ANON_KEY,
+  SUPABASE_BASE_URL,
   USER_ID,
   USER_ID_2,
   USER_PASSWORD,
@@ -16,12 +18,14 @@ const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
 const fixtureId = randomUUID()
 const orgId = randomUUID()
 const lowRankApiKey = randomUUID()
+const highRankApiKey = randomUUID()
 const rankGuardError = 'Forbidden - Cannot manage a group with higher privileges than your own'
 
 let adminAuthHeaders: Record<string, string>
 let memberAuthHeaders: Record<string, string>
 let groupId: string
 let lowRankApiKeyId: number | null = null
+let highRankApiKeyId: number | null = null
 
 async function getOrgRoleId(roleName: string) {
   const { data: role, error } = await getSupabaseClient()
@@ -73,6 +77,24 @@ async function expectRankGuard(response: Response) {
   expect(response.status).toBe(403)
   const body = await response.json() as { error: string }
   expect(body.error).toBe(rankGuardError)
+}
+
+async function readGroupRows(headers: Record<string, string>) {
+  const [groupsResponse, membersResponse] = await Promise.all([
+    fetch(`${SUPABASE_BASE_URL}/rest/v1/groups?id=eq.${groupId}&select=id`, { headers }),
+    fetch(`${SUPABASE_BASE_URL}/rest/v1/group_members?group_id=eq.${groupId}&select=user_id`, { headers }),
+  ])
+  const [groupsBody, membersBody] = await Promise.all([
+    groupsResponse.text(),
+    membersResponse.text(),
+  ])
+
+  expect(groupsResponse.status, groupsBody).toBe(200)
+  expect(membersResponse.status, membersBody).toBe(200)
+  return {
+    groupRows: JSON.parse(groupsBody) as Array<{ id: string }>,
+    memberRows: JSON.parse(membersBody) as Array<{ user_id: string }>,
+  }
 }
 
 beforeAll(async () => {
@@ -139,7 +161,17 @@ beforeAll(async () => {
   if (!apiKey.key)
     throw new Error('Unable to create private groups rank API key')
 
+  const highRankKey = await createDirectApiKeyWithBindings({
+    key: highRankApiKey,
+    name: `Private groups super-admin regression ${fixtureId}`,
+    orgId,
+    roleName: 'org_super_admin',
+  })
+  if (!highRankKey.key)
+    throw new Error('Unable to create private groups super-admin API key')
+
   lowRankApiKeyId = apiKey.id
+  highRankApiKeyId = highRankKey.id
 })
 
 afterAll(async () => {
@@ -149,6 +181,8 @@ afterAll(async () => {
   const supabase = getSupabaseClient()
   if (lowRankApiKeyId !== null)
     await supabase.from('apikeys').delete().eq('id', lowRankApiKeyId)
+  if (highRankApiKeyId !== null)
+    await supabase.from('apikeys').delete().eq('id', highRankApiKeyId)
 
   await supabase.from('orgs').delete().eq('id', orgId)
 })
@@ -174,6 +208,34 @@ describe.skipIf(USE_CLOUDFLARE)('/private/groups access', () => {
     const data = await response.json() as Array<{ user_id: string }>
     expect(data.every(row => row.user_id === USER_ID)).toBe(true)
     expect(data).toHaveLength(1)
+  })
+
+  it('does not disclose high-rank group data through direct JWT PostgREST reads', async () => {
+    const rows = await readGroupRows({
+      apikey: SUPABASE_ANON_KEY,
+      ...memberAuthHeaders,
+    })
+
+    expect(rows.groupRows).toEqual([])
+    expect(rows.memberRows).toEqual([])
+  })
+
+  it('applies group rank to direct API-key PostgREST reads', async () => {
+    const lowRankRows = await readGroupRows({
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      capgkey: lowRankApiKey,
+    })
+    expect(lowRankRows.groupRows).toEqual([])
+    expect(lowRankRows.memberRows).toEqual([])
+
+    const highRankRows = await readGroupRows({
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      capgkey: highRankApiKey,
+    })
+    expect(highRankRows.groupRows).toEqual([{ id: groupId }])
+    expect(highRankRows.memberRows).toEqual([{ user_id: USER_ID }])
   })
 
   it('blocks lower-rank principals from updating high-role groups, changing membership, or deleting the group', async () => {

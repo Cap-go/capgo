@@ -1,7 +1,6 @@
 -- Test that audit logs are created correctly when using API key authentication
--- This verifies the fix for the issue where CLI/API users were not logged in
--- audit_logs
--- because get_identity() was called without key_mode parameter
+-- This verifies API-key actor attribution in audit_logs through the current
+-- request_actor_user_id() identity helper.
 BEGIN;
 
 -- Use existing seed identities:
@@ -125,29 +124,20 @@ RESET ROLE;
 
 SELECT ok(TRUE, 'anon without capgkey cannot read audit_logs directly');
 
--- Test 6: Verify get_identity returns user_id when API key header is set
-DO $$
-BEGIN
-  PERFORM set_config('request.headers', '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520ea"}', true);
-END $$;
-
+-- Test 6: Verify the current request identity helper resolves the API-key user.
 SELECT
-    is(
-        public.get_identity('{read,upload,write,all}'::public.key_mode []),
-        '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
-        'get_identity with key_mode returns API key user_id'
-    );
+  is(
+    public.request_actor_user_id(),
+    '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
+    'request_actor_user_id returns the API-key user'
+  );
 
--- Test 7: Verify get_identity WITHOUT parameters returns NULL for API key
--- (the old broken behavior)
--- Note: This shows the original bug - parameterless get_identity doesn't
--- check API keys
+-- Test 7: Legacy identity helpers must not survive the RBAC cleanup.
 SELECT
-    is(
-        public.get_identity(),
-        NULL,
-        'get_identity without key_mode returns NULL for API key (original bug)'
-    );
+  ok(
+    to_regprocedure('public.get_identity()') IS NULL,
+    'legacy get_identity helper is removed'
+  );
 
 -- Test 8: Insert app_version with API key context and verify audit log is
 -- created
