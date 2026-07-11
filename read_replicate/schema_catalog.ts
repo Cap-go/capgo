@@ -1,3 +1,5 @@
+import { sortJson } from './schema_json.ts'
+
 export const REPLICA_TABLES = [
   'orgs',
   'stripe_info',
@@ -53,7 +55,7 @@ export interface Queryable {
 // CURRENT_TIMESTAMP predicate makes Hyperdrive treat the verification read as
 // non-cacheable, so it observes DDL from the same release run.
 export const READ_REPLICA_SCHEMA_CATALOG_SQL = `
-WITH replica_tables(table_name) AS (
+WITH RECURSIVE replica_tables(table_name) AS (
   SELECT unnest($1::text[])
 ),
 replica_sequences(sequence_name) AS (
@@ -80,26 +82,35 @@ tables AS (
   WHERE n.nspname = 'public'
     AND c.relkind IN ('r', 'p')
 ),
+selected_column_types(type_oid) AS (
+  SELECT DISTINCT a.atttypid
+  FROM tables t
+  JOIN pg_attribute a ON a.attrelid = t.table_oid
+  WHERE a.attnum > 0
+    AND NOT a.attisdropped
+),
+referenced_types(type_oid) AS (
+  SELECT type_oid
+  FROM selected_column_types
+  UNION
+  SELECT CASE
+    WHEN typ.typbasetype <> 0 THEN typ.typbasetype
+    ELSE typ.typelem
+  END
+  FROM referenced_types referenced
+  JOIN pg_type typ ON typ.oid = referenced.type_oid
+  WHERE typ.typbasetype <> 0
+     OR typ.typelem <> 0
+),
 selected_type_names(type_name) AS (
   SELECT unnest($2::text[])
   UNION
-  SELECT DISTINCT base_type.typname
-  FROM tables t
-  JOIN pg_attribute a ON a.attrelid = t.table_oid
-  JOIN pg_type declared_type ON declared_type.oid = a.atttypid
-  JOIN pg_type element_type ON element_type.oid = CASE
-    WHEN declared_type.typelem <> 0 THEN declared_type.typelem
-    ELSE declared_type.oid
-  END
-  JOIN pg_type base_type ON base_type.oid = CASE
-    WHEN element_type.typbasetype <> 0 THEN element_type.typbasetype
-    ELSE element_type.oid
-  END
-  JOIN pg_namespace type_namespace ON type_namespace.oid = base_type.typnamespace
-  WHERE a.attnum > 0
-    AND NOT a.attisdropped
-    AND type_namespace.nspname = 'public'
-    AND base_type.typtype IN ('e', 'c')
+  SELECT DISTINCT typ.typname
+  FROM referenced_types referenced
+  JOIN pg_type typ ON typ.oid = referenced.type_oid
+  JOIN pg_namespace type_namespace ON type_namespace.oid = typ.typnamespace
+  WHERE type_namespace.nspname = 'public'
+    AND typ.typtype IN ('e', 'c')
 ),
 columns AS (
   SELECT
@@ -178,6 +189,23 @@ types AS (
   JOIN selected_type_names rt ON rt.type_name = typ.typname
   WHERE n.nspname = 'public'
 ),
+selected_sequence_oids(sequence_oid) AS (
+  SELECT seq.oid
+  FROM pg_class seq
+  JOIN pg_namespace n ON n.oid = seq.relnamespace
+  JOIN replica_sequences rs ON rs.sequence_name = seq.relname
+  WHERE n.nspname = 'public'
+    AND seq.relkind = 'S'
+  UNION
+  SELECT dep.objid
+  FROM pg_depend dep
+  JOIN tables t ON t.table_oid = dep.refobjid
+  JOIN pg_class seq ON seq.oid = dep.objid
+  JOIN pg_namespace n ON n.oid = seq.relnamespace
+  WHERE dep.deptype IN ('a', 'i')
+    AND n.nspname = 'public'
+    AND seq.relkind = 'S'
+),
 sequences AS (
   SELECT
     seq.relname AS sequence_name,
@@ -193,7 +221,7 @@ sequences AS (
   FROM pg_class seq
   JOIN pg_namespace n ON n.oid = seq.relnamespace
   JOIN pg_sequence s ON s.seqrelid = seq.oid
-  JOIN replica_sequences rs ON rs.sequence_name = seq.relname
+  JOIN selected_sequence_oids selected_sequence ON selected_sequence.sequence_oid = seq.oid
   LEFT JOIN pg_depend dep ON dep.objid = seq.oid AND dep.deptype IN ('a', 'i')
   LEFT JOIN pg_class owned_table ON owned_table.oid = dep.refobjid
   LEFT JOIN pg_attribute owned_attr ON owned_attr.attrelid = dep.refobjid AND owned_attr.attnum = dep.refobjsubid
@@ -308,18 +336,4 @@ export async function readReplicaSchemaCatalog(
     throw new Error('Read-replica schema catalog query returned no rows')
 
   return sortJson(catalog)
-}
-
-function sortJson(value: unknown): unknown {
-  if (Array.isArray(value))
-    return value.map(sortJson)
-
-  if (!value || typeof value !== 'object')
-    return value
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, child]) => [key, sortJson(child)]),
-  )
 }

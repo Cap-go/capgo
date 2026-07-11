@@ -1,4 +1,5 @@
--- Keep local migrations aligned with the primary schema used by the read replica.
+-- Keep local migrations aligned with the primary schema
+-- replicated to the read replica.
 DO $$
 DECLARE
   existing_name "text";

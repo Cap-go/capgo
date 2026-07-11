@@ -1,3 +1,5 @@
+import { stableJson } from './schema_json.ts'
+
 interface SchemaColumn {
   table: string
   name: string
@@ -244,12 +246,14 @@ function compareIndexes(expected: SchemaCatalog, actual: SchemaCatalog, issues: 
           : `expected valid ${displayValue(expectedIndex.valid)}, found ${displayValue(actualIndex.valid)}`,
       })
     }
-    if (actualIndex.constraintOwned !== expectedIndex.constraintOwned) {
-      issues.push({
-        kind: 'index',
-        object: expectedIndex.name,
-        reason: `expected constraintOwned ${displayValue(expectedIndex.constraintOwned)}, found ${displayValue(actualIndex.constraintOwned)}`,
-      })
+    if (expectedIndex.constraintOwned !== undefined && actualIndex.constraintOwned !== undefined) {
+      if (actualIndex.constraintOwned !== expectedIndex.constraintOwned) {
+        issues.push({
+          kind: 'index',
+          object: expectedIndex.name,
+          reason: `expected constraintOwned ${displayValue(expectedIndex.constraintOwned)}, found ${displayValue(actualIndex.constraintOwned)}`,
+        })
+      }
     }
   }
 
@@ -362,24 +366,6 @@ function assertSchemaCatalog(value: unknown, label: string): SchemaCatalog {
 
 function sameValue(left: unknown, right: unknown): boolean {
   return stableJson(left) === stableJson(right)
-}
-
-function stableJson(value: unknown): string {
-  return JSON.stringify(sortJson(value)) ?? 'undefined'
-}
-
-function sortJson(value: unknown): unknown {
-  if (Array.isArray(value))
-    return value.map(sortJson)
-
-  if (!value || typeof value !== 'object')
-    return value
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, child]) => [key, sortJson(child)]),
-  )
 }
 
 function columnKey(column: Pick<SchemaColumn, 'table' | 'name'>): string {

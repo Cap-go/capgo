@@ -117,7 +117,6 @@ READY=0
 LAST_READY_STATUS=''
 READY_ATTEMPTS_USED=0
 for attempt in $(seq 1 "$READY_ATTEMPTS"); do
-  READY_ATTEMPTS_USED="$attempt"
   REMAINING_TIME="$(remaining_check_time)"
   if (( REMAINING_TIME <= CHECK_CLEANUP_RESERVE_SECONDS )); then
     break
@@ -129,6 +128,7 @@ for attempt in $(seq 1 "$READY_ATTEMPTS"); do
   fi
   : > "$READY_ATTEMPT_RESPONSE"
   : > "$READY_ATTEMPT_ERROR"
+  READY_ATTEMPTS_USED="$attempt"
   LAST_READY_STATUS="$(curl -sS --connect-timeout 10 --max-time "$ATTEMPT_MAX_TIME" \
     --header "authorization: Bearer ${READ_REPLICA_SCHEMA_CHECK_TOKEN}" \
     -w '%{http_code}' \
@@ -159,7 +159,6 @@ VERIFIED=0
 LAST_VERIFY_STATUS=''
 VERIFY_ATTEMPTS_USED=0
 for attempt in $(seq 1 "$VERIFY_ATTEMPTS"); do
-  VERIFY_ATTEMPTS_USED="$attempt"
   REMAINING_TIME="$(remaining_check_time)"
   if (( REMAINING_TIME <= CHECK_CLEANUP_RESERVE_SECONDS )); then
     break
@@ -171,6 +170,7 @@ for attempt in $(seq 1 "$VERIFY_ATTEMPTS"); do
   fi
   : > "$VERIFY_ATTEMPT_RESPONSE"
   : > "$VERIFY_ATTEMPT_ERROR"
+  VERIFY_ATTEMPTS_USED="$attempt"
   LAST_VERIFY_STATUS="$(curl -sS --connect-timeout 10 --max-time "$ATTEMPT_MAX_TIME" \
     --header "authorization: Bearer ${READ_REPLICA_SCHEMA_CHECK_TOKEN}" \
     -w '%{http_code}' \
