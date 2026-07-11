@@ -24414,3 +24414,34 @@ SELECT pgmq.create('replicate_data');
 SELECT pgmq.create('webhook_delivery');
 SELECT pgmq.create('webhook_dispatcher');
 
+-- Reference RBAC data from production (schema-only dump omitted table data)
+-- Required because seed.sql joins roles by name but does not insert roles rows.
+SET session_replication_role = replica;
+INSERT INTO "public"."roles" ("id", "name", "scope_type", "description", "priority_rank", "is_assignable", "created_at", "created_by") VALUES
+	('4130bd58-58e9-4717-93b5-3ab493297737', 'org_super_admin', 'org', 'Super admin for an org (same permissions as org_admin)', 95, true, '2026-01-21 22:18:57.298742+00', NULL),
+	('39eabda5-1db9-497a-93e9-cd28d19275cd', 'org_admin', 'org', 'Full org administration', 90, true, '2026-01-21 22:18:57.298742+00', NULL),
+	('f55bb530-3359-466c-8575-3a4296c7150d', 'org_billing_admin', 'org', 'Billing-only administrator for an org', 80, true, '2026-01-21 22:18:57.298742+00', NULL),
+	('7c5fd608-bd0d-4a16-bc52-9c9fd0870ee7', 'app_admin', 'app', 'Full administration of an app', 70, true, '2026-01-21 22:18:57.298742+00', NULL),
+	('b1bdbf98-4680-4fb6-b9b5-f7936f8eeca1', 'app_developer', 'app', 'Developer access: upload bundles, manage devices, but no destructive operations', 68, true, '2026-01-21 22:18:57.298742+00', NULL),
+	('9695bbac-bb2c-405c-ab3e-565efc0809fc', 'app_uploader', 'app', 'Upload-only access: read app data and upload bundles', 66, true, '2026-01-21 22:18:57.298742+00', NULL),
+	('2e91cb60-f828-4426-ba8a-914d1a3acdfd', 'app_reader', 'app', 'Read-only access to an app', 65, true, '2026-01-21 22:18:57.298742+00', NULL),
+	('bf04a281-6fca-4419-9f24-10196f461785', 'bundle_admin', 'bundle', 'Full administration of a bundle', 62, true, '2026-01-21 22:18:57.298742+00', NULL),
+	('be69fcfc-dc66-4d07-9d85-4afa7f06f5df', 'bundle_reader', 'bundle', 'Read-only access to a bundle', 61, true, '2026-01-21 22:18:57.298742+00', NULL),
+	('dd5add0a-2410-4c62-b98e-97d6cbbb7542', 'channel_admin', 'channel', 'Full administration of a channel', 60, true, '2026-01-21 22:18:57.298742+00', NULL),
+	('9bccecde-7fc3-4a95-a318-80d1d498f5c4', 'channel_reader', 'channel', 'Read-only access to a channel', 55, true, '2026-01-21 22:18:57.298742+00', NULL),
+	('24085555-334f-408d-a7f5-4e30b07da81a', 'org_member', 'org', 'Basic org member: org-only access', 75, true, '2026-01-21 22:18:57.298742+00', NULL),
+	('dfbff90c-5536-48c9-84ce-bd16517606f2', 'apikey_org_reader', 'org', 'API key compatibility role: org metadata read only', 10, false, '2026-05-27 23:08:08.528352+00', NULL),
+	('e1b80653-6ff8-4dcb-8fd9-69df70443c87', 'app_notifications', 'app', 'Send and inspect notifications for an app without device or update settings access', 64, true, '2026-07-05 15:39:12.696833+00', NULL);
+
+INSERT INTO "public"."role_hierarchy" ("parent_role_id", "child_role_id") VALUES
+	('4130bd58-58e9-4717-93b5-3ab493297737', '39eabda5-1db9-497a-93e9-cd28d19275cd'),
+	('39eabda5-1db9-497a-93e9-cd28d19275cd', '7c5fd608-bd0d-4a16-bc52-9c9fd0870ee7'),
+	('7c5fd608-bd0d-4a16-bc52-9c9fd0870ee7', 'b1bdbf98-4680-4fb6-b9b5-f7936f8eeca1'),
+	('b1bdbf98-4680-4fb6-b9b5-f7936f8eeca1', '9695bbac-bb2c-405c-ab3e-565efc0809fc'),
+	('9695bbac-bb2c-405c-ab3e-565efc0809fc', '2e91cb60-f828-4426-ba8a-914d1a3acdfd'),
+	('7c5fd608-bd0d-4a16-bc52-9c9fd0870ee7', 'bf04a281-6fca-4419-9f24-10196f461785'),
+	('7c5fd608-bd0d-4a16-bc52-9c9fd0870ee7', 'dd5add0a-2410-4c62-b98e-97d6cbbb7542'),
+	('bf04a281-6fca-4419-9f24-10196f461785', 'be69fcfc-dc66-4d07-9d85-4afa7f06f5df'),
+	('dd5add0a-2410-4c62-b98e-97d6cbbb7542', '9bccecde-7fc3-4a95-a318-80d1d498f5c4');
+
+RESET session_replication_role;
