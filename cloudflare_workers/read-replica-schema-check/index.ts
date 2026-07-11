@@ -107,6 +107,9 @@ function schemaCheckSetup(
   return { masterConnectionString, replicaConnectionString }
 }
 
+// These catalogs use independent connections, not one cross-database snapshot.
+// Concurrent DDL can transiently report drift. The release workflow serializes
+// schema writers before this check.
 async function verifyMasterSchema(setup: SchemaCheckSetup): Promise<Response> {
   const [expected, actual] = await Promise.all([
     withPgClient(setup.masterConnectionString, readReplicaSchemaCatalog),

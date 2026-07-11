@@ -65,6 +65,17 @@ describe('read-replica schema compatibility', () => {
     expect(readReplicaSchemaCompatibilityIssues(expected, actual)).toEqual([])
   })
 
+  it.concurrent('accepts legacy catalogs without constraint-owned index metadata', () => {
+    const expected = catalog() as Record<string, unknown>
+    const actual = catalog()
+    const indexes = expected.indexes as Array<Record<string, unknown>>
+
+    for (const index of indexes)
+      delete index.constraintOwned
+
+    expect(readReplicaSchemaCompatibilityIssues(expected, actual)).toEqual([])
+  })
+
   it.concurrent('rejects structural drift across selected schema objects', () => {
     const expected = catalog()
     const actual = catalog()
