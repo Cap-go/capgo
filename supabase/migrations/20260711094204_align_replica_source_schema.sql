@@ -3,7 +3,7 @@ DO $$
 DECLARE
   existing_name "text";
   existing_definition "text";
-  existing_valid "boolean";
+  existing_valid boolean;
 BEGIN
   SELECT
     "conname",
