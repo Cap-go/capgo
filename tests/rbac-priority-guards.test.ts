@@ -400,11 +400,11 @@ describe('direct RBAC mutation priority guards', () => {
       'Admins cannot elevate privileges!',
     )
 
-    await expectRejected(
+    const hiddenGroupUpdate = await query(
       `UPDATE public.groups SET description = 'rank guard' WHERE id = $1::uuid`,
       [fixture.highGroupId],
-      'Admins cannot elevate privileges!',
     )
+    expect(hiddenGroupUpdate.rowCount).toBe(0)
 
     await expectRejected(
       `DELETE FROM public.role_bindings WHERE id = $1::uuid`,
