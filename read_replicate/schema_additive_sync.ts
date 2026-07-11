@@ -201,10 +201,26 @@ export async function applyReadReplicaAdditiveSchemaSync(client: Queryable, expe
     await client.query('RESET statement_timeout')
   }
 
+  assertAppliedStatementsVisible(plan.statements, expected, await readReplicaSchemaCatalog(client))
+
   return {
     applied: plan.statements.map(({ kind, table, name }) => ({ kind, table, name })),
     skipped: plan.skipped,
   }
+}
+
+function assertAppliedStatementsVisible(applied: readonly SyncStatement[], expected: unknown, actual: unknown): void {
+  const remaining = new Set(planReadReplicaAdditiveSchemaSync(expected, actual).statements.map(statementKey))
+  const unavailable = applied.filter(statement => remaining.has(statementKey(statement)))
+  if (!unavailable.length)
+    return
+
+  throw new Error(`Read-replica additive schema sync did not persist ${unavailable.map(statement => `${statement.kind} ${statement.table}.${statement.name}`).join(', ')}`)
+}
+
+function statementKey(statement: Pick<SyncStatement, 'kind' | 'table' | 'name'>): string {
+  const kind = statement.kind === 'invalid_index' ? 'index' : statement.kind
+  return `${kind}:${statement.table}.${statement.name}`
 }
 
 async function setStatementTimeoutForRemainingBudget(client: Queryable, maxStatementTimeoutMs: number, deadline: number, statement: SyncStatement): Promise<void> {
