@@ -14,11 +14,11 @@ import {
   getWebhookLogUrlMetadata,
   getWebhookPayloadEvent,
   getWebhookPayloadEventId,
-  getWebhookRetryDelaySeconds,
   incrementAttemptCount,
   markDeliveryFailed,
   normalizeWebhookDeliveryVersion,
   queueWebhookDeliveryWithDelay,
+  scheduleRetry,
   updateDeliveryResult,
 } from '../utils/webhook.ts'
 
@@ -122,59 +122,14 @@ app.post('/', middlewareAPISecret, async (c) => {
       deliveryVersion,
     )
 
-    const maxAttempts = delivery.max_attempts || 10
-    const shouldRetry = !result.success && result.status !== 410 && attemptCount < maxAttempts
-
-    if (shouldRetry) {
-      const retryDelaySeconds = getWebhookRetryDelaySeconds(
-        attemptCount,
-        result.retryAfter,
-        result.status ?? null,
-      )
-      const nextRetryAt = new Date(Date.now() + retryDelaySeconds * 1000).toISOString()
-
-      // Persist the response and retry state together so delivery status never
-      // temporarily reports failed while a retry is already being scheduled.
-      await updateDeliveryResult(
-        c,
-        deliveryData.delivery_id,
-        false,
-        result.status ?? null,
-        result.body ?? null,
-        result.duration ?? 0,
-        'pending',
-        nextRetryAt,
-      )
-
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: 'Scheduling webhook retry',
-        deliveryId: deliveryData.delivery_id,
-        attemptCount,
-        maxAttempts,
-        retryDelaySeconds,
-        nextRetryAt,
-      })
-
-      await backgroundTask(c, queueWebhookDeliveryWithDelay(
-        c,
-        deliveryData.delivery_id,
-        deliveryData.webhook_id,
-        deliveryData.url,
-        deliveryData.payload,
-        retryDelaySeconds,
-      ))
-
-      return c.json(BRES)
-    }
-
+    // Update delivery record with result
     await updateDeliveryResult(
       c,
       deliveryData.delivery_id,
       result.success,
-      result.status ?? null,
-      result.body ?? null,
-      result.duration ?? 0,
+      result.status || null,
+      result.body || null,
+      result.duration || 0,
     )
 
     if (result.success) {
@@ -203,52 +158,85 @@ app.post('/', middlewareAPISecret, async (c) => {
       return c.json(BRES)
     }
 
-    // Max retries reached, mark as permanently failed
-    await markDeliveryFailed(c, deliveryData.delivery_id)
-    await disableWebhook(c, deliveryData.webhook_id)
+    // Handle failure
+    const maxAttempts = delivery.max_attempts || 10
 
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'Webhook delivery permanently failed',
-      deliveryId: deliveryData.delivery_id,
-      attemptCount,
-      maxAttempts,
-    })
+    if (attemptCount < maxAttempts) {
+      const retryDelaySeconds = await scheduleRetry(
+        c,
+        deliveryData.delivery_id,
+        attemptCount,
+        result.retryAfter,
+        result.status ?? null,
+      )
 
-    // Send failure notification via Bento (webhook already fetched above)
-    if (webhook) {
-      const pgClient = getPgClient(c, true)
-      const drizzleClient = getDrizzleClient(pgClient)
-      try {
-        await backgroundTask(c, sendNotifOrg(
-          c,
-          'webhook:delivery_failed',
-          {
-            webhook_name: webhook.name,
-            webhook_id: webhook.id,
-            webhook_url_info: getWebhookLogUrlMetadata(webhook.url),
-            event_type: getWebhookPayloadEvent(deliveryData.payload),
-            attempts: attemptCount,
-            last_error: result.body?.slice(0, 500) || 'Unknown error',
-            delivery_id: deliveryData.delivery_id,
-          },
-          webhook.org_id,
-          `webhook_failure_${webhook.id}_${getWebhookPayloadEventId(deliveryData.payload)}`,
-          '0 0 * * *', // Rate limit to once per day per webhook+event
-          webhook.orgs.management_email,
-          drizzleClient,
-        ))
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'Scheduling webhook retry',
+        deliveryId: deliveryData.delivery_id,
+        attemptCount,
+        maxAttempts,
+        retryDelaySeconds,
+      })
 
-        cloudlog({
-          requestId: c.get('requestId'),
-          message: 'Sent webhook failure notification',
-          webhookId: webhook.id,
-          webhookName: webhook.name,
-          orgId: webhook.org_id,
-        })
-      }
-      finally {
-        closeClient(c, pgClient)
+      // Queue for retry
+      await backgroundTask(c, queueWebhookDeliveryWithDelay(
+        c,
+        deliveryData.delivery_id,
+        deliveryData.webhook_id,
+        deliveryData.url,
+        deliveryData.payload,
+        retryDelaySeconds,
+      ))
+    }
+    else {
+      // Max retries reached, mark as permanently failed
+      await markDeliveryFailed(c, deliveryData.delivery_id)
+      await disableWebhook(c, deliveryData.webhook_id)
+
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'Webhook delivery permanently failed',
+        deliveryId: deliveryData.delivery_id,
+        attemptCount,
+        maxAttempts,
+      })
+
+      // Send failure notification via Bento (webhook already fetched above)
+      if (webhook) {
+        const pgClient = getPgClient(c, true)
+        const drizzleClient = getDrizzleClient(pgClient)
+        try {
+          await backgroundTask(c, sendNotifOrg(
+            c,
+            'webhook:delivery_failed',
+            {
+              webhook_name: webhook.name,
+              webhook_id: webhook.id,
+              webhook_url_info: getWebhookLogUrlMetadata(webhook.url),
+              event_type: getWebhookPayloadEvent(deliveryData.payload),
+              attempts: attemptCount,
+              last_error: result.body?.slice(0, 500) || 'Unknown error',
+              delivery_id: deliveryData.delivery_id,
+            },
+            webhook.org_id,
+            `webhook_failure_${webhook.id}_${getWebhookPayloadEventId(deliveryData.payload)}`,
+            '0 0 * * *', // Rate limit to once per day per webhook+event
+            webhook.orgs.management_email,
+            drizzleClient,
+          ))
+
+          cloudlog({
+            requestId: c.get('requestId'),
+            message: 'Sent webhook failure notification',
+            webhookId: webhook.id,
+            webhookName: webhook.name,
+            orgId: webhook.org_id,
+          })
+        }
+        finally {
+          closeClient(c, pgClient)
+        }
       }
     }
 

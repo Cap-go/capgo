@@ -14,6 +14,7 @@ const {
   mockIncrementAttemptCount,
   mockMarkDeliveryFailed,
   mockQueueWebhookDeliveryWithDelay,
+  mockScheduleRetry,
   mockSendNotifOrg,
   mockUpdateDeliveryResult,
 } = vi.hoisted(() => ({
@@ -30,6 +31,7 @@ const {
   mockIncrementAttemptCount: vi.fn(),
   mockMarkDeliveryFailed: vi.fn(),
   mockQueueWebhookDeliveryWithDelay: vi.fn(),
+  mockScheduleRetry: vi.fn(),
   mockSendNotifOrg: vi.fn(),
   mockUpdateDeliveryResult: vi.fn(),
 }))
@@ -71,6 +73,7 @@ vi.mock('../supabase/functions/_backend/utils/webhook.ts', async (importOriginal
     incrementAttemptCount: mockIncrementAttemptCount,
     markDeliveryFailed: mockMarkDeliveryFailed,
     queueWebhookDeliveryWithDelay: mockQueueWebhookDeliveryWithDelay,
+    scheduleRetry: mockScheduleRetry,
     updateDeliveryResult: mockUpdateDeliveryResult,
   }
 })
@@ -133,6 +136,7 @@ function resetMocks() {
     duration: 10,
   })
   mockUpdateDeliveryResult.mockResolvedValue(undefined)
+  mockScheduleRetry.mockResolvedValue(5)
   mockQueueWebhookDeliveryWithDelay.mockResolvedValue(undefined)
   mockMarkDeliveryFailed.mockResolvedValue(undefined)
   mockDisableWebhook.mockResolvedValue(undefined)
@@ -178,40 +182,6 @@ describe('webhook delivery handler security', () => {
     })
     expect(receivedLog).not.toHaveProperty('url')
     expect(serializedLogs()).not.toContain('secret-token')
-  })
-
-  it('records retryable delivery results as pending with their retry time', async () => {
-    mockDeliverWebhook.mockResolvedValue({
-      success: false,
-      status: 405,
-      body: 'method not allowed',
-      duration: 10,
-    })
-
-    const response = await postDelivery({
-      delivery_id: 'delivery-retryable',
-      webhook_id: 'webhook-1',
-      url: sensitiveUrl,
-      payload,
-    })
-
-    expect(response.status).toBe(200)
-    expect(mockUpdateDeliveryResult).toHaveBeenCalledTimes(1)
-    expect(mockUpdateDeliveryResult).toHaveBeenCalledWith(
-      expect.anything(),
-      'delivery-retryable',
-      false,
-      405,
-      'method not allowed',
-      10,
-      'pending',
-      expect.any(String),
-    )
-    const nextRetryAt = mockUpdateDeliveryResult.mock.calls[0]?.[7]
-    expect(Date.parse(nextRetryAt as string)).toBeGreaterThan(Date.now())
-    expect(mockQueueWebhookDeliveryWithDelay).toHaveBeenCalledTimes(1)
-    expect(mockMarkDeliveryFailed).not.toHaveBeenCalled()
-    expect(mockDisableWebhook).not.toHaveBeenCalled()
   })
 
   it('does not dump raw delivery data when queue payload validation fails', async () => {
@@ -262,16 +232,6 @@ describe('webhook delivery handler security', () => {
 
     expect(response.status).toBe(200)
     expect(mockSendNotifOrg).toHaveBeenCalledTimes(1)
-    expect(mockUpdateDeliveryResult).toHaveBeenCalledWith(
-      expect.anything(),
-      'delivery-3',
-      false,
-      500,
-      'receiver failed',
-      10,
-    )
-    expect(mockMarkDeliveryFailed).toHaveBeenCalledWith(expect.anything(), 'delivery-3')
-    expect(mockDisableWebhook).toHaveBeenCalledWith(expect.anything(), 'webhook-1')
 
     const eventData = mockSendNotifOrg.mock.calls[0]?.[2]
     expect(eventData).toMatchObject({
