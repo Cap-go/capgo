@@ -21422,7 +21422,7 @@ ALTER TABLE ONLY "public"."webhooks"
 
 
 
-CREATE POLICY " allow anon to select" ON "public"."global_stats" FOR SELECT TO "anon" USING (true);
+CREATE POLICY "Allow anon to select" ON "public"."global_stats" FOR SELECT TO "anon" USING (true);
 
 
 
