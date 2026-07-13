@@ -112,6 +112,37 @@ function rewriteConfigToml(raw: string, cfg: ReturnType<typeof getSupabaseWorktr
   return out.join('\n')
 }
 
+function upsertEnvValue(content: string, key: string, value: string): string {
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const matcher = new RegExp(`^${escapedKey}=.*$`, 'm')
+  const line = `${key}=${value}`
+
+  if (matcher.test(content))
+    return content.replace(matcher, line)
+
+  return content.endsWith('\n') || content.length === 0
+    ? `${content}${line}\n`
+    : `${content}\n${line}\n`
+}
+
+/**
+ * The checked-in functions env uses Supabase's default API port. Generate a
+ * worktree-specific copy so functions use the same isolated storage endpoint.
+ */
+function ensureFunctionsEnvFile(repoRoot: string, workdir: string, cfg: ReturnType<typeof getSupabaseWorktreeConfig>): string {
+  const sourcePath = resolve(repoRoot, 'supabase', 'functions', '.env')
+  const targetPath = resolve(workdir, 'functions.local.env')
+  const source = existsSync(sourcePath) ? readFileSync(sourcePath, 'utf8') : ''
+  const s3Endpoint = `127.0.0.1:${cfg.ports.api}/storage/v1/s3`
+  let generated = upsertEnvValue(source, 'S3_ENDPOINT', s3Endpoint)
+
+  if (process.env.CLOUDFLARE_FUNCTION_URL)
+    generated = upsertEnvValue(generated, 'CLOUDFLARE_FUNCTION_URL', process.env.CLOUDFLARE_FUNCTION_URL)
+
+  writeFileSync(targetPath, generated)
+  return targetPath
+}
+
 /**
  * Create (or update) the per-worktree Supabase workdir under `.context/`.
  *
@@ -242,9 +273,16 @@ function parseInlineEnvAssignments(args: string[]): { env: Record<string, string
  * Run a Supabase CLI command against the current worktree's generated `--workdir`.
  */
 function runSupabase(args: string[], repoRoot: string): number {
-  const { workdir } = ensureWorktreeSupabaseDir(repoRoot)
+  const { workdir, cfg } = ensureWorktreeSupabaseDir(repoRoot)
   const supa = getSupabaseCmd(repoRoot)
-  const res = spawnSync(supa.cmd, [...supa.argsPrefix, ...args, '--workdir', workdir], {
+  const commandArgs = [...args]
+  const isFunctionsServe = commandArgs[0] === 'functions' && commandArgs[1] === 'serve'
+  const hasEnvFile = commandArgs.some(arg => arg === '--env-file' || arg.startsWith('--env-file='))
+
+  if (isFunctionsServe && !hasEnvFile)
+    commandArgs.push('--env-file', ensureFunctionsEnvFile(repoRoot, workdir, cfg))
+
+  const res = spawnSync(supa.cmd, [...supa.argsPrefix, ...commandArgs, '--workdir', workdir], {
     stdio: 'inherit',
     env: process.env,
   })
@@ -271,9 +309,16 @@ function runWithEnv(cmdArgs: string[], repoRoot: string): number {
     return 2
   }
 
-  // Prefer the worktree-isolated stack, but fall back to legacy `supabase start`
-  // (e.g. CI workflows or older developer habits) so tests keep working.
+  // An explicitly scoped job must never fall back to a default stack: that can
+  // silently make two CI jobs share the same database.
+  const requiresIsolatedStack = Boolean(process.env.SUPABASE_WORKTREE_INSTANCE || process.env.SUPABASE_WORKTREE_PORT_OFFSET)
   const worktreeStatus = getStatusJson(supa, workdir)
+  if (!worktreeStatus.ok && requiresIsolatedStack) {
+    console.error('The isolated Supabase stack is not running. Start it with `bun run supabase:start`.')
+    return 1
+  }
+
+  // Preserve legacy compatibility for unscoped developer commands only.
   const legacyStatus = worktreeStatus.ok ? null : getStatusJson(supa, undefined)
 
   if (!worktreeStatus.ok && !legacyStatus?.ok) {
