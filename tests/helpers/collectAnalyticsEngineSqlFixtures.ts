@@ -12,6 +12,7 @@ import {
   getAdminFailureMetrics,
   getAdminMauTrend,
   getAdminOrgMetrics,
+  getAdminOnboardingTelemetry,
   getAdminPlatformOverview,
   getAdminStorageTrend,
   getAdminSuccessRate,
@@ -92,6 +93,7 @@ function createAnalyticsEngineSqlResponse(query: string) {
     version_build: '1',
     action: 'get',
     metadata: '{}',
+    first_at: '2026-06-01 00:00:00',
     created_at: '2026-01-01 00:00:00',
   }
 
@@ -117,7 +119,7 @@ function createAnalyticsEngineSqlResponse(query: string) {
       || name.includes('created_at')
       || name.includes('app_id')
       || name.includes('org_id')
-    return { name, type: stringField ? 'String' : 'UInt64' }
+    return { name, type: name === 'first_at' ? 'DateTime' : stringField ? 'String' : 'UInt64' }
   })
 
   return new Response(JSON.stringify({
@@ -264,6 +266,11 @@ export async function collectAnalyticsEngineSqlFixtures(): Promise<AnalyticsEngi
     await captureCall('readLastMonthDevicesCF', () => readLastMonthDevicesCF(context, SAMPLE_REFERENCE_DATE))
     await captureCall('readLastMonthDevicesByPlatformCF', () => readLastMonthDevicesByPlatformCF(context, SAMPLE_REFERENCE_DATE))
     await captureCall('getUpdateStatsCF', () => getUpdateStatsCF(context))
+    await captureCall('getAdminOnboardingTelemetry', () => getAdminOnboardingTelemetry(context, [{
+      app_id: SAMPLE_APP_ID,
+      start_at: SAMPLE_START,
+      end_at: SAMPLE_END,
+    }], SAMPLE_START, SAMPLE_REFERENCE_DATE))
     await captureCall('getAdminUploadMetrics', () => getAdminUploadMetrics(context, SAMPLE_START, SAMPLE_END, SAMPLE_APP_ID))
     await captureCall('getAdminDistributionMetrics', () => getAdminDistributionMetrics(context, SAMPLE_START, SAMPLE_END, SAMPLE_APP_ID))
     await captureCall('getAdminFailureMetrics', () => getAdminFailureMetrics(context, SAMPLE_START, SAMPLE_END, SAMPLE_APP_ID))

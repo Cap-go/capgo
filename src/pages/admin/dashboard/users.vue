@@ -37,10 +37,15 @@ interface OnboardingFunnelData {
   orgs_with_channel: number
   orgs_with_bundle: number
   orgs_subscribed: number
+  orgs_with_production_device: number
+  orgs_with_update_download: number
+  activation_telemetry_available: boolean
   app_conversion_rate: number
   channel_conversion_rate: number
   bundle_conversion_rate: number
   subscription_conversion_rate: number
+  production_device_conversion_rate: number
+  update_download_conversion_rate: number
   trend: Array<{
     date: string
     new_orgs: number
@@ -48,6 +53,8 @@ interface OnboardingFunnelData {
     orgs_created_channel: number
     orgs_created_bundle: number
     orgs_subscribed: number
+    orgs_with_production_device: number
+    orgs_with_update_download: number
   }>
 }
 
@@ -742,6 +749,8 @@ const onboardingFunnelRates = computed(() => {
       channel: 0,
       bundle: 0,
       subscribed: 0,
+      productionDevice: 0,
+      updateDownload: 0,
     }
   }
 
@@ -750,12 +759,16 @@ const onboardingFunnelRates = computed(() => {
   const orgsWithChannel = Number(onboardingFunnelData.value.orgs_with_channel) || 0
   const orgsWithBundle = Number(onboardingFunnelData.value.orgs_with_bundle) || 0
   const orgsSubscribed = Number(onboardingFunnelData.value.orgs_subscribed) || 0
+  const orgsWithProductionDevice = Number(onboardingFunnelData.value.orgs_with_production_device) || 0
+  const orgsWithUpdateDownload = Number(onboardingFunnelData.value.orgs_with_update_download) || 0
 
   return {
     app: totalOrgs > 0 ? (orgsWithApp / totalOrgs) * 100 : 0,
     channel: orgsWithApp > 0 ? (orgsWithChannel / orgsWithApp) * 100 : 0,
     bundle: orgsWithChannel > 0 ? (orgsWithBundle / orgsWithChannel) * 100 : 0,
     subscribed: orgsWithBundle > 0 ? (orgsSubscribed / orgsWithBundle) * 100 : 0,
+    productionDevice: totalOrgs > 0 ? (orgsWithProductionDevice / totalOrgs) * 100 : 0,
+    updateDownload: totalOrgs > 0 ? (orgsWithUpdateDownload / totalOrgs) * 100 : 0,
   }
 })
 
@@ -853,6 +866,26 @@ const onboardingFunnelTrendSeries = computed(() => {
       })),
       color: '#10b981', // green
     },
+    ...(onboardingFunnelData.value.activation_telemetry_available
+      ? [
+          {
+            label: t('production-plugin-device-within-7-days'),
+            data: trend.map(item => ({
+              date: item.date,
+              value: item.orgs_with_production_device,
+            })),
+            color: '#ec4899', // pink
+          },
+          {
+            label: t('completed-update-download-within-7-days'),
+            data: trend.map(item => ({
+              date: item.date,
+              value: item.orgs_with_update_download,
+            })),
+            color: '#6366f1', // indigo
+          },
+        ]
+      : []),
     {
       label: t('demo-apps-created'),
       data: trend.map(item => ({
@@ -969,6 +1002,39 @@ displayStore.defaultBack = '/dashboard'
                     {{ t('bundle-to-subscribed') }}
                   </p>
                 </div>
+              </div>
+
+              <div class="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
+                <h4 class="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  {{ t('activation-signals') }}
+                </h4>
+                <div v-if="onboardingFunnelData?.activation_telemetry_available" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div class="p-4 text-center rounded-lg bg-pink-50 dark:bg-pink-950/20">
+                    <p class="text-2xl font-bold text-pink-500">
+                      {{ formatNumberValue(onboardingFunnelData?.orgs_with_production_device || 0) }}
+                    </p>
+                    <p class="mt-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      {{ t('production-plugin-device') }}
+                    </p>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {{ formatOneDecimal(onboardingFunnelRates.productionDevice) }}% {{ t('of-new-organizations') }}
+                    </p>
+                  </div>
+                  <div class="p-4 text-center rounded-lg bg-indigo-50 dark:bg-indigo-950/20">
+                    <p class="text-2xl font-bold text-indigo-500">
+                      {{ formatNumberValue(onboardingFunnelData?.orgs_with_update_download || 0) }}
+                    </p>
+                    <p class="mt-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      {{ t('completed-update-download') }}
+                    </p>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {{ formatOneDecimal(onboardingFunnelRates.updateDownload) }}% {{ t('of-new-organizations') }}
+                    </p>
+                  </div>
+                </div>
+                <p v-else class="text-sm text-slate-500 dark:text-slate-400">
+                  {{ t('activation-telemetry-unavailable') }}
+                </p>
               </div>
             </div>
             <div v-else class="flex items-center justify-center h-48 text-slate-400">

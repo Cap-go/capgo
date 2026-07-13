@@ -53,6 +53,8 @@ const globalStatsTrendData = ref<Array<{
   devices_last_month: number
   stars: number
   need_upgrade: number
+  above_plan_with_credits: number | null
+  above_plan_without_credits: number | null
   paying_yearly: number
   paying_monthly: number
   new_paying_orgs: number
@@ -224,22 +226,34 @@ const activePastDueOrgSeries = computed(() => {
   ]
 })
 
+const abovePlanTrendData = computed(() => globalStatsTrendData.value.filter(
+  item => item.above_plan_with_credits !== null && item.above_plan_without_credits !== null,
+))
+
 const upgradeTrendSeries = computed(() => {
-  if (globalStatsTrendData.value.length === 0)
+  if (abovePlanTrendData.value.length === 0)
     return []
 
   return [
     {
-      label: t('need-upgrade-trend'),
-      data: globalStatsTrendData.value.map(item => ({
+      label: t('above-plan-with-credits'),
+      data: abovePlanTrendData.value.map(item => ({
         date: item.date,
-        value: item.need_upgrade,
+        value: item.above_plan_with_credits ?? 0,
+      })),
+      color: '#f59e0b', // amber
+    },
+    {
+      label: t('above-plan-without-credits'),
+      data: abovePlanTrendData.value.map(item => ({
+        date: item.date,
+        value: item.above_plan_without_credits ?? 0,
       })),
       color: '#ef4444', // red
     },
     {
       label: t('upgraded-organizations'),
-      data: globalStatsTrendData.value.map(item => ({
+      data: abovePlanTrendData.value.map(item => ({
         date: item.date,
         value: item.upgraded_orgs || 0,
       })),
@@ -797,7 +811,53 @@ displayStore.defaultBack = '/dashboard'
                   0
                 </p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Organizations over plan limits
+                  {{ t('need-upgrade-description') }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Organizations Above Plan With Credits -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-warning/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-warning"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V7m0 9v1m0-13a9 9 0 110 18 9 9 0 010-18z" /></svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  {{ t('above-plan-with-credits') }}
+                </p>
+                <p v-if="latestGlobalStats && latestGlobalStats.above_plan_with_credits !== null" class="mt-2 text-3xl font-bold text-warning">
+                  {{ formatNumberValue(latestGlobalStats.above_plan_with_credits) }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-warning">
+                  —
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ t('above-plan-with-credits-description') }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Organizations Above Plan Without Credits -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-error/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-error"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M5.07 19h13.86a2 2 0 001.74-3l-6.93-12a2 2 0 00-3.48 0l-6.93 12a2 2 0 001.74 3z" /></svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  {{ t('above-plan-without-credits') }}
+                </p>
+                <p v-if="latestGlobalStats && latestGlobalStats.above_plan_without_credits !== null" class="mt-2 text-3xl font-bold text-error">
+                  {{ formatNumberValue(latestGlobalStats.above_plan_without_credits) }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-error">
+                  —
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ t('above-plan-without-credits-description') }}
                 </p>
               </div>
             </div>
@@ -1136,9 +1196,9 @@ displayStore.defaultBack = '/dashboard'
               />
             </ChartCard>
 
-            <!-- Upgrade Trend -->
+            <!-- Above Plan Trend -->
             <ChartCard
-              :title="t('upgrade-trend')"
+              :title="t('above-plan-trend')"
               :is-loading="isLoadingGlobalStatsTrend"
               :has-data="upgradeTrendSeries.length > 0"
             >

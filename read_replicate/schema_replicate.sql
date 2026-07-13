@@ -410,7 +410,8 @@ CREATE TABLE public.stripe_info (
     customer_country character varying(2),
     last_stripe_event_at timestamp with time zone,
     past_due_at timestamp with time zone,
-    churn_reason text
+    churn_reason text,
+    is_above_plan boolean
 );
 
 

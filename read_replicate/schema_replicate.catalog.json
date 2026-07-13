@@ -1719,6 +1719,16 @@
       "position": 25,
       "table": "stripe_info",
       "type": "text"
+    },
+    {
+      "default": null,
+      "generated": "",
+      "identity": "",
+      "name": "is_above_plan",
+      "notNull": false,
+      "position": 26,
+      "table": "stripe_info",
+      "type": "boolean"
     }
   ],
   "constraints": [

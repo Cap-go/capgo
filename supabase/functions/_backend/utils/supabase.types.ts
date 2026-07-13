@@ -1572,6 +1572,8 @@ export type Database = {
           longest_ltv: number
           mrr: number
           need_upgrade: number | null
+          above_plan_with_credits: number | null
+          above_plan_without_credits: number | null
           new_paying_orgs: number
           not_paying: number | null
           nrr: number
@@ -1667,6 +1669,8 @@ export type Database = {
           longest_ltv?: number
           mrr?: number
           need_upgrade?: number | null
+          above_plan_with_credits?: number | null
+          above_plan_without_credits?: number | null
           new_paying_orgs?: number
           not_paying?: number | null
           nrr?: number
@@ -1762,6 +1766,8 @@ export type Database = {
           longest_ltv?: number
           mrr?: number
           need_upgrade?: number | null
+          above_plan_with_credits?: number | null
+          above_plan_without_credits?: number | null
           new_paying_orgs?: number
           not_paying?: number | null
           nrr?: number
@@ -2837,6 +2843,7 @@ export type Database = {
           customer_country: string | null
           customer_id: string
           id: number
+          is_above_plan: boolean | null
           is_good_plan: boolean | null
           last_stripe_event_at: string | null
           mau_exceeded: boolean | null
@@ -2864,6 +2871,7 @@ export type Database = {
           customer_country?: string | null
           customer_id: string
           id?: number
+          is_above_plan?: boolean | null
           is_good_plan?: boolean | null
           last_stripe_event_at?: string | null
           mau_exceeded?: boolean | null
@@ -2891,6 +2899,7 @@ export type Database = {
           customer_country?: string | null
           customer_id?: string
           id?: number
+          is_above_plan?: boolean | null
           is_good_plan?: boolean | null
           last_stripe_event_at?: string | null
           mau_exceeded?: boolean | null
