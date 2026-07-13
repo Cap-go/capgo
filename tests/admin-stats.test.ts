@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import process from 'node:process'
 import { Hono } from 'hono/tiny'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { logsnagInsightsTestUtils } from '../supabase/functions/_backend/triggers/logsnag_insights.ts'
@@ -62,7 +63,9 @@ async function getCoreSnapshotCountsAt(snapshotExclusiveEnd: Date) {
     EdgeRuntime?: { waitUntil: (promise: Promise<unknown>) => void }
   }
   const previousEdgeRuntime = globalWithEdgeRuntime.EdgeRuntime
+  const previousSupabaseDbUrl = process.env.SUPABASE_DB_URL
   globalWithEdgeRuntime.EdgeRuntime = undefined
+  process.env.SUPABASE_DB_URL = POSTGRES_URL
 
   try {
     const app = new Hono<{ Bindings: { SUPABASE_DB_URL: string } }>()
@@ -76,6 +79,10 @@ async function getCoreSnapshotCountsAt(snapshotExclusiveEnd: Date) {
     }
   }
   finally {
+    if (previousSupabaseDbUrl === undefined)
+      delete process.env.SUPABASE_DB_URL
+    else
+      process.env.SUPABASE_DB_URL = previousSupabaseDbUrl
     globalWithEdgeRuntime.EdgeRuntime = previousEdgeRuntime
   }
 }
