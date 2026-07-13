@@ -40,7 +40,7 @@ SELECT
     policies_are(
         'public',
         'global_stats',
-        ARRAY[]::text [],
+        ARRAY['Allow none to select']::text [],
         'global_stats should have correct policies'
     );
 
