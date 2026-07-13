@@ -18113,7 +18113,9 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
     "active_past_due_orgs" integer DEFAULT 0 NOT NULL,
     "apps_created" bigint DEFAULT 0 NOT NULL,
     "apps_with_cli_onboarding_builds_24h" bigint DEFAULT 0 NOT NULL,
-    "apps_with_manual_builds_24h" bigint DEFAULT 0 NOT NULL
+    "apps_with_manual_builds_24h" bigint DEFAULT 0 NOT NULL,
+    "above_plan_with_credits" bigint,
+    "above_plan_without_credits" bigint
 );
 
 
@@ -18369,6 +18371,14 @@ COMMENT ON COLUMN "public"."global_stats"."apps_with_cli_onboarding_builds_24h" 
 
 
 COMMENT ON COLUMN "public"."global_stats"."apps_with_manual_builds_24h" IS 'Number of apps created during the UTC day, not created from onboarding, and created more than two native build requests in the first 24 hours after app creation.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."above_plan_with_credits" IS 'Active above-plan organizations with positive, unexpired usage credits at snapshot time; null for snapshots created before this metric existed.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."above_plan_without_credits" IS 'Active above-plan organizations with no positive, unexpired usage credits at snapshot time; null for snapshots created before this metric existed.';
 
 
 
@@ -18919,7 +18929,8 @@ CREATE TABLE IF NOT EXISTS "public"."stripe_info" (
     "customer_country" character varying(2),
     "last_stripe_event_at" timestamp with time zone,
     "past_due_at" timestamp with time zone,
-    "churn_reason" "text"
+    "churn_reason" "text",
+    "is_above_plan" boolean
 );
 
 ALTER TABLE ONLY "public"."stripe_info" REPLICA IDENTITY FULL;
@@ -18953,6 +18964,10 @@ COMMENT ON COLUMN "public"."stripe_info"."past_due_at" IS 'Timestamp when the su
 
 
 COMMENT ON COLUMN "public"."stripe_info"."churn_reason" IS 'Internal churn reason captured when a subscription cancels because an unresolved past_due state was not fixed.';
+
+
+
+COMMENT ON COLUMN "public"."stripe_info"."is_above_plan" IS 'Raw plan-fit result before usage credits are applied; null until the next plan-status refresh.';
 
 
 
@@ -21422,10 +21437,6 @@ ALTER TABLE ONLY "public"."webhooks"
 
 
 
-CREATE POLICY "Allow anon to select" ON "public"."global_stats" FOR SELECT TO "anon" USING (true);
-
-
-
 CREATE POLICY "Allow admin to delete webhooks" ON "public"."webhooks" FOR DELETE TO "anon", "authenticated" USING ("public"."check_min_rights"('admin'::"public"."user_min_right",
 CASE
     WHEN (( SELECT "public"."get_apikey_header"() AS "get_apikey_header") IS NOT NULL) THEN NULL::"uuid"
@@ -21540,6 +21551,10 @@ CREATE POLICY "Allow insert org for user" ON "public"."orgs" FOR INSERT TO "auth
 
 
 CREATE POLICY "Allow member and owner to select" ON "public"."org_users" FOR SELECT TO "anon", "authenticated" USING (("org_id" = ANY (COALESCE(( SELECT "public"."org_member_readable_org_ids"() AS "org_member_readable_org_ids"), '{}'::"uuid"[]))));
+
+
+
+CREATE POLICY "Allow none to select" ON "public"."global_stats" FOR SELECT TO "anon", "authenticated" USING (false);
 
 
 
