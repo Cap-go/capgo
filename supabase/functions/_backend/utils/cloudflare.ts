@@ -413,6 +413,143 @@ export async function runQueryToCFA<T>(c: Context, query: string) {
     throw new Error(`runQueryToCFA encountered an error: ${errorMessage}`, { cause: e })
   }
 }
+export interface AdminOnboardingTelemetryWindow {
+  app_id: string
+  start_at: Date | string
+  end_at: Date | string
+}
+
+export interface AdminOnboardingTelemetry {
+  available: boolean
+  first_production_device_at_by_app: Map<string, Date>
+  first_update_download_at_by_app: Map<string, Date>
+}
+
+interface AdminOnboardingTelemetryRow {
+  app_id: string
+  first_at: Date | string
+}
+
+const ADMIN_ONBOARDING_TELEMETRY_WINDOWS_PER_QUERY = 100
+const ADMIN_ONBOARDING_COMPLETED_DOWNLOAD_ACTIONS = [
+  'download_complete',
+  'download_manifest_complete',
+  'download_zip_complete',
+]
+
+function toValidDate(value: Date | string) {
+  const date = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+export function isAdminOnboardingTelemetryWithinRetention(startDate: Date | string, now = new Date()) {
+  const start = toValidDate(startDate)
+  if (!start || start > now)
+    return false
+
+  const retentionCutoff = new Date(now)
+  retentionCutoff.setUTCMonth(retentionCutoff.getUTCMonth() - 3)
+  return start >= retentionCutoff
+}
+
+function getAdminOnboardingTelemetryWindowFilter(windows: AdminOnboardingTelemetryWindow[]) {
+  if (windows.length === 0)
+    return '1 = 0'
+
+  return windows.map((window) => {
+    return `(index1 = '${escapeSqlString(window.app_id)}'
+      AND timestamp >= toDateTime('${formatDateCF(window.start_at)}')
+      AND timestamp < toDateTime('${formatDateCF(window.end_at)}'))`
+  }).join('\n      OR ')
+}
+
+export function buildAdminOnboardingProductionDeviceQuery(windows: AdminOnboardingTelemetryWindow[]) {
+  return `SELECT
+    index1 AS app_id,
+    min(timestamp) AS first_at
+  FROM device_info
+  WHERE (${getAdminOnboardingTelemetryWindowFilter(windows)})
+    AND double2 = 1
+    AND double3 = 0
+    AND blob3 != ''
+  GROUP BY index1`
+}
+
+export function buildAdminOnboardingUpdateDownloadQuery(windows: AdminOnboardingTelemetryWindow[]) {
+  const actions = ADMIN_ONBOARDING_COMPLETED_DOWNLOAD_ACTIONS.map(action => `'${action}'`).join(', ')
+  return `SELECT
+    index1 AS app_id,
+    min(timestamp) AS first_at
+  FROM app_log
+  WHERE (${getAdminOnboardingTelemetryWindowFilter(windows)})
+    AND blob2 IN (${actions})
+  GROUP BY index1`
+}
+
+function addFirstSeenByApp(target: Map<string, Date>, rows: AdminOnboardingTelemetryRow[]) {
+  for (const row of rows) {
+    const firstAt = toValidDate(row.first_at)
+    if (!row.app_id || !firstAt)
+      continue
+
+    const current = target.get(row.app_id)
+    if (!current || firstAt < current)
+      target.set(row.app_id, firstAt)
+  }
+}
+
+function emptyAdminOnboardingTelemetry(available = false): AdminOnboardingTelemetry {
+  return {
+    available,
+    first_production_device_at_by_app: new Map(),
+    first_update_download_at_by_app: new Map(),
+  }
+}
+
+export async function getAdminOnboardingTelemetry(
+  c: Context,
+  windows: AdminOnboardingTelemetryWindow[],
+  rangeStart: Date | string,
+  now = new Date(),
+): Promise<AdminOnboardingTelemetry> {
+  if (!isAdminOnboardingTelemetryWithinRetention(rangeStart, now)
+    || !c.env.APP_LOG
+    || !c.env.DEVICE_INFO
+    || !getEnv(c, 'CF_ANALYTICS_TOKEN')
+    || !getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')) {
+    return emptyAdminOnboardingTelemetry()
+  }
+
+  const validWindows = windows.filter((window) => {
+    const start = toValidDate(window.start_at)
+    const end = toValidDate(window.end_at)
+    return Boolean(window.app_id && start && end && start < end)
+  })
+  if (validWindows.length === 0)
+    return emptyAdminOnboardingTelemetry(true)
+
+  const telemetry = emptyAdminOnboardingTelemetry(true)
+  try {
+    for (let index = 0; index < validWindows.length; index += ADMIN_ONBOARDING_TELEMETRY_WINDOWS_PER_QUERY) {
+      const windowBatch = validWindows.slice(index, index + ADMIN_ONBOARDING_TELEMETRY_WINDOWS_PER_QUERY)
+      const [productionDeviceRows, updateDownloadRows] = await Promise.all([
+        runQueryToCFA<AdminOnboardingTelemetryRow>(c, buildAdminOnboardingProductionDeviceQuery(windowBatch)),
+        runQueryToCFA<AdminOnboardingTelemetryRow>(c, buildAdminOnboardingUpdateDownloadQuery(windowBatch)),
+      ])
+      addFirstSeenByApp(telemetry.first_production_device_at_by_app, productionDeviceRows)
+      addFirstSeenByApp(telemetry.first_update_download_at_by_app, updateDownloadRows)
+    }
+    return telemetry
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'getAdminOnboardingTelemetry failed',
+      error: serializeError(error),
+    })
+    return telemetry
+  }
+}
 
 export interface DeviceUsageCF {
   date: string
