@@ -12,7 +12,7 @@ DROP POLICY IF EXISTS "Allow anon to select" ON public.global_stats;
 CREATE POLICY "Allow none to select"
 ON public.global_stats
 FOR SELECT
-TO anon
+TO anon, authenticated
 USING (false);
 
 -- Ensure non-service roles cannot query global_stats directly.
