@@ -171,11 +171,15 @@ interface BillingSnapshotRow {
 interface CoreSnapshotCounts {
   onboarded: number
   needUpgrade: number
+  abovePlanWithCredits: number
+  abovePlanWithoutCredits: number
 }
 interface CoreSnapshotRow {
   [key: string]: unknown
   onboarded: number | string | null
   need_upgrade: number | string | null
+  above_plan_with_credits: number | string | null
+  above_plan_without_credits: number | string | null
 }
 interface CustomerIdRow {
   customer_id: string
@@ -288,6 +292,8 @@ function normalizeCoreSnapshotCounts(row: Partial<CoreSnapshotRow> | null | unde
   return {
     onboarded: Number(row?.onboarded) || 0,
     needUpgrade: Number(row?.need_upgrade) || 0,
+    abovePlanWithCredits: Number(row?.above_plan_with_credits) || 0,
+    abovePlanWithoutCredits: Number(row?.above_plan_without_credits) || 0,
   }
 }
 
@@ -2393,6 +2399,41 @@ async function getCoreSnapshotCounts(c: Context, snapshotExclusiveEnd: Date): Pr
           AND si.subscription_anchor_end > ${snapshotExclusiveEndIso}::timestamptz
         ORDER BY si.customer_id, si.created_at DESC
       ),
+      active_above_plan AS (
+        SELECT DISTINCT ON (si.customer_id)
+          si.customer_id,
+          EXISTS (
+            SELECT 1
+            FROM public.usage_credit_grants g
+            WHERE g.org_id = o.id
+              AND g.granted_at < ${snapshotExclusiveEndIso}::timestamptz
+              AND g.expires_at >= ${snapshotExclusiveEndIso}::timestamptz
+              AND g.credits_total > COALESCE((
+                SELECT SUM(c.credits_used)
+                FROM public.usage_credit_consumptions c
+                WHERE c.grant_id = g.id
+                  AND c.applied_at < ${snapshotExclusiveEndIso}::timestamptz
+              ), 0)
+          ) AS has_usage_credits
+        FROM public.stripe_info si
+        INNER JOIN public.orgs o
+          ON o.customer_id = si.customer_id
+        INNER JOIN public.plans p
+          ON p.stripe_id = si.product_id
+        WHERE si.is_above_plan = true
+          AND p.name <> 'Enterprise'
+          AND si.created_at < ${snapshotExclusiveEndIso}::timestamptz
+          AND (si.plan_calculated_at IS NULL OR si.plan_calculated_at < ${snapshotExclusiveEndIso}::timestamptz)
+          AND (si.paid_at < ${snapshotExclusiveEndIso}::timestamptz OR si.paid_at IS NULL)
+          AND si.status IN (
+            'succeeded'::public.stripe_status,
+            'canceled'::public.stripe_status,
+            'deleted'::public.stripe_status
+          )
+          AND (si.canceled_at IS NULL OR si.canceled_at >= ${snapshotExclusiveEndIso}::timestamptz)
+          AND si.subscription_anchor_end > ${snapshotExclusiveEndIso}::timestamptz
+        ORDER BY si.customer_id, si.created_at DESC
+      ),
       current_onboarded_owner_orgs AS (
         SELECT COALESCE(
           (
@@ -2438,7 +2479,17 @@ async function getCoreSnapshotCounts(c: Context, snapshotExclusiveEnd: Date): Pr
         (
           SELECT COUNT(*)::int
           FROM active_need_upgrade
-        ) AS need_upgrade
+        ) AS need_upgrade,
+        (
+          SELECT COUNT(*)::int
+          FROM active_above_plan
+          WHERE has_usage_credits
+        ) AS above_plan_with_credits,
+        (
+          SELECT COUNT(*)::int
+          FROM active_above_plan
+          WHERE NOT has_usage_credits
+        ) AS above_plan_without_credits
     `)
 
     return normalizeCoreSnapshotCounts(result.rows[0])
@@ -2579,7 +2630,12 @@ async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise
   ])
 
   const { customers, payingOrgsForConversion, plans } = billingSnapshot
-  const { onboarded, needUpgrade: need_upgrade } = coreSnapshot
+  const {
+    onboarded,
+    needUpgrade: need_upgrade,
+    abovePlanWithCredits: above_plan_with_credits,
+    abovePlanWithoutCredits: above_plan_without_credits,
+  } = coreSnapshot
   const not_paying = users - customers.total - plans.Trial
   const org_conversion_rate = calculateConversionRate(payingOrgsForConversion, orgs)
   const planConversionRates = getPlanConversionRates(plans, orgs)
@@ -2593,6 +2649,8 @@ async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise
   await updateGlobalStatsSnapshot(c, window.prevDayDateId, {
     apps,
     apps_active: actives.apps,
+    above_plan_with_credits,
+    above_plan_without_credits,
     need_upgrade,
     not_paying,
     onboarded,
@@ -3222,6 +3280,7 @@ export const logsnagInsightsTestUtils = {
   isUnpaidAtBillingSnapshot,
   isPaidPlanAtBillingSnapshot,
   normalizeCoreSnapshotCounts,
+  getCoreSnapshotCounts,
   reserveLogsnagInsightsRetry,
   reserveLogsnagInsightsShardRetry,
   scheduleLogsnagInsightsUpdate,

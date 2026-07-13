@@ -34,13 +34,33 @@ async function createOrgWithMember(orgId: string) {
     management_email: `ownership-transfer-${orgId}@capgo.app`,
     name: `Ownership transfer ${orgId}`,
     updated_at: new Date().toISOString(),
-    use_new_rbac: true,
   }).throwOnError()
 
   await supabase.from('org_users').insert({
     org_id: orgId,
     user_id: USER_ID_2,
-    user_right: 'read',
+    rbac_role_name: 'org_member',
+    is_invite: false,
+  }).throwOnError()
+
+  const { data: memberRole, error: memberRoleError } = await supabase
+    .from('roles')
+    .select('id')
+    .eq('name', 'org_member')
+    .eq('scope_type', 'org')
+    .single()
+  if (memberRoleError || !memberRole)
+    throw memberRoleError ?? new Error('Expected org_member role')
+
+  await supabase.from('role_bindings').insert({
+    principal_type: 'user',
+    principal_id: USER_ID_2,
+    role_id: memberRole.id,
+    scope_type: 'org',
+    org_id: orgId,
+    granted_by: USER_ID,
+    reason: 'Ownership transfer test member fixture',
+    is_direct: true,
   }).throwOnError()
 }
 

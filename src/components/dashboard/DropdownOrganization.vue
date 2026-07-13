@@ -11,9 +11,9 @@ import { resolveImagePath } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
-import { useOrganizationStore } from '~/stores/organization'
+import { isPendingOrganizationInvite, useOrganizationStore } from '~/stores/organization'
 
-type OrganizationInvitationTarget = Pick<Organization, 'gid' | 'name' | 'role'>
+type OrganizationInvitationTarget = Pick<Organization, 'gid' | 'name' | 'role' | 'is_invite'>
 
 const router = useRouter()
 const route = useRoute()
@@ -38,7 +38,7 @@ const currentAppId = computed(() => {
 })
 const currentApp = computed(() => currentAppId.value ? organizationStore.getAppByAppId(currentAppId.value) : undefined)
 const currentAppLabel = computed(() => currentApp.value ? getAppLabel(currentApp.value) : currentAppId.value)
-const invitationCount = computed(() => organizationStore.organizations.filter(org => org.role.startsWith('invite')).length)
+const invitationCount = computed(() => organizationStore.organizations.filter(org => isPendingOrganizationInvite(org)).length)
 const canCreateOrganizationInContext = !isNativeAppStoreContext()
 const ORGANIZATION_LOGO_REFRESH_INTERVAL_MS = 10 * 60 * 1000
 const isRefreshingBrokenLogos = ref(false)
@@ -236,7 +236,7 @@ async function refreshOrganizationLogosIfNeeded(force = false) {
 
 function onOrganizationClick(org: Organization) {
   // Check if the user is invited to the organization
-  if (org.role.startsWith('invite')) {
+  if (isPendingOrganizationInvite(org)) {
     handleOrganizationInvitation(org)
     return
   }
@@ -268,7 +268,7 @@ async function openOrganizationSettings(org: Organization, e: MouseEvent) {
   e.preventDefault()
   e.stopPropagation()
 
-  if (org.role.startsWith('invite'))
+  if (isPendingOrganizationInvite(org))
     return
 
   if (!isSelected(org))
@@ -283,7 +283,7 @@ function isSelected(org: Organization) {
 }
 
 function isInvitation(org: Organization) {
-  return org.role.startsWith('invite')
+  return isPendingOrganizationInvite(org)
 }
 
 function getOrgApps(org: Organization) {
@@ -363,7 +363,7 @@ watch(
 )
 
 watch(
-  () => organizationStore.organizations.map(org => `${org.gid}:${org.role}`),
+  () => organizationStore.organizations.map(org => `${org.gid}:${org.role}:${org.is_invite}`),
   () => {
     void openInvitationFromRouteIfNeeded()
   },

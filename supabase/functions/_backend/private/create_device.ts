@@ -4,11 +4,11 @@ import { eq } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { safeParseSchema } from '../utils/ark_validation.ts'
 import { BRES, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
-import { middlewareV2 } from '../utils/hono_middleware.ts'
+import { middlewareAuth } from '../utils/hono_middleware.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { schema } from '../utils/postgres_schema.ts'
+import { checkPermission } from '../utils/rbac.ts'
 import { createStatsDevices } from '../utils/stats.ts'
-import { supabaseWithAuth } from '../utils/supabase.ts'
 
 const bodySchema = type({
   device_id: 'string.uuid',
@@ -30,7 +30,7 @@ interface CreateDeviceBody {
   version_name: string
 }
 
-app.post('/', middlewareV2(['all', 'write']), async (c) => {
+app.post('/', middlewareAuth(), async (c) => {
   const auth = c.get('auth')!
 
   const body = await parseBody<CreateDeviceBody>(c)
@@ -41,27 +41,6 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
 
   const safeBody = parsedBodyResult.data
   const normalizedOrgId = safeBody.org_id.toLowerCase()
-
-  // Use authenticated client for data queries - RLS will enforce access
-  const supabase = supabaseWithAuth(c, auth)
-
-  const userId = auth.userId
-
-  const userRight = await supabase.rpc('check_min_rights', {
-    min_right: 'write',
-    user_id: userId,
-    channel_id: null as any,
-    app_id: safeBody.app_id,
-    org_id: normalizedOrgId,
-  })
-
-  if (userRight.error) {
-    throw simpleError('internal_auth_error', 'Cannot get user right', { userRight })
-  }
-
-  if (!userRight.data) {
-    return quickError(401, 'not_authorized', 'Not authorized', { userId, appId: safeBody.app_id })
-  }
 
   let appOwnerOrg: string | null = null
   let pgClient: ReturnType<typeof getPgClient> | undefined
@@ -89,7 +68,11 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   }
 
   if (appOwnerOrg.toLowerCase() !== normalizedOrgId) {
-    return quickError(401, 'not_authorized', 'Not authorized', { userId, appId: safeBody.app_id, orgId: normalizedOrgId })
+    return quickError(401, 'not_authorized', 'Not authorized', { userId: auth.userId, appId: safeBody.app_id, orgId: normalizedOrgId })
+  }
+
+  if (!(await checkPermission(c, 'app.manage_devices', { orgId: appOwnerOrg, appId: safeBody.app_id }))) {
+    return quickError(401, 'not_authorized', 'Not authorized', { userId: auth.userId, appId: safeBody.app_id })
   }
 
   await createStatsDevices(c, {

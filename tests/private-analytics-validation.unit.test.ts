@@ -8,7 +8,7 @@ const readDevicesMock = vi.fn()
 const readStatsMock = vi.fn()
 
 vi.mock('../supabase/functions/_backend/utils/hono_middleware.ts', () => ({
-  middlewareV2: () => async (_c: unknown, next: () => Promise<void>) => {
+  middlewareAuth: () => async (_c: unknown, next: () => Promise<void>) => {
     await next()
   },
 }))

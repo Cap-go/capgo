@@ -42,8 +42,8 @@ jobs:
 
   # Tests already passed before tag was created, so just build and deploy
   supabase_deploy:
-    needs: changes
-    if: ${{ needs.changes.outputs.supabase == 'true' }}
+    needs: [changes, read_replica_schema]
+    if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.supabase == 'true' && (needs.read_replica_schema.result == 'success' || needs.read_replica_schema.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     name: Build code and deploy to Supabase
@@ -72,7 +72,6 @@ jobs:
         run: |
           echo "SUPABASE_DB_PASSWORD=${{ secrets.SUPABASE_DB_PASS_ALPHA }}" >> $GITHUB_ENV
           echo "SUPABASE_PROJECT_ID=${{ secrets.SUPABASE_PROJECT_ID_ALPHA }}" >> $GITHUB_ENV
-
       - name: Set Supabase credentials (PROD)
         if: env.SUPA_ENV == 'PROD'
         run: |
@@ -82,16 +81,8 @@ jobs:
         run: bun install
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v2.0.0
-        # Pinned to 2.98.2 because Supabase CLI v2.99.0 (2026-05-18) ships
-        # release assets with version in the filename (supabase_2.99.0_linux_amd64.tar.gz)
-        # while setup-cli@v2.0.0 hardcodes the unversioned name
-        # (supabase_linux_amd64.tar.gz) for any version >= 1.28.0, causing 404.
-        # Revert to `latest` once setup-cli ships a fix or Supabase restores
-        # the unversioned assets. Tracking: https://github.com/supabase/setup-cli
         with:
           version: 2.98.2
-      - name: Show Supabase CLI version
-        run: supabase --version
       - name: Prepare Supabase
         run: supabase link --project-ref ${{ env.SUPABASE_PROJECT_ID }}
         env:
@@ -104,8 +95,8 @@ jobs:
         run: supabase functions deploy
 
   read_replica_schema:
-    needs: [changes, supabase_deploy]
-    if: ${{ always() && needs.changes.result == 'success' && !contains(github.ref_name, '-alpha') && (needs.supabase_deploy.result == 'success' || needs.supabase_deploy.result == 'skipped') }}
+    needs: changes
+    if: ${{ needs.changes.result == 'success' && needs.changes.outputs.supabase == 'true' && !contains(github.ref_name, '-alpha') }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     name: Reconcile production read-replica schema
@@ -114,49 +105,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24.x
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+      - name: Setup Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
       - name: Install dependencies
         run: bun install
-      - name: Install Supabase CLI
-        uses: supabase/setup-cli@v2.0.0
-        with:
-          version: 2.98.2
-      - name: Require direct subscriber connection
+      - name: Reconcile the Google subscriber through Cloud SQL Data API
         env:
-          READ_REPLICATE_GOOGLE_EU1: ${{ secrets.READ_REPLICATE_GOOGLE_EU1 }}
+          GOOGLE_SERVICE_ACCOUNT_BASE64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
         run: |
-          if [[ -z "$READ_REPLICATE_GOOGLE_EU1" ]]; then
-            echo "::error title=Missing read-replica connection::Set READ_REPLICATE_GOOGLE_EU1 as a repository or selected organization secret with the direct Google subscriber PostgreSQL URL."
-            exit 1
-          fi
-      - name: Link production primary
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
-          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID_PROD }}
-        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
-      # This is deliberately independent of deploy scope: a stable release repairs
-      # any selected-table drift left by an earlier failed release before publishing.
-      - name: Reconcile the selected Google subscriber schema from the live primary
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
-          READ_REPLICATE_GOOGLE_EU1: ${{ secrets.READ_REPLICATE_GOOGLE_EU1 }}
-          READ_REPLICA_SCHEMA_SYNC_MAX_TIME: 1800
-          READ_REPLICA_SCHEMA_LOCK_WAIT_SECONDS: 120
-        run: bun scripts/sync-read-replica-schema.ts
-      - name: Verify the read-replica schema through Hyperdrive
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          READ_REPLICA_SCHEMA_CHECK_MAX_TIME: 300
-          READ_REPLICA_SCHEMA_CHECK_READY_ATTEMPTS: 20
-        run: bun run readreplicate:check-hyperdrive-schema
+          credentials_file="$(mktemp)"
+          trap 'rm -f "$credentials_file"' EXIT
+          printf '%s' "$GOOGLE_SERVICE_ACCOUNT_BASE64" | base64 --decode > "$credentials_file"
+          gcloud auth activate-service-account --key-file="$credentials_file"
+          bun scripts/sync-read-replica-schema.ts
 
   deploy_webapp:
     needs: [changes, supabase_deploy, read_replica_schema]

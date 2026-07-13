@@ -21,7 +21,7 @@ echo "The PR changes the schema replicated to Google read replicas."
 echo "Before merge:"
 echo "  1. Run: bun run readreplicate:prepare"
 echo "  2. Commit the updated read_replicate/schema_replicate.sql and read_replicate/schema_replicate.catalog.json."
-echo "Release CI reconciles the subscriber from the live primary after migrations, then verifies it through Hyperdrive; the snapshot is never a production DDL source."
+echo "Release CI applies safe additive subscriber DDL from this snapshot before primary migrations. Keep the snapshot current."
 echo ''
 echo "Diff:"
 git --no-pager diff -- "${SCHEMA_FILES[@]}"

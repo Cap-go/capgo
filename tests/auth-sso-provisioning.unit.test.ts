@@ -188,6 +188,7 @@ vi.mock('~/stores/main', () => ({
 }))
 
 vi.mock('~/stores/organization', () => ({
+  isPendingOrganizationInvite: (org: { is_invite?: boolean | null, role: string }) => org.is_invite ?? org.role.startsWith('invite'),
   useOrganizationStore: () => getContext().organizationStore,
 }))
 

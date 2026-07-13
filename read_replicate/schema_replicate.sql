@@ -3,7 +3,7 @@ BEGIN;
 DROP TABLE IF EXISTS public.channel_devices, public.manifest, public.onboarding_demo_data, public.app_versions, public.channels, public.apps, public.notifications, public.org_users, public.orgs, public.stripe_info CASCADE;
 DROP SEQUENCE IF EXISTS public.app_versions_id_seq, public.channel_devices_id_seq, public.channel_id_seq, public.manifest_id_seq, public.org_users_id_seq, public.stripe_info_id_seq CASCADE;
 DROP FUNCTION IF EXISTS public.one_month_ahead();
-DROP TYPE IF EXISTS public.manifest_entry, public.disable_update, public.user_min_right, public.stripe_status;
+DROP TYPE IF EXISTS public.manifest_entry, public.disable_update, public.stripe_status;
 
 --
 --
@@ -44,24 +44,6 @@ CREATE TYPE public.stripe_status AS ENUM (
     'failed',
     'deleted',
     'canceled'
-);
-
-
---
--- Name: user_min_right; Type: TYPE; Schema: public; Owner: -
---
-
-CREATE TYPE public.user_min_right AS ENUM (
-    'invite_read',
-    'invite_upload',
-    'invite_write',
-    'invite_admin',
-    'invite_super_admin',
-    'read',
-    'upload',
-    'write',
-    'admin',
-    'super_admin'
 );
 
 
@@ -356,8 +338,8 @@ CREATE TABLE public.org_users (
     org_id uuid NOT NULL,
     app_id character varying,
     channel_id bigint,
-    user_right public.user_min_right,
-    rbac_role_name text
+    rbac_role_name text DEFAULT 'org_member'::text,
+    is_invite boolean DEFAULT false NOT NULL
 );
 
 
@@ -441,7 +423,8 @@ CREATE TABLE public.stripe_info (
     customer_country character varying(2),
     last_stripe_event_at timestamp with time zone,
     past_due_at timestamp with time zone,
-    churn_reason text
+    churn_reason text,
+    is_above_plan boolean
 );
 
 ALTER TABLE ONLY public.stripe_info REPLICA IDENTITY FULL;

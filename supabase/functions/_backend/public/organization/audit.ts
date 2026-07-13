@@ -3,7 +3,8 @@ import type { AuthInfo } from '../../utils/hono.ts'
 import { type } from 'arktype'
 import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
-import { apikeyHasOrgRightWithPolicy, hasOrgRightApikey, supabaseWithAuth } from '../../utils/supabase.ts'
+import { checkPermission } from '../../utils/rbac.ts'
+import { apikeyHasOrgRightWithPolicy, supabaseWithAuth } from '../../utils/supabase.ts'
 
 const bodySchema = type({
   'orgId': 'string',
@@ -60,29 +61,11 @@ export async function getAuditLogs(c: Context, bodyRaw: any): Promise<Response> 
       throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
     }
 
-    // Separate check: API key scope is not enough; user must have super_admin rights.
-    const capgkey = c.get('capgkey')
-    if (!capgkey || typeof capgkey !== 'string') {
-      throw simpleError('not_authorized', 'Not authorized')
-    }
-    const hasRight = await hasOrgRightApikey(c, body.orgId, auth.userId, 'super_admin', capgkey)
-    if (!hasRight) {
-      throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
-    }
   }
-  else {
-    const { data: hasRight, error: rightsError } = await supabase.rpc('check_min_rights', {
-      min_right: 'super_admin',
-      org_id: body.orgId,
-      user_id: auth.userId,
-      channel_id: null as any,
-      app_id: null as any,
-    })
 
-    // Validate org access (super_admin required by RLS)
-    if (rightsError || !hasRight) {
-      throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
-    }
+  // Audit logs are readable through the dedicated RBAC audit permission.
+  if (!(await checkPermission(c, 'org.read_audit', { orgId: body.orgId }))) {
+    throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
   }
 
   const limit = Math.min(body.limit ?? 50, 100)

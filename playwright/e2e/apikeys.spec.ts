@@ -160,11 +160,30 @@ test.describe('API Key Management', () => {
       stripeCustomerId: INHERITED_CUSTOMER_ID,
     })
     const supabase = getSupabaseClient()
-    const { error } = await supabase.rpc('rbac_enable_for_org', {
-      p_org_id: INHERITED_ORG_ID,
-      p_granted_by: USER_ID,
-    })
-    expect(error).toBeNull()
+    const { data: role, error: roleError } = await supabase
+      .from('roles')
+      .select('id')
+      .eq('name', 'org_super_admin')
+      .single()
+    expect(roleError).toBeNull()
+    expect(role).not.toBeNull()
+
+    const { data: binding, error: bindingError } = await supabase
+      .from('role_bindings')
+      .update({
+        role_id: role!.id,
+        granted_by: USER_ID,
+        reason: 'Playwright API key test org super admin',
+        is_direct: true,
+      })
+      .eq('principal_type', 'user')
+      .eq('principal_id', USER_ID)
+      .eq('scope_type', 'org')
+      .eq('org_id', INHERITED_ORG_ID)
+      .select('id')
+      .single()
+    expect(bindingError).toBeNull()
+    expect(binding).not.toBeNull()
   })
 
   test.afterAll(async () => {

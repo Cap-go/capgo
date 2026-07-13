@@ -4,7 +4,7 @@ import { type } from 'arktype'
 import { Hono } from 'hono/tiny'
 import { literalUnion, safeParseSchema } from '../utils/ark_validation.ts'
 import { parseBody, simpleError, useCors } from '../utils/hono.ts'
-import { middlewareV2 } from '../utils/hono_middleware.ts'
+import { middlewareAuth } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { appIdSchema, cursorSchema, deviceIdSchema, hasInvalidQueryLimitInput, hasUnsafeDevicesQueryText, queryLimitSchema, safeQueryTextSchema } from '../utils/privateAnalyticsValidation.ts'
 import { checkPermission } from '../utils/rbac.ts'
@@ -50,7 +50,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
-app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
+app.post('/', middlewareAuth(), async (c) => {
   const bodyRaw = await parseBody<DataDevice>(c)
   if (hasInvalidQueryLimitInput(bodyRaw.limit))
     throw simpleError('invalid_body', 'Invalid body')

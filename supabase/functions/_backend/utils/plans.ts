@@ -575,12 +575,13 @@ export async function handleOrgNotificationsAndEvents(c: Context, org: any, orgI
 }
 
 // Update stripe_info with plan status
-export async function updatePlanStatus(c: Context, org: any, is_good_plan: boolean, percentUsage: PlanUsage): Promise<void> {
+export async function updatePlanStatus(c: Context, org: any, finalIsGoodPlan: boolean, isAbovePlan: boolean, percentUsage: PlanUsage): Promise<void> {
   const normalizedUsage = normalizePlanUsage(percentUsage)
   await supabaseAdmin(c)
     .from('stripe_info')
     .update({
-      is_good_plan,
+      is_above_plan: isAbovePlan,
+      is_good_plan: finalIsGoodPlan,
       plan_usage: Math.round(normalizedUsage.total_percent),
     })
     .eq('customer_id', org.customer_id!)
@@ -609,10 +610,12 @@ export async function checkPlanStatusOnly(c: Context, orgId: string, drizzleClie
     return
   }
   const { is_good_plan, percentUsage } = planStatus
+  // Credits can restore final plan eligibility, so retain the raw usage threshold separately.
+  const isAbovePlan = percentUsage.total_percent > 100
 
   // Update plan status in database
   const finalIsGoodPlan = await handleOrgNotificationsAndEvents(c, org, orgId, is_good_plan, percentUsage, drizzleClient)
-  await updatePlanStatus(c, org, finalIsGoodPlan, percentUsage)
+  await updatePlanStatus(c, org, finalIsGoodPlan, isAbovePlan, percentUsage)
 }
 
 // New function for cron_sync_sub - handles subscription sync + events

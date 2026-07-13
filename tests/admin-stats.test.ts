@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto'
+import process from 'node:process'
+import { Hono } from 'hono/tiny'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { logsnagInsightsTestUtils } from '../supabase/functions/_backend/triggers/logsnag_insights.ts'
 import { REQUIRED_GLOBAL_STATS_SHARDS } from '../supabase/functions/_backend/utils/global_stats.ts'
-import { BASE_URL, executeSQL, fetchWithRetry, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, PRODUCT_ID, TEST_EMAIL, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, executeSQL, fetchWithRetry, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, POSTGRES_URL, PRODUCT_ID, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000
 const NOW = Date.now()
@@ -54,6 +57,35 @@ const ONBOARDING_LATE_SUBSCRIPTION_CHANNEL_CREATED_AT = '2026-02-03T14:00:00.000
 const ONBOARDING_LATE_SUBSCRIPTION_BUNDLE_CREATED_AT = '2026-02-04T14:00:00.000Z'
 const ONBOARDING_LATE_SUBSCRIPTION_PAID_AT = '2026-02-10T14:00:00.000Z'
 const GLOBAL_STATS_TREND_DATES = ['2099-12-30', '2099-12-31', '2100-01-01'] as const
+
+async function getCoreSnapshotCountsAt(snapshotExclusiveEnd: Date) {
+  const globalWithEdgeRuntime = globalThis as typeof globalThis & {
+    EdgeRuntime?: { waitUntil: (promise: Promise<unknown>) => void }
+  }
+  const previousEdgeRuntime = globalWithEdgeRuntime.EdgeRuntime
+  const previousSupabaseDbUrl = process.env.SUPABASE_DB_URL
+  globalWithEdgeRuntime.EdgeRuntime = undefined
+  process.env.SUPABASE_DB_URL = POSTGRES_URL
+
+  try {
+    const app = new Hono<{ Bindings: { SUPABASE_DB_URL: string } }>()
+    app.get('/', async c => c.json(await logsnagInsightsTestUtils.getCoreSnapshotCounts(c, snapshotExclusiveEnd)))
+
+    const response = await app.request('http://local/', undefined, { SUPABASE_DB_URL: POSTGRES_URL })
+    expect(response.status).toBe(200)
+    return await response.json() as {
+      abovePlanWithCredits: number
+      abovePlanWithoutCredits: number
+    }
+  }
+  finally {
+    if (previousSupabaseDbUrl === undefined)
+      delete process.env.SUPABASE_DB_URL
+    else
+      process.env.SUPABASE_DB_URL = previousSupabaseDbUrl
+    globalWithEdgeRuntime.EdgeRuntime = previousEdgeRuntime
+  }
+}
 
 let adminHeaders: Record<string, string>
 let soloPlan: {
@@ -112,6 +144,8 @@ beforeAll(async () => {
       devices_last_month: 9,
       stars: 1,
       need_upgrade: 0,
+      above_plan_with_credits: null,
+      above_plan_without_credits: null,
       paying_yearly: 1,
       paying_monthly: 3,
       new_paying_orgs: 1,
@@ -153,6 +187,8 @@ beforeAll(async () => {
       devices_last_month: 12,
       stars: 2,
       need_upgrade: 1,
+      above_plan_with_credits: 4,
+      above_plan_without_credits: 2,
       paying_yearly: 2,
       paying_monthly: 3,
       new_paying_orgs: 2,
@@ -194,6 +230,8 @@ beforeAll(async () => {
       devices_last_month: 0,
       stars: 3,
       need_upgrade: 0,
+      above_plan_with_credits: null,
+      above_plan_without_credits: null,
       paying_yearly: 0,
       paying_monthly: 0,
       new_paying_orgs: 0,
@@ -517,7 +555,7 @@ beforeAll(async () => {
   const { error: orgUserError } = await supabase.from('org_users').insert({
     org_id: TRIAL_ORG_ID,
     user_id: USER_ID,
-    user_right: 'admin',
+    rbac_role_name: 'org_admin',
   })
   if (orgUserError)
     throw orgUserError
@@ -538,6 +576,101 @@ afterAll(async () => {
   await supabase.from('orgs').delete().in('id', [TRIAL_ORG_ID, ATTENTION_SORT_HEALTHY_ORG_ID, CANCELLED_YEARLY_ORG_ID, CANCELLED_MONTHLY_ORG_ID, ONBOARDING_ORG_ID, ONBOARDING_NO_BUNDLE_ORG_ID, ONBOARDING_LATE_SUBSCRIPTION_ORG_ID])
   await supabase.from('stripe_info').delete().in('customer_id', [TRIAL_CUSTOMER_ID, ATTENTION_SORT_HEALTHY_CUSTOMER_ID, CANCELLED_YEARLY_CUSTOMER_ID, CANCELLED_MONTHLY_CUSTOMER_ID, ONBOARDING_CUSTOMER_ID, ONBOARDING_NO_BUNDLE_CUSTOMER_ID, ONBOARDING_LATE_SUBSCRIPTION_CUSTOMER_ID])
 }, 90000)
+
+describe('global stats core snapshots', () => {
+  it.concurrent('counts just-over-limit orgs after plan usage rounds to 100', async () => {
+    const snapshotExclusiveEnd = new Date('2030-01-02T00:00:00.000Z')
+    const beforeSnapshot = '2029-12-01T00:00:00.000Z'
+    const afterSnapshot = '2030-02-01T00:00:00.000Z'
+    const withCreditsOrgId = randomUUID()
+    const withoutCreditsOrgId = randomUUID()
+    const withCreditsAppId = `com.admin.stats.credit.with.${withCreditsOrgId.slice(0, 8)}`
+    const withoutCreditsAppId = `com.admin.stats.credit.without.${withoutCreditsOrgId.slice(0, 8)}`
+    const withCreditsCustomerId = `cus_admin_stats_credit_with_${withCreditsOrgId.slice(0, 8)}`
+    const withoutCreditsCustomerId = `cus_admin_stats_credit_without_${withoutCreditsOrgId.slice(0, 8)}`
+    const orgIds = [withCreditsOrgId, withoutCreditsOrgId]
+    const appIds = [withCreditsAppId, withoutCreditsAppId]
+    const customerIds = [withCreditsCustomerId, withoutCreditsCustomerId]
+    const baseline = await getCoreSnapshotCountsAt(snapshotExclusiveEnd)
+
+    try {
+      await Promise.all([
+        resetAndSeedAppData(withCreditsAppId, {
+          orgId: withCreditsOrgId,
+          stripeCustomerId: withCreditsCustomerId,
+          planProductId: PRODUCT_ID,
+        }),
+        resetAndSeedAppData(withoutCreditsAppId, {
+          orgId: withoutCreditsOrgId,
+          stripeCustomerId: withoutCreditsCustomerId,
+          planProductId: PRODUCT_ID,
+        }),
+      ])
+
+      // Raw 100.1% usage is rounded to 100 in plan_usage; is_above_plan retains the exact fit result.
+      await executeSQL(`
+        UPDATE public.stripe_info
+        SET status = 'succeeded'::public.stripe_status,
+            plan_usage = 100,
+            is_above_plan = true,
+            is_good_plan = true,
+            created_at = $2::timestamptz,
+            plan_calculated_at = $2::timestamptz,
+            paid_at = $2::timestamptz,
+            canceled_at = NULL,
+            subscription_anchor_end = $3::timestamptz
+        WHERE customer_id = ANY($1::text[])
+      `, [customerIds, beforeSnapshot, afterSnapshot])
+
+      const [grant] = await executeSQL(`
+        INSERT INTO public.usage_credit_grants (
+          org_id,
+          credits_total,
+          granted_at,
+          expires_at,
+          source
+        ) VALUES ($1, 10, $2::timestamptz, $3::timestamptz, 'manual')
+        RETURNING id
+      `, [withCreditsOrgId, beforeSnapshot, snapshotExclusiveEnd.toISOString()])
+
+      await executeSQL(`
+        INSERT INTO public.usage_credit_consumptions (
+          grant_id,
+          org_id,
+          metric,
+          credits_used,
+          applied_at
+        ) VALUES
+          ($1, $2, 'mau'::public.credit_metric_type, 3, '2029-12-15T00:00:00.000Z'::timestamptz),
+          ($1, $2, 'mau'::public.credit_metric_type, 7, $3::timestamptz)
+      `, [grant.id, withCreditsOrgId, snapshotExclusiveEnd.toISOString()])
+
+      await executeSQL(`
+        INSERT INTO public.usage_credit_grants (
+          org_id,
+          credits_total,
+          granted_at,
+          expires_at,
+          source
+        ) VALUES ($1, 10, $2::timestamptz, $3::timestamptz, 'manual')
+      `, [withoutCreditsOrgId, snapshotExclusiveEnd.toISOString(), afterSnapshot])
+
+      await executeSQL('UPDATE public.orgs SET has_usage_credits = false WHERE id = ANY($1::uuid[])', [orgIds])
+
+      const counts = await getCoreSnapshotCountsAt(snapshotExclusiveEnd)
+      expect(counts.abovePlanWithCredits).toBe(baseline.abovePlanWithCredits + 1)
+      expect(counts.abovePlanWithoutCredits).toBe(baseline.abovePlanWithoutCredits + 1)
+    }
+    finally {
+      await executeSQL('DELETE FROM public.usage_credit_consumptions WHERE org_id = ANY($1::uuid[])', [orgIds])
+      await executeSQL('DELETE FROM public.usage_credit_grants WHERE org_id = ANY($1::uuid[])', [orgIds])
+      await Promise.all(appIds.map(appId => resetAppData(appId)))
+      await executeSQL('DELETE FROM public.org_users WHERE org_id = ANY($1::uuid[])', [orgIds])
+      await executeSQL('DELETE FROM public.orgs WHERE id = ANY($1::uuid[])', [orgIds])
+      await executeSQL('DELETE FROM public.stripe_info WHERE customer_id = ANY($1::text[])', [customerIds])
+    }
+  }, 90000)
+})
 
 describe('/private/admin_stats', () => {
   it.concurrent('returns global stats trend rows from the self-joined global_stats table', async () => {
@@ -568,11 +701,17 @@ describe('/private/admin_stats', () => {
         trial_extended_subscribed_orgs: number
         past_due_orgs: number
         past_due_orgs_average_days: number
+        above_plan_with_credits: number | null
+        above_plan_without_credits: number | null
       }>
     }
 
     expect(payload.success).toBe(true)
     expect(payload.data).toHaveLength(2)
+
+    const historical = payload.data.find(row => row.date === GLOBAL_STATS_TREND_DATES[0])
+    expect(historical?.above_plan_with_credits).toBeNull()
+    expect(historical?.above_plan_without_credits).toBeNull()
 
     const latest = payload.data.find(row => row.date === GLOBAL_STATS_TREND_DATES[1])
     expect(latest).toBeTruthy()
@@ -588,6 +727,8 @@ describe('/private/admin_stats', () => {
     expect(latest?.previous_mrr).toBe(120)
     expect(latest?.trial_extended_orgs).toBe(3)
     expect(latest?.trial_extended_subscribed_orgs).toBe(2)
+    expect(latest?.above_plan_with_credits).toBe(4)
+    expect(latest?.above_plan_without_credits).toBe(2)
   })
 
   it.concurrent('returns last bundle upload for trial organizations and excludes builtin versions', async () => {
@@ -814,11 +955,16 @@ describe('/private/admin_stats', () => {
         orgs_with_channel: number
         orgs_with_bundle: number
         orgs_subscribed: number
+        orgs_with_production_device: number
+        orgs_with_update_download: number
+        activation_telemetry_available: boolean
         subscription_conversion_rate: number
         trend: Array<{
           date: string
           new_orgs: number
           orgs_subscribed: number
+          orgs_with_production_device: number
+          orgs_with_update_download: number
         }>
       }
     }
@@ -829,12 +975,17 @@ describe('/private/admin_stats', () => {
     expect(payload.data.orgs_with_channel).toBe(2)
     expect(payload.data.orgs_with_bundle).toBe(2)
     expect(payload.data.orgs_subscribed).toBe(1)
+    expect(payload.data.orgs_with_production_device).toBe(0)
+    expect(payload.data.orgs_with_update_download).toBe(0)
+    expect(payload.data.activation_telemetry_available).toBe(false)
     expect(payload.data.subscription_conversion_rate).toBe(50)
     expect(payload.data.trend).toHaveLength(1)
     expect(payload.data.trend[0]).toMatchObject({
       date: '2026-02-01',
       new_orgs: 3,
       orgs_subscribed: 1,
+      orgs_with_production_device: 0,
+      orgs_with_update_download: 0,
     })
   })
 

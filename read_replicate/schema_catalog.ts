@@ -17,7 +17,6 @@ export const REPLICA_TYPES = [
   'disable_update',
   'manifest_entry',
   'stripe_status',
-  'user_min_right',
 ] as const
 
 const REPLICA_SEQUENCES = [

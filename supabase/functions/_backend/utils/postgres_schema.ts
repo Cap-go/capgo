@@ -3,18 +3,6 @@ import { bigint, boolean, integer, jsonb, numeric, pgEnum, pgTable, primaryKey, 
 // do_not_change
 
 export const disableUpdatePgEnum = pgEnum('disable_update', ['major', 'minor', 'patch', 'version_number', 'none'])
-export const keyModePgEnum = pgEnum('key_mode', ['read', 'write', 'all', 'upload'])
-export const userMinRightPgEnum = pgEnum('user_min_right', [
-  'invite_read',
-  'invite_upload',
-  'invite_write',
-  'invite_admin',
-  'read',
-  'upload',
-  'write',
-  'admin',
-  'super_admin',
-])
 
 export const apps = pgTable('apps', {
   created_at: timestamp('created_at').notNull().defaultNow(),
@@ -219,8 +207,8 @@ export const org_users = pgTable('org_users', {
   org_id: uuid('org_id').notNull(),
   app_id: varchar('app_id'),
   channel_id: bigint('channel_id', { mode: 'number' }),
-  user_right: userMinRightPgEnum('user_right'),
   rbac_role_name: text('rbac_role_name'),
+  is_invite: boolean('is_invite').notNull().default(false),
 })
 
 // RBAC tables

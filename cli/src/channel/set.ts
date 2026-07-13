@@ -3,6 +3,7 @@ import type { Database } from '../types/supabase.types'
 import type { Compatibility } from '../utils'
 import { intro, log, outro } from '@clack/prompts'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
+import { findChannel } from '../api/channels'
 import { sendUpdateNotificationsForChannels } from '../notifications/send-update'
 import { printPreviewQrForResolvedTarget, resolveChannelPreviewTarget } from '../preview/qr'
 import { formatTable } from '../terminal-table'
@@ -15,9 +16,7 @@ import {
   getBundleVersion,
   getCompatibilityDetails,
   getConfig,
-  getOrganizationId,
   isCompatible,
-  OrganizationPerm,
   resolveUserIdFromApiKey,
   sendEvent,
   updateOrCreateChannel,
@@ -95,12 +94,6 @@ export async function setChannelInternal(channel: string, appId: string, options
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
   await check2FAComplianceForApp(supabase, appId, silent)
   const userId = await resolveUserIdFromApiKey(supabase, options.apikey)
-  // Setting an existing channel (bundle promotion / settings) needs app_admin tier, which
-  // get_org_perm_for_apikey reports as perm_write; org_super_admin's app.delete is NOT required.
-  // Gating on admin here was a false-negative that blocked app_admin/org_admin keys. The backend
-  // (POST /channel/) and the channels RLS already authorize this at write/app_admin level.
-  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.write, silent, true)
-  const orgId = await getOrganizationId(supabase, appId)
 
   const {
     bundle,
@@ -138,6 +131,7 @@ export async function setChannelInternal(channel: string, appId: string, options
     sendUpdateNotification,
   } = options
   let bundleLinkChanged = false
+
   if (latest && bundle) {
     if (!silent)
       log.error('Cannot set latest and bundle at the same time')
@@ -195,6 +189,56 @@ export async function setChannelInternal(channel: string, appId: string, options
     throw new Error('No channel option provided')
   }
 
+  const hasStableBundlePromotion = bundle != null || latest === true || latestRemote === true
+  const hasRolloutTargetChange = rolloutBundle != null || rolloutRollback === true || rolloutPromote === true
+  const hasRolloutConfiguration = rolloutPercentage != null
+    || rolloutPercentageBps != null
+    || rolloutEnable != null
+    || rolloutDisable != null
+    || rolloutPause != null
+    || rolloutResume != null
+    || rolloutCacheTtlSeconds != null
+    || autoPauseEnabled != null
+    || autoPauseDisabled != null
+    || autoPauseWindowMinutes != null
+    || autoPauseFailureRateBps !== undefined
+    || autoPauseConfidence != null
+    || autoPauseMinAttempts !== undefined
+    || autoPauseMinFailures !== undefined
+    || autoPauseAction != null
+    || autoPauseCooldownMinutes != null
+  const hasSettingsUpdate = state != null
+    || downgrade != null
+    || ios != null
+    || android != null
+    || selfAssign != null
+    || disableAutoUpdate != null
+    || dev != null
+    || emulator != null
+    || device != null
+    || prod != null
+    || hasRolloutTargetChange
+    || hasRolloutConfiguration
+  const hasBundlePromotion = hasStableBundlePromotion || hasRolloutTargetChange
+  const { data: existingChannel, error: channelError } = await findChannel(supabase, appId, channel)
+  if (channelError || !existingChannel) {
+    if (!silent)
+      log.error(`Cannot find channel ${channel}`)
+    throw new Error(`Cannot find channel ${channel}`)
+  }
+
+  if (hasSettingsUpdate)
+    await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'channel.update_settings', silent, true, existingChannel.id)
+  if (hasBundlePromotion)
+    await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'channel.promote_bundle', silent, true, existingChannel.id)
+
+  const orgId = existingChannel.owner_org
+  if (!orgId) {
+    if (!silent)
+      log.error(`Cannot get organization id for channel ${channel}`)
+    throw new Error(`Cannot get organization id for channel ${channel}`)
+  }
+
   await checkPlanValid(supabase, orgId, options.apikey, appId)
 
   const channelPayload: Database['public']['Tables']['channels']['Insert'] = {
@@ -204,23 +248,6 @@ export async function setChannelInternal(channel: string, appId: string, options
     owner_org: orgId,
     version: undefined as any,
   }
-
-  const { data: existingChannel, error: channelError } = await supabase
-    .from('channels')
-    .select()
-    .eq('app_id', appId)
-    .eq('name', channel)
-    .single()
-
-  if (channelError) {
-    if (!silent)
-      log.error(`Cannot find channel ${channel}`)
-    throw new Error(`Cannot find channel ${channel}`)
-  }
-
-  const resolvedBundleVersion = latest
-    ? (extConfig?.config?.plugins?.CapacitorUpdater?.version || getBundleVersion('', options.packageJson))
-    : bundle
 
   async function findRemoteBundle(versionName: string) {
     const { data, error: vError } = await supabase
@@ -240,6 +267,10 @@ export async function setChannelInternal(channel: string, appId: string, options
 
     return data
   }
+
+  const resolvedBundleVersion = latest
+    ? (extConfig?.config?.plugins?.CapacitorUpdater?.version || getBundleVersion('', options.packageJson))
+    : bundle
 
   if (resolvedBundleVersion != null) {
     const { data, error: vError } = await supabase
@@ -416,7 +447,7 @@ export async function setChannelInternal(channel: string, appId: string, options
   }
 
   if (rolloutPromote) {
-    const rolloutVersion = channelPayload.rollout_version ?? existingChannel?.rollout_version
+    const rolloutVersion = channelPayload.rollout_version ?? existingChannel.rollout_version
     if (!rolloutVersion)
       throw new Error('Cannot promote rollout without a rollout target')
 
@@ -491,6 +522,12 @@ export async function setChannelInternal(channel: string, appId: string, options
     channelPayload.auto_pause_action = autoPauseAction
   if (autoPauseCooldownMinutes != null)
     channelPayload.auto_pause_cooldown_minutes = autoPauseCooldownMinutes
+
+  if (hasStableBundlePromotion && channelPayload.version == null) {
+    if (!silent)
+      log.error('Cannot set channel because no bundle version could be resolved')
+    throw new Error('Cannot set channel without a bundle version')
+  }
 
   if (state != null) {
     if (state !== 'normal' && state !== 'default') {
@@ -571,12 +608,30 @@ export async function setChannelInternal(channel: string, appId: string, options
       log.info(`Set ${appId} channel: ${channel} to ${finalDisableAutoUpdate} disable update strategy to this channel`)
   }
 
-  const { error: dbError } = await updateOrCreateChannel(supabase, channelPayload)
-  if (dbError) {
-    if (!silent)
-      log.error('Cannot set channel the upload key is not allowed to do that, use the "all" for this.')
-    throw new Error('Upload key is not allowed to set this channel')
+  if (hasStableBundlePromotion && !hasSettingsUpdate) {
+    const { error } = await supabase.functions.invoke('bundle', {
+      method: 'PUT',
+      body: JSON.stringify({
+        app_id: appId,
+        version_id: channelPayload.version,
+        channel_id: existingChannel.id,
+      }),
+    })
+    if (error) {
+      if (!silent)
+        log.error('Cannot set channel because this API key does not have the required RBAC permission.')
+      throw new Error('API key is not allowed to set this channel')
+    }
   }
+  else {
+    const { error: dbError } = await updateOrCreateChannel(supabase, channelPayload)
+    if (dbError) {
+      if (!silent)
+        log.error('Cannot set channel because this API key does not have the required RBAC permission.')
+      throw new Error('API key is not allowed to set this channel')
+    }
+  }
+
   if (sendUpdateNotification && bundleLinkChanged) {
     try {
       await sendUpdateNotificationsForChannels({

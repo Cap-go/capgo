@@ -8,6 +8,9 @@ import { getRuntimeKey } from 'hono/adapter'
 import { Pool } from 'pg'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { CacheHelper } from './cache.ts'
+import { getAdminOnboardingTelemetry } from './cloudflare.ts'
+import { getAdminOnboardingActivationMetrics } from './onboardingFunnel.ts'
+import type { AdminOnboardingActivationCohort } from './onboardingFunnel.ts'
 import { getChannelSelfOverride, isChannelSelfStoreEnabled } from './channelSelfStore.ts'
 import { DISPOSABLE_EMAIL_DOMAINS, PERSONAL_EMAIL_DOMAINS } from './emailClassification.ts'
 import { getClientDbRegionSB } from './geolocation.ts'
@@ -1558,6 +1561,8 @@ export interface AdminGlobalStatsTrend {
   devices_last_month_android: number
   stars: number
   need_upgrade: number
+  above_plan_with_credits: number | null
+  above_plan_without_credits: number | null
   paying_yearly: number
   paying_monthly: number
   new_paying_orgs: number
@@ -1681,6 +1686,8 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(gs.devices_last_month_android, 0)::int AS devices_last_month_android,
         gs.stars::int AS stars,
         gs.need_upgrade::int AS need_upgrade,
+        NULLIF(to_jsonb(gs) ->> 'above_plan_with_credits', '')::int AS above_plan_with_credits,
+        NULLIF(to_jsonb(gs) ->> 'above_plan_without_credits', '')::int AS above_plan_without_credits,
         gs.paying_yearly::int AS paying_yearly,
         gs.paying_monthly::int AS paying_monthly,
         gs.new_paying_orgs::int AS new_paying_orgs,
@@ -1833,6 +1840,8 @@ export async function getAdminGlobalStatsTrend(
       devices_last_month_android: Number(row.devices_last_month_android) || 0,
       stars: Number(row.stars) || 0,
       need_upgrade: Number(row.need_upgrade) || 0,
+      above_plan_with_credits: row.above_plan_with_credits === null ? null : Number(row.above_plan_with_credits) || 0,
+      above_plan_without_credits: row.above_plan_without_credits === null ? null : Number(row.above_plan_without_credits) || 0,
       paying_yearly: Number(row.paying_yearly) || 0,
       past_due_orgs: Number(row.past_due_orgs) || 0,
       past_due_orgs_average_days: Number(row.past_due_orgs_average_days) || 0,
@@ -2592,7 +2601,7 @@ export async function getAdminOrganizationInsights(
           COUNT(DISTINCT ou.user_id)::int AS members_count
         FROM org_users ou
         INNER JOIN filtered_orgs filtered ON filtered.org_id = ou.org_id
-        WHERE ou.user_right IS NULL OR ou.user_right::text NOT LIKE 'invite_%'
+        WHERE ou.is_invite IS NOT TRUE
         GROUP BY ou.org_id
       ),
       mau_by_org AS (
@@ -3098,11 +3107,16 @@ export interface AdminOnboardingFunnel {
   orgs_with_channel: number
   orgs_with_bundle: number
   orgs_subscribed: number
+  orgs_with_production_device: number
+  orgs_with_update_download: number
+  activation_telemetry_available: boolean
   // Conversion rates
   app_conversion_rate: number
   channel_conversion_rate: number
   bundle_conversion_rate: number
   subscription_conversion_rate: number
+  production_device_conversion_rate: number
+  update_download_conversion_rate: number
   // Trend data
   trend: Array<{
     date: string
@@ -3111,6 +3125,8 @@ export interface AdminOnboardingFunnel {
     orgs_created_channel: number
     orgs_created_bundle: number
     orgs_subscribed: number
+    orgs_with_production_device: number
+    orgs_with_update_download: number
   }>
 }
 
@@ -3123,6 +3139,7 @@ export async function getAdminOnboardingFunnel(
     // Read replicas don't include org/app/channel data, so use primary DB.
     const pgClient = getPgClient(c)
     const drizzleClient = getDrizzleClient(pgClient)
+    const now = new Date()
 
     // Get total funnel counts for orgs created in the date range
     const funnelQuery = sql`
@@ -3258,15 +3275,66 @@ export async function getAdminOnboardingFunnel(
       ORDER BY ds.date ASC
     `
 
-    const trendResult = await drizzleClient.execute(trendQuery)
-    const trend = trendResult.rows.map((row: any) => ({
-      date: row.date instanceof Date ? row.date.toISOString().split('T')[0] : row.date,
-      new_orgs: Number(row.new_orgs) || 0,
-      orgs_created_app: Number(row.orgs_created_app) || 0,
-      orgs_created_channel: Number(row.orgs_created_channel) || 0,
-      orgs_created_bundle: Number(row.orgs_created_bundle) || 0,
-      orgs_subscribed: Number(row.orgs_subscribed) || 0,
-    }))
+    const activationCohortQuery = sql`
+      SELECT DISTINCT
+        o.id as org_id,
+        o.created_at as created_at,
+        a.app_id as app_id
+      FROM orgs o
+      INNER JOIN apps a ON a.owner_org = o.id
+      WHERE o.created_at >= ${start_date}::timestamp
+        AND o.created_at < ${end_date}::timestamp
+        AND a.created_at >= o.created_at
+        AND a.created_at < o.created_at + interval '7 days'
+    `
+
+    const [trendResult, activationCohortResult] = await Promise.all([
+      drizzleClient.execute(trendQuery),
+      drizzleClient.execute(activationCohortQuery),
+    ])
+
+    const activationCohorts: AdminOnboardingActivationCohort[] = []
+    for (const row of activationCohortResult.rows as any[]) {
+      const createdAt = row.created_at instanceof Date ? row.created_at : new Date(row.created_at)
+      if (!row.org_id || !row.app_id || Number.isNaN(createdAt.getTime()))
+        continue
+
+      const activationWindowEnd = new Date(createdAt)
+      activationWindowEnd.setUTCDate(activationWindowEnd.getUTCDate() + 7)
+      activationCohorts.push({
+        org_id: String(row.org_id),
+        app_id: String(row.app_id),
+        created_at: createdAt,
+        activation_window_end: activationWindowEnd < now ? activationWindowEnd : now,
+      })
+    }
+
+    const activationTelemetry = await getAdminOnboardingTelemetry(
+      c,
+      activationCohorts.map(cohort => ({
+        app_id: cohort.app_id,
+        start_at: cohort.created_at,
+        end_at: cohort.activation_window_end,
+      })),
+      start_date,
+      now,
+    )
+    const activationMetrics = getAdminOnboardingActivationMetrics(activationCohorts, activationTelemetry)
+
+    const trend = trendResult.rows.map((row: any) => {
+      const date = row.date instanceof Date ? row.date.toISOString().split('T')[0] : String(row.date)
+      const activationTrend = activationMetrics.trend_by_date.get(date)
+      return {
+        date,
+        new_orgs: Number(row.new_orgs) || 0,
+        orgs_created_app: Number(row.orgs_created_app) || 0,
+        orgs_created_channel: Number(row.orgs_created_channel) || 0,
+        orgs_created_bundle: Number(row.orgs_created_bundle) || 0,
+        orgs_subscribed: Number(row.orgs_subscribed) || 0,
+        orgs_with_production_device: activationTrend?.orgs_with_production_device ?? 0,
+        orgs_with_update_download: activationTrend?.orgs_with_update_download ?? 0,
+      }
+    })
 
     const result: AdminOnboardingFunnel = {
       total_orgs: totalOrgs,
@@ -3274,10 +3342,15 @@ export async function getAdminOnboardingFunnel(
       orgs_with_channel: orgsWithChannel,
       orgs_with_bundle: orgsWithBundle,
       orgs_subscribed: orgsSubscribed,
+      orgs_with_production_device: activationMetrics.orgs_with_production_device,
+      orgs_with_update_download: activationMetrics.orgs_with_update_download,
+      activation_telemetry_available: activationTelemetry.available,
       app_conversion_rate: totalOrgs > 0 ? (orgsWithApp / totalOrgs) * 100 : 0,
       channel_conversion_rate: orgsWithApp > 0 ? (orgsWithChannel / orgsWithApp) * 100 : 0,
       bundle_conversion_rate: orgsWithChannel > 0 ? (orgsWithBundle / orgsWithChannel) * 100 : 0,
       subscription_conversion_rate: orgsWithBundle > 0 ? (orgsSubscribed / orgsWithBundle) * 100 : 0,
+      production_device_conversion_rate: totalOrgs > 0 ? (activationMetrics.orgs_with_production_device / totalOrgs) * 100 : 0,
+      update_download_conversion_rate: totalOrgs > 0 ? (activationMetrics.orgs_with_update_download / totalOrgs) * 100 : 0,
       trend,
     }
 
@@ -3293,10 +3366,15 @@ export async function getAdminOnboardingFunnel(
       orgs_with_channel: 0,
       orgs_with_bundle: 0,
       orgs_subscribed: 0,
+      orgs_with_production_device: 0,
+      orgs_with_update_download: 0,
+      activation_telemetry_available: false,
       app_conversion_rate: 0,
       channel_conversion_rate: 0,
       bundle_conversion_rate: 0,
       subscription_conversion_rate: 0,
+      production_device_conversion_rate: 0,
+      update_download_conversion_rate: 0,
       trend: [],
     }
   }

@@ -56,7 +56,6 @@ describe('files upload auth', () => {
         user_id: '00000000-0000-0000-0000-000000000001',
         key: 'valid-upload-key',
         key_hash: null,
-        mode: 'all',
         updated_at: null,
         name: 'test key',
         limited_to_orgs: null,

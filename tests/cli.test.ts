@@ -166,6 +166,231 @@ describe('tests CLI upload', () => {
     }
   }, 60000)
 
+  it('creates a missing explicit channel before assigning the uploaded bundle', async () => {
+    const appName = `com.cli_new_channel_upload_${randomUUID()}`
+    const targetChannel = `upload-target-${randomUUID().slice(0, 8)}`
+    await Promise.all([
+      resetAndSeedAppData(appName),
+      prepareCli(appName),
+    ])
+
+    try {
+      const { result, version } = await uploadWithFreshVersionRetry(appName, targetChannel, {
+        ignoreCompatibilityCheck: true,
+      })
+      expect(result.success).toBe(true)
+
+      const { data: channel, error } = await getSupabaseClient()
+        .from('channels')
+        .select('name, version(name)')
+        .eq('app_id', appName)
+        .eq('name', targetChannel)
+        .single()
+
+      expect(error).toBeNull()
+      expect(channel?.name).toBe(targetChannel)
+      expect((channel?.version as any)?.name).toBe(version)
+    }
+    finally {
+      await Promise.all([
+        cleanupCli(appName),
+        resetAppData(appName),
+        resetAppDataStats(appName),
+      ])
+    }
+  }, 60000)
+
+  it('allows app_uploader to pass explicit channel upload preflight', async () => {
+    const appName = `com.cli_channel_preflight_${randomUUID()}`
+    await Promise.all([
+      resetAndSeedAppData(appName),
+      prepareCli(appName),
+    ])
+
+    let createdApikeyId: number | null = null
+    try {
+      const createdApikey = await createDirectApiKeyWithBindings({
+        userId: USER_ID,
+        key: randomUUID(),
+        name: `cli-channel-preflight-${randomUUID()}`,
+        orgId: ORG_ID,
+        roleName: 'apikey_org_reader',
+        appId: appName,
+        appRoleName: 'app_uploader',
+      })
+      createdApikeyId = createdApikey.id
+
+      const version = getSemver()
+      const result = await uploadBundleSDK(appName, version, 'production', {
+        ignoreCompatibilityCheck: true,
+        apikey: createdApikey.key ?? undefined,
+      })
+      expect(result.success).toBe(true)
+
+      const { count, error } = await getSupabaseClient()
+        .from('app_versions')
+        .select('id', { count: 'exact', head: true })
+        .eq('app_id', appName)
+        .eq('name', version)
+
+      expect(error).toBeNull()
+      expect(count).toBe(1)
+    }
+    finally {
+      if (createdApikeyId !== null)
+        await deleteScopedApiKey(createdApikeyId)
+      await Promise.all([
+        cleanupCli(appName),
+        resetAppData(appName),
+        resetAppDataStats(appName),
+      ])
+    }
+  }, 60000)
+
+  it('allows app_uploader to pass default channel upload preflight', async () => {
+    const appName = `com.cli_default_channel_preflight_${randomUUID()}`
+    await Promise.all([
+      resetAndSeedAppData(appName),
+      prepareCli(appName),
+    ])
+
+    let createdApikeyId: number | null = null
+    try {
+      const createdApikey = await createDirectApiKeyWithBindings({
+        userId: USER_ID,
+        key: randomUUID(),
+        name: `cli-default-channel-preflight-${randomUUID()}`,
+        orgId: ORG_ID,
+        roleName: 'apikey_org_reader',
+        appId: appName,
+        appRoleName: 'app_uploader',
+      })
+      createdApikeyId = createdApikey.id
+
+      const version = getSemver()
+      const result = await uploadBundleSDK(appName, version, undefined, {
+        ignoreCompatibilityCheck: true,
+        apikey: createdApikey.key ?? undefined,
+      })
+      expect(result.success).toBe(true)
+
+      const { count, error } = await getSupabaseClient()
+        .from('app_versions')
+        .select('id', { count: 'exact', head: true })
+        .eq('app_id', appName)
+        .eq('name', version)
+
+      expect(error).toBeNull()
+      expect(count).toBe(1)
+    }
+    finally {
+      if (createdApikeyId !== null)
+        await deleteScopedApiKey(createdApikeyId)
+      await Promise.all([
+        cleanupCli(appName),
+        resetAppData(appName),
+        resetAppDataStats(appName),
+      ])
+    }
+  }, 60000)
+
+  it('does not create a missing explicit channel when create-channel preflight fails', async () => {
+    const appName = `com.cli_channel_no_orphan_${randomUUID()}`
+    const targetChannel = `upload-target-${randomUUID().slice(0, 8)}`
+    await Promise.all([
+      resetAndSeedAppData(appName),
+      prepareCli(appName),
+    ])
+
+    let createdApikeyId: number | null = null
+    try {
+      const createdApikey = await createDirectApiKeyWithBindings({
+        userId: USER_ID,
+        key: randomUUID(),
+        name: `cli-channel-no-orphan-${randomUUID()}`,
+        orgId: ORG_ID,
+        roleName: 'apikey_org_reader',
+        appId: appName,
+        appRoleName: 'app_uploader',
+      })
+      createdApikeyId = createdApikey.id
+
+      const result = await uploadBundleSDK(appName, getSemver(), targetChannel, {
+        ignoreCompatibilityCheck: true,
+        apikey: createdApikey.key ?? undefined,
+      })
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('app.create_channel')
+
+      const { count, error } = await getSupabaseClient()
+        .from('channels')
+        .select('id', { count: 'exact', head: true })
+        .eq('app_id', appName)
+        .eq('name', targetChannel)
+
+      expect(error).toBeNull()
+      expect(count).toBe(0)
+    }
+    finally {
+      if (createdApikeyId !== null)
+        await deleteScopedApiKey(createdApikeyId)
+      await Promise.all([
+        cleanupCli(appName),
+        resetAppData(appName),
+        resetAppDataStats(appName),
+      ])
+    }
+  }, 60000)
+
+  it('fails self-assign upload before creating a bundle when channel settings permission is missing', async () => {
+    const appName = `com.cli_self_assign_preflight_${randomUUID()}`
+    await Promise.all([
+      resetAndSeedAppData(appName),
+      prepareCli(appName),
+    ])
+
+    let createdApikeyId: number | null = null
+    try {
+      const createdApikey = await createDirectApiKeyWithBindings({
+        userId: USER_ID,
+        key: randomUUID(),
+        name: `cli-self-assign-preflight-${randomUUID()}`,
+        orgId: ORG_ID,
+        roleName: 'org_member',
+        appId: appName,
+        appRoleName: 'app_developer',
+      })
+      createdApikeyId = createdApikey.id
+
+      const version = getSemver()
+      const result = await uploadBundleSDK(appName, version, 'production', {
+        ignoreCompatibilityCheck: true,
+        selfAssign: true,
+        apikey: createdApikey.key ?? undefined,
+      })
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('channel.update_settings')
+
+      const { count, error } = await getSupabaseClient()
+        .from('app_versions')
+        .select('id', { count: 'exact', head: true })
+        .eq('app_id', appName)
+        .eq('name', version)
+
+      expect(error).toBeNull()
+      expect(count).toBe(0)
+    }
+    finally {
+      if (createdApikeyId !== null)
+        await deleteScopedApiKey(createdApikeyId)
+      await Promise.all([
+        cleanupCli(appName),
+        resetAppData(appName),
+        resetAppDataStats(appName),
+      ])
+    }
+  }, 60000)
+
   it('should not upload same hash twice', async () => {
     const appName = `com.cli_duplicate_${randomUUID()}`
     await Promise.all([
