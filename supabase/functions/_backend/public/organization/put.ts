@@ -310,7 +310,6 @@ async function updateOrg(
     const { query, params } = buildOrganizationUpdateQuery(orgId, updateFields, options)
     data = (await dbClient.query<OrgRow>(query, params)).rows[0]
     await dbClient.query('COMMIT')
-    transactionStarted = false
   }
   catch (error) {
     if (dbClient && transactionStarted) {
