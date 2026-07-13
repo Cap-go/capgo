@@ -1,192 +1,220 @@
+import type { Queryable } from '../read_replicate/schema_catalog.ts'
 import process from 'node:process'
-import { Client } from 'pg'
-import { reconcileDirectReadReplicaSchema } from '../read_replicate/direct_schema_sync.ts'
+import { applyReadReplicaSchemaSync } from '../read_replicate/schema_additive_sync.ts'
 import {
   READ_REPLICA_SCHEMA_CATALOG_SQL,
-  type Queryable,
+  readReplicaSchemaCatalog,
   stableStringify,
 } from '../read_replicate/schema_catalog.ts'
+import { readReplicaSchemaCatalogFromMigrations } from '../read_replicate/schema_catalog_from_migrations.ts'
+import { readReplicaSchemaCompatibilityIssues } from '../read_replicate/schema_compatibility.ts'
 
 const DEFAULT_SYNC_MAX_SECONDS = 30 * 60
-const DEFAULT_LOCK_WAIT_SECONDS = 2 * 60
 const CATALOG_QUERY_BUFFER_MS = 5000
+const GOOGLE_DATA_API_MAX_SECONDS = 30
+const GOOGLE_DATA_API_PROCESS_GRACE_SECONDS = 5
+const GOOGLE_DATA_API_REQUEST_LIMIT_BYTES = 500_000
+const GOOGLE_DATA_API_REQUEST_METADATA_BUFFER_BYTES = 1_024
+const GOOGLE_DATA_API_RESPONSE_LIMIT_BYTES = 10_000_000
 
-interface PrimaryConnection {
-  client: Queryable
-  connect: () => Promise<void>
-  close: () => Promise<void>
+interface DataApiResponse {
+  results?: Array<{
+    columns?: Array<{ name?: string }>
+    partialResult?: boolean
+    rows?: Array<{ values?: Array<{ value?: string, nullValue?: boolean }> }>
+  }>
+}
+
+interface GoogleDataApiConfig {
+  project: string
+  instance: string
+  database: string
+}
+
+const GOOGLE_READ_REPLICA: GoogleDataApiConfig = {
+  project: 'capgo-394818',
+  instance: 'eu-2',
+  database: 'postgres',
 }
 
 async function main(): Promise<void> {
-  const maxDurationMs = positiveSecondsFromEnv(
-    'READ_REPLICA_SCHEMA_SYNC_MAX_TIME',
-    DEFAULT_SYNC_MAX_SECONDS,
-  ) * 1000
+  const maxDurationMs = DEFAULT_SYNC_MAX_SECONDS * 1000
   const deadline = Date.now() + maxDurationMs
-  const primary = primaryConnection(deadline)
-  const replica = new Client({
-    connectionString: replicaConnectionString(),
-    connectionTimeoutMillis: 10_000,
+  console.log(
+    'Building the read-replica schema catalog from local migrations through Tinbase/PGlite...',
+  )
+  const expected = await readReplicaSchemaCatalogFromMigrations()
+  const replica = googleDataApiClient(GOOGLE_READ_REPLICA, deadline)
+  const result = await applyReadReplicaSchemaSync(replica, expected, {
+    deadline,
+    maxDurationMs,
+    statementTimeoutMs: GOOGLE_DATA_API_MAX_SECONDS * 1000,
   })
+  const actual = await readReplicaSchemaCatalog(replica)
+  const issues = readReplicaSchemaCompatibilityIssues(expected, actual)
 
-  try {
-    await Promise.all([primary.connect(), replica.connect()])
-    const result = await reconcileDirectReadReplicaSchema(
-      primary.client,
-      deadlineBoundCatalogClient(replica, deadline),
-      {
-        deadline,
-        maxDurationMs,
-        statementTimeoutMs: maxDurationMs,
-        lockWaitMs: positiveSecondsFromEnv(
-          'READ_REPLICA_SCHEMA_LOCK_WAIT_SECONDS',
-          DEFAULT_LOCK_WAIT_SECONDS,
-        ) * 1000,
-      },
+  if (issues.length) {
+    console.error(
+      '::error title=Read-replica schema did not converge::Cloud SQL Data API reconciliation completed with residual drift.',
     )
-
-    if (result.issues.length) {
-      console.error('::error title=Read-replica schema did not converge::Direct subscriber reconciliation completed with residual drift.')
-      console.error(stableStringify({ error: 'schema_not_converged', ...result }))
-      process.exitCode = 1
-      return
-    }
-
-    console.log('Read-replica direct schema sync result:')
-    console.log(stableStringify(result))
-    console.log('Read replica now matches the live primary schema for the selected tables.')
+    console.error(
+      stableStringify({ error: 'schema_not_converged', ...result, issues }),
+    )
+    process.exitCode = 1
+    return
   }
-  finally {
-    await Promise.allSettled([primary.close(), replica.end()])
-  }
+
+  console.log('Read-replica Cloud SQL Data API sync result:')
+  console.log(stableStringify({ ...result, issues }))
+  console.log(
+    'Read replica matches the schema derived from local migrations before primary migrations.',
+  )
 }
 
-function primaryConnection(deadline: number): PrimaryConnection {
-  const connectionString = process.env.MAIN_SUPABASE_DB_URL
-  if (!connectionString) {
-    if (!process.env.SUPABASE_ACCESS_TOKEN) {
-      throw new Error(
-        'Set MAIN_SUPABASE_DB_URL or SUPABASE_ACCESS_TOKEN after linking the Supabase project for live primary schema reads.',
-      )
-    }
-    return {
-      client: linkedPrimaryCatalogClient(deadline),
-      connect: async () => {},
-      close: async () => {},
-    }
-  }
-
-  const client = new Client({
-    connectionString,
-    connectionTimeoutMillis: 10_000,
-  })
-  return {
-    client: deadlineBoundCatalogClient(client, deadline),
-    connect: async () => client.connect(),
-    close: async () => client.end(),
-  }
-}
-
-function linkedPrimaryCatalogClient(deadline: number): Queryable {
-  return {
-    async query(queryText: string, values?: unknown[]) {
-      if (queryText !== READ_REPLICA_SCHEMA_CATALOG_SQL) {
-        throw new Error(
-          'Linked primary access is restricted to the read-replica schema catalog query.',
-        )
-      }
-
-      return queryLinkedPrimaryCatalog(
-        renderCatalogQueryWithStaticValues(queryText, values),
-        deadline,
-      )
-    },
-  }
-}
-
-function deadlineBoundCatalogClient(
-  client: Queryable,
+function googleDataApiClient(
+  config: GoogleDataApiConfig,
   deadline: number,
 ): Queryable {
+  const { project, instance, database } = config
+
   return {
     async query(queryText: string, values?: unknown[]) {
-      if (queryText !== READ_REPLICA_SCHEMA_CATALOG_SQL)
-        return client.query(queryText, values)
-
-      const timeoutMs = remainingCatalogBudgetMs(deadline)
-      await client.query(`SET statement_timeout = ${timeoutMs}`)
-      try {
-        return await client.query(queryText, values)
+      // The Data API has no session affinity and rejects requests over 0.5 MB or
+      // responses over 10 MB. Every partial result is treated as a failed read.
+      if (
+        queryText.startsWith('SET statement_timeout')
+        || queryText === 'RESET statement_timeout'
+      ) {
+        return { rows: [] }
       }
-      finally {
-        await client.query('RESET statement_timeout')
+
+      const sql
+        = queryText === READ_REPLICA_SCHEMA_CATALOG_SQL
+          ? renderCatalogQueryWithStaticValues(queryText, values)
+          : queryText
+      return {
+        rows: dataApiRows(
+          await executeGoogleSql(project, instance, database, sql, deadline),
+        ),
       }
     },
   }
 }
 
-async function queryLinkedPrimaryCatalog(
+async function executeGoogleSql(
+  project: string,
+  instance: string,
+  database: string,
   sql: string,
   deadline: number,
-): Promise<{ rows: Record<string, any>[] }> {
-  const timeoutMs = remainingCatalogBudgetMs(deadline)
-  const child = Bun.spawn(
-    [
-      'supabase',
-      'db',
-      'query',
-      '--linked',
-      '--agent=no',
-      '--output',
-      'json',
-      sql,
-    ],
-    {
-      stdout: 'pipe',
-      stderr: 'pipe',
-      env: process.env,
-    },
-  )
+): Promise<DataApiResponse> {
+  assertDataApiRequestFitsLimit(database, sql)
+
+  let child: ReturnType<typeof Bun.spawn> | undefined
+  let timeout: ReturnType<typeof setTimeout> | undefined
   let timedOut = false
-  const timeout = setTimeout(() => {
-    timedOut = true
-    child.kill()
-  }, timeoutMs)
 
   try {
+    const commandTimeoutMs = Math.min(
+      remainingBudgetMs(deadline),
+      (GOOGLE_DATA_API_MAX_SECONDS + GOOGLE_DATA_API_PROCESS_GRACE_SECONDS)
+      * 1000,
+    )
+    const command = Bun.spawn(
+      [
+        'gcloud',
+        'sql',
+        'instances',
+        'execute-sql',
+        instance,
+        `--project=${project}`,
+        `--database=${database}`,
+        `--sql=${sql}`,
+        '--format=json',
+        '--partial_result_mode=FAIL_PARTIAL_RESULT',
+        '--quiet',
+      ],
+      { stdout: 'pipe', stderr: 'pipe', env: process.env },
+    )
+    child = command
+    timeout = setTimeout(() => {
+      timedOut = true
+      command.kill()
+    }, commandTimeoutMs)
+
     const [exitCode, stdout, stderr] = await Promise.all([
-      child.exited,
-      new Response(child.stdout).text(),
-      new Response(child.stderr).text(),
+      command.exited,
+      new Response(command.stdout).text(),
+      new Response(command.stderr).text(),
     ])
     if (timedOut) {
       throw new Error(
-        'Read-replica schema sync exceeded max duration while reading the live primary schema catalog through the Supabase Management API.',
+        `Cloud SQL Data API command exceeded its ${GOOGLE_DATA_API_MAX_SECONDS}-second SQL limit.`,
       )
     }
-    if (exitCode !== 0) {
-      throw new Error(
-        `Linked primary schema catalog query failed: ${commandOutput(stderr || stdout)}`,
-      )
-    }
-
-    const parsed = JSON.parse(stdout) as unknown
-    if (
-      !Array.isArray(parsed)
-      || !parsed.every(
-        row => row !== null && typeof row === 'object' && !Array.isArray(row),
-      )
-    ) {
-      throw new Error(
-        'Linked primary schema catalog query returned an invalid JSON row array.',
-      )
-    }
-
-    return { rows: parsed as Record<string, any>[] }
+    if (exitCode !== 0)
+      throw dataApiCommandError(stderr || stdout)
+    const response = JSON.parse(stdout) as DataApiResponse
+    assertCompleteDataApiResponse(response)
+    return response
   }
   finally {
-    clearTimeout(timeout)
+    if (timeout)
+      clearTimeout(timeout)
+    if (child?.exitCode === null) {
+      child.kill()
+      await child.exited
+    }
   }
+}
+
+function assertDataApiRequestFitsLimit(database: string, sql: string): void {
+  const payloadBytes = new TextEncoder().encode(
+    JSON.stringify({
+      database,
+      partialResultMode: 'FAIL_PARTIAL_RESULT',
+      sqlStatement: sql,
+    }),
+  ).byteLength
+  const maximumPayloadBytes
+    = GOOGLE_DATA_API_REQUEST_LIMIT_BYTES
+      - GOOGLE_DATA_API_REQUEST_METADATA_BUFFER_BYTES
+
+  if (payloadBytes > maximumPayloadBytes) {
+    throw new Error(
+      `Cloud SQL Data API SQL payload is ${payloadBytes} bytes and exceeds the safe ${maximumPayloadBytes}-byte budget below its 0.5 MB request limit. Split the DDL before release.`,
+    )
+  }
+}
+
+function assertCompleteDataApiResponse(response: DataApiResponse): void {
+  if (response.results?.some(result => result.partialResult)) {
+    throw new Error(
+      `Cloud SQL Data API returned a partial result. It refuses catalog responses at or above its ${GOOGLE_DATA_API_RESPONSE_LIMIT_BYTES / 1_000_000} MB limit.`,
+    )
+  }
+}
+
+function dataApiRows(response: DataApiResponse): Record<string, any>[] {
+  const result = response.results?.[0]
+  const columns = result?.columns ?? []
+  return (result?.rows ?? []).map((row) => {
+    const mapped: Record<string, any> = {}
+    for (const [index, column] of columns.entries()) {
+      const value = row.values?.[index]
+      if (!column.name)
+        continue
+      if (value?.nullValue) {
+        mapped[column.name] = null
+        continue
+      }
+      mapped[column.name]
+        = column.name === 'catalog' && value?.value
+          ? JSON.parse(value.value)
+          : value?.value
+    }
+    return mapped
+  })
 }
 
 function renderCatalogQueryWithStaticValues(
@@ -199,7 +227,6 @@ function renderCatalogQueryWithStaticValues(
       'Read-replica schema catalog requires five selected-schema parameter arrays.',
     )
   }
-
   let sql = queryText
   for (const [index, value] of parameters.entries()) {
     const placeholder = `$${index + 1}::text[]`
@@ -210,36 +237,59 @@ function renderCatalogQueryWithStaticValues(
     }
     sql = sql.replaceAll(placeholder, postgresTextArray(value))
   }
-
   return sql
 }
 
 function postgresTextArray(value: unknown): string {
-  if (!Array.isArray(value) || !value.every(entry => typeof entry === 'string')) {
+  if (
+    !Array.isArray(value)
+    || !value.every(entry => typeof entry === 'string')
+  ) {
     throw new Error(
       'Read-replica schema catalog parameters must be arrays of selected object names.',
     )
   }
-
   return `ARRAY[${value.map(quoteSqlText).join(', ')}]::text[]`
 }
 
 function quoteSqlText(value: string): string {
-  if (value.includes('\0'))
-    throw new Error('Read-replica schema catalog parameters cannot contain null bytes.')
-
-  return `'${value.replaceAll("'", "''")}'`
+  if (value.includes('\0')) {
+    throw new Error(
+      'Read-replica schema catalog parameters cannot contain null bytes.',
+    )
+  }
+  return `'${value.replaceAll('\'', '\'\'')}'`
 }
 
-function remainingCatalogBudgetMs(deadline: number): number {
+function remainingBudgetMs(deadline: number): number {
   const remainingMs = deadline - Date.now() - CATALOG_QUERY_BUFFER_MS
   if (remainingMs <= 0) {
     throw new Error(
       'Read-replica schema sync exceeded max duration before it could read the schema catalog.',
     )
   }
-
   return remainingMs
+}
+
+function dataApiCommandError(value: string): Error {
+  const output = commandOutput(value)
+  if (
+    /0\.5\s*mb|request.*(?:size|limit)|payload.*(?:size|limit)/i.test(output)
+  ) {
+    return new Error(
+      'Cloud SQL Data API rejected the SQL request at its 0.5 MB request limit. Split the DDL before release.',
+    )
+  }
+  if (
+    /10\s*mb|partial.?result|response.*(?:size|limit)|result.*(?:size|limit)/i.test(
+      output,
+    )
+  ) {
+    return new Error(
+      'Cloud SQL Data API rejected the response at its 10 MB response limit. Keep the selected schema catalog bounded.',
+    )
+  }
+  return new Error(`Cloud SQL Data API query failed: ${output}`)
 }
 
 function commandOutput(value: string): string {
@@ -247,39 +297,11 @@ function commandOutput(value: string): string {
   return message ? message.slice(0, 4096) : 'no diagnostic output'
 }
 
-function replicaConnectionString(): string {
-  const connectionString
-    = process.env.READ_REPLICA_DB_URL
-      ?? process.env.READ_REPLICATE_GOOGLE_EU1
-      ?? process.env.GOOGLE_READ_REPLICA_DB_URL
-      ?? process.env.GOOGLE_PRIMARY_REPLICA_DB_URL
-
-  if (!connectionString) {
-    throw new Error(
-      'Set READ_REPLICA_DB_URL (or READ_REPLICATE_GOOGLE_EU1) to the direct Google subscriber PostgreSQL URL in release CI.',
-    )
-  }
-
-  return connectionString
-}
-
-function positiveSecondsFromEnv(name: string, fallback: number): number {
-  const value = process.env[name]
-  if (value === undefined)
-    return fallback
-
-  if (!/^\d+$/.test(value) || Number(value) <= 0) {
-    throw new Error(`${name} must be a positive integer number of seconds.`)
-  }
-
-  return Number(value)
-}
-
 try {
   await main()
 }
 catch (error) {
   const message = error instanceof Error ? error.message : String(error)
-  console.error(`::error title=Read-replica direct schema sync failed::${message}`)
+  console.error(`::error title=Read-replica Data API sync failed::${message}`)
   process.exitCode = 1
 }
