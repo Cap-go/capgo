@@ -10,18 +10,24 @@ Production reconciliation uses Cloud SQL Data API through GitHub OIDC. It never
 accepts a direct subscriber PostgreSQL URL, never allowlists GitHub runner IPs,
 and does not deploy a temporary Worker.
 
-| Variable                       | Value                                   |
-| ------------------------------ | --------------------------------------- |
-| `GOOGLE_CLOUD_PROJECT`         | Google Cloud project ID                 |
-| `GOOGLE_READ_REPLICA_INSTANCE` | Google Cloud SQL subscriber instance ID |
-| `GOOGLE_READ_REPLICA_DATABASE` | Subscriber database name                |
+| GitHub repository variable          | Value                                   |
+| ----------------------------------- | --------------------------------------- |
+| `GOOGLE_CLOUD_PROJECT`              | Google Cloud project ID                 |
+| `GOOGLE_READ_REPLICA_INSTANCE`      | Google Cloud SQL subscriber instance ID |
+| `GOOGLE_READ_REPLICA_DATABASE`      | Subscriber database name                |
+| `GOOGLE_WORKLOAD_IDENTITY_PROVIDER` | GitHub OIDC provider resource name      |
+| `GOOGLE_SERVICE_ACCOUNT`            | Google service account email            |
 
-The workflow verifies Data API access before it applies primary migrations. It
-then reads the selected catalog from the primary through the Supabase Management
-API and applies reconciliation DDL with the Cloud SQL Data API.
+The release workflow reads the committed
+`schema_replicate.catalog.json`, applies its safe additive DDL through the Data
+API, and verifies the subscriber before `supabase db push` starts. If the
+subscriber cannot converge, the primary migration is not run.
 
 ```bash
-bun run readreplicate:sync-schema
+bun scripts/sync-read-replica-schema.ts \
+  --google-cloud-project <project> \
+  --google-read-replica-instance <instance> \
+  --google-read-replica-database <database>
 ```
 
 The dedicated Google service account must be an IAM database user with the

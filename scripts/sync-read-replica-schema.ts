@@ -1,10 +1,13 @@
+import { readFile } from "node:fs/promises";
 import process from "node:process";
-import { reconcileReadReplicaSchema } from "../read_replicate/schema_additive_sync.ts";
+import { applyReadReplicaSchemaSync } from "../read_replicate/schema_additive_sync.ts";
 import {
   READ_REPLICA_SCHEMA_CATALOG_SQL,
+  readReplicaSchemaCatalog,
   type Queryable,
   stableStringify,
 } from "../read_replicate/schema_catalog.ts";
+import { readReplicaSchemaCompatibilityIssues } from "../read_replicate/schema_compatibility.ts";
 
 const DEFAULT_SYNC_MAX_SECONDS = 30 * 60;
 const CATALOG_QUERY_BUFFER_MS = 5000;
@@ -17,67 +20,61 @@ interface DataApiResponse {
   }>;
 }
 
+interface GoogleDataApiConfig {
+  project: string;
+  instance: string;
+  database: string;
+}
 async function main(): Promise<void> {
-  const maxDurationMs =
-    positiveSecondsFromEnv(
-      "READ_REPLICA_SCHEMA_SYNC_MAX_TIME",
-      DEFAULT_SYNC_MAX_SECONDS,
-    ) * 1000;
+  const maxDurationMs = DEFAULT_SYNC_MAX_SECONDS * 1000;
   const deadline = Date.now() + maxDurationMs;
-  const result = await reconcileReadReplicaSchema(
-    linkedPrimaryCatalogClient(deadline),
-    googleDataApiClient(deadline),
-    {
-      deadline,
-      maxDurationMs,
-      statementTimeoutMs: GOOGLE_DATA_API_MAX_SECONDS * 1000,
-    },
+  const expected = await readExpectedReplicaCatalog();
+  const replica = googleDataApiClient(
+    googleDataApiConfigFromArgs(process.argv.slice(2)),
+    deadline,
   );
+  const result = await applyReadReplicaSchemaSync(replica, expected, {
+    deadline,
+    maxDurationMs,
+    statementTimeoutMs: GOOGLE_DATA_API_MAX_SECONDS * 1000,
+  });
+  const actual = await readReplicaSchemaCatalog(replica);
+  const issues = readReplicaSchemaCompatibilityIssues(expected, actual);
 
-  if (result.issues.length) {
+  if (issues.length) {
     console.error(
       "::error title=Read-replica schema did not converge::Cloud SQL Data API reconciliation completed with residual drift.",
     );
     console.error(
-      stableStringify({ error: "schema_not_converged", ...result }),
+      stableStringify({ error: "schema_not_converged", ...result, issues }),
     );
     process.exitCode = 1;
     return;
   }
 
   console.log("Read-replica Cloud SQL Data API sync result:");
-  console.log(stableStringify(result));
+  console.log(stableStringify({ ...result, issues }));
   console.log(
-    "Read replica now matches the live primary schema for the selected tables.",
+    "Read replica matches the committed selected schema before primary migrations.",
   );
 }
 
-function linkedPrimaryCatalogClient(deadline: number): Queryable {
-  if (!process.env.SUPABASE_ACCESS_TOKEN) {
-    throw new Error(
-      "Set SUPABASE_ACCESS_TOKEN after linking the Supabase project for live primary schema reads.",
-    );
-  }
-
-  return {
-    async query(queryText: string, values?: unknown[]) {
-      if (queryText !== READ_REPLICA_SCHEMA_CATALOG_SQL) {
-        throw new Error(
-          "Linked primary access is restricted to the read-replica schema catalog query.",
-        );
-      }
-      return queryLinkedPrimaryCatalog(
-        renderCatalogQueryWithStaticValues(queryText, values),
-        deadline,
-      );
-    },
-  };
+async function readExpectedReplicaCatalog(): Promise<unknown> {
+  return JSON.parse(
+    await readFile(
+      new URL(
+        "../read_replicate/schema_replicate.catalog.json",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ) as unknown;
 }
-
-function googleDataApiClient(deadline: number): Queryable {
-  const project = requiredEnv("GOOGLE_CLOUD_PROJECT");
-  const instance = requiredEnv("GOOGLE_READ_REPLICA_INSTANCE");
-  const database = requiredEnv("GOOGLE_READ_REPLICA_DATABASE");
+function googleDataApiClient(
+  config: GoogleDataApiConfig,
+  deadline: number,
+): Queryable {
+  const { project, instance, database } = config;
 
   return {
     async query(queryText: string, values?: unknown[]) {
@@ -173,59 +170,6 @@ function dataApiRows(response: DataApiResponse): Record<string, any>[] {
   });
 }
 
-async function queryLinkedPrimaryCatalog(
-  sql: string,
-  deadline: number,
-): Promise<{ rows: Record<string, any>[] }> {
-  const child = Bun.spawn(
-    [
-      "supabase",
-      "db",
-      "query",
-      "--linked",
-      "--agent=no",
-      "--output",
-      "json",
-      sql,
-    ],
-    { stdout: "pipe", stderr: "pipe", env: process.env },
-  );
-  let timedOut = false;
-  const timeout = setTimeout(() => {
-    timedOut = true;
-    child.kill();
-  }, remainingBudgetMs(deadline));
-
-  try {
-    const [exitCode, stdout, stderr] = await Promise.all([
-      child.exited,
-      new Response(child.stdout).text(),
-      new Response(child.stderr).text(),
-    ]);
-    if (timedOut)
-      throw new Error(
-        "Read-replica schema sync exceeded max duration while reading the live primary schema catalog.",
-      );
-    if (exitCode !== 0)
-      throw new Error(
-        `Linked primary schema catalog query failed: ${commandOutput(stderr || stdout)}`,
-      );
-    const parsed = JSON.parse(stdout) as unknown;
-    if (
-      !Array.isArray(parsed) ||
-      !parsed.every(
-        (row) => row !== null && typeof row === "object" && !Array.isArray(row),
-      )
-    )
-      throw new Error(
-        "Linked primary schema catalog query returned an invalid JSON row array.",
-      );
-    return { rows: parsed as Record<string, any>[] };
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
 function renderCatalogQueryWithStaticValues(
   queryText: string,
   values: unknown[] | undefined,
@@ -266,10 +210,19 @@ function quoteSqlText(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-function requiredEnv(name: string): string {
-  const value = process.env[name];
-  if (!value)
-    throw new Error(`Set ${name} for Cloud SQL Data API reconciliation.`);
+function googleDataApiConfigFromArgs(args: string[]): GoogleDataApiConfig {
+  return {
+    project: requiredOption(args, "--google-cloud-project"),
+    instance: requiredOption(args, "--google-read-replica-instance"),
+    database: requiredOption(args, "--google-read-replica-database"),
+  };
+}
+
+function requiredOption(args: string[], option: string): string {
+  const index = args.indexOf(option);
+  const value = index === -1 ? undefined : args[index + 1];
+  if (!value || value.startsWith("--"))
+    throw new Error(`Pass ${option} for Cloud SQL Data API reconciliation.`);
   return value;
 }
 
@@ -285,14 +238,6 @@ function remainingBudgetMs(deadline: number): number {
 function commandOutput(value: string): string {
   const message = value.trim().replaceAll(/\s+/g, " ");
   return message ? message.slice(0, 4096) : "no diagnostic output";
-}
-
-function positiveSecondsFromEnv(name: string, fallback: number): number {
-  const value = process.env[name];
-  if (value === undefined) return fallback;
-  if (!/^\d+$/.test(value) || Number(value) <= 0)
-    throw new Error(`${name} must be a positive integer number of seconds.`);
-  return Number(value);
 }
 
 try {
