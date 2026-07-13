@@ -31,24 +31,16 @@ describe('production read-replica release gate', () => {
         readReplicaSyncScript(),
       ])
 
-      expect(workflow).toContain('google-github-actions/auth@v3')
+      expect(workflow).not.toContain('google-github-actions/auth@v3')
       expect(workflow).toContain(
-        githubExpression('vars.GOOGLE_WORKLOAD_IDENTITY_PROVIDER'),
+        githubExpression('secrets.GOOGLE_SERVICE_ACCOUNT'),
       )
-      expect(workflow).toContain(
-        githubExpression('vars.GOOGLE_SERVICE_ACCOUNT'),
-      )
-      expect(workflow).toContain(githubExpression('vars.GOOGLE_CLOUD_PROJECT'))
-      expect(workflow).toContain(
-        githubExpression('vars.GOOGLE_READ_REPLICA_INSTANCE'),
-      )
-      expect(workflow).toContain(
-        githubExpression('vars.GOOGLE_READ_REPLICA_DATABASE'),
-      )
-      expect(workflow).not.toContain('GOOGLE_READ_REPLICA_INSTANCE: eu-2')
+      expect(workflow).toContain('GOOGLE_SERVICE_ACCOUNT_BASE64')
+      expect(workflow).toContain('base64 --decode')
+      expect(workflow).toContain('gcloud auth activate-service-account')
+      expect(workflow).not.toContain('vars.GOOGLE_')
       expect(workflow).not.toContain('READ_REPLICATE_GOOGLE_EU1')
       expect(workflow).not.toContain('check-read-replica-hyperdrive-schema')
-      expect(workflow).not.toContain('\nenv:\n  GOOGLE_')
       expect(workflow).toContain(
         [
           'read_replica_schema:',
@@ -65,6 +57,11 @@ describe('production read-replica release gate', () => {
       expect(syncScript).toContain('schema_replicate.catalog.json')
       expect(syncScript).toContain('--partial_result_mode=FAIL_PARTIAL_RESULT')
       expect(syncScript).toContain('GOOGLE_DATA_API_REQUEST_LIMIT_BYTES')
+      expect(syncScript).toContain('const GOOGLE_READ_REPLICA: GoogleDataApiConfig = {')
+      expect(syncScript).toContain('project: \'capgo-394818\'')
+      expect(syncScript).toContain('instance: \'eu-2\'')
+      expect(syncScript).toContain('database: \'postgres\'')
+      expect(syncScript).not.toContain('googleDataApiConfigFromArgs')
       expect(syncScript).not.toContain('supabase')
     },
   )

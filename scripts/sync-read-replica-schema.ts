@@ -31,14 +31,17 @@ interface GoogleDataApiConfig {
   database: string
 }
 
+const GOOGLE_READ_REPLICA: GoogleDataApiConfig = {
+  project: 'capgo-394818',
+  instance: 'eu-2',
+  database: 'postgres',
+}
+
 async function main(): Promise<void> {
   const maxDurationMs = DEFAULT_SYNC_MAX_SECONDS * 1000
   const deadline = Date.now() + maxDurationMs
   const expected = await readExpectedReplicaCatalog()
-  const replica = googleDataApiClient(
-    googleDataApiConfigFromArgs(process.argv.slice(2)),
-    deadline,
-  )
+  const replica = googleDataApiClient(GOOGLE_READ_REPLICA, deadline)
   const result = await applyReadReplicaSchemaSync(replica, expected, {
     deadline,
     maxDurationMs,
@@ -265,22 +268,6 @@ function quoteSqlText(value: string): string {
     )
   }
   return `'${value.replaceAll('\'', '\'\'')}'`
-}
-
-function googleDataApiConfigFromArgs(args: string[]): GoogleDataApiConfig {
-  return {
-    project: requiredOption(args, '--google-cloud-project'),
-    instance: requiredOption(args, '--google-read-replica-instance'),
-    database: requiredOption(args, '--google-read-replica-database'),
-  }
-}
-
-function requiredOption(args: string[], option: string): string {
-  const index = args.indexOf(option)
-  const value = index === -1 ? undefined : args[index + 1]
-  if (!value || value.startsWith('--'))
-    throw new Error(`Pass ${option} for Cloud SQL Data API reconciliation.`)
-  return value
 }
 
 function remainingBudgetMs(deadline: number): number {

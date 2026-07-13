@@ -102,7 +102,6 @@ jobs:
     name: Reconcile production read-replica schema
     permissions:
       contents: read
-      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -110,21 +109,19 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - name: Authenticate Google Cloud
-        uses: google-github-actions/auth@v3
-        with:
-          workload_identity_provider: ${{ vars.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GOOGLE_SERVICE_ACCOUNT }}
       - name: Setup Google Cloud CLI
         uses: google-github-actions/setup-gcloud@v2
       - name: Install dependencies
         run: bun install
       - name: Reconcile the Google subscriber through Cloud SQL Data API
-        run: >-
+        env:
+          GOOGLE_SERVICE_ACCOUNT_BASE64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+        run: |
+          credentials_file="$(mktemp)"
+          trap 'rm -f "$credentials_file"' EXIT
+          printf '%s' "$GOOGLE_SERVICE_ACCOUNT_BASE64" | base64 --decode > "$credentials_file"
+          gcloud auth activate-service-account --key-file="$credentials_file"
           bun scripts/sync-read-replica-schema.ts
-          --google-cloud-project '${{ vars.GOOGLE_CLOUD_PROJECT }}'
-          --google-read-replica-instance '${{ vars.GOOGLE_READ_REPLICA_INSTANCE }}'
-          --google-read-replica-database '${{ vars.GOOGLE_READ_REPLICA_DATABASE }}'
 
   deploy_webapp:
     needs: [changes, supabase_deploy, read_replica_schema]
