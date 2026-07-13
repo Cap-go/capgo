@@ -47,8 +47,6 @@ describe('tests min version', () => {
 
   it('should test auto min version flag', async () => {
     const supabase = getSupabaseClient()
-    await resetAppData(APPNAME)
-    await resetAndSeedAppData(APPNAME, seedOptions)
 
     const { error } = await supabase.from('app_versions').update({ min_update_version: '1.0.0' }).eq('name', '1.0.0').eq('app_id', APPNAME).throwOnError()
     expect(error).toBeNull()

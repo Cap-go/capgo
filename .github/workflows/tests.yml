@@ -1048,7 +1048,10 @@ jobs:
           export BACKGROUND_WAIT_ON="${SUPABASE_FUNCTIONS_HEALTH_URL:?Missing isolated Supabase health URL}"
           bash .github/scripts/start-background-service.sh
       - name: Run Capgo CLI integration tests
-        run: bun run supabase:with-env -- bunx vitest run tests/cli*
+        run: |
+          bun run supabase:with-env -- bunx vitest run tests/cli* --exclude=tests/cli-min-version.test.ts --exclude=tests/cli-new-encryption.test.ts
+          bun run supabase:with-env -- bunx vitest run tests/cli-min-version.test.ts --no-file-parallelism --maxWorkers=1
+          bun run supabase:with-env -- bunx vitest run tests/cli-new-encryption.test.ts --no-file-parallelism --maxWorkers=1
       - name: Show CLI Edge server logs after failure
         if: failure() && steps.bootstrap_cli_edge_server.outputs.log_path != ''
         run: |
