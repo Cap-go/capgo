@@ -989,6 +989,13 @@ CREATE UNIQUE INDEX si_customer_cover_uidx ON public.stripe_info USING btree (cu
 
 
 --
+-- Name: si_customer_cover_uidx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX si_customer_cover_uidx ON public.stripe_info USING btree (customer_id) INCLUDE (status, trial_at, mau_exceeded, storage_exceeded, bandwidth_exceeded);
+
+
+--
 -- Name: si_customer_status_trial_idx; Type: INDEX; Schema: public; Owner: -
 --
 

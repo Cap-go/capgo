@@ -1,3 +1,5 @@
+import { sortJson } from './schema_json.ts'
+
 export const REPLICA_TABLES = [
   'orgs',
   'stripe_info',
@@ -27,9 +29,7 @@ const REPLICA_SEQUENCES = [
   'stripe_info_id_seq',
 ] as const
 
-export const REPLICA_FUNCTIONS = [
-  'one_month_ahead',
-] as const
+export const REPLICA_FUNCTIONS = ['one_month_ahead'] as const
 
 export const REPLICA_EXCLUDED_INDEXES = [
   // replicate_prepare.sh intentionally omits this source-only customer lookup index from the replica DDL.
@@ -45,18 +45,18 @@ function escapeRegex(value: string): string {
 }
 
 export interface Queryable {
-  query: (queryText: string, values?: unknown[]) => Promise<{ rows: Record<string, any>[] }>
+  query: (
+    queryText: string,
+    values?: unknown[],
+  ) => Promise<{ rows: Record<string, any>[] }>
 }
 
 // The release checker reads this catalog before and after schema DDL. The explicit
 // CURRENT_TIMESTAMP predicate makes Hyperdrive treat the verification read as
 // non-cacheable, so it observes DDL from the same release run.
 export const READ_REPLICA_SCHEMA_CATALOG_SQL = `
-WITH replica_tables(table_name) AS (
+WITH RECURSIVE replica_tables(table_name) AS (
   SELECT unnest($1::text[])
-),
-replica_types(type_name) AS (
-  SELECT unnest($2::text[])
 ),
 replica_sequences(sequence_name) AS (
   SELECT unnest($3::text[])
@@ -82,6 +82,36 @@ tables AS (
   WHERE n.nspname = 'public'
     AND c.relkind IN ('r', 'p')
 ),
+selected_column_types(type_oid) AS (
+  SELECT DISTINCT a.atttypid
+  FROM tables t
+  JOIN pg_attribute a ON a.attrelid = t.table_oid
+  WHERE a.attnum > 0
+    AND NOT a.attisdropped
+),
+referenced_types(type_oid) AS (
+  SELECT type_oid
+  FROM selected_column_types
+  UNION
+  SELECT CASE
+    WHEN typ.typbasetype <> 0 THEN typ.typbasetype
+    ELSE typ.typelem
+  END
+  FROM referenced_types referenced
+  JOIN pg_type typ ON typ.oid = referenced.type_oid
+  WHERE typ.typbasetype <> 0
+     OR typ.typelem <> 0
+),
+selected_type_names(type_name) AS (
+  SELECT unnest($2::text[])
+  UNION
+  SELECT DISTINCT typ.typname
+  FROM referenced_types referenced
+  JOIN pg_type typ ON typ.oid = referenced.type_oid
+  JOIN pg_namespace type_namespace ON type_namespace.oid = typ.typnamespace
+  WHERE type_namespace.nspname = 'public'
+    AND typ.typtype IN ('e', 'c')
+),
 columns AS (
   SELECT
     t.table_name,
@@ -103,6 +133,7 @@ constraints AS (
     t.table_name,
     con.conname AS constraint_name,
     con.contype AS constraint_type,
+    con.convalidated AS is_valid,
     pg_get_constraintdef(con.oid, true) AS definition
   FROM tables t
   JOIN pg_constraint con ON con.conrelid = t.table_oid
@@ -113,10 +144,14 @@ indexes AS (
     t.table_name,
     idx.relname AS index_name,
     pg_get_indexdef(idx.oid) AS definition,
-    ix.indisvalid AS is_valid
+    ix.indisvalid AS is_valid,
+    (constraint_owner.oid IS NOT NULL) AS constraint_owned
   FROM tables t
   JOIN pg_index ix ON ix.indrelid = t.table_oid
   JOIN pg_class idx ON idx.oid = ix.indexrelid
+  LEFT JOIN pg_constraint constraint_owner
+    ON constraint_owner.conindid = ix.indexrelid
+    AND constraint_owner.contype IN ('p', 'u', 'x')
   WHERE NOT EXISTS (
     SELECT 1
     FROM replica_excluded_indexes rei
@@ -151,8 +186,25 @@ types AS (
     END AS definition
   FROM pg_type typ
   JOIN pg_namespace n ON n.oid = typ.typnamespace
-  JOIN replica_types rt ON rt.type_name = typ.typname
+  JOIN selected_type_names rt ON rt.type_name = typ.typname
   WHERE n.nspname = 'public'
+),
+selected_sequence_oids(sequence_oid) AS (
+  SELECT seq.oid
+  FROM pg_class seq
+  JOIN pg_namespace n ON n.oid = seq.relnamespace
+  JOIN replica_sequences rs ON rs.sequence_name = seq.relname
+  WHERE n.nspname = 'public'
+    AND seq.relkind = 'S'
+  UNION
+  SELECT dep.objid
+  FROM pg_depend dep
+  JOIN tables t ON t.table_oid = dep.refobjid
+  JOIN pg_class seq ON seq.oid = dep.objid
+  JOIN pg_namespace n ON n.oid = seq.relnamespace
+  WHERE dep.deptype IN ('a', 'i')
+    AND n.nspname = 'public'
+    AND seq.relkind = 'S'
 ),
 sequences AS (
   SELECT
@@ -169,8 +221,8 @@ sequences AS (
   FROM pg_class seq
   JOIN pg_namespace n ON n.oid = seq.relnamespace
   JOIN pg_sequence s ON s.seqrelid = seq.oid
-  JOIN replica_sequences rs ON rs.sequence_name = seq.relname
-  LEFT JOIN pg_depend dep ON dep.objid = seq.oid AND dep.deptype = 'a'
+  JOIN selected_sequence_oids selected_sequence ON selected_sequence.sequence_oid = seq.oid
+  LEFT JOIN pg_depend dep ON dep.objid = seq.oid AND dep.deptype IN ('a', 'i')
   LEFT JOIN pg_class owned_table ON owned_table.oid = dep.refobjid
   LEFT JOIN pg_attribute owned_attr ON owned_attr.attrelid = dep.refobjid AND owned_attr.attnum = dep.refobjsubid
   WHERE n.nspname = 'public'
@@ -214,6 +266,7 @@ SELECT jsonb_build_object(
       'table', table_name,
       'name', constraint_name,
       'type', constraint_type,
+      'valid', is_valid,
       'definition', definition
     ) ORDER BY table_name, constraint_name)
     FROM constraints
@@ -223,7 +276,8 @@ SELECT jsonb_build_object(
       'table', table_name,
       'name', index_name,
       'definition', definition,
-      'valid', is_valid
+      'valid', is_valid,
+      'constraintOwned', constraint_owned
     ) ORDER BY table_name, index_name)
     FROM indexes
   ), '[]'::jsonb),
@@ -267,7 +321,9 @@ export function stableStringify(value: unknown): string {
   return JSON.stringify(sortJson(value), null, 2)
 }
 
-export async function readReplicaSchemaCatalog(client: Queryable): Promise<unknown> {
+export async function readReplicaSchemaCatalog(
+  client: Queryable,
+): Promise<unknown> {
   const result = await client.query(READ_REPLICA_SCHEMA_CATALOG_SQL, [
     REPLICA_TABLES,
     REPLICA_TYPES,
@@ -280,18 +336,4 @@ export async function readReplicaSchemaCatalog(client: Queryable): Promise<unkno
     throw new Error('Read-replica schema catalog query returned no rows')
 
   return sortJson(catalog)
-}
-
-function sortJson(value: unknown): unknown {
-  if (Array.isArray(value))
-    return value.map(sortJson)
-
-  if (!value || typeof value !== 'object')
-    return value
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, child]) => [key, sortJson(child)]),
-  )
 }

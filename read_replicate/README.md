@@ -6,24 +6,34 @@ replicas, so these scripts intentionally target only one Google database.
 
 ## Required Env
 
-Credentials are loaded from `internal/cloudflare/.env.prod`.
+Local credentials are normally loaded from `internal/cloudflare/.env.prod`.
 
-| Variable | Description |
-| --- | --- |
-| `MAIN_SUPABASE_DB_URL` | Supabase source PostgreSQL URL |
-| `READ_REPLICATE_GOOGLE_EU1` | Google Cloud SQL subscriber PostgreSQL URL |
+| Variable                    | Description                                                   |
+| --------------------------- | ------------------------------------------------------------- |
+| `READ_REPLICATE_GOOGLE_EU1` | Direct Google Cloud SQL subscriber PostgreSQL URL             |
+| `MAIN_SUPABASE_DB_URL`      | Optional direct primary URL for local/manual reconciliation   |
+
+Production release CI requires the GitHub Actions secret
+`READ_REPLICATE_GOOGLE_EU1` with the direct Cloud SQL URL. It reads the linked
+Supabase primary through the existing `SUPABASE_TOKEN` Management API access,
+then uses the direct Google URL only for subscriber DDL. The final verification
+still uses the Hyperdrive bindings.
 
 Optional overrides:
 
-| Variable | Description |
-| --- | --- |
-| `READ_REPLICA_TARGET_ENV` | Env key to use if more than one Google DB URL exists |
-| `READ_REPLICA_PUBLICATION_NAME` | Publication name on Supabase |
-| `READ_REPLICA_SUBSCRIPTION_NAME` | Subscription name on Google |
-| `READ_REPLICA_SLOT_NAME` | Slot name on Supabase |
-| `READ_REPLICA_FULL_RESET=1` | Allow full target reset in `replicate_to_replica.sh` |
-| `READ_REPLICA_SUBSCRIPTION_ONLY=1` | Recreate only the subscription |
-| `READ_REPLICA_SCHEMA_SYNC_MAX_TIME` | Max seconds for the Hyperdrive additive schema sync call; defaults to `1800` and the worker deadline is 15s shorter |
+| Variable                                    | Description                                                      |
+| ------------------------------------------- | ---------------------------------------------------------------- |
+| `READ_REPLICA_TARGET_ENV`                   | Env key to use if more than one Google DB URL exists             |
+| `READ_REPLICA_PUBLICATION_NAME`             | Publication name on Supabase                                     |
+| `READ_REPLICA_SUBSCRIPTION_NAME`            | Subscription name on Google                                      |
+| `READ_REPLICA_SLOT_NAME`                    | Slot name on Supabase                                            |
+| `READ_REPLICA_FULL_RESET=1`                 | Allow full target reset in `replicate_to_replica.sh`             |
+| `READ_REPLICA_SUBSCRIPTION_ONLY=1`          | Recreate only the subscription                                   |
+| `READ_REPLICA_SCHEMA_SYNC_MAX_TIME`         | Direct schema-sync budget in seconds; defaults to `1800`         |
+| `READ_REPLICA_SCHEMA_LOCK_WAIT_SECONDS`     | Direct subscriber advisory-lock wait; defaults to `120` seconds  |
+| `READ_REPLICA_SCHEMA_CHECK_MAX_TIME`        | Whole Hyperdrive check budget; defaults to `300` seconds         |
+| `READ_REPLICA_SCHEMA_CHECK_READY_ATTEMPTS`  | Authenticated Worker readiness attempts; defaults to `20`        |
+| `READ_REPLICA_SCHEMA_CHECK_VERIFY_ATTEMPTS` | Hyperdrive verification attempts after readiness; defaults to `1`|
 
 If subscription name is not provided, scripts discover it from `pg_subscription`.
 If exactly one subscription exists, it is used. If multiple subscriptions exist,
@@ -49,8 +59,15 @@ Check that the committed replica schema matches the current database schema:
 bun run readreplicate:check-schema
 ```
 
-Sync safe additive changes through Hyperdrive, then check that the live read
-replica is operationally compatible with the committed replica schema catalog:
+Reconcile the selected Google subscriber directly from the live Supabase primary.
+This is the release write path and requires the direct subscriber URL:
+
+```bash
+bun run readreplicate:sync-schema
+```
+
+Verify the deployed Hyperdrive read path against the live primary. This command
+never mutates the subscriber:
 
 ```bash
 bun run readreplicate:check-hyperdrive-schema
@@ -68,7 +85,8 @@ Re-sync one table only:
 bun run readreplicate:add-table channels
 ```
 
-Check and recreate missing indexes on the Google subscriber:
+Legacy check that recreates missing indexes from the committed snapshot. Use the
+release reconciler above for live-primary shape convergence:
 
 ```bash
 bun run readreplicate:indexes
@@ -92,18 +110,29 @@ READ_REPLICA_PASSWORD='new-password' bash read_replicate/update_readreplica_pass
 - `replicate_to_replica.sh` defaults to subscription-only mode unless you choose
   full reset interactively or set `READ_REPLICA_FULL_RESET=1`.
 - `replicate_add_table.sh` disables the subscription, reloads only the requested
-  table on the Google subscriber, refreshes the publication with `copy_data =
-  false`, then re-enables the subscription.
-- `schema_replicate.sql` is intentionally limited to tables replicated into the
-  Google subscriber. It excludes foreign keys, triggers, and RLS policies.
-- `schema_replicate.catalog.json` is the machine-readable catalog snapshot used
-  by release CI to sync missing additive schema changes and verify compatible
-  tables, columns, types, and exact index parity through Hyperdrive. The check
-  ignores column order, defaults, constraints, sequences, and functions because
-  they do not prevent logical replication. Unexpected indexes still fail the
-  check because they add storage and write-maintenance cost.
-- Production Supabase deploys run `bun run readreplicate:check-hyperdrive-schema`
-  before migrations, functions, or workers publish. Each check deploys a uniquely
-  named, token-protected Worker, applies safe missing columns and indexes on the
-  Google subscriber, verifies the live catalog, and deletes the Worker before
-  exiting. Concurrent CI runs therefore never share or replace a checker Worker.
+  table on the Google subscriber, refreshes the publication with `copy_data = false`,
+  then re-enables the subscription.
+- `schema_replicate.catalog.json` is a checked-in local snapshot used by PR CI to
+  keep migrations and the selected replica schema in sync. It is never used as a
+  production DDL source.
+- Every stable production release waits for primary migrations when they are in scope,
+  then reads the selected catalog from that live primary through the Supabase Management
+  API and reconciles the Google subscriber through its direct Cloud SQL connection.
+  This gate runs even for frontend-only releases and blocks downstream publishing until
+  the same selected schema verifies through the deployed Hyperdrive read path.
+- The reconciliation applies safe selected-schema changes: missing columns, column
+  defaults/nullability, selected function definitions, structural sequence options,
+  primary/unique/check constraints, enums and composites referenced by selected
+  tables, and ordinary indexes. Primary/unique constraints are built through a
+  concurrent unique index and attached afterward.
+- The reconciliation removes only subscriber-only indexes proven not to back a
+  constraint. It refuses destructive or ambiguous changes and returns structured
+  residual drift instead of claiming success.
+- Foreign keys, triggers, RLS policies, runtime sequence values, column reordering,
+  and destructive type changes are outside this automatic read-only replica contract.
+  Sequence definitions are aligned, but logical replication does not advance sequence
+  values.
+- Each Hyperdrive verification deploys a uniquely named Worker with its token in the
+  initial deployment, waits for its authenticated lightweight readiness route, then
+  verifies with bounded catalog queries that print the Worker response on failure.
+  It has no DDL or session lock because Hyperdrive uses transaction pooling.

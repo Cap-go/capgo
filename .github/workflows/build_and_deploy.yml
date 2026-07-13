@@ -45,7 +45,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.supabase == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     name: Build code and deploy to Supabase
     permissions:
       contents: read
@@ -96,12 +96,6 @@ jobs:
         run: supabase link --project-ref ${{ env.SUPABASE_PROJECT_ID }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
-      - name: Sync and check read-replica schema through Hyperdrive
-        if: env.SUPA_ENV == 'PROD'
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: bun run readreplicate:check-hyperdrive-schema
       - name: Apply Supabase Migrations
         run: supabase db push
       - name: Update functions
@@ -109,9 +103,64 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
         run: supabase functions deploy
 
-  deploy_webapp:
+  read_replica_schema:
     needs: [changes, supabase_deploy]
-    if: ${{ always() && needs.changes.result == 'success' && (needs.supabase_deploy.result == 'success' || needs.supabase_deploy.result == 'skipped') }}
+    if: ${{ always() && needs.changes.result == 'success' && !contains(github.ref_name, '-alpha') && (needs.supabase_deploy.result == 'success' || needs.supabase_deploy.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    name: Reconcile production read-replica schema
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v2.0.0
+        with:
+          version: 2.98.2
+      - name: Require direct subscriber connection
+        env:
+          READ_REPLICATE_GOOGLE_EU1: ${{ secrets.READ_REPLICATE_GOOGLE_EU1 }}
+        run: |
+          if [[ -z "$READ_REPLICATE_GOOGLE_EU1" ]]; then
+            echo "::error title=Missing read-replica connection::Set READ_REPLICATE_GOOGLE_EU1 as a repository or selected organization secret with the direct Google subscriber PostgreSQL URL."
+            exit 1
+          fi
+      - name: Link production primary
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID_PROD }}
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      # This is deliberately independent of deploy scope: a stable release repairs
+      # any selected-table drift left by an earlier failed release before publishing.
+      - name: Reconcile the selected Google subscriber schema from the live primary
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+          READ_REPLICATE_GOOGLE_EU1: ${{ secrets.READ_REPLICATE_GOOGLE_EU1 }}
+          READ_REPLICA_SCHEMA_SYNC_MAX_TIME: 1800
+          READ_REPLICA_SCHEMA_LOCK_WAIT_SECONDS: 120
+        run: bun scripts/sync-read-replica-schema.ts
+      - name: Verify the read-replica schema through Hyperdrive
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          READ_REPLICA_SCHEMA_CHECK_MAX_TIME: 300
+          READ_REPLICA_SCHEMA_CHECK_READY_ATTEMPTS: 20
+        run: bun run readreplicate:check-hyperdrive-schema
+
+  deploy_webapp:
+    needs: [changes, supabase_deploy, read_replica_schema]
+    if: ${{ always() && needs.changes.result == 'success' && (needs.supabase_deploy.result == 'success' || needs.supabase_deploy.result == 'skipped') && (needs.read_replica_schema.result == 'success' || needs.read_replica_schema.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -200,8 +249,8 @@ jobs:
           prerelease: ${{ contains(github.ref, '-alpha.') }}
 
   deploy_api:
-    needs: [changes, supabase_deploy]
-    if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.api == 'true' && (needs.supabase_deploy.result == 'success' || needs.supabase_deploy.result == 'skipped') }}
+    needs: [changes, supabase_deploy, read_replica_schema]
+    if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.api == 'true' && (needs.supabase_deploy.result == 'success' || needs.supabase_deploy.result == 'skipped') && (needs.read_replica_schema.result == 'success' || needs.read_replica_schema.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -230,8 +279,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   deploy_translation_worker:
-    needs: [changes, supabase_deploy]
-    if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.translation == 'true' && (needs.supabase_deploy.result == 'success' || (needs.supabase_deploy.result == 'skipped' && needs.changes.outputs.supabase != 'true')) }}
+    needs: [changes, supabase_deploy, read_replica_schema]
+    if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.translation == 'true' && (needs.supabase_deploy.result == 'success' || (needs.supabase_deploy.result == 'skipped' && needs.changes.outputs.supabase != 'true')) && (needs.read_replica_schema.result == 'success' || needs.read_replica_schema.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -260,8 +309,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   deploy_files:
-    needs: [changes, supabase_deploy]
-    if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.files == 'true' && (needs.supabase_deploy.result == 'success' || needs.supabase_deploy.result == 'skipped') }}
+    needs: [changes, supabase_deploy, read_replica_schema]
+    if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.files == 'true' && (needs.supabase_deploy.result == 'success' || needs.supabase_deploy.result == 'skipped') && (needs.read_replica_schema.result == 'success' || needs.read_replica_schema.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -290,8 +339,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   deploy_plugin_regions:
-    needs: [changes, supabase_deploy]
-    if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.plugins == 'true' && (needs.supabase_deploy.result == 'success' || needs.supabase_deploy.result == 'skipped') }}
+    needs: [changes, supabase_deploy, read_replica_schema]
+    if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.plugins == 'true' && (needs.supabase_deploy.result == 'success' || needs.supabase_deploy.result == 'skipped') && (needs.read_replica_schema.result == 'success' || needs.read_replica_schema.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -441,4 +490,3 @@ jobs:
           BUILD_OUTPUT_UPLOAD_ENABLED: "true"
           BUILD_OUTPUT_RETENTION_SECONDS: "604800"
         run: bunx @capgo/cli@latest build request --platform android --path . --ai-analytics
-

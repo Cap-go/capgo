@@ -8,6 +8,15 @@ REVOKE ALL PRIVILEGES ON TABLE public.global_stats FROM anon;
 REVOKE ALL PRIVILEGES ON TABLE public.global_stats FROM authenticated;
 GRANT ALL ON TABLE public.global_stats TO service_role;
 
+DROP POLICY IF EXISTS " allow anon to select" ON public.global_stats;
+DROP POLICY IF EXISTS "Allow anon to select" ON public.global_stats;
+DROP POLICY IF EXISTS "Allow none to select" ON public.global_stats;
+CREATE POLICY "Allow none to select"
+ON public.global_stats
+FOR SELECT
+TO anon, authenticated
+USING (false);
+
 -- webhook rows are API-mediated only
 REVOKE ALL PRIVILEGES ON TABLE public.webhooks FROM PUBLIC;
 REVOKE ALL PRIVILEGES ON TABLE public.webhooks FROM anon;
