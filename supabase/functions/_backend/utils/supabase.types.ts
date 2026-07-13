@@ -2846,6 +2846,7 @@ export type Database = {
           customer_country: string | null
           customer_id: string
           id: number
+          is_above_plan: boolean | null
           is_good_plan: boolean | null
           last_stripe_event_at: string | null
           mau_exceeded: boolean | null
@@ -2873,6 +2874,7 @@ export type Database = {
           customer_country?: string | null
           customer_id: string
           id?: number
+          is_above_plan?: boolean | null
           is_good_plan?: boolean | null
           last_stripe_event_at?: string | null
           mau_exceeded?: boolean | null
@@ -2900,6 +2902,7 @@ export type Database = {
           customer_country?: string | null
           customer_id?: string
           id?: number
+          is_above_plan?: boolean | null
           is_good_plan?: boolean | null
           last_stripe_event_at?: string | null
           mau_exceeded?: boolean | null

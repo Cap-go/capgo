@@ -578,7 +578,7 @@ afterAll(async () => {
 }, 90000)
 
 describe('global stats core snapshots', () => {
-  it.concurrent('counts above-plan credits at the snapshot boundary', async () => {
+  it.concurrent('counts just-over-limit orgs after plan usage rounds to 100', async () => {
     const snapshotExclusiveEnd = new Date('2030-01-02T00:00:00.000Z')
     const beforeSnapshot = '2029-12-01T00:00:00.000Z'
     const afterSnapshot = '2030-02-01T00:00:00.000Z'
@@ -607,10 +607,12 @@ describe('global stats core snapshots', () => {
         }),
       ])
 
+      // Raw 100.1% usage is rounded to 100 in plan_usage; is_above_plan retains the exact fit result.
       await executeSQL(`
         UPDATE public.stripe_info
         SET status = 'succeeded'::public.stripe_status,
-            plan_usage = 101,
+            plan_usage = 100,
+            is_above_plan = true,
             is_good_plan = true,
             created_at = $2::timestamptz,
             plan_calculated_at = $2::timestamptz,

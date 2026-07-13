@@ -635,6 +635,8 @@ describe('logsnag revenue metric helpers', () => {
     expect(coreSnapshotQuery).toContain('g.granted_at < ${snapshotExclusiveEndIso}::timestamptz')
     expect(coreSnapshotQuery).toContain('g.expires_at >= ${snapshotExclusiveEndIso}::timestamptz')
     expect(coreSnapshotQuery).toContain('c.applied_at < ${snapshotExclusiveEndIso}::timestamptz')
+    expect(coreSnapshotQuery).toContain('si.is_above_plan = true')
+    expect(coreSnapshotQuery).not.toContain('si.plan_usage > 100')
     expect(coreSnapshotQuery).not.toContain('o.has_usage_credits')
   })
   it.concurrent('normalizes logsnag insights retry payload counts', () => {

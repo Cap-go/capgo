@@ -2420,7 +2420,7 @@ async function getCoreSnapshotCounts(c: Context, snapshotExclusiveEnd: Date): Pr
           ON o.customer_id = si.customer_id
         INNER JOIN public.plans p
           ON p.stripe_id = si.product_id
-        WHERE si.plan_usage > 100
+        WHERE si.is_above_plan = true
           AND p.name <> 'Enterprise'
           AND si.created_at < ${snapshotExclusiveEndIso}::timestamptz
           AND (si.plan_calculated_at IS NULL OR si.plan_calculated_at < ${snapshotExclusiveEndIso}::timestamptz)
