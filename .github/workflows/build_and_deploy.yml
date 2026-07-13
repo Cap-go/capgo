@@ -96,7 +96,7 @@ jobs:
 
   read_replica_schema:
     needs: changes
-    if: ${{ needs.changes.result == 'success' && !contains(github.ref_name, '-alpha') }}
+    if: ${{ needs.changes.result == 'success' && needs.changes.outputs.supabase == 'true' && !contains(github.ref_name, '-alpha') }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     name: Reconcile production read-replica schema
