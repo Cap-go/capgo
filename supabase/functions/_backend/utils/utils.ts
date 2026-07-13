@@ -11,6 +11,7 @@ import { env, getRuntimeKey } from 'hono/adapter'
 declare const EdgeRuntime: { waitUntil?: (promise: Promise<any>) => void } | undefined
 
 export const fetchLimit = 50
+export const WAIT_FOR_COMPLETION_HEADER = 'x-capgo-wait-for-completion'
 
 // Regex for Zod validation of an app id
 export const reverseDomainRegex = /^[a-z0-9]+(\.[\w-]+)+$/i
@@ -178,7 +179,7 @@ export function isLimited(c: Context, id: string) {
 }
 
 export function backgroundTask(c: Context, p: any) {
-  if (getEnv(c, 'CAPGO_PREVENT_BACKGROUND_FUNCTIONS') === 'true') {
+  if (c.req.header(WAIT_FOR_COMPLETION_HEADER) === 'true' || getEnv(c, 'CAPGO_PREVENT_BACKGROUND_FUNCTIONS') === 'true') {
     return p
   }
   if (getRuntimeKey() === 'workerd') {

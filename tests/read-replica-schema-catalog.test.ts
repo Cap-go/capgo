@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
-import { READ_REPLICA_SCHEMA_CATALOG_SQL, readReplicaSchemaCatalog } from '../read_replicate/schema_catalog.ts'
+import { READ_REPLICA_SCHEMA_CATALOG_SQL } from '../read_replicate/schema_catalog.ts'
 import { cleanupPostgresClient, getPostgresClient } from './test-utils.ts'
 
 interface CatalogIndex {
@@ -33,28 +33,37 @@ afterAll(async () => {
 
 describe('read-replica schema catalog', () => {
   it('does not duplicate selected indexes for foreign keys from non-selected tables', async () => {
-    const tableName = `rr_schema_catalog_fk_${randomUUID().replaceAll('-', '')}`
+    const suffix = randomUUID().replaceAll('-', '').slice(0, 8)
+    const parentTableName = `rrcat_fk_parent_${suffix}`
+    const childTableName = `rrcat_fk_child_${suffix}`
     const pool = await getPostgresClient()
 
     try {
       await pool.query(`
-        CREATE TABLE public.${tableName} (
-          app_id character varying NOT NULL REFERENCES public.apps(app_id)
+        CREATE TABLE public.${parentTableName} (
+          id uuid PRIMARY KEY
+        );
+        CREATE TABLE public.${childTableName} (
+          parent_id uuid NOT NULL REFERENCES public.${parentTableName}(id)
         )
       `)
 
-      const catalog = await readReplicaSchemaCatalog(pool) as { indexes: CatalogIndex[] }
-      const appsPrimaryKey = catalog.indexes.filter(index => index.table === 'apps' && index.name === 'apps_pkey')
+      const result = await pool.query(READ_REPLICA_SCHEMA_CATALOG_SQL, [[parentTableName], [], [], [], []])
+      const catalog = result.rows[0].catalog as SchemaCatalog
+      const parentPrimaryKey = catalog.indexes.filter(index => index.table === parentTableName && index.name === `${parentTableName}_pkey`)
 
-      expect(appsPrimaryKey).toHaveLength(1)
-      expect(appsPrimaryKey[0]).toMatchObject({
-        table: 'apps',
-        name: 'apps_pkey',
+      expect(parentPrimaryKey).toHaveLength(1)
+      expect(parentPrimaryKey[0]).toMatchObject({
+        table: parentTableName,
+        name: `${parentTableName}_pkey`,
         constraintOwned: true,
       })
     }
     finally {
-      await pool.query(`DROP TABLE IF EXISTS public.${tableName}`)
+      await pool.query(`
+        DROP TABLE IF EXISTS public.${childTableName};
+        DROP TABLE IF EXISTS public.${parentTableName};
+      `)
     }
   })
 
