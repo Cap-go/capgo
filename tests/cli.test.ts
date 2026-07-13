@@ -133,13 +133,15 @@ describe('tests CLI upload', () => {
   it('creates a missing explicit channel before assigning the uploaded bundle', async () => {
     const appName = `com.cli_new_channel_upload_${randomUUID()}`
     const targetChannel = `upload-target-${randomUUID().slice(0, 8)}`
+    const seedOptions = createIsolatedSeedAppOptions()
     await Promise.all([
-      resetAndSeedAppData(appName),
+      resetAndSeedAppData(appName, seedOptions),
       prepareCli(appName),
     ])
 
     try {
-      const { result, version } = await uploadWithFreshVersionRetry(appName, targetChannel, {
+      const version = getSemver()
+      const result = await uploadBundleSDK(appName, version, targetChannel, {
         ignoreCompatibilityCheck: true,
       })
       expect(result.success).toBe(true)
@@ -166,8 +168,9 @@ describe('tests CLI upload', () => {
 
   it('allows app_uploader to pass explicit channel upload preflight', async () => {
     const appName = `com.cli_channel_preflight_${randomUUID()}`
+    const seedOptions = createIsolatedSeedAppOptions()
     await Promise.all([
-      resetAndSeedAppData(appName),
+      resetAndSeedAppData(appName, seedOptions),
       prepareCli(appName),
     ])
 
@@ -177,7 +180,7 @@ describe('tests CLI upload', () => {
         userId: USER_ID,
         key: randomUUID(),
         name: `cli-channel-preflight-${randomUUID()}`,
-        orgId: ORG_ID,
+        orgId: seedOptions.orgId,
         roleName: 'apikey_org_reader',
         appId: appName,
         appRoleName: 'app_uploader',
@@ -213,8 +216,9 @@ describe('tests CLI upload', () => {
 
   it('allows app_uploader to pass default channel upload preflight', async () => {
     const appName = `com.cli_default_channel_preflight_${randomUUID()}`
+    const seedOptions = createIsolatedSeedAppOptions()
     await Promise.all([
-      resetAndSeedAppData(appName),
+      resetAndSeedAppData(appName, seedOptions),
       prepareCli(appName),
     ])
 
@@ -224,7 +228,7 @@ describe('tests CLI upload', () => {
         userId: USER_ID,
         key: randomUUID(),
         name: `cli-default-channel-preflight-${randomUUID()}`,
-        orgId: ORG_ID,
+        orgId: seedOptions.orgId,
         roleName: 'apikey_org_reader',
         appId: appName,
         appRoleName: 'app_uploader',
@@ -261,8 +265,9 @@ describe('tests CLI upload', () => {
   it('does not create a missing explicit channel when create-channel preflight fails', async () => {
     const appName = `com.cli_channel_no_orphan_${randomUUID()}`
     const targetChannel = `upload-target-${randomUUID().slice(0, 8)}`
+    const seedOptions = createIsolatedSeedAppOptions()
     await Promise.all([
-      resetAndSeedAppData(appName),
+      resetAndSeedAppData(appName, seedOptions),
       prepareCli(appName),
     ])
 
@@ -272,7 +277,7 @@ describe('tests CLI upload', () => {
         userId: USER_ID,
         key: randomUUID(),
         name: `cli-channel-no-orphan-${randomUUID()}`,
-        orgId: ORG_ID,
+        orgId: seedOptions.orgId,
         roleName: 'apikey_org_reader',
         appId: appName,
         appRoleName: 'app_uploader',
@@ -308,8 +313,9 @@ describe('tests CLI upload', () => {
 
   it('fails self-assign upload before creating a bundle when channel settings permission is missing', async () => {
     const appName = `com.cli_self_assign_preflight_${randomUUID()}`
+    const seedOptions = createIsolatedSeedAppOptions()
     await Promise.all([
-      resetAndSeedAppData(appName),
+      resetAndSeedAppData(appName, seedOptions),
       prepareCli(appName),
     ])
 
@@ -319,7 +325,7 @@ describe('tests CLI upload', () => {
         userId: USER_ID,
         key: randomUUID(),
         name: `cli-self-assign-preflight-${randomUUID()}`,
-        orgId: ORG_ID,
+        orgId: seedOptions.orgId,
         roleName: 'org_member',
         appId: appName,
         appRoleName: 'app_developer',
