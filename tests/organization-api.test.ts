@@ -1276,6 +1276,7 @@ describe('[DELETE] /organization/members', () => {
 })
 
 describe('[POST] /organization', () => {
+  // Organization creation performs several linked writes; run these cases serially so the suite does not contend with itself.
   async function expectCreatedOrganizationPlan(estimatedMau: number, planName: string) {
     const name = `Created ${planName} Plan Organization ${randomUUID()}`
     const response = await fetch(`${BASE_URL}/organization`, {
@@ -1326,7 +1327,7 @@ describe('[POST] /organization', () => {
     }
   }
 
-  it.concurrent('create organization', async () => {
+  it('create organization', async () => {
     const name = `Created Organization ${new Date().toISOString()}`
     const website = 'HTTPS://capgo.app'
     const response = await fetch(`${BASE_URL}/organization`, {
@@ -1389,7 +1390,7 @@ describe('[POST] /organization', () => {
     expect(responseData.error).toBe('invalid_body')
   })
 
-  it.concurrent('create organization rejects invalid website scheme', async () => {
+  it('create organization rejects invalid website scheme', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
       headers: authHeaders,
       method: 'POST',
@@ -1403,7 +1404,7 @@ describe('[POST] /organization', () => {
     expect(responseData.error).toBe('invalid_body')
   })
 
-  it.concurrent('create organization rejects credential-bearing website urls', async () => {
+  it('create organization rejects credential-bearing website urls', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
       headers: authHeaders,
       method: 'POST',
@@ -1417,19 +1418,19 @@ describe('[POST] /organization', () => {
     expect(responseData.error).toBe('invalid_body')
   })
 
-  it.concurrent('create organization uses the estimated active users to choose the initial plan', async () => {
+  it('create organization uses the estimated active users to choose the initial plan', async () => {
     await expectCreatedOrganizationPlan(100000, 'Team')
   })
 
-  it.concurrent('create organization keeps Solo through 2K active users', async () => {
+  it('create organization keeps Solo through 2K active users', async () => {
     await expectCreatedOrganizationPlan(2000, 'Solo')
   })
 
-  it.concurrent('create organization moves above the Solo active user limit to Maker', async () => {
+  it('create organization moves above the Solo active user limit to Maker', async () => {
     await expectCreatedOrganizationPlan(2001, 'Maker')
   })
 
-  it.concurrent('create organization rejects an estimated active user count above the largest plan stop', async () => {
+  it('create organization rejects an estimated active user count above the largest plan stop', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
       headers: authHeaders,
       method: 'POST',
@@ -1780,7 +1781,7 @@ describe('[PUT] /organization - encrypted bundles settings', () => {
     const requiredEncryptionKey = 'ABCDEFGHIJKLMNOPQRSTU'
 
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
+      headers: authHeaders,
       method: 'PUT',
       body: JSON.stringify({
         orgId: ORG_ID,
@@ -1803,7 +1804,7 @@ describe('[PUT] /organization - encrypted bundles settings', () => {
 
   it('rejects invalid required encryption key length', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
+      headers: authHeaders,
       method: 'PUT',
       body: JSON.stringify({
         orgId: ORG_ID,
