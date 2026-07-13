@@ -424,6 +424,11 @@ export type Database = {
       }
       audit_logs: {
         Row: {
+          actor_apikey_id: number | null
+          actor_apikey_name: string | null
+          actor_type: string
+          actor_user_email: string | null
+          actor_user_id: string | null
           changed_fields: string[] | null
           created_at: string
           id: number
@@ -436,6 +441,11 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          actor_apikey_id?: number | null
+          actor_apikey_name?: string | null
+          actor_type?: string
+          actor_user_email?: string | null
+          actor_user_id?: string | null
           changed_fields?: string[] | null
           created_at?: string
           id?: number
@@ -448,6 +458,11 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          actor_apikey_id?: number | null
+          actor_apikey_name?: string | null
+          actor_type?: string
+          actor_user_email?: string | null
+          actor_user_id?: string | null
           changed_fields?: string[] | null
           created_at?: string
           id?: number
@@ -459,22 +474,7 @@ export type Database = {
           table_name?: string
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "audit_logs_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "audit_logs_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       backfill_progress: {
         Row: {
@@ -1531,10 +1531,10 @@ export type Database = {
           active_canceled_orgs: number
           active_past_due_orgs: number
           apps: number
+          apps_active: number | null
           apps_created: number
           apps_with_cli_onboarding_builds_24h: number
           apps_with_manual_builds_24h: number
-          apps_active: number | null
           average_ltv: number
           build_avg_seconds_day_android: number
           build_avg_seconds_day_ios: number
@@ -1626,10 +1626,10 @@ export type Database = {
           active_canceled_orgs?: number
           active_past_due_orgs?: number
           apps: number
+          apps_active?: number | null
           apps_created?: number
           apps_with_cli_onboarding_builds_24h?: number
           apps_with_manual_builds_24h?: number
-          apps_active?: number | null
           average_ltv?: number
           build_avg_seconds_day_android?: number
           build_avg_seconds_day_ios?: number
@@ -1721,10 +1721,10 @@ export type Database = {
           active_canceled_orgs?: number
           active_past_due_orgs?: number
           apps?: number
+          apps_active?: number | null
           apps_created?: number
           apps_with_cli_onboarding_builds_24h?: number
           apps_with_manual_builds_24h?: number
-          apps_active?: number | null
           average_ltv?: number
           build_avg_seconds_day_android?: number
           build_avg_seconds_day_ios?: number
@@ -2200,6 +2200,21 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      org_id_tombstones: {
+        Row: {
+          deleted_at: string
+          org_id: string
+        }
+        Insert: {
+          deleted_at?: string
+          org_id: string
+        }
+        Update: {
+          deleted_at?: string
+          org_id?: string
+        }
+        Relationships: []
       }
       org_metrics_cache: {
         Row: {
@@ -3641,6 +3656,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      channel_permission_override_readable_channel_ids: {
+        Args: never
+        Returns: number[]
+      }
       check_apikey_hashed_key_enforcement: {
         Args: { apikey_row: Database["public"]["Tables"]["apikeys"]["Row"] }
         Returns: boolean
@@ -3742,6 +3761,7 @@ export type Database = {
         }[]
       }
       current_request_role: { Args: never; Returns: string }
+      current_user_member_org_ids: { Args: never; Returns: string[] }
       delete_accounts_marked_for_deletion: {
         Args: never
         Returns: {
@@ -4046,8 +4066,6 @@ export type Database = {
           need_onboarding: boolean
           owner_org: string
           retention: number
-          rollout_channel_count: number
-          rollout_paused_version_names: string[]
           stats_refresh_requested_at: string
           stats_updated_at: string
           total_count: number
@@ -4527,6 +4545,8 @@ export type Database = {
         Returns: undefined
       }
       one_month_ahead: { Args: never; Returns: string }
+      org_member_readable_org_ids: { Args: never; Returns: string[] }
+      orgs_readable_org_ids: { Args: never; Returns: string[] }
       parse_cron_field: {
         Args: { current_val: number; field: string; max_val: number }
         Returns: number
@@ -4754,6 +4774,9 @@ export type Database = {
           version_name: string
         }[]
       }
+      readable_app_version_ids: { Args: never; Returns: number[] }
+      readable_group_ids: { Args: never; Returns: string[] }
+      readable_org_customer_ids: { Args: never; Returns: string[] }
       record_build_time: {
         Args: {
           p_app_id: string
@@ -4868,6 +4891,7 @@ export type Database = {
         Returns: undefined
       }
       restore_deleted_account: { Args: never; Returns: undefined }
+      role_bindings_readable_ids: { Args: never; Returns: string[] }
       seed_get_app_metrics_caches: {
         Args: { p_end_date: string; p_org_id: string; p_start_date: string }
         Returns: {

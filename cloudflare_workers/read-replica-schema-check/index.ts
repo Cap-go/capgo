@@ -1,128 +1,181 @@
-import { Pool } from 'pg'
+import type { PoolClient } from 'pg'
 import { timingSafeEqual } from 'node:crypto'
-import { applyReadReplicaAdditiveSchemaSync } from '../../read_replicate/schema_additive_sync.ts'
-import { readReplicaSchemaCatalog, stableStringify } from '../../read_replicate/schema_catalog.ts'
+import { Pool } from 'pg'
+import { readReplicaSchemaCatalog } from '../../read_replicate/schema_catalog.ts'
+import { readReplicaSchemaCompatibilityIssues } from '../../read_replicate/schema_compatibility.ts'
 
 interface Env {
+  HYPERDRIVE_CAPGO_DIRECT_EU?: Hyperdrive
   HYPERDRIVE_CAPGO_READ_EU?: Hyperdrive
   READ_REPLICA_SCHEMA_CHECK_TOKEN?: string
 }
 
-const textEncoder = new TextEncoder()
-const SCHEMA_SYNC_STATEMENT_TIMEOUT_MS = 550_000
-const SCHEMA_SYNC_MAX_DURATION_HEADER = 'x-schema-sync-max-duration-ms'
+interface SchemaCheckSetup {
+  masterConnectionString: string
+  replicaConnectionString: string
+}
 
-type SchemaRoute = 'catalog' | 'sync-additive'
+const textEncoder = new TextEncoder()
+const SCHEMA_VERIFICATION_TIMEOUT_MS = 40_000
+
+type SchemaRoute = 'ok' | 'verify-master'
 
 export default {
   async fetch(request: Request, env: Env) {
     const { pathname } = new URL(request.url)
     const route = schemaRoute(pathname, request.method)
-
     if (route instanceof Response)
       return route
-
-    if (route === 'ok')
-      return Response.json({ status: 'ok' })
 
     const setup = schemaCheckSetup(request, env)
     if (setup instanceof Response)
       return setup
-
-    const pool = new Pool({
-      connectionString: setup.connectionString,
-      max: 1,
-      connectionTimeoutMillis: 10000,
-    })
+    if (route === 'ok')
+      return Response.json({ status: 'ok' })
 
     try {
-      return await handleSchemaRoute(route, request, pool)
+      return await verifyMasterSchema(setup)
     }
     catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      const code = route === 'sync-additive' ? 'schema_sync_failed' : 'catalog_query_failed'
-      return Response.json({ error: code, message }, { status: 500 })
-    }
-    finally {
-      await pool.end()
+      if (isVerificationTimeout(error, message)) {
+        return Response.json(
+          {
+            error: 'schema_verification_timeout',
+            maxDurationMs: SCHEMA_VERIFICATION_TIMEOUT_MS,
+            message,
+          },
+          { status: 504 },
+        )
+      }
+
+      return Response.json(
+        { error: 'schema_verification_failed', message },
+        { status: 500 },
+      )
     }
   },
 }
 
-function schemaRoute(pathname: string, method: string): SchemaRoute | 'ok' | Response {
-  if (pathname === '/ok')
-    return 'ok'
-  if (pathname === '/catalog')
-    return method === 'GET' ? 'catalog' : Response.json({ error: 'method_not_allowed' }, { status: 405 })
-  if (pathname === '/sync-additive')
-    return method === 'POST' ? 'sync-additive' : Response.json({ error: 'method_not_allowed' }, { status: 405 })
+function schemaRoute(pathname: string, method: string): SchemaRoute | Response {
+  if (pathname === '/ok') {
+    return method === 'GET'
+      ? 'ok'
+      : Response.json({ error: 'method_not_allowed' }, { status: 405 })
+  }
+  if (pathname === '/verify-master') {
+    return method === 'GET'
+      ? 'verify-master'
+      : Response.json({ error: 'method_not_allowed' }, { status: 405 })
+  }
 
   return Response.json({ error: 'not_found' }, { status: 404 })
 }
 
-function schemaCheckSetup(request: Request, env: Env): { connectionString: string } | Response {
+function schemaCheckSetup(
+  request: Request,
+  env: Env,
+): SchemaCheckSetup | Response {
   const expectedToken = env.READ_REPLICA_SCHEMA_CHECK_TOKEN
-  if (!expectedToken)
-    return Response.json({ error: 'missing_schema_check_token' }, { status: 500 })
+  if (!expectedToken) {
+    return Response.json(
+      { error: 'missing_schema_check_token' },
+      { status: 500 },
+    )
+  }
   if (!hasExpectedAuthorization(request, expectedToken))
     return Response.json({ error: 'unauthorized' }, { status: 401 })
 
-  const connectionString = env.HYPERDRIVE_CAPGO_READ_EU?.connectionString
-  if (!connectionString)
-    return Response.json({ error: 'missing_hyperdrive_binding' }, { status: 500 })
+  const masterConnectionString
+    = env.HYPERDRIVE_CAPGO_DIRECT_EU?.connectionString
+  if (!masterConnectionString) {
+    return Response.json(
+      { error: 'missing_master_hyperdrive_binding' },
+      { status: 500 },
+    )
+  }
 
-  return { connectionString }
+  const replicaConnectionString
+    = env.HYPERDRIVE_CAPGO_READ_EU?.connectionString
+  if (!replicaConnectionString) {
+    return Response.json(
+      { error: 'missing_replica_hyperdrive_binding' },
+      { status: 500 },
+    )
+  }
+
+  return { masterConnectionString, replicaConnectionString }
 }
 
-async function handleSchemaRoute(route: SchemaRoute, request: Request, pool: Pool): Promise<Response> {
-  if (route === 'sync-additive')
-    return handleAdditiveSync(request, pool)
+// These catalogs use independent connections, not one cross-database snapshot.
+// Concurrent DDL can transiently report drift. The release workflow serializes
+// schema writers before this check.
+async function verifyMasterSchema(setup: SchemaCheckSetup): Promise<Response> {
+  const [expected, actual] = await Promise.all([
+    withPgClient(setup.masterConnectionString, readReplicaSchemaCatalog),
+    withPgClient(setup.replicaConnectionString, readReplicaSchemaCatalog),
+  ])
+  const issues = readReplicaSchemaCompatibilityIssues(expected, actual)
+  if (issues.length) {
+    return Response.json(
+      {
+        error: 'schema_not_converged',
+        issues,
+      },
+      { status: 409 },
+    )
+  }
 
-  const catalog = await readReplicaSchemaCatalog(pool)
-  return new Response(`${stableStringify(catalog)}\n`, {
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-    },
+  return Response.json({ status: 'ok', issues: [] })
+}
+
+async function withPgClient<T>(
+  connectionString: string,
+  callback: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const pool = new Pool({
+    connectionString,
+    max: 1,
+    connectionTimeoutMillis: 10_000,
+    query_timeout: SCHEMA_VERIFICATION_TIMEOUT_MS,
+    statement_timeout: SCHEMA_VERIFICATION_TIMEOUT_MS,
   })
-}
+  let client: PoolClient | undefined
 
-async function handleAdditiveSync(request: Request, pool: Pool): Promise<Response> {
-  let expectedCatalog: unknown
   try {
-    expectedCatalog = await request.json()
+    client = await pool.connect()
+    return await callback(client)
   }
-  catch {
-    return Response.json({ error: 'invalid_schema_catalog_json' }, { status: 400 })
+  finally {
+    client?.release()
+    await pool.end()
   }
-
-  const maxDurationMs = schemaSyncMaxDurationMs(request)
-  if (maxDurationMs instanceof Response)
-    return maxDurationMs
-
-  const result = await applyReadReplicaAdditiveSchemaSync(pool, expectedCatalog, {
-    maxDurationMs,
-    statementTimeoutMs: SCHEMA_SYNC_STATEMENT_TIMEOUT_MS,
-  })
-  return Response.json(result)
 }
 
-function schemaSyncMaxDurationMs(request: Request): number | Response {
-  const value = request.headers.get(SCHEMA_SYNC_MAX_DURATION_HEADER)
-  if (!value)
-    return SCHEMA_SYNC_STATEMENT_TIMEOUT_MS
+function isVerificationTimeout(error: unknown, message: string): boolean {
+  if (
+    error
+    && typeof error === 'object'
+    && 'code' in error
+    && error.code === '57014'
+  ) {
+    return true
+  }
 
-  const durationMs = Number(value)
-  if (!Number.isSafeInteger(durationMs) || durationMs <= 0)
-    return Response.json({ error: 'invalid_schema_sync_max_duration' }, { status: 400 })
-
-  return durationMs
+  return /timed? ?out/i.test(message)
 }
 
-function hasExpectedAuthorization(request: Request, expectedToken: string): boolean {
+function hasExpectedAuthorization(
+  request: Request,
+  expectedToken: string,
+): boolean {
   const actual = request.headers.get('authorization') ?? ''
   const expected = `Bearer ${expectedToken}`
   const actualBytes = textEncoder.encode(actual)
   const expectedBytes = textEncoder.encode(expected)
 
-  return actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes)
+  return (
+    actualBytes.length === expectedBytes.length
+    && timingSafeEqual(actualBytes, expectedBytes)
+  )
 }

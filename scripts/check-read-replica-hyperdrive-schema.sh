@@ -5,20 +5,62 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-EXPECTED_SCHEMA_CATALOG='read_replicate/schema_replicate.catalog.json'
-ACTUAL_SCHEMA_CATALOG="$(mktemp)"
-SYNC_RESPONSE="$(mktemp)"
-SYNC_MAX_TIME="${READ_REPLICA_SCHEMA_SYNC_MAX_TIME:-1800}"
+READY_RESPONSE="$(mktemp)"
+READY_ERROR="$(mktemp)"
+READY_ATTEMPT_RESPONSE="$(mktemp)"
+READY_ATTEMPT_ERROR="$(mktemp)"
+VERIFY_RESPONSE="$(mktemp)"
+VERIFY_ERROR="$(mktemp)"
+VERIFY_ATTEMPT_RESPONSE="$(mktemp)"
+VERIFY_ATTEMPT_ERROR="$(mktemp)"
+SECRETS_FILE="$(mktemp)"
+CHECK_MAX_TIME="${READ_REPLICA_SCHEMA_CHECK_MAX_TIME:-300}"
+READY_ATTEMPTS="${READ_REPLICA_SCHEMA_CHECK_READY_ATTEMPTS:-20}"
+VERIFY_ATTEMPTS="${READ_REPLICA_SCHEMA_CHECK_VERIFY_ATTEMPTS:-1}"
+CHECK_CLEANUP_RESERVE_SECONDS=15
+READY_ATTEMPT_MAX_TIME=10
+VERIFY_ATTEMPT_MAX_TIME=55
+SECONDS=0
+
 if [[ -n "${READ_REPLICA_WRANGLER_CMD:-}" ]]; then
   read -r -a WRANGLER_CMD <<< "$READ_REPLICA_WRANGLER_CMD"
 else
   WRANGLER_CMD=(bunx wrangler@4.107.0)
 fi
-if ! [[ "$SYNC_MAX_TIME" =~ ^[0-9]+$ ]] || (( SYNC_MAX_TIME <= 30 )); then
-  echo '::error title=Invalid read-replica schema sync timeout::READ_REPLICA_SCHEMA_SYNC_MAX_TIME must be an integer greater than 30 seconds.'
+
+if ! [[ "$CHECK_MAX_TIME" =~ ^[0-9]+$ ]] || (( CHECK_MAX_TIME <= 45 )); then
+  echo '::error title=Invalid read-replica checker timeout::READ_REPLICA_SCHEMA_CHECK_MAX_TIME must be an integer greater than 45 seconds.'
   exit 1
 fi
-SYNC_MAX_DURATION_MS="$(( (SYNC_MAX_TIME - 15) * 1000 ))"
+if ! [[ "$READY_ATTEMPTS" =~ ^[0-9]+$ ]] || (( READY_ATTEMPTS <= 0 )); then
+  echo '::error title=Invalid read-replica checker readiness attempts::READ_REPLICA_SCHEMA_CHECK_READY_ATTEMPTS must be a positive integer.'
+  exit 1
+fi
+if ! [[ "$VERIFY_ATTEMPTS" =~ ^[0-9]+$ ]] || (( VERIFY_ATTEMPTS <= 0 )); then
+  echo '::error title=Invalid read-replica checker verification attempts::READ_REPLICA_SCHEMA_CHECK_VERIFY_ATTEMPTS must be a positive integer.'
+  exit 1
+fi
+
+remaining_check_time() {
+  printf '%s' "$(( CHECK_MAX_TIME - SECONDS ))"
+}
+
+print_last_attempt() {
+  local error_file="$1"
+  local response_file="$2"
+
+  if [[ -s "$error_file" ]]; then
+    echo 'Last curl error:'
+    head -c 16384 "$error_file"
+    echo
+  fi
+  if [[ -s "$response_file" ]]; then
+    echo 'Last Worker response:'
+    head -c 16384 "$response_file"
+    echo
+  fi
+}
+
 WORKER_DEPLOYED=0
 WORKER_SUFFIX="$(bun --silent -e 'const bytes = crypto.getRandomValues(new Uint8Array(8)); console.log(Buffer.from(bytes).toString("hex"))')"
 WORKER_RUN_ID="${GITHUB_RUN_ID:-local}"
@@ -40,14 +82,19 @@ cleanup() {
     fi
   fi
 
-  rm -f "$ACTUAL_SCHEMA_CATALOG" "$SYNC_RESPONSE"
+  rm -f "$READY_RESPONSE" "$READY_ERROR" "$READY_ATTEMPT_RESPONSE" \
+    "$READY_ATTEMPT_ERROR" "$VERIFY_RESPONSE" "$VERIFY_ERROR" \
+    "$VERIFY_ATTEMPT_RESPONSE" "$VERIFY_ATTEMPT_ERROR" "$SECRETS_FILE"
   exit "$status"
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
 
-if [[ ! -f "$EXPECTED_SCHEMA_CATALOG" ]]; then
-  echo "::error title=Missing read-replica schema catalog::${EXPECTED_SCHEMA_CATALOG} does not exist."
+bun --silent -e 'process.stdout.write(JSON.stringify({ READ_REPLICA_SCHEMA_CHECK_TOKEN: process.env.READ_REPLICA_SCHEMA_CHECK_TOKEN }))' > "$SECRETS_FILE"
+chmod 600 "$SECRETS_FILE"
+
+if (( $(remaining_check_time) <= CHECK_CLEANUP_RESERVE_SECONDS )); then
+  echo '::error title=Read-replica checker timed out before deployment::No time remains to deploy and clean up the ephemeral Worker.'
   exit 1
 fi
 
@@ -56,13 +103,9 @@ WORKER_DEPLOYED=1
 DEPLOY_OUTPUT="$("${WRANGLER_CMD[@]}" deploy \
   --config cloudflare_workers/read-replica-schema-check/wrangler.jsonc \
   --name "$WORKER_NAME" \
+  --secrets-file "$SECRETS_FILE" \
   --minify)"
 printf '%s\n' "$DEPLOY_OUTPUT"
-
-bun --silent -e 'process.stdout.write(process.env.READ_REPLICA_SCHEMA_CHECK_TOKEN)' \
-  | "${WRANGLER_CMD[@]}" secret put READ_REPLICA_SCHEMA_CHECK_TOKEN \
-    --config cloudflare_workers/read-replica-schema-check/wrangler.jsonc \
-    --name "$WORKER_NAME"
 
 WORKER_URL="$(bun --silent -e 'const output = await Bun.stdin.text(); console.log(output.match(/https:\/\/[a-z0-9.-]+\.workers\.dev/i)?.[0] ?? "")' <<< "$DEPLOY_OUTPUT")"
 if [[ -z "$WORKER_URL" ]]; then
@@ -70,41 +113,91 @@ if [[ -z "$WORKER_URL" ]]; then
   exit 1
 fi
 
-for _ in $(seq 1 60); do
-  if curl -fsS --connect-timeout 5 --max-time 5 "${WORKER_URL}/ok" >/dev/null 2>&1; then
+READY=0
+LAST_READY_STATUS=''
+READY_ATTEMPTS_USED=0
+for attempt in $(seq 1 "$READY_ATTEMPTS"); do
+  REMAINING_TIME="$(remaining_check_time)"
+  if (( REMAINING_TIME <= CHECK_CLEANUP_RESERVE_SECONDS )); then
     break
   fi
-  sleep 2
+
+  ATTEMPT_MAX_TIME="$READY_ATTEMPT_MAX_TIME"
+  if (( ATTEMPT_MAX_TIME > REMAINING_TIME - CHECK_CLEANUP_RESERVE_SECONDS )); then
+    ATTEMPT_MAX_TIME="$(( REMAINING_TIME - CHECK_CLEANUP_RESERVE_SECONDS ))"
+  fi
+  : > "$READY_ATTEMPT_RESPONSE"
+  : > "$READY_ATTEMPT_ERROR"
+  READY_ATTEMPTS_USED="$attempt"
+  LAST_READY_STATUS="$(curl -sS --connect-timeout 10 --max-time "$ATTEMPT_MAX_TIME" \
+    --header "authorization: Bearer ${READ_REPLICA_SCHEMA_CHECK_TOKEN}" \
+    -w '%{http_code}' \
+    -o "$READY_ATTEMPT_RESPONSE" \
+    "${WORKER_URL}/ok" 2>"$READY_ATTEMPT_ERROR" || true)"
+  if [[ -s "$READY_ATTEMPT_RESPONSE" ]]; then
+    cp "$READY_ATTEMPT_RESPONSE" "$READY_RESPONSE"
+  fi
+  if [[ -s "$READY_ATTEMPT_ERROR" ]]; then
+    cp "$READY_ATTEMPT_ERROR" "$READY_ERROR"
+  fi
+  if [[ "$LAST_READY_STATUS" == '200' ]]; then
+    READY=1
+    break
+  fi
+  if (( attempt < READY_ATTEMPTS )) && (( $(remaining_check_time) > CHECK_CLEANUP_RESERVE_SECONDS + 2 )); then
+    sleep 2
+  fi
 done
 
-if ! curl -fsS --connect-timeout 5 --max-time 5 "${WORKER_URL}/ok" >/dev/null 2>&1; then
-  echo "::error title=Read-replica schema checker did not become ready::Timed out waiting for ephemeral Worker ${WORKER_NAME}."
+if (( READY == 0 )); then
+  echo "::error title=Read-replica checker Worker did not become ready::Worker /ok did not return HTTP 200 after ${READY_ATTEMPTS_USED} attempts; last HTTP status was ${LAST_READY_STATUS:-curl_failed}."
+  print_last_attempt "$READY_ERROR" "$READY_RESPONSE"
   exit 1
 fi
 
-SYNC_STATUS="$(curl -sS --connect-timeout 10 --max-time "$SYNC_MAX_TIME" \
-  --header "authorization: Bearer ${READ_REPLICA_SCHEMA_CHECK_TOKEN}" \
-  --header 'content-type: application/json' \
-  --header "x-schema-sync-max-duration-ms: ${SYNC_MAX_DURATION_MS}" \
-  --data-binary "@${EXPECTED_SCHEMA_CATALOG}" \
-  -w '%{http_code}' \
-  -o "$SYNC_RESPONSE" \
-  "${WORKER_URL}/sync-additive" || true)"
-if [[ "$SYNC_STATUS" != "200" ]]; then
-  echo "::error title=Failed to sync additive read-replica schema::Worker /sync-additive returned HTTP ${SYNC_STATUS}."
-  cat "$SYNC_RESPONSE"
+VERIFIED=0
+LAST_VERIFY_STATUS=''
+VERIFY_ATTEMPTS_USED=0
+for attempt in $(seq 1 "$VERIFY_ATTEMPTS"); do
+  REMAINING_TIME="$(remaining_check_time)"
+  if (( REMAINING_TIME <= CHECK_CLEANUP_RESERVE_SECONDS )); then
+    break
+  fi
+
+  ATTEMPT_MAX_TIME="$VERIFY_ATTEMPT_MAX_TIME"
+  if (( ATTEMPT_MAX_TIME > REMAINING_TIME - CHECK_CLEANUP_RESERVE_SECONDS )); then
+    ATTEMPT_MAX_TIME="$(( REMAINING_TIME - CHECK_CLEANUP_RESERVE_SECONDS ))"
+  fi
+  : > "$VERIFY_ATTEMPT_RESPONSE"
+  : > "$VERIFY_ATTEMPT_ERROR"
+  VERIFY_ATTEMPTS_USED="$attempt"
+  LAST_VERIFY_STATUS="$(curl -sS --connect-timeout 10 --max-time "$ATTEMPT_MAX_TIME" \
+    --header "authorization: Bearer ${READ_REPLICA_SCHEMA_CHECK_TOKEN}" \
+    -w '%{http_code}' \
+    -o "$VERIFY_ATTEMPT_RESPONSE" \
+    "${WORKER_URL}/verify-master" 2>"$VERIFY_ATTEMPT_ERROR" || true)"
+  if [[ -s "$VERIFY_ATTEMPT_RESPONSE" ]]; then
+    cp "$VERIFY_ATTEMPT_RESPONSE" "$VERIFY_RESPONSE"
+  fi
+  if [[ -s "$VERIFY_ATTEMPT_ERROR" ]]; then
+    cp "$VERIFY_ATTEMPT_ERROR" "$VERIFY_ERROR"
+  fi
+  if [[ "$LAST_VERIFY_STATUS" == '200' ]]; then
+    VERIFIED=1
+    break
+  fi
+  if (( attempt < VERIFY_ATTEMPTS )) && (( $(remaining_check_time) > CHECK_CLEANUP_RESERVE_SECONDS + 2 )); then
+    sleep 2
+  fi
+done
+
+if (( VERIFIED == 0 )); then
+  echo "::error title=Read-replica Hyperdrive verification failed::Worker /verify-master did not return HTTP 200 after ${VERIFY_ATTEMPTS_USED} attempts; last HTTP status was ${LAST_VERIFY_STATUS:-curl_failed}."
+  print_last_attempt "$VERIFY_ERROR" "$VERIFY_RESPONSE"
   exit 1
 fi
 
-echo 'Read-replica additive schema sync result:'
-cat "$SYNC_RESPONSE"
+echo 'Read replica Hyperdrive verification result:'
+cat "$VERIFY_RESPONSE"
 echo
-
-HTTP_STATUS="$(curl -sS --connect-timeout 5 --max-time 30 --header "authorization: Bearer ${READ_REPLICA_SCHEMA_CHECK_TOKEN}" -w '%{http_code}' -o "$ACTUAL_SCHEMA_CATALOG" "${WORKER_URL}/catalog" || true)"
-if [[ "$HTTP_STATUS" != "200" ]]; then
-  echo "::error title=Failed to fetch read-replica schema catalog::Worker /catalog returned HTTP ${HTTP_STATUS}."
-  cat "$ACTUAL_SCHEMA_CATALOG"
-  exit 1
-fi
-
-bun scripts/compare-read-replica-schema-catalog.ts "$EXPECTED_SCHEMA_CATALOG" "$ACTUAL_SCHEMA_CATALOG"
+echo 'Read replica matches the live primary schema for the selected tables through Hyperdrive.'
