@@ -4,13 +4,13 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { BRES, simpleError } from '../../utils/hono.ts'
 import { cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
-import { supabaseApikey, updateOrCreateChannel } from '../../utils/supabase.ts'
+import { supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
 import { isInternalVersionName, isValidAppId } from '../../utils/utils.ts'
 
 interface ChannelSet {
   app_id: string
   channel: string
-  version?: string
+  version?: string | null
   public?: boolean
   disableAutoUpdateUnderNative?: boolean
   disableAutoUpdate?: Database['public']['Enums']['disable_update']
@@ -102,8 +102,8 @@ function validateConfidence(value: number | undefined) {
   }
 }
 
-async function findVersion(c: Context, appID: string, version: string, ownerOrg: string, apikey: Database['public']['Tables']['apikeys']['Row']) {
-  const { data, error: vError } = await supabaseApikey(c, apikey.key)
+async function findVersion(c: Context, appID: string, version: string, ownerOrg: string) {
+  const { data, error: vError } = await supabaseAdmin(c)
     .from('app_versions')
     .select('id')
     .eq('app_id', appID)
@@ -118,8 +118,8 @@ async function findVersion(c: Context, appID: string, version: string, ownerOrg:
   return data.id
 }
 
-async function findVersionId(c: Context, appID: string, versionId: number, ownerOrg: string, apikey: Database['public']['Tables']['apikeys']['Row']) {
-  const { data, error: vError } = await supabaseApikey(c, apikey.key)
+async function findVersionId(c: Context, appID: string, versionId: number, ownerOrg: string) {
+  const { data, error: vError } = await supabaseAdmin(c)
     .from('app_versions')
     .select('id')
     .eq('id', versionId)
@@ -134,10 +134,10 @@ async function findVersionId(c: Context, appID: string, versionId: number, owner
   return data.id
 }
 
-function resolveVersion(c: Context, appID: string, version: string | number, ownerOrg: string, apikey: Database['public']['Tables']['apikeys']['Row']) {
+function resolveVersion(c: Context, appID: string, version: string | number, ownerOrg: string) {
   return typeof version === 'number'
-    ? findVersionId(c, appID, version, ownerOrg, apikey)
-    : findVersion(c, appID, version, ownerOrg, apikey)
+    ? findVersionId(c, appID, version, ownerOrg)
+    : findVersion(c, appID, version, ownerOrg)
 }
 
 export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
@@ -148,13 +148,52 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
   if (!isValidAppId(body.app_id)) {
     throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
   }
-  // Auth context is already set by middlewareKey
-  if (!(await checkPermission(c, 'app.create_channel', { appId: body.app_id }))) {
+  const { data: existingChannel } = await supabaseAdmin(c)
+    .from('channels')
+    .select('id, version, rollout_version')
+    .eq('app_id', body.app_id)
+    .eq('name', body.channel)
+    .maybeSingle()
+
+  if (existingChannel) {
+    const canUpdateChannel = await checkPermission(c, 'channel.update_settings', { appId: body.app_id, channelId: existingChannel.id })
+    if (!canUpdateChannel) {
+      throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel: body.channel })
+    }
+  }
+  else if (!(await checkPermission(c, 'app.create_channel', { appId: body.app_id }))) {
     throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id })
   }
-  const { data: org, error } = await supabaseApikey(c, apikey.key).from('apps').select('owner_org').eq('app_id', body.app_id).single()
+  const { data: org, error } = await supabaseAdmin(c).from('apps').select('owner_org').eq('app_id', body.app_id).single()
   if (error || !org) {
     throw simpleError('invalid_app_id', 'You can\'t access this app', { app_id: body.app_id })
+  }
+
+  const existingChannelVersion = existingChannel?.version ?? null
+  const existingRolloutVersion = existingChannel?.rollout_version ?? null
+  const existingChannelId = existingChannel?.id ?? null
+  let requestedVersionId: number | null | undefined
+  if (body.version !== undefined) {
+    const requestedVersionName = body.version && !isInternalVersionName(body.version) ? body.version : null
+    if (existingChannel) {
+      // Do not inspect the current or requested bundle until promotion is proven: a
+      // settings-only key can lack channel.read and must not gain a bundle oracle.
+      if (!(await checkPermission(c, 'channel.promote_bundle', { appId: body.app_id, channelId: existingChannel.id }))) {
+        throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel: body.channel })
+      }
+      requestedVersionId = requestedVersionName
+        ? await findVersion(c, body.app_id, requestedVersionName, org.owner_org)
+        : null
+    }
+    else if (requestedVersionName) {
+      if (!(await checkPermission(c, 'channel.promote_bundle', { appId: body.app_id }))) {
+        throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel: body.channel })
+      }
+      requestedVersionId = await findVersion(c, body.app_id, requestedVersionName, org.owner_org)
+    }
+    else {
+      requestedVersionId = null
+    }
   }
   const inferredElectron = body.electron ?? (body.public && body.ios !== body.android ? false : undefined)
   if (body.rolloutPercentage != null && (!Number.isFinite(body.rolloutPercentage) || body.rolloutPercentage < 0 || body.rolloutPercentage > 100)) {
@@ -173,21 +212,6 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
     throw simpleError('invalid_auto_pause_action', 'Auto-pause action must be pause, rollback, or notify', { autoPauseAction: body.autoPauseAction })
   }
   const changesRolloutTarget = body.rolloutVersion !== undefined || !!body.rollback || !!body.promoteToStable
-  const shouldLoadExistingChannel = body.version === undefined || changesRolloutTarget
-  let existingChannelVersion: number | null = null
-  let existingRolloutVersion: number | null = null
-  let existingChannelId: number | null = null
-  if (shouldLoadExistingChannel) {
-    const { data: existingChannel } = await supabaseApikey(c, apikey.key)
-      .from('channels')
-      .select('id, version, rollout_version')
-      .eq('app_id', body.app_id)
-      .eq('name', body.channel)
-      .maybeSingle()
-    existingChannelId = existingChannel?.id ?? null
-    existingChannelVersion = existingChannel?.version ?? null
-    existingRolloutVersion = existingChannel?.rollout_version ?? null
-  }
   if (changesRolloutTarget) {
     if (existingChannelId === null) {
       throw simpleError('cannot_find_channel', 'Cannot find channel', { app_id: body.app_id, channel: body.channel })
@@ -240,12 +264,12 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
   if (body.version === undefined) {
     channel.version = existingChannelVersion
   }
-  else if (body.version && !isInternalVersionName(body.version)) {
-    channel.version = await findVersion(c, body.app_id, body.version, org.owner_org, apikey)
+  else {
+    channel.version = requestedVersionId ?? null
   }
 
   if (body.rolloutVersion !== undefined) {
-    channel.rollout_version = body.rolloutVersion ? await resolveVersion(c, body.app_id, body.rolloutVersion, org.owner_org, apikey) : null
+    channel.rollout_version = body.rolloutVersion ? await resolveVersion(c, body.app_id, body.rolloutVersion, org.owner_org) : null
   }
 
   if (body.rollback) {
@@ -269,6 +293,6 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
     channel.rollout_pause_reason = null
   }
 
-  await updateOrCreateChannel(c, channel)
+  await updateOrCreateChannel(c, channel, existingChannelId, body.version === undefined && !body.promoteToStable)
   return c.json(BRES)
 }

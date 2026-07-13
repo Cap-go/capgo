@@ -48,13 +48,13 @@ beforeAll(async () => {
     await client.query('BEGIN')
 
     await client.query(`
-      INSERT INTO public.orgs (id, created_by, name, management_email, use_new_rbac)
-      VALUES ($1::uuid, $2::uuid, $3, $4, true)
+      INSERT INTO public.orgs (id, created_by, name, management_email)
+      VALUES ($1::uuid, $2::uuid, $3, $4)
     `, [orgId, USER_ID, `Group RLS Org ${fixtureId}`, `group-rls-${fixtureId}@capgo.app`])
 
     await client.query(`
-      INSERT INTO public.org_users (org_id, user_id, user_right)
-      VALUES ($1::uuid, $2::uuid, 'read'::public.user_min_right)
+      INSERT INTO public.org_users (org_id, user_id, rbac_role_name, is_invite)
+      VALUES ($1::uuid, $2::uuid, public.rbac_role_org_member(), false)
     `, [orgId, USER_ID_2])
 
     const memberGroupResult = await client.query(`

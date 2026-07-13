@@ -8,7 +8,7 @@ import { dirname, resolve } from 'node:path'
 import QRCode from 'qrcode'
 import { buildPreviewWebUrl, type PreviewWebEnv } from './web-url'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
-import { createSupabaseClient, findSavedKey, formatError, getAppId, getConfig, OrganizationPerm } from '../utils'
+import { createSupabaseClient, findSavedKey, formatError, getAppId, getConfig } from '../utils'
 
 type AppRow = Pick<Database['public']['Tables']['apps']['Row'], 'allow_preview' | 'app_id'>
 type BundleRow = Pick<Database['public']['Tables']['app_versions']['Row'], 'id' | 'name'>
@@ -321,7 +321,7 @@ export async function getPreviewQr(appId: string, target: string | undefined, op
 
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
   await check2FAComplianceForApp(supabase, appId)
-  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.read, false, true)
+  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'app.read', false, true)
 
   const resolvedTarget = await resolvePreviewQrTarget(supabase, appId, { ...options, target })
   await printPreviewQrForResolvedTarget(supabase, appId, resolvedTarget, {

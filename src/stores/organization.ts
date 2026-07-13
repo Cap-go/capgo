@@ -39,8 +39,7 @@ export interface OrganizationApp {
   icon_url_loading?: boolean
 }
 export type OrganizationRole
-  = Database['public']['Enums']['user_min_right']
-    | 'owner'
+  = 'owner'
     | 'org_member'
     | 'org_billing_admin'
     | 'org_admin'
@@ -48,8 +47,7 @@ export type OrganizationRole
 export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number | string }>>
 export type ExtendedOrganizationMembers = ExtendedOrganizationMember[]
 type SignedMemberImageCallback = (signedImages: Map<string, string>) => void
-
-type LegacyMinRight = Database['public']['Enums']['user_min_right'] | 'owner'
+type OrgPermissionFloor = 'org_member' | 'org_billing_admin' | 'org_admin' | 'org_super_admin' | 'owner'
 
 // Mapping des rôles RBAC d'organisation vers leurs clés de traduction i18n
 export const RBAC_ORG_ROLE_I18N_KEYS: Record<string, string> = {
@@ -75,79 +73,34 @@ export function getRbacRoleI18nKey(role: string): string | undefined {
   return RBAC_ORG_ROLE_I18N_KEYS[role]
 }
 
-const LEGACY_ROLE_RANK: Record<string, number> = {
-  read: 1,
-  upload: 2,
-  write: 3,
-  admin: 4,
-  super_admin: 5,
+const ORG_ROLE_RANK: Record<string, number> = {
+  org_member: 1,
+  org_billing_admin: 2,
+  org_admin: 3,
+  org_super_admin: 4,
+  owner: 4,
 }
 
-const LEGACY_ROLE_ALIASES: Record<string, string> = {
-  owner: 'super_admin',
-  org_super_admin: 'super_admin',
-  org_admin: 'admin',
-  org_billing_admin: 'read',
-  org_member: 'read',
-  app_admin: 'admin',
-  app_developer: 'write',
-  app_uploader: 'upload',
-  app_reader: 'read',
-}
-
-const LEGACY_TO_RBAC_ORG: Record<string, string> = {
-  super_admin: 'org_super_admin',
-  admin: 'org_admin',
-  write: 'org_member',
-  upload: 'org_member',
-  read: 'org_member',
-}
-
-const LEGACY_TO_RBAC_APP: Record<string, string> = {
-  super_admin: 'app_admin',
-  admin: 'app_admin',
-  write: 'app_developer',
-  upload: 'app_uploader',
-  read: 'app_reader',
-}
-
-function normalizeLegacyRole(role?: string | null) {
+export function roleHasOrgRank(role: string | null | undefined, minRole: 'org_member' | 'org_billing_admin' | 'org_admin' | 'org_super_admin') {
   if (!role)
-    return null
-  const trimmed = role.startsWith('invite_') ? role.slice('invite_'.length) : role
-  return LEGACY_ROLE_ALIASES[trimmed] ?? trimmed
-}
-
-function legacyRoleRank(role?: string | null) {
-  const normalized = normalizeLegacyRole(role)
-  if (!normalized)
-    return null
-  return LEGACY_ROLE_RANK[normalized] ?? null
-}
-
-export function roleHasLegacyMinRight(role: string | null | undefined, minRight: LegacyMinRight) {
-  const roleRank = legacyRoleRank(role)
-  const requiredRank = legacyRoleRank(minRight)
-  if (roleRank === null || requiredRank === null)
     return false
-  return roleRank >= requiredRank
+  return (ORG_ROLE_RANK[role] ?? 0) >= ORG_ROLE_RANK[minRole]
 }
 
 export function isAdminRole(role: string | null | undefined) {
-  return roleHasLegacyMinRight(role, 'admin')
+  return roleHasOrgRank(role, 'org_admin')
 }
 
 export function isSuperAdminRole(role: string | null | undefined) {
-  return roleHasLegacyMinRight(role, 'super_admin')
+  return roleHasOrgRank(role, 'org_super_admin')
 }
 
 function normalizeRbacRole(role: string, scope: 'org' | 'app') {
-  const legacy = normalizeLegacyRole(role)
-  if (!legacy)
-    return role
-  if (scope === 'org')
-    return LEGACY_TO_RBAC_ORG[legacy] ?? role
-  return LEGACY_TO_RBAC_APP[legacy] ?? role
+  if (role === 'owner')
+    return scope === 'org' ? 'org_super_admin' : 'app_admin'
+  if (scope === 'app' && (role === 'org_admin' || role === 'org_super_admin'))
+    return 'app_admin'
+  return role
 }
 
 function matchesRbacRole(role: string, requiredRole: string) {
@@ -157,11 +110,17 @@ function matchesRbacRole(role: string, requiredRole: string) {
     return normalizeRbacRole(role, 'org') === requiredRole
   if (requiredRole.startsWith('app_'))
     return normalizeRbacRole(role, 'app') === requiredRole
-  return normalizeLegacyRole(role) === normalizeLegacyRole(requiredRole)
+  return role === requiredRole
 }
 
-function isSelectableOrganization(role: string) {
-  return !role.includes('invite')
+export function isPendingOrganizationInvite(org: Pick<Organization, 'is_invite' | 'role'>) {
+  if (org.is_invite !== null && org.is_invite !== undefined)
+    return org.is_invite === true
+  return org.role.startsWith('invite')
+}
+
+function isSelectableOrganization(org: Pick<Organization, 'is_invite' | 'role'>) {
+  return !isPendingOrganizationInvite(org)
 }
 
 const supabase = useSupabase()
@@ -183,7 +142,7 @@ export const useOrganizationStore = defineStore('organization', () => {
       )
     },
   )
-  const hasOrganizations = computed(() => organizations.value.some(org => isSelectableOrganization(org.role)))
+  const hasOrganizations = computed(() => organizations.value.some(org => isSelectableOrganization(org)))
 
   const getCurrentRole = async (appOwner: string, appId?: string, channelId?: number): Promise<OrganizationRole> => {
     if (_organizations.value.size === 0) {
@@ -416,7 +375,7 @@ export const useOrganizationStore = defineStore('organization', () => {
       return
 
     const organizations = Array.from(organizationsMap.values())
-    const selectableOrganizations = organizations.filter(org => isSelectableOrganization(org.role))
+    const selectableOrganizations = organizations.filter(org => isSelectableOrganization(org))
     const orgIds = selectableOrganizations.map(org => org.gid)
 
     if (orgIds.length === 0) {
@@ -530,7 +489,6 @@ export const useOrganizationStore = defineStore('organization', () => {
       })
 
     if (error || data === null) {
-      console.log('Cannot get org members!', error)
       return []
     }
 
@@ -616,7 +574,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     loadOrganizationLogos(mappedData, logoLoadRun)
 
     const selectableOrganizations = mappedData
-      .filter(org => isSelectableOrganization(org.role))
+      .filter(org => isSelectableOrganization(org))
       .sort((a, b) => b.app_count - a.app_count)
 
     const organization = selectableOrganizations[0]
@@ -638,7 +596,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     if (!targetOrgId) {
       const storedOrgId = localStorage.getItem(STORAGE_KEY)
       if (storedOrgId) {
-        const storedOrg = mappedData.find(org => org.gid === storedOrgId && isSelectableOrganization(org.role))
+        const storedOrg = mappedData.find(org => org.gid === storedOrgId && isSelectableOrganization(org))
         if (storedOrg) {
           targetOrgId = storedOrg.gid
         }
@@ -707,7 +665,7 @@ export const useOrganizationStore = defineStore('organization', () => {
   }
 
   const hasPermissionsInRole = (
-    minRight: LegacyMinRight,
+    minRight: OrgPermissionFloor,
     requiredRoles: string[] = [],
     orgId?: string,
     appId?: string,
@@ -723,10 +681,10 @@ export const useOrganizationStore = defineStore('organization', () => {
         return true
     }
 
-    return roleHasLegacyMinRight(role, minRight)
+    return roleHasOrgRank(role, minRight === 'owner' ? 'org_super_admin' : minRight)
   }
 
-  // Check password policy compliance for all org members (for super_admin preview)
+  // Check password policy compliance for all org members in org admin previews.
   const checkPasswordPolicyImpact = async (orgId: string) => {
     const { data, error } = await supabase.rpc('check_org_members_password_policy', {
       org_id: orgId,
@@ -745,7 +703,7 @@ export const useOrganizationStore = defineStore('organization', () => {
   }
 
   const canDeleteOrganization = (orgId?: string) => {
-    return hasPermissionsInRole('super_admin', ['org_super_admin'], orgId)
+    return hasPermissionsInRole('org_super_admin', ['org_super_admin'], orgId)
   }
 
   const deleteOrganization = async (orgId: string) => {
@@ -760,11 +718,10 @@ export const useOrganizationStore = defineStore('organization', () => {
       return { data: null, error: new Error('User not authenticated') }
     }
 
-    // Verify user has super_admin or owner role for this organization
+    // Verify user has org_super_admin or owner role for this organization
     const currentOrg = _organizations.value.get(orgId)
-    console.log('Delete org check:', { orgId, currentOrg, role: currentOrg?.role, userId: currentUserId })
     if (!currentOrg || !canDeleteOrganization(orgId)) {
-      console.error('Permission denied:', { role: currentOrg?.role, required: ['super_admin', 'owner', 'org_super_admin'] })
+      console.error('Permission denied:', { role: currentOrg?.role, required: ['owner', 'org_super_admin'] })
       return { data: null, error: new Error('Insufficient permissions') }
     }
 

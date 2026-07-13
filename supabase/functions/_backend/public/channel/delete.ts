@@ -29,16 +29,14 @@ export async function deleteChannel(c: Context<MiddlewareKeyVariables>, body: Ch
   if (!isValidAppId(body.app_id)) {
     throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
   }
-  // Auth context is already set by middlewareKey
-  if (!(await checkPermission(c, 'channel.delete', { appId: body.app_id }))) {
-    throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id })
-  }
   if (!body.channel) {
     throw simpleError('missing_channel_name', 'You must provide a channel name')
   }
 
+  const supabase = supabaseApikey(c, apikey.key)
+
   // search if that exist first
-  const { data: dataChannel, error: dbError } = await supabaseApikey(c, apikey.key)
+  const { data: dataChannel, error: dbError } = await supabase
     .from('channels')
     .select('id')
     .eq('app_id', body.app_id)
@@ -47,9 +45,14 @@ export async function deleteChannel(c: Context<MiddlewareKeyVariables>, body: Ch
   if (dbError || !dataChannel) {
     throw simpleError('cannot_find_channel', 'Cannot find channel', { supabaseError: dbError })
   }
-  await supabaseApikey(c, apikey.key)
+  // Auth context is already set by middlewareKey
+  if (!(await checkPermission(c, 'channel.delete', { appId: body.app_id, channelId: dataChannel.id }))) {
+    throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel_id: dataChannel.id })
+  }
+  await supabase
     .from('channels')
     .delete()
+    .eq('id', dataChannel.id)
     .eq('app_id', body.app_id)
     .eq('name', body.channel)
   return c.json(BRES)

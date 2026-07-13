@@ -1231,24 +1231,24 @@
       "type": "bigint"
     },
     {
-      "default": null,
-      "generated": "",
-      "identity": "",
-      "name": "user_right",
-      "notNull": false,
-      "position": 8,
-      "table": "org_users",
-      "type": "user_min_right"
-    },
-    {
-      "default": null,
+      "default": "'org_member'::text",
       "generated": "",
       "identity": "",
       "name": "rbac_role_name",
       "notNull": false,
-      "position": 9,
+      "position": 8,
       "table": "org_users",
       "type": "text"
+    },
+    {
+      "default": "false",
+      "generated": "",
+      "identity": "",
+      "name": "is_invite",
+      "notNull": true,
+      "position": 9,
+      "table": "org_users",
+      "type": "boolean"
     },
     {
       "default": "gen_random_uuid()",
@@ -1351,22 +1351,12 @@
       "type": "timestamp without time zone"
     },
     {
-      "default": "true",
-      "generated": "",
-      "identity": "",
-      "name": "use_new_rbac",
-      "notNull": true,
-      "position": 11,
-      "table": "orgs",
-      "type": "boolean"
-    },
-    {
       "default": "false",
       "generated": "",
       "identity": "",
       "name": "enforcing_2fa",
       "notNull": true,
-      "position": 12,
+      "position": 11,
       "table": "orgs",
       "type": "boolean"
     },
@@ -1376,7 +1366,7 @@
       "identity": "",
       "name": "email_preferences",
       "notNull": true,
-      "position": 13,
+      "position": 12,
       "table": "orgs",
       "type": "jsonb"
     },
@@ -1386,7 +1376,7 @@
       "identity": "",
       "name": "enforce_hashed_api_keys",
       "notNull": true,
-      "position": 14,
+      "position": 13,
       "table": "orgs",
       "type": "boolean"
     },
@@ -1396,7 +1386,7 @@
       "identity": "",
       "name": "require_apikey_expiration",
       "notNull": true,
-      "position": 15,
+      "position": 14,
       "table": "orgs",
       "type": "boolean"
     },
@@ -1406,7 +1396,7 @@
       "identity": "",
       "name": "max_apikey_expiration_days",
       "notNull": false,
-      "position": 16,
+      "position": 15,
       "table": "orgs",
       "type": "integer"
     },
@@ -1416,7 +1406,7 @@
       "identity": "",
       "name": "password_policy_config",
       "notNull": false,
-      "position": 17,
+      "position": 16,
       "table": "orgs",
       "type": "jsonb"
     },
@@ -1426,7 +1416,7 @@
       "identity": "",
       "name": "enforce_encrypted_bundles",
       "notNull": true,
-      "position": 18,
+      "position": 17,
       "table": "orgs",
       "type": "boolean"
     },
@@ -1436,7 +1426,7 @@
       "identity": "",
       "name": "required_encryption_key",
       "notNull": false,
-      "position": 19,
+      "position": 18,
       "table": "orgs",
       "type": "character varying(21)"
     },
@@ -1446,7 +1436,7 @@
       "identity": "",
       "name": "has_usage_credits",
       "notNull": true,
-      "position": 20,
+      "position": 19,
       "table": "orgs",
       "type": "boolean"
     },
@@ -1456,7 +1446,7 @@
       "identity": "",
       "name": "website",
       "notNull": false,
-      "position": 21,
+      "position": 20,
       "table": "orgs",
       "type": "text"
     },
@@ -1466,7 +1456,7 @@
       "identity": "",
       "name": "stats_refresh_requested_at",
       "notNull": false,
-      "position": 22,
+      "position": 21,
       "table": "orgs",
       "type": "timestamp without time zone"
     },
@@ -1476,7 +1466,7 @@
       "identity": "",
       "name": "onboarding",
       "notNull": true,
-      "position": 23,
+      "position": 22,
       "table": "orgs",
       "type": "jsonb"
     },
@@ -2684,22 +2674,6 @@
       ],
       "kind": "e",
       "name": "stripe_status"
-    },
-    {
-      "definition": [
-        "invite_read",
-        "invite_upload",
-        "invite_write",
-        "invite_admin",
-        "invite_super_admin",
-        "read",
-        "upload",
-        "write",
-        "admin",
-        "super_admin"
-      ],
-      "kind": "e",
-      "name": "user_min_right"
     }
   ],
   "version": 1

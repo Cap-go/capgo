@@ -148,6 +148,49 @@ function createAuthenticatedSupabaseClient(headers: Record<string, string>) {
   })
 }
 
+function createApiKeySupabaseClient(apikey: string) {
+  const supabaseUrl = normalizeLocalhostUrl(env.SUPABASE_URL)
+  const supabaseAnonKey = env.SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Missing Supabase auth environment for API key client')
+  }
+
+  return createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: {
+        capgkey: apikey,
+      },
+    },
+    auth: {
+      persistSession: false,
+    },
+  })
+}
+
+async function expectApiKeyCanReadBaseOrg(apikey: string) {
+  const supabase = createApiKeySupabaseClient(apikey)
+  const { data, error } = await supabase
+    .from('orgs')
+    .select('id')
+    .eq('id', BASE_ORG_ID)
+    .single()
+
+  expect(error).toBeNull()
+  expect(data?.id).toBe(BASE_ORG_ID)
+}
+
+async function expectApiKeyCannotReadBaseOrg(apikey: string) {
+  const supabase = createApiKeySupabaseClient(apikey)
+  const { data, error } = await supabase
+    .from('orgs')
+    .select('id')
+    .eq('id', BASE_ORG_ID)
+
+  expect(error).toBeNull()
+  expect(data).toEqual([])
+}
+
 beforeAll(async () => {
   authHeaders = await getAuthHeadersForCredentials(USER_EMAIL_APIKEY_EXPIRATION, USER_PASSWORD)
 
@@ -175,7 +218,7 @@ beforeAll(async () => {
   const { error: baseMemberError } = await getSupabaseClient().from('org_users').insert({
     org_id: BASE_ORG_ID,
     user_id: USER_ID_APIKEY_EXPIRATION,
-    user_right: 'super_admin',
+    rbac_role_name: 'org_super_admin',
   })
   if (baseMemberError)
     throw baseMemberError
@@ -207,7 +250,7 @@ beforeAll(async () => {
   const { error: policyMemberError } = await getSupabaseClient().from('org_users').insert({
     org_id: POLICY_ORG_ID,
     user_id: USER_ID_APIKEY_EXPIRATION,
-    user_right: 'super_admin',
+    rbac_role_name: 'org_super_admin',
   })
   if (policyMemberError)
     throw policyMemberError
@@ -642,7 +685,7 @@ describe('[PUT] /organization with API key policy', () => {
     const { error: memberError } = await getSupabaseClient().from('org_users').insert({
       org_id: updateOrgId,
       user_id: USER_ID_APIKEY_EXPIRATION,
-      user_right: 'super_admin',
+      rbac_role_name: 'org_super_admin',
     })
     if (memberError)
       throw memberError
@@ -761,27 +804,12 @@ describe('expired API key rejection', () => {
     await deleteSeededApiKeys(seededApiKeyIds)
   })
 
-  it('expired API key should be rejected when used for authentication', async () => {
-    const response = await apiFetch('/apikey', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': expiredKeyValue,
-      },
-    })
-    // Should be rejected as unauthorized
-    expect(response.status).toBe(401)
+  it.concurrent('expired API key should be rejected when used for authentication', async () => {
+    await expectApiKeyCannotReadBaseOrg(expiredKeyValue)
   })
 
-  it('valid (non-expired) API key should work for authentication', async () => {
-    const response = await apiFetch('/apikey', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': validKeyValue,
-      },
-    })
-    expect(response.status).toBe(200)
+  it.concurrent('valid (non-expired) API key should work for RLS authentication', async () => {
+    await expectApiKeyCanReadBaseOrg(validKeyValue)
   })
 })
 
@@ -790,14 +818,7 @@ describe('api key expiration boundary conditions', () => {
     const data = await seedPlainApiKey('key-boundary-test', new Date(Date.now() - 1000).toISOString())
 
     try {
-      const authResponse = await apiFetch('/apikey', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': data.key,
-        },
-      })
-      expect(authResponse.status).toBe(401)
+      await expectApiKeyCannotReadBaseOrg(data.key)
     }
     finally {
       await deleteSeededApiKeys([data.id])
@@ -808,14 +829,7 @@ describe('api key expiration boundary conditions', () => {
     const data = await seedPlainApiKey('key-near-expiration', new Date(Date.now() + 30_000).toISOString())
 
     try {
-      const authResponse = await apiFetch('/apikey', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': data.key,
-        },
-      })
-      expect(authResponse.status).toBe(200)
+      await expectApiKeyCanReadBaseOrg(data.key)
     }
     finally {
       await deleteSeededApiKeys([data.id])

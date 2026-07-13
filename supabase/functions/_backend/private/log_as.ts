@@ -134,20 +134,6 @@ async function getOrgOwner(c: Context<MiddlewareKeyVariables>, orgId: string): P
         ),
         current_admins AS (
           SELECT
-            org_users.user_id,
-            auth.users.email,
-            org_users.created_at AS granted_at
-          FROM target_org
-          JOIN public.org_users
-            ON org_users.org_id = target_org.id
-            AND org_users.user_right = 'super_admin'::public.user_min_right
-            AND org_users.app_id IS NULL
-            AND org_users.channel_id IS NULL
-          JOIN auth.users
-            ON auth.users.id = org_users.user_id
-            AND auth.users.email IS NOT NULL
-          UNION
-          SELECT
             role_bindings.principal_id AS user_id,
             auth.users.email,
             role_bindings.granted_at

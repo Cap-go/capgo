@@ -128,7 +128,6 @@ beforeAll(async () => {
     created_by: USER_ID,
     customer_id: customerId,
     // This suite keeps the classic org membership path enabled while API keys use V2 bindings.
-    use_new_rbac: false,
   })
   if (error)
     throw error
@@ -138,7 +137,7 @@ beforeAll(async () => {
   const { error: memberError } = await getSupabaseClient().from('org_users').insert({
     org_id: ORG_ID,
     user_id: USER_ID,
-    user_right: 'super_admin',
+    rbac_role_name: 'org_super_admin',
   })
   if (memberError)
     throw memberError
@@ -398,7 +397,7 @@ describe('audit log triggers', () => {
       .insert({
         org_id: ORG_ID,
         user_id: anotherUser.id,
-        user_right: 'read',
+        rbac_role_name: 'org_member',
       })
     expect(insertError).toBeNull()
 
@@ -454,7 +453,7 @@ describe('audit log triggers', () => {
       .insert({
         org_id: ORG_ID,
         user_id: anotherUser.id,
-        user_right: 'read',
+        rbac_role_name: 'org_member',
       })
     expect(insertError).toBeNull()
 
@@ -493,7 +492,7 @@ describe('audit log triggers', () => {
 })
 
 // These tests verify that audit logs are created when using API key authentication
-// This was a bug where CLI/API users were not logged because get_identity() didn't check API keys
+// This was a bug where CLI/API users were not logged because request identity resolution missed API keys.
 describe('audit logs for app_versions via API key', () => {
   const testVersionName = `99.0.0-audit-test-${randomUUID()}`
   let createdVersionId: number | null = null

@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../types/supabase.types'
 import { log } from '@clack/prompts'
-import { getPMAndCommand, isAllowedAppOrg, OrganizationPerm, show2FADeniedError } from '../utils'
+import { getPMAndCommand, hasCliPermission, show2FADeniedError } from '../utils'
 
 export async function checkAppExists(supabase: SupabaseClient<Database>, appid: string) {
   const { data: app } = await supabase
@@ -162,51 +162,33 @@ export async function checkAppExistsAndHasPermissionOrgErr(
   supabase: SupabaseClient<Database>,
   apikey: string,
   appid: string,
-  requiredPermission: OrganizationPerm,
+  requiredPermissionKey: string,
   silent = false,
   skip2FACheck = false,
+  channelId?: number | null,
 ) {
   const pm = getPMAndCommand()
+  const isChannelScopedPermission = channelId != null && requiredPermissionKey.startsWith('channel.')
 
   // Check 2FA compliance first (unless already checked earlier)
   if (!skip2FACheck)
     await check2FAComplianceForApp(supabase, appid, silent)
 
-  const permissions = await isAllowedAppOrg(supabase, apikey, appid)
-  if (!permissions.okay) {
-    switch (permissions.error) {
-      case 'INVALID_APIKEY': {
-        const msg = 'Invalid apikey, such apikey does not exists!'
-        if (!silent)
-          log.error(msg)
-        throw new Error(msg)
-      }
-      case 'NO_APP': {
-        const msg = `App ${appid} does not exist, run first \`${pm.runner} @capgo/cli app add ${appid}\` to create it`
-        if (!silent)
-          log.error(msg)
-        throw new Error(msg)
-      }
-      case 'NO_ORG': {
-        const msg = 'Could not find organization, please contact support to resolve this!'
-        if (!silent)
-          log.error(msg)
-        throw new Error(msg)
-      }
-    }
-  }
-
-  const remotePermNumber = permissions.data as number
-  const requiredPermNumber = requiredPermission as number
-
-  if (requiredPermNumber > remotePermNumber) {
-    const msg = `Insuficcent permissions for app ${appid}. Current permission: ${OrganizationPerm[permissions.data]}, required for this action: ${OrganizationPerm[requiredPermission]}.`
+  if (!isChannelScopedPermission && !(await checkAppExists(supabase, appid))) {
+    const msg = `App ${appid} does not exist, run first \`${pm.runner} @capgo/cli app add ${appid}\` to create it`
     if (!silent)
       log.error(msg)
     throw new Error(msg)
   }
 
-  return permissions.data
+  if (!(await hasCliPermission(supabase, apikey, requiredPermissionKey, { appId: appid, channelId: channelId ?? null }))) {
+    const msg = `Insufficient permissions for app ${appid}. Required RBAC permission for this action: ${requiredPermissionKey}.`
+    if (!silent)
+      log.error(msg)
+    throw new Error(msg)
+  }
+
+  return true
 }
 
 export type { AppOptions as Options } from '../schemas/app'

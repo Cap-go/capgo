@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
-import type { AuthInfo, MiddlewareKeyVariables } from './hono.ts'
+import type { AuthInfo } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, NativeVersionUsage, Order, ReadDevicesParams, ReadStatsInsightsParams, ReadStatsParams, StatsInsightsResult, StatsMetadata, VersionUsage, VersionUsageChannel } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
@@ -209,38 +209,41 @@ export async function getAppsFromSB(c: Context, referenceDate?: Date): Promise<s
   return Array.from(new Set(apps))
 }
 
-export async function updateOrCreateChannel(c: Context, update: Database['public']['Tables']['channels']['Insert']) {
+export async function updateOrCreateChannel(
+  c: Context,
+  update: Database['public']['Tables']['channels']['Insert'],
+  existingChannelId: number | null,
+  preserveVersion = false,
+) {
   cloudlog({ requestId: c.get('requestId'), message: 'updateOrCreateChannel', update })
   if (!update.app_id || !update.name || !update.created_by) {
     cloudlog({ requestId: c.get('requestId'), message: 'missing app_id, name, or created_by' })
-    return Promise.reject(new Error('missing app_id, name, or created_by'))
+    throw new Error('missing app_id, name, or created_by')
   }
 
-  const { data: existingChannel } = await supabaseAdmin(c)
+  const auth = c.get('auth')
+  if (!auth) {
+    throw new Error('missing request auth')
+  }
+
+  const supabase = supabaseWithAuth(c, auth)
+  if (existingChannelId === null) {
+    return supabase
+      .from('channels')
+      .insert(update)
+      .throwOnError()
+  }
+
+  // Keep the original creator immutable. Omitted stable versions are read only
+  // for the response shape and must not overwrite a concurrent promotion.
+  const { created_by: _createdBy, version, ...channelUpdate } = update
+  const requestUpdate = preserveVersion ? channelUpdate : { ...channelUpdate, version }
+  return supabase
     .from('channels')
-    .select('*')
+    .update(requestUpdate)
+    .eq('id', existingChannelId)
     .eq('app_id', update.app_id)
     .eq('name', update.name)
-    .single()
-
-  const upsertPayload = {
-    ...update,
-    created_by: existingChannel?.created_by || update.created_by,
-  }
-
-  if (existingChannel) {
-    const fieldsDiffer = Object.keys(upsertPayload).some(key =>
-      (upsertPayload as any)[key] !== (existingChannel as any)[key] && key !== 'created_at' && key !== 'updated_at',
-    )
-    if (!fieldsDiffer) {
-      cloudlog({ requestId: c.get('requestId'), message: 'No fields differ, no update needed' })
-      return Promise.resolve({ error: null, requestId: c.get('requestId') })
-    }
-  }
-
-  return supabaseAdmin(c)
-    .from('channels')
-    .upsert(upsertPayload, { onConflict: 'app_id, name' })
     .throwOnError()
 }
 
@@ -292,53 +295,6 @@ export async function checkAppOwner(c: Context, userId: string | undefined, appI
   }
 }
 
-export async function hasAppRight(c: Context, appId: string | undefined, userid: string, right: Database['public']['Enums']['user_min_right']) {
-  if (!appId)
-    return false
-
-  const { data, error } = await supabaseAdmin(c)
-    .rpc('has_app_right_userid', { appid: appId, right, userid })
-
-  if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'has_app_right_userid error', error })
-    return false
-  }
-
-  return data
-}
-
-export async function hasAppRightApikey(c: Context<MiddlewareKeyVariables, any, object>, appId: string | undefined, userid: string, right: Database['public']['Enums']['user_min_right'], apikey: string | null | undefined) {
-  if (!appId) {
-    cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - appId is undefined' })
-    return false
-  }
-
-  // For hashed keys, use the capgkey from the request header
-  const effectiveApikey = apikey ?? c.get('capgkey')
-  if (!effectiveApikey) {
-    cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - no API key available' })
-    return false
-  }
-
-  cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - calling RPC', appId, userid, right, apikeyPrefix: effectiveApikey?.substring(0, 15) })
-
-  const { data, error } = await supabaseAdmin(c)
-    .rpc('has_app_right_apikey', { appid: appId, right, userid, apikey: effectiveApikey })
-
-  cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - RPC result', data, hasError: !!error, error })
-
-  if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'has_app_right_apikey error', error, appId, userid, right })
-    return false
-  }
-
-  if (!data) {
-    cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - permission denied', appId, userid, right, apikeyPrefix: effectiveApikey?.substring(0, 15) })
-  }
-
-  return data
-}
-
 export async function apikeyHasOrgRight(c: Context, key: Database['public']['Tables']['apikeys']['Row'], orgId: string) {
   if (!key.rbac_id)
     return false
@@ -386,44 +342,6 @@ export async function apikeyHasOrgRightWithPolicy(
   }
 
   return { valid: true }
-}
-
-export async function hasOrgRight(c: Context, orgId: string, userId: string, right: Database['public']['Enums']['user_min_right']) {
-  const userRight = await supabaseAdmin(c).rpc('check_min_rights', {
-    min_right: right,
-    org_id: orgId,
-    user_id: userId,
-    channel_id: null as any,
-    app_id: null as any,
-  })
-
-  cloudlog({ requestId: c.get('requestId'), message: 'check_min_rights (hasOrgRight)', userRight })
-
-  if (userRight.error || !userRight.data) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'check_min_rights (hasOrgRight) error', error: userRight.error })
-    return false
-  }
-
-  return userRight.data
-}
-
-export async function hasOrgRightApikey(c: Context, orgId: string, userId: string, right: Database['public']['Enums']['user_min_right'], apikey: string | null | undefined) {
-  const userRight = await supabaseApikey(c, apikey).rpc('check_min_rights', {
-    min_right: right,
-    org_id: orgId,
-    user_id: userId,
-    channel_id: null as any,
-    app_id: null as any,
-  })
-
-  cloudlog({ requestId: c.get('requestId'), message: 'check_min_rights (hasOrgRight)', userRight })
-
-  if (userRight.error || !userRight.data) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'check_min_rights (hasOrgRight) error', error: userRight.error })
-    return false
-  }
-
-  return userRight.data
 }
 
 interface PlanTotal {
@@ -931,7 +849,13 @@ export async function createApiKey(c: Context, userId: string) {
     }
 
     await pgClient.query(
-      `WITH inserted AS (
+      `WITH default_keys(name, org_role_name, app_role_name) AS (
+         VALUES
+           ('default org admin', public.rbac_role_org_admin(), NULL::text),
+           ('default app uploader', public.rbac_role_org_member(), public.rbac_role_app_uploader()),
+           ('default app reader', public.rbac_role_org_member(), public.rbac_role_app_reader())
+       ),
+       inserted AS (
          INSERT INTO public.apikeys (
            user_id,
            key,
@@ -943,8 +867,18 @@ export async function createApiKey(c: Context, userId: string) {
            gen_random_uuid()::text,
            NULL,
            default_key.name
-         FROM (VALUES ('all'), ('upload'), ('read')) AS default_key(name)
+         FROM default_keys AS default_key
          RETURNING user_id, rbac_id, name
+       ),
+       inserted_with_roles AS (
+         SELECT
+           inserted.user_id,
+           inserted.rbac_id,
+           inserted.name,
+           default_keys.org_role_name,
+           default_keys.app_role_name
+         FROM inserted
+         JOIN default_keys USING (name)
        ),
        current_orgs AS (
          SELECT DISTINCT rb.org_id
@@ -980,20 +914,17 @@ export async function createApiKey(c: Context, userId: string) {
          )
          SELECT
            public.rbac_principal_apikey(),
-           inserted.rbac_id,
+           inserted_with_roles.rbac_id,
            roles.id,
            public.rbac_scope_org(),
            current_orgs.org_id,
-           inserted.user_id,
-           'Default API key V2 binding',
+           inserted_with_roles.user_id,
+           'Default API key RBAC org binding',
            true
-         FROM inserted
+         FROM inserted_with_roles
          CROSS JOIN current_orgs
          JOIN public.roles roles
-           ON roles.name = CASE
-             WHEN inserted.name = 'all' THEN public.rbac_role_org_admin()
-             ELSE public.rbac_role_org_member()
-           END
+           ON roles.name = inserted_with_roles.org_role_name
          ON CONFLICT DO NOTHING
        )
        INSERT INTO public.role_bindings (
@@ -1009,24 +940,20 @@ export async function createApiKey(c: Context, userId: string) {
        )
        SELECT
          public.rbac_principal_apikey(),
-         inserted.rbac_id,
+         inserted_with_roles.rbac_id,
          roles.id,
          public.rbac_scope_app(),
          apps.owner_org,
          apps.id,
-         inserted.user_id,
-         'Default API key V2 app binding',
+         inserted_with_roles.user_id,
+         'Default API key RBAC app binding',
          true
-       FROM inserted
+       FROM inserted_with_roles
        JOIN current_orgs ON true
        JOIN public.apps apps ON apps.owner_org = current_orgs.org_id
        JOIN public.roles roles
-         ON roles.name = CASE inserted.name
-           WHEN 'upload' THEN public.rbac_role_app_uploader()
-           WHEN 'read' THEN public.rbac_role_app_reader()
-           ELSE NULL
-         END
-       WHERE inserted.name IN ('upload', 'read')
+         ON roles.name = inserted_with_roles.app_role_name
+       WHERE inserted_with_roles.app_role_name IS NOT NULL
        ON CONFLICT DO NOTHING`,
       [userId],
     )
@@ -1870,7 +1797,7 @@ export async function getUpdateStatsSB(c: Context): Promise<UpdateStats> {
  * Uses find_apikey_by_value SQL function to look up both plain-text and hashed keys
  * Expiration is checked after lookup
  */
-export async function checkKey(c: Context, authorization: string | undefined, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
+export async function checkKey(c: Context, authorization: string | undefined, supabase: SupabaseClient<Database>): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   if (!authorization)
     return null
 
@@ -1882,7 +1809,7 @@ export async function checkKey(c: Context, authorization: string | undefined, su
       .single()
 
     if (error || !data) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorizationPrefix: authorization?.substring(0, 8), allowed, error })
+      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorizationPrefix: authorization?.substring(0, 8), error })
       return null
     }
 
@@ -1908,7 +1835,6 @@ export async function checkKeyById(
   c: Context,
   id: number,
   supabase: SupabaseClient<Database>,
-  _allowed: Database['public']['Enums']['key_mode'][],
   userId?: string,
 ): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   if (!id)

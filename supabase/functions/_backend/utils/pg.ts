@@ -2601,7 +2601,7 @@ export async function getAdminOrganizationInsights(
           COUNT(DISTINCT ou.user_id)::int AS members_count
         FROM org_users ou
         INNER JOIN filtered_orgs filtered ON filtered.org_id = ou.org_id
-        WHERE ou.user_right IS NULL OR ou.user_right::text NOT LIKE 'invite_%'
+        WHERE ou.is_invite IS NOT TRUE
         GROUP BY ou.org_id
       ),
       mau_by_org AS (

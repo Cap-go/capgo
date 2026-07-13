@@ -442,8 +442,8 @@ $$;
 Every PostgreSQL function call added to a policy, view, trigger, RPC,
 PostgREST-exposed query path, or hot backend endpoint must be proven to scale
 before it ships. Treat this as mandatory for RLS helpers such as
-`check_min_rights`, `get_identity_org_appid`, `get_identity_org_allowed`, and
-any new wrapper around them.
+`rbac_check_permission_request`, `rbac_check_permission`, and any new wrapper
+around them.
 
 Before adding or changing a function call, document the execution model:
 
@@ -466,9 +466,8 @@ RLS function calls are dangerous by default:
   another large table. Allowed-list helpers are only acceptable when they start
   from caller-scoped, indexed identity data and stay bounded before touching the
   protected resource.
-- Never create a helper that scans a broad production table and calls
-  `check_min_rights`, `get_identity*`, RBAC checks, API-key checks, logging, or
-  other SQL functions once per scanned row.
+- Never create a helper that scans a broad production table and calls RBAC
+  checks, API-key checks, logging, or other SQL functions once per scanned row.
 - If a table has `app_id`, prefer a policy shape that constrains by that
   row's indexed `app_id`/`owner_org` values. Do not precompute visibility by
   scanning all apps, all versions, all channels, or all org resources.
@@ -643,48 +642,37 @@ FOR SELECT USING (
 
 ## Database RLS Policies
 
-### Identity Functions for RLS - CRITICAL RULES
+### RBAC Functions for RLS - CRITICAL RULES
 
-**NEVER use `get_identity()` directly in RLS policies.**
+**NEVER use deleted identity/min-right helpers in RLS policies.**
 
-**ALWAYS use `get_identity_org_appid()` when app_id exists on the table.**
+Authorization must use RBAC permission keys through the current helpers:
 
-```sql
-public.get_identity_org_appid(
-    '{read,upload,write,all}'::public.key_mode[],
-    owner_org,  -- or org_id
-    app_id
-)
-```
+- `public.rbac_check_permission_request(permission_key, org_id, app_id, channel_id)`
+- `public.rbac_check_permission(permission_key, org_id, app_id, channel_id)`
+- `public.rbac_check_permission_direct(permission_key, user_id, org_id, app_id, channel_id, apikey)`
 
-**`get_identity_org_allowed()` is an ABSOLUTE LAST RESORT.** Only use it when:
+`org_users` is metadata only and must not grant rights. API keys must authorize
+through `role_bindings` with `principal_type = public.rbac_principal_apikey()`.
 
-- The table genuinely has NO app_id column
-- There is NO way to join to get an app_id
-- You have exhausted all other options
-
-If you find yourself reaching for `get_identity_org_allowed()`, STOP and ask:
-"Is there ANY way to get an app_id here?" If yes, use `get_identity_org_appid()`.
+When a table has `app_id`, pass the row's indexed `owner_org`/`org_id` and
+`app_id` to the RBAC check. If a table has no `app_id`, join through the closest
+indexed parent that provides the app or org scope.
 
 ### RLS Pattern Examples
 
 ```sql
--- CORRECT: Table has app_id - use get_identity_org_appid
+-- CORRECT: Table has app_id - use row scope with RBAC permission key
 CREATE POLICY "Allow org members to select build_requests"
 ON public.build_requests
 FOR SELECT
 TO authenticated, anon
 USING (
-    public.check_min_rights(
-        'read'::public.user_min_right,
-        public.get_identity_org_appid(
-            '{read,upload,write,all}'::public.key_mode[],
-            owner_org,
-            app_id
-        ),
+    public.rbac_check_permission_request(
+        public.rbac_perm_app_read(),
         owner_org,
         app_id,
-        NULL::BIGINT
+        NULL::bigint
     )
 );
 
@@ -695,46 +683,40 @@ FOR SELECT
 TO authenticated, anon
 USING (
     EXISTS (
-        SELECT 1 FROM public.apps
-        WHERE apps.app_id = daily_build_time.app_id
-        AND public.check_min_rights(
-            'read'::public.user_min_right,
-            public.get_identity_org_appid(
-                '{read,upload,write,all}'::public.key_mode[],
-                apps.owner_org,
-                apps.app_id
-            ),
+      SELECT 1 FROM public.apps
+      WHERE apps.app_id = daily_build_time.app_id
+        AND public.rbac_check_permission_request(
+            public.rbac_perm_app_read(),
             apps.owner_org,
             apps.app_id,
-            NULL::BIGINT
+            NULL::bigint
         )
     )
 );
 
--- LAST RESORT: Table has NO app_id and NO way to get one (e.g., build_logs)
+-- Table has no app scope, so use the row's org scope directly.
 CREATE POLICY "Allow org members to select build_logs"
 ON public.build_logs
 FOR SELECT
 TO authenticated, anon
 USING (
-    public.check_min_rights(
-        'read'::public.user_min_right,
-        public.get_identity_org_allowed(
-            '{read,upload,write,all}'::public.key_mode[],
-            org_id
-        ),
+    public.rbac_check_permission_request(
+        public.rbac_perm_org_read(),
         org_id,
-        NULL::CHARACTER VARYING,
-        NULL::BIGINT
+        NULL::character varying,
+        NULL::bigint
     )
 );
 ```
 
 Key points:
 
-- Use both `authenticated` and `anon` roles (anon enables API key auth)
-- Pass app_id to BOTH `get_identity_org_appid()` AND `check_min_rights()`
-- Reference apps, channels, app_versions tables for more examples
+- Use both `authenticated` and `anon` roles where API-key traffic must reach the
+  policy.
+- API-key access must still resolve through RBAC `role_bindings`; do not inspect
+  key modes.
+- Reference apps, channels, app_versions, and manifest tables for current
+  policy examples.
 
 ## Frontend Style
 

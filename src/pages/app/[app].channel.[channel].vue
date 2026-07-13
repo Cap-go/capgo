@@ -111,9 +111,9 @@ const showRolloutSettings = computed(() => !!channel.value?.rollout_enabled)
 const showRolloutEnableRow = computed(() => !!channel.value && !channel.value.rollout_enabled)
 
 const canUpdateChannelSettings = computedAsync(async () => {
-  if (!packageId.value)
+  if (!packageId.value || !id.value)
     return false
-  return await checkPermissions('channel.update_settings', { appId: packageId.value })
+  return await checkPermissions('channel.update_settings', { appId: packageId.value, channelId: id.value })
 }, false)
 const rolloutControlsDisabled = computed(() => !canUpdateChannelSettings.value)
 const rolloutActionsDisabled = computed(() => rolloutControlsDisabled.value || !rolloutConfigured.value)

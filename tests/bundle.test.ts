@@ -438,7 +438,6 @@ describe('[PUT] /bundle RBAC channel overrides', () => {
       name: `Bundle RBAC Org ${id}`,
       management_email: `bundle-rbac-${id}@capgo.app`,
       created_by: USER_ID,
-      use_new_rbac: true,
     })
     if (orgError)
       throw orgError
@@ -462,7 +461,7 @@ describe('[PUT] /bundle RBAC channel overrides', () => {
     const { error: memberError } = await supabase.from('org_users').insert({
       org_id: RBAC_ORG_ID,
       user_id: USER_ID,
-      user_right: 'write',
+      rbac_role_name: 'org_member',
     })
     if (memberError)
       throw memberError

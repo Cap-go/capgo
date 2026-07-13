@@ -5,7 +5,7 @@ import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc.js'
 import { createSchema, makeIssue, safeParseSchema } from '../../utils/ark_validation.ts'
 import { honoFactory, quickError, simpleError, useCors } from '../../utils/hono.ts'
-import { middlewareV2 } from '../../utils/hono_middleware.ts'
+import { middlewareAuth } from '../../utils/hono_middleware.ts'
 import { cloudlog } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { getRetryablePostgrestStatus, isRetryablePostgrestError, isRetryablePostgrestResult, retryWithBackoff } from '../../utils/retry.ts'
@@ -18,7 +18,7 @@ dayjs.extend(utc)
 
 export const app = honoFactory.createApp()
 app.use('*', useCors)
-app.use('*', middlewareV2(['all', 'read']))
+app.use('*', middlewareAuth())
 
 function accumulateNumbers(values: number[]): number[] {
   return values.reduce<number[]>((result, value) => {

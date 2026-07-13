@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { readReplicaSchemaCatalog } from '../read_replicate/schema_catalog.ts'
+import { REPLICA_TYPES, readReplicaSchemaCatalog, replicaConfigPattern } from '../read_replicate/schema_catalog.ts'
 
 describe('read-replica schema catalog', () => {
+  it('does not export the removed legacy RBAC enum', () => {
+    expect(REPLICA_TYPES).not.toContain('user_min_right')
+    expect(replicaConfigPattern(REPLICA_TYPES)).not.toContain('user_min_right')
+  })
+
   it.concurrent(
     'makes the post-DDL catalog read uncacheable in Hyperdrive',
     async () => {
@@ -31,9 +36,13 @@ describe('read-replica schema catalog', () => {
       expect(queries[0]?.text).toContain("'constraintOwned', constraint_owned")
       expect(queries[0]?.text).toContain('WITH RECURSIVE')
       expect(queries[0]?.text).toContain('referenced_types(type_oid)')
-      expect(queries[0]?.text).toContain('JOIN pg_type typ ON typ.oid = referenced.type_oid')
+      expect(queries[0]?.text).toContain(
+        'JOIN pg_type typ ON typ.oid = referenced.type_oid',
+      )
       expect(queries[0]?.text).toContain('selected_sequence_oids(sequence_oid)')
-      expect(queries[0]?.text).toContain('JOIN selected_sequence_oids selected_sequence')
+      expect(queries[0]?.text).toContain(
+        'JOIN selected_sequence_oids selected_sequence',
+      )
       expect(queries[0]?.text).toContain('JOIN selected_type_names rt')
     },
   )

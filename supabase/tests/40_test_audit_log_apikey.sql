@@ -1,7 +1,6 @@
 -- Test that audit logs are created correctly when using API key authentication
--- This verifies the fix for the issue where CLI/API users were not logged in
--- audit_logs
--- because get_identity() was called without key_mode parameter
+-- This verifies API-key actor attribution in audit_logs through the current
+-- request_actor_user_id() identity helper.
 BEGIN;
 
 -- Use existing seed identities:
@@ -52,7 +51,7 @@ SELECT
                     n.nspname = 'public'
                     AND c.relname = 'audit_logs'
                     AND p.polname
-                    = 'Allow select for auth, api keys (super_admin+)'
+                    = 'Allow select via RBAC'
             )
         ) > 0
         AND (
@@ -64,7 +63,7 @@ SELECT
                 n.nspname = 'public'
                 AND c.relname = 'audit_logs'
                 AND p.polname
-                = 'Allow select for auth, api keys (super_admin+)'
+                    = 'Allow select via RBAC'
         ) ~* 'ANY\s*\([^;]*SELECT[^;]*audit_logs_allowed_orgs',
         'audit_logs SELECT policy uses initPlan-wrapped'
         || ' audit_logs_allowed_orgs()'
@@ -83,7 +82,7 @@ INNER JOIN pg_namespace AS n ON c.relnamespace = n.oid
 WHERE
     n.nspname = 'public'
     AND c.relname = 'audit_logs'
-    AND p.polname = 'Allow select for auth, api keys (super_admin+)';
+    AND p.polname = 'Allow select via RBAC';
 
 -- Test 5: anon without a Capgo API key gets an empty result through RLS
 INSERT INTO public.audit_logs (
@@ -125,29 +124,21 @@ RESET ROLE;
 
 SELECT ok(TRUE, 'anon without capgkey cannot read audit_logs directly');
 
--- Test 6: Verify get_identity returns user_id when API key header is set
-DO $$
-BEGIN
-  PERFORM set_config('request.headers', '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520ea"}', true);
-END $$;
-
+-- Test 6: Verify the current request identity helper resolves the API-key user.
+SELECT set_config('request.headers', '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520ea"}', true);
 SELECT
-    is(
-        public.get_identity('{read,upload,write,all}'::public.key_mode []),
-        '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
-        'get_identity with key_mode returns API key user_id'
-    );
+  is(
+    public.request_actor_user_id(),
+    '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
+    'request_actor_user_id returns the API-key user'
+  );
 
--- Test 7: Verify get_identity WITHOUT parameters returns NULL for API key
--- (the old broken behavior)
--- Note: This shows the original bug - parameterless get_identity doesn't
--- check API keys
+-- Test 7: Legacy identity helpers must not survive the RBAC cleanup.
 SELECT
-    is(
-        public.get_identity(),
-        NULL,
-        'get_identity without key_mode returns NULL for API key (original bug)'
-    );
+  ok(
+    to_regprocedure('public.get_identity()') IS NULL,
+    'legacy get_identity helper is removed'
+  );
 
 -- Test 8: Insert app_version with API key context and verify audit log is
 -- created
@@ -348,27 +339,35 @@ SELECT ok(
             AND c.relname = 'orgs'
             AND t.tgname = 'lock_org_tombstone_guard'
             AND NOT t.tgisinternal
-            AND (t.tgtype & 1) = 0
+            AND (t.tgtype & 1) = 1
             AND (t.tgtype & 2) = 2
             AND (t.tgtype & 4) = 4
             AND (t.tgtype & 8) = 8
             AND (t.tgtype & 16) = 16
-    ),
-    'org tombstone guard serializes insert/delete/id-update statements'
+    )
+    AND position(
+        'lock_rbac_orgs' IN pg_get_functiondef(
+            'public.lock_org_tombstone_guard()'::regprocedure
+        )
+    ) > 0
+    AND position(
+        'LOCK TABLE' IN pg_get_functiondef(
+            'public.lock_org_tombstone_guard()'::regprocedure
+        )
+    ) = 0,
+    'org tombstone guard serializes matching org ids with a row-level lock'
 );
 
 INSERT INTO public.orgs (
     id,
     created_by,
     name,
-    management_email,
-    use_new_rbac
+    management_email
 ) VALUES (
     '0e5b4c90-f3fa-49d8-a9f7-1f83b57ec2a1'::uuid,
     '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
     'Audit Tombstone Test Org',
-    'audit-tombstone@test.com',
-    false
+    'audit-tombstone@test.com'
 );
 
 SELECT throws_ok(
@@ -413,14 +412,12 @@ SELECT throws_ok(
             id,
             created_by,
             name,
-            management_email,
-            use_new_rbac
+            management_email
         ) VALUES (
             '0e5b4c90-f3fa-49d8-a9f7-1f83b57ec2a1'::uuid,
             '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
             'Reused Audit Tombstone Test Org',
-            'audit-tombstone-reuse@test.com',
-            false
+            'audit-tombstone-reuse@test.com'
         );
     $q$,
     'P0001',
