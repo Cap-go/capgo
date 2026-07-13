@@ -483,6 +483,42 @@ describe('read-replica additive schema sync', () => {
     expect(statements.join('\n')).not.toContain('RESTART')
   })
 
+  it.concurrent('escapes enum labels and rejects NUL labels', () => {
+    const actual = { types: [] }
+
+    expect(planReadReplicaSchemaSync({
+      types: [{
+        name: 'replica_enum',
+        kind: 'e',
+        definition: ['safe', String.raw`slash\and'quote`],
+      }],
+    }, actual)).toEqual({
+      statements: [{
+        kind: 'type',
+        table: 'public',
+        name: 'replica_enum',
+        sql: String.raw`CREATE TYPE public."replica_enum" AS ENUM (E'safe', E'slash\\and''quote')`,
+      }],
+      skipped: [],
+    })
+
+    expect(planReadReplicaSchemaSync({
+      types: [{
+        name: 'invalid_enum',
+        kind: 'e',
+        definition: ['contains\0nul'],
+      }],
+    }, actual)).toEqual({
+      statements: [],
+      skipped: [{
+        kind: 'type',
+        table: 'public',
+        name: 'invalid_enum',
+        reason: 'unsupported_type_creation',
+      }],
+    })
+  })
+
   it.concurrent('does not reconcile existing column defaults', () => {
     const { expected } = catalogs()
     const current = structuredClone(expected)
