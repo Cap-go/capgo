@@ -575,15 +575,18 @@ export async function updateDeliveryResult(
   responseStatus: number | null,
   responseBody: string | null,
   duration: number,
+  deliveryStatus: 'pending' | 'success' | 'failed' = success ? 'success' : 'failed',
+  nextRetryAt: string | null = null,
 ): Promise<void> {
   const { error } = await supabaseAdmin(c)
     .from('webhook_deliveries')
     .update({
-      status: success ? 'success' : 'failed',
+      status: deliveryStatus,
       response_status: responseStatus,
       response_body: responseBody,
-      completed_at: new Date().toISOString(),
+      completed_at: deliveryStatus === 'pending' ? null : new Date().toISOString(),
       duration_ms: duration,
+      next_retry_at: nextRetryAt,
     })
     .eq('id', deliveryId)
 
@@ -618,44 +621,6 @@ export async function incrementAttemptCount(
     .eq('id', deliveryId)
 
   return newCount
-}
-
-/**
- * Schedule a retry for a failed delivery
- */
-export async function scheduleRetry(
-  c: Context,
-  deliveryId: string,
-  attemptCount: number,
-  retryAfter?: string | null,
-  responseStatus?: number | null,
-): Promise<number> {
-  const retryDelaySeconds = getWebhookRetryDelaySeconds(attemptCount, retryAfter, responseStatus)
-  const nextRetryAt = new Date(Date.now() + retryDelaySeconds * 1000).toISOString()
-
-  const { error } = await supabaseAdmin(c)
-    .from('webhook_deliveries')
-    .update({
-      next_retry_at: nextRetryAt,
-      status: 'pending',
-    })
-    .eq('id', deliveryId)
-
-  if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error scheduling retry', error: serializeError(error) })
-  }
-
-  cloudlog({
-    requestId: c.get('requestId'),
-    message: 'Scheduled webhook retry',
-    deliveryId,
-    attemptCount,
-    nextRetryAt,
-    retryDelaySeconds,
-    responseStatus,
-  })
-
-  return retryDelaySeconds
 }
 
 /**

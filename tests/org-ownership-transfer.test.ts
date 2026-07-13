@@ -1,27 +1,43 @@
 import type { Database } from '~/types/supabase.types'
 import { randomUUID } from 'node:crypto'
+import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
+import { SignJWT } from 'jose'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   getSupabaseClient,
   SUPABASE_ANON_KEY,
   SUPABASE_BASE_URL,
-  USER_EMAIL,
   USER_ID,
   USER_ID_2,
-  USER_PASSWORD,
 } from './test-utils.ts'
 
-const USER_EMAIL_2 = 'test2@capgo.app'
 const transferOrgId = randomUUID()
 const protectedOrgId = randomUUID()
 const orgIds = [transferOrgId, protectedOrgId]
 
-function createAuthClient() {
+async function createTestAccessToken(userId: string) {
+  const jwtSecret = env.JWT_SECRET
+  if (!jwtSecret)
+    throw new Error('JWT_SECRET is required to create local test auth tokens')
+
+  return new SignJWT({
+    aud: 'authenticated',
+    role: 'authenticated',
+  })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setIssuer('supabase-demo')
+    .setSubject(userId)
+    .setIssuedAt()
+    .setExpirationTime('1h')
+    .sign(new TextEncoder().encode(jwtSecret))
+}
+
+function createAuthClient(userId: string) {
+  const accessToken = createTestAccessToken(userId)
+
   return createClient<Database>(SUPABASE_BASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-      persistSession: false,
-    },
+    accessToken: () => accessToken,
   })
 }
 
@@ -65,24 +81,10 @@ async function createOrgWithMember(orgId: string) {
 }
 
 describe('organization ownership transfer', () => {
-  const ownerClient = createAuthClient()
-  const memberClient = createAuthClient()
+  const ownerClient = createAuthClient(USER_ID)
+  const memberClient = createAuthClient(USER_ID_2)
 
   beforeAll(async () => {
-    const { error: ownerSignInError } = await ownerClient.auth.signInWithPassword({
-      email: USER_EMAIL,
-      password: USER_PASSWORD,
-    })
-    if (ownerSignInError)
-      throw ownerSignInError
-
-    const { error: memberSignInError } = await memberClient.auth.signInWithPassword({
-      email: USER_EMAIL_2,
-      password: USER_PASSWORD,
-    })
-    if (memberSignInError)
-      throw memberSignInError
-
     for (const orgId of orgIds) {
       await createOrgWithMember(orgId)
     }

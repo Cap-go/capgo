@@ -219,6 +219,7 @@ describe('webhook queue processing', () => {
     expect(attemptedDelivery.attempt_count).toBe(1)
     expect(attemptedDelivery.response_status).toBe(405)
     expect(attemptedDelivery.next_retry_at).toBeTruthy()
+    expect(attemptedDelivery.completed_at).toBeNull()
     expect(attemptedDelivery.response_body).toBeTruthy()
   })
 })
