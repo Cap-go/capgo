@@ -11,6 +11,13 @@ on:
 
 permissions: {}
 
+env:
+  GOOGLE_CLOUD_PROJECT: capgo-394818
+  GOOGLE_READ_REPLICA_INSTANCE: eu-2
+  GOOGLE_READ_REPLICA_DATABASE: postgres
+  GOOGLE_WORKLOAD_IDENTITY_PROVIDER: projects/959612431688/locations/global/workloadIdentityPools/capgo-github/providers/capgo
+  GOOGLE_SERVICE_ACCOUNT: capgo-read-replica-ci@capgo-394818.iam.gserviceaccount.com
+
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -49,6 +56,7 @@ jobs:
     name: Build code and deploy to Supabase
     permissions:
       contents: read
+      id-token: write
     steps:
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -72,7 +80,6 @@ jobs:
         run: |
           echo "SUPABASE_DB_PASSWORD=${{ secrets.SUPABASE_DB_PASS_ALPHA }}" >> $GITHUB_ENV
           echo "SUPABASE_PROJECT_ID=${{ secrets.SUPABASE_PROJECT_ID_ALPHA }}" >> $GITHUB_ENV
-
       - name: Set Supabase credentials (PROD)
         if: env.SUPA_ENV == 'PROD'
         run: |
@@ -82,16 +89,25 @@ jobs:
         run: bun install
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v2.0.0
-        # Pinned to 2.98.2 because Supabase CLI v2.99.0 (2026-05-18) ships
-        # release assets with version in the filename (supabase_2.99.0_linux_amd64.tar.gz)
-        # while setup-cli@v2.0.0 hardcodes the unversioned name
-        # (supabase_linux_amd64.tar.gz) for any version >= 1.28.0, causing 404.
-        # Revert to `latest` once setup-cli ships a fix or Supabase restores
-        # the unversioned assets. Tracking: https://github.com/supabase/setup-cli
         with:
           version: 2.98.2
-      - name: Show Supabase CLI version
-        run: supabase --version
+      - name: Authenticate Google Cloud for read-replica preflight
+        if: env.SUPA_ENV == 'PROD'
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GOOGLE_SERVICE_ACCOUNT }}
+      - name: Setup Google Cloud CLI
+        if: env.SUPA_ENV == 'PROD'
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Verify Cloud SQL Data API before primary migration
+        if: env.SUPA_ENV == 'PROD'
+        run: >-
+          gcloud sql instances execute-sql "$GOOGLE_READ_REPLICA_INSTANCE"
+          --project="$GOOGLE_CLOUD_PROJECT"
+          --database="$GOOGLE_READ_REPLICA_DATABASE"
+          --sql='SELECT 1'
+          --quiet
       - name: Prepare Supabase
         run: supabase link --project-ref ${{ env.SUPABASE_PROJECT_ID }}
         env:
@@ -111,6 +127,7 @@ jobs:
     name: Reconcile production read-replica schema
     permissions:
       contents: read
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -122,41 +139,29 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+      - name: Authenticate Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GOOGLE_SERVICE_ACCOUNT }}
+      - name: Setup Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
       - name: Install dependencies
         run: bun install
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v2.0.0
         with:
           version: 2.98.2
-      - name: Require direct subscriber connection
-        env:
-          READ_REPLICATE_GOOGLE_EU1: ${{ secrets.READ_REPLICATE_GOOGLE_EU1 }}
-        run: |
-          if [[ -z "$READ_REPLICATE_GOOGLE_EU1" ]]; then
-            echo "::error title=Missing read-replica connection::Set READ_REPLICATE_GOOGLE_EU1 as a repository or selected organization secret with the direct Google subscriber PostgreSQL URL."
-            exit 1
-          fi
       - name: Link production primary
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
           SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID_PROD }}
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
-      # This is deliberately independent of deploy scope: a stable release repairs
-      # any selected-table drift left by an earlier failed release before publishing.
-      - name: Reconcile the selected Google subscriber schema from the live primary
+      - name: Reconcile the Google subscriber through Cloud SQL Data API
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
-          READ_REPLICATE_GOOGLE_EU1: ${{ secrets.READ_REPLICATE_GOOGLE_EU1 }}
           READ_REPLICA_SCHEMA_SYNC_MAX_TIME: 1800
-          READ_REPLICA_SCHEMA_LOCK_WAIT_SECONDS: 120
         run: bun scripts/sync-read-replica-schema.ts
-      - name: Verify the read-replica schema through Hyperdrive
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          READ_REPLICA_SCHEMA_CHECK_MAX_TIME: 300
-          READ_REPLICA_SCHEMA_CHECK_READY_ATTEMPTS: 20
-        run: bun run readreplicate:check-hyperdrive-schema
 
   deploy_webapp:
     needs: [changes, supabase_deploy, read_replica_schema]
