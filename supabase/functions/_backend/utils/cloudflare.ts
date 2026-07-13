@@ -547,7 +547,7 @@ export async function getAdminOnboardingTelemetry(
       message: 'getAdminOnboardingTelemetry failed',
       error: serializeError(error),
     })
-    return emptyAdminOnboardingTelemetry()
+    return telemetry
   }
 }
 

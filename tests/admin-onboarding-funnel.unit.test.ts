@@ -1,10 +1,20 @@
-import { describe, expect, it } from 'vitest'
+import type { Context } from 'hono'
+import { describe, expect, it, vi } from 'vitest'
 import {
   buildAdminOnboardingProductionDeviceQuery,
   buildAdminOnboardingUpdateDownloadQuery,
+  getAdminOnboardingTelemetry,
   isAdminOnboardingTelemetryWithinRetention,
 } from '../supabase/functions/_backend/utils/cloudflare.ts'
 import { getAdminOnboardingActivationMetrics } from '../supabase/functions/_backend/utils/onboardingFunnel.ts'
+
+vi.mock('hono/adapter', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('hono/adapter')>()
+  return {
+    ...actual,
+    env: vi.fn((c: Context) => (c as Context & { env?: Record<string, string | undefined> }).env ?? {}),
+  }
+})
 
 describe('admin onboarding activation telemetry', () => {
   it.concurrent('uses the Analytics Engine retention boundary', () => {
@@ -34,6 +44,56 @@ describe('admin onboarding activation telemetry', () => {
     expect(updateDownloadQuery).toContain('FROM app_log')
     expect(updateDownloadQuery).toContain("blob2 IN ('download_complete', 'download_manifest_complete', 'download_zip_complete')")
     expect(updateDownloadQuery).toContain('min(timestamp) AS first_at')
+  })
+
+  it('preserves prior batch telemetry when a later Analytics Engine query fails', async () => {
+    const windows = Array.from({ length: 101 }, (_, index) => ({
+      app_id: 'com.example.' + index,
+      start_at: '2026-07-01T00:00:00.000Z',
+      end_at: '2026-07-08T00:00:00.000Z',
+    }))
+    const fetchMock = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const query = String(init?.body ?? '')
+      if (query.includes("index1 = 'com.example.100'") && query.includes('FROM device_info'))
+        throw new Error('later batch failed')
+
+      return new Response(JSON.stringify({
+        meta: [
+          { name: 'app_id', type: 'String' },
+          { name: 'first_at', type: 'DateTime' },
+        ],
+        data: [{
+          app_id: 'com.example.0',
+          first_at: query.includes('FROM device_info')
+            ? '2026-07-02T00:00:00.000Z'
+            : '2026-07-03T00:00:00.000Z',
+        }],
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    try {
+      const telemetry = await getAdminOnboardingTelemetry({
+        env: {
+          APP_LOG: {},
+          DEVICE_INFO: {},
+          CF_ANALYTICS_TOKEN: 'token',
+          CF_ACCOUNT_ANALYTICS_ID: 'account',
+        },
+        get: vi.fn((key: string) => key === 'requestId' ? 'test-request' : undefined),
+      } as unknown as Context, windows, '2026-07-01T00:00:00.000Z', new Date('2026-07-13T12:00:00.000Z'))
+
+      expect(telemetry.available).toBe(true)
+      expect(telemetry.first_production_device_at_by_app.get('com.example.0')).toEqual(new Date('2026-07-02T00:00:00.000Z'))
+      expect(telemetry.first_update_download_at_by_app.get('com.example.0')).toEqual(new Date('2026-07-03T00:00:00.000Z'))
+      expect(fetchMock).toHaveBeenCalledTimes(4)
+    }
+    finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it.concurrent('counts organization activation signals once within each seven-day window', () => {
