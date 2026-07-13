@@ -814,11 +814,16 @@ describe('/private/admin_stats', () => {
         orgs_with_channel: number
         orgs_with_bundle: number
         orgs_subscribed: number
+        orgs_with_production_device: number
+        orgs_with_update_download: number
+        activation_telemetry_available: boolean
         subscription_conversion_rate: number
         trend: Array<{
           date: string
           new_orgs: number
           orgs_subscribed: number
+          orgs_with_production_device: number
+          orgs_with_update_download: number
         }>
       }
     }
@@ -829,12 +834,17 @@ describe('/private/admin_stats', () => {
     expect(payload.data.orgs_with_channel).toBe(2)
     expect(payload.data.orgs_with_bundle).toBe(2)
     expect(payload.data.orgs_subscribed).toBe(1)
+    expect(payload.data.orgs_with_production_device).toBe(0)
+    expect(payload.data.orgs_with_update_download).toBe(0)
+    expect(payload.data.activation_telemetry_available).toBe(false)
     expect(payload.data.subscription_conversion_rate).toBe(50)
     expect(payload.data.trend).toHaveLength(1)
     expect(payload.data.trend[0]).toMatchObject({
       date: '2026-02-01',
       new_orgs: 3,
       orgs_subscribed: 1,
+      orgs_with_production_device: 0,
+      orgs_with_update_download: 0,
     })
   })
 
