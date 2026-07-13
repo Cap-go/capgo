@@ -81,7 +81,7 @@ const ORGANIZATION_UPDATE_COLUMNS = {
   enforce_encrypted_bundles: 'enforce_encrypted_bundles',
   required_encryption_key: 'required_encryption_key',
   enforcing_2fa: 'enforcing_2fa',
-  password_policy_config: 'password_policy_config',
+  password_policy_config: 'password_policy_config', // NOSONAR: SQL column identifier, not a credential.
 } as const
 
 function getOrganizationUpdateColumn(field: string) {
