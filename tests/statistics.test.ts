@@ -88,8 +88,8 @@ describe('[GET] /statistics operations with and without subkey', () => {
       method: 'GET',
       headers: headersStats,
     })
-    expect(getOrgStats.status).toBe(200)
     const orgStatsData = await getOrgStats.json()
+    expect(getOrgStats.status, JSON.stringify(orgStatsData)).toBe(200)
     expect(Array.isArray(orgStatsData)).toBe(true)
     expect(hasSeededStats(orgStatsData)).toBe(true)
   })

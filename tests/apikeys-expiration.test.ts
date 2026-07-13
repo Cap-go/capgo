@@ -723,7 +723,7 @@ describe('[PUT] /organization with API key policy', () => {
         max_apikey_expiration_days: null,
       }),
     })
-    expect(response.status).toBe(200)
+    expect(response.status, await response.text()).toBe(200)
 
     // Verify the update
     const { data, error } = await getSupabaseClient().from('orgs').select('max_apikey_expiration_days').eq('id', updateOrgId).single()

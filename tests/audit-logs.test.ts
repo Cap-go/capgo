@@ -127,7 +127,6 @@ beforeAll(async () => {
     management_email: TEST_EMAIL,
     created_by: USER_ID,
     customer_id: customerId,
-    // This suite keeps the classic org membership path enabled while API keys use V2 bindings.
   })
   if (error)
     throw error
@@ -141,6 +140,38 @@ beforeAll(async () => {
   })
   if (memberError)
     throw memberError
+
+  const { data: superAdminRole, error: superAdminRoleError } = await getSupabaseClient()
+    .from('roles')
+    .select('id')
+    .eq('name', 'org_super_admin')
+    .single()
+  if (superAdminRoleError || !superAdminRole)
+    throw superAdminRoleError ?? new Error('Failed to find org_super_admin role')
+
+  const { error: removeBindingError } = await getSupabaseClient()
+    .from('role_bindings')
+    .delete()
+    .eq('principal_type', 'user')
+    .eq('principal_id', USER_ID)
+    .eq('scope_type', 'org')
+    .eq('org_id', ORG_ID)
+    .eq('role_id', superAdminRole.id)
+  if (removeBindingError)
+    throw removeBindingError
+
+  const { error: bindingError } = await getSupabaseClient().from('role_bindings').insert({
+    principal_type: 'user',
+    principal_id: USER_ID,
+    role_id: superAdminRole.id,
+    scope_type: 'org',
+    org_id: ORG_ID,
+    granted_by: USER_ID,
+    reason: 'Audit log test fixture authorization',
+    is_direct: true,
+  })
+  if (bindingError)
+    throw bindingError
 
   const { error: appError } = await getSupabaseClient().from('apps').insert({
     app_id: APIKEY_AUDIT_APP_ID,
@@ -180,6 +211,7 @@ afterAll(async () => {
     await getSupabaseClient().from('apikeys').delete().eq('id', apiKeyId)
   await getSupabaseClient().from('app_versions').delete().eq('app_id', APIKEY_AUDIT_APP_ID)
   await getSupabaseClient().from('apps').delete().eq('app_id', APIKEY_AUDIT_APP_ID)
+  await getSupabaseClient().from('role_bindings').delete().eq('org_id', ORG_ID)
   await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID)
   await getSupabaseClient().from('orgs').delete().eq('id', ORG_ID)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
