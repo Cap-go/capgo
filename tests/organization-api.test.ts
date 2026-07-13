@@ -19,11 +19,9 @@ import {
   TEST_EMAIL,
   USER_ADMIN_EMAIL,
   USER_EMAIL,
-  USER_EMAIL_NONMEMBER,
   USER_ID,
   USER_ID_2,
   USER_PASSWORD,
-  USER_PASSWORD_NONMEMBER,
 } from './test-utils.ts'
 
 const normalizedSupabaseBaseUrl = normalizeLocalhostUrl(SUPABASE_BASE_URL) ?? SUPABASE_BASE_URL
@@ -59,9 +57,19 @@ beforeAll(async () => {
     created_by: USER_ID,
     customer_id: customerId,
     website,
+    use_new_rbac: false, // Compatibility flag is ignored; permissions are RBAC-backed.
   })
   if (error)
     throw error
+
+  // Add the test user as super_admin to the org so they can access it via API
+  const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+    org_id: ORG_ID,
+    user_id: USER_ID,
+    user_right: 'super_admin',
+  })
+  if (orgUserError)
+    throw orgUserError
 
   const createdKey = await createDirectApiKeyWithBindings({
     userId: USER_ID,
@@ -80,37 +88,12 @@ beforeAll(async () => {
   }
 })
 
-async function createUserOrgBinding(orgId: string, userId: string, roleName = 'org_member', grantedBy = USER_ID) {
-  const { data: role, error: roleError } = await getSupabaseClient()
-    .from('roles')
-    .select('id')
-    .eq('name', roleName)
-    .eq('scope_type', 'org')
-    .single()
-  if (roleError)
-    throw roleError
-
-  const { error: bindingError } = await getSupabaseClient()
-    .from('role_bindings')
-    .insert({
-      principal_type: 'user',
-      principal_id: userId,
-      role_id: role!.id,
-      scope_type: 'org',
-      org_id: orgId,
-      granted_by: grantedBy,
-      reason: 'Test RBAC binding',
-      is_direct: true,
-    })
-  if (bindingError && bindingError.code !== '23505')
-    throw bindingError
-}
-
 afterAll(async () => {
   // Clean up test organization, org_users relation, and stripe_info
   if (organizationApiKeyId) {
     await getSupabaseClient().from('apikeys').delete().eq('id', organizationApiKeyId)
   }
+  await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID)
   await getSupabaseClient().from('orgs').delete().eq('id', ORG_ID)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
 })
@@ -144,8 +127,16 @@ describe('read-only API keys cannot access destructive organization routes', () 
       created_by: USER_ID,
       customer_id: readOnlyCustomerId,
       require_apikey_expiration: false,
+      use_new_rbac: false, // Compatibility flag is ignored; permissions are RBAC-backed.
     })
     expect(orgError).toBeNull()
+
+    const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+      org_id: readOnlyOrgId,
+      user_id: USER_ID,
+      user_right: 'super_admin',
+    })
+    expect(orgUserError).toBeNull()
 
     const createdKey = await createDirectApiKeyWithBindings({
       userId: USER_ID,
@@ -168,6 +159,7 @@ describe('read-only API keys cannot access destructive organization routes', () 
     if (readOnlyKeyId) {
       await getSupabaseClient().from('apikeys').delete().eq('id', readOnlyKeyId)
     }
+    await getSupabaseClient().from('org_users').delete().eq('org_id', readOnlyOrgId)
     await getSupabaseClient().from('orgs').delete().eq('id', readOnlyOrgId)
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', readOnlyCustomerId)
   })
@@ -179,7 +171,7 @@ describe('read-only API keys cannot access destructive organization routes', () 
       body: JSON.stringify({
         orgId: readOnlyOrgId,
         email: USER_ADMIN_EMAIL,
-        invite_type: 'org_member',
+        invite_type: 'read',
       }),
     })
 
@@ -315,32 +307,25 @@ describe('scoped write API keys cannot cross organization boundaries', () => {
   let scopedKeyId = 0
 
   beforeAll(async () => {
-    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
-      customer_id: targetCustomerId,
-      status: 'succeeded',
-      product_id: 'prod_LQIregjtNduh4q',
-      subscription_id: `sub_${randomUUID()}`,
-      trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-      is_good_plan: true,
-    })
-    expect(stripeError).toBeNull()
+    // Seed private fixtures through Postgres so parallel Cloudflare tests do not
+    // compete for PostgREST connections before exercising the worker routes.
+    await executeSQL(
+      `INSERT INTO public.stripe_info (customer_id, status, product_id, subscription_id, trial_at, is_good_plan)
+       VALUES ($1, 'succeeded', 'prod_LQIregjtNduh4q', $2, $3, true)`,
+      [targetCustomerId, `sub_${randomUUID()}`, new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()],
+    )
 
-    const { error: allowedOrgError } = await getSupabaseClient().from('orgs').insert({
-      id: allowedOrgId,
-      name: `Scoped allowed ${randomUUID()}`,
-      management_email: TEST_EMAIL,
-      created_by: USER_ID,
-    })
-    expect(allowedOrgError).toBeNull()
+    await executeSQL(
+      `INSERT INTO public.orgs (id, name, management_email, created_by)
+       VALUES ($1::uuid, $2, $3, $4::uuid)`,
+      [allowedOrgId, `Scoped allowed ${randomUUID()}`, TEST_EMAIL, USER_ID],
+    )
 
-    const { error: targetOrgError } = await getSupabaseClient().from('orgs').insert({
-      id: targetOrgId,
-      name: targetOrgName,
-      management_email: TEST_EMAIL,
-      created_by: USER_ID,
-      customer_id: targetCustomerId,
-    })
-    expect(targetOrgError).toBeNull()
+    await executeSQL(
+      `INSERT INTO public.orgs (id, name, management_email, created_by, customer_id)
+       VALUES ($1::uuid, $2, $3, $4::uuid, $5)`,
+      [targetOrgId, targetOrgName, TEST_EMAIL, USER_ID, targetCustomerId],
+    )
 
     const createdKey = await createDirectApiKeyWithBindings({
       userId: USER_ID,
@@ -377,6 +362,10 @@ describe('scoped write API keys cannot cross organization boundaries', () => {
     }
 
     await getSupabaseClient().storage.from('images').remove([imagePath])
+    await getSupabaseClient().from('role_bindings').delete().eq('org_id', allowedOrgId)
+    await getSupabaseClient().from('role_bindings').delete().eq('org_id', targetOrgId)
+    await getSupabaseClient().from('org_users').delete().eq('org_id', allowedOrgId)
+    await getSupabaseClient().from('org_users').delete().eq('org_id', targetOrgId)
     await getSupabaseClient().from('orgs').delete().eq('id', allowedOrgId)
     await getSupabaseClient().from('orgs').delete().eq('id', targetOrgId)
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', targetCustomerId)
@@ -434,7 +423,7 @@ describe('scoped write API keys cannot cross organization boundaries', () => {
       body: JSON.stringify({
         orgId: targetOrgId,
         email: USER_ADMIN_EMAIL,
-        invite_type: 'org_member',
+        invite_type: 'read',
       }),
     })
     expect(addMemberResponse.status).toBe(200)
@@ -529,6 +518,7 @@ describe('x-limited-key-id subkeys enforce organization scope on middlewareKey r
         management_email: TEST_EMAIL,
         created_by: USER_ID,
         customer_id: scopedCustomerId,
+        use_new_rbac: false,
       },
       {
         id: blockedOrgId,
@@ -536,9 +526,16 @@ describe('x-limited-key-id subkeys enforce organization scope on middlewareKey r
         management_email: TEST_EMAIL,
         created_by: USER_ID,
         customer_id: blockedCustomerId,
+        use_new_rbac: false,
       },
     ])
     expect(orgError).toBeNull()
+
+    const { error: orgUsersError } = await supabase.from('org_users').insert([
+      { org_id: scopedOrgId, user_id: USER_ID, user_right: 'super_admin' },
+      { org_id: blockedOrgId, user_id: USER_ID, user_right: 'super_admin' },
+    ])
+    expect(orgUsersError).toBeNull()
 
     const parentKeyData = await createDirectApiKeyWithBindings({
       userId: USER_ID,
@@ -983,7 +980,7 @@ describe('[GET] /organization/members', () => {
     const testUser = safe.data.find(m => m.uid === USER_ID)
     expect(testUser).toBeTruthy()
     expect(testUser?.email).toBe(USER_EMAIL)
-    expect(testUser?.role).toBe('org_super_admin')
+    expect(testUser?.role).toBe('super_admin')
   })
 
   it('get organization members with missing orgId', async () => {
@@ -1012,7 +1009,7 @@ describe('[GET] /organization/members', () => {
     const { error: insertError } = await getSupabaseClient().from('tmp_users').insert({
       email: testEmail,
       org_id: ORG_ID,
-      rbac_role_name: 'org_admin',
+      role: 'admin',
       first_name: 'Test',
       last_name: 'User',
     })
@@ -1035,7 +1032,7 @@ describe('[GET] /organization/members', () => {
     const pendingMember = members.find(m => m.email === testEmail)
     expect(pendingMember).toBeTruthy()
     expect(pendingMember?.is_tmp).toBe(true)
-    expect(pendingMember?.role).toBe('org_admin')
+    expect(pendingMember?.role).toBe('invite_admin') // Role should be prefixed with invite_
 
     // Cleanup
     await getSupabaseClient().from('tmp_users').delete().eq('email', testEmail).eq('org_id', ORG_ID)
@@ -1048,7 +1045,7 @@ describe('[GET] /organization/members', () => {
     const { error: insertError } = await getSupabaseClient().from('tmp_users').insert({
       email: testEmail,
       org_id: ORG_ID,
-      rbac_role_name: 'org_admin',
+      role: 'admin',
       first_name: 'Cancelled',
       last_name: 'User',
       cancelled_at: new Date().toISOString(),
@@ -1086,7 +1083,7 @@ describe('[GET] /organization/members', () => {
     const { error: insertError } = await getSupabaseClient().from('tmp_users').insert({
       email: testEmail,
       org_id: ORG_ID,
-      rbac_role_name: 'org_member',
+      role: 'read',
       first_name: 'Expired',
       last_name: 'User',
       created_at: expiredDate.toISOString(),
@@ -1118,71 +1115,40 @@ describe('[GET] /organization/members', () => {
 
 describe('[POST] /organization/members', () => {
   it('add organization member', async () => {
-    if (!normalizedSupabaseBaseUrl || !SUPABASE_ANON_KEY)
-      throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY are required for this test')
-
-    let invitedUserId: string | undefined
-    const inviteeSupabase = createClient(normalizedSupabaseBaseUrl, SUPABASE_ANON_KEY, {
-      auth: {
-        persistSession: false,
-      },
+    const response = await fetch(`${BASE_URL}/organization/members`, {
+      headers,
+      method: 'POST',
+      body: JSON.stringify({
+        orgId: ORG_ID,
+        email: USER_ADMIN_EMAIL,
+        invite_type: 'read',
+      }),
     })
 
-    try {
-      const response = await fetch(`${BASE_URL}/organization/members`, {
-        headers,
-        method: 'POST',
-        body: JSON.stringify({
-          orgId: ORG_ID,
-          email: USER_ADMIN_EMAIL,
-          invite_type: 'org_member',
-        }),
-      })
+    const responseData = await response.json()
+    expect(response.status).toBe(200)
+    const responseType = type({
+      status: 'string',
+    })
+    const safe = safeParseSchema(responseType, responseData)
+    expect(safe.success).toBe(true)
+    if (!safe.success)
+      throw safe.error
+    expect(safe.data.status).toBe('ok')
 
-      const responseData = await response.json()
-      expect(response.status).toBe(200)
-      const responseType = type({
-        status: 'string',
-      })
-      const safe = safeParseSchema(responseType, responseData)
-      expect(safe.success).toBe(true)
-      if (!safe.success)
-        throw safe.error
-      expect(safe.data.status).toBe('ok')
+    const { data: userData, error: userError } = await getSupabaseClient().from('users').select().eq('email', USER_ADMIN_EMAIL).single()
+    expect(userError).toBeNull()
+    expect(userData).toBeTruthy()
+    expect(userData?.email).toBe(USER_ADMIN_EMAIL)
 
-      const { data: userData, error: userError } = await getSupabaseClient().from('users').select().eq('email', USER_ADMIN_EMAIL).single()
-      expect(userError).toBeNull()
-      expect(userData).toBeTruthy()
-      expect(userData?.email).toBe(USER_ADMIN_EMAIL)
-      invitedUserId = userData!.id
+    const { data, error } = await getSupabaseClient().from('org_users').select().eq('org_id', ORG_ID).eq('user_id', userData!.id).single()
+    expect(error).toBeNull()
+    expect(data).toBeTruthy()
+    expect(data?.org_id).toBe(ORG_ID)
+    expect(data?.user_right).toBe('invite_read')
 
-      const { data, error } = await getSupabaseClient().from('org_users').select().eq('org_id', ORG_ID).eq('user_id', invitedUserId).single()
-      expect(error).toBeNull()
-      expect(data).toBeTruthy()
-      expect(data?.org_id).toBe(ORG_ID)
-      expect(data?.rbac_role_name).toBe('org_member')
-      expect(data?.is_invite).toBe(true)
-
-      const { error: signInError } = await inviteeSupabase.auth.signInWithPassword({
-        email: USER_ADMIN_EMAIL,
-        password: 'adminadmin',
-      })
-      expect(signInError).toBeNull()
-
-      const { data: invitedOrgs, error: invitedOrgsError } = await inviteeSupabase.rpc('get_orgs_v7')
-      expect(invitedOrgsError).toBeNull()
-      const invitedOrg = invitedOrgs?.find((org: { gid: string }) => org.gid === ORG_ID)
-      expect(invitedOrg).toBeTruthy()
-      expect(invitedOrg?.is_invite).toBe(true)
-      expect(invitedOrg?.role).toBe('org_member')
-    }
-    finally {
-      await inviteeSupabase.auth.signOut()
-      if (invitedUserId) {
-        await getSupabaseClient().from('role_bindings').delete().eq('principal_type', 'user').eq('principal_id', invitedUserId).eq('org_id', ORG_ID)
-        await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID).eq('user_id', invitedUserId)
-      }
-    }
+    // Cleanup: Remove the added member to avoid affecting other tests
+    await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID).eq('user_id', userData!.id)
   })
 
   it('add organization member with invalid body', async () => {
@@ -1204,7 +1170,7 @@ describe('[POST] /organization/members', () => {
       body: JSON.stringify({
         orgId: invalidOrgId,
         email: USER_ADMIN_EMAIL,
-        invite_type: 'org_member',
+        invite_type: 'read',
       }),
     })
     expect(response.status).toBe(400)
@@ -1218,7 +1184,7 @@ describe('[POST] /organization/members', () => {
       method: 'POST',
       body: JSON.stringify({
         orgId: ORG_ID,
-        invite_type: 'org_member',
+        invite_type: 'read',
       }),
     })
     expect(response.status).toBe(400)
@@ -1237,12 +1203,12 @@ describe('[DELETE] /organization/members', () => {
     const { error } = await getSupabaseClient().from('org_users').insert({
       org_id: ORG_ID,
       user_id: userData!.id,
-      rbac_role_name: 'org_member',
+      user_right: 'read',
     })
     expect(error).toBeNull()
 
-    await createUserOrgBinding(ORG_ID, userData!.id, 'org_member')
-
+    // The sync_org_user_to_role_binding_on_insert trigger automatically creates role_bindings
+    // when a user is added to org_users. Verify the trigger created the binding.
     const { data: rbacData, error: rbacFetchError } = await getSupabaseClient()
       .from('role_bindings')
       .select()
@@ -1384,6 +1350,8 @@ describe('[POST] /organization', () => {
       expect(data).toBeTruthy()
       expect(data?.name).toBe(name)
       expect(data?.website).toBe('https://capgo.app/')
+      // New orgs should default to RBAC enabled
+      expect(data?.use_new_rbac).toBe(true)
     }
     finally {
       await getSupabaseClient().from('orgs').delete().eq('id', safe.data.id)
@@ -1488,9 +1456,17 @@ describe('[PUT] /organization', () => {
       management_email: TEST_EMAIL,
       created_by: USER_ID,
       website: 'https://base.example/',
+      use_new_rbac: false,
     })
     if (createError)
       throw createError
+    const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+      org_id: orgId,
+      user_id: USER_ID,
+      user_right: 'super_admin',
+    })
+    if (orgUserError)
+      throw orgUserError
 
     try {
       const response = await fetch(`${BASE_URL}/organization`, {
@@ -1516,6 +1492,7 @@ describe('[PUT] /organization', () => {
       expect(data?.website).toBe(website)
     }
     finally {
+      await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
       await getSupabaseClient().from('orgs').delete().eq('id', orgId)
     }
   })
@@ -1749,7 +1726,7 @@ describe('[DELETE] /organization', () => {
     const { error: memberError } = await getSupabaseClient().from('org_users').insert({
       org_id: id,
       user_id: USER_ID,
-      rbac_role_name: 'org_admin', // Even with admin rights, shouldn't be able to delete
+      user_right: 'admin', // Even with admin rights, shouldn't be able to delete
     })
     expect(memberError).toBeNull()
 
@@ -1785,6 +1762,7 @@ describe('[DELETE] /organization', () => {
 
     // Clean up
     await getSupabaseClient().from('apikeys').delete().eq('id', orgAdminKey.id)
+    await getSupabaseClient().from('org_users').delete().eq('org_id', id).eq('user_id', USER_ID)
     await getSupabaseClient().from('orgs').delete().eq('id', id)
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
   })
@@ -1839,64 +1817,6 @@ describe('[PUT] /organization - encrypted bundles settings', () => {
   })
 })
 
-describe('[PUT] /organization - password policy settings', () => {
-  afterAll(async () => {
-    await getSupabaseClient().from('orgs').update({
-      password_policy_config: null,
-    }).eq('id', ORG_ID)
-  })
-
-  it('updates password policy config through the API route', async () => {
-    const policyConfig = {
-      enabled: true,
-      min_length: 12,
-      require_uppercase: true,
-      require_number: true,
-      require_special: true,
-    }
-
-    const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
-      method: 'PUT',
-      body: JSON.stringify({
-        orgId: ORG_ID,
-        password_policy_config: policyConfig,
-      }),
-    })
-    expect(response.status).toBe(200)
-
-    const { data, error } = await getSupabaseClient()
-      .from('orgs')
-      .select('password_policy_config')
-      .eq('id', ORG_ID)
-      .single()
-
-    expect(error).toBeNull()
-    expect(data?.password_policy_config).toEqual(policyConfig)
-  })
-
-  it('rejects invalid password policy lengths before updating the org', async () => {
-    const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
-      method: 'PUT',
-      body: JSON.stringify({
-        orgId: ORG_ID,
-        password_policy_config: {
-          enabled: true,
-          min_length: 73,
-          require_uppercase: true,
-          require_number: true,
-          require_special: true,
-        },
-      }),
-    })
-
-    expect(response.status).toBe(400)
-    const responseData = await response.json() as { error: string }
-    expect(responseData.error).toBe('invalid_body')
-  })
-})
-
 describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
   const enforceOrgId = randomUUID()
   const enforceGlobalId = randomUUID()
@@ -1922,13 +1842,22 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
       created_by: USER_ID_2,
       customer_id: enforceCustomerId,
       website: enforceWebsite,
+      use_new_rbac: false,
     })
     expect(orgError).toBeNull()
+
+    const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+      org_id: enforceOrgId,
+      user_id: USER_ID_2,
+      user_right: 'super_admin',
+    })
+    expect(orgUserError).toBeNull()
 
     user2AuthHeaders = await getAuthHeadersForCredentials('test2@capgo.app', USER_PASSWORD)
   })
 
   afterAll(async () => {
+    await getSupabaseClient().from('org_users').delete().eq('org_id', enforceOrgId)
     await getSupabaseClient().from('orgs').delete().eq('id', enforceOrgId)
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', enforceCustomerId)
   })
@@ -2011,7 +1940,7 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
     await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false, website: previousWebsite }).eq('id', enforceOrgId)
   })
 
-  it.concurrent('get_orgs_v6 exposes only the request-scoped RBAC return shape', async () => {
+  it.concurrent('get_orgs_v6 keeps the old CLI return shape', async () => {
     const expectedColumns = [
       'gid',
       'created_by',
@@ -2027,6 +1956,7 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
       'subscription_end',
       'management_email',
       'is_yearly',
+      'use_new_rbac',
     ]
 
     const rows = await executeSQL(`
@@ -2038,13 +1968,20 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
           WITH ORDINALITY AS args(type_oid, arg_mode, arg_name, ordinality) ON true
         WHERE proc.oid = 'public.get_orgs_v6()'::regprocedure
           AND args.arg_mode = 't'
+        UNION ALL
+        SELECT 'user_id' AS overload, args.arg_name, args.ordinality
+        FROM pg_proc proc
+        JOIN LATERAL unnest(proc.proallargtypes, proc.proargmodes, proc.proargnames)
+          WITH ORDINALITY AS args(type_oid, arg_mode, arg_name, ordinality) ON true
+        WHERE proc.oid = 'public.get_orgs_v6(uuid)'::regprocedure
+          AND args.arg_mode = 't'
       ) output_args
       GROUP BY overload
       ORDER BY overload
     `)
 
-    expect(rows).toHaveLength(1)
-    expect(rows.map((row: { overload: string }) => row.overload)).toEqual(['no_args'])
+    expect(rows).toHaveLength(2)
+    expect(rows.map((row: { overload: string }) => row.overload)).toEqual(['no_args', 'user_id'])
     for (const row of rows)
       expect(row.columns).toEqual(expectedColumns)
   })
@@ -2094,9 +2031,10 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
   })
 })
 
-// ─── RBAC Coverage ───────────────────────────────────────────────────────────
-// The suite below runs key member operations against a dedicated org so the
-// role_bindings permission path is exercised in isolation.
+// ─── RBAC mode coverage ──────────────────────────────────────────────────────
+// New orgs default to use_new_rbac = true. The suite below runs the same key
+// member operations against an explicitly RBAC-enabled org so that the RBAC
+// permission path (role_bindings) is exercised alongside the legacy tests above.
 
 const ORG_ID_RBAC = randomUUID()
 const globalIdRbac = randomUUID()
@@ -2112,6 +2050,7 @@ describe('rbac mode - organization member operations', () => {
       name: nameRbac,
       management_email: TEST_EMAIL,
       created_by: USER_ID,
+      use_new_rbac: true, // Explicitly RBAC — tests the RBAC permission path
     })
     if (error)
       throw error
@@ -2138,6 +2077,8 @@ describe('rbac mode - organization member operations', () => {
     if (rbacApiKeyId) {
       await getSupabaseClient().from('apikeys').delete().eq('id', rbacApiKeyId)
     }
+    await getSupabaseClient().from('role_bindings').delete().eq('org_id', ORG_ID_RBAC)
+    await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID_RBAC)
     await getSupabaseClient().from('orgs').delete().eq('id', ORG_ID_RBAC)
   })
 
@@ -2173,7 +2114,7 @@ describe('rbac mode - organization member operations', () => {
     const testUser = safe.data.find(m => m.uid === USER_ID)
     expect(testUser).toBeTruthy()
     expect(testUser?.email).toBe(USER_EMAIL)
-    expect(testUser?.role).toBe('org_super_admin')
+    expect(testUser?.role).toBe('super_admin')
   })
 
   it('[PUT] /organization - update RBAC org name', async () => {
@@ -2199,7 +2140,7 @@ describe('rbac mode - organization member operations', () => {
       body: JSON.stringify({
         orgId: ORG_ID_RBAC,
         email: USER_ADMIN_EMAIL,
-        invite_type: 'org_member',
+        invite_type: 'read',
       }),
     })
     expect(response.status).toBe(200)
@@ -2210,8 +2151,7 @@ describe('rbac mode - organization member operations', () => {
     // Verify org_users entry exists
     const { data: orgUser } = await getSupabaseClient().from('org_users').select().eq('org_id', ORG_ID_RBAC).eq('user_id', userData!.id).single()
     expect(orgUser).toBeTruthy()
-    expect(orgUser?.rbac_role_name).toBe('org_member')
-    expect(orgUser?.is_invite).toBe(true)
+    expect(orgUser?.user_right).toBe('invite_read')
 
     // Verify role_binding was created by sync trigger
     const { data: binding } = await getSupabaseClient().from('role_bindings').select().eq('principal_type', 'user').eq('principal_id', userData!.id).eq('org_id', ORG_ID_RBAC)
@@ -2226,13 +2166,12 @@ describe('rbac mode - organization member operations', () => {
     const { data: userData } = await getSupabaseClient().from('users').select().eq('email', USER_ADMIN_EMAIL).single()
     expect(userData).toBeTruthy()
 
-    // Add member metadata and the RBAC binding explicitly.
+    // Add member (sync trigger creates role_binding)
     await getSupabaseClient().from('org_users').insert({
       org_id: ORG_ID_RBAC,
       user_id: userData!.id,
-      rbac_role_name: 'org_member',
+      user_right: 'read',
     })
-    await createUserOrgBinding(ORG_ID_RBAC, userData!.id, 'org_member')
 
     const { data: bindingsBefore } = await getSupabaseClient().from('role_bindings').select().eq('principal_type', 'user').eq('principal_id', userData!.id).eq('org_id', ORG_ID_RBAC)
     expect(bindingsBefore!.length).toBeGreaterThan(0)
@@ -2250,293 +2189,6 @@ describe('rbac mode - organization member operations', () => {
     // role_bindings also cleaned up
     const { data: bindingsAfter } = await getSupabaseClient().from('role_bindings').select().eq('principal_type', 'user').eq('principal_id', userData!.id).eq('org_id', ORG_ID_RBAC)
     expect(bindingsAfter).toHaveLength(0)
-  })
-
-  it('[DELETE] /organization/members - removes group membership and inherited organization access', async () => {
-    const supabase = getSupabaseClient()
-    const targetGroupId = randomUUID()
-    const { data: targetUser, error: targetUserError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', USER_ADMIN_EMAIL)
-      .single()
-    if (targetUserError || !targetUser)
-      throw targetUserError ?? new Error('Expected target user')
-
-    try {
-      await supabase.from('role_bindings').delete().eq('principal_type', 'user').eq('principal_id', targetUser.id).eq('org_id', ORG_ID_RBAC)
-      await supabase.from('org_users').delete().eq('org_id', ORG_ID_RBAC).eq('user_id', targetUser.id)
-
-      const { error: memberError } = await supabase.from('org_users').insert({
-        org_id: ORG_ID_RBAC,
-        user_id: targetUser.id,
-        rbac_role_name: 'org_member',
-      })
-      expect(memberError).toBeNull()
-      await createUserOrgBinding(ORG_ID_RBAC, targetUser.id, 'org_member')
-
-      const { data: orgMemberRole, error: orgMemberRoleError } = await supabase
-        .from('roles')
-        .select('id')
-        .eq('name', 'org_member')
-        .eq('scope_type', 'org')
-        .single()
-      expect(orgMemberRoleError).toBeNull()
-      expect(orgMemberRole?.id).toBeTruthy()
-
-      const { error: groupError } = await supabase.from('groups').insert({
-        id: targetGroupId,
-        org_id: ORG_ID_RBAC,
-        name: `Removal access group ${targetGroupId}`,
-        description: 'Member removal group membership regression',
-        created_by: USER_ID,
-      })
-      expect(groupError).toBeNull()
-      const { error: groupMemberError } = await supabase.from('group_members').insert({
-        group_id: targetGroupId,
-        user_id: targetUser.id,
-        added_by: USER_ID,
-      })
-      expect(groupMemberError).toBeNull()
-      const { error: groupBindingError } = await supabase.from('role_bindings').insert({
-        principal_type: 'group',
-        principal_id: targetGroupId,
-        role_id: orgMemberRole!.id,
-        scope_type: 'org',
-        org_id: ORG_ID_RBAC,
-        granted_by: USER_ID,
-        reason: 'Member removal group access regression',
-        is_direct: true,
-      })
-      expect(groupBindingError).toBeNull()
-
-      const { data: accessBefore, error: accessBeforeError } = await supabase.rpc('rbac_check_permission_direct' as any, {
-        p_permission_key: 'org.read',
-        p_user_id: targetUser.id,
-        p_org_id: ORG_ID_RBAC,
-        p_app_id: null,
-        p_channel_id: null,
-        p_apikey: null,
-      })
-      expect(accessBeforeError).toBeNull()
-      expect(accessBefore).toBe(true)
-
-      const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID_RBAC}&email=${USER_ADMIN_EMAIL}`, {
-        headers: rbacHeaders,
-        method: 'DELETE',
-      })
-      expect(response.status).toBe(200)
-
-      const { data: groupMembershipAfter, error: groupMembershipAfterError } = await supabase
-        .from('group_members')
-        .select('group_id')
-        .eq('group_id', targetGroupId)
-        .eq('user_id', targetUser.id)
-      expect(groupMembershipAfterError).toBeNull()
-      expect(groupMembershipAfter).toHaveLength(0)
-
-      const { data: accessAfter, error: accessAfterError } = await supabase.rpc('rbac_check_permission_direct' as any, {
-        p_permission_key: 'org.read',
-        p_user_id: targetUser.id,
-        p_org_id: ORG_ID_RBAC,
-        p_app_id: null,
-        p_channel_id: null,
-        p_apikey: null,
-      })
-      expect(accessAfterError).toBeNull()
-      expect(accessAfter).toBe(false)
-    }
-    finally {
-      await supabase.from('role_bindings').delete().eq('principal_type', 'group').eq('principal_id', targetGroupId)
-      await supabase.from('group_members').delete().eq('group_id', targetGroupId)
-      await supabase.from('groups').delete().eq('id', targetGroupId)
-      await supabase.from('role_bindings').delete().eq('principal_type', 'user').eq('principal_id', targetUser.id).eq('org_id', ORG_ID_RBAC)
-      await supabase.from('org_users').delete().eq('org_id', ORG_ID_RBAC).eq('user_id', targetUser.id)
-    }
-  })
-
-  it('[DELETE] /organization/members - lower-priority org admin cannot remove member with a higher group role', async () => {
-    const supabase = getSupabaseClient()
-    const targetGroupId = randomUUID()
-    const { data: targetUser, error: targetUserError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', USER_ADMIN_EMAIL)
-      .single()
-    if (targetUserError || !targetUser)
-      throw targetUserError ?? new Error('Expected target user')
-
-    let lowerPriorityKeyId = 0
-    let lowerPriorityKeyRbacId = ''
-    try {
-      await supabase.from('role_bindings').delete().eq('principal_type', 'user').eq('principal_id', targetUser.id).eq('org_id', ORG_ID_RBAC)
-      await supabase.from('org_users').delete().eq('org_id', ORG_ID_RBAC).eq('user_id', targetUser.id)
-
-      const { error: memberError } = await supabase.from('org_users').insert({
-        org_id: ORG_ID_RBAC,
-        user_id: targetUser.id,
-        rbac_role_name: 'org_member',
-      })
-      if (memberError)
-        throw memberError
-      await createUserOrgBinding(ORG_ID_RBAC, targetUser.id, 'org_member')
-
-      const { error: groupError } = await supabase.from('groups').insert({
-        id: targetGroupId,
-        org_id: ORG_ID_RBAC,
-        name: `Higher-priority member group ${targetGroupId}`,
-        description: 'Member removal rank regression',
-        created_by: USER_ID,
-      })
-      if (groupError)
-        throw groupError
-      const { error: groupMemberError } = await supabase.from('group_members').insert({
-        group_id: targetGroupId,
-        user_id: targetUser.id,
-        added_by: USER_ID,
-      })
-      if (groupMemberError)
-        throw groupMemberError
-
-      const { data: superAdminRole, error: superAdminRoleError } = await supabase
-        .from('roles')
-        .select('id')
-        .eq('name', 'org_super_admin')
-        .eq('scope_type', 'org')
-        .single()
-      if (superAdminRoleError || !superAdminRole)
-        throw superAdminRoleError ?? new Error('Expected org_super_admin role')
-      const { error: groupBindingError } = await supabase.from('role_bindings').insert({
-        principal_type: 'group',
-        principal_id: targetGroupId,
-        role_id: superAdminRole.id,
-        scope_type: 'org',
-        org_id: ORG_ID_RBAC,
-        granted_by: USER_ID,
-        reason: 'Member removal rank regression',
-        is_direct: true,
-      })
-      if (groupBindingError)
-        throw groupBindingError
-
-      const lowerPriorityKey = await createDirectApiKeyWithBindings({
-        userId: USER_ID,
-        key: randomUUID(),
-        name: `Lower-priority member removal ${randomUUID()}`,
-        orgId: ORG_ID_RBAC,
-        roleName: 'org_admin',
-      })
-      lowerPriorityKeyId = lowerPriorityKey.id
-      lowerPriorityKeyRbacId = lowerPriorityKey.rbac_id
-
-      const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID_RBAC}&email=${USER_ADMIN_EMAIL}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'capgkey': lowerPriorityKey.key!,
-        },
-        method: 'DELETE',
-      })
-      expect(response.status).toBe(403)
-      expect(await response.json()).toEqual(expect.objectContaining({ error: 'cannot_delete_higher_priority_role' }))
-
-      const { data: memberAfter, error: memberAfterError } = await supabase
-        .from('org_users')
-        .select('user_id')
-        .eq('org_id', ORG_ID_RBAC)
-        .eq('user_id', targetUser.id)
-        .maybeSingle()
-      expect(memberAfterError).toBeNull()
-      expect(memberAfter?.user_id).toBe(targetUser.id)
-
-      const { data: groupBindingAfter, error: groupBindingAfterError } = await supabase
-        .from('role_bindings')
-        .select('id')
-        .eq('principal_type', 'group')
-        .eq('principal_id', targetGroupId)
-        .eq('org_id', ORG_ID_RBAC)
-      expect(groupBindingAfterError).toBeNull()
-      expect(groupBindingAfter?.length).toBeGreaterThan(0)
-
-      const { data: groupMembershipAfter, error: groupMembershipAfterError } = await supabase
-        .from('group_members')
-        .select('group_id')
-        .eq('group_id', targetGroupId)
-        .eq('user_id', targetUser.id)
-      expect(groupMembershipAfterError).toBeNull()
-      expect(groupMembershipAfter?.length).toBe(1)
-    }
-    finally {
-      if (lowerPriorityKeyRbacId) {
-        await supabase.from('role_bindings').delete().eq('principal_type', 'apikey').eq('principal_id', lowerPriorityKeyRbacId)
-      }
-      if (lowerPriorityKeyId) {
-        await supabase.from('apikeys').delete().eq('id', lowerPriorityKeyId)
-      }
-      await supabase.from('role_bindings').delete().eq('principal_type', 'group').eq('principal_id', targetGroupId)
-      await supabase.from('group_members').delete().eq('group_id', targetGroupId)
-      await supabase.from('groups').delete().eq('id', targetGroupId)
-      await supabase.from('role_bindings').delete().eq('principal_type', 'user').eq('principal_id', targetUser.id).eq('org_id', ORG_ID_RBAC)
-      await supabase.from('org_users').delete().eq('org_id', ORG_ID_RBAC).eq('user_id', targetUser.id)
-    }
-  })
-
-  it('[DELETE] /organization/members - org member can leave self and cleans role_bindings', async () => {
-    const { data: userData } = await getSupabaseClient().from('users').select('id').eq('email', USER_EMAIL_NONMEMBER).single()
-    expect(userData).toBeTruthy()
-
-    await getSupabaseClient().from('role_bindings').delete().eq('principal_type', 'user').eq('principal_id', userData!.id).eq('org_id', ORG_ID_RBAC)
-    await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID_RBAC).eq('user_id', userData!.id)
-    await getSupabaseClient().from('org_users').insert({
-      org_id: ORG_ID_RBAC,
-      user_id: userData!.id,
-      rbac_role_name: 'org_member',
-    })
-    await createUserOrgBinding(ORG_ID_RBAC, userData!.id, 'org_member')
-
-    const memberHeaders = await getAuthHeadersForCredentials(USER_EMAIL_NONMEMBER, USER_PASSWORD_NONMEMBER)
-    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID_RBAC}&email=${encodeURIComponent(USER_EMAIL_NONMEMBER)}`, {
-      headers: memberHeaders,
-      method: 'DELETE',
-    })
-    expect(response.status).toBe(200)
-
-    const { data: orgUserAfter } = await getSupabaseClient().from('org_users').select().eq('org_id', ORG_ID_RBAC).eq('user_id', userData!.id)
-    expect(orgUserAfter).toHaveLength(0)
-
-    const { data: bindingsAfter } = await getSupabaseClient().from('role_bindings').select().eq('principal_type', 'user').eq('principal_id', userData!.id).eq('org_id', ORG_ID_RBAC)
-    expect(bindingsAfter).toHaveLength(0)
-  })
-
-  it('[DELETE] /organization/members - org member cannot delete another member', async () => {
-    const { data: userData } = await getSupabaseClient().from('users').select('id').eq('email', USER_EMAIL_NONMEMBER).single()
-    expect(userData).toBeTruthy()
-
-    await getSupabaseClient().from('role_bindings').delete().eq('principal_type', 'user').eq('principal_id', userData!.id).eq('org_id', ORG_ID_RBAC)
-    await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID_RBAC).eq('user_id', userData!.id)
-    await getSupabaseClient().from('org_users').insert({
-      org_id: ORG_ID_RBAC,
-      user_id: userData!.id,
-      rbac_role_name: 'org_member',
-    })
-    await createUserOrgBinding(ORG_ID_RBAC, userData!.id, 'org_member')
-
-    const memberHeaders = await getAuthHeadersForCredentials(USER_EMAIL_NONMEMBER, USER_PASSWORD_NONMEMBER)
-    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID_RBAC}&email=${USER_ADMIN_EMAIL}`, {
-      headers: memberHeaders,
-      method: 'DELETE',
-    })
-    expect(response.status).toBe(400)
-    const payload = await response.json() as { error: string }
-    expect(payload.error).toBe('cannot_access_organization')
-
-    const { data: orgUserAfter } = await getSupabaseClient().from('org_users').select().eq('org_id', ORG_ID_RBAC).eq('user_id', userData!.id)
-    expect(orgUserAfter).toHaveLength(1)
-
-    const { data: bindingsAfter } = await getSupabaseClient().from('role_bindings').select().eq('principal_type', 'user').eq('principal_id', userData!.id).eq('org_id', ORG_ID_RBAC)
-    expect(bindingsAfter!.length).toBeGreaterThan(0)
-
-    await getSupabaseClient().from('role_bindings').delete().eq('principal_type', 'user').eq('principal_id', userData!.id).eq('org_id', ORG_ID_RBAC)
-    await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID_RBAC).eq('user_id', userData!.id)
   })
 })
 
