@@ -76,6 +76,24 @@ describe('read-replica schema compatibility', () => {
     expect(readReplicaSchemaCompatibilityIssues(expected, actual)).toEqual([])
   })
 
+  it.concurrent('ignores existing column defaults and missing publisher CHECK constraints', () => {
+    const expected = catalog()
+    const actual = catalog()
+    actual.columns[0] = {
+      ...actual.columns[0],
+      default: null,
+    }
+    actual.columns[1] = {
+      ...actual.columns[1],
+      default: '\'replica\'',
+    }
+    actual.constraints = actual.constraints.filter(
+      constraint => constraint.type !== 'c',
+    )
+
+    expect(readReplicaSchemaCompatibilityIssues(expected, actual)).toEqual([])
+  })
+
   it.concurrent('rejects structural drift across selected schema objects', () => {
     const expected = catalog()
     const actual = catalog()
@@ -107,7 +125,6 @@ describe('read-replica schema compatibility', () => {
     expect(readReplicaSchemaCompatibilityIssues(expected, actual)).toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: 'column', object: 'apps.name', reason: 'expected type text, found integer' }),
       expect.objectContaining({ kind: 'column', object: 'apps.name', reason: 'subscriber is NOT NULL while publisher accepts NULL' }),
-      expect.objectContaining({ kind: 'column', object: 'apps.name', reason: 'expected default null, found 0' }),
       expect.objectContaining({ kind: 'column', object: 'apps.name', reason: 'expected identity kind none, found a' }),
       expect.objectContaining({ kind: 'column', object: 'apps.name', reason: 'expected generated kind none, found s' }),
       expect.objectContaining({ kind: 'constraint', object: 'apps.apps_pkey', reason: 'expected type p, found u' }),

@@ -1,5 +1,7 @@
+import type { CloudSqlDataApiResponse } from '../read_replicate/cloud_sql_data_api_response.ts'
 import type { Queryable } from '../read_replicate/schema_catalog.ts'
 import process from 'node:process'
+import { assertCloudSqlDataApiResponseSucceeded } from '../read_replicate/cloud_sql_data_api_response.ts'
 import { applyReadReplicaSchemaSync } from '../read_replicate/schema_additive_sync.ts'
 import {
   READ_REPLICA_SCHEMA_CATALOG_SQL,
@@ -17,7 +19,7 @@ const GOOGLE_DATA_API_REQUEST_LIMIT_BYTES = 500_000
 const GOOGLE_DATA_API_REQUEST_METADATA_BUFFER_BYTES = 1_024
 const GOOGLE_DATA_API_RESPONSE_LIMIT_BYTES = 10_000_000
 
-interface DataApiResponse {
+interface DataApiResponse extends CloudSqlDataApiResponse {
   results?: Array<{
     columns?: Array<{ name?: string }>
     partialResult?: boolean
@@ -155,6 +157,10 @@ async function executeGoogleSql(
     if (exitCode !== 0)
       throw dataApiCommandError(stderr || stdout)
     const response = JSON.parse(stdout) as DataApiResponse
+    assertCloudSqlDataApiResponseSucceeded(
+      response,
+      dataApiCommandError,
+    )
     assertCompleteDataApiResponse(response)
     return response
   }
@@ -297,11 +303,13 @@ function commandOutput(value: string): string {
   return message ? message.slice(0, 4096) : 'no diagnostic output'
 }
 
-try {
-  await main()
-}
-catch (error) {
-  const message = error instanceof Error ? error.message : String(error)
-  console.error(`::error title=Read-replica Data API sync failed::${message}`)
-  process.exitCode = 1
+if (import.meta.main) {
+  try {
+    await main()
+  }
+  catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error(`::error title=Read-replica Data API sync failed::${message}`)
+    process.exitCode = 1
+  }
 }
