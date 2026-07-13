@@ -21,6 +21,8 @@ const pool = new Pool({
 const WEBHOOK_QUEUE_TEST_ORG_ID = randomUUID()
 const webhookName = `Webhook Queue Test ${randomUUID()}`
 const customerId = `cus_webhook_queue_${randomUUID().replace(/-/g, '').slice(0, 20)}`
+const dispatcherQueueName = `webhook_dispatcher_${randomUUID().replace(/-/g, '').slice(0, 12)}`
+const deliveryQueueName = `webhook_delivery_${randomUUID().replace(/-/g, '').slice(0, 12)}`
 
 let createdWebhookId: string | null = null
 
@@ -53,15 +55,20 @@ async function getDeliveryRecord(webhookId: string, recordId: string) {
   return rows[0]
 }
 
-async function expectWebhookDeliveryQueueMessage(deliveryId: string) {
-  const { rows } = await pool.query(
-    `SELECT count(*) AS count
+async function getWebhookDeliveryQueueMessage(deliveryId: string) {
+  const { rows } = await pool.query<{ msg_id: number | string, message: unknown }>(
+    `SELECT msg_id, message
      FROM pgmq.q_webhook_delivery
      WHERE message->'payload'->>'delivery_id' = $1`,
     [deliveryId],
   )
 
-  expect(Number(rows[0]?.count ?? 0)).toBe(1)
+  expect(rows).toHaveLength(1)
+  return rows[0]
+}
+
+async function deleteWebhookDeliveryQueueMessage(msgId: number | string) {
+  await pool.query('SELECT pgmq.delete($1::text, $2::bigint)', ['webhook_delivery', msgId])
 }
 
 async function getDeliveryAttempt(deliveryId: string) {
@@ -76,6 +83,8 @@ async function getDeliveryAttempt(deliveryId: string) {
 
 describe('webhook queue processing', () => {
   beforeAll(async () => {
+    await pool.query('SELECT pgmq.create($1)', [dispatcherQueueName])
+    await pool.query('SELECT pgmq.create($1)', [deliveryQueueName])
     const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
       customer_id: customerId,
       status: 'succeeded',
@@ -124,6 +133,16 @@ describe('webhook queue processing', () => {
 
     await getSupabaseClient().from('orgs').delete().eq('id', WEBHOOK_QUEUE_TEST_ORG_ID)
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
+    if (createdWebhookId) {
+      await pool.query(`DELETE FROM pgmq.q_webhook_delivery WHERE message->'payload'->>'webhook_id' = $1`, [createdWebhookId])
+      await pool.query(`DELETE FROM pgmq.a_webhook_delivery WHERE message->'payload'->>'webhook_id' = $1`, [createdWebhookId])
+    }
+
+    for (const queueName of [dispatcherQueueName, deliveryQueueName]) {
+      await pool.query(`DELETE FROM pgmq.q_${queueName}`)
+      await pool.query(`DELETE FROM pgmq.a_${queueName}`)
+      await pool.query('SELECT pgmq.drop_queue($1)', [queueName])
+    }
     await pool.end()
   })
 
@@ -149,18 +168,22 @@ describe('webhook queue processing', () => {
       },
     }
 
-    await pool.query('SELECT pgmq.send($1, $2::jsonb)', ['webhook_dispatcher', JSON.stringify(queueMessage)])
+    await pool.query('SELECT pgmq.send($1, $2::jsonb)', [dispatcherQueueName, JSON.stringify(queueMessage)])
 
-    await fetchQueueSync('webhook_dispatcher')
+    await fetchQueueSync(dispatcherQueueName)
     const createdDelivery = await getDeliveryRecord(createdWebhookId, recordId)
-    await expectWebhookDeliveryQueueMessage(createdDelivery.id)
+    const queuedDelivery = await getWebhookDeliveryQueueMessage(createdDelivery.id)
+    await deleteWebhookDeliveryQueueMessage(queuedDelivery.msg_id)
 
     expect(createdDelivery.event_type).toBe('apps.UPDATE')
     expect(createdDelivery.status).toBe('pending')
 
-    await fetchQueueSync('webhook_delivery')
+    await pool.query('SELECT pgmq.send($1, $2::jsonb)', [deliveryQueueName, JSON.stringify(queuedDelivery.message)])
+
+    await fetchQueueSync(deliveryQueueName)
     const attemptedDelivery = await getDeliveryAttempt(createdDelivery.id)
-    await expectWebhookDeliveryQueueMessage(createdDelivery.id)
+    const retryDelivery = await getWebhookDeliveryQueueMessage(createdDelivery.id)
+    await deleteWebhookDeliveryQueueMessage(retryDelivery.msg_id)
 
     expect(attemptedDelivery.status).toBe('pending')
     expect(attemptedDelivery.attempt_count).toBe(1)
