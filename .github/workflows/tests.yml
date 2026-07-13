@@ -386,6 +386,9 @@ jobs:
       - name: Lint SQL
         if: matrix.shard == '1/2'
         run: bun scripts/supabase-worktree.ts db lint -s public --fail-on warning
+      - name: Quiesce test scheduler
+        run: bun scripts/supabase-worktree.ts with-env bun scripts/quiesce-test-scheduler.ts
+
       - id: bootstrap_edge_server
         name: Bootstrap Edge server
         env:
@@ -492,6 +495,9 @@ jobs:
             bun scripts/supabase-worktree.ts with-env bun -e 'const apiUrl = new URL(process.env.SUPABASE_URL ?? ""); const dbUrl = process.env.SUPABASE_DB_URL ?? ""; if (!apiUrl.host || !dbUrl) throw new Error("Isolated Supabase status is missing API_URL or DB_URL."); console.log(`SUPABASE_FUNCTIONS_HEALTH_URL=http-get://${apiUrl.host}/functions/v1/ok`); console.log(`MAIN_SUPABASE_DB_URL=${dbUrl}`)'
             printf 'CLOUDFLARE_FUNCTION_URL=http://127.0.0.1:%s\n' "$((8787 + CLOUDFLARE_WORKER_PORT_OFFSET))"
           } >> "$GITHUB_ENV"
+      - name: Quiesce test scheduler
+        run: bun scripts/supabase-worktree.ts with-env bun scripts/quiesce-test-scheduler.ts
+
       - id: bootstrap_edge_server
         name: Bootstrap Edge server
         env:
