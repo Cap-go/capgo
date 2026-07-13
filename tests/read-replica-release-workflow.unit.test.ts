@@ -1,5 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
+import { REPLICA_TABLES } from '../read_replicate/schema_catalog.ts'
+import { readReplicaSchemaCatalogFromMigrations } from '../read_replicate/schema_catalog_from_migrations.ts'
 
 const workflowUrl = new URL(
   '../.github/workflows/build_and_deploy.yml',
@@ -7,6 +9,10 @@ const workflowUrl = new URL(
 )
 const syncScriptUrl = new URL(
   '../scripts/sync-read-replica-schema.ts',
+  import.meta.url,
+)
+const schemaCatalogFromMigrationsUrl = new URL(
+  '../read_replicate/schema_catalog_from_migrations.ts',
   import.meta.url,
 )
 
@@ -22,13 +28,18 @@ async function readReplicaSyncScript(): Promise<string> {
   return readFile(syncScriptUrl, 'utf8')
 }
 
+async function readSchemaCatalogFromMigrations(): Promise<string> {
+  return readFile(schemaCatalogFromMigrationsUrl, 'utf8')
+}
+
 describe('production read-replica release gate', () => {
   it.concurrent(
-    'reconciles the committed catalog through Data API before primary migrations',
+    'recreates the catalog from local migrations through Data API before primary migrations',
     async () => {
-      const [workflow, syncScript] = await Promise.all([
+      const [workflow, syncScript, catalogFromMigrations] = await Promise.all([
         readReleaseWorkflow(),
         readReplicaSyncScript(),
+        readSchemaCatalogFromMigrations(),
       ])
 
       expect(workflow).not.toContain('google-github-actions/auth@v3')
@@ -54,7 +65,8 @@ describe('production read-replica release gate', () => {
       expect(syncScript).toContain('applyReadReplicaSchemaSync')
       expect(syncScript).toContain('readReplicaSchemaCompatibilityIssues')
       expect(syncScript).toContain('gcloud')
-      expect(syncScript).toContain('schema_replicate.catalog.json')
+      expect(syncScript).toContain('readReplicaSchemaCatalogFromMigrations')
+      expect(syncScript).not.toContain('schema_replicate.catalog.json')
       expect(syncScript).toContain('--partial_result_mode=FAIL_PARTIAL_RESULT')
       expect(syncScript).toContain('GOOGLE_DATA_API_REQUEST_LIMIT_BYTES')
       expect(syncScript).toContain('const GOOGLE_READ_REPLICA: GoogleDataApiConfig = {')
@@ -62,7 +74,12 @@ describe('production read-replica release gate', () => {
       expect(syncScript).toContain('instance: \'eu-2\'')
       expect(syncScript).toContain('database: \'postgres\'')
       expect(syncScript).not.toContain('googleDataApiConfigFromArgs')
-      expect(syncScript).not.toContain('supabase')
+      expect(catalogFromMigrations).toContain('createPgliteEngine')
+      expect(catalogFromMigrations).toContain('loadSupabaseProject')
+      expect(catalogFromMigrations).toContain('runMigrations(project.migrations)')
+      expect(catalogFromMigrations).not.toContain('schema_replicate.catalog.json')
+      expect(catalogFromMigrations).not.toContain('supabase db')
+      expect(catalogFromMigrations).not.toContain('docker')
     },
   )
 
@@ -83,5 +100,19 @@ describe('production read-replica release gate', () => {
         )
       }
     },
+  )
+
+  it(
+    'builds the release catalog from all local migrations through PGlite',
+    async () => {
+      const catalog = await readReplicaSchemaCatalogFromMigrations() as {
+        tables: Array<{ name: string }>
+      }
+
+      expect(catalog.tables.map(table => table.name)).toEqual(
+        [...REPLICA_TABLES].sort(),
+      )
+    },
+    30_000,
   )
 })

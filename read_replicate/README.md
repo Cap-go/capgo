@@ -6,30 +6,31 @@ so every reconciliation targets only this database.
 
 ## Release reconciliation
 
-Production reconciliation uses Cloud SQL Data API through GitHub OIDC. It never
-accepts a direct subscriber PostgreSQL URL, never allowlists GitHub runner IPs,
-and does not deploy a temporary Worker.
+Production reconciliation uses Cloud SQL Data API with a dedicated Google
+service-account key stored as a base64 GitHub repository secret. It never accepts
+a direct subscriber PostgreSQL URL, allowlists GitHub runner IPs, or deploys a
+temporary Worker.
 
-| GitHub repository variable          | Value                                   |
-| ----------------------------------- | --------------------------------------- |
-| `GOOGLE_CLOUD_PROJECT`              | Google Cloud project ID                 |
-| `GOOGLE_READ_REPLICA_INSTANCE`      | Google Cloud SQL subscriber instance ID |
-| `GOOGLE_READ_REPLICA_DATABASE`      | Subscriber database name                |
-| `GOOGLE_WORKLOAD_IDENTITY_PROVIDER` | GitHub OIDC provider resource name      |
-| `GOOGLE_SERVICE_ACCOUNT`            | Google service account email            |
+| GitHub repository secret | Value                              |
+| ------------------------ | ---------------------------------- |
+| `GOOGLE_SERVICE_ACCOUNT` | Base64-encoded service-account JSON |
 
-The release workflow reads the committed
-`schema_replicate.catalog.json`, applies its safe additive DDL through the Data
-API, and verifies the subscriber before `supabase db push` starts. If the
-subscriber cannot converge, the primary migration is not run.
+The Cloud project, instance, and database are fixed literals in the sync script,
+not GitHub variables.
+
+The release workflow first uses Tinbase/PGlite to apply the tag's local migrations
+in memory and build a fresh selected-schema catalog. Only then does it apply safe
+additive DDL through the Data API and verify the subscriber before primary
+migrations start. A migration or local catalog failure therefore makes no Google
+SQL request.
+
+`schema_replicate.catalog.json` is not a release input; it can remain only as a
+PR regression artifact.
 
 ```bash
-bun scripts/sync-read-replica-schema.ts \
-  --google-cloud-project <project> \
-  --google-read-replica-instance <instance> \
-  --google-read-replica-database <database>
+bun scripts/sync-read-replica-schema.ts
 ```
 
 The dedicated Google service account must be an IAM database user with the
-subscriber DDL permissions. Cloud SQL Data API limits an individual statement
-to 30 seconds; the reconciler fails rather than pretending a timed-out DDL ran.
+subscriber DDL permissions. Cloud SQL Data API limits an individual statement to
+30 seconds; the reconciler fails rather than pretending a timed-out DDL ran.

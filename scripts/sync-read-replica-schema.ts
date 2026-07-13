@@ -1,5 +1,4 @@
 import type { Queryable } from '../read_replicate/schema_catalog.ts'
-import { readFile } from 'node:fs/promises'
 import process from 'node:process'
 import { applyReadReplicaSchemaSync } from '../read_replicate/schema_additive_sync.ts'
 import {
@@ -7,6 +6,7 @@ import {
   readReplicaSchemaCatalog,
   stableStringify,
 } from '../read_replicate/schema_catalog.ts'
+import { readReplicaSchemaCatalogFromMigrations } from '../read_replicate/schema_catalog_from_migrations.ts'
 import { readReplicaSchemaCompatibilityIssues } from '../read_replicate/schema_compatibility.ts'
 
 const DEFAULT_SYNC_MAX_SECONDS = 30 * 60
@@ -40,7 +40,10 @@ const GOOGLE_READ_REPLICA: GoogleDataApiConfig = {
 async function main(): Promise<void> {
   const maxDurationMs = DEFAULT_SYNC_MAX_SECONDS * 1000
   const deadline = Date.now() + maxDurationMs
-  const expected = await readExpectedReplicaCatalog()
+  console.log(
+    'Building the read-replica schema catalog from local migrations through Tinbase/PGlite...',
+  )
+  const expected = await readReplicaSchemaCatalogFromMigrations()
   const replica = googleDataApiClient(GOOGLE_READ_REPLICA, deadline)
   const result = await applyReadReplicaSchemaSync(replica, expected, {
     deadline,
@@ -64,20 +67,8 @@ async function main(): Promise<void> {
   console.log('Read-replica Cloud SQL Data API sync result:')
   console.log(stableStringify({ ...result, issues }))
   console.log(
-    'Read replica matches the committed selected schema before primary migrations.',
+    'Read replica matches the schema derived from local migrations before primary migrations.',
   )
-}
-
-async function readExpectedReplicaCatalog(): Promise<unknown> {
-  return JSON.parse(
-    await readFile(
-      new URL(
-        '../read_replicate/schema_replicate.catalog.json',
-        import.meta.url,
-      ),
-      'utf8',
-    ),
-  ) as unknown
 }
 
 function googleDataApiClient(
