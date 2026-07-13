@@ -1558,6 +1558,8 @@ export interface AdminGlobalStatsTrend {
   devices_last_month_android: number
   stars: number
   need_upgrade: number
+  above_plan_with_credits: number | null
+  above_plan_without_credits: number | null
   paying_yearly: number
   paying_monthly: number
   new_paying_orgs: number
@@ -1681,6 +1683,8 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(gs.devices_last_month_android, 0)::int AS devices_last_month_android,
         gs.stars::int AS stars,
         gs.need_upgrade::int AS need_upgrade,
+        NULLIF(to_jsonb(gs) ->> 'above_plan_with_credits', '')::int AS above_plan_with_credits,
+        NULLIF(to_jsonb(gs) ->> 'above_plan_without_credits', '')::int AS above_plan_without_credits,
         gs.paying_yearly::int AS paying_yearly,
         gs.paying_monthly::int AS paying_monthly,
         gs.new_paying_orgs::int AS new_paying_orgs,
@@ -1833,6 +1837,8 @@ export async function getAdminGlobalStatsTrend(
       devices_last_month_android: Number(row.devices_last_month_android) || 0,
       stars: Number(row.stars) || 0,
       need_upgrade: Number(row.need_upgrade) || 0,
+      above_plan_with_credits: row.above_plan_with_credits === null ? null : Number(row.above_plan_with_credits) || 0,
+      above_plan_without_credits: row.above_plan_without_credits === null ? null : Number(row.above_plan_without_credits) || 0,
       paying_yearly: Number(row.paying_yearly) || 0,
       past_due_orgs: Number(row.past_due_orgs) || 0,
       past_due_orgs_average_days: Number(row.past_due_orgs_average_days) || 0,

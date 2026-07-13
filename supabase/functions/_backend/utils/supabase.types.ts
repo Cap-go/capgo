@@ -1572,6 +1572,8 @@ export type Database = {
           longest_ltv: number
           mrr: number
           need_upgrade: number | null
+          above_plan_with_credits: number | null
+          above_plan_without_credits: number | null
           new_paying_orgs: number
           not_paying: number | null
           nrr: number
@@ -1667,6 +1669,8 @@ export type Database = {
           longest_ltv?: number
           mrr?: number
           need_upgrade?: number | null
+          above_plan_with_credits?: number | null
+          above_plan_without_credits?: number | null
           new_paying_orgs?: number
           not_paying?: number | null
           nrr?: number
@@ -1762,6 +1766,8 @@ export type Database = {
           longest_ltv?: number
           mrr?: number
           need_upgrade?: number | null
+          above_plan_with_credits?: number | null
+          above_plan_without_credits?: number | null
           new_paying_orgs?: number
           not_paying?: number | null
           nrr?: number

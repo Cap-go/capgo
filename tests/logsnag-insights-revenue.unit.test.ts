@@ -609,11 +609,34 @@ describe('logsnag revenue metric helpers', () => {
     expect(logsnagInsightsTestUtils.normalizeCoreSnapshotCounts({
       onboarded: '7',
       need_upgrade: null,
-    })).toEqual({ onboarded: 7, needUpgrade: 0 })
+      above_plan_with_credits: '4',
+      above_plan_without_credits: null,
+    })).toEqual({
+      onboarded: 7,
+      needUpgrade: 0,
+      abovePlanWithCredits: 4,
+      abovePlanWithoutCredits: 0,
+    })
 
-    expect(logsnagInsightsTestUtils.normalizeCoreSnapshotCounts(null)).toEqual({ onboarded: 0, needUpgrade: 0 })
+    expect(logsnagInsightsTestUtils.normalizeCoreSnapshotCounts(null)).toEqual({
+      onboarded: 0,
+      needUpgrade: 0,
+      abovePlanWithCredits: 0,
+      abovePlanWithoutCredits: 0,
+    })
   })
 
+  it.concurrent('reconstructs above-plan credit state at the replayed snapshot boundary', () => {
+    const source = readFileSync(new URL('../supabase/functions/_backend/triggers/logsnag_insights.ts', import.meta.url), 'utf8')
+    const coreSnapshotQuery = source.match(/async function getCoreSnapshotCounts[\s\S]*?async function runCoreGlobalStatsShard/)?.[0] ?? ''
+
+    expect(coreSnapshotQuery).toContain('public.usage_credit_grants')
+    expect(coreSnapshotQuery).toContain('public.usage_credit_consumptions')
+    expect(coreSnapshotQuery).toContain('g.granted_at < ${snapshotExclusiveEndIso}::timestamptz')
+    expect(coreSnapshotQuery).toContain('g.expires_at >= ${snapshotExclusiveEndIso}::timestamptz')
+    expect(coreSnapshotQuery).toContain('c.applied_at < ${snapshotExclusiveEndIso}::timestamptz')
+    expect(coreSnapshotQuery).not.toContain('o.has_usage_credits')
+  })
   it.concurrent('normalizes logsnag insights retry payload counts', () => {
     expect(logsnagInsightsTestUtils.normalizeLogsnagInsightsRetryCount('2')).toBe(2)
     expect(logsnagInsightsTestUtils.normalizeLogsnagInsightsRetryCount(2.8)).toBe(2)
