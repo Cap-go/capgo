@@ -9,21 +9,10 @@ const supabaseUrl = env.SUPABASE_URL as string
 const supabaseServiceKey = env.SUPABASE_SERVICE_KEY as string
 const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey)
 
-// Helper to retry RPC calls that may fail due to transient network issues in CI
-async function retryRpc<T>(
+async function callRpc<T>(
   fn: () => PromiseLike<{ data: T | null, error: any }>,
-  maxRetries = 3,
 ): Promise<{ data: T | null, error: any }> {
-  let lastResult: { data: T | null, error: any } = { data: null, error: null }
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    lastResult = await fn()
-    if (!lastResult.error || !lastResult.error.message?.includes('fetch failed')) {
-      return lastResult
-    }
-    // Wait before retry with exponential backoff
-    await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)))
-  }
-  return lastResult
+  return await fn()
 }
 
 describe('overage Tracking - Duplicate Prevention', () => {
@@ -52,7 +41,7 @@ describe('overage Tracking - Duplicate Prevention', () => {
 
     // Call apply_usage_overage 5 times with identical parameters
     for (let i = 0; i < 5; i++) {
-      const { data, error } = await retryRpc(() => supabase.rpc('apply_usage_overage', {
+      const { data, error } = await callRpc(() => supabase.rpc('apply_usage_overage', {
         p_org_id: ORG_ID_OVERAGE,
         p_metric: testMetric,
         p_overage_amount: overageAmount,
@@ -86,7 +75,7 @@ describe('overage Tracking - Duplicate Prevention', () => {
     const billingEnd = new Date('2026-01-07')
 
     // First call with initial overage
-    await retryRpc(() => supabase.rpc('apply_usage_overage', {
+    await callRpc(() => supabase.rpc('apply_usage_overage', {
       p_org_id: ORG_ID_OVERAGE,
       p_metric: testMetric,
       p_overage_amount: 1000000,
@@ -96,7 +85,7 @@ describe('overage Tracking - Duplicate Prevention', () => {
     }))
 
     // Second call with significantly higher overage (>1% increase)
-    await retryRpc(() => supabase.rpc('apply_usage_overage', {
+    await callRpc(() => supabase.rpc('apply_usage_overage', {
       p_org_id: ORG_ID_OVERAGE,
       p_metric: testMetric,
       p_overage_amount: 2000000, // 100% increase
@@ -131,7 +120,7 @@ describe('overage Tracking - Duplicate Prevention', () => {
     )
 
     // Call with credits available - should apply them
-    const { data: firstCall, error: firstError } = await retryRpc(() => supabase.rpc('apply_usage_overage', {
+    const { data: firstCall, error: firstError } = await callRpc(() => supabase.rpc('apply_usage_overage', {
       p_org_id: ORG_ID_OVERAGE,
       p_metric: testMetric,
       p_overage_amount: overageAmount,
@@ -146,7 +135,7 @@ describe('overage Tracking - Duplicate Prevention', () => {
     expect(Number(firstResult?.credits_applied)).toBeGreaterThan(0)
 
     // Second call with same params - should NOT create new record (no new credits, same overage)
-    const { error: secondError } = await retryRpc(() => supabase.rpc('apply_usage_overage', {
+    const { error: secondError } = await callRpc(() => supabase.rpc('apply_usage_overage', {
       p_org_id: ORG_ID_OVERAGE,
       p_metric: testMetric,
       p_overage_amount: overageAmount,
@@ -175,7 +164,7 @@ describe('overage Tracking - Duplicate Prevention', () => {
     const billingEnd = new Date('2025-12-01')
 
     // First call
-    await retryRpc(() => supabase.rpc('apply_usage_overage', {
+    await callRpc(() => supabase.rpc('apply_usage_overage', {
       p_org_id: ORG_ID_OVERAGE,
       p_metric: testMetric,
       p_overage_amount: 100000,
@@ -185,7 +174,7 @@ describe('overage Tracking - Duplicate Prevention', () => {
     }))
 
     // Second call with tiny increase (0.5%)
-    await retryRpc(() => supabase.rpc('apply_usage_overage', {
+    await callRpc(() => supabase.rpc('apply_usage_overage', {
       p_org_id: ORG_ID_OVERAGE,
       p_metric: testMetric,
       p_overage_amount: 100500, // Only 0.5% increase

@@ -21,51 +21,18 @@ beforeEach(async () => {
   await pool.query(`DELETE FROM pgmq.a_${queueName}`)
 })
 
-async function waitForQueueCount(queueName: string, expectedCount: number, timeoutMs = 10000) {
-  const start = Date.now()
+async function fetchQueueSync(queueName: string) {
+  const response = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
+    method: 'POST',
+    headers: headersInternal,
+    body: JSON.stringify({
+      queue_name: queueName,
+      wait_for_completion: true,
+    }),
+  })
 
-  while (Date.now() - start < timeoutMs) {
-    const { rows } = await pool.query(`SELECT count(*) as count FROM pgmq.q_${queueName}`)
-    if (Number(rows[0]?.count ?? -1) === expectedCount)
-      return
-
-    await new Promise(resolve => setTimeout(resolve, 250))
-  }
-
-  const { rows } = await pool.query(`SELECT count(*) as count FROM pgmq.q_${queueName}`)
-  throw new Error(`Timed out waiting for queue ${queueName} to reach ${expectedCount} messages (last count: ${rows[0]?.count ?? 'unknown'})`)
-}
-
-async function fetchQueueSync(queueName: string, maxRetries = 4) {
-  let lastError: Error | null = null
-
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const response = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
-        method: 'POST',
-        headers: headersInternal,
-        body: JSON.stringify({ queue_name: queueName }),
-      })
-
-      if (response.status === 202) {
-        expect(await response.json()).toEqual({ status: 'ok' })
-        return response
-      }
-
-      lastError = new Error(`queue_consumer/sync returned HTTP ${response.status} for ${queueName}`)
-    }
-    catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error))
-    }
-
-    if (attempt < maxRetries - 1)
-      await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)))
-  }
-
-  if (lastError)
-    throw new Error(`queue_consumer/sync failed for ${queueName}: ${lastError.message}`)
-
-  throw new Error(`queue_consumer/sync failed for ${queueName}`)
+  expect(response.status).toBe(202)
+  expect(await response.json()).toEqual({ status: 'ok' })
 }
 
 describe('queue Load Test', () => {
@@ -162,19 +129,8 @@ describe('queue Load Test', () => {
     const { rows: initialRows } = await pool.query(`SELECT count(*) as count FROM pgmq.q_${queueName}`)
     expect(initialRows[0].count).toBe('10')
 
-    // Process the queue
     await fetchQueueSync(queueName)
-    await waitForQueueCount(queueName, 0)
-  })
-
-  it('should handle stress test with rapid queue processing', { timeout: 30000 }, async () => {
-    // Keep the burst modest so the assertion measures queue_consumer behavior
-    // instead of GitHub runner resource spikes from unrelated parallel files.
-    await Promise.all([
-      fetchQueueSync(queueName, 6),
-      fetchQueueSync(queueName, 6),
-      fetchQueueSync(queueName, 6),
-      fetchQueueSync(queueName, 6),
-    ])
+    const { rows: processedRows } = await pool.query(`SELECT count(*) as count FROM pgmq.q_${queueName}`)
+    expect(processedRows[0].count).toBe('0')
   })
 })

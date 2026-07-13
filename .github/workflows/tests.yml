@@ -303,10 +303,20 @@ jobs:
     permissions:
       contents: read
       actions: write
+    concurrency:
+      group: capgo-local-services-backend-${{ github.repository }}-${{ matrix.shard }}
+      cancel-in-progress: false
+    env:
+      SUPABASE_WORKTREE_INSTANCE: backend-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
+      SUPABASE_WORKTREE_PORT_OFFSET: ${{ matrix.supabase_port_offset }}
     strategy:
       fail-fast: false
       matrix:
-        shard: ['1/2', '2/2']
+        include:
+          - shard: 1/2
+            supabase_port_offset: 2000
+          - shard: 2/2
+            supabase_port_offset: 2100
     steps:
       - name: Cache Deno dependencies
         uses: actions/cache@v5 # v5
@@ -329,8 +339,8 @@ jobs:
           version: 2.84.2
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
-      - name: Stop leftover Supabase containers
-        run: supabase stop --no-backup || true
+      - name: Stop this job's Supabase stack
+        run: bun scripts/supabase-worktree.ts stop --no-backup || true
       - name: Run Supabase Start (deps and PostgreSQL 17 client install in background)
         run: |
           (
@@ -349,7 +359,7 @@ jobs:
             sudo apt-get install -y postgresql-client-17
           ) > "${RUNNER_TEMP}/pg17-client-install.log" 2>&1 &
           pg17_install_pid=$!
-          supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
+          bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
           if ! wait "${deps_install_pid}"; then
             echo "::error::Dependency install failed"
             cat "${RUNNER_TEMP}/deps-install.log"
@@ -360,34 +370,43 @@ jobs:
             cat "${RUNNER_TEMP}/pg17-client-install.log"
             exit 1
           fi
+      - name: Export isolated Supabase endpoints
+        run: |
+          bun scripts/supabase-worktree.ts with-env bun -e 'const apiUrl = new URL(process.env.SUPABASE_URL ?? ""); const dbUrl = process.env.SUPABASE_DB_URL ?? ""; if (!apiUrl.host || !dbUrl) throw new Error("Isolated Supabase status is missing API_URL or DB_URL."); console.log(`SUPABASE_FUNCTIONS_HEALTH_URL=http-get://${apiUrl.host}/functions/v1/ok`); console.log(`MAIN_SUPABASE_DB_URL=${dbUrl}`)' >> "$GITHUB_ENV"
       - name: Check read-replica schema snapshot
         if: matrix.shard == '1/2'
         env:
-          MAIN_SUPABASE_DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
           PSQL_BIN: /usr/lib/postgresql/17/bin/psql
           PG_DUMP_BIN: /usr/lib/postgresql/17/bin/pg_dump
           PG_RESTORE_BIN: /usr/lib/postgresql/17/bin/pg_restore
         run: bun run readreplicate:check-schema
       - name: Run Supabase Test DB
         if: matrix.shard == '1/2'
-        run: supabase test db
+        run: bun scripts/supabase-worktree.ts test db
       - name: Lint SQL
         if: matrix.shard == '1/2'
-        run: supabase db lint -s public --fail-on warning
+        run: bun scripts/supabase-worktree.ts db lint -s public --fail-on warning
+      - name: Quiesce test scheduler
+        run: bun scripts/supabase-worktree.ts with-env bun scripts/quiesce-test-scheduler.ts
+
       - id: bootstrap_edge_server
         name: Bootstrap Edge server
         env:
+          CAPGO_PREVENT_BACKGROUND_FUNCTIONS: 'true'
           BACKGROUND_SERVICE_NAME: Bootstrap Edge server
-          BACKGROUND_RUN_COMMAND: supabase functions serve
-          BACKGROUND_WAIT_ON: |
-            http-get://127.0.0.1:54321/functions/v1/ok
+          BACKGROUND_RUN_COMMAND: exec bun scripts/supabase-worktree.ts functions serve
           BACKGROUND_LOG_PATH: ${{ runner.temp }}/bootstrap-edge-server.log
           BACKGROUND_WAIT_TIMEOUT_MS: 60000
-        run: bash .github/scripts/start-background-service.sh
+        run: |
+          export BACKGROUND_WAIT_ON="${SUPABASE_FUNCTIONS_HEALTH_URL:?Missing isolated Supabase health URL}"
+          bash .github/scripts/start-background-service.sh
       - name: Run backend integration tests
         env:
           VITEST_SHARD: ${{ matrix.shard }}
-        run: bun run supabase:with-env -- bunx vitest run --exclude=tests/*.unit.test.ts --exclude=tests/cli* $(sed 's|^|--exclude=|' tests/tinbase-db-tests.txt | tr '\n' ' ') --shard="$VITEST_SHARD"
+        run: bun run supabase:with-env -- bunx vitest run --exclude=tests/*.unit.test.ts --exclude=tests/cli* --exclude=tests/read-replica-schema-catalog.test.ts $(sed 's|^|--exclude=|' tests/tinbase-db-tests.txt | tr '\n' ' ') --shard="$VITEST_SHARD"
+      - name: Run read-replica schema catalog test
+        if: matrix.shard == '1/2'
+        run: bun run supabase:with-env -- bunx vitest run tests/read-replica-schema-catalog.test.ts --no-file-parallelism --maxWorkers=1
       - name: Show Edge server logs after backend test failure
         if: failure() && steps.bootstrap_edge_server.outputs.log_path != ''
         run: |
@@ -410,6 +429,7 @@ jobs:
               kill "${pid}" 2>/dev/null || true
             fi
           done
+          bun scripts/supabase-worktree.ts stop --no-backup || true
 
   test_cloudflare:
     needs: changes
@@ -419,10 +439,24 @@ jobs:
     name: Run Cloudflare Workers tests (shard ${{ matrix.shard }})
     permissions:
       contents: read
+    concurrency:
+      group: capgo-local-services-cloudflare-${{ github.repository }}-${{ matrix.shard }}
+      cancel-in-progress: false
+    env:
+      SUPABASE_WORKTREE_INSTANCE: cloudflare-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
+      SUPABASE_WORKTREE_PORT_OFFSET: ${{ matrix.supabase_port_offset }}
+      CLOUDFLARE_WORKER_PORT_OFFSET: ${{ matrix.cloudflare_worker_port_offset }}
+      CLOUDFLARE_PERSIST_DIR: .context/cloudflare-workers-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.supabase_port_offset }}
     strategy:
       fail-fast: false
       matrix:
-        shard: ['1/2', '2/2']
+        include:
+          - shard: 1/2
+            supabase_port_offset: 4000
+            cloudflare_worker_port_offset: 4000
+          - shard: 2/2
+            supabase_port_offset: 4100
+            cloudflare_worker_port_offset: 4100
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6 # v6
@@ -440,8 +474,8 @@ jobs:
           version: 2.84.2
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
-      - name: Stop leftover Supabase containers
-        run: supabase stop --no-backup || true
+      - name: Stop this job's Supabase stack
+        run: bun scripts/supabase-worktree.ts stop --no-backup || true
       - name: Run Supabase Start (deps install in background)
         run: |
           (
@@ -449,41 +483,51 @@ jobs:
             bun install
           ) > "${RUNNER_TEMP}/deps-install.log" 2>&1 &
           deps_install_pid=$!
-          supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
+          bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
           if ! wait "${deps_install_pid}"; then
             echo "::error::Dependency install failed"
             cat "${RUNNER_TEMP}/deps-install.log"
             exit 1
           fi
+      - name: Export isolated test endpoints
+        run: |
+          {
+            bun scripts/supabase-worktree.ts with-env bun -e 'const apiUrl = new URL(process.env.SUPABASE_URL ?? ""); const dbUrl = process.env.SUPABASE_DB_URL ?? ""; if (!apiUrl.host || !dbUrl) throw new Error("Isolated Supabase status is missing API_URL or DB_URL."); console.log(`SUPABASE_FUNCTIONS_HEALTH_URL=http-get://${apiUrl.host}/functions/v1/ok`); console.log(`MAIN_SUPABASE_DB_URL=${dbUrl}`)'
+            printf 'CLOUDFLARE_FUNCTION_URL=http://127.0.0.1:%s\n' "$((8787 + CLOUDFLARE_WORKER_PORT_OFFSET))"
+          } >> "$GITHUB_ENV"
+      - name: Quiesce test scheduler
+        run: bun scripts/supabase-worktree.ts with-env bun scripts/quiesce-test-scheduler.ts
+
       - id: bootstrap_edge_server
         name: Bootstrap Edge server
         env:
           BACKGROUND_SERVICE_NAME: Bootstrap Edge server
-          BACKGROUND_RUN_COMMAND: supabase functions serve
-          BACKGROUND_WAIT_ON: |
-            http-get://127.0.0.1:54321/functions/v1/ok
+          BACKGROUND_RUN_COMMAND: exec bun scripts/supabase-worktree.ts functions serve
           BACKGROUND_LOG_PATH: ${{ runner.temp }}/cloudflare-edge-server.log
           BACKGROUND_WAIT_TIMEOUT_MS: 60000
-        run: bash .github/scripts/start-background-service.sh
+        run: |
+          export BACKGROUND_WAIT_ON="${SUPABASE_FUNCTIONS_HEALTH_URL:?Missing isolated Supabase health URL}"
+          bash .github/scripts/start-background-service.sh
       - id: start_cloudflare_workers
         name: Start Cloudflare Workers for testing
         env:
           BACKGROUND_SERVICE_NAME: Cloudflare Workers
           BACKGROUND_RUN_COMMAND: |
             chmod +x scripts/start-cloudflare-workers.sh
-            ./scripts/start-cloudflare-workers.sh
-          BACKGROUND_WAIT_ON: |
-            http-get://127.0.0.1:8787/ok
-            http-get://127.0.0.1:8788/ok
-            http-get://127.0.0.1:8789/ok
+            exec ./scripts/start-cloudflare-workers.sh
           BACKGROUND_LOG_PATH: ${{ runner.temp }}/cloudflare-workers.log
           BACKGROUND_WAIT_TIMEOUT_MS: 120000
           BACKGROUND_TAIL_LINES: 400
-        run: bash .github/scripts/start-background-service.sh
+        run: |
+          worker_port_offset="${CLOUDFLARE_WORKER_PORT_OFFSET:-0}"
+          export BACKGROUND_WAIT_ON="http-get://127.0.0.1:$((8787 + worker_port_offset))/ok
+          http-get://127.0.0.1:$((8788 + worker_port_offset))/ok
+          http-get://127.0.0.1:$((8789 + worker_port_offset))/ok"
+          bash .github/scripts/start-background-service.sh
       - name: Run Cloudflare Workers integration tests
         env:
           VITEST_SHARD: ${{ matrix.shard }}
-        run: bunx vitest run --exclude=tests/cli* --exclude=tests/*.unit.test.ts $(sed 's|^|--exclude=|' tests/tinbase-db-tests.txt | tr '\n' ' ') --config vitest.config.cloudflare.ts --shard="$VITEST_SHARD"
+        run: bun run supabase:with-env -- bunx vitest run --exclude=tests/cli* --exclude=tests/*.unit.test.ts $(sed 's|^|--exclude=|' tests/tinbase-db-tests.txt | tr '\n' ' ') --config vitest.config.cloudflare.ts --shard="$VITEST_SHARD"
       - name: Show Cloudflare Worker logs after Cloudflare test failure
         if: failure() && steps.start_cloudflare_workers.outputs.log_path != ''
         run: |
@@ -508,6 +552,7 @@ jobs:
               kill "${pid}" 2>/dev/null || true
             fi
           done
+          bun scripts/supabase-worktree.ts stop --no-backup || true
 
   test_playwright:
     needs: changes
@@ -517,6 +562,12 @@ jobs:
     name: Run Playwright tests
     permissions:
       contents: read
+    concurrency:
+      group: capgo-local-services-playwright-${{ github.repository }}
+      cancel-in-progress: false
+    env:
+      SUPABASE_WORKTREE_INSTANCE: playwright-${{ github.run_id }}-${{ github.run_attempt }}
+      SUPABASE_WORKTREE_PORT_OFFSET: 5000
     steps:
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -642,6 +693,7 @@ jobs:
               kill "${pid}" 2>/dev/null || true
             fi
           done
+          bun scripts/supabase-worktree.ts stop --no-backup || true
 
   cli_node_compatibility:
     needs: changes
@@ -945,6 +997,12 @@ jobs:
     permissions:
       contents: read
       actions: write
+    concurrency:
+      group: capgo-local-services-cli-${{ github.repository }}
+      cancel-in-progress: false
+    env:
+      SUPABASE_WORKTREE_INSTANCE: cli-${{ github.run_id }}-${{ github.run_attempt }}
+      SUPABASE_WORKTREE_PORT_OFFSET: 6000
     steps:
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -967,8 +1025,8 @@ jobs:
           version: 2.84.2
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
-      - name: Stop leftover Supabase containers
-        run: supabase stop --no-backup || true
+      - name: Stop this job's Supabase stack
+        run: bun scripts/supabase-worktree.ts stop --no-backup || true
       - name: Run Supabase Start (deps install in background)
         run: |
           (
@@ -977,24 +1035,30 @@ jobs:
             bun run cli:build
           ) > "${RUNNER_TEMP}/deps-install.log" 2>&1 &
           deps_install_pid=$!
-          supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
+          bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
           if ! wait "${deps_install_pid}"; then
             echo "::error::Dependency install or CLI build failed"
             cat "${RUNNER_TEMP}/deps-install.log"
             exit 1
           fi
+      - name: Export isolated Supabase endpoints
+        run: |
+          bun scripts/supabase-worktree.ts with-env bun -e 'const apiUrl = new URL(process.env.SUPABASE_URL ?? ""); const dbUrl = process.env.SUPABASE_DB_URL ?? ""; if (!apiUrl.host || !dbUrl) throw new Error("Isolated Supabase status is missing API_URL or DB_URL."); console.log(`SUPABASE_FUNCTIONS_HEALTH_URL=http-get://${apiUrl.host}/functions/v1/ok`); console.log(`MAIN_SUPABASE_DB_URL=${dbUrl}`)' >> "$GITHUB_ENV"
       - id: bootstrap_cli_edge_server
         name: Bootstrap Edge server
         env:
           BACKGROUND_SERVICE_NAME: Bootstrap Edge server
-          BACKGROUND_RUN_COMMAND: supabase functions serve
-          BACKGROUND_WAIT_ON: |
-            http-get://127.0.0.1:54321/functions/v1/ok
+          BACKGROUND_RUN_COMMAND: exec bun scripts/supabase-worktree.ts functions serve
           BACKGROUND_LOG_PATH: ${{ runner.temp }}/bootstrap-cli-edge-server.log
           BACKGROUND_WAIT_TIMEOUT_MS: 60000
-        run: bash .github/scripts/start-background-service.sh
+        run: |
+          export BACKGROUND_WAIT_ON="${SUPABASE_FUNCTIONS_HEALTH_URL:?Missing isolated Supabase health URL}"
+          bash .github/scripts/start-background-service.sh
       - name: Run Capgo CLI integration tests
-        run: bun run supabase:with-env -- bunx vitest run tests/cli*
+        run: |
+          bun run supabase:with-env -- bunx vitest run tests/cli* --exclude=tests/cli-min-version.test.ts --exclude=tests/cli-new-encryption.test.ts
+          bun run supabase:with-env -- bunx vitest run tests/cli-min-version.test.ts --no-file-parallelism --maxWorkers=1
+          bun run supabase:with-env -- bunx vitest run tests/cli-new-encryption.test.ts --no-file-parallelism --maxWorkers=1
       - name: Show CLI Edge server logs after failure
         if: failure() && steps.bootstrap_cli_edge_server.outputs.log_path != ''
         run: |
@@ -1017,3 +1081,4 @@ jobs:
               kill "${pid}" 2>/dev/null || true
             fi
           done
+          bun scripts/supabase-worktree.ts stop --no-backup || true

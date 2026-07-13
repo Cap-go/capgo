@@ -79,6 +79,7 @@ export interface AuthInfo {
   authType: 'apikey' | 'jwt'
   apikey: Database['public']['Tables']['apikeys']['Row'] | null
   jwt: string | null
+  claims?: JWTClaims
 }
 
 export interface MiddlewareKeyVariables {
@@ -290,6 +291,7 @@ export const middlewareAuth = honoFactory.createMiddleware(async (c, next) => {
     authType: 'jwt',
     apikey: null,
     jwt: authorization,
+    claims,
   } as AuthInfo)
 
   await next()

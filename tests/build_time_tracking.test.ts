@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { fetchWithRetry, getEndpointUrl, getSupabaseClient, PRODUCT_ID, resetAppData, resetAppDataStats, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { fetchTestRequest, getEndpointUrl, getSupabaseClient, PRODUCT_ID, resetAppData, resetAppDataStats, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 // Generate unique IDs per test run to avoid conflicts with parallel test runs
 const testRunId = randomUUID()
@@ -232,7 +232,7 @@ describe('build Time Tracking System', () => {
     // Verify our inserted build time is the only one (should be exactly 36000)
     expect((totalMetrics as any)?.[0]?.build_time_unit).toBe(36000)
 
-    const response = await fetchWithRetry(getEndpointUrl('/triggers/cron_stat_org'), {
+    const response = await fetchTestRequest(getEndpointUrl('/triggers/cron_stat_org'), {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: ORG_ID }),

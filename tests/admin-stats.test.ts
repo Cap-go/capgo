@@ -4,7 +4,7 @@ import { Hono } from 'hono/tiny'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { logsnagInsightsTestUtils } from '../supabase/functions/_backend/triggers/logsnag_insights.ts'
 import { REQUIRED_GLOBAL_STATS_SHARDS } from '../supabase/functions/_backend/utils/global_stats.ts'
-import { BASE_URL, executeSQL, fetchWithRetry, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, POSTGRES_URL, PRODUCT_ID, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, executeSQL, fetchTestRequest, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, POSTGRES_URL, PRODUCT_ID, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000
 const NOW = Date.now()
@@ -673,8 +673,8 @@ describe('global stats core snapshots', () => {
 })
 
 describe('/private/admin_stats', () => {
-  it.concurrent('returns global stats trend rows from the self-joined global_stats table', async () => {
-    const response = await fetchWithRetry(`${BASE_URL}/private/admin_stats`, {
+  it('returns global stats trend rows from the self-joined global_stats table', async () => {
+    const response = await fetchTestRequest(`${BASE_URL}/private/admin_stats`, {
       method: 'POST',
       headers: adminHeaders,
       body: JSON.stringify({
@@ -731,8 +731,8 @@ describe('/private/admin_stats', () => {
     expect(latest?.above_plan_without_credits).toBe(2)
   })
 
-  it.concurrent('returns last bundle upload for trial organizations and excludes builtin versions', async () => {
-    const response = await fetchWithRetry(`${BASE_URL}/private/admin_stats`, {
+  it('returns last bundle upload for trial organizations and excludes builtin versions', async () => {
+    const response = await fetchTestRequest(`${BASE_URL}/private/admin_stats`, {
       method: 'POST',
       headers: adminHeaders,
       body: JSON.stringify({
@@ -765,11 +765,11 @@ describe('/private/admin_stats', () => {
     expect(organization?.trial_extension_count).toBe(2)
   })
 
-  it.concurrent('returns organization insights with plan filtering and preprocessed period usage', async () => {
+  it('returns organization insights with plan filtering and preprocessed period usage', async () => {
     if (!soloPlan)
       throw new Error('Expected Solo plan to be loaded')
 
-    const response = await fetchWithRetry(`${BASE_URL}/private/admin_stats`, {
+    const response = await fetchTestRequest(`${BASE_URL}/private/admin_stats`, {
       method: 'POST',
       headers: adminHeaders,
       body: JSON.stringify({
@@ -824,7 +824,7 @@ describe('/private/admin_stats', () => {
     expect(organization?.members_count).toBe(1)
     expect(organization?.last_build_at).toBe(INSIGHTS_LAST_BUILD_AT)
 
-    const paidOnlyResponse = await fetchWithRetry(`${BASE_URL}/private/admin_stats`, {
+    const paidOnlyResponse = await fetchTestRequest(`${BASE_URL}/private/admin_stats`, {
       method: 'POST',
       headers: adminHeaders,
       body: JSON.stringify({
@@ -854,11 +854,11 @@ describe('/private/admin_stats', () => {
     expect(paidOnlyPayload.data.total).toBe(0)
   })
 
-  it.concurrent('prioritizes organizations needing attention before pagination', async () => {
+  it('prioritizes organizations needing attention before pagination', async () => {
     if (!soloPlan)
       throw new Error('Expected Solo plan to be loaded')
 
-    const response = await fetchWithRetry(getEndpointUrl('/private/admin_stats'), {
+    const response = await fetchTestRequest(getEndpointUrl('/private/admin_stats'), {
       method: 'POST',
       headers: adminHeaders,
       body: JSON.stringify({
@@ -892,8 +892,8 @@ describe('/private/admin_stats', () => {
     expect(payload.data.organizations[0]?.needs_attention).toBe(true)
   })
 
-  it.concurrent('returns cancellation billing metadata and subscription-or-signup dates', async () => {
-    const response = await fetchWithRetry(`${BASE_URL}/private/admin_stats`, {
+  it('returns cancellation billing metadata and subscription-or-signup dates', async () => {
+    const response = await fetchTestRequest(`${BASE_URL}/private/admin_stats`, {
       method: 'POST',
       headers: adminHeaders,
       body: JSON.stringify({
@@ -935,8 +935,8 @@ describe('/private/admin_stats', () => {
     expect(monthlyOrganization?.subscription_or_signup_date).toBe(creatorUserCreatedAt)
   })
 
-  it.concurrent('returns subscribed as the last onboarding funnel step without exceeding the bundle cohort', async () => {
-    const response = await fetchWithRetry(`${BASE_URL}/private/admin_stats`, {
+  it('returns subscribed as the last onboarding funnel step without exceeding the bundle cohort', async () => {
+    const response = await fetchTestRequest(`${BASE_URL}/private/admin_stats`, {
       method: 'POST',
       headers: adminHeaders,
       body: JSON.stringify({
@@ -989,8 +989,8 @@ describe('/private/admin_stats', () => {
     })
   })
 
-  it.concurrent('returns daily new trial organizations grouped by plan', async () => {
-    const response = await fetchWithRetry(getEndpointUrl('/private/admin_stats'), {
+  it('returns daily new trial organizations grouped by plan', async () => {
+    const response = await fetchTestRequest(getEndpointUrl('/private/admin_stats'), {
       method: 'POST',
       headers: adminHeaders,
       body: JSON.stringify({

@@ -1,165 +1,134 @@
-import type { Database } from '~/types/supabase.types'
+import type { PoolClient } from 'pg'
 import { randomUUID } from 'node:crypto'
-import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
-  getSupabaseClient,
-  SUPABASE_ANON_KEY,
-  SUPABASE_BASE_URL,
-  USER_EMAIL,
+  executeSQL,
+  getPostgresClient,
   USER_ID,
   USER_ID_2,
-  USER_PASSWORD,
 } from './test-utils.ts'
 
-const USER_EMAIL_2 = 'test2@capgo.app'
 const transferOrgId = randomUUID()
 const protectedOrgId = randomUUID()
 const orgIds = [transferOrgId, protectedOrgId]
 
-function createAuthClient() {
-  return createClient<Database>(SUPABASE_BASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-      persistSession: false,
-    },
-  })
+async function withAuthenticatedUser<T>(userId: string, fn: (client: PoolClient) => Promise<T>): Promise<T> {
+  const pool = await getPostgresClient()
+  const client = await pool.connect()
+
+  try {
+    await client.query('BEGIN')
+    await client.query('SET LOCAL ROLE authenticated')
+    await client.query('SELECT set_config($1, $2, true)', ['request.jwt.claim.sub', userId])
+    await client.query('SELECT set_config($1, $2, true)', ['request.jwt.claim.role', 'authenticated'])
+    await client.query('SELECT set_config($1, $2, true)', [
+      'request.jwt.claims',
+      JSON.stringify({ sub: userId, role: 'authenticated', aud: 'authenticated' }),
+    ])
+
+    const result = await fn(client)
+    await client.query('COMMIT')
+    return result
+  }
+  catch (error) {
+    try {
+      await client.query('ROLLBACK')
+    }
+    catch {
+      // Keep the database error that caused the authenticated request to fail.
+    }
+    throw error
+  }
+  finally {
+    client.release()
+  }
 }
 
 async function createOrgWithMember(orgId: string) {
-  const supabase = getSupabaseClient()
+  await executeSQL(
+    `INSERT INTO public.orgs (id, created_by, management_email, name, updated_at)
+     VALUES ($1::uuid, $2::uuid, $3, $4, NOW())`,
+    [orgId, USER_ID, `ownership-transfer-${orgId}@capgo.app`, `Ownership transfer ${orgId}`],
+  )
 
-  await supabase.from('orgs').insert({
-    id: orgId,
-    created_by: USER_ID,
-    management_email: `ownership-transfer-${orgId}@capgo.app`,
-    name: `Ownership transfer ${orgId}`,
-    updated_at: new Date().toISOString(),
-  }).throwOnError()
+  await executeSQL(
+    `INSERT INTO public.org_users (org_id, user_id, rbac_role_name, is_invite)
+     VALUES ($1::uuid, $2::uuid, 'org_member', false)`,
+    [orgId, USER_ID_2],
+  )
 
-  await supabase.from('org_users').insert({
-    org_id: orgId,
-    user_id: USER_ID_2,
-    rbac_role_name: 'org_member',
-    is_invite: false,
-  }).throwOnError()
-
-  const { data: memberRole, error: memberRoleError } = await supabase
-    .from('roles')
-    .select('id')
-    .eq('name', 'org_member')
-    .eq('scope_type', 'org')
-    .single()
-  if (memberRoleError || !memberRole)
-    throw memberRoleError ?? new Error('Expected org_member role')
-
-  await supabase.from('role_bindings').insert({
-    principal_type: 'user',
-    principal_id: USER_ID_2,
-    role_id: memberRole.id,
-    scope_type: 'org',
-    org_id: orgId,
-    granted_by: USER_ID,
-    reason: 'Ownership transfer test member fixture',
-    is_direct: true,
-  }).throwOnError()
+  const bindings = await executeSQL(
+    `INSERT INTO public.role_bindings (
+       principal_type, principal_id, role_id, scope_type, org_id,
+       granted_by, reason, is_direct
+     )
+     SELECT
+       public.rbac_principal_user(), $1::uuid, roles.id, public.rbac_scope_org(), $2::uuid,
+       $3::uuid, 'Ownership transfer test member fixture', true
+     FROM public.roles
+     WHERE roles.name = public.rbac_role_org_member()
+       AND roles.scope_type = public.rbac_scope_org()
+     RETURNING id`,
+    [USER_ID_2, orgId, USER_ID],
+  )
+  if (!bindings[0])
+    throw new Error('Expected org_member role')
 }
 
 describe('organization ownership transfer', () => {
-  const ownerClient = createAuthClient()
-  const memberClient = createAuthClient()
-
   beforeAll(async () => {
-    const { error: ownerSignInError } = await ownerClient.auth.signInWithPassword({
-      email: USER_EMAIL,
-      password: USER_PASSWORD,
-    })
-    if (ownerSignInError)
-      throw ownerSignInError
-
-    const { error: memberSignInError } = await memberClient.auth.signInWithPassword({
-      email: USER_EMAIL_2,
-      password: USER_PASSWORD,
-    })
-    if (memberSignInError)
-      throw memberSignInError
-
     for (const orgId of orgIds) {
       await createOrgWithMember(orgId)
     }
   })
 
   afterAll(async () => {
-    const supabase = getSupabaseClient()
-    const { data: orgs } = await supabase
-      .from('orgs')
-      .select('customer_id')
-      .in('id', orgIds)
-      .throwOnError()
+    const orgs = await executeSQL(
+      'SELECT customer_id FROM public.orgs WHERE id = ANY($1::uuid[])',
+      [orgIds],
+    )
 
     // Delete orgs first so role_bindings cascade without hitting
     // prevent_last_super_admin_binding_delete on direct binding deletes.
-    await supabase.from('orgs').delete().in('id', orgIds).throwOnError()
+    await executeSQL('DELETE FROM public.orgs WHERE id = ANY($1::uuid[])', [orgIds])
 
-    for (const org of orgs ?? []) {
+    for (const org of orgs) {
       if (org.customer_id?.startsWith('pending_')) {
-        await supabase.from('stripe_info').delete().eq('customer_id', org.customer_id).throwOnError()
+        await executeSQL('DELETE FROM public.stripe_info WHERE customer_id = $1', [org.customer_id])
       }
     }
   })
 
   it.concurrent('lets an owner delegate super admin and leave the org', async () => {
-    const promoteResult = await ownerClient.rpc('update_org_member_role', {
-      p_org_id: transferOrgId,
-      p_user_id: USER_ID_2,
-      p_new_role_name: 'org_super_admin',
-    })
+    const promoteResult = await withAuthenticatedUser(USER_ID, client => client.query(
+      'SELECT public.update_org_member_role($1::uuid, $2::uuid, $3) AS status',
+      [transferOrgId, USER_ID_2, 'org_super_admin'],
+    ))
+    expect(promoteResult.rows[0]?.status).toBe('OK')
 
-    expect(promoteResult.error).toBeNull()
-    expect(promoteResult.data).toBe('OK')
+    const leaveResult = await withAuthenticatedUser(USER_ID, client => client.query(
+      'SELECT public.delete_org_member_role($1::uuid, $2::uuid) AS status',
+      [transferOrgId, USER_ID],
+    ))
+    expect(leaveResult.rows[0]?.status).toBe('OK')
 
-    const leaveResult = await ownerClient.rpc('delete_org_member_role', {
-      p_org_id: transferOrgId,
-      p_user_id: USER_ID,
-    })
-
-    expect(leaveResult.error).toBeNull()
-    expect(leaveResult.data).toBe('OK')
-
-    const { data: org, error: orgError } = await getSupabaseClient()
-      .from('orgs')
-      .select('created_by')
-      .eq('id', transferOrgId)
-      .single()
-
-    expect(orgError).toBeNull()
+    const [org] = await executeSQL('SELECT created_by FROM public.orgs WHERE id = $1::uuid', [transferOrgId])
     expect(org?.created_by).toBe(USER_ID_2)
   })
 
   it.concurrent('does not let another super admin remove the owner', async () => {
-    const promoteResult = await ownerClient.rpc('update_org_member_role', {
-      p_org_id: protectedOrgId,
-      p_user_id: USER_ID_2,
-      p_new_role_name: 'org_super_admin',
-    })
+    const promoteResult = await withAuthenticatedUser(USER_ID, client => client.query(
+      'SELECT public.update_org_member_role($1::uuid, $2::uuid, $3) AS status',
+      [protectedOrgId, USER_ID_2, 'org_super_admin'],
+    ))
+    expect(promoteResult.rows[0]?.status).toBe('OK')
 
-    expect(promoteResult.error).toBeNull()
-    expect(promoteResult.data).toBe('OK')
+    await expect(withAuthenticatedUser(USER_ID_2, client => client.query(
+      'SELECT public.delete_org_member_role($1::uuid, $2::uuid)',
+      [protectedOrgId, USER_ID],
+    ))).rejects.toThrow('CANNOT_CHANGE_OWNER_ROLE')
 
-    const removeOwnerResult = await memberClient.rpc('delete_org_member_role', {
-      p_org_id: protectedOrgId,
-      p_user_id: USER_ID,
-    })
-
-    expect(removeOwnerResult.data).toBeNull()
-    expect(removeOwnerResult.error?.message).toContain('CANNOT_CHANGE_OWNER_ROLE')
-
-    const { data: org, error: orgError } = await getSupabaseClient()
-      .from('orgs')
-      .select('created_by')
-      .eq('id', protectedOrgId)
-      .single()
-
-    expect(orgError).toBeNull()
+    const [org] = await executeSQL('SELECT created_by FROM public.orgs WHERE id = $1::uuid', [protectedOrgId])
     expect(org?.created_by).toBe(USER_ID)
   })
 })

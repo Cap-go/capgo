@@ -26,7 +26,7 @@ function resolveEndpointProtocol(c: Context): 'http' | 'https' {
   return getEnv(c, 'S3_SSL') === 'true' ? 'https' : 'http'
 }
 
-function resolveStorageEndpoint(c: Context): string {
+export function resolveStorageEndpoint(c: Context): string {
   const storageEndpoint = getEnv(c, 'S3_ENDPOINT')
   const protocol = resolveEndpointProtocol(c)
   const rawEndpoint = storageEndpoint.includes('://')
@@ -37,8 +37,9 @@ function resolveStorageEndpoint(c: Context): string {
     const endpointUrl = new URL(rawEndpoint)
     const looksLikeLocalStorage = endpointUrl.pathname.startsWith('/storage/v1/s3')
       && ['localhost', '127.0.0.1', 'kong'].includes(endpointUrl.hostname)
+    const rewriteLocalEndpoint = getEnv(c, 'S3_REWRITE_LOCAL_ENDPOINT') !== 'false'
 
-    if (!looksLikeLocalStorage)
+    if (!looksLikeLocalStorage || !rewriteLocalEndpoint)
       return endpointUrl.toString()
 
     let forwardedHost = firstForwardedHeaderValue(c.req.header('X-Forwarded-Host'))

@@ -9,7 +9,7 @@ import { sendDiscordAlert } from '../utils/discord.ts'
 import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
 import { closeClient, getPgClient } from '../utils/pg.ts'
-import { backgroundTask, getEnv } from '../utils/utils.ts'
+import { backgroundTask, getEnv, WAIT_FOR_COMPLETION_HEADER } from '../utils/utils.ts'
 import { updateManifestSize } from './on_manifest_create.ts'
 
 // Define constants
@@ -326,6 +326,7 @@ async function dispatchQueueMessage(
   cfId: string,
   metadata: QueueMessageMetadata,
   targetUrl: string,
+  waitForCompletion = false,
 ): Promise<{ response: Response, targetUrl: string }> {
   if (function_name === 'on_manifest_create') {
     const record = getManifestRecordFromQueueBody(body)
@@ -338,11 +339,11 @@ async function dispatchQueueMessage(
     return { response, targetUrl }
   }
 
-  const response = await http_post_helper(c, function_name, function_type, body, cfId, metadata, targetUrl)
+  const response = await http_post_helper(c, function_name, function_type, body, cfId, metadata, targetUrl, waitForCompletion)
   return { response, targetUrl }
 }
 
-async function processQueueMessage(c: Context, queueName: string, message: Message): Promise<ProcessedQueueMessage> {
+async function processQueueMessage(c: Context, queueName: string, message: Message, waitForCompletion = false): Promise<ProcessedQueueMessage> {
   const function_name = message.message?.function_name ?? 'unknown'
   const function_type = message.message?.function_type ?? 'supabase'
   const body = extractMessageBody(message)
@@ -377,7 +378,7 @@ async function processQueueMessage(c: Context, queueName: string, message: Messa
       msgId: message.msg_id,
       queueName,
       readCount: message.read_ct,
-    }, targetUrl)
+    }, targetUrl, waitForCompletion)
     const errorDetails = await extractErrorDetails(result.response)
     const durationMs = Date.now() - start
 
@@ -544,13 +545,14 @@ async function processQueueMessageChunks(
   queueName: string,
   messagesToProcess: Message[],
   processConcurrency: number,
+  waitForCompletion: boolean,
 ): Promise<ProcessedQueueMessage[]> {
   const ackChunkSize = getQueueAckChunkSize(queueName)
   const processChunks = ackChunkSize ? chunkArray(messagesToProcess, ackChunkSize) : [messagesToProcess]
   const results: ProcessedQueueMessage[] = []
 
   for (const chunk of processChunks) {
-    const chunkResults = await mapWithConcurrency(chunk, processConcurrency, async message => processQueueMessage(c, queueName, message))
+    const chunkResults = await mapWithConcurrency(chunk, processConcurrency, async message => processQueueMessage(c, queueName, message, waitForCompletion))
     results.push(...chunkResults)
 
     if (ackChunkSize) {
@@ -714,7 +716,7 @@ async function reportQueueFailures(c: Context, queueName: string, messagesFailed
   return actionableFailures.length
 }
 
-async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE): Promise<QueueProcessResult> {
+async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE, waitForCompletion = false): Promise<QueueProcessResult> {
   const messages = await readQueue(c, db, queueName, batchSize)
 
   if (messages === null) {
@@ -763,7 +765,7 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
     await archive_queue_messages(c, db, queueName, messagesToSkip.map(msg => msg.msg_id))
   }
 
-  const results = await processQueueMessageChunks(c, db, queueName, messagesToProcess, processConcurrency)
+  const results = await processQueueMessageChunks(c, db, queueName, messagesToProcess, processConcurrency, waitForCompletion)
   await persistQueueCfIds(c, db, queueName, results)
 
   // Batch remove all messages that have succeeded.
@@ -903,6 +905,7 @@ export async function http_post_helper(
   cfId: string,
   metadata?: QueueMessageMetadata,
   targetUrl = resolveFunctionUrl(c, function_name, function_type),
+  waitForCompletion = false,
 ): Promise<Response> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -915,12 +918,12 @@ export async function http_post_helper(
     headers['x-capgo-queue-read-count'] = String(metadata.readCount)
     headers['x-capgo-queue-max-reads'] = String(MAX_QUEUE_READS)
   }
-
+  if (waitForCompletion)
+    headers[WAIT_FOR_COMPLETION_HEADER] = 'true'
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), QUEUE_HTTP_TIMEOUT_MS)
 
   try {
-    cloudlog({ requestId: c.get('requestId'), message: `[${function_name}] Making HTTP POST request to "${targetUrl}" with body:`, body })
     const response = await fetch(targetUrl, {
       method: 'POST',
       headers,
@@ -1080,14 +1083,21 @@ function shouldRunQueueSyncInBackground(queueName: string): boolean {
   return queueName !== 'on_manifest_create'
 }
 
-async function runQueueSync(c: Context, queueName: string, finalBatchSize: number, healthcheckUrl: string | null, executionMode: 'background' | 'awaited'): Promise<QueueProcessResult> {
+async function runQueueSync(
+  c: Context,
+  queueName: string,
+  finalBatchSize: number,
+  healthcheckUrl: string | null,
+  executionMode: 'background' | 'awaited',
+  waitForCompletion = false,
+): Promise<QueueProcessResult> {
   cloudlog({ requestId: c.get('requestId'), message: `[Queue Sync] Starting ${executionMode} execution for queue: ${queueName} with batch size: ${finalBatchSize}` })
   let db: ReturnType<typeof getPgClient> | null = null
   try {
     db = getPgClient(c)
     if (healthcheckUrl !== null)
       await maybePingCronHealthcheckStart(healthcheckUrl)
-    const result = await processQueue(c, db, queueName, finalBatchSize)
+    const result = await processQueue(c, db, queueName, finalBatchSize, waitForCompletion)
     await maybePingCronHealthcheck(result, healthcheckUrl)
     cloudlog({
       requestId: c.get('requestId'),
@@ -1120,10 +1130,11 @@ app.post('/sync', async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: `[Sync Request] Received trigger to process queue.` })
 
   // Require JSON body with queue_name and optional batch_size
-  const body = await parseBody<{ queue_name: string, batch_size?: number, healthcheck_url?: string | null }>(c)
+  const body = await parseBody<{ queue_name: string, batch_size?: number, healthcheck_url?: string | null, wait_for_completion?: boolean }>(c)
   const queueName = body?.queue_name
   const batchSize = body?.batch_size
   const healthcheckUrl = typeof body?.healthcheck_url === 'string' && body.healthcheck_url.trim() ? body.healthcheck_url.trim() : null
+  const waitForCompletion = body?.wait_for_completion === true
 
   if (!queueName || typeof queueName !== 'string') {
     throw simpleError('missing_or_invalid_queue_name', 'Missing or invalid queue_name in body', { body })
@@ -1148,13 +1159,13 @@ app.post('/sync', async (c) => {
     })
   }
 
-  if (shouldRunQueueSyncInBackground(queueName)) {
+  if (shouldRunQueueSyncInBackground(queueName) && !waitForCompletion) {
     await backgroundTask(c, runQueueSync(c, queueName, finalBatchSize, healthcheckUrl, 'background'))
     cloudlog({ requestId: c.get('requestId'), message: `[Sync Request] Responding 202 Accepted. Time: ${Date.now() - handlerStart}ms` })
     return c.json(BRES, 202)
   }
 
-  await runQueueSync(c, queueName, finalBatchSize, healthcheckUrl, 'awaited')
+  await runQueueSync(c, queueName, finalBatchSize, healthcheckUrl, 'awaited', waitForCompletion)
   cloudlog({ requestId: c.get('requestId'), message: `[Sync Request] Responding 202 Accepted after awaited queue processing. Time: ${Date.now() - handlerStart}ms` })
   return c.json(BRES, 202)
 })

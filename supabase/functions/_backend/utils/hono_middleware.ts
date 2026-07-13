@@ -511,6 +511,7 @@ async function foundJWT(c: Context, jwt: string) {
     authType: 'jwt',
     jwt,
     apikey: null,
+    claims,
   })
 }
 

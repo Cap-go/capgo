@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { APIKEY_TEST_ALL, executeSQL, fetchWithRetry, getAuthHeaders, SUPABASE_ANON_KEY, SUPABASE_BASE_URL } from './test-utils.ts'
+import { APIKEY_TEST_ALL, executeSQL, fetchTestRequest, getAuthHeaders, SUPABASE_ANON_KEY, SUPABASE_BASE_URL } from './test-utils.ts'
 
 interface RestProbeRow {
   table_name: string
@@ -194,10 +194,9 @@ async function fetchRestProbe(probe: RestProbeRow, headers: Record<string, strin
   const timeout = setTimeout(() => controller.abort(), 5000)
 
   try {
-    const response = await fetchWithRetry(
+    const response = await fetchTestRequest(
       request.url,
       { headers: request.headers, signal: controller.signal },
-      1,
     )
     const body = await response.text()
 
