@@ -13,6 +13,8 @@ export default defineConfig(({ mode }) => ({
   },
   test: {
     include: ['tests/*.test.ts'],
+    // This raw PostgreSQL DDL test belongs to the backend suite, not concurrent Worker integration tests.
+    exclude: ['tests/read-replica-schema-catalog.test.ts'],
     environment: 'node',
     watch: false,
     bail: 0, // Run all tests to see full results
