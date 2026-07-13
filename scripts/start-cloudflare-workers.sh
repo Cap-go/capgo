@@ -112,8 +112,8 @@ else
 fi
 mkdir -p "${PERSIST_DIR}"
 
-# In CI/linux, `host.docker.internal` is unreliable. Prefer localhost (mapped ports).
-S3_ENDPOINT_TO_USE="${S3_ENDPOINT:-127.0.0.1:9000}"
+# Route worker S3 calls through the selected isolated Supabase API endpoint.
+S3_ENDPOINT_TO_USE="${S3_ENDPOINT:-${SUPABASE_URL%/}/storage/v1/s3}"
 
 API_PID=''
 PLUGIN_PID=''
@@ -122,9 +122,13 @@ cleanup() {
   local pid
   echo -e "\n${YELLOW}Stopping workers...${NC}"
   for pid in "${API_PID}" "${PLUGIN_PID}" "${FILES_PID}"; do
-    if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
+    if [[ -z "${pid}" ]]; then
+      continue
+    fi
+    if kill -0 "${pid}" 2>/dev/null; then
       kill "${pid}" 2>/dev/null || true
     fi
+    wait "${pid}" 2>/dev/null || true
   done
   rm -f "${RUNTIME_ENV_FILE}" 2>/dev/null || true
   echo -e "${GREEN}All workers stopped${NC}"

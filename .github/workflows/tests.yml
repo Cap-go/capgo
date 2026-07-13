@@ -422,6 +422,7 @@ jobs:
               kill "${pid}" 2>/dev/null || true
             fi
           done
+          bun scripts/supabase-worktree.ts stop --no-backup || true
 
   test_cloudflare:
     needs: changes
@@ -438,7 +439,7 @@ jobs:
       SUPABASE_WORKTREE_INSTANCE: cloudflare-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
       SUPABASE_WORKTREE_PORT_OFFSET: ${{ matrix.supabase_port_offset }}
       CLOUDFLARE_WORKER_PORT_OFFSET: ${{ matrix.cloudflare_worker_port_offset }}
-      CLOUDFLARE_PERSIST_DIR: .context/cloudflare-workers-${{ github.run_id }}-${{ matrix.supabase_port_offset }}
+      CLOUDFLARE_PERSIST_DIR: .context/cloudflare-workers-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.supabase_port_offset }}
     strategy:
       fail-fast: false
       matrix:
@@ -541,6 +542,7 @@ jobs:
               kill "${pid}" 2>/dev/null || true
             fi
           done
+          bun scripts/supabase-worktree.ts stop --no-backup || true
 
   test_playwright:
     needs: changes
@@ -553,6 +555,9 @@ jobs:
     concurrency:
       group: capgo-local-services-playwright-${{ github.repository }}
       cancel-in-progress: false
+    env:
+      SUPABASE_WORKTREE_INSTANCE: playwright-${{ github.run_id }}-${{ github.run_attempt }}
+      SUPABASE_WORKTREE_PORT_OFFSET: 5000
     steps:
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -678,6 +683,7 @@ jobs:
               kill "${pid}" 2>/dev/null || true
             fi
           done
+          bun scripts/supabase-worktree.ts stop --no-backup || true
 
   cli_node_compatibility:
     needs: changes
@@ -1062,3 +1068,4 @@ jobs:
               kill "${pid}" 2>/dev/null || true
             fi
           done
+          bun scripts/supabase-worktree.ts stop --no-backup || true
