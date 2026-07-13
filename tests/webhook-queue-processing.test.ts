@@ -104,7 +104,7 @@ async function waitForWebhookDeliveryQueueMessage(deliveryId: string, timeoutMs 
   throw new Error(`Timed out waiting for webhook_delivery queue message for delivery ${deliveryId}`)
 }
 
-async function waitForDeliveryAttempt(deliveryId: string, timeoutMs = 15000) {
+async function waitForScheduledDeliveryAttempt(deliveryId: string, timeoutMs = 15000) {
   const start = Date.now()
   let lastState: Record<string, unknown> | null = null
 
@@ -120,13 +120,16 @@ async function waitForDeliveryAttempt(deliveryId: string, timeoutMs = 15000) {
 
     lastState = data
 
-    if ((data?.attempt_count ?? 0) > 0 && data?.response_status !== null)
+    // updateDeliveryResult records the failed HTTP response before scheduleRetry
+    // restores the delivery to pending. Observe the durable retry state, not that
+    // short-lived intermediate status.
+    if ((data?.attempt_count ?? 0) > 0 && data?.response_status !== null && data?.status === 'pending' && data?.next_retry_at)
       return data
 
     await new Promise(resolve => setTimeout(resolve, 250))
   }
 
-  throw new Error(`Timed out waiting for delivery ${deliveryId} to be attempted: ${JSON.stringify(lastState)}`)
+  throw new Error(`Timed out waiting for delivery ${deliveryId} to be scheduled for retry: ${JSON.stringify(lastState)}`)
 }
 
 describe('webhook queue processing', () => {
@@ -213,7 +216,7 @@ describe('webhook queue processing', () => {
     expect(createdDelivery.event_type).toBe('apps.UPDATE')
     expect(createdDelivery.status).toBe('pending')
     await fetchQueueSync('webhook_delivery')
-    const attemptedDelivery = await waitForDeliveryAttempt(createdDelivery.id)
+    const attemptedDelivery = await waitForScheduledDeliveryAttempt(createdDelivery.id)
 
     expect(attemptedDelivery.status).toBe('pending')
     expect(attemptedDelivery.attempt_count).toBe(1)
