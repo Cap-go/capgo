@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
   APP_NAME,
-  fetchWithRetry,
+  fetchTestRequest,
   getBaseData,
   getEndpointUrl,
   getSupabaseClient,
@@ -49,7 +49,7 @@ describeBackend('expose_metadata feature', () => {
 
   describe('[PUT] /app - expose_metadata field', () => {
     it('should set expose_metadata to true via API', async () => {
-      const response = await fetchWithRetry(`${getEndpointUrl('/app')}/${APP_NAME_METADATA}`, {
+      const response = await fetchTestRequest(`${getEndpointUrl('/app')}/${APP_NAME_METADATA}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({
@@ -80,7 +80,7 @@ describeBackend('expose_metadata feature', () => {
         .eq('app_id', APP_NAME_METADATA)
 
       // Then set to false via API
-      const response = await fetchWithRetry(`${getEndpointUrl('/app')}/${APP_NAME_METADATA}`, {
+      const response = await fetchTestRequest(`${getEndpointUrl('/app')}/${APP_NAME_METADATA}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({
@@ -106,7 +106,7 @@ describeBackend('expose_metadata feature', () => {
     it('should default expose_metadata to false for new apps', async () => {
       const newAppId = `${APP_NAME}.${randomUUID()}`
 
-      const createResponse = await fetchWithRetry(`${getEndpointUrl('/app')}`, {
+      const createResponse = await fetchTestRequest(`${getEndpointUrl('/app')}`, {
         method: 'POST',
         headers,
         body: JSON.stringify({

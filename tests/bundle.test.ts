@@ -7,27 +7,12 @@ const APPNAME = `com.app.b.${id}`
 const RBAC_APPNAME = `com.app.b.rbac.${id}`
 const RBAC_ORG_ID = randomUUID()
 
-async function putBundleToChannelWithRetry(body: { app_id: string, version_id: number, channel_id: number }, maxRetries = 3): Promise<Response> {
-  let response: Response | undefined
-
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    response = await fetch(`${BASE_URL}/bundle`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(body),
-    })
-
-    if (response.status === 200)
-      return response
-
-    if (attempt < maxRetries - 1)
-      await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)))
-  }
-
-  if (!response)
-    throw new Error('Failed to set bundle to channel: no response received')
-
-  return response
+async function putBundleToChannel(body: { app_id: string, version_id: number, channel_id: number }): Promise<Response> {
+  return fetch(`${BASE_URL}/bundle`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(body),
+  })
 }
 
 beforeAll(async () => {
@@ -298,7 +283,7 @@ describe('[PUT] /bundle operations - Set bundle to channel', () => {
   })
 
   it('should set bundle to channel successfully', async () => {
-    const response = await putBundleToChannelWithRetry({
+    const response = await putBundleToChannel({
       app_id: APPNAME,
       version_id: versionId,
       channel_id: channelId,

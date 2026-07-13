@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, createDirectApiKeyWithBindings, executeSQL, fetchWithRetry, getAuthHeaders, getSupabaseClient, headers, ORG_ID, ORG_ID_2, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID, USER_ID_2 } from './test-utils.ts'
+import { BASE_URL, createDirectApiKeyWithBindings, executeSQL, fetchTestRequest, getAuthHeaders, getSupabaseClient, headers, ORG_ID, ORG_ID_2, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID, USER_ID_2 } from './test-utils.ts'
 
 function isDuplicateAppCreationError(body: any): boolean {
   if (!body || typeof body !== 'object')
@@ -39,7 +39,7 @@ describe('[DELETE] /app operations', () => {
 
   it('should delete app and all associated data', async () => {
     // Create a test app
-    const createApp = await fetchWithRetry(`${BASE_URL}/app`, {
+    const createApp = await fetchTestRequest(`${BASE_URL}/app`, {
       method: 'POST',
       headers,
       body: JSON.stringify(createBody),
@@ -55,7 +55,7 @@ describe('[DELETE] /app operations', () => {
     await resetAndSeedAppData(APPNAME)
 
     // Delete the app
-    const deleteApp = await fetchWithRetry(`${BASE_URL}/app/${APPNAME}`, {
+    const deleteApp = await fetchTestRequest(`${BASE_URL}/app/${APPNAME}`, {
       method: 'DELETE',
       headers,
     })
@@ -65,28 +65,28 @@ describe('[DELETE] /app operations', () => {
     }
 
     // Verify app is deleted
-    const checkApp = await fetchWithRetry(`${BASE_URL}/app/${APPNAME}`, {
+    const checkApp = await fetchTestRequest(`${BASE_URL}/app/${APPNAME}`, {
       method: 'GET',
       headers,
     })
     expect(checkApp.status).toBe(401)
 
     // Verify version is deleted
-    const checkVersion = await fetchWithRetry(`${BASE_URL}/bundle/${APPNAME}/1.0.0`, {
+    const checkVersion = await fetchTestRequest(`${BASE_URL}/bundle/${APPNAME}/1.0.0`, {
       method: 'GET',
       headers,
     })
     expect(checkVersion.status).toBe(404)
 
     // Verify channel devices are deleted
-    const checkDevices = await fetchWithRetry(`${BASE_URL}/device/${APPNAME}`, {
+    const checkDevices = await fetchTestRequest(`${BASE_URL}/device/${APPNAME}`, {
       method: 'GET',
       headers,
     })
     expect(checkDevices.status).toBe(404)
 
     // Verify channels are deleted
-    const checkChannels = await fetchWithRetry(`${BASE_URL}/channel/${APPNAME}`, {
+    const checkChannels = await fetchTestRequest(`${BASE_URL}/channel/${APPNAME}`, {
       method: 'GET',
       headers,
     })

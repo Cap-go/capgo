@@ -3,7 +3,9 @@ import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createTestSDK } from './cli-sdk-utils'
-import { BASE_URL, createDirectApiKeyWithBindings, getSupabaseClient, ORG_ID, resetAndSeedAppData, resetAppData, SUPABASE_ANON_KEY, SUPABASE_BASE_URL, USER_ID } from './test-utils'
+import { BASE_URL, createDirectApiKeyWithBindings, createIsolatedSeedAppOptions, getSupabaseClient, resetAndSeedAppData, resetAppData, SUPABASE_ANON_KEY, SUPABASE_BASE_URL, USER_ID } from './test-utils'
+
+const seedOptions = createIsolatedSeedAppOptions()
 
 // Helper to generate unique channel names for concurrent tests
 const generateChannelName = () => `test-channel-${randomUUID().slice(0, 8)}`
@@ -34,7 +36,7 @@ async function createChannel(channelName: string, appId: string) {
       name: channelName,
       app_id: appId,
       version: versionId,
-      owner_org: ORG_ID,
+      owner_org: seedOptions.orgId,
       created_by: USER_ID,
       public: false,
       disable_auto_update_under_native: true,
@@ -57,7 +59,7 @@ describe('tests CLI channel commands', () => {
   const invalidAppName = `invalid-app-${randomUUID().slice(0, 8)}`
 
   beforeAll(async () => {
-    await resetAndSeedAppData(APPNAME)
+    await resetAndSeedAppData(APPNAME, seedOptions)
   })
 
   afterAll(async () => {
@@ -146,7 +148,7 @@ describe('tests CLI channel commands', () => {
         .insert({
           app_id: APPNAME,
           name: bundle,
-          owner_org: ORG_ID,
+          owner_org: seedOptions.orgId,
           user_id: USER_ID,
           storage_provider: 'r2-direct',
         })
@@ -202,7 +204,7 @@ describe('tests CLI channel commands', () => {
       const apiKey = await createDirectApiKeyWithBindings({
         key,
         name: `Channel current bundle reader ${channelName}`,
-        orgId: ORG_ID,
+        orgId: seedOptions.orgId,
         roleName: 'org_member',
       })
       const resolvedKey = apiKey.key ?? key
@@ -215,7 +217,7 @@ describe('tests CLI channel commands', () => {
             principal_id: apiKey.rbac_id,
             role_id: channelReaderRole!.id,
             scope_type: 'channel',
-            org_id: ORG_ID,
+            org_id: seedOptions.orgId,
             app_id: app!.id,
             channel_id: channel!.rbac_id,
             granted_by: apiKey.user_id,
@@ -227,7 +229,7 @@ describe('tests CLI channel commands', () => {
         const { data: directAllowed, error: directError } = await supabase.rpc('rbac_check_permission_direct' as any, {
           p_permission_key: 'channel.read',
           p_user_id: apiKey.user_id,
-          p_org_id: ORG_ID,
+          p_org_id: seedOptions.orgId,
           p_app_id: APPNAME,
           p_channel_id: channel!.id,
           p_apikey: resolvedKey,
@@ -255,7 +257,7 @@ describe('tests CLI channel commands', () => {
         .insert({
           app_id: APPNAME,
           name: bundle,
-          owner_org: ORG_ID,
+          owner_org: seedOptions.orgId,
           user_id: USER_ID,
           storage_provider: 'r2-direct',
         })
@@ -292,7 +294,7 @@ describe('tests CLI channel commands', () => {
       const apiKey = await createDirectApiKeyWithBindings({
         key,
         name: `Channel update admin ${channelName}`,
-        orgId: ORG_ID,
+        orgId: seedOptions.orgId,
         roleName: 'org_member',
       })
       const resolvedKey = apiKey.key ?? key
@@ -305,7 +307,7 @@ describe('tests CLI channel commands', () => {
             principal_id: apiKey.rbac_id,
             role_id: channelAdminRole!.id,
             scope_type: 'channel',
-            org_id: ORG_ID,
+            org_id: seedOptions.orgId,
             app_id: app!.id,
             channel_id: channel!.rbac_id,
             granted_by: apiKey.user_id,
@@ -317,7 +319,7 @@ describe('tests CLI channel commands', () => {
         const { data: directAllowed, error: directError } = await supabase.rpc('rbac_check_permission_direct' as any, {
           p_permission_key: 'channel.update_settings',
           p_user_id: apiKey.user_id,
-          p_org_id: ORG_ID,
+          p_org_id: seedOptions.orgId,
           p_app_id: APPNAME,
           p_channel_id: channel!.id,
           p_apikey: resolvedKey,
@@ -344,7 +346,7 @@ describe('tests CLI channel commands', () => {
         .insert({
           app_id: APPNAME,
           name: bundle,
-          owner_org: ORG_ID,
+          owner_org: seedOptions.orgId,
           user_id: USER_ID,
           storage_provider: 'r2-direct',
         })
@@ -353,7 +355,7 @@ describe('tests CLI channel commands', () => {
       const apiKey = await createDirectApiKeyWithBindings({
         key: `channel-promote-${randomUUID()}`,
         name: `Channel promote developer ${channelName}`,
-        orgId: ORG_ID,
+        orgId: seedOptions.orgId,
         roleName: 'org_member',
         appId: APPNAME,
         appRoleName: 'app_developer',
@@ -374,7 +376,7 @@ describe('tests CLI channel commands', () => {
         const { data: canPromote, error: promoteError } = await supabase.rpc('rbac_check_permission_direct' as any, {
           p_permission_key: 'channel.promote_bundle',
           p_user_id: apiKey.user_id,
-          p_org_id: ORG_ID,
+          p_org_id: seedOptions.orgId,
           p_app_id: APPNAME,
           p_channel_id: channel!.id,
           p_apikey: resolvedKey,
@@ -385,7 +387,7 @@ describe('tests CLI channel commands', () => {
         const { data: canUpdateSettings, error: settingsError } = await supabase.rpc('rbac_check_permission_direct' as any, {
           p_permission_key: 'channel.update_settings',
           p_user_id: apiKey.user_id,
-          p_org_id: ORG_ID,
+          p_org_id: seedOptions.orgId,
           p_app_id: APPNAME,
           p_channel_id: channel!.id,
           p_apikey: resolvedKey,
@@ -735,7 +737,7 @@ describe('tests CLI channel commands', () => {
             channel_id: channelId,
             device_id: deviceId,
             app_id: APPNAME,
-            owner_org: ORG_ID,
+            owner_org: seedOptions.orgId,
           })
           .throwOnError()
       }
@@ -798,7 +800,7 @@ describe('tests CLI channel commands', () => {
           channel_id: channel!.id,
           device_id: deviceId,
           app_id: APPNAME,
-          owner_org: ORG_ID,
+          owner_org: seedOptions.orgId,
         })
         .throwOnError()
 
@@ -815,7 +817,7 @@ describe('tests CLI channel commands', () => {
       const apiKey = await createDirectApiKeyWithBindings({
         key,
         name: `Channel delete admin ${channelName}`,
-        orgId: ORG_ID,
+        orgId: seedOptions.orgId,
         roleName: 'org_member',
       })
       const resolvedKey = apiKey.key ?? key
@@ -828,7 +830,7 @@ describe('tests CLI channel commands', () => {
             principal_id: apiKey.rbac_id,
             role_id: channelAdminRole!.id,
             scope_type: 'channel',
-            org_id: ORG_ID,
+            org_id: seedOptions.orgId,
             app_id: app!.id,
             channel_id: channel!.rbac_id,
             granted_by: apiKey.user_id,
@@ -840,7 +842,7 @@ describe('tests CLI channel commands', () => {
         const { data: directAllowed, error: directError } = await supabase.rpc('rbac_check_permission_direct' as any, {
           p_permission_key: 'channel.delete',
           p_user_id: apiKey.user_id,
-          p_org_id: ORG_ID,
+          p_org_id: seedOptions.orgId,
           p_app_id: APPNAME,
           p_channel_id: channel!.id,
           p_apikey: resolvedKey,
@@ -913,7 +915,7 @@ describe('tests CLI channel commands', () => {
       const apiKey = await createDirectApiKeyWithBindings({
         key,
         name: `Channel HTTP admin ${targetChannelName}`,
-        orgId: ORG_ID,
+        orgId: seedOptions.orgId,
         roleName: 'org_billing_admin',
       })
       const resolvedKey = apiKey.key ?? key
@@ -926,7 +928,7 @@ describe('tests CLI channel commands', () => {
             principal_id: apiKey.rbac_id,
             role_id: channelAdminRole!.id,
             scope_type: 'channel',
-            org_id: ORG_ID,
+            org_id: seedOptions.orgId,
             app_id: app!.id,
             channel_id: target!.rbac_id,
             granted_by: apiKey.user_id,
