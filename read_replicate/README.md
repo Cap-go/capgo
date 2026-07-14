@@ -18,6 +18,16 @@ temporary Worker.
 The Cloud project, instance, and database are fixed literals in the sync script,
 not GitHub variables.
 
+The key only authenticates the release workload. Its IAM database user must be a
+member of `capgo_read_replica_schema_executor`, with no `cloudsqlsuperuser`
+membership and no direct selected-table privileges. The postgres-owned
+`capgo_internal.add_read_replica_column` function installed from
+`cloud_sql_owner_executor.sql` is the only DDL capability available to it.
+
+Install or update that owner bootstrap through an authenticated Google CLI admin
+before releasing it; do not grant the CI database user table ownership or broad
+DDL roles.
+
 The release workflow first uses Tinbase/PGlite to apply the tag's local migrations
 in memory and build a fresh selected-schema catalog. Only then does it apply safe
 additive DDL through the Data API and verify the subscriber before primary
