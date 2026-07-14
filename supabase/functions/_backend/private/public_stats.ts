@@ -43,6 +43,7 @@ app.get('/', async (c) => {
     updates: 1862788600,
     stars: 595,
   })
+})
 
 app.get('/live_updates', async (c) => {
   const metrics = await getPublicLiveUpdateMetricsCF(c)
@@ -53,5 +54,4 @@ app.get('/live_updates', async (c) => {
   }, 200, {
     'Cache-Control': 'public, max-age=300, s-maxage=900, stale-while-revalidate=3600',
   })
-})
 })
