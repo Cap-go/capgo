@@ -85,7 +85,6 @@ interface SchemaCatalog {
 
 type SyncStatementKind
   = | 'column'
-    | 'column_default'
     | 'column_not_null'
     | 'constraint'
     | 'function'
@@ -285,29 +284,6 @@ export function planReadReplicaSchemaSync(
       continue
     }
 
-    if (actualColumn.default !== column.default) {
-      const defaultSql = buildAlterColumnDefaultStatement(
-        column,
-        actualTables,
-      )
-      if (!defaultSql) {
-        skipped.push({
-          kind: 'column',
-          table: column.table,
-          name: column.name,
-          reason: 'unsupported_column_default',
-        })
-      }
-      else {
-        statements.push({
-          kind: 'column_default',
-          table: column.table,
-          name: column.name,
-          sql: defaultSql,
-        })
-      }
-    }
-
     if (actualColumn.notNull !== column.notNull) {
       const notNullSql = buildAlterColumnNotNullStatement(
         column,
@@ -435,29 +411,16 @@ export function planReadReplicaSchemaSync(
   }
 
   for (const constraint of expectedCatalog.constraints ?? []) {
+    // Publisher CHECK constraints do not need to exist on a read-only logical
+    // subscriber. Creating them here can only add avoidable replica writes.
+    if (constraint.type === 'c')
+      continue
+
     const actualConstraint = actualConstraintsByKey.get(
       constraintKey(constraint),
     )
     if (constraintMatches(constraint, actualConstraint))
       continue
-
-    if (
-      actualConstraint
-      && constraintShapeMatches(constraint, actualConstraint)
-      && constraint.valid === true
-      && actualConstraint.valid === false
-    ) {
-      const sql = buildValidateConstraintStatement(constraint, actualTables)
-      if (sql) {
-        statements.push({
-          kind: 'constraint',
-          table: constraint.table,
-          name: constraint.name,
-          sql,
-        })
-        continue
-      }
-    }
 
     if (actualConstraint) {
       skipped.push({
@@ -465,27 +428,6 @@ export function planReadReplicaSchemaSync(
         table: constraint.table,
         name: constraint.name,
         reason: 'constraint_conflict',
-      })
-      continue
-    }
-
-    if (constraint.type === 'c') {
-      const sql = buildAddCheckConstraintStatement(constraint, actualTables)
-      if (!sql) {
-        skipped.push({
-          kind: 'constraint',
-          table: constraint.table,
-          name: constraint.name,
-          reason: 'unsupported_check_constraint',
-        })
-        continue
-      }
-
-      statements.push({
-        kind: 'constraint',
-        table: constraint.table,
-        name: constraint.name,
-        sql,
       })
       continue
     }
@@ -1161,7 +1103,7 @@ function quoteEnumValues(values: readonly string[]): string[] | null {
       return null
 
     quotedValues.push(
-      `E'${value.replaceAll('\\', '\\\\').replaceAll("'", "''")}'`,
+      `E'${value.replaceAll('\\', '\\\\').replaceAll('\'', '\'\'')}'`,
     )
   }
 
@@ -1200,25 +1142,6 @@ function buildAddColumnStatement(
   return `ALTER TABLE ${quoteQualifiedTable(column.table)} ADD COLUMN IF NOT EXISTS ${quoteIdent(column.name)} ${column.type}${defaultSql}${notNullSql}`
 }
 
-function buildAlterColumnDefaultStatement(
-  column: SchemaColumn,
-  actualTables: Set<string>,
-): string | null {
-  if (
-    !isSafeReplicaTable(column.table, actualTables)
-    || !isSafeIdentifier(column.name)
-  ) {
-    return null
-  }
-  if (column.default === null) {
-    return `ALTER TABLE ${quoteQualifiedTable(column.table)} ALTER COLUMN ${quoteIdent(column.name)} DROP DEFAULT`
-  }
-  if (!isSafeSqlFragment(column.default))
-    return null
-
-  return `ALTER TABLE ${quoteQualifiedTable(column.table)} ALTER COLUMN ${quoteIdent(column.name)} SET DEFAULT ${column.default}`
-}
-
 function buildAlterColumnNotNullStatement(
   column: SchemaColumn,
   actualTables: Set<string>,
@@ -1254,42 +1177,6 @@ function buildCreateIndexStatement(
     return null
 
   return `CREATE ${unique}INDEX CONCURRENTLY IF NOT EXISTS ${quoteIdent(index.name)} ON ${quoteQualifiedTable(index.table)} ${indexTail}`
-}
-
-function buildAddCheckConstraintStatement(
-  constraint: SchemaConstraint,
-  actualTables: Set<string>,
-): string | null {
-  if (
-    constraint.type !== 'c'
-    || !isSafeReplicaTable(constraint.table, actualTables)
-    || !isSafeQuotedIdentifier(constraint.name)
-    || !constraint.definition.startsWith('CHECK ')
-    || !isSafeSchemaDefinition(constraint.definition)
-  ) {
-    return null
-  }
-
-  const notValid = constraint.valid === false
-    && !/\bNOT VALID\s*$/i.test(constraint.definition)
-    ? ' NOT VALID'
-    : ''
-  return `ALTER TABLE ${quoteQualifiedTable(constraint.table)} ADD CONSTRAINT ${quoteIdent(constraint.name)} ${constraint.definition}${notValid}`
-}
-
-function buildValidateConstraintStatement(
-  constraint: SchemaConstraint,
-  actualTables: Set<string>,
-): string | null {
-  if (
-    constraint.type !== 'c'
-    || !isSafeReplicaTable(constraint.table, actualTables)
-    || !isSafeQuotedIdentifier(constraint.name)
-  ) {
-    return null
-  }
-
-  return `ALTER TABLE ${quoteQualifiedTable(constraint.table)} VALIDATE CONSTRAINT ${quoteIdent(constraint.name)}`
 }
 
 function buildAttachConstraintStatement(

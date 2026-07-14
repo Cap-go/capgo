@@ -382,7 +382,7 @@ describe('read-replica additive schema sync', () => {
     ]))
   })
 
-  it.concurrent('adds a missing selected check constraint', async () => {
+  it.concurrent('does not add a missing selected CHECK constraint', () => {
     const expected = {
       tables: [{ name: 'apps' }],
       columns: [],
@@ -397,62 +397,11 @@ describe('read-replica additive schema sync', () => {
     }
     const current = structuredClone(expected)
     current.constraints = []
-    const client = {
-      query: async (text: string) => {
-        if (text === READ_REPLICA_SCHEMA_CATALOG_SQL)
-          return { rows: [{ catalog: current }] }
 
-        if (text.startsWith('ALTER TABLE') && text.includes('ADD CONSTRAINT'))
-          current.constraints.push(expected.constraints[0])
-        return { rows: [] }
-      },
-    }
-
-    await expect(
-      applyReadReplicaAdditiveSchemaSync(client, expected),
-    ).resolves.toEqual({
-      applied: [{ kind: 'constraint', table: 'apps', name: 'apps_id_check' }],
+    expect(planReadReplicaSchemaSync(expected, current)).toEqual({
+      statements: [],
       skipped: [],
     })
-  })
-
-  it.concurrent('validates an existing selected check constraint when the primary is valid', async () => {
-    const expected = {
-      tables: [{ name: 'apps' }],
-      columns: [],
-      constraints: [{
-        table: 'apps',
-        name: 'apps_id_check',
-        type: 'c' as const,
-        definition: 'CHECK (id IS NOT NULL)',
-        valid: true,
-      }],
-      indexes: [],
-    }
-    const current = structuredClone(expected)
-    current.constraints[0].valid = false
-    const statements: string[] = []
-    const client = {
-      query: async (text: string) => {
-        if (text === READ_REPLICA_SCHEMA_CATALOG_SQL)
-          return { rows: [{ catalog: current }] }
-
-        statements.push(text)
-        if (text.includes('VALIDATE CONSTRAINT'))
-          current.constraints[0].valid = true
-        return { rows: [] }
-      },
-    }
-
-    await expect(
-      applyReadReplicaAdditiveSchemaSync(client, expected),
-    ).resolves.toEqual({
-      applied: [{ kind: 'constraint', table: 'apps', name: 'apps_id_check' }],
-      skipped: [],
-    })
-    expect(statements).toContain(
-      'ALTER TABLE public."apps" VALIDATE CONSTRAINT "apps_id_check"',
-    )
   })
 
   it.concurrent('replaces the selected helper function from the primary catalog', async () => {
@@ -534,41 +483,53 @@ describe('read-replica additive schema sync', () => {
     expect(statements.join('\n')).not.toContain('RESTART')
   })
 
-  it.concurrent('aligns existing column defaults and nullability from the primary catalog', async () => {
+  it.concurrent('escapes enum labels and rejects NUL labels', () => {
+    const actual = { types: [] }
+
+    expect(planReadReplicaSchemaSync({
+      types: [{
+        name: 'replica_enum',
+        kind: 'e',
+        definition: ['safe', String.raw`slash\and'quote`],
+      }],
+    }, actual)).toEqual({
+      statements: [{
+        kind: 'type',
+        table: 'public',
+        name: 'replica_enum',
+        sql: String.raw`CREATE TYPE public."replica_enum" AS ENUM (E'safe', E'slash\\and''quote')`,
+      }],
+      skipped: [],
+    })
+
+    expect(planReadReplicaSchemaSync({
+      types: [{
+        name: 'invalid_enum',
+        kind: 'e',
+        definition: ['contains\0nul'],
+      }],
+    }, actual)).toEqual({
+      statements: [],
+      skipped: [{
+        kind: 'type',
+        table: 'public',
+        name: 'invalid_enum',
+        reason: 'unsupported_type_creation',
+      }],
+    })
+  })
+
+  it.concurrent('does not reconcile existing column defaults', () => {
     const { expected } = catalogs()
     const current = structuredClone(expected)
     current.columns[0] = {
       ...current.columns[0],
       default: 'gen_random_uuid()',
-      notNull: false,
-    }
-    const statements: string[] = []
-    const client = {
-      query: async (text: string) => {
-        if (text === READ_REPLICA_SCHEMA_CATALOG_SQL)
-          return { rows: [{ catalog: current }] }
-
-        statements.push(text)
-        if (text.includes('DROP DEFAULT'))
-          current.columns[0].default = null
-        if (text.endsWith('SET NOT NULL'))
-          current.columns[0].notNull = true
-        return { rows: [] }
-      },
     }
 
-    await expect(
-      applyReadReplicaAdditiveSchemaSync(client, expected),
-    ).resolves.toEqual({
-      applied: [
-        { kind: 'column_default', table: 'apps', name: 'id' },
-        { kind: 'column_not_null', table: 'apps', name: 'id' },
-      ],
+    expect(planReadReplicaSchemaSync(expected, current)).toEqual({
+      statements: [],
       skipped: [],
     })
-    expect(statements).toEqual(expect.arrayContaining([
-      'ALTER TABLE public."apps" ALTER COLUMN "id" DROP DEFAULT',
-      'ALTER TABLE public."apps" ALTER COLUMN "id" SET NOT NULL',
-    ]))
   })
 })

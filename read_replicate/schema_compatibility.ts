@@ -75,8 +75,9 @@ export interface SchemaCompatibilityIssue {
   reason: string
 }
 
-// The catalog intentionally excludes foreign keys, triggers, and RLS. Those
-// objects remain outside the selected read-replica schema contract.
+// The compatibility check intentionally ignores existing column defaults and
+// missing publisher CHECK constraints. A read-only logical subscriber does not
+// use defaults and does not need source CHECK constraints.
 export function readReplicaSchemaCompatibilityIssues(expected: unknown, actual: unknown): SchemaCompatibilityIssue[] {
   const expectedCatalog = assertSchemaCatalog(expected, 'expected')
   const actualCatalog = assertSchemaCatalog(actual, 'actual')
@@ -149,13 +150,6 @@ function compareColumns(expected: SchemaCatalog, actual: SchemaCatalog, issues: 
           : 'subscriber is NOT NULL while publisher accepts NULL',
       })
     }
-    if (!sameValue(actualColumn.default, expectedColumn.default)) {
-      issues.push({
-        kind: 'column',
-        object: key,
-        reason: `expected default ${displayValue(expectedColumn.default)}, found ${displayValue(actualColumn.default)}`,
-      })
-    }
     if (actualColumn.identity !== expectedColumn.identity) {
       issues.push({
         kind: 'column',
@@ -186,6 +180,19 @@ function compareConstraints(expected: SchemaCatalog, actual: SchemaCatalog, issu
   for (const expectedConstraint of expected.constraints ?? []) {
     const key = constraintKey(expectedConstraint)
     const actualConstraint = actualConstraints.get(key)
+    if (expectedConstraint.type === 'c') {
+      if (
+        actualConstraint
+        && (
+          actualConstraint.type !== 'c'
+          || actualConstraint.definition !== expectedConstraint.definition
+        )
+      ) {
+        issues.push({ kind: 'constraint', object: key, reason: 'subscriber CHECK constraint differs' })
+      }
+      continue
+    }
+
     if (!actualConstraint) {
       issues.push({ kind: 'constraint', object: key, reason: 'missing required constraint' })
       continue
