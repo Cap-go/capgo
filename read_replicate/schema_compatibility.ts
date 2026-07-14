@@ -75,10 +75,25 @@ export interface SchemaCompatibilityIssue {
   reason: string
 }
 
-// The compatibility check intentionally ignores defaults on columns already
-// present at both ends and missing publisher CHECK constraints. A pre-created
-// subscriber-only NOT NULL column retains its default until the publisher adds it.
+// Strict comparison is retained for snapshot tooling. The release gate below is
+// directional because PostgreSQL logical subscribers may deliberately retain
+// columns and supporting objects that the publisher has already dropped.
 export function readReplicaSchemaCompatibilityIssues(expected: unknown, actual: unknown): SchemaCompatibilityIssue[] {
+  return readReplicaSchemaCompatibilityIssuesInternal(expected, actual, false)
+}
+
+// A logical subscriber must accept every publisher column, but it can safely
+// retain nullable or default-backed legacy columns until the publisher removes
+// them. This is the compatibility relation used before primary migrations.
+export function readReplicaSubscriberCompatibilityIssues(expected: unknown, actual: unknown): SchemaCompatibilityIssue[] {
+  return readReplicaSchemaCompatibilityIssuesInternal(expected, actual, true)
+}
+
+function readReplicaSchemaCompatibilityIssuesInternal(
+  expected: unknown,
+  actual: unknown,
+  allowSafeSubscriberOnlyObjects: boolean,
+): SchemaCompatibilityIssue[] {
   const expectedCatalog = assertSchemaCatalog(expected, 'expected')
   const actualCatalog = assertSchemaCatalog(actual, 'actual')
   const issues: SchemaCompatibilityIssue[] = []
@@ -92,17 +107,21 @@ export function readReplicaSchemaCompatibilityIssues(expected: unknown, actual: 
   }
 
   compareTables(expectedCatalog, actualCatalog, issues)
-  compareColumns(expectedCatalog, actualCatalog, issues)
+  compareColumns(expectedCatalog, actualCatalog, issues, allowSafeSubscriberOnlyObjects)
   compareConstraints(expectedCatalog, actualCatalog, issues)
-  compareIndexes(expectedCatalog, actualCatalog, issues)
-  compareTypes(expectedCatalog, actualCatalog, issues)
-  compareSequences(expectedCatalog, actualCatalog, issues)
-  compareFunctions(expectedCatalog, actualCatalog, issues)
+  compareIndexes(expectedCatalog, actualCatalog, issues, allowSafeSubscriberOnlyObjects)
+  compareTypes(expectedCatalog, actualCatalog, issues, allowSafeSubscriberOnlyObjects)
+  compareSequences(expectedCatalog, actualCatalog, issues, allowSafeSubscriberOnlyObjects)
+  compareFunctions(expectedCatalog, actualCatalog, issues, allowSafeSubscriberOnlyObjects)
 
   return issues
 }
 
-function compareTables(expected: SchemaCatalog, actual: SchemaCatalog, issues: SchemaCompatibilityIssue[]): void {
+function compareTables(
+  expected: SchemaCatalog,
+  actual: SchemaCatalog,
+  issues: SchemaCompatibilityIssue[],
+): void {
   const expectedTables = new Map((expected.tables ?? []).map(table => [table.name, table]))
   const actualTables = new Map((actual.tables ?? []).map(table => [table.name, table]))
 
@@ -115,14 +134,18 @@ function compareTables(expected: SchemaCatalog, actual: SchemaCatalog, issues: S
     if (actualTable.kind !== expectedTable.kind)
       issues.push({ kind: 'table', object: expectedTable.name, reason: `expected kind ${expectedTable.kind}, found ${actualTable.kind}` })
   }
-
   for (const actualTable of actual.tables ?? []) {
     if (!expectedTables.has(actualTable.name))
       issues.push({ kind: 'table', object: actualTable.name, reason: 'unexpected table' })
   }
 }
 
-function compareColumns(expected: SchemaCatalog, actual: SchemaCatalog, issues: SchemaCompatibilityIssue[]): void {
+function compareColumns(
+  expected: SchemaCatalog,
+  actual: SchemaCatalog,
+  issues: SchemaCompatibilityIssue[],
+  allowSafeSubscriberOnlyObjects: boolean,
+): void {
   const expectedColumns = new Map((expected.columns ?? []).map(column => [columnKey(column), column]))
   const actualColumns = new Map((actual.columns ?? []).map(column => [columnKey(column), column]))
 
@@ -168,8 +191,17 @@ function compareColumns(expected: SchemaCatalog, actual: SchemaCatalog, issues: 
 
   for (const actualColumn of actual.columns ?? []) {
     const key = columnKey(actualColumn)
-    if (!expectedColumns.has(key))
-      issues.push({ kind: 'column', object: key, reason: 'unexpected column' })
+    if (expectedColumns.has(key))
+      continue
+    if (allowSafeSubscriberOnlyObjects && subscriberOnlyColumnCanAcceptPublisherRows(actualColumn))
+      continue
+    issues.push({
+      kind: 'column',
+      object: key,
+      reason: allowSafeSubscriberOnlyObjects
+        ? 'subscriber-only column can reject replicated rows'
+        : 'unexpected column',
+    })
   }
 }
 
@@ -225,7 +257,12 @@ function compareConstraints(expected: SchemaCatalog, actual: SchemaCatalog, issu
   }
 }
 
-function compareIndexes(expected: SchemaCatalog, actual: SchemaCatalog, issues: SchemaCompatibilityIssue[]): void {
+function compareIndexes(
+  expected: SchemaCatalog,
+  actual: SchemaCatalog,
+  issues: SchemaCompatibilityIssue[],
+  allowSafeSubscriberOnlyObjects: boolean,
+): void {
   const expectedIndexes = new Map((expected.indexes ?? []).map(index => [index.name, index]))
   const actualIndexes = new Map((actual.indexes ?? []).map(index => [index.name, index]))
 
@@ -265,12 +302,26 @@ function compareIndexes(expected: SchemaCatalog, actual: SchemaCatalog, issues: 
   }
 
   for (const actualIndex of actual.indexes ?? []) {
-    if (!expectedIndexes.has(actualIndex.name))
-      issues.push({ kind: 'index', object: actualIndex.name, reason: 'unexpected index adds storage and write cost' })
+    if (expectedIndexes.has(actualIndex.name))
+      continue
+    if (allowSafeSubscriberOnlyObjects && subscriberOnlyIndexCannotRejectPublisherRows(actualIndex))
+      continue
+    issues.push({
+      kind: 'index',
+      object: actualIndex.name,
+      reason: allowSafeSubscriberOnlyObjects
+        ? 'subscriber-only unique index can reject replicated rows'
+        : 'unexpected index adds storage and write cost',
+    })
   }
 }
 
-function compareTypes(expected: SchemaCatalog, actual: SchemaCatalog, issues: SchemaCompatibilityIssue[]): void {
+function compareTypes(
+  expected: SchemaCatalog,
+  actual: SchemaCatalog,
+  issues: SchemaCompatibilityIssue[],
+  allowSafeSubscriberOnlyObjects: boolean,
+): void {
   const expectedTypes = new Map((expected.types ?? []).map(type => [type.name, type]))
   const actualTypes = new Map((actual.types ?? []).map(type => [type.name, type]))
 
@@ -292,13 +343,21 @@ function compareTypes(expected: SchemaCatalog, actual: SchemaCatalog, issues: Sc
       issues.push({ kind: 'type', object: expectedType.name, reason: 'type definition differs' })
   }
 
+  if (allowSafeSubscriberOnlyObjects)
+    return
+
   for (const actualType of actual.types ?? []) {
     if (!expectedTypes.has(actualType.name))
       issues.push({ kind: 'type', object: actualType.name, reason: 'unexpected type' })
   }
 }
 
-function compareSequences(expected: SchemaCatalog, actual: SchemaCatalog, issues: SchemaCompatibilityIssue[]): void {
+function compareSequences(
+  expected: SchemaCatalog,
+  actual: SchemaCatalog,
+  issues: SchemaCompatibilityIssue[],
+  allowSafeSubscriberOnlyObjects: boolean,
+): void {
   const expectedSequences = new Map((expected.sequences ?? []).map(sequence => [sequence.name, sequence]))
   const actualSequences = new Map((actual.sequences ?? []).map(sequence => [sequence.name, sequence]))
   const fields = [
@@ -331,13 +390,21 @@ function compareSequences(expected: SchemaCatalog, actual: SchemaCatalog, issues
     }
   }
 
+  if (allowSafeSubscriberOnlyObjects)
+    return
+
   for (const actualSequence of actual.sequences ?? []) {
     if (!expectedSequences.has(actualSequence.name))
       issues.push({ kind: 'sequence', object: actualSequence.name, reason: 'unexpected sequence' })
   }
 }
 
-function compareFunctions(expected: SchemaCatalog, actual: SchemaCatalog, issues: SchemaCompatibilityIssue[]): void {
+function compareFunctions(
+  expected: SchemaCatalog,
+  actual: SchemaCatalog,
+  issues: SchemaCompatibilityIssue[],
+  allowSafeSubscriberOnlyObjects: boolean,
+): void {
   const expectedFunctions = new Map((expected.functions ?? []).map(fn => [functionKey(fn), fn]))
   const actualFunctions = new Map((actual.functions ?? []).map(fn => [functionKey(fn), fn]))
 
@@ -352,11 +419,29 @@ function compareFunctions(expected: SchemaCatalog, actual: SchemaCatalog, issues
       issues.push({ kind: 'function', object: key, reason: 'function definition differs' })
   }
 
+  if (allowSafeSubscriberOnlyObjects)
+    return
+
   for (const actualFunction of actual.functions ?? []) {
     const key = functionKey(actualFunction)
     if (!expectedFunctions.has(key))
       issues.push({ kind: 'function', object: key, reason: 'unexpected function overload' })
   }
+}
+function subscriberOnlyColumnCanAcceptPublisherRows(column: SchemaColumn): boolean {
+  return !column.notNull || hasNonNullDefault(column.default)
+}
+
+function hasNonNullDefault(defaultValue: string | null): boolean {
+  if (defaultValue === null)
+    return false
+
+  const normalized = defaultValue.trim().toUpperCase()
+  return normalized !== 'NULL' && !/^NULL::[A-Z0-9_." ]+$/u.test(normalized)
+}
+
+function subscriberOnlyIndexCannotRejectPublisherRows(index: SchemaIndex): boolean {
+  return index.constraintOwned !== true && !/^CREATE\s+UNIQUE\s+INDEX\b/iu.test(index.definition)
 }
 
 function assertSchemaCatalog(value: unknown, label: string): SchemaCatalog {

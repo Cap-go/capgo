@@ -1,12 +1,17 @@
 import type { CloudSqlDataApiResponse } from '../read_replicate/cloud_sql_data_api_response.ts'
 import type {
-  ReadReplicaSchemaOwnerOperation,
   ReadReplicaSchemaSyncClient,
+  ReadReplicaSchemaSyncPlan,
   ReadReplicaSchemaSyncStatement,
 } from '../read_replicate/schema_additive_sync.ts'
+import type { SchemaCompatibilityIssue } from '../read_replicate/schema_compatibility.ts'
+import { randomUUID } from 'node:crypto'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import process from 'node:process'
 import { assertCloudSqlDataApiResponseSucceeded } from '../read_replicate/cloud_sql_data_api_response.ts'
-import { applyReadReplicaSchemaSync } from '../read_replicate/schema_additive_sync.ts'
+import { planReadReplicaSchemaSync } from '../read_replicate/schema_additive_sync.ts'
 import {
   READ_REPLICA_SCHEMA_CATALOG_SQL,
   readReplicaSchemaCatalog,
@@ -14,7 +19,7 @@ import {
   stableStringify,
 } from '../read_replicate/schema_catalog.ts'
 import { readReplicaSchemaCatalogFromMigrations } from '../read_replicate/schema_catalog_from_migrations.ts'
-import { readReplicaSchemaCompatibilityIssues } from '../read_replicate/schema_compatibility.ts'
+import { readReplicaSubscriberCompatibilityIssues } from '../read_replicate/schema_compatibility.ts'
 
 interface BunSubprocess {
   exitCode: number | null
@@ -27,15 +32,6 @@ interface BunSubprocess {
 interface BunRuntime {
   spawn: (command: string[], options: unknown) => BunSubprocess
 }
-
-const bunRuntime = (globalThis as unknown as { Bun: BunRuntime }).Bun
-const DEFAULT_SYNC_MAX_SECONDS = 30 * 60
-const CATALOG_QUERY_BUFFER_MS = 5000
-const GOOGLE_DATA_API_MAX_SECONDS = 30
-const GOOGLE_DATA_API_PROCESS_GRACE_SECONDS = 5
-const GOOGLE_DATA_API_REQUEST_LIMIT_BYTES = 500_000
-const GOOGLE_DATA_API_REQUEST_METADATA_BUFFER_BYTES = 1_024
-const GOOGLE_DATA_API_RESPONSE_LIMIT_BYTES = 10_000_000
 
 interface DataApiResponse extends CloudSqlDataApiResponse {
   results?: Array<{
@@ -51,37 +47,72 @@ interface GoogleDataApiConfig {
   database: string
 }
 
+const bunRuntime = (globalThis as unknown as { Bun: BunRuntime }).Bun
+const DEFAULT_SYNC_MAX_SECONDS = 30 * 60
+const CATALOG_QUERY_BUFFER_MS = 5000
+const GOOGLE_DATA_API_MAX_SECONDS = 30
+const GOOGLE_DATA_API_PROCESS_GRACE_SECONDS = 5
+const GOOGLE_DATA_API_REQUEST_LIMIT_BYTES = 500_000
+const GOOGLE_DATA_API_REQUEST_METADATA_BUFFER_BYTES = 1_024
+const GOOGLE_DATA_API_RESPONSE_LIMIT_BYTES = 10_000_000
+const IMPORT_CLEANUP_MAX_SECONDS = 60
+const POSTGRES_IMPORT_USER = 'postgres'
+const GCS_IMPORT_BUCKET = 'capgo-read-replica-schema-import-394818'
 const GOOGLE_READ_REPLICA: GoogleDataApiConfig = {
   project: 'capgo-394818',
   instance: 'eu-2',
   database: 'postgres',
 }
-
-const GOOGLE_READ_REPLICA_IAM_DATABASE_USER = 'capgo-read-replica-ci@capgo-394818.iam'
-
 async function main(): Promise<void> {
-  const maxDurationMs = DEFAULT_SYNC_MAX_SECONDS * 1000
-  const deadline = Date.now() + maxDurationMs
+  const deadline = Date.now() + DEFAULT_SYNC_MAX_SECONDS * 1000
+  const dryRun = process.argv.includes('--dry-run')
   console.log(
     'Building the read-replica schema catalog from local migrations through Tinbase/PGlite...',
   )
   const expected = await readReplicaSchemaCatalogFromMigrations()
-  await assertGoogleReadReplicaExecutor(
-    GOOGLE_READ_REPLICA,
-    deadline,
-  )
   const replica = googleDataApiClient(GOOGLE_READ_REPLICA, deadline)
-  const result = await applyReadReplicaSchemaSync(replica, expected, {
-    deadline,
-    maxDurationMs,
-    statementTimeoutMs: GOOGLE_DATA_API_MAX_SECONDS * 1000,
-  })
   const actual = await readReplicaSchemaCatalog(replica)
-  const issues = readReplicaSchemaCompatibilityIssues(expected, actual)
+  const plan = planReadReplicaSchemaSync(expected, actual)
+
+  // Both checks run before the SQL object is uploaded or Cloud SQL is asked to
+  // import anything. The import receives this exact already-reviewed plan.
+  assertGoogleReadReplicaSchemaPlan(plan)
+  const preflightIssues = preflightCompatibilityIssues(expected, actual, plan)
+  if (preflightIssues.length) {
+    throw new Error(
+      `Read-replica schema preflight found residual drift: ${stableStringify(preflightIssues)}`,
+    )
+  }
+
+  if (dryRun) {
+    console.log('Read-replica schema dry run result:')
+    console.log(stableStringify({
+      statements: plan.statements.map(({ kind, table, name }) => ({ kind, table, name })),
+      skipped: plan.skipped,
+    }))
+    return
+  }
+
+  if (plan.statements.length) {
+    const applyPlan = replica.applyReadReplicaSchemaPlan
+    if (!applyPlan) {
+      throw new Error(
+        'Cloud SQL schema reconciliation requires a server-side plan importer.',
+      )
+    }
+    await applyPlan(plan)
+  }
+
+  const finalActual = await readReplicaSchemaCatalog(replica)
+  const issues = readReplicaSubscriberCompatibilityIssues(expected, finalActual)
+  const result = {
+    applied: plan.statements.map(({ kind, table, name }) => ({ kind, table, name })),
+    skipped: plan.skipped,
+  }
 
   if (issues.length) {
     console.error(
-      '::error title=Read-replica schema did not converge::Cloud SQL Data API reconciliation completed with residual drift.',
+      '::error title=Read-replica schema did not converge::Cloud SQL server-side import completed with residual drift.',
     )
     console.error(
       stableStringify({ error: 'schema_not_converged', ...result, issues }),
@@ -90,70 +121,46 @@ async function main(): Promise<void> {
     return
   }
 
-  console.log('Read-replica Cloud SQL Data API sync result:')
+  console.log('Read-replica Cloud SQL server-side import result:')
   console.log(stableStringify({ ...result, issues }))
   console.log(
-    'Read replica matches the schema derived from local migrations before primary migrations.',
+    'Read replica accepts the schema derived from local migrations before primary migrations.',
   )
 }
 
-async function assertGoogleReadReplicaExecutor(
-  config: GoogleDataApiConfig,
-  deadline: number,
-): Promise<void> {
-  const response = await executeGoogleSql(
-    config.project,
-    config.instance,
-    config.database,
-    renderReadReplicaExecutorPreflightSql(),
-    deadline,
+export function preflightCompatibilityIssues(
+  expected: unknown,
+  actual: unknown,
+  plan: ReadReplicaSchemaSyncPlan,
+): SchemaCompatibilityIssue[] {
+  return readReplicaSubscriberCompatibilityIssues(expected, actual).filter(issue =>
+    !plan.statements.some(statement => statementResolvesCompatibilityIssue(statement, issue)),
   )
-  assertGoogleReadReplicaExecutorState(dataApiRows(response))
 }
 
-export function renderReadReplicaExecutorPreflightSql(): string {
-  const replicaTables = REPLICA_TABLES.map(quoteSqlText).join(', ')
-  return `SELECT
-  session_user AS session_user,
-  pg_catalog.pg_has_role(session_user, 'capgo_read_replica_schema_executor', 'member') AS executor_member,
-  NOT pg_catalog.pg_has_role(session_user, 'cloudsqlsuperuser', 'member') AS no_cloudsqlsuperuser,
-  pg_catalog.has_schema_privilege(session_user, 'capgo_internal', 'USAGE') AS schema_usage,
-  pg_catalog.has_function_privilege(
-    session_user,
-    'capgo_internal.add_read_replica_column(text,text,text,text,boolean)',
-    'EXECUTE'
-  ) AS add_column_execute,
-  NOT EXISTS (
-    SELECT 1
-    FROM pg_catalog.unnest(ARRAY[${replicaTables}]::pg_catalog.text[]) AS selected(table_name)
-    WHERE pg_catalog.has_table_privilege(
-      session_user,
-      pg_catalog.format('public.%I', selected.table_name),
-      'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'
-    )
-  ) AS no_table_access`
-}
-
-export function assertGoogleReadReplicaExecutorState(
-  rows: readonly Record<string, unknown>[],
-): void {
-  const state = rows[0]
-  if (
-    state?.session_user !== GOOGLE_READ_REPLICA_IAM_DATABASE_USER
-    || !dataApiBoolean(state.executor_member)
-    || !dataApiBoolean(state.no_cloudsqlsuperuser)
-    || !dataApiBoolean(state.schema_usage)
-    || !dataApiBoolean(state.add_column_execute)
-    || !dataApiBoolean(state.no_table_access)
-  ) {
-    throw new Error(
-      'Cloud SQL IAM database identity is not limited to capgo_read_replica_schema_executor with owner-executor access only. Install the owner bootstrap and replace cloudsqlsuperuser before primary migrations.',
-    )
+function statementResolvesCompatibilityIssue(
+  statement: ReadReplicaSchemaSyncStatement,
+  issue: SchemaCompatibilityIssue,
+): boolean {
+  switch (issue.kind) {
+    case 'column':
+    case 'constraint':
+      return statement.kind === issue.kind
+        && issue.object === `${statement.table}.${statement.name}`
+    case 'type':
+    case 'sequence':
+    case 'function':
+      return statement.kind === issue.kind && issue.object === statement.name
+    case 'index':
+      return (
+        (statement.kind === 'index'
+          || statement.kind === 'invalid_index'
+          || statement.kind === 'drop_index')
+        && issue.object === statement.name
+      )
+    default:
+      return false
   }
-}
-
-function dataApiBoolean(value: unknown): boolean {
-  return value === true || value === 'true'
 }
 
 function googleDataApiClient(
@@ -164,25 +171,18 @@ function googleDataApiClient(
 
   return {
     assertCanApplyReadReplicaSchemaPlan(plan) {
-      const skipped = plan.skipped[0]
-      if (skipped) {
-        throw new Error(
-          `The least-privilege Cloud SQL owner executor cannot reconcile skipped ${skipped.kind} ${skipped.table}.${skipped.name} (${skipped.reason}); extend its reviewed bootstrap before primary migrations.`,
-        )
-      }
-
-      for (const statement of plan.statements)
-        assertGoogleOwnerExecutorStatement(statement)
+      assertGoogleReadReplicaSchemaPlan(plan)
     },
     async applyReadReplicaSchemaPlan(plan) {
-      const sql = renderReadReplicaOwnerExecutorTransaction(
-        plan.statements.map(assertGoogleOwnerExecutorStatement),
+      await importReadReplicaSchemaTransaction(
+        config,
+        renderReadReplicaImportTransaction(plan.statements),
+        deadline,
       )
-      await executeGoogleSql(project, instance, database, sql, deadline)
     },
     async query(queryText: string, values?: unknown[]) {
       // The Data API has no session affinity and rejects requests over 0.5 MB or
-      // responses over 10 MB. Every partial result is treated as a failed read.
+      // responses over 10 MB. It is only used for bounded selected-schema reads.
       if (
         queryText.startsWith('SET statement_timeout')
         || queryText === 'RESET statement_timeout'
@@ -201,49 +201,302 @@ function googleDataApiClient(
   }
 }
 
-function assertGoogleOwnerExecutorStatement(
-  statement: ReadReplicaSchemaSyncStatement,
-): ReadReplicaSchemaOwnerOperation {
-  if (!statement.ownerOperation) {
+export function assertGoogleReadReplicaSchemaPlan(
+  plan: ReadReplicaSchemaSyncPlan,
+): void {
+  const skipped = plan.skipped[0]
+  if (skipped) {
     throw new Error(
-      `The least-privilege Cloud SQL owner executor cannot apply ${statement.kind} ${statement.table}.${statement.name}; extend its reviewed bootstrap before primary migrations.`,
+      `Cloud SQL server-side import cannot reconcile skipped ${skipped.kind} ${skipped.table}.${skipped.name} (${skipped.reason}) before primary migrations.`,
     )
   }
 
-  return statement.ownerOperation
+  for (const statement of plan.statements)
+    assertGoogleReadReplicaSchemaStatement(statement)
+}
+
+function assertGoogleReadReplicaSchemaStatement(
+  statement: ReadReplicaSchemaSyncStatement,
+): void {
+  if (statement.sql.includes(';') || statement.sql.includes('\0')) {
+    throw new Error(
+      `Cloud SQL server-side import rejected unsafe ${statement.kind} ${statement.table}.${statement.name}.`,
+    )
+  }
+
+  switch (statement.kind) {
+    case 'column':
+      assertSelectedReplicaTable(statement)
+      assertColumnStatement(statement)
+      return
+    case 'constraint':
+      assertSelectedReplicaTable(statement)
+      assertConstraintStatement(statement)
+      return
+    case 'type':
+      assertTypeStatement(statement)
+      return
+    case 'sequence':
+      assertSequenceStatement(statement)
+      return
+    default:
+      throw new Error(
+        `Cloud SQL server-side import cannot atomically apply ${statement.kind} ${statement.table}.${statement.name} before primary migrations.`,
+      )
+  }
+}
+
+function assertColumnStatement(statement: ReadReplicaSchemaSyncStatement): void {
+  const prefix = `ALTER TABLE public.${quoteSqlIdentifier(statement.table)} ADD COLUMN IF NOT EXISTS ${quoteSqlIdentifier(statement.name)} `
+  if (
+    !isSafeIdentifier(statement.name)
+    || !statement.sql.startsWith(prefix)
+    || !isSafeSchemaFragment(statement.sql.slice(prefix.length))
+  ) {
+    throw new Error(
+      `Cloud SQL server-side import cannot atomically apply ${statement.kind} ${statement.table}.${statement.name} before primary migrations.`,
+    )
+  }
+}
+
+function assertConstraintStatement(statement: ReadReplicaSchemaSyncStatement): void {
+  const expected = `ALTER TABLE public.${quoteSqlIdentifier(statement.table)} ADD CONSTRAINT ${quoteSqlIdentifier(statement.name)} `
+  if (
+    !isSafeIdentifier(statement.name)
+    || !statement.sql.startsWith(expected)
+    || !/^(?:PRIMARY KEY|UNIQUE) USING INDEX "[A-Za-z_]\w*"$/u.test(
+      statement.sql.slice(expected.length),
+    )
+  ) {
+    throw new Error(
+      `Cloud SQL server-side import cannot atomically apply ${statement.kind} ${statement.table}.${statement.name} before primary migrations.`,
+    )
+  }
+}
+
+function assertTypeStatement(statement: ReadReplicaSchemaSyncStatement): void {
+  const identifier = quoteSqlIdentifier(statement.name)
+  const createPrefix = `CREATE TYPE public.${identifier} AS `
+  const alterPrefix = `ALTER TYPE public.${identifier} ADD `
+  const validCreate = statement.sql.startsWith(createPrefix)
+    && isSafeTypeDefinition(statement.sql.slice(createPrefix.length))
+  const validAlter = statement.sql.startsWith(alterPrefix)
+    && isSafeTypeAlteration(statement.sql.slice(alterPrefix.length))
+  if (
+    statement.table !== 'public'
+    || !isSafeIdentifier(statement.name)
+    || (!validCreate && !validAlter)
+  ) {
+    throw new Error(
+      `Cloud SQL server-side import cannot atomically apply ${statement.kind} ${statement.table}.${statement.name} before primary migrations.`,
+    )
+  }
+}
+
+function assertSequenceStatement(statement: ReadReplicaSchemaSyncStatement): void {
+  const identifier = quoteSqlIdentifier(statement.name)
+  const createPrefix = `CREATE SEQUENCE IF NOT EXISTS public.${identifier} `
+  const alterPrefix = `ALTER SEQUENCE public.${identifier} `
+  const options = statement.sql.startsWith(createPrefix)
+    ? statement.sql.slice(createPrefix.length)
+    : statement.sql.startsWith(alterPrefix)
+      ? statement.sql.slice(alterPrefix.length)
+      : undefined
+  if (
+    statement.table !== 'public'
+    || !isSafeIdentifier(statement.name)
+    || !options
+    || !isSafeSequenceOptions(options)
+  ) {
+    throw new Error(
+      `Cloud SQL server-side import cannot atomically apply ${statement.kind} ${statement.table}.${statement.name} before primary migrations.`,
+    )
+  }
+}
+
+function assertSelectedReplicaTable(statement: ReadReplicaSchemaSyncStatement): void {
+  if (!REPLICA_TABLES.includes(statement.table as never)) {
+    throw new Error(
+      `Cloud SQL server-side import rejected non-subscriber table ${statement.table}.`,
+    )
+  }
+}
+
+function isSafeIdentifier(value: string): boolean {
+  return /^[A-Za-z_]\w*$/u.test(value)
+}
+
+function isSafeSchemaFragment(value: string): boolean {
+  return /^[\w .()[\],:'"{}+\-=<>!]+$/u.test(value)
+}
+
+function isSafeTypeDefinition(value: string): boolean {
+  return (
+    (value.startsWith('ENUM (') || value.startsWith('('))
+    && value.endsWith(')')
+    && /^[\w .()[\],:'"{}+\-=<>!\\]+$/u.test(value)
+  )
+}
+
+function isSafeTypeAlteration(value: string): boolean {
+  return (
+    (value.startsWith('VALUE IF NOT EXISTS ') || value.startsWith('ATTRIBUTE '))
+    && /^[\w .()[\],:'"{}+\-=<>!\\]+$/u.test(value)
+  )
+}
+
+function isSafeSequenceOptions(value: string): boolean {
+  const match = /^AS (?:smallint|integer|bigint) START WITH -?\d+ INCREMENT BY -?\d+ MINVALUE -?\d+ MAXVALUE -?\d+ CACHE \d+ (?:CYCLE|NO CYCLE) (?:OWNED BY NONE|OWNED BY public\."([A-Za-z_]\w*)"\."[A-Za-z_]\w*")$/u.exec(value)
+  if (!match)
+    return false
+
+  return !match[1] || REPLICA_TABLES.includes(match[1] as never)
 }
 
 export function assertGoogleDataApiCatalogQuery(queryText: string): void {
   if (queryText !== READ_REPLICA_SCHEMA_CATALOG_SQL) {
     throw new Error(
-      'Cloud SQL Data API schema adapter only permits selected-schema catalog reads outside the owner executor.',
+      'Cloud SQL Data API schema adapter only permits selected-schema catalog reads outside the server-side import.',
     )
   }
 }
 
-export function renderReadReplicaOwnerExecutorSql(
-  operation: ReadReplicaSchemaOwnerOperation,
+export function renderReadReplicaImportTransaction(
+  statements: readonly ReadReplicaSchemaSyncStatement[],
 ): string {
-  const defaultLiteral = operation.defaultLiteral === null
-    ? 'NULL'
-    : quoteSqlText(operation.defaultLiteral)
-  return `SELECT capgo_internal.add_read_replica_column(${[
-    quoteSqlText(operation.table),
-    quoteSqlText(operation.column),
-    quoteSqlText(operation.expectedType),
-    defaultLiteral,
-    operation.notNull ? 'TRUE' : 'FALSE',
-  ].join(', ')})`
+  if (!statements.length) {
+    throw new Error(
+      'Read-replica server-side import requires at least one reviewed statement',
+    )
+  }
+
+  for (const statement of statements)
+    assertGoogleReadReplicaSchemaStatement(statement)
+
+  return `BEGIN;\n${statements.map(statement => statement.sql).join(';\n')};\nCOMMIT;`
 }
 
-export function renderReadReplicaOwnerExecutorTransaction(
-  operations: readonly ReadReplicaSchemaOwnerOperation[],
-): string {
-  if (!operations.length)
-    throw new Error('Read-replica owner executor requires at least one reviewed operation')
+async function importReadReplicaSchemaTransaction(
+  config: GoogleDataApiConfig,
+  sql: string,
+  deadline: number,
+): Promise<void> {
+  const workingDirectory = await mkdtemp(
+    join(tmpdir(), 'capgo-read-replica-schema-'),
+  )
+  const object = `schema-${randomUUID()}.sql`
+  const uri = `gs://${GCS_IMPORT_BUCKET}/${object}`
+  let uploaded = false
+  let operationError: unknown
 
-  return `BEGIN;\n${operations.map(renderReadReplicaOwnerExecutorSql).join(';\n')};\nCOMMIT;`
+  try {
+    const localSqlPath = join(workingDirectory, 'schema.sql')
+    await writeFile(localSqlPath, sql, { mode: 0o600 })
+    await runGcloudCommand(
+      [
+        'gcloud',
+        'storage',
+        'cp',
+        localSqlPath,
+        uri,
+        '--quiet',
+      ],
+      deadline,
+      'Upload the reviewed read-replica schema transaction',
+    )
+    uploaded = true
+    await runGcloudCommand(
+      [
+        'gcloud',
+        'sql',
+        'import',
+        'sql',
+        config.instance,
+        uri,
+        `--project=${config.project}`,
+        `--database=${config.database}`,
+        `--user=${POSTGRES_IMPORT_USER}`,
+        '--quiet',
+      ],
+      deadline,
+      'Run the Cloud SQL server-side schema import',
+    )
+  }
+  catch (error) {
+    operationError = error
+    throw error
+  }
+  finally {
+    try {
+      if (uploaded) {
+        await runGcloudCommand(
+          [
+            'gcloud',
+            'storage',
+            'rm',
+            uri,
+            '--quiet',
+          ],
+          Date.now() + IMPORT_CLEANUP_MAX_SECONDS * 1000,
+          'Remove the temporary read-replica schema object',
+        )
+      }
+    }
+    catch (cleanupError) {
+      const message = cleanupError instanceof Error
+        ? cleanupError.message
+        : String(cleanupError)
+      if (operationError)
+        console.error(`::warning title=Temporary import object cleanup failed::${message}`)
+      else
+        throw cleanupError
+    }
+    finally {
+      await rm(workingDirectory, { force: true, recursive: true })
+    }
+  }
 }
+async function runGcloudCommand(
+  command: string[],
+  deadline: number,
+  operation: string,
+): Promise<void> {
+  const timeoutMs = remainingBudgetMs(deadline, operation)
+  let child: BunSubprocess | undefined
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  let timedOut = false
+
+  try {
+    const childProcess = bunRuntime.spawn(command, {
+      env: process.env,
+      stderr: 'pipe',
+      stdout: 'pipe',
+    })
+    child = childProcess
+    timeout = setTimeout(() => {
+      timedOut = true
+      childProcess.kill()
+    }, timeoutMs)
+    const [exitCode, stdout, stderr] = await Promise.all([
+      childProcess.exited,
+      new Response(childProcess.stdout).text(),
+      new Response(childProcess.stderr).text(),
+    ])
+    if (timedOut)
+      throw new Error(`${operation} exceeded the remaining release time budget.`)
+    if (exitCode !== 0)
+      throw new Error(`${operation} failed: ${commandOutput(stderr || stdout)}`)
+  }
+  finally {
+    if (timeout)
+      clearTimeout(timeout)
+    if (child?.exitCode === null) {
+      child.kill()
+      await child.exited
+    }
+  }
+}
+
 async function executeGoogleSql(
   project: string,
   instance: string,
@@ -259,7 +512,7 @@ async function executeGoogleSql(
 
   try {
     const commandTimeoutMs = Math.min(
-      remainingBudgetMs(deadline),
+      remainingBudgetMs(deadline, 'read the selected schema catalog'),
       (GOOGLE_DATA_API_MAX_SECONDS + GOOGLE_DATA_API_PROCESS_GRACE_SECONDS)
       * 1000,
     )
@@ -329,7 +582,7 @@ function assertDataApiRequestFitsLimit(database: string, sql: string): void {
 
   if (payloadBytes > maximumPayloadBytes) {
     throw new Error(
-      `Cloud SQL Data API SQL payload is ${payloadBytes} bytes and exceeds the safe ${maximumPayloadBytes}-byte budget below its 0.5 MB request limit. Split the DDL before release.`,
+      `Cloud SQL Data API SQL payload is ${payloadBytes} bytes and exceeds the safe ${maximumPayloadBytes}-byte budget below its 0.5 MB request limit. Keep the selected schema catalog bounded.`,
     )
   }
 }
@@ -408,11 +661,18 @@ function quoteSqlText(value: string): string {
   return `'${value.replaceAll('\'', '\'\'')}'`
 }
 
-function remainingBudgetMs(deadline: number): number {
+function quoteSqlIdentifier(value: string): string {
+  if (!isSafeIdentifier(value))
+    throw new Error('Read-replica schema identifier must be valid')
+
+  return `"${value}"`
+}
+
+function remainingBudgetMs(deadline: number, operation: string): number {
   const remainingMs = deadline - Date.now() - CATALOG_QUERY_BUFFER_MS
   if (remainingMs <= 0) {
     throw new Error(
-      'Read-replica schema sync exceeded max duration before it could read the schema catalog.',
+      `Read-replica schema sync exceeded max duration before it could ${operation}.`,
     )
   }
   return remainingMs
@@ -424,7 +684,7 @@ function dataApiCommandError(value: string): Error {
     /0\.5\s*mb|request.*(?:size|limit)|payload.*(?:size|limit)/i.test(output)
   ) {
     return new Error(
-      'Cloud SQL Data API rejected the SQL request at its 0.5 MB request limit. Split the DDL before release.',
+      'Cloud SQL Data API rejected the SQL request at its 0.5 MB request limit. Keep the selected schema catalog bounded.',
     )
   }
   if (
@@ -450,7 +710,7 @@ if (import.meta.main) {
   }
   catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    console.error(`::error title=Read-replica Data API sync failed::${message}`)
+    console.error(`::error title=Read-replica schema sync failed::${message}`)
     process.exitCode = 1
   }
 }
