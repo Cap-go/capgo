@@ -99,21 +99,36 @@ describe('read-replica Cloud SQL owner executor', () => {
   })
 
   it.concurrent(
-    'atomically adds the selected column, retains its replication default, and denies table reads',
+    'atomically adds the selected column, retains its replication default, and denies direct table access',
     async () => {
       const database = await Database.create(await createPgliteEngine())
       try {
         await database.exec(await readFile(ownerExecutorUrl, 'utf8'))
+        const otherReplicaTableSql = REPLICA_TABLES
+          .filter(table => table !== 'org_users')
+          .map(table => `CREATE TABLE public.${table} (id bigint);`)
+          .join('\n')
         await database.exec(`
           CREATE TABLE public.org_users (
             id bigint,
             existing_boolean boolean
           );
+          ${otherReplicaTableSql}
           CREATE ROLE cloudsqlsuperuser NOLOGIN;
           CREATE ROLE "${ciDatabaseUser}" LOGIN;
           GRANT capgo_read_replica_schema_executor TO "${ciDatabaseUser}";
           SET SESSION AUTHORIZATION '${ciDatabaseUser}';
         `)
+
+        const preflight = await database.query(renderReadReplicaExecutorPreflightSql())
+        expect(preflight.rows).toEqual([{
+          session_user: ciDatabaseUser,
+          executor_member: true,
+          no_cloudsqlsuperuser: true,
+          schema_usage: true,
+          add_column_execute: true,
+          no_table_access: true,
+        }])
 
         await database.exec(
           renderReadReplicaOwnerExecutorTransaction([addInviteOperation]),
