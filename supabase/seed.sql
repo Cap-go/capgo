@@ -799,6 +799,11 @@ BEGIN
   INSERT INTO public.devices (updated_at, device_id, version_name, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator) VALUES
     (NOW(), '00000000-0000-0000-0000-000000000000', '1.0.0', 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
 
+  INSERT INTO public.devices (updated_at, device_id, version_name, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator) VALUES
+    (NOW(), '00000000-0000-0000-0000-000000000010', '1.0.0', 'com.demo.app', 'ios', '4.15.3', '16.0', '1.0.0', 'observe-plugin-4-ios', 't', 'f'),
+    (NOW(), '00000000-0000-0000-0000-000000000011', '1.0.1', 'com.demo.app', 'android', '4.15.3', '14', '1.0.1', 'observe-plugin-4-android', 't', 'f'),
+    (NOW(), '00000000-0000-0000-0000-000000000012', '1.0.0', 'com.demo.app', 'electron', '7.0.0', 'Linux 5.15', '1.0.0', 'observe-plugin-7-electron', 't', 'f');
+
   INSERT INTO public.stats (created_at, action, device_id, version_name, app_id) VALUES
     (NOW(), 'get'::"public"."stats_action", random_uuid, '1.0.0', 'com.demo.app'),
     (NOW(), 'set'::"public"."stats_action", random_uuid, '1.0.0', 'com.demo.app');
