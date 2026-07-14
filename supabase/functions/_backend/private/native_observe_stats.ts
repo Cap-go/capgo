@@ -203,7 +203,7 @@ FROM public.devices
 WHERE app_id = $1
   AND is_prod IS TRUE
   AND is_emulator IS NOT TRUE
-GROUP BY plugin_version
+GROUP BY COALESCE(NULLIF(plugin_version, ''), 'unknown')
 ORDER BY devices DESC, plugin_version ASC
 LIMIT 12`
 

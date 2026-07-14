@@ -100,7 +100,7 @@ const periodDayOptions: PeriodDayOption[] = [1, 3, 7, 30]
 const stats = ref<NativeObserveStatsResponse | null>(null)
 const statsLoading = ref(false)
 let latestStatsRequest = 0
-const topPluginVersions = computed(() => stats.value?.pluginVersions.slice(0, 8) ?? [])
+const topPluginVersions = computed(() => stats.value?.pluginVersions?.slice(0, 8) ?? [])
 
 const hasData = computed(() => (stats.value?.overview.total_events ?? 0) > 0)
 const topActions = computed(() => stats.value?.actionBreakdown.slice(0, 10) ?? [])

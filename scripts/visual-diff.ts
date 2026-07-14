@@ -702,10 +702,14 @@ async function runPipeline(options: CliOptions) {
   const originalRef = git(['rev-parse', 'HEAD'])
   const baseSha = resolveGitRef(options.baseRef, git(['merge-base', 'HEAD', 'origin/main']))
   const headSha = resolveGitRef(options.headRef, originalRef)
-  // Keep the head route manifest while Git moves between revisions.
-  const visualDiffConfig = await loadVisualDiffConfig()
 
   try {
+    if (!options.skipGitCheckout && originalRef !== headSha)
+      await checkoutRef(headSha)
+
+    // Keep the head route manifest while Git moves between revisions.
+    const visualDiffConfig = await loadVisualDiffConfig()
+
     if (!options.skipGitCheckout) {
       await stopFrontendStack()
       await stopBackendStack()
