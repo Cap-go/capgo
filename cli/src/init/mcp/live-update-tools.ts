@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path'
 import type { CapgoSDK } from '../../sdk.js'
 import type { LiveUpdateNextStepInput, LiveUpdateStartInput } from '../../schemas/live-update-onboarding.js'
 import { liveUpdateNextStepSchema, liveUpdateStartSchema } from '../../schemas/live-update-onboarding.js'
+import { capacitorConfigOptionSchema } from '../../schemas/sdk.js'
 import { getConfigWriteTarget, resolveCapacitorConfigTargetPath, withConfigWriteTarget } from '../../config'
 import { getPlatformDirFromCapacitorConfig } from '../../build/platform-paths.js'
 import { isAppAlreadyExistsError } from '../app-conflict.js'
@@ -334,7 +335,7 @@ export function registerLiveUpdateTools(server: McpLike, sdk: CapgoSDK, depsOver
     'Explain a Capgo live-update onboarding step in plain language — call when the user is confused. Defaults to the CURRENT step; pass { state } for a specific one. Read-only; never advances the flow.',
     {
       state: z.string().optional().describe('Optional state name to explain (from a prior result state field).'),
-      capacitorConfig: z.string().min(1).optional().describe('The same app-specific capacitor.config.* source used to start onboarding when more than one source is active for this app.'),
+      capacitorConfig: capacitorConfigOptionSchema.describe('The same app-specific capacitor.config.* source used to start onboarding when more than one source is active for this app.'),
     },
     async (args: { state?: string, capacitorConfig?: string }) => {
       const { capacitorConfig, ...input } = args

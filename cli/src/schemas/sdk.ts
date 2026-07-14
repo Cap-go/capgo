@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { buildCredentialsSchema } from './build'
 
-const capacitorConfigOptionSchema = z.string().min(1).optional().describe('Capacitor config source to update')
+export const capacitorConfigOptionSchema = z.string().min(1).optional().describe('Capacitor config source to update')
 
 function rejectConflictingBooleanGroup<T extends Record<string, unknown>>(value: T, ctx: z.RefinementCtx, keys: Array<keyof T>) {
   const selected = keys.filter(key => value[key] === true)

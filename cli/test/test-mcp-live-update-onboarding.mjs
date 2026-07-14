@@ -146,6 +146,9 @@ await test('registerLiveUpdateTools registers spine + explain', async () => {
   ok(server.tools.capgo_live_update_onboarding_explain)
   ok(server.tools.capgo_live_update_onboarding_next_step.schema.capacitorConfig)
   ok(server.tools.capgo_live_update_onboarding_explain.schema.capacitorConfig)
+  const explainConfigSchema = server.tools.capgo_live_update_onboarding_explain.schema.capacitorConfig
+  eq(explainConfigSchema.safeParse('').success, false)
+  eq(explainConfigSchema.safeParse('./env-configs/capacitor.config.qr-code-reader.ts').success, true)
 })
 
 await test('registerLiveUpdateTools: start returns rendered text', async () => {
