@@ -149,7 +149,21 @@ function compareColumns(
   const expectedColumns = new Map((expected.columns ?? []).map(column => [columnKey(column), column]))
   const actualColumns = new Map((actual.columns ?? []).map(column => [columnKey(column), column]))
 
-  for (const expectedColumn of expected.columns ?? []) {
+  compareExpectedColumns(expected.columns ?? [], actualColumns, issues)
+  compareSubscriberOnlyColumns(
+    actual.columns ?? [],
+    expectedColumns,
+    issues,
+    allowSafeSubscriberOnlyObjects,
+  )
+}
+
+function compareExpectedColumns(
+  expectedColumns: SchemaColumn[],
+  actualColumns: Map<string, SchemaColumn>,
+  issues: SchemaCompatibilityIssue[],
+): void {
+  for (const expectedColumn of expectedColumns) {
     const key = columnKey(expectedColumn)
     const actualColumn = actualColumns.get(key)
     if (!actualColumn) {
@@ -157,39 +171,55 @@ function compareColumns(
       continue
     }
 
-    if (actualColumn.type !== expectedColumn.type) {
-      issues.push({
-        kind: 'column',
-        object: key,
-        reason: `expected type ${expectedColumn.type}, found ${actualColumn.type}`,
-      })
-    }
-    if (actualColumn.notNull !== expectedColumn.notNull) {
-      issues.push({
-        kind: 'column',
-        object: key,
-        reason: expectedColumn.notNull
-          ? 'publisher is NOT NULL while subscriber accepts NULL'
-          : 'subscriber is NOT NULL while publisher accepts NULL',
-      })
-    }
-    if (actualColumn.identity !== expectedColumn.identity) {
-      issues.push({
-        kind: 'column',
-        object: key,
-        reason: `expected identity kind ${displayValue(expectedColumn.identity)}, found ${displayValue(actualColumn.identity)}`,
-      })
-    }
-    if (actualColumn.generated !== expectedColumn.generated) {
-      issues.push({
-        kind: 'column',
-        object: key,
-        reason: `expected generated kind ${displayValue(expectedColumn.generated)}, found ${displayValue(actualColumn.generated)}`,
-      })
-    }
+    compareMatchingColumns(expectedColumn, actualColumn, issues)
   }
+}
 
-  for (const actualColumn of actual.columns ?? []) {
+function compareMatchingColumns(
+  expectedColumn: SchemaColumn,
+  actualColumn: SchemaColumn,
+  issues: SchemaCompatibilityIssue[],
+): void {
+  const key = columnKey(expectedColumn)
+  if (actualColumn.type !== expectedColumn.type) {
+    issues.push({
+      kind: 'column',
+      object: key,
+      reason: `expected type ${expectedColumn.type}, found ${actualColumn.type}`,
+    })
+  }
+  if (actualColumn.notNull !== expectedColumn.notNull) {
+    issues.push({
+      kind: 'column',
+      object: key,
+      reason: expectedColumn.notNull
+        ? 'publisher is NOT NULL while subscriber accepts NULL'
+        : 'subscriber is NOT NULL while publisher accepts NULL',
+    })
+  }
+  if (actualColumn.identity !== expectedColumn.identity) {
+    issues.push({
+      kind: 'column',
+      object: key,
+      reason: `expected identity kind ${displayValue(expectedColumn.identity)}, found ${displayValue(actualColumn.identity)}`,
+    })
+  }
+  if (actualColumn.generated !== expectedColumn.generated) {
+    issues.push({
+      kind: 'column',
+      object: key,
+      reason: `expected generated kind ${displayValue(expectedColumn.generated)}, found ${displayValue(actualColumn.generated)}`,
+    })
+  }
+}
+
+function compareSubscriberOnlyColumns(
+  actualColumns: SchemaColumn[],
+  expectedColumns: Map<string, SchemaColumn>,
+  issues: SchemaCompatibilityIssue[],
+  allowSafeSubscriberOnlyObjects: boolean,
+): void {
+  for (const actualColumn of actualColumns) {
     const key = columnKey(actualColumn)
     if (expectedColumns.has(key))
       continue
@@ -266,42 +296,79 @@ function compareIndexes(
   const expectedIndexes = new Map((expected.indexes ?? []).map(index => [index.name, index]))
   const actualIndexes = new Map((actual.indexes ?? []).map(index => [index.name, index]))
 
-  for (const expectedIndex of expected.indexes ?? []) {
+  compareExpectedIndexes(expected.indexes ?? [], actualIndexes, issues)
+  compareSubscriberOnlyIndexes(
+    actual.indexes ?? [],
+    expectedIndexes,
+    issues,
+    allowSafeSubscriberOnlyObjects,
+  )
+}
+
+function compareExpectedIndexes(
+  expectedIndexes: SchemaIndex[],
+  actualIndexes: Map<string, SchemaIndex>,
+  issues: SchemaCompatibilityIssue[],
+): void {
+  for (const expectedIndex of expectedIndexes) {
     const actualIndex = actualIndexes.get(expectedIndex.name)
     if (!actualIndex) {
       issues.push({ kind: 'index', object: expectedIndex.name, reason: 'missing required index' })
       continue
     }
-    if (actualIndex.table !== expectedIndex.table) {
-      issues.push({
-        kind: 'index',
-        object: expectedIndex.name,
-        reason: `expected table ${expectedIndex.table}, found ${actualIndex.table}`,
-      })
-    }
-    if (actualIndex.definition !== expectedIndex.definition)
-      issues.push({ kind: 'index', object: expectedIndex.name, reason: 'index definition differs' })
-    if (actualIndex.valid !== expectedIndex.valid) {
-      issues.push({
-        kind: 'index',
-        object: expectedIndex.name,
-        reason: expectedIndex.valid && !actualIndex.valid
-          ? 'index is invalid'
-          : `expected valid ${displayValue(expectedIndex.valid)}, found ${displayValue(actualIndex.valid)}`,
-      })
-    }
-    if (expectedIndex.constraintOwned !== undefined && actualIndex.constraintOwned !== undefined) {
-      if (actualIndex.constraintOwned !== expectedIndex.constraintOwned) {
-        issues.push({
-          kind: 'index',
-          object: expectedIndex.name,
-          reason: `expected constraintOwned ${displayValue(expectedIndex.constraintOwned)}, found ${displayValue(actualIndex.constraintOwned)}`,
-        })
-      }
-    }
-  }
 
-  for (const actualIndex of actual.indexes ?? []) {
+    compareMatchingIndexes(expectedIndex, actualIndex, issues)
+  }
+}
+
+function compareMatchingIndexes(
+  expectedIndex: SchemaIndex,
+  actualIndex: SchemaIndex,
+  issues: SchemaCompatibilityIssue[],
+): void {
+  if (actualIndex.table !== expectedIndex.table) {
+    issues.push({
+      kind: 'index',
+      object: expectedIndex.name,
+      reason: `expected table ${expectedIndex.table}, found ${actualIndex.table}`,
+    })
+  }
+  if (actualIndex.definition !== expectedIndex.definition)
+    issues.push({ kind: 'index', object: expectedIndex.name, reason: 'index definition differs' })
+  if (actualIndex.valid !== expectedIndex.valid) {
+    issues.push({
+      kind: 'index',
+      object: expectedIndex.name,
+      reason: expectedIndex.valid && !actualIndex.valid
+        ? 'index is invalid'
+        : `expected valid ${displayValue(expectedIndex.valid)}, found ${displayValue(actualIndex.valid)}`,
+    })
+  }
+  if (indexConstraintOwnershipDiffers(expectedIndex, actualIndex)) {
+    issues.push({
+      kind: 'index',
+      object: expectedIndex.name,
+      reason: `expected constraintOwned ${displayValue(expectedIndex.constraintOwned)}, found ${displayValue(actualIndex.constraintOwned)}`,
+    })
+  }
+}
+
+function indexConstraintOwnershipDiffers(
+  expectedIndex: SchemaIndex,
+  actualIndex: SchemaIndex,
+): boolean {
+  return expectedIndex.constraintOwned !== undefined
+    && actualIndex.constraintOwned !== undefined
+    && actualIndex.constraintOwned !== expectedIndex.constraintOwned
+}
+
+function compareSubscriberOnlyIndexes(
+  actualIndexes: SchemaIndex[],
+  expectedIndexes: Map<string, SchemaIndex>,
+  issues: SchemaCompatibilityIssue[],
+  allowSafeSubscriberOnlyObjects: boolean,
+): void {
+  for (const actualIndex of actualIndexes) {
     if (expectedIndexes.has(actualIndex.name))
       continue
     if (allowSafeSubscriberOnlyObjects && subscriberOnlyIndexCannotRejectPublisherRows(actualIndex))
@@ -315,7 +382,6 @@ function compareIndexes(
     })
   }
 }
-
 function compareTypes(
   expected: SchemaCatalog,
   actual: SchemaCatalog,
