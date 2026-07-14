@@ -1,14 +1,13 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import { toast } from 'vue-sonner'
 import IconActivity from '~icons/lucide/activity'
 import IconLayers from '~icons/lucide/layers'
 import IconRocket from '~icons/lucide/rocket'
 import IconSmartphone from '~icons/lucide/smartphone'
+import { useNativeObserveStats } from '~/composables/useNativeObserveStats'
 import { formatNumberValue } from '~/services/formatLocale'
-import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 
 interface NativeObservePluginStatsResponse {
@@ -21,17 +20,17 @@ interface NativeObservePluginStatsResponse {
 
 const route = useRoute()
 const displayStore = useDisplayStore()
-const supabase = useSupabase()
 const { t } = useI18n()
 
 const packageId = computed(() => {
   const app = (route.params as Record<string, string | string[] | undefined>).app
   return Array.isArray(app) ? app[0] ?? '' : String(app ?? '')
 })
-const stats = ref<NativeObservePluginStatsResponse | null>(null)
-const statsLoading = ref(false)
-let latestStatsRequest = 0
-
+const { stats, statsLoading, fetchStats: fetchPluginStats } = useNativeObserveStats<NativeObservePluginStatsResponse>(
+  packageId,
+  () => ({ view: 'plugins' }),
+  'native observe plugin stats',
+)
 const pluginVersions = computed(() => stats.value?.pluginVersions ?? [])
 const pluginFleetDevices = computed(() => pluginVersions.value[0]?.total_devices ?? 0)
 const dominantPluginVersion = computed(() => pluginVersions.value[0] ?? null)
@@ -51,57 +50,6 @@ function pluginVersionShare(version: NativeObservePluginStatsResponse['pluginVer
     return 0
   return (version.devices / version.total_devices) * 100
 }
-
-async function fetchPluginStats() {
-  if (!packageId.value)
-    return
-
-  const requestId = ++latestStatsRequest
-  statsLoading.value = true
-  try {
-    const { data: sessionData } = await supabase.auth.getSession()
-    if (!sessionData.session) {
-      if (requestId === latestStatsRequest)
-        toast.error(t('not-authenticated'))
-      return
-    }
-
-    const response = await fetch(`${defaultApiHost}/private/native_observe_stats`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'authorization': `Bearer ${sessionData.session.access_token}`,
-      },
-      body: JSON.stringify({
-        app_id: packageId.value,
-        view: 'plugins',
-      }),
-    })
-
-    if (requestId !== latestStatsRequest)
-      return
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      console.error('Failed to fetch native observe plugin stats:', errorData)
-      toast.error(t('failed-to-fetch-native-observe-stats'))
-      return
-    }
-
-    stats.value = await response.json() as NativeObservePluginStatsResponse
-  }
-  catch (error) {
-    if (requestId !== latestStatsRequest)
-      return
-    console.error('Error fetching native observe plugin stats:', error)
-    toast.error(t('failed-to-fetch-native-observe-stats'))
-  }
-  finally {
-    if (requestId === latestStatsRequest)
-      statsLoading.value = false
-  }
-}
-
 watch(packageId, () => {
   displayStore.NavTitle = t('observe')
   displayStore.defaultBack = '/apps'
