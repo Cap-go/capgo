@@ -12,10 +12,12 @@ dayjs.extend(utc)
 
 const supportedPeriodDays = [1, 3, 7, 30] as const
 type NativeObservePeriodDays = typeof supportedPeriodDays[number]
+type NativeObserveView = 'global' | 'plugins'
 
 interface NativeObserveStatsRequest {
   app_id: string
   days?: number
+  view?: NativeObserveView
 }
 
 interface NativeObserveMetricRow {
@@ -67,7 +69,6 @@ type NativeObserveNumericValue = number | string | null | undefined
 interface BuildNativeObserveResponseInput {
   labels: string[]
   days: NativeObservePeriodDays
-  pluginVersionRows: NativeObservePluginVersionRow[]
   start: string
   end: string
   dailyRows: NativeObserveMetricRow[]
@@ -227,6 +228,13 @@ function normalizeNativeObservePeriodDays(days: number | undefined = 7): NativeO
   return days as NativeObservePeriodDays
 }
 
+function normalizeNativeObserveView(value: unknown): NativeObserveView | null {
+  if (value === undefined || value === 'global')
+    return 'global'
+  if (value === 'plugins')
+    return 'plugins'
+  return null
+}
 function generateDateLabels(from: Date, to: Date) {
   const start = dayjs(from).utc().startOf('day')
   const end = dayjs(to).utc().startOf('day')
@@ -373,12 +381,17 @@ function buildNativeObserveResponse(input: BuildNativeObserveResponseInput) {
       launch_p90_ms: toMetric(row.launch_p90_ms),
       webview_load_p90_ms: toMetric(row.webview_load_p90_ms),
     })),
-    pluginVersions: input.pluginVersionRows.map(row => ({
+    releaseMarkers: input.releaseMarkers,
+  }
+}
+
+function buildNativeObservePluginResponse(pluginVersionRows: NativeObservePluginVersionRow[]) {
+  return {
+    pluginVersions: pluginVersionRows.map(row => ({
       plugin_version: row.plugin_version,
       devices: toCount(row.devices),
       total_devices: toCount(row.total_devices),
     })),
-    releaseMarkers: input.releaseMarkers,
   }
 }
 
@@ -395,7 +408,6 @@ async function readNativeObserveStats(c: Context<MiddlewareKeyVariables>, appId:
     const dailyResult = await db.query<NativeObserveMetricRow>(dailyStatsQuery, params)
     const actionResult = await db.query<NativeObserveMetricRow>(actionStatsQuery, params)
     const overviewResult = await db.query<NativeObserveOverviewRow>(overviewStatsQuery, paramsWithIssues)
-    const pluginVersionResult = await db.query<NativeObservePluginVersionRow>(pluginVersionStatsQuery, [appId])
     const versionResult = await db.query<NativeObserveVersionRow>(versionStatsQuery, paramsWithIssues)
     const releaseMarkersResult = await db.query<NativeObserveReleaseMarker>(releaseMarkersQuery, params.slice(0, 3))
 
@@ -406,7 +418,6 @@ async function readNativeObserveStats(c: Context<MiddlewareKeyVariables>, appId:
       end: endInclusive.toISOString(),
       dailyRows: dailyResult.rows,
       actionRows: actionResult.rows,
-      pluginVersionRows: pluginVersionResult.rows,
       versionRows: versionResult.rows,
       overviewRow: overviewResult.rows[0],
       releaseMarkers: releaseMarkersResult.rows,
@@ -414,6 +425,22 @@ async function readNativeObserveStats(c: Context<MiddlewareKeyVariables>, appId:
   }
   catch (error) {
     logPgError(c, 'readNativeObserveStats', error)
+    throw error
+  }
+  finally {
+    await closeClient(c, db)
+  }
+}
+
+async function readNativeObservePluginStats(c: Context<MiddlewareKeyVariables>, appId: string) {
+  const db = getPgClient(c, true)
+
+  try {
+    const pluginVersionResult = await db.query<NativeObservePluginVersionRow>(pluginVersionStatsQuery, [appId])
+    return buildNativeObservePluginResponse(pluginVersionResult.rows)
+  }
+  catch (error) {
+    logPgError(c, 'readNativeObservePluginStats', error)
     throw error
   }
   finally {
@@ -432,15 +459,22 @@ app.post('/', middlewareAuth, async (c) => {
   if (!body.app_id)
     throw simpleError('missing_params', 'app_id is required')
 
+  const view = normalizeNativeObserveView(body.view)
+  if (!view)
+    throw simpleError('invalid_view', 'view must be global or plugins')
+
   const days = normalizeNativeObservePeriodDays(body.days)
-  if (!days)
+  if (view === 'global' && !days)
     throw simpleError('invalid_days', 'days must be one of 1, 3, 7, or 30')
 
   if (!(await checkPermission(c, 'app.read', { appId: body.app_id })))
     throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.app_id })
 
   try {
-    return c.json(await readNativeObserveStats(c, body.app_id, days))
+    if (view === 'plugins')
+      return c.json(await readNativeObservePluginStats(c, body.app_id))
+
+    return c.json(await readNativeObserveStats(c, body.app_id, days as NativeObservePeriodDays))
   }
   catch (error) {
     cloudlog({ requestId: c.get('requestId'), message: 'Error fetching native observe stats', error })
@@ -449,7 +483,9 @@ app.post('/', middlewareAuth, async (c) => {
 })
 
 export const nativeObserveStatsTestUtils = {
+  buildNativeObservePluginResponse,
   buildNativeObserveResponse,
   generateDateLabels,
   normalizeNativeObservePeriodDays,
+  normalizeNativeObserveView,
 }

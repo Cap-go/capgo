@@ -17,6 +17,7 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
   { slug: 'channels', path: '/app/com.demo.app/channels', auth: true },
   { slug: 'devices', path: '/app/com.demo.app/devices', auth: true },
   { slug: 'observe', path: '/app/com.demo.app/observe', auth: true },
+  { slug: 'observe-plugins', path: '/app/com.demo.app/observe/plugins', auth: true },
 ]
 
 export const visualDiffViewport = {

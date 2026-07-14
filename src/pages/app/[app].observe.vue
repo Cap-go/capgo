@@ -72,11 +72,6 @@ interface NativeObserveStatsResponse {
     launch_p90_ms: number | null
     webview_load_p90_ms: number | null
   }>
-  pluginVersions: Array<{
-    plugin_version: string
-    devices: number
-    total_devices: number
-  }>
   releaseMarkers: Array<{
     version_name: string
     channel_name: string
@@ -100,7 +95,6 @@ const periodDayOptions: PeriodDayOption[] = [1, 3, 7, 30]
 const stats = ref<NativeObserveStatsResponse | null>(null)
 const statsLoading = ref(false)
 let latestStatsRequest = 0
-const topPluginVersions = computed(() => stats.value?.pluginVersions?.slice(0, 8) ?? [])
 
 const hasData = computed(() => (stats.value?.overview.total_events ?? 0) > 0)
 const topActions = computed(() => stats.value?.actionBreakdown.slice(0, 10) ?? [])
@@ -453,48 +447,6 @@ watch([packageId, days], async () => {
           <Spinner size="w-5 h-5" />
         </div>
 
-        <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-          <div class="flex items-center justify-between gap-3 mb-4">
-            <div>
-              <h2 class="text-base font-semibold text-slate-950 dark:text-white">
-                {{ t('native-observe-plugin-adoption') }}
-              </h2>
-              <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                {{ t('native-observe-plugin-adoption-help') }}
-              </p>
-            </div>
-            <IconRocket class="w-5 h-5 text-violet-500" />
-          </div>
-          <div v-if="topPluginVersions.length" class="overflow-x-auto">
-            <table class="d-table d-table-sm w-full min-w-[460px]">
-              <thead>
-                <tr>
-                  <th class="whitespace-nowrap">
-                    {{ t('native-observe-plugin-version') }}
-                  </th>
-                  <th class="whitespace-nowrap">
-                    {{ t('devices') }}
-                  </th>
-                  <th class="whitespace-nowrap">
-                    {{ t('adoption-rate') }}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="version in topPluginVersions" :key="version.plugin_version">
-                  <td class="font-medium text-slate-900 dark:text-slate-100">
-                    {{ version.plugin_version }}
-                  </td>
-                  <td>{{ formatCount(version.devices) }}</td>
-                  <td>{{ formatPercent(version.total_devices > 0 ? (version.devices / version.total_devices) * 100 : 0) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div v-else class="text-sm text-slate-500 dark:text-slate-400">
-            {{ t('native-observe-no-plugin-data') }}
-          </div>
-        </div>
         <div v-if="!hasData" class="flex flex-col items-center justify-center h-72 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
           <IconActivity class="w-12 h-12 mb-3" />
           <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100">
