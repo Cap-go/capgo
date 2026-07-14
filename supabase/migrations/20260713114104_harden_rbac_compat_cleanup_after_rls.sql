@@ -5364,6 +5364,20 @@ ALTER FUNCTION public.check_if_org_can_exist() OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.check_if_org_can_exist() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.check_if_org_can_exist() TO service_role;
 
+DROP TRIGGER IF EXISTS check_privileges ON public.org_users;
+CREATE TRIGGER check_privileges
+BEFORE INSERT OR UPDATE OF user_id, org_id, rbac_role_name ON public.org_users
+FOR EACH ROW
+WHEN (
+  current_setting('request.jwt.claim.role', true) = 'authenticated'
+  AND NOT (
+    current_setting('request.jwt.claim.email', true) = ANY (
+      ARRAY['bot@capgo.app', 'test@capgo.app']
+    )
+  )
+)
+EXECUTE FUNCTION public.check_org_user_privileges();
+
 DROP TRIGGER IF EXISTS sync_org_user_to_role_binding_on_insert ON public.org_users;
 DROP TRIGGER IF EXISTS sync_org_user_role_binding_on_update ON public.org_users;
 DROP TRIGGER IF EXISTS sync_org_user_role_binding_on_delete ON public.org_users;
