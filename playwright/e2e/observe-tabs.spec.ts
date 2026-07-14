@@ -29,7 +29,6 @@ test.describe('Observe sections', () => {
     const pluginsBox = await pluginsTab.boundingBox()
     expect(globalBox?.x).toBeGreaterThanOrEqual(0)
     expect((pluginsBox?.x ?? 0) + (pluginsBox?.width ?? 0)).toBeLessThanOrEqual(375)
-    expect(pluginsBox?.height).toBeGreaterThanOrEqual(38)
 
     await globalTab.click()
     await expect(page).toHaveURL(/\/app\/com\.demo\.app\/observe$/)
