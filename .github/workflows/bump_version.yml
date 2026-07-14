@@ -32,6 +32,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          filter: blob:none
       - name: Setup bun
         run: bash scripts/setup-bun.sh
       - name: Resolve Capgo release scope
@@ -85,6 +86,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          filter: blob:none
           token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
@@ -209,6 +211,7 @@ jobs:
           ref: main
           token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
           fetch-depth: 0
+          filter: blob:none
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:

@@ -115,6 +115,7 @@ jobs:
         with:
           ref: ${{ steps.pr.outputs.sha }}
           fetch-depth: 0
+          filter: blob:none
           submodules: recursive
           token: ${{ secrets.CLI_MCP_TESTS_TOKEN || secrets.PERSONAL_ACCESS_TOKEN || github.token }}
           persist-credentials: false
