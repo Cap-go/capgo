@@ -6,6 +6,7 @@ export const liveUpdateStartSchema = z.object({
 })
 
 export const liveUpdateNextStepSchema = z.object({
+  capacitorConfig: z.string().min(1).optional().describe('The same app-specific capacitor.config.* source used to start onboarding when more than one source is active for this app.'),
   resumeChoice: z.enum(['continue', 'restart']).optional().describe('Answer to the resume prompt: "continue" resumes saved progress, "restart" wipes it'),
   encryptionChoice: z.enum(['enable', 'skip']).optional().describe('Answer at setup-encryption: "enable" turns on bundle encryption, "skip" leaves it off'),
   platform: z.enum(['ios', 'android']).optional().describe('Answer at select-platform: target device platform'),

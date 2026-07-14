@@ -2796,14 +2796,8 @@ async function addEncryptionStep(orgId: string, apikey: string, appId: string) {
     // setupChannel=false avoids a rogue clack confirm when an old private
     // key is present in the config.
     try {
-      const previousCwd = cwd()
-      try {
-        chdir(projectDir)
-        await createKeyInternal({ force: true, setupChannel: false }, true, getInitConfigLoadDir(projectDir))
-      }
-      finally {
-        chdir(previousCwd)
-      }
+      const encryptionConfig = await withTemporaryCwd(getInitConfigLoadDir(projectDir), () => getConfig())
+      await withTemporaryCwd(projectDir, () => createKeyInternal({ force: true, setupChannel: false }, true, encryptionConfig))
       // Intentionally stop without a success message: the persistent
       // encryption summary panel renders on the next step and already shows
       // the outcome. Passing a message here would push it into the rolling

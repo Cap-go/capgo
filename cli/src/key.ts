@@ -1,10 +1,10 @@
+import type { ExtConfigPairs } from './config'
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
-import { chdir, cwd } from 'node:process'
 import { intro, log, outro, confirm as pConfirm } from '@clack/prompts'
 import { trackEvent } from './analytics/track'
 import { createRSA } from './api/crypto'
 import { checkAlerts } from './api/update'
-import { writeConfigUpdater } from './config'
+import { writeConfigSnapshot, writeConfigUpdater } from './config'
 import { baseKey, baseKeyPub, baseKeyPubV2, baseKeyV2, getConfig, promptAndSyncCapacitor } from './utils'
 
 interface SaveOptions {
@@ -23,20 +23,6 @@ function ensureCapacitorUpdaterConfig(config: any) {
   config.plugins.extConfig ??= {}
   config.plugins.CapacitorUpdater ??= {}
   return config.plugins.CapacitorUpdater
-}
-
-async function withConfigLoadDir<T>(configLoadDir: string | undefined, action: () => Promise<T>): Promise<T> {
-  if (!configLoadDir)
-    return action()
-
-  const previousCwd = cwd()
-  try {
-    chdir(configLoadDir)
-    return await action()
-  }
-  finally {
-    chdir(previousCwd)
-  }
 }
 
 export async function saveKeyInternal(options: SaveOptions, silent = false) {
@@ -147,7 +133,7 @@ export async function saveKeyCommand(options: SaveOptions) {
   await saveKeyInternal(options, false)
 }
 
-export async function createKeyInternal(options: Options, silent = false, configLoadDir?: string) {
+export async function createKeyInternal(options: Options, silent = false, existingConfig?: ExtConfigPairs) {
   if (!silent)
     intro('Create keys 🔑')
 
@@ -167,7 +153,7 @@ export async function createKeyInternal(options: Options, silent = false, config
   }
   writeFileSync(baseKeyV2, privateKey)
 
-  const extConfig = await withConfigLoadDir(configLoadDir, () => getConfig())
+  const extConfig = existingConfig ?? await getConfig()
 
   if (extConfig) {
     const updaterConfig = ensureCapacitorUpdaterConfig(extConfig.config)
@@ -188,7 +174,7 @@ export async function createKeyInternal(options: Options, silent = false, config
     }
 
     updaterConfig.publicKey = publicKey
-    await withConfigLoadDir(configLoadDir, () => writeConfigUpdater(extConfig))
+    await writeConfigSnapshot(extConfig)
   }
 
   void trackEvent({ channel: 'key', event: 'Encryption Keys Generated', icon: '🔑', tags: {} })

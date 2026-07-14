@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { buildCredentialsSchema } from './build'
 
+const capacitorConfigOptionSchema = z.string().min(1).optional().describe('Capacitor config source to update')
+
 function rejectConflictingBooleanGroup<T extends Record<string, unknown>>(value: T, ctx: z.RefinementCtx, keys: Array<keyof T>) {
   const selected = keys.filter(key => value[key] === true)
   if (selected.length < 2)
@@ -104,11 +106,13 @@ export const uploadOptionsSchema = z.object({
   comment: z.string().optional(),
   minUpdateVersion: z.string().optional(),
   autoMinUpdateVersion: z.boolean().optional(),
+  autoSetBundle: z.boolean().optional(),
   selfAssign: z.boolean().optional(),
   packageJsonPaths: z.string().optional(),
   ignoreCompatibilityCheck: z.boolean().optional(),
   disableCodeCheck: z.boolean().optional(),
   useZip: z.boolean().optional(),
+  capacitorConfig: capacitorConfigOptionSchema,
 })
 
 export type UploadOptions = z.infer<typeof uploadOptionsSchema>
@@ -159,8 +163,9 @@ export type CleanupOptions = z.infer<typeof cleanupOptionsSchema>
 // ============================================================================
 
 export const generateKeyOptionsSchema = z.object({
-  force: z.boolean().optional(),
+  force: z.boolean().optional().describe('Overwrite existing keys if they exist'),
   setupChannel: z.boolean().optional(),
+  capacitorConfig: capacitorConfigOptionSchema,
 })
 
 export type GenerateKeyOptions = z.infer<typeof generateKeyOptionsSchema>
@@ -169,6 +174,7 @@ export const saveKeyOptionsSchema = z.object({
   keyPath: z.string().optional(),
   keyData: z.string().optional(),
   setupChannel: z.boolean().optional(),
+  capacitorConfig: capacitorConfigOptionSchema,
 })
 
 export type SaveKeyOptions = z.infer<typeof saveKeyOptionsSchema>
@@ -176,6 +182,7 @@ export type SaveKeyOptions = z.infer<typeof saveKeyOptionsSchema>
 export const deleteOldKeyOptionsSchema = z.object({
   force: z.boolean().optional(),
   setupChannel: z.boolean().optional(),
+  capacitorConfig: capacitorConfigOptionSchema,
 })
 
 export type DeleteOldKeyOptions = z.infer<typeof deleteOldKeyOptionsSchema>
@@ -405,6 +412,7 @@ export const setSettingOptionsSchema = z.object({
   apikey: z.string().optional(),
   bool: z.string().optional(),
   string: z.string().optional(),
+  capacitorConfig: capacitorConfigOptionSchema,
 })
 
 export type SetSettingOptions = z.infer<typeof setSettingOptionsSchema>

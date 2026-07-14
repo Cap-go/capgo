@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { existsSync, statSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
 import { cwd } from 'node:process'
@@ -7,7 +8,8 @@ import { loadConfig as loadConfigCap, writeConfig as writeConfigCap } from '../c
 export type { CapacitorConfig, ExtConfigPairs } from '../schemas/config'
 
 let configWriteTarget: string | undefined
-const capacitorConfigFilePattern = /^capacitor\.config(?:\.[^.]+)?\.(?:ts|js|json)$/
+const configWriteTargetStore = new AsyncLocalStorage<{ filePath: string | undefined }>()
+const capacitorConfigFilePattern = /^capacitor\.config(?:\.[^.]+)*\.(?:ts|js|json)$/
 
 /**
  * Overrides the config file Capacitor writes after loading the active root config.
@@ -19,7 +21,16 @@ export function setConfigWriteTarget(filePath?: string): void {
 }
 
 export function getConfigWriteTarget(): string | undefined {
-  return configWriteTarget
+  const scopedTarget = configWriteTargetStore.getStore()
+  return scopedTarget === undefined ? configWriteTarget : scopedTarget.filePath
+}
+
+/**
+ * Uses a request-local config target so concurrent MCP tool calls cannot
+ * redirect one another's writes while awaiting async work.
+ */
+export function withConfigWriteTarget<T>(filePath: string | undefined, action: () => T): T {
+  return configWriteTargetStore.run({ filePath }, action)
 }
 
 export function resolveCapacitorConfigTargetPath(value: string | undefined, initialCwd = cwd()): string | undefined {
@@ -40,7 +51,7 @@ export async function loadConfig(): Promise<ExtConfigPairs | undefined> {
   const config = await loadConfigCap()
   return {
     config: config.app.extConfig,
-    path: configWriteTarget ?? config.app.extConfigFilePath,
+    path: getConfigWriteTarget() ?? config.app.extConfigFilePath,
   }
 }
 
@@ -62,8 +73,12 @@ export async function writeConfig(key: string, config: ExtConfigPairs, raw = fal
       extConfig.plugins[key] = config.config.plugins?.[key]
     else
       extConfig = config.config
-    await writeConfigCap(extConfig, configWriteTarget ?? oldConfig.app.extConfigFilePath)
+    await writeConfigCap(extConfig, getConfigWriteTarget() ?? oldConfig.app.extConfigFilePath)
   }
+}
+
+export async function writeConfigSnapshot(config: ExtConfigPairs): Promise<void> {
+  await writeConfigCap(config.config, config.path)
 }
 
 export async function writeConfigUpdater(config: ExtConfigPairs, raw = false): Promise<void> {

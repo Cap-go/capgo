@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Headless tests for the MCP-conducted Capgo live-update onboarding engine. */
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -8,8 +8,8 @@ import process from 'node:process'
 console.log('🧪 Testing MCP live-update onboarding...\n')
 
 const { renderResult, LIVE_UPDATE_RULES } = await import('../src/init/mcp/contract.ts')
-const { clearAllSessions } = await import('../src/init/mcp/session-state.ts')
-
+const { clearAllSessions, getSession, mergeSession } = await import('../src/init/mcp/session-state.ts')
+const { clearLiveUpdateProgress, loadLiveUpdateProgress, saveLiveUpdateProgress } = await import('../src/init/mcp/progress.ts')
 let pass = 0
 let fail = 0
 async function test(name, fn) {
@@ -144,6 +144,8 @@ await test('registerLiveUpdateTools registers spine + explain', async () => {
   ok(server.tools.start_capgo_live_update_onboarding.schema.capacitorConfig)
   ok(server.tools.capgo_live_update_onboarding_next_step)
   ok(server.tools.capgo_live_update_onboarding_explain)
+  ok(server.tools.capgo_live_update_onboarding_next_step.schema.capacitorConfig)
+  ok(server.tools.capgo_live_update_onboarding_explain.schema.capacitorConfig)
 })
 
 await test('registerLiveUpdateTools: start returns rendered text', async () => {
@@ -153,14 +155,14 @@ await test('registerLiveUpdateTools: start returns rendered text', async () => {
   ok(res.content[0].text.includes('Capgo live-update onboarding'))
 })
 
-const { getConfigWriteTarget, setConfigWriteTarget } = await import('../src/config/index.ts')
-const { liveUpdateStartSchema } = await import('../src/schemas/live-update-onboarding.ts')
-
+const { getConfigWriteTarget, setConfigWriteTarget, withConfigWriteTarget } = await import('../src/config/index.ts')
+const { liveUpdateNextStepSchema, liveUpdateStartSchema } = await import('../src/schemas/live-update-onboarding.ts')
 await test('live-update onboarding validates Capacitor config target input', async () => {
   eq(liveUpdateStartSchema.safeParse({ capacitorConfig: '' }).success, false)
+  eq(liveUpdateNextStepSchema.safeParse({ capacitorConfig: '' }).success, false)
+  eq(liveUpdateNextStepSchema.safeParse({ capacitorConfig: './env-configs/capacitor.config.qr-code-reader.ts' }).success, true)
   eq(liveUpdateStartSchema.safeParse({}).success, true)
 })
-
 const { startMcpServer } = await import('../src/mcp/server.ts')
 
 await test('MCP startup restores the prior config target after failure', async () => {
@@ -190,18 +192,29 @@ await test('MCP startup restores the prior config target after failure', async (
   }
 })
 
-await test('registerLiveUpdateTools keeps a start config target for later steps', async () => {
+await test('registerLiveUpdateTools keeps a request-local start config target for later steps', async () => {
   const root = mkdtempSync(join(tmpdir(), 'capgo-live-update-config-'))
   const target = join(root, 'capacitor.config.qr-code-reader.ts')
   const previousTarget = getConfigWriteTarget()
+  const serverTarget = '/tmp/capgo-server-config.ts'
+  const observedTargets = []
   try {
     writeFileSync(target, 'export default {}\n')
+    setConfigWriteTarget(serverTarget)
     const server = fakeServer()
-    registerLiveUpdateTools(server, null, fakeDeps({ cwd: root, getAppId: async () => undefined }))
-    await server.tools.start_capgo_live_update_onboarding.handler({ capacitorConfig: './capacitor.config.qr-code-reader.ts' })
-    eq(getConfigWriteTarget(), target)
-    await server.tools.capgo_live_update_onboarding_next_step.handler({})
-    eq(getConfigWriteTarget(), target)
+    registerLiveUpdateTools(server, null, fakeDeps({
+      cwd: root,
+      setupEncryption: async (_appId, enable) => {
+        observedTargets.push(getConfigWriteTarget())
+        return { ok: true, enabled: enable }
+      },
+    }))
+    const started = await server.tools.start_capgo_live_update_onboarding.handler({ capacitorConfig: './capacitor.config.qr-code-reader.ts' })
+    ok(started.content[0].text.includes(target))
+    eq(getConfigWriteTarget(), serverTarget)
+    await server.tools.capgo_live_update_onboarding_next_step.handler({ resumeChoice: 'continue', encryptionChoice: 'enable' })
+    eq(observedTargets[0], target)
+    eq(getConfigWriteTarget(), serverTarget)
 
     let missingError
     try {
@@ -211,6 +224,297 @@ await test('registerLiveUpdateTools keeps a start config target for later steps'
       missingError = error
     }
     ok(String(missingError).includes('Capacitor config path does not exist'))
+  }
+  finally {
+    setConfigWriteTarget(previousTarget)
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+await test('routing config does not bypass the saved-progress resume choice', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'capgo-live-update-resume-config-'))
+  const target = join(root, 'capacitor.config.qr-code-reader.ts')
+  const progress = { step_done: 4, appId: 'com.acme.app' }
+  try {
+    writeFileSync(target, 'export default {}\n')
+    const server = fakeServer()
+    registerLiveUpdateTools(server, null, fakeDeps({
+      cwd: root,
+      loadProgress: () => progress,
+      saveProgress: () => {},
+      clearProgress: () => {},
+    }))
+
+    const started = await server.tools.start_capgo_live_update_onboarding.handler({ capacitorConfig: './capacitor.config.qr-code-reader.ts' })
+    ok(started.content[0].text.includes('"state": "resume-prompt"'))
+
+    const continued = await server.tools.capgo_live_update_onboarding_next_step.handler({ capacitorConfig: './capacitor.config.qr-code-reader.ts' })
+    ok(continued.content[0].text.includes('"state": "resume-prompt"'))
+  }
+  finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+await test('scopes onboarding session and progress by Capacitor config source', async () => {
+  const firstTarget = '/tmp/capgo-live-update-first.ts'
+  const secondTarget = '/tmp/capgo-live-update-second.ts'
+  try {
+    withConfigWriteTarget(firstTarget, () => {
+      mergeSession('com.acme.shared', { encryptionChoice: 'enable' })
+      saveLiveUpdateProgress({ step_done: 4, appId: 'com.acme.shared' })
+    })
+    withConfigWriteTarget(secondTarget, () => {
+      mergeSession('com.acme.shared', { encryptionChoice: 'skip' })
+      saveLiveUpdateProgress({ step_done: 7, appId: 'com.acme.shared' })
+    })
+
+    withConfigWriteTarget(firstTarget, () => {
+      eq(getSession('com.acme.shared').encryptionChoice, 'enable')
+      eq(loadLiveUpdateProgress()?.step_done, 4)
+    })
+    withConfigWriteTarget(secondTarget, () => {
+      eq(getSession('com.acme.shared').encryptionChoice, 'skip')
+      eq(loadLiveUpdateProgress()?.step_done, 7)
+    })
+  }
+  finally {
+    withConfigWriteTarget(firstTarget, clearLiveUpdateProgress)
+    withConfigWriteTarget(secondTarget, clearLiveUpdateProgress)
+  }
+})
+
+await test('root onboarding migrates legacy progress to its resolved config source', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'capgo-live-update-legacy-progress-'))
+  const rootConfig = join(root, 'capacitor.config.json')
+  const previousCwd = process.cwd()
+  const previousTarget = getConfigWriteTarget()
+  const progressByTarget = new Map([[undefined, { step_done: 4, appId: 'com.acme.shared' }]])
+  try {
+    writeFileSync(join(root, 'package.json'), '{}')
+    writeFileSync(rootConfig, JSON.stringify({ appId: 'com.acme.shared', appName: 'Shared', webDir: 'www' }))
+    process.chdir(root)
+    setConfigWriteTarget(undefined)
+    const server = fakeServer()
+    registerLiveUpdateTools(server, null, fakeDeps({
+      cwd: root,
+      getAppId: async () => 'com.acme.shared',
+      loadProgress: () => progressByTarget.get(getConfigWriteTarget()) ?? null,
+      saveProgress: data => progressByTarget.set(getConfigWriteTarget(), data),
+      clearProgress: () => progressByTarget.delete(getConfigWriteTarget()),
+    }))
+
+    const started = await server.tools.start_capgo_live_update_onboarding.handler({})
+    ok(started.content[0].text.includes('"state": "resume-prompt"'))
+    const resolvedTarget = [...progressByTarget.keys()].find(target => target !== undefined)
+    eq(progressByTarget.get(resolvedTarget)?.step_done, 4)
+    eq(progressByTarget.has(undefined), false)
+  }
+  finally {
+    process.chdir(previousCwd)
+    setConfigWriteTarget(previousTarget)
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+await test('registerLiveUpdateTools returns a concrete root config source for ambiguous continuation', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'capgo-live-update-root-config-'))
+  const rootConfig = join(root, 'capacitor.config.json')
+  const customConfig = join(root, 'capacitor.config.qr-code-reader.ts')
+  const previousCwd = process.cwd()
+  const previousTarget = getConfigWriteTarget()
+  const observedTargets = []
+  const progressByTarget = new Map()
+  try {
+    writeFileSync(join(root, 'package.json'), '{}')
+    writeFileSync(rootConfig, JSON.stringify({ appId: 'com.acme.shared', appName: 'Shared', webDir: 'www' }))
+    writeFileSync(customConfig, 'export default {}\n')
+    process.chdir(root)
+    setConfigWriteTarget(undefined)
+    const server = fakeServer()
+    registerLiveUpdateTools(server, null, fakeDeps({
+      cwd: root,
+      getAppId: async () => 'com.acme.shared',
+      loadProgress: () => progressByTarget.get(getConfigWriteTarget()) ?? null,
+      saveProgress: data => progressByTarget.set(getConfigWriteTarget(), data),
+      clearProgress: () => progressByTarget.delete(getConfigWriteTarget()),
+      setupEncryption: async (_appId, enable) => {
+        observedTargets.push(getConfigWriteTarget())
+        return { ok: true, enabled: enable }
+      },
+    }))
+
+    const rootStarted = await server.tools.start_capgo_live_update_onboarding.handler({})
+    ok(rootStarted.content[0].text.includes(rootConfig))
+    await server.tools.start_capgo_live_update_onboarding.handler({ capacitorConfig: './capacitor.config.qr-code-reader.ts' })
+
+    let ambiguousError
+    try {
+      await server.tools.capgo_live_update_onboarding_next_step.handler({ encryptionChoice: 'enable' })
+    }
+    catch (error) {
+      ambiguousError = error
+    }
+    ok(String(ambiguousError).includes('Multiple Capacitor config sources'))
+
+    await server.tools.capgo_live_update_onboarding_next_step.handler({ capacitorConfig: rootConfig, resumeChoice: 'continue', encryptionChoice: 'enable' })
+    eq(observedTargets[0], rootConfig)
+  }
+  finally {
+    process.chdir(previousCwd)
+    setConfigWriteTarget(previousTarget)
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+await test('registerLiveUpdateTools drops completed config sources from pathless routing', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'capgo-live-update-complete-config-'))
+  const firstTarget = join(root, 'capacitor.config.first.ts')
+  const secondTarget = join(root, 'capacitor.config.second.ts')
+  const previousTarget = getConfigWriteTarget()
+  const progressByTarget = new Map()
+  const observedTargets = []
+  try {
+    writeFileSync(firstTarget, 'export default {}\n')
+    writeFileSync(secondTarget, 'export default {}\n')
+    progressByTarget.set(firstTarget, { step_done: 4, appId: 'com.acme.shared' })
+    setConfigWriteTarget(undefined)
+    const server = fakeServer()
+    registerLiveUpdateTools(server, null, fakeDeps({
+      cwd: root,
+      getAppId: async () => 'com.acme.shared',
+      loadProgress: () => progressByTarget.get(getConfigWriteTarget()) ?? null,
+      saveProgress: data => progressByTarget.set(getConfigWriteTarget(), data),
+      clearProgress: () => progressByTarget.delete(getConfigWriteTarget()),
+      setupEncryption: async (_appId, enable) => {
+        observedTargets.push(getConfigWriteTarget())
+        return { ok: true, enabled: enable }
+      },
+    }))
+
+    const firstStarted = await server.tools.start_capgo_live_update_onboarding.handler({ capacitorConfig: './capacitor.config.first.ts' })
+    ok(firstStarted.content[0].text.includes('"state": "resume-prompt"'))
+
+    progressByTarget.set(firstTarget, { step_done: 12, appId: 'com.acme.shared' })
+    withConfigWriteTarget(firstTarget, () => mergeSession('com.acme.shared', { resumeResolved: true }))
+    const completed = await server.tools.capgo_live_update_onboarding_next_step.handler({ capacitorConfig: './capacitor.config.first.ts' })
+    ok(completed.content[0].text.includes('"state": "completion"'))
+    await server.tools.start_capgo_live_update_onboarding.handler({ capacitorConfig: './capacitor.config.second.ts' })
+    await server.tools.capgo_live_update_onboarding_next_step.handler({ resumeChoice: 'continue', encryptionChoice: 'enable' })
+    eq(observedTargets[0], secondTarget)
+  }
+  finally {
+    setConfigWriteTarget(previousTarget)
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+await test('registerLiveUpdateTools retains a failed source for a pathless retry', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'capgo-live-update-retry-config-'))
+  const target = join(root, 'capacitor.config.retry.ts')
+  const previousTarget = getConfigWriteTarget()
+  const progressByTarget = new Map()
+  const installTargets = []
+  let installAttempts = 0
+  try {
+    writeFileSync(target, 'export default {}\n')
+    withConfigWriteTarget(target, () => mergeSession('com.acme.shared', { resumeResolved: true }))
+    setConfigWriteTarget(undefined)
+    const server = fakeServer()
+    registerLiveUpdateTools(server, null, fakeDeps({
+      cwd: root,
+      getAppId: async () => 'com.acme.shared',
+      loadProgress: () => progressByTarget.get(getConfigWriteTarget()) ?? null,
+      saveProgress: data => progressByTarget.set(getConfigWriteTarget(), data),
+      clearProgress: () => progressByTarget.delete(getConfigWriteTarget()),
+      installUpdater: async () => {
+        installTargets.push(getConfigWriteTarget())
+        installAttempts++
+        return installAttempts === 1
+          ? { ok: false, error: 'temporary install failure' }
+          : { ok: true, delta: false, currentVersion: '1.0.0' }
+      },
+    }))
+
+    const failed = await server.tools.start_capgo_live_update_onboarding.handler({ capacitorConfig: './capacitor.config.retry.ts' })
+    ok(failed.content[0].text.includes('temporary install failure'))
+
+    await server.tools.capgo_live_update_onboarding_next_step.handler({})
+    eq(installTargets[0], target)
+    eq(installTargets[1], target)
+  }
+  finally {
+    setConfigWriteTarget(previousTarget)
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+await test('registerLiveUpdateTools isolates concurrent same-app config writes', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'capgo-live-update-concurrent-config-'))
+  const firstTarget = join(root, 'capacitor.config.first.ts')
+  const secondTarget = join(root, 'capacitor.config.second.ts')
+  const previousTarget = getConfigWriteTarget()
+  const progressByTarget = new Map()
+  const observedTargets = []
+  const installTargets = []
+  let writersReady = 0
+  let releaseWriters = () => {}
+  const writersStarted = new Promise((resolve) => {
+    releaseWriters = resolve
+  })
+  try {
+    writeFileSync(firstTarget, 'export default {}\n')
+    withConfigWriteTarget(firstTarget, () => mergeSession('com.acme.shared', { resumeResolved: true }))
+    withConfigWriteTarget(secondTarget, () => mergeSession('com.acme.shared', { resumeResolved: true }))
+    writeFileSync(secondTarget, 'export default {}\n')
+    setConfigWriteTarget(undefined)
+    const server = fakeServer()
+    registerLiveUpdateTools(server, null, fakeDeps({
+      cwd: root,
+      getAppId: async () => 'com.acme.shared',
+      loadProgress: () => progressByTarget.get(getConfigWriteTarget()) ?? null,
+      saveProgress: data => progressByTarget.set(getConfigWriteTarget(), data),
+      clearProgress: () => progressByTarget.delete(getConfigWriteTarget()),
+      installUpdater: async () => {
+        writersReady++
+        if (writersReady === 2)
+          releaseWriters()
+        await writersStarted
+        const target = getConfigWriteTarget()
+        installTargets.push(target)
+        writeFileSync(target, target === firstTarget ? 'first\n' : 'second\n')
+        return { ok: true, delta: false, currentVersion: '1.0.0' }
+      },
+      setupEncryption: async (_appId, enable) => {
+        observedTargets.push(getConfigWriteTarget())
+        return { ok: true, enabled: enable }
+      },
+    }))
+
+    const startResults = await Promise.all([
+      server.tools.start_capgo_live_update_onboarding.handler({ capacitorConfig: './capacitor.config.first.ts' }),
+      server.tools.start_capgo_live_update_onboarding.handler({ capacitorConfig: './capacitor.config.second.ts' }),
+    ])
+    const startStates = startResults.map(result => result.content[0].text.match(/"state": "([^"]+)"/)?.[1])
+    ok(installTargets.includes(firstTarget), `missing first config target: ${JSON.stringify(installTargets)}; states: ${JSON.stringify(startStates)}`)
+    ok(installTargets.includes(secondTarget), `missing second config target: ${JSON.stringify(installTargets)}; states: ${JSON.stringify(startStates)}`)
+
+    eq(readFileSync(firstTarget, 'utf8'), 'first\n')
+    eq(readFileSync(secondTarget, 'utf8'), 'second\n')
+
+    let ambiguousError
+    try {
+      await server.tools.capgo_live_update_onboarding_next_step.handler({ encryptionChoice: 'enable' })
+    }
+    catch (error) {
+      ambiguousError = error
+    }
+    ok(String(ambiguousError).includes('Multiple Capacitor config sources'))
+
+    await server.tools.capgo_live_update_onboarding_next_step.handler({ capacitorConfig: './capacitor.config.first.ts', resumeChoice: 'continue', encryptionChoice: 'enable' })
+    await server.tools.capgo_live_update_onboarding_next_step.handler({ capacitorConfig: './capacitor.config.second.ts', resumeChoice: 'continue', encryptionChoice: 'enable' })
+    eq(observedTargets[0], firstTarget)
+    eq(observedTargets[1], secondTarget)
+    eq(getConfigWriteTarget(), undefined)
   }
   finally {
     setConfigWriteTarget(previousTarget)

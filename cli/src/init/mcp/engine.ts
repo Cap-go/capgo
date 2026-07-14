@@ -216,12 +216,9 @@ export async function decideAdvance(facts: LiveUpdateFacts, deps: EngineDeps, in
     if (input.resumeChoice === 'restart') {
       deps.clearProgress()
       clearSession(appId)
-      mergeSession(appId, { resumeResolved: true })
       facts = { ...facts, progress: null }
     }
-    else {
-      mergeSession(appId, { resumeResolved: true })
-    }
+    mergeSession(appId, { resumeResolved: true })
   }
 
   if (input?.encryptionChoice)

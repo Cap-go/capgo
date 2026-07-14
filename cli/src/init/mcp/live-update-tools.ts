@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path'
 import type { CapgoSDK } from '../../sdk.js'
 import type { LiveUpdateNextStepInput, LiveUpdateStartInput } from '../../schemas/live-update-onboarding.js'
 import { liveUpdateNextStepSchema, liveUpdateStartSchema } from '../../schemas/live-update-onboarding.js'
-import { resolveCapacitorConfigTargetPath, setConfigWriteTarget } from '../../config'
+import { getConfigWriteTarget, resolveCapacitorConfigTargetPath, withConfigWriteTarget } from '../../config'
 import { getPlatformDirFromCapacitorConfig } from '../../build/platform-paths.js'
 import { isAppAlreadyExistsError } from '../app-conflict.js'
 import {
@@ -22,7 +22,7 @@ import { formatRunnerCommand } from '../../runner-command.js'
 import { addChannelInternal } from '../../channel/add.js'
 import { uploadBundleInternal } from '../../bundle/upload.js'
 import { execSync, spawnSync } from 'node:child_process'
-import type { Platform } from './contract.js'
+import type { NextStepResult, Platform } from './contract.js'
 import { renderResult } from './contract.js'
 import type { EngineDeps } from './engine.js'
 import { explainLiveUpdateOnboarding, runAdvance, runStart } from './engine.js'
@@ -209,23 +209,107 @@ export function buildDeps(sdk: CapgoSDK, cwd = process.cwd()): EngineDeps {
         return { ok: false as const, error: error instanceof Error ? error.message : String(error) }
       }
     },
+
     getRunDeviceCommand: platform => getRunDeviceCommandForPlatform(platform),
     getGitStatus: startDir => getGitRepoStatus(startDir ?? cwd),
   }
 }
 
+function addConfigTargetToResult(result: NextStepResult, configTarget: string | undefined): NextStepResult {
+  if (!configTarget)
+    return result
+
+  const context = { ...result.context, capacitorConfig: configTarget }
+  if (!result.next)
+    return { ...result, context }
+
+  const withArgs = { ...result.next.with, capacitorConfig: configTarget }
+  return {
+    ...result,
+    context,
+    next: {
+      ...result.next,
+      with: withArgs,
+      call: `${result.next.tool}(${JSON.stringify(withArgs)})`,
+      instruction: `${result.next.instruction} Include the same capacitorConfig from context.`,
+    },
+  }
+}
+
 export function registerLiveUpdateTools(server: McpLike, sdk: CapgoSDK, depsOverride?: EngineDeps): void {
   const deps = depsOverride ?? buildDeps(sdk)
+  const configTargetsByApp = new Map<string, Set<string>>()
+  const addConfigTarget = (appId: string, configTarget: string): void => {
+    const targets = configTargetsByApp.get(appId) ?? new Set<string>()
+    targets.add(configTarget)
+    configTargetsByApp.set(appId, targets)
+  }
+  const removeConfigTarget = (appId: string, configTarget: string): void => {
+    const targets = configTargetsByApp.get(appId)
+    if (!targets)
+      return
+    targets.delete(configTarget)
+    if (targets.size === 0)
+      configTargetsByApp.delete(appId)
+  }
+  const updateActiveConfigTarget = (appId: string | undefined, configTarget: string | undefined, result: NextStepResult): void => {
+    if (!appId || !configTarget)
+      return
+    if (result.kind === 'done')
+      removeConfigTarget(appId, configTarget)
+    else
+      addConfigTarget(appId, configTarget)
+  }
+  const migrateLegacyProgress = (appId: string | undefined, configTarget: string): void => {
+    const legacyProgress = deps.loadProgress()
+    if (!legacyProgress || (legacyProgress.appId && legacyProgress.appId !== appId))
+      return
+
+    const targetProgress = withConfigWriteTarget(configTarget, () => deps.loadProgress())
+    if (targetProgress)
+      return
+
+    withConfigWriteTarget(configTarget, () => deps.saveProgress(legacyProgress))
+    deps.clearProgress()
+  }
+  const getSessionConfigTarget = async (capacitorConfig?: string): Promise<string | undefined> => {
+    if (capacitorConfig !== undefined)
+      return resolveCapacitorConfigTargetPath(capacitorConfig, deps.cwd)
+
+    const appId = await deps.getAppId()
+    const targets = appId ? configTargetsByApp.get(appId) : undefined
+    if (targets && targets.size > 1) {
+      throw new Error('Multiple Capacitor config sources are active for this onboarding. Pass the same capacitorConfig path used to start this flow.')
+    }
+    return targets?.values().next().value ?? getConfigWriteTarget()
+  }
 
   server.tool(
     'start_capgo_live_update_onboarding',
     'Start (or resume) the guided Capgo live-update (OTA) setup for this Capacitor project — register the app, install the updater plugin, build, upload a test bundle, and confirm OTA delivery. ALWAYS call this FIRST when the user wants to set up or troubleshoot Capgo OTA / live updates. Do NOT configure Capgo yourself — this tool conducts the flow.',
     liveUpdateStartSchema.shape,
     async (args: LiveUpdateStartInput) => {
-      if (args.capacitorConfig !== undefined)
-        setConfigWriteTarget(resolveCapacitorConfigTargetPath(args.capacitorConfig, deps.cwd))
-      const result = await runStart(deps)
-      return { content: [{ type: 'text' as const, text: renderResult(result) }] }
+      const requestedConfigTarget = args.capacitorConfig === undefined
+        ? getConfigWriteTarget()
+        : resolveCapacitorConfigTargetPath(args.capacitorConfig, deps.cwd)
+      const { appId, result, configTarget } = await withConfigWriteTarget(requestedConfigTarget, async () => {
+        let configTarget = requestedConfigTarget
+        if (!configTarget) {
+          try {
+            configTarget = (await getConfig(true)).path
+          }
+          catch {
+            // runStart returns the normal no-Capacitor-project response
+          }
+        }
+        const appId = await deps.getAppId()
+        if (configTarget && requestedConfigTarget === undefined)
+          migrateLegacyProgress(appId, configTarget)
+        const result = await withConfigWriteTarget(configTarget, () => runStart(deps))
+        return { appId, result, configTarget }
+      })
+      updateActiveConfigTarget(appId, configTarget, result)
+      return { content: [{ type: 'text' as const, text: renderResult(addConfigTargetToResult(result, configTarget)) }] }
     },
   )
 
@@ -234,8 +318,14 @@ export function registerLiveUpdateTools(server: McpLike, sdk: CapgoSDK, depsOver
     'Advance the guided Capgo live-update onboarding by one step. Call ONLY as directed by the previous result\'s `next`. Pass the user\'s choice when the previous step asked for one.',
     liveUpdateNextStepSchema.shape,
     async (args: LiveUpdateNextStepInput) => {
-      const result = await runAdvance(deps, args)
-      return { content: [{ type: 'text' as const, text: renderResult(result) }] }
+      const { capacitorConfig, ...input } = args
+      const configTarget = await getSessionConfigTarget(capacitorConfig)
+      const { appId, result } = await withConfigWriteTarget(configTarget, async () => ({
+        appId: await deps.getAppId(),
+        result: await runAdvance(deps, input),
+      }))
+      updateActiveConfigTarget(appId, configTarget, result)
+      return { content: [{ type: 'text' as const, text: renderResult(addConfigTargetToResult(result, configTarget)) }] }
     },
   )
 
@@ -244,9 +334,12 @@ export function registerLiveUpdateTools(server: McpLike, sdk: CapgoSDK, depsOver
     'Explain a Capgo live-update onboarding step in plain language — call when the user is confused. Defaults to the CURRENT step; pass { state } for a specific one. Read-only; never advances the flow.',
     {
       state: z.string().optional().describe('Optional state name to explain (from a prior result state field).'),
+      capacitorConfig: z.string().min(1).optional().describe('The same app-specific capacitor.config.* source used to start onboarding when more than one source is active for this app.'),
     },
-    async (args: { state?: string }) => {
-      const text = await explainLiveUpdateOnboarding(deps, args)
+    async (args: { state?: string, capacitorConfig?: string }) => {
+      const { capacitorConfig, ...input } = args
+      const configTarget = await getSessionConfigTarget(capacitorConfig)
+      const text = await withConfigWriteTarget(configTarget, () => explainLiveUpdateOnboarding(deps, input))
       return { content: [{ type: 'text' as const, text }] }
     },
   )

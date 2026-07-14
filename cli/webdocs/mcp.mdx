@@ -23,8 +23,8 @@ CAP_APP=qr-code-reader npx @capgo/cli@latest mcp \
   --capacitor-config ./env-configs/capacitor.config.qr-code-reader.ts
 ```
 
-Capacitor continues to load the active root config, while every MCP tool that writes Capacitor config updates only the supplied app source.
-The live-update onboarding start tool also accepts `capacitorConfig` when the server was launched without this option.
+Capacitor continues to load the active root config, while every MCP tool that writes Capacitor config updates only the supplied app source. The `capgo_upload_bundle` and `capgo_generate_encryption_keys` tools also accept a per-call `capacitorConfig` override.
+The live-update onboarding start tool accepts `capacitorConfig` when the server was launched without this option. If more than one source resolves to the same app ID, pass that same value from the returned context to the onboarding next-step and explain tools.
 
 Selected tools exposed via MCP:
 
