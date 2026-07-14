@@ -86,9 +86,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: visual-diff-report-${{ github.event.pull_request.head.sha }}
-          path: |
-            .context/visual-diff/report/
-            .context/visual-diff/after/
+          path: .context/visual-diff/report/
           if-no-files-found: ignore
           retention-days: 14
 
