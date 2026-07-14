@@ -5370,10 +5370,13 @@ BEFORE INSERT OR UPDATE OF user_id, org_id, rbac_role_name ON public.org_users
 FOR EACH ROW
 WHEN (
   current_setting('request.jwt.claim.role', true) = 'authenticated'
-  AND NOT (
-    current_setting('request.jwt.claim.email', true) = ANY (
-      ARRAY['bot@capgo.app', 'test@capgo.app']
-    )
+  AND COALESCE(
+    NOT (
+      current_setting('request.jwt.claim.email', true) = ANY (
+        ARRAY['bot@capgo.app', 'test@capgo.app']
+      )
+    ),
+    true
   )
 )
 EXECUTE FUNCTION public.check_org_user_privileges();
