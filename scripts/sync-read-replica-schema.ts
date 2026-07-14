@@ -1,16 +1,34 @@
 import type { CloudSqlDataApiResponse } from '../read_replicate/cloud_sql_data_api_response.ts'
-import type { Queryable } from '../read_replicate/schema_catalog.ts'
+import type {
+  ReadReplicaSchemaOwnerOperation,
+  ReadReplicaSchemaSyncClient,
+  ReadReplicaSchemaSyncStatement,
+} from '../read_replicate/schema_additive_sync.ts'
 import process from 'node:process'
 import { assertCloudSqlDataApiResponseSucceeded } from '../read_replicate/cloud_sql_data_api_response.ts'
 import { applyReadReplicaSchemaSync } from '../read_replicate/schema_additive_sync.ts'
 import {
   READ_REPLICA_SCHEMA_CATALOG_SQL,
   readReplicaSchemaCatalog,
+  REPLICA_TABLES,
   stableStringify,
 } from '../read_replicate/schema_catalog.ts'
 import { readReplicaSchemaCatalogFromMigrations } from '../read_replicate/schema_catalog_from_migrations.ts'
 import { readReplicaSchemaCompatibilityIssues } from '../read_replicate/schema_compatibility.ts'
 
+interface BunSubprocess {
+  exitCode: number | null
+  exited: Promise<number>
+  kill: () => void
+  stderr: ReadableStream<Uint8Array>
+  stdout: ReadableStream<Uint8Array>
+}
+
+interface BunRuntime {
+  spawn: (command: string[], options: unknown) => BunSubprocess
+}
+
+const bunRuntime = (globalThis as unknown as { Bun: BunRuntime }).Bun
 const DEFAULT_SYNC_MAX_SECONDS = 30 * 60
 const CATALOG_QUERY_BUFFER_MS = 5000
 const GOOGLE_DATA_API_MAX_SECONDS = 30
@@ -39,6 +57,8 @@ const GOOGLE_READ_REPLICA: GoogleDataApiConfig = {
   database: 'postgres',
 }
 
+const GOOGLE_READ_REPLICA_IAM_DATABASE_USER = 'capgo-read-replica-ci@capgo-394818.iam'
+
 async function main(): Promise<void> {
   const maxDurationMs = DEFAULT_SYNC_MAX_SECONDS * 1000
   const deadline = Date.now() + maxDurationMs
@@ -46,6 +66,10 @@ async function main(): Promise<void> {
     'Building the read-replica schema catalog from local migrations through Tinbase/PGlite...',
   )
   const expected = await readReplicaSchemaCatalogFromMigrations()
+  await assertGoogleReadReplicaExecutor(
+    GOOGLE_READ_REPLICA,
+    deadline,
+  )
   const replica = googleDataApiClient(GOOGLE_READ_REPLICA, deadline)
   const result = await applyReadReplicaSchemaSync(replica, expected, {
     deadline,
@@ -73,13 +97,89 @@ async function main(): Promise<void> {
   )
 }
 
+async function assertGoogleReadReplicaExecutor(
+  config: GoogleDataApiConfig,
+  deadline: number,
+): Promise<void> {
+  const response = await executeGoogleSql(
+    config.project,
+    config.instance,
+    config.database,
+    renderReadReplicaExecutorPreflightSql(),
+    deadline,
+  )
+  assertGoogleReadReplicaExecutorState(dataApiRows(response))
+}
+
+export function renderReadReplicaExecutorPreflightSql(): string {
+  const replicaTables = REPLICA_TABLES.map(quoteSqlText).join(', ')
+  return `SELECT
+  session_user AS session_user,
+  pg_catalog.pg_has_role(session_user, 'capgo_read_replica_schema_executor', 'member') AS executor_member,
+  NOT pg_catalog.pg_has_role(session_user, 'cloudsqlsuperuser', 'member') AS no_cloudsqlsuperuser,
+  pg_catalog.has_schema_privilege(session_user, 'capgo_internal', 'USAGE') AS schema_usage,
+  pg_catalog.has_function_privilege(
+    session_user,
+    'capgo_internal.add_read_replica_column(text,text,text,text,boolean)',
+    'EXECUTE'
+  ) AS add_column_execute,
+  NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.unnest(ARRAY[${replicaTables}]::pg_catalog.text[]) AS selected(table_name)
+    WHERE pg_catalog.has_table_privilege(
+      session_user,
+      pg_catalog.format('public.%I', selected.table_name),
+      'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'
+    )
+  ) AS no_table_access`
+}
+
+export function assertGoogleReadReplicaExecutorState(
+  rows: readonly Record<string, unknown>[],
+): void {
+  const state = rows[0]
+  if (
+    state?.session_user !== GOOGLE_READ_REPLICA_IAM_DATABASE_USER
+    || !dataApiBoolean(state.executor_member)
+    || !dataApiBoolean(state.no_cloudsqlsuperuser)
+    || !dataApiBoolean(state.schema_usage)
+    || !dataApiBoolean(state.add_column_execute)
+    || !dataApiBoolean(state.no_table_access)
+  ) {
+    throw new Error(
+      'Cloud SQL IAM database identity is not limited to capgo_read_replica_schema_executor with owner-executor access only. Install the owner bootstrap and replace cloudsqlsuperuser before primary migrations.',
+    )
+  }
+}
+
+function dataApiBoolean(value: unknown): boolean {
+  return value === true || value === 'true'
+}
+
 function googleDataApiClient(
   config: GoogleDataApiConfig,
   deadline: number,
-): Queryable {
+): ReadReplicaSchemaSyncClient {
   const { project, instance, database } = config
 
   return {
+    assertCanApplyReadReplicaSchemaPlan(plan) {
+      const skipped = plan.skipped[0]
+      if (skipped) {
+        throw new Error(
+          `The least-privilege Cloud SQL owner executor cannot reconcile skipped ${skipped.kind} ${skipped.table}.${skipped.name} (${skipped.reason}); extend its reviewed bootstrap before primary migrations.`,
+        )
+      }
+
+      for (const statement of plan.statements)
+        assertGoogleOwnerExecutorStatement(statement)
+    },
+    async applyReadReplicaSchemaPlan(plan) {
+      const sql = renderReadReplicaOwnerExecutorTransaction(
+        plan.statements.map(assertGoogleOwnerExecutorStatement),
+      )
+      await executeGoogleSql(project, instance, database, sql, deadline)
+    },
     async query(queryText: string, values?: unknown[]) {
       // The Data API has no session affinity and rejects requests over 0.5 MB or
       // responses over 10 MB. Every partial result is treated as a failed read.
@@ -90,10 +190,8 @@ function googleDataApiClient(
         return { rows: [] }
       }
 
-      const sql
-        = queryText === READ_REPLICA_SCHEMA_CATALOG_SQL
-          ? renderCatalogQueryWithStaticValues(queryText, values)
-          : queryText
+      assertGoogleDataApiCatalogQuery(queryText)
+      const sql = renderCatalogQueryWithStaticValues(queryText, values)
       return {
         rows: dataApiRows(
           await executeGoogleSql(project, instance, database, sql, deadline),
@@ -103,6 +201,49 @@ function googleDataApiClient(
   }
 }
 
+function assertGoogleOwnerExecutorStatement(
+  statement: ReadReplicaSchemaSyncStatement,
+): ReadReplicaSchemaOwnerOperation {
+  if (!statement.ownerOperation) {
+    throw new Error(
+      `The least-privilege Cloud SQL owner executor cannot apply ${statement.kind} ${statement.table}.${statement.name}; extend its reviewed bootstrap before primary migrations.`,
+    )
+  }
+
+  return statement.ownerOperation
+}
+
+export function assertGoogleDataApiCatalogQuery(queryText: string): void {
+  if (queryText !== READ_REPLICA_SCHEMA_CATALOG_SQL) {
+    throw new Error(
+      'Cloud SQL Data API schema adapter only permits selected-schema catalog reads outside the owner executor.',
+    )
+  }
+}
+
+export function renderReadReplicaOwnerExecutorSql(
+  operation: ReadReplicaSchemaOwnerOperation,
+): string {
+  const defaultLiteral = operation.defaultLiteral === null
+    ? 'NULL'
+    : quoteSqlText(operation.defaultLiteral)
+  return `SELECT capgo_internal.add_read_replica_column(${[
+    quoteSqlText(operation.table),
+    quoteSqlText(operation.column),
+    quoteSqlText(operation.expectedType),
+    defaultLiteral,
+    operation.notNull ? 'TRUE' : 'FALSE',
+  ].join(', ')})`
+}
+
+export function renderReadReplicaOwnerExecutorTransaction(
+  operations: readonly ReadReplicaSchemaOwnerOperation[],
+): string {
+  if (!operations.length)
+    throw new Error('Read-replica owner executor requires at least one reviewed operation')
+
+  return `BEGIN;\n${operations.map(renderReadReplicaOwnerExecutorSql).join(';\n')};\nCOMMIT;`
+}
 async function executeGoogleSql(
   project: string,
   instance: string,
@@ -112,7 +253,7 @@ async function executeGoogleSql(
 ): Promise<DataApiResponse> {
   assertDataApiRequestFitsLimit(database, sql)
 
-  let child: ReturnType<typeof Bun.spawn> | undefined
+  let child: BunSubprocess | undefined
   let timeout: ReturnType<typeof setTimeout> | undefined
   let timedOut = false
 
@@ -122,7 +263,7 @@ async function executeGoogleSql(
       (GOOGLE_DATA_API_MAX_SECONDS + GOOGLE_DATA_API_PROCESS_GRACE_SECONDS)
       * 1000,
     )
-    const command = Bun.spawn(
+    const command = bunRuntime.spawn(
       [
         'gcloud',
         'sql',

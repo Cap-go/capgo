@@ -75,9 +75,9 @@ export interface SchemaCompatibilityIssue {
   reason: string
 }
 
-// The compatibility check intentionally ignores existing column defaults and
-// missing publisher CHECK constraints. A read-only logical subscriber does not
-// use defaults and does not need source CHECK constraints.
+// The compatibility check intentionally ignores defaults on columns already
+// present at both ends and missing publisher CHECK constraints. A pre-created
+// subscriber-only NOT NULL column retains its default until the publisher adds it.
 export function readReplicaSchemaCompatibilityIssues(expected: unknown, actual: unknown): SchemaCompatibilityIssue[] {
   const expectedCatalog = assertSchemaCatalog(expected, 'expected')
   const actualCatalog = assertSchemaCatalog(actual, 'actual')

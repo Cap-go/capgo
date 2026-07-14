@@ -1,3 +1,7 @@
+import type {
+  ReadReplicaSchemaSyncClient,
+  ReadReplicaSchemaSyncStatement,
+} from '../read_replicate/schema_additive_sync.ts'
 import { describe, expect, it } from 'vitest'
 import {
   applyReadReplicaAdditiveSchemaSync,
@@ -139,6 +143,151 @@ describe('read-replica additive schema sync', () => {
         skipped: [],
       })
       expect(catalogReads).toBe(2)
+    },
+  )
+
+  it.concurrent(
+    'routes supported column additions through one owner transaction instead of raw DDL',
+    async () => {
+      const { expected, initial } = catalogs()
+      const expectedColumnsOnly = { ...expected, indexes: [] }
+      const current = structuredClone(initial)
+      const directQueries: string[] = []
+      const executed: ReadReplicaSchemaSyncStatement[][] = []
+      const client: ReadReplicaSchemaSyncClient = {
+        query: async (text: string) => {
+          if (text === READ_REPLICA_SCHEMA_CATALOG_SQL)
+            return { rows: [{ catalog: current }] }
+
+          directQueries.push(text)
+          return { rows: [] }
+        },
+        assertCanApplyReadReplicaSchemaPlan(plan) {
+          expect(plan.skipped).toEqual([])
+          expect(plan.statements).toEqual([
+            expect.objectContaining({
+              kind: 'column',
+              table: 'apps',
+              name: 'created_from_onboarding',
+              ownerOperation: {
+                action: 'add_column',
+                table: 'apps',
+                column: 'created_from_onboarding',
+                expectedType: 'boolean',
+                defaultLiteral: 'false',
+                notNull: true,
+              },
+            }),
+          ])
+        },
+        async applyReadReplicaSchemaPlan(plan) {
+          executed.push(plan.statements)
+          current.columns.push(expectedColumnsOnly.columns[1])
+        },
+      }
+
+      await expect(
+        applyReadReplicaAdditiveSchemaSync(client, expectedColumnsOnly),
+      ).resolves.toEqual({
+        applied: [{
+          kind: 'column',
+          table: 'apps',
+          name: 'created_from_onboarding',
+        }],
+        skipped: [],
+      })
+      expect(executed).toHaveLength(1)
+      expect(directQueries).not.toContain(
+        expect.stringContaining('ALTER TABLE'),
+      )
+    },
+  )
+
+  it.concurrent(
+    'preflights unsupported owner operations before applying any schema change',
+    async () => {
+      const { expected, initial } = catalogs()
+      const queryCalls: string[] = []
+      const executed: ReadReplicaSchemaSyncStatement[] = []
+      const client: ReadReplicaSchemaSyncClient = {
+        query: async (text: string) => {
+          queryCalls.push(text)
+          if (text === READ_REPLICA_SCHEMA_CATALOG_SQL)
+            return { rows: [{ catalog: initial }] }
+
+          return { rows: [] }
+        },
+        assertCanApplyReadReplicaSchemaPlan(plan) {
+          const unsupported = plan.statements.find(statement => !statement.ownerOperation)
+          if (unsupported) {
+            throw new Error(
+              `owner executor cannot apply ${unsupported.kind} ${unsupported.table}.${unsupported.name}`,
+            )
+          }
+        },
+        async applyReadReplicaSchemaStatement(statement) {
+          executed.push(statement)
+        },
+      }
+
+      await expect(
+        applyReadReplicaAdditiveSchemaSync(client, expected),
+      ).rejects.toThrow('owner executor cannot apply index apps.idx_apps_id')
+      expect(executed).toEqual([])
+      expect(queryCalls).toEqual([READ_REPLICA_SCHEMA_CATALOG_SQL])
+    },
+  )
+
+  it.concurrent(
+    'rejects skipped reconciliation before applying supported schema changes',
+    async () => {
+      const { expected: baseExpected, initial } = catalogs()
+      const expected = {
+        ...baseExpected,
+        indexes: [],
+        columns: [
+          ...baseExpected.columns,
+          {
+            table: 'apps',
+            name: 'unsupported_generated',
+            type: 'text',
+            notNull: false,
+            default: null,
+            identity: '',
+            generated: 's',
+          },
+        ],
+      }
+      const queryCalls: string[] = []
+      const executed: ReadReplicaSchemaSyncStatement[] = []
+      const client: ReadReplicaSchemaSyncClient = {
+        query: async (text: string) => {
+          queryCalls.push(text)
+          if (text === READ_REPLICA_SCHEMA_CATALOG_SQL)
+            return { rows: [{ catalog: initial }] }
+
+          return { rows: [] }
+        },
+        assertCanApplyReadReplicaSchemaPlan(plan) {
+          const skipped = plan.skipped[0]
+          if (skipped) {
+            throw new Error(
+              `owner executor cannot reconcile skipped ${skipped.kind} ${skipped.table}.${skipped.name}`,
+            )
+          }
+        },
+        async applyReadReplicaSchemaStatement(statement) {
+          executed.push(statement)
+        },
+      }
+
+      await expect(
+        applyReadReplicaAdditiveSchemaSync(client, expected),
+      ).rejects.toThrow(
+        'owner executor cannot reconcile skipped column apps.unsupported_generated',
+      )
+      expect(executed).toEqual([])
+      expect(queryCalls).toEqual([READ_REPLICA_SCHEMA_CATALOG_SQL])
     },
   )
 
@@ -530,6 +679,25 @@ describe('read-replica additive schema sync', () => {
     expect(planReadReplicaSchemaSync(expected, current)).toEqual({
       statements: [],
       skipped: [],
+    })
+  })
+
+  it.concurrent('rejects existing-column nullability changes before primary migration', () => {
+    const { expected } = catalogs()
+    const current = structuredClone(expected)
+    current.columns[0] = {
+      ...current.columns[0],
+      notNull: false,
+    }
+
+    expect(planReadReplicaSchemaSync(expected, current)).toEqual({
+      statements: [],
+      skipped: [{
+        kind: 'column',
+        table: 'apps',
+        name: 'id',
+        reason: 'pre_primary_column_nullability',
+      }],
     })
   })
 })
