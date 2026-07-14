@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { chdir, cwd } from 'node:process'
 import { intro, log, outro, confirm as pConfirm } from '@clack/prompts'
 import { trackEvent } from './analytics/track'
 import { createRSA } from './api/crypto'
@@ -22,6 +23,20 @@ function ensureCapacitorUpdaterConfig(config: any) {
   config.plugins.extConfig ??= {}
   config.plugins.CapacitorUpdater ??= {}
   return config.plugins.CapacitorUpdater
+}
+
+async function withConfigLoadDir<T>(configLoadDir: string | undefined, action: () => Promise<T>): Promise<T> {
+  if (!configLoadDir)
+    return action()
+
+  const previousCwd = cwd()
+  try {
+    chdir(configLoadDir)
+    return await action()
+  }
+  finally {
+    chdir(previousCwd)
+  }
 }
 
 export async function saveKeyInternal(options: SaveOptions, silent = false) {
@@ -132,7 +147,7 @@ export async function saveKeyCommand(options: SaveOptions) {
   await saveKeyInternal(options, false)
 }
 
-export async function createKeyInternal(options: Options, silent = false) {
+export async function createKeyInternal(options: Options, silent = false, configLoadDir?: string) {
   if (!silent)
     intro('Create keys 🔑')
 
@@ -152,7 +167,7 @@ export async function createKeyInternal(options: Options, silent = false) {
   }
   writeFileSync(baseKeyV2, privateKey)
 
-  const extConfig = await getConfig()
+  const extConfig = await withConfigLoadDir(configLoadDir, () => getConfig())
 
   if (extConfig) {
     const updaterConfig = ensureCapacitorUpdaterConfig(extConfig.config)
@@ -173,7 +188,7 @@ export async function createKeyInternal(options: Options, silent = false) {
     }
 
     updaterConfig.publicKey = publicKey
-    await writeConfigUpdater(extConfig)
+    await withConfigLoadDir(configLoadDir, () => writeConfigUpdater(extConfig))
   }
 
   void trackEvent({ channel: 'key', event: 'Encryption Keys Generated', icon: '🔑', tags: {} })

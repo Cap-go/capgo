@@ -1,6 +1,10 @@
 // src/schemas/live-update-onboarding.ts
 import { z } from 'zod'
 
+export const liveUpdateStartSchema = z.object({
+  capacitorConfig: z.string().min(1).optional().describe('Existing app-specific capacitor.config.* file to update while Capacitor loads the active root config (useful with dynamic monorepos).'),
+})
+
 export const liveUpdateNextStepSchema = z.object({
   resumeChoice: z.enum(['continue', 'restart']).optional().describe('Answer to the resume prompt: "continue" resumes saved progress, "restart" wipes it'),
   encryptionChoice: z.enum(['enable', 'skip']).optional().describe('Answer at setup-encryption: "enable" turns on bundle encryption, "skip" leaves it off'),
@@ -10,4 +14,5 @@ export const liveUpdateNextStepSchema = z.object({
   otaReceivedConfirmed: z.boolean().optional().describe('Set true after the user confirms the OTA update appeared on device (test-update step)'),
 })
 
+export type LiveUpdateStartInput = z.infer<typeof liveUpdateStartSchema>
 export type LiveUpdateNextStepInput = z.infer<typeof liveUpdateNextStepSchema>

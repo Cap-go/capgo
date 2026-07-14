@@ -7,6 +7,7 @@ import pack from '../../package.json'
 import { enableSupabaseInstrumentation, setInvocationSource, trackMcpServerStarted, withMcpToolTracking } from '../analytics/track'
 import { addAppOptionsSchema, cleanupOptionsSchema, getStatsOptionsSchema, requestBuildOptionsSchema, starAllRepositoriesOptionsSchema, starRepoOptionsSchema, updateAppOptionsSchema, updateChannelOptionsBaseSchema, updateChannelOptionsSchema, uploadOptionsSchema } from '../schemas/sdk'
 import { CapgoSDK } from '../sdk'
+import { getConfigWriteTarget, setConfigWriteTarget } from '../config'
 import { clearSavedKey, getLoginState, loginSuccessMessage, logoutMessage, validateAndSaveKey, whoamiMessage } from '../auth/session'
 import { mcpLoginInputSchema, mcpLogoutInputSchema } from '../schemas/auth'
 import { findSavedKeySilent, formatError } from '../utils'
@@ -32,12 +33,31 @@ function formatMcpError<T>(result: SDKResult<T>): { content: Array<{ type: 'text
     isError: true,
   }
 }
-
 /**
  * Start the Capgo MCP (Model Context Protocol) server.
  * This allows AI agents to interact with Capgo Cloud programmatically.
  */
-export async function startMcpServer(): Promise<void> {
+export async function startMcpServer(capacitorConfigTarget?: string): Promise<void> {
+  const previousConfigWriteTarget = getConfigWriteTarget()
+  let restored = false
+  const restoreConfigWriteTarget = () => {
+    if (restored)
+      return
+    restored = true
+    setConfigWriteTarget(previousConfigWriteTarget)
+  }
+
+  setConfigWriteTarget(capacitorConfigTarget)
+  try {
+    await startMcpServerInternal(restoreConfigWriteTarget)
+  }
+  catch (error) {
+    restoreConfigWriteTarget()
+    throw error
+  }
+}
+
+async function startMcpServerInternal(restoreConfigWriteTarget: () => void): Promise<void> {
   // Install the stdout guard FIRST, before any startup code (saved-key lookup, SDK init,
   // lazily imported deps) can emit a stray clack/console line. It reroutes ambient stdout
   // to stderr and returns the ONLY writer allowed to reach the real stdout for JSON-RPC
@@ -726,8 +746,10 @@ export async function startMcpServer(): Promise<void> {
   // Start the server with stdio transport. The stdout guard installed at the top of this
   // function already routed ambient stdout (stray clack/console output from any tool or
   // dependency) to stderr, so only JSON-RPC frames reach the real stdout a strict client
-  // reads; otherwise the transport drops ("Transport closed").
+  // reads; otherwise the transport drops ("Transport closed"). Keep the config target
+  // for this server's lifetime because tool calls happen after the CLI action completes.
   const transport = new StdioServerTransport(process.stdin, transportStdout)
+  transport.onclose = restoreConfigWriteTarget
   await server.connect(transport)
   trackMcpServerStarted(Boolean(savedApiKey))
 }

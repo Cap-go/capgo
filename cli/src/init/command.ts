@@ -19,7 +19,7 @@ import { canUseFilePicker, openPackageJsonPicker } from '../build/onboarding/fil
 import { getPlatformDirFromCapacitorConfig } from '../build/platform-paths'
 import { uploadBundleInternal } from '../bundle/upload'
 import { addChannelInternal } from '../channel/add'
-import { setConfigWriteTarget, writeConfigUpdater } from '../config'
+import { getConfigWriteTarget, resolveCapacitorConfigTargetPath, setConfigWriteTarget, writeConfigUpdater } from '../config'
 import { getRepoStarStatus, isRepoStarredInSession, starAllRepositories, starRepository } from '../github'
 import { createKeyInternal } from '../key'
 import { doLoginExists, loginInternal } from '../login'
@@ -2799,7 +2799,7 @@ async function addEncryptionStep(orgId: string, apikey: string, appId: string) {
       const previousCwd = cwd()
       try {
         chdir(projectDir)
-        await createKeyInternal({ force: true, setupChannel: false }, true)
+        await createKeyInternal({ force: true, setupChannel: false }, true, getInitConfigLoadDir(projectDir))
       }
       finally {
         chdir(previousCwd)
@@ -4559,12 +4559,10 @@ async function maybeStarCapgoRepo(includeSkillsRepository = false, repository?: 
 export async function initApp(apikeyCommand: string, appId: string, options: SuperOptions) {
   const initialCwd = cwd()
   const packageJsonPath = resolveInitTargetPath(options.packageJson, 'Package JSON path', initialCwd)
-  const capacitorConfigPath = resolveInitTargetPath(options.capacitorConfig, 'Capacitor config path', initialCwd)
+  const capacitorConfigPath = getConfigWriteTarget() ?? resolveCapacitorConfigTargetPath(options.capacitorConfig, initialCwd)
   const mainFilePath = resolveInitTargetPath(options.mainFile, 'Main file path', initialCwd)
   if (packageJsonPath && path.basename(packageJsonPath) !== PACKNAME)
     throw new Error(`Package JSON path must point to ${PACKNAME}: ${packageJsonPath}`)
-  if (capacitorConfigPath && !/^capacitor\.config(?:\.[^.]+)?\.(?:ts|js|json)$/.test(path.basename(capacitorConfigPath)))
-    throw new Error(`Capacitor config path must point to a capacitor.config.* file: ${capacitorConfigPath}`)
   if (mainFilePath && !/\.[cm]?[jt]sx?$/.test(mainFilePath))
     throw new Error(`Main file path must point to a JavaScript or TypeScript file: ${mainFilePath}`)
 

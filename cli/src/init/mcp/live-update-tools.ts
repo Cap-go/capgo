@@ -5,8 +5,9 @@ import { existsSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type { CapgoSDK } from '../../sdk.js'
-import type { LiveUpdateNextStepInput } from '../../schemas/live-update-onboarding.js'
-import { liveUpdateNextStepSchema } from '../../schemas/live-update-onboarding.js'
+import type { LiveUpdateNextStepInput, LiveUpdateStartInput } from '../../schemas/live-update-onboarding.js'
+import { liveUpdateNextStepSchema, liveUpdateStartSchema } from '../../schemas/live-update-onboarding.js'
+import { resolveCapacitorConfigTargetPath, setConfigWriteTarget } from '../../config'
 import { getPlatformDirFromCapacitorConfig } from '../../build/platform-paths.js'
 import { isAppAlreadyExistsError } from '../app-conflict.js'
 import {
@@ -50,7 +51,6 @@ function getRunDeviceCommandForPlatform(platform: Platform): { command: string }
   const args = ['cap', 'run', platform]
   return { command: formatRunnerCommand(pm.runner, args) }
 }
-
 export function buildDeps(sdk: CapgoSDK, cwd = process.cwd()): EngineDeps {
   const getAppIdClosure = async (): Promise<string | undefined> => {
     try {
@@ -220,8 +220,10 @@ export function registerLiveUpdateTools(server: McpLike, sdk: CapgoSDK, depsOver
   server.tool(
     'start_capgo_live_update_onboarding',
     'Start (or resume) the guided Capgo live-update (OTA) setup for this Capacitor project — register the app, install the updater plugin, build, upload a test bundle, and confirm OTA delivery. ALWAYS call this FIRST when the user wants to set up or troubleshoot Capgo OTA / live updates. Do NOT configure Capgo yourself — this tool conducts the flow.',
-    {},
-    async () => {
+    liveUpdateStartSchema.shape,
+    async (args: LiveUpdateStartInput) => {
+      if (args.capacitorConfig !== undefined)
+        setConfigWriteTarget(resolveCapacitorConfigTargetPath(args.capacitorConfig, deps.cwd))
       const result = await runStart(deps)
       return { content: [{ type: 'text' as const, text: renderResult(result) }] }
     },

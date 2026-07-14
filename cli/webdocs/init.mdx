@@ -35,7 +35,7 @@ CAP_APP=qr-code-reader npx @capgo/cli@latest init \
   --capacitor-config ./env-configs/capacitor.config.qr-code-reader.ts
 ```
 
-Capgo uses the selected package for dependency checks, the selected entry file for `notifyAppReady()`, and writes only the supplied config source.
+Capgo uses the selected package for dependency checks, the selected entry file for `notifyAppReady()`, and loads the active root config while writing only the supplied config source. The same global `--capacitor-config` option also targets config changes made by `bundle upload --auto-set-bundle`, `app setting`, key commands, and `notifications setup`.
 
 ## <a id="options-init"></a> Options (Init)
 

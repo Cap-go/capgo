@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 /** Headless tests for the MCP-conducted Capgo live-update onboarding engine. */
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import process from 'node:process'
 
 console.log('🧪 Testing MCP live-update onboarding...\n')
@@ -130,7 +133,7 @@ function fakeServer() {
   const tools = {}
   return {
     tools,
-    tool(name, _desc, _schema, handler) { tools[name] = { handler } },
+    tool(name, _desc, schema, handler) { tools[name] = { schema, handler } },
   }
 }
 
@@ -138,6 +141,7 @@ await test('registerLiveUpdateTools registers spine + explain', async () => {
   const server = fakeServer()
   registerLiveUpdateTools(server, null, fakeDeps())
   ok(server.tools.start_capgo_live_update_onboarding)
+  ok(server.tools.start_capgo_live_update_onboarding.schema.capacitorConfig)
   ok(server.tools.capgo_live_update_onboarding_next_step)
   ok(server.tools.capgo_live_update_onboarding_explain)
 })
@@ -147,6 +151,71 @@ await test('registerLiveUpdateTools: start returns rendered text', async () => {
   registerLiveUpdateTools(server, null, fakeDeps())
   const res = await server.tools.start_capgo_live_update_onboarding.handler({})
   ok(res.content[0].text.includes('Capgo live-update onboarding'))
+})
+
+const { getConfigWriteTarget, setConfigWriteTarget } = await import('../src/config/index.ts')
+const { liveUpdateStartSchema } = await import('../src/schemas/live-update-onboarding.ts')
+
+await test('live-update onboarding validates Capacitor config target input', async () => {
+  eq(liveUpdateStartSchema.safeParse({ capacitorConfig: '' }).success, false)
+  eq(liveUpdateStartSchema.safeParse({}).success, true)
+})
+
+const { startMcpServer } = await import('../src/mcp/server.ts')
+
+await test('MCP startup restores the prior config target after failure', async () => {
+  const originalTarget = getConfigWriteTarget()
+  const originalStdinOn = process.stdin.on
+  const originalStdoutWrite = process.stdout.write
+  const priorTarget = '/tmp/capgo-prior-config.ts'
+  try {
+    setConfigWriteTarget(priorTarget)
+    process.stdin.on = () => { throw new Error('forced MCP startup failure') }
+
+    let failure
+    try {
+      await startMcpServer('/tmp/capgo-new-config.ts')
+    }
+    catch (error) {
+      failure = error
+    }
+
+    ok(String(failure).includes('forced MCP startup failure'))
+    eq(getConfigWriteTarget(), priorTarget)
+  }
+  finally {
+    process.stdin.on = originalStdinOn
+    process.stdout.write = originalStdoutWrite
+    setConfigWriteTarget(originalTarget)
+  }
+})
+
+await test('registerLiveUpdateTools keeps a start config target for later steps', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'capgo-live-update-config-'))
+  const target = join(root, 'capacitor.config.qr-code-reader.ts')
+  const previousTarget = getConfigWriteTarget()
+  try {
+    writeFileSync(target, 'export default {}\n')
+    const server = fakeServer()
+    registerLiveUpdateTools(server, null, fakeDeps({ cwd: root, getAppId: async () => undefined }))
+    await server.tools.start_capgo_live_update_onboarding.handler({ capacitorConfig: './capacitor.config.qr-code-reader.ts' })
+    eq(getConfigWriteTarget(), target)
+    await server.tools.capgo_live_update_onboarding_next_step.handler({})
+    eq(getConfigWriteTarget(), target)
+
+    let missingError
+    try {
+      await server.tools.start_capgo_live_update_onboarding.handler({ capacitorConfig: './missing.ts' })
+    }
+    catch (error) {
+      missingError = error
+    }
+    ok(String(missingError).includes('Capacitor config path does not exist'))
+  }
+  finally {
+    setConfigWriteTarget(previousTarget)
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 console.log(`\n📊 Results: ${pass} passed, ${fail} failed`)

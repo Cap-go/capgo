@@ -13,6 +13,7 @@ Use this skill for OTA update workflows in Capgo Cloud.
 - `appId` can often be inferred from the current Capacitor project.
 - Shared public flags often include `-a, --apikey`.
 - Preview QR workflows require app preview to be enabled before the QR code can be printed.
+- `--capacitor-config <path>` is global. With a dynamic root config selector such as `CAP_APP`, it keeps loading the root config and writes config changes to the selected app-specific source.
 
 ## Preview QR workflows
 
