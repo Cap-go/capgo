@@ -3,6 +3,17 @@ import { loadConfig as loadConfigCap, writeConfig as writeConfigCap } from '../c
 
 export type { CapacitorConfig, ExtConfigPairs } from '../schemas/config'
 
+let configWriteTarget: string | undefined
+
+/**
+ * Overrides the config file Capacitor writes after loading a dynamic root config.
+ * This lets monorepos keep a root config loader while onboarding updates the
+ * selected app-specific source config.
+ */
+export function setConfigWriteTarget(filePath?: string): void {
+  configWriteTarget = filePath
+}
+
 export async function loadConfig(): Promise<ExtConfigPairs | undefined> {
   const config = await loadConfigCap()
   return {
@@ -29,7 +40,7 @@ export async function writeConfig(key: string, config: ExtConfigPairs, raw = fal
       extConfig.plugins[key] = config.config.plugins?.[key]
     else
       extConfig = config.config
-    writeConfigCap(extConfig, oldConfig.app.extConfigFilePath)
+    await writeConfigCap(extConfig, configWriteTarget ?? oldConfig.app.extConfigFilePath)
   }
 }
 

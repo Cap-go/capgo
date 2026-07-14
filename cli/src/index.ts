@@ -106,6 +106,9 @@ Example: npx @capgo/cli@latest init YOUR_API_KEY com.example.app`)
   .option('-i, --icon <icon>', `App icon path for display in Capgo Cloud`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+  .option('--package-json <path>', 'Package JSON for the Capacitor app to onboard (useful in monorepos)')
+  .option('--main-file <path>', 'Application entry file to update (useful in monorepos)')
+  .option('--capacitor-config <path>', 'Capacitor config source to update (useful with dynamic monorepo configs)')
   .option('--no-analytics', 'Disable init analytics and terminal replay for this run')
 
 const run = program

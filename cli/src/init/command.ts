@@ -19,7 +19,7 @@ import { canUseFilePicker, openPackageJsonPicker } from '../build/onboarding/fil
 import { getPlatformDirFromCapacitorConfig } from '../build/platform-paths'
 import { uploadBundleInternal } from '../bundle/upload'
 import { addChannelInternal } from '../channel/add'
-import { writeConfigUpdater } from '../config'
+import { setConfigWriteTarget, writeConfigUpdater } from '../config'
 import { getRepoStarStatus, isRepoStarredInSession, starAllRepositories, starRepository } from '../github'
 import { createKeyInternal } from '../key'
 import { doLoginExists, loginInternal } from '../login'
@@ -40,7 +40,10 @@ import { CAPGO_UPDATER_PACKAGE, getUpdaterInstallState } from './updater'
 
 interface SuperOptions extends Options {
   analytics?: boolean
+  capacitorConfig?: string
   local: boolean
+  mainFile?: string
+  packageJson?: string
 }
 
 export type RunDeviceCancelHandler = () => Promise<never>
@@ -102,6 +105,9 @@ interface InitAutoTestChange {
   displayPath: string
   kind: InitAutoTestChangeKind
 }
+let globalCapacitorConfigPath: string | undefined
+let globalConfigLoadDir: string | undefined
+let globalMainFilePath: string | undefined
 
 let tmpObject: tmp.FileResult['name'] | undefined
 let globalPathToPackageJson: string | undefined
@@ -112,6 +118,20 @@ let globalDelta = false
 let globalCurrentVersion: string | undefined
 let globalAppId: string | undefined
 let globalSupaHost: string | undefined
+
+export function resolveInitTargetPath(value: string | undefined, label: string, initialCwd = cwd()): string | undefined {
+  if (!value)
+    return undefined
+
+  const resolved = path.resolve(initialCwd, value)
+  if (!existsSync(resolved))
+    throw new Error(`${label} does not exist: ${resolved}`)
+  return resolved
+}
+
+function getInitConfigLoadDir(projectDir: string): string {
+  return globalCapacitorConfigPath ? globalConfigLoadDir ?? projectDir : projectDir
+}
 let globalCodeDiff: InitCodeDiff | undefined
 let globalEncryptionSummary: InitEncryptionSummary | undefined
 let globalCurrentStepNumber = 0
@@ -2447,7 +2467,7 @@ async function addUpdaterStep(orgId: string, apikey: string, appId: string) {
     s.start(`Updating config file`)
     delta = !!doDirectInstall
     const projectDir = dirname(path)
-    await withTemporaryCwd(projectDir, async () => {
+    await withTemporaryCwd(getInitConfigLoadDir(projectDir), async () => {
       if (doDirectInstall) {
         await updateConfigbyKey('SplashScreen', { launchAutoHide: false })
       }
@@ -2536,11 +2556,11 @@ async function addCodeStep(orgId: string, apikey: string, appId: string) {
     }
     else {
       // Handle other project types
-      let mainFilePath: string | null = null
-      if (projectType === 'unknown') {
+      let mainFilePath: string | null = globalMainFilePath ?? null
+      if (!mainFilePath && projectType === 'unknown') {
         mainFilePath = await findMainFile(true, projectDir)
       }
-      else {
+      else if (!mainFilePath) {
         const isTypeScript = projectType.endsWith('-ts')
         const projectTypeMainFile = findMainFileForProjectType(projectType, isTypeScript, projectDir)
         mainFilePath = projectTypeMainFile ? resolveProjectFilePath(projectTypeMainFile) : projectTypeMainFile
@@ -4537,6 +4557,22 @@ async function maybeStarCapgoRepo(includeSkillsRepository = false, repository?: 
 }
 
 export async function initApp(apikeyCommand: string, appId: string, options: SuperOptions) {
+  const initialCwd = cwd()
+  const packageJsonPath = resolveInitTargetPath(options.packageJson, 'Package JSON path', initialCwd)
+  const capacitorConfigPath = resolveInitTargetPath(options.capacitorConfig, 'Capacitor config path', initialCwd)
+  const mainFilePath = resolveInitTargetPath(options.mainFile, 'Main file path', initialCwd)
+  if (packageJsonPath && path.basename(packageJsonPath) !== PACKNAME)
+    throw new Error(`Package JSON path must point to ${PACKNAME}: ${packageJsonPath}`)
+  if (capacitorConfigPath && !/^capacitor\.config(?:\.[^.]+)?\.(?:ts|js|json)$/.test(path.basename(capacitorConfigPath)))
+    throw new Error(`Capacitor config path must point to a capacitor.config.* file: ${capacitorConfigPath}`)
+  if (mainFilePath && !/\.[cm]?[jt]sx?$/.test(mainFilePath))
+    throw new Error(`Main file path must point to a JavaScript or TypeScript file: ${mainFilePath}`)
+
+  globalPathToPackageJson = packageJsonPath
+  globalCapacitorConfigPath = capacitorConfigPath
+  globalConfigLoadDir = capacitorConfigPath ? initialCwd : undefined
+  globalMainFilePath = mainFilePath
+  setConfigWriteTarget(capacitorConfigPath)
   globalSupaHost = options.supaHost // honor --supa-host for the support-logs upload
   const pm = getPMAndCommand()
   options.apikey = apikeyCommand
@@ -4578,14 +4614,14 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   let extConfig: Awaited<ReturnType<typeof getConfig>> | undefined
   if (!options.supaAnon || !options.supaHost) {
     try {
-      extConfig = await withTemporaryCwd(selectedProjectDir, () => getConfig())
+      extConfig = await withTemporaryCwd(getInitConfigLoadDir(selectedProjectDir), () => getConfig())
     }
     catch {
       extConfig = undefined
     }
   }
   else {
-    extConfig = await withTemporaryCwd(selectedProjectDir, () => updateConfigUpdater({
+    extConfig = await withTemporaryCwd(getInitConfigLoadDir(selectedProjectDir), () => updateConfigUpdater({
       statsUrl: `${options.supaHost}/functions/v1/stats`,
       channelUrl: `${options.supaHost}/functions/v1/channel_self`,
       updateUrl: `${options.supaHost}/functions/v1/updates`,
@@ -4596,7 +4632,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
     }))
   }
   // Warn if this doesn't look like a Capacitor project
-  const hasCapacitorConfig = capacitorConfigFiles.some(file => existsSync(join(selectedProjectDir, file)))
+  const hasCapacitorConfig = Boolean(globalCapacitorConfigPath) || capacitorConfigFiles.some(file => existsSync(join(selectedProjectDir, file)))
   if (!hasCapacitorConfig) {
     pLog.warn('⚠️  No capacitor.config.* found in the selected project directory.')
     pLog.info(`   Capgo requires a Capacitor project. Selected project: ${selectedProjectDir}`)
@@ -4828,7 +4864,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
       selectedPackageJsonPath = path.resolve(globalPathToPackageJson ?? join(findRoot(cwd()), PACKNAME))
       selectedProjectDir = dirname(selectedPackageJsonPath)
       try {
-        extConfig = await withTemporaryCwd(selectedProjectDir, () => getConfig())
+        extConfig = await withTemporaryCwd(getInitConfigLoadDir(selectedProjectDir), () => getConfig())
       }
       catch {
         extConfig = undefined
