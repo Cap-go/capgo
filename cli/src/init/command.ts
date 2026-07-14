@@ -124,7 +124,7 @@ export function resolveInitTargetPath(value: string | undefined, label: string, 
     return undefined
 
   const resolved = path.resolve(initialCwd, value)
-  if (!existsSync(resolved))
+  if (!existsSync(resolved) || !statSync(resolved).isFile())
     throw new Error(`${label} does not exist: ${resolved}`)
   return resolved
 }
@@ -2499,7 +2499,7 @@ async function addCodeStep(orgId: string, apikey: string, appId: string) {
     const projectDir = dirname(packageJsonPath)
     const resolveProjectFilePath = (filePath: string) => path.isAbsolute(filePath) ? filePath : join(projectDir, filePath)
     const projectType = await findProjectType({ quiet: true, packageJsonPath })
-    if (projectType === 'nuxtjs-js' || projectType === 'nuxtjs-ts') {
+    if (!globalMainFilePath && (projectType === 'nuxtjs-js' || projectType === 'nuxtjs-ts')) {
       // Nuxt.js specific logic
       const nuxtDir = join(projectDir, 'plugins')
       if (!existsSync(nuxtDir)) {
@@ -4739,7 +4739,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   const discardResumedState = () => {
     stepToSkip = 0
     resumed = undefined
-    globalPathToPackageJson = undefined
+    globalPathToPackageJson = packageJsonPath
     globalNodeModulesPath = undefined
     globalChannelName = defaultChannel
     globalPlatform = 'ios'
