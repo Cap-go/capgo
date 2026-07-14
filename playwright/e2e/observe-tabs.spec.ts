@@ -19,7 +19,7 @@ test.describe('Observe sections', () => {
     await expect(page).toHaveURL(/\/app\/com\.demo\.app\/observe\/plugins$/)
     await expect(pluginsTab).toHaveAttribute('aria-current', 'page')
     await expect(page.locator('[data-test="observe-plugin-insights"]')).toBeVisible()
-    await expect(page.getByText('4.15.3', { exact: true })).toBeVisible()
+    await expect(page.locator('[data-test="observe-plugin-insights"] table').getByText('4.15.3', { exact: true })).toBeVisible()
 
     await page.setViewportSize({ width: 375, height: 667 })
     await expect(globalTab).toBeVisible()
