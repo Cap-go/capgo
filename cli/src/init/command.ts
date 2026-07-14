@@ -46,6 +46,13 @@ interface SuperOptions extends Options {
   packageJson?: string
 }
 
+interface InitTargetPaths {
+  pathToPackageJson?: string
+  capacitorConfigPath?: string
+  configLoadDir?: string
+  mainFilePath?: string
+}
+
 export type RunDeviceCancelHandler = () => Promise<never>
 const importInject = 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\''
 const codeInject = 'CapacitorUpdater.notifyAppReady()'
@@ -127,6 +134,49 @@ export function resolveInitTargetPath(value: string | undefined, label: string, 
   if (!existsSync(resolved) || !statSync(resolved).isFile())
     throw new Error(`${label} does not exist: ${resolved}`)
   return resolved
+}
+
+function resolveInitDirectoryPath(value: string | undefined, initialCwd: string): string | undefined {
+  if (!value)
+    return undefined
+
+  const resolved = path.resolve(initialCwd, value)
+  if (!existsSync(resolved) || !statSync(resolved).isDirectory())
+    return undefined
+  return resolved
+}
+
+export function resolveResumedInitTargets(currentTargets: InitTargetPaths, savedTargets: Partial<InitTargetPaths>, initialCwd = cwd()): InitTargetPaths {
+  const resumedTargets = { ...currentTargets }
+
+  if (!resumedTargets.pathToPackageJson && savedTargets.pathToPackageJson) {
+    try {
+      resumedTargets.pathToPackageJson = resolveInitTargetPath(savedTargets.pathToPackageJson, 'Package JSON path', initialCwd)
+    }
+    catch {
+    }
+  }
+
+  if (!resumedTargets.capacitorConfigPath && savedTargets.capacitorConfigPath) {
+    try {
+      resumedTargets.capacitorConfigPath = resolveCapacitorConfigTargetPath(savedTargets.capacitorConfigPath, initialCwd)
+      resumedTargets.configLoadDir = resolveInitDirectoryPath(savedTargets.configLoadDir, initialCwd) ?? initialCwd
+    }
+    catch {
+    }
+  }
+
+  if (!resumedTargets.mainFilePath && savedTargets.mainFilePath) {
+    try {
+      const mainFilePath = resolveInitTargetPath(savedTargets.mainFilePath, 'Main file path', initialCwd)
+      if (mainFilePath && /\.[cm]?[jt]sx?$/.test(mainFilePath))
+        resumedTargets.mainFilePath = mainFilePath
+    }
+    catch {
+    }
+  }
+
+  return resumedTargets
 }
 
 function getInitConfigLoadDir(projectDir: string): string {
@@ -1064,6 +1114,9 @@ function markStepDone(step: number, pathToPackageJson?: string, channelName?: st
       orgName: globalOrgName,
       appId: globalAppId,
       pathToPackageJson: pathToPackageJson ?? globalPathToPackageJson,
+      capacitorConfigPath: globalCapacitorConfigPath,
+      configLoadDir: globalConfigLoadDir,
+      mainFilePath: globalMainFilePath,
       channelName: channelName ?? globalChannelName,
       platform: globalPlatform,
       delta: globalDelta,
@@ -1093,13 +1146,30 @@ interface ResumeResult {
   appId?: string
 }
 
-async function tryResumeOnboarding(apikey: string): Promise<ResumeResult | undefined> {
+async function tryResumeOnboarding(apikey: string, initialTargets: InitTargetPaths, initialCwd: string): Promise<ResumeResult | undefined> {
   try {
     const rawData = readFileSync(getTmpObjectPath(), 'utf-8')
     if (!rawData || rawData.length === 0)
       return undefined
 
-    const { step_done, orgId, orgName, appId: savedAppId, pathToPackageJson, nodeModulesPath, channelName, platform, delta, currentVersion, codeDiff, encryptionSummary, autoTestChange } = JSON.parse(rawData)
+    const {
+      step_done,
+      orgId,
+      orgName,
+      appId: savedAppId,
+      pathToPackageJson,
+      capacitorConfigPath,
+      configLoadDir,
+      mainFilePath,
+      nodeModulesPath,
+      channelName,
+      platform,
+      delta,
+      currentVersion,
+      codeDiff,
+      encryptionSummary,
+      autoTestChange,
+    } = JSON.parse(rawData)
     if (!orgId || !step_done) {
       pLog.warn('⚠️  Found previous onboarding progress, but it was saved in an older format.')
       pLog.info('   Starting fresh. Your previous progress cannot be resumed.')
@@ -1119,9 +1189,17 @@ async function tryResumeOnboarding(apikey: string): Promise<ResumeResult | undef
     })
     await cancelCommand(resumeChoice, orgId, apikey)
     if (resumeChoice === 'yes') {
-      if (pathToPackageJson) {
-        globalPathToPackageJson = pathToPackageJson
-      }
+      const resumedTargets = resolveResumedInitTargets(initialTargets, {
+        pathToPackageJson: typeof pathToPackageJson === 'string' ? pathToPackageJson : undefined,
+        capacitorConfigPath: typeof capacitorConfigPath === 'string' ? capacitorConfigPath : undefined,
+        configLoadDir: typeof configLoadDir === 'string' ? configLoadDir : undefined,
+        mainFilePath: typeof mainFilePath === 'string' ? mainFilePath : undefined,
+      }, initialCwd)
+      globalPathToPackageJson = resumedTargets.pathToPackageJson
+      globalCapacitorConfigPath = resumedTargets.capacitorConfigPath
+      globalConfigLoadDir = resumedTargets.configLoadDir
+      globalMainFilePath = resumedTargets.mainFilePath
+      setConfigWriteTarget(globalCapacitorConfigPath)
       if (typeof nodeModulesPath === 'string' && nodeModulesPath.length > 0) {
         globalNodeModulesPath = nodeModulesPath
       }
@@ -4560,11 +4638,17 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   if (mainFilePath && !/\.[cm]?[jt]sx?$/.test(mainFilePath))
     throw new Error(`Main file path must point to a JavaScript or TypeScript file: ${mainFilePath}`)
 
-  globalPathToPackageJson = packageJsonPath
-  globalCapacitorConfigPath = capacitorConfigPath
-  globalConfigLoadDir = capacitorConfigPath ? initialCwd : undefined
-  globalMainFilePath = mainFilePath
-  setConfigWriteTarget(capacitorConfigPath)
+  const initialTargets: InitTargetPaths = {
+    pathToPackageJson: packageJsonPath,
+    capacitorConfigPath,
+    configLoadDir: capacitorConfigPath ? initialCwd : undefined,
+    mainFilePath,
+  }
+  globalPathToPackageJson = initialTargets.pathToPackageJson
+  globalCapacitorConfigPath = initialTargets.capacitorConfigPath
+  globalConfigLoadDir = initialTargets.configLoadDir
+  globalMainFilePath = initialTargets.mainFilePath
+  setConfigWriteTarget(initialTargets.capacitorConfigPath)
   globalSupaHost = options.supaHost // honor --supa-host for the support-logs upload
   const pm = getPMAndCommand()
   options.apikey = apikeyCommand
@@ -4590,7 +4674,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
     }
   }
 
-  let resumed = await tryResumeOnboarding(options.apikey)
+  let resumed = await tryResumeOnboarding(options.apikey, initialTargets, initialCwd)
   let stepToSkip = resumed?.stepDone ?? 0
 
   await ensureGitRepoCleanBeforeInit(stepToSkip > 0 ? globalAutoTestChange : undefined)
@@ -4731,7 +4815,11 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   const discardResumedState = () => {
     stepToSkip = 0
     resumed = undefined
-    globalPathToPackageJson = packageJsonPath
+    globalPathToPackageJson = initialTargets.pathToPackageJson
+    globalCapacitorConfigPath = initialTargets.capacitorConfigPath
+    globalConfigLoadDir = initialTargets.configLoadDir
+    globalMainFilePath = initialTargets.mainFilePath
+    setConfigWriteTarget(initialTargets.capacitorConfigPath)
     globalNodeModulesPath = undefined
     globalChannelName = defaultChannel
     globalPlatform = 'ios'

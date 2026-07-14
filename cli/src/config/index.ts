@@ -1,15 +1,17 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { existsSync, statSync } from 'node:fs'
-import { basename, resolve } from 'node:path'
+import { existsSync, realpathSync, statSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
+import { basename, extname, isAbsolute, relative, resolve, sep } from 'node:path'
 import { cwd } from 'node:process'
-import type { ExtConfigPairs } from '../schemas/config'
-import { loadConfig as loadConfigCap, writeConfig as writeConfigCap } from '../capacitor-cli'
+import type { CapacitorConfig, ExtConfigPairs } from '../schemas/config'
+import { loadConfig as loadConfigCap, requireTS, writeConfig as writeConfigCap } from '../capacitor-cli'
 
 export type { CapacitorConfig, ExtConfigPairs } from '../schemas/config'
 
 let configWriteTarget: string | undefined
 const configWriteTargetStore = new AsyncLocalStorage<{ filePath: string | undefined }>()
-const capacitorConfigFilePattern = /^capacitor\.config(?:\.[^.]+)*\.(?:ts|js|json)$/
+const capacitorConfigFilePattern = /^capacitor\.config(?:\.[^.]+)*\.(?:ts|json)$/
 
 /**
  * Overrides the config file Capacitor writes after loading the active root config.
@@ -43,22 +45,46 @@ export function resolveCapacitorConfigTargetPath(value: string | undefined, init
   if (!existsSync(resolved) || !statSync(resolved).isFile())
     throw new Error(`Capacitor config path does not exist: ${resolved}`)
   if (!capacitorConfigFilePattern.test(basename(resolved)))
-    throw new Error(`Capacitor config path must point to a capacitor.config.* file: ${resolved}`)
-  return resolved
+    throw new Error(`Capacitor config path must point to a capacitor.config.*.ts or capacitor.config.*.json file: ${resolved}`)
+
+  const workspaceRoot = realpathSync(initialCwd)
+  const target = realpathSync(resolved)
+  const pathFromWorkspace = relative(workspaceRoot, target)
+  if (pathFromWorkspace === '..' || pathFromWorkspace.startsWith(`..${sep}`) || isAbsolute(pathFromWorkspace))
+    throw new Error(`Capacitor config path must stay within the current working directory: ${resolved}`)
+  return target
+}
+
+async function loadConfigTarget(filePath: string): Promise<CapacitorConfig> {
+  if (extname(filePath) === '.json')
+    return JSON.parse(await readFile(filePath, 'utf8')) as CapacitorConfig
+
+  const configModule = requireTS(createRequire(filePath)('typescript'), filePath)
+  return (configModule.default ? await configModule.default : configModule) as CapacitorConfig
 }
 
 export async function loadConfig(): Promise<ExtConfigPairs | undefined> {
+  const configTarget = getConfigWriteTarget()
+  if (configTarget) {
+    return {
+      config: await loadConfigTarget(configTarget),
+      path: configTarget,
+    }
+  }
+
   const config = await loadConfigCap()
   return {
     config: config.app.extConfig,
-    path: getConfigWriteTarget() ?? config.app.extConfigFilePath,
+    path: config.app.extConfigFilePath,
   }
 }
 
 export async function writeConfig(key: string, config: ExtConfigPairs, raw = false): Promise<void> {
-  const oldConfig = await loadConfigCap()
+  const oldConfig = await loadConfig()
+  if (!oldConfig)
+    return
 
-  let { extConfig } = oldConfig.app
+  let { config: extConfig } = oldConfig
   if (extConfig) {
     if (!extConfig.plugins) {
       extConfig.plugins = {
@@ -73,7 +99,7 @@ export async function writeConfig(key: string, config: ExtConfigPairs, raw = fal
       extConfig.plugins[key] = config.config.plugins?.[key]
     else
       extConfig = config.config
-    await writeConfigCap(extConfig, getConfigWriteTarget() ?? oldConfig.app.extConfigFilePath)
+    await writeConfigCap(extConfig, oldConfig.path)
   }
 }
 

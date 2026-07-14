@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join, relative } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
@@ -13,6 +14,7 @@ import { CapgoSDK } from '../src/sdk.ts'
 
 const cliRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 const root = mkdtempSync(join(cliRoot, '.capgo-config-target-'))
+const outsideRoot = mkdtempSync(join(tmpdir(), 'capgo-config-outside-'))
 const withTimeout = (promise, ms, label) => new Promise((resolve, reject) => {
   const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
   promise.then(
@@ -30,16 +32,43 @@ try {
   const configTarget = join(configDir, 'capacitor.config.qr-code-reader.ts')
   const alternateConfigTarget = join(configDir, 'capacitor.config.stripe-phone-app.ts')
   const multiPartConfigTarget = join(configDir, 'capacitor.config.qr-code-reader.production.ts')
+  const jsonConfigTarget = join(configDir, 'capacitor.config.json-target.json')
+  const javascriptConfigTarget = join(configDir, 'capacitor.config.javascript.js')
+  const outsideConfigTarget = join(outsideRoot, 'capacitor.config.escape.ts')
   const rootConfigSource = JSON.stringify({
-    appId: 'com.example.app',
-    appName: 'Example',
-    webDir: 'www',
+    appId: 'com.example.root',
+    appName: 'Root app',
+    webDir: 'root-www',
+    server: {
+      url: 'https://root.example',
+    },
     plugins: {
+      RootOnlyPlugin: {
+        enabled: true,
+      },
       CapacitorUpdater: {
-        appId: 'com.example.app',
+        appId: 'com.example.root',
       },
     },
   }, null, 2)
+  const configTargetSource = `export default {
+  appId: 'com.example.target',
+  appName: 'Target app',
+  webDir: 'target-www',
+  server: {
+    url: 'https://target.example',
+  },
+  plugins: {
+    TargetOnlyPlugin: {
+      enabled: true,
+    },
+    CapacitorUpdater: {
+      appId: 'com.example.target',
+      targetOnly: true,
+    },
+  },
+}
+`
   const appDir = join(root, 'apps', 'qr-code-reader')
   mkdirSync(configDir, { recursive: true })
   mkdirSync(directoryTarget)
@@ -48,11 +77,20 @@ try {
   writeFileSync(rootConfig, rootConfigSource)
   writeFileSync(alternateConfigTarget, 'export default {}\n')
   writeFileSync(multiPartConfigTarget, 'export default {}\n')
-  writeFileSync(configTarget, 'export default {}\n')
+  writeFileSync(configTarget, configTargetSource)
+  writeFileSync(jsonConfigTarget, JSON.stringify({ appId: 'com.example.json', appName: 'JSON app', webDir: 'json-www' }))
+  writeFileSync(javascriptConfigTarget, 'module.exports = {}\n')
   writeFileSync(join(configDir, 'not-a-capacitor-config.ts'), 'export default {}\n')
+  writeFileSync(outsideConfigTarget, 'export default {}\n')
   assert.equal(resolveCapacitorConfigTargetPath('./env-configs/capacitor.config.qr-code-reader.production.ts', root), multiPartConfigTarget)
-
   assert.equal(resolveCapacitorConfigTargetPath('./env-configs/capacitor.config.qr-code-reader.ts', root), configTarget)
+  assert.equal(resolveCapacitorConfigTargetPath('./env-configs/capacitor.config.json-target.json', root), jsonConfigTarget)
+  assert.throws(() => resolveCapacitorConfigTargetPath('./env-configs/capacitor.config.javascript.js', root), /\.ts or capacitor\.config\.\*\.json/)
+  assert.throws(() => resolveCapacitorConfigTargetPath(relative(root, outsideConfigTarget), root), /must stay within the current working directory/)
+  assert.throws(() => resolveCapacitorConfigTargetPath(outsideConfigTarget, root), /must stay within the current working directory/)
+  const outsideLink = join(root, 'outside-link')
+  symlinkSync(outsideRoot, outsideLink, process.platform === 'win32' ? 'junction' : 'dir')
+  assert.throws(() => resolveCapacitorConfigTargetPath(join('outside-link', 'capacitor.config.escape.ts'), root), /must stay within the current working directory/)
   assert.throws(() => resolveCapacitorConfigTargetPath('./missing.ts', root), /Capacitor config path does not exist/)
   assert.throws(() => resolveCapacitorConfigTargetPath('./directory-target', root), /Capacitor config path does not exist/)
   assert.throws(() => resolveCapacitorConfigTargetPath('', root), /Capacitor config path must not be empty/)
@@ -60,8 +98,12 @@ try {
   const previousConfigWriteTarget = getConfigWriteTarget()
   try {
     process.chdir(root)
+    setConfigWriteTarget(jsonConfigTarget)
+    const jsonConfigSnapshot = await getConfig()
+    assert.equal(jsonConfigSnapshot.config.appId, 'com.example.json')
     setConfigWriteTarget(configTarget)
     const configSnapshot = await getConfig()
+    assert.equal(configSnapshot.config.appId, 'com.example.target')
     process.chdir(appDir)
     const createKeyPromise = createKeyInternal({ force: true, setupChannel: false }, true, configSnapshot)
     assert.equal(process.cwd(), appDir)
@@ -113,7 +155,15 @@ try {
   })
 
   assert.equal(command.status, 0, `${command.stdout}\n${command.stderr}`)
-  assert.match(readFileSync(configTarget, 'utf8'), /autoUpdate:\s*false/)
+  const writtenTargetConfig = readFileSync(configTarget, 'utf8')
+  assert.match(writtenTargetConfig, /appId:\s*'com\.example\.target'/)
+  assert.match(writtenTargetConfig, /appName:\s*'Target app'/)
+  assert.match(writtenTargetConfig, /webDir:\s*'target-www'/)
+  assert.match(writtenTargetConfig, /https:\/\/target\.example/)
+  assert.match(writtenTargetConfig, /TargetOnlyPlugin/)
+  assert.match(writtenTargetConfig, /targetOnly:\s*true/)
+  assert.match(writtenTargetConfig, /autoUpdate:\s*false/)
+  assert.doesNotMatch(writtenTargetConfig, /RootOnlyPlugin/)
   assert.equal(readFileSync(rootConfig, 'utf8'), rootConfigSource)
 
   const notificationHelper = join(root, 'src', 'capgo-notifications.ts')
@@ -186,4 +236,5 @@ finally {
   if (mcpStderr)
     console.error(mcpStderr.trim())
   rmSync(root, { recursive: true, force: true })
+  rmSync(outsideRoot, { recursive: true, force: true })
 }
