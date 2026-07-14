@@ -95,21 +95,11 @@ type SyncStatementKind
 
 type SyncObjectKind = 'column' | 'constraint' | 'function' | 'index' | 'sequence' | 'type'
 
-export interface ReadReplicaSchemaOwnerOperation {
-  action: 'add_column'
-  table: string
-  column: string
-  expectedType: string
-  defaultLiteral: string | null
-  notNull: boolean
-}
-
 export interface ReadReplicaSchemaSyncStatement {
   kind: SyncStatementKind
   table: string
   name: string
   sql: string
-  ownerOperation?: ReadReplicaSchemaOwnerOperation
 }
 
 export interface ReadReplicaSchemaSyncClient extends Queryable {
@@ -118,9 +108,6 @@ export interface ReadReplicaSchemaSyncClient extends Queryable {
   ) => void
   applyReadReplicaSchemaPlan?: (
     plan: ReadReplicaSchemaSyncPlan,
-  ) => Promise<void>
-  applyReadReplicaSchemaStatement?: (
-    statement: ReadReplicaSchemaSyncStatement,
   ) => Promise<void>
 }
 
@@ -139,7 +126,7 @@ export interface ReadReplicaSchemaSyncPlan {
 export type AdditiveSchemaSyncPlan = ReadReplicaSchemaSyncPlan
 
 export interface ReadReplicaSchemaSyncResult {
-  applied: Array<Omit<ReadReplicaSchemaSyncStatement, 'sql' | 'ownerOperation'>>
+  applied: Array<Omit<ReadReplicaSchemaSyncStatement, 'sql'>>
   skipped: SkippedChange[]
 }
 
@@ -301,7 +288,6 @@ export function planReadReplicaSchemaSync(
         table: column.table,
         name: column.name,
         sql: addColumnSql,
-        ownerOperation: buildAddColumnOwnerOperation(column),
       })
       continue
     }
@@ -534,21 +520,13 @@ export async function applyReadReplicaSchemaSync(
     DEFAULT_SCHEMA_SYNC_STATEMENT_TIMEOUT_MS,
   )
   const applyPlan = client.applyReadReplicaSchemaPlan
-  const applyStatement = client.applyReadReplicaSchemaStatement
-  if (applyPlan && applyStatement) {
+  const assertPlan = client.assertCanApplyReadReplicaSchemaPlan
+  if (applyPlan && !assertPlan) {
     throw new Error(
-      'Read-replica owner executor cannot combine transactional and per-statement schema execution',
+      'Transactional read-replica schema execution must preflight the whole reconciliation plan before applying schema changes',
     )
   }
-  if (
-    (applyPlan || applyStatement)
-    && !client.assertCanApplyReadReplicaSchemaPlan
-  ) {
-    throw new Error(
-      'Read-replica owner executor must preflight the whole reconciliation plan before applying schema changes',
-    )
-  }
-  client.assertCanApplyReadReplicaSchemaPlan?.(plan)
+  assertPlan?.(plan)
 
   try {
     if (applyPlan) {
@@ -566,10 +544,7 @@ export async function applyReadReplicaSchemaSync(
           deadline,
           statement,
         )
-        if (applyStatement)
-          await applyStatement(statement)
-        else
-          await client.query(statement.sql)
+        await client.query(statement.sql)
         assertTimeRemaining(
           deadline,
           `finish ${statement.kind} ${statement.table}.${statement.name}`,
@@ -595,7 +570,6 @@ export async function applyReadReplicaSchemaSync(
     skipped: plan.skipped,
   }
 }
-
 export const applyReadReplicaAdditiveSchemaSync = applyReadReplicaSchemaSync
 
 export async function reconcileReadReplicaSchema(
@@ -1180,23 +1154,6 @@ function buildAddColumnStatement(
   return `ALTER TABLE ${quoteQualifiedTable(column.table)} ADD COLUMN IF NOT EXISTS ${quoteIdent(column.name)} ${column.type}${defaultSql}${notNullSql}`
 }
 
-function buildAddColumnOwnerOperation(
-  column: SchemaColumn,
-): ReadReplicaSchemaOwnerOperation | undefined {
-  const defaultLiteral = readReplicaDefaultLiteral(column.default)
-  if (defaultLiteral === undefined)
-    return undefined
-
-  return {
-    action: 'add_column',
-    table: column.table,
-    column: column.name,
-    expectedType: column.type,
-    defaultLiteral,
-    notNull: column.notNull,
-  }
-}
-
 function buildCreateIndexStatement(
   index: SchemaIndex,
   actualTables: Set<string>,
@@ -1631,45 +1588,6 @@ function isIdentifierChar(value: string): boolean {
 function isNullDefault(value: string): boolean {
   return /^NULL\b/i.test(value)
 }
-
-function readReplicaDefaultLiteral(
-  value: string | null,
-): string | null | undefined {
-  if (value === null || isNullDefault(value))
-    return null
-  if (/^(?:true|false)$/i.test(value))
-    return value.toLowerCase()
-  if (/^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/.test(value))
-    return value
-  if (!value.startsWith('\''))
-    return undefined
-
-  let literal = ''
-  let position = 1
-  while (position < value.length) {
-    const character = value[position]
-    if (character !== '\'') {
-      literal += character
-      position += 1
-      continue
-    }
-    if (value[position + 1] === '\'') {
-      literal += '\''
-      position += 2
-      continue
-    }
-
-    const cast = value.slice(position + 1).trim()
-    if (!cast)
-      return literal
-    if (!cast.startsWith('::') || !isSafeSqlFragment(cast.slice(2)))
-      return undefined
-    return literal
-  }
-
-  return undefined
-}
-
 function quoteQualifiedTable(table: string): string {
   return `public.${quoteIdent(table)}`
 }
