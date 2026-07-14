@@ -13,12 +13,12 @@ dayjs.extend(utc)
 const supportedPeriodDays = [1, 3, 7, 30] as const
 type NativeObservePeriodDays = typeof supportedPeriodDays[number]
 
-type NativeObserveStatsRequest = {
+interface NativeObserveStatsRequest {
   app_id: string
   days?: number
 }
 
-type NativeObserveMetricRow = {
+interface NativeObserveMetricRow {
   day?: string
   action: string
   events: number | string
@@ -28,7 +28,7 @@ type NativeObserveMetricRow = {
   p99_ms: number | string | null
 }
 
-type NativeObserveVersionRow = {
+interface NativeObserveVersionRow {
   version_name: string
   events: number | string
   devices: number | string
@@ -38,7 +38,13 @@ type NativeObserveVersionRow = {
   webview_load_p90_ms: number | string | null
 }
 
-type NativeObserveOverviewRow = {
+interface NativeObservePluginVersionRow {
+  plugin_version: string
+  devices: number | string
+  total_devices: number | string
+}
+
+interface NativeObserveOverviewRow {
   events: number | string
   devices: number | string
   issue_count: number | string
@@ -50,7 +56,7 @@ type NativeObserveOverviewRow = {
   webview_load_p90_ms: number | string | null
 }
 
-type NativeObserveReleaseMarker = {
+interface NativeObserveReleaseMarker {
   version_name: string
   channel_name: string
   deployed_at: string
@@ -58,9 +64,10 @@ type NativeObserveReleaseMarker = {
 
 type NativeObserveNumericValue = number | string | null | undefined
 
-type BuildNativeObserveResponseInput = {
+interface BuildNativeObserveResponseInput {
   labels: string[]
   days: NativeObservePeriodDays
+  pluginVersionRows: NativeObservePluginVersionRow[]
   start: string
   end: string
   dailyRows: NativeObserveMetricRow[]
@@ -188,6 +195,18 @@ GROUP BY version_name
 ORDER BY events DESC, version_name ASC
 LIMIT 12`
 
+const pluginVersionStatsQuery = `SELECT
+  COALESCE(NULLIF(plugin_version, ''), 'unknown') AS plugin_version,
+  count(*)::integer AS devices,
+  sum(count(*)) OVER ()::integer AS total_devices
+FROM public.devices
+WHERE app_id = $1
+  AND is_prod IS TRUE
+  AND is_emulator IS NOT TRUE
+GROUP BY plugin_version
+ORDER BY devices DESC, plugin_version ASC
+LIMIT 12`
+
 const releaseMarkersQuery = `SELECT
   COALESCE(NULLIF(app_versions.name, ''), 'unknown') AS version_name,
   COALESCE(NULLIF(channels.name, ''), 'unknown') AS channel_name,
@@ -238,8 +257,8 @@ function toMetric(value: NativeObserveNumericValue, decimals = 0) {
   return Math.round(numeric * factor) / factor
 }
 
-function createSeries(length: number) {
-  return Array.from({ length }, () => 0)
+function createSeries(length: number): number[] {
+  return Array.from<number>({ length }).fill(0)
 }
 
 function setMetric(series: Array<number | null>, index: number, value: NativeObserveNumericValue) {
@@ -354,6 +373,11 @@ function buildNativeObserveResponse(input: BuildNativeObserveResponseInput) {
       launch_p90_ms: toMetric(row.launch_p90_ms),
       webview_load_p90_ms: toMetric(row.webview_load_p90_ms),
     })),
+    pluginVersions: input.pluginVersionRows.map(row => ({
+      plugin_version: row.plugin_version,
+      devices: toCount(row.devices),
+      total_devices: toCount(row.total_devices),
+    })),
     releaseMarkers: input.releaseMarkers,
   }
 }
@@ -371,6 +395,7 @@ async function readNativeObserveStats(c: Context<MiddlewareKeyVariables>, appId:
     const dailyResult = await db.query<NativeObserveMetricRow>(dailyStatsQuery, params)
     const actionResult = await db.query<NativeObserveMetricRow>(actionStatsQuery, params)
     const overviewResult = await db.query<NativeObserveOverviewRow>(overviewStatsQuery, paramsWithIssues)
+    const pluginVersionResult = await db.query<NativeObservePluginVersionRow>(pluginVersionStatsQuery, [appId])
     const versionResult = await db.query<NativeObserveVersionRow>(versionStatsQuery, paramsWithIssues)
     const releaseMarkersResult = await db.query<NativeObserveReleaseMarker>(releaseMarkersQuery, params.slice(0, 3))
 
@@ -381,6 +406,7 @@ async function readNativeObserveStats(c: Context<MiddlewareKeyVariables>, appId:
       end: endInclusive.toISOString(),
       dailyRows: dailyResult.rows,
       actionRows: actionResult.rows,
+      pluginVersionRows: pluginVersionResult.rows,
       versionRows: versionResult.rows,
       overviewRow: overviewResult.rows[0],
       releaseMarkers: releaseMarkersResult.rows,

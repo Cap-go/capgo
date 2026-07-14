@@ -37,6 +37,10 @@ describe('native observe stats helpers', () => {
       versionRows: [
         { version_name: '1.2.3', events: 8, devices: 4, issue_count: 1, affected_devices: 1, launch_p90_ms: 912.8, webview_load_p90_ms: 1450 },
       ],
+      pluginVersionRows: [
+        { plugin_version: '7.0.0', devices: 3, total_devices: 4 },
+        { plugin_version: '6.9.0', devices: 1, total_devices: 4 },
+      ],
       overviewRow: {
         events: 8,
         devices: 4,
@@ -57,6 +61,10 @@ describe('native observe stats helpers', () => {
     expect(response.overview.launch_p90_ms).toBe(913)
     expect(response.daily.launches).toEqual([4, 0])
     expect(response.daily.webview_loads).toEqual([3, 0])
+    expect(response.pluginVersions).toEqual([
+      { plugin_version: '7.0.0', devices: 3, total_devices: 4 },
+      { plugin_version: '6.9.0', devices: 1, total_devices: 4 },
+    ])
     expect(response.daily.issue_events).toEqual([0, 1])
     expect(response.daily.launch_p50_ms).toEqual([410, null])
     expect(response.actionBreakdown[1]).toMatchObject({ action: 'app_crash', is_issue: true })
