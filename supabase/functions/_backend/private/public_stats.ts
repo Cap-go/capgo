@@ -3,6 +3,7 @@ import { Hono } from 'hono/tiny'
 import { REQUIRED_GLOBAL_STATS_SHARDS } from '../utils/global_stats.ts'
 import { useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { getPublicLiveUpdateMetricsCF } from '../utils/cloudflare.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -42,4 +43,15 @@ app.get('/', async (c) => {
     updates: 1862788600,
     stars: 595,
   })
+
+app.get('/live_updates', async (c) => {
+  const metrics = await getPublicLiveUpdateMetricsCF(c)
+  return c.json({
+    period_days: 30,
+    updated_at: new Date().toISOString(),
+    ...metrics,
+  }, 200, {
+    'Cache-Control': 'public, max-age=300, s-maxage=900, stale-while-revalidate=3600',
+  })
+})
 })

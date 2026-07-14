@@ -2584,3 +2584,63 @@ export async function getPluginBreakdownCF(c: Context, referenceDate?: Date): Pr
     return emptyResult
   }
 }
+
+const PUBLIC_FAILURE_ACTIONS = ['set_fail', 'update_fail', 'download_fail', 'windows_path_fail', 'canonical_path_fail', 'directory_path_fail', 'unzip_fail', 'low_mem_fail', 'download_manifest_file_fail', 'download_manifest_checksum_fail', 'download_manifest_brotli_fail', 'finish_download_fail', 'manifest_path_fail', 'decrypt_fail', 'insufficient_disk_space', 'cannotGetBundle', 'checksum_fail', 'blocked_by_server_url', 'backend_refusal'] as const
+
+export interface PublicLiveUpdateMetrics {
+  daily: Array<{ date: string, requests: number, failures: number }>
+  failures: Array<{ reason: string, count: number }>
+  platforms: { ios: number, android: number, electron: number }
+  updater_versions: Array<{ date: string, version: string, devices: number }>
+}
+
+export async function getPublicLiveUpdateMetricsCF(c: Context, referenceDate = new Date()): Promise<PublicLiveUpdateMetrics> {
+  const empty: PublicLiveUpdateMetrics = { daily: [], failures: [], platforms: { ios: 0, android: 0, electron: 0 }, updater_versions: [] }
+  if (!c.env.APP_LOG || !c.env.DEVICE_USAGE || !c.env.DEVICE_INFO || !getEnv(c, 'CF_ANALYTICS_TOKEN') || !getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID'))
+    return empty
+
+  const end = new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), referenceDate.getUTCDate()))
+  const start = new Date(end)
+  start.setUTCDate(start.getUTCDate() - 30)
+  const window = `timestamp >= toDateTime('${formatDateCF(start)}') AND timestamp < toDateTime('${formatDateCF(end)}')`
+  const failureActions = PUBLIC_FAILURE_ACTIONS.map(action => `'${action}'`).join(', ')
+  const requestsAndFailuresQuery = `SELECT toString(toDate(timestamp)) AS date, blob2 AS action, count() AS total FROM app_log WHERE ${window} AND (blob2 = 'get' OR blob2 IN (${failureActions})) GROUP BY date, action`
+  const platformsQuery = `SELECT double1 AS platform, uniqExact(concat(index1, ':', blob1)) AS devices FROM device_usage WHERE ${window} AND double1 IN (0, 1, 2) GROUP BY platform`
+  const updaterVersionsQuery = `SELECT date, version, count() AS devices FROM (SELECT toString(toDate(timestamp)) AS date, index1 AS app_id, blob1 AS device_id, argMax(blob3, timestamp) AS version FROM device_info WHERE ${window} AND blob3 != '' GROUP BY date, app_id, device_id) GROUP BY date, version`
+
+  try {
+    const [actionRows, platformRows, versionRows] = await Promise.all([
+      runQueryToCFA<{ date: string, action: string, total: number }>(c, requestsAndFailuresQuery),
+      runQueryToCFA<{ platform: number, devices: number }>(c, platformsQuery),
+      runQueryToCFA<{ date: string, version: string, devices: number }>(c, updaterVersionsQuery),
+    ])
+    const byDate = new Map<string, { date: string, requests: number, failures: number }>()
+    const failures = new Map<string, number>()
+    for (const row of actionRows) {
+      const day = byDate.get(row.date) ?? { date: row.date, requests: 0, failures: 0 }
+      const total = Number(row.total) || 0
+      if (row.action === 'get') day.requests += total
+      else {
+        day.failures += total
+        failures.set(row.action, (failures.get(row.action) ?? 0) + total)
+      }
+      byDate.set(row.date, day)
+    }
+    const platforms = { ios: 0, android: 0, electron: 0 }
+    for (const row of platformRows) {
+      if (row.platform === 0) platforms.android += Number(row.devices) || 0
+      if (row.platform === 1) platforms.ios += Number(row.devices) || 0
+      if (row.platform === 2) platforms.electron += Number(row.devices) || 0
+    }
+    return {
+      daily: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)),
+      failures: [...failures.entries()].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count).slice(0, 8),
+      platforms,
+      updater_versions: versionRows.map(row => ({ date: row.date, version: row.version, devices: Number(row.devices) || 0 })).sort((a, b) => a.date.localeCompare(b.date) || b.devices - a.devices),
+    }
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading public live update metrics', error: serializeError(error) })
+    return empty
+  }
+}
