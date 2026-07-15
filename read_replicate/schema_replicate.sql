@@ -380,7 +380,6 @@ CREATE TABLE public.orgs (
     max_apikey_expiration_days integer,
     enforce_encrypted_bundles boolean DEFAULT false NOT NULL,
     required_encryption_key character varying(21) DEFAULT NULL::character varying,
-    use_new_rbac boolean DEFAULT true NOT NULL,
     has_usage_credits boolean DEFAULT false NOT NULL,
     website text,
     stats_refresh_requested_at timestamp without time zone,
@@ -916,20 +915,6 @@ CREATE INDEX idx_stripe_info_trial ON public.stripe_info USING btree (trial_at) 
 
 
 --
--- Name: manifest_file_hash_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX manifest_file_hash_idx ON public.manifest USING btree (file_hash);
-
-
---
--- Name: manifest_file_name_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX manifest_file_name_idx ON public.manifest USING btree (file_name);
-
-
---
 -- Name: notifications_uniq_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -962,13 +947,6 @@ CREATE INDEX org_users_app_id_idx ON public.org_users USING btree (app_id);
 --
 
 CREATE INDEX orgs_enforce_hashed_api_keys_true_idx ON public.orgs USING btree (id) WHERE (enforce_hashed_api_keys = true);
-
-
---
--- Name: si_customer_cover_uidx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX si_customer_cover_uidx ON public.stripe_info USING btree (customer_id) INCLUDE (status, trial_at, mau_exceeded, storage_exceeded, bandwidth_exceeded);
 
 
 --
