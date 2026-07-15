@@ -1,8 +1,12 @@
+import type { Page } from '@playwright/test'
+
 export interface VisualDiffRoute {
   slug: string
   path: string
   /** When true, logs in as test@capgo.app before visiting the route. */
   auth?: boolean
+  /** Optional deterministic UI setup before the screenshot is captured. */
+  prepare?: (page: Page) => Promise<void>
 }
 
 /**
@@ -18,6 +22,17 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
   { slug: 'devices', path: '/app/com.demo.app/devices', auth: true },
   { slug: 'observe', path: '/app/com.demo.app/observe', auth: true },
   { slug: 'observe-plugins', path: '/app/com.demo.app/observe/plugins', auth: true },
+  {
+    slug: 'api-keys-app-preview',
+    path: '/apikeys',
+    auth: true,
+    prepare: async (page) => {
+      await page.getByTestId('create-key').click()
+      const appOnlyScope = page.getByTestId('create-key-app-only-scope')
+      if (await appOnlyScope.count())
+        await appOnlyScope.check()
+    },
+  },
 ]
 
 export const visualDiffViewport = {

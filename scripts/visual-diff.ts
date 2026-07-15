@@ -498,6 +498,10 @@ async function captureScreenshots(
 
       await page.goto(route.path, { waitUntil: 'domcontentloaded' })
       await settlePage(page)
+      if (route.prepare) {
+        await route.prepare(page)
+        await settlePage(page)
+      }
       const outputPath = resolve(targetDir, `${route.slug}.png`)
       await page.screenshot({ path: outputPath, fullPage: false })
       console.log(`[visual-diff] captured ${phase} ${route.slug} -> ${outputPath}`)
