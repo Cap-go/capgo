@@ -64,6 +64,18 @@ async function loadConfigTarget(filePath: string): Promise<CapacitorConfig> {
 }
 
 export async function loadConfig(): Promise<ExtConfigPairs | undefined> {
+  const config = await loadConfigCap()
+  return {
+    config: config.app.extConfig,
+    path: getConfigWriteTarget() ?? config.app.extConfigFilePath,
+  }
+}
+
+/**
+ * Loads the source file that will receive a config update. Normal reads must
+ * continue through Capacitor's root loader so dynamic monorepos keep working.
+ */
+export async function loadConfigForWrite(): Promise<ExtConfigPairs | undefined> {
   const configTarget = getConfigWriteTarget()
   if (configTarget) {
     return {
@@ -71,16 +83,11 @@ export async function loadConfig(): Promise<ExtConfigPairs | undefined> {
       path: configTarget,
     }
   }
-
-  const config = await loadConfigCap()
-  return {
-    config: config.app.extConfig,
-    path: config.app.extConfigFilePath,
-  }
+  return loadConfig()
 }
 
 export async function writeConfig(key: string, config: ExtConfigPairs, raw = false): Promise<void> {
-  const oldConfig = await loadConfig()
+  const oldConfig = await loadConfigForWrite()
   if (!oldConfig)
     return
 
@@ -101,10 +108,6 @@ export async function writeConfig(key: string, config: ExtConfigPairs, raw = fal
       extConfig = config.config
     await writeConfigCap(extConfig, oldConfig.path)
   }
-}
-
-export async function writeConfigSnapshot(config: ExtConfigPairs): Promise<void> {
-  await writeConfigCap(config.config, config.path)
 }
 
 export async function writeConfigUpdater(config: ExtConfigPairs, raw = false): Promise<void> {

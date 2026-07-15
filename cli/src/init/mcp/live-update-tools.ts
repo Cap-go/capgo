@@ -262,7 +262,7 @@ export function registerLiveUpdateTools(server: McpLike, sdk: CapgoSDK, depsOver
       addConfigTarget(appId, configTarget)
   }
   const migrateLegacyProgress = (appId: string | undefined, configTarget: string): void => {
-    const legacyProgress = deps.loadProgress()
+    const legacyProgress = withConfigWriteTarget(undefined, () => deps.loadProgress())
     if (!legacyProgress || (legacyProgress.appId && legacyProgress.appId !== appId))
       return
 
@@ -271,7 +271,7 @@ export function registerLiveUpdateTools(server: McpLike, sdk: CapgoSDK, depsOver
       return
 
     withConfigWriteTarget(configTarget, () => deps.saveProgress(legacyProgress))
-    deps.clearProgress()
+    withConfigWriteTarget(undefined, () => deps.clearProgress())
   }
   const getSessionConfigTarget = async (capacitorConfig?: string): Promise<string | undefined> => {
     if (capacitorConfig !== undefined)
@@ -304,7 +304,7 @@ export function registerLiveUpdateTools(server: McpLike, sdk: CapgoSDK, depsOver
           }
         }
         const appId = await deps.getAppId()
-        if (configTarget && requestedConfigTarget === undefined)
+        if (configTarget)
           migrateLegacyProgress(appId, configTarget)
         const result = await withConfigWriteTarget(configTarget, () => runStart(deps))
         return { appId, result, configTarget }

@@ -62,10 +62,21 @@ try {
   }
   assert.deepEqual(resolveResumedInitTargets(explicitTargets, savedTargets, root), explicitTargets)
   assert.deepEqual(resolveResumedInitTargets({}, {}, root), {})
-  assert.equal(
-    resolveResumedInitTargets({}, { ...savedTargets, configLoadDir: join(root, 'missing') }, root).configLoadDir,
-    root,
-  )
+
+  const invalidMainFile = join(root, 'projects', 'qr-code-reader', 'src', 'main.txt')
+  writeFileSync(invalidMainFile, 'export {}')
+  const staleTargets = {
+    pathToPackageJson: join(root, 'missing-package.json'),
+    capacitorConfigPath: join(configDir, 'capacitor.config.missing.ts'),
+    configLoadDir: join(root, 'missing-config-dir'),
+    mainFilePath: join(root, 'missing-main.ts'),
+  }
+  assert.deepEqual(resolveResumedInitTargets(explicitTargets, staleTargets, root), explicitTargets)
+  assert.equal(resolveResumedInitTargets({}, { ...savedTargets, pathToPackageJson: staleTargets.pathToPackageJson }, root), undefined)
+  assert.equal(resolveResumedInitTargets({}, { ...savedTargets, capacitorConfigPath: staleTargets.capacitorConfigPath }, root), undefined)
+  assert.equal(resolveResumedInitTargets({}, { ...savedTargets, configLoadDir: staleTargets.configLoadDir }, root), undefined)
+  assert.equal(resolveResumedInitTargets({}, { ...savedTargets, mainFilePath: staleTargets.mainFilePath }, root), undefined)
+  assert.equal(resolveResumedInitTargets({}, { ...savedTargets, mainFilePath: invalidMainFile }, root), undefined)
   console.log('✅ init monorepo target tests passed')
 }
 finally {

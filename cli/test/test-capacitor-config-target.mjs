@@ -7,7 +7,7 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
-import { getConfigWriteTarget, resolveCapacitorConfigTargetPath, setConfigWriteTarget } from '../src/config/index.ts'
+import { getConfigWriteTarget, loadConfigForWrite, resolveCapacitorConfigTargetPath, setConfigWriteTarget } from '../src/config/index.ts'
 import { createKeyInternal } from '../src/key.ts'
 import { getConfig } from '../src/utils.ts'
 import { CapgoSDK } from '../src/sdk.ts'
@@ -100,12 +100,20 @@ try {
     process.chdir(root)
     setConfigWriteTarget(jsonConfigTarget)
     const jsonConfigSnapshot = await getConfig()
-    assert.equal(jsonConfigSnapshot.config.appId, 'com.example.json')
+    assert.equal(jsonConfigSnapshot.config.appId, 'com.example.root')
+    assert.equal(jsonConfigSnapshot.path, jsonConfigTarget)
+    const jsonConfigWriteSnapshot = await loadConfigForWrite()
+    assert.equal(jsonConfigWriteSnapshot.config.appId, 'com.example.json')
+
     setConfigWriteTarget(configTarget)
     const configSnapshot = await getConfig()
-    assert.equal(configSnapshot.config.appId, 'com.example.target')
+    assert.equal(configSnapshot.config.appId, 'com.example.root')
+    assert.equal(configSnapshot.path, configTarget)
+    assert.ok(configSnapshot.config.plugins.RootOnlyPlugin)
+    const configWriteSnapshot = await loadConfigForWrite()
+    assert.equal(configWriteSnapshot.config.appId, 'com.example.target')
     process.chdir(appDir)
-    const createKeyPromise = createKeyInternal({ force: true, setupChannel: false }, true, configSnapshot)
+    const createKeyPromise = createKeyInternal({ force: true, setupChannel: false }, true, configWriteSnapshot)
     assert.equal(process.cwd(), appDir)
     await createKeyPromise
     assert.equal(process.cwd(), appDir)
@@ -114,7 +122,12 @@ try {
     process.chdir(previousCwd)
     setConfigWriteTarget(previousConfigWriteTarget)
   }
-
+  const createdTargetConfig = readFileSync(configTarget, 'utf8')
+  assert.match(createdTargetConfig, /publicKey/)
+  assert.match(createdTargetConfig, /appId:\s*'com\.example\.target'/)
+  assert.match(createdTargetConfig, /TargetOnlyPlugin/)
+  assert.match(createdTargetConfig, /targetOnly:\s*true/)
+  assert.doesNotMatch(createdTargetConfig, /RootOnlyPlugin/)
   assert.ok(existsSync(join(appDir, '.capgo_key_v2')))
   assert.ok(existsSync(join(appDir, '.capgo_key_v2.pub')))
   assert.match(readFileSync(configTarget, 'utf8'), /publicKey/)

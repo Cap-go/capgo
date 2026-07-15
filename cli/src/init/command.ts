@@ -30,7 +30,7 @@ import { copyToClipboard, revealInFinder } from '../support/clipboard'
 import { appendInternalLog, getInternalLogPath, startInternalLog } from '../support/internal-log'
 import { showReplicationProgress } from '../replicationProgress'
 import { formatRunnerCommand, splitRunnerCommand } from '../runner-command'
-import { consoleWebUrl, createSupabaseClient, defaultApiHost, findBuildCommandForProjectType, findMainFile, findMainFileForProjectType, findProjectType, findRoot, findSavedKey, findSavedKeySilent, formatError, getAllPackagesDependencies, getAppId, getBundleVersion, getConfig, getLocalConfig, getNativeProjectResetAdvice, getOrganizationListWithPermission, getPackageScripts, getPMAndCommand, hasCliPermission, PACKNAME, projectIsMonorepo, resolveUserIdFromApiKey, updateConfigbyKey, updateConfigUpdater, validateIosUpdaterSync } from '../utils'
+import { consoleWebUrl, createSupabaseClient, defaultApiHost, findBuildCommandForProjectType, findMainFile, findMainFileForProjectType, findProjectType, findRoot, findSavedKey, findSavedKeySilent, formatError, getAllPackagesDependencies, getAppId, getBundleVersion, getConfig, getConfigForWrite, getLocalConfig, getNativeProjectResetAdvice, getOrganizationListWithPermission, getPackageScripts, getPMAndCommand, hasCliPermission, PACKNAME, projectIsMonorepo, resolveUserIdFromApiKey, updateConfigbyKey, updateConfigUpdater, validateIosUpdaterSync } from '../utils'
 import { buildAppIdConflictSuggestions, isAppAlreadyExistsError } from './app-conflict'
 import { cancel as pCancel, confirm as pConfirm, intro as pIntro, isCancel as pIsCancel, log as pLog, outro as pOutro, select as pSelect, spinner as pSpinner, text as pText } from './prompts'
 import { appendInitStreamingLine, clearInitStreamingOutput, setInitCodeDiff, setInitEncryptionSummary, setInitVersionWarning, startInitStreamingOutput, stopInitInkSession, updateInitStreamingStatus } from './runtime'
@@ -146,33 +146,44 @@ function resolveInitDirectoryPath(value: string | undefined, initialCwd: string)
   return resolved
 }
 
-export function resolveResumedInitTargets(currentTargets: InitTargetPaths, savedTargets: Partial<InitTargetPaths>, initialCwd = cwd()): InitTargetPaths {
+export function resolveResumedInitTargets(currentTargets: InitTargetPaths, savedTargets: Partial<InitTargetPaths>, initialCwd = cwd()): InitTargetPaths | undefined {
   const resumedTargets = { ...currentTargets }
 
   if (!resumedTargets.pathToPackageJson && savedTargets.pathToPackageJson) {
     try {
-      resumedTargets.pathToPackageJson = resolveInitTargetPath(savedTargets.pathToPackageJson, 'Package JSON path', initialCwd)
+      const packageJsonPath = resolveInitTargetPath(savedTargets.pathToPackageJson, 'Package JSON path', initialCwd)
+      if (!packageJsonPath)
+        return undefined
+      resumedTargets.pathToPackageJson = packageJsonPath
     }
     catch {
+      return undefined
     }
   }
 
   if (!resumedTargets.capacitorConfigPath && savedTargets.capacitorConfigPath) {
     try {
-      resumedTargets.capacitorConfigPath = resolveCapacitorConfigTargetPath(savedTargets.capacitorConfigPath, initialCwd)
-      resumedTargets.configLoadDir = resolveInitDirectoryPath(savedTargets.configLoadDir, initialCwd) ?? initialCwd
+      const capacitorConfigPath = resolveCapacitorConfigTargetPath(savedTargets.capacitorConfigPath, initialCwd)
+      const configLoadDir = resolveInitDirectoryPath(savedTargets.configLoadDir, initialCwd)
+      if (!capacitorConfigPath || !configLoadDir)
+        return undefined
+      resumedTargets.capacitorConfigPath = capacitorConfigPath
+      resumedTargets.configLoadDir = configLoadDir
     }
     catch {
+      return undefined
     }
   }
 
   if (!resumedTargets.mainFilePath && savedTargets.mainFilePath) {
     try {
       const mainFilePath = resolveInitTargetPath(savedTargets.mainFilePath, 'Main file path', initialCwd)
-      if (mainFilePath && /\.[cm]?[jt]sx?$/.test(mainFilePath))
-        resumedTargets.mainFilePath = mainFilePath
+      if (!mainFilePath || !/\.[cm]?[jt]sx?$/.test(mainFilePath))
+        return undefined
+      resumedTargets.mainFilePath = mainFilePath
     }
     catch {
+      return undefined
     }
   }
 
@@ -1195,6 +1206,16 @@ async function tryResumeOnboarding(apikey: string, initialTargets: InitTargetPat
         configLoadDir: typeof configLoadDir === 'string' ? configLoadDir : undefined,
         mainFilePath: typeof mainFilePath === 'string' ? mainFilePath : undefined,
       }, initialCwd)
+      if (!resumedTargets) {
+        pLog.warn('Saved onboarding targets are no longer available. Starting over.')
+        cleanupStepsDone()
+        globalCodeDiff = undefined
+        setInitCodeDiff(undefined)
+        globalEncryptionSummary = undefined
+        setInitEncryptionSummary(undefined)
+        globalAutoTestChange = undefined
+        return undefined
+      }
       globalPathToPackageJson = resumedTargets.pathToPackageJson
       globalCapacitorConfigPath = resumedTargets.capacitorConfigPath
       globalConfigLoadDir = resumedTargets.configLoadDir
@@ -1531,7 +1552,7 @@ async function saveAppIdToCapacitorConfig(appId: string) {
  */
 async function syncPendingAppIdToCapacitorConfig(appId: string) {
   try {
-    const extConfig = await getConfig()
+    const extConfig = await getConfigForWrite()
     extConfig.config.appId = appId
     extConfig.config.plugins ||= {}
     extConfig.config.plugins.CapacitorUpdater = {
@@ -2874,7 +2895,7 @@ async function addEncryptionStep(orgId: string, apikey: string, appId: string) {
     // setupChannel=false avoids a rogue clack confirm when an old private
     // key is present in the config.
     try {
-      const encryptionConfig = await withTemporaryCwd(getInitConfigLoadDir(projectDir), () => getConfig())
+      const encryptionConfig = await withTemporaryCwd(getInitConfigLoadDir(projectDir), () => getConfigForWrite())
       await withTemporaryCwd(projectDir, () => createKeyInternal({ force: true, setupChannel: false }, true, encryptionConfig))
       // Intentionally stop without a success message: the persistent
       // encryption summary panel renders on the next step and already shows
@@ -4806,20 +4827,12 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
   await resolveUserIdFromApiKey(supabase, options.apikey)
 
-  // Whenever a resume is aborted (org no longer available, role lost, 2FA
-  // required, lookup failed) we restart from step 0. Drop any diff that
-  // `tryResumeOnboarding` restored so the freshly walked step 4 doesn't see
-  // stale content from an earlier run, and delete the on-disk resume file so
-  // a subsequent `capgo init` run won't re-offer the now-invalid resume
-  // before `markStepDone()` has had a chance to overwrite it.
+  // A failed remote checkpoint (organization access, role, or 2FA) restarts
+  // onboarding at step 0. Keep the already validated local targets intact: the
+  // project, config, and app ID below were derived from them before this check.
   const discardResumedState = () => {
     stepToSkip = 0
     resumed = undefined
-    globalPathToPackageJson = initialTargets.pathToPackageJson
-    globalCapacitorConfigPath = initialTargets.capacitorConfigPath
-    globalConfigLoadDir = initialTargets.configLoadDir
-    globalMainFilePath = initialTargets.mainFilePath
-    setConfigWriteTarget(initialTargets.capacitorConfigPath)
     globalNodeModulesPath = undefined
     globalChannelName = defaultChannel
     globalPlatform = 'ios'

@@ -4,8 +4,8 @@ import { intro, log, outro, confirm as pConfirm } from '@clack/prompts'
 import { trackEvent } from './analytics/track'
 import { createRSA } from './api/crypto'
 import { checkAlerts } from './api/update'
-import { writeConfigSnapshot, writeConfigUpdater } from './config'
-import { baseKey, baseKeyPub, baseKeyPubV2, baseKeyV2, getConfig, promptAndSyncCapacitor } from './utils'
+import { getConfigWriteTarget, writeConfigUpdater } from './config'
+import { baseKey, baseKeyPub, baseKeyPubV2, baseKeyV2, getConfigForWrite, promptAndSyncCapacitor } from './utils'
 
 interface SaveOptions {
   key?: string
@@ -29,7 +29,7 @@ export async function saveKeyInternal(options: SaveOptions, silent = false) {
   if (!silent)
     intro('Save keys 🔑')
 
-  const extConfig = await getConfig()
+  const extConfig = await getConfigForWrite()
   const keyPath = options.key || baseKeyPubV2
   let publicKey = options.keyData || ''
 
@@ -83,7 +83,7 @@ export async function deleteOldPrivateKeyInternal(options: Options, silent = fal
   if (!silent)
     intro('Deleting old private key 🗑️')
 
-  const extConfig = await getConfig()
+  const extConfig = await getConfigForWrite()
   const updaterConfig = extConfig?.config?.plugins?.CapacitorUpdater
 
   if (updaterConfig?.privateKey) {
@@ -153,7 +153,9 @@ export async function createKeyInternal(options: Options, silent = false, existi
   }
   writeFileSync(baseKeyV2, privateKey)
 
-  const extConfig = existingConfig ?? await getConfig()
+  const extConfig = existingConfig && !getConfigWriteTarget()
+    ? existingConfig
+    : await getConfigForWrite()
 
   if (extConfig) {
     const updaterConfig = ensureCapacitorUpdaterConfig(extConfig.config)
@@ -174,7 +176,7 @@ export async function createKeyInternal(options: Options, silent = false, existi
     }
 
     updaterConfig.publicKey = publicKey
-    await writeConfigSnapshot(extConfig)
+    await writeConfigUpdater(extConfig)
   }
 
   void trackEvent({ channel: 'key', event: 'Encryption Keys Generated', icon: '🔑', tags: {} })

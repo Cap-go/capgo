@@ -526,8 +526,12 @@ async function drive(deps: EngineDeps, input?: LiveUpdateNextStepInput): Promise
 
 export async function runStart(deps: EngineDeps): Promise<NextStepResult> {
   const appId = await deps.getAppId()
-  if (appId)
-    mergeSession(appId, { resumeResolved: undefined })
+  if (appId) {
+    const stepDone = progressForApp(appId, deps.loadProgress())?.step_done ?? 0
+    // Fresh starts may create progress during this call; only an existing
+    // checkpoint needs a resume decision.
+    mergeSession(appId, { resumeResolved: stepDone === 0 })
+  }
   return drive(deps)
 }
 
