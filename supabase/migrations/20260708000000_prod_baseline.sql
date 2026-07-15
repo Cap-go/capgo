@@ -10108,11 +10108,6 @@ lock (ID=1) to prevent concurrent execution - if a previous run is still
 executing, the new invocation will skip. Also queues and processes progressive
 rollout auto-pause evaluation through the existing cron processor.';
 
-SELECT cron.schedule(
-  'process_all_cron_tasks',
-  '10 seconds',
-  $$SELECT public.process_all_cron_tasks();$$
-);
 
 
 

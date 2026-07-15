@@ -89,6 +89,8 @@ async function replaceApiKeyBindings(
     ...bindings.map(binding => binding.org_id),
   ])]
 
+  await assertApiKeyManagerCanAssignBindings(c, auth, bindings)
+
   for (const orgId of affectedOrgIds) {
     if (!(await checkPermission(c, 'org.update_user_roles', { orgId }))) {
       throw quickError(403, 'forbidden_binding', `Forbidden - Admin rights required for org ${orgId}`, { requestId: c.get('requestId'), orgId })
@@ -99,7 +101,6 @@ async function replaceApiKeyBindings(
   try {
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
-    await assertApiKeyManagerCanAssignBindings(c, auth, bindings)
     if (globalPermissions !== undefined) {
       validateApiKeyGlobalPermissionsForBindings(globalPermissions, bindings, c.get('requestId'))
     }

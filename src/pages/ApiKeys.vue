@@ -992,7 +992,7 @@ async function loadManageableOrganizations() {
 function validateApiKeyScope() {
   if (appOnlyScope.value) {
     if (selectedAppIds.value.length === 0) {
-      toast.error(t('select-at-least-one-role'))
+      toast.error(t('select-at-least-one-app'))
       return false
     }
   }
