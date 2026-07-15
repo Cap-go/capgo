@@ -28,6 +28,14 @@ describe('analytics engine sql lint rules', () => {
     expect(lintAnalyticsEngineSql("SELECT multiIf(blob4 != '', blob4, 1, 'ios') FROM device_usage").map(issue => issue.rule)).toContain('no-multiif')
   })
 
+  it.concurrent('flags unsupported toString calls', () => {
+    expect(lintAnalyticsEngineSql('SELECT toString(toDate(timestamp)) AS date FROM app_log').map(issue => issue.rule)).toContain('no-to-string')
+  })
+
+  it.concurrent('flags unsupported concat calls', () => {
+    expect(lintAnalyticsEngineSql("SELECT concat(index1, ':', blob1) FROM device_usage").map(issue => issue.rule)).toContain('no-concat')
+  })
+
   it.concurrent('accepts supported COUNT() and COUNT(DISTINCT) forms', () => {
     expect(lintAnalyticsEngineSql('SELECT COUNT() AS total FROM device_info')).toEqual([])
     expect(lintAnalyticsEngineSql('SELECT COUNT(DISTINCT blob1) AS total FROM device_info')).toEqual([])

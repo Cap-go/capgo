@@ -236,6 +236,14 @@ const upgradeTrendSeries = computed(() => {
 
   return [
     {
+      label: t('total-above-plan'),
+      data: abovePlanTrendData.value.map(item => ({
+        date: item.date,
+        value: (item.above_plan_with_credits ?? 0) + (item.above_plan_without_credits ?? 0),
+      })),
+      color: '#2563eb', // blue
+    },
+    {
       label: t('above-plan-with-credits'),
       data: abovePlanTrendData.value.map(item => ({
         date: item.date,

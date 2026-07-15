@@ -31,6 +31,16 @@ export const ANALYTICS_ENGINE_SQL_LINT_RULES: AnalyticsEngineSqlLintRule[] = [
     message: 'multiIf is unsupported by Analytics Engine SQL; use nested if() instead',
   },
   {
+    id: 'no-to-string',
+    test: sql => /\btoString\s*\(/i.test(sql),
+    message: 'toString is unsupported by Analytics Engine SQL; use a supported formatter instead',
+  },
+  {
+    id: 'no-concat',
+    test: sql => /\bconcat\s*\(/i.test(sql),
+    message: 'concat is unsupported by Analytics Engine SQL; group the dimensions instead',
+  },
+  {
     id: 'no-select-alias-dependency',
     test: sql => /\bif\(\s*(?:installs|failures|fails)\s*\+/i.test(sql),
     message: 'Analytics Engine SQL cannot reference SELECT aliases inside other projected expressions',

@@ -18,6 +18,7 @@ import {
   getAdminSuccessRate,
   getAdminSuccessRateTrend,
   getAdminUploadMetrics,
+  getPublicLiveUpdateMetricsCF,
   getPluginBreakdownCF,
   getUpdateStatsCF,
   readActiveAppsCF,
@@ -200,6 +201,10 @@ export function installAnalyticsEngineSqlCapture(): AnalyticsEngineSqlCapture {
 
 export async function collectAnalyticsEngineSqlFixtures(): Promise<AnalyticsEngineSqlFixture[]> {
   const capture = installAnalyticsEngineSqlCapture()
+  const previousAnalyticsToken = process.env.CF_ANALYTICS_TOKEN
+  const previousAnalyticsAccountId = process.env.CF_ACCOUNT_ANALYTICS_ID
+  process.env.CF_ANALYTICS_TOKEN = 'cf-analytics-token'
+  process.env.CF_ACCOUNT_ANALYTICS_ID = 'cf-account-id'
 
   try {
     const context = createMockContext()
@@ -284,10 +289,17 @@ export async function collectAnalyticsEngineSqlFixtures(): Promise<AnalyticsEngi
     await captureCall('getAdminStorageTrend', () => getAdminStorageTrend(context, SAMPLE_START, SAMPLE_END))
     await captureCall('getAdminBandwidthTrend', () => getAdminBandwidthTrend(context, SAMPLE_START, SAMPLE_END))
     await captureCall('getPluginBreakdownCF', () => getPluginBreakdownCF(context, SAMPLE_REFERENCE_DATE))
+    await captureCall('getPublicLiveUpdateMetricsCF', () => getPublicLiveUpdateMetricsCF(context, SAMPLE_REFERENCE_DATE))
 
     return [...staticFixtures, ...capture.fixtures]
   }
   finally {
+    if (previousAnalyticsToken === undefined)
+      delete process.env.CF_ANALYTICS_TOKEN
+    else process.env.CF_ANALYTICS_TOKEN = previousAnalyticsToken
+    if (previousAnalyticsAccountId === undefined)
+      delete process.env.CF_ACCOUNT_ANALYTICS_ID
+    else process.env.CF_ACCOUNT_ANALYTICS_ID = previousAnalyticsAccountId
     capture.restore()
   }
 }
