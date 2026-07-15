@@ -989,6 +989,67 @@ describe('/private/admin_stats', () => {
     })
   })
 
+  it('keeps an uploaded bundle in the funnel after a later channel promotion', async () => {
+    const supabase = getSupabaseClient()
+    const { data: promotedVersion, error: promotedVersionError } = await supabase
+      .from('app_versions')
+      .insert({
+        app_id: ONBOARDING_APP_ID,
+        name: '2.0.0',
+        owner_org: ONBOARDING_ORG_ID,
+        user_id: USER_ID,
+        storage_provider: 'r2-direct',
+        created_at: '2026-02-12T10:00:00.000Z',
+      })
+      .select('id')
+      .single()
+    if (promotedVersionError)
+      throw promotedVersionError
+    if (!promotedVersion)
+      throw new Error('Expected a later onboarding bundle to be created')
+
+    const { error: channelUpdateError } = await supabase
+      .from('channels')
+      .update({ version: promotedVersion.id })
+      .eq('app_id', ONBOARDING_APP_ID)
+      .eq('name', 'production')
+    if (channelUpdateError)
+      throw channelUpdateError
+
+    const response = await fetchTestRequest(`${BASE_URL}/private/admin_stats`, {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({
+        metric_category: 'onboarding_funnel',
+        start_date: '2026-02-01T00:00:00.000Z',
+        end_date: '2026-02-02T00:00:00.000Z',
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const payload = await response.json() as {
+      success: boolean
+      data: {
+        orgs_with_bundle: number
+        orgs_subscribed: number
+        trend: Array<{
+          date: string
+          orgs_created_bundle: number
+          orgs_subscribed: number
+        }>
+      }
+    }
+
+    expect(payload.success).toBe(true)
+    expect(payload.data.orgs_with_bundle).toBe(2)
+    expect(payload.data.orgs_subscribed).toBe(1)
+    expect(payload.data.trend[0]).toMatchObject({
+      date: '2026-02-01',
+      orgs_created_bundle: 2,
+      orgs_subscribed: 1,
+    })
+  })
+
   it('returns daily new trial organizations grouped by plan', async () => {
     const response = await fetchTestRequest(getEndpointUrl('/private/admin_stats'), {
       method: 'POST',

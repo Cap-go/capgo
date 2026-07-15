@@ -3164,10 +3164,19 @@ export async function getAdminOnboardingFunnel(
         SELECT DISTINCT o.id, o.customer_id, o.created_at, o.created_date
         FROM orgs_in_range o
         INNER JOIN apps a ON a.owner_org = o.id
-        INNER JOIN channels c ON c.app_id = a.app_id
-        INNER JOIN app_versions av ON av.id = c.version AND av.name NOT IN ('builtin', 'unknown')
-        WHERE av.created_at >= o.created_at
-          AND av.created_at < o.created_at + interval '7 days'
+        WHERE EXISTS (
+          SELECT 1
+          FROM channels c
+          WHERE c.app_id = a.app_id
+        )
+          AND EXISTS (
+            SELECT 1
+            FROM app_versions av
+            WHERE av.app_id = a.app_id
+              AND av.name NOT IN ('builtin', 'unknown')
+              AND av.created_at >= o.created_at
+              AND av.created_at < o.created_at + interval '7 days'
+          )
       ),
       orgs_subscribed AS (
         SELECT DISTINCT o.id, o.created_date
@@ -3235,25 +3244,43 @@ export async function getAdminOnboardingFunnel(
         SELECT o.created_at::date as date, COUNT(DISTINCT o.id)::int as orgs_created_bundle
         FROM orgs o
         INNER JOIN apps a ON a.owner_org = o.id
-        INNER JOIN channels c ON c.app_id = a.app_id
-        INNER JOIN app_versions av ON av.id = c.version AND av.name NOT IN ('builtin', 'unknown')
         WHERE o.created_at >= ${start_date}::timestamp
           AND o.created_at < ${end_date}::timestamp
-          AND av.created_at >= o.created_at
-          AND av.created_at < o.created_at + interval '7 days'
+          AND EXISTS (
+            SELECT 1
+            FROM channels c
+            WHERE c.app_id = a.app_id
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM app_versions av
+            WHERE av.app_id = a.app_id
+              AND av.name NOT IN ('builtin', 'unknown')
+              AND av.created_at >= o.created_at
+              AND av.created_at < o.created_at + interval '7 days'
+          )
         GROUP BY o.created_at::date
       ),
       daily_subscriptions AS (
         SELECT o.created_at::date as date, COUNT(DISTINCT o.id)::int as orgs_subscribed
         FROM orgs o
         INNER JOIN apps a ON a.owner_org = o.id
-        INNER JOIN channels c ON c.app_id = a.app_id
-        INNER JOIN app_versions av ON av.id = c.version AND av.name NOT IN ('builtin', 'unknown')
         INNER JOIN stripe_info si ON si.customer_id = o.customer_id
         WHERE o.created_at >= ${start_date}::timestamp
           AND o.created_at < ${end_date}::timestamp
-          AND av.created_at >= o.created_at
-          AND av.created_at < o.created_at + interval '7 days'
+          AND EXISTS (
+            SELECT 1
+            FROM channels c
+            WHERE c.app_id = a.app_id
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM app_versions av
+            WHERE av.app_id = a.app_id
+              AND av.name NOT IN ('builtin', 'unknown')
+              AND av.created_at >= o.created_at
+              AND av.created_at < o.created_at + interval '7 days'
+          )
           AND si.paid_at IS NOT NULL
           AND si.paid_at >= o.created_at
           AND si.paid_at < o.created_at + interval '7 days'
@@ -3282,14 +3309,23 @@ export async function getAdminOnboardingFunnel(
         a.app_id as app_id
       FROM orgs o
       INNER JOIN apps a ON a.owner_org = o.id
-      INNER JOIN channels ch ON ch.app_id = a.app_id
-      INNER JOIN app_versions av ON av.id = ch.version AND av.name NOT IN ('builtin', 'unknown')
       WHERE o.created_at >= ${start_date}::timestamp
         AND o.created_at < ${end_date}::timestamp
         AND a.created_at >= o.created_at
         AND a.created_at < o.created_at + interval '7 days'
-        AND av.created_at >= o.created_at
-        AND av.created_at < o.created_at + interval '7 days'
+        AND EXISTS (
+          SELECT 1
+          FROM channels ch
+          WHERE ch.app_id = a.app_id
+        )
+        AND EXISTS (
+          SELECT 1
+          FROM app_versions av
+          WHERE av.app_id = a.app_id
+            AND av.name NOT IN ('builtin', 'unknown')
+            AND av.created_at >= o.created_at
+            AND av.created_at < o.created_at + interval '7 days'
+        )
     `
 
     const [trendResult, activationCohortResult] = await Promise.all([
