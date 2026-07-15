@@ -98,6 +98,19 @@ The most complete [documentation is here](https://capgo.app/docs/).
 
 Join the [discord](https://discord.gg/VnYRvBfgA6) to get help.
 
+
+## Dynamic monorepos
+
+When a root `capacitor.config.ts` selects an app-specific source through an environment variable, keep that selector active and pass the source to Capgo:
+
+```bash
+CAP_APP=qr-code-reader npx @capgo/cli@latest init \
+  --package-json ./package.json \
+  --main-file ./projects/qr-code-reader/src/main.ts \
+  --capacitor-config ./env-configs/capacitor.config.qr-code-reader.ts
+```
+
+Capgo continues to load the root config while writing only the selected source. Use `--capacitor-config` on every config-changing CLI command, or the matching `capacitorConfig` SDK/MCP option.
 <!-- AUTO-GENERATED-DOCS-START -->
 ## 📑 Capgo CLI Commands
 
@@ -199,6 +212,9 @@ npx @capgo/cli@latest init YOUR_API_KEY com.example.app
 | **-i** | <code>string</code> | App icon path for display in Capgo Cloud |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+| **--package-json** | <code>string</code> | Package JSON for the Capacitor app to onboard (useful in monorepos) |
+| **--main-file** | <code>string</code> | Application entry file to update (useful in monorepos) |
+| **--capacitor-config** | <code>string</code> | Capacitor config source to update (useful with dynamic monorepo configs) |
 | **--no-analytics** | <code>boolean</code> | Disable init analytics and terminal replay for this run |
 
 
@@ -405,7 +421,8 @@ npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel prod
 | **--delta-only** | <code>boolean</code> | Upload only delta updates without full bundle for maximum speed (useful for large apps) |
 | **--no-delta** | <code>boolean</code> | Disable delta updates even if instant updates are enabled |
 | **--encrypted-checksum** | <code>string</code> | An encrypted checksum (signature). Used only when uploading an external bundle. |
-| **--auto-set-bundle** | <code>boolean</code> | Set the bundle in capacitor.config.json |
+| **--auto-set-bundle** | <code>boolean</code> | Set the bundle version in Capacitor config |
+| **--capacitor-config** | <code>string</code> | Capacitor config source to update (useful with dynamic monorepo configs) |
 | **--dry-upload** | <code>boolean</code> | Dry upload the bundle process: add the row in database without uploading files or updating channels (Used by Capgo for internal testing) |
 | **--package-json** | <code>string</code> | Paths to package.json files for monorepos (comma-separated) |
 | **--node-modules** | <code>string</code> | Paths to node_modules directories for monorepos (comma-separated) |
@@ -747,6 +764,7 @@ npx @capgo/cli@latest app setting plugins.CapacitorUpdater.defaultChannel --stri
 | -------------- | ------------- | -------------------- |
 | **--bool** | <code>string</code> | A value for the setting to modify as a boolean, ex: --bool true |
 | **--string** | <code>string</code> | A value for the setting to modify as a string, ex: --string "Production" |
+| **--capacitor-config** | <code>string</code> | Capacitor config source to update (useful with dynamic monorepo configs) |
 
 ### <a id="app-set"></a> ⚙️ **Set**
 
@@ -990,6 +1008,7 @@ npx @capgo/cli@latest key save --key ./path/to/key.pub
 | **-f** | <code>boolean</code> | Force generate a new one |
 | **--key** | <code>string</code> | Key path to save in Capacitor config |
 | **--key-data** | <code>string</code> | Key data to save in Capacitor config |
+| **--capacitor-config** | <code>string</code> | Capacitor config source to update (useful with dynamic monorepo configs) |
 
 ### <a id="key-create"></a> 🔨 **Create**
 
@@ -1013,6 +1032,7 @@ npx @capgo/cli@latest key create
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
 | **-f** | <code>boolean</code> | Force generate a new one |
+| **--capacitor-config** | <code>string</code> | Capacitor config source to update (useful with dynamic monorepo configs) |
 
 ### <a id="key-delete_old"></a> 🗑️ **Delete_old**
 
@@ -1027,6 +1047,12 @@ npx @capgo/cli@latest key delete_old
 ```bash
 npx @capgo/cli@latest key delete_old
 ```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **--capacitor-config** | <code>string</code> | Capacitor config source to update (useful with dynamic monorepo configs) |
 
 
 ## <a id="account"></a> 👤 **Account**
@@ -1789,6 +1815,7 @@ npx @capgo/cli@latest notifications setup com.example.app
 | **--force** | <code>boolean</code> | Overwrite the helper file if it already exists |
 | **--no-install** | <code>boolean</code> | Skip installing the notifications package |
 | **--no-sync** | <code>boolean</code> | Skip Capacitor sync |
+| **--capacitor-config** | <code>string</code> | Capacitor config source to update (useful with dynamic monorepo configs) |
 
 
 ## <a id="probe"></a> 🔹 **Probe**
@@ -1823,7 +1850,7 @@ npx @capgo/cli@latest mcp
 🤖 Start the Capgo MCP (Model Context Protocol) server for AI agent integration.
 This command starts an MCP server that exposes Capgo functionality as tools for AI agents.
 The server communicates via stdio and is designed for non-interactive, programmatic use.
-Available tools exposed via MCP:
+Selected tools exposed via MCP:
   - capgo_list_apps, capgo_add_app, capgo_update_app, capgo_delete_app
   - capgo_upload_bundle, capgo_list_bundles, capgo_delete_bundle, capgo_cleanup_bundles
   - capgo_list_channels, capgo_add_channel, capgo_update_channel, capgo_delete_channel
@@ -1839,7 +1866,7 @@ Example usage with Claude Desktop:
     "mcpServers": {
       "capgo": {
         "command": "npx",
-        "args": ["@capgo/cli", "mcp"]
+        "args": ["@capgo/cli@latest", "mcp"]
       }
     }
   }
@@ -1847,8 +1874,14 @@ Example usage with Claude Desktop:
 **Example:**
 
 ```bash
-npx @capgo/cli mcp
+npx @capgo/cli@latest mcp
 ```
+
+## <a id="options-mcp"></a> Options (Mcp)
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **--capacitor-config** | <code>string</code> | Capacitor config source to update (useful with dynamic monorepo configs) |
 
 
 

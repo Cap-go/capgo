@@ -26,7 +26,7 @@ import { createTimedFetch, isSupabaseInstrumentationEnabled } from './analytics/
 import { markSnag } from './app/debug'
 import { findMonorepoRoot, findNXMonorepoRoot, isMonorepo, isNXMonorepo } from './capacitor-cli'
 import { getChecksum } from './checksum'
-import { loadConfig, writeConfig } from './config'
+import { loadConfig, loadConfigForWrite, writeConfig } from './config'
 import { isTruthyEnvValue } from './posthog'
 import { nativePackageSchema } from './schemas/common'
 import { formatApiErrorForCli, parseSecurityPolicyError } from './utils/security_policy_errors'
@@ -540,9 +540,9 @@ export async function getDeclaredPackageVersionMap(f: string = findRoot(cwd()), 
   return dependencies
 }
 
-export async function getConfig(silent = false) {
+async function getConfigFrom(loader: () => Promise<ExtConfigPairs | undefined>, silent = false): Promise<ExtConfigPairs> {
   try {
-    const extConfig = await loadConfig()
+    const extConfig = await loader()
     if (!extConfig) {
       const message = 'No capacitor config file found, run `cap init` first'
       if (!silent)
@@ -559,8 +559,17 @@ export async function getConfig(silent = false) {
   }
 }
 
+export function getConfig(silent = false) {
+  return getConfigFrom(loadConfig, silent)
+}
+
+/** Loads the source config that a subsequent mutation will write. */
+export function getConfigForWrite(silent = false) {
+  return getConfigFrom(loadConfigForWrite, silent)
+}
+
 export async function updateConfigbyKey(key: string, newConfig: any): Promise<ExtConfigPairs> {
-  const extConfig = await getConfig()
+  const extConfig = await getConfigForWrite()
 
   if (extConfig?.config) {
     extConfig.config.plugins ??= {}

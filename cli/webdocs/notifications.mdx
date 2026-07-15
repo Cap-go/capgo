@@ -18,6 +18,8 @@ npx @capgo/cli@latest notifications setup
 Install the Capgo notifications plugin, add Capacitor config, create a helper file, and run Capacitor sync.
 Before sending production notifications, configure Android and iOS push credentials in the Capgo app Notifications tab.
 
+For dynamic monorepos, keep the root config selector active and add `--capacitor-config ./env-configs/capacitor.config.qr-code-reader.ts` so the notification configuration is written to the selected app source.
+
 **Example:**
 
 ```bash
@@ -33,3 +35,4 @@ npx @capgo/cli@latest notifications setup com.example.app
 | **--force** | <code>boolean</code> | Overwrite the helper file if it already exists |
 | **--no-install** | <code>boolean</code> | Skip installing the notifications package |
 | **--no-sync** | <code>boolean</code> | Skip Capacitor sync |
+| **--capacitor-config** | <code>string</code> | Capacitor config source to update (useful with dynamic monorepo configs) |
