@@ -420,7 +420,7 @@ async function presentActionSheet() {
   return dialogStore.onDialogDismiss()
 }
 
-async function submit(form: { first_name: string, last_name: string, email: string, country: string, format_locale: string }) {
+async function submit(form: { first_name: string, last_name: string, email: string, country: string, discord_username: string, github_username: string, format_locale: string }) {
   if (isLoading.value || !main.user?.id)
     return
 
@@ -430,6 +430,8 @@ async function submit(form: { first_name: string, last_name: string, email: stri
     && form.last_name === main.user?.last_name
     && form.email === main.user?.email
     && form.country === main.user?.country
+    && (form.discord_username || null) === main.user?.discord_username
+    && (form.github_username || null) === main.user?.github_username
     && formatLocale === currentFormatLocale) {
     return
   }
@@ -441,6 +443,8 @@ async function submit(form: { first_name: string, last_name: string, email: stri
     last_name: form.last_name,
     email: main.user.email,
     country: form.country,
+    discord_username: form.discord_username || null,
+    github_username: form.github_username || null,
     format_locale: formatLocale,
   }
 
@@ -568,6 +572,34 @@ onMounted(async () => {
                   enterkeyhint="send"
                   validation="required:trim"
                   :label="t('country')"
+                />
+              </div>
+            </div>
+            <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-y-0 sm:space-x-4">
+              <div class="sm:w-1/2">
+                <FormKit
+                  type="text"
+                  name="discord_username"
+                  autocomplete="off"
+                  :disabled="isLoading"
+                  :value="main.user?.discord_username ?? ''"
+                  validation="length:0,32"
+                  enterkeyhint="next"
+                  :label="t('discord-username')"
+                  :help="t('discord-username-help')"
+                />
+              </div>
+              <div class="sm:w-1/2">
+                <FormKit
+                  type="text"
+                  name="github_username"
+                  autocomplete="off"
+                  :disabled="isLoading"
+                  :value="main.user?.github_username ?? ''"
+                  validation="length:0,39"
+                  enterkeyhint="send"
+                  :label="t('github-username')"
+                  :help="t('github-username-help')"
                 />
               </div>
             </div>
