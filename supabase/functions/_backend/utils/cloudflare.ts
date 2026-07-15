@@ -1,9 +1,9 @@
 import type { AnalyticsEngineDataset, D1Database, Hyperdrive, KVNamespace, Queue } from '@cloudflare/workers-types'
 import type { Context } from 'hono'
 import type { DeviceComparable } from './deviceComparison.ts'
+import type { StatsInsightRawAction, StatsInsightRawDaily, StatsInsightRawDevice, StatsInsightRawSummary, StatsInsightRawVersion } from './statsInsights.ts'
 import type { Database } from './supabase.types.ts'
 import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadStatsInsightsParams, ReadStatsParams, StatsInsightsResult, StatsMetadata, VersionUsage, VersionUsageChannel } from './types.ts'
-import type { StatsInsightRawAction, StatsInsightRawDaily, StatsInsightRawDevice, StatsInsightRawSummary, StatsInsightRawVersion } from './statsInsights.ts'
 import dayjs from 'dayjs'
 import { CacheHelper } from './cache.ts'
 import { hasComparableDeviceChanged, toComparableDevice } from './deviceComparison.ts'
@@ -2588,10 +2588,11 @@ export async function getPluginBreakdownCF(c: Context, referenceDate?: Date): Pr
 const PUBLIC_FAILURE_ACTIONS = ['set_fail', 'update_fail', 'download_fail', 'windows_path_fail', 'canonical_path_fail', 'directory_path_fail', 'unzip_fail', 'low_mem_fail', 'download_manifest_file_fail', 'download_manifest_checksum_fail', 'download_manifest_brotli_fail', 'finish_download_fail', 'manifest_path_fail', 'decrypt_fail', 'insufficient_disk_space', 'cannotGetBundle', 'checksum_fail', 'blocked_by_server_url', 'backend_refusal'] as const
 
 export interface PublicLiveUpdateMetrics {
-  daily: Array<{ date: string, requests: number, failures: number }>
-  failures: Array<{ reason: string, count: number }>
+  success_rate: number
+  daily: Array<{ date: string, success_rate: number }>
+  failures: Array<{ reason: string, share: number }>
   platforms: { ios: number, android: number, electron: number }
-  updater_versions: Array<{ date: string, version: string, devices: number }>
+  updater_versions: Array<{ date: string, version: string, share: number }>
 }
 
 export async function getPublicLiveUpdateMetricsCF(c: Context, referenceDate = new Date()): Promise<PublicLiveUpdateMetrics> {
@@ -2604,40 +2605,60 @@ export async function getPublicLiveUpdateMetricsCF(c: Context, referenceDate = n
   const window = `timestamp >= toDateTime('${formatDateCF(start)}') AND timestamp < toDateTime('${formatDateCF(end)}')`
   const failureActions = PUBLIC_FAILURE_ACTIONS.map(action => `'${action}'`).join(', ')
   const day = `formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d')`
-  const requestsAndFailuresQuery = `SELECT ${day} AS date, blob2 AS action, count() AS total FROM app_log WHERE ${window} AND (blob2 = 'get' OR blob2 IN (${failureActions})) GROUP BY date, action`
+  const outcomesQuery = `SELECT date, sum(succeeded) AS successes, sum(failed) AS failures FROM (SELECT ${day} AS date, index1 AS app_id, blob1 AS device_id, max(if(blob2 = 'set', 1, 0)) AS succeeded, max(if(blob2 IN (${failureActions}), 1, 0)) AS failed FROM app_log WHERE ${window} AND (blob2 = 'set' OR blob2 IN (${failureActions})) GROUP BY date, app_id, device_id) GROUP BY date`
+  const failuresQuery = `SELECT action, count() AS devices FROM (SELECT ${day} AS date, blob2 AS action, index1 AS app_id, blob1 AS device_id FROM app_log WHERE ${window} AND blob2 IN (${failureActions}) GROUP BY date, action, app_id, device_id) GROUP BY action`
   const platformsQuery = `SELECT platform, count() AS devices FROM (SELECT double1 AS platform, index1 AS app_id, blob1 AS device_id FROM device_usage WHERE ${window} AND double1 IN (0.0, 1.0, 2.0) GROUP BY platform, app_id, device_id) GROUP BY platform`
   const updaterVersionsQuery = `SELECT date, version, count() AS devices FROM (SELECT ${day} AS date, index1 AS app_id, blob1 AS device_id, argMax(blob3, timestamp) AS version FROM device_info WHERE ${window} AND blob3 != '' GROUP BY date, app_id, device_id) GROUP BY date, version`
 
   try {
-    const [actionRows, platformRows, versionRows] = await Promise.all([
-      runQueryToCFA<{ date: string, action: string, total: number }>(c, requestsAndFailuresQuery),
+    const [outcomeRows, failureRows, platformRows, versionRows] = await Promise.all([
+      runQueryToCFA<{ date: string, successes: number, failures: number }>(c, outcomesQuery),
+      runQueryToCFA<{ action: string, devices: number }>(c, failuresQuery),
       runQueryToCFA<{ platform: number, devices: number }>(c, platformsQuery),
       runQueryToCFA<{ date: string, version: string, devices: number }>(c, updaterVersionsQuery),
     ])
-    const byDate = new Map<string, { date: string, requests: number, failures: number }>()
-    const failures = new Map<string, number>()
-    for (const row of actionRows) {
-      const day = byDate.get(row.date) ?? { date: row.date, requests: 0, failures: 0 }
-      const total = Number(row.total) || 0
-      if (row.action === 'get') day.requests += total
-      else {
-        day.failures += total
-        failures.set(row.action, (failures.get(row.action) ?? 0) + total)
-      }
-      byDate.set(row.date, day)
-    }
-    const platforms = { ios: 0, android: 0, electron: 0 }
+    const daily = outcomeRows.map((row) => {
+      const successes = Number(row.successes) || 0
+      const failures = Number(row.failures) || 0
+      const outcomes = successes + failures
+      return { date: row.date, success_rate: outcomes ? (successes / outcomes) * 100 : 0 }
+    }).sort((a, b) => a.date.localeCompare(b.date))
+    const totalSuccesses = outcomeRows.reduce((sum, row) => sum + (Number(row.successes) || 0), 0)
+    const totalFailures = outcomeRows.reduce((sum, row) => sum + (Number(row.failures) || 0), 0)
+    const totalOutcomes = totalSuccesses + totalFailures
+    const success_rate = totalOutcomes ? (totalSuccesses / totalOutcomes) * 100 : 0
+    const failureTotal = failureRows.reduce((sum, row) => sum + (Number(row.devices) || 0), 0)
+    const failures = failureRows
+      .map(row => ({ reason: row.action, share: failureTotal ? ((Number(row.devices) || 0) / failureTotal) * 100 : 0 }))
+      .sort((a, b) => b.share - a.share)
+      .slice(0, 8)
+    const platformCounts = { ios: 0, android: 0, electron: 0 }
     for (const row of platformRows) {
       const platform = Number(row.platform)
-      if (platform === 0) platforms.android += Number(row.devices) || 0
-      if (platform === 1) platforms.ios += Number(row.devices) || 0
-      if (platform === 2) platforms.electron += Number(row.devices) || 0
+      if (platform === 0)
+        platformCounts.android += Number(row.devices) || 0
+      if (platform === 1)
+        platformCounts.ios += Number(row.devices) || 0
+      if (platform === 2)
+        platformCounts.electron += Number(row.devices) || 0
     }
+    const platformTotal = Object.values(platformCounts).reduce((sum, count) => sum + count, 0)
+    const platforms = {
+      ios: platformTotal ? (platformCounts.ios / platformTotal) * 100 : 0,
+      android: platformTotal ? (platformCounts.android / platformTotal) * 100 : 0,
+      electron: platformTotal ? (platformCounts.electron / platformTotal) * 100 : 0,
+    }
+    const versionTotals = new Map<string, number>()
+    for (const row of versionRows)
+      versionTotals.set(row.date, (versionTotals.get(row.date) ?? 0) + (Number(row.devices) || 0))
     return {
-      daily: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)),
-      failures: [...failures.entries()].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count).slice(0, 8),
+      success_rate,
+      daily,
+      failures,
       platforms,
-      updater_versions: versionRows.map(row => ({ date: row.date, version: row.version, devices: Number(row.devices) || 0 })).sort((a, b) => a.date.localeCompare(b.date) || b.devices - a.devices),
+      updater_versions: versionRows
+        .map(row => ({ date: row.date, version: row.version, share: versionTotals.get(row.date) ? ((Number(row.devices) || 0) / versionTotals.get(row.date)!) * 100 : 0 }))
+        .sort((a, b) => a.date.localeCompare(b.date) || b.share - a.share),
     }
   }
   catch (error) {

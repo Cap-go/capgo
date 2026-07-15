@@ -85,10 +85,11 @@ describe('public stats endpoint', () => {
 
   it('serves runtime live update metrics with browser CORS', async () => {
     mocks.getPublicLiveUpdateMetricsCF.mockResolvedValueOnce({
-      daily: [{ date: '2026-05-10', requests: 120, failures: 3 }],
-      failures: [{ reason: 'download_fail', count: 3 }],
-      platforms: { ios: 30, android: 80, electron: 10 },
-      updater_versions: [{ date: '2026-05-10', version: '8.1.0', devices: 120 }],
+      success_rate: 97.5,
+      daily: [{ date: '2026-05-10', success_rate: 97.5 }],
+      failures: [{ reason: 'download_fail', share: 100 }],
+      platforms: { ios: 25, android: 66.7, electron: 8.3 },
+      updater_versions: [{ date: '2026-05-10', version: '8.1.0', share: 100 }],
     })
 
     const res = await app.request('http://localhost/live_updates', {
@@ -101,10 +102,11 @@ describe('public stats endpoint', () => {
     expect(await res.json()).toEqual({
       period_days: 30,
       updated_at: '2026-05-11T12:00:00.000Z',
-      daily: [{ date: '2026-05-10', requests: 120, failures: 3 }],
-      failures: [{ reason: 'download_fail', count: 3 }],
-      platforms: { ios: 30, android: 80, electron: 10 },
-      updater_versions: [{ date: '2026-05-10', version: '8.1.0', devices: 120 }],
+      success_rate: 97.5,
+      daily: [{ date: '2026-05-10', success_rate: 97.5 }],
+      failures: [{ reason: 'download_fail', share: 100 }],
+      platforms: { ios: 25, android: 66.7, electron: 8.3 },
+      updater_versions: [{ date: '2026-05-10', version: '8.1.0', share: 100 }],
     })
     expect(mocks.getPublicLiveUpdateMetricsCF).toHaveBeenCalledOnce()
   })
