@@ -215,6 +215,17 @@ function getDisplayOrgIds(key: Database['public']['Tables']['apikeys']['Row']): 
   return Array.from(orgIds)
 }
 
+// App bindings carry their validated owner organization. Keep it filter-only so
+// app-only keys do not appear to have an organization-level role.
+function getFilterOrgIds(key: Database['public']['Tables']['apikeys']['Row']): string[] {
+  const orgIds = new Set(getDisplayOrgIds(key))
+  getBindingsForKey(key).forEach((binding) => {
+    if (binding.scope_type === 'app' && binding.org_id)
+      orgIds.add(binding.org_id)
+  })
+  return Array.from(orgIds)
+}
+
 function coversAllOrganizations(orgIds: string[]): boolean {
   const allOrgIds = organizationStore.organizations.map(org => org.gid)
   return allOrgIds.length > 0 && allOrgIds.every(orgId => orgIds.includes(orgId))
@@ -461,6 +472,9 @@ const uniqueOrgIds = computed(() => {
   allBindings.value.forEach((binding) => {
     if (binding.scope_type === 'org' && binding.org_id && binding.role_name !== systemApiKeyOrgReaderRole)
       orgIds.add(binding.org_id)
+
+    if (binding.scope_type === 'app' && binding.org_id)
+      orgIds.add(binding.org_id)
   })
 
   return orgIds
@@ -608,7 +622,7 @@ const filteredAndSortedKeys = computed(() => {
   const orgFilterIds = selectedScopeFilterIds('org')
   if (orgFilterIds.length > 0) {
     result = result.filter((key) => {
-      const orgIds = getDisplayOrgIds(key)
+      const orgIds = getFilterOrgIds(key)
       return orgFilterIds.some(orgId => orgIds.includes(orgId))
     })
   }

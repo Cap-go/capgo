@@ -1370,6 +1370,17 @@ BEGIN
     WHERE r.name = public.rbac_role_app_uploader()
     ON CONFLICT DO NOTHING;
 
+    -- app_preview: CI preview lifecycle without organization-level access or bundle deletion
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r
+    JOIN public.permissions p ON p.key IN (
+      public.rbac_perm_app_read(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(),
+      public.rbac_perm_app_create_channel(), public.rbac_perm_channel_read(), public.rbac_perm_channel_promote_bundle(),
+      public.rbac_perm_channel_delete()
+    )
+    WHERE r.name = 'app_preview'
+    ON CONFLICT DO NOTHING;
+
     INSERT INTO public.roles (name, scope_type, description, priority_rank, is_assignable, created_by)
     VALUES (
       public.rbac_role_apikey_manager(),

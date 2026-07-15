@@ -41,4 +41,12 @@ describe('frontend channel RBAC scope regressions', () => {
 
     expect(source).toContain(`  app_preview: {\n    'channel.read': true,\n    'channel.read_history': false,\n    'channel.promote_bundle': true,\n  },`)
   })
+
+  it.concurrent('keeps app-only keys in their owner organization filter without showing an organization role', async () => {
+    const source = await readRepoFile('src/pages/ApiKeys.vue')
+
+    expect(source).toContain('if (binding.scope_type === \'app\' && binding.org_id)')
+    expect(source).toContain('const orgIds = getFilterOrgIds(key)')
+    expect(source).toContain('binding.scope_type === \'org\' && binding.org_id && binding.role_name !== systemApiKeyOrgReaderRole')
+  })
 })

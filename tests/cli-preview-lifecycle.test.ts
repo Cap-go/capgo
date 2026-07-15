@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   appApiKeyBindings,
@@ -87,9 +88,14 @@ describe('cli app preview lifecycle', () => {
 
     const bindings = await executeSQL(
       `
-      SELECT role_bindings.scope_type, roles.name AS role_name
+      SELECT
+        role_bindings.scope_type,
+        role_bindings.app_id::text AS app_id,
+        apps.id::text AS expected_app_id,
+        roles.name AS role_name
       FROM public.role_bindings
       INNER JOIN public.roles ON roles.id = role_bindings.role_id
+      LEFT JOIN public.apps ON apps.id = role_bindings.app_id
       WHERE role_bindings.principal_type = public.rbac_principal_apikey()
         AND role_bindings.principal_id = $1::uuid
       ORDER BY role_bindings.scope_type, roles.name
@@ -100,8 +106,56 @@ describe('cli app preview lifecycle', () => {
       expect.objectContaining({
         scope_type: 'app',
         role_name: 'app_preview',
+        app_id: expect.any(String),
+        expected_app_id: expect.any(String),
       }),
     ])
+    expect(bindings[0]?.app_id).toBe(bindings[0]?.expected_app_id)
+
+    const previewPermissionRows = await executeSQL(
+      `
+      SELECT permissions.key
+      FROM public.role_bindings
+      INNER JOIN public.roles ON roles.id = role_bindings.role_id
+      INNER JOIN public.role_permissions ON role_permissions.role_id = roles.id
+      INNER JOIN public.permissions ON permissions.id = role_permissions.permission_id
+      WHERE role_bindings.principal_type = public.rbac_principal_apikey()
+        AND role_bindings.principal_id = $1::uuid
+        AND roles.name = 'app_preview'
+      ORDER BY permissions.key
+      `,
+      [apiKey.rbac_id],
+    )
+    expect(previewPermissionRows.map(permission => permission.key)).toEqual(expect.arrayContaining([
+      'app.read',
+      'app.create_channel',
+      'channel.delete',
+    ]))
+
+    const apiKeyClient = createClient(SUPABASE_BASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: false,
+      },
+      global: {
+        headers: {
+          capgkey: apiKey.key,
+        },
+      },
+    })
+    const [{ data: appExists, error: appExistsError }, { data: canCreateChannel, error: createChannelPermissionError }] = await Promise.all([
+      apiKeyClient.rpc('exist_app_v2', { appid: APPNAME }).single(),
+      apiKeyClient.rpc('cli_check_permission', {
+        apikey: apiKey.key,
+        permission_key: 'app.create_channel',
+        org_id: null,
+        app_id: APPNAME,
+        channel_id: null,
+      }),
+    ])
+    expect(appExistsError).toBeNull()
+    expect(appExists).toBe(true)
+    expect(createChannelPermissionError).toBeNull()
+    expect(canCreateChannel).toBe(true)
 
     const cliOptions = {
       apikey: apiKey.key,

@@ -284,6 +284,11 @@ test.describe('API Key Management', () => {
     await expect(keyRow).toContainText('App Preview')
     await expect(keyRow.locator('td').nth(3)).toContainText('-')
 
+    await page.reload()
+    const reloadedKeyRow = await expectApiKeyRow(page, keyName)
+    await expect(reloadedKeyRow).toContainText('App Preview')
+    await expect(reloadedKeyRow.locator('td').nth(3)).toContainText('-')
+
     const supabase = getSupabaseClient()
     const { data: key, error: keyError } = await supabase
       .from('apikeys')
