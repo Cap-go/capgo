@@ -1,7 +1,53 @@
--- The squashed baseline retained a dead pre-RBAC trigger function. The current
--- schema has no trigger or other dependency on it, and its body references
--- columns and types that no longer exist.
-DROP FUNCTION IF EXISTS public.generate_org_user_on_org_create();
+-- App-scoped preview deployments need to create dynamic channels, so a
+-- channel-scoped role cannot be assigned ahead of time. This role is therefore
+-- intentionally scoped to one app. It does not restrict access by channel name;
+-- enforcing a PR-name or creator boundary needs a separate data model.
+INSERT INTO public.roles (name, scope_type, description, priority_rank, is_assignable, created_by)
+VALUES (
+  'app_preview',
+  public.rbac_scope_app(),
+  'Preview deployment lifecycle for an app: upload and promote bundles, create channels, and delete channels',
+  69,
+  true,
+  NULL
+)
+ON CONFLICT (name) DO UPDATE
+SET
+  scope_type = EXCLUDED.scope_type,
+  description = EXCLUDED.description,
+  priority_rank = EXCLUDED.priority_rank,
+  is_assignable = EXCLUDED.is_assignable;
+
+-- Keep this role limited to the preview deployment lifecycle. In particular it
+-- intentionally excludes bundle deletion, app settings, device control, role
+-- management, channel settings, rollbacks, and forced-device management.
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT roles.id, permissions.id
+FROM public.roles
+INNER JOIN public.permissions
+  ON permissions.key IN (
+    public.rbac_perm_app_read(),
+    public.rbac_perm_app_read_bundles(),
+    public.rbac_perm_app_upload_bundle(),
+    public.rbac_perm_app_create_channel(),
+    public.rbac_perm_channel_read(),
+    public.rbac_perm_channel_promote_bundle(),
+    public.rbac_perm_channel_delete()
+  )
+WHERE roles.name = 'app_preview'
+ON CONFLICT DO NOTHING;
+
+-- App-scoped keys no longer need the automatic organization reader for CLI
+-- warnings: the warning helper falls back to app.read. Remove only the rows
+-- created by that compatibility path, preserving historical migrated keys.
+DELETE FROM public.role_bindings AS org_reader
+USING public.roles AS org_reader_role
+WHERE org_reader.role_id = org_reader_role.id
+  AND org_reader.principal_type = public.rbac_principal_apikey()
+  AND org_reader.scope_type = public.rbac_scope_org()
+  AND org_reader_role.name = public.rbac_role_apikey_org_reader()
+  AND org_reader.reason = 'API key app-scope org read compatibility';
+
 -- Keep the API-key listing RPC signed-in only. Reassert explicit grants so the
 -- function cannot regain anonymous execution through default ACLs.
 REVOKE ALL ON FUNCTION public.get_org_apikeys(uuid) FROM public;
@@ -127,3 +173,17 @@ BEGIN
   END LOOP;
 END;
 $$;
+
+-- The squashed baseline is already applied in existing environments, so ensure
+-- its scheduler registration is restored with a forward-only migration.
+SELECT
+    cron.schedule(
+        'process_all_cron_tasks',
+        '10 seconds',
+        $job$SELECT public.process_all_cron_tasks();$job$
+    )
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM cron.job
+    WHERE jobname = 'process_all_cron_tasks'
+);
