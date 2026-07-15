@@ -96,7 +96,7 @@ describe('admin onboarding activation telemetry', () => {
     }
   })
 
-  it.concurrent('counts organization activation signals once within each seven-day window', () => {
+  it.concurrent('counts nested activation funnel stages once within each seven-day window', () => {
     const metrics = getAdminOnboardingActivationMetrics([
       {
         org_id: 'org-alpha',
@@ -116,29 +116,44 @@ describe('admin onboarding activation telemetry', () => {
         created_at: '2026-07-02T00:00:00.000Z',
         activation_window_end: '2026-07-09T00:00:00.000Z',
       },
+      {
+        org_id: 'org-gamma',
+        app_id: 'app-gamma-device',
+        created_at: '2026-07-03T00:00:00.000Z',
+        activation_window_end: '2026-07-10T00:00:00.000Z',
+      },
+      {
+        org_id: 'org-gamma',
+        app_id: 'app-gamma-download',
+        created_at: '2026-07-03T00:00:00.000Z',
+        activation_window_end: '2026-07-10T00:00:00.000Z',
+      },
     ], {
       available: true,
       first_production_device_at_by_app: new Map([
         ['app-alpha', new Date('2026-07-02T00:00:00.000Z')],
         ['app-alpha-second', new Date('2026-07-03T00:00:00.000Z')],
         ['app-beta', new Date('2026-07-09T00:00:00.000Z')],
+        ['app-gamma-device', new Date('2026-07-04T00:00:00.000Z')],
       ]),
       first_update_download_at_by_app: new Map([
         ['app-alpha', new Date('2026-07-04T00:00:00.000Z')],
         ['app-alpha-second', new Date('2026-07-10T00:00:00.000Z')],
         ['app-beta', new Date('2026-07-08T00:00:00.000Z')],
+        ['app-gamma-download', new Date('2026-07-05T00:00:00.000Z')],
       ]),
     })
 
-    expect(metrics.orgs_with_production_device).toBe(1)
-    expect(metrics.orgs_with_update_download).toBe(2)
+    expect(metrics.orgs_with_production_device).toBe(2)
+    expect(metrics.orgs_with_update_download).toBe(1)
     expect(metrics.trend_by_date.get('2026-07-01')).toEqual({
       orgs_with_production_device: 1,
       orgs_with_update_download: 1,
     })
-    expect(metrics.trend_by_date.get('2026-07-02')).toEqual({
-      orgs_with_production_device: 0,
-      orgs_with_update_download: 1,
+    expect(metrics.trend_by_date.get('2026-07-02')).toBeUndefined()
+    expect(metrics.trend_by_date.get('2026-07-03')).toEqual({
+      orgs_with_production_device: 1,
+      orgs_with_update_download: 0,
     })
   })
 

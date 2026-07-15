@@ -3282,10 +3282,14 @@ export async function getAdminOnboardingFunnel(
         a.app_id as app_id
       FROM orgs o
       INNER JOIN apps a ON a.owner_org = o.id
+      INNER JOIN channels ch ON ch.app_id = a.app_id
+      INNER JOIN app_versions av ON av.id = ch.version AND av.name NOT IN ('builtin', 'unknown')
       WHERE o.created_at >= ${start_date}::timestamp
         AND o.created_at < ${end_date}::timestamp
         AND a.created_at >= o.created_at
         AND a.created_at < o.created_at + interval '7 days'
+        AND av.created_at >= o.created_at
+        AND av.created_at < o.created_at + interval '7 days'
     `
 
     const [trendResult, activationCohortResult] = await Promise.all([
@@ -3349,8 +3353,8 @@ export async function getAdminOnboardingFunnel(
       channel_conversion_rate: orgsWithApp > 0 ? (orgsWithChannel / orgsWithApp) * 100 : 0,
       bundle_conversion_rate: orgsWithChannel > 0 ? (orgsWithBundle / orgsWithChannel) * 100 : 0,
       subscription_conversion_rate: orgsWithBundle > 0 ? (orgsSubscribed / orgsWithBundle) * 100 : 0,
-      production_device_conversion_rate: totalOrgs > 0 ? (activationMetrics.orgs_with_production_device / totalOrgs) * 100 : 0,
-      update_download_conversion_rate: totalOrgs > 0 ? (activationMetrics.orgs_with_update_download / totalOrgs) * 100 : 0,
+      production_device_conversion_rate: orgsWithBundle > 0 ? (activationMetrics.orgs_with_production_device / orgsWithBundle) * 100 : 0,
+      update_download_conversion_rate: activationMetrics.orgs_with_production_device > 0 ? (activationMetrics.orgs_with_update_download / activationMetrics.orgs_with_production_device) * 100 : 0,
       trend,
     }
 
