@@ -50,19 +50,20 @@ export function getAdminOnboardingActivationMetrics(
 
     const date = startAt.toISOString().slice(0, 10)
     const productionDeviceAt = telemetry.first_production_device_at_by_app.get(cohort.app_id)
-    if (isWithinActivationWindow(productionDeviceAt, startAt, endAt)) {
-      productionDeviceOrgIds.add(cohort.org_id)
-      const orgIds = productionDeviceOrgIdsByDate.get(date) ?? new Set<string>()
-      orgIds.add(cohort.org_id)
-      productionDeviceOrgIdsByDate.set(date, orgIds)
-    }
+    if (!isWithinActivationWindow(productionDeviceAt, startAt, endAt))
+      continue
+
+    productionDeviceOrgIds.add(cohort.org_id)
+    const productionDeviceOrgIdsForDate = productionDeviceOrgIdsByDate.get(date) ?? new Set<string>()
+    productionDeviceOrgIdsForDate.add(cohort.org_id)
+    productionDeviceOrgIdsByDate.set(date, productionDeviceOrgIdsForDate)
 
     const updateDownloadAt = telemetry.first_update_download_at_by_app.get(cohort.app_id)
     if (isWithinActivationWindow(updateDownloadAt, startAt, endAt)) {
       updateDownloadOrgIds.add(cohort.org_id)
-      const orgIds = updateDownloadOrgIdsByDate.get(date) ?? new Set<string>()
-      orgIds.add(cohort.org_id)
-      updateDownloadOrgIdsByDate.set(date, orgIds)
+      const updateDownloadOrgIdsForDate = updateDownloadOrgIdsByDate.get(date) ?? new Set<string>()
+      updateDownloadOrgIdsForDate.add(cohort.org_id)
+      updateDownloadOrgIdsByDate.set(date, updateDownloadOrgIdsForDate)
     }
   }
 

@@ -767,8 +767,8 @@ const onboardingFunnelRates = computed(() => {
     channel: orgsWithApp > 0 ? (orgsWithChannel / orgsWithApp) * 100 : 0,
     bundle: orgsWithChannel > 0 ? (orgsWithBundle / orgsWithChannel) * 100 : 0,
     subscribed: orgsWithBundle > 0 ? (orgsSubscribed / orgsWithBundle) * 100 : 0,
-    productionDevice: totalOrgs > 0 ? (orgsWithProductionDevice / totalOrgs) * 100 : 0,
-    updateDownload: totalOrgs > 0 ? (orgsWithUpdateDownload / totalOrgs) * 100 : 0,
+    productionDevice: orgsWithBundle > 0 ? (orgsWithProductionDevice / orgsWithBundle) * 100 : 0,
+    updateDownload: orgsWithProductionDevice > 0 ? (orgsWithUpdateDownload / orgsWithProductionDevice) * 100 : 0,
   }
 })
 
@@ -804,12 +804,22 @@ const onboardingFunnelStages = computed(() => {
       percentage: rates.bundle,
       color: '#10b981', // green
     },
-    {
-      label: t('subscribed'),
-      value: Number(data.orgs_subscribed) || 0,
-      percentage: rates.subscribed,
-      color: '#ef4444', // red
-    },
+    ...(data.activation_telemetry_available
+      ? [
+          {
+            label: t('production-plugin-device'),
+            value: Number(data.orgs_with_production_device) || 0,
+            percentage: rates.productionDevice,
+            color: '#ec4899', // pink
+          },
+          {
+            label: t('completed-update-download'),
+            value: Number(data.orgs_with_update_download) || 0,
+            percentage: rates.updateDownload,
+            color: '#6366f1', // indigo
+          },
+        ]
+      : []),
   ]
 })
 
@@ -964,12 +974,12 @@ displayStore.defaultBack = '/dashboard'
               <span class="loading loading-spinner loading-lg" />
             </div>
             <div v-else-if="onboardingFunnelStages.length > 0" class="space-y-6">
-              <div class="h-64 sm:h-72">
+              <div class="h-72 sm:h-80">
                 <AdminFunnelChart :stages="onboardingFunnelStages" :is-loading="isLoadingOnboardingFunnel" />
               </div>
 
-              <!-- Conversion summary -->
-              <div class="grid grid-cols-2 gap-4 pt-4 mt-4 border-t border-gray-200 sm:grid-cols-4 dark:border-gray-700">
+              <!-- Funnel conversion summary -->
+              <div class="grid grid-cols-2 gap-4 pt-4 mt-4 border-t border-gray-200 sm:grid-cols-3 xl:grid-cols-5 dark:border-gray-700">
                 <div class="text-center">
                   <p class="text-2xl font-bold text-purple-500">
                     {{ formatOneDecimal(onboardingFunnelRates.app) }}%
@@ -994,6 +1004,30 @@ displayStore.defaultBack = '/dashboard'
                     {{ t('channel-to-bundle') }}
                   </p>
                 </div>
+                <div v-if="onboardingFunnelData?.activation_telemetry_available" class="text-center">
+                  <p class="text-2xl font-bold text-pink-500">
+                    {{ formatOneDecimal(onboardingFunnelRates.productionDevice) }}%
+                  </p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ t('bundle-to-production-device') }}
+                  </p>
+                </div>
+                <div v-if="onboardingFunnelData?.activation_telemetry_available" class="text-center">
+                  <p class="text-2xl font-bold text-indigo-500">
+                    {{ formatOneDecimal(onboardingFunnelRates.updateDownload) }}%
+                  </p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ t('production-device-to-update-download') }}
+                  </p>
+                </div>
+              </div>
+
+              <p v-if="!onboardingFunnelData?.activation_telemetry_available" class="text-sm text-slate-500 dark:text-slate-400">
+                {{ t('activation-telemetry-unavailable') }}
+              </p>
+
+              <!-- Commercial conversion -->
+              <div class="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
                 <div class="text-center">
                   <p class="text-2xl font-bold text-rose-500">
                     {{ formatOneDecimal(onboardingFunnelRates.subscribed) }}%
@@ -1002,39 +1036,6 @@ displayStore.defaultBack = '/dashboard'
                     {{ t('bundle-to-subscribed') }}
                   </p>
                 </div>
-              </div>
-
-              <div class="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
-                <h4 class="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  {{ t('activation-signals') }}
-                </h4>
-                <div v-if="onboardingFunnelData?.activation_telemetry_available" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div class="p-4 text-center rounded-lg bg-pink-50 dark:bg-pink-950/20">
-                    <p class="text-2xl font-bold text-pink-500">
-                      {{ formatNumberValue(onboardingFunnelData?.orgs_with_production_device || 0) }}
-                    </p>
-                    <p class="mt-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      {{ t('production-plugin-device') }}
-                    </p>
-                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      {{ formatOneDecimal(onboardingFunnelRates.productionDevice) }}% {{ t('of-new-organizations') }}
-                    </p>
-                  </div>
-                  <div class="p-4 text-center rounded-lg bg-indigo-50 dark:bg-indigo-950/20">
-                    <p class="text-2xl font-bold text-indigo-500">
-                      {{ formatNumberValue(onboardingFunnelData?.orgs_with_update_download || 0) }}
-                    </p>
-                    <p class="mt-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      {{ t('completed-update-download') }}
-                    </p>
-                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      {{ formatOneDecimal(onboardingFunnelRates.updateDownload) }}% {{ t('of-new-organizations') }}
-                    </p>
-                  </div>
-                </div>
-                <p v-else class="text-sm text-slate-500 dark:text-slate-400">
-                  {{ t('activation-telemetry-unavailable') }}
-                </p>
               </div>
             </div>
             <div v-else class="flex items-center justify-center h-48 text-slate-400">

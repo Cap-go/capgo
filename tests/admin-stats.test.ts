@@ -989,6 +989,156 @@ describe('/private/admin_stats', () => {
     })
   })
 
+  it.concurrent('keeps an uploaded bundle in the funnel after a later channel promotion', async () => {
+    if (!soloPlan)
+      throw new Error('Expected Solo plan to exist for onboarding funnel test')
+
+    const supabase = getSupabaseClient()
+    const orgId = randomUUID()
+    const suffix = orgId.replaceAll('-', '').slice(0, 12)
+    const appId = `com.admin.stats.onboardinghistory.${suffix}`
+    const customerId = `cus_admin_stats_onboarding_history_${suffix}`
+    const orgCreatedAt = '2098-07-01T10:00:00.000Z'
+
+    try {
+      const { error: stripeError } = await supabase.from('stripe_info').insert({
+        customer_id: customerId,
+        status: 'succeeded',
+        product_id: soloPlan.stripe_id,
+        price_id: soloPlan.price_m_id,
+        trial_at: '2098-07-20T10:00:00.000Z',
+        paid_at: '2098-07-05T10:00:00.000Z',
+        is_good_plan: true,
+        plan_usage: 2,
+        subscription_anchor_start: '2098-07-05T10:00:00.000Z',
+        subscription_anchor_end: '2098-08-05T10:00:00.000Z',
+      })
+      if (stripeError)
+        throw stripeError
+
+      const { error: orgError } = await supabase.from('orgs').insert({
+        id: orgId,
+        name: `Admin Stats Onboarding History ${suffix}`,
+        created_by: USER_ID,
+        management_email: TEST_EMAIL,
+        customer_id: customerId,
+        created_at: orgCreatedAt,
+      })
+      if (orgError)
+        throw orgError
+
+      const { error: appError } = await supabase.from('apps').insert({
+        owner_org: orgId,
+        name: 'Admin Stats Onboarding History App',
+        app_id: appId,
+        icon_url: 'https://example.com/icon.png',
+        created_at: '2098-07-02T10:00:00.000Z',
+      })
+      if (appError)
+        throw appError
+
+      const { data: firstVersion, error: firstVersionError } = await supabase
+        .from('app_versions')
+        .insert({
+          app_id: appId,
+          name: '1.0.0',
+          owner_org: orgId,
+          user_id: USER_ID,
+          storage_provider: 'r2-direct',
+          created_at: '2098-07-04T10:00:00.000Z',
+        })
+        .select('id')
+        .single()
+      if (firstVersionError)
+        throw firstVersionError
+      if (!firstVersion)
+        throw new Error('Expected the initial onboarding bundle to be created')
+
+      const { error: channelError } = await supabase.from('channels').insert({
+        name: 'production',
+        app_id: appId,
+        version: firstVersion.id,
+        created_by: USER_ID,
+        owner_org: orgId,
+        created_at: '2098-07-03T10:00:00.000Z',
+      })
+      if (channelError)
+        throw channelError
+
+      const { data: promotedVersion, error: promotedVersionError } = await supabase
+        .from('app_versions')
+        .insert({
+          app_id: appId,
+          name: '2.0.0',
+          owner_org: orgId,
+          user_id: USER_ID,
+          storage_provider: 'r2-direct',
+          created_at: '2098-07-12T10:00:00.000Z',
+        })
+        .select('id')
+        .single()
+      if (promotedVersionError)
+        throw promotedVersionError
+      if (!promotedVersion)
+        throw new Error('Expected a later onboarding bundle to be created')
+
+      const { error: channelUpdateError } = await supabase
+        .from('channels')
+        .update({ version: promotedVersion.id })
+        .eq('app_id', appId)
+        .eq('name', 'production')
+      if (channelUpdateError)
+        throw channelUpdateError
+
+      const response = await fetchTestRequest(`${BASE_URL}/private/admin_stats`, {
+        method: 'POST',
+        headers: adminHeaders,
+        body: JSON.stringify({
+          metric_category: 'onboarding_funnel',
+          start_date: '2098-07-01T00:00:00.000Z',
+          end_date: '2098-07-02T00:00:00.000Z',
+        }),
+      })
+
+      expect(response.status).toBe(200)
+      const payload = await response.json() as {
+        success: boolean
+        data: {
+          total_orgs: number
+          orgs_with_app: number
+          orgs_with_channel: number
+          orgs_with_bundle: number
+          orgs_subscribed: number
+          trend: Array<{
+            date: string
+            orgs_created_bundle: number
+            orgs_subscribed: number
+          }>
+        }
+      }
+
+      expect(payload.success).toBe(true)
+      expect(payload.data.total_orgs).toBe(1)
+      expect(payload.data.orgs_with_app).toBe(1)
+      expect(payload.data.orgs_with_channel).toBe(1)
+      expect(payload.data.orgs_with_bundle).toBe(1)
+      expect(payload.data.orgs_subscribed).toBe(1)
+      expect(payload.data.trend).toHaveLength(1)
+      expect(payload.data.trend[0]).toMatchObject({
+        date: '2098-07-01',
+        orgs_created_bundle: 1,
+        orgs_subscribed: 1,
+      })
+    }
+    finally {
+      await supabase.from('channels').delete().eq('app_id', appId)
+      await supabase.from('app_versions').delete().eq('app_id', appId)
+      await supabase.from('apps').delete().eq('app_id', appId)
+      await supabase.from('orgs').delete().eq('id', orgId)
+      await supabase.from('stripe_info').delete().eq('customer_id', customerId)
+    }
+  })
+
   it('returns daily new trial organizations grouped by plan', async () => {
     const response = await fetchTestRequest(getEndpointUrl('/private/admin_stats'), {
       method: 'POST',
