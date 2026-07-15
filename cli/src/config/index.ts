@@ -60,7 +60,8 @@ async function loadConfigTarget(filePath: string): Promise<CapacitorConfig> {
     return JSON.parse(await readFile(filePath, 'utf8')) as CapacitorConfig
 
   const configModule = requireTS(createRequire(filePath)('typescript'), filePath)
-  return (configModule.default ? await configModule.default : configModule) as CapacitorConfig
+  const exportedConfig = configModule.default ?? configModule
+  return (typeof exportedConfig === 'function' ? await exportedConfig() : await exportedConfig) as CapacitorConfig
 }
 
 export async function loadConfig(): Promise<ExtConfigPairs | undefined> {

@@ -133,6 +133,12 @@ export function resolveInitTargetPath(value: string | undefined, label: string, 
   const resolved = path.resolve(initialCwd, value)
   if (!existsSync(resolved) || !statSync(resolved).isFile())
     throw new Error(`${label} does not exist: ${resolved}`)
+
+  const workspaceRoot = realpathSync(initialCwd)
+  const target = realpathSync(resolved)
+  const pathFromWorkspace = path.relative(workspaceRoot, target)
+  if (pathFromWorkspace === '..' || pathFromWorkspace.startsWith(`..${path.sep}`) || path.isAbsolute(pathFromWorkspace))
+    throw new Error(`${label} must stay within the current working directory: ${resolved}`)
   return resolved
 }
 
@@ -143,10 +149,32 @@ function resolveInitDirectoryPath(value: string | undefined, initialCwd: string)
   const resolved = path.resolve(initialCwd, value)
   if (!existsSync(resolved) || !statSync(resolved).isDirectory())
     return undefined
+
+  const workspaceRoot = realpathSync(initialCwd)
+  const target = realpathSync(resolved)
+  const pathFromWorkspace = path.relative(workspaceRoot, target)
+  if (pathFromWorkspace === '..' || pathFromWorkspace.startsWith(`..${path.sep}`) || path.isAbsolute(pathFromWorkspace))
+    return undefined
   return resolved
 }
 
 export function resolveResumedInitTargets(currentTargets: InitTargetPaths, savedTargets: Partial<InitTargetPaths>, initialCwd = cwd()): InitTargetPaths | undefined {
+  // An explicit config source identifies the app being onboarded. Never merge
+  // it with a checkpoint created for another app in the same workspace.
+  if (currentTargets.capacitorConfigPath) {
+    try {
+      const currentConfigPath = resolveCapacitorConfigTargetPath(currentTargets.capacitorConfigPath, initialCwd)
+      const savedConfigPath = savedTargets.capacitorConfigPath
+        ? resolveCapacitorConfigTargetPath(savedTargets.capacitorConfigPath, initialCwd)
+        : undefined
+      if (!currentConfigPath || currentConfigPath !== savedConfigPath)
+        return undefined
+    }
+    catch {
+      return undefined
+    }
+  }
+
   const resumedTargets = { ...currentTargets }
 
   if (!resumedTargets.pathToPackageJson && savedTargets.pathToPackageJson) {
@@ -4700,7 +4728,8 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
 
   await ensureGitRepoCleanBeforeInit(stepToSkip > 0 ? globalAutoTestChange : undefined)
 
-  appId = await ensureWorkspaceReadyForInit(appId) ?? appId
+  const initialAppId = await ensureWorkspaceReadyForInit(appId) ?? appId
+  appId = initialAppId
   let selectedPackageJsonPath = path.resolve(globalPathToPackageJson ?? join(findRoot(cwd()), PACKNAME))
   let selectedProjectDir = dirname(selectedPackageJsonPath)
   const versionStatus = await checkVersionStatus()
@@ -4709,25 +4738,30 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   }
 
   let extConfig: Awaited<ReturnType<typeof getConfig>> | undefined
-  if (!options.supaAnon || !options.supaHost) {
-    try {
-      extConfig = await withTemporaryCwd(getInitConfigLoadDir(selectedProjectDir), () => getConfig())
+  const reloadSelectedProjectConfig = async () => {
+    selectedPackageJsonPath = path.resolve(globalPathToPackageJson ?? join(findRoot(cwd()), PACKNAME))
+    selectedProjectDir = dirname(selectedPackageJsonPath)
+    if (!options.supaAnon || !options.supaHost) {
+      try {
+        extConfig = await withTemporaryCwd(getInitConfigLoadDir(selectedProjectDir), () => getConfig())
+      }
+      catch {
+        extConfig = undefined
+      }
     }
-    catch {
-      extConfig = undefined
+    else {
+      extConfig = await withTemporaryCwd(getInitConfigLoadDir(selectedProjectDir), () => updateConfigUpdater({
+        statsUrl: `${options.supaHost}/functions/v1/stats`,
+        channelUrl: `${options.supaHost}/functions/v1/channel_self`,
+        updateUrl: `${options.supaHost}/functions/v1/updates`,
+        localApiFiles: `${options.supaHost}/functions/v1`,
+        localS3: true,
+        localSupa: options.supaHost,
+        localSupaAnon: options.supaAnon,
+      }))
     }
   }
-  else {
-    extConfig = await withTemporaryCwd(getInitConfigLoadDir(selectedProjectDir), () => updateConfigUpdater({
-      statsUrl: `${options.supaHost}/functions/v1/stats`,
-      channelUrl: `${options.supaHost}/functions/v1/channel_self`,
-      updateUrl: `${options.supaHost}/functions/v1/updates`,
-      localApiFiles: `${options.supaHost}/functions/v1`,
-      localS3: true,
-      localSupa: options.supaHost,
-      localSupaAnon: options.supaAnon,
-    }))
-  }
+  await reloadSelectedProjectConfig()
   // Warn if this doesn't look like a Capacitor project
   const hasCapacitorConfig = Boolean(globalCapacitorConfigPath) || capacitorConfigFiles.some(file => existsSync(join(selectedProjectDir, file)))
   if (!hasCapacitorConfig) {
@@ -4806,8 +4840,8 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
     }
   }
 
-  const localConfig = await withTemporaryCwd(selectedProjectDir, () => getLocalConfig())
-  appId = getAppId(appId, extConfig?.config)
+  let localConfig = await withTemporaryCwd(selectedProjectDir, () => getLocalConfig())
+  appId = getAppId(initialAppId, extConfig?.config)
 
   appId ??= await askForAppId('Enter your appId:')
 
@@ -4828,9 +4862,8 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   await resolveUserIdFromApiKey(supabase, options.apikey)
 
   // A failed remote checkpoint (organization access, role, or 2FA) restarts
-  // onboarding at step 0. Keep the already validated local targets intact: the
-  // project, config, and app ID below were derived from them before this check.
-  const discardResumedState = () => {
+  // onboarding at step 0 using only the caller's original project targets.
+  const discardResumedState = async () => {
     stepToSkip = 0
     resumed = undefined
     globalNodeModulesPath = undefined
@@ -4847,6 +4880,14 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
     setInitEncryptionSummary(undefined)
     globalAutoTestChange = undefined
     cleanupStepsDone()
+    globalPathToPackageJson = initialTargets.pathToPackageJson
+    globalCapacitorConfigPath = initialTargets.capacitorConfigPath
+    globalConfigLoadDir = initialTargets.configLoadDir
+    globalMainFilePath = initialTargets.mainFilePath
+    setConfigWriteTarget(initialTargets.capacitorConfigPath)
+    await reloadSelectedProjectConfig()
+    localConfig = await withTemporaryCwd(selectedProjectDir, () => getLocalConfig())
+    appId = getAppId(initialAppId, extConfig?.config)
   }
 
   let organization: Organization
@@ -4858,7 +4899,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
       pLog.error(`Cannot verify organization access: ${orgError ? JSON.stringify(orgError) : 'no data returned'}`)
       pLog.warn('Falling back to organization selection.')
       organization = await selectOrganizationForInit(supabase, options.apikey)
-      discardResumedState()
+      await discardResumedState()
     }
     else {
       const savedOrg = allOrganizations.find(org => org.gid === resumedSnapshot.orgId)
@@ -4870,18 +4911,18 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
       if (!savedOrg) {
         pLog.warn(`Previously used organization "${resumedSnapshot.orgName}" is no longer available. Please select a new one.`)
         organization = await selectOrganizationForInit(supabase, options.apikey)
-        discardResumedState()
+        await discardResumedState()
       }
       else if (!hasCreateAppPermission) {
         pLog.warn(`You no longer have permission to create an app in "${savedOrg.name}". Please select a different organization.`)
         organization = await selectOrganizationForInit(supabase, options.apikey)
-        discardResumedState()
+        await discardResumedState()
       }
       else if (blocked2fa) {
         pLog.warn(`Organization "${savedOrg.name}" now requires 2FA. Enable it at ${consoleWebUrl('/settings/account')}`)
         pLog.warn('Please select a different organization or enable 2FA and try again.')
         organization = await selectOrganizationForInit(supabase, options.apikey)
-        discardResumedState()
+        await discardResumedState()
       }
       else {
         organization = savedOrg

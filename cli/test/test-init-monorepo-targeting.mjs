@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import { resolveInitTargetPath, resolveResumedInitTargets } from '../src/init/command.ts'
 
 const root = mkdtempSync(join(tmpdir(), 'capgo-init-monorepo-'))
+const outsideRoot = mkdtempSync(join(tmpdir(), 'capgo-init-monorepo-outside-'))
 try {
   const appDir = join(root, 'projects', 'qr-code-reader', 'src')
   const configDir = join(root, 'env-configs')
@@ -16,6 +17,7 @@ try {
   const explicitPackageJson = join(explicitProjectDir, 'package.json')
   const explicitMainFile = join(explicitProjectDir, 'src', 'main.ts')
   const explicitConfigFile = join(configDir, 'capacitor.config.stripe-phone-app.ts')
+  const outsidePackageJson = join(outsideRoot, 'package.json')
   mkdirSync(appDir, { recursive: true })
   mkdirSync(configDir, { recursive: true })
   mkdirSync(directoryTarget)
@@ -26,6 +28,7 @@ try {
   writeFileSync(explicitPackageJson, '{}')
   writeFileSync(explicitMainFile, 'export {}')
   writeFileSync(explicitConfigFile, 'export default {}')
+  writeFileSync(outsidePackageJson, '{}')
   const canonicalSavedConfigFile = realpathSync(savedConfigFile)
   const canonicalExplicitConfigFile = realpathSync(explicitConfigFile)
 
@@ -34,6 +37,10 @@ try {
   assert.equal(resolveInitTargetPath('./env-configs/capacitor.config.qr-code-reader.ts', 'Capacitor config path', root), savedConfigFile)
   assert.throws(() => resolveInitTargetPath('./missing.ts', 'Main file path', root), /Main file path does not exist/)
   assert.throws(() => resolveInitTargetPath('./directory-target', 'Main file path', root), /Main file path does not exist/)
+  assert.throws(() => resolveInitTargetPath(relative(root, outsidePackageJson), 'Package JSON path', root), /must stay within the current working directory/)
+  const outsideLink = join(root, 'outside-package.json')
+  symlinkSync(outsidePackageJson, outsideLink)
+  assert.throws(() => resolveInitTargetPath('./outside-package.json', 'Package JSON path', root), /must stay within the current working directory/)
 
   const savedTargets = {
     pathToPackageJson: savedPackageJson,
@@ -47,12 +54,9 @@ try {
     capacitorConfigPath: canonicalExplicitConfigFile,
     configLoadDir: root,
   }
-  assert.deepEqual(resolveResumedInitTargets(currentConfigTarget, savedTargets, root), {
-    pathToPackageJson: savedPackageJson,
-    capacitorConfigPath: canonicalExplicitConfigFile,
-    configLoadDir: root,
-    mainFilePath: savedMainFile,
-  })
+  assert.equal(resolveResumedInitTargets(currentConfigTarget, savedTargets, root), undefined)
+  assert.deepEqual(resolveResumedInitTargets({ capacitorConfigPath: canonicalSavedConfigFile, configLoadDir: root }, savedTargets, root), savedTargets)
+  assert.equal(resolveResumedInitTargets(currentConfigTarget, { ...savedTargets, capacitorConfigPath: undefined, configLoadDir: undefined }, root), undefined)
 
   const explicitTargets = {
     pathToPackageJson: explicitPackageJson,
@@ -60,7 +64,7 @@ try {
     configLoadDir: root,
     mainFilePath: explicitMainFile,
   }
-  assert.deepEqual(resolveResumedInitTargets(explicitTargets, savedTargets, root), explicitTargets)
+  assert.equal(resolveResumedInitTargets(explicitTargets, savedTargets, root), undefined)
   assert.deepEqual(resolveResumedInitTargets({}, {}, root), {})
 
   const invalidMainFile = join(root, 'projects', 'qr-code-reader', 'src', 'main.txt')
@@ -71,7 +75,13 @@ try {
     configLoadDir: join(root, 'missing-config-dir'),
     mainFilePath: join(root, 'missing-main.ts'),
   }
-  assert.deepEqual(resolveResumedInitTargets(explicitTargets, staleTargets, root), explicitTargets)
+  assert.deepEqual(resolveResumedInitTargets({ pathToPackageJson: explicitPackageJson, mainFilePath: explicitMainFile }, {
+    pathToPackageJson: staleTargets.pathToPackageJson,
+    mainFilePath: staleTargets.mainFilePath,
+  }, root), {
+    pathToPackageJson: explicitPackageJson,
+    mainFilePath: explicitMainFile,
+  })
   assert.equal(resolveResumedInitTargets({}, { ...savedTargets, pathToPackageJson: staleTargets.pathToPackageJson }, root), undefined)
   assert.equal(resolveResumedInitTargets({}, { ...savedTargets, capacitorConfigPath: staleTargets.capacitorConfigPath }, root), undefined)
   assert.equal(resolveResumedInitTargets({}, { ...savedTargets, configLoadDir: staleTargets.configLoadDir }, root), undefined)
@@ -81,4 +91,5 @@ try {
 }
 finally {
   rmSync(root, { recursive: true, force: true })
+  rmSync(outsideRoot, { recursive: true, force: true })
 }

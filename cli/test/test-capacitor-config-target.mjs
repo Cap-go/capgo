@@ -34,6 +34,7 @@ try {
   const multiPartConfigTarget = join(configDir, 'capacitor.config.qr-code-reader.production.ts')
   const jsonConfigTarget = join(configDir, 'capacitor.config.json-target.json')
   const javascriptConfigTarget = join(configDir, 'capacitor.config.javascript.js')
+  const factoryConfigTarget = join(configDir, 'capacitor.config.factory.ts')
   const outsideConfigTarget = join(outsideRoot, 'capacitor.config.escape.ts')
   const rootConfigSource = JSON.stringify({
     appId: 'com.example.root',
@@ -69,6 +70,12 @@ try {
   },
 }
 `
+  const factoryConfigSource = `export default async () => ({
+  appId: 'com.example.factory',
+  appName: 'Factory app',
+  webDir: 'factory-www',
+})
+`
   const appDir = join(root, 'apps', 'qr-code-reader')
   mkdirSync(configDir, { recursive: true })
   mkdirSync(directoryTarget)
@@ -80,6 +87,7 @@ try {
   writeFileSync(configTarget, configTargetSource)
   writeFileSync(jsonConfigTarget, JSON.stringify({ appId: 'com.example.json', appName: 'JSON app', webDir: 'json-www' }))
   writeFileSync(javascriptConfigTarget, 'module.exports = {}\n')
+  writeFileSync(factoryConfigTarget, factoryConfigSource)
   writeFileSync(join(configDir, 'not-a-capacitor-config.ts'), 'export default {}\n')
   writeFileSync(outsideConfigTarget, 'export default {}\n')
   assert.equal(resolveCapacitorConfigTargetPath('./env-configs/capacitor.config.qr-code-reader.production.ts', root), multiPartConfigTarget)
@@ -98,6 +106,10 @@ try {
   const previousConfigWriteTarget = getConfigWriteTarget()
   try {
     process.chdir(root)
+    setConfigWriteTarget(factoryConfigTarget)
+    const factoryConfigWriteSnapshot = await loadConfigForWrite()
+    assert.equal(factoryConfigWriteSnapshot.config.appId, 'com.example.factory')
+    assert.equal(factoryConfigWriteSnapshot.config.webDir, 'factory-www')
     setConfigWriteTarget(jsonConfigTarget)
     const jsonConfigSnapshot = await getConfig()
     assert.equal(jsonConfigSnapshot.config.appId, 'com.example.root')
@@ -112,11 +124,10 @@ try {
     assert.ok(configSnapshot.config.plugins.RootOnlyPlugin)
     const configWriteSnapshot = await loadConfigForWrite()
     assert.equal(configWriteSnapshot.config.appId, 'com.example.target')
-    process.chdir(appDir)
-    const createKeyPromise = createKeyInternal({ force: true, setupChannel: false }, true, configWriteSnapshot)
-    assert.equal(process.cwd(), appDir)
+    const createKeyPromise = createKeyInternal({ force: true, keyDir: appDir, setupChannel: false }, true, configWriteSnapshot)
+    assert.equal(process.cwd(), root)
     await createKeyPromise
-    assert.equal(process.cwd(), appDir)
+    assert.equal(process.cwd(), root)
   }
   finally {
     process.chdir(previousCwd)
@@ -132,6 +143,7 @@ try {
   assert.ok(existsSync(join(appDir, '.capgo_key_v2.pub')))
   assert.match(readFileSync(configTarget, 'utf8'), /publicKey/)
   assert.equal(readFileSync(rootConfig, 'utf8'), rootConfigSource)
+  assert.ok(!existsSync(join(root, '.capgo_key_v2')))
   assert.throws(() => resolveCapacitorConfigTargetPath('./env-configs/not-a-capacitor-config.ts', root), /must point to a capacitor.config/)
 
   const sdkCwd = process.cwd()

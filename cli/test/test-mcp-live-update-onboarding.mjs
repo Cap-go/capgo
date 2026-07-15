@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Headless tests for the MCP-conducted Capgo live-update onboarding engine. */
-import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -137,7 +137,7 @@ await test('runStart re-prompts after a previous resume decision', async () => {
   eq(r.state, 'resume-prompt')
 })
 
-const { registerLiveUpdateTools } = await import('../src/init/mcp/live-update-tools.ts')
+const { buildDeps, registerLiveUpdateTools, resolveLiveUpdateProjectTarget } = await import('../src/init/mcp/live-update-tools.ts')
 
 function fakeServer() {
   const tools = {}
@@ -175,6 +175,99 @@ await test('live-update onboarding validates Capacitor config target input', asy
   eq(liveUpdateNextStepSchema.safeParse({ capacitorConfig: '' }).success, false)
   eq(liveUpdateNextStepSchema.safeParse({ capacitorConfig: './env-configs/capacitor.config.qr-code-reader.ts' }).success, true)
   eq(liveUpdateStartSchema.safeParse({}).success, true)
+})
+
+await test('MCP monorepo targets keep project work scoped to the selected app', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'capgo-live-update-monorepo-'))
+  const configDir = join(root, 'env-configs')
+  const configTarget = join(configDir, 'capacitor.config.reader.ts')
+  const appDir = join(root, 'projects', 'reader')
+  const packageJsonPath = join(appDir, 'package.json')
+  const mainFilePath = join(appDir, 'src', 'main.ts')
+  const rootMainFilePath = join(root, 'main.ts')
+  const invalidMainFilePath = join(appDir, 'src', 'main.txt')
+  const previousCwd = process.cwd()
+  const previousTarget = getConfigWriteTarget()
+  try {
+    mkdirSync(join(appDir, 'src'), { recursive: true })
+    mkdirSync(join(appDir, 'ios'), { recursive: true })
+    mkdirSync(configDir, { recursive: true })
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'workspace-root', version: '1.0.0' }))
+    writeFileSync(join(root, 'capacitor.config.json'), JSON.stringify({ appId: 'com.acme.reader', appName: 'Reader', webDir: 'www' }))
+    writeFileSync(configTarget, 'export default {}\n')
+    writeFileSync(packageJsonPath, JSON.stringify({ name: 'reader', version: '2.0.0' }))
+    writeFileSync(mainFilePath, 'export {}\n')
+    writeFileSync(rootMainFilePath, 'export const rootOnly = true\n')
+    writeFileSync(invalidMainFilePath, 'export {}\n')
+
+    const projectTarget = resolveLiveUpdateProjectTarget({
+      packageJson: './projects/reader/package.json',
+      mainFile: './projects/reader/src/main.ts',
+    }, root)
+    eq(projectTarget.packageJsonPath, packageJsonPath)
+    eq(projectTarget.mainFilePath, mainFilePath)
+    let invalidPackageError
+    try {
+      resolveLiveUpdateProjectTarget({ packageJson: './projects/reader/src/main.ts' }, root)
+    }
+    catch (error) {
+      invalidPackageError = error
+    }
+    ok(String(invalidPackageError).includes('must point to package.json'))
+    let invalidMainError
+    try {
+      resolveLiveUpdateProjectTarget({ mainFile: './projects/reader/src/main.txt' }, root)
+    }
+    catch (error) {
+      invalidMainError = error
+    }
+    ok(String(invalidMainError).includes('JavaScript or TypeScript'))
+    eq(liveUpdateStartSchema.safeParse({ packageJson: './projects/reader/package.json', mainFile: './projects/reader/src/main.ts' }).success, true)
+    eq(liveUpdateNextStepSchema.safeParse({ packageJson: './projects/reader/package.json', mainFile: './projects/reader/src/main.ts' }).success, true)
+
+    process.chdir(root)
+    setConfigWriteTarget(undefined)
+    const deps = buildDeps({}, root, () => projectTarget)
+    eq(JSON.stringify(await deps.detectPlatforms()), JSON.stringify(['ios']))
+    const runCommand = deps.getRunDeviceCommand('ios')
+    eq(runCommand.cwd, appDir)
+    ok(!runCommand.command.includes(appDir))
+    const unsafeProjectDir = join(root, 'projects', 'reader-$(touch injected)')
+    const unsafeRunCommand = buildDeps({}, root, () => ({ packageJsonPath: join(unsafeProjectDir, 'package.json') })).getRunDeviceCommand('ios')
+    eq(unsafeRunCommand.cwd, unsafeProjectDir)
+    ok(!unsafeRunCommand.command.includes('$('))
+    const integration = await deps.addIntegrationCode('com.acme.reader')
+    eq(integration.ok, true)
+    ok(readFileSync(mainFilePath, 'utf8').includes('CapacitorUpdater.notifyAppReady()'))
+    ok(!readFileSync(rootMainFilePath, 'utf8').includes('CapacitorUpdater.notifyAppReady()'))
+
+    const server = fakeServer()
+    registerLiveUpdateTools(server, null, fakeDeps({ cwd: root }))
+    const started = await server.tools.start_capgo_live_update_onboarding.handler({
+      capacitorConfig: './env-configs/capacitor.config.reader.ts',
+      packageJson: './projects/reader/package.json',
+      mainFile: './projects/reader/src/main.ts',
+    })
+    ok(started.content[0].text.includes(realConfigPath(configTarget)))
+    ok(started.content[0].text.includes(packageJsonPath))
+    ok(started.content[0].text.includes(mainFilePath))
+    let conflictingTargetError
+    try {
+      await server.tools.start_capgo_live_update_onboarding.handler({
+        capacitorConfig: './env-configs/capacitor.config.reader.ts',
+        mainFile: './main.ts',
+      })
+    }
+    catch (error) {
+      conflictingTargetError = error
+    }
+    ok(String(conflictingTargetError).includes('already has packageJson or mainFile targets'))
+  }
+  finally {
+    process.chdir(previousCwd)
+    setConfigWriteTarget(previousTarget)
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 const { startMcpServer } = await import('../src/mcp/server.ts')
 

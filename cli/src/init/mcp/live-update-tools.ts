@@ -3,22 +3,24 @@ import process from 'node:process'
 // src/init/mcp/live-update-tools.ts
 import { existsSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import type { CapgoSDK } from '../../sdk.js'
 import type { LiveUpdateNextStepInput, LiveUpdateStartInput } from '../../schemas/live-update-onboarding.js'
 import { liveUpdateNextStepSchema, liveUpdateStartSchema } from '../../schemas/live-update-onboarding.js'
 import { capacitorConfigOptionSchema } from '../../schemas/sdk.js'
 import { getConfigWriteTarget, resolveCapacitorConfigTargetPath, withConfigWriteTarget } from '../../config'
 import { getPlatformDirFromCapacitorConfig } from '../../build/platform-paths.js'
+import { createKeyInternal } from '../../key.js'
 import { isAppAlreadyExistsError } from '../app-conflict.js'
 import {
   applyInitAutoTestChange,
   getGitRepoStatus,
   getInitSuggestedOtaVersion,
   getInitUpdaterPluginConfig,
+  resolveInitTargetPath,
 } from '../command.js'
 import { getUpdaterInstallState } from '../updater.js'
-import { findSavedKeySilent, findMainFile, findRoot, getAppId, getBundleVersion, getConfig, getPMAndCommand, PACKNAME, updateConfigUpdater } from '../../utils.js'
+import { baseKeyV2, findSavedKeySilent, findMainFile, findRoot, getAppId, getBundleVersion, getConfig, getPMAndCommand, PACKNAME, updateConfigUpdater } from '../../utils.js'
 import { formatRunnerCommand } from '../../runner-command.js'
 import { addChannelInternal } from '../../channel/add.js'
 import { uploadBundleInternal } from '../../bundle/upload.js'
@@ -47,12 +49,48 @@ const DEFAULT_CHANNEL = 'production'
 const importInject = 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\''
 const codeInject = 'CapacitorUpdater.notifyAppReady()'
 
-function getRunDeviceCommandForPlatform(platform: Platform): { command: string } {
+export interface LiveUpdateProjectTarget {
+  packageJsonPath?: string
+  mainFilePath?: string
+}
+
+type LiveUpdateProjectTargetInput = Pick<LiveUpdateStartInput, 'packageJson' | 'mainFile'>
+
+function hasProjectTarget(target: LiveUpdateProjectTarget | undefined): target is LiveUpdateProjectTarget {
+  return Boolean(target?.packageJsonPath || target?.mainFilePath)
+}
+
+export function resolveLiveUpdateProjectTarget(input: LiveUpdateProjectTargetInput, initialCwd = process.cwd()): LiveUpdateProjectTarget {
+  const packageJsonPath = resolveInitTargetPath(input.packageJson, 'Package JSON path', initialCwd)
+  if (packageJsonPath && basename(packageJsonPath) !== PACKNAME)
+    throw new Error(`Package JSON path must point to ${PACKNAME}: ${packageJsonPath}`)
+
+  const mainFilePath = resolveInitTargetPath(input.mainFile, 'Main file path', initialCwd)
+  if (mainFilePath && !/\.[cm]?[jt]sx?$/.test(mainFilePath))
+    throw new Error(`Main file path must point to a JavaScript or TypeScript file: ${mainFilePath}`)
+
+  return { packageJsonPath, mainFilePath }
+}
+
+function getRunDeviceCommandForPlatform(platform: Platform, projectDir: string, initialCwd: string): { command: string, cwd?: string } {
   const pm = getPMAndCommand()
   const args = ['cap', 'run', platform]
-  return { command: formatRunnerCommand(pm.runner, args) }
+  const command = formatRunnerCommand(pm.runner, args)
+  return { command, ...(projectDir === initialCwd ? {} : { cwd: projectDir }) }
 }
-export function buildDeps(sdk: CapgoSDK, cwd = process.cwd()): EngineDeps {
+
+export function buildDeps(
+  sdk: CapgoSDK,
+  cwd = process.cwd(),
+  getProjectTarget: () => LiveUpdateProjectTarget | undefined = () => undefined,
+): EngineDeps {
+  const getPackageJsonPath = () => getProjectTarget()?.packageJsonPath ?? join(findRoot(cwd), PACKNAME)
+  const getProjectDir = () => dirname(getPackageJsonPath())
+  const getMainFile = async () => getProjectTarget()?.mainFilePath ?? findMainFile(true, getProjectDir())
+  const getNodeModulesPath = () => {
+    const nodeModulesPath = join(findRoot(getProjectDir()), 'node_modules')
+    return existsSync(nodeModulesPath) ? nodeModulesPath : undefined
+  }
   const getAppIdClosure = async (): Promise<string | undefined> => {
     try {
       const ext = await getConfig(true)
@@ -71,11 +109,12 @@ export function buildDeps(sdk: CapgoSDK, cwd = process.cwd()): EngineDeps {
       const out: Platform[] = []
       try {
         const ext = await getConfig(true)
+        const projectDir = getProjectDir()
         const iosDir = getPlatformDirFromCapacitorConfig(ext?.config, 'ios')
         const androidDir = getPlatformDirFromCapacitorConfig(ext?.config, 'android')
-        if (existsSync(join(cwd, iosDir)))
+        if (existsSync(join(projectDir, iosDir)))
           out.push('ios')
-        if (existsSync(join(cwd, androidDir)))
+        if (existsSync(join(projectDir, androidDir)))
           out.push('android')
       }
       catch {
@@ -109,8 +148,8 @@ export function buildDeps(sdk: CapgoSDK, cwd = process.cwd()): EngineDeps {
     },
     installUpdater: async (appId: string) => {
       try {
-        const packageJsonPath = join(findRoot(cwd), PACKNAME)
-        const projectDir = dirname(packageJsonPath)
+        const packageJsonPath = getPackageJsonPath()
+        const projectDir = getProjectDir()
         const installState = getUpdaterInstallState(packageJsonPath)
         if (!installState.ready) {
           const pm = getPMAndCommand()
@@ -129,9 +168,7 @@ export function buildDeps(sdk: CapgoSDK, cwd = process.cwd()): EngineDeps {
     },
     addIntegrationCode: async (_appId: string) => {
       try {
-        const packageJsonPath = join(findRoot(cwd), PACKNAME)
-        const projectDir = dirname(packageJsonPath)
-        const mainFile = await findMainFile(true, projectDir)
+        const mainFile = await getMainFile()
         if (!mainFile)
           return { ok: false as const, error: 'Could not find main entry file' }
         let content = await readFile(mainFile, 'utf8')
@@ -154,9 +191,7 @@ export function buildDeps(sdk: CapgoSDK, cwd = process.cwd()): EngineDeps {
       if (!enable)
         return { ok: true as const, enabled: false }
       try {
-        const res = await sdk.generateEncryptionKeys({ force: false })
-        if (!res.success)
-          return { ok: false as const, enabled: false, error: res.error ?? 'Encryption key generation failed' }
+        await createKeyInternal({ force: false, keyDir: getProjectDir(), setupChannel: false }, true)
         return { ok: true as const, enabled: true }
       }
       catch (error) {
@@ -166,7 +201,7 @@ export function buildDeps(sdk: CapgoSDK, cwd = process.cwd()): EngineDeps {
     buildProject: async (_appId: string, platform: Platform) => {
       try {
         const pm = getPMAndCommand()
-        const projectDir = findRoot(cwd)
+        const projectDir = getProjectDir()
         execSync(`${pm.pm} run build`, { cwd: projectDir, stdio: 'pipe' })
         execSync(formatRunnerCommand(pm.runner, ['cap', 'sync', platform]), { cwd: projectDir, stdio: 'pipe' })
         return { ok: true as const }
@@ -177,9 +212,8 @@ export function buildDeps(sdk: CapgoSDK, cwd = process.cwd()): EngineDeps {
     },
     applyTestChange: async (_appId: string, baseVersion?: string) => {
       try {
-        const packageJsonPath = join(findRoot(cwd), PACKNAME)
-        const projectDir = dirname(packageJsonPath)
-        const mainFile = await findMainFile(true, projectDir)
+        const packageJsonPath = getPackageJsonPath()
+        const mainFile = await getMainFile()
         if (!mainFile)
           return { ok: false as const, error: 'Could not find main entry file for test change' }
         const content = await readFile(mainFile, 'utf8')
@@ -195,6 +229,14 @@ export function buildDeps(sdk: CapgoSDK, cwd = process.cwd()): EngineDeps {
     },
     uploadBundle: async (appId: string, opts) => {
       try {
+        const projectDir = getProjectDir()
+        const packageJsonPath = getPackageJsonPath()
+        const privateKeyPath = join(projectDir, baseKeyV2)
+        const encrypt = opts.encrypt === true
+        if (encrypt && !existsSync(privateKeyPath))
+          return { ok: false as const, error: `Cannot find private key ${privateKeyPath}` }
+
+        const webDir = (await getConfig(true))?.config.webDir
         const apikey = findSavedKeySilent() ?? ''
         await uploadBundleInternal(appId, {
           apikey,
@@ -202,6 +244,11 @@ export function buildDeps(sdk: CapgoSDK, cwd = process.cwd()): EngineDeps {
           channel: opts.channelName || DEFAULT_CHANNEL,
           deltaOnly: opts.delta,
           ignoreChecksumCheck: true,
+          key: encrypt ? undefined : false,
+          keyV2: encrypt ? privateKeyPath : undefined,
+          nodeModules: getNodeModulesPath(),
+          packageJson: packageJsonPath,
+          path: webDir ? resolve(projectDir, webDir) : undefined,
           showReplicationProgress: false,
         }, true)
         return { ok: true as const }
@@ -211,20 +258,30 @@ export function buildDeps(sdk: CapgoSDK, cwd = process.cwd()): EngineDeps {
       }
     },
 
-    getRunDeviceCommand: platform => getRunDeviceCommandForPlatform(platform),
-    getGitStatus: startDir => getGitRepoStatus(startDir ?? cwd),
+    getRunDeviceCommand: platform => getRunDeviceCommandForPlatform(platform, getProjectDir(), cwd),
+    getGitStatus: startDir => getGitRepoStatus(startDir ?? getProjectDir()),
   }
 }
 
-function addConfigTargetToResult(result: NextStepResult, configTarget: string | undefined): NextStepResult {
-  if (!configTarget)
+function addConfigTargetToResult(
+  result: NextStepResult,
+  configTarget: string | undefined,
+  projectTarget: LiveUpdateProjectTarget | undefined,
+): NextStepResult {
+  const targetArgs = {
+    ...(configTarget ? { capacitorConfig: configTarget } : {}),
+    ...(projectTarget?.packageJsonPath ? { packageJson: projectTarget.packageJsonPath } : {}),
+    ...(projectTarget?.mainFilePath ? { mainFile: projectTarget.mainFilePath } : {}),
+  }
+  const targetNames = Object.keys(targetArgs)
+  if (targetNames.length === 0)
     return result
 
-  const context = { ...result.context, capacitorConfig: configTarget }
+  const context = { ...result.context, ...targetArgs }
   if (!result.next)
     return { ...result, context }
 
-  const withArgs = { ...result.next.with, capacitorConfig: configTarget }
+  const withArgs = { ...result.next.with, ...targetArgs }
   return {
     ...result,
     context,
@@ -232,14 +289,18 @@ function addConfigTargetToResult(result: NextStepResult, configTarget: string | 
       ...result.next,
       with: withArgs,
       call: `${result.next.tool}(${JSON.stringify(withArgs)})`,
-      instruction: `${result.next.instruction} Include the same capacitorConfig from context.`,
+      instruction: `${result.next.instruction} Include the same ${targetNames.join(', ')} from context.`,
     },
   }
 }
 
 export function registerLiveUpdateTools(server: McpLike, sdk: CapgoSDK, depsOverride?: EngineDeps): void {
-  const deps = depsOverride ?? buildDeps(sdk)
   const configTargetsByApp = new Map<string, Set<string>>()
+  const projectTargetsByConfig = new Map<string, LiveUpdateProjectTarget>()
+  const deps = depsOverride ?? buildDeps(sdk, process.cwd(), () => {
+    const configTarget = getConfigWriteTarget()
+    return configTarget ? projectTargetsByConfig.get(configTarget) : undefined
+  })
   const addConfigTarget = (appId: string, configTarget: string): void => {
     const targets = configTargetsByApp.get(appId) ?? new Set<string>()
     targets.add(configTarget)
@@ -253,7 +314,30 @@ export function registerLiveUpdateTools(server: McpLike, sdk: CapgoSDK, depsOver
     if (targets.size === 0)
       configTargetsByApp.delete(appId)
   }
+  const getSessionProjectTarget = (
+    configTarget: string | undefined,
+    incomingTarget: LiveUpdateProjectTarget,
+  ): LiveUpdateProjectTarget | undefined => {
+    if (!configTarget)
+      return hasProjectTarget(incomingTarget) ? incomingTarget : undefined
+
+    const currentTarget = projectTargetsByConfig.get(configTarget)
+    if (!hasProjectTarget(incomingTarget))
+      return currentTarget
+    if (
+      (currentTarget?.packageJsonPath && incomingTarget.packageJsonPath && currentTarget.packageJsonPath !== incomingTarget.packageJsonPath)
+      || (currentTarget?.mainFilePath && incomingTarget.mainFilePath && currentTarget.mainFilePath !== incomingTarget.mainFilePath)
+    ) {
+      throw new Error('This onboarding already has packageJson or mainFile targets for its Capacitor config. Pass the same paths from context.')
+    }
+
+    const projectTarget = { ...currentTarget, ...incomingTarget }
+    projectTargetsByConfig.set(configTarget, projectTarget)
+    return projectTarget
+  }
   const updateActiveConfigTarget = (appId: string | undefined, configTarget: string | undefined, result: NextStepResult): void => {
+    if (configTarget && result.kind === 'done')
+      projectTargetsByConfig.delete(configTarget)
     if (!appId || !configTarget)
       return
     if (result.kind === 'done')
@@ -290,10 +374,11 @@ export function registerLiveUpdateTools(server: McpLike, sdk: CapgoSDK, depsOver
     'Start (or resume) the guided Capgo live-update (OTA) setup for this Capacitor project — register the app, install the updater plugin, build, upload a test bundle, and confirm OTA delivery. ALWAYS call this FIRST when the user wants to set up or troubleshoot Capgo OTA / live updates. Do NOT configure Capgo yourself — this tool conducts the flow.',
     liveUpdateStartSchema.shape,
     async (args: LiveUpdateStartInput) => {
+      const requestedProjectTarget = resolveLiveUpdateProjectTarget(args, deps.cwd)
       const requestedConfigTarget = args.capacitorConfig === undefined
         ? getConfigWriteTarget()
         : resolveCapacitorConfigTargetPath(args.capacitorConfig, deps.cwd)
-      const { appId, result, configTarget } = await withConfigWriteTarget(requestedConfigTarget, async () => {
+      const { appId, result, configTarget, projectTarget } = await withConfigWriteTarget(requestedConfigTarget, async () => {
         let configTarget = requestedConfigTarget
         if (!configTarget) {
           try {
@@ -303,14 +388,15 @@ export function registerLiveUpdateTools(server: McpLike, sdk: CapgoSDK, depsOver
             // runStart returns the normal no-Capacitor-project response
           }
         }
+        const projectTarget = getSessionProjectTarget(configTarget, requestedProjectTarget)
         const appId = await deps.getAppId()
         if (configTarget)
           migrateLegacyProgress(appId, configTarget)
         const result = await withConfigWriteTarget(configTarget, () => runStart(deps))
-        return { appId, result, configTarget }
+        return { appId, result, configTarget, projectTarget }
       })
       updateActiveConfigTarget(appId, configTarget, result)
-      return { content: [{ type: 'text' as const, text: renderResult(addConfigTargetToResult(result, configTarget)) }] }
+      return { content: [{ type: 'text' as const, text: renderResult(addConfigTargetToResult(result, configTarget, projectTarget)) }] }
     },
   )
 
@@ -319,14 +405,15 @@ export function registerLiveUpdateTools(server: McpLike, sdk: CapgoSDK, depsOver
     'Advance the guided Capgo live-update onboarding by one step. Call ONLY as directed by the previous result\'s `next`. Pass the user\'s choice when the previous step asked for one.',
     liveUpdateNextStepSchema.shape,
     async (args: LiveUpdateNextStepInput) => {
-      const { capacitorConfig, ...input } = args
+      const { capacitorConfig, packageJson, mainFile, ...input } = args
       const configTarget = await getSessionConfigTarget(capacitorConfig)
+      const projectTarget = getSessionProjectTarget(configTarget, resolveLiveUpdateProjectTarget({ packageJson, mainFile }, deps.cwd))
       const { appId, result } = await withConfigWriteTarget(configTarget, async () => ({
         appId: await deps.getAppId(),
         result: await runAdvance(deps, input),
       }))
       updateActiveConfigTarget(appId, configTarget, result)
-      return { content: [{ type: 'text' as const, text: renderResult(addConfigTargetToResult(result, configTarget)) }] }
+      return { content: [{ type: 'text' as const, text: renderResult(addConfigTargetToResult(result, configTarget, projectTarget)) }] }
     },
   )
 
