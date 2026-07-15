@@ -714,29 +714,9 @@
       "default": "true",
       "generated": "",
       "identity": "",
-      "name": "allow_device",
-      "notNull": true,
-      "position": 13,
-      "table": "channels",
-      "type": "boolean"
-    },
-    {
-      "default": "true",
-      "generated": "",
-      "identity": "",
       "name": "allow_dev",
       "notNull": true,
-      "position": 14,
-      "table": "channels",
-      "type": "boolean"
-    },
-    {
-      "default": "true",
-      "generated": "",
-      "identity": "",
-      "name": "allow_prod",
-      "notNull": true,
-      "position": 15,
+      "position": 13,
       "table": "channels",
       "type": "boolean"
     },
@@ -746,7 +726,7 @@
       "identity": "",
       "name": "disable_auto_update",
       "notNull": true,
-      "position": 16,
+      "position": 14,
       "table": "channels",
       "type": "disable_update"
     },
@@ -756,7 +736,7 @@
       "identity": "",
       "name": "owner_org",
       "notNull": true,
-      "position": 17,
+      "position": 15,
       "table": "channels",
       "type": "uuid"
     },
@@ -766,17 +746,7 @@
       "identity": "",
       "name": "created_by",
       "notNull": true,
-      "position": 18,
-      "table": "channels",
-      "type": "uuid"
-    },
-    {
-      "default": "gen_random_uuid()",
-      "generated": "",
-      "identity": "",
-      "name": "rbac_id",
-      "notNull": true,
-      "position": 19,
+      "position": 16,
       "table": "channels",
       "type": "uuid"
     },
@@ -784,11 +754,41 @@
       "default": "true",
       "generated": "",
       "identity": "",
+      "name": "allow_device",
+      "notNull": true,
+      "position": 17,
+      "table": "channels",
+      "type": "boolean"
+    },
+    {
+      "default": "true",
+      "generated": "",
+      "identity": "",
+      "name": "allow_prod",
+      "notNull": true,
+      "position": 18,
+      "table": "channels",
+      "type": "boolean"
+    },
+    {
+      "default": "true",
+      "generated": "",
+      "identity": "",
       "name": "electron",
+      "notNull": true,
+      "position": 19,
+      "table": "channels",
+      "type": "boolean"
+    },
+    {
+      "default": "gen_random_uuid()",
+      "generated": "",
+      "identity": "",
+      "name": "rbac_id",
       "notNull": true,
       "position": 20,
       "table": "channels",
-      "type": "boolean"
+      "type": "uuid"
     },
     {
       "default": null,
@@ -1371,12 +1371,22 @@
       "type": "jsonb"
     },
     {
+      "default": null,
+      "generated": "",
+      "identity": "",
+      "name": "password_policy_config",
+      "notNull": false,
+      "position": 13,
+      "table": "orgs",
+      "type": "jsonb"
+    },
+    {
       "default": "false",
       "generated": "",
       "identity": "",
       "name": "enforce_hashed_api_keys",
       "notNull": true,
-      "position": 13,
+      "position": 14,
       "table": "orgs",
       "type": "boolean"
     },
@@ -1386,7 +1396,7 @@
       "identity": "",
       "name": "require_apikey_expiration",
       "notNull": true,
-      "position": 14,
+      "position": 15,
       "table": "orgs",
       "type": "boolean"
     },
@@ -1396,19 +1406,9 @@
       "identity": "",
       "name": "max_apikey_expiration_days",
       "notNull": false,
-      "position": 15,
-      "table": "orgs",
-      "type": "integer"
-    },
-    {
-      "default": null,
-      "generated": "",
-      "identity": "",
-      "name": "password_policy_config",
-      "notNull": false,
       "position": 16,
       "table": "orgs",
-      "type": "jsonb"
+      "type": "integer"
     },
     {
       "default": "false",
@@ -2051,13 +2051,6 @@
     },
     {
       "constraintOwned": false,
-      "definition": "CREATE INDEX idx_app_versions_key_id ON public.app_versions USING btree (key_id) WHERE (key_id IS NOT NULL)",
-      "name": "idx_app_versions_key_id",
-      "table": "app_versions",
-      "valid": true
-    },
-    {
-      "constraintOwned": false,
       "definition": "CREATE INDEX idx_app_versions_name ON public.app_versions USING btree (name)",
       "name": "idx_app_versions_name",
       "table": "app_versions",
@@ -2149,22 +2142,8 @@
     },
     {
       "constraintOwned": false,
-      "definition": "CREATE INDEX finx_channel_devices_app_id ON public.channel_devices USING btree (app_id)",
-      "name": "finx_channel_devices_app_id",
-      "table": "channel_devices",
-      "valid": true
-    },
-    {
-      "constraintOwned": false,
       "definition": "CREATE INDEX finx_channel_devices_channel_id ON public.channel_devices USING btree (channel_id)",
       "name": "finx_channel_devices_channel_id",
-      "table": "channel_devices",
-      "valid": true
-    },
-    {
-      "constraintOwned": false,
-      "definition": "CREATE UNIQUE INDEX idx_app_id_device_id_channel_id_channel_devices ON public.channel_devices USING btree (app_id, device_id, channel_id)",
-      "name": "idx_app_id_device_id_channel_id_channel_devices",
       "table": "channel_devices",
       "valid": true
     },
@@ -2221,13 +2200,6 @@
       "constraintOwned": false,
       "definition": "CREATE INDEX finx_channels_version ON public.channels USING btree (version)",
       "name": "finx_channels_version",
-      "table": "channels",
-      "valid": true
-    },
-    {
-      "constraintOwned": false,
-      "definition": "CREATE INDEX idx_app_id_public_channel ON public.channels USING btree (app_id, public)",
-      "name": "idx_app_id_public_channel",
       "table": "channels",
       "valid": true
     },
@@ -2414,13 +2386,6 @@
       "valid": true
     },
     {
-      "constraintOwned": false,
-      "definition": "CREATE INDEX orgs_updated_at_id_idx ON public.orgs USING btree (updated_at DESC) INCLUDE (id) WHERE (customer_id IS NOT NULL)",
-      "name": "orgs_updated_at_id_idx",
-      "table": "orgs",
-      "valid": true
-    },
-    {
       "constraintOwned": true,
       "definition": "CREATE UNIQUE INDEX \"unique customer_id on orgs\" ON public.orgs USING btree (customer_id)",
       "name": "unique customer_id on orgs",
@@ -2452,13 +2417,6 @@
       "constraintOwned": false,
       "definition": "CREATE INDEX idx_stripe_info_past_due_at ON public.stripe_info USING btree (past_due_at) WHERE (past_due_at IS NOT NULL)",
       "name": "idx_stripe_info_past_due_at",
-      "table": "stripe_info",
-      "valid": true
-    },
-    {
-      "constraintOwned": false,
-      "definition": "CREATE INDEX idx_stripe_info_status_plan ON public.stripe_info USING btree (status, is_good_plan) WHERE ((status = 'succeeded'::stripe_status) AND (is_good_plan = true))",
-      "name": "idx_stripe_info_status_plan",
       "table": "stripe_info",
       "valid": true
     },
