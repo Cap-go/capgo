@@ -9,8 +9,6 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
-CREATE SCHEMA IF NOT EXISTS "capgo_private";
-ALTER SCHEMA "capgo_private" OWNER TO "postgres";
 
 CREATE EXTENSION IF NOT EXISTS "pg_cron" WITH SCHEMA "pg_catalog";
 CREATE EXTENSION IF NOT EXISTS "pg_net" WITH SCHEMA "extensions";
@@ -323,50 +321,6 @@ CREATE TYPE "public"."version_action" AS ENUM (
 ALTER TYPE "public"."version_action" OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "capgo_private"."matches_app_storage_apikey_owner"("folder_user_id" "text", "target_app_id" character varying, "keymode" "public"."key_mode"[]) RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-DECLARE
-  api_key_text text;
-  api_key public.apikeys%ROWTYPE;
-  target_app record;
-  required_permission text;
-BEGIN
-  SELECT public.get_apikey_header() INTO api_key_text;
-  IF api_key_text IS NULL THEN
-    RETURN false;
-  END IF;
-
-  SELECT * INTO api_key FROM public.find_apikey_by_value(api_key_text) LIMIT 1;
-  IF api_key.id IS NULL OR public.is_apikey_expired(api_key.expires_at) THEN
-    RETURN false;
-  END IF;
-
-  SELECT user_id, owner_org
-  INTO target_app
-  FROM public.apps
-  WHERE app_id = target_app_id
-  LIMIT 1;
-
-  IF target_app.user_id IS NULL THEN
-    RETURN false;
-  END IF;
-
-  IF api_key.user_id::text <> folder_user_id OR target_app.user_id <> api_key.user_id THEN
-    RETURN false;
-  END IF;
-
-  required_permission := public.apikey_permission_for_keymode(keymode, public.rbac_scope_app());
-  RETURN public.rbac_has_permission(public.rbac_principal_apikey(), api_key.rbac_id, required_permission, target_app.owner_org, target_app_id, NULL);
-END;
-$$;
-
-
-ALTER FUNCTION "capgo_private"."matches_app_storage_apikey_owner"("folder_user_id" "text", "target_app_id" character varying, "keymode" "public"."key_mode"[]) OWNER TO "postgres";
-
-
-COMMENT ON FUNCTION "capgo_private"."matches_app_storage_apikey_owner"("folder_user_id" "text", "target_app_id" character varying, "keymode" "public"."key_mode"[]) IS 'Internal non-RPC helper for storage app-bucket API-key auth.';
 
 
 
@@ -21584,9 +21538,6 @@ ALTER TABLE "public"."webhook_deliveries" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."webhooks" ENABLE ROW LEVEL SECURITY;
 
 
-GRANT USAGE ON SCHEMA "capgo_private" TO "anon";
-GRANT USAGE ON SCHEMA "capgo_private" TO "authenticated";
-GRANT USAGE ON SCHEMA "capgo_private" TO "service_role";
 
 
 
@@ -21597,10 +21548,6 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "capgo_private"."matches_app_storage_apikey_owner"("folder_user_id" "text", "target_app_id" character varying, "keymode" "public"."key_mode"[]) FROM PUBLIC;
-GRANT ALL ON FUNCTION "capgo_private"."matches_app_storage_apikey_owner"("folder_user_id" "text", "target_app_id" character varying, "keymode" "public"."key_mode"[]) TO "anon";
-GRANT ALL ON FUNCTION "capgo_private"."matches_app_storage_apikey_owner"("folder_user_id" "text", "target_app_id" character varying, "keymode" "public"."key_mode"[]) TO "authenticated";
-GRANT ALL ON FUNCTION "capgo_private"."matches_app_storage_apikey_owner"("folder_user_id" "text", "target_app_id" character varying, "keymode" "public"."key_mode"[]) TO "service_role";
 
 
 
@@ -24512,7 +24459,6 @@ CREATE POLICY "Enable select for anyone" ON "public"."plans" FOR SELECT TO "anon
 -- Created as postgres (superuser locally / migration role).
 -- Storage policies from production (storage schema excluded from public dump)
 
-CREATE POLICY "Allow user or apikey to delete they own folder in apps" ON "storage"."objects" FOR DELETE USING ((("bucket_id" = 'apps'::"text") AND (((( SELECT "auth"."uid"() AS "auth_user_id"))::"text" = ("storage"."foldername"("name"))[1]) OR "capgo_private"."matches_app_storage_apikey_owner"(("storage"."foldername"("name"))[1], (("storage"."foldername"("name"))[2])::character varying, '{all}'::"public"."key_mode"[]))));
 
 CREATE POLICY "Allow user or apikey to delete they own folder in images" ON "storage"."objects" FOR DELETE TO "anon", "authenticated" USING ((("bucket_id" = 'images'::"text") AND (
 CASE
@@ -24522,7 +24468,6 @@ END OR ((("storage"."foldername"("name"))[1] = 'org'::"text") AND (("storage"."f
    FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
   WHERE (("auth_user"."uid" IS NOT NULL) AND (("auth_user"."uid")::"text" = ("storage"."foldername"("objects"."name"))[1])))))));
 
-CREATE POLICY "Allow user or apikey to insert they own folder in apps" ON "storage"."objects" FOR INSERT WITH CHECK ((("bucket_id" = 'apps'::"text") AND (((( SELECT "auth"."uid"() AS "auth_user_id"))::"text" = ("storage"."foldername"("name"))[1]) OR "capgo_private"."matches_app_storage_apikey_owner"(("storage"."foldername"("name"))[1], (("storage"."foldername"("name"))[2])::character varying, '{write,all}'::"public"."key_mode"[]))));
 
 CREATE POLICY "Allow user or apikey to insert they own folder in images" ON "storage"."objects" FOR INSERT TO "anon", "authenticated" WITH CHECK ((("bucket_id" = 'images'::"text") AND (
 CASE
@@ -24536,7 +24481,6 @@ END OR (EXISTS ( SELECT 1
    FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
   WHERE (("auth_user"."uid" IS NOT NULL) AND (("auth_user"."uid")::"text" = ("storage"."foldername"("objects"."name"))[1])))))));
 
-CREATE POLICY "Allow user or apikey to read they own folder in apps" ON "storage"."objects" FOR SELECT USING ((("bucket_id" = 'apps'::"text") AND (((( SELECT "auth"."uid"() AS "auth_user_id"))::"text" = ("storage"."foldername"("name"))[1]) OR "capgo_private"."matches_app_storage_apikey_owner"(("storage"."foldername"("name"))[1], (("storage"."foldername"("name"))[2])::character varying, '{read,all}'::"public"."key_mode"[]))));
 
 CREATE POLICY "Allow user or apikey to read they own folder in images" ON "storage"."objects" FOR SELECT TO "anon", "authenticated" USING ((("bucket_id" = 'images'::"text") AND ((("storage"."foldername"("name"))[1] = 'public'::"text") OR
 CASE
@@ -24546,7 +24490,6 @@ END OR ((("storage"."foldername"("name"))[1] = 'org'::"text") AND (("storage"."f
    FROM "public"."org_users" "ou"
   WHERE ((("ou"."user_id")::"text" = ("storage"."foldername"("objects"."name"))[1]) AND "public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity_org_allowed"('{read,upload,write,all}'::"public"."key_mode"[], "ou"."org_id"), "ou"."org_id", NULL::character varying, NULL::bigint))))))));
 
-CREATE POLICY "Allow user or apikey to update they own folder in apps" ON "storage"."objects" FOR UPDATE USING ((("bucket_id" = 'apps'::"text") AND (((( SELECT "auth"."uid"() AS "auth_user_id"))::"text" = ("storage"."foldername"("name"))[1]) OR "capgo_private"."matches_app_storage_apikey_owner"(("storage"."foldername"("name"))[1], (("storage"."foldername"("name"))[2])::character varying, '{write,all}'::"public"."key_mode"[]))));
 
 CREATE POLICY "Allow user or apikey to update they own folder in images" ON "storage"."objects" FOR UPDATE TO "anon", "authenticated" USING ((("bucket_id" = 'images'::"text") AND (
 CASE
@@ -28017,63 +27960,6 @@ GRANT EXECUTE ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) TO s
 COMMENT ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) IS
   'Checks app.update_user_roles using RBAC only. The caller must be the checked user or already hold the same RBAC permission.';
 
-CREATE OR REPLACE FUNCTION capgo_private.matches_app_storage_rbac_owner(
-  folder_user_id text,
-  target_app_id character varying,
-  permission_key text
-)
-RETURNS boolean
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  v_apikey text;
-  v_api_key public.apikeys%ROWTYPE;
-  v_owner_org uuid;
-BEGIN
-  SELECT public.get_apikey_header() INTO v_apikey;
-
-  IF v_apikey IS NULL OR v_apikey = '' THEN
-    RETURN false;
-  END IF;
-
-  SELECT * INTO v_api_key
-  FROM public.find_apikey_by_value(v_apikey)
-  LIMIT 1;
-
-  IF v_api_key.id IS NULL
-    OR public.is_apikey_expired(v_api_key.expires_at)
-    OR v_api_key.user_id::text IS DISTINCT FROM folder_user_id
-  THEN
-    RETURN false;
-  END IF;
-
-  SELECT owner_org INTO v_owner_org
-  FROM public.apps
-  WHERE app_id = target_app_id
-  LIMIT 1;
-
-  IF v_owner_org IS NULL THEN
-    RETURN false;
-  END IF;
-
-  RETURN public.rbac_check_permission_direct(
-    permission_key,
-    v_api_key.user_id,
-    v_owner_org,
-    target_app_id,
-    NULL::bigint,
-    v_apikey
-  );
-END;
-$$;
-
-ALTER FUNCTION capgo_private.matches_app_storage_rbac_owner(text, character varying, text) OWNER TO postgres;
-REVOKE ALL ON FUNCTION capgo_private.matches_app_storage_rbac_owner(text, character varying, text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION capgo_private.matches_app_storage_rbac_owner(text, character varying, text) TO anon;
-GRANT EXECUTE ON FUNCTION capgo_private.matches_app_storage_rbac_owner(text, character varying, text) TO authenticated;
-GRANT EXECUTE ON FUNCTION capgo_private.matches_app_storage_rbac_owner(text, character varying, text) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.get_user_main_org_id_by_app_id(app_id text)
 RETURNS uuid
@@ -29531,26 +29417,17 @@ FOR DELETE
 TO anon, authenticated
 USING (
   bucket_id = 'apps'
-  AND (
-    (
-      (SELECT auth.uid())::text = (storage.foldername(name))[1]
-      AND EXISTS (
-        SELECT 1
-        FROM public.apps
-        WHERE apps.app_id = ((storage.foldername(name))[2])::character varying
-          AND public.rbac_check_permission_request(
-            public.rbac_perm_bundle_delete(),
-            apps.owner_org,
-            apps.app_id,
-            NULL::bigint
-          )
+  AND (storage.foldername(name))[1] = COALESCE(
+    (SELECT auth.uid())::text,
+    public.get_user_id(public.get_apikey_header())::text
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.apps
+    WHERE apps.app_id = ((storage.foldername(name))[2])::character varying
+      AND public.rbac_check_permission_request(
+        public.rbac_perm_bundle_delete(), apps.owner_org, apps.app_id, NULL::bigint
       )
-    )
-    OR capgo_private.matches_app_storage_rbac_owner(
-      (storage.foldername(name))[1],
-      ((storage.foldername(name))[2])::character varying,
-      public.rbac_perm_bundle_delete()
-    )
   )
 );
 
@@ -29561,26 +29438,17 @@ FOR INSERT
 TO anon, authenticated
 WITH CHECK (
   bucket_id = 'apps'
-  AND (
-    (
-      (SELECT auth.uid())::text = (storage.foldername(name))[1]
-      AND EXISTS (
-        SELECT 1
-        FROM public.apps
-        WHERE apps.app_id = ((storage.foldername(name))[2])::character varying
-          AND public.rbac_check_permission_request(
-            public.rbac_perm_app_upload_bundle(),
-            apps.owner_org,
-            apps.app_id,
-            NULL::bigint
-          )
+  AND (storage.foldername(name))[1] = COALESCE(
+    (SELECT auth.uid())::text,
+    public.get_user_id(public.get_apikey_header())::text
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.apps
+    WHERE apps.app_id = ((storage.foldername(name))[2])::character varying
+      AND public.rbac_check_permission_request(
+        public.rbac_perm_app_upload_bundle(), apps.owner_org, apps.app_id, NULL::bigint
       )
-    )
-    OR capgo_private.matches_app_storage_rbac_owner(
-      (storage.foldername(name))[1],
-      ((storage.foldername(name))[2])::character varying,
-      public.rbac_perm_app_upload_bundle()
-    )
   )
 );
 
@@ -29591,26 +29459,17 @@ FOR SELECT
 TO anon, authenticated
 USING (
   bucket_id = 'apps'
-  AND (
-    (
-      (SELECT auth.uid())::text = (storage.foldername(name))[1]
-      AND EXISTS (
-        SELECT 1
-        FROM public.apps
-        WHERE apps.app_id = ((storage.foldername(name))[2])::character varying
-          AND public.rbac_check_permission_request(
-            public.rbac_perm_app_read_bundles(),
-            apps.owner_org,
-            apps.app_id,
-            NULL::bigint
-          )
+  AND (storage.foldername(name))[1] = COALESCE(
+    (SELECT auth.uid())::text,
+    public.get_user_id(public.get_apikey_header())::text
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.apps
+    WHERE apps.app_id = ((storage.foldername(name))[2])::character varying
+      AND public.rbac_check_permission_request(
+        public.rbac_perm_app_read_bundles(), apps.owner_org, apps.app_id, NULL::bigint
       )
-    )
-    OR capgo_private.matches_app_storage_rbac_owner(
-      (storage.foldername(name))[1],
-      ((storage.foldername(name))[2])::character varying,
-      public.rbac_perm_app_read_bundles()
-    )
   )
 );
 
@@ -29621,50 +29480,32 @@ FOR UPDATE
 TO anon, authenticated
 USING (
   bucket_id = 'apps'
-  AND (
-    (
-      (SELECT auth.uid())::text = (storage.foldername(name))[1]
-      AND EXISTS (
-        SELECT 1
-        FROM public.apps
-        WHERE apps.app_id = ((storage.foldername(name))[2])::character varying
-          AND public.rbac_check_permission_request(
-            public.rbac_perm_app_upload_bundle(),
-            apps.owner_org,
-            apps.app_id,
-            NULL::bigint
-          )
+  AND (storage.foldername(name))[1] = COALESCE(
+    (SELECT auth.uid())::text,
+    public.get_user_id(public.get_apikey_header())::text
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.apps
+    WHERE apps.app_id = ((storage.foldername(name))[2])::character varying
+      AND public.rbac_check_permission_request(
+        public.rbac_perm_app_upload_bundle(), apps.owner_org, apps.app_id, NULL::bigint
       )
-    )
-    OR capgo_private.matches_app_storage_rbac_owner(
-      (storage.foldername(name))[1],
-      ((storage.foldername(name))[2])::character varying,
-      public.rbac_perm_app_upload_bundle()
-    )
   )
 )
 WITH CHECK (
   bucket_id = 'apps'
-  AND (
-    (
-      (SELECT auth.uid())::text = (storage.foldername(name))[1]
-      AND EXISTS (
-        SELECT 1
-        FROM public.apps
-        WHERE apps.app_id = ((storage.foldername(name))[2])::character varying
-          AND public.rbac_check_permission_request(
-            public.rbac_perm_app_upload_bundle(),
-            apps.owner_org,
-            apps.app_id,
-            NULL::bigint
-          )
+  AND (storage.foldername(name))[1] = COALESCE(
+    (SELECT auth.uid())::text,
+    public.get_user_id(public.get_apikey_header())::text
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.apps
+    WHERE apps.app_id = ((storage.foldername(name))[2])::character varying
+      AND public.rbac_check_permission_request(
+        public.rbac_perm_app_upload_bundle(), apps.owner_org, apps.app_id, NULL::bigint
       )
-    )
-    OR capgo_private.matches_app_storage_rbac_owner(
-      (storage.foldername(name))[1],
-      ((storage.foldername(name))[2])::character varying,
-      public.rbac_perm_app_upload_bundle()
-    )
   )
 );
 
@@ -31969,7 +31810,6 @@ DROP FUNCTION IF EXISTS public.current_user_member_org_ids() CASCADE;
 DROP FUNCTION IF EXISTS public.role_bindings_readable_ids() CASCADE;
 DROP FUNCTION IF EXISTS public.channel_permission_override_readable_channel_ids() CASCADE;
 DROP FUNCTION IF EXISTS public.app_versions_has_app_permission(public.user_min_right, uuid, character varying, uuid, text);
-DROP FUNCTION IF EXISTS capgo_private.matches_app_storage_apikey_owner(text, character varying, public.key_mode[]);
 
 DROP FUNCTION IF EXISTS public.check_min_rights(public.user_min_right, uuid, character varying, bigint) CASCADE;
 DROP FUNCTION IF EXISTS public.check_min_rights(public.user_min_right, uuid, uuid, character varying, bigint) CASCADE;
