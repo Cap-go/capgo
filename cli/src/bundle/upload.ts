@@ -1120,7 +1120,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   if (options.autoSetBundle) {
     await updateConfigUpdater({ version: bundle })
     if (options.verbose)
-      log.info(`[Verbose] Auto-set bundle version in capacitor.config.json`)
+      log.info(`[Verbose] Auto-set bundle version in ${extConfig.path}`)
   }
 
   checkNotifyAppReady(options, path)

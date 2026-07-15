@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { env } from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ALLOWED_STATS_ACTIONS } from '../supabase/functions/_backend/plugins/stats_actions.ts'
-import { createAppVersions, fetchWithRetry, getBaseData, getSupabaseClient, getVersionFromAction, headers, PLUGIN_BASE_URL, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { createAppVersions, fetchTestRequest, getBaseData, getSupabaseClient, getVersionFromAction, headers, PLUGIN_BASE_URL, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const id = randomUUID().substring(0, 8)
 const APP_NAME_DOWNLOAD_STATS = `com.download.${id}`
@@ -23,7 +23,7 @@ interface StatsPayload extends ReturnType<typeof getBaseData> {
 }
 
 async function postStats(data: object) {
-  const response = await fetchWithRetry(`${PLUGIN_BASE_URL}/stats`, {
+  const response = await fetchTestRequest(`${PLUGIN_BASE_URL}/stats`, {
     method: 'POST',
     headers,
     body: JSON.stringify(data),

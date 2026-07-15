@@ -1,3 +1,7 @@
+import type {
+  ReadReplicaSchemaSyncClient,
+  ReadReplicaSchemaSyncStatement,
+} from '../read_replicate/schema_additive_sync.ts'
 import { describe, expect, it } from 'vitest'
 import {
   applyReadReplicaAdditiveSchemaSync,
@@ -139,6 +143,180 @@ describe('read-replica additive schema sync', () => {
         skipped: [],
       })
       expect(catalogReads).toBe(2)
+    },
+  )
+
+  it.concurrent(
+    'preflights and routes supported column additions through one direct transactional plan instead of raw DDL',
+    async () => {
+      const { expected, initial } = catalogs()
+      const expectedColumnsOnly = { ...expected, indexes: [] }
+      const current = structuredClone(initial)
+      const directQueries: string[] = []
+      const events: string[] = []
+      const executed: ReadReplicaSchemaSyncStatement[][] = []
+      const client: ReadReplicaSchemaSyncClient = {
+        query: async (text: string) => {
+          if (text === READ_REPLICA_SCHEMA_CATALOG_SQL)
+            return { rows: [{ catalog: current }] }
+
+          directQueries.push(text)
+          return { rows: [] }
+        },
+        assertCanApplyReadReplicaSchemaPlan(plan) {
+          events.push('preflight')
+          expect(plan.skipped).toEqual([])
+          expect(plan.statements).toEqual([
+            {
+              kind: 'column',
+              table: 'apps',
+              name: 'created_from_onboarding',
+              sql: 'ALTER TABLE public."apps" ADD COLUMN IF NOT EXISTS "created_from_onboarding" boolean DEFAULT false NOT NULL',
+            },
+          ])
+        },
+        async applyReadReplicaSchemaPlan(plan) {
+          events.push('apply')
+          executed.push(plan.statements)
+          current.columns.push(expectedColumnsOnly.columns[1])
+        },
+      }
+
+      await expect(
+        applyReadReplicaAdditiveSchemaSync(client, expectedColumnsOnly),
+      ).resolves.toEqual({
+        applied: [{
+          kind: 'column',
+          table: 'apps',
+          name: 'created_from_onboarding',
+        }],
+        skipped: [],
+      })
+      expect(events).toEqual(['preflight', 'apply'])
+      expect(executed).toHaveLength(1)
+      expect(directQueries).not.toContain(
+        expect.stringContaining('ALTER TABLE'),
+      )
+    },
+  )
+
+  it.concurrent(
+    'requires a whole-plan preflight before transactional schema execution',
+    async () => {
+      const { expected, initial } = catalogs()
+      const expectedColumnsOnly = { ...expected, indexes: [] }
+      const queryCalls: string[] = []
+      const appliedPlans: ReadReplicaSchemaSyncStatement[][] = []
+      const client: ReadReplicaSchemaSyncClient = {
+        query: async (text: string) => {
+          queryCalls.push(text)
+          if (text === READ_REPLICA_SCHEMA_CATALOG_SQL)
+            return { rows: [{ catalog: initial }] }
+
+          return { rows: [] }
+        },
+        async applyReadReplicaSchemaPlan(plan) {
+          appliedPlans.push(plan.statements)
+        },
+      }
+
+      await expect(
+        applyReadReplicaAdditiveSchemaSync(client, expectedColumnsOnly),
+      ).rejects.toThrow(
+        'Transactional read-replica schema execution must preflight the whole reconciliation plan before applying schema changes',
+      )
+      expect(appliedPlans).toEqual([])
+      expect(queryCalls).toEqual([READ_REPLICA_SCHEMA_CATALOG_SQL])
+    },
+  )
+
+  it.concurrent(
+    'does not invoke the server-side import when whole-plan preflight rejects unsupported DDL',
+    async () => {
+      const { expected, initial } = catalogs()
+      const queryCalls: string[] = []
+      let serverSideImportCalls = 0
+      const client: ReadReplicaSchemaSyncClient = {
+        query: async (text: string) => {
+          queryCalls.push(text)
+          if (text === READ_REPLICA_SCHEMA_CATALOG_SQL)
+            return { rows: [{ catalog: initial }] }
+
+          return { rows: [] }
+        },
+        assertCanApplyReadReplicaSchemaPlan(plan) {
+          const unsupported = plan.statements.find(
+            statement => statement.kind !== 'column',
+          )
+          if (unsupported) {
+            throw new Error(
+              `direct plan cannot apply ${unsupported.kind} ${unsupported.table}.${unsupported.name}`,
+            )
+          }
+        },
+        async applyReadReplicaSchemaPlan() {
+          serverSideImportCalls += 1
+        },
+      }
+
+      await expect(
+        applyReadReplicaAdditiveSchemaSync(client, expected),
+      ).rejects.toThrow('direct plan cannot apply index apps.idx_apps_id')
+      expect(serverSideImportCalls).toBe(0)
+      expect(queryCalls).toEqual([READ_REPLICA_SCHEMA_CATALOG_SQL])
+    },
+  )
+
+  it.concurrent(
+    'rejects skipped reconciliation before applying supported schema changes',
+    async () => {
+      const { expected: baseExpected, initial } = catalogs()
+      const expected = {
+        ...baseExpected,
+        indexes: [],
+        columns: [
+          ...baseExpected.columns,
+          {
+            table: 'apps',
+            name: 'unsupported_generated',
+            type: 'text',
+            notNull: false,
+            default: null,
+            identity: '',
+            generated: 's',
+          },
+        ],
+      }
+      const queryCalls: string[] = []
+      const appliedPlans: ReadReplicaSchemaSyncStatement[][] = []
+      const client: ReadReplicaSchemaSyncClient = {
+        query: async (text: string) => {
+          queryCalls.push(text)
+          if (text === READ_REPLICA_SCHEMA_CATALOG_SQL)
+            return { rows: [{ catalog: initial }] }
+
+          return { rows: [] }
+        },
+        assertCanApplyReadReplicaSchemaPlan(plan) {
+          const skipped = plan.skipped[0]
+          if (skipped) {
+            throw new Error(
+              `direct plan cannot reconcile skipped ${skipped.kind} ${skipped.table}.${skipped.name}`,
+            )
+          }
+        },
+        async applyReadReplicaSchemaPlan(plan) {
+          appliedPlans.push(plan.statements)
+        },
+      }
+
+      await expect(
+        applyReadReplicaAdditiveSchemaSync(client, expected),
+      ).rejects.toThrow(
+        'direct plan cannot reconcile skipped column apps.unsupported_generated',
+      )
+      expect(appliedPlans).toEqual([])
+      expect(queryCalls).toEqual([READ_REPLICA_SCHEMA_CATALOG_SQL])
     },
   )
 
@@ -382,7 +560,7 @@ describe('read-replica additive schema sync', () => {
     ]))
   })
 
-  it.concurrent('adds a missing selected check constraint', async () => {
+  it.concurrent('does not add a missing selected CHECK constraint', () => {
     const expected = {
       tables: [{ name: 'apps' }],
       columns: [],
@@ -397,62 +575,11 @@ describe('read-replica additive schema sync', () => {
     }
     const current = structuredClone(expected)
     current.constraints = []
-    const client = {
-      query: async (text: string) => {
-        if (text === READ_REPLICA_SCHEMA_CATALOG_SQL)
-          return { rows: [{ catalog: current }] }
 
-        if (text.startsWith('ALTER TABLE') && text.includes('ADD CONSTRAINT'))
-          current.constraints.push(expected.constraints[0])
-        return { rows: [] }
-      },
-    }
-
-    await expect(
-      applyReadReplicaAdditiveSchemaSync(client, expected),
-    ).resolves.toEqual({
-      applied: [{ kind: 'constraint', table: 'apps', name: 'apps_id_check' }],
+    expect(planReadReplicaSchemaSync(expected, current)).toEqual({
+      statements: [],
       skipped: [],
     })
-  })
-
-  it.concurrent('validates an existing selected check constraint when the primary is valid', async () => {
-    const expected = {
-      tables: [{ name: 'apps' }],
-      columns: [],
-      constraints: [{
-        table: 'apps',
-        name: 'apps_id_check',
-        type: 'c' as const,
-        definition: 'CHECK (id IS NOT NULL)',
-        valid: true,
-      }],
-      indexes: [],
-    }
-    const current = structuredClone(expected)
-    current.constraints[0].valid = false
-    const statements: string[] = []
-    const client = {
-      query: async (text: string) => {
-        if (text === READ_REPLICA_SCHEMA_CATALOG_SQL)
-          return { rows: [{ catalog: current }] }
-
-        statements.push(text)
-        if (text.includes('VALIDATE CONSTRAINT'))
-          current.constraints[0].valid = true
-        return { rows: [] }
-      },
-    }
-
-    await expect(
-      applyReadReplicaAdditiveSchemaSync(client, expected),
-    ).resolves.toEqual({
-      applied: [{ kind: 'constraint', table: 'apps', name: 'apps_id_check' }],
-      skipped: [],
-    })
-    expect(statements).toContain(
-      'ALTER TABLE public."apps" VALIDATE CONSTRAINT "apps_id_check"',
-    )
   })
 
   it.concurrent('replaces the selected helper function from the primary catalog', async () => {
@@ -534,41 +661,72 @@ describe('read-replica additive schema sync', () => {
     expect(statements.join('\n')).not.toContain('RESTART')
   })
 
-  it.concurrent('aligns existing column defaults and nullability from the primary catalog', async () => {
+  it.concurrent('escapes enum labels and rejects NUL labels', () => {
+    const actual = { types: [] }
+
+    expect(planReadReplicaSchemaSync({
+      types: [{
+        name: 'replica_enum',
+        kind: 'e',
+        definition: ['safe', String.raw`slash\and'quote`],
+      }],
+    }, actual)).toEqual({
+      statements: [{
+        kind: 'type',
+        table: 'public',
+        name: 'replica_enum',
+        sql: String.raw`CREATE TYPE public."replica_enum" AS ENUM (E'safe', E'slash\\and''quote')`,
+      }],
+      skipped: [],
+    })
+
+    expect(planReadReplicaSchemaSync({
+      types: [{
+        name: 'invalid_enum',
+        kind: 'e',
+        definition: ['contains\0nul'],
+      }],
+    }, actual)).toEqual({
+      statements: [],
+      skipped: [{
+        kind: 'type',
+        table: 'public',
+        name: 'invalid_enum',
+        reason: 'unsupported_type_creation',
+      }],
+    })
+  })
+
+  it.concurrent('does not reconcile existing column defaults', () => {
     const { expected } = catalogs()
     const current = structuredClone(expected)
     current.columns[0] = {
       ...current.columns[0],
       default: 'gen_random_uuid()',
-      notNull: false,
-    }
-    const statements: string[] = []
-    const client = {
-      query: async (text: string) => {
-        if (text === READ_REPLICA_SCHEMA_CATALOG_SQL)
-          return { rows: [{ catalog: current }] }
-
-        statements.push(text)
-        if (text.includes('DROP DEFAULT'))
-          current.columns[0].default = null
-        if (text.endsWith('SET NOT NULL'))
-          current.columns[0].notNull = true
-        return { rows: [] }
-      },
     }
 
-    await expect(
-      applyReadReplicaAdditiveSchemaSync(client, expected),
-    ).resolves.toEqual({
-      applied: [
-        { kind: 'column_default', table: 'apps', name: 'id' },
-        { kind: 'column_not_null', table: 'apps', name: 'id' },
-      ],
+    expect(planReadReplicaSchemaSync(expected, current)).toEqual({
+      statements: [],
       skipped: [],
     })
-    expect(statements).toEqual(expect.arrayContaining([
-      'ALTER TABLE public."apps" ALTER COLUMN "id" DROP DEFAULT',
-      'ALTER TABLE public."apps" ALTER COLUMN "id" SET NOT NULL',
-    ]))
+  })
+
+  it.concurrent('rejects existing-column nullability changes before primary migration', () => {
+    const { expected } = catalogs()
+    const current = structuredClone(expected)
+    current.columns[0] = {
+      ...current.columns[0],
+      notNull: false,
+    }
+
+    expect(planReadReplicaSchemaSync(expected, current)).toEqual({
+      statements: [],
+      skipped: [{
+        kind: 'column',
+        table: 'apps',
+        name: 'id',
+        reason: 'pre_primary_column_nullability',
+      }],
+    })
   })
 })

@@ -38,6 +38,7 @@ import { currentBundle } from './channel/currentBundle'
 import { deleteChannel } from './channel/delete'
 import { listChannels } from './channel/list'
 import { setChannel } from './channel/set'
+import { getConfigWriteTarget, resolveCapacitorConfigTargetPath, setConfigWriteTarget } from './config'
 import { generateDocs } from './docs'
 import { defaultStarRepo } from './github'
 import { starAllRepositoriesCommand, starRepositoryCommand } from './github-command'
@@ -62,6 +63,7 @@ const optionDescriptions = {
   supaAnon: `Custom Supabase anon key (for self-hosting)`,
   packageJson: `Paths to package.json files for monorepos (comma-separated)`,
   nodeModules: `Paths to node_modules directories for monorepos (comma-separated)`,
+  capacitorConfig: `Capacitor config source to update (useful with dynamic monorepo configs)`,
   verbose: `Enable verbose output with detailed logging`,
 }
 
@@ -74,6 +76,7 @@ program
   .name(pack.name)
   .description(`📦 Manage packages and bundle versions in Capgo Cloud`)
   .version(pack.version, '-v, --version', `output the current version`)
+  .option('--capacitor-config <path>', optionDescriptions.capacitorConfig)
 
 // Turn on client-side Supabase perf tracking for the CLI. (Off by default so
 // the SDK bundle, which transitively imports createSupabaseClient, stays clean.)
@@ -82,13 +85,20 @@ enableSupabaseInstrumentation()
 let currentCommandPath = 'unknown'
 
 program.hook('preAction', (_thisCommand, actionCommand) => {
+  setConfigWriteTarget(resolveCapacitorConfigTargetPath(actionCommand.optsWithGlobals().capacitorConfig))
   currentCommandPath = getCommandPath(actionCommand)
   applyCommandAnalyticsOptOut(currentCommandPath, actionCommand.opts())
   trackCommandInvoked(currentCommandPath, extractCommandContext(actionCommand))
 })
 
 program.hook('postAction', (_thisCommand, actionCommand) => {
-  trackCommandSucceeded(getCommandPath(actionCommand))
+  try {
+    trackCommandSucceeded(getCommandPath(actionCommand))
+  }
+  finally {
+    if (getCommandPath(actionCommand) !== 'mcp')
+      setConfigWriteTarget()
+  }
 })
 
 program
@@ -106,6 +116,9 @@ Example: npx @capgo/cli@latest init YOUR_API_KEY com.example.app`)
   .option('-i, --icon <icon>', `App icon path for display in Capgo Cloud`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+  .option('--package-json <path>', 'Package JSON for the Capacitor app to onboard (useful in monorepos)')
+  .option('--main-file <path>', 'Application entry file to update (useful in monorepos)')
+  .option('--capacitor-config <path>', optionDescriptions.capacitorConfig)
   .option('--no-analytics', 'Disable init analytics and terminal replay for this run')
 
 const run = program
@@ -251,7 +264,8 @@ Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --cha
   .option('--delta-only', `Upload only delta updates without full bundle for maximum speed (useful for large apps)`)
   .option('--no-delta', `Disable delta updates even if instant updates are enabled`)
   .option('--encrypted-checksum <encryptedChecksum>', `An encrypted checksum (signature). Used only when uploading an external bundle.`)
-  .option('--auto-set-bundle', `Set the bundle in capacitor.config.json`)
+  .option('--auto-set-bundle', `Set the bundle version in Capacitor config`)
+  .option('--capacitor-config <path>', optionDescriptions.capacitorConfig)
   .option('--dry-upload', `Dry upload the bundle process: add the row in database without uploading files or updating channels (Used by Capgo for internal testing)`)
   .option('--package-json <packageJson>', optionDescriptions.packageJson)
   .option('--node-modules <nodeModules>', optionDescriptions.nodeModules)
@@ -447,6 +461,7 @@ Specify setting path (e.g., plugins.CapacitorUpdater.defaultChannel) with --stri
 Example: npx @capgo/cli@latest app setting plugins.CapacitorUpdater.defaultChannel --string "Production"`)
   .option('--bool <bool>', `A value for the setting to modify as a boolean, ex: --bool true`)
   .option('--string <string>', `A value for the setting to modify as a string, ex: --string "Production"`)
+  .option('--capacitor-config <path>', optionDescriptions.capacitorConfig)
   .action(setSetting)
 
 app
@@ -613,6 +628,7 @@ Example: npx @capgo/cli@latest key save --key ./path/to/key.pub`)
   .option('-f, --force', `Force generate a new one`)
   .option('--key <key>', `Key path to save in Capacitor config`)
   .option('--key-data <keyData>', `Key data to save in Capacitor config`)
+  .option('--capacitor-config <path>', optionDescriptions.capacitorConfig)
 
 key
   .command('create')
@@ -625,6 +641,7 @@ NEVER commit the private key - store it securely!
 Example: npx @capgo/cli@latest key create`)
   .action(createKey)
   .option('-f, --force', `Force generate a new one`)
+  .option('--capacitor-config <path>', optionDescriptions.capacitorConfig)
 
 key
   .command('delete_old')
@@ -632,6 +649,7 @@ key
 
 Example: npx @capgo/cli@latest key delete_old`)
   .action(deleteOldKey)
+  .option('--capacitor-config <path>', optionDescriptions.capacitorConfig)
 
 const account = program
   .command('account')
@@ -1209,6 +1227,7 @@ Example: npx @capgo/cli@latest notifications setup com.example.app`)
   .option('--force', 'Overwrite the helper file if it already exists')
   .option('--no-install', 'Skip installing the notifications package')
   .option('--no-sync', 'Skip Capacitor sync')
+  .option('--capacitor-config <path>', optionDescriptions.capacitorConfig)
 
 program
   .command('probe')
@@ -1236,7 +1255,7 @@ program
 This command starts an MCP server that exposes Capgo functionality as tools for AI agents.
 The server communicates via stdio and is designed for non-interactive, programmatic use.
 
-Available tools exposed via MCP:
+Selected tools exposed via MCP:
   - capgo_list_apps, capgo_add_app, capgo_update_app, capgo_delete_app
   - capgo_upload_bundle, capgo_list_bundles, capgo_delete_bundle, capgo_cleanup_bundles
   - capgo_list_channels, capgo_add_channel, capgo_update_channel, capgo_delete_channel
@@ -1253,14 +1272,15 @@ Example usage with Claude Desktop:
     "mcpServers": {
       "capgo": {
         "command": "npx",
-        "args": ["@capgo/cli", "mcp"]
+        "args": ["@capgo/cli@latest", "mcp"]
       }
     }
   }
 
-Example: npx @capgo/cli mcp`)
+Example: npx @capgo/cli@latest mcp`)
+  .option('--capacitor-config <path>', optionDescriptions.capacitorConfig)
   .action(async () => {
-    await startMcpServer()
+    await startMcpServer(getConfigWriteTarget())
   })
 
 program.exitOverride()

@@ -3,7 +3,7 @@ import { type } from 'arktype'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { safeParseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
 
-import { BASE_URL, createDirectApiKeyWithBindings, executeSQL, fetchWithRetry, getAuthHeaders, getSupabaseClient, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, createDirectApiKeyWithBindings, executeSQL, fetchTestRequest, getAuthHeaders, getSupabaseClient, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
@@ -74,7 +74,7 @@ async function waitForAuditLog(
   let lastBody: unknown = null
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const response = await fetchWithRetry(url, {
+    const response = await fetchTestRequest(url, {
       headers: authHeaders,
     })
     lastStatus = response.status
@@ -127,7 +127,6 @@ beforeAll(async () => {
     management_email: TEST_EMAIL,
     created_by: USER_ID,
     customer_id: customerId,
-    // This suite keeps the classic org membership path enabled while API keys use V2 bindings.
   })
   if (error)
     throw error
@@ -187,7 +186,7 @@ afterAll(async () => {
 
 describe('[GET] /organization/audit', () => {
   it('get audit logs for organization', async () => {
-    const response = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${ORG_ID}`, {
+    const response = await fetchTestRequest(`${BASE_URL}/organization/audit?orgId=${ORG_ID}`, {
       headers: authHeaders,
     })
     expect(response.status).toBe(200)
@@ -202,7 +201,7 @@ describe('[GET] /organization/audit', () => {
   })
 
   it('get audit logs with pagination', async () => {
-    const response = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&page=0&limit=10`, {
+    const response = await fetchTestRequest(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&page=0&limit=10`, {
       headers: authHeaders,
     })
     expect(response.status).toBe(200)
@@ -216,7 +215,7 @@ describe('[GET] /organization/audit', () => {
   })
 
   it('get audit logs filtered by table name', async () => {
-    const response = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=orgs`, {
+    const response = await fetchTestRequest(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=orgs`, {
       headers: authHeaders,
     })
     expect(response.status).toBe(200)
@@ -232,7 +231,7 @@ describe('[GET] /organization/audit', () => {
   })
 
   it('get audit logs filtered by operation', async () => {
-    const response = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&operation=INSERT`, {
+    const response = await fetchTestRequest(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&operation=INSERT`, {
       headers: authHeaders,
     })
     expect(response.status).toBe(200)
@@ -248,7 +247,7 @@ describe('[GET] /organization/audit', () => {
   })
 
   it('get audit logs with combined filters', async () => {
-    const response = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=orgs&operation=INSERT`, {
+    const response = await fetchTestRequest(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=orgs&operation=INSERT`, {
       headers: authHeaders,
     })
     expect(response.status).toBe(200)
@@ -264,7 +263,7 @@ describe('[GET] /organization/audit', () => {
   })
 
   it('limit is capped at 100', async () => {
-    const response = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&limit=200`, {
+    const response = await fetchTestRequest(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&limit=200`, {
       headers: authHeaders,
     })
     expect(response.status).toBe(200)
@@ -278,7 +277,7 @@ describe('[GET] /organization/audit', () => {
   })
 
   it('get audit logs with missing orgId returns error', async () => {
-    const response = await fetchWithRetry(`${BASE_URL}/organization/audit`, {
+    const response = await fetchTestRequest(`${BASE_URL}/organization/audit`, {
       headers: authHeaders,
     })
     expect(response.status).toBe(400)
@@ -288,7 +287,7 @@ describe('[GET] /organization/audit', () => {
 
   it('get audit logs with invalid orgId returns error', async () => {
     const invalidOrgId = randomUUID()
-    const response = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${invalidOrgId}`, {
+    const response = await fetchTestRequest(`${BASE_URL}/organization/audit?orgId=${invalidOrgId}`, {
       headers: authHeaders,
     })
     expect(response.status).toBe(400)
@@ -342,7 +341,7 @@ describe('audit log triggers', () => {
     await new Promise(resolve => setTimeout(resolve, 100))
 
     // Fetch audit logs for this org
-    const response = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=orgs&operation=UPDATE`, {
+    const response = await fetchTestRequest(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=orgs&operation=UPDATE`, {
       headers: authHeaders,
     })
     expect(response.status).toBe(200)
@@ -405,7 +404,7 @@ describe('audit log triggers', () => {
     await new Promise(resolve => setTimeout(resolve, 100))
 
     // Fetch audit logs
-    const response = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=org_users&operation=INSERT`, {
+    const response = await fetchTestRequest(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=org_users&operation=INSERT`, {
       headers: authHeaders,
     })
     expect(response.status).toBe(200)
@@ -472,7 +471,7 @@ describe('audit log triggers', () => {
     await new Promise(resolve => setTimeout(resolve, 100))
 
     // Fetch audit logs for DELETE
-    const response = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=org_users&operation=DELETE`, {
+    const response = await fetchTestRequest(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=org_users&operation=DELETE`, {
       headers: authHeaders,
     })
     expect(response.status).toBe(200)
@@ -508,7 +507,7 @@ describe('audit logs for app_versions via API key', () => {
 
   it('app_version INSERT via API creates audit log with user_id from API key', async () => {
     // Create a bundle via the API (uses API key authentication)
-    const response = await fetchWithRetry(`${BASE_URL}/bundle`, {
+    const response = await fetchTestRequest(`${BASE_URL}/bundle`, {
       method: 'POST',
       headers: apiKeyAuthHeaders,
       body: JSON.stringify({
@@ -529,7 +528,7 @@ describe('audit logs for app_versions via API key', () => {
     await new Promise(resolve => setTimeout(resolve, 200))
 
     // Fetch audit logs for the dedicated test org
-    const auditResponse = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=app_versions&operation=INSERT`, {
+    const auditResponse = await fetchTestRequest(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=app_versions&operation=INSERT`, {
       headers: authHeaders,
     })
     expect(auditResponse.status).toBe(200)
@@ -572,7 +571,7 @@ describe('audit logs for app_versions via API key', () => {
     }
 
     // Update the bundle via the API - note: endpoint requires version_id (number), not version name
-    const response = await fetchWithRetry(`${BASE_URL}/bundle/metadata`, {
+    const response = await fetchTestRequest(`${BASE_URL}/bundle/metadata`, {
       method: 'POST',
       headers: apiKeyAuthHeaders,
       body: JSON.stringify({
@@ -615,7 +614,7 @@ describe('audit logs for app_versions via API key', () => {
     const versionIdToDelete = createdVersionId
 
     // Delete the bundle via the API - note: this is a soft-delete (sets deleted=true)
-    const response = await fetchWithRetry(`${BASE_URL}/bundle`, {
+    const response = await fetchTestRequest(`${BASE_URL}/bundle`, {
       method: 'DELETE',
       headers: apiKeyAuthHeaders,
       body: JSON.stringify({
@@ -630,7 +629,7 @@ describe('audit logs for app_versions via API key', () => {
     await new Promise(resolve => setTimeout(resolve, 200))
 
     // Fetch audit logs for UPDATE operations (soft-delete creates UPDATE, not DELETE)
-    const auditResponse = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=app_versions&operation=UPDATE`, {
+    const auditResponse = await fetchTestRequest(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=app_versions&operation=UPDATE`, {
       headers: authHeaders,
     })
     expect(auditResponse.status).toBe(200)
@@ -749,7 +748,7 @@ describe('audit logs for channel promotions via API key bundle flow', () => {
     }
     const promotionChannelId = channelId
 
-    const response = await fetchWithRetry(`${BASE_URL}/bundle`, {
+    const response = await fetchTestRequest(`${BASE_URL}/bundle`, {
       method: 'PUT',
       headers: apiKeyAuthHeaders,
       body: JSON.stringify({

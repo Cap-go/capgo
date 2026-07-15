@@ -121,12 +121,15 @@ Specify setting path (e.g., plugins.CapacitorUpdater.defaultChannel) with --stri
 npx @capgo/cli@latest app setting plugins.CapacitorUpdater.defaultChannel --string "Production"
 ```
 
+For dynamic monorepos, keep the root config selector active and add `--capacitor-config ./env-configs/capacitor.config.qr-code-reader.ts` to write this setting to the selected app source.
+
 **Options:**
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
 | **--bool** | <code>string</code> | A value for the setting to modify as a boolean, ex: --bool true |
 | **--string** | <code>string</code> | A value for the setting to modify as a string, ex: --string "Production" |
+| **--capacitor-config** | <code>string</code> | Capacitor config source to update (useful with dynamic monorepo configs) |
 
 ### <a id="app-set"></a> ⚙️ **Set**
 

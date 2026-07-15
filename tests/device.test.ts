@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APP_NAME, BASE_URL, fetchWithRetry, getSupabaseClient, headers, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { APP_NAME, BASE_URL, fetchTestRequest, getSupabaseClient, headers, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME_DEVICE = `${APP_NAME}.d.${id}`
@@ -92,7 +92,7 @@ describe('[POST] /device operations', () => {
 
     if (response.status === 429) {
       await new Promise(resolve => setTimeout(resolve, 1100))
-      response = await fetchWithRetry(`${BASE_URL}/device`, {
+      response = await fetchTestRequest(`${BASE_URL}/device`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -156,7 +156,7 @@ describe('[DELETE] /device operations', () => {
   it('unlink device', async () => {
     // Use the device ID that was linked in the POST test
     const deviceId = '11111111-1111-1111-1111-111111111111'
-    const response = await fetchWithRetry(`${BASE_URL}/device`, {
+    const response = await fetchTestRequest(`${BASE_URL}/device`, {
       method: 'DELETE',
       headers,
       body: JSON.stringify({

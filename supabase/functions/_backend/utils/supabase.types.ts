@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -571,13 +566,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "apps"
             referencedColumns: ["app_id"]
-          },
-          {
-            foreignKeyName: "build_logs_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
           },
         ]
       }
@@ -1528,6 +1516,8 @@ export type Database = {
       }
       global_stats: {
         Row: {
+          above_plan_with_credits: number | null
+          above_plan_without_credits: number | null
           active_canceled_orgs: number
           active_past_due_orgs: number
           apps: number
@@ -1572,8 +1562,6 @@ export type Database = {
           longest_ltv: number
           mrr: number
           need_upgrade: number | null
-          above_plan_with_credits: number | null
-          above_plan_without_credits: number | null
           new_paying_orgs: number
           not_paying: number | null
           nrr: number
@@ -1585,7 +1573,7 @@ export type Database = {
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
-          plan_enterprise: number | null
+          plan_enterprise: number
           plan_enterprise_conversion_rate: number
           plan_enterprise_monthly: number
           plan_enterprise_yearly: number
@@ -1625,6 +1613,8 @@ export type Database = {
           users_active: number | null
         }
         Insert: {
+          above_plan_with_credits?: number | null
+          above_plan_without_credits?: number | null
           active_canceled_orgs?: number
           active_past_due_orgs?: number
           apps: number
@@ -1669,8 +1659,6 @@ export type Database = {
           longest_ltv?: number
           mrr?: number
           need_upgrade?: number | null
-          above_plan_with_credits?: number | null
-          above_plan_without_credits?: number | null
           new_paying_orgs?: number
           not_paying?: number | null
           nrr?: number
@@ -1682,7 +1670,7 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
-          plan_enterprise?: number | null
+          plan_enterprise?: number
           plan_enterprise_conversion_rate?: number
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
@@ -1722,6 +1710,8 @@ export type Database = {
           users_active?: number | null
         }
         Update: {
+          above_plan_with_credits?: number | null
+          above_plan_without_credits?: number | null
           active_canceled_orgs?: number
           active_past_due_orgs?: number
           apps?: number
@@ -1766,8 +1756,6 @@ export type Database = {
           longest_ltv?: number
           mrr?: number
           need_upgrade?: number | null
-          above_plan_with_credits?: number | null
-          above_plan_without_credits?: number | null
           new_paying_orgs?: number
           not_paying?: number | null
           nrr?: number
@@ -1779,7 +1767,7 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
-          plan_enterprise?: number | null
+          plan_enterprise?: number
           plan_enterprise_conversion_rate?: number
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
@@ -3630,6 +3618,33 @@ export type Database = {
           overage_unpaid: number
         }[]
       }
+      apps_readable_app_ids: { Args: never; Returns: string[] }
+      assert_effective_super_admin_binding_removal:
+        | { Args: { p_binding_id: string }; Returns: undefined }
+        | {
+            Args: { p_binding_id: string; p_error_code: string }
+            Returns: undefined
+          }
+      assert_effective_super_admin_group_member_removal: {
+        Args: { p_group_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      assert_effective_super_admin_group_removal: {
+        Args: { p_group_id: string; p_org_id: string }
+        Returns: undefined
+      }
+      assert_group_member_is_org_member: {
+        Args: { p_group_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      assert_request_principal_rank: {
+        Args: {
+          p_mutation: string
+          p_org_id: string
+          p_target_priority: number
+        }
+        Returns: undefined
+      }
       audit_logs_allowed_orgs: { Args: never; Returns: string[] }
       calculate_credit_cost: {
         Args: {
@@ -3665,10 +3680,20 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      channel_forced_devices_denied_channel_ids: {
+        Args: never
+        Returns: number[]
+      }
+      channel_forced_devices_readable_channel_ids: {
+        Args: never
+        Returns: number[]
+      }
       channel_permission_override_readable_channel_ids: {
         Args: never
         Returns: number[]
       }
+      channel_read_denied_channel_ids: { Args: never; Returns: number[] }
+      channel_readable_channel_ids: { Args: never; Returns: number[] }
       check_apikey_hashed_key_enforcement: {
         Args: { apikey_row: Database["public"]["Tables"]["apikeys"]["Row"] }
         Returns: boolean
@@ -3958,6 +3983,12 @@ export type Database = {
       get_app_versions: {
         Args: { apikey: string; appid: string; name_version: string }
         Returns: number
+      }
+      get_channel_current_bundle_rbac: {
+        Args: { p_app_id: string; p_channel_id: number }
+        Returns: {
+          bundle_name: string
+        }[]
       }
       get_current_plan_max_org: {
         Args: { orgid: string }
@@ -4428,9 +4459,25 @@ export type Database = {
           open_app: number
         }[]
       }
+      group_max_role_priority: { Args: { p_group_id: string }; Returns: number }
       has_2fa_enabled:
         | { Args: never; Returns: boolean }
         | { Args: { user_id: string }; Returns: boolean }
+      has_effective_active_org_super_admin: {
+        Args: { p_excluded_user_id?: string; p_org_id: string }
+        Returns: boolean
+      }
+      has_effective_non_expiring_org_super_admin_after_removal: {
+        Args: {
+          p_excluded_binding_id?: string
+          p_excluded_group_id?: string
+          p_excluded_group_member_group_id?: string
+          p_excluded_group_member_user_id?: string
+          p_excluded_user_id?: string
+          p_org_id: string
+        }
+        Returns: boolean
+      }
       has_seeded_demo_data: { Args: { p_app_id: string }; Returns: boolean }
       internal_request_db_user_names: { Args: never; Returns: string[] }
       internal_request_role_names: { Args: never; Returns: string[] }
@@ -4439,6 +4486,16 @@ export type Database = {
         Returns: string
       }
       is_account_disabled: { Args: { user_id: string }; Returns: boolean }
+      is_active_org_super_admin_binding: {
+        Args: {
+          p_expires_at: string
+          p_org_id: string
+          p_principal_type: string
+          p_role_id: string
+          p_scope_type: string
+        }
+        Returns: boolean
+      }
       is_allowed_action: {
         Args: { apikey: string; appid: string }
         Returns: boolean
@@ -4461,19 +4518,9 @@ export type Database = {
             Returns: boolean
           }
       is_allowed_capgkey:
+        | { Args: { apikey: string; keymode: string[] }; Returns: boolean }
         | {
-            Args: {
-              apikey: string
-              keymode: string[]
-            }
-            Returns: boolean
-          }
-        | {
-            Args: {
-              apikey: string
-              appid: string
-              keymode: string[]
-            }
+            Args: { apikey: string; appid: string; keymode: string[] }
             Returns: boolean
           }
       is_apikey_expired: { Args: { key_expires_at: string }; Returns: boolean }
@@ -4495,6 +4542,10 @@ export type Database = {
         Args: { p_group_id: string }
         Returns: boolean
       }
+      is_effective_active_org_super_admin_user: {
+        Args: { p_org_id: string; p_user_id: string }
+        Returns: boolean
+      }
       is_good_plan_v5_org: { Args: { orgid: string }; Returns: boolean }
       is_internal_request_role: {
         Args: { caller_role: string }
@@ -4505,10 +4556,15 @@ export type Database = {
         Args: { org_id: string; user_id: string }
         Returns: boolean
       }
+      is_nested_self_org_departure_cleanup: {
+        Args: { p_org_id: string; p_user_id: string }
+        Returns: boolean
+      }
       is_not_deleted: { Args: { email_check: string }; Returns: boolean }
       is_numeric: { Args: { "": string }; Returns: boolean }
       is_onboarded_org: { Args: { orgid: string }; Returns: boolean }
       is_onboarding_needed_org: { Args: { orgid: string }; Returns: boolean }
+      is_org_delete_cascade: { Args: { p_org_id: string }; Returns: boolean }
       is_org_yearly: { Args: { orgid: string }; Returns: boolean }
       is_paying_and_good_plan_org: { Args: { orgid: string }; Returns: boolean }
       is_paying_and_good_plan_org_action:
@@ -4533,7 +4589,7 @@ export type Database = {
         | { Args: { userid: string }; Returns: boolean }
       is_rbac_enabled_globally: { Args: never; Returns: boolean }
       is_recent_email_otp_verified: {
-        Args: { user_id: string }
+        Args: { p_user_id: string }
         Returns: boolean
       }
       is_storage_exceeded_by_org: { Args: { org_id: string }; Returns: boolean }
@@ -4546,6 +4602,10 @@ export type Database = {
         Args: { p_org_id: string; p_user_id: string }
         Returns: boolean
       }
+      lock_rbac_orgs: {
+        Args: { p_first_org_id: string; p_second_org_id?: string }
+        Returns: undefined
+      }
       mark_app_stats_refreshed: { Args: { p_app_id: string }; Returns: string }
       mass_edit_queue_messages_cf_ids: {
         Args: {
@@ -4555,6 +4615,7 @@ export type Database = {
       }
       one_month_ahead: { Args: never; Returns: string }
       org_member_readable_org_ids: { Args: never; Returns: string[] }
+      orgs_admin_org_ids: { Args: never; Returns: string[] }
       orgs_readable_org_ids: { Args: never; Returns: string[] }
       parse_cron_field: {
         Args: { current_val: number; field: string; max_val: number }
@@ -4562,6 +4623,22 @@ export type Database = {
       }
       parse_step_pattern: { Args: { pattern: string }; Returns: number }
       pg_log: { Args: { decision: string; input?: Json }; Returns: undefined }
+      principal_can_manage_group_rank: {
+        Args: {
+          p_group_id: string
+          p_principal_id: string
+          p_principal_type: string
+        }
+        Returns: boolean
+      }
+      principal_max_role_priority: {
+        Args: {
+          p_org_id: string
+          p_principal_id: string
+          p_principal_type: string
+        }
+        Returns: number
+      }
       process_admin_stats: { Args: never; Returns: undefined }
       process_all_cron_tasks: { Args: never; Returns: undefined }
       process_billing_period_stats_email: { Args: never; Returns: undefined }
@@ -4652,6 +4729,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      rbac_denied_channel_ids_for_permission: {
+        Args: { p_permission_key: string }
+        Returns: number[]
+      }
+      rbac_direct_channel_ids_for_permission: {
+        Args: { p_permission_key: string }
+        Returns: number[]
+      }
       rbac_has_permission: {
         Args: {
           p_app_id: string
@@ -4662,6 +4747,10 @@ export type Database = {
           p_principal_type: string
         }
         Returns: boolean
+      }
+      rbac_org_ids_for_permission: {
+        Args: { p_permission_key: string }
+        Returns: string[]
       }
       rbac_perm_app_build_native: { Args: never; Returns: string }
       rbac_perm_app_create_channel: { Args: never; Returns: string }
@@ -4693,6 +4782,7 @@ export type Database = {
       rbac_perm_org_create_app: { Args: never; Returns: string }
       rbac_perm_org_delete: { Args: never; Returns: string }
       rbac_perm_org_invite_user: { Args: never; Returns: string }
+      rbac_perm_org_manage_apikeys: { Args: never; Returns: string }
       rbac_perm_org_read: { Args: never; Returns: string }
       rbac_perm_org_read_audit: { Args: never; Returns: string }
       rbac_perm_org_read_billing: { Args: never; Returns: string }
@@ -4713,6 +4803,7 @@ export type Database = {
       rbac_principal_apikey: { Args: never; Returns: string }
       rbac_principal_group: { Args: never; Returns: string }
       rbac_principal_user: { Args: never; Returns: string }
+      rbac_role_apikey_manager: { Args: never; Returns: string }
       rbac_role_apikey_org_reader: { Args: never; Returns: string }
       rbac_role_app_admin: { Args: never; Returns: string }
       rbac_role_app_developer: { Args: never; Returns: string }
@@ -4721,7 +4812,9 @@ export type Database = {
       rbac_role_bundle_admin: { Args: never; Returns: string }
       rbac_role_bundle_reader: { Args: never; Returns: string }
       rbac_role_channel_admin: { Args: never; Returns: string }
+      rbac_role_channel_developer: { Args: never; Returns: string }
       rbac_role_channel_reader: { Args: never; Returns: string }
+      rbac_role_channel_uploader: { Args: never; Returns: string }
       rbac_role_org_admin: { Args: never; Returns: string }
       rbac_role_org_billing_admin: { Args: never; Returns: string }
       rbac_role_org_member: { Args: never; Returns: string }
@@ -4891,10 +4984,33 @@ export type Database = {
           skipped_count: number
         }[]
       }
+      request_principal_max_role_priority: {
+        Args: { p_org_id: string }
+        Returns: number
+      }
       rescind_invitation: {
         Args: { email: string; org_id: string }
         Returns: string
       }
+      reset_and_seed_app_data: {
+        Args: {
+          p_admin_user_id?: string
+          p_app_id: string
+          p_org_id?: string
+          p_plan_product_id?: string
+          p_stripe_customer_id?: string
+          p_user_id?: string
+        }
+        Returns: undefined
+      }
+      reset_and_seed_app_stats_data: {
+        Args: { p_app_id: string }
+        Returns: undefined
+      }
+      reset_and_seed_data: { Args: never; Returns: undefined }
+      reset_and_seed_stats_data: { Args: never; Returns: undefined }
+      reset_app_data: { Args: { p_app_id: string }; Returns: undefined }
+      reset_app_stats_data: { Args: { p_app_id: string }; Returns: undefined }
       reset_onboarding_demo_app_data: {
         Args: { p_app_uuid: string }
         Returns: undefined
@@ -5067,7 +5183,9 @@ export type Database = {
         | "disableAutoUpdateMetadata"
         | "disableAutoUpdateUnderNative"
         | "disableDevBuild"
+        | "disableProdBuild"
         | "disableEmulator"
+        | "disableDevice"
         | "cannotGetBundle"
         | "checksum_fail"
         | "NoChannelOrOverride"
@@ -5088,8 +5206,6 @@ export type Database = {
         | "download_manifest_brotli_fail"
         | "backend_refusal"
         | "download_0"
-        | "disableProdBuild"
-        | "disableDevice"
         | "disablePlatformElectron"
         | "customIdBlocked"
         | "app_crash"
@@ -5340,7 +5456,9 @@ export const Constants = {
         "disableAutoUpdateMetadata",
         "disableAutoUpdateUnderNative",
         "disableDevBuild",
+        "disableProdBuild",
         "disableEmulator",
+        "disableDevice",
         "cannotGetBundle",
         "checksum_fail",
         "NoChannelOrOverride",
@@ -5361,8 +5479,6 @@ export const Constants = {
         "download_manifest_brotli_fail",
         "backend_refusal",
         "download_0",
-        "disableProdBuild",
-        "disableDevice",
         "disablePlatformElectron",
         "customIdBlocked",
         "app_crash",
@@ -5406,3 +5522,4 @@ export const Constants = {
     },
   },
 } as const
+

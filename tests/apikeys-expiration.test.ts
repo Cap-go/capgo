@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { appApiKeyBindings, BASE_URL, createDirectApiKeyWithBindings, executeSQL, fetchWithRetry, getAuthHeadersForCredentials, getSupabaseClient, normalizeLocalhostUrl, orgApiKeyBindings, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_EMAIL_APIKEY_EXPIRATION, USER_ID_APIKEY_EXPIRATION, USER_PASSWORD } from './test-utils.ts'
+import { appApiKeyBindings, BASE_URL, createDirectApiKeyWithBindings, executeSQL, fetchTestRequest, getAuthHeadersForCredentials, getSupabaseClient, normalizeLocalhostUrl, orgApiKeyBindings, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_EMAIL_APIKEY_EXPIRATION, USER_ID_APIKEY_EXPIRATION, USER_PASSWORD } from './test-utils.ts'
 
 const id = randomUUID()
 const BASE_ORG_ID = randomUUID()
@@ -124,7 +124,7 @@ async function deleteSeededApiKeys(ids: number[]) {
 }
 
 function apiFetch(path: string, init?: RequestInit) {
-  return fetchWithRetry(`${BASE_URL}${path}`, init)
+  return fetchTestRequest(`${BASE_URL}${path}`, init)
 }
 
 function createAuthenticatedSupabaseClient(headers: Record<string, string>) {
@@ -723,7 +723,7 @@ describe('[PUT] /organization with API key policy', () => {
         max_apikey_expiration_days: null,
       }),
     })
-    expect(response.status).toBe(200)
+    expect(response.status, await response.text()).toBe(200)
 
     // Verify the update
     const { data, error } = await getSupabaseClient().from('orgs').select('max_apikey_expiration_days').eq('id', updateOrgId).single()

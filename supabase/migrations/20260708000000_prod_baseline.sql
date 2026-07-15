@@ -27388,6 +27388,79 @@ USING (
 -- <<< END 20260713114103_harden_group_rls_rbac_permissions.sql
 
 -- >>> BEGIN 20260713114104_harden_rbac_compat_cleanup_after_rls.sql
+-- Pre-lock every relation whose policy, trigger, or schema changes below require
+-- AccessExclusiveLock. Legacy RLS helpers traverse these relations, so acquire
+-- the full set before changing any of them to prevent inverse lock-order
+-- deadlocks with live requests.
+-- NOWAIT retries a conflicting acquisition before DDL holds a partial set.
+CREATE OR REPLACE FUNCTION pg_temp.exec_ddl_with_retry(p_sql text, p_attempts integer DEFAULT 20)
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+DECLARE
+  v_attempt integer := 0;
+BEGIN
+  LOOP
+    v_attempt := v_attempt + 1;
+    PERFORM pg_catalog.set_config('lock_timeout', '5s', true);
+
+    BEGIN
+      EXECUTE p_sql;
+      PERFORM pg_catalog.set_config('lock_timeout', '0', true);
+      RETURN;
+    EXCEPTION
+      WHEN deadlock_detected OR lock_not_available THEN
+        PERFORM pg_catalog.set_config('lock_timeout', '0', true);
+
+        IF v_attempt >= p_attempts THEN
+          RAISE;
+        END IF;
+
+        RAISE NOTICE 'Retrying migration DDL after lock conflict on attempt %', v_attempt;
+        PERFORM pg_catalog.pg_sleep(LEAST(0.25 * v_attempt, 3.0));
+    END;
+  END LOOP;
+END;
+$$;
+
+SELECT pg_temp.exec_ddl_with_retry($lock$
+  LOCK TABLE
+    "storage"."objects",
+    "public"."audit_logs",
+    "public"."app_versions_meta",
+    "public"."app_versions",
+    "public"."build_logs",
+    "public"."build_requests",
+    "public"."channel_devices",
+    "public"."channels",
+    "public"."compatibility_events",
+    "public"."daily_bandwidth",
+    "public"."daily_build_time",
+    "public"."daily_mau",
+    "public"."daily_storage",
+    "public"."daily_storage_hourly",
+    "public"."daily_version",
+    "public"."deploy_history",
+    "public"."devices",
+    "public"."manifest",
+    "public"."sso_providers",
+    "public"."stats",
+    "public"."stripe_info",
+    "public"."webhook_deliveries",
+    "public"."webhooks",
+    "public"."tmp_users",
+    "public"."apikeys",
+    "public"."channel_permission_overrides",
+    "public"."group_members",
+    "public"."groups",
+    "public"."org_users",
+    "public"."role_bindings",
+    "public"."apps",
+    "public"."orgs"
+  IN ACCESS EXCLUSIVE MODE NOWAIT
+$lock$);
+
 -- RBAC is now always on. Remove the old org opt-in flag entirely so it cannot
 -- act as a downgrade switch or appear as an authorization source.
 DROP TRIGGER IF EXISTS force_org_rbac_enabled ON public.orgs;
@@ -32754,6 +32827,23 @@ ALTER FUNCTION public.check_if_org_can_exist() OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.check_if_org_can_exist() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.check_if_org_can_exist() TO service_role;
 
+DROP TRIGGER IF EXISTS check_privileges ON public.org_users;
+CREATE TRIGGER check_privileges
+BEFORE INSERT OR UPDATE OF user_id, org_id, rbac_role_name ON public.org_users
+FOR EACH ROW
+WHEN (
+  current_setting('request.jwt.claim.role', true) = 'authenticated'
+  AND COALESCE(
+    NOT (
+      current_setting('request.jwt.claim.email', true) = ANY (
+        ARRAY['bot@capgo.app', 'test@capgo.app']
+      )
+    ),
+    true
+  )
+)
+EXECUTE FUNCTION public.check_org_user_privileges();
+
 DROP TRIGGER IF EXISTS sync_org_user_to_role_binding_on_insert ON public.org_users;
 DROP TRIGGER IF EXISTS sync_org_user_role_binding_on_update ON public.org_users;
 DROP TRIGGER IF EXISTS sync_org_user_role_binding_on_delete ON public.org_users;
@@ -36913,7 +37003,6 @@ $$;
 ALTER FUNCTION public.refresh_channel_rollout_id() OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.refresh_channel_rollout_id() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.refresh_channel_rollout_id() TO service_role;
-
 -- <<< END 20260713114104_harden_rbac_compat_cleanup_after_rls.sql
 
 -- >>> BEGIN 20260713114105_reconcile_rbac_account_deletion_after_audit_attribution.sql
@@ -37329,3 +37418,28 @@ $$;
 
 
 -- <<< END 20260713125000_baseline_privilege_and_rls_hardening.sql
+
+-- >>> BEGIN 20260713203749_fix_rls_policy_index_lints.sql
+-- Keep the optimized policies introduced by the unfiltered-read timeout fix.
+-- These legacy policies cover the same SELECT roles and force PostgreSQL to
+-- evaluate a second permissive expression for every read.
+DROP POLICY IF EXISTS "Allow read for auth (read+)"
+ON "public"."channel_devices";
+
+DROP POLICY IF EXISTS "Allow org admins to select sso_providers"
+ON "public"."sso_providers";
+
+-- The idx_manifest_* versions were added later for the same one-column
+-- lookups. The older manifest_* indexes are fully redundant.
+-- Supabase migrations run in a transaction, so this cannot use DROP INDEX CONCURRENTLY.
+DROP INDEX IF EXISTS "public"."manifest_file_hash_idx";
+DROP INDEX IF EXISTS "public"."manifest_file_name_idx";
+-- <<< END 20260713203749_fix_rls_policy_index_lints.sql
+
+-- >>> BEGIN 20260714100722_observe_plugin_version_adoption_index.sql
+CREATE INDEX CONCURRENTLY IF NOT EXISTS
+idx_devices_app_id_plugin_version_production
+ON public.devices USING btree (app_id, plugin_version)
+WHERE is_prod IS TRUE
+AND is_emulator IS NOT TRUE;
+-- <<< END 20260714100722_observe_plugin_version_adoption_index.sql

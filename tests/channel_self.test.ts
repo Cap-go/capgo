@@ -59,24 +59,10 @@ async function getResponseErrorCode(response: Response) {
 
 type Awaitable<T> = T | PromiseLike<T>
 
-async function withSupabaseRetry<T extends { error?: { message?: string } | null }>(
+async function withSupabaseCall<T extends { error?: { message?: string } | null }>(
   fn: () => Awaitable<T>,
-  retries = 3,
-  delayMs = 200,
 ): Promise<T> {
-  let lastResult: T | null = null
-  for (let attempt = 0; attempt < retries; attempt++) {
-    const result = await Promise.resolve(fn())
-    lastResult = result
-    const message = result.error?.message ?? ''
-    if (!message.includes('fetch failed')) {
-      return result
-    }
-    if (attempt < retries - 1) {
-      await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)))
-    }
-  }
-  return lastResult as T
+  return await Promise.resolve(fn())
 }
 
 beforeAll(async () => {
@@ -861,7 +847,7 @@ it.skipIf(USE_CLOUDFLARE)('[PUT] /channel_self (with overwrite)', async () => {
   const deviceId = randomUUID().toLowerCase()
   data.device_id = deviceId
 
-  const { data: noAccessChannel, error: noAccessChannelError } = await withSupabaseRetry(() =>
+  const { data: noAccessChannel, error: noAccessChannelError } = await withSupabaseCall(() =>
     getSupabaseClient()
       .from('channels')
       .select('id, owner_org')
@@ -880,7 +866,7 @@ it.skipIf(USE_CLOUDFLARE)('[PUT] /channel_self (with overwrite)', async () => {
   const noAccessId = noAccessChannel.id
   const ownerOrg = noAccessChannel.owner_org
 
-  const { error } = await withSupabaseRetry(() =>
+  const { error } = await withSupabaseCall(() =>
     getSupabaseClient()
       .from('channel_devices')
       .upsert({
@@ -908,7 +894,7 @@ it.skipIf(USE_CLOUDFLARE)('[PUT] /channel_self (with overwrite)', async () => {
     expect(channel).toBe('no_access')
   }
   finally {
-    const { error } = await withSupabaseRetry(() =>
+    const { error } = await withSupabaseCall(() =>
       getSupabaseClient()
         .from('channel_devices')
         .delete()

@@ -1,9 +1,7 @@
 -- Test RLS Policies
 -- This file tests all Row Level Security policies in the database
 BEGIN;
-SELECT plan(66);
-
--- Test app_versions policies
+SELECT plan(70);
 SELECT
     policies_are(
         'public',
@@ -146,6 +144,74 @@ SELECT
         ),
         0::bigint,
         'public RLS should not have duplicate permissive policies for the same table operation'
+    );
+
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM (
+                SELECT role_name
+                FROM pg_policies
+                CROSS JOIN LATERAL unnest(roles) AS role_name
+                WHERE schemaname = 'public'
+                  AND tablename = 'channel_devices'
+                  AND permissive = 'PERMISSIVE'
+                  AND cmd = 'SELECT'
+                  AND role_name IN ('anon', 'authenticated')
+                GROUP BY role_name
+                HAVING count(*) > 1
+            ) duplicate_channel_devices_select_roles
+        ),
+        0::bigint,
+        'channel_devices should have one permissive SELECT policy per API role'
+    );
+
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM (
+                SELECT role_name
+                FROM pg_policies
+                CROSS JOIN LATERAL unnest(roles) AS role_name
+                WHERE schemaname = 'public'
+                  AND tablename = 'sso_providers'
+                  AND permissive = 'PERMISSIVE'
+                  AND cmd = 'SELECT'
+                  AND role_name IN ('anon', 'authenticated')
+                GROUP BY role_name
+                HAVING count(*) > 1
+            ) duplicate_sso_provider_select_roles
+        ),
+        0::bigint,
+        'sso_providers should have one permissive SELECT policy per API role'
+    );
+
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM pg_indexes
+            WHERE schemaname = 'public'
+              AND tablename = 'manifest'
+              AND indexname IN ('manifest_file_hash_idx', 'manifest_file_name_idx')
+        ),
+        0::bigint,
+        'manifest should not retain redundant single-column indexes'
+    );
+
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM pg_indexes
+            WHERE schemaname = 'public'
+              AND tablename = 'manifest'
+              AND indexname IN ('idx_manifest_file_hash', 'idx_manifest_file_name')
+        ),
+        2::bigint,
+        'manifest should retain the supported single-column indexes'
     );
 
 -- Test orgs policies

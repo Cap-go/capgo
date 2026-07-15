@@ -85,8 +85,6 @@ interface SchemaCatalog {
 
 type SyncStatementKind
   = | 'column'
-    | 'column_default'
-    | 'column_not_null'
     | 'constraint'
     | 'function'
     | 'index'
@@ -97,11 +95,20 @@ type SyncStatementKind
 
 type SyncObjectKind = 'column' | 'constraint' | 'function' | 'index' | 'sequence' | 'type'
 
-interface SyncStatement {
+export interface ReadReplicaSchemaSyncStatement {
   kind: SyncStatementKind
   table: string
   name: string
   sql: string
+}
+
+export interface ReadReplicaSchemaSyncClient extends Queryable {
+  assertCanApplyReadReplicaSchemaPlan?: (
+    plan: ReadReplicaSchemaSyncPlan,
+  ) => void
+  applyReadReplicaSchemaPlan?: (
+    plan: ReadReplicaSchemaSyncPlan,
+  ) => Promise<void>
 }
 
 interface SkippedChange {
@@ -112,14 +119,14 @@ interface SkippedChange {
 }
 
 export interface ReadReplicaSchemaSyncPlan {
-  statements: SyncStatement[]
+  statements: ReadReplicaSchemaSyncStatement[]
   skipped: SkippedChange[]
 }
 
 export type AdditiveSchemaSyncPlan = ReadReplicaSchemaSyncPlan
 
 export interface ReadReplicaSchemaSyncResult {
-  applied: Array<Omit<SyncStatement, 'sql'>>
+  applied: Array<Omit<ReadReplicaSchemaSyncStatement, 'sql'>>
   skipped: SkippedChange[]
 }
 
@@ -182,7 +189,7 @@ export function planReadReplicaSchemaSync(
     (actualCatalog.types ?? []).map(type => [type.name, type]),
   )
   const skippedColumnsByTable = new Map<string, Set<string>>()
-  const statements: SyncStatement[] = []
+  const statements: ReadReplicaSchemaSyncStatement[] = []
   const skipped: SkippedChange[] = []
 
   for (const type of expectedCatalog.types ?? []) {
@@ -285,50 +292,16 @@ export function planReadReplicaSchemaSync(
       continue
     }
 
-    if (actualColumn.default !== column.default) {
-      const defaultSql = buildAlterColumnDefaultStatement(
-        column,
-        actualTables,
-      )
-      if (!defaultSql) {
-        skipped.push({
-          kind: 'column',
-          table: column.table,
-          name: column.name,
-          reason: 'unsupported_column_default',
-        })
-      }
-      else {
-        statements.push({
-          kind: 'column_default',
-          table: column.table,
-          name: column.name,
-          sql: defaultSql,
-        })
-      }
-    }
-
     if (actualColumn.notNull !== column.notNull) {
-      const notNullSql = buildAlterColumnNotNullStatement(
-        column,
-        actualTables,
-      )
-      if (!notNullSql) {
-        skipped.push({
-          kind: 'column',
-          table: column.table,
-          name: column.name,
-          reason: 'unsupported_column_nullability',
-        })
-      }
-      else {
-        statements.push({
-          kind: 'column_not_null',
-          table: column.table,
-          name: column.name,
-          sql: notNullSql,
-        })
-      }
+      // Tightening or loosening an existing subscriber column before the
+      // publisher changes can reject replicated rows. Leave it for a proven
+      // publisher-compatible transition rather than risk stopping replication.
+      skipped.push({
+        kind: 'column',
+        table: column.table,
+        name: column.name,
+        reason: 'pre_primary_column_nullability',
+      })
     }
   }
 
@@ -433,31 +406,17 @@ export function planReadReplicaSchemaSync(
       sql: addIndexSql,
     })
   }
-
   for (const constraint of expectedCatalog.constraints ?? []) {
+    // Publisher CHECK constraints do not need to exist on a read-only logical
+    // subscriber. Creating them here can only add avoidable replica writes.
+    if (constraint.type === 'c')
+      continue
+
     const actualConstraint = actualConstraintsByKey.get(
       constraintKey(constraint),
     )
     if (constraintMatches(constraint, actualConstraint))
       continue
-
-    if (
-      actualConstraint
-      && constraintShapeMatches(constraint, actualConstraint)
-      && constraint.valid === true
-      && actualConstraint.valid === false
-    ) {
-      const sql = buildValidateConstraintStatement(constraint, actualTables)
-      if (sql) {
-        statements.push({
-          kind: 'constraint',
-          table: constraint.table,
-          name: constraint.name,
-          sql,
-        })
-        continue
-      }
-    }
 
     if (actualConstraint) {
       skipped.push({
@@ -465,27 +424,6 @@ export function planReadReplicaSchemaSync(
         table: constraint.table,
         name: constraint.name,
         reason: 'constraint_conflict',
-      })
-      continue
-    }
-
-    if (constraint.type === 'c') {
-      const sql = buildAddCheckConstraintStatement(constraint, actualTables)
-      if (!sql) {
-        skipped.push({
-          kind: 'constraint',
-          table: constraint.table,
-          name: constraint.name,
-          reason: 'unsupported_check_constraint',
-        })
-        continue
-      }
-
-      statements.push({
-        kind: 'constraint',
-        table: constraint.table,
-        name: constraint.name,
-        sql,
       })
       continue
     }
@@ -562,16 +500,16 @@ export function planReadReplicaSchemaSync(
 export const planReadReplicaAdditiveSchemaSync = planReadReplicaSchemaSync
 
 export async function applyReadReplicaSchemaSync(
-  client: Queryable,
+  client: ReadReplicaSchemaSyncClient,
   expected: unknown,
   options: ReadReplicaSchemaSyncOptions = {},
 ): Promise<ReadReplicaSchemaSyncResult> {
   const deadline = options.deadline ?? (
     Date.now()
-      + positiveIntegerOrDefault(
-        options.maxDurationMs,
-        DEFAULT_SCHEMA_SYNC_MAX_DURATION_MS,
-      )
+    + positiveIntegerOrDefault(
+      options.maxDurationMs,
+      DEFAULT_SCHEMA_SYNC_MAX_DURATION_MS,
+    )
   )
   assertTimeRemaining(deadline, 'read the subscriber schema catalog')
   const actual = await readReplicaSchemaCatalog(client)
@@ -581,20 +519,37 @@ export async function applyReadReplicaSchemaSync(
     options.statementTimeoutMs,
     DEFAULT_SCHEMA_SYNC_STATEMENT_TIMEOUT_MS,
   )
+  const applyPlan = client.applyReadReplicaSchemaPlan
+  const assertPlan = client.assertCanApplyReadReplicaSchemaPlan
+  if (applyPlan && !assertPlan) {
+    throw new Error(
+      'Transactional read-replica schema execution must preflight the whole reconciliation plan before applying schema changes',
+    )
+  }
+  assertPlan?.(plan)
 
   try {
-    for (const statement of plan.statements) {
-      await setStatementTimeoutForRemainingBudget(
-        client,
-        statementTimeoutMs,
-        deadline,
-        statement,
-      )
-      await client.query(statement.sql)
-      assertTimeRemaining(
-        deadline,
-        `finish ${statement.kind} ${statement.table}.${statement.name}`,
-      )
+    if (applyPlan) {
+      if (plan.statements.length) {
+        assertTimeRemaining(deadline, 'apply the transactional subscriber schema plan')
+        await applyPlan(plan)
+        assertTimeRemaining(deadline, 'finish the transactional subscriber schema plan')
+      }
+    }
+    else {
+      for (const statement of plan.statements) {
+        await setStatementTimeoutForRemainingBudget(
+          client,
+          statementTimeoutMs,
+          deadline,
+          statement,
+        )
+        await client.query(statement.sql)
+        assertTimeRemaining(
+          deadline,
+          `finish ${statement.kind} ${statement.table}.${statement.name}`,
+        )
+      }
     }
   }
   finally {
@@ -615,20 +570,19 @@ export async function applyReadReplicaSchemaSync(
     skipped: plan.skipped,
   }
 }
-
 export const applyReadReplicaAdditiveSchemaSync = applyReadReplicaSchemaSync
 
 export async function reconcileReadReplicaSchema(
   master: Queryable,
-  replica: Queryable,
+  replica: ReadReplicaSchemaSyncClient,
   options: ReadReplicaSchemaSyncOptions = {},
 ): Promise<ReadReplicaSchemaReconciliationResult> {
   const deadline = options.deadline ?? (
     Date.now()
-      + positiveIntegerOrDefault(
-        options.maxDurationMs,
-        DEFAULT_SCHEMA_SYNC_MAX_DURATION_MS,
-      )
+    + positiveIntegerOrDefault(
+      options.maxDurationMs,
+      DEFAULT_SCHEMA_SYNC_MAX_DURATION_MS,
+    )
   )
   assertTimeRemaining(deadline, 'read the primary schema catalog')
   const expected = await readReplicaSchemaCatalog(master)
@@ -650,7 +604,7 @@ export async function reconcileReadReplicaSchema(
 }
 
 function assertAppliedStatementsVisible(
-  applied: readonly SyncStatement[],
+  applied: readonly ReadReplicaSchemaSyncStatement[],
   expected: unknown,
   actual: unknown,
 ): void {
@@ -669,7 +623,7 @@ function assertAppliedStatementsVisible(
 }
 
 function statementKey(
-  statement: Pick<SyncStatement, 'kind' | 'table' | 'name'>,
+  statement: Pick<ReadReplicaSchemaSyncStatement, 'kind' | 'table' | 'name'>,
 ): string {
   const kind = statement.kind === 'invalid_index' ? 'index' : statement.kind
   return `${kind}:${statement.table}.${statement.name}`
@@ -690,7 +644,7 @@ async function setStatementTimeoutForRemainingBudget(
   client: Queryable,
   maxStatementTimeoutMs: number,
   deadline: number,
-  statement: SyncStatement,
+  statement: ReadReplicaSchemaSyncStatement,
 ): Promise<void> {
   const remainingMs = deadline - Date.now() - SCHEMA_SYNC_RESPONSE_BUFFER_MS
   if (remainingMs <= 0) {
@@ -1161,7 +1115,7 @@ function quoteEnumValues(values: readonly string[]): string[] | null {
       return null
 
     quotedValues.push(
-      `E'${value.replaceAll('\\', '\\\\').replaceAll("'", "''")}'`,
+      `E'${value.replaceAll('\\', '\\\\').replaceAll('\'', '\'\'')}'`,
     )
   }
 
@@ -1200,40 +1154,6 @@ function buildAddColumnStatement(
   return `ALTER TABLE ${quoteQualifiedTable(column.table)} ADD COLUMN IF NOT EXISTS ${quoteIdent(column.name)} ${column.type}${defaultSql}${notNullSql}`
 }
 
-function buildAlterColumnDefaultStatement(
-  column: SchemaColumn,
-  actualTables: Set<string>,
-): string | null {
-  if (
-    !isSafeReplicaTable(column.table, actualTables)
-    || !isSafeIdentifier(column.name)
-  ) {
-    return null
-  }
-  if (column.default === null) {
-    return `ALTER TABLE ${quoteQualifiedTable(column.table)} ALTER COLUMN ${quoteIdent(column.name)} DROP DEFAULT`
-  }
-  if (!isSafeSqlFragment(column.default))
-    return null
-
-  return `ALTER TABLE ${quoteQualifiedTable(column.table)} ALTER COLUMN ${quoteIdent(column.name)} SET DEFAULT ${column.default}`
-}
-
-function buildAlterColumnNotNullStatement(
-  column: SchemaColumn,
-  actualTables: Set<string>,
-): string | null {
-  if (
-    !isSafeReplicaTable(column.table, actualTables)
-    || !isSafeIdentifier(column.name)
-  ) {
-    return null
-  }
-
-  const action = column.notNull ? 'SET NOT NULL' : 'DROP NOT NULL'
-  return `ALTER TABLE ${quoteQualifiedTable(column.table)} ALTER COLUMN ${quoteIdent(column.name)} ${action}`
-}
-
 function buildCreateIndexStatement(
   index: SchemaIndex,
   actualTables: Set<string>,
@@ -1255,43 +1175,6 @@ function buildCreateIndexStatement(
 
   return `CREATE ${unique}INDEX CONCURRENTLY IF NOT EXISTS ${quoteIdent(index.name)} ON ${quoteQualifiedTable(index.table)} ${indexTail}`
 }
-
-function buildAddCheckConstraintStatement(
-  constraint: SchemaConstraint,
-  actualTables: Set<string>,
-): string | null {
-  if (
-    constraint.type !== 'c'
-    || !isSafeReplicaTable(constraint.table, actualTables)
-    || !isSafeQuotedIdentifier(constraint.name)
-    || !constraint.definition.startsWith('CHECK ')
-    || !isSafeSchemaDefinition(constraint.definition)
-  ) {
-    return null
-  }
-
-  const notValid = constraint.valid === false
-    && !/\bNOT VALID\s*$/i.test(constraint.definition)
-    ? ' NOT VALID'
-    : ''
-  return `ALTER TABLE ${quoteQualifiedTable(constraint.table)} ADD CONSTRAINT ${quoteIdent(constraint.name)} ${constraint.definition}${notValid}`
-}
-
-function buildValidateConstraintStatement(
-  constraint: SchemaConstraint,
-  actualTables: Set<string>,
-): string | null {
-  if (
-    constraint.type !== 'c'
-    || !isSafeReplicaTable(constraint.table, actualTables)
-    || !isSafeQuotedIdentifier(constraint.name)
-  ) {
-    return null
-  }
-
-  return `ALTER TABLE ${quoteQualifiedTable(constraint.table)} VALIDATE CONSTRAINT ${quoteIdent(constraint.name)}`
-}
-
 function buildAttachConstraintStatement(
   constraint: SchemaConstraint,
   expectedIndex: SchemaIndex | undefined,
@@ -1705,7 +1588,6 @@ function isIdentifierChar(value: string): boolean {
 function isNullDefault(value: string): boolean {
   return /^NULL\b/i.test(value)
 }
-
 function quoteQualifiedTable(table: string): string {
   return `public.${quoteIdent(table)}`
 }

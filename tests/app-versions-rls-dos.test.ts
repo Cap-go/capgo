@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { APIKEY_TEST_ORG_SUPER_ADMIN, APP_NAME, fetchWithRetry, SUPABASE_ANON_KEY, SUPABASE_BASE_URL } from './test-utils.ts'
+import { APIKEY_TEST_ORG_SUPER_ADMIN, APP_NAME, fetchTestRequest, SUPABASE_ANON_KEY, SUPABASE_BASE_URL } from './test-utils.ts'
 
 function getAnonHeaders() {
   if (!SUPABASE_BASE_URL || !SUPABASE_ANON_KEY)
@@ -19,7 +19,7 @@ function getApiKeyHeaders() {
 }
 
 function fetchRest(path: string, headers: Record<string, string>) {
-  return fetchWithRetry(`${SUPABASE_BASE_URL}/rest/v1/${path}`, { headers })
+  return fetchTestRequest(`${SUPABASE_BASE_URL}/rest/v1/${path}`, { headers })
 }
 
 describe('app_versions RLS DoS regression', () => {

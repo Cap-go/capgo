@@ -5,16 +5,15 @@ import { computed, ref, watch } from 'vue'
 import { Bar, Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { toast } from 'vue-sonner'
 import IconActivity from '~icons/lucide/activity'
 import IconAlertTriangle from '~icons/lucide/alert-triangle'
 import IconExternalLink from '~icons/lucide/external-link'
 import IconRocket from '~icons/lucide/rocket'
 import IconTimer from '~icons/lucide/timer'
+import { useNativeObserveStats } from '~/composables/useNativeObserveStats'
 import { formatLocalDateShort } from '~/services/date'
 import { formatNumberValue } from '~/services/formatLocale'
 import { actionToFilter } from '~/services/statsActions'
-import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend)
@@ -82,7 +81,6 @@ interface NativeObserveStatsResponse {
 const route = useRoute()
 const router = useRouter()
 const displayStore = useDisplayStore()
-const supabase = useSupabase()
 const { t } = useI18n()
 
 const packageId = computed(() => {
@@ -92,10 +90,11 @@ const packageId = computed(() => {
 const appRouteSegment = computed(() => route.path.match(/^\/app\/([^/]+)/)?.[1] ?? encodeURIComponent(packageId.value))
 const days = ref<PeriodDayOption>(7)
 const periodDayOptions: PeriodDayOption[] = [1, 3, 7, 30]
-const stats = ref<NativeObserveStatsResponse | null>(null)
-const statsLoading = ref(false)
-let latestStatsRequest = 0
-
+const { stats, statsLoading, fetchStats } = useNativeObserveStats<NativeObserveStatsResponse>(
+  packageId,
+  () => ({ days: days.value }),
+  'native observe stats',
+)
 const hasData = computed(() => (stats.value?.overview.total_events ?? 0) > 0)
 const topActions = computed(() => stats.value?.actionBreakdown.slice(0, 10) ?? [])
 const topVersions = computed(() => stats.value?.versions.slice(0, 8) ?? [])
@@ -270,56 +269,6 @@ function selectPeriod(option: PeriodDayOption) {
   if (days.value === option)
     return
   days.value = option
-}
-
-async function fetchStats() {
-  if (!packageId.value)
-    return
-
-  const requestId = ++latestStatsRequest
-  statsLoading.value = true
-  try {
-    const { data: sessionData } = await supabase.auth.getSession()
-    if (!sessionData.session) {
-      if (requestId === latestStatsRequest)
-        toast.error(t('not-authenticated'))
-      return
-    }
-
-    const response = await fetch(`${defaultApiHost}/private/native_observe_stats`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'authorization': `Bearer ${sessionData.session.access_token}`,
-      },
-      body: JSON.stringify({
-        app_id: packageId.value,
-        days: days.value,
-      }),
-    })
-
-    if (requestId !== latestStatsRequest)
-      return
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      console.error('Failed to fetch native observe stats:', errorData)
-      toast.error(t('failed-to-fetch-native-observe-stats'))
-      return
-    }
-
-    stats.value = await response.json() as NativeObserveStatsResponse
-  }
-  catch (error) {
-    if (requestId !== latestStatsRequest)
-      return
-    console.error('Error fetching native observe stats:', error)
-    toast.error(t('failed-to-fetch-native-observe-stats'))
-  }
-  finally {
-    if (requestId === latestStatsRequest)
-      statsLoading.value = false
-  }
 }
 
 function openLogs(action: string) {

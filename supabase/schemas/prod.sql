@@ -6017,31 +6017,6 @@ $$;
 ALTER FUNCTION "public"."get_identity_apikey_only"("keymode" "public"."key_mode"[]) OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."get_identity_for_apikey_creation"() RETURNS "uuid"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-DECLARE
-  auth_uid uuid;
-BEGIN
-  SELECT auth.uid() INTO auth_uid;
-  IF auth_uid IS NOT NULL THEN
-    RETURN auth_uid;
-  END IF;
-
-  PERFORM public.pg_log('deny: APIKEY_CREATE_WITH_API_KEY_DISABLED', '{}'::jsonb);
-  RETURN NULL;
-END;
-$$;
-
-
-ALTER FUNCTION "public"."get_identity_for_apikey_creation"() OWNER TO "postgres";
-
-
-COMMENT ON FUNCTION "public"."get_identity_for_apikey_creation"() IS 'Returns auth.uid() for JWT callers; API-key creation of API keys stays disabled even when org.create is granted.';
-
-
-
 CREATE OR REPLACE FUNCTION "public"."get_identity_org_allowed"("keymode" "public"."key_mode"[], "org_id" "uuid") RETURNS "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -6697,18 +6672,17 @@ CREATE OR REPLACE FUNCTION "public"."get_org_perm_for_apikey"("apikey" "text", "
 DECLARE
   apikey_user_id uuid;
   org_id uuid;
-  api_key record;
 BEGIN
-  SELECT * FROM public.find_apikey_by_value(apikey) INTO api_key;
-  apikey_user_id := api_key.user_id;
+  SELECT user_id INTO apikey_user_id
+  FROM public.find_apikey_by_value(apikey)
+  LIMIT 1;
 
   IF apikey_user_id IS NULL THEN
     PERFORM public.pg_log('deny: INVALID_APIKEY', jsonb_build_object('app_id', get_org_perm_for_apikey.app_id));
     RETURN 'INVALID_APIKEY';
   END IF;
 
-  SELECT owner_org
-  INTO org_id
+  SELECT owner_org INTO org_id
   FROM public.apps
   WHERE apps.app_id = get_org_perm_for_apikey.app_id
   LIMIT 1;
@@ -6722,11 +6696,19 @@ BEGIN
     RETURN 'perm_owner';
   END IF;
 
-  IF public.rbac_check_permission_direct(public.rbac_perm_app_delete(), apikey_user_id, org_id, get_org_perm_for_apikey.app_id, NULL::bigint, apikey) THEN
+  -- Old CLI builds ask this coarse helper for admin before channel create/set/delete
+  -- because they cannot pass an action name. Return admin for channel-mutating RBAC
+  -- permissions so old CLI reaches the authoritative RLS/endpoint checks below.
+  IF public.rbac_check_permission_direct(public.rbac_perm_app_update_user_roles(), apikey_user_id, org_id, get_org_perm_for_apikey.app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct(public.rbac_perm_channel_delete(), apikey_user_id, org_id, get_org_perm_for_apikey.app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct(public.rbac_perm_app_create_channel(), apikey_user_id, org_id, get_org_perm_for_apikey.app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct(public.rbac_perm_channel_update_settings(), apikey_user_id, org_id, get_org_perm_for_apikey.app_id, NULL::bigint, apikey)
+  THEN
     RETURN 'perm_admin';
   END IF;
 
-  IF public.rbac_check_permission_direct(public.rbac_perm_app_update_settings(), apikey_user_id, org_id, get_org_perm_for_apikey.app_id, NULL::bigint, apikey) THEN
+  IF public.rbac_check_permission_direct(public.rbac_perm_app_update_settings(), apikey_user_id, org_id, get_org_perm_for_apikey.app_id, NULL::bigint, apikey)
+  THEN
     RETURN 'perm_write';
   END IF;
 
@@ -6754,9 +6736,7 @@ CREATE OR REPLACE FUNCTION "public"."get_org_perm_for_apikey_v2"("apikey" "text"
 DECLARE
   v_user_id uuid;
   v_org_id uuid;
-  v_use_rbac boolean;
 BEGIN
-  -- Resolve user from API key (supports hashed keys)
   SELECT user_id INTO v_user_id
   FROM public.find_apikey_by_value(get_org_perm_for_apikey_v2.apikey)
   LIMIT 1;
@@ -6765,7 +6745,6 @@ BEGIN
     RETURN 'INVALID_APIKEY';
   END IF;
 
-  -- Resolve org from app
   SELECT owner_org INTO v_org_id
   FROM public.apps
   WHERE public.apps.app_id = get_org_perm_for_apikey_v2.app_id
@@ -6775,45 +6754,50 @@ BEGIN
     RETURN 'NO_APP';
   END IF;
 
-  -- Route to legacy function for non-RBAC orgs
-  v_use_rbac := public.rbac_is_enabled_for_org(v_org_id);
-  IF NOT v_use_rbac THEN
-    RETURN public.get_org_perm_for_apikey(get_org_perm_for_apikey_v2.apikey, get_org_perm_for_apikey_v2.app_id);
-  END IF;
-
-  -- RBAC path: probe permissions from highest to lowest, return first match.
-  -- rbac_check_permission_direct handles "key bindings take priority" logic internally.
-
   IF public.rbac_check_permission_direct(
-    'org.delete', v_user_id, v_org_id, get_org_perm_for_apikey_v2.app_id::varchar, NULL,
+    public.rbac_perm_app_transfer(), v_user_id, v_org_id, get_org_perm_for_apikey_v2.app_id::varchar, NULL,
     get_org_perm_for_apikey_v2.apikey
   ) THEN
     RETURN 'perm_owner';
   END IF;
 
   IF public.rbac_check_permission_direct(
-    'app.delete', v_user_id, v_org_id, get_org_perm_for_apikey_v2.app_id::varchar, NULL,
+    public.rbac_perm_app_update_user_roles(), v_user_id, v_org_id, get_org_perm_for_apikey_v2.app_id::varchar, NULL,
     get_org_perm_for_apikey_v2.apikey
-  ) THEN
+  )
+    OR public.rbac_check_permission_direct(
+      public.rbac_perm_channel_delete(), v_user_id, v_org_id, get_org_perm_for_apikey_v2.app_id::varchar, NULL,
+      get_org_perm_for_apikey_v2.apikey
+    )
+  THEN
     RETURN 'perm_admin';
   END IF;
 
   IF public.rbac_check_permission_direct(
-    'app.create_channel', v_user_id, v_org_id, get_org_perm_for_apikey_v2.app_id::varchar, NULL,
+    public.rbac_perm_app_update_settings(), v_user_id, v_org_id, get_org_perm_for_apikey_v2.app_id::varchar, NULL,
     get_org_perm_for_apikey_v2.apikey
-  ) THEN
+  )
+    OR public.rbac_check_permission_direct(
+      public.rbac_perm_app_create_channel(), v_user_id, v_org_id, get_org_perm_for_apikey_v2.app_id::varchar, NULL,
+      get_org_perm_for_apikey_v2.apikey
+    )
+    OR public.rbac_check_permission_direct(
+      public.rbac_perm_channel_update_settings(), v_user_id, v_org_id, get_org_perm_for_apikey_v2.app_id::varchar, NULL,
+      get_org_perm_for_apikey_v2.apikey
+    )
+  THEN
     RETURN 'perm_write';
   END IF;
 
   IF public.rbac_check_permission_direct(
-    'app.upload_bundle', v_user_id, v_org_id, get_org_perm_for_apikey_v2.app_id::varchar, NULL,
+    public.rbac_perm_app_upload_bundle(), v_user_id, v_org_id, get_org_perm_for_apikey_v2.app_id::varchar, NULL,
     get_org_perm_for_apikey_v2.apikey
   ) THEN
     RETURN 'perm_upload';
   END IF;
 
   IF public.rbac_check_permission_direct(
-    'app.read', v_user_id, v_org_id, get_org_perm_for_apikey_v2.app_id::varchar, NULL,
+    public.rbac_perm_app_read(), v_user_id, v_org_id, get_org_perm_for_apikey_v2.app_id::varchar, NULL,
     get_org_perm_for_apikey_v2.apikey
   ) THEN
     RETURN 'perm_read';
@@ -9968,26 +9952,46 @@ CREATE OR REPLACE FUNCTION "public"."normalize_public_channel_overlap"() RETURNS
     SET "search_path" TO ''
     AS $$
 BEGIN
-  -- Serialize public-channel changes per app so concurrent writers cannot
-  -- reintroduce overlapping public state between the normalization update and
-  -- the row write itself. Taking this lock before the cross-row UPDATE also
-  -- makes same-app writers wait here instead of deadlocking on channel rows.
-  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(NEW.app_id));
-
   IF NEW.public IS DISTINCT FROM true THEN
     RETURN NEW;
   END IF;
 
+  IF TG_OP = 'UPDATE'
+    AND NEW.public IS NOT DISTINCT FROM OLD.public
+    AND NEW.ios IS NOT DISTINCT FROM OLD.ios
+    AND NEW.android IS NOT DISTINCT FROM OLD.android
+    AND NEW.electron IS NOT DISTINCT FROM OLD.electron
+    AND NEW.app_id IS NOT DISTINCT FROM OLD.app_id
+  THEN
+    RETURN NEW;
+  END IF;
+
+  -- Row-level UPDATE triggers run after the target row is locked. Do not wait
+  -- behind another same-app normalizer here; the partial unique indexes will
+  -- reject the rare concurrent conflict instead of letting API calls deadlock.
+  IF NOT pg_catalog.pg_try_advisory_xact_lock(pg_catalog.hashtext(NEW.app_id)) THEN
+    RETURN NEW;
+  END IF;
+
+  WITH target AS (
+    SELECT existing.id
+    FROM public.channels AS existing
+    WHERE existing.app_id = NEW.app_id
+      AND existing.public = true
+      AND existing.id IS DISTINCT FROM NEW.id
+      AND (
+        (NEW.ios = true AND existing.ios = true)
+        OR (NEW.android = true AND existing.android = true)
+        OR (NEW.electron = true AND existing.electron = true)
+      )
+    ORDER BY existing.id
+    FOR UPDATE SKIP LOCKED
+  )
   UPDATE public.channels AS existing
   SET public = false
-  WHERE existing.app_id = NEW.app_id
-    AND existing.public = true
-    AND existing.id IS DISTINCT FROM NEW.id
-    AND (
-      (NEW.ios = true AND existing.ios = true)
-      OR (NEW.android = true AND existing.android = true)
-      OR (NEW.electron = true AND existing.electron = true)
-    );
+  FROM target
+  WHERE existing.id = target.id
+    AND existing.public = true;
 
   RETURN NEW;
 END;
@@ -11720,26 +11724,11 @@ CREATE OR REPLACE FUNCTION "public"."rbac_enable_for_org"("p_org_id" "uuid", "p_
     AS $$
 DECLARE
   v_migration_result jsonb;
-  v_was_enabled boolean;
 BEGIN
-  -- Check if already enabled
-  SELECT use_new_rbac INTO v_was_enabled FROM public.orgs WHERE id = p_org_id;
-  IF v_was_enabled THEN
-    RETURN jsonb_build_object(
-      'status', 'already_enabled',
-      'org_id', p_org_id,
-      'message', 'RBAC was already enabled for this org'
-    );
-  END IF;
-
-  -- Migrate org_users to role_bindings
   v_migration_result := public.rbac_migrate_org_users_to_bindings(p_org_id, p_granted_by);
 
-  -- Enable RBAC flag
-  UPDATE public.orgs SET use_new_rbac = true WHERE id = p_org_id;
-
   RETURN jsonb_build_object(
-    'status', 'success',
+    'status', 'already_enabled',
     'org_id', p_org_id,
     'migration_result', v_migration_result,
     'rbac_enabled', true
@@ -11751,7 +11740,7 @@ $$;
 ALTER FUNCTION "public"."rbac_enable_for_org"("p_org_id" "uuid", "p_granted_by" "uuid") OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."rbac_enable_for_org"("p_org_id" "uuid", "p_granted_by" "uuid") IS 'Migrates org_users to role_bindings and enables RBAC for an org in one transaction.';
+COMMENT ON FUNCTION "public"."rbac_enable_for_org"("p_org_id" "uuid", "p_granted_by" "uuid") IS 'Compatibility RPC. RBAC is always enabled; this only resyncs legacy org_users bindings.';
 
 
 
@@ -13088,26 +13077,13 @@ CREATE OR REPLACE FUNCTION "public"."rbac_rollback_org"("p_org_id" "uuid") RETUR
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-DECLARE
-  v_deleted_count int;
-  v_migration_reason text := 'Migrated from org_users (legacy)';
 BEGIN
-  -- Delete all role_bindings that were migrated from org_users
-  DELETE FROM public.role_bindings
-  WHERE org_id = p_org_id
-    AND reason = v_migration_reason
-    AND is_direct = true;
-
-  GET DIAGNOSTICS v_deleted_count = ROW_COUNT;
-
-  -- Disable RBAC flag
-  UPDATE public.orgs SET use_new_rbac = false WHERE id = p_org_id;
-
   RETURN jsonb_build_object(
     'status', 'success',
     'org_id', p_org_id,
-    'deleted_bindings', v_deleted_count,
-    'rbac_enabled', false
+    'rbac_enabled', true,
+    'rollback_performed', false,
+    'message', 'RBAC is always enabled and cannot be rolled back'
   );
 END;
 $$;
@@ -13116,7 +13092,7 @@ $$;
 ALTER FUNCTION "public"."rbac_rollback_org"("p_org_id" "uuid") OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."rbac_rollback_org"("p_org_id" "uuid") IS 'Removes migrated role_bindings and disables RBAC for an org (rollback migration).';
+COMMENT ON FUNCTION "public"."rbac_rollback_org"("p_org_id" "uuid") IS 'Compatibility RPC. RBAC rollback is a no-op because RBAC is always enabled.';
 
 
 
@@ -14805,14 +14781,33 @@ DECLARE
   v_granted_by uuid;
   v_sync_reason text := 'Synced from org_users';
 BEGIN
-  DELETE FROM "public"."role_bindings"
-  WHERE "principal_type" = "public"."rbac_principal_user"()
-    AND "principal_id" = p_user_id
-    AND "org_id" = p_org_id
-    AND "reason" IN (
+  DELETE FROM "public"."role_bindings" rb
+  WHERE rb."principal_type" = "public"."rbac_principal_user"()
+    AND rb."principal_id" = p_user_id
+    AND rb."org_id" = p_org_id
+    AND rb."reason" IN (
       'Synced from org_users',
       'Updated from org_users',
       'Migrated from org_users (legacy)'
+    )
+    AND NOT (
+      rb."scope_type" = "public"."rbac_scope_org"()
+      AND EXISTS (
+        SELECT 1
+        FROM "public"."roles" r
+        WHERE r."id" = rb."role_id"
+          AND r."name" = "public"."rbac_role_org_super_admin"()
+      )
+      AND EXISTS (
+        SELECT 1
+        FROM "public"."org_users" ou
+        WHERE ou."user_id" = p_user_id
+          AND ou."org_id" = p_org_id
+          AND ou."app_id" IS NULL
+          AND ou."channel_id" IS NULL
+          AND ou."rbac_role_name" IS NULL
+          AND ou."user_right" = "public"."rbac_right_super_admin"()
+      )
     );
 
   FOR v_org_user IN
@@ -14820,6 +14815,7 @@ BEGIN
     FROM "public"."org_users"
     WHERE "user_id" = p_user_id
       AND "org_id" = p_org_id
+      AND "rbac_role_name" IS NULL
   LOOP
     v_granted_by := COALESCE("auth"."uid"(), v_org_user.user_id);
 
@@ -14957,6 +14953,10 @@ $$;
 
 
 ALTER FUNCTION "public"."resync_org_user_role_bindings"("p_user_id" "uuid", "p_org_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."resync_org_user_role_bindings"("p_user_id" "uuid", "p_org_id" "uuid") IS 'Compatibility sync from legacy org_users rows into RBAC role_bindings. RBAC invite rows are ignored.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."rls_auto_enable"() RETURNS "event_trigger"
@@ -15537,198 +15537,13 @@ CREATE OR REPLACE FUNCTION "public"."sync_org_user_role_binding_on_update"() RET
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-DECLARE
-  old_org_role_name text;
-  new_org_role_name text;
-  old_org_role_id uuid;
-  new_org_role_id uuid;
-  old_app_role_name text;
-  new_app_role_name text;
-  old_app_role_id uuid;
-  new_app_role_id uuid;
-  org_member_role_id uuid;
-  v_app RECORD;
-  v_granted_by uuid;
-  v_update_reason text := 'Updated from org_users';
-  v_use_rbac boolean;
 BEGIN
-  SELECT use_new_rbac INTO v_use_rbac FROM public.orgs WHERE id = NEW.org_id;
-  IF v_use_rbac AND (NEW.rbac_role_name IS NOT NULL OR OLD.rbac_role_name IS NOT NULL) THEN
+  IF NEW.rbac_role_name IS NOT NULL OR OLD.rbac_role_name IS NOT NULL THEN
     RETURN NEW;
   END IF;
 
-  -- Only process if user_right actually changed
-  IF OLD.user_right = NEW.user_right THEN
-    RETURN NEW;
-  END IF;
-
-  -- Only handle org-level rights (no app_id, no channel_id)
-  IF NEW.app_id IS NOT NULL OR NEW.channel_id IS NOT NULL THEN
-    RETURN NEW;
-  END IF;
-
-  v_granted_by := COALESCE(auth.uid(), NEW.user_id);
-
-  -- Map old user_right to role names
-  CASE OLD.user_right
-    WHEN public.rbac_right_super_admin() THEN
-      old_org_role_name := public.rbac_role_org_super_admin();
-      old_app_role_name := NULL;
-    WHEN public.rbac_right_admin() THEN
-      old_org_role_name := public.rbac_role_org_admin();
-      old_app_role_name := NULL;
-    WHEN public.rbac_right_write() THEN
-      old_org_role_name := public.rbac_role_org_member();
-      old_app_role_name := public.rbac_role_app_developer();
-    WHEN public.rbac_right_upload() THEN
-      old_org_role_name := public.rbac_role_org_member();
-      old_app_role_name := public.rbac_role_app_uploader();
-    WHEN public.rbac_right_read() THEN
-      old_org_role_name := public.rbac_role_org_member();
-      old_app_role_name := public.rbac_role_app_reader();
-    WHEN 'invite_super_admin'::public.user_min_right THEN
-      old_org_role_name := NULL;
-      old_app_role_name := NULL;
-    WHEN 'invite_admin'::public.user_min_right THEN
-      old_org_role_name := NULL;
-      old_app_role_name := NULL;
-    WHEN 'invite_write'::public.user_min_right THEN
-      old_org_role_name := NULL;
-      old_app_role_name := NULL;
-    WHEN 'invite_upload'::public.user_min_right THEN
-      old_org_role_name := NULL;
-      old_app_role_name := NULL;
-    WHEN 'invite_read'::public.user_min_right THEN
-      old_org_role_name := NULL;
-      old_app_role_name := NULL;
-    ELSE
-      RAISE WARNING 'Unexpected OLD.user_right value: %, skipping role binding sync', OLD.user_right;
-      RETURN NEW;
-  END CASE;
-
-  -- Map new user_right to role names
-  CASE NEW.user_right
-    WHEN public.rbac_right_super_admin() THEN
-      new_org_role_name := public.rbac_role_org_super_admin();
-      new_app_role_name := NULL;
-    WHEN public.rbac_right_admin() THEN
-      new_org_role_name := public.rbac_role_org_admin();
-      new_app_role_name := NULL;
-    WHEN public.rbac_right_write() THEN
-      new_org_role_name := public.rbac_role_org_member();
-      new_app_role_name := public.rbac_role_app_developer();
-    WHEN public.rbac_right_upload() THEN
-      new_org_role_name := public.rbac_role_org_member();
-      new_app_role_name := public.rbac_role_app_uploader();
-    WHEN public.rbac_right_read() THEN
-      new_org_role_name := public.rbac_role_org_member();
-      new_app_role_name := public.rbac_role_app_reader();
-    WHEN 'invite_super_admin'::public.user_min_right THEN
-      new_org_role_name := NULL;
-      new_app_role_name := NULL;
-    WHEN 'invite_admin'::public.user_min_right THEN
-      new_org_role_name := NULL;
-      new_app_role_name := NULL;
-    WHEN 'invite_write'::public.user_min_right THEN
-      new_org_role_name := NULL;
-      new_app_role_name := NULL;
-    WHEN 'invite_upload'::public.user_min_right THEN
-      new_org_role_name := NULL;
-      new_app_role_name := NULL;
-    WHEN 'invite_read'::public.user_min_right THEN
-      new_org_role_name := NULL;
-      new_app_role_name := NULL;
-    ELSE
-      RAISE WARNING 'Unexpected NEW.user_right value: %, skipping role binding sync', NEW.user_right;
-      RETURN NEW;
-  END CASE;
-
-  -- Get role IDs
-  IF old_org_role_name IS NOT NULL THEN
-    SELECT id INTO old_org_role_id FROM public.roles WHERE name = old_org_role_name LIMIT 1;
-  END IF;
-
-  IF new_org_role_name IS NOT NULL THEN
-    SELECT id INTO new_org_role_id FROM public.roles WHERE name = new_org_role_name LIMIT 1;
-  END IF;
-  SELECT id INTO org_member_role_id FROM public.roles WHERE name = public.rbac_role_org_member() LIMIT 1;
-
-  IF old_app_role_name IS NOT NULL THEN
-    SELECT id INTO old_app_role_id FROM public.roles WHERE name = old_app_role_name LIMIT 1;
-  END IF;
-
-  IF new_app_role_name IS NOT NULL THEN
-    SELECT id INTO new_app_role_id FROM public.roles WHERE name = new_app_role_name LIMIT 1;
-  END IF;
-
-  -- Delete old org-level binding (only if there was a role)
-  IF old_org_role_id IS NOT NULL THEN
-    DELETE FROM public.role_bindings
-    WHERE principal_type = public.rbac_principal_user()
-      AND principal_id = NEW.user_id
-      AND scope_type = public.rbac_scope_org()
-      AND org_id = NEW.org_id
-      AND role_id = old_org_role_id;
-  END IF;
-
-  -- Delete old app-level bindings (for read/upload/write users)
-  IF old_app_role_id IS NOT NULL THEN
-    DELETE FROM public.role_bindings
-    WHERE principal_type = public.rbac_principal_user()
-      AND principal_id = NEW.user_id
-      AND scope_type = public.rbac_scope_app()
-      AND org_id = NEW.org_id
-      AND role_id = old_app_role_id;
-  END IF;
-
-  -- Create new org-level binding
-  IF new_org_role_id IS NOT NULL THEN
-    INSERT INTO public.role_bindings (
-      principal_type, principal_id, role_id, scope_type, org_id,
-      granted_by, granted_at, reason, is_direct
-    ) VALUES (
-      public.rbac_principal_user(), NEW.user_id, new_org_role_id, public.rbac_scope_org(), NEW.org_id,
-      v_granted_by, now(), v_update_reason, true
-    ) ON CONFLICT DO NOTHING;
-  END IF;
-
-  -- Create new app-level bindings for each app (for read/upload/write users)
-  IF new_app_role_id IS NOT NULL THEN
-    FOR v_app IN SELECT id FROM public.apps WHERE owner_org = NEW.org_id
-    LOOP
-      INSERT INTO public.role_bindings (
-        principal_type, principal_id, role_id, scope_type, org_id, app_id,
-        granted_by, granted_at, reason, is_direct
-      ) VALUES (
-        public.rbac_principal_user(), NEW.user_id, new_app_role_id, public.rbac_scope_app(), NEW.org_id, v_app.id,
-        v_granted_by, now(), v_update_reason, true
-      ) ON CONFLICT DO NOTHING;
-    END LOOP;
-  END IF;
-
-  -- Handle transition from admin/super_admin to read/upload/write:
-  IF OLD.user_right IN (public.rbac_right_super_admin(), public.rbac_right_admin())
-    AND NEW.user_right IN (public.rbac_right_read(), public.rbac_right_upload(), public.rbac_right_write()) THEN
-    NULL;
-  END IF;
-
-  -- Handle transition from read/upload/write to admin/super_admin:
-  IF OLD.user_right IN (public.rbac_right_read(), public.rbac_right_upload(), public.rbac_right_write())
-    AND NEW.user_right IN (public.rbac_right_super_admin(), public.rbac_right_admin()) THEN
-    IF org_member_role_id IS NOT NULL THEN
-      DELETE FROM public.role_bindings
-      WHERE principal_type = public.rbac_principal_user()
-        AND principal_id = NEW.user_id
-        AND scope_type = public.rbac_scope_org()
-        AND org_id = NEW.org_id
-        AND role_id = org_member_role_id;
-    END IF;
-
-    DELETE FROM public.role_bindings
-    WHERE principal_type = public.rbac_principal_user()
-      AND principal_id = NEW.user_id
-      AND scope_type = public.rbac_scope_app()
-      AND org_id = NEW.org_id;
+  IF OLD.user_right IS DISTINCT FROM NEW.user_right THEN
+    PERFORM "public"."resync_org_user_role_bindings"(NEW.user_id, NEW.org_id);
   END IF;
 
   RETURN NEW;
@@ -15739,7 +15554,7 @@ $$;
 ALTER FUNCTION "public"."sync_org_user_role_binding_on_update"() OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."sync_org_user_role_binding_on_update"() IS 'Automatically updates role_bindings entries when org_users.user_right is modified, ensuring both systems stay in sync. Handles transitions between admin roles and member roles.';
+COMMENT ON FUNCTION "public"."sync_org_user_role_binding_on_update"() IS 'Updates role_bindings when legacy org_users.user_right changes. RBAC invite rows are ignored.';
 
 
 
@@ -15747,135 +15562,12 @@ CREATE OR REPLACE FUNCTION "public"."sync_org_user_to_role_binding"() RETURNS "t
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-DECLARE
-  role_name_to_bind text;
-  role_id_to_bind uuid;
-  org_member_role_id uuid;
-  app_role_name text;
-  app_role_id uuid;
-  v_app RECORD;
-  v_app_uuid uuid;
-  v_channel_uuid uuid;
-  v_granted_by uuid;
-  v_sync_reason text := 'Synced from org_users';
-  v_use_rbac boolean;
 BEGIN
-  SELECT use_new_rbac INTO v_use_rbac FROM public.orgs WHERE id = NEW.org_id;
-  IF v_use_rbac AND NEW.rbac_role_name IS NOT NULL THEN
+  IF NEW.rbac_role_name IS NOT NULL THEN
     RETURN NEW;
   END IF;
 
-  v_granted_by := COALESCE(auth.uid(), NEW.user_id);
-
-  -- Handle org-level rights (no app_id, no channel_id)
-  IF NEW.app_id IS NULL AND NEW.channel_id IS NULL THEN
-    -- For super_admin and admin: create org-level binding directly
-    IF NEW.user_right IN (public.rbac_right_super_admin(), public.rbac_right_admin()) THEN
-      CASE NEW.user_right
-        WHEN public.rbac_right_super_admin() THEN role_name_to_bind := public.rbac_role_org_super_admin();
-        WHEN public.rbac_right_admin() THEN role_name_to_bind := public.rbac_role_org_admin();
-      END CASE;
-
-      SELECT id INTO role_id_to_bind FROM public.roles WHERE name = role_name_to_bind LIMIT 1;
-
-      IF role_id_to_bind IS NOT NULL THEN
-        INSERT INTO public.role_bindings (
-          principal_type, principal_id, role_id, scope_type, org_id,
-          granted_by, granted_at, reason, is_direct
-        ) VALUES (
-          public.rbac_principal_user(), NEW.user_id, role_id_to_bind, public.rbac_scope_org(), NEW.org_id,
-          v_granted_by, now(), v_sync_reason, true
-        ) ON CONFLICT DO NOTHING;
-      END IF;
-
-    -- For read/upload/write at org level: create org_member + app-level roles for each app
-    ELSIF NEW.user_right IN (public.rbac_right_read(), public.rbac_right_upload(), public.rbac_right_write()) THEN
-      -- 1) Create org_member binding at org level
-      SELECT id INTO org_member_role_id FROM public.roles WHERE name = public.rbac_role_org_member() LIMIT 1;
-      IF org_member_role_id IS NOT NULL THEN
-        INSERT INTO public.role_bindings (
-          principal_type, principal_id, role_id, scope_type, org_id,
-          granted_by, granted_at, reason, is_direct
-        ) VALUES (
-          public.rbac_principal_user(), NEW.user_id, org_member_role_id, public.rbac_scope_org(), NEW.org_id,
-          v_granted_by, now(), v_sync_reason, true
-        ) ON CONFLICT DO NOTHING;
-      END IF;
-
-      -- 2) Determine app-level role based on user_right
-      CASE NEW.user_right
-        WHEN public.rbac_right_read() THEN app_role_name := public.rbac_role_app_reader();
-        WHEN public.rbac_right_upload() THEN app_role_name := public.rbac_role_app_uploader();
-        WHEN public.rbac_right_write() THEN app_role_name := public.rbac_role_app_developer();
-      END CASE;
-
-      SELECT id INTO app_role_id FROM public.roles WHERE name = app_role_name LIMIT 1;
-
-      -- 3) Create app-level binding for EACH app in the org
-      IF app_role_id IS NOT NULL THEN
-        FOR v_app IN SELECT id FROM public.apps WHERE owner_org = NEW.org_id
-        LOOP
-          INSERT INTO public.role_bindings (
-            principal_type, principal_id, role_id, scope_type, org_id, app_id,
-            granted_by, granted_at, reason, is_direct
-          ) VALUES (
-            public.rbac_principal_user(), NEW.user_id, app_role_id, public.rbac_scope_app(), NEW.org_id, v_app.id,
-            v_granted_by, now(), v_sync_reason, true
-          ) ON CONFLICT DO NOTHING;
-        END LOOP;
-      END IF;
-    END IF;
-
-  -- Handle app-level rights (has app_id, no channel_id)
-  ELSIF NEW.app_id IS NOT NULL AND NEW.channel_id IS NULL THEN
-    CASE NEW.user_right
-      WHEN public.rbac_right_super_admin() THEN role_name_to_bind := public.rbac_role_app_admin();
-      WHEN public.rbac_right_admin() THEN role_name_to_bind := public.rbac_role_app_admin();
-      WHEN public.rbac_right_write() THEN role_name_to_bind := public.rbac_role_app_developer();
-      WHEN public.rbac_right_upload() THEN role_name_to_bind := public.rbac_role_app_uploader();
-      WHEN public.rbac_right_read() THEN role_name_to_bind := public.rbac_role_app_reader();
-      ELSE role_name_to_bind := public.rbac_role_app_reader();
-    END CASE;
-
-    SELECT id INTO role_id_to_bind FROM public.roles WHERE name = role_name_to_bind LIMIT 1;
-    SELECT id INTO v_app_uuid FROM public.apps WHERE app_id = NEW.app_id LIMIT 1;
-
-    IF role_id_to_bind IS NOT NULL AND v_app_uuid IS NOT NULL THEN
-      INSERT INTO public.role_bindings (
-        principal_type, principal_id, role_id, scope_type, org_id, app_id,
-        granted_by, granted_at, reason, is_direct
-      ) VALUES (
-        public.rbac_principal_user(), NEW.user_id, role_id_to_bind, public.rbac_scope_app(), NEW.org_id, v_app_uuid,
-        v_granted_by, now(), v_sync_reason, true
-      ) ON CONFLICT DO NOTHING;
-    END IF;
-
-  -- Handle channel-level rights (has app_id and channel_id)
-  ELSIF NEW.app_id IS NOT NULL AND NEW.channel_id IS NOT NULL THEN
-    CASE NEW.user_right
-      WHEN public.rbac_right_super_admin() THEN role_name_to_bind := public.rbac_role_channel_admin();
-      WHEN public.rbac_right_admin() THEN role_name_to_bind := public.rbac_role_channel_admin();
-      WHEN public.rbac_right_write() THEN role_name_to_bind := 'channel_developer';
-      WHEN public.rbac_right_upload() THEN role_name_to_bind := 'channel_uploader';
-      WHEN public.rbac_right_read() THEN role_name_to_bind := public.rbac_role_channel_reader();
-      ELSE role_name_to_bind := public.rbac_role_channel_reader();
-    END CASE;
-
-    SELECT id INTO role_id_to_bind FROM public.roles WHERE name = role_name_to_bind LIMIT 1;
-    SELECT id INTO v_app_uuid FROM public.apps WHERE app_id = NEW.app_id LIMIT 1;
-    SELECT rbac_id INTO v_channel_uuid FROM public.channels WHERE id = NEW.channel_id LIMIT 1;
-
-    IF role_id_to_bind IS NOT NULL AND v_app_uuid IS NOT NULL AND v_channel_uuid IS NOT NULL THEN
-      INSERT INTO public.role_bindings (
-        principal_type, principal_id, role_id, scope_type, org_id, app_id, channel_id,
-        granted_by, granted_at, reason, is_direct
-      ) VALUES (
-        public.rbac_principal_user(), NEW.user_id, role_id_to_bind, public.rbac_scope_channel(), NEW.org_id, v_app_uuid, v_channel_uuid,
-        v_granted_by, now(), v_sync_reason, true
-      ) ON CONFLICT DO NOTHING;
-    END IF;
-  END IF;
-
+  PERFORM "public"."resync_org_user_role_bindings"(NEW.user_id, NEW.org_id);
   RETURN NEW;
 END;
 $$;
@@ -15884,7 +15576,7 @@ $$;
 ALTER FUNCTION "public"."sync_org_user_to_role_binding"() OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."sync_org_user_to_role_binding"() IS 'Automatically creates/updates role_bindings entries when org_users entries are inserted, ensuring both systems stay in sync. For org-level read/upload/write rights, creates org_member + app-level roles for each app.';
+COMMENT ON FUNCTION "public"."sync_org_user_to_role_binding"() IS 'Creates role_bindings when legacy org_users rows are inserted. RBAC invite rows are ignored.';
 
 
 
@@ -18041,7 +17733,9 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
     "active_past_due_orgs" integer DEFAULT 0 NOT NULL,
     "apps_created" bigint DEFAULT 0 NOT NULL,
     "apps_with_cli_onboarding_builds_24h" bigint DEFAULT 0 NOT NULL,
-    "apps_with_manual_builds_24h" bigint DEFAULT 0 NOT NULL
+    "apps_with_manual_builds_24h" bigint DEFAULT 0 NOT NULL,
+    "above_plan_with_credits" bigint,
+    "above_plan_without_credits" bigint
 );
 
 
@@ -18300,6 +17994,14 @@ COMMENT ON COLUMN "public"."global_stats"."apps_with_manual_builds_24h" IS 'Numb
 
 
 
+COMMENT ON COLUMN "public"."global_stats"."above_plan_with_credits" IS 'Active above-plan organizations with positive, unexpired usage credits at snapshot time; null for snapshots created before this metric existed.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."above_plan_without_credits" IS 'Active above-plan organizations with no positive, unexpired usage credits at snapshot time; null for snapshots created before this metric existed.';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."group_members" (
     "group_id" "uuid" NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -18537,7 +18239,6 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
     "max_apikey_expiration_days" integer,
     "enforce_encrypted_bundles" boolean DEFAULT false NOT NULL,
     "required_encryption_key" character varying(21) DEFAULT NULL::character varying,
-    "use_new_rbac" boolean DEFAULT true NOT NULL,
     "has_usage_credits" boolean DEFAULT false NOT NULL,
     "website" "text",
     "stats_refresh_requested_at" timestamp without time zone,
@@ -18583,10 +18284,6 @@ COMMENT ON COLUMN "public"."orgs"."enforce_encrypted_bundles" IS 'When true, all
 
 
 COMMENT ON COLUMN "public"."orgs"."required_encryption_key" IS 'Optional: First 21 characters of the base64-encoded public key. When set, only bundles encrypted with this specific key (matching key_id) will be accepted.';
-
-
-
-COMMENT ON COLUMN "public"."orgs"."use_new_rbac" IS 'Feature flag: when true, org uses RBAC instead of legacy org_users rights.';
 
 
 
@@ -18847,7 +18544,8 @@ CREATE TABLE IF NOT EXISTS "public"."stripe_info" (
     "customer_country" character varying(2),
     "last_stripe_event_at" timestamp with time zone,
     "past_due_at" timestamp with time zone,
-    "churn_reason" "text"
+    "churn_reason" "text",
+    "is_above_plan" boolean
 );
 
 ALTER TABLE ONLY "public"."stripe_info" REPLICA IDENTITY FULL;
@@ -18881,6 +18579,10 @@ COMMENT ON COLUMN "public"."stripe_info"."past_due_at" IS 'Timestamp when the su
 
 
 COMMENT ON COLUMN "public"."stripe_info"."churn_reason" IS 'Internal churn reason captured when a subscription cancels because an unresolved past_due state was not fixed.';
+
+
+
+COMMENT ON COLUMN "public"."stripe_info"."is_above_plan" IS 'Raw plan-fit result before usage credits are applied; null until the next plan-status refresh.';
 
 
 
@@ -21350,62 +21052,6 @@ ALTER TABLE ONLY "public"."webhooks"
 
 
 
-CREATE POLICY "Allow none to select" ON "public"."global_stats" FOR SELECT TO "anon", "authenticated" USING (false);
-
-
-
-CREATE POLICY "Allow admin to delete webhooks" ON "public"."webhooks" FOR DELETE TO "anon", "authenticated" USING ("public"."check_min_rights"('admin'::"public"."user_min_right",
-CASE
-    WHEN (( SELECT "public"."get_apikey_header"() AS "get_apikey_header") IS NOT NULL) THEN NULL::"uuid"
-    ELSE ( SELECT "auth"."uid"() AS "uid")
-END, "org_id", NULL::character varying, NULL::bigint));
-
-
-
-CREATE POLICY "Allow admin to insert webhook_deliveries" ON "public"."webhook_deliveries" FOR INSERT TO "anon", "authenticated" WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right",
-CASE
-    WHEN (( SELECT "public"."get_apikey_header"() AS "get_apikey_header") IS NOT NULL) THEN NULL::"uuid"
-    ELSE ( SELECT "auth"."uid"() AS "uid")
-END, "org_id", NULL::character varying, NULL::bigint));
-
-
-
-CREATE POLICY "Allow admin to insert webhooks" ON "public"."webhooks" FOR INSERT TO "anon", "authenticated" WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right",
-CASE
-    WHEN (( SELECT "public"."get_apikey_header"() AS "get_apikey_header") IS NOT NULL) THEN NULL::"uuid"
-    ELSE ( SELECT "auth"."uid"() AS "uid")
-END, "org_id", NULL::character varying, NULL::bigint));
-
-
-
-CREATE POLICY "Allow admin to select webhooks" ON "public"."webhooks" FOR SELECT TO "anon", "authenticated" USING (("org_id" = ANY (COALESCE(( SELECT "public"."orgs_with_min_right"('admin'::"public"."user_min_right") AS "orgs_with_min_right"), '{}'::"uuid"[]))));
-
-
-
-CREATE POLICY "Allow admin to update webhook_deliveries" ON "public"."webhook_deliveries" FOR UPDATE TO "anon", "authenticated" USING ("public"."check_min_rights"('admin'::"public"."user_min_right",
-CASE
-    WHEN (( SELECT "public"."get_apikey_header"() AS "get_apikey_header") IS NOT NULL) THEN NULL::"uuid"
-    ELSE ( SELECT "auth"."uid"() AS "uid")
-END, "org_id", NULL::character varying, NULL::bigint)) WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right",
-CASE
-    WHEN (( SELECT "public"."get_apikey_header"() AS "get_apikey_header") IS NOT NULL) THEN NULL::"uuid"
-    ELSE ( SELECT "auth"."uid"() AS "uid")
-END, "org_id", NULL::character varying, NULL::bigint));
-
-
-
-CREATE POLICY "Allow admin to update webhooks" ON "public"."webhooks" FOR UPDATE TO "anon", "authenticated" USING ("public"."check_min_rights"('admin'::"public"."user_min_right",
-CASE
-    WHEN (( SELECT "public"."get_apikey_header"() AS "get_apikey_header") IS NOT NULL) THEN NULL::"uuid"
-    ELSE ( SELECT "auth"."uid"() AS "uid")
-END, "org_id", NULL::character varying, NULL::bigint)) WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right",
-CASE
-    WHEN (( SELECT "public"."get_apikey_header"() AS "get_apikey_header") IS NOT NULL) THEN NULL::"uuid"
-    ELSE ( SELECT "auth"."uid"() AS "uid")
-END, "org_id", NULL::character varying, NULL::bigint));
-
-
-
 CREATE POLICY "Allow all for auth (super_admin+)" ON "public"."app_versions" FOR DELETE TO "anon", "authenticated" USING ("public"."check_min_rights"('super_admin'::"public"."user_min_right",
 CASE
     WHEN (( SELECT "public"."get_apikey_header"() AS "get_apikey_header") IS NOT NULL) THEN NULL::"uuid"
@@ -21422,7 +21068,7 @@ END, "owner_org", "app_id", NULL::bigint));
 
 
 
-CREATE POLICY "Allow delete for auth (admin+) (all apikey)" ON "public"."channels" FOR DELETE TO "anon", "authenticated" USING ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity_org_appid"('{all}'::"public"."key_mode"[], "owner_org", "app_id"), "owner_org", "app_id", NULL::bigint));
+CREATE POLICY "Allow delete for auth, api keys (channel.delete)" ON "public"."channels" FOR DELETE TO "anon", "authenticated" USING ("public"."rbac_check_permission_request"("public"."rbac_perm_channel_delete"(), "owner_org", "app_id", "id"));
 
 
 
@@ -21459,15 +21105,21 @@ CREATE POLICY "Allow insert for auth (write+)" ON "public"."channel_devices" FOR
 
 
 
-CREATE POLICY "Allow insert for auth, api keys (write, all) (admin+)" ON "public"."channels" FOR INSERT TO "anon", "authenticated" WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity_org_appid"('{write,all}'::"public"."key_mode"[], "owner_org", "app_id"), "owner_org", "app_id", NULL::bigint));
+CREATE POLICY "Allow insert for auth, api keys (create_channel)" ON "public"."channels" FOR INSERT TO "anon", "authenticated" WITH CHECK (((EXISTS ( SELECT 1
+   FROM "public"."apps"
+  WHERE ((("apps"."app_id")::"text" = ("channels"."app_id")::"text") AND ("apps"."owner_org" = "channels"."owner_org")))) AND "public"."rbac_check_permission_request"("public"."rbac_perm_app_create_channel"(), "owner_org", "app_id", NULL::bigint) AND (("version" IS NULL) OR "public"."rbac_check_permission_request"("public"."rbac_perm_channel_promote_bundle"(), "owner_org", "app_id", NULL::bigint))));
 
 
 
-CREATE POLICY "Allow insert org for user" ON "public"."orgs" FOR INSERT TO "authenticated" WITH CHECK (("created_by" = ( SELECT "public"."get_identity_for_apikey_creation"() AS "get_identity_for_apikey_creation")));
+CREATE POLICY "Allow insert org for user" ON "public"."orgs" FOR INSERT TO "authenticated" WITH CHECK (("created_by" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
 CREATE POLICY "Allow member and owner to select" ON "public"."org_users" FOR SELECT TO "anon", "authenticated" USING (("org_id" = ANY (COALESCE(( SELECT "public"."org_member_readable_org_ids"() AS "org_member_readable_org_ids"), '{}'::"uuid"[]))));
+
+
+
+CREATE POLICY "Allow none to select" ON "public"."global_stats" FOR SELECT TO "anon", "authenticated" USING (false);
 
 
 
@@ -21539,10 +21191,6 @@ CREATE POLICY "Allow org members to select usage_overage_events" ON "public"."us
 
 
 
-CREATE POLICY "Allow org members to select webhook_deliveries" ON "public"."webhook_deliveries" FOR SELECT TO "anon", "authenticated" USING (("org_id" = ANY (COALESCE(( SELECT "public"."orgs_readable_org_ids"() AS "orgs_readable_org_ids"), '{}'::"uuid"[]))));
-
-
-
 CREATE POLICY "Allow org super_admins to delete sso_providers" ON "public"."sso_providers" FOR DELETE TO "anon", "authenticated" USING ("public"."check_min_rights"('super_admin'::"public"."user_min_right", "public"."get_identity_org_allowed"('{all}'::"public"."key_mode"[], "org_id"), "org_id", NULL::character varying, NULL::bigint));
 
 
@@ -21560,10 +21208,6 @@ CREATE POLICY "Allow owner to select own apikeys" ON "public"."apikeys" FOR SELE
 
 
 CREATE POLICY "Allow owner to select own user" ON "public"."users" FOR SELECT TO "authenticated" USING ((("id" = ( SELECT "auth"."uid"() AS "uid")) AND ( SELECT "public"."is_not_deleted"("users"."email") AS "is_not_deleted")));
-
-
-
-CREATE POLICY "Allow owner to update own apikeys" ON "public"."apikeys" FOR UPDATE TO "anon", "authenticated" USING (("user_id" = ( SELECT "public"."get_identity_for_apikey_creation"() AS "get_identity_for_apikey_creation"))) WITH CHECK (("user_id" = ( SELECT "public"."get_identity_for_apikey_creation"() AS "get_identity_for_apikey_creation")));
 
 
 
@@ -21665,15 +21309,17 @@ CREATE POLICY "Allow update for auth and api keys" ON "public"."app_versions" FO
 
 
 
+CREATE POLICY "Allow update for auth, api keys (channel write)" ON "public"."channels" FOR UPDATE TO "anon", "authenticated" USING ("public"."rbac_check_permission_request"("public"."rbac_perm_channel_update_settings"(), "owner_org", "app_id", "id")) WITH CHECK (((EXISTS ( SELECT 1
+   FROM "public"."apps"
+  WHERE ((("apps"."app_id")::"text" = ("channels"."app_id")::"text") AND ("apps"."owner_org" = "channels"."owner_org")))) AND "public"."rbac_check_permission_request"("public"."rbac_perm_channel_update_settings"(), "owner_org", "app_id", "id")));
+
+
+
 CREATE POLICY "Allow update for auth, api keys (write+)" ON "public"."channel_devices" FOR UPDATE TO "anon", "authenticated" USING ("public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity_org_appid"('{write,all}'::"public"."key_mode"[], "owner_org", "app_id"), "owner_org", "app_id", NULL::bigint)) WITH CHECK ("public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity_org_appid"('{write,all}'::"public"."key_mode"[], "owner_org", "app_id"), "owner_org", "app_id", NULL::bigint));
 
 
 
 CREATE POLICY "Allow update for auth, api keys (write, all) (admin+)" ON "public"."apps" FOR UPDATE TO "anon", "authenticated" USING ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity_org_appid"('{write,all}'::"public"."key_mode"[], "owner_org", "app_id"), "owner_org", "app_id", NULL::bigint)) WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity_org_appid"('{write,all}'::"public"."key_mode"[], "owner_org", "app_id"), "owner_org", "app_id", NULL::bigint));
-
-
-
-CREATE POLICY "Allow update for auth, api keys (write, all) (write+)" ON "public"."channels" FOR UPDATE TO "anon", "authenticated" USING ("public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity_org_appid"('{all}'::"public"."key_mode"[], "owner_org", "app_id"), "owner_org", "app_id", NULL::bigint)) WITH CHECK ("public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity_org_appid"('{all}'::"public"."key_mode"[], "owner_org", "app_id"), "owner_org", "app_id", NULL::bigint));
 
 
 
@@ -21729,6 +21375,14 @@ CREATE POLICY "Deny all notification provider config access" ON "public"."notifi
 
 
 
+CREATE POLICY "Deny anon delete on apikeys" ON "public"."apikeys" AS RESTRICTIVE FOR DELETE TO "anon" USING (false);
+
+
+
+CREATE POLICY "Deny anon select on apikeys" ON "public"."apikeys" AS RESTRICTIVE FOR SELECT TO "anon" USING (false);
+
+
+
 CREATE POLICY "Deny client delete on org_id_tombstones" ON "public"."org_id_tombstones" AS RESTRICTIVE FOR DELETE TO "anon", "authenticated" USING (false);
 
 
@@ -21742,6 +21396,10 @@ CREATE POLICY "Deny client insert on org_id_tombstones" ON "public"."org_id_tomb
 
 
 CREATE POLICY "Deny client select on org_id_tombstones" ON "public"."org_id_tombstones" AS RESTRICTIVE FOR SELECT TO "anon", "authenticated" USING (false);
+
+
+
+CREATE POLICY "Deny client update on apikeys" ON "public"."apikeys" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
 
 
 
@@ -22158,7 +21816,9 @@ CREATE POLICY "group_members_insert" ON "public"."group_members" FOR INSERT TO "
 
 
 
-CREATE POLICY "group_members_select" ON "public"."group_members" FOR SELECT TO "authenticated" USING (("group_id" = ANY (COALESCE(( SELECT "public"."readable_group_ids"() AS "readable_group_ids"), '{}'::"uuid"[]))));
+CREATE POLICY "group_members_select" ON "public"."group_members" FOR SELECT TO "authenticated" USING (("public"."is_current_user_group_member"("group_id") OR (EXISTS ( SELECT 1
+   FROM "public"."groups" "g"
+  WHERE (("g"."id" = "group_members"."group_id") AND "public"."rbac_check_permission_request"("public"."rbac_perm_org_update_user_roles"(), "g"."org_id", NULL::character varying, NULL::bigint))))));
 
 
 
@@ -22185,7 +21845,7 @@ CREATE POLICY "groups_insert" ON "public"."groups" FOR INSERT TO "authenticated"
 
 
 
-CREATE POLICY "groups_select" ON "public"."groups" FOR SELECT TO "authenticated" USING (("id" = ANY (COALESCE(( SELECT "public"."readable_group_ids"() AS "readable_group_ids"), '{}'::"uuid"[]))));
+CREATE POLICY "groups_select" ON "public"."groups" FOR SELECT TO "authenticated" USING (("public"."is_current_user_group_member"("id") OR "public"."rbac_check_permission_request"("public"."rbac_perm_org_update_user_roles"(), "org_id", NULL::character varying, NULL::bigint)));
 
 
 
@@ -23027,13 +22687,6 @@ GRANT ALL ON FUNCTION "public"."get_identity"("keymode" "public"."key_mode"[]) T
 
 REVOKE ALL ON FUNCTION "public"."get_identity_apikey_only"("keymode" "public"."key_mode"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."get_identity_apikey_only"("keymode" "public"."key_mode"[]) TO "service_role";
-
-
-
-REVOKE ALL ON FUNCTION "public"."get_identity_for_apikey_creation"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."get_identity_for_apikey_creation"() TO "service_role";
-GRANT ALL ON FUNCTION "public"."get_identity_for_apikey_creation"() TO "anon";
-GRANT ALL ON FUNCTION "public"."get_identity_for_apikey_creation"() TO "authenticated";
 
 
 

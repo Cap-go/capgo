@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { APIKEY_TEST_ALL, executeSQL, fetchWithRetry, getAuthHeaders, ORG_ID, SUPABASE_ANON_KEY, SUPABASE_BASE_URL, USER_ID } from './test-utils.ts'
+import { APIKEY_TEST_ALL, executeSQL, fetchTestRequest, getAuthHeaders, ORG_ID, SUPABASE_ANON_KEY, SUPABASE_BASE_URL, USER_ID } from './test-utils.ts'
 
 function getAnonHeaders() {
   if (!SUPABASE_BASE_URL || !SUPABASE_ANON_KEY)
@@ -20,7 +20,7 @@ function getApiKeyHeaders(apiKey = APIKEY_TEST_ALL) {
 }
 
 function fetchRest(path: string, headers: Record<string, string>) {
-  return fetchWithRetry(`${SUPABASE_BASE_URL}/rest/v1/${path}`, { headers })
+  return fetchTestRequest(`${SUPABASE_BASE_URL}/rest/v1/${path}`, { headers })
 }
 
 describe('orgs RLS DoS regression', () => {

@@ -4,7 +4,6 @@ import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   executeSQL,
-  fetchWithRetry,
   getSupabaseClient,
   ORG_ID,
   resetAndSeedAppData,
@@ -21,22 +20,10 @@ const destinationOrgId = randomUUID()
 const destinationOrgName = `Transfer Destination ${destinationOrgId}`
 const destinationOrgEmail = `transfer-${destinationOrgId}@capgo.app`
 
-function fetchWithRetryForAuth(input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) {
-  const url = typeof input === 'string'
-    ? input
-    : input instanceof URL
-      ? input.href
-      : input.url
-  return fetchWithRetry(url, init, 5, 250)
-}
-
 function createAuthClient() {
   return createClient<Database>(SUPABASE_BASE_URL, SUPABASE_ANON_KEY, {
     auth: {
       persistSession: false,
-    },
-    global: {
-      fetch: fetchWithRetryForAuth,
     },
   })
 }

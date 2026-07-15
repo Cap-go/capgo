@@ -34,7 +34,7 @@ async function readSchemaCatalogFromMigrations(): Promise<string> {
 
 describe('production read-replica release gate', () => {
   it.concurrent(
-    'recreates the catalog from local migrations through Data API before primary migrations',
+    'rebuilds the catalog locally and imports only a fully preflighted atomic plan before primary migrations',
     async () => {
       const [workflow, syncScript, catalogFromMigrations] = await Promise.all([
         readReleaseWorkflow(),
@@ -62,17 +62,35 @@ describe('production read-replica release gate', () => {
       expect(workflow).toContain(
         'supabase_deploy:\n    needs: [changes, read_replica_schema]',
       )
-      expect(syncScript).toContain('applyReadReplicaSchemaSync')
-      expect(syncScript).toContain('readReplicaSchemaCompatibilityIssues')
+      expect(syncScript).toContain('planReadReplicaSchemaSync')
+      expect(syncScript).toContain('preflightCompatibilityIssues')
+      expect(syncScript).toContain('applyReadReplicaSchemaPlan')
+      expect(syncScript).toContain('assertCanApplyReadReplicaSchemaPlan')
+      expect(syncScript).toContain('assertGoogleReadReplicaSchemaPlan')
+      expect(syncScript).toContain('readReplicaSubscriberCompatibilityIssues')
       expect(syncScript).toContain('gcloud')
+      expect(syncScript.indexOf('preflightCompatibilityIssues')).toBeLessThan(
+        syncScript.indexOf('await applyPlan(plan)'),
+      )
+      expect(syncScript).toMatch(/['"]sql['"],\s*['"]import['"],\s*['"]sql['"]/)
+      expect(syncScript).toMatch(/--user=(?:postgres|\$\{POSTGRES_IMPORT_USER\})/)
       expect(syncScript).toContain('readReplicaSchemaCatalogFromMigrations')
       expect(syncScript).not.toContain('schema_replicate.catalog.json')
-      expect(syncScript).toContain('--partial_result_mode=FAIL_PARTIAL_RESULT')
-      expect(syncScript).toContain('GOOGLE_DATA_API_REQUEST_LIMIT_BYTES')
-      expect(syncScript).toContain('const GOOGLE_READ_REPLICA: GoogleDataApiConfig = {')
-      expect(syncScript).toContain('project: \'capgo-394818\'')
-      expect(syncScript).toContain('instance: \'eu-2\'')
-      expect(syncScript).toContain('database: \'postgres\'')
+      expect(syncScript).toContain('BEGIN;')
+      expect(syncScript).toContain('COMMIT;')
+      expect(syncScript).toContain('statement.sql')
+      expect(syncScript).not.toContain('capgo_read_replica_schema_owner')
+      expect(syncScript).not.toContain('bootstrap-read-replica-schema-owner')
+      expect(syncScript).not.toContain('CREATE ROLE')
+      expect(syncScript).not.toContain(' OWNER TO ')
+      expect(syncScript).not.toContain('SET LOCAL ROLE')
+      expect(syncScript).not.toContain('CREATE FUNCTION')
+      expect(syncScript).not.toContain('SECURITY DEFINER')
+      expect(syncScript).not.toContain('GRANT ')
+      expect(syncScript).not.toContain('REVOKE ')
+      expect(syncScript).not.toContain('capgo_internal')
+      expect(syncScript).not.toContain('ReadReplicaSchemaOwnerOperation')
+      expect(syncScript).not.toContain('renderReadReplicaOwnerExecutor')
       expect(syncScript).not.toContain('googleDataApiConfigFromArgs')
       expect(catalogFromMigrations).toContain('createPgliteEngine')
       expect(catalogFromMigrations).toContain('loadSupabaseProject')

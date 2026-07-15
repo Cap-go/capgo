@@ -315,32 +315,25 @@ describe('scoped write API keys cannot cross organization boundaries', () => {
   let scopedKeyId = 0
 
   beforeAll(async () => {
-    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
-      customer_id: targetCustomerId,
-      status: 'succeeded',
-      product_id: 'prod_LQIregjtNduh4q',
-      subscription_id: `sub_${randomUUID()}`,
-      trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-      is_good_plan: true,
-    })
-    expect(stripeError).toBeNull()
+    // Seed private fixtures through Postgres so parallel Cloudflare tests do not
+    // compete for PostgREST connections before exercising the worker routes.
+    await executeSQL(
+      `INSERT INTO public.stripe_info (customer_id, status, product_id, subscription_id, trial_at, is_good_plan)
+       VALUES ($1, 'succeeded', 'prod_LQIregjtNduh4q', $2, $3, true)`,
+      [targetCustomerId, `sub_${randomUUID()}`, new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()],
+    )
 
-    const { error: allowedOrgError } = await getSupabaseClient().from('orgs').insert({
-      id: allowedOrgId,
-      name: `Scoped allowed ${randomUUID()}`,
-      management_email: TEST_EMAIL,
-      created_by: USER_ID,
-    })
-    expect(allowedOrgError).toBeNull()
+    await executeSQL(
+      `INSERT INTO public.orgs (id, name, management_email, created_by)
+       VALUES ($1::uuid, $2, $3, $4::uuid)`,
+      [allowedOrgId, `Scoped allowed ${randomUUID()}`, TEST_EMAIL, USER_ID],
+    )
 
-    const { error: targetOrgError } = await getSupabaseClient().from('orgs').insert({
-      id: targetOrgId,
-      name: targetOrgName,
-      management_email: TEST_EMAIL,
-      created_by: USER_ID,
-      customer_id: targetCustomerId,
-    })
-    expect(targetOrgError).toBeNull()
+    await executeSQL(
+      `INSERT INTO public.orgs (id, name, management_email, created_by, customer_id)
+       VALUES ($1::uuid, $2, $3, $4::uuid, $5)`,
+      [targetOrgId, targetOrgName, TEST_EMAIL, USER_ID, targetCustomerId],
+    )
 
     const createdKey = await createDirectApiKeyWithBindings({
       userId: USER_ID,
@@ -377,6 +370,10 @@ describe('scoped write API keys cannot cross organization boundaries', () => {
     }
 
     await getSupabaseClient().storage.from('images').remove([imagePath])
+    await getSupabaseClient().from('role_bindings').delete().eq('org_id', allowedOrgId)
+    await getSupabaseClient().from('role_bindings').delete().eq('org_id', targetOrgId)
+    await getSupabaseClient().from('org_users').delete().eq('org_id', allowedOrgId)
+    await getSupabaseClient().from('org_users').delete().eq('org_id', targetOrgId)
     await getSupabaseClient().from('orgs').delete().eq('id', allowedOrgId)
     await getSupabaseClient().from('orgs').delete().eq('id', targetOrgId)
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', targetCustomerId)
@@ -1360,7 +1357,7 @@ describe('[POST] /organization', () => {
     }
   }
 
-  it.concurrent('create organization', async () => {
+  it('create organization', async () => {
     const name = `Created Organization ${new Date().toISOString()}`
     const website = 'HTTPS://capgo.app'
     const response = await fetch(`${BASE_URL}/organization`, {
@@ -1421,7 +1418,7 @@ describe('[POST] /organization', () => {
     expect(responseData.error).toBe('invalid_body')
   })
 
-  it.concurrent('create organization rejects invalid website scheme', async () => {
+  it('create organization rejects invalid website scheme', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
       headers: authHeaders,
       method: 'POST',
@@ -1435,7 +1432,7 @@ describe('[POST] /organization', () => {
     expect(responseData.error).toBe('invalid_body')
   })
 
-  it.concurrent('create organization rejects credential-bearing website urls', async () => {
+  it('create organization rejects credential-bearing website urls', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
       headers: authHeaders,
       method: 'POST',
@@ -1449,19 +1446,19 @@ describe('[POST] /organization', () => {
     expect(responseData.error).toBe('invalid_body')
   })
 
-  it.concurrent('create organization uses the estimated active users to choose the initial plan', async () => {
+  it('create organization uses the estimated active users to choose the initial plan', async () => {
     await expectCreatedOrganizationPlan(100000, 'Team')
   })
 
-  it.concurrent('create organization keeps Solo through 2K active users', async () => {
+  it('create organization keeps Solo through 2K active users', async () => {
     await expectCreatedOrganizationPlan(2000, 'Solo')
   })
 
-  it.concurrent('create organization moves above the Solo active user limit to Maker', async () => {
+  it('create organization moves above the Solo active user limit to Maker', async () => {
     await expectCreatedOrganizationPlan(2001, 'Maker')
   })
 
-  it.concurrent('create organization rejects an estimated active user count above the largest plan stop', async () => {
+  it('create organization rejects an estimated active user count above the largest plan stop', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
       headers: authHeaders,
       method: 'POST',
@@ -1802,7 +1799,7 @@ describe('[PUT] /organization - encrypted bundles settings', () => {
     const requiredEncryptionKey = 'ABCDEFGHIJKLMNOPQRSTU'
 
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
+      headers: authHeaders,
       method: 'PUT',
       body: JSON.stringify({
         orgId: ORG_ID,
@@ -1825,7 +1822,7 @@ describe('[PUT] /organization - encrypted bundles settings', () => {
 
   it('rejects invalid required encryption key length', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
+      headers: authHeaders,
       method: 'PUT',
       body: JSON.stringify({
         orgId: ORG_ID,
