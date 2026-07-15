@@ -48,7 +48,6 @@ interface AssignablePrincipal {
   detail: string | null
 }
 const INVALID_APIKEY_ACCESS_ERROR = 'Invalid API key or access'
-const APIKEY_ORG_READER_ROLE = 'apikey_org_reader'
 type DrizzleClient = ReturnType<typeof getDrizzleClient>
 type DrizzleExecutor = Pick<DrizzleClient, 'execute'>
 
@@ -540,7 +539,6 @@ export interface CreateBindingParams {
   app_id?: string | null
   channel_id?: string | number | null
   reason?: string
-  allowSystemRole?: boolean
 }
 
 export type CreateBindingResult = {
@@ -568,7 +566,6 @@ export async function createRoleBindingForPrincipal(
     app_id,
     channel_id,
     reason,
-    allowSystemRole = false,
   } = params
 
   await lockRbacOrgs(drizzle, [org_id])
@@ -584,14 +581,9 @@ export async function createRoleBindingForPrincipal(
     return { ok: false, status: 404, error: 'Role not found' }
   }
 
-  const canUseSystemRole = allowSystemRole
-    && principal_type === 'apikey'
-    && role_name === APIKEY_ORG_READER_ROLE
-
-  if (!role.is_assignable && !canUseSystemRole) {
+  if (!role.is_assignable) {
     return { ok: false, status: 403, error: 'Role is not assignable' }
   }
-
   // 2. Role scope must match binding scope
   const roleScopeValidation = validateRoleScope(role.scope_type, scope_type)
   if (!roleScopeValidation.ok) {

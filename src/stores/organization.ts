@@ -56,6 +56,7 @@ export const RBAC_ORG_ROLE_I18N_KEYS: Record<string, string> = {
   org_billing_admin: 'role-org-billing-admin',
   org_member: 'role-org-member',
   app_admin: 'role-app-admin',
+  app_preview: 'role-app-preview',
   app_developer: 'role-app-developer',
   app_notifications: 'role-app-notifications',
   app_uploader: 'role-app-uploader',

@@ -124,6 +124,7 @@ const expirationDate = ref<Date | null>(null)
 const selectedOrgRole = ref('org_member')
 const allowOrgCreation = ref(false)
 const hideOrgCreationPermission = isNativeAppStoreContext()
+const appOnlyScope = ref(false)
 const selectedOrgsForCreation = ref<string[]>([])
 const selectedOrgRolesById = ref<Record<string, string>>({})
 const isHydratingApiKeyEdit = ref(false)
@@ -168,22 +169,27 @@ function getRoleDisplayName(roleName: string): string {
   const i18nKey = getRbacRoleI18nKey(normalized)
   return i18nKey ? t(i18nKey) : normalized.replaceAll('_', ' ')
 }
+const systemApiKeyOrgReaderRole = 'apikey_org_reader'
 
 // Get bindings for a specific key
 function getBindingsForKey(key: Database['public']['Tables']['apikeys']['Row']): RoleBindingRow[] {
   return allBindings.value.filter(b => b.principal_id === key.rbac_id)
 }
 
-// Get the highest role for a key (by priority_rank)
+// Older app-only keys can retain apikey_org_reader for compatibility; show
+// their actual app role instead.
 function getHighestRole(key: Database['public']['Tables']['apikeys']['Row']): string | null {
-  const keyBindings = getBindingsForKey(key)
-    .filter(binding => binding.scope_type === 'org')
-  if (keyBindings.length === 0)
-    return null
+  const bindings = getBindingsForKey(key)
+  const directOrgBindings = bindings.filter(binding =>
+    binding.scope_type === 'org' && binding.role_name !== systemApiKeyOrgReaderRole,
+  )
+  const candidateBindings = directOrgBindings.length > 0
+    ? directOrgBindings
+    : bindings.filter(binding => binding.scope_type === 'app')
 
   let highest: RoleBindingRow | null = null
   let highestRank = -1
-  for (const binding of keyBindings) {
+  for (const binding of candidateBindings) {
     const role = roles.value.find(r => r.name === binding.role_name)
     const rank = role?.priority_rank ?? 0
     if (rank > highestRank) {
@@ -203,7 +209,7 @@ function getRbacAppBindingIds(key: Database['public']['Tables']['apikeys']['Row'
 function getDisplayOrgIds(key: Database['public']['Tables']['apikeys']['Row']): string[] {
   const orgIds = new Set<string>()
   getBindingsForKey(key).forEach((binding) => {
-    if (binding.org_id)
+    if (binding.scope_type === 'org' && binding.org_id && binding.role_name !== systemApiKeyOrgReaderRole)
       orgIds.add(binding.org_id)
   })
   return Array.from(orgIds)
@@ -452,9 +458,9 @@ const uniqueOrgIds = computed(() => {
   if (currentOrganizationId.value)
     orgIds.add(currentOrganizationId.value)
 
-  allBindings.value.forEach((b) => {
-    if (b.org_id)
-      orgIds.add(b.org_id)
+  allBindings.value.forEach((binding) => {
+    if (binding.scope_type === 'org' && binding.org_id && binding.role_name !== systemApiKeyOrgReaderRole)
+      orgIds.add(binding.org_id)
   })
 
   return orgIds
@@ -679,11 +685,10 @@ const appRoleOptions = computed(() =>
 
 const rolesWithInheritedAppAccess = new Set(['org_admin', 'org_super_admin'])
 const rolesWithOrgCreateAccess = new Set(['org_admin', 'org_super_admin'])
-const systemApiKeyOrgReaderRole = 'apikey_org_reader'
 const apiKeyOrgCreatePermission = 'org.create'
 const isEditingApiKey = computed(() => editingApiKey.value !== null)
 const showAppAccessInModal = computed(() =>
-  !!selectedOrgRole.value && !rolesWithInheritedAppAccess.has(selectedOrgRole.value),
+  appOnlyScope.value || (!!selectedOrgRole.value && !rolesWithInheritedAppAccess.has(selectedOrgRole.value)),
 )
 
 // Filtered apps based on selected orgs for creation
@@ -736,7 +741,9 @@ function getOrgRoleForBinding(orgId: string) {
 }
 
 const canEnableOrgCreation = computed(() =>
-  !hideOrgCreationPermission && selectedOrgsForCreation.value.some(orgId => rolesWithOrgCreateAccess.has(getOrgRoleForBinding(orgId))),
+  !appOnlyScope.value
+  && !hideOrgCreationPermission
+  && selectedOrgsForCreation.value.some(orgId => rolesWithOrgCreateAccess.has(getOrgRoleForBinding(orgId))),
 )
 const selectedAppIds = computed(() => Object.keys(pendingAppBindings.value))
 const selectedChannelPermissionApp = computed(() =>
@@ -968,23 +975,38 @@ async function loadManageableOrganizations() {
   manageableOrgIds.value = new Set(checks.filter((orgId): orgId is string => !!orgId))
 }
 
-async function createApiKey() {
-  const isHashed = createAsHashed.value
-
-  if (selectedOrgsForCreation.value.length === 0) {
-    toast.error(t('alert-no-org-selected'))
-    return false
+function validateApiKeyScope() {
+  if (appOnlyScope.value) {
+    if (selectedAppIds.value.length === 0) {
+      toast.error(t('select-at-least-one-role'))
+      return false
+    }
   }
+  else {
+    if (selectedOrgsForCreation.value.length === 0) {
+      toast.error(t('alert-no-org-selected'))
+      return false
+    }
 
-  if (!selectedOrgRole.value) {
-    toast.error(t('select-at-least-one-role'))
-    return false
+    if (!selectedOrgRole.value) {
+      toast.error(t('select-at-least-one-role'))
+      return false
+    }
   }
 
   if (hasIncompleteAppBindings()) {
     toast.error(t('select-role-for-each-app'))
     return false
   }
+
+  return true
+}
+
+async function createApiKey() {
+  const isHashed = createAsHashed.value
+
+  if (!validateApiKeyScope())
+    return false
 
   // Get expiration date if set
   let expiresAt: string | null = null
@@ -1059,12 +1081,14 @@ async function showOneTimeKeyModal(plainKey: string) {
 function buildApiKeyBindingsFromForm(): ApiKeyBindingInput[] {
   const bindings: ApiKeyBindingInput[] = []
 
-  for (const orgId of selectedOrgsForCreation.value) {
-    bindings.push({
-      role_name: getOrgRoleForBinding(orgId),
-      scope_type: 'org',
-      org_id: orgId,
-    })
+  if (!appOnlyScope.value) {
+    for (const orgId of selectedOrgsForCreation.value) {
+      bindings.push({
+        role_name: getOrgRoleForBinding(orgId),
+        scope_type: 'org',
+        org_id: orgId,
+      })
+    }
   }
 
   for (const [appId, roleName] of Object.entries(pendingAppBindings.value)) {
@@ -1085,10 +1109,10 @@ function buildApiKeyBindingsFromForm(): ApiKeyBindingInput[] {
 }
 
 function buildApiKeyGlobalPermissionsFromForm(currentKey?: ApiKeyRow | null) {
-  if (allowOrgCreation.value && canEnableOrgCreation.value)
+  if (!appOnlyScope.value && allowOrgCreation.value && canEnableOrgCreation.value)
     return [apiKeyOrgCreatePermission]
 
-  if (hideOrgCreationPermission && currentKey && hasOrgCreatePermission(currentKey))
+  if (!appOnlyScope.value && hideOrgCreationPermission && currentKey && hasOrgCreatePermission(currentKey))
     return [apiKeyOrgCreatePermission]
 
   return []
@@ -1104,6 +1128,7 @@ async function addNewApiKey() {
   newApiKeyName.value = ''
   createAsHashed.value = false
   allowOrgCreation.value = false
+  appOnlyScope.value = false
   setExpirationCheckbox.value = false
   expirationDate.value = null
   selectedOrgRole.value = 'org_member'
@@ -1132,6 +1157,7 @@ async function editApiKey(key: Database['public']['Tables']['apikeys']['Row']) {
     newApiKeyName.value = key.name || ''
     createAsHashed.value = isHashedKey(key)
     allowOrgCreation.value = hasOrgCreatePermission(key as ApiKeyRow)
+    appOnlyScope.value = false
     setExpirationCheckbox.value = !!key.expires_at
     expirationDate.value = key.expires_at ? new Date(key.expires_at) : null
     selectedOrgRolesById.value = {}
@@ -1144,8 +1170,13 @@ async function editApiKey(key: Database['public']['Tables']['apikeys']['Row']) {
     const keyBindings = getBindingsForKey(key)
     const editableOrgBindings = keyBindings
       .filter(binding => binding.scope_type === 'org' && !!binding.org_id && binding.role_name !== systemApiKeyOrgReaderRole)
-    const appBindingOrgIds = keyBindings
-      .filter(binding => binding.scope_type === 'app' && !!binding.app_id)
+    const appBindings = keyBindings
+      .filter(binding => binding.scope_type === 'app' && !!binding.app_id && !!binding.role_name)
+    appOnlyScope.value = editableOrgBindings.length === 0 && appBindings.length > 0
+    if (appOnlyScope.value)
+      allowOrgCreation.value = false
+
+    const appBindingOrgIds = appBindings
       .map(binding => availableApps.value.find(app => app.id === binding.app_id)?.owner_org)
       .filter((orgId): orgId is string => !!orgId)
 
@@ -1167,9 +1198,7 @@ async function editApiKey(key: Database['public']['Tables']['apikeys']['Row']) {
     syncSelectedOrgRolesById(selectedOrgRole.value)
 
     pendingAppBindings.value = Object.fromEntries(
-      keyBindings
-        .filter(binding => binding.scope_type === 'app' && !!binding.app_id && !!binding.role_name)
-        .map(binding => [binding.app_id!, binding.role_name]),
+      appBindings.map(binding => [binding.app_id!, binding.role_name]),
     )
 
     await nextTick()
@@ -1186,20 +1215,8 @@ async function updateApiKey() {
   if (!key)
     return false
 
-  if (selectedOrgsForCreation.value.length === 0) {
-    toast.error(t('alert-no-org-selected'))
+  if (!validateApiKeyScope())
     return false
-  }
-
-  if (!selectedOrgRole.value) {
-    toast.error(t('select-at-least-one-role'))
-    return false
-  }
-
-  if (hasIncompleteAppBindings()) {
-    toast.error(t('select-role-for-each-app'))
-    return false
-  }
 
   const currentName = key.name || ''
   const trimmedName = newApiKeyName.value.trim()
@@ -1570,6 +1587,11 @@ watch(orgRoleOptions, () => {
   ensureSelectedOrgRoleAllowed()
 })
 
+watch(appOnlyScope, (isAppOnly) => {
+  if (isAppOnly)
+    allowOrgCreation.value = false
+})
+
 watch(canEnableOrgCreation, (canEnable) => {
   if (!canEnable)
     allowOrgCreation.value = false
@@ -1583,9 +1605,8 @@ watch(selectedOrgRole, (newRole) => {
   if (isEditingApiKey.value)
     syncSelectedOrgRolesById(newRole, true)
 
-  if (rolesWithInheritedAppAccess.has(newRole)) {
+  if (!appOnlyScope.value && rolesWithInheritedAppAccess.has(newRole))
     pendingAppBindings.value = {}
-  }
 })
 
 displayStore.NavTitle = t('api-keys')
@@ -1749,12 +1770,32 @@ getKeys()
               </div>
             </div>
           </div>
-
+          <div class="rounded-lg border border-azure-200 bg-azure-50 p-4 dark:border-azure-500/30 dark:bg-azure-500/10">
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input
+                v-model="appOnlyScope"
+                type="checkbox"
+                data-test="create-key-app-only-scope"
+                class="mt-1 d-checkbox d-checkbox-primary d-checkbox-sm"
+              >
+              <span>
+                <span class="block text-sm font-medium text-slate-800 dark:text-white">
+                  {{ t('api-key-selected-apps-only') }}
+                </span>
+                <span class="mt-1 block text-sm text-slate-600 dark:text-slate-300">
+                  {{ t('api-key-selected-apps-only-description') }}
+                </span>
+              </span>
+            </label>
+          </div>
           <!-- Organizations Selection (all checked by default) -->
           <div>
             <h3 class="mb-2 text-sm font-semibold uppercase text-slate-500">
-              {{ t('organizations') }}
+              {{ t(appOnlyScope ? 'api-key-selected-apps-only-org-filter' : 'organizations') }}
             </h3>
+            <p v-if="appOnlyScope" class="mb-2 text-sm text-slate-500">
+              {{ t('api-key-selected-apps-only-org-filter-description') }}
+            </p>
             <div class="relative">
               <button
                 type="button"
@@ -1802,7 +1843,7 @@ getKeys()
           </div>
 
           <!-- Organization Role -->
-          <div>
+          <div v-if="!appOnlyScope">
             <h3 class="mb-2 text-sm font-semibold uppercase text-slate-500">
               {{ t('role') }}
             </h3>
@@ -1829,7 +1870,7 @@ getKeys()
           </div>
 
           <!-- Global organization permissions -->
-          <div v-if="!hideOrgCreationPermission" class="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+          <div v-if="!appOnlyScope && !hideOrgCreationPermission" class="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/40">
             <label class="flex items-start gap-3" :class="canEnableOrgCreation ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'">
               <input
                 v-model="allowOrgCreation"
@@ -1849,13 +1890,13 @@ getKeys()
             </label>
           </div>
 
-          <!-- App Access Control (only when role is not admin) -->
-          <div v-if="showAppAccessInModal && selectedOrgsForCreation.length > 0">
+          <!-- App Access Control -->
+          <div v-if="showAppAccessInModal">
             <h3 class="mb-2 text-sm font-semibold uppercase text-slate-500">
               {{ t('app-access-control') }}
             </h3>
             <p class="mb-3 text-sm text-slate-500">
-              {{ t('app-access-member-only') }}
+              {{ t(appOnlyScope ? 'api-key-selected-apps-only-app-access' : 'app-access-member-only') }}
             </p>
 
             <!-- Add app dropdown -->

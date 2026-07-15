@@ -145,6 +145,43 @@ describe('[POST] /apikey operations', () => {
     expect(verifyData.name).toBe(keyName)
   })
 
+  it('creates an app-only preview key without organization bindings', async () => {
+    const response = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: `app-preview-key-${id.slice(0, 8)}`,
+        bindings: await appApiKeyBindings(APPNAME, 'app_preview'),
+      }),
+    })
+    expect(response.status).toBe(200)
+    const data = await response.json<{ id: number, rbac_id: string }>()
+
+    try {
+      const bindings = await executeSQL(
+        `
+        SELECT role_bindings.scope_type, role_bindings.org_id, role_bindings.app_id, roles.name AS role_name
+        FROM public.role_bindings
+        INNER JOIN public.roles ON roles.id = role_bindings.role_id
+        WHERE role_bindings.principal_type = public.rbac_principal_apikey()
+          AND role_bindings.principal_id = $1::uuid
+        ORDER BY role_bindings.scope_type, roles.name
+        `,
+        [data.rbac_id],
+      )
+
+      expect(bindings).toEqual([
+        expect.objectContaining({ scope_type: 'app', role_name: 'app_preview' }),
+      ])
+    }
+    finally {
+      await fetch(`${BASE_URL}/apikey/${data.id}`, {
+        method: 'DELETE',
+        headers: authHeaders,
+      })
+    }
+  })
+
   it('app-limited key cannot create another API key', async () => {
     const limitedCreatorResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
@@ -771,18 +808,13 @@ describe('[PUT] /apikey/:id operations', () => {
 
       expect(error).toBeNull()
       const bindingRows = (bindings || []) as any[]
-      expect(bindingRows).toHaveLength(2)
-      expect(bindingRows).toEqual(expect.arrayContaining([
+      expect(bindingRows).toEqual([
         expect.objectContaining({
           scope_type: 'app',
           app_id: appBindings[0].app_id,
           roles: expect.objectContaining({ name: 'app_reader' }),
         }),
-        expect.objectContaining({
-          scope_type: 'org',
-          roles: expect.objectContaining({ name: 'apikey_org_reader' }),
-        }),
-      ]))
+      ])
     }
     finally {
       if (createData) {

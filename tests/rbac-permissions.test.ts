@@ -346,6 +346,111 @@ describe('rbac permission system', () => {
         expect(result.rows[0].settings_allowed).toBe(false)
       })
 
+      it('allows an app preview key only its deployment lifecycle', async () => {
+        const slug = randomUUID().slice(0, 8)
+        const orgId = randomUUID()
+        const appId = `com.rbac.preview.${slug}`
+        const siblingAppId = `com.rbac.preview.sibling.${slug}`
+        const channelName = `preview-${slug}`
+        const apiKey = `preview-key-${slug}`
+
+        await query(`
+          INSERT INTO public.orgs (id, name, management_email, created_by)
+          VALUES ($1::uuid, $2, $3, $4::uuid)
+        `, [orgId, `Preview RBAC Org ${slug}`, `preview-rbac-${slug}@capgo.app`, USER_ID])
+
+        const appResult = await query(`
+          INSERT INTO public.apps (app_id, name, icon_url, owner_org)
+          VALUES
+            ($1, $3, 'https://example.com/icon.png', $2::uuid),
+            ($4, $5, 'https://example.com/icon.png', $2::uuid)
+          RETURNING id, app_id
+        `, [appId, orgId, `Preview RBAC App ${slug}`, siblingAppId, `Preview RBAC Sibling ${slug}`])
+        const appUuid = appResult.rows.find(row => row.app_id === appId)?.id
+        expect(appUuid).toBeTruthy()
+
+        const channelResult = await query(`
+          INSERT INTO public.channels (name, app_id, created_by, owner_org)
+          VALUES ($1, $2, $3::uuid, $4::uuid)
+          RETURNING id
+        `, [channelName, appId, USER_ID, orgId])
+        const channelId = channelResult.rows[0]?.id
+        expect(channelId).toBeTruthy()
+
+        const apiKeyResult = await query(`
+          INSERT INTO public.apikeys (user_id, key, name)
+          VALUES ($1::uuid, $2, $3)
+          RETURNING rbac_id
+        `, [USER_ID, apiKey, `Preview key ${slug}`])
+        const apiKeyRbacId = apiKeyResult.rows[0]?.rbac_id
+        expect(apiKeyRbacId).toBeTruthy()
+
+        const bindingResult = await query(`
+          INSERT INTO public.role_bindings (
+            principal_type,
+            principal_id,
+            role_id,
+            scope_type,
+            org_id,
+            app_id,
+            granted_by,
+            is_direct
+          )
+          SELECT
+            public.rbac_principal_apikey(),
+            $1::uuid,
+            roles.id,
+            public.rbac_scope_app(),
+            $2::uuid,
+            $3::uuid,
+            $4::uuid,
+            true
+          FROM public.roles
+          WHERE roles.name = 'app_preview'
+          LIMIT 1
+          RETURNING id
+        `, [apiKeyRbacId, orgId, appUuid, USER_ID])
+        expect(bindingResult.rowCount).toBe(1)
+
+        const result = await query(`
+          SELECT
+            public.rbac_check_permission_direct('org.read', $1::uuid, $2::uuid, NULL::varchar, NULL::bigint, $6) AS can_read_org,
+            public.rbac_check_permission_direct('app.read', $1::uuid, $2::uuid, $3, NULL::bigint, $6) AS can_read_app,
+            public.rbac_check_permission_direct('app.read_bundles', $1::uuid, $2::uuid, $3, NULL::bigint, $6) AS can_read_bundles,
+            public.rbac_check_permission_direct('app.upload_bundle', $1::uuid, $2::uuid, $3, NULL::bigint, $6) AS can_upload_bundle,
+            public.rbac_check_permission_direct('app.create_channel', $1::uuid, $2::uuid, $3, NULL::bigint, $6) AS can_create_channel,
+            public.rbac_check_permission_direct('channel.read', $1::uuid, $2::uuid, $3, $4::bigint, $6) AS can_read_channel,
+            public.rbac_check_permission_direct('channel.promote_bundle', $1::uuid, $2::uuid, $3, $4::bigint, $6) AS can_promote_bundle,
+            public.rbac_check_permission_direct('channel.delete', $1::uuid, $2::uuid, $3, $4::bigint, $6) AS can_delete_channel,
+            public.rbac_check_permission_direct('app.update_settings', $1::uuid, $2::uuid, $3, NULL::bigint, $6) AS can_update_settings,
+            public.rbac_check_permission_direct('app.update_user_roles', $1::uuid, $2::uuid, $3, NULL::bigint, $6) AS can_manage_roles,
+            public.rbac_check_permission_direct('app.manage_devices', $1::uuid, $2::uuid, $3, NULL::bigint, $6) AS can_manage_devices,
+            public.rbac_check_permission_direct('bundle.delete', $1::uuid, $2::uuid, $3, NULL::bigint, $6) AS can_delete_bundle,
+            public.rbac_check_permission_direct('channel.update_settings', $1::uuid, $2::uuid, $3, $4::bigint, $6) AS can_update_channel_settings,
+            public.rbac_check_permission_direct('channel.rollback_bundle', $1::uuid, $2::uuid, $3, $4::bigint, $6) AS can_rollback_channel,
+            public.rbac_check_permission_direct('channel.manage_forced_devices', $1::uuid, $2::uuid, $3, $4::bigint, $6) AS can_manage_forced_devices,
+            public.rbac_check_permission_direct('app.read', $1::uuid, $2::uuid, $5, NULL::bigint, $6) AS can_read_sibling_app
+        `, [USER_ID, orgId, appId, channelId, siblingAppId, apiKey])
+        expect(result.rows[0]).toMatchObject({
+          can_read_org: false,
+          can_read_app: true,
+          can_read_bundles: true,
+          can_upload_bundle: true,
+          can_create_channel: true,
+          can_read_channel: true,
+          can_promote_bundle: true,
+          can_delete_channel: true,
+          can_update_settings: false,
+          can_manage_roles: false,
+          can_manage_devices: false,
+          can_delete_bundle: false,
+          can_update_channel_settings: false,
+          can_rollback_channel: false,
+          can_manage_forced_devices: false,
+          can_read_sibling_app: false,
+        })
+      })
+
       it('should map app-scoped channel RBAC permissions to legacy CLI permissions', async () => {
         const developerKey = `rbac-channel-developer-${randomUUID()}`
         const adminKey = `rbac-channel-admin-${randomUUID()}`
