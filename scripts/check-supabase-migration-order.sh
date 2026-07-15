@@ -193,7 +193,33 @@ if [[ -n "$modified_files" ]]; then
 fi
 
 deleted_files="$(git diff --name-only --diff-filter=D "${base_ref}...HEAD" -- 'supabase/migrations/*.sql')"
+added_files="$(git diff --name-only --diff-filter=A "${base_ref}...HEAD" -- 'supabase/migrations/*.sql')"
+
+# Intentional squash: replace a large migration history with one *_baseline.sql dump.
+# Local/CI reset then reapplies baseline + any migrations still ahead of prod.
+allow_migration_squash=0
+baseline_added_files=''
+while IFS= read -r file; do
+  [[ -z "$file" ]] && continue
+  if [[ "${file##*/}" == *_baseline.sql ]]; then
+    baseline_added_files+="${file}"$'
+'
+  fi
+done <<< "${added_files}"
+baseline_added_count=0
+if [[ -n "$baseline_added_files" ]]; then
+  baseline_added_count="$(printf '%s' "$baseline_added_files" | grep -c . || true)"
+fi
+deleted_count=0
 if [[ -n "$deleted_files" ]]; then
+  deleted_count="$(printf '%s' "$deleted_files" | grep -c . || true)"
+fi
+if [[ "$baseline_added_count" -eq 1 && "$deleted_count" -ge 50 ]]; then
+  allow_migration_squash=1
+  echo "⚠️  Allowing migration squash via baseline ($(echo "$baseline_added_files" | head -1); ${deleted_count} deletions)."
+fi
+
+if [[ -n "$deleted_files" && "$allow_migration_squash" -ne 1 ]]; then
   echo '❌ Existing Supabase migrations were deleted in this change.'
   echo '  Supabase migrations must remain append-only.'
   while IFS= read -r file; do
@@ -202,8 +228,6 @@ if [[ -n "$deleted_files" ]]; then
   done <<< "$deleted_files"
   status=1
 fi
-
-added_files="$(git diff --name-only --diff-filter=A "${base_ref}...HEAD" -- 'supabase/migrations/*.sql')"
 if [[ -n "$added_files" ]]; then
   : > "${added_timestamps_file}"
 
@@ -236,11 +260,15 @@ if [[ -n "$added_files" ]]; then
     fi
 
     if (( 10#$ts < 10#$latest_base_timestamp )); then
-      echo '❌ Migration timestamp regression detected'
-      echo "  Latest timestamp on ${base_ref}: ${latest_base_timestamp}"
-      echo "  New file: $file"
-      echo "  New timestamp: ${ts}"
-      status=1
+      if [[ "$allow_migration_squash" -eq 1 && "${file##*/}" == *_baseline.sql ]]; then
+        echo "⚠️  Allowing baseline timestamp before latest main migration during squash: $file"
+      else
+        echo '❌ Migration timestamp regression detected'
+        echo "  Latest timestamp on ${base_ref}: ${latest_base_timestamp}"
+        echo "  New file: $file"
+        echo "  New timestamp: ${ts}"
+        status=1
+      fi
     fi
   done <<< "$added_files"
 fi
