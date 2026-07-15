@@ -27,15 +27,17 @@ try {
     'SELECT jobid FROM cron.job WHERE jobname = $1',
     ['process_all_cron_tasks'],
   )
-  if (scheduledJobs.rows.length !== 1)
-    throw new Error(`Expected one process_all_cron_tasks scheduler job, found ${scheduledJobs.rows.length}`)
+  if (scheduledJobs.rows.length > 1)
+    throw new Error(`Expected at most one process_all_cron_tasks scheduler job, found ${scheduledJobs.rows.length}`)
 
-  const { rows: unscheduledRows } = await client.query<{ unscheduled: boolean }>(
-    'SELECT cron.unschedule($1::text) AS unscheduled',
-    ['process_all_cron_tasks'],
-  )
-  if (!unscheduledRows[0]?.unscheduled)
-    throw new Error('Could not unschedule process_all_cron_tasks')
+  if (scheduledJobs.rows.length === 1) {
+    const { rows: unscheduledRows } = await client.query<{ unscheduled: boolean }>(
+      'SELECT cron.unschedule($1::text) AS unscheduled',
+      ['process_all_cron_tasks'],
+    )
+    if (!unscheduledRows[0]?.unscheduled)
+      throw new Error('Could not unschedule process_all_cron_tasks')
+  }
 
   // Wait for a pg_net worker already handling seeded scheduler work, then remove queued callbacks.
   // Deleting rows would not synchronize with an active pg_net batch.
