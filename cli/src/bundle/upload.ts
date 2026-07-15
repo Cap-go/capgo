@@ -6,6 +6,7 @@ import type { Compatibility, manifestType } from '../utils'
 import type { OptionsUpload } from './upload_interface'
 import { randomUUID } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { cwd } from 'node:process'
 import { S3Client } from '@bradenmacdonald/s3-lite-client'
 import { intro, log, outro, confirm as pConfirm, isCancel as pIsCancel, select as pSelect, spinner as spinnerC } from '@clack/prompts'
@@ -23,7 +24,7 @@ import { confirmWithRememberedChoice } from '../promptPreferences'
 import { showReplicationProgress } from '../replicationProgress'
 import { formatTable } from '../terminal-table'
 import { usesAlwaysDirectUpdate } from '../updaterConfig'
-import { baseKeyV2, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, canPromptInteractively, checkCompatibilityCloud, checkPlanValidUpload, checkRemoteCliMessages, createSupabaseClient, deletedFailedVersion, findRoot, findSavedKey, formatError, getAppId, getBundleVersion, getCompatibilityDetails, getConfig, getInstalledVersion, getLocalConfig, getLocalDependencies, getOrganizationId, getPMAndCommand, getRemoteChecksums, getRemoteFileConfig, hasCliPermission, isCompatible, isDeprecatedPluginVersion, regexSemver, resolveUserIdFromApiKey, sendEvent, updateConfigUpdater, updateOrCreateChannel, updateOrCreateVersion, UPLOAD_TIMEOUT, uploadTUS, uploadUrl, zipFile } from '../utils'
+import { baseKeyV2, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, canPromptInteractively, checkCompatibilityCloud, checkPlanValidUpload, checkRemoteCliMessages, createSupabaseClient, deletedFailedVersion, findRoot, findSavedKey, formatError, getAppId, getBundleVersion, getCompatibilityDetails, getConfig, getCapgoUpdaterPackageVersion, getInstalledVersion, getLocalConfig, getLocalDependencies, getOrganizationId, getPMAndCommand, getRemoteChecksums, getRemoteFileConfig, hasCliPermission, isCompatible, isDeprecatedPluginVersion, regexSemver, resolveUserIdFromApiKey, sendEvent, updateConfigUpdater, updateOrCreateChannel, updateOrCreateVersion, UPLOAD_TIMEOUT, uploadTUS, uploadUrl, zipFile } from '../utils'
 import { getVersionSuggestions, interactiveVersionBump } from '../versionHelpers'
 import { maybePromptBuilderCta, shouldBlockIncompatibleUpload } from './builder-cta'
 import { checkIndexPosition, searchInDirectory } from './check'
@@ -126,10 +127,18 @@ function getAppIdAndPath(appId: string | undefined, options: OptionsUpload, conf
   return { appid: finalAppId, path }
 }
 
+function isReactNativeExportFolder(path: string) {
+  return existsSync(join(path, 'index.android.bundle')) || existsSync(join(path, 'main.jsbundle'))
+}
+
 function checkNotifyAppReady(options: OptionsUpload, path: string) {
   const checkNotifyAppReady = options.codeCheck
 
   if (typeof checkNotifyAppReady === 'undefined' || checkNotifyAppReady) {
+    // React Native Metro exports do not embed notifyAppReady / index.html in the bundle folder.
+    if (isReactNativeExportFolder(path))
+      return
+
     const isPluginConfigured = searchInDirectory(path, 'notifyAppReady')
     if (!isPluginConfigured) {
       uploadFail(`notifyAppReady() is missing in the build folder of your app. see: https://capgo.app/docs/plugin/api/#notifyappready
@@ -412,7 +421,8 @@ async function prepareBundleFile(path: string, options: OptionsUpload, apikey: s
   zipped = await zipFile(path)
   s.message(`Calculating checksum`)
   const root = findRoot(cwd())
-  const updaterVersion = await getInstalledVersion('@capgo/capacitor-updater', root, options.packageJson)
+  const updaterPackage = await getCapgoUpdaterPackageVersion(root, options.packageJson)
+  const updaterVersion = updaterPackage?.version ?? null
   let useSha256 = false
   let coerced
   try {
@@ -421,15 +431,19 @@ async function prepareBundleFile(path: string, options: OptionsUpload, apikey: s
   catch {
     coerced = undefined
   }
-  if (!updaterVersion) {
-    uploadFail('Cannot find @capgo/capacitor-updater in node_modules, please install it first with your package manager')
+  if (!updaterPackage) {
+    uploadFail('Cannot find @capgo/capacitor-updater or @capgo/react-native-updater in node_modules, please install one first with your package manager')
+  }
+  else if (updaterPackage.kind === 'react-native') {
+    // RN updater uses Capgo file-level delta + SHA256 from day one
+    useSha256 = true
   }
   else if (coerced) {
     // Use SHA256 for v5.10.0+, v6.25.0+ and v7.0.30+
     useSha256 = !isDeprecatedPluginVersion(coerced, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7)
   }
-  else if (updaterVersion === 'link:@capgo/capacitor-updater' || updaterVersion === 'file:..' || updaterVersion === 'file:../') {
-    log.warn('Using local @capgo/capacitor-updater. Assuming latest version for checksum calculation.')
+  else if (updaterVersion === 'link:@capgo/capacitor-updater' || updaterVersion === 'file:..' || updaterVersion === 'file:../' || updaterVersion === 'link:@capgo/react-native-updater') {
+    log.warn(`Using local ${updaterPackage.packageName}. Assuming latest version for checksum calculation.`)
     useSha256 = true
   }
   const forceCrc32 = options.forceCrc32Checksum === true
