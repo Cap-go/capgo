@@ -49,6 +49,9 @@ describe('security response headers', () => {
   })
 
   it.concurrent.each([
+    'https://capgo.app',
+    'https://preprod.capgo.app',
+    'https://development.capgo.app',
     'https://console.capgo.app',
     'https://console.preprod.capgo.app',
     'capacitor://localhost',
