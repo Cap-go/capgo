@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getPublicLiveUpdateMetricsCF } from '../supabase/functions/_backend/utils/cloudflare.ts'
 
-type AnalyticsColumn = { name: string, type: string }
+interface AnalyticsColumn { name: string, type: string }
 
 function analyticsResponse(meta: AnalyticsColumn[], data: Array<Record<string, string>>) {
   return new Response(JSON.stringify({
@@ -44,17 +44,24 @@ describe('public live update metrics', () => {
       const query = String(init?.body ?? '')
       queries.push(query)
 
-      if (query.includes('FROM app_log')) {
+      if (query.includes('sum(succeeded)')) {
         return analyticsResponse(
           [
             { name: 'date', type: 'String' },
-            { name: 'action', type: 'String' },
-            { name: 'total', type: 'UInt64' },
+            { name: 'successes', type: 'UInt64' },
+            { name: 'failures', type: 'UInt64' },
           ],
+          [{ date: '2026-06-30', successes: '117', failures: '3' }],
+        )
+      }
+
+      if (query.includes('SELECT action, count() AS devices')) {
+        return analyticsResponse(
           [
-            { date: '2026-06-30', action: 'get', total: '120' },
-            { date: '2026-06-30', action: 'download_fail', total: '3' },
+            { name: 'action', type: 'String' },
+            { name: 'devices', type: 'UInt64' },
           ],
+          [{ action: 'download_fail', devices: '3' }],
         )
       }
 
@@ -88,14 +95,17 @@ describe('public live update metrics', () => {
     )
 
     expect(metrics).toEqual({
-      daily: [{ date: '2026-06-30', requests: 120, failures: 3 }],
-      failures: [{ reason: 'download_fail', count: 3 }],
-      platforms: { ios: 30, android: 80, electron: 10 },
-      updater_versions: [{ date: '2026-06-30', version: '8.1.0', devices: 120 }],
+      success_rate: 97.5,
+      daily: [{ date: '2026-06-30', success_rate: 97.5 }],
+      failures: [{ reason: 'download_fail', share: 100 }],
+      platforms: { ios: 25, android: 66.66666666666666, electron: 8.333333333333332 },
+      updater_versions: [{ date: '2026-06-30', version: '8.1.0', share: 100 }],
     })
-    expect(queries).toHaveLength(3)
+    expect(queries).toHaveLength(4)
     expect(queries.join('\n')).not.toContain('toString')
     expect(queries.join('\n')).not.toContain('concat')
     expect(queries.find(query => query.includes('FROM device_usage'))).toContain('double1 IN (0.0, 1.0, 2.0)')
+    expect(queries.find(query => query.includes('sum(succeeded)'))).toContain('GROUP BY date, app_id, device_id')
+    expect(queries.find(query => query.includes('SELECT action, count() AS devices'))).toContain('GROUP BY date, action, app_id, device_id')
   })
 })
