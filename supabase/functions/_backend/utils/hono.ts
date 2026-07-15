@@ -112,6 +112,8 @@ const CAPGO_CONSOLE_SUBDOMAIN = 'console'
 const DEFAULT_CORS_ALLOWED_ORIGINS = new Set([
   ...['capgo.app', 'preprod.capgo.app', 'development.capgo.app'].map(domain => `https://${CAPGO_CONSOLE_SUBDOMAIN}.${domain}`),
   'https://capgo.app',
+  'https://preprod.capgo.app',
+  'https://development.capgo.app',
 ])
 
 function normalizeHttpOrigin(origin: string) {

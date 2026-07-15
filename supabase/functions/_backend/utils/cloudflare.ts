@@ -2595,18 +2595,18 @@ export interface PublicLiveUpdateMetrics {
 }
 
 export async function getPublicLiveUpdateMetricsCF(c: Context, referenceDate = new Date()): Promise<PublicLiveUpdateMetrics> {
-  const empty: PublicLiveUpdateMetrics = { daily: [], failures: [], platforms: { ios: 0, android: 0, electron: 0 }, updater_versions: [] }
   if (!c.env.APP_LOG || !c.env.DEVICE_USAGE || !c.env.DEVICE_INFO || !getEnv(c, 'CF_ANALYTICS_TOKEN') || !getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID'))
-    return empty
+    throw new Error('Public live update metric bindings are unavailable')
 
   const end = new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), referenceDate.getUTCDate()))
   const start = new Date(end)
   start.setUTCDate(start.getUTCDate() - 30)
   const window = `timestamp >= toDateTime('${formatDateCF(start)}') AND timestamp < toDateTime('${formatDateCF(end)}')`
   const failureActions = PUBLIC_FAILURE_ACTIONS.map(action => `'${action}'`).join(', ')
-  const requestsAndFailuresQuery = `SELECT toString(toDate(timestamp)) AS date, blob2 AS action, count() AS total FROM app_log WHERE ${window} AND (blob2 = 'get' OR blob2 IN (${failureActions})) GROUP BY date, action`
-  const platformsQuery = `SELECT double1 AS platform, uniqExact(concat(index1, ':', blob1)) AS devices FROM device_usage WHERE ${window} AND double1 IN (0, 1, 2) GROUP BY platform`
-  const updaterVersionsQuery = `SELECT date, version, count() AS devices FROM (SELECT toString(toDate(timestamp)) AS date, index1 AS app_id, blob1 AS device_id, argMax(blob3, timestamp) AS version FROM device_info WHERE ${window} AND blob3 != '' GROUP BY date, app_id, device_id) GROUP BY date, version`
+  const day = `formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d')`
+  const requestsAndFailuresQuery = `SELECT ${day} AS date, blob2 AS action, count() AS total FROM app_log WHERE ${window} AND (blob2 = 'get' OR blob2 IN (${failureActions})) GROUP BY date, action`
+  const platformsQuery = `SELECT platform, count() AS devices FROM (SELECT double1 AS platform, index1 AS app_id, blob1 AS device_id FROM device_usage WHERE ${window} AND double1 IN (0.0, 1.0, 2.0) GROUP BY platform, app_id, device_id) GROUP BY platform`
+  const updaterVersionsQuery = `SELECT date, version, count() AS devices FROM (SELECT ${day} AS date, index1 AS app_id, blob1 AS device_id, argMax(blob3, timestamp) AS version FROM device_info WHERE ${window} AND blob3 != '' GROUP BY date, app_id, device_id) GROUP BY date, version`
 
   try {
     const [actionRows, platformRows, versionRows] = await Promise.all([
@@ -2628,9 +2628,10 @@ export async function getPublicLiveUpdateMetricsCF(c: Context, referenceDate = n
     }
     const platforms = { ios: 0, android: 0, electron: 0 }
     for (const row of platformRows) {
-      if (row.platform === 0) platforms.android += Number(row.devices) || 0
-      if (row.platform === 1) platforms.ios += Number(row.devices) || 0
-      if (row.platform === 2) platforms.electron += Number(row.devices) || 0
+      const platform = Number(row.platform)
+      if (platform === 0) platforms.android += Number(row.devices) || 0
+      if (platform === 1) platforms.ios += Number(row.devices) || 0
+      if (platform === 2) platforms.electron += Number(row.devices) || 0
     }
     return {
       daily: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)),
@@ -2641,6 +2642,6 @@ export async function getPublicLiveUpdateMetricsCF(c: Context, referenceDate = n
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading public live update metrics', error: serializeError(error) })
-    return empty
+    throw error
   }
 }
