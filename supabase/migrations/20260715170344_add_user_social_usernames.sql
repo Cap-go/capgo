@@ -54,3 +54,4 @@ $function$;
 COMMENT ON FUNCTION "public"."generate_org_user_on_org_create"() IS 'Creates the initial org super-admin role binding when an organization is created.';
 
 REVOKE ALL ON FUNCTION "public"."get_org_apikeys"(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION "public"."get_org_apikeys"(uuid) TO authenticated;
