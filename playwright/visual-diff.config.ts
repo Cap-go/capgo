@@ -27,8 +27,8 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
     path: '/apikeys',
     auth: true,
     prepare: async (page) => {
-      await page.getByTestId('create-key').click()
-      const appOnlyScope = page.getByTestId('create-key-app-only-scope')
+      await page.locator('[data-test="create-key"]').click()
+      const appOnlyScope = page.locator('[data-test="create-key-app-only-scope"]')
       if (await appOnlyScope.count())
         await appOnlyScope.check()
     },
