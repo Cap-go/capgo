@@ -70,3 +70,6 @@ GRANT EXECUTE ON FUNCTION "public"."assert_effective_super_admin_binding_removal
 
 REVOKE ALL ON FUNCTION "public"."prevent_role_binding_priority_escalation"() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION "public"."prevent_role_binding_priority_escalation"() TO service_role;
+
+REVOKE ALL ON FUNCTION "public"."get_org_members"(uuid, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION "public"."get_org_members"(uuid, uuid) TO service_role;
