@@ -55,3 +55,15 @@ COMMENT ON FUNCTION "public"."generate_org_user_on_org_create"() IS 'Creates the
 
 REVOKE ALL ON FUNCTION "public"."get_org_apikeys"(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION "public"."get_org_apikeys"(uuid) TO authenticated;
+
+-- Preserve API-key and authenticated compatibility RPC access after the baseline hardening pass.
+GRANT EXECUTE ON FUNCTION "public"."get_org_perm_for_apikey_v2"(text, text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION "public"."get_org_members"(uuid) TO anon;
+GRANT EXECUTE ON FUNCTION "public"."get_org_members_rbac"(uuid) TO anon;
+GRANT EXECUTE ON FUNCTION "public"."check_org_members_password_policy"(uuid) TO anon;
+GRANT EXECUTE ON FUNCTION "public"."update_org_invite_role_rbac"(uuid, uuid, text) TO anon;
+GRANT EXECUTE ON FUNCTION "public"."update_tmp_invite_role_rbac"(uuid, text, text) TO anon;
+GRANT EXECUTE ON FUNCTION "public"."check_org_members_2fa_enabled"(uuid) TO anon;
+
+REVOKE ALL ON FUNCTION "public"."assert_effective_super_admin_binding_removal"(uuid, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION "public"."assert_effective_super_admin_binding_removal"(uuid, text) TO service_role;
