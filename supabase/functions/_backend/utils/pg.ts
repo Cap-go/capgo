@@ -3141,6 +3141,24 @@ export async function getAdminOnboardingFunnel(
     const drizzleClient = getDrizzleClient(pgClient)
     const now = new Date()
 
+    const onboardingBundleEligibility = sql`
+      a.created_at >= o.created_at
+      AND a.created_at < o.created_at + interval '7 days'
+      AND EXISTS (
+        SELECT 1
+        FROM channels c
+        WHERE c.app_id = a.app_id
+      )
+      AND EXISTS (
+        SELECT 1
+        FROM app_versions av
+        WHERE av.app_id = a.app_id
+          AND av.name NOT IN ('builtin', 'unknown')
+          AND av.created_at >= o.created_at
+          AND av.created_at < o.created_at + interval '7 days'
+      )
+    `
+
     // Get total funnel counts for orgs created in the date range
     const funnelQuery = sql`
       WITH orgs_in_range AS (
@@ -3164,19 +3182,7 @@ export async function getAdminOnboardingFunnel(
         SELECT DISTINCT o.id, o.customer_id, o.created_at, o.created_date
         FROM orgs_in_range o
         INNER JOIN apps a ON a.owner_org = o.id
-        WHERE EXISTS (
-          SELECT 1
-          FROM channels c
-          WHERE c.app_id = a.app_id
-        )
-          AND EXISTS (
-            SELECT 1
-            FROM app_versions av
-            WHERE av.app_id = a.app_id
-              AND av.name NOT IN ('builtin', 'unknown')
-              AND av.created_at >= o.created_at
-              AND av.created_at < o.created_at + interval '7 days'
-          )
+        WHERE ${onboardingBundleEligibility}
       ),
       orgs_subscribed AS (
         SELECT DISTINCT o.id, o.created_date
@@ -3246,19 +3252,7 @@ export async function getAdminOnboardingFunnel(
         INNER JOIN apps a ON a.owner_org = o.id
         WHERE o.created_at >= ${start_date}::timestamp
           AND o.created_at < ${end_date}::timestamp
-          AND EXISTS (
-            SELECT 1
-            FROM channels c
-            WHERE c.app_id = a.app_id
-          )
-          AND EXISTS (
-            SELECT 1
-            FROM app_versions av
-            WHERE av.app_id = a.app_id
-              AND av.name NOT IN ('builtin', 'unknown')
-              AND av.created_at >= o.created_at
-              AND av.created_at < o.created_at + interval '7 days'
-          )
+          AND ${onboardingBundleEligibility}
         GROUP BY o.created_at::date
       ),
       daily_subscriptions AS (
@@ -3268,19 +3262,7 @@ export async function getAdminOnboardingFunnel(
         INNER JOIN stripe_info si ON si.customer_id = o.customer_id
         WHERE o.created_at >= ${start_date}::timestamp
           AND o.created_at < ${end_date}::timestamp
-          AND EXISTS (
-            SELECT 1
-            FROM channels c
-            WHERE c.app_id = a.app_id
-          )
-          AND EXISTS (
-            SELECT 1
-            FROM app_versions av
-            WHERE av.app_id = a.app_id
-              AND av.name NOT IN ('builtin', 'unknown')
-              AND av.created_at >= o.created_at
-              AND av.created_at < o.created_at + interval '7 days'
-          )
+          AND ${onboardingBundleEligibility}
           AND si.paid_at IS NOT NULL
           AND si.paid_at >= o.created_at
           AND si.paid_at < o.created_at + interval '7 days'
@@ -3311,21 +3293,7 @@ export async function getAdminOnboardingFunnel(
       INNER JOIN apps a ON a.owner_org = o.id
       WHERE o.created_at >= ${start_date}::timestamp
         AND o.created_at < ${end_date}::timestamp
-        AND a.created_at >= o.created_at
-        AND a.created_at < o.created_at + interval '7 days'
-        AND EXISTS (
-          SELECT 1
-          FROM channels ch
-          WHERE ch.app_id = a.app_id
-        )
-        AND EXISTS (
-          SELECT 1
-          FROM app_versions av
-          WHERE av.app_id = a.app_id
-            AND av.name NOT IN ('builtin', 'unknown')
-            AND av.created_at >= o.created_at
-            AND av.created_at < o.created_at + interval '7 days'
-        )
+        AND ${onboardingBundleEligibility}
     `
 
     const [trendResult, activationCohortResult] = await Promise.all([
