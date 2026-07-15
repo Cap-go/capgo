@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -566,6 +571,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "apps"
             referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "build_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1573,7 +1585,7 @@ export type Database = {
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
-          plan_enterprise: number
+          plan_enterprise: number | null
           plan_enterprise_conversion_rate: number
           plan_enterprise_monthly: number
           plan_enterprise_yearly: number
@@ -1670,7 +1682,7 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
-          plan_enterprise?: number
+          plan_enterprise?: number | null
           plan_enterprise_conversion_rate?: number
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
@@ -1767,7 +1779,7 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
-          plan_enterprise?: number
+          plan_enterprise?: number | null
           plan_enterprise_conversion_rate?: number
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
@@ -3316,9 +3328,7 @@ export type Database = {
           email_preferences: Json
           enable_notifications: boolean
           first_name: string | null
-          discord_username: string | null
           format_locale: string | null
-          github_username: string | null
           id: string
           image_url: string | null
           last_name: string | null
@@ -3334,9 +3344,7 @@ export type Database = {
           email_preferences?: Json
           enable_notifications?: boolean
           first_name?: string | null
-          discord_username?: string | null
           format_locale?: string | null
-          github_username?: string | null
           id: string
           image_url?: string | null
           last_name?: string | null
@@ -3352,9 +3360,7 @@ export type Database = {
           email_preferences?: Json
           enable_notifications?: boolean
           first_name?: string | null
-          discord_username?: string | null
           format_locale?: string | null
-          github_username?: string | null
           id?: string
           image_url?: string | null
           last_name?: string | null
@@ -4595,7 +4601,7 @@ export type Database = {
         | { Args: { userid: string }; Returns: boolean }
       is_rbac_enabled_globally: { Args: never; Returns: boolean }
       is_recent_email_otp_verified: {
-        Args: { p_user_id: string }
+        Args: { user_id: string }
         Returns: boolean
       }
       is_storage_exceeded_by_org: { Args: { org_id: string }; Returns: boolean }
@@ -4998,25 +5004,6 @@ export type Database = {
         Args: { email: string; org_id: string }
         Returns: string
       }
-      reset_and_seed_app_data: {
-        Args: {
-          p_admin_user_id?: string
-          p_app_id: string
-          p_org_id?: string
-          p_plan_product_id?: string
-          p_stripe_customer_id?: string
-          p_user_id?: string
-        }
-        Returns: undefined
-      }
-      reset_and_seed_app_stats_data: {
-        Args: { p_app_id: string }
-        Returns: undefined
-      }
-      reset_and_seed_data: { Args: never; Returns: undefined }
-      reset_and_seed_stats_data: { Args: never; Returns: undefined }
-      reset_app_data: { Args: { p_app_id: string }; Returns: undefined }
-      reset_app_stats_data: { Args: { p_app_id: string }; Returns: undefined }
       reset_onboarding_demo_app_data: {
         Args: { p_app_uuid: string }
         Returns: undefined
@@ -5189,9 +5176,7 @@ export type Database = {
         | "disableAutoUpdateMetadata"
         | "disableAutoUpdateUnderNative"
         | "disableDevBuild"
-        | "disableProdBuild"
         | "disableEmulator"
-        | "disableDevice"
         | "cannotGetBundle"
         | "checksum_fail"
         | "NoChannelOrOverride"
@@ -5212,6 +5197,8 @@ export type Database = {
         | "download_manifest_brotli_fail"
         | "backend_refusal"
         | "download_0"
+        | "disableProdBuild"
+        | "disableDevice"
         | "disablePlatformElectron"
         | "customIdBlocked"
         | "app_crash"
@@ -5462,9 +5449,7 @@ export const Constants = {
         "disableAutoUpdateMetadata",
         "disableAutoUpdateUnderNative",
         "disableDevBuild",
-        "disableProdBuild",
         "disableEmulator",
-        "disableDevice",
         "cannotGetBundle",
         "checksum_fail",
         "NoChannelOrOverride",
@@ -5485,6 +5470,8 @@ export const Constants = {
         "download_manifest_brotli_fail",
         "backend_refusal",
         "download_0",
+        "disableProdBuild",
+        "disableDevice",
         "disablePlatformElectron",
         "customIdBlocked",
         "app_crash",
@@ -5528,4 +5515,3 @@ export const Constants = {
     },
   },
 } as const
-
