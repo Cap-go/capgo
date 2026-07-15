@@ -37437,7 +37437,7 @@ DROP INDEX IF EXISTS "public"."manifest_file_name_idx";
 -- <<< END 20260713203749_fix_rls_policy_index_lints.sql
 
 -- >>> BEGIN 20260714100722_observe_plugin_version_adoption_index.sql
-CREATE INDEX CONCURRENTLY IF NOT EXISTS
+CREATE INDEX IF NOT EXISTS
 idx_devices_app_id_plugin_version_production
 ON public.devices USING btree (app_id, plugin_version)
 WHERE is_prod IS TRUE

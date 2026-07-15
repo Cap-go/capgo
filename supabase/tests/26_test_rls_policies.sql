@@ -920,14 +920,11 @@ SELECT
     is(
         (
             SELECT count(*)
-            FROM pg_proc p
-            JOIN pg_namespace n ON n.oid = p.pronamespace
-            WHERE n.nspname = 'capgo_private'
-              AND p.proname = 'matches_app_storage_rbac_owner'
-              AND pg_get_functiondef(p.oid) !~ 'key_mode|check_min_rights|get_identity'
+            FROM pg_namespace
+            WHERE nspname = 'capgo_private'
         ),
-        1::bigint,
-        'storage API-key helper should use RBAC permissions without key modes'
+        0::bigint,
+        'capgo_private schema should not exist'
     );
 
 SELECT
