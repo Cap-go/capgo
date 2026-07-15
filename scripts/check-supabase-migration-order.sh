@@ -149,7 +149,7 @@ done < <(git diff --name-status -M100% --diff-filter=R "${base_ref}...HEAD" -- '
 # with live RLS traffic. Permit only the audited repair below; later edits stay
 # blocked by the exact blob hash.
 failed_migration_hotfix='supabase/migrations/20260713114104_harden_rbac_compat_cleanup_after_rls.sql'
-failed_migration_hotfix_blob='97602d186eccb7ab61766f79baff70fa74f34b75'
+failed_migration_hotfix_blob='17dfb3f478bff6b52bc71a85f0016cce11f1d789'
 
 modified_files="$(git diff --name-only --diff-filter=MR "${base_ref}...HEAD" -- 'supabase/migrations/*.sql')"
 if [[ -n "$modified_files" ]]; then

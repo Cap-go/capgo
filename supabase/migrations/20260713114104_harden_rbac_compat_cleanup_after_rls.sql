@@ -28,7 +28,7 @@ BEGIN
         END IF;
 
         RAISE NOTICE 'Retrying migration DDL after lock conflict on attempt %', v_attempt;
-        PERFORM pg_catalog.pg_sleep(pg_catalog.least(0.25 * v_attempt, 3.0));
+        PERFORM pg_catalog.pg_sleep(LEAST(0.25 * v_attempt, 3.0));
     END;
   END LOOP;
 END;
