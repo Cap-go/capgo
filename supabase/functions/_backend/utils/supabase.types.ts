@@ -3324,11 +3324,13 @@ export type Database = {
           country: string | null
           created_at: string | null
           created_via_invite: boolean
+          discord_username: string | null
           email: string
           email_preferences: Json
           enable_notifications: boolean
           first_name: string | null
           format_locale: string | null
+          github_username: string | null
           id: string
           image_url: string | null
           last_name: string | null
@@ -3340,11 +3342,13 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           created_via_invite?: boolean
+          discord_username?: string | null
           email: string
           email_preferences?: Json
           enable_notifications?: boolean
           first_name?: string | null
           format_locale?: string | null
+          github_username?: string | null
           id: string
           image_url?: string | null
           last_name?: string | null
@@ -3356,11 +3360,13 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           created_via_invite?: boolean
+          discord_username?: string | null
           email?: string
           email_preferences?: Json
           enable_notifications?: boolean
           first_name?: string | null
           format_locale?: string | null
+          github_username?: string | null
           id?: string
           image_url?: string | null
           last_name?: string | null
