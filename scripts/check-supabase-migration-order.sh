@@ -144,6 +144,12 @@ while IFS=$'\t' read -r similarity _old_path new_path; do
   fi
 done < <(git diff --name-status -M100% --diff-filter=R "${base_ref}...HEAD" -- 'supabase/migrations/*.sql')
 
+# This migration failed before it was recorded in production because a legacy
+# trigger still referenced the column it removes. Permit only the audited repair
+# below; later edits remain blocked by the exact blob hash.
+failed_migration_hotfix='supabase/migrations/20260713114104_harden_rbac_compat_cleanup_after_rls.sql'
+failed_migration_hotfix_blob='870d5ce61eb58366617f0870ff14e8183c207303'
+
 modified_files="$(git diff --name-only --diff-filter=MR "${base_ref}...HEAD" -- 'supabase/migrations/*.sql')"
 if [[ -n "$modified_files" ]]; then
   disallowed_modified_files=''
@@ -160,6 +166,14 @@ if [[ -n "$modified_files" ]]; then
 
     if [[ -n "$restamped_files" ]] && printf '%s' "$restamped_files" | grep -qxF "$file"; then
       echo "⚠️  Allowing content-preserving re-stamp to a newer timestamp: $file"
+      continue
+
+
+    fi
+
+    if [[ "$file" == "$failed_migration_hotfix" ]] \
+      && [[ "$(git hash-object "$file")" == "$failed_migration_hotfix_blob" ]]; then
+      echo "⚠️  Allowing audited repair to failed unapplied migration: $file"
       continue
     fi
 
