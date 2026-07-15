@@ -9,6 +9,7 @@ import { bundleTabs } from '~/constants/bundleTabs'
 import { channelTabs } from '~/constants/channelTabs'
 import { deviceTabs } from '~/constants/deviceTabs'
 import { logTabs } from '~/constants/logTabs'
+import { observeTabs } from '~/constants/observeTabs'
 import { useOrganizationStore } from '~/stores/organization'
 
 const router = useRouter()
@@ -112,6 +113,8 @@ const tabs = computed<Tab[]>(() => {
 const appSectionType = computed(() => {
   if (/^\/app\/[^/]+\/logs(?:\/|$)/.test(route.path))
     return 'logs'
+  if (/^\/app\/[^/]+\/observe(?:\/|$)/.test(route.path))
+    return 'observe'
   return null
 })
 
@@ -124,6 +127,8 @@ const secondaryTabBasePath = computed(() => {
     return `/app/${appRouteSegment.value}/${resourceType.value}/${resourceId.value}`
   if (secondaryTabType.value === 'logs')
     return `/app/${appRouteSegment.value}/logs`
+  if (secondaryTabType.value === 'observe')
+    return `/app/${appRouteSegment.value}/observe`
   return ''
 })
 
@@ -133,6 +138,7 @@ const tabsConfig: Record<string, Tab[]> = {
   device: deviceTabs,
   bundle: bundleTabs,
   logs: logTabs,
+  observe: observeTabs,
 }
 
 // Generate secondary tabs with full paths for the current resource or app section

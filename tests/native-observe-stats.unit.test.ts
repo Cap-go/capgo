@@ -12,6 +12,13 @@ describe('native observe stats helpers', () => {
     expect(nativeObserveStatsTestUtils.normalizeNativeObservePeriodDays(7.5)).toBeNull()
   })
 
+  it.concurrent('normalizes supported views', () => {
+    expect(nativeObserveStatsTestUtils.normalizeNativeObserveView(undefined)).toBe('global')
+    expect(nativeObserveStatsTestUtils.normalizeNativeObserveView('global')).toBe('global')
+    expect(nativeObserveStatsTestUtils.normalizeNativeObserveView('plugins')).toBe('plugins')
+    expect(nativeObserveStatsTestUtils.normalizeNativeObserveView('unknown')).toBeNull()
+  })
+
   it.concurrent('generates inclusive UTC day labels', () => {
     expect(nativeObserveStatsTestUtils.generateDateLabels(
       new Date('2026-07-01T18:00:00Z'),
@@ -57,10 +64,23 @@ describe('native observe stats helpers', () => {
     expect(response.overview.launch_p90_ms).toBe(913)
     expect(response.daily.launches).toEqual([4, 0])
     expect(response.daily.webview_loads).toEqual([3, 0])
+    expect('pluginVersions' in response).toBe(false)
     expect(response.daily.issue_events).toEqual([0, 1])
     expect(response.daily.launch_p50_ms).toEqual([410, null])
     expect(response.actionBreakdown[1]).toMatchObject({ action: 'app_crash', is_issue: true })
     expect(response.versions[0]).toMatchObject({ version_name: '1.2.3', issue_free_rate: 75, launch_p90_ms: 913 })
     expect(response.releaseMarkers).toHaveLength(1)
+  })
+
+  it('builds plugin version aggregates without global statistics', () => {
+    expect(nativeObserveStatsTestUtils.buildNativeObservePluginResponse([
+      { plugin_version: '7.0.0', devices: 3, total_devices: 4 },
+      { plugin_version: '6.9.0', devices: 1, total_devices: 4 },
+    ])).toEqual({
+      pluginVersions: [
+        { plugin_version: '7.0.0', devices: 3, total_devices: 4 },
+        { plugin_version: '6.9.0', devices: 1, total_devices: 4 },
+      ],
+    })
   })
 })

@@ -53,7 +53,7 @@ interface LoadedVisualDiffConfig {
 
 async function loadVisualDiffConfig(): Promise<LoadedVisualDiffConfig> {
   const configPath = resolve(repoRoot, 'playwright/visual-diff.config.ts')
-  const module = await import(`${pathToFileURL(configPath).href}?t=${Date.now()}`)
+  const module = await import(pathToFileURL(configPath).href)
   return {
     visualDiffRoutes: module.visualDiffRoutes as VisualDiffRoute[],
     visualDiffViewport: module.visualDiffViewport as LoadedVisualDiffConfig['visualDiffViewport'],
@@ -465,8 +465,13 @@ async function settlePage(page: Page) {
   })
 }
 
-async function captureScreenshots(phase: Phase, routeFilter: string[], options: { forceFrontend?: boolean, forceBackend?: boolean } = {}) {
-  const { visualDiffRoutes, visualDiffViewport } = await loadVisualDiffConfig()
+async function captureScreenshots(
+  phase: Phase,
+  routeFilter: string[],
+  options: { forceFrontend?: boolean, forceBackend?: boolean } = {},
+  config?: LoadedVisualDiffConfig,
+) {
+  const { visualDiffRoutes, visualDiffViewport } = config ?? await loadVisualDiffConfig()
   const routes = selectedRoutes(visualDiffRoutes, routeFilter)
   const targetDir = phaseDir(phase)
   mkdirSync(targetDir, { recursive: true })
@@ -547,10 +552,14 @@ function writeDiffImage(beforePath: string, afterPath: string, diffPath: string)
   }
 }
 
-async function compareScreenshots(thresholdPercent: number, routeFilter: string[]): Promise<DiffResult[]> {
+async function compareScreenshots(
+  thresholdPercent: number,
+  routeFilter: string[],
+  config?: LoadedVisualDiffConfig,
+): Promise<DiffResult[]> {
   const beforeRoot = phaseDir('before')
   const afterRoot = phaseDir('after')
-  const { visualDiffRoutes } = await loadVisualDiffConfig()
+  const { visualDiffRoutes } = config ?? await loadVisualDiffConfig()
   const routes = selectedRoutes(visualDiffRoutes, routeFilter)
   const results: DiffResult[] = []
 
@@ -695,21 +704,37 @@ async function runPipeline(options: CliOptions) {
   const headSha = resolveGitRef(options.headRef, originalRef)
 
   try {
+    if (!options.skipGitCheckout && originalRef !== headSha)
+      await checkoutRef(headSha)
+
+    // Keep the head route manifest while Git moves between revisions.
+    const visualDiffConfig = await loadVisualDiffConfig()
+
     if (!options.skipGitCheckout) {
       await stopFrontendStack()
       await stopBackendStack()
       await checkoutRef(baseSha)
-      await captureScreenshots('before', options.routes, { forceFrontend: true, forceBackend: true })
+      await captureScreenshots(
+        'before',
+        options.routes,
+        { forceFrontend: true, forceBackend: true },
+        visualDiffConfig,
+      )
       await stopFrontendStack()
       await stopBackendStack()
       await checkoutRef(headSha)
     }
 
-    await captureScreenshots('after', options.routes, {
-      forceFrontend: !options.skipGitCheckout,
-      forceBackend: !options.skipGitCheckout,
-    })
-    const results = await compareScreenshots(options.thresholdPercent, options.routes)
+    await captureScreenshots(
+      'after',
+      options.routes,
+      {
+        forceFrontend: !options.skipGitCheckout,
+        forceBackend: !options.skipGitCheckout,
+      },
+      visualDiffConfig,
+    )
+    const results = await compareScreenshots(options.thresholdPercent, options.routes, visualDiffConfig)
     const summary = generateReport(results, options.thresholdPercent)
 
     if (summary.changedCount > 0)
