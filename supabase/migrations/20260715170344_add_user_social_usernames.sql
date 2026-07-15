@@ -67,3 +67,6 @@ GRANT EXECUTE ON FUNCTION "public"."check_org_members_2fa_enabled"(uuid) TO anon
 
 REVOKE ALL ON FUNCTION "public"."assert_effective_super_admin_binding_removal"(uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION "public"."assert_effective_super_admin_binding_removal"(uuid, text) TO service_role;
+
+REVOKE ALL ON FUNCTION "public"."prevent_role_binding_priority_escalation"() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION "public"."prevent_role_binding_priority_escalation"() TO service_role;
