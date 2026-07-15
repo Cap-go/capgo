@@ -603,8 +603,8 @@ watchEffect(async () => {
               type="button"
               :aria-describedby="d === 30 ? 'max-period-tooltip' : undefined"
               :aria-pressed="days === d"
-              class="relative overflow-visible d-btn d-btn-sm d-join-item min-w-12 group"
-              :class="days === d ? 'd-btn-primary' : 'd-btn-outline'"
+              class="relative overflow-visible d-btn d-btn-sm d-join-item min-w-12 border-slate-500 bg-transparent text-slate-300 group hover:border-slate-400 hover:bg-slate-800 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-azure-500"
+              :class="days === d ? 'border-slate-400 bg-slate-700 text-white hover:bg-slate-600' : ''"
               @click="selectPeriod(d)"
             >
               {{ periodButtonLabel(d) }}
