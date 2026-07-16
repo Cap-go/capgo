@@ -566,21 +566,26 @@ export async function createAppVersions(
   values: Partial<Database['public']['Tables']['app_versions']['Insert']> = {},
 ) {
   const supabase = getSupabaseClient()
-  const { error, data } = await supabase.from('app_versions').upsert({
-    app_id: appId,
-    name: version,
-    owner_org: ORG_ID,
-    ...values,
-  }, {
-    onConflict: 'app_id,name',
-  }).select('id,name').single()
-  if (error) {
-    console.error(`Error creating app_version for ${version}:`, error)
+  // Concurrent upserts under it.concurrent can briefly return no row from .single();
+  // retry a few times instead of failing the whole stats suite on that race.
+  let lastError: unknown
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { error, data } = await supabase.from('app_versions').upsert({
+      app_id: appId,
+      name: version,
+      owner_org: ORG_ID,
+      ...values,
+    }, {
+      onConflict: 'app_id,name',
+    }).select('id,name').single()
+    if (data)
+      return data
+    lastError = error
+    if (error)
+      console.error(`Error creating app_version for ${version} (attempt ${attempt + 1}):`, error)
+    await new Promise(resolve => setTimeout(resolve, 25 * (attempt + 1)))
   }
-  if (!data) {
-    throw new Error(`Error creating app_version for ${version}: no data`)
-  }
-  return data
+  throw new Error(`Error creating app_version for ${version}: no data${lastError ? ` (${JSON.stringify(lastError)})` : ''}`)
 }
 
 export function getBaseData(appId: string): Partial<ReturnType<typeof makeBaseData>> {
@@ -824,8 +829,30 @@ export async function getCronPlanQueueCount(): Promise<number> {
   return Number.parseInt(result[0]?.count || '0')
 }
 
+export async function getCronPlanQueueCountForOrg(orgId: string): Promise<number> {
+  const result = await executeSQL(
+    `SELECT COUNT(*) as count
+     FROM pgmq.q_cron_stat_org
+     WHERE message->'payload'->>'orgId' = $1`,
+    [orgId],
+  )
+  return Number.parseInt(result[0]?.count || '0')
+}
+
 export async function getLatestCronPlanMessage(): Promise<any> {
   const result = await executeSQL('SELECT message FROM pgmq.q_cron_stat_org ORDER BY msg_id DESC LIMIT 1')
+  return result[0]?.message
+}
+
+export async function getLatestCronPlanMessageForOrg(orgId: string): Promise<any> {
+  const result = await executeSQL(
+    `SELECT message
+     FROM pgmq.q_cron_stat_org
+     WHERE message->'payload'->>'orgId' = $1
+     ORDER BY msg_id DESC
+     LIMIT 1`,
+    [orgId],
+  )
   return result[0]?.message
 }
 
