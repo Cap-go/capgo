@@ -44,6 +44,10 @@ interface PreviewVersionRow {
   created_by_apikey_rbac_id: string | null
 }
 
+interface OwnerOrgRow {
+  owner_org: string
+}
+
 function getEffectiveApikey(c: Context<MiddlewareKeyVariables>, apikey: Database['public']['Tables']['apikeys']['Row']) {
   const effectiveApikey = apikey.key ?? c.get('capgkey')
   if (!effectiveApikey) {
@@ -60,6 +64,30 @@ async function loadPreviewChannelForUpdate(dbClient: PgQueryClient, body: Channe
        AND name = $2
      FOR UPDATE`,
     [body.app_id, body.channel],
+  )
+
+  return (result.rowCount ?? 0) === 1 ? result.rows[0] : null
+}
+
+async function loadPreviewChannelOwner(dbClient: PgQueryClient, body: ChannelSet) {
+  const result = await dbClient.query<OwnerOrgRow>(
+    `SELECT owner_org
+     FROM public.channels
+     WHERE app_id = $1
+       AND name = $2`,
+    [body.app_id, body.channel],
+  )
+
+  return (result.rowCount ?? 0) === 1 ? result.rows[0] : null
+}
+
+async function loadPreviewAppForUpdate(dbClient: PgQueryClient, appId: string) {
+  const result = await dbClient.query<OwnerOrgRow>(
+    `SELECT owner_org
+     FROM public.apps
+     WHERE app_id = $1
+     FOR UPDATE`,
+    [appId],
   )
 
   return (result.rowCount ?? 0) === 1 ? result.rows[0] : null
@@ -150,19 +178,36 @@ async function deletePreviewChannelAndBundle(
     await dbClient.query('BEGIN')
     transactionStarted = true
 
+    const expectedChannel = await loadPreviewChannelOwner(dbClient, body)
+    if (!expectedChannel) {
+      throw simpleError('cannot_find_channel', 'Cannot find channel')
+    }
+
+    // Keep the organization, app, channel, then bundle lock order. Org deletion
+    // takes the org lock before its cascades, and app transfers update the app
+    // before versions and channels. The initial lookup stays unlocked to avoid a cycle.
+    await dbClient.query(
+      'SELECT public.lock_rbac_orgs($1::uuid)',
+      [expectedChannel.owner_org],
+    )
+
+    const app = await loadPreviewAppForUpdate(dbClient, body.app_id)
+    if (!app) {
+      throw simpleError('cannot_find_channel', 'Cannot find channel')
+    }
+    if (app.owner_org !== expectedChannel.owner_org) {
+      throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id })
+    }
+
     const channel = await loadPreviewChannelForUpdate(dbClient, body)
     if (!channel) {
       throw simpleError('cannot_find_channel', 'Cannot find channel')
     }
+    if (channel.owner_org !== app.owner_org) {
+      throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel_id: channel.id })
+    }
 
     await assertPreviewChannelDeletePermission(c, dbClient, body, apikey, effectiveApikey, channel)
-
-    // Channel creation inserts its preview role binding (which takes this org
-    // lock) before it locks the bundle. Keep delete on the same lock order.
-    await dbClient.query(
-      'SELECT public.lock_rbac_orgs($1::uuid)',
-      [channel.owner_org],
-    )
 
     const versionIds = [...new Set([channel.version, channel.rollout_version].filter((version): version is number => version !== null))]
     await lockPreviewBundleLifecycle(dbClient, versionIds)

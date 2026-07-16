@@ -317,9 +317,11 @@ describe('cli app preview lifecycle', () => {
       [APPNAME, BUNDLE_NAME],
     )
     expect(bundle).toEqual(expect.objectContaining({
-      id: expect.any(Number),
+      id: expect.anything(),
       created_by_apikey_rbac_id: apiKey.rbac_id,
     }))
+    const bundleId = Number(bundle?.id)
+    expect(Number.isSafeInteger(bundleId)).toBe(true)
 
     const [promotedChannel] = await executeSQL(
       `SELECT version
@@ -327,7 +329,7 @@ describe('cli app preview lifecycle', () => {
        WHERE app_id = $1 AND name = $2`,
       [APPNAME, CHANNEL_NAME],
     )
-    expect(Number(promotedChannel?.version)).toBe(bundle?.id)
+    expect(Number(promotedChannel?.version)).toBe(bundleId)
 
     await expect(deleteChannelInternal(CHANNEL_NAME, APPNAME, {
       ...cliOptions,

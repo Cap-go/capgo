@@ -8,6 +8,8 @@ const queryMock = vi.fn()
 const releaseMock = vi.fn()
 const connectMock = vi.fn()
 const pgClientMock = { connect: connectMock }
+const transactionClientMock = { query: queryMock, release: releaseMock }
+const transactionDrizzleMock = {}
 
 vi.mock('../supabase/functions/_backend/utils/rbac.ts', () => ({
   checkPermissionPg: (...args: unknown[]) => checkPermissionPgMock(...args),
@@ -43,7 +45,7 @@ describe('bundle set channel RBAC guard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     checkPermissionPgMock.mockResolvedValue(true)
-    getDrizzleClientMock.mockReturnValue({})
+    getDrizzleClientMock.mockReturnValue(transactionDrizzleMock)
     queryMock.mockImplementation(async (text: string) => {
       if (text.includes('FROM public.channels')) {
         return { rowCount: 1, rows: [{ name: 'production', owner_org: '046a36ac-e03c-4590-9257-bd6c9dba9ee8' }] }
@@ -56,10 +58,7 @@ describe('bundle set channel RBAC guard', () => {
         rows: [],
       }
     })
-    connectMock.mockResolvedValue({
-      query: queryMock,
-      release: releaseMock,
-    })
+    connectMock.mockResolvedValue(transactionClientMock)
   })
 
   it('checks promotion permission against the target channel on its transaction connection', async () => {
@@ -73,11 +72,12 @@ describe('bundle set channel RBAC guard', () => {
 
     expect(response.status).toBe(200)
     expect(checkPermissionPgMock).toHaveBeenCalledTimes(1)
+    expect(getDrizzleClientMock).toHaveBeenCalledWith(transactionClientMock)
     expect(checkPermissionPgMock).toHaveBeenCalledWith(
       c,
       'channel.promote_bundle',
       { appId: 'com.example.app', channelId: 42 },
-      expect.anything(),
+      transactionDrizzleMock,
       'user-test',
       'test-apikey',
     )
