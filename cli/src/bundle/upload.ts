@@ -982,7 +982,7 @@ async function setVersionInChannel(
     }
 
     const bundleUrl = `${localConfig.hostWeb}/app/${appid}/channel/${createdChannelId}`
-    if (createdChannel.public === true)
+    if (createdChannel?.public === true)
       log.info('Your update is now available in your public channel 🎉')
     else
       log.info(`Link device to this bundle to try it: ${bundleUrl}`)
