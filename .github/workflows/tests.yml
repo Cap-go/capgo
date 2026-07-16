@@ -337,7 +337,7 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v2 # v2.0.0
         with:
-          version: 2.109.1
+          version: 2.84.2
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
       - name: Stop this job's Supabase stack
@@ -472,7 +472,7 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v2 # v2.0.0
         with:
-          version: 2.109.1
+          version: 2.84.2
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
       - name: Stop this job's Supabase stack
@@ -604,7 +604,7 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v2 # v2.0.0
         with:
-          version: 2.109.1
+          version: 2.84.2
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
       - id: start_playwright_services
@@ -1023,7 +1023,7 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v2 # v2.0.0
         with:
-          version: 2.109.1
+          version: 2.84.2
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
       - name: Stop this job's Supabase stack

@@ -90,7 +90,10 @@ ALTER TABLE public.role_bindings
   ON DELETE CASCADE
   NOT VALID;
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS role_bindings_parent_binding_id_idx
+-- Supabase applies local and CI migrations through a pipeline, where
+-- CREATE INDEX CONCURRENTLY is invalid. This nullable column was added just
+-- above, so no pre-existing binding can enter this partial index.
+CREATE INDEX IF NOT EXISTS role_bindings_parent_binding_id_idx
   ON public.role_bindings(parent_binding_id)
   WHERE parent_binding_id IS NOT NULL;
 
