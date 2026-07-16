@@ -5194,40 +5194,34 @@ CREATE OR REPLACE FUNCTION "public"."generate_org_user_on_org_create"() RETURNS 
 DECLARE
   org_super_admin_role_id uuid;
 BEGIN
-  -- Create org_users entry (legacy system)
-  INSERT INTO public.org_users (user_id, org_id, user_right)
-  VALUES (NEW.created_by, NEW.id, public.rbac_right_super_admin()::"public"."user_min_right");
-
-  -- Get the org_super_admin role ID for role_bindings
-  SELECT id INTO org_super_admin_role_id
-  FROM public.roles
-  WHERE name = public.rbac_role_org_super_admin()
+  SELECT "id"
+  INTO org_super_admin_role_id
+  FROM "public"."roles"
+  WHERE "name" = "public"."rbac_role_org_super_admin"()
   LIMIT 1;
 
-  -- Create role_bindings entry (new RBAC system) if role exists
   IF org_super_admin_role_id IS NOT NULL THEN
-    INSERT INTO public.role_bindings (
-      principal_type,
-      principal_id,
-      role_id,
-      scope_type,
-      org_id,
-      granted_by,
-      granted_at,
-      reason,
-      is_direct
+    INSERT INTO "public"."role_bindings" (
+      "principal_type",
+      "principal_id",
+      "role_id",
+      "scope_type",
+      "org_id",
+      "granted_by",
+      "granted_at",
+      "reason",
+      "is_direct"
     ) VALUES (
-      public.rbac_principal_user(),
-      NEW.created_by,
+      "public"."rbac_principal_user"(),
+      NEW."created_by",
       org_super_admin_role_id,
-      public.rbac_scope_org(),
-      NEW.id,
-      NEW.created_by, -- The user grants themselves super_admin on their own org
-      now(),
+      "public"."rbac_scope_org"(),
+      NEW."id",
+      NEW."created_by",
+      pg_catalog.now(),
       'Auto-granted on org creation',
       true
     )
-    -- Only insert if not already exists (in case of re-run or manual entry)
     ON CONFLICT DO NOTHING;
   END IF;
 
@@ -5239,7 +5233,7 @@ $$;
 ALTER FUNCTION "public"."generate_org_user_on_org_create"() OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."generate_org_user_on_org_create"() IS 'Creates entries in both org_users (legacy) and role_bindings (RBAC) when an org is created, allowing dual-system operation during transition.';
+COMMENT ON FUNCTION "public"."generate_org_user_on_org_create"() IS 'Creates the initial org super-admin role binding when an organization is created.';
 
 
 
@@ -18487,7 +18481,9 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
     "ban_time" timestamp with time zone,
     "email_preferences" "jsonb" DEFAULT '{"onboarding": true, "usage_limit": true, "credit_usage": true, "device_error": true, "weekly_stats": true, "monthly_stats": true, "bundle_created": true, "bundle_deployed": true, "deploy_stats_24h": true, "cli_realtime_feed": true, "builder_onboarding": true, "bundle_incompatible": true, "billing_period_stats": true, "channel_self_rejected": true}'::"jsonb" NOT NULL,
     "created_via_invite" boolean DEFAULT false NOT NULL,
-    "format_locale" character varying
+    "format_locale" character varying,
+    "discord_username" character varying(32),
+    "github_username" character varying(39)
 );
 
 
@@ -18503,6 +18499,14 @@ COMMENT ON COLUMN "public"."users"."created_via_invite" IS 'True when the accoun
 
 
 COMMENT ON COLUMN "public"."users"."format_locale" IS 'Optional BCP 47 locale tag used for date and number formatting. Language stays independent from formatting.';
+
+
+
+COMMENT ON COLUMN "public"."users"."discord_username" IS 'Optional Discord username supplied by the user for future experience enrichment.';
+
+
+
+COMMENT ON COLUMN "public"."users"."github_username" IS 'Optional GitHub username supplied by the user for future experience enrichment.';
 
 
 
@@ -19832,6 +19836,10 @@ CREATE OR REPLACE TRIGGER "force_valid_owner_org_channel_devices" BEFORE INSERT 
 
 
 CREATE OR REPLACE TRIGGER "force_valid_owner_org_channels" BEFORE INSERT OR UPDATE ON "public"."channels" FOR EACH ROW EXECUTE FUNCTION "public"."auto_owner_org_by_app_id"();
+
+
+
+CREATE OR REPLACE TRIGGER "force_valid_user_id_on_app" BEFORE INSERT ON "public"."apps" FOR EACH ROW EXECUTE FUNCTION "public"."force_valid_user_id_on_app"();
 
 
 

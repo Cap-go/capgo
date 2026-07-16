@@ -167,7 +167,6 @@ export type Database = {
           cli_version: string | null
           comment: string | null
           created_at: string | null
-          created_by_apikey_rbac_id: string | null
           deleted: boolean
           deleted_at: string | null
           external_url: string | null
@@ -194,7 +193,6 @@ export type Database = {
           cli_version?: string | null
           comment?: string | null
           created_at?: string | null
-          created_by_apikey_rbac_id?: string | null
           deleted?: boolean
           deleted_at?: string | null
           external_url?: string | null
@@ -221,7 +219,6 @@ export type Database = {
           cli_version?: string | null
           comment?: string | null
           created_at?: string | null
-          created_by_apikey_rbac_id?: string | null
           deleted?: boolean
           deleted_at?: string | null
           external_url?: string | null
@@ -2560,7 +2557,6 @@ export type Database = {
           id: string
           is_direct: boolean
           org_id: string | null
-          parent_binding_id: string | null
           principal_id: string
           principal_type: string
           reason: string | null
@@ -2577,7 +2573,6 @@ export type Database = {
           id?: string
           is_direct?: boolean
           org_id?: string | null
-          parent_binding_id?: string | null
           principal_id: string
           principal_type: string
           reason?: string | null
@@ -2594,7 +2589,6 @@ export type Database = {
           id?: string
           is_direct?: boolean
           org_id?: string | null
-          parent_binding_id?: string | null
           principal_id?: string
           principal_type?: string
           reason?: string | null
@@ -2628,13 +2622,6 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "orgs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "role_bindings_parent_binding_id_fkey"
-            columns: ["parent_binding_id"]
-            isOneToOne: false
-            referencedRelation: "role_bindings"
             referencedColumns: ["id"]
           },
           {
