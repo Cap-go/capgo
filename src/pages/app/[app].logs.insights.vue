@@ -10,6 +10,7 @@ import IconBug from '~icons/lucide/bug'
 import IconExternalLink from '~icons/lucide/external-link'
 import IconLayers from '~icons/lucide/layers'
 import IconSmartphone from '~icons/lucide/smartphone'
+import PeriodDaySelector from '~/components/dashboard/PeriodDaySelector.vue'
 import { formatLocalDateShort, formatLocalDateTime } from '~/services/date'
 import { formatNumberValue } from '~/services/formatLocale'
 import { actionToFilter } from '~/services/statsActions'
@@ -82,7 +83,6 @@ const lastPath = ref('')
 const isLoading = ref(false)
 const insightsLoading = ref(false)
 const selectedDays = ref<PeriodDayOption>(7)
-const periodDayOptions: PeriodDayOption[] = [1, 3, 7, 30]
 const app = ref<Database['public']['Tables']['apps']['Row']>()
 const insights = ref<LogInsightsResponse | null>(null)
 let latestInsightsRequest = 0
@@ -146,16 +146,6 @@ function formatCount(value: number | null | undefined) {
 
 function formatPercent(value: number | null | undefined) {
   return `${formatNumberValue(value ?? 0, { maximumFractionDigits: 1 })}%`
-}
-
-function periodButtonLabel(option: PeriodDayOption) {
-  if (option === 1)
-    return t('one-day')
-  if (option === 3)
-    return t('three-days')
-  if (option === 7)
-    return t('seven-days')
-  return t('30-days')
 }
 
 function formatLastSeen(value: string | null | undefined) {
@@ -289,22 +279,7 @@ watchEffect(async () => {
               {{ t('log-insights-period-help') }}
             </p>
           </div>
-          <fieldset class="d-join shrink-0">
-            <legend class="sr-only">
-              {{ t('selected-period') }}
-            </legend>
-            <button
-              v-for="option in periodDayOptions"
-              :key="option"
-              type="button"
-              :aria-pressed="selectedDays === option"
-              class="d-btn d-btn-sm d-join-item min-w-12"
-              :class="selectedDays === option ? 'd-btn-primary' : 'd-btn-outline'"
-              @click="selectPeriod(option)"
-            >
-              {{ periodButtonLabel(option) }}
-            </button>
-          </fieldset>
+          <PeriodDaySelector :model-value="selectedDays" @update:model-value="selectPeriod" />
         </div>
 
         <div
