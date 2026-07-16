@@ -10,6 +10,7 @@ import IconAlertTriangle from '~icons/lucide/alert-triangle'
 import IconExternalLink from '~icons/lucide/external-link'
 import IconRocket from '~icons/lucide/rocket'
 import IconTimer from '~icons/lucide/timer'
+import DeliveryLatencyPanel from '~/components/dashboard/DeliveryLatencyPanel.vue'
 import { useNativeObserveStats } from '~/composables/useNativeObserveStats'
 import { formatLocalDateShort } from '~/services/date'
 import { formatNumberValue } from '~/services/formatLocale'
@@ -391,6 +392,12 @@ watch([packageId, days], async () => {
             </div>
           </div>
         </div>
+        <DeliveryLatencyPanel
+          scope="app"
+          :app-id="packageId"
+          :days="days"
+          hide-period-selector
+        />
 
         <div v-if="statsLoading" class="flex items-center justify-center h-10 text-sm text-slate-500 dark:text-slate-400">
           <Spinner size="w-5 h-5" />

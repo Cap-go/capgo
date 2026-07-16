@@ -1170,10 +1170,9 @@ onBeforeUnmount(() => {
     <DeploymentStatsCard v-show="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" :force-demo="forceDemo" class="col-span-full sm:col-span-6 xl:col-span-4" />
   </div>
 
-  <div v-if="!noData || isLoading" class="mb-6">
+  <div v-if="(!noData || isLoading) && !appId" class="mb-6">
     <DeliveryLatencyPanel
-      :scope="appId ? 'app' : 'org'"
-      :app-id="appId || ''"
+      scope="org"
       :org-id="effectiveOrganization?.gid || ''"
       :force-demo="forceDemo"
     />

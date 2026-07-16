@@ -50,6 +50,7 @@ declare module 'vue' {
     ConnectAppPicker: typeof import('./components/connect/ConnectAppPicker.vue')['default']
     CreditsCta: typeof import('./components/CreditsCta.vue')['default']
     DataTable: typeof import('./components/DataTable.vue')['default']
+    DeliveryLatencyPanel: typeof import('./components/dashboard/DeliveryLatencyPanel.vue')['default']
     DemoOnboardingGate: typeof import('./components/dashboard/DemoOnboardingGate.vue')['default']
     DemoOnboardingModal: typeof import('./components/dashboard/DemoOnboardingModal.vue')['default']
     DeploymentBanner: typeof import('./components/dashboard/DeploymentBanner.vue')['default']

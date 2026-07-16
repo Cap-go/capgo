@@ -18,16 +18,20 @@ const props = withDefaults(defineProps<{
   appId?: string
   orgId?: string
   forceDemo?: boolean
+  days?: PeriodDayOption
+  hidePeriodSelector?: boolean
 }>(), {
   appId: '',
   orgId: '',
   forceDemo: false,
+  hidePeriodSelector: false,
 })
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
 const { t } = useI18n()
-const days = ref<PeriodDayOption>(7)
+const localDays = ref<PeriodDayOption>(7)
+const days = computed<PeriodDayOption>(() => props.days ?? localDays.value)
 const periodDayOptions: PeriodDayOption[] = [1, 3, 7, 30]
 
 const { stats, statsLoading, fetchStats } = useUpdateDeliveryStats(() => ({
@@ -164,9 +168,9 @@ function periodButtonLabel(option: PeriodDayOption) {
 }
 
 function selectPeriod(option: PeriodDayOption) {
-  if (days.value === option)
+  if (props.days !== undefined || localDays.value === option)
     return
-  days.value = option
+  localDays.value = option
 }
 
 watch(
@@ -181,7 +185,7 @@ watch(
 </script>
 
 <template>
-  <section class="flex flex-col gap-4">
+  <section class="flex flex-col gap-4" data-testid="update-delivery-latency">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div class="min-w-0">
         <div class="flex flex-wrap items-center gap-2">
@@ -200,7 +204,7 @@ watch(
           {{ t('update-delivery-latency-help') }}
         </p>
       </div>
-      <fieldset class="d-join shrink-0">
+      <fieldset v-if="!hidePeriodSelector" class="d-join shrink-0">
         <legend class="sr-only">
           {{ t('selected-period') }}
         </legend>
