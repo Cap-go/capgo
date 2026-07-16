@@ -26,8 +26,8 @@ export default defineConfig(({ mode }) => ({
     testTimeout: 30_000, // Increased timeout for Cloudflare Workers
     hookTimeout: 30_000, // Cloudflare worker-backed fixture setup can be slower in CI
     // Keep concurrency modest: maxWorkers=5 overloaded local workerd into intermittent 503s.
-    // No suite-wide retry — that would mask real assertion failures. Transient Cache API
-    // blips are handled in the affected tests (e.g. channel-rate-limit scenario retries).
+    // Zero-retry policy: flaky cases are fixed at the source, not masked by re-running tests.
+    retry: 0,
     maxConcurrency: 6,
     maxWorkers: 3,
     env: {

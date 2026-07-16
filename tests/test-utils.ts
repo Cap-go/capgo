@@ -566,26 +566,19 @@ export async function createAppVersions(
   values: Partial<Database['public']['Tables']['app_versions']['Insert']> = {},
 ) {
   const supabase = getSupabaseClient()
-  // Concurrent upserts under it.concurrent can briefly return no row from .single();
-  // retry a few times instead of failing the whole stats suite on that race.
-  let lastError: unknown
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const { error, data } = await supabase.from('app_versions').upsert({
-      app_id: appId,
-      name: version,
-      owner_org: ORG_ID,
-      ...values,
-    }, {
-      onConflict: 'app_id,name',
-    }).select('id,name').single()
-    if (data)
-      return data
-    lastError = error
-    if (error)
-      console.error(`Error creating app_version for ${version} (attempt ${attempt + 1}):`, error)
-    await new Promise(resolve => setTimeout(resolve, 25 * (attempt + 1)))
-  }
-  throw new Error(`Error creating app_version for ${version}: no data${lastError ? ` (${JSON.stringify(lastError)})` : ''}`)
+  const { error, data } = await supabase.from('app_versions').upsert({
+    app_id: appId,
+    name: version,
+    owner_org: ORG_ID,
+    ...values,
+  }, {
+    onConflict: 'app_id,name',
+  }).select('id,name').single()
+  if (error)
+    console.error(`Error creating app_version for ${version}:`, error)
+  if (!data)
+    throw new Error(`Error creating app_version for ${version}: no data`)
+  return data
 }
 
 export function getBaseData(appId: string): Partial<ReturnType<typeof makeBaseData>> {
