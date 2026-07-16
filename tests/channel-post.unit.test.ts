@@ -159,7 +159,7 @@ function configureTransaction(versionId: number | null = 123) {
     }
     if (statement.includes('INSERT INTO public.channels')) {
       transactionEvents.push('insert')
-      return { rowCount: 1, rows: [{ id: 77 }] }
+      return { rowCount: 1, rows: [{ id: 77, public: false }] }
     }
     if (statement.includes('FROM public.app_versions')) {
       transactionEvents.push('version')
@@ -373,7 +373,7 @@ describe('public channel post', () => {
       'set',
       'commit',
     ])
-    expect(c.json).toHaveBeenCalledWith({ status: 'ok' })
+    expect(c.json).toHaveBeenCalledWith({ status: 'ok', id: 77, public: false })
   })
 
   it('rolls back the new channel when its post-insert scoped promotion permission is denied', async () => {

@@ -180,10 +180,15 @@ const channelInsertColumns = [
 
 type ChannelInsertColumn = typeof channelInsertColumns[number]
 
+type CreatedChannel = {
+  id: number
+  public: boolean
+}
+
 async function insertChannelInTransaction(
   dbClient: PgQueryClient,
   channel: Database['public']['Tables']['channels']['Insert'],
-): Promise<number> {
+): Promise<CreatedChannel> {
   const channelValues: Record<ChannelInsertColumn, unknown> = {
     owner_org: channel.owner_org,
     app_id: channel.app_id,
@@ -218,18 +223,18 @@ async function insertChannelInTransaction(
   }
   // Column names are from the closed list above; request data is always a value.
   const columns = channelInsertColumns.filter(column => channelValues[column] !== undefined)
-  const result = await dbClient.query<{ id: string | number }>(
+  const result = await dbClient.query<{ id: string | number, public: boolean }>(
     `INSERT INTO public.channels (${columns.join(', ')})
      VALUES (${columns.map((_, index) => `$${index + 1}`).join(', ')})
-     RETURNING id`,
+     RETURNING id, public`,
     columns.map(column => channelValues[column]),
   )
   const createdChannel = result.rows[0]
   const channelId = Number(createdChannel?.id)
-  if ((result.rowCount ?? 0) !== 1 || !Number.isSafeInteger(channelId)) {
+  if ((result.rowCount ?? 0) !== 1 || !Number.isSafeInteger(channelId) || typeof createdChannel?.public !== 'boolean') {
     throw new Error('Channel insert returned no row')
   }
-  return channelId
+  return { id: channelId, public: createdChannel.public }
 }
 
 async function findVersionInTransaction(dbClient: PgQueryClient, appId: string, version: string, ownerOrg: string) {
@@ -253,7 +258,7 @@ async function createAndPromoteChannelInTransaction(
   channel: Database['public']['Tables']['channels']['Insert'],
   versionName: string,
   apikey: Database['public']['Tables']['apikeys']['Row'],
-) {
+): Promise<CreatedChannel> {
   const effectiveApikey = apikey.key ?? c.get('capgkey')
   if (!effectiveApikey) {
     throw simpleError('cannot_set_bundle_to_channel', 'Cannot set bundle to channel', { error: 'Missing API key context for audit logging' })
@@ -284,16 +289,17 @@ async function createAndPromoteChannelInTransaction(
       throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: channel.app_id })
     }
 
-    const createdChannelId = await insertChannelInTransaction(dbClient, channel)
+    const createdChannel = await insertChannelInTransaction(dbClient, channel)
     const setChannelBody: SetChannelBody = {
       app_id: channel.app_id,
-      channel_id: createdChannelId,
+      channel_id: createdChannel.id,
       version_id: 0,
     }
     await assertCanPromoteChannelInTransaction(c, setChannelBody, apikey, dbClient)
     setChannelBody.version_id = await findVersionInTransaction(dbClient, channel.app_id, versionName, channel.owner_org)
     await setChannelInTransaction(c, setChannelBody, apikey, dbClient)
     await dbClient.query('COMMIT')
+    return createdChannel
   }
   catch (error) {
     if (dbClient && transactionStarted) {
@@ -465,8 +471,8 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
     channel.rollout_pause_reason = null
   }
   if (!existingChannel && requestedVersionName) {
-    await createAndPromoteChannelInTransaction(c, channel, requestedVersionName, apikey)
-    return c.json(BRES)
+    const createdChannel = await createAndPromoteChannelInTransaction(c, channel, requestedVersionName, apikey)
+    return c.json({ ...BRES, ...createdChannel })
   }
 
   await updateOrCreateChannel(c, channel, existingChannelId, body.version === undefined && !body.promoteToStable)

@@ -910,12 +910,6 @@ async function setVersionInChannel(
   requireChannelAssignment = false,
   selfAssign?: boolean,
 ): Promise<boolean> {
-  const { data: versionId } = await supabase
-    .rpc('get_app_versions', { apikey, name_version: bundle, appid })
-    .single()
-
-  if (!versionId)
-    uploadFail('Cannot get version id, cannot set channel')
 
   const canPromoteTargetChannel = targetChannel !== null
     && await hasCliPermission(supabase, apikey, 'channel.promote_bundle', { appId: appid, channelId: targetChannel.id })
@@ -930,18 +924,19 @@ async function setVersionInChannel(
     return false
   }
 
-  if (targetChannel && canPromoteTargetChannel && selfAssign) {
-    const canUpdateChannelSettings = await hasCliPermission(supabase, apikey, 'channel.update_settings', { appId: appid, channelId: targetChannel.id })
-    if (!canUpdateChannelSettings) {
-      log.warn('Cannot enable device self-assign because this API key lacks channel.update_settings')
-      return promoteExistingChannel(supabase, appid, versionId, targetChannel, localConfig, displayBundleUrl)
-    }
-  }
-
-  if (targetChannel && canPromoteTargetChannel && !selfAssign)
-    return promoteExistingChannel(supabase, appid, versionId, targetChannel, localConfig, displayBundleUrl)
-
   if (targetChannel && canPromoteTargetChannel) {
+    const versionId = await getVersionIdForChannelUpdate(supabase, apikey, appid, bundle)
+    if (selfAssign) {
+      const canUpdateChannelSettings = await hasCliPermission(supabase, apikey, 'channel.update_settings', { appId: appid, channelId: targetChannel.id })
+      if (!canUpdateChannelSettings) {
+        log.warn('Cannot enable device self-assign because this API key lacks channel.update_settings')
+        return promoteExistingChannel(supabase, appid, versionId, targetChannel, localConfig, displayBundleUrl)
+      }
+    }
+
+    if (!selfAssign)
+      return promoteExistingChannel(supabase, appid, versionId, targetChannel, localConfig, displayBundleUrl)
+
     const { error: dbError3, data } = await updateOrCreateChannel(supabase, {
       name: channel,
       app_id: appid,
@@ -966,7 +961,7 @@ async function setVersionInChannel(
   // The channel endpoint creates the preview channel, receives its scoped
   // lifecycle binding, and promotes this bundle in one transaction.
   if (canCreateChannel) {
-    const { error } = await supabase.functions.invoke('channel', {
+    const { error, data } = await supabase.functions.invoke('channel', {
       method: 'POST',
       body: JSON.stringify({
         app_id: appid,
@@ -979,12 +974,15 @@ async function setVersionInChannel(
       uploadFail(`Cannot create channel and set its bundle because this API key does not have the required RBAC permission. ${await formatFunctionInvokeError(error)}`)
     }
 
-    const createdChannel = await findUploadTargetChannel(supabase, appid, channel)
-    if (!createdChannel)
-      uploadFail('Cannot find the channel after creating it')
+    const createdChannel = data as { id?: unknown, public?: unknown } | null
+    const createdChannelId = Number(createdChannel?.id)
+    if (!Number.isSafeInteger(createdChannelId)) {
+      log.info('Your update is now available 🎉')
+      return true
+    }
 
-    const bundleUrl = `${localConfig.hostWeb}/app/${appid}/channel/${createdChannel.id}`
-    if (createdChannel.public)
+    const bundleUrl = `${localConfig.hostWeb}/app/${appid}/channel/${createdChannelId}`
+    if (createdChannel.public === true)
       log.info('Your update is now available in your public channel 🎉')
     else
       log.info(`Link device to this bundle to try it: ${bundleUrl}`)

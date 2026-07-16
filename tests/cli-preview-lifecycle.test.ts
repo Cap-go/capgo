@@ -85,6 +85,15 @@ interface ApiKeyResponse {
   rbac_id: string
 }
 
+function requestTrace(input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) {
+  const request = input instanceof Request ? input : undefined
+  const url = request?.url ?? (input instanceof URL ? input.href : input)
+  return {
+    method: (init?.method ?? request?.method ?? 'GET').toUpperCase(),
+    path: new URL(url).pathname,
+  }
+}
+
 let authHeaders: Record<string, string>
 const apiKeyIds: number[] = []
 
@@ -235,22 +244,38 @@ describe('cli app preview lifecycle', () => {
       supaAnon: SUPABASE_ANON_KEY,
     }
 
-    const upload = await uploadBundleInternal(APPNAME, {
-      ...cliOptions,
-      path: '.',
-      bundle: BUNDLE_NAME,
-      channel: CHANNEL_NAME,
-      external: 'https://example.invalid/preview.zip',
-      codeCheck: false,
-      ignoreMetadataCheck: true,
-      ignoreChecksumCheck: true,
-    }, true)
+    const { upload, requests } = await (async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      try {
+        const upload = await uploadBundleInternal(APPNAME, {
+          ...cliOptions,
+          path: '.',
+          bundle: BUNDLE_NAME,
+          channel: CHANNEL_NAME,
+          external: 'https://example.invalid/preview.zip',
+          codeCheck: false,
+          ignoreMetadataCheck: true,
+          ignoreChecksumCheck: true,
+        }, true)
+        return {
+          upload,
+          requests: fetchSpy.mock.calls.map(([input, init]) => requestTrace(input, init)),
+        }
+      }
+      finally {
+        fetchSpy.mockRestore()
+      }
+    })()
     expect(upload).toMatchObject({
       success: true,
       appId: APPNAME,
       bundle: BUNDLE_NAME,
       updatedChannels: [CHANNEL_NAME],
     })
+    const channelPostIndex = requests.findIndex(request => request.method === 'POST' && request.path === '/functions/v1/channel')
+    expect(channelPostIndex).toBeGreaterThanOrEqual(0)
+    expect(requests).not.toContainEqual({ method: 'POST', path: '/rest/v1/rpc/get_app_versions' })
+    expect(requests.slice(channelPostIndex + 1)).not.toContainEqual({ method: 'GET', path: '/rest/v1/channels' })
 
     const [createdChannel] = await executeSQL(
       `SELECT id, rbac_id::text AS rbac_id
