@@ -987,11 +987,15 @@ async function setVersionInChannel(
       const fallbackChannel = await findUploadTargetChannel(supabase, appid, channel, false)
       const fallbackChannelId = Number(fallbackChannel?.id)
       if (!Number.isSafeInteger(fallbackChannelId)) {
-        log.info('Your update is now available 🎉')
-        return true
+        if (!Number.isSafeInteger(createdChannelId)) {
+          log.info('Your update is now available 🎉')
+          return true
+        }
       }
-      createdChannelId = fallbackChannelId
-      createdChannelPublic = fallbackChannel?.public === true
+      else {
+        createdChannelId = fallbackChannelId
+        createdChannelPublic = fallbackChannel?.public === true
+      }
     }
 
     const bundleUrl = `${localConfig.hostWeb}/app/${appid}/channel/${createdChannelId}`

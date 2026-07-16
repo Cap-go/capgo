@@ -79,6 +79,8 @@ const MAIN_CHANNEL_NAME = `main-${id.slice(0, 8)}`
 const BUNDLE_NAME = `1.0.0-preview-${id.slice(0, 8)}`
 const LEGACY_CHANNEL_NAME = `preview-legacy-${id.slice(0, 8)}`
 const LEGACY_BUNDLE_NAME = `1.0.0-legacy-${id.slice(0, 8)}`
+const LEGACY_PARTIAL_CHANNEL_NAME = `preview-legacy-partial-${id.slice(0, 8)}`
+const LEGACY_PARTIAL_BUNDLE_NAME = `1.0.0-legacy-partial-${id.slice(0, 8)}`
 const seedOptions = createIsolatedSeedAppOptions()
 
 interface ApiKeyResponse {
@@ -446,6 +448,83 @@ describe('cli app preview lifecycle', () => {
     expect(requests.slice(channelPostIndex + 1)).toContainEqual({ method: 'GET', path: '/rest/v1/channels' })
 
     await expect(deleteChannelInternal(LEGACY_CHANNEL_NAME, APPNAME, {
+      ...cliOptions,
+      deleteBundle: true,
+      successIfNotFound: false,
+    }, true)).resolves.toBe(true)
+  }, 60_000)
+  it('retains a legacy channel ID when public metadata and readback are unavailable', async () => {
+    const apiKey = await createAppApiKey(`cli-app-preview-legacy-partial-${id}`)
+    const cliOptions = {
+      apikey: apiKey.key,
+      supaHost: SUPABASE_BASE_URL,
+      supaAnon: SUPABASE_ANON_KEY,
+    }
+    const { log } = await import(new URL('../cli/node_modules/@clack/prompts', import.meta.url).href)
+    const logInfo = vi.spyOn(log, 'info')
+    const originalFetch = globalThis.fetch
+    let createdChannelId: number | undefined
+
+    try {
+      const { upload, requests } = await (async () => {
+        const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+          const request = requestTrace(input, init)
+          if (createdChannelId != null && request.method === 'GET' && request.path === '/rest/v1/channels') {
+            return new Response(JSON.stringify({ message: 'Readback unavailable' }), {
+              status: 503,
+              headers: { 'content-type': 'application/json' },
+            })
+          }
+
+          const response = await originalFetch(input, init)
+          if (response.ok && request.method === 'POST' && request.path === '/functions/v1/channel') {
+            const createdChannel = await response.clone().json() as { id?: unknown }
+            createdChannelId = Number(createdChannel.id)
+            return new Response(JSON.stringify({ id: createdChannelId }), {
+              status: response.status,
+              headers: { 'content-type': 'application/json' },
+            })
+          }
+          return response
+        })
+        try {
+          const upload = await uploadBundleInternal(APPNAME, {
+            ...cliOptions,
+            path: '.',
+            bundle: LEGACY_PARTIAL_BUNDLE_NAME,
+            channel: LEGACY_PARTIAL_CHANNEL_NAME,
+            bundleUrl: true,
+            external: 'https://example.invalid/legacy-partial-preview.zip',
+            codeCheck: false,
+            ignoreMetadataCheck: true,
+            ignoreChecksumCheck: true,
+          }, true)
+          return {
+            upload,
+            requests: fetchSpy.mock.calls.map(([input, init]) => requestTrace(input, init)),
+          }
+        }
+        finally {
+          fetchSpy.mockRestore()
+        }
+      })()
+
+      expect(Number.isSafeInteger(createdChannelId)).toBe(true)
+      expect(upload).toMatchObject({
+        success: true,
+        appId: APPNAME,
+        bundle: LEGACY_PARTIAL_BUNDLE_NAME,
+        updatedChannels: [LEGACY_PARTIAL_CHANNEL_NAME],
+      })
+      expect(requests).toContainEqual({ method: 'GET', path: '/rest/v1/channels' })
+      expect(logInfo).toHaveBeenCalledWith(expect.stringContaining(`Link device to this bundle to try it: `))
+      expect(logInfo).toHaveBeenCalledWith(expect.stringContaining(`/app/${APPNAME}/channel/${createdChannelId}`))
+    }
+    finally {
+      logInfo.mockRestore()
+    }
+
+    await expect(deleteChannelInternal(LEGACY_PARTIAL_CHANNEL_NAME, APPNAME, {
       ...cliOptions,
       deleteBundle: true,
       successIfNotFound: false,
