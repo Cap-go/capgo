@@ -700,39 +700,49 @@ SET search_path = ''
 AS $$
 DECLARE
   v_request_role text := COALESCE(auth.role(), session_user);
-  v_has_apikey_context boolean := public.get_apikey_header() IS NOT NULL;
+  v_owner_org uuid;
+  v_channel_id bigint;
 BEGIN
-  IF NEW.version IS NOT DISTINCT FROM OLD.version THEN
+  IF TG_OP = 'UPDATE' AND NEW.version IS NOT DISTINCT FROM OLD.version THEN
     RETURN NEW;
   END IF;
 
-  IF v_request_role NOT IN ('service_role', 'postgres') THEN
+  IF TG_OP = 'INSERT' THEN
+    v_owner_org := public.get_owner_org_by_app_id_internal(NEW.app_id);
+    v_channel_id := NULL::bigint;
+  ELSE
+    v_owner_org := OLD.owner_org;
+    v_channel_id := OLD.id;
+  END IF;
+
+  -- A blank target is the native/builtin channel state; an initial target needs
+  -- app-level promotion, while changing an existing target is channel-scoped.
+  IF v_request_role NOT IN ('service_role', 'postgres')
+    AND pg_catalog.current_setting('capgo.seed_channel_targets', true) IS DISTINCT FROM 'true'
+  THEN
     IF v_request_role IS DISTINCT FROM 'anon' AND v_request_role IS DISTINCT FROM 'authenticated' THEN
       RAISE EXCEPTION 'PERMISSION_DENIED_CHANNEL_PROMOTE_BUNDLE'
         USING ERRCODE = '42501';
     END IF;
 
-    IF NOT public.rbac_check_permission_request(
-      public.rbac_perm_channel_promote_bundle(),
-      OLD.owner_org,
-      OLD.app_id,
-      OLD.id
-    ) THEN
+    IF NOT (TG_OP = 'INSERT' AND NEW.version IS NULL)
+      AND NOT public.rbac_check_permission_request(
+        public.rbac_perm_channel_promote_bundle(),
+        v_owner_org,
+        NEW.app_id,
+        v_channel_id
+      ) THEN
       RAISE EXCEPTION 'PERMISSION_DENIED_CHANNEL_PROMOTE_BUNDLE'
         USING ERRCODE = '42501';
     END IF;
   END IF;
-  -- Internal service jobs without an API key retain the existing bypass. API
-  -- endpoints deliberately set capgkey, so preview-key ownership is still
-  -- enforced even though their database client uses service_role.
-  IF NEW.version IS NOT NULL
-    AND (v_request_role NOT IN ('service_role', 'postgres') OR v_has_apikey_context)
-  THEN
+
+  IF NEW.version IS NOT NULL THEN
     PERFORM 1
     FROM public.app_versions AS version
     WHERE version.id = NEW.version
-      AND version.app_id = OLD.app_id
-      AND version.owner_org = OLD.owner_org
+      AND version.app_id = NEW.app_id
+      AND version.owner_org = v_owner_org
       AND version.deleted = false
     FOR KEY SHARE;
 
@@ -740,9 +750,11 @@ BEGIN
       RAISE EXCEPTION 'INVALID_CHANNEL_VERSION';
     END IF;
 
+    -- Service-role endpoints carry the key in request.headers. This helper
+    -- no-ops for other callers and preserves preview-key bundle ownership.
     PERFORM public.assert_preview_bundle_owner(
-      OLD.owner_org,
-      OLD.app_id,
+      v_owner_org,
+      NEW.app_id,
       NEW.version
     );
   END IF;
@@ -763,11 +775,14 @@ SET search_path = ''
 AS $$
 DECLARE
   v_rollout_changed boolean;
+  v_channel_id bigint;
 BEGIN
   IF TG_OP = 'INSERT' THEN
     v_rollout_changed := NEW.rollout_version IS NOT NULL;
+    v_channel_id := NULL::bigint;
   ELSE
     v_rollout_changed := NEW.rollout_version IS DISTINCT FROM OLD.rollout_version;
+    v_channel_id := NEW.id;
   END IF;
 
   IF v_rollout_changed THEN
@@ -776,7 +791,7 @@ BEGIN
         public.rbac_perm_channel_promote_bundle(),
         NEW.owner_org,
         NEW.app_id,
-        NEW.id
+        v_channel_id
       )
     THEN
       RAISE EXCEPTION 'NO_RIGHTS';

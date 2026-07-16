@@ -221,6 +221,16 @@
       "type": "timestamp with time zone"
     },
     {
+      "default": null,
+      "generated": "",
+      "identity": "",
+      "name": "created_by_apikey_rbac_id",
+      "notNull": false,
+      "position": 23,
+      "table": "app_versions",
+      "type": "uuid"
+    },
+    {
       "default": "now()",
       "generated": "",
       "identity": "",

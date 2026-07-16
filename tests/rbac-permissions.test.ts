@@ -673,6 +673,57 @@ describe('rbac permission system', () => {
         await query('RESET ROLE')
       })
 
+      it('preserves blank and trusted seed channel inserts in the promotion trigger', async () => {
+        const requesterId = randomUUID()
+        const suffix = randomUUID().slice(0, 8)
+        const targetResult = await query(`
+          SELECT app.app_id, app.owner_org, version.id AS version_id
+          FROM public.apps AS app
+          INNER JOIN public.app_versions AS version
+            ON version.app_id = app.app_id
+            AND version.owner_org = app.owner_org
+            AND version.deleted = false
+          WHERE app.app_id = $1
+          ORDER BY version.id
+          LIMIT 1
+        `, [TEST_APP_ID])
+        const target = targetResult.rows[0]
+        if (!target)
+          throw new Error('Missing active demo bundle for channel trigger test')
+
+        await withAuthClaim(requesterId)
+        await query(`SELECT set_config('request.headers', '{}', true)`)
+
+        await query('SAVEPOINT channel_insert_requires_promotion')
+        let denied: unknown
+        try {
+          await query(`
+            INSERT INTO public.channels (name, app_id, version, created_by, owner_org)
+            VALUES ($1, $2, $3::bigint, $4::uuid, $5::uuid)
+          `, [`trigger-denied-${suffix}`, target.app_id, target.version_id, USER_ID, target.owner_org])
+        }
+        catch (error) {
+          denied = error
+        }
+        await query('ROLLBACK TO SAVEPOINT channel_insert_requires_promotion')
+        expect((denied as { message?: string } | undefined)?.message).toContain('PERMISSION_DENIED_CHANNEL_PROMOTE_BUNDLE')
+
+        const blank = await query(`
+          INSERT INTO public.channels (name, app_id, version, created_by, owner_org)
+          VALUES ($1, $2, NULL, $3::uuid, $4::uuid)
+          RETURNING version
+        `, [`trigger-blank-${suffix}`, target.app_id, USER_ID, target.owner_org])
+        expect(blank.rows).toEqual([{ version: null }])
+
+        await query(`SELECT pg_catalog.set_config('capgo.seed_channel_targets', 'true', true)`)
+        const seeded = await query(`
+          INSERT INTO public.channels (name, app_id, version, created_by, owner_org)
+          VALUES ($1, $2, $3::bigint, $4::uuid, $5::uuid)
+          RETURNING version
+        `, [`trigger-seeded-${suffix}`, target.app_id, target.version_id, USER_ID, target.owner_org])
+        expect(Number(seeded.rows[0]?.version)).toBe(Number(target.version_id))
+      })
+
       it('should map app-scoped channel RBAC permissions to legacy CLI permissions', async () => {
         const developerKey = `rbac-channel-developer-${randomUUID()}`
         const adminKey = `rbac-channel-admin-${randomUUID()}`

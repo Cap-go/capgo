@@ -136,7 +136,8 @@ CREATE TABLE public.app_versions (
     manifest_count integer DEFAULT 0 NOT NULL,
     key_id character varying(20),
     cli_version character varying,
-    deleted_at timestamp with time zone
+    deleted_at timestamp with time zone,
+    created_by_apikey_rbac_id uuid
 )
 WITH (autovacuum_vacuum_scale_factor='0.05', autovacuum_analyze_scale_factor='0.02');
 
