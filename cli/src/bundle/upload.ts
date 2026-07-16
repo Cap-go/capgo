@@ -963,39 +963,35 @@ async function setVersionInChannel(
     return true
   }
 
-  // Create without a version so a preview key receives its channel-scoped binding before promotion.
+  // The channel endpoint creates the preview channel, receives its scoped
+  // lifecycle binding, and promotes this bundle in one transaction.
   if (canCreateChannel) {
-    const { error: dbError3, data } = await updateOrCreateChannel(supabase, {
-      name: channel,
-      app_id: appid,
-      created_by: userId,
-      owner_org: orgId,
-      version: null,
-      ...(selfAssign ? { allow_device_self_set: true } : {}),
+    const { error } = await supabase.functions.invoke('channel', {
+      method: 'POST',
+      body: JSON.stringify({
+        app_id: appid,
+        channel,
+        version: bundle,
+        ...(selfAssign ? { allow_device_self_set: true } : {}),
+      }),
     })
-    if (dbError3 || !data)
-      uploadFail(`Cannot create channel because this API key does not have the required RBAC permission. ${formatError(dbError3)}`)
+    if (error) {
+      uploadFail(`Cannot create channel and set its bundle because this API key does not have the required RBAC permission. ${await formatFunctionInvokeError(error)}`)
+    }
 
-    try {
-      return await promoteExistingChannel(supabase, appid, versionId, data, localConfig, displayBundleUrl)
-    }
-    catch (promotionError) {
-      try {
-        const { data: deletedChannels, error: cleanupError } = await supabase
-          .from('channels')
-          .delete()
-          .eq('id', data.id)
-          .eq('app_id', appid)
-          .select('id')
-        if (cleanupError || !deletedChannels || deletedChannels.length !== 1) {
-          log.warn(`Cannot clean up newly created channel after promotion failure: ${formatError(cleanupError)}`)
-        }
-      }
-      catch (cleanupError) {
-        log.warn(`Cannot clean up newly created channel after promotion failure: ${formatError(cleanupError)}`)
-      }
-      throw promotionError
-    }
+    const createdChannel = await findUploadTargetChannel(supabase, appid, channel)
+    if (!createdChannel)
+      uploadFail('Cannot find the channel after creating it')
+
+    const bundleUrl = `${localConfig.hostWeb}/app/${appid}/channel/${createdChannel.id}`
+    if (createdChannel.public)
+      log.info('Your update is now available in your public channel 🎉')
+    else
+      log.info(`Link device to this bundle to try it: ${bundleUrl}`)
+
+    if (displayBundleUrl)
+      log.info(`Bundle url: ${bundleUrl}`)
+    return true
   }
 
   const message = 'Cannot create target channel because this API key lacks app.create_channel'

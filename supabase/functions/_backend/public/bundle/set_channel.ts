@@ -95,12 +95,13 @@ export async function assertCanPromoteChannelInTransaction(
   body: SetChannelBody,
   apikey: Database['public']['Tables']['apikeys']['Row'],
   dbClient: PgQueryClient,
+  checkAppScope = false,
 ) {
   const drizzle = getDrizzleClient(dbClient as unknown as ReturnType<typeof getPgClient>) as DrizzleClient
   const canPromote = await checkPermissionPg(
     c,
     'channel.promote_bundle',
-    { appId: body.app_id, channelId: body.channel_id },
+    checkAppScope ? { appId: body.app_id } : { appId: body.app_id, channelId: body.channel_id },
     drizzle,
     apikey.user_id,
     getEffectiveApikey(c, apikey),
@@ -120,11 +121,7 @@ export async function setChannelInTransaction(
   validateSetChannelBody(body)
 
   const channel = await fetchTargetChannel(dbClient, body)
-  if (!channel) {
-    throw simpleError('cannot_find_channel', 'Cannot find channel')
-  }
-
-  await assertCanPromoteChannelInTransaction(c, body, apikey, dbClient)
+  await assertCanPromoteChannelInTransaction(c, body, apikey, dbClient, channel === null)
 
   // The preview-delete route takes this same transaction-scoped lock before
   // checking references and soft-deleting the bundle.
@@ -133,6 +130,10 @@ export async function setChannelInTransaction(
     [body.version_id],
   )
   const versionName = await fetchVersionName(dbClient, body)
+
+  if (!channel) {
+    throw simpleError('cannot_find_channel', 'Cannot find channel')
+  }
 
   await dbClient.query(
     'SELECT set_config(\'request.headers\', $1, true)',

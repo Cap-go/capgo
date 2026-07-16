@@ -35,11 +35,38 @@ vi.mock('../cli/src/utils', async (importOriginal) => {
       })
     },
     checkPlanValid: async () => {},
-    getConfig: async () => undefined,
+    checkPlanValidUpload: async () => {},
+    checkRemoteCliMessages: async () => {},
+    getConfig: async () => ({ config: {} }),
+    getRemoteFileConfig: async () => ({
+      alertUploadSize: 1_000_000,
+      maxChunkSize: 1_000_000,
+      maxUploadLength: 1_000_000,
+      partialUpload: false,
+      partialUploadForced: false,
+      TUSUpload: false,
+      TUSUploadForced: false,
+    }),
     sendEvent: async () => {},
   }
 })
 
+vi.mock('../cli/src/api/app', async importOriginal => ({
+  ...await importOriginal<typeof import('../cli/src/api/app')>(),
+  check2FAComplianceForApp: async () => {},
+}))
+
+vi.mock('../cli/src/api/update', async importOriginal => ({
+  ...await importOriginal<typeof import('../cli/src/api/update')>(),
+  checkAlerts: async () => {},
+}))
+
+vi.mock('../cli/src/analytics/track', async importOriginal => ({
+  ...await importOriginal<typeof import('../cli/src/analytics/track')>(),
+  trackEvent: async () => {},
+}))
+
+const { uploadBundleInternal } = await import('../cli/src/bundle/upload.ts')
 const { addChannelInternal } = await import('../cli/src/channel/add.ts')
 const { deleteChannelInternal } = await import('../cli/src/channel/delete.ts')
 const { setChannelInternal } = await import('../cli/src/channel/set.ts')
@@ -208,9 +235,22 @@ describe('cli app preview lifecycle', () => {
       supaAnon: SUPABASE_ANON_KEY,
     }
 
-    await expect(addChannelInternal(CHANNEL_NAME, APPNAME, cliOptions, true))
-      .resolves
-      .toMatchObject({ name: CHANNEL_NAME })
+    const upload = await uploadBundleInternal(APPNAME, {
+      ...cliOptions,
+      path: '.',
+      bundle: BUNDLE_NAME,
+      channel: CHANNEL_NAME,
+      external: 'https://example.invalid/preview.zip',
+      codeCheck: false,
+      ignoreMetadataCheck: true,
+      ignoreChecksumCheck: true,
+    }, true)
+    expect(upload).toMatchObject({
+      success: true,
+      appId: APPNAME,
+      bundle: BUNDLE_NAME,
+      updatedChannels: [CHANNEL_NAME],
+    })
 
     const [createdChannel] = await executeSQL(
       `SELECT id, rbac_id::text AS rbac_id
@@ -270,41 +310,16 @@ describe('cli app preview lifecycle', () => {
       successIfNotFound: false,
     }, true)).rejects.toThrow('channel.delete')
 
-    const { data: uploaderUserId, error: uploaderUserError } = await apiKeyClient
-      .rpc('get_user_id', { apikey: apiKey.key })
-      .single()
-    expect(uploaderUserError).toBeNull()
-    expect(uploaderUserId).toEqual(expect.any(String))
-
-    const { data: bundle, error: bundleError } = await apiKeyClient
-      .from('app_versions')
-      .insert({
-        app_id: APPNAME,
-        checksum: `checksum-${id}`,
-        name: BUNDLE_NAME,
-        native_packages: [],
-        owner_org: app.owner_org,
-        storage_provider: 'r2-direct',
-        user_id: uploaderUserId,
-      })
-      .select('id')
-      .single()
-    expect(bundleError).toBeNull()
-    expect(bundle).toEqual(expect.objectContaining({ id: expect.any(Number) }))
-
-    const [ownedBundle] = await executeSQL(
-      `SELECT created_by_apikey_rbac_id::text AS created_by_apikey_rbac_id
+    const [bundle] = await executeSQL(
+      `SELECT id, created_by_apikey_rbac_id::text AS created_by_apikey_rbac_id
        FROM public.app_versions
-       WHERE id = $1`,
-      [bundle?.id],
+       WHERE app_id = $1 AND name = $2`,
+      [APPNAME, BUNDLE_NAME],
     )
-    expect(ownedBundle?.created_by_apikey_rbac_id).toBe(apiKey.rbac_id)
-
-    await expect(setChannelInternal(CHANNEL_NAME, APPNAME, {
-      ...cliOptions,
-      bundle: BUNDLE_NAME,
-      ignoreMetadataCheck: true,
-    }, true)).resolves.toBe(true)
+    expect(bundle).toEqual(expect.objectContaining({
+      id: expect.any(Number),
+      created_by_apikey_rbac_id: apiKey.rbac_id,
+    }))
 
     const [promotedChannel] = await executeSQL(
       `SELECT version

@@ -138,4 +138,71 @@ describe('bundle set channel RBAC guard', () => {
     expect(queryMock).not.toHaveBeenCalledWith(expect.stringContaining('FROM public.app_versions'), expect.anything())
     expect(queryMock).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE public.channels'), expect.anything())
   })
+
+  it('uses app-scoped promotion permission when the target channel is missing', async () => {
+    const c = context()
+    queryMock.mockImplementation(async (text: string) => {
+      if (text.includes('FROM public.channels'))
+        return { rowCount: 0, rows: [] }
+      return { rowCount: undefined, rows: [] }
+    })
+    checkPermissionPgMock.mockResolvedValueOnce(false)
+
+    await expect(setChannel(c as any, {
+      app_id: 'com.example.app',
+      version_id: 7,
+      channel_id: 42,
+    }, apiKey())).rejects.toMatchObject({
+      status: 400,
+      cause: expect.objectContaining({ error: 'cannot_access_app' }),
+    })
+
+    expect(checkPermissionPgMock).toHaveBeenCalledTimes(1)
+    expect(checkPermissionPgMock).toHaveBeenCalledWith(
+      c,
+      'channel.promote_bundle',
+      { appId: 'com.example.app' },
+      expect.anything(),
+      'user-test',
+      'test-apikey',
+    )
+    expect(queryMock).toHaveBeenCalledWith('ROLLBACK')
+    expect(queryMock).not.toHaveBeenCalledWith(expect.stringContaining('FROM public.app_versions'), expect.anything())
+    expect(queryMock).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE public.channels'), expect.anything())
+  })
+
+  it('checks the version before returning a missing-channel error', async () => {
+    const c = context()
+    queryMock.mockImplementation(async (text: string) => {
+      if (text.includes('FROM public.channels'))
+        return { rowCount: 0, rows: [] }
+      if (text.includes('FROM public.app_versions'))
+        return { rowCount: 0, rows: [] }
+      return { rowCount: undefined, rows: [] }
+    })
+
+    await expect(setChannel(c as any, {
+      app_id: 'com.example.app',
+      version_id: 7,
+      channel_id: 42,
+    }, apiKey())).rejects.toMatchObject({
+      status: 400,
+      cause: expect.objectContaining({ error: 'cannot_find_version' }),
+    })
+
+    expect(checkPermissionPgMock).toHaveBeenCalledWith(
+      c,
+      'channel.promote_bundle',
+      { appId: 'com.example.app' },
+      expect.anything(),
+      'user-test',
+      'test-apikey',
+    )
+    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('FROM public.app_versions'), [
+      7,
+      'com.example.app',
+    ])
+    expect(queryMock).toHaveBeenCalledWith('ROLLBACK')
+    expect(queryMock).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE public.channels'), expect.anything())
+  })
 })
