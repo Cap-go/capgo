@@ -18,8 +18,6 @@ npx @capgo/cli@latest key save
 💾 Save the public key in the Capacitor config, useful for CI environments.
 Recommended not to commit the key for security.
 
-For dynamic monorepos, add `--capacitor-config ./env-configs/capacitor.config.qr-code-reader.ts` to `key save`, `key create`, or `key delete_old` so the key change is written to the selected app source.
-
 **Example:**
 
 ```bash
@@ -78,3 +76,4 @@ npx @capgo/cli@latest key delete_old
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
 | **--capacitor-config** | <code>string</code> | Capacitor config source to update (useful with dynamic monorepo configs) |
+

@@ -12,47 +12,38 @@ sidebar:
 npx @capgo/cli@latest mcp
 ```
 
-This command starts an MCP server that exposes Capgo functionality as tools for AI agents. The server communicates via stdio and is designed for non-interactive, programmatic use.
-
-### Dynamic monorepos
-
-When a root `capacitor.config.ts` selects an app-specific source through an environment variable, launch the MCP server with the same selector and target source:
-
-```bash
-CAP_APP=qr-code-reader npx @capgo/cli@latest mcp \
-  --capacitor-config ./env-configs/capacitor.config.qr-code-reader.ts
-```
-
-Capacitor continues to load the active root config, while every MCP tool that writes Capacitor config updates only the supplied app source. The `capgo_upload_bundle` and `capgo_generate_encryption_keys` tools also accept a per-call `capacitorConfig` override.
-The live-update onboarding start tool accepts `capacitorConfig` when the server was launched without this option. If more than one source resolves to the same app ID, pass that same value from the returned context to the onboarding next-step and explain tools.
-
+This command starts an MCP server that exposes Capgo functionality as tools for AI agents.
+The server communicates via stdio and is designed for non-interactive, programmatic use.
 Selected tools exposed via MCP:
-
-- capgo_list_apps, capgo_add_app, capgo_update_app, capgo_delete_app
-- capgo_upload_bundle, capgo_list_bundles, capgo_delete_bundle, capgo_cleanup_bundles
-- capgo_list_channels, capgo_add_channel, capgo_update_channel, capgo_delete_channel
-- capgo_get_current_bundle, capgo_check_compatibility
-- capgo_list_organizations, capgo_add_organization
-- capgo_star_repository
-- capgo_star_all_repositories
-- capgo_get_account_id, capgo_doctor, capgo_get_stats
-- capgo_request_build, capgo_generate_encryption_keys
-
-Example usage with Claude Desktop: add this to `claude_desktop_config.json`.
-
-```json
-{
-  "mcpServers": {
-    "capgo": {
-      "command": "npx",
-      "args": ["@capgo/cli@latest", "mcp"]
+  - capgo_list_apps, capgo_add_app, capgo_update_app, capgo_delete_app
+  - capgo_upload_bundle, capgo_list_bundles, capgo_delete_bundle, capgo_cleanup_bundles
+  - capgo_list_channels, capgo_add_channel, capgo_update_channel, capgo_delete_channel
+  - capgo_get_current_bundle, capgo_check_compatibility
+  - capgo_list_organizations, capgo_add_organization
+  - capgo_star_repository
+  - capgo_star_all_repositories
+  - capgo_get_account_id, capgo_doctor, capgo_get_stats
+  - capgo_request_build, capgo_generate_encryption_keys
+Example usage with Claude Desktop:
+  Add to claude_desktop_config.json:
+  {
+    "mcpServers": {
+      "capgo": {
+        "command": "npx",
+        "args": ["@capgo/cli@latest", "mcp"]
+      }
     }
   }
-}
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest mcp
 ```
 
-**Options:**
+## <a id="options-mcp"></a> Options (Mcp)
 
-| Param | Type | Description |
-| --- | --- | --- |
-| **--capacitor-config** | <code>string</code> | Capacitor config source to update for the lifetime of the MCP server |
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **--capacitor-config** | <code>string</code> | Capacitor config source to update (useful with dynamic monorepo configs) |
+

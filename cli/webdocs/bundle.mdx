@@ -28,20 +28,6 @@ Capgo never inspects external content. Add encryption for trustless security.
 npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production,beta
 ```
 
-### Dynamic monorepos
-
-When a root `capacitor.config.ts` selects an app-specific source through an environment variable, keep that selector active and pass the source Capgo should write. This is especially useful with `--auto-set-bundle`:
-
-```bash
-CAP_APP=qr-code-reader npx @capgo/cli@latest bundle upload com.example.app \
-  --path ./dist/qr-code-reader/browser \
-  --channel production \
-  --auto-set-bundle \
-  --capacitor-config ./env-configs/capacitor.config.qr-code-reader.ts
-```
-
-Capgo loads the root config selected by `CAP_APP` and updates only the supplied source file.
-
 **Options:**
 
 | Param          | Type          | Description          |
