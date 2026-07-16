@@ -59,7 +59,15 @@ describe('update delivery stats helpers', () => {
     })
     expect(response.daily.samples).toEqual([12, 8])
     expect(response.daily.p50_ms).toEqual([820, 900])
+    expect(response.daily.p75_ms).toEqual([1100, 1300])
     expect(response.daily.p95_ms).toEqual([2400, 2800])
     expect(response.daily.p99_ms).toEqual([4100, 5000])
+  })
+
+  it('keeps null percentiles as null', () => {
+    expect(updateDeliveryStatsTestUtils.toMetric(null)).toBeNull()
+    expect(updateDeliveryStatsTestUtils.toMetric(undefined)).toBeNull()
+    expect(updateDeliveryStatsTestUtils.toMetric('')).toBeNull()
+    expect(updateDeliveryStatsTestUtils.toMetric(12.4)).toBe(12)
   })
 })

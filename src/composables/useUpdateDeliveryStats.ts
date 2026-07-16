@@ -45,22 +45,37 @@ export function useUpdateDeliveryStats(
   const { t } = useI18n()
   const stats = ref<UpdateDeliveryStatsResponse | null>(null) as Ref<UpdateDeliveryStatsResponse | null>
   const statsLoading = ref(false)
+  const statsError = ref(false)
   let latestRequest = 0
 
   async function fetchStats() {
     const body = params()
-    if (body.scope === 'app' && !body.app_id)
+    if (body.scope === 'app' && !body.app_id) {
+      latestRequest += 1
+      stats.value = null
+      statsError.value = false
+      statsLoading.value = false
       return
-    if (body.scope === 'org' && !body.org_id)
+    }
+    if (body.scope === 'org' && !body.org_id) {
+      latestRequest += 1
+      stats.value = null
+      statsError.value = false
+      statsLoading.value = false
       return
+    }
 
     const requestId = ++latestRequest
     statsLoading.value = true
+    statsError.value = false
+    stats.value = null
     try {
       const { data: sessionData } = await supabase.auth.getSession()
       if (!sessionData.session) {
-        if (requestId === latestRequest)
+        if (requestId === latestRequest) {
+          statsError.value = true
           toast.error(t('not-authenticated'))
+        }
         return
       }
 
@@ -78,17 +93,24 @@ export function useUpdateDeliveryStats(
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
+        if (requestId !== latestRequest)
+          return
         console.error(`Failed to fetch ${logContext}:`, errorData)
+        statsError.value = true
         toast.error(t('failed-to-fetch-update-delivery-stats'))
         return
       }
 
-      stats.value = await response.json() as UpdateDeliveryStatsResponse
+      const payload = await response.json() as UpdateDeliveryStatsResponse
+      if (requestId !== latestRequest)
+        return
+      stats.value = payload
     }
     catch (error) {
       if (requestId !== latestRequest)
         return
       console.error(`Error fetching ${logContext}:`, error)
+      statsError.value = true
       toast.error(t('failed-to-fetch-update-delivery-stats'))
     }
     finally {
@@ -97,7 +119,7 @@ export function useUpdateDeliveryStats(
     }
   }
 
-  return { stats, statsLoading, fetchStats }
+  return { stats, statsLoading, statsError, fetchStats }
 }
 
 export function buildDemoUpdateDeliveryStats(days: 1 | 3 | 7 | 30): UpdateDeliveryStatsResponse {

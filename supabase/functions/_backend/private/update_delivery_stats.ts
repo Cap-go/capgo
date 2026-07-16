@@ -47,8 +47,14 @@ const startActions = ['download_0', 'download_zip_start', 'download_manifest_sta
 const timingActions = [...endActions, ...startActions] as const
 
 const durationExpression = String.raw`CASE
-  WHEN s.metadata ? 'duration_ms' AND s.metadata ->> 'duration_ms' ~ '^[0-9]+(\.[0-9]+)?$' THEN (s.metadata ->> 'duration_ms')::double precision
-  WHEN s.metadata ? 'duration' AND s.metadata ->> 'duration' ~ '^[0-9]+(\.[0-9]+)?$' THEN (s.metadata ->> 'duration')::double precision
+  WHEN s.metadata ? 'duration_ms'
+    AND s.metadata ->> 'duration_ms' ~ '^[0-9]+(\.[0-9]+)?$'
+    AND char_length(s.metadata ->> 'duration_ms') <= 15
+    THEN (s.metadata ->> 'duration_ms')::double precision
+  WHEN s.metadata ? 'duration'
+    AND s.metadata ->> 'duration' ~ '^[0-9]+(\.[0-9]+)?$'
+    AND char_length(s.metadata ->> 'duration') <= 15
+    THEN (s.metadata ->> 'duration')::double precision
   ELSE NULL
 END`
 
@@ -64,11 +70,13 @@ function buildScopedDeliveriesCte(scope: UpdateDeliveryScope) {
     return `WITH deliveries AS (
   SELECT
     to_char(date_trunc('day', s.created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS day,
+    s.app_id,
     s.device_id,
     duration_ms
   FROM (
     SELECT
       s.created_at,
+      s.app_id,
       s.device_id,
       ${durationExpression} AS duration_ms
     FROM public.stats s
@@ -91,7 +99,7 @@ function buildScopedDeliveriesCte(scope: UpdateDeliveryScope) {
     s.created_at,
     ${durationExpression} AS meta_duration_ms
   FROM public.stats s
-  WHERE s.created_at >= $2::timestamptz
+  WHERE s.created_at >= ($2::timestamptz - INTERVAL '2 hours')
     AND s.created_at < $3::timestamptz
     AND s.action = ANY($4::public.stats_action[])
     ${appFilter}
@@ -100,6 +108,7 @@ ends AS (
   SELECT *
   FROM scoped
   WHERE action = ANY($5::public.stats_action[])
+    AND created_at >= $2::timestamptz
 ),
 starts AS (
   SELECT *
@@ -109,6 +118,7 @@ starts AS (
 deliveries AS (
   SELECT
     to_char(date_trunc('day', e.created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS day,
+    e.app_id,
     e.device_id,
     COALESCE(
       e.meta_duration_ms,
@@ -141,30 +151,46 @@ deliveries AS (
 )`
 }
 
-function buildDailyQuery(scope: UpdateDeliveryScope) {
-  return `${buildScopedDeliveriesCte(scope)}
+function buildStatsQuery(scope: UpdateDeliveryScope) {
+  // One deliveries CTE shared by daily + overview so platform/org/app avoid a second full scan.
+  return `${buildScopedDeliveriesCte(scope)},
+daily AS (
+  SELECT
+    day,
+    count(*)::integer AS samples,
+    percentile_cont(0.50) WITHIN GROUP (ORDER BY duration_ms) AS p50_ms,
+    percentile_cont(0.75) WITHIN GROUP (ORDER BY duration_ms) AS p75_ms,
+    percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms,
+    percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_ms
+  FROM deliveries
+  GROUP BY day
+),
+overview AS (
+  SELECT
+    count(*)::integer AS samples,
+    count(DISTINCT (app_id, device_id))::integer AS devices,
+    percentile_cont(0.50) WITHIN GROUP (ORDER BY duration_ms) AS p50_ms,
+    percentile_cont(0.75) WITHIN GROUP (ORDER BY duration_ms) AS p75_ms,
+    percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms,
+    percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_ms
+  FROM deliveries
+)
 SELECT
-  day,
-  count(*)::integer AS samples,
-  percentile_cont(0.50) WITHIN GROUP (ORDER BY duration_ms) AS p50_ms,
-  percentile_cont(0.75) WITHIN GROUP (ORDER BY duration_ms) AS p75_ms,
-  percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms,
-  percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_ms
-FROM deliveries
-GROUP BY day
-ORDER BY day ASC`
-}
-
-function buildOverviewQuery(scope: UpdateDeliveryScope) {
-  return `${buildScopedDeliveriesCte(scope)}
-SELECT
-  count(*)::integer AS samples,
-  count(DISTINCT device_id)::integer AS devices,
-  percentile_cont(0.50) WITHIN GROUP (ORDER BY duration_ms) AS p50_ms,
-  percentile_cont(0.75) WITHIN GROUP (ORDER BY duration_ms) AS p75_ms,
-  percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms,
-  percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_ms
-FROM deliveries`
+  COALESCE(
+    (SELECT json_agg(row_to_json(d) ORDER BY d.day) FROM daily d),
+    '[]'::json
+  ) AS daily,
+  COALESCE(
+    (SELECT row_to_json(o) FROM overview o),
+    json_build_object(
+      'samples', 0,
+      'devices', 0,
+      'p50_ms', null,
+      'p75_ms', null,
+      'p95_ms', null,
+      'p99_ms', null
+    )
+  ) AS overview`
 }
 
 function normalizePeriodDays(days: number | undefined = 7): UpdateDeliveryPeriodDays | null {
@@ -202,6 +228,8 @@ function toCount(value: NumericValue) {
 }
 
 function toMetric(value: NumericValue, decimals = 0) {
+  if (value === null || value === undefined || value === '')
+    return null
   const numeric = Number(value)
   if (!Number.isFinite(numeric))
     return null
@@ -219,7 +247,7 @@ function buildUpdateDeliveryResponse(input: {
   overviewRow: UpdateDeliveryOverviewRow | undefined
 }) {
   const labelIndex = new Map(input.labels.map((label, index) => [label, index]))
-  const samples = Array.from({ length: input.labels.length }, () => 0)
+  const samples = Array.from({ length: input.labels.length }).fill(0)
   const p50 = Array.from<number | null>({ length: input.labels.length }).fill(null)
   const p75 = Array.from<number | null>({ length: input.labels.length }).fill(null)
   const p95 = Array.from<number | null>({ length: input.labels.length }).fill(null)
@@ -300,16 +328,23 @@ async function readUpdateDeliveryStats(
   const db = getPgClient(c, true)
 
   try {
-    const dailyQuery = buildDailyQuery(scope)
-    const overviewQuery = buildOverviewQuery(scope)
+    const query = buildStatsQuery(scope)
     const params = scope === 'platform'
       ? [start.toISOString(), endExclusive.toISOString(), [...endActions]]
       : [scopeId, start.toISOString(), endExclusive.toISOString(), [...timingActions], [...endActions], [...startActions]]
 
-    const [dailyResult, overviewResult] = await Promise.all([
-      db.query<UpdateDeliveryDailyRow>(dailyQuery, params),
-      db.query<UpdateDeliveryOverviewRow>(overviewQuery, params),
-    ])
+    const result = await db.query<{
+      daily: UpdateDeliveryDailyRow[] | string
+      overview: UpdateDeliveryOverviewRow | string
+    }>(query, params)
+
+    const row = result.rows[0]
+    const dailyRows = typeof row?.daily === 'string'
+      ? JSON.parse(row.daily) as UpdateDeliveryDailyRow[]
+      : (row?.daily ?? [])
+    const overviewRow = typeof row?.overview === 'string'
+      ? JSON.parse(row.overview) as UpdateDeliveryOverviewRow
+      : row?.overview
 
     return buildUpdateDeliveryResponse({
       labels,
@@ -317,8 +352,8 @@ async function readUpdateDeliveryStats(
       start: start.toISOString(),
       end: endInclusive.toISOString(),
       scope,
-      dailyRows: dailyResult.rows,
-      overviewRow: overviewResult.rows[0],
+      dailyRows: Array.isArray(dailyRows) ? dailyRows : [],
+      overviewRow: overviewRow ?? undefined,
     })
   }
   catch (error) {
@@ -390,4 +425,5 @@ export const updateDeliveryStatsTestUtils = {
   generateDateLabels,
   normalizePeriodDays,
   normalizeScope,
+  toMetric,
 }

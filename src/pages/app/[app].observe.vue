@@ -393,6 +393,7 @@ watch([packageId, days], async () => {
           </div>
         </div>
         <DeliveryLatencyPanel
+          :key="packageId"
           scope="app"
           :app-id="packageId"
           :days="days"

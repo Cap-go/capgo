@@ -34,7 +34,7 @@ const localDays = ref<PeriodDayOption>(7)
 const days = computed<PeriodDayOption>(() => props.days ?? localDays.value)
 const periodDayOptions: PeriodDayOption[] = [1, 3, 7, 30]
 
-const { stats, statsLoading, fetchStats } = useUpdateDeliveryStats(() => ({
+const { stats, statsLoading, statsError, fetchStats } = useUpdateDeliveryStats(() => ({
   scope: props.scope,
   app_id: props.appId || undefined,
   org_id: props.orgId || undefined,
@@ -49,6 +49,9 @@ const effectiveStats = computed<UpdateDeliveryStatsResponse | null>(() => {
 })
 
 const hasData = computed(() => (effectiveStats.value?.overview.samples ?? 0) > 0)
+const emptyHelpKey = computed(() => props.scope === 'platform'
+  ? 'update-delivery-no-data-help-platform'
+  : 'update-delivery-no-data-help')
 const chartLabels = computed(() => (effectiveStats.value?.labels ?? []).map(label => formatLocalDateShort(label) || label))
 
 const chartData = computed<ChartData<'line'>>(() => ({
@@ -63,7 +66,7 @@ const chartData = computed<ChartData<'line'>>(() => ({
       tension: 0.35,
       pointRadius: 2,
       pointHoverRadius: 4,
-      spanGaps: true,
+      spanGaps: false,
     },
     {
       label: t('update-delivery-p75'),
@@ -74,7 +77,7 @@ const chartData = computed<ChartData<'line'>>(() => ({
       tension: 0.35,
       pointRadius: 2,
       pointHoverRadius: 4,
-      spanGaps: true,
+      spanGaps: false,
     },
     {
       label: t('update-delivery-p95'),
@@ -85,7 +88,7 @@ const chartData = computed<ChartData<'line'>>(() => ({
       tension: 0.35,
       pointRadius: 2,
       pointHoverRadius: 4,
-      spanGaps: true,
+      spanGaps: false,
     },
     {
       label: t('update-delivery-p99'),
@@ -96,7 +99,7 @@ const chartData = computed<ChartData<'line'>>(() => ({
       tension: 0.35,
       pointRadius: 2,
       pointHoverRadius: 4,
-      spanGaps: true,
+      spanGaps: false,
     },
   ],
 }))
@@ -204,7 +207,7 @@ watch(
           {{ t('update-delivery-latency-help') }}
         </p>
       </div>
-      <fieldset v-if="!hidePeriodSelector" class="d-join shrink-0">
+      <fieldset v-if="!hidePeriodSelector && props.days === undefined" class="d-join shrink-0">
         <legend class="sr-only">
           {{ t('selected-period') }}
         </legend>
@@ -222,8 +225,24 @@ watch(
       </fieldset>
     </div>
 
-    <div v-if="statsLoading && !forceDemo && !stats" class="flex items-center justify-center h-64 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+    <div v-if="statsLoading && !forceDemo && !stats && !statsError" class="flex items-center justify-center h-64 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
       <Spinner size="w-10 h-10" />
+    </div>
+
+    <div
+      v-else-if="statsError && !forceDemo"
+      class="flex flex-col items-center justify-center h-64 gap-3 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400"
+    >
+      <IconTimer class="w-12 h-12" />
+      <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100">
+        {{ t('update-delivery-fetch-error') }}
+      </h3>
+      <p class="text-sm text-center max-w-lg">
+        {{ t('update-delivery-fetch-error-help') }}
+      </p>
+      <button type="button" class="d-btn d-btn-sm d-btn-primary" @click="fetchStats">
+        {{ t('update-delivery-retry') }}
+      </button>
     </div>
 
     <template v-else>
@@ -281,7 +300,7 @@ watch(
             {{ t('update-delivery-no-data') }}
           </h3>
           <p class="mt-1 text-sm text-center text-slate-500 dark:text-slate-400 max-w-lg">
-            {{ t('update-delivery-no-data-help') }}
+            {{ t(emptyHelpKey) }}
           </p>
         </div>
         <div v-else class="relative h-80">
