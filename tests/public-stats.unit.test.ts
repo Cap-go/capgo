@@ -6,8 +6,10 @@ const mocks = vi.hoisted(() => {
   const limit = vi.fn(() => ({ maybeSingle }))
   const order = vi.fn(() => ({ limit }))
   const contains = vi.fn(() => ({ order }))
-  const lte = vi.fn(() => ({ contains }))
-  const select = vi.fn(() => ({ lte }))
+  const not = vi.fn(() => ({ order }))
+  const lte = vi.fn(() => ({ contains, not }))
+  const gte = vi.fn(() => ({ lte }))
+  const select = vi.fn(() => ({ lte, gte }))
   const from = vi.fn(() => ({ select }))
 
   return {
@@ -16,9 +18,11 @@ const mocks = vi.hoisted(() => {
     contains,
     from,
     getPublicLiveUpdateMetricsCF: vi.fn(),
+    gte,
     limit,
     lte,
     maybeSingle,
+    not,
     order,
     select,
     serializeError: vi.fn(error => error),
@@ -47,6 +51,10 @@ describe('public stats endpoint', () => {
     vi.clearAllMocks()
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-05-11T12:00:00.000Z'))
+    mocks.order.mockImplementation(() => ({ limit: mocks.limit }))
+    mocks.lte.mockImplementation(() => ({ contains: mocks.contains, not: mocks.not }))
+    mocks.gte.mockImplementation(() => ({ lte: mocks.lte }))
+    mocks.select.mockImplementation(() => ({ lte: mocks.lte, gte: mocks.gte }))
   })
 
   afterEach(() => {
@@ -84,9 +92,11 @@ describe('public stats endpoint', () => {
   })
 
   it('serves runtime live update metrics with browser CORS', async () => {
+    mocks.order.mockImplementationOnce(() => Promise.resolve({
+      data: [{ date_id: '2026-05-10', success_rate: 84 }],
+      error: null,
+    }) as any)
     mocks.getPublicLiveUpdateMetricsCF.mockResolvedValueOnce({
-      success_rate: 97.5,
-      daily: [{ date: '2026-05-10', success_rate: 97.5 }],
       failures: [{ reason: 'download_fail', share: 100 }],
       platforms: { ios: 25, android: 66.7, electron: 8.3 },
       updater_versions: [{ date: '2026-05-10', version: '8.1.0', share: 100 }],
@@ -102,17 +112,24 @@ describe('public stats endpoint', () => {
     expect(await res.json()).toEqual({
       period_days: 30,
       updated_at: '2026-05-11T12:00:00.000Z',
-      success_rate: 97.5,
-      daily: [{ date: '2026-05-10', success_rate: 97.5 }],
+      success_rate: 84,
+      daily: [{ date: '2026-05-10', success_rate: 84 }],
       failures: [{ reason: 'download_fail', share: 100 }],
       platforms: { ios: 25, android: 66.7, electron: 8.3 },
       updater_versions: [{ date: '2026-05-10', version: '8.1.0', share: 100 }],
     })
+    expect(mocks.from).toHaveBeenCalledWith('global_stats')
+    expect(mocks.gte).toHaveBeenCalledWith('date_id', '2026-04-11')
+    expect(mocks.lte).toHaveBeenCalledWith('date_id', '2026-05-10')
     expect(mocks.getPublicLiveUpdateMetricsCF).toHaveBeenCalledOnce()
   })
 
   it('does not cache an unavailable live metric query as zero data', async () => {
     const error = new Error('Analytics Engine query failed')
+    mocks.order.mockImplementationOnce(() => Promise.resolve({
+      data: [{ date_id: '2026-05-10', success_rate: 84 }],
+      error: null,
+    }) as any)
     mocks.getPublicLiveUpdateMetricsCF.mockRejectedValueOnce(error)
 
     const res = await app.request('http://localhost/live_updates', {

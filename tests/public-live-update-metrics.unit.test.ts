@@ -44,17 +44,6 @@ describe('public live update metrics', () => {
       const query = String(init?.body ?? '')
       queries.push(query)
 
-      if (query.includes('sum(succeeded)')) {
-        return analyticsResponse(
-          [
-            { name: 'date', type: 'String' },
-            { name: 'successes', type: 'UInt64' },
-            { name: 'failures', type: 'UInt64' },
-          ],
-          [{ date: '2026-06-30', successes: '117', failures: '3' }],
-        )
-      }
-
       if (query.includes('SELECT action, count() AS devices')) {
         return analyticsResponse(
           [
@@ -95,17 +84,15 @@ describe('public live update metrics', () => {
     )
 
     expect(metrics).toEqual({
-      success_rate: 97.5,
-      daily: [{ date: '2026-06-30', success_rate: 97.5 }],
       failures: [{ reason: 'download_fail', share: 100 }],
       platforms: { ios: 25, android: 66.66666666666666, electron: 8.333333333333332 },
       updater_versions: [{ date: '2026-06-30', version: '8.1.0', share: 100 }],
     })
-    expect(queries).toHaveLength(4)
+    expect(queries).toHaveLength(3)
     expect(queries.join('\n')).not.toContain('toString')
     expect(queries.join('\n')).not.toContain('concat')
+    expect(queries.join('\n')).not.toContain('sum(succeeded)')
     expect(queries.find(query => query.includes('FROM device_usage'))).toContain('double1 IN (0.0, 1.0, 2.0)')
-    expect(queries.find(query => query.includes('sum(succeeded)'))).toContain('GROUP BY date, app_id, device_id')
-    expect(queries.find(query => query.includes('sum(succeeded)'))).toContain('sum(if(succeeded = 0, failed, 0))')
+    expect(queries.find(query => query.includes('SELECT action, count() AS devices'))).toContain('GROUP BY date, action, app_id, device_id')
   })
 })

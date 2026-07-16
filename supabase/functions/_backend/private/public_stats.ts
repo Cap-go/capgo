@@ -1,3 +1,4 @@
+import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { PublicLiveUpdateMetrics } from '../utils/cloudflare.ts'
 import { Hono } from 'hono/tiny'
@@ -33,6 +34,34 @@ export function getLatestCompletedGlobalStatsDateId(referenceDate = new Date()) 
   return completedDay.toISOString().slice(0, 10)
 }
 
+export async function getGlobalStatsSuccessRates(c: Context, referenceDate = new Date()) {
+  const latestCompletedDateId = getLatestCompletedGlobalStatsDateId(referenceDate)
+  const start = new Date(`${latestCompletedDateId}T00:00:00.000Z`)
+  start.setUTCDate(start.getUTCDate() - 29)
+  const startDateId = start.toISOString().slice(0, 10)
+
+  const { data, error } = await supabaseAdmin(c)
+    .from('global_stats')
+    .select('date_id, success_rate')
+    .gte('date_id', startDateId)
+    .lte('date_id', latestCompletedDateId)
+    .not('success_rate', 'is', null)
+    .order('date_id', { ascending: true })
+
+  if (error)
+    throw error
+
+  const daily = (data ?? []).map(row => ({
+    date: row.date_id,
+    success_rate: Number(row.success_rate) || 0,
+  }))
+
+  return {
+    success_rate: daily.at(-1)?.success_rate ?? 0,
+    daily,
+  }
+}
+
 app.get('/', async (c) => {
   const latestCompletedDateId = getLatestCompletedGlobalStatsDateId()
   const { data, error } = await supabaseAdmin(c)
@@ -65,11 +94,15 @@ app.get('/live_updates', async (c) => {
 
   if (!response) {
     try {
-      const metrics = await getPublicLiveUpdateMetricsCF(c)
+      const [successRates, breakdown] = await Promise.all([
+        getGlobalStatsSuccessRates(c),
+        getPublicLiveUpdateMetricsCF(c),
+      ])
       response = {
         period_days: 30,
         updated_at: new Date().toISOString(),
-        ...metrics,
+        ...breakdown,
+        ...successRates,
       }
       await cache.putJson(cacheKey, response, LIVE_UPDATE_METRICS_CACHE_TTL_SECONDS)
     }
