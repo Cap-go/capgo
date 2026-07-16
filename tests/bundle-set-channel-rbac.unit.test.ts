@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const checkPermissionMock = vi.fn()
+const checkPermissionPgMock = vi.fn()
 const closeClientMock = vi.fn()
+const getDrizzleClientMock = vi.fn()
 const logPgErrorMock = vi.fn()
 const queryMock = vi.fn()
 const releaseMock = vi.fn()
@@ -9,11 +10,12 @@ const connectMock = vi.fn()
 const pgClientMock = { connect: connectMock }
 
 vi.mock('../supabase/functions/_backend/utils/rbac.ts', () => ({
-  checkPermission: (...args: unknown[]) => checkPermissionMock(...args),
+  checkPermissionPg: (...args: unknown[]) => checkPermissionPgMock(...args),
 }))
 
 vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
   closeClient: (...args: unknown[]) => closeClientMock(...args),
+  getDrizzleClient: (...args: unknown[]) => getDrizzleClientMock(...args),
   getPgClient: () => pgClientMock,
   logPgError: (...args: unknown[]) => logPgErrorMock(...args),
 }))
@@ -33,10 +35,15 @@ function context() {
   }
 }
 
+function apiKey() {
+  return { key: 'test-apikey', user_id: 'user-test' } as any
+}
+
 describe('bundle set channel RBAC guard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    checkPermissionMock.mockResolvedValue(true)
+    checkPermissionPgMock.mockResolvedValue(true)
+    getDrizzleClientMock.mockReturnValue({})
     queryMock.mockImplementation(async (text: string) => {
       if (text.includes('FROM public.channels')) {
         return { rowCount: 1, rows: [{ name: 'production', owner_org: '046a36ac-e03c-4590-9257-bd6c9dba9ee8' }] }
@@ -55,21 +62,25 @@ describe('bundle set channel RBAC guard', () => {
     })
   })
 
-  it('checks promotion permission against the target channel', async () => {
+  it('checks promotion permission against the target channel on its transaction connection', async () => {
     const c = context()
 
     const response = await setChannel(c as any, {
       app_id: 'com.example.app',
       version_id: 7,
       channel_id: 42,
-    }, { key: 'test-apikey' } as any)
+    }, apiKey())
 
     expect(response.status).toBe(200)
-    expect(checkPermissionMock).toHaveBeenCalledTimes(1)
-    expect(checkPermissionMock).toHaveBeenCalledWith(c, 'channel.promote_bundle', {
-      appId: 'com.example.app',
-      channelId: 42,
-    })
+    expect(checkPermissionPgMock).toHaveBeenCalledTimes(1)
+    expect(checkPermissionPgMock).toHaveBeenCalledWith(
+      c,
+      'channel.promote_bundle',
+      { appId: 'com.example.app', channelId: 42 },
+      expect.anything(),
+      'user-test',
+      'test-apikey',
+    )
     expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('FROM public.app_versions'), [
       7,
       'com.example.app',
@@ -99,26 +110,31 @@ describe('bundle set channel RBAC guard', () => {
     )
   })
 
-  it('does not update the channel when channel-scoped promotion is denied', async () => {
+  it('rolls back without updating when channel-scoped promotion is denied', async () => {
     const c = context()
-    checkPermissionMock.mockResolvedValueOnce(false)
+    checkPermissionPgMock.mockResolvedValueOnce(false)
 
     await expect(setChannel(c as any, {
       app_id: 'com.example.app',
       version_id: 7,
       channel_id: 42,
-    }, { key: 'test-apikey' } as any)).rejects.toHaveProperty('status', 400)
+    }, apiKey())).rejects.toHaveProperty('status', 400)
 
-    expect(checkPermissionMock).toHaveBeenCalledTimes(1)
-    expect(checkPermissionMock).toHaveBeenCalledWith(c, 'channel.promote_bundle', {
-      appId: 'com.example.app',
-      channelId: 42,
-    })
+    expect(checkPermissionPgMock).toHaveBeenCalledTimes(1)
+    expect(checkPermissionPgMock).toHaveBeenCalledWith(
+      c,
+      'channel.promote_bundle',
+      { appId: 'com.example.app', channelId: 42 },
+      expect.anything(),
+      'user-test',
+      'test-apikey',
+    )
     expect(connectMock).toHaveBeenCalledTimes(1)
     expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('FROM public.channels'), [
       42,
       'com.example.app',
     ])
+    expect(queryMock).toHaveBeenCalledWith('ROLLBACK')
     expect(queryMock).not.toHaveBeenCalledWith(expect.stringContaining('FROM public.app_versions'), expect.anything())
     expect(queryMock).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE public.channels'), expect.anything())
   })

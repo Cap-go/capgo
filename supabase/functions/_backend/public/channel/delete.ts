@@ -157,6 +157,13 @@ async function deletePreviewChannelAndBundle(
 
     await assertPreviewChannelDeletePermission(c, dbClient, body, apikey, effectiveApikey, channel)
 
+    // Channel creation inserts its preview role binding (which takes this org
+    // lock) before it locks the bundle. Keep delete on the same lock order.
+    await dbClient.query(
+      'SELECT public.lock_rbac_orgs($1::uuid)',
+      [channel.owner_org],
+    )
+
     const versionIds = [...new Set([channel.version, channel.rollout_version].filter((version): version is number => version !== null))]
     await lockPreviewBundleLifecycle(dbClient, versionIds)
     const versions = versionIds.length === 0

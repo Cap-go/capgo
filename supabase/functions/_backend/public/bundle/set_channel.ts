@@ -3,22 +3,29 @@ import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { HTTPException } from 'hono/http-exception'
 import { simpleError } from '../../utils/hono.ts'
-import { closeClient, getPgClient, logPgError } from '../../utils/pg.ts'
-import { checkPermission } from '../../utils/rbac.ts'
+import { closeClient, getDrizzleClient, getPgClient, logPgError } from '../../utils/pg.ts'
+import { checkPermissionPg } from '../../utils/rbac.ts'
 import { isValidAppId } from '../../utils/utils.ts'
 
-interface SetChannelBody {
+export interface SetChannelBody {
   app_id: string
   version_id: number
   channel_id: number
 }
 
-interface PgQueryClient {
+export interface PgQueryClient {
   query: <TRow = Record<string, unknown>>(text: string, params?: unknown[]) => Promise<{ rowCount?: number | null, rows: TRow[] }>
   release: () => void
 }
 
 interface ChannelRow { name: string, owner_org: string }
+
+export interface SetChannelResult {
+  channelName: string
+  versionName: string
+}
+
+type DrizzleClient = ReturnType<typeof getDrizzleClient>
 
 function validateSetChannelBody(body: SetChannelBody) {
   if (!body.app_id || !body.version_id || !body.channel_id) {
@@ -49,15 +56,6 @@ async function fetchTargetChannel(dbClient: PgQueryClient, body: SetChannelBody)
   )
 
   return (channelResult.rowCount ?? 0) === 1 ? channelResult.rows[0] : null
-}
-
-async function assertCanPromoteChannel(c: Context<MiddlewareKeyVariables>, body: SetChannelBody, channel: ChannelRow | null) {
-  const canPromoteTargetChannel = channel !== null && await checkPermission(c, 'channel.promote_bundle', { appId: body.app_id, channelId: body.channel_id })
-  const canPromoteAppChannels = channel === null && await checkPermission(c, 'channel.promote_bundle', { appId: body.app_id })
-
-  if (!canPromoteTargetChannel && !canPromoteAppChannels) {
-    throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel_id: body.channel_id })
-  }
 }
 
 async function fetchVersionName(dbClient: PgQueryClient, body: SetChannelBody) {
@@ -92,42 +90,68 @@ async function updateChannelVersion(dbClient: PgQueryClient, body: SetChannelBod
   }
 }
 
-export async function setChannel(c: Context<MiddlewareKeyVariables>, body: SetChannelBody, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function assertCanPromoteChannelInTransaction(
+  c: Context<MiddlewareKeyVariables>,
+  body: SetChannelBody,
+  apikey: Database['public']['Tables']['apikeys']['Row'],
+  dbClient: PgQueryClient,
+) {
+  const drizzle = getDrizzleClient(dbClient as unknown as ReturnType<typeof getPgClient>) as DrizzleClient
+  const canPromote = await checkPermissionPg(
+    c,
+    'channel.promote_bundle',
+    { appId: body.app_id, channelId: body.channel_id },
+    drizzle,
+    apikey.user_id,
+    getEffectiveApikey(c, apikey),
+  )
+
+  if (!canPromote) {
+    throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel_id: body.channel_id })
+  }
+}
+
+export async function setChannelInTransaction(
+  c: Context<MiddlewareKeyVariables>,
+  body: SetChannelBody,
+  apikey: Database['public']['Tables']['apikeys']['Row'],
+  dbClient: PgQueryClient,
+): Promise<SetChannelResult> {
   validateSetChannelBody(body)
 
-  let channelName: string | null = null
-  let versionName: string | null = null
-  const effectiveApikey = getEffectiveApikey(c, apikey)
+  const channel = await fetchTargetChannel(dbClient, body)
+  if (!channel) {
+    throw simpleError('cannot_find_channel', 'Cannot find channel')
+  }
 
+  await assertCanPromoteChannelInTransaction(c, body, apikey, dbClient)
+
+  // The preview-delete route takes this same transaction-scoped lock before
+  // checking references and soft-deleting the bundle.
+  await dbClient.query(
+    'SELECT pg_catalog.pg_advisory_xact_lock($1::bigint)',
+    [body.version_id],
+  )
+  const versionName = await fetchVersionName(dbClient, body)
+
+  await dbClient.query(
+    'SELECT set_config(\'request.headers\', $1, true)',
+    [JSON.stringify({ capgkey: getEffectiveApikey(c, apikey) })],
+  )
+  await updateChannelVersion(dbClient, body, channel.owner_org)
+  return { channelName: channel.name, versionName }
+}
+
+export async function setChannel(c: Context<MiddlewareKeyVariables>, body: SetChannelBody, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const pgClient = getPgClient(c)
   let dbClient: PgQueryClient | null = null
   let transactionStarted = false
+  let result: SetChannelResult | null = null
   try {
     dbClient = await pgClient.connect()
     await dbClient.query('BEGIN')
     transactionStarted = true
-
-    const channel = await fetchTargetChannel(dbClient, body)
-    await assertCanPromoteChannel(c, body, channel)
-
-    if (!channel) {
-      throw simpleError('cannot_find_channel', 'Cannot find channel')
-    }
-    channelName = channel.name
-
-    // The preview-delete route takes this same transaction-scoped lock before
-    // checking references and soft-deleting the bundle.
-    await dbClient.query(
-      'SELECT pg_catalog.pg_advisory_xact_lock($1::bigint)',
-      [body.version_id],
-    )
-    versionName = await fetchVersionName(dbClient, body)
-
-    await dbClient.query(
-      'SELECT set_config(\'request.headers\', $1, true)',
-      [JSON.stringify({ capgkey: effectiveApikey })],
-    )
-    await updateChannelVersion(dbClient, body, channel.owner_org)
+    result = await setChannelInTransaction(c, body, apikey, dbClient)
     await dbClient.query('COMMIT')
   }
   catch (error) {
@@ -151,6 +175,6 @@ export async function setChannel(c: Context<MiddlewareKeyVariables>, body: SetCh
 
   return c.json({
     status: 'success',
-    message: `Bundle ${versionName} set to channel ${channelName}`,
+    message: `Bundle ${result!.versionName} set to channel ${result!.channelName}`,
   })
 }
