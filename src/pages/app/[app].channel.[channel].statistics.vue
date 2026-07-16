@@ -12,6 +12,7 @@ import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconAlertTriangle from '~icons/lucide/alert-triangle'
 import IconCheckCircle from '~icons/lucide/check-circle'
 import IconTrendingUp from '~icons/lucide/trending-up'
+import PeriodDaySelector from '~/components/dashboard/PeriodDaySelector.vue'
 import { createTooltipConfig } from '~/services/chartTooltip'
 import { formatDistanceToNow, formatLocalDate, formatLocalDateShort } from '~/services/date'
 import { formatNumberValue } from '~/services/formatLocale'
@@ -112,7 +113,6 @@ const statsLoading = ref(true)
 const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
 type PeriodDayOption = 1 | 3 | 7 | 30
 const days = ref<PeriodDayOption>(30)
-const periodDayOptions: PeriodDayOption[] = [1, 3, 7, 30]
 const stats = ref<ChannelStatsResponse | null>(null)
 const bundleIdCache = ref<Record<string, number>>({})
 let latestStatsRequest = 0
@@ -230,17 +230,6 @@ const currentVersionDataset = computed(() => {
   return stats.value.datasets.find(dataset => dataset.label === stats.value?.currentVersion) ?? null
 })
 
-function periodButtonLabel(option: PeriodDayOption) {
-  if (option === 1)
-    return t('one-day')
-  if (option === 3)
-    return t('three-days')
-  if (option === 7)
-    return t('seven-days')
-  if (option === 30)
-    return t('max-period')
-  return t('max-period')
-}
 const selectedPeriodLabel = computed(() => {
   if (days.value === 1)
     return t('last-one-day')
@@ -596,29 +585,11 @@ watchEffect(async () => {
               {{ t('selected-period-applies-to-stats') }}
             </p>
           </div>
-          <div class="d-join shrink-0" role="group" :aria-label="t('selected-period')">
-            <button
-              v-for="d in periodDayOptions"
-              :key="d"
-              type="button"
-              :aria-describedby="d === 30 ? 'max-period-tooltip' : undefined"
-              :aria-pressed="days === d"
-              class="relative overflow-visible d-btn d-btn-sm d-join-item min-w-12 border-slate-500 bg-transparent text-slate-300 group hover:border-slate-400 hover:bg-slate-800 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-azure-500"
-              :class="days === d ? '!border-slate-200 !bg-slate-600 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)] hover:!bg-slate-500' : ''"
-              @click="selectPeriod(d)"
-            >
-              {{ periodButtonLabel(d) }}
-              <span
-                v-if="d === 30"
-                id="max-period-tooltip"
-                role="tooltip"
-                class="invisible absolute right-0 top-full z-50 mt-2 w-64 px-3 py-2 text-xs font-normal leading-relaxed text-left text-white normal-case transition-opacity bg-gray-900 rounded-lg shadow-lg opacity-0 pointer-events-none dark:bg-gray-700 group-hover:visible group-hover:opacity-100 group-focus-visible:visible group-focus-visible:opacity-100"
-              >
-                {{ t('max-period-tooltip') }}
-                <span class="absolute bottom-full w-0 h-0 border-4 border-transparent right-4 border-b-gray-900 dark:border-b-gray-700" />
-              </span>
-            </button>
-          </div>
+          <PeriodDaySelector
+            :model-value="days"
+            :labels="{ 30: 'max-period' }"
+            @update:model-value="selectPeriod"
+          />
         </div>
 
         <!-- Selected Period Adoption Status -->

@@ -2,13 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { updateDeliveryStatsTestUtils } from '../supabase/functions/_backend/private/update_delivery_stats.ts'
 
 describe('update delivery stats helpers', () => {
-  it.concurrent('normalizes supported period presets', () => {
+  it.concurrent('normalizes bounded period days', () => {
     expect(updateDeliveryStatsTestUtils.normalizePeriodDays(undefined)).toBe(7)
     expect(updateDeliveryStatsTestUtils.normalizePeriodDays(1)).toBe(1)
     expect(updateDeliveryStatsTestUtils.normalizePeriodDays(3)).toBe(3)
     expect(updateDeliveryStatsTestUtils.normalizePeriodDays(7)).toBe(7)
     expect(updateDeliveryStatsTestUtils.normalizePeriodDays(30)).toBe(30)
-    expect(updateDeliveryStatsTestUtils.normalizePeriodDays(2)).toBeNull()
+    expect(updateDeliveryStatsTestUtils.normalizePeriodDays(2)).toBe(2)
+    expect(updateDeliveryStatsTestUtils.normalizePeriodDays(365)).toBe(365)
+    expect(updateDeliveryStatsTestUtils.normalizePeriodDays(0)).toBeNull()
+    expect(updateDeliveryStatsTestUtils.normalizePeriodDays(366)).toBeNull()
     expect(updateDeliveryStatsTestUtils.normalizePeriodDays(7.5)).toBeNull()
   })
 

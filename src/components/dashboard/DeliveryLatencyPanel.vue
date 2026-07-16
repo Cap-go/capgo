@@ -6,6 +6,7 @@ import { computed, ref, watch } from 'vue'
 import { Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
 import IconTimer from '~icons/lucide/timer'
+import PeriodDaySelector from '~/components/dashboard/PeriodDaySelector.vue'
 import Spinner from '~/components/Spinner.vue'
 import { buildDemoUpdateDeliveryStats, useUpdateDeliveryStats } from '~/composables/useUpdateDeliveryStats'
 import { formatLocalDateShort } from '~/services/date'
@@ -18,7 +19,7 @@ const props = withDefaults(defineProps<{
   appId?: string
   orgId?: string
   forceDemo?: boolean
-  days?: PeriodDayOption
+  days?: number
   hidePeriodSelector?: boolean
 }>(), {
   appId: '',
@@ -31,8 +32,7 @@ Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, L
 
 const { t } = useI18n()
 const localDays = ref<PeriodDayOption>(7)
-const days = computed<PeriodDayOption>(() => props.days ?? localDays.value)
-const periodDayOptions: PeriodDayOption[] = [1, 3, 7, 30]
+const days = computed(() => props.days ?? localDays.value)
 
 const { stats, statsLoading, statsError, fetchStats } = useUpdateDeliveryStats(() => ({
   scope: props.scope,
@@ -160,16 +160,6 @@ function formatCount(value: number | null | undefined) {
   return formatNumberValue(value ?? 0)
 }
 
-function periodButtonLabel(option: PeriodDayOption) {
-  if (option === 1)
-    return t('one-day')
-  if (option === 3)
-    return t('three-days')
-  if (option === 7)
-    return t('seven-days')
-  return t('thirty-days')
-}
-
 function selectPeriod(option: PeriodDayOption) {
   if (props.days !== undefined || localDays.value === option)
     return
@@ -207,22 +197,11 @@ watch(
           {{ t('update-delivery-latency-help') }}
         </p>
       </div>
-      <fieldset v-if="!hidePeriodSelector && props.days === undefined" class="d-join shrink-0">
-        <legend class="sr-only">
-          {{ t('selected-period') }}
-        </legend>
-        <button
-          v-for="option in periodDayOptions"
-          :key="option"
-          type="button"
-          :aria-pressed="days === option"
-          class="d-btn d-btn-sm d-join-item min-w-12"
-          :class="days === option ? 'd-btn-primary' : 'd-btn-outline'"
-          @click="selectPeriod(option)"
-        >
-          {{ periodButtonLabel(option) }}
-        </button>
-      </fieldset>
+      <PeriodDaySelector
+        v-if="!hidePeriodSelector && props.days === undefined"
+        :model-value="localDays"
+        @update:model-value="selectPeriod"
+      />
     </div>
 
     <div v-if="statsLoading && !forceDemo && !stats && !statsError" class="flex items-center justify-center h-64 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">

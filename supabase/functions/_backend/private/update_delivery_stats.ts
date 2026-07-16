@@ -11,8 +11,8 @@ import { supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
 dayjs.extend(utc)
 
-const supportedPeriodDays = [1, 3, 7, 30] as const
-type UpdateDeliveryPeriodDays = typeof supportedPeriodDays[number]
+const maxPeriodDays = 365
+type UpdateDeliveryPeriodDays = number
 type UpdateDeliveryScope = 'app' | 'org' | 'platform'
 
 interface UpdateDeliveryStatsRequest {
@@ -194,7 +194,7 @@ SELECT
 }
 
 function normalizePeriodDays(days: number | undefined = 7): UpdateDeliveryPeriodDays | null {
-  if (!Number.isInteger(days) || !supportedPeriodDays.includes(days as UpdateDeliveryPeriodDays))
+  if (!Number.isInteger(days) || days < 1 || days > maxPeriodDays)
     return null
   return days as UpdateDeliveryPeriodDays
 }
@@ -379,7 +379,7 @@ app.post('/', middlewareAuth, async (c) => {
 
   const days = normalizePeriodDays(body.days)
   if (!days)
-    throw simpleError('invalid_days', 'days must be one of 1, 3, 7, or 30')
+    throw simpleError('invalid_days', `days must be an integer from 1 to ${maxPeriodDays}`)
 
   if (scope === 'platform') {
     await assertPlatformAdmin(c)

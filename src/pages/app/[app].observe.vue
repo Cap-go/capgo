@@ -11,6 +11,7 @@ import IconExternalLink from '~icons/lucide/external-link'
 import IconRocket from '~icons/lucide/rocket'
 import IconTimer from '~icons/lucide/timer'
 import DeliveryLatencyPanel from '~/components/dashboard/DeliveryLatencyPanel.vue'
+import PeriodDaySelector from '~/components/dashboard/PeriodDaySelector.vue'
 import { useNativeObserveStats } from '~/composables/useNativeObserveStats'
 import { formatLocalDateShort } from '~/services/date'
 import { formatNumberValue } from '~/services/formatLocale'
@@ -90,7 +91,6 @@ const packageId = computed(() => {
 })
 const appRouteSegment = computed(() => route.path.match(/^\/app\/([^/]+)/)?.[1] ?? encodeURIComponent(packageId.value))
 const days = ref<PeriodDayOption>(7)
-const periodDayOptions: PeriodDayOption[] = [1, 3, 7, 30]
 const { stats, statsLoading, fetchStats } = useNativeObserveStats<NativeObserveStatsResponse>(
   packageId,
   () => ({ days: days.value }),
@@ -229,16 +229,6 @@ const eventChartOptions = computed<ChartOptions<'bar'>>(() => ({
   },
 }))
 
-function periodButtonLabel(option: PeriodDayOption) {
-  if (option === 1)
-    return t('one-day')
-  if (option === 3)
-    return t('three-days')
-  if (option === 7)
-    return t('seven-days')
-  return t('thirty-days')
-}
-
 function formatShortDate(value: string | null | undefined) {
   if (!value)
     return '-'
@@ -314,22 +304,7 @@ watch([packageId, days], async () => {
             {{ observeScopeLabel }}
           </p>
         </div>
-        <fieldset class="d-join shrink-0">
-          <legend class="sr-only">
-            {{ t('selected-period') }}
-          </legend>
-          <button
-            v-for="option in periodDayOptions"
-            :key="option"
-            type="button"
-            :aria-pressed="days === option"
-            class="d-btn d-btn-sm d-join-item min-w-12"
-            :class="days === option ? 'd-btn-primary' : 'd-btn-outline'"
-            @click="selectPeriod(option)"
-          >
-            {{ periodButtonLabel(option) }}
-          </button>
-        </fieldset>
+        <PeriodDaySelector :model-value="days" @update:model-value="selectPeriod" />
       </div>
 
       <div v-if="statsLoading && !stats" class="flex items-center justify-center h-80">

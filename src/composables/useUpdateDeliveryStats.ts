@@ -10,7 +10,7 @@ export interface UpdateDeliveryStatsResponse {
   scope: UpdateDeliveryScope
   labels: string[]
   period: {
-    requested_days: 1 | 3 | 7 | 30
+    requested_days: number
     actual_days: number
     start: string
     end: string
@@ -37,7 +37,7 @@ export function useUpdateDeliveryStats(
     scope: UpdateDeliveryScope
     app_id?: string
     org_id?: string
-    days: 1 | 3 | 7 | 30
+    days: number
   },
   logContext = 'update delivery stats',
 ) {
@@ -122,7 +122,7 @@ export function useUpdateDeliveryStats(
   return { stats, statsLoading, statsError, fetchStats }
 }
 
-export function buildDemoUpdateDeliveryStats(days: 1 | 3 | 7 | 30): UpdateDeliveryStatsResponse {
+export function buildDemoUpdateDeliveryStats(days: number): UpdateDeliveryStatsResponse {
   const labels: string[] = []
   const end = new Date()
   for (let i = days - 1; i >= 0; i -= 1) {
