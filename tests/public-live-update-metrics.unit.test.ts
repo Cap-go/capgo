@@ -106,6 +106,6 @@ describe('public live update metrics', () => {
     expect(queries.join('\n')).not.toContain('concat')
     expect(queries.find(query => query.includes('FROM device_usage'))).toContain('double1 IN (0.0, 1.0, 2.0)')
     expect(queries.find(query => query.includes('sum(succeeded)'))).toContain('GROUP BY date, app_id, device_id')
-    expect(queries.find(query => query.includes('SELECT action, count() AS devices'))).toContain('GROUP BY date, action, app_id, device_id')
+    expect(queries.find(query => query.includes('sum(succeeded)'))).toContain('sum(if(succeeded = 0, failed, 0))')
   })
 })
