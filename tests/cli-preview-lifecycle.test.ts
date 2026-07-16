@@ -77,6 +77,8 @@ const CHANNEL_NAME = `preview-${id.slice(0, 8)}`
 const SECOND_CHANNEL_NAME = `preview-other-${id.slice(0, 8)}`
 const MAIN_CHANNEL_NAME = `main-${id.slice(0, 8)}`
 const BUNDLE_NAME = `1.0.0-preview-${id.slice(0, 8)}`
+const LEGACY_CHANNEL_NAME = `preview-legacy-${id.slice(0, 8)}`
+const LEGACY_BUNDLE_NAME = `1.0.0-legacy-${id.slice(0, 8)}`
 const seedOptions = createIsolatedSeedAppOptions()
 
 interface ApiKeyResponse {
@@ -388,6 +390,66 @@ describe('cli app preview lifecycle', () => {
       [APPNAME, MAIN_CHANNEL_NAME],
     )
     expect(Number(remainingMainChannels[0]?.count ?? 0)).toBe(1)
+  }, 60_000)
+  it('reads back legacy channel creation responses without metadata', async () => {
+    const apiKey = await createAppApiKey(`cli-app-preview-legacy-${id}`)
+    const cliOptions = {
+      apikey: apiKey.key,
+      supaHost: SUPABASE_BASE_URL,
+      supaAnon: SUPABASE_ANON_KEY,
+    }
+    const originalFetch = globalThis.fetch
+
+    const { upload, requests } = await (async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+        const response = await originalFetch(input, init)
+        const request = requestTrace(input, init)
+        if (response.ok && request.method === 'POST' && request.path === '/functions/v1/channel') {
+          return new Response(JSON.stringify({ status: 'ok' }), {
+            status: response.status,
+            headers: { 'content-type': 'application/json' },
+          })
+        }
+        return response
+      })
+      try {
+        const upload = await uploadBundleInternal(APPNAME, {
+          ...cliOptions,
+          path: '.',
+          bundle: LEGACY_BUNDLE_NAME,
+          channel: LEGACY_CHANNEL_NAME,
+          bundleUrl: true,
+          external: 'https://example.invalid/legacy-preview.zip',
+          codeCheck: false,
+          ignoreMetadataCheck: true,
+          ignoreChecksumCheck: true,
+        }, true)
+        return {
+          upload,
+          requests: fetchSpy.mock.calls.map(([input, init]) => requestTrace(input, init)),
+        }
+      }
+      finally {
+        fetchSpy.mockRestore()
+      }
+    })()
+
+    expect(upload).toMatchObject({
+      success: true,
+      appId: APPNAME,
+      bundle: LEGACY_BUNDLE_NAME,
+      updatedChannels: [LEGACY_CHANNEL_NAME],
+    })
+    const channelPostIndex = requests.findIndex(request => request.method === 'POST' && request.path === '/functions/v1/channel')
+    expect(channelPostIndex).toBeGreaterThanOrEqual(0)
+    expect(requests).not.toContainEqual({ method: 'POST', path: '/rest/v1/rpc/get_app_versions' })
+    expect(requests.slice(channelPostIndex + 1)).toContainEqual({ method: 'GET', path: '/rest/v1/channels' })
+
+    await expect(deleteChannelInternal(LEGACY_CHANNEL_NAME, APPNAME, {
+      ...cliOptions,
+      deleteBundle: true,
+      successIfNotFound: false,
+    }, true)).resolves.toBe(true)
   }, 60_000)
   it('keeps generic app-admin bundle cleanup behavior unchanged', async () => {
     const genericChannelName = `admin-${id.slice(0, 8)}`

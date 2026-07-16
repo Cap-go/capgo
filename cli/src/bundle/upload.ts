@@ -789,7 +789,12 @@ async function deleteLinkedBundleOnUpload(supabase: SupabaseType, version: Linke
   log.info(`Linked bundle ${version.name} deleted`)
 }
 
-async function findUploadTargetChannel(supabase: SupabaseType, appid: string, channel: string): Promise<UploadTargetChannel | null> {
+async function findUploadTargetChannel(
+  supabase: SupabaseType,
+  appid: string,
+  channel: string,
+  failOnError = true,
+): Promise<UploadTargetChannel | null> {
   const { data, error } = await supabase
     .from('channels')
     .select('id, public, version, rollout_version')
@@ -797,7 +802,7 @@ async function findUploadTargetChannel(supabase: SupabaseType, appid: string, ch
     .eq('name', channel)
     .maybeSingle()
 
-  if (error)
+  if (error && failOnError)
     uploadFail(`Cannot check channel ${channel}: ${formatError(error)}`)
 
   return data
@@ -975,14 +980,22 @@ async function setVersionInChannel(
     }
 
     const createdChannel = data as { id?: unknown, public?: unknown } | null
-    const createdChannelId = Number(createdChannel?.id)
-    if (!Number.isSafeInteger(createdChannelId)) {
-      log.info('Your update is now available 🎉')
-      return true
+    let createdChannelId = Number(createdChannel?.id)
+    let createdChannelPublic = createdChannel?.public === true
+    if (!Number.isSafeInteger(createdChannelId) || typeof createdChannel?.public !== 'boolean') {
+      // Older channel endpoints do not return metadata, so only their fallback reads the new channel.
+      const fallbackChannel = await findUploadTargetChannel(supabase, appid, channel, false)
+      const fallbackChannelId = Number(fallbackChannel?.id)
+      if (!Number.isSafeInteger(fallbackChannelId)) {
+        log.info('Your update is now available 🎉')
+        return true
+      }
+      createdChannelId = fallbackChannelId
+      createdChannelPublic = fallbackChannel?.public === true
     }
 
     const bundleUrl = `${localConfig.hostWeb}/app/${appid}/channel/${createdChannelId}`
-    if (createdChannel?.public === true)
+    if (createdChannelPublic)
       log.info('Your update is now available in your public channel 🎉')
     else
       log.info(`Link device to this bundle to try it: ${bundleUrl}`)
