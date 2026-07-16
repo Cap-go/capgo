@@ -574,12 +574,10 @@ export async function createAppVersions(
   }, {
     onConflict: 'app_id,name',
   }).select('id,name').single()
-  if (error) {
+  if (error)
     console.error(`Error creating app_version for ${version}:`, error)
-  }
-  if (!data) {
+  if (!data)
     throw new Error(`Error creating app_version for ${version}: no data`)
-  }
   return data
 }
 
@@ -824,8 +822,30 @@ export async function getCronPlanQueueCount(): Promise<number> {
   return Number.parseInt(result[0]?.count || '0')
 }
 
+export async function getCronPlanQueueCountForOrg(orgId: string): Promise<number> {
+  const result = await executeSQL(
+    `SELECT COUNT(*) as count
+     FROM pgmq.q_cron_stat_org
+     WHERE message->'payload'->>'orgId' = $1`,
+    [orgId],
+  )
+  return Number.parseInt(result[0]?.count || '0')
+}
+
 export async function getLatestCronPlanMessage(): Promise<any> {
   const result = await executeSQL('SELECT message FROM pgmq.q_cron_stat_org ORDER BY msg_id DESC LIMIT 1')
+  return result[0]?.message
+}
+
+export async function getLatestCronPlanMessageForOrg(orgId: string): Promise<any> {
+  const result = await executeSQL(
+    `SELECT message
+     FROM pgmq.q_cron_stat_org
+     WHERE message->'payload'->>'orgId' = $1
+     ORDER BY msg_id DESC
+     LIMIT 1`,
+    [orgId],
+  )
   return result[0]?.message
 }
 

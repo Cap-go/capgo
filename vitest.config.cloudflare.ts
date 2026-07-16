@@ -25,8 +25,11 @@ export default defineConfig(({ mode }) => ({
     bail: 0, // Run all tests to see full results
     testTimeout: 30_000, // Increased timeout for Cloudflare Workers
     hookTimeout: 30_000, // Cloudflare worker-backed fixture setup can be slower in CI
-    maxConcurrency: 10, // Reduced for replica sync reliability
-    maxWorkers: 5, // Reduced for replica sync reliability
+    // Keep concurrency modest: maxWorkers=5 overloaded local workerd into intermittent 503s.
+    // Zero-retry policy: flaky cases are fixed at the source, not masked by re-running tests.
+    retry: 0,
+    maxConcurrency: 6,
+    maxWorkers: 3,
     env: {
       ...loadEnv(mode, cwd(), ''),
       // Override to use Cloudflare Workers instead of Supabase Edge Functions
