@@ -10,6 +10,7 @@ import { useRouter } from 'vue-router'
 import AdminFilterBar from '~/components/admin/AdminFilterBar.vue'
 import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
+import DeliveryLatencyPanel from '~/components/dashboard/DeliveryLatencyPanel.vue'
 import PageLoader from '~/components/PageLoader.vue'
 import { formatNumberValue, formatOneDecimal } from '~/services/formatLocale'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
@@ -290,6 +291,8 @@ displayStore.defaultBack = '/dashboard'
               />
             </ChartCard>
           </div>
+
+          <DeliveryLatencyPanel scope="platform" />
         </div>
       </div>
     </div>

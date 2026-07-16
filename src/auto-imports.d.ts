@@ -11,6 +11,7 @@ declare global {
   const WEBHOOK_EVENT_TYPES: typeof import('./stores/webhooks').WEBHOOK_EVENT_TYPES
   const asyncComputed: typeof import('@vueuse/core').asyncComputed
   const autoResetRef: typeof import('@vueuse/core').autoResetRef
+  const buildDemoUpdateDeliveryStats: typeof import('./composables/useUpdateDeliveryStats').buildDemoUpdateDeliveryStats
   const computed: typeof import('vue').computed
   const computedAsync: typeof import('@vueuse/core').computedAsync
   const computedEager: typeof import('@vueuse/core').computedEager
@@ -294,6 +295,7 @@ declare global {
   const useToString: typeof import('@vueuse/core').useToString
   const useToggle: typeof import('@vueuse/core').useToggle
   const useTransition: typeof import('@vueuse/core').useTransition
+  const useUpdateDeliveryStats: typeof import('./composables/useUpdateDeliveryStats').useUpdateDeliveryStats
   const useUrlSearchParams: typeof import('@vueuse/core').useUrlSearchParams
   const useUserMedia: typeof import('@vueuse/core').useUserMedia
   const useVModel: typeof import('@vueuse/core').useVModel
@@ -338,6 +340,9 @@ declare global {
   export type { CheckDomainResponse } from './composables/useSSORouting'
   import('./composables/useSSORouting')
   // @ts-ignore
+  export type { UpdateDeliveryScope, UpdateDeliveryStatsResponse } from './composables/useUpdateDeliveryStats'
+  import('./composables/useUpdateDeliveryStats')
+  // @ts-ignore
   export type { MetricCategory, DateRangeMode } from './stores/adminDashboard'
   import('./stores/adminDashboard')
   // @ts-ignore
@@ -364,6 +369,7 @@ declare module 'vue' {
     readonly WEBHOOK_EVENT_TYPES: UnwrapRef<typeof import('./stores/webhooks')['WEBHOOK_EVENT_TYPES']>
     readonly asyncComputed: UnwrapRef<typeof import('@vueuse/core')['asyncComputed']>
     readonly autoResetRef: UnwrapRef<typeof import('@vueuse/core')['autoResetRef']>
+    readonly buildDemoUpdateDeliveryStats: UnwrapRef<typeof import('./composables/useUpdateDeliveryStats')['buildDemoUpdateDeliveryStats']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
     readonly computedAsync: UnwrapRef<typeof import('@vueuse/core')['computedAsync']>
     readonly computedEager: UnwrapRef<typeof import('@vueuse/core')['computedEager']>
@@ -644,6 +650,7 @@ declare module 'vue' {
     readonly useToString: UnwrapRef<typeof import('@vueuse/core')['useToString']>
     readonly useToggle: UnwrapRef<typeof import('@vueuse/core')['useToggle']>
     readonly useTransition: UnwrapRef<typeof import('@vueuse/core')['useTransition']>
+    readonly useUpdateDeliveryStats: UnwrapRef<typeof import('./composables/useUpdateDeliveryStats')['useUpdateDeliveryStats']>
     readonly useUrlSearchParams: UnwrapRef<typeof import('@vueuse/core')['useUrlSearchParams']>
     readonly useUserMedia: UnwrapRef<typeof import('@vueuse/core')['useUserMedia']>
     readonly useVModel: UnwrapRef<typeof import('@vueuse/core')['useVModel']>
