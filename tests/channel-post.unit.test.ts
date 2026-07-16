@@ -1,9 +1,26 @@
+import { HTTPException } from 'hono/http-exception'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const updateOrCreateChannel = vi.fn()
 const checkPermission = vi.fn()
+const checkPermissionPg = vi.fn()
+const assertCanPromoteChannelInTransaction = vi.fn()
+const setChannelInTransaction = vi.fn()
 const supabaseAdmin = vi.fn()
 const isValidAppId = vi.fn()
+const getPgClient = vi.fn()
+const getDrizzleClient = vi.fn()
+const closeClient = vi.fn()
+const logPgError = vi.fn()
+const transactionEvents: string[] = []
+const dbClient = {
+  query: vi.fn(),
+  release: vi.fn(),
+}
+const pgClient = {
+  connect: vi.fn(),
+}
+const drizzle = {}
 
 vi.mock('../supabase/functions/_backend/utils/hono.ts', () => ({
   BRES: { status: 'ok' },
@@ -20,11 +37,24 @@ vi.mock('../supabase/functions/_backend/utils/logging.ts', () => ({
 
 vi.mock('../supabase/functions/_backend/utils/rbac.ts', () => ({
   checkPermission,
+  checkPermissionPg,
+}))
+
+vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
+  closeClient,
+  getDrizzleClient,
+  getPgClient,
+  logPgError,
 }))
 
 vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
   supabaseAdmin,
   updateOrCreateChannel,
+}))
+
+vi.mock('../supabase/functions/_backend/public/bundle/set_channel.ts', () => ({
+  assertCanPromoteChannelInTransaction,
+  setChannelInTransaction,
 }))
 
 vi.mock('../supabase/functions/_backend/utils/utils.ts', () => ({
@@ -38,6 +68,7 @@ function buildAdminChain(body: {
   existingRolloutVersion?: number | null
   ownerOrg?: string
   versionId?: number
+  versionError?: { message: string } | null
   eqCalls?: Array<[string, unknown]>
   fromCalls?: string[]
 } = {}) {
@@ -81,7 +112,7 @@ function buildAdminChain(body: {
               body.eqCalls?.push([column, value])
               return this
             },
-            single: async () => ({ data: { id: body.versionId ?? 123 }, error: null }),
+            single: async () => body.versionError ? { data: null, error: body.versionError } : { data: { id: body.versionId ?? 123 }, error: null },
           }),
         }
       }
@@ -96,16 +127,74 @@ function apiKey() {
 }
 
 function context() {
-  return { json: vi.fn().mockReturnValue({ ok: true }) } as any
+  return {
+    get: vi.fn((key: string) => {
+      if (key === 'auth')
+        return { authType: 'apikey', userId: 'user-test', apikey: apiKey() }
+      if (key === 'requestId')
+        return 'channel-post-test'
+      return undefined
+    }),
+    json: vi.fn().mockReturnValue({ ok: true }),
+  } as any
+}
+
+function configureTransaction(versionId: number | null = 123) {
+  dbClient.query.mockImplementation(async (statement: string) => {
+    if (statement === 'BEGIN') {
+      transactionEvents.push('begin')
+      return { rowCount: null, rows: [] }
+    }
+    if (statement === 'COMMIT') {
+      transactionEvents.push('commit')
+      return { rowCount: null, rows: [] }
+    }
+    if (statement === 'ROLLBACK') {
+      transactionEvents.push('rollback')
+      return { rowCount: null, rows: [] }
+    }
+    if (statement.includes('set_config')) {
+      transactionEvents.push('headers')
+      return { rowCount: 1, rows: [] }
+    }
+    if (statement.includes('INSERT INTO public.channels')) {
+      transactionEvents.push('insert')
+      return { rowCount: 1, rows: [{ id: 77, public: false }] }
+    }
+    if (statement.includes('FROM public.app_versions')) {
+      transactionEvents.push('version')
+      return versionId === null
+        ? { rowCount: 0, rows: [] }
+        : { rowCount: 1, rows: [{ id: versionId }] }
+    }
+    throw new Error(`Unexpected transaction statement: ${statement}`)
+  })
 }
 
 describe('public channel post', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    transactionEvents.splice(0)
     checkPermission.mockResolvedValue(true)
+    checkPermissionPg.mockImplementation(async (_context: unknown, permission: string) => {
+      transactionEvents.push(`permission:${permission}`)
+      return true
+    })
+    assertCanPromoteChannelInTransaction.mockImplementation(async () => {
+      transactionEvents.push('promote')
+    })
+    setChannelInTransaction.mockImplementation(async () => {
+      transactionEvents.push('set')
+      return { channelName: 'preview', versionName: '1.0.0' }
+    })
     isValidAppId.mockReturnValue(true)
     supabaseAdmin.mockImplementation(() => buildAdminChain())
-    updateOrCreateChannel.mockResolvedValue({ error: null })
+    updateOrCreateChannel.mockResolvedValue({ data: { id: 99 }, error: null })
+    getPgClient.mockReturnValue(pgClient)
+    pgClient.connect.mockResolvedValue(dbClient)
+    getDrizzleClient.mockReturnValue(drizzle)
+    closeClient.mockResolvedValue(undefined)
+    configureTransaction()
   })
 
   it('defaults legacy public mobile channel writes to electron false', async () => {
@@ -115,7 +204,6 @@ describe('public channel post', () => {
     await post(c, {
       app_id: 'com.test.legacy-mobile',
       channel: 'ios-default',
-      version: '1.0.0',
       public: true,
       ios: true,
       android: false,
@@ -132,7 +220,7 @@ describe('public channel post', () => {
         electron: false,
       }),
       null,
-      false,
+      true,
     )
     expect(c.json).toHaveBeenCalledWith({ status: 'ok' })
   })
@@ -144,14 +232,13 @@ describe('public channel post', () => {
     await post(c, {
       app_id: 'com.test.explicit-electron',
       channel: 'all-platforms',
-      version: '1.0.0',
       public: true,
       ios: true,
       android: true,
       electron: true,
     }, apiKey())
 
-    expect(updateOrCreateChannel).toHaveBeenCalledWith(c, expect.objectContaining({ electron: true }), null, false)
+    expect(updateOrCreateChannel).toHaveBeenCalledWith(c, expect.objectContaining({ electron: true }), null, true)
   })
 
   it('keeps legacy all-platform public writes electron-compatible when both mobile flags are true', async () => {
@@ -161,13 +248,12 @@ describe('public channel post', () => {
     await post(c, {
       app_id: 'com.test.legacy-all-platforms',
       channel: 'production',
-      version: '1.0.0',
       public: true,
       ios: true,
       android: true,
     }, apiKey())
 
-    expect(updateOrCreateChannel).toHaveBeenCalledWith(c, expect.not.objectContaining({ electron: false }), null, false)
+    expect(updateOrCreateChannel).toHaveBeenCalledWith(c, expect.not.objectContaining({ electron: false }), null, true)
   })
 
   it('preserves the stable version for a settings-only update without channel.read or bundle lookup', async () => {
@@ -191,7 +277,6 @@ describe('public channel post', () => {
     expect(fromCalls).toEqual(['channels', 'apps'])
     expect(updateOrCreateChannel).toHaveBeenCalledWith(c, expect.objectContaining({ version: 123, public: false }), 42, true)
   })
-
   it('requires promote permission before explicit version lookup, even when the name is current', async () => {
     const fromCalls: string[] = []
     supabaseAdmin.mockImplementation(() => buildAdminChain({
@@ -257,23 +342,111 @@ describe('public channel post', () => {
     expect(updateOrCreateChannel).toHaveBeenCalledWith(c, expect.objectContaining({ version: 456, rollout_version: null }), 42, false)
   })
 
-  it('requires app-scoped promote permission to create a channel with a bundle', async () => {
-    checkPermission
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false)
+  it('creates and promotes a new channel in one transaction after its scoped grant exists', async () => {
+    const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
+    const c = context()
+    const key = apiKey()
+
+    await post(c, {
+      app_id: 'com.test.new-channel-version',
+      channel: 'preview',
+      version: '1.0.0',
+    }, key)
+
+    expect(updateOrCreateChannel).not.toHaveBeenCalled()
+    expect(assertCanPromoteChannelInTransaction).toHaveBeenCalledWith(c, expect.objectContaining({
+      app_id: 'com.test.new-channel-version',
+      channel_id: 77,
+    }), key, dbClient)
+    expect(setChannelInTransaction).toHaveBeenCalledWith(c, {
+      app_id: 'com.test.new-channel-version',
+      channel_id: 77,
+      version_id: 123,
+    }, key, dbClient)
+    expect(transactionEvents).toEqual([
+      'begin',
+      'headers',
+      'permission:app.create_channel',
+      'insert',
+      'promote',
+      'version',
+      'set',
+      'commit',
+    ])
+    expect(c.json).toHaveBeenCalledWith({ status: 'ok', id: 77, public: false })
+  })
+
+  it('rolls back the new channel when its post-insert scoped promotion permission is denied', async () => {
+    const denied = new HTTPException(400, { message: 'You can\'t access this app' })
+    assertCanPromoteChannelInTransaction.mockImplementation(async () => {
+      transactionEvents.push('promote')
+      throw denied
+    })
     const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
 
     await expect(post(context(), {
-      app_id: 'com.test.new-channel-version',
-      channel: 'production',
+      app_id: 'com.test.new-channel-permission-denied',
+      channel: 'preview',
       version: '1.0.0',
-    }, apiKey())).rejects.toMatchObject({
-      cause: expect.objectContaining({ error: 'cannot_access_app' }),
-    })
+    }, apiKey())).rejects.toBe(denied)
 
-    expect(checkPermission).toHaveBeenNthCalledWith(1, expect.anything(), 'app.create_channel', { appId: 'com.test.new-channel-version' })
-    expect(checkPermission).toHaveBeenNthCalledWith(2, expect.anything(), 'channel.promote_bundle', { appId: 'com.test.new-channel-version' })
-    expect(updateOrCreateChannel).not.toHaveBeenCalled()
+    expect(transactionEvents).toEqual([
+      'begin',
+      'headers',
+      'permission:app.create_channel',
+      'insert',
+      'promote',
+      'rollback',
+    ])
+    expect(setChannelInTransaction).not.toHaveBeenCalled()
+  })
+
+  it('rolls back the new channel when the requested bundle is missing', async () => {
+    configureTransaction(null)
+    const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
+
+    await expect(post(context(), {
+      app_id: 'com.test.new-channel-version-missing',
+      channel: 'preview',
+      version: '1.0.0',
+    }, apiKey())).rejects.toThrow()
+
+    expect(transactionEvents).toEqual([
+      'begin',
+      'headers',
+      'permission:app.create_channel',
+      'insert',
+      'promote',
+      'version',
+      'rollback',
+    ])
+    expect(setChannelInTransaction).not.toHaveBeenCalled()
+  })
+
+  it('rolls back the new channel when bundle association fails', async () => {
+    const associationError = new HTTPException(400, { message: 'Cannot associate bundle with the new channel' })
+    setChannelInTransaction.mockImplementation(async () => {
+      transactionEvents.push('set')
+      throw associationError
+    })
+    const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
+
+    await expect(post(context(), {
+      app_id: 'com.test.new-channel-association-failure',
+      channel: 'preview',
+      version: '1.0.0',
+    }, apiKey())).rejects.toBe(associationError)
+
+    expect(transactionEvents).toEqual([
+      'begin',
+      'headers',
+      'permission:app.create_channel',
+      'insert',
+      'promote',
+      'version',
+      'set',
+      'rollback',
+    ])
   })
 
   it('requires promote bundle permission to explicitly clear a channel version', async () => {

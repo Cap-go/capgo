@@ -789,7 +789,12 @@ async function deleteLinkedBundleOnUpload(supabase: SupabaseType, version: Linke
   log.info(`Linked bundle ${version.name} deleted`)
 }
 
-async function findUploadTargetChannel(supabase: SupabaseType, appid: string, channel: string): Promise<UploadTargetChannel | null> {
+async function findUploadTargetChannel(
+  supabase: SupabaseType,
+  appid: string,
+  channel: string,
+  failOnError = true,
+): Promise<UploadTargetChannel | null> {
   const { data, error } = await supabase
     .from('channels')
     .select('id, public, version, rollout_version')
@@ -797,7 +802,7 @@ async function findUploadTargetChannel(supabase: SupabaseType, appid: string, ch
     .eq('name', channel)
     .maybeSingle()
 
-  if (error)
+  if (error && failOnError)
     uploadFail(`Cannot check channel ${channel}: ${formatError(error)}`)
 
   return data
@@ -844,10 +849,6 @@ async function preflightRequiredChannelAssignments(
     const canCreateChannel = await hasCliPermission(supabase, apikey, 'app.create_channel', { appId: appid })
     if (!canCreateChannel)
       uploadFail('Cannot create target channel because this API key lacks app.create_channel')
-
-    const canPromoteCreatedChannel = await hasCliPermission(supabase, apikey, 'channel.promote_bundle', { appId: appid })
-    if (!canPromoteCreatedChannel)
-      uploadFail('Cannot create target channel with a bundle because this API key lacks channel.promote_bundle')
 
     uploadTargetChannels.set(channel, null)
   }
@@ -914,12 +915,6 @@ async function setVersionInChannel(
   requireChannelAssignment = false,
   selfAssign?: boolean,
 ): Promise<boolean> {
-  const { data: versionId } = await supabase
-    .rpc('get_app_versions', { apikey, name_version: bundle, appid })
-    .single()
-
-  if (!versionId)
-    uploadFail('Cannot get version id, cannot set channel')
 
   const canPromoteTargetChannel = targetChannel !== null
     && await hasCliPermission(supabase, apikey, 'channel.promote_bundle', { appId: appid, channelId: targetChannel.id })
@@ -934,18 +929,19 @@ async function setVersionInChannel(
     return false
   }
 
-  if (targetChannel && canPromoteTargetChannel && selfAssign) {
-    const canUpdateChannelSettings = await hasCliPermission(supabase, apikey, 'channel.update_settings', { appId: appid, channelId: targetChannel.id })
-    if (!canUpdateChannelSettings) {
-      log.warn('Cannot enable device self-assign because this API key lacks channel.update_settings')
-      return promoteExistingChannel(supabase, appid, versionId, targetChannel, localConfig, displayBundleUrl)
+  if (targetChannel && canPromoteTargetChannel) {
+    const versionId = await getVersionIdForChannelUpdate(supabase, apikey, appid, bundle)
+    if (selfAssign) {
+      const canUpdateChannelSettings = await hasCliPermission(supabase, apikey, 'channel.update_settings', { appId: appid, channelId: targetChannel.id })
+      if (!canUpdateChannelSettings) {
+        log.warn('Cannot enable device self-assign because this API key lacks channel.update_settings')
+        return promoteExistingChannel(supabase, appid, versionId, targetChannel, localConfig, displayBundleUrl)
+      }
     }
-  }
 
-  if (targetChannel && canPromoteTargetChannel && !selfAssign)
-    return promoteExistingChannel(supabase, appid, versionId, targetChannel, localConfig, displayBundleUrl)
+    if (!selfAssign)
+      return promoteExistingChannel(supabase, appid, versionId, targetChannel, localConfig, displayBundleUrl)
 
-  if ((targetChannel && canPromoteTargetChannel) || canCreateChannel) {
     const { error: dbError3, data } = await updateOrCreateChannel(supabase, {
       name: channel,
       app_id: appid,
@@ -960,6 +956,52 @@ async function setVersionInChannel(
     if (data?.public)
       log.info('Your update is now available in your public channel 🎉')
     else if (data?.id)
+      log.info(`Link device to this bundle to try it: ${bundleUrl}`)
+
+    if (displayBundleUrl)
+      log.info(`Bundle url: ${bundleUrl}`)
+    return true
+  }
+
+  // The channel endpoint creates the preview channel, receives its scoped
+  // lifecycle binding, and promotes this bundle in one transaction.
+  if (canCreateChannel) {
+    const { error, data } = await supabase.functions.invoke('channel', {
+      method: 'POST',
+      body: JSON.stringify({
+        app_id: appid,
+        channel,
+        version: bundle,
+        ...(selfAssign ? { allow_device_self_set: true } : {}),
+      }),
+    })
+    if (error) {
+      uploadFail(`Cannot create channel and set its bundle because this API key does not have the required RBAC permission. ${await formatFunctionInvokeError(error)}`)
+    }
+
+    const createdChannel = data as { id?: unknown, public?: unknown } | null
+    let createdChannelId = Number(createdChannel?.id)
+    let createdChannelPublic = createdChannel?.public === true
+    if (!Number.isSafeInteger(createdChannelId) || typeof createdChannel?.public !== 'boolean') {
+      // Older channel endpoints do not return metadata, so only their fallback reads the new channel.
+      const fallbackChannel = await findUploadTargetChannel(supabase, appid, channel, false)
+      const fallbackChannelId = Number(fallbackChannel?.id)
+      if (!Number.isSafeInteger(fallbackChannelId)) {
+        if (!Number.isSafeInteger(createdChannelId)) {
+          log.info('Your update is now available 🎉')
+          return true
+        }
+      }
+      else {
+        createdChannelId = fallbackChannelId
+        createdChannelPublic = fallbackChannel?.public === true
+      }
+    }
+
+    const bundleUrl = `${localConfig.hostWeb}/app/${appid}/channel/${createdChannelId}`
+    if (createdChannelPublic)
+      log.info('Your update is now available in your public channel 🎉')
+    else
       log.info(`Link device to this bundle to try it: ${bundleUrl}`)
 
     if (displayBundleUrl)

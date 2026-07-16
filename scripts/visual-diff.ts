@@ -70,6 +70,8 @@ const stripePort = getStripeEmulatorPort(process.env)
 const stripeApiBaseUrl = getPlaywrightStripeApiBaseUrl(process.env)
 const managedProcesses: ManagedProcess[] = []
 const isWindows = process.platform === 'win32'
+const httpReadyTimeoutMs = 5_000
+const visualDiffActionTimeoutMs = 60_000
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
@@ -173,12 +175,26 @@ function diffDir() {
 }
 
 async function isHttpReady(url: string, options: { requireSuccess?: boolean } = {}): Promise<boolean> {
+  const controller = new AbortController()
+  let timeout: ReturnType<typeof setTimeout> | undefined
   try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(5_000) })
+    const response = await Promise.race([
+      fetch(url, { signal: controller.signal }),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          controller.abort()
+          reject(new Error(`Timed out waiting for ${url}`))
+        }, httpReadyTimeoutMs)
+      }),
+    ])
     return options.requireSuccess ? response.ok : response.status < 500
   }
   catch {
     return false
+  }
+  finally {
+    if (timeout)
+      clearTimeout(timeout)
   }
 }
 
@@ -476,30 +492,42 @@ async function captureScreenshots(
   const targetDir = phaseDir(phase)
   mkdirSync(targetDir, { recursive: true })
 
+  console.log(`[visual-diff] preparing ${phase} capture stack`)
   const { supabaseUrl, supabaseAnon, apiDomain } = await ensureBackendStack({ force: options.forceBackend })
   await prepareScreenshotData(supabaseUrl, supabaseAnon)
   await ensureFrontendStack(supabaseUrl, supabaseAnon, apiDomain, { force: options.forceFrontend })
+  console.log(`[visual-diff] ${phase} frontend ready`)
 
-  const browser = await chromium.launch({ headless: true })
+  console.log(`[visual-diff] launching browser for ${phase}`)
+  const browser = await chromium.launch({ headless: true, timeout: visualDiffActionTimeoutMs })
   try {
+    console.log(`[visual-diff] creating browser context for ${phase}`)
     const context = await browser.newContext({
       baseURL: frontendBaseUrl,
       viewport: visualDiffViewport,
       deviceScaleFactor: 1,
     })
+    console.log(`[visual-diff] creating page for ${phase}`)
     const page = await context.newPage()
+    page.setDefaultTimeout(visualDiffActionTimeoutMs)
+    page.setDefaultNavigationTimeout(visualDiffActionTimeoutMs)
     let authenticated = false
 
     for (const route of routes) {
+      console.log(`[visual-diff] capturing ${phase} ${route.slug}`)
       if (route.auth && !authenticated) {
         await login(page)
         authenticated = true
       }
 
-      await page.goto(route.path, { waitUntil: 'domcontentloaded' })
+      await page.goto(route.path, { waitUntil: 'domcontentloaded', timeout: visualDiffActionTimeoutMs })
       await settlePage(page)
+      if (route.prepare) {
+        await route.prepare(page)
+        await settlePage(page)
+      }
       const outputPath = resolve(targetDir, `${route.slug}.png`)
-      await page.screenshot({ path: outputPath, fullPage: false })
+      await page.screenshot({ path: outputPath, fullPage: false, timeout: visualDiffActionTimeoutMs })
       console.log(`[visual-diff] captured ${phase} ${route.slug} -> ${outputPath}`)
     }
 

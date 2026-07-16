@@ -1,11 +1,14 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
+import { HTTPException } from 'hono/http-exception'
 import { BRES, simpleError } from '../../utils/hono.ts'
 import { cloudlogErr } from '../../utils/logging.ts'
-import { checkPermission } from '../../utils/rbac.ts'
+import { closeClient, getDrizzleClient, getPgClient, logPgError } from '../../utils/pg.ts'
+import { checkPermission, checkPermissionPg } from '../../utils/rbac.ts'
 import { supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
 import { isInternalVersionName, isValidAppId } from '../../utils/utils.ts'
+import { assertCanPromoteChannelInTransaction, type PgQueryClient, setChannelInTransaction, type SetChannelBody } from '../bundle/set_channel.ts'
 
 interface ChannelSet {
   app_id: string
@@ -140,6 +143,184 @@ function resolveVersion(c: Context, appID: string, version: string | number, own
     : findVersion(c, appID, version, ownerOrg)
 }
 
+type DrizzleClient = ReturnType<typeof getDrizzleClient>
+
+const channelInsertColumns = [
+  'owner_org',
+  'app_id',
+  'name',
+  'created_by',
+  'version',
+  'public',
+  'disable_auto_update_under_native',
+  'disable_auto_update',
+  'ios',
+  'android',
+  'electron',
+  'allow_device_self_set',
+  'allow_emulator',
+  'allow_device',
+  'allow_dev',
+  'allow_prod',
+  'rollout_version',
+  'rollout_percentage_bps',
+  'rollout_enabled',
+  'rollout_paused_at',
+  'rollout_pause_reason',
+  'rollout_cache_ttl_seconds',
+  'auto_pause_enabled',
+  'auto_pause_window_minutes',
+  'auto_pause_failure_rate_bps',
+  'auto_pause_confidence',
+  'auto_pause_min_attempts',
+  'auto_pause_min_failures',
+  'auto_pause_action',
+  'auto_pause_cooldown_minutes',
+] as const
+
+type ChannelInsertColumn = typeof channelInsertColumns[number]
+
+type CreatedChannel = {
+  id: number
+  public: boolean
+}
+
+async function insertChannelInTransaction(
+  dbClient: PgQueryClient,
+  channel: Database['public']['Tables']['channels']['Insert'],
+): Promise<CreatedChannel> {
+  const channelValues: Record<ChannelInsertColumn, unknown> = {
+    owner_org: channel.owner_org,
+    app_id: channel.app_id,
+    name: channel.name,
+    created_by: channel.created_by,
+    version: channel.version,
+    public: channel.public,
+    disable_auto_update_under_native: channel.disable_auto_update_under_native,
+    disable_auto_update: channel.disable_auto_update,
+    ios: channel.ios,
+    android: channel.android,
+    electron: channel.electron,
+    allow_device_self_set: channel.allow_device_self_set,
+    allow_emulator: channel.allow_emulator,
+    allow_device: channel.allow_device,
+    allow_dev: channel.allow_dev,
+    allow_prod: channel.allow_prod,
+    rollout_version: channel.rollout_version,
+    rollout_percentage_bps: channel.rollout_percentage_bps,
+    rollout_enabled: channel.rollout_enabled,
+    rollout_paused_at: channel.rollout_paused_at,
+    rollout_pause_reason: channel.rollout_pause_reason,
+    rollout_cache_ttl_seconds: channel.rollout_cache_ttl_seconds,
+    auto_pause_enabled: channel.auto_pause_enabled,
+    auto_pause_window_minutes: channel.auto_pause_window_minutes,
+    auto_pause_failure_rate_bps: channel.auto_pause_failure_rate_bps,
+    auto_pause_confidence: channel.auto_pause_confidence,
+    auto_pause_min_attempts: channel.auto_pause_min_attempts,
+    auto_pause_min_failures: channel.auto_pause_min_failures,
+    auto_pause_action: channel.auto_pause_action,
+    auto_pause_cooldown_minutes: channel.auto_pause_cooldown_minutes,
+  }
+  // Column names are from the closed list above; request data is always a value.
+  const columns = channelInsertColumns.filter(column => channelValues[column] !== undefined)
+  const result = await dbClient.query<{ id: string | number, public: boolean }>(
+    `INSERT INTO public.channels (${columns.join(', ')})
+     VALUES (${columns.map((_, index) => `$${index + 1}`).join(', ')})
+     RETURNING id, public`,
+    columns.map(column => channelValues[column]),
+  )
+  const createdChannel = result.rows[0]
+  const channelId = Number(createdChannel?.id)
+  if ((result.rowCount ?? 0) !== 1 || !Number.isSafeInteger(channelId) || typeof createdChannel?.public !== 'boolean') {
+    throw new Error('Channel insert returned no row')
+  }
+  return { id: channelId, public: createdChannel.public }
+}
+
+async function findVersionInTransaction(dbClient: PgQueryClient, appId: string, version: string, ownerOrg: string) {
+  const result = await dbClient.query<{ id: number }>(
+    `SELECT id
+     FROM public.app_versions
+     WHERE app_id = $1
+       AND name = $2
+       AND owner_org = $3::uuid
+       AND deleted = false`,
+    [appId, version, ownerOrg],
+  )
+  if ((result.rowCount ?? 0) !== 1) {
+    throw simpleError('cannot_find_version', 'Cannot find version')
+  }
+  return result.rows[0].id
+}
+
+async function createAndPromoteChannelInTransaction(
+  c: Context<MiddlewareKeyVariables>,
+  channel: Database['public']['Tables']['channels']['Insert'],
+  versionName: string,
+  apikey: Database['public']['Tables']['apikeys']['Row'],
+): Promise<CreatedChannel> {
+  const effectiveApikey = apikey.key ?? c.get('capgkey')
+  if (!effectiveApikey) {
+    throw simpleError('cannot_set_bundle_to_channel', 'Cannot set bundle to channel', { error: 'Missing API key context for audit logging' })
+  }
+
+  const pgClient = getPgClient(c)
+  let dbClient: PgQueryClient | null = null
+  let transactionStarted = false
+  try {
+    dbClient = await pgClient.connect()
+    await dbClient.query('BEGIN')
+    transactionStarted = true
+    await dbClient.query(
+      'SELECT set_config(\'request.headers\', $1, true)',
+      [JSON.stringify({ capgkey: effectiveApikey })],
+    )
+
+    const drizzle = getDrizzleClient(dbClient as unknown as ReturnType<typeof getPgClient>) as DrizzleClient
+    const canCreateChannel = await checkPermissionPg(
+      c,
+      'app.create_channel',
+      { appId: channel.app_id },
+      drizzle,
+      apikey.user_id,
+      effectiveApikey,
+    )
+    if (!canCreateChannel) {
+      throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: channel.app_id })
+    }
+
+    const createdChannel = await insertChannelInTransaction(dbClient, channel)
+    const setChannelBody: SetChannelBody = {
+      app_id: channel.app_id,
+      channel_id: createdChannel.id,
+      version_id: 0,
+    }
+    await assertCanPromoteChannelInTransaction(c, setChannelBody, apikey, dbClient)
+    setChannelBody.version_id = await findVersionInTransaction(dbClient, channel.app_id, versionName, channel.owner_org)
+    await setChannelInTransaction(c, setChannelBody, apikey, dbClient)
+    await dbClient.query('COMMIT')
+    return createdChannel
+  }
+  catch (error) {
+    if (dbClient && transactionStarted) {
+      try {
+        await dbClient.query('ROLLBACK')
+      }
+      catch {
+        // Preserve the original database error when rollback itself fails.
+      }
+    }
+    if (error instanceof HTTPException)
+      throw error
+    logPgError(c, 'create_and_promote_channel', error)
+    throw simpleError('cannot_set_bundle_to_channel', 'Cannot set bundle to channel', { error: (error as Error)?.message })
+  }
+  finally {
+    dbClient?.release()
+    await closeClient(c, pgClient)
+  }
+}
+
 export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   body = normalizeChannelSet(body)
   if (!body.app_id) {
@@ -173,26 +354,24 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
   const existingRolloutVersion = existingChannel?.rollout_version ?? null
   const existingChannelId = existingChannel?.id ?? null
   let requestedVersionId: number | null | undefined
+  let requestedVersionName: string | null = null
   if (body.version !== undefined) {
-    const requestedVersionName = body.version && !isInternalVersionName(body.version) ? body.version : null
+    const requestedVersion = body.version && !isInternalVersionName(body.version) ? body.version : null
     if (existingChannel) {
       // Do not inspect the current or requested bundle until promotion is proven: a
       // settings-only key can lack channel.read and must not gain a bundle oracle.
       if (!(await checkPermission(c, 'channel.promote_bundle', { appId: body.app_id, channelId: existingChannel.id }))) {
         throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel: body.channel })
       }
-      requestedVersionId = requestedVersionName
-        ? await findVersion(c, body.app_id, requestedVersionName, org.owner_org)
+      requestedVersionId = requestedVersion
+        ? await findVersion(c, body.app_id, requestedVersion, org.owner_org)
         : null
     }
-    else if (requestedVersionName) {
-      if (!(await checkPermission(c, 'channel.promote_bundle', { appId: body.app_id }))) {
-        throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel: body.channel })
-      }
-      requestedVersionId = await findVersion(c, body.app_id, requestedVersionName, org.owner_org)
-    }
     else {
-      requestedVersionId = null
+      // A new channel receives its scoped lifecycle binding from the database
+      // trigger. Its channel-scoped promotion permission is checked after insert,
+      // before the service-role version lookup below.
+      requestedVersionName = requestedVersion
     }
   }
   const inferredElectron = body.electron ?? (body.public && body.ios !== body.android ? false : undefined)
@@ -260,11 +439,10 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
     version: null,
     owner_org: org.owner_org,
   }
-
   if (body.version === undefined) {
     channel.version = existingChannelVersion
   }
-  else {
+  else if (existingChannel) {
     channel.version = requestedVersionId ?? null
   }
 
@@ -291,6 +469,10 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
     channel.rollout_percentage_bps = 0
     channel.rollout_paused_at = null
     channel.rollout_pause_reason = null
+  }
+  if (!existingChannel && requestedVersionName) {
+    const createdChannel = await createAndPromoteChannelInTransaction(c, channel, requestedVersionName, apikey)
+    return c.json({ ...BRES, ...createdChannel })
   }
 
   await updateOrCreateChannel(c, channel, existingChannelId, body.version === undefined && !body.promoteToStable)

@@ -78,7 +78,7 @@ export async function createAiApiKey(
   supabase: SupabaseClient<Database>,
   name: string,
   options: {
-    /** One or more organizations the key spans. */
+    /** Organizations used for admin bindings or to validate each selected app's owner. */
     orgIds: string[]
     role: 'admin' | 'member'
     /** Member role only: the apps to grant access on, each with its owning org and chosen app-level role. */
@@ -106,9 +106,11 @@ export async function createAiApiKey(
   }
   else {
     const orgIdSet = new Set(orgIds)
-    for (const orgId of orgIds)
-      bindings.push({ role_name: 'org_member', scope_type: 'org', org_id: orgId })
-    for (const app of options.apps ?? []) {
+    const apps = options.apps ?? []
+    if (apps.length === 0)
+      throw new Error('Select at least one app for a member API key')
+
+    for (const app of apps) {
       if (!orgIdSet.has(app.orgId))
         throw new Error('Each app.orgId must be one of the selected orgIds')
       bindings.push({ role_name: app.role, scope_type: 'app', org_id: app.orgId, app_id: app.uuid })

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
+  assertApiKeyManagerCanAssignBindingsMock,
   assertCanKeepOrgCreateMock,
   checkPermissionMock,
   checkPermissionPgMock,
@@ -13,8 +14,10 @@ const {
   parseApiKeyGlobalPermissionsMock,
   replaceApiKeyGlobalPermissionsMock,
   requireApiKeyManagementAuthMock,
+  sanitizeClientBindingsMock,
   selectOwnedApiKeyByIdentifierMock,
 } = vi.hoisted(() => ({
+  assertApiKeyManagerCanAssignBindingsMock: vi.fn(),
   assertCanKeepOrgCreateMock: vi.fn(),
   checkPermissionMock: vi.fn(),
   checkPermissionPgMock: vi.fn(),
@@ -27,6 +30,7 @@ const {
   parseApiKeyGlobalPermissionsMock: vi.fn(),
   replaceApiKeyGlobalPermissionsMock: vi.fn(),
   requireApiKeyManagementAuthMock: vi.fn(),
+  sanitizeClientBindingsMock: vi.fn(),
   selectOwnedApiKeyByIdentifierMock: vi.fn(),
 }))
 
@@ -74,13 +78,13 @@ vi.mock('../supabase/functions/_backend/public/apikey/global_permissions.ts', ()
 }))
 
 vi.mock('../supabase/functions/_backend/public/apikey/scope.ts', () => ({
-  assertApiKeyManagerCanAssignBindings: vi.fn(),
+  assertApiKeyManagerCanAssignBindings: assertApiKeyManagerCanAssignBindingsMock,
   ensureApiKeyCanManageTargetOrgIds: vi.fn(),
   ensureApiKeyManagementAllowed: ensureApiKeyManagementAllowedMock,
   getApiKeyBindingOrgIds: getApiKeyBindingOrgIdsMock,
   isValidApiKeyIdFormat: () => true,
   requireApiKeyManagementAuth: requireApiKeyManagementAuthMock,
-  sanitizeClientBindings: vi.fn(),
+  sanitizeClientBindings: sanitizeClientBindingsMock,
   selectOwnedApiKeyByIdentifier: selectOwnedApiKeyByIdentifierMock,
 }))
 
@@ -91,7 +95,7 @@ vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
   validateExpirationDate: vi.fn(),
 }))
 
-describe('api key global-permissions authorization recheck', () => {
+describe('api key update authorization recheck', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.resetModules()
@@ -110,6 +114,8 @@ describe('api key global-permissions authorization recheck', () => {
       error: null,
     })
     parseApiKeyGlobalPermissionsMock.mockReturnValue(['org.create'])
+    assertApiKeyManagerCanAssignBindingsMock.mockResolvedValue(undefined)
+    sanitizeClientBindingsMock.mockImplementation((bindings: unknown[]) => bindings)
     checkPermissionMock.mockResolvedValue(true)
     checkPermissionPgMock.mockResolvedValue(false)
     closeClientMock.mockResolvedValue(undefined)
@@ -145,5 +151,38 @@ describe('api key global-permissions authorization recheck', () => {
     )
     expect(assertCanKeepOrgCreateMock).not.toHaveBeenCalled()
     expect(replaceApiKeyGlobalPermissionsMock).not.toHaveBeenCalled()
+  })
+
+  it('runs the binding role guard before the update-role precheck', async () => {
+    const { default: app } = await import('../supabase/functions/_backend/public/apikey/put.ts')
+    const bindings = [{
+      role_name: 'app_preview',
+      scope_type: 'app',
+      org_id: ORG_ID,
+      app_id: '00000000-0000-4000-8000-000000000444',
+    }]
+
+    const response = await app.request(new Request('http://local/', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: 41,
+        bindings,
+      }),
+    }))
+
+    expect(response.status).toBe(403)
+    expect(assertApiKeyManagerCanAssignBindingsMock).toHaveBeenCalledWith(
+      expect.anything(),
+      { authType: 'jwt', userId: USER_ID },
+      bindings,
+    )
+    expect(checkPermissionMock).toHaveBeenCalledWith(
+      expect.anything(),
+      'org.update_user_roles',
+      { orgId: ORG_ID },
+    )
+    expect(assertApiKeyManagerCanAssignBindingsMock.mock.invocationCallOrder[0])
+      .toBeLessThan(checkPermissionMock.mock.invocationCallOrder[0])
   })
 })

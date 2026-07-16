@@ -16,7 +16,6 @@ import { apiKeyBindingsAllowOrgCreate, assertApiKeyCanKeepOrgCreateGrant, parseA
 import { assertApiKeyManagerCanAssignBindings, ensureApiKeyCanManageTargetOrgIds, ensureApiKeyManagementAllowed, getApiKeyBindingOrgIds, isValidApiKeyIdFormat, requireApiKeyManagementAuth, sanitizeClientBindings, selectOwnedApiKeyByIdentifier } from './scope.ts'
 
 const app = honoFactory.createApp()
-const APIKEY_ORG_READER_ROLE = 'apikey_org_reader'
 type ApiKeyRow = Database['public']['Tables']['apikeys']['Row']
 type ApiKeyUpdateData = Partial<Pick<Database['public']['Tables']['apikeys']['Update'], 'name' | 'expires_at'>>
 type ApiKeyLookupRow = Pick<ApiKeyRow, 'id' | 'rbac_id' | 'expires_at' | 'key' | 'key_hash'>
@@ -59,28 +58,6 @@ function parseBindingsForUpdate(body: ApiKeyPut, requestId: string): BindingInpu
   return sanitizeClientBindings(body.bindings)
 }
 
-function enrichApiKeyBindings(bindings: BindingInput[]): Array<BindingInput & { allowSystemRole?: boolean }> {
-  const enrichedBindings: Array<BindingInput & { allowSystemRole?: boolean }> = [...bindings]
-  const orgsWithOrgBinding = new Set(
-    bindings.filter(binding => binding.scope_type === 'org').map(binding => binding.org_id),
-  )
-
-  for (const binding of bindings) {
-    if (binding.scope_type === 'app' && !orgsWithOrgBinding.has(binding.org_id)) {
-      enrichedBindings.push({
-        role_name: APIKEY_ORG_READER_ROLE,
-        scope_type: 'org',
-        org_id: binding.org_id,
-        reason: 'API key app-scope org read compatibility',
-        allowSystemRole: true,
-      })
-      orgsWithOrgBinding.add(binding.org_id)
-    }
-  }
-
-  return enrichedBindings
-}
-
 function toDrizzleApiKeyUpdate(updateData: ApiKeyUpdateData): Partial<typeof schema.apikeys.$inferInsert> {
   const drizzleUpdate: Partial<typeof schema.apikeys.$inferInsert> = {}
 
@@ -112,6 +89,8 @@ async function replaceApiKeyBindings(
     ...bindings.map(binding => binding.org_id),
   ])]
 
+  await assertApiKeyManagerCanAssignBindings(c, auth, bindings)
+
   for (const orgId of affectedOrgIds) {
     if (!(await checkPermission(c, 'org.update_user_roles', { orgId }))) {
       throw quickError(403, 'forbidden_binding', `Forbidden - Admin rights required for org ${orgId}`, { requestId: c.get('requestId'), orgId })
@@ -122,9 +101,6 @@ async function replaceApiKeyBindings(
   try {
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
-    await assertApiKeyManagerCanAssignBindings(c, auth, bindings)
-
-    const enrichedBindings = enrichApiKeyBindings(bindings)
     if (globalPermissions !== undefined) {
       validateApiKeyGlobalPermissionsForBindings(globalPermissions, bindings, c.get('requestId'))
     }
@@ -154,7 +130,7 @@ async function replaceApiKeyBindings(
         .delete(schema.role_bindings)
         .where(sql`${schema.role_bindings.principal_type} = public.rbac_principal_apikey() AND ${schema.role_bindings.principal_id} = ${apikey.rbac_id}::uuid`)
 
-      for (const binding of enrichedBindings) {
+      for (const binding of bindings) {
         const bindingParams: CreateBindingParams = {
           principal_type: 'apikey',
           principal_id: apikey.rbac_id,
@@ -164,7 +140,6 @@ async function replaceApiKeyBindings(
           app_id: binding.app_id,
           channel_id: binding.channel_id,
           reason: binding.reason,
-          allowSystemRole: binding.allowSystemRole === true,
         }
 
         const result = await createRoleBindingForPrincipal(
@@ -200,7 +175,7 @@ async function replaceApiKeyBindings(
       requestId: c.get('requestId'),
       message: 'apikey_bindings_replaced',
       apikeyId: apikey.id,
-      bindingsCount: enrichedBindings.length,
+      bindingsCount: bindings.length,
     })
   }
   catch (error: any) {

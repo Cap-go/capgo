@@ -63,6 +63,16 @@ const roleDefaultChannelPermissions: Record<string, Record<ChannelPermissionKey,
     'channel.read_history': true,
     'channel.promote_bundle': true,
   },
+  app_preview: {
+    'channel.read': false,
+    'channel.read_history': false,
+    'channel.promote_bundle': false,
+  },
+  channel_preview: {
+    'channel.read': true,
+    'channel.read_history': false,
+    'channel.promote_bundle': true,
+  },
   app_developer: {
     'channel.read': true,
     'channel.read_history': true,

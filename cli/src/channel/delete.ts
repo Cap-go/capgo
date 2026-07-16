@@ -9,6 +9,7 @@ import {
   formatError,
   getAppId,
   getConfig,
+  hasCliPermission,
   sendEvent,
 } from '../utils'
 
@@ -48,10 +49,10 @@ export async function deleteChannelInternal(channelId: string, appId: string, op
 
     throw new Error(`Channel ${channelId} not found`)
   }
-
   await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'channel.delete', silent, true, channel.id)
-  if (options.deleteBundle)
-    await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'bundle.delete', silent, true)
+  const canDeleteBundle = options.deleteBundle
+    ? await hasCliPermission(supabase, options.apikey, 'bundle.delete', { appId })
+    : false
 
   const orgId = channel.owner_org
   if (!orgId) {
@@ -60,25 +61,46 @@ export async function deleteChannelInternal(channelId: string, appId: string, op
     throw new Error(`Channel ${channelId} has no owner organization`)
   }
 
-  if (options.deleteBundle && !silent)
-    log.info(`Deleting bundle ${appId}#${channelId} from Capgo`)
-
-  if (options.deleteBundle) {
-    const bundle = await findBundleIdByChannelName(supabase, appId, channelId)
-    if (bundle?.name && !silent)
-      log.info(`Deleting bundle ${bundle.name} from Capgo`)
-    if (bundle?.name)
-      await deleteAppVersion(supabase, appId, bundle.name)
-  }
-
-  if (!silent)
-    log.info(`Deleting channel ${appId}#${channelId} from Capgo`)
-
-  const deleteStatus = await delChannel(supabase, channelId, appId)
-  if (deleteStatus.error) {
+  if (options.deleteBundle && !canDeleteBundle) {
     if (!silent)
-      log.error(`Cannot delete Channel 🙀 ${formatError(deleteStatus.error)}`)
-    throw new Error(`Cannot delete channel: ${formatError(deleteStatus.error)}`)
+      log.info(`Deleting preview channel ${appId}#${channelId} and its bundle from Capgo`)
+
+    const { error } = await supabase.functions.invoke('channel', {
+      method: 'DELETE',
+      body: JSON.stringify({
+        app_id: appId,
+        channel: channelId,
+        delete_bundle: true,
+      }),
+    })
+    if (error) {
+      const message = `Cannot delete preview channel and bundle: ${formatError(error)}`
+      if (!silent)
+        log.error(message)
+      throw new Error(message)
+    }
+  }
+  else {
+    if (options.deleteBundle && !silent)
+      log.info(`Deleting bundle ${appId}#${channelId} from Capgo`)
+
+    if (options.deleteBundle) {
+      const bundle = await findBundleIdByChannelName(supabase, appId, channelId)
+      if (bundle?.name && !silent)
+        log.info(`Deleting bundle ${bundle.name} from Capgo`)
+      if (bundle?.name)
+        await deleteAppVersion(supabase, appId, bundle.name)
+    }
+
+    if (!silent)
+      log.info(`Deleting channel ${appId}#${channelId} from Capgo`)
+
+    const deleteStatus = await delChannel(supabase, channelId, appId)
+    if (deleteStatus.error) {
+      if (!silent)
+        log.error(`Cannot delete Channel 🙀 ${formatError(deleteStatus.error)}`)
+      throw new Error(`Cannot delete channel: ${formatError(deleteStatus.error)}`)
+    }
   }
 
   await sendEvent(options.apikey, {

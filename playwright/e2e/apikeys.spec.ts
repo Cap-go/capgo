@@ -9,6 +9,12 @@ const INHERITED_ORG_ID = randomUUID()
 const INHERITED_APP_ID = `com.apikeys.e2e.${randomUUID().replaceAll('-', '').slice(0, 12)}`
 const INHERITED_CUSTOMER_ID = `cus_apikeys_e2e_${randomUUID().replaceAll('-', '').slice(0, 12)}`
 
+interface RoleBindingWithRole {
+  scope_type: string
+  app_id: string | null
+  roles: { name: string } | { name: string }[] | null
+}
+
 function uniqueKeyName(prefix: string) {
   return `${prefix} ${Date.now().toString(36)}`
 }
@@ -248,6 +254,79 @@ test.describe('API Key Management', () => {
 
     await page.mouse.click(5, 5)
     await page.getByRole('button', { name: 'Cancel' }).click()
+  })
+
+  test('should create and preserve an app-only preview key', async ({ page }) => {
+    const keyName = uniqueKeyName('App Preview')
+    const dialog = await openCreateKeyDialog(page)
+    await selectOnlyOrgForCreation(page, dialog, INHERITED_ORG_ID)
+
+    const appOnlyScope = dialog.locator('[data-test="create-key-app-only-scope"]')
+    await appOnlyScope.check()
+    await expect(appOnlyScope).toBeChecked()
+    await expect(dialog.locator('[data-test^="create-key-org-role-"]')).toHaveCount(0)
+
+    await fillApiKeyName(page, dialog, keyName)
+    await dialog.locator('[data-test="create-key-add-app"]').click()
+    const seededAppOption = dialog.locator('label', { hasText: INHERITED_APP_ID }).first()
+    await expect(seededAppOption).toBeVisible()
+    await seededAppOption.locator('[data-test="create-key-app-checkbox"]').check()
+
+    const selectedApp = dialog.locator('[data-test="create-key-selected-app"]', { hasText: 'Seeded App' }).first()
+    await expect(selectedApp).toBeVisible()
+    const roleSelect = selectedApp.locator('[data-test="create-key-app-role-select"]')
+    await roleSelect.selectOption('app_preview')
+    await page.mouse.click(5, 5)
+
+    await page.getByRole('button', { name: 'Create' }).click()
+    await expect(page.getByText('Added new API key successfully').first()).toBeVisible()
+    const keyRow = await expectApiKeyRow(page, keyName)
+    await expect(keyRow).toContainText('App Preview')
+    await expect(keyRow.locator('td').nth(1)).toContainText('-')
+
+    await page.reload()
+    const reloadedKeyRow = await expectApiKeyRow(page, keyName)
+    await expect(reloadedKeyRow).toContainText('App Preview')
+    await expect(reloadedKeyRow.locator('td').nth(1)).toContainText('-')
+
+    const supabase = getSupabaseClient()
+    const { data: key, error: keyError } = await supabase
+      .from('apikeys')
+      .select('id, rbac_id')
+      .eq('name', keyName)
+      .single()
+    expect(keyError).toBeNull()
+    expect(key?.rbac_id).toBeTruthy()
+
+    const assertAppOnlyBindings = async () => {
+      const { data: bindings, error: bindingsError } = await supabase
+        .from('role_bindings')
+        .select('scope_type, app_id, roles(name)')
+        .eq('principal_type', 'apikey')
+        .eq('principal_id', key!.rbac_id)
+      expect(bindingsError).toBeNull()
+
+      const normalized = ((bindings ?? []) as unknown as RoleBindingWithRole[]).map(binding => ({
+        scope_type: binding.scope_type,
+        app_id: binding.app_id,
+        role_name: Array.isArray(binding.roles) ? binding.roles[0]?.name : binding.roles?.name,
+      }))
+      expect(normalized).toEqual([
+        expect.objectContaining({ scope_type: 'app', role_name: 'app_preview' }),
+      ])
+    }
+
+    await assertAppOnlyBindings()
+
+    await keyRow.locator('[data-test^="edit-key-"]').click()
+    const editDialog = page.locator('#dialog-v2-content')
+    await expect(editDialog.locator('[data-test="create-key-app-only-scope"]')).toBeChecked()
+    await expect(editDialog.locator('[data-test^="create-key-org-role-"]')).toHaveCount(0)
+    await expect(editDialog.locator('[data-test="create-key-app-role-select"]')).toHaveValue('app_preview')
+    await page.getByRole('button', { name: 'Confirm' }).click()
+    await expect(page.locator('[data-test="toast"]')).toContainText('API key updated')
+
+    await assertAppOnlyBindings()
   })
 
   test('should edit API key rights', async ({ page }) => {

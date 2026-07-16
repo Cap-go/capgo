@@ -159,6 +159,7 @@ const APIKEY_MANAGER_DENIED_ASSIGNABLE_ROLES = new Set([
   'org_super_admin',
   'org_admin',
   'app_admin',
+  'app_preview',
   'channel_admin',
 ])
 
@@ -168,10 +169,8 @@ export async function assertApiKeyManagerCanAssignBindings(
   bindings: Array<{ role_name: string, org_id: string }>,
   drizzle?: ReturnType<typeof getDrizzleClient>,
 ) {
-  if (auth.authType !== 'apikey') {
-    return
-  }
-
+  // API-key managers use JWT sessions to create keys. Determine whether the
+  // caller can assign sensitive roles from RBAC permissions, not auth type.
   const apikeyString = auth.apikey?.key ?? c.get('capgkey') ?? null
   const orgIds = [...new Set(bindings.map(binding => binding.org_id))]
   for (const orgId of orgIds) {

@@ -13,7 +13,6 @@ import { parseApiKeyGlobalPermissions, replaceApiKeyGlobalPermissions, validateA
 import { assertApiKeyManagerCanAssignBindings, ensureApiKeyManagementAllowed, requireApiKeyManagementAuth, sanitizeClientBindings } from './scope.ts'
 
 type BindingInput = ClientBindingInput
-type EnrichedBindingInput = BindingInput & { allowSystemRole?: boolean }
 type ApiKeyRow = Database['public']['Tables']['apikeys']['Row']
 
 type DrizzleExecutor = Pick<ReturnType<typeof getDrizzleClient>, 'execute'>
@@ -26,7 +25,6 @@ interface CreateApiKeyRecordParams {
 }
 
 const app = honoFactory.createApp()
-const APIKEY_ORG_READER_ROLE = 'apikey_org_reader'
 
 async function createApiKeyRecord(
   db: DrizzleExecutor,
@@ -153,26 +151,7 @@ app.post('/', middlewareAuth(), async (c) => {
         throw new Error('Created API key is missing rbac_id')
       }
 
-      // App-scoped keys still need org.read for CLI warning compatibility, but
-      // must not gain org-wide app reads through org_member.
-      const enrichedBindings: EnrichedBindingInput[] = [...resolvedBindings]
-      const orgsWithOrgBinding = new Set(
-        resolvedBindings.filter(b => b.scope_type === 'org').map(b => b.org_id),
-      )
-      for (const b of resolvedBindings) {
-        if (b.scope_type === 'app' && !orgsWithOrgBinding.has(b.org_id)) {
-          enrichedBindings.push({
-            role_name: APIKEY_ORG_READER_ROLE,
-            scope_type: 'org',
-            org_id: b.org_id,
-            reason: 'API key app-scope org read compatibility',
-            allowSystemRole: true,
-          })
-          orgsWithOrgBinding.add(b.org_id)
-        }
-      }
-
-      for (const binding of enrichedBindings) {
+      for (const binding of resolvedBindings) {
         const bindingParams: CreateBindingParams = {
           principal_type: 'apikey',
           principal_id: apikeyData.rbac_id,
@@ -182,9 +161,7 @@ app.post('/', middlewareAuth(), async (c) => {
           app_id: binding.app_id,
           channel_id: binding.channel_id,
           reason: binding.reason,
-          allowSystemRole: binding.allowSystemRole === true,
         }
-
         const result = await createRoleBindingForPrincipal(
           txDrizzle,
           bindingParams,

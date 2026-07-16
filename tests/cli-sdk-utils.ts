@@ -919,8 +919,6 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ORG_SUPER_ADMIN) {
           return { success: false, error: 'App does not have an owner organization' }
         if (!(await apiKeyHasAnyAppPermission(resolvedApiKey, apiKey, app, ['app.create_channel'])))
           return { success: false, error: 'Cannot create target channel because this API key lacks app.create_channel' }
-        if (!(await apiKeyHasAnyAppPermission(resolvedApiKey, apiKey, app, ['channel.promote_bundle'])))
-          return { success: false, error: 'Cannot create target channel with a bundle because this API key lacks channel.promote_bundle' }
       }
 
       const minUpdateVersion = await resolveUploadMinUpdateVersion(
@@ -959,27 +957,40 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ORG_SUPER_ADMIN) {
 
       for (const targetChannel of channelsToAssign) {
         const channelRecord = await getChannelRecord(options.appId, targetChannel)
-        const { error } = channelRecord
-          ? await getSupabaseClient()
-              .from('channels')
-              .update({
-                version: versionId,
-                ...(typeof options.selfAssign === 'boolean' ? { allow_device_self_set: options.selfAssign } : {}),
-              })
-              .eq('id', channelRecord.id)
-          : await getSupabaseClient()
-              .from('channels')
-              .insert({
-                name: targetChannel,
-                app_id: options.appId,
-                owner_org: app.owner_org,
-                created_by: app.user_id ?? USER_ID,
-                version: versionId,
-                allow_device_self_set: options.selfAssign ?? false,
-              })
+        if (channelRecord) {
+          const { error } = await getSupabaseClient()
+            .from('channels')
+            .update({
+              version: versionId,
+              ...(typeof options.selfAssign === 'boolean' ? { allow_device_self_set: options.selfAssign } : {}),
+            })
+            .eq('id', channelRecord.id)
+          if (error)
+            return { success: false, error: error.message }
+          continue
+        }
 
-        if (error)
-          return { success: false, error: error.message }
+        const { data: createdChannel, error: createError } = await getSupabaseClient()
+          .from('channels')
+          .insert({
+            name: targetChannel,
+            app_id: options.appId,
+            owner_org: app.owner_org,
+            created_by: app.user_id ?? USER_ID,
+            version: null,
+            allow_device_self_set: options.selfAssign ?? false,
+          })
+          .select('id')
+          .single()
+        if (createError || !createdChannel)
+          return { success: false, error: createError?.message ?? 'Cannot create target channel' }
+
+        const { error: promoteError } = await getSupabaseClient()
+          .from('channels')
+          .update({ version: versionId })
+          .eq('id', createdChannel.id)
+        if (promoteError)
+          return { success: false, error: promoteError.message }
       }
 
       return {

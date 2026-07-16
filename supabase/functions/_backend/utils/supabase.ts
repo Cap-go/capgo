@@ -1,17 +1,18 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
+import type { BillingPlanBentoState } from './billing_bento_tags.ts'
 import type { AuthInfo } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, NativeVersionUsage, Order, ReadDevicesParams, ReadStatsInsightsParams, ReadStatsParams, StatsInsightsResult, StatsMetadata, VersionUsage, VersionUsageChannel } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
-import { type BillingPlanBentoState, buildBillingPlanBentoTags } from './billing_bento_tags.ts'
+import { buildBillingPlanBentoTags } from './billing_bento_tags.ts'
 import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged, nullableString } from './deviceComparison.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { closeClient, getPgClient } from './pg.ts'
+import { emptyStatsInsights, normalizeStatsInsightsResult } from './statsInsights.ts'
 import { createCustomer } from './stripe.ts'
 import { Constants } from './supabase.types.ts'
-import { emptyStatsInsights, normalizeStatsInsightsResult } from './statsInsights.ts'
 import { getEnv, isStripeConfigured } from './utils.ts'
 
 const DEFAULT_LIMIT = 1000
@@ -231,6 +232,8 @@ export async function updateOrCreateChannel(
     return supabase
       .from('channels')
       .insert(update)
+      .select('id')
+      .single()
       .throwOnError()
   }
 

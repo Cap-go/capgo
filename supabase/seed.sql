@@ -1370,6 +1370,17 @@ BEGIN
     WHERE r.name = public.rbac_role_app_uploader()
     ON CONFLICT DO NOTHING;
 
+    -- app_preview: app-scoped bootstrap permissions. Channel lifecycle access is
+    -- granted only through a system-managed channel_preview binding after creation.
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r
+    JOIN public.permissions p ON p.key IN (
+      public.rbac_perm_app_read(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(),
+      public.rbac_perm_app_create_channel()
+    )
+    WHERE r.name = 'app_preview'
+    ON CONFLICT DO NOTHING;
+
     INSERT INTO public.roles (name, scope_type, description, priority_rank, is_assignable, created_by)
     VALUES (
       public.rbac_role_apikey_manager(),
@@ -1398,6 +1409,14 @@ BEGIN
 
     INSERT INTO public.roles (name, scope_type, description, priority_rank, is_assignable, created_by)
     VALUES
+      (
+        'channel_preview',
+        public.rbac_scope_channel(),
+        'Preview deployment lifecycle for a channel created by an app-preview API key',
+        68,
+        false,
+        NULL
+      ),
       (
         public.rbac_role_channel_developer(),
         public.rbac_scope_channel(),
@@ -1436,6 +1455,15 @@ BEGIN
       public.rbac_perm_channel_read(), public.rbac_perm_channel_promote_bundle()
     )
     WHERE r.name = public.rbac_role_channel_uploader()
+    ON CONFLICT DO NOTHING;
+
+    -- channel_preview: system-managed access for the channel its app_preview key created
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r
+    JOIN public.permissions p ON p.key IN (
+      public.rbac_perm_channel_read(), public.rbac_perm_channel_promote_bundle(), public.rbac_perm_channel_delete()
+    )
+    WHERE r.name = 'channel_preview'
     ON CONFLICT DO NOTHING;
 
     -- app_reader: read-only app access plus read-only access to every channel in the app
