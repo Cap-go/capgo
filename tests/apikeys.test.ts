@@ -145,7 +145,7 @@ describe('[POST] /apikey operations', () => {
     expect(verifyData.name).toBe(keyName)
   })
 
-  it('creates an app-only preview key bound to its owning organization', async () => {
+  it.concurrent('creates an app-only preview key bound to its owning organization', async () => {
     const appBindings = await appApiKeyBindings(APPNAME, 'app_preview')
     const response = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',

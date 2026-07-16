@@ -87,11 +87,15 @@ ALTER TABLE public.role_bindings
   ADD CONSTRAINT role_bindings_parent_binding_id_fkey
   FOREIGN KEY (parent_binding_id)
   REFERENCES public.role_bindings(id)
-  ON DELETE CASCADE;
+  ON DELETE CASCADE
+  NOT VALID;
 
-CREATE INDEX IF NOT EXISTS role_bindings_parent_binding_id_idx
+CREATE INDEX CONCURRENTLY IF NOT EXISTS role_bindings_parent_binding_id_idx
   ON public.role_bindings(parent_binding_id)
   WHERE parent_binding_id IS NOT NULL;
+
+ALTER TABLE public.role_bindings
+  VALIDATE CONSTRAINT role_bindings_parent_binding_id_fkey;
 
 ALTER TABLE public.app_versions
   ADD COLUMN IF NOT EXISTS created_by_apikey_rbac_id uuid;

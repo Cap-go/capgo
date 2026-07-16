@@ -289,6 +289,28 @@ describe('public channel post', () => {
     }, key)
   })
 
+  it('propagates a bundle association failure after creating a channel', async () => {
+    const associationError = new Error('Cannot associate bundle with the new channel')
+    const c = context()
+    const key = apiKey()
+    updateOrCreateChannel.mockResolvedValue({ data: { id: 456 }, error: null })
+    setChannel.mockRejectedValue(associationError)
+    const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
+
+    await expect(post(c, {
+      app_id: 'com.test.new-channel-association-failure',
+      channel: 'preview',
+      version: '1.0.0',
+    }, key)).rejects.toBe(associationError)
+
+    expect(setChannel).toHaveBeenCalledWith(c, {
+      app_id: 'com.test.new-channel-association-failure',
+      channel_id: 456,
+      version_id: 123,
+    }, key)
+    expect(c.json).not.toHaveBeenCalled()
+  })
+
   it('requires promote bundle permission to explicitly clear a channel version', async () => {
     supabaseAdmin.mockImplementation(() => buildAdminChain({ existingChannelId: 42, existingChannelVersion: 123 }))
     checkPermission

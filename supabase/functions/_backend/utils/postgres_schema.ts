@@ -38,6 +38,7 @@ export const app_versions = pgTable('app_versions', {
   app_id: varchar('app_id').notNull().references(() => apps.name),
   name: varchar('name').notNull(),
   user_id: uuid('user_id'),
+  created_by_apikey_rbac_id: uuid('created_by_apikey_rbac_id'),
   updated_at: timestamp('updated_at').defaultNow(),
   deleted: boolean('deleted').default(false),
   deleted_at: timestamp('deleted_at'),
@@ -261,6 +262,7 @@ export const role_bindings = pgTable('role_bindings', {
   expires_at: timestamp('expires_at'),
   reason: text('reason'),
   is_direct: boolean('is_direct').notNull().default(true),
+  parent_binding_id: uuid('parent_binding_id'),
 })
 
 // Export all tables as schema object for convenience

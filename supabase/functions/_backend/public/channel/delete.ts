@@ -273,12 +273,17 @@ export async function deleteChannel(c: Context<MiddlewareKeyVariables>, body: Ch
     throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel_id: dataChannel.id })
   }
 
-  await supabase
+  const { data: deletedChannels, error: deleteError } = await supabase
     .from('channels')
     .delete()
     .eq('id', dataChannel.id)
     .eq('app_id', body.app_id)
     .eq('name', body.channel)
+    .select('id')
+
+  if (deleteError || !deletedChannels || deletedChannels.length !== 1) {
+    throw simpleError('cannot_delete_channel', 'Cannot delete channel', { supabaseError: deleteError })
+  }
 
   return c.json(BRES)
 }

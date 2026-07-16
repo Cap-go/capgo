@@ -14,16 +14,21 @@ vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
 const { deleteChannel } = await import('../supabase/functions/_backend/public/channel/delete.ts')
 
 function createChannelBuilder() {
+  const deleteResult = {
+    data: [{ id: 42 }],
+    error: null,
+  }
   const builder = {
     delete: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
-    select: vi.fn().mockReturnThis(),
+    select: vi.fn(),
     single: vi.fn().mockResolvedValue({
       data: { id: 42 },
       error: null,
     }),
   }
-  return builder
+  builder.select.mockImplementation(() => builder.delete.mock.calls.length > 0 ? Promise.resolve(deleteResult) : builder)
+  return { ...builder, deleteResult }
 }
 
 function context() {
@@ -69,6 +74,17 @@ describe('channel delete RBAC guard', () => {
     })
     expect(channelBuilder.delete).toHaveBeenCalledTimes(1)
     expect(channelBuilder.eq).toHaveBeenCalledWith('id', 42)
+  })
+
+  it('fails when channel deletion affects no rows', async () => {
+    channelBuilder.deleteResult.data = []
+
+    await expect(deleteChannel(c as any, {
+      app_id: 'com.example.app',
+      channel: 'production',
+    }, { key: 'test-apikey' } as any)).rejects.toHaveProperty('status', 400)
+
+    expect(channelBuilder.select).toHaveBeenCalledWith('id')
   })
 
   it('does not delete the channel when channel-scoped delete is denied', async () => {
