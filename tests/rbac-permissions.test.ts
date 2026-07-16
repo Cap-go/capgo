@@ -554,6 +554,50 @@ describe('rbac permission system', () => {
         await query('ROLLBACK TO SAVEPOINT preview_cross_bundle_update')
         expect((crossBundleUpdateError as { message?: string } | undefined)?.message).toContain('PREVIEW_APIKEY_CAN_ONLY_MANAGE_OWN_BUNDLE')
 
+        const movedBundleOrgId = randomUUID()
+        const movedBundleAppId = `com.rbac.preview.moved.${slug}`
+        await query(`
+          CREATE TEMP TABLE preview_bundle_scope_test (
+            id bigint PRIMARY KEY,
+            app_id character varying NOT NULL,
+            owner_org uuid NOT NULL,
+            created_by_apikey_rbac_id uuid,
+            comment text
+          ) ON COMMIT DROP
+        `)
+        await query(`
+          CREATE TRIGGER enforce_preview_bundle_ownership
+          BEFORE INSERT OR UPDATE ON preview_bundle_scope_test
+          FOR EACH ROW EXECUTE FUNCTION public.enforce_preview_bundle_ownership()
+        `)
+
+        await query(`SELECT set_config('request.headers', $1, true)`, [JSON.stringify({ capgkey: apiKeyB })])
+        const scopeTestBundle = await query(`
+          INSERT INTO preview_bundle_scope_test (id, app_id, owner_org, comment)
+          VALUES (-1, $1, $2::uuid, 'created by preview key b')
+          RETURNING created_by_apikey_rbac_id
+        `, [appId, orgId])
+        expect(scopeTestBundle.rows[0]?.created_by_apikey_rbac_id).toBe(apiKeyBRbacId)
+
+        // app_versions prevents scope moves in production. This isolated trigger
+        // table exercises the same UPDATE path, where mutable NEW values must not
+        // hide a bundle created by key B from key A's old app/org scope.
+        await query(`SELECT set_config('request.headers', $1, true)`, [JSON.stringify({ capgkey: apiKeyA })])
+        await query('SAVEPOINT preview_cross_scope_bundle_update')
+        let crossScopeBundleUpdateError: unknown
+        try {
+          await query(`
+            UPDATE preview_bundle_scope_test
+            SET app_id = $1, owner_org = $2::uuid
+            WHERE id = -1
+          `, [movedBundleAppId, movedBundleOrgId])
+        }
+        catch (error) {
+          crossScopeBundleUpdateError = error
+        }
+        await query('ROLLBACK TO SAVEPOINT preview_cross_scope_bundle_update')
+        expect((crossScopeBundleUpdateError as { message?: string } | undefined)?.message).toContain('PREVIEW_APIKEY_CAN_ONLY_MANAGE_OWN_BUNDLE')
+
         // The public endpoint checks the channel-scoped permission before making
         // its service-role write. Exercise the trigger's key-bound bundle guard
         // here, while the direct checks above prove the channel scope.
@@ -671,6 +715,35 @@ describe('rbac permission system', () => {
         expect(ownDeletion.rows).toEqual([{ id: previewA.channelId }])
 
         await query('RESET ROLE')
+      })
+
+      it('serializes preview bundle lifecycle locks across promotion and deletion transactions', async () => {
+        const holder = await pool.connect()
+        const waiter = await pool.connect()
+        const lockSeed = BigInt(Date.now()) * BigInt(1_000_000) + BigInt(Math.floor(Math.random() * 1_000_000))
+        const lowerBundleId = lockSeed.toString()
+        const higherBundleId = (lockSeed + BigInt(1)).toString()
+
+        try {
+          await holder.query('BEGIN')
+          await holder.query(
+            'SELECT public.lock_channel_bundle_lifecycle($1::bigint, $2::bigint)',
+            [higherBundleId, lowerBundleId],
+          )
+
+          await waiter.query('BEGIN')
+          await waiter.query(`SET LOCAL lock_timeout = '100ms'`)
+          await expect(waiter.query(
+            'SELECT public.lock_channel_bundle_lifecycle($1::bigint, $2::bigint)',
+            [lowerBundleId, higherBundleId],
+          )).rejects.toThrow(/lock timeout/i)
+        }
+        finally {
+          await holder.query('ROLLBACK')
+          await waiter.query('ROLLBACK')
+          holder.release()
+          waiter.release()
+        }
       })
 
       it('preserves blank and trusted seed channel inserts in the promotion trigger', async () => {

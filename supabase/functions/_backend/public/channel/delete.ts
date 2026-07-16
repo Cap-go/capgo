@@ -65,6 +65,15 @@ async function loadPreviewChannelForUpdate(dbClient: PgQueryClient, body: Channe
   return (result.rowCount ?? 0) === 1 ? result.rows[0] : null
 }
 
+async function lockPreviewBundleLifecycle(dbClient: PgQueryClient, versionIds: number[]) {
+  for (const versionId of [...versionIds].sort((left, right) => left - right)) {
+    await dbClient.query(
+      'SELECT pg_catalog.pg_advisory_xact_lock($1::bigint)',
+      [versionId],
+    )
+  }
+}
+
 async function assertPreviewChannelDeletePermission(
   c: Context<MiddlewareKeyVariables>,
   dbClient: PgQueryClient,
@@ -149,6 +158,7 @@ async function deletePreviewChannelAndBundle(
     await assertPreviewChannelDeletePermission(c, dbClient, body, apikey, effectiveApikey, channel)
 
     const versionIds = [...new Set([channel.version, channel.rollout_version].filter((version): version is number => version !== null))]
+    await lockPreviewBundleLifecycle(dbClient, versionIds)
     const versions = versionIds.length === 0
       ? []
       : (await dbClient.query<PreviewVersionRow>(

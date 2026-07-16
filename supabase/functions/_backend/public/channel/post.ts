@@ -4,7 +4,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { BRES, simpleError } from '../../utils/hono.ts'
 import { cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
-import { supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
+import { supabaseAdmin, supabaseApikey, updateOrCreateChannel } from '../../utils/supabase.ts'
 import { isInternalVersionName, isValidAppId } from '../../utils/utils.ts'
 import { setChannel } from '../bundle/set_channel.ts'
 
@@ -141,6 +141,39 @@ function resolveVersion(c: Context, appID: string, version: string | number, own
     : findVersion(c, appID, version, ownerOrg)
 }
 
+async function cleanupCreatedChannel(
+  c: Context<MiddlewareKeyVariables>,
+  appId: string,
+  channelId: number,
+  apikey: Database['public']['Tables']['apikeys']['Row'],
+) {
+  try {
+    const { data, error } = await supabaseApikey(c, apikey.key)
+      .from('channels')
+      .delete()
+      .eq('id', channelId)
+      .eq('app_id', appId)
+      .eq('created_by', apikey.user_id)
+      .select('id')
+
+    if (error || !data || data.length !== 1) {
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'Cannot clean up newly created channel after promotion failure',
+        data: { appId, channelId, deletedChannelCount: data?.length ?? 0, error },
+      })
+    }
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Cannot clean up newly created channel after promotion failure',
+      data: { appId, channelId },
+      error,
+    })
+  }
+}
+
 export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   body = normalizeChannelSet(body)
   if (!body.app_id) {
@@ -174,25 +207,24 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
   const existingRolloutVersion = existingChannel?.rollout_version ?? null
   const existingChannelId = existingChannel?.id ?? null
   let requestedVersionId: number | null | undefined
+  let requestedVersionName: string | null = null
   if (body.version !== undefined) {
-    const requestedVersionName = body.version && !isInternalVersionName(body.version) ? body.version : null
+    const requestedVersion = body.version && !isInternalVersionName(body.version) ? body.version : null
     if (existingChannel) {
       // Do not inspect the current or requested bundle until promotion is proven: a
       // settings-only key can lack channel.read and must not gain a bundle oracle.
       if (!(await checkPermission(c, 'channel.promote_bundle', { appId: body.app_id, channelId: existingChannel.id }))) {
         throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel: body.channel })
       }
-      requestedVersionId = requestedVersionName
-        ? await findVersion(c, body.app_id, requestedVersionName, org.owner_org)
+      requestedVersionId = requestedVersion
+        ? await findVersion(c, body.app_id, requestedVersion, org.owner_org)
         : null
     }
-    else if (requestedVersionName) {
-      // A new channel receives its scoped lifecycle binding from the database
-      // trigger. Promote only after that insert, through setChannel below.
-      requestedVersionId = await findVersion(c, body.app_id, requestedVersionName, org.owner_org)
-    }
     else {
-      requestedVersionId = null
+      // A new channel receives its scoped lifecycle binding from the database
+      // trigger. Its channel-scoped promotion permission is checked after insert,
+      // before the service-role version lookup below.
+      requestedVersionName = requestedVersion
     }
   }
   const inferredElectron = body.electron ?? (body.public && body.ios !== body.android ? false : undefined)
@@ -292,16 +324,27 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
     channel.rollout_pause_reason = null
   }
   const result = await updateOrCreateChannel(c, channel, existingChannelId, body.version === undefined && !body.promoteToStable)
-  if (!existingChannel && requestedVersionId) {
+  if (!existingChannel && requestedVersionName) {
     const createdChannelId = result.data?.id
     if (!createdChannelId) {
       throw simpleError('cannot_find_channel', 'Cannot find channel', { app_id: body.app_id, channel: body.channel })
     }
-    await setChannel(c, {
-      app_id: body.app_id,
-      channel_id: createdChannelId,
-      version_id: requestedVersionId,
-    }, apikey)
+
+    try {
+      if (!(await checkPermission(c, 'channel.promote_bundle', { appId: body.app_id, channelId: createdChannelId }))) {
+        throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel: body.channel })
+      }
+      const requestedVersionId = await findVersion(c, body.app_id, requestedVersionName, org.owner_org)
+      await setChannel(c, {
+        app_id: body.app_id,
+        channel_id: createdChannelId,
+        version_id: requestedVersionId,
+      }, apikey)
+    }
+    catch (error) {
+      await cleanupCreatedChannel(c, body.app_id, createdChannelId, apikey)
+      throw error
+    }
   }
   return c.json(BRES)
 }

@@ -25,7 +25,7 @@ function createSupabaseMock() {
 }
 
 describe('createAiApiKey', () => {
-  it('creates a member key with only the selected app bindings', async () => {
+  it.concurrent('creates a member key with only the selected app bindings', async () => {
     const { invoke, supabase } = createSupabaseMock()
 
     await createAiApiKey(supabase, 'Preview key', {
@@ -46,7 +46,7 @@ describe('createAiApiKey', () => {
     expect(payload.body.global_permissions).toBeUndefined()
   })
 
-  it('requires a member key to select at least one app', async () => {
+  it.concurrent('requires a member key to select at least one app', async () => {
     const { supabase } = createSupabaseMock()
 
     await expect(createAiApiKey(supabase, 'Empty member key', {

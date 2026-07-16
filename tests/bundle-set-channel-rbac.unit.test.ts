@@ -84,6 +84,19 @@ describe('bundle set channel RBAC guard', () => {
       'com.example.app',
       '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
     ])
+
+    const queryTexts = queryMock.mock.calls.map(([text]) => String(text))
+    const targetChannelQueryIndex = queryTexts.findIndex(text => text.includes('FROM public.channels'))
+    const bundleLockQueryIndex = queryTexts.findIndex(text => text.includes('pg_advisory_xact_lock'))
+    const versionQueryIndex = queryTexts.findIndex(text => text.includes('FROM public.app_versions'))
+
+    expect(queryTexts[targetChannelQueryIndex]).toContain('FOR UPDATE')
+    expect(bundleLockQueryIndex).toBeGreaterThan(targetChannelQueryIndex)
+    expect(bundleLockQueryIndex).toBeLessThan(versionQueryIndex)
+    expect(queryMock).toHaveBeenCalledWith(
+      'SELECT pg_catalog.pg_advisory_xact_lock($1::bigint)',
+      [7],
+    )
   })
 
   it('does not update the channel when channel-scoped promotion is denied', async () => {

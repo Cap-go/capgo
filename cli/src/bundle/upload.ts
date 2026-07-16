@@ -976,7 +976,26 @@ async function setVersionInChannel(
     if (dbError3 || !data)
       uploadFail(`Cannot create channel because this API key does not have the required RBAC permission. ${formatError(dbError3)}`)
 
-    return promoteExistingChannel(supabase, appid, versionId, data, localConfig, displayBundleUrl)
+    try {
+      return await promoteExistingChannel(supabase, appid, versionId, data, localConfig, displayBundleUrl)
+    }
+    catch (promotionError) {
+      try {
+        const { data: deletedChannels, error: cleanupError } = await supabase
+          .from('channels')
+          .delete()
+          .eq('id', data.id)
+          .eq('app_id', appid)
+          .select('id')
+        if (cleanupError || !deletedChannels || deletedChannels.length !== 1) {
+          log.warn(`Cannot clean up newly created channel after promotion failure: ${formatError(cleanupError)}`)
+        }
+      }
+      catch (cleanupError) {
+        log.warn(`Cannot clean up newly created channel after promotion failure: ${formatError(cleanupError)}`)
+      }
+      throw promotionError
+    }
   }
 
   const message = 'Cannot create target channel because this API key lacks app.create_channel'

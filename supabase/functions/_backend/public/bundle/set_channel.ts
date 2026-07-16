@@ -43,7 +43,8 @@ async function fetchTargetChannel(dbClient: PgQueryClient, body: SetChannelBody)
     `SELECT name, owner_org
      FROM public.channels
      WHERE id = $1
-       AND app_id = $2`,
+       AND app_id = $2
+     FOR UPDATE`,
     [body.channel_id, body.app_id],
   )
 
@@ -103,18 +104,25 @@ export async function setChannel(c: Context<MiddlewareKeyVariables>, body: SetCh
   let transactionStarted = false
   try {
     dbClient = await pgClient.connect()
+    await dbClient.query('BEGIN')
+    transactionStarted = true
 
     const channel = await fetchTargetChannel(dbClient, body)
     await assertCanPromoteChannel(c, body, channel)
-    versionName = await fetchVersionName(dbClient, body)
 
     if (!channel) {
       throw simpleError('cannot_find_channel', 'Cannot find channel')
     }
     channelName = channel.name
 
-    await dbClient.query('BEGIN')
-    transactionStarted = true
+    // The preview-delete route takes this same transaction-scoped lock before
+    // checking references and soft-deleting the bundle.
+    await dbClient.query(
+      'SELECT pg_catalog.pg_advisory_xact_lock($1::bigint)',
+      [body.version_id],
+    )
+    versionName = await fetchVersionName(dbClient, body)
+
     await dbClient.query(
       'SELECT set_config(\'request.headers\', $1, true)',
       [JSON.stringify({ capgkey: effectiveApikey })],

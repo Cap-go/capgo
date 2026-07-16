@@ -564,13 +564,16 @@ AS $$
 DECLARE
   v_preview_apikey_rbac_id uuid;
 BEGIN
-  SELECT public.current_app_preview_apikey_rbac_id(NEW.owner_org, NEW.app_id)
-  INTO v_preview_apikey_rbac_id;
-
   IF TG_OP = 'INSERT' THEN
+    SELECT public.current_app_preview_apikey_rbac_id(NEW.owner_org, NEW.app_id)
+    INTO v_preview_apikey_rbac_id;
+
     NEW.created_by_apikey_rbac_id := v_preview_apikey_rbac_id;
     RETURN NEW;
   END IF;
+
+  SELECT public.current_app_preview_apikey_rbac_id(OLD.owner_org, OLD.app_id)
+  INTO v_preview_apikey_rbac_id;
 
   IF NEW.created_by_apikey_rbac_id IS DISTINCT FROM OLD.created_by_apikey_rbac_id THEN
     RAISE EXCEPTION 'PREVIEW_BUNDLE_CREATOR_IMMUTABLE'
@@ -696,6 +699,36 @@ ALTER FUNCTION public.assert_preview_bundle_owner(uuid, character varying, bigin
 REVOKE ALL ON FUNCTION public.assert_preview_bundle_owner(uuid, character varying, bigint) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.assert_preview_bundle_owner(uuid, character varying, bigint) TO service_role;
 
+-- Promotion and preview deletion serialize on each immutable bundle id. The
+-- shared lock prevents a new channel reference from appearing between the
+-- preview-delete linked-channel check and its app_versions soft delete.
+CREATE OR REPLACE FUNCTION public.lock_channel_bundle_lifecycle(
+  p_version_id bigint,
+  p_rollout_version_id bigint
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_bundle_id bigint;
+BEGIN
+  FOR v_bundle_id IN
+    SELECT bundle.bundle_id
+    FROM pg_catalog.unnest(ARRAY[p_version_id, p_rollout_version_id]) AS bundle(bundle_id)
+    WHERE bundle.bundle_id IS NOT NULL
+    ORDER BY bundle.bundle_id
+  LOOP
+    PERFORM pg_catalog.pg_advisory_xact_lock(v_bundle_id);
+  END LOOP;
+END;
+$$;
+
+ALTER FUNCTION public.lock_channel_bundle_lifecycle(bigint, bigint) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.lock_channel_bundle_lifecycle(bigint, bigint) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.lock_channel_bundle_lifecycle(bigint, bigint) TO service_role;
+
 -- Service-role endpoints set request.headers.capgkey before their channel
 -- write. Keep that key-bound ownership check active even when service_role
 -- bypasses the normal channel-permission branch.
@@ -713,6 +746,8 @@ BEGIN
   IF TG_OP = 'UPDATE' AND NEW.version IS NOT DISTINCT FROM OLD.version THEN
     RETURN NEW;
   END IF;
+
+  PERFORM public.lock_channel_bundle_lifecycle(NEW.version, NEW.rollout_version);
 
   IF TG_OP = 'INSERT' THEN
     v_owner_org := public.get_owner_org_by_app_id_internal(NEW.app_id);
@@ -793,6 +828,8 @@ BEGIN
   END IF;
 
   IF v_rollout_changed THEN
+    PERFORM public.lock_channel_bundle_lifecycle(NEW.version, NEW.rollout_version);
+
     IF (auth.uid() IS NOT NULL OR public.get_apikey_header() IS NOT NULL)
       AND NOT public.rbac_check_permission_request(
         public.rbac_perm_channel_promote_bundle(),
