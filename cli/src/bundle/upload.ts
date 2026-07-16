@@ -845,10 +845,6 @@ async function preflightRequiredChannelAssignments(
     if (!canCreateChannel)
       uploadFail('Cannot create target channel because this API key lacks app.create_channel')
 
-    const canPromoteCreatedChannel = await hasCliPermission(supabase, apikey, 'channel.promote_bundle', { appId: appid })
-    if (!canPromoteCreatedChannel)
-      uploadFail('Cannot create target channel with a bundle because this API key lacks channel.promote_bundle')
-
     uploadTargetChannels.set(channel, null)
   }
 
@@ -945,7 +941,7 @@ async function setVersionInChannel(
   if (targetChannel && canPromoteTargetChannel && !selfAssign)
     return promoteExistingChannel(supabase, appid, versionId, targetChannel, localConfig, displayBundleUrl)
 
-  if ((targetChannel && canPromoteTargetChannel) || canCreateChannel) {
+  if (targetChannel && canPromoteTargetChannel) {
     const { error: dbError3, data } = await updateOrCreateChannel(supabase, {
       name: channel,
       app_id: appid,
@@ -965,6 +961,22 @@ async function setVersionInChannel(
     if (displayBundleUrl)
       log.info(`Bundle url: ${bundleUrl}`)
     return true
+  }
+
+  // Create without a version so a preview key receives its channel-scoped binding before promotion.
+  if (canCreateChannel) {
+    const { error: dbError3, data } = await updateOrCreateChannel(supabase, {
+      name: channel,
+      app_id: appid,
+      created_by: userId,
+      owner_org: orgId,
+      version: null,
+      ...(selfAssign ? { allow_device_self_set: true } : {}),
+    })
+    if (dbError3 || !data)
+      uploadFail(`Cannot create channel because this API key does not have the required RBAC permission. ${formatError(dbError3)}`)
+
+    return promoteExistingChannel(supabase, appid, versionId, data, localConfig, displayBundleUrl)
   }
 
   const message = 'Cannot create target channel because this API key lacks app.create_channel'

@@ -36,10 +36,16 @@ describe('frontend channel RBAC scope regressions', () => {
     expect(source).toContain(`  app_reader: {\n    'channel.read': false,\n    'channel.read_history': false,\n    'channel.promote_bundle': false,\n  },`)
   })
 
-  it.concurrent('keeps app preview channel defaults aligned with RBAC role permissions', async () => {
+  it.concurrent('keeps app preview channel defaults denied until a channel-specific grant exists', async () => {
     const source = await readRepoFile('src/components/permissions/ChannelPermissionOverridesPanel.vue')
 
-    expect(source).toContain(`  app_preview: {\n    'channel.read': true,\n    'channel.read_history': false,\n    'channel.promote_bundle': true,\n  },`)
+    expect(source).toContain(`  app_preview: {\n    'channel.read': false,\n    'channel.read_history': false,\n    'channel.promote_bundle': false,\n  },`)
+  })
+
+  it.concurrent('keeps preview channel defaults aligned with its channel-scoped RBAC role permissions', async () => {
+    const source = await readRepoFile('src/components/permissions/ChannelPermissionOverridesPanel.vue')
+
+    expect(source).toContain(`  channel_preview: {\n    'channel.read': true,\n    'channel.read_history': false,\n    'channel.promote_bundle': true,\n  },`)
   })
 
   it.concurrent('keeps app-only keys in their owner organization filter without showing an organization role', async () => {

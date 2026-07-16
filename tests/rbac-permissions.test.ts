@@ -346,13 +346,14 @@ describe('rbac permission system', () => {
         expect(result.rows[0].settings_allowed).toBe(false)
       })
 
-      it('allows an app preview key only its deployment lifecycle', async () => {
+      it('limits each app preview key to its auto-created channels and bundles', async () => {
         const slug = randomUUID().slice(0, 8)
         const orgId = randomUUID()
         const appId = `com.rbac.preview.${slug}`
-        const siblingAppId = `com.rbac.preview.sibling.${slug}`
-        const channelName = `preview-${slug}`
-        const apiKey = `preview-key-${slug}`
+        const apiKeyA = `preview-key-a-${slug}`
+        const apiKeyB = `preview-key-b-${slug}`
+
+        await query(`SELECT set_config('request.headers', '{}', true)`)
 
         await query(`
           INSERT INTO public.orgs (id, name, management_email, created_by)
@@ -361,31 +362,33 @@ describe('rbac permission system', () => {
 
         const appResult = await query(`
           INSERT INTO public.apps (app_id, name, icon_url, owner_org)
-          VALUES
-            ($1, $3, 'https://example.com/icon.png', $2::uuid),
-            ($4, $5, 'https://example.com/icon.png', $2::uuid)
-          RETURNING id, app_id
-        `, [appId, orgId, `Preview RBAC App ${slug}`, siblingAppId, `Preview RBAC Sibling ${slug}`])
-        const appUuid = appResult.rows.find(row => row.app_id === appId)?.id
+          VALUES ($1, $2, 'https://example.com/icon.png', $3::uuid)
+          RETURNING id
+        `, [appId, `Preview RBAC App ${slug}`, orgId])
+        const appUuid = appResult.rows[0]?.id
         expect(appUuid).toBeTruthy()
 
-        const channelResult = await query(`
+        const mainChannelResult = await query(`
           INSERT INTO public.channels (name, app_id, created_by, owner_org)
-          VALUES ($1, $2, $3::uuid, $4::uuid)
-          RETURNING id
-        `, [channelName, appId, USER_ID, orgId])
-        const channelId = channelResult.rows[0]?.id
-        expect(channelId).toBeTruthy()
+          VALUES ('production', $1, $2::uuid, $3::uuid)
+          RETURNING id, rbac_id
+        `, [appId, USER_ID, orgId])
+        const mainChannelId = mainChannelResult.rows[0]?.id
+        expect(mainChannelId).toBeTruthy()
 
         const apiKeyResult = await query(`
           INSERT INTO public.apikeys (user_id, key, name)
-          VALUES ($1::uuid, $2, $3)
-          RETURNING rbac_id
-        `, [USER_ID, apiKey, `Preview key ${slug}`])
-        const apiKeyRbacId = apiKeyResult.rows[0]?.rbac_id
-        expect(apiKeyRbacId).toBeTruthy()
+          VALUES
+            ($1::uuid, $2, $3),
+            ($1::uuid, $4, $5)
+          RETURNING key, rbac_id
+        `, [USER_ID, apiKeyA, `Preview key A ${slug}`, apiKeyB, `Preview key B ${slug}`])
+        const apiKeyARbacId = apiKeyResult.rows.find(row => row.key === apiKeyA)?.rbac_id
+        const apiKeyBRbacId = apiKeyResult.rows.find(row => row.key === apiKeyB)?.rbac_id
+        expect(apiKeyARbacId).toBeTruthy()
+        expect(apiKeyBRbacId).toBeTruthy()
 
-        const bindingResult = await query(`
+        const parentBindings = await query(`
           INSERT INTO public.role_bindings (
             principal_type,
             principal_id,
@@ -398,57 +401,276 @@ describe('rbac permission system', () => {
           )
           SELECT
             public.rbac_principal_apikey(),
-            $1::uuid,
-            roles.id,
+            api_key.rbac_id,
+            role.id,
             public.rbac_scope_app(),
+            $1::uuid,
             $2::uuid,
             $3::uuid,
-            $4::uuid,
             true
-          FROM public.roles
-          WHERE roles.name = 'app_preview'
-          LIMIT 1
-          RETURNING id
-        `, [apiKeyRbacId, orgId, appUuid, USER_ID])
-        expect(bindingResult.rowCount).toBe(1)
-
-        const result = await query(`
-          SELECT
-            public.rbac_check_permission_direct('org.read', $1::uuid, $2::uuid, NULL::varchar, NULL::bigint, $6) AS can_read_org,
-            public.rbac_check_permission_direct('app.read', $1::uuid, $2::uuid, $3, NULL::bigint, $6) AS can_read_app,
-            public.rbac_check_permission_direct('app.read_bundles', $1::uuid, $2::uuid, $3, NULL::bigint, $6) AS can_read_bundles,
-            public.rbac_check_permission_direct('app.upload_bundle', $1::uuid, $2::uuid, $3, NULL::bigint, $6) AS can_upload_bundle,
-            public.rbac_check_permission_direct('app.create_channel', $1::uuid, $2::uuid, $3, NULL::bigint, $6) AS can_create_channel,
-            public.rbac_check_permission_direct('channel.read', $1::uuid, $2::uuid, $3, $4::bigint, $6) AS can_read_channel,
-            public.rbac_check_permission_direct('channel.promote_bundle', $1::uuid, $2::uuid, $3, $4::bigint, $6) AS can_promote_bundle,
-            public.rbac_check_permission_direct('channel.delete', $1::uuid, $2::uuid, $3, $4::bigint, $6) AS can_delete_channel,
-            public.rbac_check_permission_direct('app.update_settings', $1::uuid, $2::uuid, $3, NULL::bigint, $6) AS can_update_settings,
-            public.rbac_check_permission_direct('app.update_user_roles', $1::uuid, $2::uuid, $3, NULL::bigint, $6) AS can_manage_roles,
-            public.rbac_check_permission_direct('app.manage_devices', $1::uuid, $2::uuid, $3, NULL::bigint, $6) AS can_manage_devices,
-            public.rbac_check_permission_direct('bundle.delete', $1::uuid, $2::uuid, $3, NULL::bigint, $6) AS can_delete_bundle,
-            public.rbac_check_permission_direct('channel.update_settings', $1::uuid, $2::uuid, $3, $4::bigint, $6) AS can_update_channel_settings,
-            public.rbac_check_permission_direct('channel.rollback_bundle', $1::uuid, $2::uuid, $3, $4::bigint, $6) AS can_rollback_channel,
-            public.rbac_check_permission_direct('channel.manage_forced_devices', $1::uuid, $2::uuid, $3, $4::bigint, $6) AS can_manage_forced_devices,
-            public.rbac_check_permission_direct('app.read', $1::uuid, $2::uuid, $5, NULL::bigint, $6) AS can_read_sibling_app
-        `, [USER_ID, orgId, appId, channelId, siblingAppId, apiKey])
-        expect(result.rows[0]).toMatchObject({
-          can_read_org: false,
-          can_read_app: true,
-          can_read_bundles: true,
-          can_upload_bundle: true,
-          can_create_channel: true,
-          can_read_channel: true,
-          can_promote_bundle: true,
-          can_delete_channel: true,
-          can_update_settings: false,
-          can_manage_roles: false,
-          can_manage_devices: false,
-          can_delete_bundle: false,
-          can_update_channel_settings: false,
-          can_rollback_channel: false,
-          can_manage_forced_devices: false,
-          can_read_sibling_app: false,
+          FROM public.apikeys AS api_key
+          INNER JOIN public.roles AS role
+            ON role.name = 'app_preview'
+          WHERE api_key.key IN ($4, $5)
+          RETURNING id, principal_id, org_id, app_id
+        `, [orgId, appUuid, USER_ID, apiKeyA, apiKeyB])
+        expect(parentBindings.rowCount).toBe(2)
+        const parentBindingA = parentBindings.rows.find(row => row.principal_id === apiKeyARbacId)
+        const parentBindingB = parentBindings.rows.find(row => row.principal_id === apiKeyBRbacId)
+        expect(parentBindingA).toMatchObject({
+          org_id: orgId,
+          app_id: appUuid,
         })
+        expect(parentBindingB).toMatchObject({
+          org_id: orgId,
+          app_id: appUuid,
+        })
+
+        const createPreviewResources = async (apiKey: string, name: string) => {
+          await query(`SELECT set_config('request.headers', $1, true)`, [JSON.stringify({ capgkey: apiKey })])
+          const bundleResult = await query(`
+            INSERT INTO public.app_versions (app_id, name, owner_org, user_id, storage_provider)
+            VALUES ($1, $2, $3::uuid, $4::uuid, 'r2-direct')
+            RETURNING id, created_by_apikey_rbac_id
+          `, [appId, `bundle-${name}-${slug}`, orgId, USER_ID])
+          const channelResult = await query(`
+            INSERT INTO public.channels (name, app_id, created_by, owner_org)
+            VALUES ($1, $2, $3::uuid, $4::uuid)
+            RETURNING id, rbac_id
+          `, [`preview-${name}-${slug}`, appId, USER_ID, orgId])
+
+          return {
+            bundleId: bundleResult.rows[0]?.id,
+            bundleCreator: bundleResult.rows[0]?.created_by_apikey_rbac_id,
+            channelId: channelResult.rows[0]?.id,
+            channelRbacId: channelResult.rows[0]?.rbac_id,
+          }
+        }
+
+        const previewA = await createPreviewResources(apiKeyA, 'a')
+        const previewB = await createPreviewResources(apiKeyB, 'b')
+        expect(previewA.bundleId).toBeTruthy()
+        expect(previewA.channelId).toBeTruthy()
+        expect(previewB.bundleId).toBeTruthy()
+        expect(previewB.channelId).toBeTruthy()
+        expect(previewA.bundleCreator).toBe(apiKeyARbacId)
+        expect(previewB.bundleCreator).toBe(apiKeyBRbacId)
+
+        const childBindingA = await query(`
+          SELECT child.principal_id, child.parent_binding_id, child.org_id, child.app_id,
+            child.channel_id, child.is_direct, role.name
+          FROM public.role_bindings AS child
+          INNER JOIN public.roles AS role ON role.id = child.role_id
+          WHERE child.channel_id = $1::uuid
+            AND role.name = 'channel_preview'
+        `, [previewA.channelRbacId])
+        const childBindingB = await query(`
+          SELECT child.principal_id, child.parent_binding_id, child.org_id, child.app_id,
+            child.channel_id, child.is_direct, role.name
+          FROM public.role_bindings AS child
+          INNER JOIN public.roles AS role ON role.id = child.role_id
+          WHERE child.channel_id = $1::uuid
+            AND role.name = 'channel_preview'
+        `, [previewB.channelRbacId])
+        expect(childBindingA.rows).toEqual([expect.objectContaining({
+          principal_id: apiKeyARbacId,
+          parent_binding_id: parentBindingA?.id,
+          org_id: orgId,
+          app_id: appUuid,
+          channel_id: previewA.channelRbacId,
+          is_direct: false,
+          name: 'channel_preview',
+        })])
+        expect(childBindingB.rows).toEqual([expect.objectContaining({
+          principal_id: apiKeyBRbacId,
+          parent_binding_id: parentBindingB?.id,
+          org_id: orgId,
+          app_id: appUuid,
+          channel_id: previewB.channelRbacId,
+          is_direct: false,
+          name: 'channel_preview',
+        })])
+
+        const channelPermissions = await query(`
+          SELECT
+            public.rbac_check_permission_direct('channel.read', $1::uuid, $2::uuid, $3, $4::bigint, $7) AS a_reads_own,
+            public.rbac_check_permission_direct('channel.promote_bundle', $1::uuid, $2::uuid, $3, $4::bigint, $7) AS a_promotes_own,
+            public.rbac_check_permission_direct('channel.delete', $1::uuid, $2::uuid, $3, $4::bigint, $7) AS a_deletes_own,
+            public.rbac_check_permission_direct('channel.read', $1::uuid, $2::uuid, $3, $5::bigint, $7) AS a_reads_b,
+            public.rbac_check_permission_direct('channel.promote_bundle', $1::uuid, $2::uuid, $3, $5::bigint, $7) AS a_promotes_b,
+            public.rbac_check_permission_direct('channel.delete', $1::uuid, $2::uuid, $3, $5::bigint, $7) AS a_deletes_b,
+            public.rbac_check_permission_direct('channel.promote_bundle', $1::uuid, $2::uuid, $3, $6::bigint, $7) AS a_promotes_main,
+            public.rbac_check_permission_direct('channel.delete', $1::uuid, $2::uuid, $3, $6::bigint, $7) AS a_deletes_main,
+            public.rbac_check_permission_direct('channel.promote_bundle', $1::uuid, $2::uuid, $3, $5::bigint, $8) AS b_promotes_own,
+            public.rbac_check_permission_direct('channel.delete', $1::uuid, $2::uuid, $3, $5::bigint, $8) AS b_deletes_own,
+            public.rbac_check_permission_direct('channel.promote_bundle', $1::uuid, $2::uuid, $3, $4::bigint, $8) AS b_promotes_a,
+            public.rbac_check_permission_direct('channel.delete', $1::uuid, $2::uuid, $3, $4::bigint, $8) AS b_deletes_a
+        `, [
+          USER_ID,
+          orgId,
+          appId,
+          previewA.channelId,
+          previewB.channelId,
+          mainChannelId,
+          apiKeyA,
+          apiKeyB,
+        ])
+        expect(channelPermissions.rows[0]).toMatchObject({
+          a_reads_own: true,
+          a_promotes_own: true,
+          a_deletes_own: true,
+          a_reads_b: false,
+          a_promotes_b: false,
+          a_deletes_b: false,
+          a_promotes_main: false,
+          a_deletes_main: false,
+          b_promotes_own: true,
+          b_deletes_own: true,
+          b_promotes_a: false,
+          b_deletes_a: false,
+        })
+
+        await query(`SELECT set_config('request.headers', $1, true)`, [JSON.stringify({ capgkey: apiKeyA })])
+        const ownBundleUpdate = await query(`
+          UPDATE public.app_versions
+          SET comment = 'updated by preview key a'
+          WHERE id = $1::bigint
+          RETURNING id
+        `, [previewA.bundleId])
+        expect(ownBundleUpdate.rows).toEqual([{ id: previewA.bundleId }])
+
+        await query('SAVEPOINT preview_cross_bundle_update')
+        let crossBundleUpdateError: unknown
+        try {
+          await query(`
+            UPDATE public.app_versions
+            SET comment = 'attempted by preview key a'
+            WHERE id = $1::bigint
+          `, [previewB.bundleId])
+        }
+        catch (error) {
+          crossBundleUpdateError = error
+        }
+        await query('ROLLBACK TO SAVEPOINT preview_cross_bundle_update')
+        expect((crossBundleUpdateError as { message?: string } | undefined)?.message).toContain('PREVIEW_APIKEY_CAN_ONLY_MANAGE_OWN_BUNDLE')
+
+        // The public endpoint checks the channel-scoped permission before making
+        // its service-role write. Exercise the trigger's key-bound bundle guard
+        // here, while the direct checks above prove the channel scope.
+        const ownPromotion = await query(`
+          UPDATE public.channels
+          SET version = $1::bigint
+          WHERE id = $2::bigint
+          RETURNING id, version
+        `, [previewA.bundleId, previewA.channelId])
+        expect(ownPromotion.rows).toEqual([{
+          id: previewA.channelId,
+          version: previewA.bundleId,
+        }])
+
+        await query('SAVEPOINT preview_cross_bundle_promotion')
+        let crossBundlePromotionError: unknown
+        try {
+          await query(`
+            UPDATE public.channels
+            SET version = $1::bigint
+            WHERE id = $2::bigint
+          `, [previewB.bundleId, previewA.channelId])
+        }
+        catch (error) {
+          crossBundlePromotionError = error
+        }
+        await query('ROLLBACK TO SAVEPOINT preview_cross_bundle_promotion')
+        expect((crossBundlePromotionError as { message?: string } | undefined)?.message).toContain('PREVIEW_APIKEY_CAN_ONLY_PROMOTE_OWN_BUNDLE')
+
+        // Link A's bundle from an internal main-channel write. The direct
+        // PostgREST-style update below must not let key A alter that shared
+        // bundle, even though it created the bundle itself.
+        await query(`SELECT set_config('request.headers', '{}', true)`)
+        const mainPromotion = await query(`
+          UPDATE public.channels
+          SET version = $1::bigint
+          WHERE id = $2::bigint
+          RETURNING id, version
+        `, [previewA.bundleId, mainChannelId])
+        expect(mainPromotion.rows).toEqual([{
+          id: mainChannelId,
+          version: previewA.bundleId,
+        }])
+
+        await query(`SELECT set_config('request.headers', $1, true)`, [JSON.stringify({ capgkey: apiKeyA })])
+        const unreferencedBundleResult = await query(`
+          INSERT INTO public.app_versions (app_id, name, owner_org, user_id, storage_provider)
+          VALUES ($1, $2, $3::uuid, $4::uuid, 'r2-direct')
+          RETURNING id
+        `, [appId, `bundle-a-unreferenced-${slug}`, orgId, USER_ID])
+        const unreferencedBundleId = unreferencedBundleResult.rows[0]?.id
+        expect(unreferencedBundleId).toBeTruthy()
+        await query('SET LOCAL ROLE anon')
+
+        await query('SAVEPOINT preview_shared_bundle_update')
+        let sharedBundleUpdateError: unknown
+        try {
+          await query(`
+            UPDATE public.app_versions
+            SET comment = 'attempted against a main-linked preview bundle'
+            WHERE id = $1::bigint
+          `, [previewA.bundleId])
+        }
+        catch (error) {
+          sharedBundleUpdateError = error
+        }
+        await query('ROLLBACK TO SAVEPOINT preview_shared_bundle_update')
+        expect((sharedBundleUpdateError as { message?: string } | undefined)?.message).toContain('PREVIEW_APIKEY_CANNOT_MUTATE_SHARED_BUNDLE')
+
+        await query('SAVEPOINT preview_shared_bundle_soft_delete')
+        let sharedBundleSoftDeleteError: unknown
+        try {
+          await query(`
+            UPDATE public.app_versions
+            SET deleted = true
+            WHERE id = $1::bigint
+          `, [previewA.bundleId])
+        }
+        catch (error) {
+          sharedBundleSoftDeleteError = error
+        }
+        await query('ROLLBACK TO SAVEPOINT preview_shared_bundle_soft_delete')
+        expect((sharedBundleSoftDeleteError as { message?: string } | undefined)?.message).toContain('PREVIEW_APIKEY_CANNOT_MUTATE_SHARED_BUNDLE')
+
+        // RLS remains the defense in depth for direct PostgREST soft-deletes
+        // of an otherwise unreferenced bundle. The service-role cleanup route
+        // is intentionally the only preview lifecycle path that can delete it.
+        await query('SAVEPOINT preview_unreferenced_bundle_soft_delete')
+        let unreferencedBundleSoftDeleteError: unknown
+        try {
+          await query(`
+            UPDATE public.app_versions
+            SET deleted = true
+            WHERE id = $1::bigint
+          `, [unreferencedBundleId])
+        }
+        catch (error) {
+          unreferencedBundleSoftDeleteError = error
+        }
+        await query('ROLLBACK TO SAVEPOINT preview_unreferenced_bundle_soft_delete')
+        expect((unreferencedBundleSoftDeleteError as { message?: string } | undefined)?.message).toMatch(/row-level security/i)
+
+        const foreignDeletion = await query(`
+          DELETE FROM public.channels
+          WHERE id IN ($1::bigint, $2::bigint)
+          RETURNING id
+        `, [previewB.channelId, mainChannelId])
+        expect(foreignDeletion.rowCount).toBe(0)
+
+        const ownDeletion = await query(`
+          DELETE FROM public.channels
+          WHERE id = $1::bigint
+          RETURNING id
+        `, [previewA.channelId])
+        expect(ownDeletion.rows).toEqual([{ id: previewA.channelId }])
+
+        await query('RESET ROLE')
       })
 
       it('should map app-scoped channel RBAC permissions to legacy CLI permissions', async () => {

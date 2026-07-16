@@ -43,15 +43,19 @@ function channelInsert() {
 }
 
 function requestClient() {
-  const throwOnError = vi.fn().mockResolvedValue({ data: null, error: null })
+  const throwOnError = vi.fn().mockResolvedValue({ data: { id: 42 }, error: null })
   const table = {
     eq: vi.fn(),
     insert: vi.fn(),
+    select: vi.fn(),
+    single: vi.fn(),
     update: vi.fn(),
     throwOnError,
   }
   table.eq.mockReturnValue(table)
   table.insert.mockReturnValue(table)
+  table.select.mockReturnValue(table)
+  table.single.mockReturnValue(table)
   table.update.mockReturnValue(table)
   return {
     client: { from: vi.fn().mockReturnValue(table) },
@@ -93,6 +97,8 @@ describe('channel write authorization boundary', () => {
     await updateOrCreateChannel(requestContext(), insert, null)
 
     expect(table.insert).toHaveBeenCalledWith(insert)
+    expect(table.select).toHaveBeenCalledWith('id')
+    expect(table.single).toHaveBeenCalledTimes(1)
     expect(table.update).not.toHaveBeenCalled()
   })
 })

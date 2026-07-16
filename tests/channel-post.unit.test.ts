@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const updateOrCreateChannel = vi.fn()
 const checkPermission = vi.fn()
+const setChannel = vi.fn()
 const supabaseAdmin = vi.fn()
 const isValidAppId = vi.fn()
 
@@ -25,6 +26,10 @@ vi.mock('../supabase/functions/_backend/utils/rbac.ts', () => ({
 vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
   supabaseAdmin,
   updateOrCreateChannel,
+}))
+
+vi.mock('../supabase/functions/_backend/public/bundle/set_channel.ts', () => ({
+  setChannel,
 }))
 
 vi.mock('../supabase/functions/_backend/utils/utils.ts', () => ({
@@ -105,7 +110,8 @@ describe('public channel post', () => {
     checkPermission.mockResolvedValue(true)
     isValidAppId.mockReturnValue(true)
     supabaseAdmin.mockImplementation(() => buildAdminChain())
-    updateOrCreateChannel.mockResolvedValue({ error: null })
+    updateOrCreateChannel.mockResolvedValue({ data: { id: 99 }, error: null })
+    setChannel.mockResolvedValue(new Response(null, { status: 200 }))
   })
 
   it('defaults legacy public mobile channel writes to electron false', async () => {
@@ -257,23 +263,30 @@ describe('public channel post', () => {
     expect(updateOrCreateChannel).toHaveBeenCalledWith(c, expect.objectContaining({ version: 456, rollout_version: null }), 42, false)
   })
 
-  it('requires app-scoped promote permission to create a channel with a bundle', async () => {
-    checkPermission
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false)
+  it('creates a blank channel then delegates a requested bundle to its scoped lifecycle', async () => {
+    updateOrCreateChannel.mockResolvedValue({ data: { id: 77 }, error: null })
     const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
+    const c = context()
+    const key = apiKey()
 
-    await expect(post(context(), {
+    await post(c, {
       app_id: 'com.test.new-channel-version',
       channel: 'production',
       version: '1.0.0',
-    }, apiKey())).rejects.toMatchObject({
-      cause: expect.objectContaining({ error: 'cannot_access_app' }),
-    })
+    }, key)
 
-    expect(checkPermission).toHaveBeenNthCalledWith(1, expect.anything(), 'app.create_channel', { appId: 'com.test.new-channel-version' })
-    expect(checkPermission).toHaveBeenNthCalledWith(2, expect.anything(), 'channel.promote_bundle', { appId: 'com.test.new-channel-version' })
-    expect(updateOrCreateChannel).not.toHaveBeenCalled()
+    expect(checkPermission).toHaveBeenCalledTimes(1)
+    expect(checkPermission).toHaveBeenCalledWith(c, 'app.create_channel', { appId: 'com.test.new-channel-version' })
+    expect(updateOrCreateChannel).toHaveBeenCalledWith(c, expect.objectContaining({
+      app_id: 'com.test.new-channel-version',
+      name: 'production',
+      version: null,
+    }), null, false)
+    expect(setChannel).toHaveBeenCalledWith(c, {
+      app_id: 'com.test.new-channel-version',
+      channel_id: 77,
+      version_id: 123,
+    }, key)
   })
 
   it('requires promote bundle permission to explicitly clear a channel version', async () => {

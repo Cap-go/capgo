@@ -145,13 +145,14 @@ describe('[POST] /apikey operations', () => {
     expect(verifyData.name).toBe(keyName)
   })
 
-  it('creates an app-only preview key without organization bindings', async () => {
+  it('creates an app-only preview key bound to its owning organization', async () => {
+    const appBindings = await appApiKeyBindings(APPNAME, 'app_preview')
     const response = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
         name: `app-preview-key-${id.slice(0, 8)}`,
-        bindings: await appApiKeyBindings(APPNAME, 'app_preview'),
+        bindings: appBindings,
       }),
     })
     expect(response.status).toBe(200)
@@ -170,9 +171,12 @@ describe('[POST] /apikey operations', () => {
         [data.rbac_id],
       )
 
-      expect(bindings).toEqual([
-        expect.objectContaining({ scope_type: 'app', role_name: 'app_preview' }),
-      ])
+      expect(bindings).toEqual([expect.objectContaining({
+        scope_type: 'app',
+        org_id: appBindings[0].org_id,
+        app_id: appBindings[0].app_id,
+        role_name: 'app_preview',
+      })])
     }
     finally {
       await fetch(`${BASE_URL}/apikey/${data.id}`, {

@@ -6,6 +6,7 @@ import { cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
 import { isInternalVersionName, isValidAppId } from '../../utils/utils.ts'
+import { setChannel } from '../bundle/set_channel.ts'
 
 interface ChannelSet {
   app_id: string
@@ -186,9 +187,8 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
         : null
     }
     else if (requestedVersionName) {
-      if (!(await checkPermission(c, 'channel.promote_bundle', { appId: body.app_id }))) {
-        throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel: body.channel })
-      }
+      // A new channel receives its scoped lifecycle binding from the database
+      // trigger. Promote only after that insert, through setChannel below.
       requestedVersionId = await findVersion(c, body.app_id, requestedVersionName, org.owner_org)
     }
     else {
@@ -260,11 +260,10 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
     version: null,
     owner_org: org.owner_org,
   }
-
   if (body.version === undefined) {
     channel.version = existingChannelVersion
   }
-  else {
+  else if (existingChannel) {
     channel.version = requestedVersionId ?? null
   }
 
@@ -292,7 +291,17 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
     channel.rollout_paused_at = null
     channel.rollout_pause_reason = null
   }
-
-  await updateOrCreateChannel(c, channel, existingChannelId, body.version === undefined && !body.promoteToStable)
+  const result = await updateOrCreateChannel(c, channel, existingChannelId, body.version === undefined && !body.promoteToStable)
+  if (!existingChannel && requestedVersionId) {
+    const createdChannelId = result.data?.id
+    if (!createdChannelId) {
+      throw simpleError('cannot_find_channel', 'Cannot find channel', { app_id: body.app_id, channel: body.channel })
+    }
+    await setChannel(c, {
+      app_id: body.app_id,
+      channel_id: createdChannelId,
+      version_id: requestedVersionId,
+    }, apikey)
+  }
   return c.json(BRES)
 }

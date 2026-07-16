@@ -215,8 +215,8 @@ function getDisplayOrgIds(key: Database['public']['Tables']['apikeys']['Row']): 
   return Array.from(orgIds)
 }
 
-// App bindings carry their validated owner organization. Keep it filter-only so
-// app-only keys do not appear to have an organization-level role.
+// App bindings retain their validated owning organization while remaining
+// restricted to the selected app rather than receiving an organization role.
 function getFilterOrgIds(key: Database['public']['Tables']['apikeys']['Row']): string[] {
   const orgIds = new Set(getDisplayOrgIds(key))
   getBindingsForKey(key).forEach((binding) => {
