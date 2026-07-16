@@ -41,12 +41,12 @@ function select(option: PeriodDayOption) {
       v-for="option in options"
       :key="option"
       type="button"
-      :aria-pressed="modelValue === option"
+      :aria-pressed="props.modelValue === option"
       class="d-btn d-btn-sm d-join-item min-w-12"
-      :class="modelValue === option ? 'd-btn-primary' : 'd-btn-outline'"
+      :class="props.modelValue === option ? 'd-btn-primary' : 'd-btn-outline'"
       @click="select(option)"
     >
-      {{ t(labels[option] ?? defaultLabels[option]) }}
+      {{ t(props.labels[option] ?? defaultLabels[option]) }}
     </button>
   </fieldset>
 </template>
