@@ -174,7 +174,7 @@ async function ensureVersionManifest(
 
   if (error) {
     cloudlog({ requestId: c.get('requestId'), message: 'error reload app_versions.manifest', error, id: record.id })
-    return record
+    throw simpleError('manifest_reload_failed', 'Failed to reload app_versions.manifest', { id: record.id }, error)
   }
 
   if (!data?.manifest)
@@ -195,7 +195,7 @@ async function ensureVersionManifest(
 async function handleManifest(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
   cloudlog({ requestId: c.get('requestId'), message: 'manifest', manifest: record.manifest })
   const manifestEntries = record.manifest as Database['public']['CompositeTypes']['manifest_entry'][]
-  if (!Array.isArray(manifestEntries) || manifestEntries.length === 0)
+  if (!Array.isArray(manifestEntries))
     return
 
   // Check if entries exist
@@ -478,25 +478,25 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'UPDATE'), a
     cloudlog({ requestId: c.get('requestId'), message: 'no app_id', record })
     return c.json(BRES)
   }
+  // Queue payloads omit app_versions.manifest; reload before deleted-version decisions.
+  let workRecord = record
+  if (!workRecord.manifest)
+    workRecord = await ensureVersionManifest(c, workRecord)
 
-  const deletedVersionAction = getDeletedVersionAction(record, oldRecord)
+  const deletedVersionAction = getDeletedVersionAction(workRecord, oldRecord)
   if (deletedVersionAction === 'delete')
-    return deleteIt(c, record)
+    return deleteIt(c, workRecord)
   if (deletedVersionAction === 'cleanup_manifest') {
-    cloudlog({ requestId: c.get('requestId'), message: 'cleaning manifest for already deleted version', ...versionUpdateLogFields(record, oldRecord) })
-    await deleteManifest(c, record)
+    cloudlog({ requestId: c.get('requestId'), message: 'cleaning manifest for already deleted version', ...versionUpdateLogFields(workRecord, oldRecord) })
+    await deleteManifest(c, workRecord)
     return c.json(BRES)
   }
   if (deletedVersionAction === 'skip')
     return c.json(BRES)
 
-  let workRecord = record
   if (!workRecord.r2_path && !workRecord.manifest) {
-    workRecord = await ensureVersionManifest(c, workRecord)
-    if (!workRecord.r2_path && !workRecord.manifest) {
-      cloudlog({ requestId: c.get('requestId'), message: 'no r2_path and no manifest, skipping update', ...versionUpdateLogFields(record, oldRecord) })
-      return c.json(BRES)
-    }
+    cloudlog({ requestId: c.get('requestId'), message: 'no r2_path and no manifest, skipping update', ...versionUpdateLogFields(workRecord, oldRecord) })
+    return c.json(BRES)
   }
 
   cloudlog({ requestId: c.get('requestId'), message: 'Update but not deleted', ...versionUpdateLogFields(workRecord, oldRecord) })

@@ -12,7 +12,11 @@ DECLARE
   old_record_payload jsonb;
   function_type text;
 BEGIN
-  function_type := COALESCE(NULLIF(TG_ARGV[1], ''), 'cloudflare');
+  function_type := CASE
+    WHEN NULLIF(TG_ARGV[1], '') IS NULL THEN 'cloudflare'
+    WHEN lower(TG_ARGV[1]) = 'supabase' THEN 'cloudflare'
+    ELSE TG_ARGV[1]
+  END;
 
   record_payload := to_jsonb(NEW);
   old_record_payload := to_jsonb(OLD);

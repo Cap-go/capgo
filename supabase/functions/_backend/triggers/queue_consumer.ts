@@ -16,10 +16,11 @@ import { updateManifestSize } from './on_manifest_create.ts'
 const DEFAULT_BATCH_SIZE = 950 // Default batch size for queue reads limit of CF is 1000 fetches so we take a safe margin
 const DEFAULT_QUEUE_HTTP_CONCURRENCY = 25
 const VERSION_QUEUE_HTTP_CONCURRENCY = 10
+const VERSION_QUEUE_BATCH_SIZE = 40 // Keep under visibility window at 10-way / 60s HTTP
 const MANIFEST_QUEUE_HTTP_CONCURRENCY = 100
 const MANIFEST_QUEUE_ACK_CHUNK_SIZE = 100
 const DEFAULT_QUEUE_VISIBILITY_TIMEOUT_SECONDS = 120
-const VERSION_QUEUE_VISIBILITY_TIMEOUT_SECONDS = 300
+const VERSION_QUEUE_VISIBILITY_TIMEOUT_SECONDS = 900
 const MANIFEST_QUEUE_VISIBILITY_TIMEOUT_SECONDS = 900
 const QUEUE_HTTP_TIMEOUT_MS = 15_000
 const VERSION_QUEUE_HTTP_TIMEOUT_MS = 60_000
@@ -28,14 +29,13 @@ export const MAX_QUEUE_READS = 5
 const DISCORD_IGNORED_ERROR_CODES = new Set(['version_not_found', 'no_channel'])
 
 const integerLikeSchema = type('number.integer').or(type('string.numeric.parse |> number.integer'))
-
 export const messageSchema = type({
   msg_id: integerLikeSchema,
   read_ct: integerLikeSchema,
   message: type({
     'payload?': 'unknown',
     'function_name': 'string',
-    'function_type?': '"cloudflare" | "cloudflare_pp" | "" | null',
+    'function_type?': '"cloudflare" | "cloudflare_pp" | "supabase" | "" | null',
   }),
 })
 
@@ -45,7 +45,7 @@ interface Message {
   message: {
     payload?: any
     function_name: string
-    function_type?: 'cloudflare' | 'cloudflare_pp' | '' | null
+    function_type?: 'cloudflare' | 'cloudflare_pp' | 'supabase' | '' | null
     [key: string]: unknown
   }
 }
@@ -456,6 +456,10 @@ async function processQueueMessage(c: Context, queueName: string, message: Messa
       durationMs,
       targetUrl: result.targetUrl,
       ...message,
+      message: {
+        ...message.message,
+        function_type: function_type as Message['message']['function_type'],
+      },
     }
   }
   catch (error) {
@@ -512,13 +516,20 @@ async function processQueueMessage(c: Context, queueName: string, message: Messa
       durationMs,
       targetUrl,
       ...message,
+      message: {
+        ...message.message,
+        function_type: function_type as Message['message']['function_type'],
+      },
     }
   }
 }
 
-function getQueueBatchSize(_queueName: string, requestedBatchSize: number): number {
+function getQueueBatchSize(queueName: string, requestedBatchSize: number): number {
+  if (isVersionQueueFunction(queueName))
+    return Math.min(requestedBatchSize, VERSION_QUEUE_BATCH_SIZE)
   return requestedBatchSize
 }
+
 function getQueueHttpConcurrency(queueName: string): number {
   if (queueName === 'on_manifest_create')
     return MANIFEST_QUEUE_HTTP_CONCURRENCY
