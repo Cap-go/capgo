@@ -294,7 +294,10 @@ async function login(form: { email: string, password: string }) {
   })
   if (error) {
     isLoading.value = false
-    console.error('error', error)
+    const isExpectedAuthError = error.message.includes('Invalid login credentials')
+      || error.message.includes('captcha')
+    if (!isExpectedAuthError)
+      console.error('Login failed', error)
     setErrors('login-account', [error.message], {})
     if (error.message.includes('Invalid login credentials')) {
       turnstileToken.value = ''
@@ -612,7 +615,10 @@ async function acceptQuerySession() {
     refresh_token: querySessionRefreshToken.value,
   })
   if (res.error) {
-    console.error('Cannot set auth', res.error)
+    if (res.error.name === 'AuthSessionMissingError')
+      console.warn('Cannot set auth', res.error)
+    else
+      console.error('Cannot set auth', res.error)
     isLoading.value = false
     return
   }
