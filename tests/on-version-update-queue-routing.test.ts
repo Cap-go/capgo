@@ -28,7 +28,7 @@ describe('on_version_update queue routing trigger', () => {
       `INSERT INTO public.app_versions (
         app_id, name, owner_org, storage_provider, r2_path, manifest, manifest_count
       ) VALUES (
-        $1, $2, $3, 'r2', $4, $5::jsonb, 2
+        $1, $2, $3, 'r2', $4, $5::jsonb::public.manifest_entry[], 2
       ) RETURNING id`,
       [
         APP_ID,
