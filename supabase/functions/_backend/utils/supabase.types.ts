@@ -167,6 +167,7 @@ export type Database = {
           cli_version: string | null
           comment: string | null
           created_at: string | null
+          created_by_apikey_rbac_id: string | null
           deleted: boolean
           deleted_at: string | null
           external_url: string | null
@@ -193,6 +194,7 @@ export type Database = {
           cli_version?: string | null
           comment?: string | null
           created_at?: string | null
+          created_by_apikey_rbac_id?: string | null
           deleted?: boolean
           deleted_at?: string | null
           external_url?: string | null
@@ -219,6 +221,7 @@ export type Database = {
           cli_version?: string | null
           comment?: string | null
           created_at?: string | null
+          created_by_apikey_rbac_id?: string | null
           deleted?: boolean
           deleted_at?: string | null
           external_url?: string | null
