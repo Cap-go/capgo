@@ -6,7 +6,6 @@ const STALE_ASSET_ERROR_PATTERNS = [
   /text\/html.*is not a valid JavaScript MIME type/i,
   /Loading chunk [\w-]+ failed/i,
   /Loading CSS chunk [\w-]+ failed/i,
-  /Couldn't resolve component ["']default["']/i,
 ]
 
 const KNOWN_CRAWLER_ERROR_PATTERNS = [

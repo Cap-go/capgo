@@ -294,16 +294,16 @@ async function login(form: { email: string, password: string }) {
   })
   if (error) {
     isLoading.value = false
-    const isExpectedAuthError = error.message.includes('Invalid login credentials')
-      || error.message.includes('captcha')
+    const isExpectedAuthError = error.code === 'invalid_credentials'
+      || error.code === 'captcha_failed'
     if (!isExpectedAuthError)
       console.error('Login failed', error)
     setErrors('login-account', [error.message], {})
-    if (error.message.includes('Invalid login credentials')) {
+    if (error.code === 'invalid_credentials' || error.message.includes('Invalid login credentials')) {
       turnstileToken.value = ''
       captchaComponent.value?.reset()
     }
-    if (error.message.includes('captcha')) {
+    if (error.code === 'captcha_failed' || error.message.includes('captcha')) {
       turnstileToken.value = ''
       captchaComponent.value?.reset()
       toast.error(t('captcha-fail'))

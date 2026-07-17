@@ -9,7 +9,6 @@ describe('stale asset error helpers', () => {
     expect(isStaleAssetErrorMessage('Importing a module script failed.')).toBe(true)
     expect(isStaleAssetErrorMessage('Unable to preload CSS for /assets/main-C3MIONxo.css')).toBe(true)
     expect(isStaleAssetErrorMessage('\'text/html\' is not a valid JavaScript MIME type.')).toBe(true)
-    expect(isStaleAssetErrorMessage('Couldn\'t resolve component "default" at /app/com.demo.app')).toBe(true)
   })
 
   it('does not match unrelated runtime errors', () => {
