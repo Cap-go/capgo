@@ -21,6 +21,45 @@ type LiveUpdateMetricsResponse = PublicLiveUpdateMetrics & {
   updated_at: string
 }
 
+function sanitizePublicPercent(value: number) {
+  return Number(Number(value).toFixed(1))
+}
+
+function sanitizeBreakdown(rows: PublicLiveUpdateMetrics['platforms']) {
+  return rows.map(row => ({
+    key: row.key,
+    share: sanitizePublicPercent(row.share),
+    success_rate: row.success_rate === null || row.success_rate === undefined
+      ? null
+      : sanitizePublicPercent(row.success_rate),
+    top_failure: row.top_failure
+      ? {
+          reason: row.top_failure.reason,
+          share: sanitizePublicPercent(row.top_failure.share),
+        }
+      : null,
+  }))
+}
+
+/** Strip anything that is not a ratio/percent for the public /data page. */
+export function sanitizePublicLiveUpdateMetrics(metrics: PublicLiveUpdateMetrics): PublicLiveUpdateMetrics {
+  return {
+    success_rate: sanitizePublicPercent(metrics.success_rate),
+    daily: metrics.daily.map(row => ({
+      date: row.date,
+      success_rate: sanitizePublicPercent(row.success_rate),
+    })),
+    failures: metrics.failures.map(row => ({
+      reason: row.reason,
+      share: sanitizePublicPercent(row.share),
+    })),
+    platforms: sanitizeBreakdown(metrics.platforms),
+    countries: sanitizeBreakdown(metrics.countries),
+    updater_versions: sanitizeBreakdown(metrics.updater_versions),
+  }
+}
+
+
 app.use('*', useCors)
 
 export function getLatestCompletedGlobalStatsDateId(referenceDate = new Date()) {
@@ -65,7 +104,7 @@ app.get('/live_updates', async (c) => {
 
   if (!response) {
     try {
-      const metrics = await getPublicLiveUpdateMetricsCF(c)
+      const metrics = sanitizePublicLiveUpdateMetrics(await getPublicLiveUpdateMetricsCF(c))
       response = {
         period_days: 30,
         updated_at: new Date().toISOString(),
