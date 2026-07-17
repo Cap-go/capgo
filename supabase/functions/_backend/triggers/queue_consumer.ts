@@ -15,24 +15,27 @@ import { updateManifestSize } from './on_manifest_create.ts'
 // Define constants
 const DEFAULT_BATCH_SIZE = 950 // Default batch size for queue reads limit of CF is 1000 fetches so we take a safe margin
 const DEFAULT_QUEUE_HTTP_CONCURRENCY = 25
+const VERSION_QUEUE_HTTP_CONCURRENCY = 10
+const VERSION_QUEUE_BATCH_SIZE = 40 // Keep under visibility window at 10-way / 60s HTTP
 const MANIFEST_QUEUE_HTTP_CONCURRENCY = 100
 const MANIFEST_QUEUE_ACK_CHUNK_SIZE = 100
 const DEFAULT_QUEUE_VISIBILITY_TIMEOUT_SECONDS = 120
+const VERSION_QUEUE_VISIBILITY_TIMEOUT_SECONDS = 900
 const MANIFEST_QUEUE_VISIBILITY_TIMEOUT_SECONDS = 900
 const QUEUE_HTTP_TIMEOUT_MS = 15_000
+const VERSION_QUEUE_HTTP_TIMEOUT_MS = 60_000
 const HEALTHCHECK_HTTP_TIMEOUT_MS = 8_000
 export const MAX_QUEUE_READS = 5
 const DISCORD_IGNORED_ERROR_CODES = new Set(['version_not_found', 'no_channel'])
 
 const integerLikeSchema = type('number.integer').or(type('string.numeric.parse |> number.integer'))
-
 export const messageSchema = type({
   msg_id: integerLikeSchema,
   read_ct: integerLikeSchema,
   message: type({
     'payload?': 'unknown',
     'function_name': 'string',
-    'function_type?': '"cloudflare" | "cloudflare_pp" | "" | null',
+    'function_type?': '"cloudflare" | "cloudflare_pp" | "supabase" | "" | null',
   }),
 })
 
@@ -42,7 +45,7 @@ interface Message {
   message: {
     payload?: any
     function_name: string
-    function_type?: 'cloudflare' | 'cloudflare_pp' | '' | null
+    function_type?: 'cloudflare' | 'cloudflare_pp' | 'supabase' | '' | null
     [key: string]: unknown
   }
 }
@@ -235,10 +238,53 @@ function generateUUID(): string {
   return crypto.randomUUID()
 }
 
+function isVersionQueueFunction(functionName: string): boolean {
+  return functionName === 'on_version_update'
+    || functionName === 'on_version_create'
+    || functionName === 'on_version_delete'
+}
+
+function normalizeQueueFunctionType(functionType: string | null | undefined): string {
+  const normalizedType = (functionType ?? '').trim()
+  // Triggers historically omitted function_type; prefer the production Cloudflare path.
+  if (!normalizedType || normalizedType === 'supabase')
+    return 'cloudflare'
+  return normalizedType
+}
+
+function stripAppVersionManifestFromQueueBody(body: Record<string, unknown>): Record<string, unknown> {
+  let changed = false
+  let next = body
+
+  if (isRecord(body.record) && 'manifest' in body.record) {
+    next = { ...next, record: { ...body.record, manifest: null } }
+    changed = true
+  }
+  if (isRecord(body.old_record) && 'manifest' in body.old_record) {
+    const oldRecord = isRecord(next.old_record) ? next.old_record : body.old_record
+    next = { ...next, old_record: { ...oldRecord, manifest: null } }
+    changed = true
+  }
+
+  return changed ? next : body
+}
+
+function prepareQueueHttpBody(functionName: string, body: Record<string, unknown>): Record<string, unknown> {
+  if (!isVersionQueueFunction(functionName))
+    return body
+  return stripAppVersionManifestFromQueueBody(body)
+}
+
+function getQueueHttpTimeoutMs(functionName: string): number {
+  if (isVersionQueueFunction(functionName))
+    return VERSION_QUEUE_HTTP_TIMEOUT_MS
+  return QUEUE_HTTP_TIMEOUT_MS
+}
+
 function resolveFunctionUrl(c: Context, function_name: string, function_type: string | null | undefined): string {
   const cfPpUrl = getEnv(c, 'CLOUDFLARE_PP_FUNCTION_URL')
   const cfUrl = getEnv(c, 'CLOUDFLARE_FUNCTION_URL')
-  const normalizedType = (function_type ?? '').trim()
+  const normalizedType = normalizeQueueFunctionType(function_type)
 
   if (normalizedType === 'cloudflare_pp' && cfPpUrl)
     return `${cfPpUrl}/triggers/${function_name}`
@@ -246,7 +292,8 @@ function resolveFunctionUrl(c: Context, function_name: string, function_type: st
   if (normalizedType === 'cloudflare' && cfUrl)
     return `${cfUrl}/triggers/${function_name}`
 
-  if (normalizedType === '' && cfUrl)
+  // Prefer Cloudflare whenever it is configured; Supabase is the local/dev fallback.
+  if (cfUrl)
     return `${cfUrl}/triggers/${function_name}`
 
   return `${getEnv(c, 'SUPABASE_URL')}/functions/v1/triggers/${function_name}`
@@ -345,7 +392,7 @@ async function dispatchQueueMessage(
 
 async function processQueueMessage(c: Context, queueName: string, message: Message, waitForCompletion = false): Promise<ProcessedQueueMessage> {
   const function_name = message.message?.function_name ?? 'unknown'
-  const function_type = message.message?.function_type ?? 'supabase'
+  const function_type = normalizeQueueFunctionType(message.message?.function_type)
   const body = extractMessageBody(message)
   if (message.message?.payload === undefined && Object.keys(body).length > 0) {
     cloudlog({
@@ -356,7 +403,8 @@ async function processQueueMessage(c: Context, queueName: string, message: Messa
   }
 
   const cfId = generateUUID()
-  const payloadSize = JSON.stringify(body).length
+  const dispatchBody = prepareQueueHttpBody(function_name, body)
+  const payloadSize = JSON.stringify(dispatchBody).length
   const start = Date.now()
   const targetUrl = function_name === 'on_manifest_create' ? 'direct:on_manifest_create' : resolveFunctionUrl(c, function_name, function_type)
   const trace = getQueueMessageTrace(function_name, body)
@@ -374,7 +422,7 @@ async function processQueueMessage(c: Context, queueName: string, message: Messa
       readCount: message.read_ct,
       targetUrl,
     })
-    const result = await dispatchQueueMessage(c, function_name, function_type, body, cfId, {
+    const result = await dispatchQueueMessage(c, function_name, function_type, dispatchBody, cfId, {
       msgId: message.msg_id,
       queueName,
       readCount: message.read_ct,
@@ -408,6 +456,10 @@ async function processQueueMessage(c: Context, queueName: string, message: Messa
       durationMs,
       targetUrl: result.targetUrl,
       ...message,
+      message: {
+        ...message.message,
+        function_type: function_type as Message['message']['function_type'],
+      },
     }
   }
   catch (error) {
@@ -464,23 +516,33 @@ async function processQueueMessage(c: Context, queueName: string, message: Messa
       durationMs,
       targetUrl,
       ...message,
+      message: {
+        ...message.message,
+        function_type: function_type as Message['message']['function_type'],
+      },
     }
   }
 }
 
-function getQueueBatchSize(_queueName: string, requestedBatchSize: number): number {
+function getQueueBatchSize(queueName: string, requestedBatchSize: number): number {
+  if (isVersionQueueFunction(queueName))
+    return Math.min(requestedBatchSize, VERSION_QUEUE_BATCH_SIZE)
   return requestedBatchSize
 }
 
 function getQueueHttpConcurrency(queueName: string): number {
   if (queueName === 'on_manifest_create')
     return MANIFEST_QUEUE_HTTP_CONCURRENCY
+  if (isVersionQueueFunction(queueName))
+    return VERSION_QUEUE_HTTP_CONCURRENCY
   return DEFAULT_QUEUE_HTTP_CONCURRENCY
 }
 
 function getQueueVisibilityTimeout(queueName: string): number {
   if (queueName === 'on_manifest_create')
     return MANIFEST_QUEUE_VISIBILITY_TIMEOUT_SECONDS
+  if (isVersionQueueFunction(queueName))
+    return VERSION_QUEUE_VISIBILITY_TIMEOUT_SECONDS
   return DEFAULT_QUEUE_VISIBILITY_TIMEOUT_SECONDS
 }
 
@@ -920,8 +982,9 @@ export async function http_post_helper(
   }
   if (waitForCompletion)
     headers[WAIT_FOR_COMPLETION_HEADER] = 'true'
+  const timeoutMs = getQueueHttpTimeoutMs(function_name)
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), QUEUE_HTTP_TIMEOUT_MS)
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
     const response = await fetch(targetUrl, {
@@ -941,7 +1004,7 @@ export async function http_post_helper(
       function_type: function_type ?? null,
       metadata: metadata ?? null,
       targetUrl,
-      timeoutMs: QUEUE_HTTP_TIMEOUT_MS,
+      timeoutMs,
     }, error)
   }
   finally {
@@ -1179,12 +1242,16 @@ export const __queueConsumerTestUtils__ = {
   getQueueBatchSize,
   getQueueAckChunkSize,
   getQueueHttpConcurrency,
+  getQueueHttpTimeoutMs,
   httpExceptionToQueueResponse,
   getQueueVisibilityTimeout,
+  normalizeQueueFunctionType,
+  prepareQueueHttpBody,
   shouldRunQueueSyncInBackground,
   maybePingCronHealthcheck,
   maybePingCronHealthcheckStart,
   queueFailureResponse,
   resolveFunctionUrl,
   sanitizeDiscordResponseBody,
+  stripAppVersionManifestFromQueueBody,
 }

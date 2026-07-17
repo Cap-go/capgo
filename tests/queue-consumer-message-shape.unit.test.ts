@@ -149,14 +149,68 @@ describe('queue_consumer legacy message compatibility', () => {
   it.concurrent('checkpoints manifest queue deletes without reducing read batch size', () => {
     expect(__queueConsumerTestUtils__.getQueueBatchSize('on_manifest_create', 950)).toBe(950)
     expect(__queueConsumerTestUtils__.getQueueBatchSize('cron_email', 950)).toBe(950)
+    expect(__queueConsumerTestUtils__.getQueueBatchSize('on_version_update', 950)).toBe(40)
     expect(__queueConsumerTestUtils__.getQueueAckChunkSize('on_manifest_create')).toBe(100)
     expect(__queueConsumerTestUtils__.getQueueAckChunkSize('cron_email')).toBeNull()
     expect(__queueConsumerTestUtils__.getQueueHttpConcurrency('on_manifest_create')).toBe(100)
     expect(__queueConsumerTestUtils__.getQueueHttpConcurrency('cron_email')).toBe(25)
+    expect(__queueConsumerTestUtils__.getQueueHttpConcurrency('on_version_update')).toBe(10)
     expect(__queueConsumerTestUtils__.getQueueVisibilityTimeout('on_manifest_create')).toBe(900)
     expect(__queueConsumerTestUtils__.getQueueVisibilityTimeout('cron_email')).toBe(120)
+    expect(__queueConsumerTestUtils__.getQueueVisibilityTimeout('on_version_update')).toBe(900)
+    expect(__queueConsumerTestUtils__.getQueueHttpTimeoutMs('on_version_update')).toBe(60_000)
+    expect(__queueConsumerTestUtils__.getQueueHttpTimeoutMs('cron_email')).toBe(15_000)
     expect(__queueConsumerTestUtils__.shouldRunQueueSyncInBackground('on_manifest_create')).toBe(false)
     expect(__queueConsumerTestUtils__.shouldRunQueueSyncInBackground('cron_email')).toBe(true)
+  })
+
+  it.concurrent('accepts legacy supabase function_type in queue message schema', () => {
+    const [message] = parseSchema(messagesArraySchema, [
+      {
+        msg_id: 11,
+        read_ct: 0,
+        message: {
+          function_name: 'on_version_update',
+          function_type: 'supabase',
+          payload: { table: 'app_versions', type: 'UPDATE' },
+        },
+      },
+    ])
+    expect(message?.message.function_type).toBe('supabase')
+    expect(__queueConsumerTestUtils__.normalizeQueueFunctionType(message?.message.function_type)).toBe('cloudflare')
+  })
+
+  it.concurrent('routes omitted and legacy supabase function types to cloudflare', () => {
+    expect(__queueConsumerTestUtils__.normalizeQueueFunctionType(null)).toBe('cloudflare')
+    expect(__queueConsumerTestUtils__.normalizeQueueFunctionType(undefined)).toBe('cloudflare')
+    expect(__queueConsumerTestUtils__.normalizeQueueFunctionType('')).toBe('cloudflare')
+    expect(__queueConsumerTestUtils__.normalizeQueueFunctionType('supabase')).toBe('cloudflare')
+    expect(__queueConsumerTestUtils__.normalizeQueueFunctionType('cloudflare')).toBe('cloudflare')
+    expect(__queueConsumerTestUtils__.normalizeQueueFunctionType('cloudflare_pp')).toBe('cloudflare_pp')
+  })
+
+  it.concurrent('strips app version manifest payloads before HTTP dispatch', () => {
+    const body = {
+      record: {
+        id: 1,
+        manifest: [{ file_name: 'index.html' }, { file_name: 'app.js' }],
+        r2_path: 'orgs/x/apps/y/1.0.0.zip',
+      },
+      old_record: {
+        id: 1,
+        manifest: [{ file_name: 'old.html' }],
+        r2_path: null,
+      },
+      table: 'app_versions',
+      type: 'UPDATE',
+    }
+
+    expect(__queueConsumerTestUtils__.prepareQueueHttpBody('on_version_update', body)).toEqual({
+      ...body,
+      record: { ...body.record, manifest: null },
+      old_record: { ...body.old_record, manifest: null },
+    })
+    expect(__queueConsumerTestUtils__.prepareQueueHttpBody('cron_email', body)).toEqual(body)
   })
 
   it.concurrent('does not reprocess manifests for already deleted versions', () => {

@@ -157,11 +157,46 @@ async function v2PathSize(c: Context, record: Database['public']['Tables']['app_
 }
 
 /**
+ * Reloads `app_versions.manifest` when the queue payload omitted it to stay under size limits.
+ */
+async function ensureVersionManifest(
+  c: Context,
+  record: Database['public']['Tables']['app_versions']['Row'],
+): Promise<Database['public']['Tables']['app_versions']['Row']> {
+  if (record.manifest)
+    return record
+
+  const { data, error } = await supabaseAdmin(c)
+    .from('app_versions')
+    .select('manifest')
+    .eq('id', record.id)
+    .maybeSingle()
+
+  if (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'error reload app_versions.manifest', error, id: record.id })
+    throw simpleError('manifest_reload_failed', 'Failed to reload app_versions.manifest', { id: record.id }, error)
+  }
+
+  if (!data?.manifest)
+    return record
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'on_version_update reloaded manifest from database',
+    id: record.id,
+    manifest_entries: getManifestEntryCount(data.manifest),
+  })
+  return { ...record, manifest: data.manifest }
+}
+
+/**
  * Persists manifest rows and updates aggregate counters when a version includes a manifest payload.
  */
 async function handleManifest(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
   cloudlog({ requestId: c.get('requestId'), message: 'manifest', manifest: record.manifest })
   const manifestEntries = record.manifest as Database['public']['CompositeTypes']['manifest_entry'][]
+  if (!Array.isArray(manifestEntries))
+    return
 
   // Check if entries exist
   const { data: existingEntries } = await supabaseAdmin(c)
@@ -273,10 +308,10 @@ async function updateIt(c: Context, record: Database['public']['Tables']['app_ve
     }
   }
 
-  // Handle manifest entries
-  if (record.manifest) {
-    await handleManifest(c, record)
-  }
+  // Handle manifest entries (reload when the queue payload omitted the jsonb column)
+  const recordWithManifest = await ensureVersionManifest(c, record)
+  if (recordWithManifest.manifest)
+    await handleManifest(c, recordWithManifest)
 
   return c.json(BRES)
 }
@@ -443,25 +478,29 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'UPDATE'), a
     cloudlog({ requestId: c.get('requestId'), message: 'no app_id', record })
     return c.json(BRES)
   }
+  // Queue payloads omit app_versions.manifest; reload before deleted-version decisions.
+  let workRecord = record
+  if (!workRecord.manifest)
+    workRecord = await ensureVersionManifest(c, workRecord)
 
-  const deletedVersionAction = getDeletedVersionAction(record, oldRecord)
+  const deletedVersionAction = getDeletedVersionAction(workRecord, oldRecord)
   if (deletedVersionAction === 'delete')
-    return deleteIt(c, record)
+    return deleteIt(c, workRecord)
   if (deletedVersionAction === 'cleanup_manifest') {
-    cloudlog({ requestId: c.get('requestId'), message: 'cleaning manifest for already deleted version', ...versionUpdateLogFields(record, oldRecord) })
-    await deleteManifest(c, record)
+    cloudlog({ requestId: c.get('requestId'), message: 'cleaning manifest for already deleted version', ...versionUpdateLogFields(workRecord, oldRecord) })
+    await deleteManifest(c, workRecord)
     return c.json(BRES)
   }
   if (deletedVersionAction === 'skip')
     return c.json(BRES)
 
-  if (!record.r2_path && !record.manifest) {
-    cloudlog({ requestId: c.get('requestId'), message: 'no r2_path and no manifest, skipping update', ...versionUpdateLogFields(record, oldRecord) })
+  if (!workRecord.r2_path && !workRecord.manifest) {
+    cloudlog({ requestId: c.get('requestId'), message: 'no r2_path and no manifest, skipping update', ...versionUpdateLogFields(workRecord, oldRecord) })
     return c.json(BRES)
   }
 
-  cloudlog({ requestId: c.get('requestId'), message: 'Update but not deleted', ...versionUpdateLogFields(record, oldRecord) })
-  return updateIt(c, record)
+  cloudlog({ requestId: c.get('requestId'), message: 'Update but not deleted', ...versionUpdateLogFields(workRecord, oldRecord) })
+  return updateIt(c, workRecord)
 })
 
 export const onVersionUpdateTestUtils = {
