@@ -294,13 +294,16 @@ async function login(form: { email: string, password: string }) {
   })
   if (error) {
     isLoading.value = false
-    console.error('error', error)
+    const isExpectedAuthError = error.code === 'invalid_credentials'
+      || error.code === 'captcha_failed'
+    if (!isExpectedAuthError)
+      console.error('Login failed', error)
     setErrors('login-account', [error.message], {})
-    if (error.message.includes('Invalid login credentials')) {
+    if (error.code === 'invalid_credentials' || error.message.includes('Invalid login credentials')) {
       turnstileToken.value = ''
       captchaComponent.value?.reset()
     }
-    if (error.message.includes('captcha')) {
+    if (error.code === 'captcha_failed' || error.message.includes('captcha')) {
       turnstileToken.value = ''
       captchaComponent.value?.reset()
       toast.error(t('captcha-fail'))
@@ -612,7 +615,10 @@ async function acceptQuerySession() {
     refresh_token: querySessionRefreshToken.value,
   })
   if (res.error) {
-    console.error('Cannot set auth', res.error)
+    if (res.error.name === 'AuthSessionMissingError')
+      console.warn('Cannot set auth', res.error)
+    else
+      console.error('Cannot set auth', res.error)
     isLoading.value = false
     return
   }
