@@ -28,7 +28,12 @@ describe('on_version_update queue routing trigger', () => {
       `INSERT INTO public.app_versions (
         app_id, name, owner_org, storage_provider, r2_path, manifest, manifest_count
       ) VALUES (
-        $1, $2, $3, 'r2', $4, $5::jsonb::public.manifest_entry[], 2
+        $1, $2, $3, 'r2', $4,
+        ARRAY(
+          SELECT ROW(e.file_name, e.s3_path, e.file_hash)::public.manifest_entry
+          FROM jsonb_to_recordset($5::jsonb) AS e(file_name text, s3_path text, file_hash text)
+        ),
+        2
       ) RETURNING id`,
       [
         APP_ID,
@@ -36,8 +41,8 @@ describe('on_version_update queue routing trigger', () => {
         ownerOrg,
         `orgs/${ownerOrg}/apps/${APP_ID}/${VERSION_NAME}.zip`,
         JSON.stringify([
-          { file_name: 'index.html', file_hash: 'abc', s3_path: 'a/index.html' },
-          { file_name: 'app.js', file_hash: 'def', s3_path: 'a/app.js' },
+          { file_name: 'index.html', s3_path: 'a/index.html', file_hash: 'abc' },
+          { file_name: 'app.js', s3_path: 'a/app.js', file_hash: 'def' },
         ]),
       ],
     )
