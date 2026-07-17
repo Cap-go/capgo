@@ -19,6 +19,7 @@ import { cloudlog } from './logging.ts'
 import { getClientIP } from './rate_limit.ts'
 import { sendNotifOrgCached } from './notifications.ts'
 import { closeClient, getAppBlockProviderInfraRequestsPostgres, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres, setReplicationLagHeader } from './pg.ts'
+import { cachedGetAppOwner, cachedRequestInfos, isUpdatesCacheEnabled } from './updates_colo_cache.ts'
 import { makeDevice } from './plugin_parser.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './stats.ts'
@@ -238,7 +239,10 @@ export async function updateWithPG(
       return providerBlockedResponse
   }
 
-  const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT)
+  const useColoCache = isUpdatesCacheEnabled(c)
+  const appOwner = useColoCache
+    ? await cachedGetAppOwner(c, app_id, drizzleClient, PLAN_LIMIT)
+    : await getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT)
   // if version_build is not semver, then make it semver
   const device = makeDevice(body, appOwner?.allow_device_custom_id)
   if (!appOwner) {
@@ -340,7 +344,7 @@ export async function updateWithPG(
   // Only query link/comment if plugin supports it (v5.35.0+, v6.35.0+, v7.35.0+, v8.35.0+) AND app has expose_metadata enabled
   const needsMetadata = appOwner.expose_metadata && !isDeprecatedPluginVersion(pluginVersion, '5.35.0', '6.35.0', '7.35.0', '8.35.0')
 
-  const requestedInto = await requestInfosPostgres({
+  const requestInfosOptions = {
     c,
     platform,
     app_id,
@@ -354,7 +358,10 @@ export async function updateWithPG(
     currentVersionName: version_name,
     includeMetadata: needsMetadata,
     channelSelfOverrideChannelId: channelSelfOverride?.channel_id.id,
-  })
+  }
+  const requestedInto = useColoCache
+    ? await cachedRequestInfos(requestInfosOptions)
+    : await requestInfosPostgres(requestInfosOptions)
   const { channelOverride } = requestedInto
   let { channelData } = requestedInto
   cloudlog({ requestId: c.get('requestId'), message: `channelData exists ? ${channelData !== undefined}, channelOverride exists ? ${channelOverride !== undefined}` })
