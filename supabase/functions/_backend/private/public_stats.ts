@@ -42,7 +42,7 @@ function sanitizeBreakdown(rows: PublicLiveUpdateMetrics['platforms']) {
 }
 
 /** Strip anything that is not a ratio/percent for the public /data page. */
-function sanitizePublicLiveUpdateMetrics(metrics: PublicLiveUpdateMetrics): PublicLiveUpdateMetrics {
+export function sanitizePublicLiveUpdateMetrics(metrics: PublicLiveUpdateMetrics): PublicLiveUpdateMetrics {
   return {
     success_rate: sanitizePublicPercent(metrics.success_rate),
     daily: metrics.daily.map(row => ({

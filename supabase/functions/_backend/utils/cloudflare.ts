@@ -2631,13 +2631,13 @@ const PUBLIC_MIN_DIMENSION_OUTCOMES = 50
 const PUBLIC_TOP_COUNTRIES = 12
 const PUBLIC_TOP_VERSIONS = 10
 
-function toShare(part: number, total: number) {
-  return total > 0 ? roundPublicPercent((part / total) * 100) : 0
-}
-
 /** Public /data metrics are percentage-only — never expose raw counts. */
 function roundPublicPercent(value: number) {
   return Number(value.toFixed(1))
+}
+
+function rawShare(part: number, total: number) {
+  return total > 0 ? (part / total) * 100 : 0
 }
 
 function buildBreakdownMetrics(
@@ -2667,6 +2667,7 @@ function buildBreakdownMetrics(
     failuresByKey.set(key, list)
   }
 
+  // Rank/limit on raw volume first, then round percentages for the public payload.
   return shareRows
     .map((row) => {
       const key = String(row.key || '').trim()
@@ -2681,16 +2682,22 @@ function buildBreakdownMetrics(
       const top = [...dimFailures].sort((a, b) => b.devices - a.devices)[0]
       return {
         key,
-        share: toShare(devices, shareTotal),
+        devices,
         success_rate,
         top_failure: top && failureTotal
-          ? { reason: top.reason, share: toShare(top.devices, failureTotal) }
+          ? { reason: top.reason, share: roundPublicPercent(rawShare(top.devices, failureTotal)) }
           : null,
       }
     })
-    .filter(row => row.key && row.share > 0)
-    .sort((a, b) => b.share - a.share || (b.success_rate ?? -1) - (a.success_rate ?? -1))
+    .filter(row => row.key && row.devices > 0)
+    .sort((a, b) => b.devices - a.devices || (b.success_rate ?? -1) - (a.success_rate ?? -1))
     .slice(0, limit)
+    .map(({ key, devices, success_rate, top_failure }) => ({
+      key,
+      share: roundPublicPercent(rawShare(devices, shareTotal)),
+      success_rate,
+      top_failure,
+    }))
 }
 
 export async function getPublicLiveUpdateMetricsCF(c: Context, referenceDate = new Date()): Promise<PublicLiveUpdateMetrics> {
@@ -2753,10 +2760,14 @@ export async function getPublicLiveUpdateMetricsCF(c: Context, referenceDate = n
     const totalOutcomes = totalSuccesses + totalFailures
     const success_rate = totalOutcomes ? roundPublicPercent((totalSuccesses / totalOutcomes) * 100) : 0
     const failureTotal = failureRows.reduce((sum, row) => sum + (Number(row.devices) || 0), 0)
-    const failures = failureRows
-      .map(row => ({ reason: row.action, share: failureTotal ? roundPublicPercent(((Number(row.devices) || 0) / failureTotal) * 100) : 0 }))
-      .sort((a, b) => b.share - a.share)
+    const failures = [...failureRows]
+      .map(row => ({ reason: row.action, devices: Number(row.devices) || 0 }))
+      .sort((a, b) => b.devices - a.devices)
       .slice(0, 8)
+      .map(row => ({
+        reason: row.reason,
+        share: failureTotal ? roundPublicPercent(rawShare(row.devices, failureTotal)) : 0,
+      }))
 
     const platformShareMapped = platformShareRows.map((row) => {
       const platform = Number(row.platform)

@@ -40,7 +40,7 @@ vi.mock('../supabase/functions/_backend/utils/cloudflare.ts', () => ({
   getPublicLiveUpdateMetricsCF: mocks.getPublicLiveUpdateMetricsCF,
 }))
 
-const { app, getLatestCompletedGlobalStatsDateId } = await import('../supabase/functions/_backend/private/public_stats.ts')
+const { app, getLatestCompletedGlobalStatsDateId, sanitizePublicLiveUpdateMetrics } = await import('../supabase/functions/_backend/private/public_stats.ts')
 
 describe('public stats endpoint', () => {
   beforeEach(() => {
@@ -149,6 +149,41 @@ describe('public stats endpoint', () => {
       message: 'Public live update metrics are unavailable',
       requestId: undefined,
     })
+  })
+
+  it('sanitizes public live update metrics to rounded percentages only', () => {
+    const dirty = {
+      success_rate: 84.246,
+      daily: [{ date: '2026-05-10', success_rate: 91.999 }],
+      failures: [{ reason: 'download_fail', share: 37.94 }],
+      platforms: [
+        { key: 'ios', share: 66.666, success_rate: 90.04, top_failure: { reason: 'download_fail', share: 55.55 } },
+      ],
+      countries: [
+        { key: 'US', share: 34.21, success_rate: 93.14, top_failure: null },
+      ],
+      updater_versions: [
+        { key: '8.1.0', share: 22.19, success_rate: 94.21, top_failure: null },
+      ],
+      devices: 12345,
+    }
+    const sanitized = sanitizePublicLiveUpdateMetrics(dirty as typeof dirty & { devices: number })
+
+    expect(sanitized).toEqual({
+      success_rate: 84.2,
+      daily: [{ date: '2026-05-10', success_rate: 92 }],
+      failures: [{ reason: 'download_fail', share: 37.9 }],
+      platforms: [
+        { key: 'ios', share: 66.7, success_rate: 90, top_failure: { reason: 'download_fail', share: 55.5 } },
+      ],
+      countries: [
+        { key: 'US', share: 34.2, success_rate: 93.1, top_failure: null },
+      ],
+      updater_versions: [
+        { key: '8.1.0', share: 22.2, success_rate: 94.2, top_failure: null },
+      ],
+    })
+    expect(sanitized).not.toHaveProperty('devices')
   })
 
   it('keeps the fallback counters when no completed stats row exists', async () => {
