@@ -101,7 +101,13 @@ export function normalizeStatsMetadata(metadata?: StatsMetadata): StatsMetadata 
   return Object.keys(normalized).length > 0 ? normalized : undefined
 }
 
-export function createStatsLogsExternal(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], versionName?: string, metadata?: StatsMetadata) {
+export interface StatsLogDimensions {
+  platform?: string | null
+  country_code?: string | null
+  plugin_version?: string | null
+}
+
+export function createStatsLogsExternal(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], versionName?: string, metadata?: StatsMetadata, dimensions?: StatsLogDimensions) {
   const lowerDeviceId = device_id
   const finalVersionName = versionName && versionName !== '' ? versionName : 'unknown'
   const finalMetadata = normalizeStatsMetadata(metadata)
@@ -113,10 +119,10 @@ export function createStatsLogsExternal(c: Context, app_id: string, device_id: s
     }
     return backgroundTask(c, trackLogsSB(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata))
   }
-  return trackLogsCFExternal(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata)
+  return trackLogsCFExternal(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata, dimensions)
 }
 
-export function createStatsLogs(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], versionName?: string, metadata?: StatsMetadata) {
+export function createStatsLogs(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], versionName?: string, metadata?: StatsMetadata, dimensions?: StatsLogDimensions) {
   const lowerDeviceId = device_id
   const finalVersionName = versionName && versionName !== '' ? versionName : 'unknown'
   const finalMetadata = normalizeStatsMetadata(metadata)
@@ -128,7 +134,7 @@ export function createStatsLogs(c: Context, app_id: string, device_id: string, a
     }
     return backgroundTask(c, trackLogsSB(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata))
   }
-  return trackLogsCF(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata)
+  return trackLogsCF(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata, dimensions)
 }
 
 interface CreateStatsDevicesOptions {
@@ -156,9 +162,16 @@ export function createStatsDevices(c: Context, device: DeviceWithoutCreatedAt, o
 }
 
 export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, statsActions: StatsActions[], isFailedStat = false) {
+  const requestCountry = c.req.raw?.cf?.country
+  const countryCode = normalizeDeviceCountryCode(typeof requestCountry === 'string' ? requestCountry : device.country_code)
+  const dimensions: StatsLogDimensions = {
+    platform: device.platform,
+    country_code: countryCode,
+    plugin_version: device.plugin_version,
+  }
   const jobs = []
   statsActions.forEach(({ action, versionName, metadata }) => {
-    jobs.push(createStatsLogs(c, device.app_id, device.device_id, action, versionName ?? device.version_name, metadata))
+    jobs.push(createStatsLogs(c, device.app_id, device.device_id, action, versionName ?? device.version_name, metadata, dimensions))
   })
 
   if (!isFailedStat)

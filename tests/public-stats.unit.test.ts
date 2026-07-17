@@ -88,8 +88,18 @@ describe('public stats endpoint', () => {
       success_rate: 97.5,
       daily: [{ date: '2026-05-10', success_rate: 97.5 }],
       failures: [{ reason: 'download_fail', share: 100 }],
-      platforms: { ios: 25, android: 66.7, electron: 8.3 },
-      updater_versions: [{ date: '2026-05-10', version: '8.1.0', share: 100 }],
+      platforms: [
+        { key: 'android', share: 66.7, success_rate: 80, top_failure: { reason: 'download_fail', share: 100 } },
+        { key: 'ios', share: 25, success_rate: 90, top_failure: null },
+        { key: 'electron', share: 8.3, success_rate: null, top_failure: null },
+      ],
+      countries: [
+        { key: 'US', share: 55, success_rate: 92, top_failure: null },
+        { key: 'IQ', share: 10, success_rate: 48, top_failure: { reason: 'download_fail', share: 80 } },
+      ],
+      updater_versions: [
+        { key: '8.1.0', share: 60, success_rate: 93, top_failure: null },
+      ],
     })
 
     const res = await app.request('http://localhost/live_updates', {
@@ -105,8 +115,18 @@ describe('public stats endpoint', () => {
       success_rate: 97.5,
       daily: [{ date: '2026-05-10', success_rate: 97.5 }],
       failures: [{ reason: 'download_fail', share: 100 }],
-      platforms: { ios: 25, android: 66.7, electron: 8.3 },
-      updater_versions: [{ date: '2026-05-10', version: '8.1.0', share: 100 }],
+      platforms: [
+        { key: 'android', share: 66.7, success_rate: 80, top_failure: { reason: 'download_fail', share: 100 } },
+        { key: 'ios', share: 25, success_rate: 90, top_failure: null },
+        { key: 'electron', share: 8.3, success_rate: null, top_failure: null },
+      ],
+      countries: [
+        { key: 'US', share: 55, success_rate: 92, top_failure: null },
+        { key: 'IQ', share: 10, success_rate: 48, top_failure: { reason: 'download_fail', share: 80 } },
+      ],
+      updater_versions: [
+        { key: '8.1.0', share: 60, success_rate: 93, top_failure: null },
+      ],
     })
     expect(mocks.getPublicLiveUpdateMetricsCF).toHaveBeenCalledOnce()
   })

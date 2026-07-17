@@ -36,7 +36,7 @@ describe('public live update metrics', () => {
     vi.unstubAllGlobals()
   })
 
-  it('uses Analytics Engine-supported queries and preserves Float64 platform values', async () => {
+  it('returns usage shares plus dimensional success when denormalized log fields exist', async () => {
     const queries: string[] = []
     vi.stubEnv('CF_ANALYTICS_TOKEN', 'analytics-token')
     vi.stubEnv('CF_ACCOUNT_ANALYTICS_ID', 'analytics-account')
@@ -44,18 +44,18 @@ describe('public live update metrics', () => {
       const query = String(init?.body ?? '')
       queries.push(query)
 
-      if (query.includes('sum(succeeded)')) {
+      if (query.includes('SELECT date, sum(succeeded) AS successes') && query.includes('GROUP BY date')) {
         return analyticsResponse(
           [
             { name: 'date', type: 'String' },
             { name: 'successes', type: 'UInt64' },
             { name: 'failures', type: 'UInt64' },
           ],
-          [{ date: '2026-06-30', successes: '117', failures: '3' }],
+          [{ date: '2026-06-30', successes: '90', failures: '10' }],
         )
       }
 
-      if (query.includes('SELECT action, count() AS devices')) {
+      if (query.includes('SELECT action, count() AS devices') && !query.includes('AS key')) {
         return analyticsResponse(
           [
             { name: 'action', type: 'String' },
@@ -79,14 +79,115 @@ describe('public live update metrics', () => {
         )
       }
 
-      return analyticsResponse(
-        [
-          { name: 'date', type: 'String' },
-          { name: 'version', type: 'String' },
-          { name: 'devices', type: 'UInt64' },
-        ],
-        [{ date: '2026-06-30', version: '8.1.0', devices: '120' }],
-      )
+      if (query.includes('platform AS key') && query.includes('sum(succeeded)')) {
+        return analyticsResponse(
+          [
+            { name: 'key', type: 'String' },
+            { name: 'successes', type: 'UInt64' },
+            { name: 'failures', type: 'UInt64' },
+          ],
+          [
+            { key: 'ios', successes: '80', failures: '5' },
+            { key: 'android', successes: '40', failures: '20' },
+          ],
+        )
+      }
+
+      if (query.includes('platform AS key') && query.includes('action, count()')) {
+        return analyticsResponse(
+          [
+            { name: 'key', type: 'String' },
+            { name: 'action', type: 'String' },
+            { name: 'devices', type: 'UInt64' },
+          ],
+          [
+            { key: 'android', action: 'download_fail', devices: '12' },
+            { key: 'ios', action: 'checksum_fail', devices: '2' },
+          ],
+        )
+      }
+
+      if (query.includes('FROM device_info') && query.includes('blob10')) {
+        return analyticsResponse(
+          [
+            { name: 'key', type: 'String' },
+            { name: 'devices', type: 'UInt64' },
+          ],
+          [
+            { key: 'US', devices: '70' },
+            { key: 'IQ', devices: '20' },
+            { key: 'DE', devices: '10' },
+          ],
+        )
+      }
+
+      if (query.includes('country AS key') && query.includes('sum(succeeded)')) {
+        return analyticsResponse(
+          [
+            { name: 'key', type: 'String' },
+            { name: 'successes', type: 'UInt64' },
+            { name: 'failures', type: 'UInt64' },
+          ],
+          [
+            { key: 'US', successes: '90', failures: '5' },
+            { key: 'IQ', successes: '20', failures: '40' },
+          ],
+        )
+      }
+
+      if (query.includes('country AS key') && query.includes('action, count()')) {
+        return analyticsResponse(
+          [
+            { name: 'key', type: 'String' },
+            { name: 'action', type: 'String' },
+            { name: 'devices', type: 'UInt64' },
+          ],
+          [
+            { key: 'IQ', action: 'download_fail', devices: '30' },
+            { key: 'US', action: 'unzip_fail', devices: '2' },
+          ],
+        )
+      }
+
+      if (query.includes('FROM device_info') && query.includes('blob3')) {
+        return analyticsResponse(
+          [
+            { name: 'key', type: 'String' },
+            { name: 'devices', type: 'UInt64' },
+          ],
+          [
+            { key: '8.1.0', devices: '60' },
+            { key: '7.34.2', devices: '40' },
+          ],
+        )
+      }
+
+      if (query.includes('plugin_version AS key') && query.includes('sum(succeeded)')) {
+        return analyticsResponse(
+          [
+            { name: 'key', type: 'String' },
+            { name: 'successes', type: 'UInt64' },
+            { name: 'failures', type: 'UInt64' },
+          ],
+          [
+            { key: '8.1.0', successes: '70', failures: '5' },
+            { key: '7.34.2', successes: '30', failures: '20' },
+          ],
+        )
+      }
+
+      if (query.includes('plugin_version AS key') && query.includes('action, count()')) {
+        return analyticsResponse(
+          [
+            { name: 'key', type: 'String' },
+            { name: 'action', type: 'String' },
+            { name: 'devices', type: 'UInt64' },
+          ],
+          [{ key: '7.34.2', action: 'download_fail', devices: '15' }],
+        )
+      }
+
+      return analyticsResponse([], [])
     }))
 
     const metrics = await getPublicLiveUpdateMetricsCF(
@@ -94,18 +195,22 @@ describe('public live update metrics', () => {
       new Date('2026-07-01T00:00:00.000Z'),
     )
 
-    expect(metrics).toEqual({
-      success_rate: 97.5,
-      daily: [{ date: '2026-06-30', success_rate: 97.5 }],
-      failures: [{ reason: 'download_fail', share: 100 }],
-      platforms: { ios: 25, android: 66.66666666666666, electron: 8.333333333333332 },
-      updater_versions: [{ date: '2026-06-30', version: '8.1.0', share: 100 }],
+    expect(metrics.success_rate).toBe(90)
+    expect(metrics.failures).toEqual([{ reason: 'download_fail', share: 100 }])
+    expect(metrics.platforms.map(row => row.key)).toEqual(['android', 'ios', 'electron'])
+    expect(metrics.platforms.find(row => row.key === 'android')?.success_rate).toBeCloseTo((40 / 60) * 100)
+    expect(metrics.platforms.find(row => row.key === 'android')?.top_failure).toEqual({
+      reason: 'download_fail',
+      share: 100,
     })
-    expect(queries).toHaveLength(4)
-    expect(queries.join('\n')).not.toContain('toString')
-    expect(queries.join('\n')).not.toContain('concat')
-    expect(queries.find(query => query.includes('FROM device_usage'))).toContain('double1 IN (0.0, 1.0, 2.0)')
-    expect(queries.find(query => query.includes('sum(succeeded)'))).toContain('GROUP BY date, app_id, device_id')
-    expect(queries.find(query => query.includes('sum(succeeded)'))).toContain('sum(if(succeeded = 0, failed, 0))')
+    expect(metrics.countries[0]).toMatchObject({ key: 'US', share: 70 })
+    expect(metrics.countries.find(row => row.key === 'US')?.success_rate).toBeCloseTo((90 / 95) * 100)
+    expect(metrics.countries.find(row => row.key === 'IQ')?.success_rate).toBeCloseTo((20 / 60) * 100)
+    expect(metrics.updater_versions[0]).toMatchObject({ key: '8.1.0', share: 60 })
+    expect(metrics.updater_versions.find(row => row.key === '8.1.0')?.success_rate).toBeCloseTo((70 / 75) * 100)
+    expect(queries.length).toBe(11)
+    expect(queries.join('\n')).toContain('blob6')
+    expect(queries.join('\n')).toContain('blob7')
+    expect(queries.join('\n')).toContain('blob10')
   })
 })
