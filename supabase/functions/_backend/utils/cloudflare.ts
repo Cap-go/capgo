@@ -2632,7 +2632,12 @@ const PUBLIC_TOP_COUNTRIES = 12
 const PUBLIC_TOP_VERSIONS = 10
 
 function toShare(part: number, total: number) {
-  return total > 0 ? (part / total) * 100 : 0
+  return total > 0 ? roundPublicPercent((part / total) * 100) : 0
+}
+
+/** Public /data metrics are percentage-only — never expose raw counts. */
+function roundPublicPercent(value: number) {
+  return Number(value.toFixed(1))
 }
 
 function buildBreakdownMetrics(
@@ -2669,7 +2674,7 @@ function buildBreakdownMetrics(
       const outcomes = outcomesByKey.get(key)
       const totalOutcomes = outcomes ? outcomes.successes + outcomes.failures : 0
       const success_rate = totalOutcomes >= PUBLIC_MIN_DIMENSION_OUTCOMES
-        ? (outcomes!.successes / totalOutcomes) * 100
+        ? roundPublicPercent((outcomes!.successes / totalOutcomes) * 100)
         : null
       const dimFailures = failuresByKey.get(key) ?? []
       const failureTotal = dimFailures.reduce((sum, item) => sum + item.devices, 0)
@@ -2741,15 +2746,15 @@ export async function getPublicLiveUpdateMetricsCF(c: Context, referenceDate = n
       const successes = Number(row.successes) || 0
       const failures = Number(row.failures) || 0
       const outcomes = successes + failures
-      return { date: row.date, success_rate: outcomes ? (successes / outcomes) * 100 : 0 }
+      return { date: row.date, success_rate: outcomes ? roundPublicPercent((successes / outcomes) * 100) : 0 }
     }).sort((a, b) => a.date.localeCompare(b.date))
     const totalSuccesses = outcomeRows.reduce((sum, row) => sum + (Number(row.successes) || 0), 0)
     const totalFailures = outcomeRows.reduce((sum, row) => sum + (Number(row.failures) || 0), 0)
     const totalOutcomes = totalSuccesses + totalFailures
-    const success_rate = totalOutcomes ? (totalSuccesses / totalOutcomes) * 100 : 0
+    const success_rate = totalOutcomes ? roundPublicPercent((totalSuccesses / totalOutcomes) * 100) : 0
     const failureTotal = failureRows.reduce((sum, row) => sum + (Number(row.devices) || 0), 0)
     const failures = failureRows
-      .map(row => ({ reason: row.action, share: failureTotal ? ((Number(row.devices) || 0) / failureTotal) * 100 : 0 }))
+      .map(row => ({ reason: row.action, share: failureTotal ? roundPublicPercent(((Number(row.devices) || 0) / failureTotal) * 100) : 0 }))
       .sort((a, b) => b.share - a.share)
       .slice(0, 8)
 

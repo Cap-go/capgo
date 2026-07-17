@@ -198,16 +198,16 @@ describe('public live update metrics', () => {
     expect(metrics.success_rate).toBe(90)
     expect(metrics.failures).toEqual([{ reason: 'download_fail', share: 100 }])
     expect(metrics.platforms.map(row => row.key)).toEqual(['android', 'ios', 'electron'])
-    expect(metrics.platforms.find(row => row.key === 'android')?.success_rate).toBeCloseTo((40 / 60) * 100)
+    expect(metrics.platforms.find(row => row.key === 'android')?.success_rate).toBe(66.7)
     expect(metrics.platforms.find(row => row.key === 'android')?.top_failure).toEqual({
       reason: 'download_fail',
       share: 100,
     })
     expect(metrics.countries[0]).toMatchObject({ key: 'US', share: 70 })
-    expect(metrics.countries.find(row => row.key === 'US')?.success_rate).toBeCloseTo((90 / 95) * 100)
-    expect(metrics.countries.find(row => row.key === 'IQ')?.success_rate).toBeCloseTo((20 / 60) * 100)
+    expect(metrics.countries.find(row => row.key === 'US')?.success_rate).toBe(94.7)
+    expect(metrics.countries.find(row => row.key === 'IQ')?.success_rate).toBe(33.3)
     expect(metrics.updater_versions[0]).toMatchObject({ key: '8.1.0', share: 60 })
-    expect(metrics.updater_versions.find(row => row.key === '8.1.0')?.success_rate).toBeCloseTo((70 / 75) * 100)
+    expect(metrics.updater_versions.find(row => row.key === '8.1.0')?.success_rate).toBe(93.3)
     expect(queries.length).toBe(11)
     expect(queries.join('\n')).toContain('blob6')
     expect(queries.join('\n')).toContain('blob7')

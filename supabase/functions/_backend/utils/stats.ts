@@ -49,7 +49,15 @@ export async function onPremStats(c: Context, app_id: string, action: string, de
   })
 
   // save stats of unknown sources in our analytic DB
-  await createStatsLogsExternal(c, device.app_id, device.device_id, 'get', device.version_name, metadata)
+  await createStatsLogsExternal(
+    c,
+    device.app_id,
+    device.device_id,
+    'get',
+    device.version_name,
+    metadata,
+    getStatsLogDimensions(c, device),
+  )
   cloudlog({ requestId: c.get('requestId'), message: 'App is external (onPremise), returning 429', app_id: device.app_id, country: c.req.raw.cf?.country, user_agent: c.req.raw.headers.get('user-agent') })
   // Return 429 to prevent device from retrying until next app kill (DDOS prevention)
   return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
@@ -161,14 +169,18 @@ export function createStatsDevices(c: Context, device: DeviceWithoutCreatedAt, o
   return backgroundTask(c, trackDevicesSB(c, deviceWithCountry))
 }
 
-export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, statsActions: StatsActions[], isFailedStat = false) {
+function getStatsLogDimensions(c: Context, device: DeviceWithoutCreatedAt): StatsLogDimensions {
   const requestCountry = c.req.raw?.cf?.country
   const countryCode = normalizeDeviceCountryCode(typeof requestCountry === 'string' ? requestCountry : device.country_code)
-  const dimensions: StatsLogDimensions = {
+  return {
     platform: device.platform,
     country_code: countryCode,
     plugin_version: device.plugin_version,
   }
+}
+
+export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, statsActions: StatsActions[], isFailedStat = false) {
+  const dimensions = getStatsLogDimensions(c, device)
   const jobs = []
   statsActions.forEach(({ action, versionName, metadata }) => {
     jobs.push(createStatsLogs(c, device.app_id, device.device_id, action, versionName ?? device.version_name, metadata, dimensions))
