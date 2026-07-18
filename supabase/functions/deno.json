@@ -13,7 +13,7 @@
     "dayjs/": "npm:/dayjs@1.11.21/",
     "drizzle-orm": "npm:drizzle-orm@1.0.0-rc.3",
     "drizzle-orm/": "npm:/drizzle-orm@1.0.0-rc.3/",
-    "adm-zip": "npm:adm-zip@0.5.17",
+    "adm-zip": "npm:adm-zip@0.6.0",
     "pg": "npm:pg@8.21.0",
     "type/pg": "npm:@types/pg@8.20.0",
     "@supabase/supabase-js": "npm:@supabase/supabase-js@2.106.2",
