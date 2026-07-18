@@ -82,16 +82,34 @@ describe('fixture helpers', () => {
 })
 
 describe('registry', () => {
-  it('contains all 47 checks with unique ids', () => {
+  it('contains all 80 checks with unique ids', () => {
     const ids = ALL_CHECKS.map(c => c.id)
     expect(new Set(ids).size).toBe(ids.length)
-    expect(ids.length).toBe(47)
+    expect(ids.length).toBe(80)
     for (const expected of [
       'shared/apikey-permission', 'shared/app-exists', 'shared/credentials-saved',
       'shared/cap-sync-stale', 'shared/node-linker-layout', 'shared/bundle-id-consistency',
       'ios/p12-opens', 'ios/p12-expiry', 'ios/profile-expiry', 'ios/profile-bundle-match',
       'ios/profile-type-vs-mode', 'ios/cert-profile-pairing', 'ios/targets-covered',
       'ios/infoplist-sanity', 'ios/asc-key-valid',
+      // 10 ios plist checks
+      'ios/plist-bundle-id-format', 'ios/plist-version-short-format', 'ios/plist-version-build-format',
+      'ios/plist-encryption-compliance', 'ios/plist-ats-arbitrary-loads', 'ios/plist-launch-storyboard',
+      'ios/plist-orientations-multitasking', 'ios/plist-orientations-present', 'ios/plist-display-name',
+      'ios/plist-background-modes-sanity',
+      // 7 ios xcode checks
+      'ios/xcode-deployment-target-capacitor', 'ios/xcode-signing-team', 'ios/xcode-bundle-id-mismatch-across-configs',
+      'ios/xcode-enable-bitcode-leftover', 'ios/xcode-swift-version-sanity', 'ios/xcode-no-app-target',
+      'ios/xcode-multiple-app-targets',
+      // 4 ios entitlements checks
+      'ios/entitlements-vs-profile-capability', 'ios/entitlements-aps-environment-vs-mode',
+      'ios/entitlements-associated-domains-format', 'ios/entitlements-app-groups-format',
+      // 3 ios capacitor config checks
+      'ios/capacitor-server-url-shipped', 'ios/capacitor-server-cleartext', 'ios/capacitor-allow-navigation-wildcard',
+      // 9 ios pods/spm/appicon checks
+      'ios/pods-not-installed', 'ios/pods-lock-missing', 'ios/pods-capacitor-missing',
+      'ios/spm-package-resolved-missing', 'ios/spm-capacitor-dependency-missing', 'ios/appicon-empty-or-placeholder',
+      'ios/appicon-referenced-file-missing', 'ios/appicon-marketing-missing', 'ios/spm-deployment-target-consistency',
       'android/keystore-opens', 'android/keystore-expiry', 'android/cordova-vars-present',
       'android/gradle-props-heuristics', 'android/play-sa-json', 'android/flavor-exists',
       'android/agp8-package-attr',
