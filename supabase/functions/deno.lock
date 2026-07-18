@@ -9,7 +9,7 @@
     "npm:@standard-schema/spec@^1.1.0": "1.1.0",
     "npm:@supabase/supabase-js@2.106.2": "2.106.2",
     "npm:@types/pg@8.20.0": "8.20.0",
-    "npm:adm-zip@0.5.17": "0.5.17",
+    "npm:adm-zip@0.6.0": "0.6.0",
     "npm:arktype@^2.2.0": "2.2.0",
     "npm:cron-schedule@6.0.0": "6.0.0",
     "npm:dayjs@1.11.21": "1.11.21",
@@ -112,8 +112,8 @@
         "pg-types"
       ]
     },
-    "adm-zip@0.5.17": {
-      "integrity": "sha512-+Ut8d9LLqwEvHHJl1+PIHqoyDxFgVN847JTVM3Izi3xHDWPE4UtzzXysMZQs64DMcrJfBeS/uoEP4AD3HQHnQQ=="
+    "adm-zip@0.6.0": {
+      "integrity": "sha512-XleryMhbuksdKtofnWZ9Sk+4CUTbms4Mb/EU32SZwToAyZ5RgVos/ki8n+yr0LWHOGKuakbXTuuYNHLQjhddgg=="
     },
     "arkregex@0.0.5": {
       "integrity": "sha512-ncYjBdLlh5/QnVsAA8De16Tc9EqmYM7y/WU9j+236KcyYNUXogpz3sC4ATIZYzzLxwI+0sEOaQLEmLmRleaEXw==",
@@ -247,7 +247,7 @@
       "npm:@standard-schema/spec@^1.1.0",
       "npm:@supabase/supabase-js@2.106.2",
       "npm:@types/pg@8.20.0",
-      "npm:adm-zip@0.5.17",
+      "npm:adm-zip@0.6.0",
       "npm:arktype@^2.2.0",
       "npm:cron-schedule@6.0.0",
       "npm:dayjs@1.11.21",
