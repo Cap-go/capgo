@@ -2780,10 +2780,14 @@ async function runUsageDemoAppsGlobalStatsShard(c: Context, window: DailyWindow)
 
 
 function getTrailing12mStart(nextDayStart: Date): Date {
+  const year = nextDayStart.getUTCFullYear() - 1
+  const month = nextDayStart.getUTCMonth()
+  const day = nextDayStart.getUTCDate()
+  const clampedDay = Math.min(day, new Date(Date.UTC(year, month + 1, 0)).getUTCDate())
   return new Date(Date.UTC(
-    nextDayStart.getUTCFullYear() - 1,
-    nextDayStart.getUTCMonth(),
-    nextDayStart.getUTCDate(),
+    year,
+    month,
+    clampedDay,
     nextDayStart.getUTCHours(),
     nextDayStart.getUTCMinutes(),
     nextDayStart.getUTCSeconds(),

@@ -68,6 +68,14 @@ function getNextDateId(dateId: string) {
   return getDateId(date)
 }
 
+function getTrailing12mStartMs(endExclusive: Date) {
+  const year = endExclusive.getUTCFullYear() - 1
+  const month = endExclusive.getUTCMonth()
+  const day = endExclusive.getUTCDate()
+  const clampedDay = Math.min(day, new Date(Date.UTC(year, month + 1, 0)).getUTCDate())
+  return Date.UTC(year, month, clampedDay)
+}
+
 function toMetricNumber(value: number | string | null | undefined) {
   const numberValue = Number(value ?? 0)
   return Number.isFinite(numberValue) ? numberValue : 0
@@ -133,11 +141,7 @@ export function buildUpgradeRate12mBackfillRows(
     .map((row) => {
       const endExclusiveDate = new Date(`${getNextDateId(row.date_id)}T00:00:00.000Z`)
       const endExclusive = endExclusiveDate.getTime()
-      const startInclusive = Date.UTC(
-        endExclusiveDate.getUTCFullYear() - 1,
-        endExclusiveDate.getUTCMonth(),
-        endExclusiveDate.getUTCDate(),
-      )
+      const startInclusive = getTrailing12mStartMs(endExclusiveDate)
 
       while (orgIndex < orgCreatedAtTimes.length && orgCreatedAtTimes[orgIndex]! < endExclusive)
         orgIndex++
@@ -200,18 +204,19 @@ async function fetchGlobalStatsRows(supabase: SupabaseClient, fromDateId: string
 
 async function fetchOrgRows(supabase: SupabaseClient, toDateId: string | null) {
   const rows: OrgRow[] = []
-  let offset = 0
+  let lastId: string | null = null
 
   while (true) {
     let query = supabase
       .from('orgs')
       .select('id, created_at, customer_id')
-      .order('created_at', { ascending: true })
       .order('id', { ascending: true })
-      .range(offset, offset + DEFAULT_PAGE_SIZE - 1)
+      .limit(DEFAULT_PAGE_SIZE)
 
     if (toDateId)
       query = query.lt('created_at', `${getNextDateId(toDateId)}T00:00:00.000Z`)
+    if (lastId)
+      query = query.gt('id', lastId)
 
     const { data, error } = await query
     if (error)
@@ -220,9 +225,9 @@ async function fetchOrgRows(supabase: SupabaseClient, toDateId: string | null) {
       break
 
     rows.push(...data)
+    lastId = data[data.length - 1]!.id
     if (data.length < DEFAULT_PAGE_SIZE)
       break
-    offset += DEFAULT_PAGE_SIZE
   }
 
   return rows
@@ -230,26 +235,29 @@ async function fetchOrgRows(supabase: SupabaseClient, toDateId: string | null) {
 
 async function fetchStripeInfoRows(supabase: SupabaseClient) {
   const rows: StripeInfoRow[] = []
-  let offset = 0
+  let lastCustomerId: string | null = null
 
   while (true) {
-    const { data, error } = await supabase
+    let query = supabase
       .from('stripe_info')
       .select('customer_id, upgraded_at')
       .not('upgraded_at', 'is', null)
-      .order('upgraded_at', { ascending: true })
       .order('customer_id', { ascending: true })
-      .range(offset, offset + DEFAULT_PAGE_SIZE - 1)
+      .limit(DEFAULT_PAGE_SIZE)
 
+    if (lastCustomerId)
+      query = query.gt('customer_id', lastCustomerId)
+
+    const { data, error } = await query
     if (error)
       throw error
     if (!data?.length)
       break
 
     rows.push(...data)
+    lastCustomerId = data[data.length - 1]!.customer_id
     if (data.length < DEFAULT_PAGE_SIZE)
       break
-    offset += DEFAULT_PAGE_SIZE
   }
 
   return rows
