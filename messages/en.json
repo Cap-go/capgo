@@ -1840,7 +1840,7 @@
   "password-policy-updated": "Password policy updated successfully",
   "password-update-org-access": "Update your password to access this organization. Your current password doesn't meet the security requirements.",
   "password-verified-successfully": "Password verified successfully",
-  "password-verify-it": "just verify it to regain access.",
+  "auth-verify-access-hint": "Just verify it to regain access.",
   "patch": "Patch",
   "paying-client-product-activity-trend": "Paying Client Product Activity (60d Active)",
   "paying-orgs-trend": "Total Paying Organizations",
