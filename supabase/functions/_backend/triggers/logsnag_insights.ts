@@ -2779,11 +2779,23 @@ async function runUsageDemoAppsGlobalStatsShard(c: Context, window: DailyWindow)
 }
 
 
+function getTrailing12mStart(nextDayStart: Date): Date {
+  return new Date(Date.UTC(
+    nextDayStart.getUTCFullYear() - 1,
+    nextDayStart.getUTCMonth(),
+    nextDayStart.getUTCDate(),
+    nextDayStart.getUTCHours(),
+    nextDayStart.getUTCMinutes(),
+    nextDayStart.getUTCSeconds(),
+    nextDayStart.getUTCMilliseconds(),
+  ))
+}
+
 async function getUpgradeRate12m(c: Context, nextDayStart: Date): Promise<number> {
   const pgClient = getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
   const snapshotEndIso = nextDayStart.toISOString()
-  const trailing12mStartIso = new Date(nextDayStart.getTime() - 365 * DAY_IN_MS).toISOString()
+  const trailing12mStartIso = getTrailing12mStart(nextDayStart).toISOString()
 
   try {
     const result = await drizzleClient.execute(sql`
@@ -2806,7 +2818,7 @@ async function getUpgradeRate12m(c: Context, nextDayStart: Date): Promise<number
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getUpgradeRate12m error', error })
-    return 0
+    throw error
   }
   finally {
     closeClient(c, pgClient)
@@ -3291,6 +3303,7 @@ export const logsnagInsightsTestUtils = {
   calculateConversionRate,
   calculateNrr,
   getUpgradeRate12m,
+  getTrailing12mStart,
   countUniqueCustomers,
   getCompletedDayWindowForDateId,
   getMetricWindowFromDailyWindow,

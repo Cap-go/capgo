@@ -2,9 +2,14 @@
  * Backfill public.global_stats.upgrade_rate_12m.
  *
  * For each snapshot day, compute:
- *   orgs with stripe_info.upgraded_at in [dayEnd-365d, dayEnd)
+ *   orgs with stripe_info.upgraded_at in [dayEnd-12 calendar months, dayEnd)
  *   / orgs with created_at < dayEnd
  *   * 100
+ *
+ * Limitation: stripe_info.upgraded_at stores only the latest upgrade timestamp,
+ * so historical rows use that last-known upgrade (same contract as the daily
+ * revenue shard). Orgs that upgraded earlier in-window but again later may be
+ * undercounted on older snapshots.
  *
  * Dry run, defaulting to the last 30 UTC calendar days:
  *   bun run stripe:backfill-upgrade-rate-12m
@@ -22,7 +27,6 @@ import { asyncPool, createSupabaseServiceClient, DEFAULT_ENV_FILE, getArgValue, 
 const DEFAULT_LOOKBACK_DAYS = 30
 const DEFAULT_CONCURRENCY = 10
 const DEFAULT_PAGE_SIZE = 1000
-const DAY_IN_MS = 24 * 60 * 60 * 1000
 const DATE_ID_REGEX = /^\d{4}-\d{2}-\d{2}$/
 
 type SupabaseClient = ReturnType<typeof createSupabaseServiceClient>
@@ -46,6 +50,9 @@ function getDateId(targetDate = new Date()) {
 function assertDateId(value: string, label: string) {
   if (!DATE_ID_REGEX.test(value))
     throw new Error(`${label} must use YYYY-MM-DD`)
+  const parsed = new Date(`${value}T00:00:00.000Z`)
+  if (Number.isNaN(parsed.getTime()) || getDateId(parsed) !== value)
+    throw new Error(`${label} must be a valid UTC calendar date`)
   return value
 }
 
@@ -124,8 +131,13 @@ export function buildUpgradeRate12mBackfillRows(
   return [...rows]
     .sort((left, right) => left.date_id.localeCompare(right.date_id))
     .map((row) => {
-      const endExclusive = Date.parse(`${getNextDateId(row.date_id)}T00:00:00.000Z`)
-      const startInclusive = endExclusive - (365 * DAY_IN_MS)
+      const endExclusiveDate = new Date(`${getNextDateId(row.date_id)}T00:00:00.000Z`)
+      const endExclusive = endExclusiveDate.getTime()
+      const startInclusive = Date.UTC(
+        endExclusiveDate.getUTCFullYear() - 1,
+        endExclusiveDate.getUTCMonth(),
+        endExclusiveDate.getUTCDate(),
+      )
 
       while (orgIndex < orgCreatedAtTimes.length && orgCreatedAtTimes[orgIndex]! < endExclusive)
         orgIndex++
@@ -150,7 +162,7 @@ export function buildUpgradeRate12mBackfillRows(
         upgraded_orgs_12m,
         current_rate,
         next_rate,
-        changed: hasRateChanged(current_rate, next_rate),
+        changed: row.upgrade_rate_12m == null || hasRateChanged(current_rate, next_rate),
       }
     })
 }
@@ -195,6 +207,7 @@ async function fetchOrgRows(supabase: SupabaseClient, toDateId: string | null) {
       .from('orgs')
       .select('id, created_at, customer_id')
       .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
       .range(offset, offset + DEFAULT_PAGE_SIZE - 1)
 
     if (toDateId)
@@ -225,6 +238,7 @@ async function fetchStripeInfoRows(supabase: SupabaseClient) {
       .select('customer_id, upgraded_at')
       .not('upgraded_at', 'is', null)
       .order('upgraded_at', { ascending: true })
+      .order('customer_id', { ascending: true })
       .range(offset, offset + DEFAULT_PAGE_SIZE - 1)
 
     if (error)
