@@ -1702,7 +1702,6 @@ export type Database = {
           updates_external?: number | null
           updates_last_month?: number | null
           upgrade_rate_12m?: number
-          upgrade_rate_12m?: number
           upgraded_orgs?: number
           trial_extended_orgs?: number
           trial_extended_subscribed_orgs?: number
@@ -1794,6 +1793,7 @@ export type Database = {
           updates?: number
           updates_external?: number | null
           updates_last_month?: number | null
+          upgrade_rate_12m?: number
           upgraded_orgs?: number
           trial_extended_orgs?: number
           trial_extended_subscribed_orgs?: number

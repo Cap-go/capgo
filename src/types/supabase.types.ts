@@ -1719,7 +1719,6 @@ export type Database = {
           updates_external?: number | null
           updates_last_month?: number | null
           upgrade_rate_12m?: number
-          upgrade_rate_12m?: number
           upgraded_orgs?: number
           users?: number | null
           users_active?: number | null
@@ -1817,6 +1816,7 @@ export type Database = {
           updates?: number
           updates_external?: number | null
           updates_last_month?: number | null
+          upgrade_rate_12m?: number
           upgraded_orgs?: number
           users?: number | null
           users_active?: number | null
