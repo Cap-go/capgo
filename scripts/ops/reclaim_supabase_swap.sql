@@ -1,8 +1,10 @@
 -- Capgo-EU Phase A reclaim (run manually in a maintenance window).
 -- REQUIRED: psql for VACUUM (cannot run inside a transaction / SQL-editor tx).
 -- Prefer ~/.pgpass / PGPASSFILE instead of putting the password on the CLI.
--- Candidate index app_versions_manifest_present_idx comes from migration
--- 20260722154010_app_versions_manifest_present_idx (deploy migration first).
+--
+-- Schema source of truth: migration 20260722154010_app_versions_manifest_present_idx.
+-- Optional non-blocking prebuild before that migration deploys:
+--   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/ops/reclaim_supabase_swap_index.sql
 --
 -- Example:
 --   psql "postgresql://postgres@HOST:5432/postgres?sslmode=require" -v ON_ERROR_STOP=1 -f scripts/ops/reclaim_supabase_swap.sql
@@ -13,9 +15,26 @@
 SET lock_timeout = '5s';
 
 -- ---------------------------------------------------------------------------
--- 0) Baseline sizes
+-- 0) Baseline sizes + require a valid candidate index
 -- ---------------------------------------------------------------------------
 SELECT pg_size_pretty(pg_database_size(current_database())::bigint) AS db_size;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_class AS idx
+    JOIN pg_catalog.pg_namespace AS ns ON ns.oid = idx.relnamespace
+    JOIN pg_catalog.pg_index AS i ON i.indexrelid = idx.oid
+    WHERE ns.nspname = 'public'
+      AND idx.relname = 'app_versions_manifest_present_idx'
+      AND i.indrelid = 'public.app_versions'::pg_catalog.regclass
+      AND i.indisvalid
+  ) THEN
+    RAISE EXCEPTION
+      'Missing or invalid app_versions_manifest_present_idx. Deploy migration 20260722154010 (or run scripts/ops/reclaim_supabase_swap_index.sql alone first if the index is invalid/missing).';
+  END IF;
+END $$;
 
 SELECT
   relname,
