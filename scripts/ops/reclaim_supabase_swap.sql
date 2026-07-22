@@ -3,9 +3,11 @@
 -- Prefer ~/.pgpass / PGPASSFILE instead of putting the password on the CLI.
 -- Example:
 --   psql "postgresql://postgres@HOST:5432/postgres?sslmode=require" -v ON_ERROR_STOP=1 -f scripts/ops/reclaim_supabase_swap.sql
--- Safe order: truncate empty bloat -> batched archive deletes -> null dual manifests -> trim audit.
--- Each statement commits separately. Re-run until cleanup notices report deleted/updated = 0
+-- Safe order: index -> truncate -> archives -> null manifests -> audit trim.
+-- Re-run the FULL script until cleanup notices report deleted/updated = 0
 -- (functions always emit a notice, including zero totals).
+
+SET lock_timeout = '5s';
 
 -- ---------------------------------------------------------------------------
 -- 0) Baseline sizes
@@ -30,56 +32,51 @@ WHERE (schemaname, relname) IN (
 ORDER BY pg_total_relation_size(format('%I.%I', schemaname, relname)::regclass) DESC;
 
 -- ---------------------------------------------------------------------------
+-- 0b) Candidate index for hourly nulling (non-blocking; must be outside a tx)
+-- ---------------------------------------------------------------------------
+CREATE INDEX CONCURRENTLY IF NOT EXISTS app_versions_manifest_present_idx
+  ON public.app_versions USING btree (id)
+  WHERE manifest IS NOT NULL;
+
+-- ---------------------------------------------------------------------------
 -- 1) Truncate pg_net response bloat
 -- ---------------------------------------------------------------------------
 TRUNCATE TABLE net._http_response;
 
 -- ---------------------------------------------------------------------------
--- 2) Purge pgmq archives/stuck messages (global round-robin batch budget).
---    Re-run this SELECT until the notice shows archived_deleted=0 and
---    stuck_deleted=0.
+-- 2) Purge pgmq archives/stuck messages.
+--    Re-run the FULL script until archived_deleted=0 and stuck_deleted=0.
 -- ---------------------------------------------------------------------------
 SELECT public.cleanup_queue_messages();
 
--- Vacuum every pgmq archive + queue table (quote full physical table name).
-SELECT format('VACUUM (VERBOSE) pgmq.%I;', 'a_' || pg_catalog.lower(queue_name))
-FROM pgmq.list_queues()
-\gexec
-SELECT format('VACUUM (VERBOSE) pgmq.%I;', 'q_' || pg_catalog.lower(queue_name))
-FROM pgmq.list_queues()
-\gexec
-
--- Optional hard reclaim (stronger locks):
--- SELECT format('VACUUM (FULL, VERBOSE) pgmq.%I;', 'a_' || pg_catalog.lower(queue_name))
--- FROM pgmq.list_queues()
--- \gexec
+-- Vacuum Capgo-EU evidenced bloated queues only.
+VACUUM (VERBOSE) pgmq.a_on_version_update;
+VACUUM (VERBOSE) pgmq.a_on_manifest_create;
+VACUUM (VERBOSE) pgmq.a_webhook_dispatcher;
+VACUUM (VERBOSE) pgmq.a_on_channel_update;
+VACUUM (VERBOSE) pgmq.q_on_version_update;
+VACUUM (VERBOSE) pgmq.q_on_manifest_create;
+VACUUM (VERBOSE) pgmq.q_webhook_dispatcher;
+VACUUM (VERBOSE) pgmq.q_on_channel_update;
 
 -- ---------------------------------------------------------------------------
--- 3) Null fully migrated app_versions.manifest arrays
---    Requires every legacy entry to exist in public.manifest by
---    file_name/s3_path/file_hash. Re-run until notice shows updated=0.
+-- 3) Null fully migrated app_versions.manifest arrays (s3_path + file_hash).
+--    Re-run the FULL script until updated=0.
 -- ---------------------------------------------------------------------------
 SELECT public.null_migrated_app_version_manifests();
 
-VACUUM (VERBOSE) public.app_versions;
--- Routine VACUUM does not shrink TOAST. After nulling is done, compact in the
--- maintenance window (exclusive lock):
+VACUUM (ANALYZE, VERBOSE) public.app_versions;
+-- Optional TOAST compaction after updated=0:
 -- VACUUM (FULL, VERBOSE) public.app_versions;
 
--- Candidate index for hourly cleanup. Migration creates it non-concurrently;
--- if deploying via ops only, prefer CONCURRENTLY outside a transaction:
--- CREATE INDEX CONCURRENTLY IF NOT EXISTS app_versions_manifest_present_idx
---   ON public.app_versions USING btree (id)
---   WHERE manifest IS NOT NULL;
-
 -- ---------------------------------------------------------------------------
--- 4) Trim audit_logs older than 30 days (bounded batches).
---    Re-run until deleted=0.
+-- 4) Trim audit_logs older than 30 days.
+--    Re-run the FULL script until deleted=0.
 -- ---------------------------------------------------------------------------
 SELECT public.cleanup_old_audit_logs();
 
-VACUUM (VERBOSE) public.audit_logs;
--- After deleted=0, compact TOAST if pg_total_relation_size must fall:
+VACUUM (ANALYZE, VERBOSE) public.audit_logs;
+-- Optional TOAST compaction after deleted=0:
 -- VACUUM (FULL, VERBOSE) public.audit_logs;
 
 -- ---------------------------------------------------------------------------

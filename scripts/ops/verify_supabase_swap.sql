@@ -39,8 +39,7 @@ FROM (
     ORDER BY av.id
     LIMIT 1000
   ) AS sample
-  WHERE cardinality(sample.manifest) > 0
-    AND NOT EXISTS (
+  WHERE NOT EXISTS (
       SELECT 1
       FROM unnest(sample.manifest) AS entry(file_name, s3_path, file_hash)
       WHERE NOT EXISTS (
@@ -71,14 +70,18 @@ WHERE name IN (
 )
 ORDER BY name;
 
--- process_all_cron_tasks() swallows per-task errors; prefer Postgres logs /
--- healthchecks for task failures.
 SELECT indexname
 FROM pg_indexes
 WHERE schemaname = 'public'
   AND indexname = 'app_versions_manifest_present_idx';
 
--- Same queue set as cleanup_queue_messages() (archives + stuck).
+SELECT EXISTS (
+  SELECT 1
+  FROM public.audit_logs
+  WHERE created_at < now() - interval '30 days'
+  LIMIT 1
+) AS has_audit_logs_older_than_30d;
+
 SELECT format(
   $fmt$SELECT %L AS queue_name,
          EXISTS (
@@ -109,10 +112,10 @@ FROM pgmq.list_queues()
 
 SELECT
   'index hit rate' AS name,
-  ROUND((sum(idx_blks_hit) / nullif(sum(idx_blks_hit + idx_blks_read), 0) * 100)::numeric, 2) AS ratio
+  ROUND((sum(idx_blks_hit)::numeric / nullif(sum(idx_blks_hit + idx_blks_read), 0) * 100), 2) AS ratio
 FROM pg_statio_user_indexes
 UNION ALL
 SELECT
   'table hit rate',
-  ROUND((sum(heap_blks_hit) / nullif(sum(heap_blks_hit) + sum(heap_blks_read), 0) * 100)::numeric, 2)
+  ROUND((sum(heap_blks_hit)::numeric / nullif(sum(heap_blks_hit) + sum(heap_blks_read), 0) * 100), 2)
 FROM pg_statio_user_tables;

@@ -177,7 +177,6 @@ BEGIN
       SELECT av.id
       FROM public.app_versions AS av
       WHERE av.manifest IS NOT NULL
-        AND pg_catalog.cardinality(av.manifest) > 0
         AND NOT EXISTS (
           SELECT 1
           FROM pg_catalog.unnest(av.manifest) AS entry(file_name, s3_path, file_hash)
@@ -564,12 +563,6 @@ SET
 WHERE name = 'cleanup_old_audit_logs';
 
 
--- Bound dual-storage candidate discovery for hourly reclaim.
--- Maintenance-window deploy: brief lock on app_versions is expected.
-CREATE INDEX IF NOT EXISTS app_versions_manifest_present_idx
-  ON public.app_versions USING btree (id)
-  WHERE manifest IS NOT NULL;
-
 -- ---------------------------------------------------------------------------
 -- Allow clearing dual-storage app_versions.manifest after upload (null only).
 -- native_packages stays locked: no alternate persisted source of truth.
@@ -597,7 +590,7 @@ BEGIN
           SELECT 1
           FROM public.manifest AS m
           WHERE m.app_version_id = OLD.id
-            AND m.file_name = entry.file_name
+            -- Match stable identity; file_name may have been normalized at migrate time.
             AND m.s3_path = entry.s3_path
             AND m.file_hash = entry.file_hash
         )
@@ -635,7 +628,7 @@ BEGIN
               SELECT 1
               FROM public.manifest AS m
               WHERE m.app_version_id = OLD.id
-                AND m.file_name = entry.file_name
+                -- Match stable identity; file_name may have been normalized at migrate time.
                 AND m.s3_path = entry.s3_path
                 AND m.file_hash = entry.file_hash
             )
@@ -645,7 +638,7 @@ BEGIN
       )
     THEN
       PERFORM public.pg_log('deny: BUNDLE_CONTENT_LOCKED_TRIGGER',
-        jsonb_build_object(
+        pg_catalog.jsonb_build_object(
           'org_id', OLD.owner_org,
           'app_id', OLD.app_id,
           'version_name', OLD.name,
@@ -721,11 +714,11 @@ BEGIN
   END IF;
 
   bundle_is_encrypted := public.is_bundle_encrypted(NEW.session_key);
-  bundle_key_id := NULLIF(btrim(NEW.key_id), '')::varchar(20);
+  bundle_key_id := NULLIF(pg_catalog.btrim(NEW.key_id), '')::varchar(20);
 
   IF NOT bundle_is_encrypted THEN
     PERFORM public.pg_log('deny: ORG_REQUIRES_ENCRYPTED_BUNDLES_TRIGGER',
-      jsonb_build_object(
+      pg_catalog.jsonb_build_object(
         'org_id', org_id,
         'app_id', NEW.app_id,
         'version_name', NEW.name,
@@ -740,7 +733,7 @@ BEGIN
   IF org_required_key IS NOT NULL AND org_required_key <> '' THEN
     IF bundle_key_id IS NULL THEN
       PERFORM public.pg_log('deny: ORG_REQUIRES_SPECIFIC_ENCRYPTION_KEY_TRIGGER',
-        jsonb_build_object(
+        pg_catalog.jsonb_build_object(
           'org_id', org_id,
           'app_id', NEW.app_id,
           'version_name', NEW.name,
@@ -757,11 +750,11 @@ BEGIN
 
     -- key_id is 20 chars and required_encryption_key may be 20 or 21 chars.
     IF NOT (
-      bundle_key_id = LEFT(org_required_key, 20)
-      OR LEFT(bundle_key_id, LENGTH(org_required_key)) = org_required_key
+      bundle_key_id = pg_catalog.left(org_required_key, 20)
+      OR pg_catalog.left(bundle_key_id, pg_catalog.length(org_required_key)) = org_required_key
     ) THEN
       PERFORM public.pg_log('deny: ORG_REQUIRES_SPECIFIC_ENCRYPTION_KEY_TRIGGER',
-        jsonb_build_object(
+        pg_catalog.jsonb_build_object(
           'org_id', org_id,
           'app_id', NEW.app_id,
           'version_name', NEW.name,
