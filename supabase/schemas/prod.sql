@@ -1507,6 +1507,49 @@ $$;
 ALTER FUNCTION "public"."assert_group_member_is_org_member"("p_group_id" "uuid", "p_user_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."assert_preview_bundle_owner"("p_owner_org" "uuid", "p_app_id" character varying, "p_version_id" bigint) RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_preview_apikey_rbac_id uuid;
+  v_bundle_creator_apikey_rbac_id uuid;
+BEGIN
+  IF p_version_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  SELECT public.current_app_preview_apikey_rbac_id(p_owner_org, p_app_id)
+  INTO v_preview_apikey_rbac_id;
+
+  IF v_preview_apikey_rbac_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  SELECT version.created_by_apikey_rbac_id
+  INTO v_bundle_creator_apikey_rbac_id
+  FROM public.app_versions AS version
+  WHERE version.id = p_version_id
+    AND version.app_id = p_app_id
+    AND version.owner_org = p_owner_org
+    AND version.deleted = false
+  FOR KEY SHARE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'INVALID_CHANNEL_VERSION';
+  END IF;
+
+  IF v_bundle_creator_apikey_rbac_id IS DISTINCT FROM v_preview_apikey_rbac_id THEN
+    RAISE EXCEPTION 'PREVIEW_APIKEY_CAN_ONLY_PROMOTE_OWN_BUNDLE'
+      USING ERRCODE = '42501';
+  END IF;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."assert_preview_bundle_owner"("p_owner_org" "uuid", "p_app_id" character varying, "p_version_id" bigint) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."assert_request_principal_rank"("p_org_id" "uuid", "p_target_priority" integer, "p_mutation" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -1756,6 +1799,78 @@ $$;
 
 
 ALTER FUNCTION "public"."auto_owner_org_by_app_id"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."bind_app_preview_apikey_to_created_channel"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_parent_binding_id uuid;
+  v_apikey_text text;
+  v_apikey public.apikeys%ROWTYPE;
+BEGIN
+  SELECT public.current_app_preview_binding_id(NEW.owner_org, NEW.app_id)
+  INTO v_parent_binding_id;
+
+  IF v_parent_binding_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT public.get_apikey_header() INTO v_apikey_text;
+  SELECT *
+  INTO v_apikey
+  FROM public.find_apikey_by_value(v_apikey_text)
+  LIMIT 1;
+
+  IF v_apikey.id IS NULL
+    OR public.is_apikey_expired(v_apikey.expires_at)
+    OR v_apikey.user_id IS DISTINCT FROM NEW.created_by
+  THEN
+    RAISE EXCEPTION 'INVALID_PREVIEW_CHANNEL_CREATOR'
+      USING ERRCODE = '42501';
+  END IF;
+
+  INSERT INTO public.role_bindings (
+    principal_type,
+    principal_id,
+    role_id,
+    scope_type,
+    org_id,
+    app_id,
+    channel_id,
+    parent_binding_id,
+    granted_by,
+    granted_at,
+    reason,
+    is_direct
+  )
+  SELECT
+    public.rbac_principal_apikey(),
+    parent_binding.principal_id,
+    preview_role.id,
+    public.rbac_scope_channel(),
+    parent_binding.org_id,
+    parent_binding.app_id,
+    NEW.rbac_id,
+    parent_binding.id,
+    v_apikey.user_id,
+    pg_catalog.now(),
+    'Automatically granted to the app-preview API key that created this channel',
+    false
+  FROM public.role_bindings AS parent_binding
+  INNER JOIN public.roles AS preview_role
+    ON preview_role.name = 'channel_preview'
+    AND preview_role.scope_type = public.rbac_scope_channel()
+  WHERE parent_binding.id = v_parent_binding_id
+  ON CONFLICT DO NOTHING;
+
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."bind_app_preview_apikey_to_created_channel"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."bind_creating_apikey_to_org_on_create"() RETURNS "trigger"
@@ -3847,6 +3962,88 @@ $$;
 ALTER FUNCTION "public"."count_non_compliant_bundles"("org_id" "uuid", "required_key" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."current_app_preview_apikey_rbac_id"("p_owner_org" "uuid", "p_app_id" character varying) RETURNS "uuid"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_parent_binding_id uuid;
+  v_apikey_rbac_id uuid;
+BEGIN
+  SELECT public.current_app_preview_binding_id(p_owner_org, p_app_id)
+  INTO v_parent_binding_id;
+
+  IF v_parent_binding_id IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT parent_binding.principal_id
+  INTO v_apikey_rbac_id
+  FROM public.role_bindings AS parent_binding
+  WHERE parent_binding.id = v_parent_binding_id
+  LIMIT 1;
+
+  RETURN v_apikey_rbac_id;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."current_app_preview_apikey_rbac_id"("p_owner_org" "uuid", "p_app_id" character varying) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."current_app_preview_binding_id"("p_owner_org" "uuid", "p_app_id" character varying) RETURNS "uuid"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_apikey_text text;
+  v_apikey public.apikeys%ROWTYPE;
+  v_parent_binding_id uuid;
+BEGIN
+  IF p_owner_org IS NULL OR p_app_id IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT public.get_apikey_header() INTO v_apikey_text;
+  IF v_apikey_text IS NULL OR v_apikey_text = '' THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT *
+  INTO v_apikey
+  FROM public.find_apikey_by_value(v_apikey_text)
+  LIMIT 1;
+
+  IF v_apikey.id IS NULL OR public.is_apikey_expired(v_apikey.expires_at) THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT parent_binding.id
+  INTO v_parent_binding_id
+  FROM public.role_bindings AS parent_binding
+  INNER JOIN public.roles AS parent_role
+    ON parent_role.id = parent_binding.role_id
+    AND parent_role.scope_type = parent_binding.scope_type
+  INNER JOIN public.apps AS app
+    ON app.id = parent_binding.app_id
+  WHERE parent_binding.principal_type = public.rbac_principal_apikey()
+    AND parent_binding.principal_id = v_apikey.rbac_id
+    AND parent_binding.scope_type = public.rbac_scope_app()
+    AND parent_binding.org_id = p_owner_org
+    AND parent_role.name = 'app_preview'
+    AND app.app_id = p_app_id
+    AND app.owner_org = p_owner_org
+    AND (parent_binding.expires_at IS NULL OR parent_binding.expires_at > pg_catalog.now())
+  LIMIT 1;
+
+  RETURN v_parent_binding_id;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."current_app_preview_binding_id"("p_owner_org" "uuid", "p_app_id" character varying) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."current_request_role"() RETURNS "text"
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
@@ -4555,6 +4752,8 @@ BEGIN
     RETURN NEW;
   END IF;
 
+  PERFORM public.lock_channel_bundle_lifecycle(NEW.version, NEW.rollout_version);
+
   IF TG_OP = 'INSERT' THEN
     v_owner_org := public.get_owner_org_by_app_id_internal(NEW.app_id);
     v_channel_id := NULL::bigint;
@@ -4585,16 +4784,26 @@ BEGIN
     END IF;
   END IF;
 
-  IF NEW.version IS NOT NULL
-    AND NOT EXISTS (
-      SELECT 1
-      FROM public.app_versions AS app_version
-      WHERE app_version.id = NEW.version
-        AND app_version.app_id = NEW.app_id
-        AND app_version.owner_org = v_owner_org
-        AND app_version.deleted = false
-    ) THEN
-    RAISE EXCEPTION 'INVALID_CHANNEL_VERSION';
+  IF NEW.version IS NOT NULL THEN
+    PERFORM 1
+    FROM public.app_versions AS version
+    WHERE version.id = NEW.version
+      AND version.app_id = NEW.app_id
+      AND version.owner_org = v_owner_org
+      AND version.deleted = false
+    FOR KEY SHARE;
+
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'INVALID_CHANNEL_VERSION';
+    END IF;
+
+    -- Service-role endpoints carry the key in request.headers. This helper
+    -- no-ops for other callers and preserves preview-key bundle ownership.
+    PERFORM public.assert_preview_bundle_owner(
+      v_owner_org,
+      NEW.app_id,
+      NEW.version
+    );
   END IF;
 
   RETURN NEW;
@@ -4654,6 +4863,93 @@ $$;
 
 
 ALTER FUNCTION "public"."enforce_email_otp_for_mfa"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."enforce_preview_bundle_ownership"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_preview_apikey_rbac_id uuid;
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    SELECT public.current_app_preview_apikey_rbac_id(NEW.owner_org, NEW.app_id)
+    INTO v_preview_apikey_rbac_id;
+
+    NEW.created_by_apikey_rbac_id := v_preview_apikey_rbac_id;
+    RETURN NEW;
+  END IF;
+
+  SELECT public.current_app_preview_apikey_rbac_id(OLD.owner_org, OLD.app_id)
+  INTO v_preview_apikey_rbac_id;
+
+  IF NEW.created_by_apikey_rbac_id IS DISTINCT FROM OLD.created_by_apikey_rbac_id THEN
+    RAISE EXCEPTION 'PREVIEW_BUNDLE_CREATOR_IMMUTABLE'
+      USING ERRCODE = '42501';
+  END IF;
+
+  IF v_preview_apikey_rbac_id IS NOT NULL
+    AND OLD.created_by_apikey_rbac_id IS DISTINCT FROM v_preview_apikey_rbac_id
+  THEN
+    RAISE EXCEPTION 'PREVIEW_APIKEY_CAN_ONLY_MANAGE_OWN_BUNDLE'
+      USING ERRCODE = '42501';
+  END IF;
+
+  -- Endpoint-level lifecycle checks are not sufficient here: an app_preview
+  -- key can directly update app_versions through PostgREST. Once a bundle is
+  -- referenced by a main channel or another key's preview channel, only a
+  -- matching active channel_preview binding may keep it mutable.
+  IF v_preview_apikey_rbac_id IS NOT NULL
+    AND OLD.created_by_apikey_rbac_id = v_preview_apikey_rbac_id
+    AND EXISTS (
+      SELECT 1
+      FROM public.channels AS channel
+      WHERE channel.app_id = OLD.app_id
+        AND channel.owner_org = OLD.owner_org
+        AND (channel.version = OLD.id OR channel.rollout_version = OLD.id)
+        AND NOT EXISTS (
+          SELECT 1
+          FROM public.role_bindings AS child_binding
+          INNER JOIN public.roles AS child_role
+            ON child_role.id = child_binding.role_id
+            AND child_role.scope_type = child_binding.scope_type
+          INNER JOIN public.apps AS app
+            ON app.id = child_binding.app_id
+            AND app.app_id = channel.app_id
+            AND app.owner_org = channel.owner_org
+          INNER JOIN public.role_bindings AS parent_binding
+            ON parent_binding.id = child_binding.parent_binding_id
+          INNER JOIN public.roles AS parent_role
+            ON parent_role.id = parent_binding.role_id
+            AND parent_role.scope_type = parent_binding.scope_type
+          WHERE child_binding.principal_type = public.rbac_principal_apikey()
+            AND child_binding.principal_id = v_preview_apikey_rbac_id
+            AND child_binding.scope_type = public.rbac_scope_channel()
+            AND child_binding.org_id = channel.owner_org
+            AND child_binding.channel_id = channel.rbac_id
+            AND child_binding.is_direct IS FALSE
+            AND child_role.name = 'channel_preview'
+            AND (child_binding.expires_at IS NULL OR child_binding.expires_at > pg_catalog.now())
+            AND parent_binding.principal_type = child_binding.principal_type
+            AND parent_binding.principal_id = child_binding.principal_id
+            AND parent_binding.scope_type = public.rbac_scope_app()
+            AND parent_binding.org_id = child_binding.org_id
+            AND parent_binding.app_id = child_binding.app_id
+            AND parent_role.name = 'app_preview'
+            AND (parent_binding.expires_at IS NULL OR parent_binding.expires_at > pg_catalog.now())
+        )
+    )
+  THEN
+    RAISE EXCEPTION 'PREVIEW_APIKEY_CANNOT_MUTATE_SHARED_BUNDLE'
+      USING ERRCODE = '42501';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."enforce_preview_bundle_ownership"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."enforce_role_binding_role_scope"() RETURNS "trigger"
@@ -8170,7 +8466,8 @@ CREATE TABLE IF NOT EXISTS "public"."app_versions" (
     "manifest_count" integer DEFAULT 0 NOT NULL,
     "key_id" character varying(20),
     "cli_version" character varying,
-    "deleted_at" timestamp with time zone
+    "deleted_at" timestamp with time zone,
+    "created_by_apikey_rbac_id" "uuid"
 )
 WITH ("autovacuum_vacuum_scale_factor"='0.05', "autovacuum_analyze_scale_factor"='0.02');
 
@@ -8185,6 +8482,10 @@ COMMENT ON COLUMN "public"."app_versions"."key_id" IS 'First 4 characters of the
 
 
 COMMENT ON COLUMN "public"."app_versions"."cli_version" IS 'The version of @capgo/cli used to upload this bundle';
+
+
+
+COMMENT ON COLUMN "public"."app_versions"."created_by_apikey_rbac_id" IS 'Immutable API-key RBAC principal recorded only for bundles created by an active app_preview API key. Legacy bundles remain NULL and are not preview-key manageable.';
 
 
 
@@ -9619,6 +9920,28 @@ COMMENT ON FUNCTION "public"."is_user_org_admin"("p_user_id" "uuid", "p_org_id" 
 
 
 
+CREATE OR REPLACE FUNCTION "public"."lock_channel_bundle_lifecycle"("p_version_id" bigint, "p_rollout_version_id" bigint) RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_bundle_id bigint;
+BEGIN
+  FOR v_bundle_id IN
+    SELECT bundle.bundle_id
+    FROM pg_catalog.unnest(ARRAY[p_version_id, p_rollout_version_id]) AS bundle(bundle_id)
+    WHERE bundle.bundle_id IS NOT NULL
+    ORDER BY bundle.bundle_id
+  LOOP
+    PERFORM pg_catalog.pg_advisory_xact_lock(v_bundle_id);
+  END LOOP;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."lock_channel_bundle_lifecycle"("p_version_id" bigint, "p_rollout_version_id" bigint) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."lock_org_tombstone_guard"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -10550,6 +10873,27 @@ BEGIN
       WHERE roles.id = NEW.role_id
         AND roles.scope_type = public.rbac_scope_org()
         AND roles.name = public.rbac_role_org_super_admin()
+    )
+  THEN
+    RETURN NEW;
+  END IF;
+
+  -- The channel insert trigger is the sole creator of this non-assignable role.
+  -- validate_channel_preview_role_binding fires after this guard and checks the
+  -- exact active parent, key, organization, app, and channel scope.
+  IF TG_OP = 'INSERT'
+    AND pg_trigger_depth() > 1
+    AND NEW.principal_type = public.rbac_principal_apikey()
+    AND NEW.scope_type = public.rbac_scope_channel()
+    AND NEW.is_direct IS FALSE
+    AND NEW.parent_binding_id IS NOT NULL
+    AND EXISTS (
+      SELECT 1
+      FROM public.roles
+      WHERE roles.id = NEW.role_id
+        AND roles.scope_type = public.rbac_scope_channel()
+        AND roles.name = 'channel_preview'
+        AND roles.is_assignable IS FALSE
     )
   THEN
     RETURN NEW;
@@ -12109,11 +12453,11 @@ BEGIN
     RETURN false;
   END IF;
 
-  -- Resolve scope identifiers to UUIDs. Preserve the caller org when the app does not exist yet.
   IF p_app_id IS NOT NULL THEN
-    SELECT id, owner_org INTO v_app_uuid, v_app_owner_org
-    FROM public.apps
-    WHERE app_id = p_app_id
+    SELECT app.id, app.owner_org
+    INTO v_app_uuid, v_app_owner_org
+    FROM public.apps AS app
+    WHERE app.app_id = p_app_id
     LIMIT 1;
 
     IF v_app_owner_org IS NOT NULL THEN
@@ -12122,9 +12466,10 @@ BEGIN
   END IF;
 
   IF p_channel_id IS NOT NULL THEN
-    SELECT rbac_id, app_id, owner_org INTO v_channel_uuid, v_channel_app_id, v_channel_org_id
-    FROM public.channels
-    WHERE id = p_channel_id
+    SELECT channel.rbac_id, channel.app_id, channel.owner_org
+    INTO v_channel_uuid, v_channel_app_id, v_channel_org_id
+    FROM public.channels AS channel
+    WHERE channel.id = p_channel_id
     LIMIT 1;
 
     IF v_channel_uuid IS NOT NULL THEN
@@ -12136,9 +12481,10 @@ BEGIN
         RETURN false;
       END IF;
 
-      SELECT id INTO v_app_uuid
-      FROM public.apps
-      WHERE app_id = v_channel_app_id
+      SELECT app.id
+      INTO v_app_uuid
+      FROM public.apps AS app
+      WHERE app.app_id = v_channel_app_id
       LIMIT 1;
 
       v_org_id := v_channel_org_id;
@@ -12153,37 +12499,68 @@ BEGIN
     SELECT public.rbac_scope_channel(), v_org_id, v_app_uuid, v_channel_uuid WHERE v_channel_uuid IS NOT NULL
   ),
   direct_roles AS (
-    SELECT rb.role_id, rb.scope_type
-    FROM scope_catalog s
-    JOIN public.role_bindings rb ON rb.scope_type = s.scope_type
+    SELECT role_binding.role_id, role_binding.scope_type
+    FROM scope_catalog AS scope
+    INNER JOIN public.role_bindings AS role_binding
+      ON role_binding.scope_type = scope.scope_type
       AND (
-        (rb.scope_type = public.rbac_scope_org() AND rb.org_id = s.org_id) OR
-        (rb.scope_type = public.rbac_scope_app() AND rb.org_id = s.org_id AND rb.app_id = s.app_id) OR
-        (rb.scope_type = public.rbac_scope_channel() AND rb.org_id = s.org_id AND rb.app_id = s.app_id AND rb.channel_id = s.channel_id)
+        (role_binding.scope_type = public.rbac_scope_org() AND role_binding.org_id = scope.org_id)
+        OR (role_binding.scope_type = public.rbac_scope_app() AND role_binding.org_id = scope.org_id AND role_binding.app_id = scope.app_id)
+        OR (role_binding.scope_type = public.rbac_scope_channel() AND role_binding.org_id = scope.org_id AND role_binding.app_id = scope.app_id AND role_binding.channel_id = scope.channel_id)
       )
-    JOIN public.roles r ON r.id = rb.role_id
-      AND r.scope_type = rb.scope_type
-    WHERE rb.principal_type = p_principal_type
-      AND rb.principal_id = p_principal_id
-      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+    INNER JOIN public.roles AS role
+      ON role.id = role_binding.role_id
+      AND role.scope_type = role_binding.scope_type
+    WHERE role_binding.principal_type = p_principal_type
+      AND role_binding.principal_id = p_principal_id
+      AND (role_binding.expires_at IS NULL OR role_binding.expires_at > pg_catalog.now())
+      AND (
+        role.name <> 'channel_preview'
+        OR (
+          role_binding.principal_type = public.rbac_principal_apikey()
+          AND role_binding.is_direct IS FALSE
+          AND role_binding.parent_binding_id IS NOT NULL
+          AND EXISTS (
+            SELECT 1
+            FROM public.role_bindings AS parent_binding
+            INNER JOIN public.roles AS parent_role
+              ON parent_role.id = parent_binding.role_id
+              AND parent_role.scope_type = parent_binding.scope_type
+            WHERE parent_binding.id = role_binding.parent_binding_id
+              AND parent_binding.principal_type = role_binding.principal_type
+              AND parent_binding.principal_id = role_binding.principal_id
+              AND parent_binding.scope_type = public.rbac_scope_app()
+              AND parent_binding.org_id = scope.org_id
+              AND parent_binding.app_id = scope.app_id
+              AND parent_role.name = 'app_preview'
+              AND (parent_binding.expires_at IS NULL OR parent_binding.expires_at > pg_catalog.now())
+          )
+        )
+      )
   ),
   group_roles AS (
-    SELECT rb.role_id, rb.scope_type
-    FROM scope_catalog s
-    JOIN public.group_members gm ON gm.user_id = p_principal_id
-    JOIN public.groups g ON g.id = gm.group_id
-    JOIN public.role_bindings rb ON rb.principal_type = public.rbac_principal_group() AND rb.principal_id = gm.group_id
-    JOIN public.roles r ON r.id = rb.role_id
-      AND r.scope_type = rb.scope_type
+    SELECT role_binding.role_id, role_binding.scope_type
+    FROM scope_catalog AS scope
+    INNER JOIN public.group_members AS group_member
+      ON group_member.user_id = p_principal_id
+    INNER JOIN public.groups AS member_group
+      ON member_group.id = group_member.group_id
+    INNER JOIN public.role_bindings AS role_binding
+      ON role_binding.principal_type = public.rbac_principal_group()
+      AND role_binding.principal_id = group_member.group_id
+    INNER JOIN public.roles AS role
+      ON role.id = role_binding.role_id
+      AND role.scope_type = role_binding.scope_type
     WHERE p_principal_type = public.rbac_principal_user()
-      AND rb.scope_type = s.scope_type
+      AND role.name <> 'channel_preview'
+      AND role_binding.scope_type = scope.scope_type
       AND (
-        (rb.scope_type = public.rbac_scope_org() AND rb.org_id = s.org_id) OR
-        (rb.scope_type = public.rbac_scope_app() AND rb.org_id = s.org_id AND rb.app_id = s.app_id) OR
-        (rb.scope_type = public.rbac_scope_channel() AND rb.org_id = s.org_id AND rb.app_id = s.app_id AND rb.channel_id = s.channel_id)
+        (role_binding.scope_type = public.rbac_scope_org() AND role_binding.org_id = scope.org_id)
+        OR (role_binding.scope_type = public.rbac_scope_app() AND role_binding.org_id = scope.org_id AND role_binding.app_id = scope.app_id)
+        OR (role_binding.scope_type = public.rbac_scope_channel() AND role_binding.org_id = scope.org_id AND role_binding.app_id = scope.app_id AND role_binding.channel_id = scope.channel_id)
       )
-      AND (v_org_id IS NULL OR g.org_id = v_org_id)
-      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+      AND (v_org_id IS NULL OR member_group.org_id = v_org_id)
+      AND (role_binding.expires_at IS NULL OR role_binding.expires_at > pg_catalog.now())
   ),
   combined_roles AS (
     SELECT role_id, scope_type FROM direct_roles
@@ -12193,19 +12570,28 @@ BEGIN
   role_closure AS (
     SELECT role_id, scope_type FROM combined_roles
     UNION
-    SELECT rh.child_role_id, rc.scope_type
-    FROM public.role_hierarchy rh
-    JOIN role_closure rc ON rc.role_id = rh.parent_role_id
-    JOIN public.roles child_role ON child_role.id = rh.child_role_id
-      AND child_role.scope_type = rc.scope_type
+    SELECT hierarchy.child_role_id, closure.scope_type
+    FROM public.role_hierarchy AS hierarchy
+    INNER JOIN role_closure AS closure
+      ON closure.role_id = hierarchy.parent_role_id
+    INNER JOIN public.roles AS child_role
+      ON child_role.id = hierarchy.child_role_id
+      AND child_role.scope_type = closure.scope_type
   ),
-  perm_set AS (
-    SELECT DISTINCT p.key
-    FROM role_closure rc
-    JOIN public.role_permissions rp ON rp.role_id = rc.role_id
-    JOIN public.permissions p ON p.id = rp.permission_id
+  permission_set AS (
+    SELECT DISTINCT permission.key
+    FROM role_closure AS closure
+    INNER JOIN public.role_permissions AS role_permission
+      ON role_permission.role_id = closure.role_id
+    INNER JOIN public.permissions AS permission
+      ON permission.id = role_permission.permission_id
   )
-  SELECT EXISTS (SELECT 1 FROM perm_set WHERE key = p_permission_key) INTO v_has;
+  SELECT EXISTS (
+    SELECT 1
+    FROM permission_set
+    WHERE permission_set.key = p_permission_key
+  )
+  INTO v_has;
 
   RETURN v_has;
 END;
@@ -12215,7 +12601,7 @@ $$;
 ALTER FUNCTION "public"."rbac_has_permission"("p_principal_type" "text", "p_principal_id" "uuid", "p_permission_key" "text", "p_org_id" "uuid", "p_app_id" character varying, "p_channel_id" bigint) OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."rbac_has_permission"("p_principal_type" "text", "p_principal_id" "uuid", "p_permission_key" "text", "p_org_id" "uuid", "p_app_id" character varying, "p_channel_id" bigint) IS 'Checks whether a principal has a permission at org/app/channel scope. App and channel bindings must match the resolved owning org so forged cross-org scope rows are ignored.';
+COMMENT ON FUNCTION "public"."rbac_has_permission"("p_principal_type" "text", "p_principal_id" "uuid", "p_permission_key" "text", "p_org_id" "uuid", "p_app_id" character varying, "p_channel_id" bigint) IS 'Checks org, app, and channel RBAC permissions. System-managed channel_preview bindings require their active organization-bound app_preview parent.';
 
 
 
@@ -13540,18 +13926,20 @@ CREATE OR REPLACE FUNCTION "public"."refresh_channel_rollout_id"() RETURNS "trig
     SET "search_path" TO ''
     AS $$
 DECLARE
-  rollout_changed boolean;
+  v_rollout_changed boolean;
   v_channel_id bigint;
 BEGIN
   IF TG_OP = 'INSERT' THEN
-    rollout_changed := NEW.rollout_version IS NOT NULL;
+    v_rollout_changed := NEW.rollout_version IS NOT NULL;
     v_channel_id := NULL::bigint;
   ELSE
-    rollout_changed := NEW.rollout_version IS DISTINCT FROM OLD.rollout_version;
+    v_rollout_changed := NEW.rollout_version IS DISTINCT FROM OLD.rollout_version;
     v_channel_id := NEW.id;
   END IF;
 
-  IF rollout_changed THEN
+  IF v_rollout_changed THEN
+    PERFORM public.lock_channel_bundle_lifecycle(NEW.version, NEW.rollout_version);
+
     IF (auth.uid() IS NOT NULL OR public.get_apikey_header() IS NOT NULL)
       AND NOT public.rbac_check_permission_request(
         public.rbac_perm_channel_promote_bundle(),
@@ -13563,17 +13951,24 @@ BEGIN
       RAISE EXCEPTION 'NO_RIGHTS';
     END IF;
 
-    IF NEW.rollout_version IS NOT NULL
-      AND NOT EXISTS (
-        SELECT 1
-        FROM public.app_versions AS app_version
-        WHERE app_version.id = NEW.rollout_version
-          AND app_version.app_id = NEW.app_id
-          AND app_version.owner_org = NEW.owner_org
-          AND app_version.deleted = false
-      )
-    THEN
-      RAISE EXCEPTION 'INVALID_ROLLOUT_VERSION';
+    IF NEW.rollout_version IS NOT NULL THEN
+      PERFORM 1
+      FROM public.app_versions AS version
+      WHERE version.id = NEW.rollout_version
+        AND version.app_id = NEW.app_id
+        AND version.owner_org = NEW.owner_org
+        AND version.deleted = false
+      FOR KEY SHARE;
+
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'INVALID_ROLLOUT_VERSION';
+      END IF;
+
+      PERFORM public.assert_preview_bundle_owner(
+        NEW.owner_org,
+        NEW.app_id,
+        NEW.rollout_version
+      );
     END IF;
 
     NEW.rollout_id = gen_random_uuid();
@@ -15545,25 +15940,45 @@ CREATE OR REPLACE FUNCTION "public"."trigger_http_queue_post_to_function"() RETU
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-DECLARE 
+DECLARE
   payload jsonb;
-BEGIN 
-  -- Build the base payload
+  record_payload jsonb;
+  old_record_payload jsonb;
+  function_type text;
+BEGIN
+  function_type := CASE
+    WHEN NULLIF(TG_ARGV[1], '') IS NULL THEN 'cloudflare'
+    WHEN lower(TG_ARGV[1]) = 'supabase' THEN 'cloudflare'
+    ELSE TG_ARGV[1]
+  END;
+
+  record_payload := to_jsonb(NEW);
+  old_record_payload := to_jsonb(OLD);
+
+  -- app_versions.manifest can be multi-MB. Never enqueue it; handlers reload when needed.
+  IF TG_TABLE_NAME = 'app_versions' THEN
+    IF record_payload IS NOT NULL THEN
+      record_payload := record_payload - 'manifest';
+    END IF;
+    IF old_record_payload IS NOT NULL THEN
+      old_record_payload := old_record_payload - 'manifest';
+    END IF;
+  END IF;
+
   payload := jsonb_build_object(
     'function_name', TG_ARGV[0],
-    'function_type', TG_ARGV[1],
+    'function_type', function_type,
     'payload', jsonb_build_object(
-      'old_record', OLD, 
-      'record', NEW, 
+      'old_record', old_record_payload,
+      'record', record_payload,
       'type', TG_OP,
       'table', TG_TABLE_NAME,
       'schema', TG_TABLE_SCHEMA
     )
   );
-  
-  -- Also send to function-specific queue
+
   IF TG_ARGV[0] IS NOT NULL THEN
-    PERFORM pgmq.send(TG_ARGV[0], payload);
+    PERFORM "pgmq"."send"(TG_ARGV[0], payload);
   END IF;
   RETURN NEW;
 END;
@@ -16159,6 +16574,91 @@ $$;
 
 
 ALTER FUNCTION "public"."user_meets_password_policy"("user_id" "uuid", "org_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."validate_channel_preview_role_binding"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_role_name text;
+  v_parent_principal_id uuid;
+  v_parent_org_id uuid;
+  v_parent_app_id uuid;
+  v_channel_org_id uuid;
+  v_channel_app_id uuid;
+BEGIN
+  SELECT roles.name
+  INTO v_role_name
+  FROM public.roles
+  WHERE roles.id = NEW.role_id
+  LIMIT 1;
+
+  IF v_role_name IS DISTINCT FROM 'channel_preview' THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.principal_type IS DISTINCT FROM public.rbac_principal_apikey()
+    OR NEW.scope_type IS DISTINCT FROM public.rbac_scope_channel()
+    OR NEW.is_direct IS DISTINCT FROM false
+    OR NEW.parent_binding_id IS NULL
+    OR NEW.expires_at IS NOT NULL
+  THEN
+    RAISE EXCEPTION 'INVALID_CHANNEL_PREVIEW_BINDING'
+      USING ERRCODE = '42501';
+  END IF;
+
+  SELECT
+    parent_binding.principal_id,
+    parent_binding.org_id,
+    parent_binding.app_id
+  INTO
+    v_parent_principal_id,
+    v_parent_org_id,
+    v_parent_app_id
+  FROM public.role_bindings AS parent_binding
+  INNER JOIN public.roles AS parent_role
+    ON parent_role.id = parent_binding.role_id
+    AND parent_role.scope_type = parent_binding.scope_type
+  WHERE parent_binding.id = NEW.parent_binding_id
+    AND parent_binding.principal_type = public.rbac_principal_apikey()
+    AND parent_binding.scope_type = public.rbac_scope_app()
+    AND parent_role.name = 'app_preview'
+    AND (parent_binding.expires_at IS NULL OR parent_binding.expires_at > pg_catalog.now())
+  LIMIT 1;
+
+  IF v_parent_principal_id IS NULL
+    OR v_parent_principal_id IS DISTINCT FROM NEW.principal_id
+    OR v_parent_org_id IS DISTINCT FROM NEW.org_id
+    OR v_parent_app_id IS DISTINCT FROM NEW.app_id
+  THEN
+    RAISE EXCEPTION 'INVALID_CHANNEL_PREVIEW_PARENT'
+      USING ERRCODE = '42501';
+  END IF;
+
+  SELECT channel.owner_org, app.id
+  INTO v_channel_org_id, v_channel_app_id
+  FROM public.channels AS channel
+  INNER JOIN public.apps AS app
+    ON app.app_id = channel.app_id
+    AND app.owner_org = channel.owner_org
+  WHERE channel.rbac_id = NEW.channel_id
+  LIMIT 1;
+
+  IF v_channel_org_id IS NULL
+    OR v_channel_org_id IS DISTINCT FROM NEW.org_id
+    OR v_channel_app_id IS DISTINCT FROM NEW.app_id
+  THEN
+    RAISE EXCEPTION 'INVALID_CHANNEL_PREVIEW_SCOPE'
+      USING ERRCODE = '42501';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."validate_channel_preview_role_binding"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."verify_api_key_hash"("plain_key" "text", "stored_hash" "text") RETURNS boolean
@@ -17216,7 +17716,8 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
     "apps_with_cli_onboarding_builds_24h" bigint DEFAULT 0 NOT NULL,
     "apps_with_manual_builds_24h" bigint DEFAULT 0 NOT NULL,
     "above_plan_with_credits" bigint,
-    "above_plan_without_credits" bigint
+    "above_plan_without_credits" bigint,
+    "upgrade_rate_12m" double precision DEFAULT 0 NOT NULL
 );
 
 
@@ -17480,6 +17981,10 @@ COMMENT ON COLUMN "public"."global_stats"."above_plan_with_credits" IS 'Active a
 
 
 COMMENT ON COLUMN "public"."global_stats"."above_plan_without_credits" IS 'Active above-plan organizations with no positive, unexpired usage credits at snapshot time; null for snapshots created before this metric existed.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."upgrade_rate_12m" IS 'Percentage of organizations whose last stripe_info.upgraded_at falls within the trailing 12 calendar months ending at the UTC snapshot day end (orgs with last stripe_info.upgraded_at in-window / orgs created by day end * 100).';
 
 
 
@@ -17864,6 +18369,7 @@ CREATE TABLE IF NOT EXISTS "public"."role_bindings" (
     "expires_at" timestamp with time zone,
     "reason" "text",
     "is_direct" boolean DEFAULT true NOT NULL,
+    "parent_binding_id" "uuid",
     CONSTRAINT "role_bindings_check" CHECK (((("scope_type" = "public"."rbac_scope_platform"()) AND ("org_id" IS NULL) AND ("app_id" IS NULL) AND ("bundle_id" IS NULL) AND ("channel_id" IS NULL)) OR (("scope_type" = "public"."rbac_scope_org"()) AND ("org_id" IS NOT NULL) AND ("app_id" IS NULL) AND ("bundle_id" IS NULL) AND ("channel_id" IS NULL)) OR (("scope_type" = "public"."rbac_scope_app"()) AND ("org_id" IS NOT NULL) AND ("app_id" IS NOT NULL) AND ("bundle_id" IS NULL) AND ("channel_id" IS NULL)) OR (("scope_type" = "public"."rbac_scope_bundle"()) AND ("org_id" IS NOT NULL) AND ("app_id" IS NOT NULL) AND ("bundle_id" IS NOT NULL) AND ("channel_id" IS NULL)) OR (("scope_type" = "public"."rbac_scope_channel"()) AND ("org_id" IS NOT NULL) AND ("app_id" IS NOT NULL) AND ("bundle_id" IS NULL) AND ("channel_id" IS NOT NULL)))),
     CONSTRAINT "role_bindings_principal_type_check" CHECK (("principal_type" = ANY (ARRAY["public"."rbac_principal_user"(), "public"."rbac_principal_group"(), "public"."rbac_principal_apikey"()]))),
     CONSTRAINT "role_bindings_scope_type_check" CHECK (("scope_type" = ANY (ARRAY["public"."rbac_scope_platform"(), "public"."rbac_scope_org"(), "public"."rbac_scope_app"(), "public"."rbac_scope_bundle"(), "public"."rbac_scope_channel"()]))),
@@ -19659,6 +20165,10 @@ CREATE UNIQUE INDEX "role_bindings_org_scope_uniq" ON "public"."role_bindings" U
 
 
 
+CREATE INDEX "role_bindings_parent_binding_id_idx" ON "public"."role_bindings" USING "btree" ("parent_binding_id") WHERE ("parent_binding_id" IS NOT NULL);
+
+
+
 CREATE INDEX "role_bindings_principal_scope_idx" ON "public"."role_bindings" USING "btree" ("principal_type", "principal_id", "scope_type", "org_id", "app_id", "channel_id");
 
 
@@ -19768,6 +20278,10 @@ CREATE OR REPLACE TRIGGER "audit_org_users_trigger" AFTER INSERT OR DELETE OR UP
 
 
 CREATE OR REPLACE TRIGGER "audit_orgs_trigger" AFTER INSERT OR DELETE OR UPDATE ON "public"."orgs" FOR EACH ROW EXECUTE FUNCTION "public"."audit_log_trigger"();
+
+
+
+CREATE OR REPLACE TRIGGER "bind_app_preview_apikey_to_created_channel" AFTER INSERT ON "public"."channels" FOR EACH ROW EXECUTE FUNCTION "public"."bind_app_preview_apikey_to_created_channel"();
 
 
 
@@ -20063,6 +20577,10 @@ CREATE OR REPLACE TRIGGER "tombstone_deleted_org_id" BEFORE DELETE ON "public"."
 
 
 
+CREATE OR REPLACE TRIGGER "track_preview_bundle_creator" BEFORE INSERT OR UPDATE ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "public"."enforce_preview_bundle_ownership"();
+
+
+
 CREATE OR REPLACE TRIGGER "trg_sync_org_has_usage_credits" AFTER INSERT OR DELETE OR UPDATE ON "public"."usage_credit_grants" FOR EACH ROW EXECUTE FUNCTION "public"."sync_org_has_usage_credits_from_grants"();
 
 
@@ -20072,6 +20590,10 @@ CREATE OR REPLACE TRIGGER "update_apps_build_timeout_updated_at" BEFORE INSERT O
 
 
 CREATE OR REPLACE TRIGGER "update_webhooks_updated_at" BEFORE UPDATE ON "public"."webhooks" FOR EACH ROW EXECUTE FUNCTION "public"."update_webhook_updated_at"();
+
+
+
+CREATE OR REPLACE TRIGGER "validate_channel_preview_role_binding" BEFORE INSERT OR UPDATE OF "role_id", "scope_type", "principal_type", "principal_id", "org_id", "app_id", "channel_id", "parent_binding_id", "expires_at", "is_direct" ON "public"."role_bindings" FOR EACH ROW EXECUTE FUNCTION "public"."validate_channel_preview_role_binding"();
 
 
 
@@ -20392,6 +20914,11 @@ ALTER TABLE ONLY "public"."role_bindings"
 
 ALTER TABLE ONLY "public"."role_bindings"
     ADD CONSTRAINT "role_bindings_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."role_bindings"
+    ADD CONSTRAINT "role_bindings_parent_binding_id_fkey" FOREIGN KEY ("parent_binding_id") REFERENCES "public"."role_bindings"("id") ON DELETE CASCADE;
 
 
 
@@ -21974,6 +22501,11 @@ GRANT ALL ON FUNCTION "public"."assert_group_member_is_org_member"("p_group_id" 
 
 
 
+REVOKE ALL ON FUNCTION "public"."assert_preview_bundle_owner"("p_owner_org" "uuid", "p_app_id" character varying, "p_version_id" bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."assert_preview_bundle_owner"("p_owner_org" "uuid", "p_app_id" character varying, "p_version_id" bigint) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."assert_request_principal_rank"("p_org_id" "uuid", "p_target_priority" integer, "p_mutation" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."assert_request_principal_rank"("p_org_id" "uuid", "p_target_priority" integer, "p_mutation" "text") TO "service_role";
 
@@ -21996,6 +22528,11 @@ REVOKE ALL ON FUNCTION "public"."auto_apikey_name_by_id"() FROM PUBLIC;
 
 
 REVOKE ALL ON FUNCTION "public"."auto_owner_org_by_app_id"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."bind_app_preview_apikey_to_created_channel"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."bind_app_preview_apikey_to_created_channel"() TO "service_role";
 
 
 
@@ -22092,16 +22629,16 @@ GRANT ALL ON FUNCTION "public"."check_org_hashed_key_enforcement"("org_id" "uuid
 
 
 REVOKE ALL ON FUNCTION "public"."check_org_members_2fa_enabled"("org_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."check_org_members_2fa_enabled"("org_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."check_org_members_2fa_enabled"("org_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."check_org_members_2fa_enabled"("org_id" "uuid") TO "service_role";
-GRANT ALL ON FUNCTION "public"."check_org_members_2fa_enabled"("org_id" "uuid") TO "anon";
 
 
 
 REVOKE ALL ON FUNCTION "public"."check_org_members_password_policy"("org_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."check_org_members_password_policy"("org_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."check_org_members_password_policy"("org_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."check_org_members_password_policy"("org_id" "uuid") TO "service_role";
-GRANT ALL ON FUNCTION "public"."check_org_members_password_policy"("org_id" "uuid") TO "anon";
 
 
 
@@ -22253,6 +22790,16 @@ GRANT ALL ON FUNCTION "public"."count_non_compliant_bundles"("org_id" "uuid", "r
 
 
 
+REVOKE ALL ON FUNCTION "public"."current_app_preview_apikey_rbac_id"("p_owner_org" "uuid", "p_app_id" character varying) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."current_app_preview_apikey_rbac_id"("p_owner_org" "uuid", "p_app_id" character varying) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."current_app_preview_binding_id"("p_owner_org" "uuid", "p_app_id" character varying) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."current_app_preview_binding_id"("p_owner_org" "uuid", "p_app_id" character varying) TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."current_request_role"() TO "service_role";
 
 
@@ -22324,6 +22871,11 @@ REVOKE ALL ON FUNCTION "public"."enforce_email_otp_for_mfa"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "public"."enforce_preview_bundle_ownership"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."enforce_preview_bundle_ownership"() TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."enforce_role_binding_role_scope"() TO "service_role";
 
 
@@ -22337,6 +22889,7 @@ REVOKE ALL ON FUNCTION "public"."enqueue_credit_usage_alert"() FROM PUBLIC;
 
 
 REVOKE ALL ON FUNCTION "public"."enqueue_credit_usage_posthog_event"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."enqueue_credit_usage_posthog_event"() TO "service_role";
 
 
 
@@ -22559,9 +23112,9 @@ GRANT ALL ON FUNCTION "public"."get_org_build_time_unit"("p_org_id" "uuid", "p_s
 
 
 REVOKE ALL ON FUNCTION "public"."get_org_members"("guild_id" "uuid") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."get_org_members"("guild_id" "uuid") TO "service_role";
 GRANT ALL ON FUNCTION "public"."get_org_members"("guild_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_org_members"("guild_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_org_members"("guild_id" "uuid") TO "service_role";
 
 
 
@@ -22571,9 +23124,9 @@ GRANT ALL ON FUNCTION "public"."get_org_members"("user_id" "uuid", "guild_id" "u
 
 
 REVOKE ALL ON FUNCTION "public"."get_org_members_rbac"("p_org_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."get_org_members_rbac"("p_org_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_org_members_rbac"("p_org_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_org_members_rbac"("p_org_id" "uuid") TO "service_role";
-GRANT ALL ON FUNCTION "public"."get_org_members_rbac"("p_org_id" "uuid") TO "anon";
 
 
 
@@ -22585,9 +23138,9 @@ GRANT ALL ON FUNCTION "public"."get_org_perm_for_apikey"("apikey" "text", "app_i
 
 
 REVOKE ALL ON FUNCTION "public"."get_org_perm_for_apikey_v2"("apikey" "text", "app_id" "text") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."get_org_perm_for_apikey_v2"("apikey" "text", "app_id" "text") TO "service_role";
 GRANT ALL ON FUNCTION "public"."get_org_perm_for_apikey_v2"("apikey" "text", "app_id" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_org_perm_for_apikey_v2"("apikey" "text", "app_id" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_org_perm_for_apikey_v2"("apikey" "text", "app_id" "text") TO "service_role";
 
 
 
@@ -23047,6 +23600,11 @@ GRANT ALL ON FUNCTION "public"."is_user_app_admin"("p_user_id" "uuid", "p_app_id
 REVOKE ALL ON FUNCTION "public"."is_user_org_admin"("p_user_id" "uuid", "p_org_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."is_user_org_admin"("p_user_id" "uuid", "p_org_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."is_user_org_admin"("p_user_id" "uuid", "p_org_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."lock_channel_bundle_lifecycle"("p_version_id" bigint, "p_rollout_version_id" bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."lock_channel_bundle_lifecycle"("p_version_id" bigint, "p_rollout_version_id" bigint) TO "service_role";
 
 
 
@@ -24060,9 +24618,9 @@ GRANT ALL ON FUNCTION "public"."update_apps_build_timeout_updated_at"() TO "serv
 
 
 REVOKE ALL ON FUNCTION "public"."update_org_invite_role_rbac"("p_org_id" "uuid", "p_user_id" "uuid", "p_new_role_name" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."update_org_invite_role_rbac"("p_org_id" "uuid", "p_user_id" "uuid", "p_new_role_name" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."update_org_invite_role_rbac"("p_org_id" "uuid", "p_user_id" "uuid", "p_new_role_name" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_org_invite_role_rbac"("p_org_id" "uuid", "p_user_id" "uuid", "p_new_role_name" "text") TO "service_role";
-GRANT ALL ON FUNCTION "public"."update_org_invite_role_rbac"("p_org_id" "uuid", "p_user_id" "uuid", "p_new_role_name" "text") TO "anon";
 
 
 
@@ -24079,9 +24637,9 @@ GRANT ALL ON FUNCTION "public"."update_sso_providers_updated_at"() TO "authentic
 
 
 REVOKE ALL ON FUNCTION "public"."update_tmp_invite_role_rbac"("p_org_id" "uuid", "p_email" "text", "p_new_role_name" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."update_tmp_invite_role_rbac"("p_org_id" "uuid", "p_email" "text", "p_new_role_name" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."update_tmp_invite_role_rbac"("p_org_id" "uuid", "p_email" "text", "p_new_role_name" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_tmp_invite_role_rbac"("p_org_id" "uuid", "p_email" "text", "p_new_role_name" "text") TO "service_role";
-GRANT ALL ON FUNCTION "public"."update_tmp_invite_role_rbac"("p_org_id" "uuid", "p_email" "text", "p_new_role_name" "text") TO "anon";
 
 
 
@@ -24115,6 +24673,11 @@ GRANT ALL ON FUNCTION "public"."user_has_role_in_app"("p_user_id" "uuid", "p_app
 
 REVOKE ALL ON FUNCTION "public"."user_meets_password_policy"("user_id" "uuid", "org_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."user_meets_password_policy"("user_id" "uuid", "org_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."validate_channel_preview_role_binding"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."validate_channel_preview_role_binding"() TO "service_role";
 
 
 
