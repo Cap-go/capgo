@@ -18,7 +18,21 @@ export interface SDKResult<T = void> {
   warnings?: string[]
 }
 
-const localizedReleaseNotesSchema = type({ '[string]': 'string.trim |> string > 0' })
+const localizedReleaseNotesSchema = type({ '[string]': 'string' }).pipe((data, ctx) => {
+  const out: Record<string, string> = {}
+  for (const [rawKey, rawValue] of Object.entries(data)) {
+    const key = rawKey.trim()
+    const value = rawValue.trim()
+    if (!key) {
+      return ctx.reject('a non-empty locale key')
+    }
+    if (!value) {
+      return ctx.reject('a non-empty release note')
+    }
+    out[key] = value
+  }
+  return out
+})
 
 // ============================================================================
 // SDK App Schemas

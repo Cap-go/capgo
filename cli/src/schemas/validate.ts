@@ -13,6 +13,12 @@ export function validateOptions<T>(schema: StandardSchema<T>, data: unknown, sil
 
   const issues = result.error.issues
   const messages = issues.map((issue) => {
+    // ArkType issue.message often already includes the property path; prefer
+    // `problem` when present to avoid "foo: foo must be ..." duplication.
+    const problem = (issue as { problem?: string }).problem
+    if (typeof problem === 'string' && problem.length > 0)
+      return problem
+
     const path = issue.path && issue.path.length > 0 ? issue.path.join('.') : 'value'
     return `${path}: ${issue.message}`
   })
