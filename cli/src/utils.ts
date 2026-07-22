@@ -202,7 +202,6 @@ interface TrackOptions {
   timestamp?: number | Date
 }
 
-export type { OptionsBase } from './schemas/base'
 
 export function wait(ms: number) {
   return new Promise((resolve) => {
@@ -2115,7 +2114,7 @@ export async function getRemoteDependencies(supabase: SupabaseClient<Database>, 
   return convertNativePackages(((remoteNativePackages.version as any)?.native_packages as any) ?? [])
 }
 
-export type { Compatibility, CompatibilityDetails, IncompatibilityReason } from './schemas/common'
+export type { Compatibility, CompatibilityDetails } from './schemas/common'
 
 export function getAppId(appId: string | undefined, config: CapacitorConfig | undefined) {
   const finalAppId = appId || config?.plugins?.CapacitorUpdater?.appId || config?.appId
