@@ -602,7 +602,7 @@ const totalAbovePlan = computed(() => {
   const stats = latestGlobalStats.value
   if (!stats || stats.above_plan_with_credits === null || stats.above_plan_without_credits === null)
     return null
-  return (stats.above_plan_with_credits ?? 0) + (stats.above_plan_without_credits ?? 0)
+  return stats.above_plan_with_credits + stats.above_plan_without_credits
 })
 
 watch(() => adminStore.activeDateRange, () => {
