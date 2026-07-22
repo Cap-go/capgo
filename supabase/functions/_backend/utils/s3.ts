@@ -150,7 +150,10 @@ async function getObjectPresence(c: Context, fileId: string | null): Promise<Obj
   try {
     const client = initS3(c)
     const url = await client.getPresignedUrl('HEAD', fileId)
-    const response = await fetch(url, { method: 'HEAD' })
+    const response = await fetch(url, {
+      method: 'HEAD',
+      signal: AbortSignal.timeout(10_000),
+    })
     await response.body?.cancel()
 
     if (response.status === 404)
