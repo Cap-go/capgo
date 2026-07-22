@@ -379,7 +379,7 @@
     "supabase": "^2.109.1",
     "tailwindcss": "^4.3.3",
     "tinbase": "^0.10.0",
-    "typescript": "6.0.3",
+    "typescript": "npm:typescript-native-bridge@6.0.3-bridge.1.tsgo.7.0.2",
     "unplugin-auto-import": "^21.0.0",
     "unplugin-formkit": "^0.3.0",
     "unplugin-icons": "23.0.1",
@@ -409,5 +409,8 @@
   "trustedDependencies": [
     "supabase",
     "core-js"
-  ]
+  ],
+  "overrides": {
+    "typescript": "npm:typescript-native-bridge@6.0.3-bridge.1.tsgo.7.0.2"
+  }
 }

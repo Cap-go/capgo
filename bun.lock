@@ -191,7 +191,7 @@
         "supabase": "^2.109.1",
         "tailwindcss": "^4.3.3",
         "tinbase": "^0.10.0",
-        "typescript": "6.0.3",
+        "typescript": "npm:typescript-native-bridge@6.0.3-bridge.1.tsgo.7.0.2",
         "unplugin-auto-import": "^21.0.0",
         "unplugin-formkit": "^0.3.0",
         "unplugin-icons": "23.0.1",
@@ -266,7 +266,7 @@
         "prettyjson": "^1.2.5",
         "tmp": "^0.2.7",
         "tus-js-client": "^4.3.1",
-        "typescript": "6.0.3",
+        "typescript": "npm:typescript-native-bridge@6.0.3-bridge.1.tsgo.7.0.2",
         "ws": "^8.21.1",
         "zod": "^4.4.3",
       },
@@ -282,7 +282,7 @@
       "devDependencies": {
         "@capacitor/android": "^8.4.2",
         "@capacitor/ios": "^8.4.2",
-        "typescript": "6.0.3",
+        "typescript": "npm:typescript-native-bridge@6.0.3-bridge.1.tsgo.7.0.2",
       },
       "peerDependencies": {
         "@capacitor/core": "^8.4.2",
@@ -296,6 +296,9 @@
   "trustedDependencies": [
     "supabase",
   ],
+  "overrides": {
+    "typescript": "npm:typescript-native-bridge@6.0.3-bridge.1.tsgo.7.0.2",
+  },
   "packages": {
     "@alcalzone/ansi-tokenize": ["@alcalzone/ansi-tokenize@0.3.0", "", { "dependencies": { "ansi-styles": "^6.2.1", "is-fullwidth-code-point": "^5.0.0" } }, "sha512-p+CMKJ93HFmLkjXKlXiVGlMQEuRb6H0MokBSwUsX+S6BRX8eV5naFZpQJFfJHjRZY0Hmnqy1/r6UWl3x+19zYA=="],
 
@@ -1344,6 +1347,20 @@
     "@typescript-eslint/utils": ["@typescript-eslint/utils@8.65.0", "", { "dependencies": { "@eslint-community/eslint-utils": "^4.9.1", "@typescript-eslint/scope-manager": "8.65.0", "@typescript-eslint/types": "8.65.0", "@typescript-eslint/typescript-estree": "8.65.0" }, "peerDependencies": { "eslint": "^8.57.0 || ^9.0.0 || ^10.0.0", "typescript": ">=4.8.4 <6.1.0" } }, "sha512-gXiwIHsYreboxeJucHKPvgwl7dXt50mF8s1/c00cP/WoVTyWKFdtfhRWwZiXYFU5H2O8vVoSLNrexFZjYS/SGA=="],
 
     "@typescript-eslint/visitor-keys": ["@typescript-eslint/visitor-keys@8.65.0", "", { "dependencies": { "@typescript-eslint/types": "8.65.0", "eslint-visitor-keys": "^5.0.0" } }, "sha512-8C71BQkGjiMmXtop7pHVJu1l2NNShFdkCyD6a2ezzs5vU/L3LRtb69EtcteFwz0mYMPzIgOw0n6OV4VBUWZd7A=="],
+
+    "@typescript-native-bridge/darwin-arm64": ["@typescript-native-bridge/darwin-arm64@6.0.3-bridge.1.tsgo.7.0.2", "", { "os": "darwin", "cpu": "arm64" }, "sha512-odo538uhOuD6PZT4gY8955l/r1xTLfVoyeU1RQ8O7QxISRbS90sYeQBNCts4VUyvcVa/1yBClgjgEbBYXZbDyg=="],
+
+    "@typescript-native-bridge/darwin-x64": ["@typescript-native-bridge/darwin-x64@6.0.3-bridge.1.tsgo.7.0.2", "", { "os": "darwin", "cpu": "x64" }, "sha512-LMJSZZXLNh7otRZoMH2+algHWupo3EcYnEXdxwH6+AAZJL7FZAiRA2h+nGNc0j3f0lRrw5qeFLcE2Rhtzk6Kpw=="],
+
+    "@typescript-native-bridge/linux-arm": ["@typescript-native-bridge/linux-arm@6.0.3-bridge.1.tsgo.7.0.2", "", { "os": "linux", "cpu": "arm" }, "sha512-28OCjw/dpf5NV8glXnVsdMbCSImhInCe49jVIH3ICKYf9Re8QFnqz5fLVI8+3SUVproaFT7PQfuAKGt0sUuePQ=="],
+
+    "@typescript-native-bridge/linux-arm64": ["@typescript-native-bridge/linux-arm64@6.0.3-bridge.1.tsgo.7.0.2", "", { "os": "linux", "cpu": "arm64" }, "sha512-uPSbphc1Z7VMSVTs9wVuaqxK1jpkGwkMwcg7UvXwUUBdVrIv/zdFq349RkbG4IB0G0i78EWDDFDSkGs/aL/WEg=="],
+
+    "@typescript-native-bridge/linux-x64": ["@typescript-native-bridge/linux-x64@6.0.3-bridge.1.tsgo.7.0.2", "", { "os": "linux", "cpu": "x64" }, "sha512-kVJXTkXx3GWSGKJXZak6IhSiiR+HuKX4F6H74Dr96kqKS4Jopx0dqBbZ1+05xizCShJsw6gFP1tmWtYwt/V63A=="],
+
+    "@typescript-native-bridge/win32-arm64": ["@typescript-native-bridge/win32-arm64@6.0.3-bridge.1.tsgo.7.0.2", "", { "os": "win32", "cpu": "arm64" }, "sha512-xvNNBTKogTyvd1rFogt/dreCsx1kvbqLidBeoTuGDOjOCXjLRGuz1ym6woVXUwiVi3KdtwsaXqYE9CoURxNyCA=="],
+
+    "@typescript-native-bridge/win32-x64": ["@typescript-native-bridge/win32-x64@6.0.3-bridge.1.tsgo.7.0.2", "", { "os": "win32", "cpu": "x64" }, "sha512-5HegdRz7LXB61YdtJ0/F6tgTv4A4WfT0Uz0BQma6fPVhwK6UHdYOWosFW05ZEZOAZMQ9MgFsryvd8nNZNvUjVg=="],
 
     "@typescript/native-preview": ["@typescript/native-preview@7.0.0-dev.20260707.2", "", { "optionalDependencies": { "@typescript/native-preview-darwin-arm64": "7.0.0-dev.20260707.2", "@typescript/native-preview-darwin-x64": "7.0.0-dev.20260707.2", "@typescript/native-preview-linux-arm": "7.0.0-dev.20260707.2", "@typescript/native-preview-linux-arm64": "7.0.0-dev.20260707.2", "@typescript/native-preview-linux-x64": "7.0.0-dev.20260707.2", "@typescript/native-preview-win32-arm64": "7.0.0-dev.20260707.2", "@typescript/native-preview-win32-x64": "7.0.0-dev.20260707.2" }, "bin": { "tsgo": "bin/tsgo" } }, "sha512-oUGp+Rep/hqMhPunyinsALUwSlzHINSxitifPiSaeqoKOKD2OlR9NE3TaPqwsl4NlGslsOSUXI1JotWQzpYCPg=="],
 
@@ -2741,7 +2758,7 @@
 
     "type-is": ["type-is@2.1.0", "", { "dependencies": { "content-type": "^2.0.0", "media-typer": "^1.1.0", "mime-types": "^3.0.0" } }, "sha512-faYHw0anBbc/kWF3zFTEnxSFOAGUX9GFbOBthvDdLsIlEoWOFOtS0zgCiQYwIskL9iGXZL3kAXD8OoZ4GmMATA=="],
 
-    "typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
+    "typescript": ["typescript-native-bridge@6.0.3-bridge.1.tsgo.7.0.2", "", { "optionalDependencies": { "@typescript-native-bridge/darwin-arm64": "6.0.3-bridge.1.tsgo.7.0.2", "@typescript-native-bridge/darwin-x64": "6.0.3-bridge.1.tsgo.7.0.2", "@typescript-native-bridge/linux-arm": "6.0.3-bridge.1.tsgo.7.0.2", "@typescript-native-bridge/linux-arm64": "6.0.3-bridge.1.tsgo.7.0.2", "@typescript-native-bridge/linux-x64": "6.0.3-bridge.1.tsgo.7.0.2", "@typescript-native-bridge/win32-arm64": "6.0.3-bridge.1.tsgo.7.0.2", "@typescript-native-bridge/win32-x64": "6.0.3-bridge.1.tsgo.7.0.2" }, "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-vBtvhFVhjwUBIo4xZE6CNr3C1J1VSAvV7kLBRAPqs29HuL5bvxsOTRq+KxXODSEyp/TCWn/TeE0Bzd0D7k1UWg=="],
 
     "ufo": ["ufo@1.6.4", "", {}, "sha512-JFNbkD1Svwe0KvGi8GOeLcP4kAWQ609twvCdcHxq1oSL8svv39ZuSvajcD8B+5D0eL4+s1Is2D/O6KN3qcTeRA=="],
 

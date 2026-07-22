@@ -15,5 +15,7 @@
   },
   "editor.formatOnSave": true,
   "SQL-Formatter-VSCode.dialect": "postgresql",
-  "SQL-Formatter-VSCode.linesBetweenQueries": 1
+  "SQL-Formatter-VSCode.linesBetweenQueries": 1,
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
 }
