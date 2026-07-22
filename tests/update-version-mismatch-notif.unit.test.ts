@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const getAppOwnerPostgresMock = vi.fn()
 const requestInfosPostgresMock = vi.fn()
-const sendNotifToOrgMembersCachedMock = vi.fn(() => Promise.resolve(true))
+const sendNotifToOrgMembersCachedMock = vi.fn<(...args: any[]) => Promise<boolean>>(() => Promise.resolve(true))
 const sendStatsAndDeviceMock = vi.fn(() => Promise.resolve())
 
 ;(globalThis as any).EdgeRuntime = undefined
@@ -125,7 +125,7 @@ describe('updates version mismatch bento notifications', () => {
     })
 
     const res = await runUpdate({ version_build: '1.0.0', version_name: '1.0.0' })
-    const json = await res.json()
+    const json = await res.json() as { error?: string }
     expect(json.error).toBe('disable_auto_update_to_major')
     expect(sendNotifToOrgMembersCachedMock).toHaveBeenCalledWith(
       expect.anything(),
@@ -149,7 +149,8 @@ describe('updates version mismatch bento notifications', () => {
       expect.anything(),
     )
     // payload must not expose numeric bundle ids
-    const payload = sendNotifToOrgMembersCachedMock.mock.calls[0][3]
+    const firstCall = sendNotifToOrgMembersCachedMock.mock.calls[0] as unknown as unknown[]
+    const payload = firstCall[3] as Record<string, unknown>
     expect(payload).not.toHaveProperty('version_id')
     expect(Object.values(payload)).not.toContain(12345)
   })
@@ -177,7 +178,7 @@ describe('updates version mismatch bento notifications', () => {
     })
 
     const res = await runUpdate({ version_build: '2.0.0', version_name: '2.0.0' })
-    const json = await res.json()
+    const json = await res.json() as { error?: string }
     expect(json.error).toBe('disable_auto_update_under_native')
     expect(sendNotifToOrgMembersCachedMock).toHaveBeenCalledWith(
       expect.anything(),
