@@ -127,7 +127,7 @@ Tag does NOT contain: bundle_deployed_disabled
 
 **Events**: `device:upgrade_blocked`, `device:downgrade_blocked`
 
-Emitted from `/updates` when a device is blocked by channel auto-update version policy (upgrade: major/minor/patch/metadata; downgrade: under-native). Delivery uses `sendNotifToOrgMembersCached` with preference key `device_error` (Cloudflare plugin KV queue in production).
+Emitted from `/updates` when a device is blocked by channel auto-update version policy (upgrade: major/minor/patch/metadata; downgrade: under_native). Delivery uses `sendNotifToOrgMembersCached` with preference key `device_error` (Cloudflare plugin KV queue in production).
 
 **Payload fields** (`event.details`):
 

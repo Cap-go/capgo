@@ -20,6 +20,7 @@ import { getClientIP } from './rate_limit.ts'
 import { sendNotifOrgCached } from './notifications.ts'
 import { sendNotifToOrgMembersCached } from './org_email_notifications.ts'
 import { closeClient, getAppBlockProviderInfraRequestsPostgres, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres, setReplicationLagHeader } from './pg.ts'
+import { shouldQueuePluginNotifications } from './supabase_write_guard.ts'
 import { makeDevice } from './plugin_parser.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './stats.ts'
@@ -48,31 +49,58 @@ function notifyAutoUpdateVersionBlocked(
     version: string
     versionBuild: string
     versionName: string
-    drizzleClient: ReturnType<typeof getDrizzleClient>
   },
 ) {
   const eventName = kind === 'upgrade' ? 'device:upgrade_blocked' : 'device:downgrade_blocked'
-  return backgroundTask(c, sendNotifToOrgMembersCached(
-    c,
-    eventName,
-    'device_error',
-    {
-      app_id: args.appId,
-      app_id_url: args.appId,
-      device_id: args.deviceId,
-      platform: args.platform,
-      channel_name: args.channelName,
-      channel_id: args.channelId,
-      version: args.version,
-      version_build: args.versionBuild,
-      version_name: args.versionName,
-      reason,
-    },
-    args.orgId,
-    args.appId,
-    '0 0 * * 0',
-    args.drizzleClient,
-  ))
+  const eventData = {
+    app_id: args.appId,
+    app_id_url: args.appId,
+    device_id: args.deviceId,
+    platform: args.platform,
+    channel_name: args.channelName,
+    channel_id: args.channelId,
+    version: args.version,
+    version_build: args.versionBuild,
+    version_name: args.versionName,
+    reason,
+  }
+  return backgroundTask(c, (async () => {
+    // Cloudflare plugin sets queuePluginNotifications — enqueue only, no request DB client.
+    if (shouldQueuePluginNotifications(c)) {
+      await sendNotifToOrgMembersCached(
+        c,
+        eventName,
+        'device_error',
+        eventData,
+        args.orgId,
+        args.appId,
+        '0 0 * * 0',
+        // Unused on the queued path; avoid borrowing the request-scoped client.
+        null as unknown as ReturnType<typeof getDrizzleClient>,
+      )
+      return
+    }
+
+    // Non-queued fallback (local/Supabase): own a short-lived client so the request
+    // pool can close without cancelling the Bento send.
+    const pgClient = getPgClient(c)
+    const drizzleClient = getDrizzleClient(pgClient)
+    try {
+      await sendNotifToOrgMembersCached(
+        c,
+        eventName,
+        'device_error',
+        eventData,
+        args.orgId,
+        args.appId,
+        '0 0 * * 0',
+        drizzleClient,
+      )
+    }
+    finally {
+      await closeClient(c, pgClient)
+    }
+  })())
 }
 
 type InvalidIpInfo = {
@@ -461,7 +489,6 @@ export async function updateWithPG(
       version: version.name,
       versionBuild: version_build,
       versionName: version_name,
-      drizzleClient,
     })
     // cloudlog(c.get('requestId'), 'check disableAutoUpdateToMajor', device_id)
     if (!channelData.channels.ios && platform === 'ios') {
