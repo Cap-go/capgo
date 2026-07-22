@@ -185,7 +185,7 @@ BEGIN
             SELECT 1
             FROM public.manifest AS m
             WHERE m.app_version_id = av.id
-              AND m.file_name = entry.file_name
+              -- Match stable identity; file_name may have been normalized at migrate time.
               AND m.s3_path = entry.s3_path
               AND m.file_hash = entry.file_hash
           )
@@ -685,7 +685,7 @@ BEGIN
             SELECT 1
             FROM public.manifest AS m
             WHERE m.app_version_id = OLD.id
-              AND m.file_name = entry.file_name
+              -- Match stable identity; file_name may have been normalized at migrate time.
               AND m.s3_path = entry.s3_path
               AND m.file_hash = entry.file_hash
           )

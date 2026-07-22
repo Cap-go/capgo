@@ -47,7 +47,6 @@ FROM (
         SELECT 1
         FROM public.manifest AS m
         WHERE m.app_version_id = sample.id
-          AND m.file_name = entry.file_name
           AND m.s3_path = entry.s3_path
           AND m.file_hash = entry.file_hash
       )
