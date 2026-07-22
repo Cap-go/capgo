@@ -608,13 +608,6 @@ CREATE INDEX app_versions_cli_version_idx ON public.app_versions USING btree (cl
 
 
 --
--- Name: app_versions_manifest_present_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX app_versions_manifest_present_idx ON public.app_versions USING btree (id) WHERE (manifest IS NOT NULL);
-
-
---
 -- Name: app_versions_r2_path_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -773,20 +766,6 @@ CREATE INDEX idx_app_versions_deleted ON public.app_versions USING btree (delete
 --
 
 CREATE INDEX idx_app_versions_deleted_at ON public.app_versions USING btree (deleted_at) WHERE (deleted_at IS NOT NULL);
-
-
---
--- Name: idx_app_versions_deleted_at_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_app_versions_deleted_at_id ON public.app_versions USING btree (deleted_at, id) WHERE (deleted = true);
-
-
---
--- Name: idx_app_versions_deleted_with_manifest; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_app_versions_deleted_with_manifest ON public.app_versions USING btree (id) WHERE ((deleted = true) AND (manifest_count > 0));
 
 
 --

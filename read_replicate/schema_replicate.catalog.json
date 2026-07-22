@@ -1983,13 +1983,6 @@
       "valid": true
     },
     {
-      "constraintOwned": false,
-      "definition": "CREATE INDEX app_versions_manifest_present_idx ON public.app_versions USING btree (id) WHERE (manifest IS NOT NULL)",
-      "name": "app_versions_manifest_present_idx",
-      "table": "app_versions",
-      "valid": true
-    },
-    {
       "constraintOwned": true,
       "definition": "CREATE UNIQUE INDEX app_versions_name_app_id_key ON public.app_versions USING btree (name, app_id)",
       "name": "app_versions_name_app_id_key",
@@ -2056,20 +2049,6 @@
       "constraintOwned": false,
       "definition": "CREATE INDEX idx_app_versions_deleted_at ON public.app_versions USING btree (deleted_at) WHERE (deleted_at IS NOT NULL)",
       "name": "idx_app_versions_deleted_at",
-      "table": "app_versions",
-      "valid": true
-    },
-    {
-      "constraintOwned": false,
-      "definition": "CREATE INDEX idx_app_versions_deleted_at_id ON public.app_versions USING btree (deleted_at, id) WHERE (deleted = true)",
-      "name": "idx_app_versions_deleted_at_id",
-      "table": "app_versions",
-      "valid": true
-    },
-    {
-      "constraintOwned": false,
-      "definition": "CREATE INDEX idx_app_versions_deleted_with_manifest ON public.app_versions USING btree (id) WHERE ((deleted = true) AND (manifest_count > 0))",
-      "name": "idx_app_versions_deleted_with_manifest",
       "table": "app_versions",
       "valid": true
     },
