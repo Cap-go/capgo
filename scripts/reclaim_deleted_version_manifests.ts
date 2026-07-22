@@ -84,9 +84,10 @@ async function moveToTrash(s3: S3Client, bucket: string, key: string) {
   if (!exists)
     return
 
+  const encodedKey = key.split('/').map(segment => encodeURIComponent(segment)).join('/')
   await s3.send(new CopyObjectCommand({
     Bucket: bucket,
-    CopySource: `${bucket}/${key}`,
+    CopySource: `${bucket}/${encodedKey}`,
     Key: `${TRASH_PREFIX}${key}`,
   }))
   await s3.send(new DeleteObjectCommand({

@@ -237,6 +237,31 @@ describe('queue_consumer legacy message compatibility', () => {
     )).toBe('continue')
   })
 
+  it.concurrent('uses the version queue retry budget for Discord failure alerts', () => {
+    const versionRetryBudget = __queueConsumerTestUtils__.getQueueMaxReads('on_version_update')
+    const midRetry = {
+      cf_id: 'cf-version-mid',
+      error_code: 'manifest_cleanup_incomplete',
+      function_name: 'on_version_update',
+      function_type: 'supabase',
+      msg_id: 2,
+      payload_size: 10,
+      read_count: MAX_QUEUE_READS,
+      status: 500,
+      status_text: 'Internal Server Error',
+    }
+    const exhausted = {
+      ...midRetry,
+      cf_id: 'cf-version-done',
+      msg_id: 3,
+      read_count: versionRetryBudget,
+    }
+
+    expect(versionRetryBudget).toBe(30)
+    expect(__queueConsumerTestUtils__.getActionableQueueFailures([midRetry], versionRetryBudget)).toEqual([])
+    expect(__queueConsumerTestUtils__.getActionableQueueFailures([exhausted], versionRetryBudget)).toEqual([exhausted])
+  })
+
   it.concurrent('alerts Discord after retry budget is exhausted', () => {
     const failure = {
       cf_id: 'cf-1',

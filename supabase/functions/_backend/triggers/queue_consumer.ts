@@ -138,9 +138,9 @@ function getQueueMessageTrace(functionName: string, body: Record<string, unknown
   }
 }
 
-function getActionableQueueFailures(failureDetails: FailureDetail[]): FailureDetail[] {
+function getActionableQueueFailures(failureDetails: FailureDetail[], retryBudget: number = MAX_QUEUE_READS): FailureDetail[] {
   return failureDetails.filter((detail) => {
-    if (detail.read_count < MAX_QUEUE_READS)
+    if (detail.read_count < retryBudget)
       return false
     return !detail.error_code || !DISCORD_IGNORED_ERROR_CODES.has(detail.error_code)
   })
@@ -682,6 +682,7 @@ async function reportQueueFailures(c: Context, queueName: string, messagesFailed
 
   cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Failed to process ${messagesFailed.length} messages.` })
 
+  const retryBudget = getQueueMaxReads(queueName)
   const timestamp = new Date().toISOString()
   const failureDetails = messagesFailed.map(msg => ({
     function_name: msg.message?.function_name ?? 'unknown',
@@ -699,7 +700,7 @@ async function reportQueueFailures(c: Context, queueName: string, messagesFailed
     target_url: msg.targetUrl ?? undefined,
   }))
 
-  const actionableFailures = getActionableQueueFailures(failureDetails)
+  const actionableFailures = getActionableQueueFailures(failureDetails, retryBudget)
   const groupedByFunction = actionableFailures.reduce((acc, detail) => {
     const key = detail.function_name
     acc[key] ??= []
@@ -734,7 +735,7 @@ async function reportQueueFailures(c: Context, queueName: string, messagesFailed
                 const messageInfo = detail.error_message ? ` | ${truncateDiscordField(detail.error_message.replace(/\s+/g, ' ').trim(), 180)}` : ''
                 const durationInfo = typeof detail.duration_ms === 'number' ? ` | ${detail.duration_ms}ms` : ''
                 const targetInfo = detail.target_url ? ` | Target: ${truncateDiscordField(detail.target_url, 120)}` : ''
-                return `**${detail.function_name}** | Status: ${detail.status} | Read: ${detail.read_count}/${MAX_QUEUE_READS}${durationInfo}${errorInfo}${messageInfo}${targetInfo} | [CF Logs](${cfLogUrl})`
+                return `**${detail.function_name}** | Status: ${detail.status} | Read: ${detail.read_count}/${retryBudget}${durationInfo}${errorInfo}${messageInfo}${targetInfo} | [CF Logs](${cfLogUrl})`
               }).join('\n')),
               inline: false,
             },
@@ -777,7 +778,7 @@ async function reportQueueFailures(c: Context, queueName: string, messagesFailed
     cloudlog({
       requestId: c.get('requestId'),
       message: `[${queueName}] Suppressed Discord alert for retryable or ignored queue failures.`,
-      retryingFailures: failureDetails.filter(detail => detail.read_count < MAX_QUEUE_READS).length,
+      retryingFailures: failureDetails.filter(detail => detail.read_count < retryBudget).length,
       ignoredErrors: Array.from(DISCORD_IGNORED_ERROR_CODES),
     })
   }
