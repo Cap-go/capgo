@@ -114,3 +114,4 @@ cli-helper/dist/
 cli-helper/npm/*/CapgoKeychainHelper.app
 cli-helper/npm/*/CapgoAscKeyHelper.app
 .tinbase/
+.context/

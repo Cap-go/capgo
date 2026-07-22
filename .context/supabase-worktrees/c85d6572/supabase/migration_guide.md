@@ -1,1 +1,0 @@
-/Users/martindonadieu/Projects/capgo_all/capgo/supabase/migration_guide.md
