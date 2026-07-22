@@ -558,6 +558,9 @@ describe('audit logs for app_versions via API key', () => {
         expect(versionAuditLog.new_record).toBeTruthy()
         if (versionAuditLog.new_record && typeof versionAuditLog.new_record === 'object') {
           expect((versionAuditLog.new_record as Record<string, unknown>).name).toBe(testVersionName)
+          // Fat columns must stay out of audit TOAST to protect primary DB memory.
+          expect((versionAuditLog.new_record as Record<string, unknown>).manifest).toBeUndefined()
+          expect((versionAuditLog.new_record as Record<string, unknown>).native_packages).toBeUndefined()
         }
       }
     }
