@@ -26,15 +26,13 @@ BEGIN
 
     LOOP
       EXECUTE format(
-        'WITH doomed AS (
+        'DELETE FROM pgmq.a_%I
+         WHERE ctid IN (
            SELECT ctid
            FROM pgmq.a_%I
            WHERE archived_at < $1
            LIMIT $2
-         )
-         DELETE FROM pgmq.a_%I AS archive
-         USING doomed
-         WHERE archive.ctid = doomed.ctid',
+         )',
         queue_name,
         queue_name
       )
@@ -52,15 +50,13 @@ BEGIN
     deleted_total := 0;
     LOOP
       EXECUTE format(
-        'WITH doomed AS (
+        'DELETE FROM pgmq.q_%I
+         WHERE ctid IN (
            SELECT ctid
            FROM pgmq.q_%I
            WHERE read_ct > 5
            LIMIT $1
-         )
-         DELETE FROM pgmq.q_%I AS queue
-         USING doomed
-         WHERE queue.ctid = doomed.ctid',
+         )',
         queue_name,
         queue_name
       )
@@ -115,15 +111,13 @@ DECLARE
   deleted_total bigint := 0;
 BEGIN
   LOOP
-    WITH doomed AS (
+    DELETE FROM public.audit_logs
+    WHERE ctid IN (
       SELECT ctid
       FROM public.audit_logs
       WHERE created_at < cutoff
       LIMIT batch_size
-    )
-    DELETE FROM public.audit_logs AS audit_logs
-    USING doomed
-    WHERE audit_logs.ctid = doomed.ctid;
+    );
 
     GET DIAGNOSTICS deleted_batch = ROW_COUNT;
     deleted_total := deleted_total + deleted_batch;
