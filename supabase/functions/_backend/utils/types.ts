@@ -134,6 +134,8 @@ export interface ReadDevicesParams {
   installSources?: string[]
   search?: string
   order?: Order[]
+  /** Only return devices with updated_at greater than this ISO timestamp */
+  updated_at_gt?: string
   limit?: number
   /** Cursor for pagination - use the last updated_at from previous page */
   cursor?: string

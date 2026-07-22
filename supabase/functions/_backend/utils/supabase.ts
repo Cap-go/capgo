@@ -1605,6 +1605,9 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
   if (params.installSources?.length)
     query = query.in('install_source', params.installSources)
 
+  if (params.updated_at_gt)
+    query = query.gt('updated_at', params.updated_at_gt)
+
   const devicesOrder = getDevicesOrder(params.order)
 
   if (params.cursor) {
