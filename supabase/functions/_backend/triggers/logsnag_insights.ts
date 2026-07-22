@@ -2778,6 +2778,57 @@ async function runUsageDemoAppsGlobalStatsShard(c: Context, window: DailyWindow)
   await updateUsageGlobalStatsSnapshot(c, window, 'Updated global stats usage demo apps shard', { demo_apps_created: demoAppsCreated }, { demoAppsCreated })
 }
 
+
+function getTrailing12mStart(nextDayStart: Date): Date {
+  const year = nextDayStart.getUTCFullYear() - 1
+  const month = nextDayStart.getUTCMonth()
+  const day = nextDayStart.getUTCDate()
+  const clampedDay = Math.min(day, new Date(Date.UTC(year, month + 1, 0)).getUTCDate())
+  return new Date(Date.UTC(
+    year,
+    month,
+    clampedDay,
+    nextDayStart.getUTCHours(),
+    nextDayStart.getUTCMinutes(),
+    nextDayStart.getUTCSeconds(),
+    nextDayStart.getUTCMilliseconds(),
+  ))
+}
+
+async function getUpgradeRate12m(c: Context, nextDayStart: Date): Promise<number> {
+  const pgClient = getPgClient(c, false)
+  const drizzleClient = getDrizzleClient(pgClient)
+  const snapshotEndIso = nextDayStart.toISOString()
+  const trailing12mStartIso = getTrailing12mStart(nextDayStart).toISOString()
+
+  try {
+    const result = await drizzleClient.execute(sql`
+      SELECT
+        (
+          SELECT COUNT(*)::int
+          FROM public.orgs
+          WHERE created_at < ${snapshotEndIso}::timestamptz
+        ) AS orgs,
+        (
+          SELECT COUNT(DISTINCT o.id)::int
+          FROM public.orgs o
+          INNER JOIN public.stripe_info si ON si.customer_id = o.customer_id
+          WHERE si.upgraded_at >= ${trailing12mStartIso}::timestamptz
+            AND si.upgraded_at < ${snapshotEndIso}::timestamptz
+        ) AS upgraded_orgs_12m
+    `)
+    const row = result.rows[0] as { orgs?: number | string | null, upgraded_orgs_12m?: number | string | null } | undefined
+    return calculateConversionRate(Number(row?.upgraded_orgs_12m) || 0, Number(row?.orgs) || 0)
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getUpgradeRate12m error', error })
+    throw error
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
+}
+
 async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
   const supabase = supabaseAdmin(c)
   const metricWindow = getMetricWindowFromDailyWindow(window)
@@ -2791,6 +2842,7 @@ async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Prom
     new_paying_orgs,
     canceled_orgs,
     upgraded_orgs,
+    upgrade_rate_12m,
     trialExtensionStats,
     pastDueOrgStats,
     subscriptionAccessCounts,
@@ -2850,6 +2902,7 @@ async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Prom
         }
         return new Set((res.data || []).map(row => row.customer_id)).size
       }),
+    getUpgradeRate12m(c, nextDayStart),
     getTrialExtensionStats(c, metricWindow),
     refreshPastDueStats
       ? (async () => {
@@ -2917,6 +2970,7 @@ async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Prom
     trial_extended_orgs: trialExtensionStats.trial_extended_orgs,
     trial_extended_subscribed_orgs: trialExtensionStats.trial_extended_subscribed_orgs,
     total_revenue: revenue.total_revenue,
+    upgrade_rate_12m,
     upgraded_orgs,
   }
 
@@ -3250,7 +3304,10 @@ export const logsnagInsightsTestUtils = {
   normalizeSubscriptionAccessSnapshotCounts,
   shouldRefreshMutablePastDueStats,
   calculateChurnRevenue,
+  calculateConversionRate,
   calculateNrr,
+  getUpgradeRate12m,
+  getTrailing12mStart,
   countUniqueCustomers,
   getCompletedDayWindowForDateId,
   getMetricWindowFromDailyWindow,
