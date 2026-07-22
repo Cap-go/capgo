@@ -125,7 +125,26 @@ Tag does NOT contain: bundle_deployed_disabled
 
 #### 10. Device Error Notifications
 
-**Events**: `user:update_fail`
+**Events**: `device:upgrade_blocked`, `device:downgrade_blocked`
+
+Emitted from `/updates` when a device is blocked by channel auto-update version policy (upgrade: major/minor/patch/metadata; downgrade: under_native). Delivery uses `sendNotifToOrgMembersCached` with preference key `device_error` (Cloudflare plugin KV queue in production).
+
+**Payload fields** (`event.details`):
+
+| Field | Description |
+|-------|-------------|
+| `app_id` | App identifier |
+| `app_id_url` | Same as `app_id` (for console URL segments) |
+| `device_id` | Device UUID |
+| `platform` | `ios` / `android` / `electron` |
+| `channel_name` | Channel name |
+| `channel_id` | Channel numeric id (console channel link) |
+| `version` | Cloud/channel target bundle version name |
+| `version_build` | Device native version used in the policy check |
+| `version_name` | Device current OTA version name |
+| `reason` | `major` \| `minor` \| `patch` \| `metadata` \| `under_native` |
+
+Bundle / `version_id` numeric IDs are intentionally omitted — build console links from version names in the Bento template.
 
 **Filter to add**:
 ```text
