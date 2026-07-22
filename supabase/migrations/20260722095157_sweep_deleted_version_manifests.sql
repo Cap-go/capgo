@@ -7,7 +7,8 @@ CREATE INDEX IF NOT EXISTS idx_app_versions_deleted_with_manifest
 CREATE INDEX IF NOT EXISTS idx_app_versions_deleted_at_id
   ON public.app_versions (deleted_at, id)
   WHERE deleted = true;
- that still have manifest rows or stale counters.
+
+-- Sweeps soft-deleted app_versions that still have manifest rows or stale counters.
 -- Touches a bounded batch so on_version_update re-runs cleanup_manifest.
 -- Also zeros stale manifest_count when no rows remain.
 
