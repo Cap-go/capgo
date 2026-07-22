@@ -92,13 +92,6 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
   }
 
-  const updatedAtGt = parseUpdatedAtFilter(body.updated_at)
-  const order = parseDevicesOrder(body.order)
-  const limit = body.limit == null ? fetchLimit : Number(body.limit)
-  if (!Number.isFinite(limit) || !Number.isInteger(limit) || limit < 1) {
-    throw simpleError('invalid_limit', 'limit must be a positive integer', { limit: body.limit })
-  }
-
   // Auth context is already set by middlewareKey
   if (!(await checkPermission(c, 'app.read_devices', { appId: body.app_id }))) {
     throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id })
@@ -148,6 +141,13 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     return c.json(dataDevice)
   }
   else {
+    const updatedAtGt = parseUpdatedAtFilter(body.updated_at)
+    const order = parseDevicesOrder(body.order)
+    const limit = body.limit == null ? fetchLimit : Number(body.limit)
+    if (!Number.isFinite(limit) || !Number.isInteger(limit) || limit < 1) {
+      throw simpleError('invalid_limit', 'limit must be a positive integer', { limit: body.limit })
+    }
+
     const res = await readDevices(c, {
       app_id: body.app_id,
       cursor: body.cursor,

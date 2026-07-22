@@ -169,6 +169,23 @@ describe('[GET] /device updated_at filter and order', () => {
     expect(response.status).toBe(400)
     expect(data.error).toBe('invalid_order')
   })
+
+  it('ignores list-only params when fetching a specific device', async () => {
+    const params = new URLSearchParams({
+      app_id: APPNAME_DEVICE,
+      device_id: '00000000-0000-0000-0000-000000000000',
+      order: 'sideways',
+      updated_at: 'not-a-date',
+      limit: '1.5',
+    })
+    const response = await fetch(`${BASE_URL}/device?${params.toString()}`, {
+      method: 'GET',
+      headers,
+    })
+    const data = await response.json<{ device_id?: string, error?: string }>()
+    expect(response.status).toBe(200)
+    expect(data.device_id).toBe('00000000-0000-0000-0000-000000000000')
+  })
 })
 
 describe('[POST] /device operations', () => {
