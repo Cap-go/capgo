@@ -236,6 +236,14 @@ const upgradeTrendSeries = computed(() => {
 
   return [
     {
+      label: t('need-upgrade-trend'),
+      data: abovePlanTrendData.value.map(item => ({
+        date: item.date,
+        value: item.need_upgrade || 0,
+      })),
+      color: '#7c3aed', // violet
+    },
+    {
       label: t('total-above-plan'),
       data: abovePlanTrendData.value.map(item => ({
         date: item.date,
@@ -590,6 +598,13 @@ const latestGlobalStats = computed(() => {
   return globalStatsTrendData.value[globalStatsTrendData.value.length - 1]
 })
 
+const totalAbovePlan = computed(() => {
+  const stats = latestGlobalStats.value
+  if (!stats || stats.above_plan_with_credits === null || stats.above_plan_without_credits === null)
+    return null
+  return (stats.above_plan_with_credits ?? 0) + (stats.above_plan_without_credits ?? 0)
+})
+
 watch(() => adminStore.activeDateRange, () => {
   loadGlobalStatsTrend()
 }, { deep: true })
@@ -820,6 +835,29 @@ displayStore.defaultBack = '/dashboard'
                 </p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   {{ t('need-upgrade-description') }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Organizations Above Plan Total -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-info/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-info"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  {{ t('total-above-plan') }}
+                </p>
+                <p v-if="totalAbovePlan !== null" class="mt-2 text-3xl font-bold text-info">
+                  {{ formatNumberValue(totalAbovePlan) }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-info">
+                  —
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ t('total-above-plan-description') }}
                 </p>
               </div>
             </div>
