@@ -2806,9 +2806,17 @@ async function getUpgradeRate12m(c: Context, nextDayStart: Date): Promise<number
       SELECT
         (
           SELECT COUNT(*)::int
-          FROM public.orgs
-          WHERE created_at < ${snapshotEndIso}::timestamptz
-        ) AS orgs,
+          FROM public.stripe_info si
+          WHERE si.is_good_plan = true
+            AND si.status = 'succeeded'
+            AND si.created_at < ${snapshotEndIso}::timestamptz
+            AND (si.canceled_at IS NULL OR si.canceled_at >= ${snapshotEndIso}::timestamptz)
+            AND si.subscription_anchor_end > ${snapshotEndIso}::timestamptz
+            AND (
+              si.paid_at < ${snapshotEndIso}::timestamptz
+              OR (si.paid_at IS NULL AND si.trial_at <= ${snapshotEndIso}::timestamptz)
+            )
+        ) AS paying,
         (
           SELECT COUNT(DISTINCT o.id)::int
           FROM public.orgs o
@@ -2817,8 +2825,8 @@ async function getUpgradeRate12m(c: Context, nextDayStart: Date): Promise<number
             AND si.upgraded_at < ${snapshotEndIso}::timestamptz
         ) AS upgraded_orgs_12m
     `)
-    const row = result.rows[0] as { orgs?: number | string | null, upgraded_orgs_12m?: number | string | null } | undefined
-    return calculateConversionRate(Number(row?.upgraded_orgs_12m) || 0, Number(row?.orgs) || 0)
+    const row = result.rows[0] as { paying?: number | string | null, upgraded_orgs_12m?: number | string | null } | undefined
+    return calculateConversionRate(Number(row?.upgraded_orgs_12m) || 0, Number(row?.paying) || 0)
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getUpgradeRate12m error', error })

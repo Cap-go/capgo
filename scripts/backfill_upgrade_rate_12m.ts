@@ -8,7 +8,7 @@
  *
  * For each snapshot day D:
  *   sum(upgraded_orgs) over date_ids in [D+1-12 calendar months, D]
- *   / orgs with created_at < D+1
+ *   / paying orgs on day D (global_stats.paying)
  *   * 100
  *
  * Dry run, defaulting to the last 30 UTC calendar days:
@@ -30,15 +30,14 @@ const DEFAULT_PAGE_SIZE = 1000
 const DATE_ID_REGEX = /^\d{4}-\d{2}-\d{2}$/
 
 type SupabaseClient = ReturnType<typeof createSupabaseServiceClient>
-type GlobalStatsRow = Pick<Database['public']['Tables']['global_stats']['Row'], 'date_id' | 'upgrade_rate_12m' | 'upgraded_orgs'>
-type OrgRow = Pick<Database['public']['Tables']['orgs']['Row'], 'created_at' | 'id'>
+type GlobalStatsRow = Pick<Database['public']['Tables']['global_stats']['Row'], 'date_id' | 'paying' | 'upgrade_rate_12m' | 'upgraded_orgs'>
 
 export interface UpgradeRate12mBackfillRow {
   changed: boolean
   current_rate: number
   date_id: string
   next_rate: number
-  orgs: number
+  paying: number
   upgraded_orgs_12m: number
 }
 
@@ -81,31 +80,22 @@ function toMetricNumber(value: number | string | null | undefined) {
   return Number.isFinite(numberValue) ? numberValue : 0
 }
 
-export function calculateUpgradeRate12m(upgradedOrgs: number | string | null | undefined, orgs: number | string | null | undefined) {
+export function calculateUpgradeRate12m(upgradedOrgs: number | string | null | undefined, paying: number | string | null | undefined) {
   const upgradedCount = toMetricNumber(upgradedOrgs)
-  const orgCount = toMetricNumber(orgs)
-  if (orgCount <= 0)
+  const payingCount = toMetricNumber(paying)
+  if (payingCount <= 0)
     return 0
-  return Number(((upgradedCount * 100) / orgCount).toFixed(1))
+  return Number(((upgradedCount * 100) / payingCount).toFixed(1))
 }
 
 function hasRateChanged(currentRate: number, nextRate: number) {
   return Math.abs(currentRate - nextRate) > 0.0001
 }
 
-function buildOrgCreatedAtTimes(orgRows: OrgRow[]) {
-  return orgRows
-    .map(row => row.created_at ? Date.parse(row.created_at) : Number.NaN)
-    .filter(Number.isFinite)
-    .sort((left, right) => left - right)
-}
-
 export function buildUpgradeRate12mBackfillRows(
   rows: GlobalStatsRow[],
-  orgRows: OrgRow[],
   allUpgradeRows: GlobalStatsRow[],
 ): UpgradeRate12mBackfillRow[] {
-  const orgCreatedAtTimes = buildOrgCreatedAtTimes(orgRows)
   const upgradedByDateId = new Map(
     allUpgradeRows.map(row => [row.date_id, toMetricNumber(row.upgraded_orgs)]),
   )
@@ -133,24 +123,18 @@ export function buildUpgradeRate12mBackfillRows(
     return through - before
   }
 
-  let orgIndex = 0
-
   return [...rows]
     .sort((left, right) => left.date_id.localeCompare(right.date_id))
     .map((row) => {
-      const endExclusive = new Date(`${getNextDateId(row.date_id)}T00:00:00.000Z`).getTime()
-      while (orgIndex < orgCreatedAtTimes.length && orgCreatedAtTimes[orgIndex]! < endExclusive)
-        orgIndex++
-
       const fromDateId = getTrailing12mStartDateId(row.date_id)
       const upgraded_orgs_12m = sumUpgradedInclusive(fromDateId, row.date_id)
-      const orgs = orgIndex
+      const paying = toMetricNumber(row.paying)
       const current_rate = toMetricNumber(row.upgrade_rate_12m)
-      const next_rate = calculateUpgradeRate12m(upgraded_orgs_12m, orgs)
+      const next_rate = calculateUpgradeRate12m(upgraded_orgs_12m, paying)
 
       return {
         date_id: row.date_id,
-        orgs,
+        paying,
         upgraded_orgs_12m,
         current_rate,
         next_rate,
@@ -166,7 +150,7 @@ async function fetchGlobalStatsRows(supabase: SupabaseClient, fromDateId: string
   while (true) {
     let query = supabase
       .from('global_stats')
-      .select('date_id, upgrade_rate_12m, upgraded_orgs')
+      .select('date_id, paying, upgrade_rate_12m, upgraded_orgs')
       .order('date_id', { ascending: true })
       .range(offset, offset + DEFAULT_PAGE_SIZE - 1)
 
@@ -193,37 +177,6 @@ async function fetchGlobalStatsRows(supabase: SupabaseClient, fromDateId: string
 async function fetchAllUpgradeRows(supabase: SupabaseClient) {
   // Need full history so trailing windows near --from still have prior days.
   return fetchGlobalStatsRows(supabase, null, null)
-}
-
-async function fetchOrgRows(supabase: SupabaseClient, toDateId: string | null) {
-  const rows: OrgRow[] = []
-  let lastId: string | null = null
-
-  while (true) {
-    let query = supabase
-      .from('orgs')
-      .select('id, created_at')
-      .order('id', { ascending: true })
-      .limit(DEFAULT_PAGE_SIZE)
-
-    if (lastId)
-      query = query.gt('id', lastId)
-    if (toDateId)
-      query = query.lt('created_at', `${getNextDateId(toDateId)}T00:00:00.000Z`)
-
-    const { data, error } = await query
-    if (error)
-      throw error
-    if (!data?.length)
-      break
-
-    rows.push(...data)
-    lastId = data[data.length - 1]!.id
-    if (data.length < DEFAULT_PAGE_SIZE)
-      break
-  }
-
-  return rows
 }
 
 async function updateUpgradeRate(supabase: SupabaseClient, row: UpgradeRate12mBackfillRow) {
@@ -258,17 +211,15 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   }
   const supabase = createSupabaseServiceClient(env)
 
-  const [targetRows, allUpgradeRows, orgRows] = await Promise.all([
+  const [targetRows, allUpgradeRows] = await Promise.all([
     fetchGlobalStatsRows(supabase, fromDateId, toDateId),
     fetchAllUpgradeRows(supabase),
-    fetchOrgRows(supabase, toDateId),
   ])
-  const backfillRows = buildUpgradeRate12mBackfillRows(targetRows, orgRows, allUpgradeRows)
+  const backfillRows = buildUpgradeRate12mBackfillRows(targetRows, allUpgradeRows)
   const changedRows = backfillRows.filter(row => row.changed)
 
   console.log(`Loaded ${targetRows.length} target global_stats rows`)
   console.log(`Loaded ${allUpgradeRows.length} upgrade-history rows`)
-  console.log(`Loaded ${orgRows.length} org rows`)
   console.log(`Env file: ${envFile}`)
   if (all)
     console.log('Scope: all global_stats rows')
@@ -280,7 +231,7 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   if (sampleRows.length > 0) {
     console.log('Sample updates:')
     for (const row of sampleRows)
-      console.log(`${row.date_id}: ${row.current_rate}% -> ${row.next_rate}% (${row.upgraded_orgs_12m}/${row.orgs})`)
+      console.log(`${row.date_id}: ${row.current_rate}% -> ${row.next_rate}% (${row.upgraded_orgs_12m}/${row.paying} paying)`)
   }
 
   if (!apply) {
