@@ -146,6 +146,7 @@ function fakeServer() {
   return {
     tools,
     registerTool(name, config, handler) { tools[name] = { inputSchema: config.inputSchema, handler } },
+    registerPrompt() {},
   }
 }
 

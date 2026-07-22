@@ -1,4 +1,4 @@
-import { type } from 'arktype'
+import { type } from './arktype'
 import { optionsBaseSchema } from './base'
 
 // ============================================================================
@@ -7,6 +7,7 @@ import { optionsBaseSchema } from './base'
 
 export const appOptionsSchema = type({
   '...': optionsBaseSchema,
+  '+': 'delete',
   'name?': 'string',
   'icon?': 'string',
   'retention?': 'number',
@@ -26,6 +27,7 @@ export type AppOptions = typeof appOptionsSchema.infer
 
 export const appDebugOptionsSchema = type({
   '...': optionsBaseSchema,
+  '+': 'delete',
   'device?': 'string',
 })
 
@@ -33,6 +35,7 @@ export type AppDebugOptions = typeof appDebugOptionsSchema.infer
 
 export const appSettingOptionsSchema = type({
   '...': optionsBaseSchema,
+  '+': 'delete',
   'bool?': 'string',
   'string?': 'string',
 })

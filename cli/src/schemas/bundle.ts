@@ -1,4 +1,4 @@
-import { type } from 'arktype'
+import { type } from './arktype'
 import { optionsBaseSchema } from './base'
 
 // ============================================================================
@@ -7,6 +7,7 @@ import { optionsBaseSchema } from './base'
 
 export const optionsUploadSchema = type({
   '...': optionsBaseSchema,
+  '+': 'delete',
   'bundle?': 'string',
   'path?': 'string',
   'channel?': 'string',
@@ -70,6 +71,7 @@ export type OptionsUpload = typeof optionsUploadSchema.infer
 // ============================================================================
 
 export const zipResultSchema = type({
+  '+': 'delete',
   bundle: 'string',
   filename: 'string',
   checksum: 'string',
@@ -78,6 +80,7 @@ export const zipResultSchema = type({
 export type ZipResult = typeof zipResultSchema.infer
 
 export const encryptResultSchema = type({
+  '+': 'delete',
   checksum: 'string',
   filename: 'string',
   ivSessionKey: 'string',
@@ -86,6 +89,7 @@ export const encryptResultSchema = type({
 export type EncryptResult = typeof encryptResultSchema.infer
 
 export const decryptResultSchema = type({
+  '+': 'delete',
   outputPath: 'string',
   'checksumMatches?': 'boolean',
 })
@@ -93,6 +97,7 @@ export const decryptResultSchema = type({
 export type DecryptResult = typeof decryptResultSchema.infer
 
 export const uploadBundleResultSchema = type({
+  '+': 'delete',
   success: 'boolean',
   'appId?': 'string',
   bundle: 'string',
@@ -115,6 +120,7 @@ export type UploadBundleResult = typeof uploadBundleResultSchema.infer
 
 export const bundleZipOptionsSchema = type({
   '...': optionsBaseSchema,
+  '+': 'delete',
   'bundle?': 'string',
   'path?': 'string',
   'codeCheck?': 'boolean',
@@ -128,6 +134,7 @@ export type BundleZipOptions = typeof bundleZipOptionsSchema.infer
 
 export const bundleDeleteOptionsSchema = type({
   '...': optionsBaseSchema,
+  '+': 'delete',
   bundle: 'string',
 })
 
@@ -135,6 +142,7 @@ export type BundleDeleteOptions = typeof bundleDeleteOptionsSchema.infer
 
 export const bundleCompatibilityOptionsSchema = type({
   '...': optionsBaseSchema,
+  '+': 'delete',
   'channel?': 'string',
   'text?': 'boolean',
   'packageJson?': 'string',
@@ -145,6 +153,7 @@ export type BundleCompatibilityOptions = typeof bundleCompatibilityOptionsSchema
 
 export const bundleReleaseTypeOptionsSchema = type({
   '...': optionsBaseSchema,
+  '+': 'delete',
   'channel?': 'string',
   'packageJson?': 'string',
   'nodeModules?': 'string',
@@ -154,6 +163,7 @@ export type BundleReleaseTypeOptions = typeof bundleReleaseTypeOptionsSchema.inf
 
 export const bundleCleanupOptionsSchema = type({
   '...': optionsBaseSchema,
+  '+': 'delete',
   version: 'string',
   bundle: 'string',
   keep: 'number',
@@ -164,6 +174,7 @@ export const bundleCleanupOptionsSchema = type({
 export type BundleCleanupOptions = typeof bundleCleanupOptionsSchema.infer
 
 export const bundleEncryptOptionsSchema = type({
+  '+': 'delete',
   'key?': 'string',
   'keyData?': 'string',
   'json?': 'boolean',
@@ -173,6 +184,7 @@ export const bundleEncryptOptionsSchema = type({
 export type BundleEncryptOptions = typeof bundleEncryptOptionsSchema.infer
 
 export const bundleDecryptOptionsSchema = type({
+  '+': 'delete',
   'key?': 'string',
   'keyData?': 'string',
   'checksum?': 'string',

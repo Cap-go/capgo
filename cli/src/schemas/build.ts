@@ -1,7 +1,7 @@
-import { type } from 'arktype'
+import { type } from './arktype'
 import { optionsBaseSchema } from './base'
 
-const localizedReleaseNotesSchema = type({ '[string]': 'string > 0' })
+const localizedReleaseNotesSchema = type({ '[string]': 'string.trim |> string > 0' })
 
 // ============================================================================
 // Build Credentials Schema
@@ -42,6 +42,7 @@ export type BuildCredentials = typeof buildCredentialsSchema.infer
 
 export const buildRequestOptionsSchema = type({
   '...': optionsBaseSchema,
+  '+': 'delete',
   'path?': 'string',
   'nodeModules?': 'string',
   'platform?': "'ios' | 'android'",
@@ -97,6 +98,7 @@ export type BuildRequestOptions = typeof buildRequestOptionsSchema.infer
 
 export const buildNeededOptionsSchema = type({
   '...': optionsBaseSchema,
+  '+': 'delete',
   'channel?': 'string',
   'packageJson?': 'string',
   'nodeModules?': 'string',
@@ -110,12 +112,14 @@ export type BuildNeededOptions = typeof buildNeededOptionsSchema.infer
 // ============================================================================
 
 export const buildRequestResultSchema = type({
+  '+': 'delete',
   success: 'boolean',
   'jobId?': 'string',
   'uploadUrl?': 'string',
   'status?': 'string',
   'error?': 'string',
   'aiAnalysis?': {
+    '+': 'delete',
     jobId: 'string',
     capturedLogPath: 'string',
     ready: 'boolean',
@@ -129,6 +133,7 @@ export type BuildRequestResult = typeof buildRequestResultSchema.infer
 // ============================================================================
 
 export const buildOptionsPayloadSchema = type({
+  '+': 'delete',
   platform: "'ios' | 'android'",
   buildMode: "'debug' | 'release'",
   cliVersion: 'string',
@@ -161,6 +166,7 @@ export type BuildOptionsPayload = typeof buildOptionsPayloadSchema.infer
 // ============================================================================
 
 export const credentialFileSchema = type({
+  '+': 'delete',
   'BUILD_CERTIFICATE_FILE?': 'string',
   'APPLE_KEY_FILE?': 'string',
   'ANDROID_KEYSTORE_PATH?': 'string',
@@ -170,6 +176,7 @@ export const credentialFileSchema = type({
 export type CredentialFile = typeof credentialFileSchema.infer
 
 export const savedCredentialsSchema = type({
+  '+': 'delete',
   'ios?': buildCredentialsSchema.partial(),
   'android?': buildCredentialsSchema.partial(),
 })

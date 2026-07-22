@@ -1,3 +1,4 @@
+import './arktype_config'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 
 export type ValidationIssue = StandardSchemaV1.Issue & { readonly code?: string }

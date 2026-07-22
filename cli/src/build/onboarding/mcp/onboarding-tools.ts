@@ -551,11 +551,10 @@ export function registerOnboardingTools(server: McpRegistrar, getSdk: () => Capg
   // Clients that support MCP prompts surface this as a slash command (e.g.
   // /capgo-builder-setup). Invoking it injects the message below, which kicks
   // off the tool-driven flow — so the user never has to name the tool, and the
-  // agent is told NOT to improvise the setup itself. Optional-chained so the
-  // 2-tool test mock (no .prompt) is unaffected.
-  server.prompt?.(
+  // agent is told NOT to improvise the setup itself.
+  server.registerPrompt(
     'capgo-builder-setup',
-    'Set up Capgo Builder native cloud builds (iOS/Android signing + first build) — starts the guided, tool-driven onboarding.',
+    { description: 'Set up Capgo Builder native cloud builds (iOS/Android signing + first build) — starts the guided, tool-driven onboarding.' },
     () => ({
       messages: [{
         role: 'user' as const,

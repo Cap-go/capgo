@@ -208,6 +208,7 @@ function fakeServer() {
   return {
     tools,
     registerTool(name, _config, handler) { tools[name] = { handler } },
+    registerPrompt() {},
   }
 }
 

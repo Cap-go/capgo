@@ -1,17 +1,19 @@
 // src/schemas/live-update-onboarding.ts
-import { type } from 'arktype'
+import { type } from './arktype'
 import { capacitorConfigOptionSchema } from './sdk'
 
 const packageJsonSchema = type('string > 0').describe('Package JSON for the Capacitor app to onboard. Use this with capacitorConfig when a monorepo config source lives outside the app directory.')
 const mainFileSchema = type('string > 0').describe('Application entry file to update. Use this with capacitorConfig when a monorepo app has a separate main file.')
 
 export const liveUpdateStartSchema = type({
+  '+': 'delete',
   'capacitorConfig?': capacitorConfigOptionSchema.describe('Existing app-specific capacitor.config.* file to update while Capacitor loads the active root config (useful with dynamic monorepos).'),
   'packageJson?': packageJsonSchema,
   'mainFile?': mainFileSchema,
 })
 
 export const liveUpdateNextStepSchema = type({
+  '+': 'delete',
   'capacitorConfig?': capacitorConfigOptionSchema.describe('The same app-specific capacitor.config.* source used to start onboarding when more than one source is active for this app.'),
   'packageJson?': packageJsonSchema,
   'mainFile?': mainFileSchema,
@@ -27,6 +29,7 @@ export type LiveUpdateStartInput = typeof liveUpdateStartSchema.infer
 export type LiveUpdateNextStepInput = typeof liveUpdateNextStepSchema.infer
 
 export const liveUpdateExplainInputSchema = type({
+  '+': 'delete',
   'state?': type('string').describe('Optional state name to explain (from a prior result state field).'),
   'capacitorConfig?': capacitorConfigOptionSchema.describe('The same app-specific capacitor.config.* source used to start onboarding when more than one source is active for this app.'),
 })

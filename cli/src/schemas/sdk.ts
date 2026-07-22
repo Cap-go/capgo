@@ -1,4 +1,4 @@
-import { type } from 'arktype'
+import { type } from './arktype'
 import { buildCredentialsSchema } from './build'
 import { rejectConflictingBooleanGroup } from './common'
 
@@ -18,13 +18,14 @@ export interface SDKResult<T = void> {
   warnings?: string[]
 }
 
-const localizedReleaseNotesSchema = type({ '[string]': 'string > 0' })
+const localizedReleaseNotesSchema = type({ '[string]': 'string.trim |> string > 0' })
 
 // ============================================================================
 // SDK App Schemas
 // ============================================================================
 
 export const addAppOptionsSchema = type({
+  '+': 'delete',
   appId: 'string',
   'name?': 'string',
   'icon?': 'string',
@@ -36,6 +37,7 @@ export const addAppOptionsSchema = type({
 export type AddAppOptions = typeof addAppOptionsSchema.infer
 
 export const updateAppOptionsSchema = type({
+  '+': 'delete',
   appId: 'string',
   'name?': 'string',
   'icon?': 'string',
@@ -48,6 +50,7 @@ export const updateAppOptionsSchema = type({
 export type UpdateAppOptions = typeof updateAppOptionsSchema.infer
 
 export const appInfoSchema = type({
+  '+': 'delete',
   appId: 'string',
   name: 'string',
   'iconUrl?': 'string',
@@ -57,12 +60,14 @@ export const appInfoSchema = type({
 export type AppInfo = typeof appInfoSchema.infer
 
 export const starRepoOptionsSchema = type({
+  '+': 'delete',
   'repository?': 'string',
 })
 
 export type StarRepoOptions = typeof starRepoOptionsSchema.infer
 
 export const starAllRepositoriesOptionsSchema = type({
+  '+': 'delete',
   'repositories?': 'string > 0[]',
   'minDelayMs?': 'number.integer >= 0',
   'maxDelayMs?': 'number.integer >= 0',
@@ -76,6 +81,7 @@ export type StarAllRepositoriesOptions = typeof starAllRepositoriesOptionsSchema
 // ============================================================================
 
 export const uploadOptionsSchema = type({
+  '+': 'delete',
   appId: 'string',
   path: 'string',
   'bundle?': 'string',
@@ -106,6 +112,7 @@ export const uploadOptionsSchema = type({
 export type UploadOptions = typeof uploadOptionsSchema.infer
 
 export const uploadResultSchema = type({
+  '+': 'delete',
   success: 'boolean',
   'bundleId?': 'string',
   'bundleUrl?': 'string',
@@ -123,6 +130,7 @@ export const uploadResultSchema = type({
 export type UploadResult = typeof uploadResultSchema.infer
 
 export const bundleInfoSchema = type({
+  '+': 'delete',
   id: 'string',
   version: 'string',
   'channel?': 'string',
@@ -134,6 +142,7 @@ export const bundleInfoSchema = type({
 export type BundleInfo = typeof bundleInfoSchema.infer
 
 export const cleanupOptionsSchema = type({
+  '+': 'delete',
   appId: 'string',
   'keep?': 'number',
   'bundle?': 'string',
@@ -151,6 +160,7 @@ export type CleanupOptions = typeof cleanupOptionsSchema.infer
 // ============================================================================
 
 export const generateKeyOptionsSchema = type({
+  '+': 'delete',
   'force?': type('boolean').describe('Overwrite existing keys if they exist'),
   'setupChannel?': 'boolean',
   'capacitorConfig?': capacitorConfigOptionSchema,
@@ -159,6 +169,7 @@ export const generateKeyOptionsSchema = type({
 export type GenerateKeyOptions = typeof generateKeyOptionsSchema.infer
 
 export const saveKeyOptionsSchema = type({
+  '+': 'delete',
   'keyPath?': 'string',
   'keyData?': 'string',
   'setupChannel?': 'boolean',
@@ -168,6 +179,7 @@ export const saveKeyOptionsSchema = type({
 export type SaveKeyOptions = typeof saveKeyOptionsSchema.infer
 
 export const deleteOldKeyOptionsSchema = type({
+  '+': 'delete',
   'force?': 'boolean',
   'setupChannel?': 'boolean',
   'capacitorConfig?': capacitorConfigOptionSchema,
@@ -180,6 +192,7 @@ export type DeleteOldKeyOptions = typeof deleteOldKeyOptionsSchema.infer
 // ============================================================================
 
 export const addChannelOptionsSchema = type({
+  '+': 'delete',
   channelId: type('string').describe('Channel name'),
   appId: 'string',
   'default?': 'boolean',
@@ -192,6 +205,7 @@ export const addChannelOptionsSchema = type({
 export type AddChannelOptions = typeof addChannelOptionsSchema.infer
 
 export const updateChannelOptionsBaseSchema = type({
+  '+': 'delete',
   channelId: type('string').describe('Channel name'),
   appId: 'string',
   'bundle?': 'string',
@@ -246,6 +260,7 @@ export type UpdateChannelOptions = typeof updateChannelOptionsSchema.infer
 // ============================================================================
 
 export const accountIdOptionsSchema = type({
+  '+': 'delete',
   'apikey?': 'string',
   'supaHost?': 'string',
   'supaAnon?': 'string',
@@ -259,6 +274,7 @@ export type ListOrganizationsOptions = typeof listOrganizationsOptionsSchema.inf
 
 export const addOrganizationOptionsSchema = type({
   '...': accountIdOptionsSchema,
+  '+': 'delete',
   name: 'string',
   email: 'string',
 })
@@ -267,6 +283,7 @@ export type AddOrganizationOptions = typeof addOrganizationOptionsSchema.infer
 
 export const updateOrganizationOptionsSchema = type({
   '...': accountIdOptionsSchema,
+  '+': 'delete',
   orgId: 'string',
   'name?': 'string',
   'email?': 'string',
@@ -275,6 +292,7 @@ export const updateOrganizationOptionsSchema = type({
 export type UpdateOrganizationOptions = typeof updateOrganizationOptionsSchema.infer
 
 export const organizationInfoSchema = type({
+  '+': 'delete',
   id: 'string',
   name: 'string',
   'role?': 'string',
@@ -287,6 +305,7 @@ export type OrganizationInfo = typeof organizationInfoSchema.infer
 
 export const deleteOrganizationOptionsSchema = type({
   '...': accountIdOptionsSchema,
+  '+': 'delete',
   'autoConfirm?': 'boolean',
 })
 
@@ -297,6 +316,7 @@ export type DeleteOrganizationOptions = typeof deleteOrganizationOptionsSchema.i
 // ============================================================================
 
 export const loginOptionsSchema = type({
+  '+': 'delete',
   apikey: 'string',
   'local?': 'boolean',
   'supaHost?': 'string',
@@ -306,6 +326,7 @@ export const loginOptionsSchema = type({
 export type LoginOptions = typeof loginOptionsSchema.infer
 
 export const doctorOptionsSchema = type({
+  '+': 'delete',
   'packageJson?': 'string',
 })
 
@@ -316,6 +337,7 @@ export type DoctorOptions = typeof doctorOptionsSchema.infer
 // ============================================================================
 
 export const bundleCompatibilityOptionsSchema = type({
+  '+': 'delete',
   appId: 'string',
   channel: 'string',
   'packageJson?': 'string',
@@ -333,6 +355,7 @@ export type BundleCompatibilityOptions = typeof bundleCompatibilityOptionsSchema
 // ============================================================================
 
 export const encryptBundleOptionsSchema = type({
+  '+': 'delete',
   zipPath: 'string',
   checksum: 'string',
   'keyPath?': 'string',
@@ -344,6 +367,7 @@ export const encryptBundleOptionsSchema = type({
 export type EncryptBundleOptions = typeof encryptBundleOptionsSchema.infer
 
 export const decryptBundleOptionsSchema = type({
+  '+': 'delete',
   zipPath: 'string',
   ivSessionKey: 'string',
   'keyPath?': 'string',
@@ -355,6 +379,7 @@ export const decryptBundleOptionsSchema = type({
 export type DecryptBundleOptions = typeof decryptBundleOptionsSchema.infer
 
 export const zipBundleOptionsSchema = type({
+  '+': 'delete',
   appId: 'string',
   path: 'string',
   'bundle?': 'string',
@@ -372,6 +397,7 @@ export type ZipBundleOptions = typeof zipBundleOptionsSchema.infer
 // ============================================================================
 
 export const requestBuildOptionsSchema = type({
+  '+': 'delete',
   appId: 'string',
   'path?': 'string',
   'nodeModules?': 'string',
@@ -402,6 +428,7 @@ export type CurrentBundleOptions = typeof currentBundleOptionsSchema.infer
 // ============================================================================
 
 export const setSettingOptionsSchema = type({
+  '+': 'delete',
   'apikey?': 'string',
   'bool?': 'string',
   'string?': 'string',
@@ -415,6 +442,7 @@ export type SetSettingOptions = typeof setSettingOptionsSchema.infer
 // ============================================================================
 
 export const statsOrderSchema = type({
+  '+': 'delete',
   key: 'string',
   'sortable?': "'asc' | 'desc'",
 })
@@ -422,6 +450,7 @@ export const statsOrderSchema = type({
 export type StatsOrder = typeof statsOrderSchema.infer
 
 export const getStatsOptionsSchema = type({
+  '+': 'delete',
   appId: 'string',
   'deviceIds?': 'string[]',
   'search?': 'string',
@@ -438,6 +467,7 @@ export const getStatsOptionsSchema = type({
 export type GetStatsOptions = typeof getStatsOptionsSchema.infer
 
 export const deviceStatsSchema = type({
+  '+': 'delete',
   appId: 'string',
   deviceId: 'string',
   action: 'string',
@@ -453,6 +483,7 @@ export type DeviceStats = typeof deviceStatsSchema.infer
 // ============================================================================
 
 export const probeOptionsSchema = type({
+  '+': 'delete',
   platform: "'ios' | 'android'",
 })
 

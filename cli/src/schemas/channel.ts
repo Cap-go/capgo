@@ -1,4 +1,4 @@
-import { type } from 'arktype'
+import { type } from './arktype'
 import { optionsBaseSchema } from './base'
 import { rejectConflictingBooleanGroup } from './common'
 
@@ -30,6 +30,7 @@ export type Channel = typeof channelSchema.infer
 
 export const channelAddOptionsSchema = type({
   '...': optionsBaseSchema,
+  '+': 'delete',
   'default?': 'boolean',
   'selfAssign?': 'boolean',
 })
@@ -38,6 +39,7 @@ export type ChannelAddOptions = typeof channelAddOptionsSchema.infer
 
 export const channelDeleteOptionsSchema = type({
   '...': optionsBaseSchema,
+  '+': 'delete',
   deleteBundle: 'boolean',
   successIfNotFound: 'boolean',
 })
@@ -46,6 +48,7 @@ export type ChannelDeleteOptions = typeof channelDeleteOptionsSchema.infer
 
 export const channelCurrentBundleOptionsSchema = type({
   '...': optionsBaseSchema,
+  '+': 'delete',
   'channel?': 'string',
   'quiet?': 'boolean',
 })
@@ -54,6 +57,7 @@ export type ChannelCurrentBundleOptions = typeof channelCurrentBundleOptionsSche
 
 export const optionsSetChannelSchema = type({
   '...': optionsBaseSchema,
+  '+': 'delete',
   'bundle?': 'string',
   'state?': 'string',
   'downgrade?': 'boolean',

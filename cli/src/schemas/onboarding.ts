@@ -1,9 +1,10 @@
-import { type } from 'arktype'
+import { type } from './arktype'
 
 // Input schema for the guided Capgo Builder onboarding `next_step` MCP tool.
 // Shared so the runtime validation and the handler's TS type stay in sync.
 
 export const onboardingNextStepSchema = type({
+  '+': 'delete',
   'platform?': type("'ios' | 'android'").describe('Platform choice, when the previous step asked for it'),
   'serviceAccountJsonPath?': type('string').describe('Path to your Google Play service-account JSON file, when the previous step asked for it'),
   'runBuild?': type('boolean').describe('Set false (with platform) to SKIP the first cloud build and finish onboarding. The build itself is run with the start_capgo_build tool, not here — passing true is rejected with a pointer to start_capgo_build.'),
@@ -57,9 +58,11 @@ export const onboardingNextStepSchema = type({
 export type OnboardingNextStepInput = typeof onboardingNextStepSchema.infer
 
 export const onboardingStartInputSchema = type({
+  '+': 'delete',
   'platform?': type("'ios' | 'android'").describe('Set up (or switch to) a specific platform directly: "ios" or "android". Pass it when the user already said which platform, or to switch platforms; omit to be asked.'),
 })
 
 export const onboardingExplainInputSchema = type({
+  '+': 'delete',
   'state?': type('string').describe('Optional state name to explain (from a prior result state field). Omit to explain the current step.'),
 })

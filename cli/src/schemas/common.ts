@@ -1,4 +1,4 @@
-import { type } from 'arktype'
+import { type } from './arktype'
 
 // ============================================================================
 // Shared Validation Helpers
@@ -28,6 +28,7 @@ export function rejectConflictingBooleanGroup(
 // ============================================================================
 
 export const nativePackageSchema = type({
+  '+': 'delete',
   name: 'string > 0',
   version: 'string > 0',
   'requested_version?': 'string',
@@ -46,6 +47,7 @@ export const incompatibilityReasonSchema = type("'new_plugin' | 'removed_plugin'
 export type IncompatibilityReason = typeof incompatibilityReasonSchema.infer
 
 export const compatibilitySchema = type({
+  '+': 'delete',
   name: 'string',
   'localVersion?': 'string',
   'remoteVersion?': 'string',
@@ -60,6 +62,7 @@ export const compatibilitySchema = type({
 export type Compatibility = typeof compatibilitySchema.infer
 
 export const compatibilityDetailsSchema = type({
+  '+': 'delete',
   compatible: 'boolean',
   reasons: incompatibilityReasonSchema.array(),
   message: 'string',
@@ -72,6 +75,7 @@ export type CompatibilityDetails = typeof compatibilityDetailsSchema.infer
 // ============================================================================
 
 export const parsedSecurityErrorSchema = type({
+  '+': 'delete',
   isSecurityPolicyError: 'boolean',
   errorCode: 'string',
   message: 'string',

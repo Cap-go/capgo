@@ -422,9 +422,9 @@ export function registerLiveUpdateTools(server: McpRegistrar, sdk: CapgoSDK, dep
     },
   )
 
-  server.prompt?.(
+  server.registerPrompt(
     'capgo-live-update-setup',
-    'Set up Capgo live updates (OTA) for this Capacitor app — starts the guided onboarding.',
+    { description: 'Set up Capgo live updates (OTA) for this Capacitor app — starts the guided onboarding.' },
     () => ({
       messages: [{
         role: 'user' as const,
