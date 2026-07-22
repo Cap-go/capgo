@@ -445,7 +445,7 @@ SET
   hour_interval = NULL,
   run_at_hour = 3,
   run_at_minute = 0,
-  run_at_second = NULL,
+  run_at_second = 0,
   updated_at = pg_catalog.now()
 WHERE name = 'cleanup_old_audit_logs';
 
