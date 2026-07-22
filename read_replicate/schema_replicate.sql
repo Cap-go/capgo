@@ -608,13 +608,6 @@ CREATE INDEX app_versions_cli_version_idx ON public.app_versions USING btree (cl
 
 
 --
--- Name: app_versions_manifest_present_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX app_versions_manifest_present_idx ON public.app_versions USING btree (id) WHERE (manifest IS NOT NULL);
-
-
---
 -- Name: app_versions_r2_path_idx; Type: INDEX; Schema: public; Owner: -
 --
 
