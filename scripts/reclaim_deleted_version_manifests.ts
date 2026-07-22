@@ -95,9 +95,26 @@ async function moveToTrash(s3: S3Client, bucket: string, key: string) {
   }))
 }
 
+function shouldAllowSelfSignedPgCertificate(env: Record<string, string>, databaseUrl: string) {
+  const rejectUnauthorized = env.PG_SSL_REJECT_UNAUTHORIZED?.trim()
+  if (rejectUnauthorized === '0')
+    return true
+  if (rejectUnauthorized === '1')
+    return false
+  // Local/docker URLs keep default Node TLS verification off only when explicitly local.
+  return databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1')
+}
+
 async function main() {
   const env = await loadEnv(ENV_FILE)
-  const db = new pg.Client({ connectionString: requireDbUrl(env), ssl: { rejectUnauthorized: false } })
+  const databaseUrl = requireDbUrl(env)
+  const usesLocalDatabase = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1')
+  const db = new pg.Client({
+    connectionString: databaseUrl,
+    ssl: usesLocalDatabase
+      ? false
+      : { rejectUnauthorized: !shouldAllowSelfSignedPgCertificate(env, databaseUrl) },
+  })
   await db.connect()
 
   const s3 = new S3Client({

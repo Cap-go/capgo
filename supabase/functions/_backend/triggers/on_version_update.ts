@@ -316,7 +316,7 @@ async function updateIt(c: Context, record: Database['public']['Tables']['app_ve
   return c.json(BRES)
 }
 
-const MANIFEST_TRASH_CONCURRENCY = 50
+const MANIFEST_TRASH_CONCURRENCY = 10
 
 type ManifestCleanupEntry = {
   id: number
@@ -356,45 +356,55 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
     for (let i = 0; i < manifestEntries.length; i += MANIFEST_TRASH_CONCURRENCY) {
       const batch = manifestEntries.slice(i, i + MANIFEST_TRASH_CONCURRENCY)
       await Promise.all(batch.map(async (entry) => {
-        if (entry.s3_path) {
-          const { data: stillReferenced, error: refError } = await supabaseAdmin(c)
-            .from('manifest')
-            .select('id')
-            .eq('file_hash', entry.file_hash)
-            .eq('file_name', entry.file_name)
-            .neq('app_version_id', record.id)
-            .limit(1)
-            .maybeSingle()
+        const entryPg = getPgClient(c, false)
+        try {
+          await entryPg.query('BEGIN')
+          // Serialize shared-hash cleanup across concurrent deleted versions.
+          await entryPg.query(
+            `SELECT pg_advisory_xact_lock(hashtextextended($1 || chr(0) || $2, 0))`,
+            [entry.file_hash, entry.file_name],
+          )
 
-          if (refError) {
-            throw simpleError('cannot_check_manifest_references', 'Cannot check manifest file references before trash', {
-              id: entry.id,
-              s3_path: entry.s3_path,
-            }, refError)
-          }
+          if (entry.s3_path) {
+            const refs = await entryPg.query(
+              `SELECT 1 AS ok
+               FROM public.manifest
+               WHERE file_hash = $1
+                 AND file_name = $2
+                 AND app_version_id <> $3
+               LIMIT 1`,
+              [entry.file_hash, entry.file_name, record.id],
+            )
 
-          if (!stillReferenced) {
-            const moved = await s3.moveObjectToTrash(c, entry.s3_path)
-            if (!moved) {
-              throw simpleError('cannot_move_manifest_s3_to_trash', 'Cannot move S3 object for deleted manifest file to trash', {
-                id: entry.id,
-                s3_path: entry.s3_path,
-              })
+            if (refs.rows.length === 0) {
+              const moved = await s3.moveObjectToTrash(c, entry.s3_path)
+              if (!moved) {
+                throw simpleError('cannot_move_manifest_s3_to_trash', 'Cannot move S3 object for deleted manifest file to trash', {
+                  id: entry.id,
+                  s3_path: entry.s3_path,
+                })
+              }
             }
           }
+
+          // Only delete the DB row after R2 is handled (or shared and kept).
+          await entryPg.query(
+            `DELETE FROM public.manifest WHERE id = $1`,
+            [entry.id],
+          )
+          await entryPg.query('COMMIT')
         }
-
-        // Only delete the DB row after R2 is handled (or shared and kept).
-        const { error: deleteError } = await supabaseAdmin(c)
-          .from('manifest')
-          .delete()
-          .eq('id', entry.id)
-
-        if (deleteError) {
-          throw simpleError('cannot_delete_manifest_row', 'Cannot delete manifest row after R2 trash', {
-            id: entry.id,
-            s3_path: entry.s3_path,
-          }, deleteError)
+        catch (error) {
+          try {
+            await entryPg.query('ROLLBACK')
+          }
+          catch {
+            // ignore rollback errors
+          }
+          throw error
+        }
+        finally {
+          await closeClient(c, entryPg)
         }
       }))
     }

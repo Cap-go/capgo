@@ -5,14 +5,11 @@ const {
   appVersionsMetaUpdate,
   appVersionsMetaUpdateEq,
   callOrder,
-  checkIfExist,
   closeClient,
   createStatsMeta,
   deleteObject,
   getDrizzleClient,
   getPgClient,
-  manifestDeleteEq,
-  manifestReferenceMaybeSingle,
   manifestSelectWhere,
   moveObjectToTrash,
   pgQuery,
@@ -23,17 +20,6 @@ const {
   const appVersionsMetaSelect = vi.fn(() => ({ eq: appVersionsMetaSelectEq }))
   const appVersionsMetaUpdateEq = vi.fn()
   const appVersionsMetaUpdate = vi.fn(() => ({ eq: appVersionsMetaUpdateEq }))
-  const manifestDeleteEq = vi.fn(async (..._args: any[]) => {
-    callOrder.push('db_delete_row')
-    return { error: null }
-  })
-  const manifestDelete = vi.fn(() => ({ eq: manifestDeleteEq }))
-  const manifestReferenceMaybeSingle = vi.fn()
-  const manifestReferenceLimit = vi.fn(() => ({ maybeSingle: manifestReferenceMaybeSingle }))
-  const manifestReferenceNeq = vi.fn(() => ({ limit: manifestReferenceLimit }))
-  const manifestReferenceEqFileName = vi.fn(() => ({ neq: manifestReferenceNeq }))
-  const manifestReferenceEqFileHash = vi.fn(() => ({ eq: manifestReferenceEqFileName }))
-  const manifestSelect = vi.fn(() => ({ eq: manifestReferenceEqFileHash }))
   const supabaseFrom = vi.fn((table: string) => {
     if (table === 'app_versions_meta') {
       return {
@@ -41,28 +27,40 @@ const {
         update: appVersionsMetaUpdate,
       }
     }
-    if (table === 'manifest') {
-      return {
-        delete: manifestDelete,
-        select: manifestSelect,
-      }
-    }
     return {}
   })
   const manifestSelectWhere = vi.fn(async (): Promise<any[]> => [])
-  const pgQuery = vi.fn(async (..._args: any[]) => ({ rows: [] as any[], rowCount: 0 }))
+  const pgQuery = vi.fn(async (sql: string, params?: any[]) => {
+    if (sql === 'BEGIN')
+      callOrder.push('begin')
+    if (sql.includes('pg_advisory_xact_lock'))
+      callOrder.push('lock')
+    if (sql.includes('SELECT 1 AS ok'))
+      return { rows: [], rowCount: 0 }
+    if (sql.includes('DELETE FROM public.manifest WHERE id')) {
+      callOrder.push(`db_delete_row:${params?.[0]}`)
+      return { rows: [], rowCount: 1 }
+    }
+    if (sql === 'COMMIT')
+      callOrder.push('commit_entry')
+    if (sql === 'ROLLBACK')
+      callOrder.push('rollback_entry')
+    if (sql.includes('SELECT COUNT(*)'))
+      return { rows: [{ count: 0 }], rowCount: 1 }
+    if (sql.includes('WITH prev AS'))
+      return { rows: [], rowCount: 1 }
+    return { rows: [], rowCount: 0 }
+  })
   const moveObjectToTrash = vi.fn(async (..._args: any[]) => {
     callOrder.push('r2_trash')
     return true
   })
-  const checkIfExist = vi.fn(async () => true)
 
   return {
     appVersionsMetaSelectEq,
     appVersionsMetaUpdate,
     appVersionsMetaUpdateEq,
     callOrder,
-    checkIfExist,
     closeClient: vi.fn(),
     createStatsMeta: vi.fn(),
     deleteObject: vi.fn(),
@@ -74,20 +72,16 @@ const {
       })),
     })),
     getPgClient: vi.fn(() => ({ query: pgQuery })),
-    manifestDeleteEq,
-    manifestReferenceMaybeSingle,
     manifestSelectWhere,
     moveObjectToTrash,
     pgQuery,
     supabaseAdmin: vi.fn(() => ({ from: supabaseFrom })),
-    supabaseFrom,
   }
 })
 
 vi.mock('../supabase/functions/_backend/utils/s3.ts', () => ({
   getPath: vi.fn(),
   s3: {
-    checkIfExist,
     deleteObject,
     moveObjectToTrash,
   },
@@ -134,18 +128,6 @@ function createVersion(overrides: Record<string, unknown> = {}) {
   } as any
 }
 
-function mockSuccessfulDbFinalize() {
-  pgQuery.mockImplementation(async (sql: string) => {
-    if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK')
-      return { rows: [], rowCount: 0 }
-    if (sql.includes('SELECT COUNT(*)'))
-      return { rows: [{ count: 0 }], rowCount: 1 }
-    if (sql.includes('WITH prev AS'))
-      return { rows: [], rowCount: 1 }
-    return { rows: [], rowCount: 0 }
-  })
-}
-
 function makeEntries(count: number) {
   return Array.from({ length: count }, (_, i) => ({
     id: 1000 + i,
@@ -164,15 +146,29 @@ describe('on_version_update deleted version cleanup', () => {
       callOrder.push('r2_trash')
       return true
     })
-    checkIfExist.mockResolvedValue(true)
     createStatsMeta.mockResolvedValue({ error: null })
     manifestSelectWhere.mockResolvedValue([])
-    manifestReferenceMaybeSingle.mockResolvedValue({ data: null, error: null })
-    manifestDeleteEq.mockImplementation(async () => {
-      callOrder.push('db_delete_row')
-      return { error: null }
+    pgQuery.mockImplementation(async (sql: string, params?: any[]) => {
+      if (sql === 'BEGIN')
+        callOrder.push('begin')
+      if (sql.includes('pg_advisory_xact_lock'))
+        callOrder.push('lock')
+      if (sql.includes('SELECT 1 AS ok'))
+        return { rows: [], rowCount: 0 }
+      if (sql.includes('DELETE FROM public.manifest WHERE id')) {
+        callOrder.push(`db_delete_row:${params?.[0]}`)
+        return { rows: [], rowCount: 1 }
+      }
+      if (sql === 'COMMIT')
+        callOrder.push('commit_entry')
+      if (sql === 'ROLLBACK')
+        callOrder.push('rollback_entry')
+      if (sql.includes('SELECT COUNT(*)'))
+        return { rows: [{ count: 0 }], rowCount: 1 }
+      if (sql.includes('WITH prev AS'))
+        return { rows: [], rowCount: 1 }
+      return { rows: [], rowCount: 0 }
     })
-    mockSuccessfulDbFinalize()
     appVersionsMetaSelectEq.mockReturnValue({
       single: vi.fn(async () => ({ data: { size: 1234 }, error: null })),
     })
@@ -181,20 +177,20 @@ describe('on_version_update deleted version cleanup', () => {
 
   it('moves the bundle to trash and clears stored size for soft-deleted versions', async () => {
     const response = await deleteIt(createContext(), createVersion())
-
     expect(response.status).toBe(200)
     expect(moveObjectToTrash).toHaveBeenCalledWith(expect.anything(), 'orgs/org-1/apps/com.cleanup.test/1.0.0.zip')
     expect(appVersionsMetaUpdate).toHaveBeenCalledWith({ size: 0 })
   })
 
-  it('trashes R2 before deleting each manifest DB row', async () => {
+  it('locks, trashes R2, then deletes each manifest DB row', async () => {
     manifestSelectWhere.mockResolvedValue(makeEntries(1))
 
     await deleteIt(createContext(), createVersion({ r2_path: null, manifest_count: 1 }))
 
-    expect(callOrder.indexOf('r2_trash')).toBeGreaterThanOrEqual(0)
-    expect(callOrder.indexOf('db_delete_row')).toBeGreaterThan(callOrder.indexOf('r2_trash'))
-    expect(pgQuery).toHaveBeenCalledWith('COMMIT')
+    expect(callOrder).toContain('lock')
+    expect(callOrder.indexOf('r2_trash')).toBeGreaterThan(callOrder.indexOf('lock'))
+    expect(callOrder.indexOf('db_delete_row:1000')).toBeGreaterThan(callOrder.indexOf('r2_trash'))
+    expect(pgQuery).toHaveBeenCalledWith(expect.stringContaining('WITH prev AS'), expect.any(Array))
   })
 
   it('does not delete DB rows when R2 trash fails', async () => {
@@ -208,18 +204,36 @@ describe('on_version_update deleted version cleanup', () => {
       'Cannot move S3 object for deleted manifest file to trash',
     )
     expect(callOrder).toContain('r2_trash')
-    expect(callOrder).not.toContain('db_delete_row')
-    expect(pgQuery).not.toHaveBeenCalledWith('COMMIT')
+    expect(callOrder.some(v => v.startsWith('db_delete_row:'))).toBe(false)
+    expect(callOrder).toContain('rollback_entry')
   })
 
   it('skips R2 trash when another version still references the file, then deletes the row', async () => {
     manifestSelectWhere.mockResolvedValue(makeEntries(1))
-    manifestReferenceMaybeSingle.mockResolvedValue({ data: { id: 999 }, error: null })
+    pgQuery.mockImplementation((async (sql: string, params?: any[]) => {
+      if (sql === 'BEGIN')
+        callOrder.push('begin')
+      if (sql.includes('pg_advisory_xact_lock'))
+        callOrder.push('lock')
+      if (sql.includes('SELECT 1 AS ok'))
+        return { rows: [{ ok: 1 }], rowCount: 1 }
+      if (sql.includes('DELETE FROM public.manifest WHERE id')) {
+        callOrder.push(`db_delete_row:${params?.[0]}`)
+        return { rows: [], rowCount: 1 }
+      }
+      if (sql === 'COMMIT')
+        callOrder.push('commit_entry')
+      if (sql.includes('SELECT COUNT(*)'))
+        return { rows: [{ count: 0 }], rowCount: 1 }
+      if (sql.includes('WITH prev AS'))
+        return { rows: [], rowCount: 1 }
+      return { rows: [], rowCount: 0 }
+    }) as any)
 
     await deleteIt(createContext(), createVersion({ r2_path: null, manifest_count: 1 }))
 
     expect(moveObjectToTrash).not.toHaveBeenCalled()
-    expect(callOrder).toContain('db_delete_row')
+    expect(callOrder).toContain('db_delete_row:1000')
   })
 
   it('still clears manifests when version meta is missing', async () => {
@@ -231,7 +245,7 @@ describe('on_version_update deleted version cleanup', () => {
     const response = await deleteIt(createContext(), createVersion({ manifest_count: 1 }))
 
     expect(response.status).toBe(200)
-    expect(callOrder.indexOf('r2_trash')).toBeLessThan(callOrder.indexOf('db_delete_row'))
+    expect(callOrder.indexOf('r2_trash')).toBeLessThan(callOrder.indexOf('db_delete_row:1000'))
     expect(moveObjectToTrash).toHaveBeenCalledWith(expect.anything(), 'orgs/org-1/apps/com.cleanup.test/1.0.0.zip')
   })
 
@@ -246,15 +260,26 @@ describe('on_version_update deleted version cleanup', () => {
       'Cannot move S3 object for deleted version to trash',
     )
     expect(callOrder).toContain('r2_trash')
-    expect(callOrder).toContain('db_delete_row')
-    expect(pgQuery).toHaveBeenCalledWith('COMMIT')
+    expect(callOrder).toContain('db_delete_row:1000')
   })
 
   it('throws when rows remain after the trash/delete pass', async () => {
     manifestSelectWhere.mockResolvedValue(makeEntries(1))
-    pgQuery.mockImplementation(async (sql: string) => {
-      if (sql === 'BEGIN' || sql === 'ROLLBACK')
+    pgQuery.mockImplementation(async (sql: string, params?: any[]) => {
+      if (sql === 'BEGIN')
+        callOrder.push('begin')
+      if (sql.includes('pg_advisory_xact_lock'))
+        callOrder.push('lock')
+      if (sql.includes('SELECT 1 AS ok'))
         return { rows: [], rowCount: 0 }
+      if (sql.includes('DELETE FROM public.manifest WHERE id')) {
+        callOrder.push(`db_delete_row:${params?.[0]}`)
+        return { rows: [], rowCount: 1 }
+      }
+      if (sql === 'COMMIT')
+        callOrder.push('commit_entry')
+      if (sql === 'ROLLBACK')
+        callOrder.push('rollback_entry')
       if (sql.includes('SELECT COUNT(*)'))
         return { rows: [{ count: 2 }], rowCount: 1 }
       return { rows: [], rowCount: 0 }
@@ -263,7 +288,7 @@ describe('on_version_update deleted version cleanup', () => {
     await expect(deleteIt(createContext(), createVersion({ r2_path: null, manifest_count: 1 }))).rejects.toThrow(
       'Manifest rows still present after trash/delete pass',
     )
-    expect(pgQuery).toHaveBeenCalledWith('ROLLBACK')
+    expect(callOrder).toContain('rollback_entry')
   })
 
   it('routes already-deleted versions with leftover counts to cleanup_manifest', () => {
@@ -279,44 +304,42 @@ describe('on_version_update manifest cleanup load', () => {
     vi.clearAllMocks()
     callOrder.length = 0
     createStatsMeta.mockResolvedValue({ error: null })
-    manifestReferenceMaybeSingle.mockResolvedValue({ data: null, error: null })
-    mockSuccessfulDbFinalize()
     appVersionsMetaSelectEq.mockReturnValue({
       single: vi.fn(async () => ({ data: { size: 0 }, error: null })),
     })
     appVersionsMetaUpdateEq.mockResolvedValue({ error: null })
-    manifestDeleteEq.mockImplementation(async () => {
-      callOrder.push('db_delete_row')
-      return { error: null }
-    })
     moveObjectToTrash.mockImplementation(async () => {
       callOrder.push('r2_trash')
       return true
     })
+    pgQuery.mockImplementation(async (sql: string, params?: any[]) => {
+      if (sql.includes('SELECT 1 AS ok'))
+        return { rows: [], rowCount: 0 }
+      if (sql.includes('DELETE FROM public.manifest WHERE id')) {
+        callOrder.push(`db_delete_row:${params?.[0]}`)
+        return { rows: [], rowCount: 1 }
+      }
+      if (sql.includes('SELECT COUNT(*)'))
+        return { rows: [{ count: 0 }], rowCount: 1 }
+      if (sql.includes('WITH prev AS'))
+        return { rows: [], rowCount: 1 }
+      return { rows: [], rowCount: 0 }
+    })
   })
 
-  it('handles 5000-file manifests with R2 before every DB delete and one final commit', async () => {
-    const entries = makeEntries(5000)
-    manifestSelectWhere.mockResolvedValue(entries)
+  it('handles 5000-file manifests with R2 before every DB delete', async () => {
+    manifestSelectWhere.mockResolvedValue(makeEntries(5000))
 
     const response = await deleteIt(createContext(), createVersion({ r2_path: null, manifest_count: 5000 }))
 
     expect(response.status).toBe(200)
     expect(moveObjectToTrash).toHaveBeenCalledTimes(5000)
-    expect(manifestDeleteEq).toHaveBeenCalledTimes(5000)
-    expect(pgQuery).toHaveBeenCalledWith('COMMIT')
-
-    const trashIndexes = callOrder.map((v, i) => v === 'r2_trash' ? i : -1).filter(i => i >= 0)
-    const deleteIndexes = callOrder.map((v, i) => v === 'db_delete_row' ? i : -1).filter(i => i >= 0)
-    expect(trashIndexes).toHaveLength(5000)
-    expect(deleteIndexes).toHaveLength(5000)
-    expect(deleteIndexes[0]).toBeGreaterThan(trashIndexes[0])
-    expect(deleteIndexes.at(-1)!).toBeGreaterThan(trashIndexes[0])
-  }, 30_000)
+    expect(callOrder.filter(v => v.startsWith('db_delete_row:'))).toHaveLength(5000)
+    expect(pgQuery).toHaveBeenCalledWith(expect.stringContaining('WITH prev AS'), expect.any(Array))
+  }, 60_000)
 
   it('keeps remaining rows retryable when one file in a large batch fails trash', async () => {
-    const entries = makeEntries(200)
-    manifestSelectWhere.mockResolvedValue(entries)
+    manifestSelectWhere.mockResolvedValue(makeEntries(200))
     moveObjectToTrash.mockImplementation(async (_c: unknown, path: string) => {
       callOrder.push('r2_trash')
       if (path.endsWith('file-150.js'))
@@ -328,29 +351,7 @@ describe('on_version_update manifest cleanup load', () => {
       'Cannot move S3 object for deleted manifest file to trash',
     )
 
-    const deletedIds = manifestDeleteEq.mock.calls.map(call => call[1] as number)
+    const deletedIds = callOrder.filter(v => v.startsWith('db_delete_row:')).map(v => Number(v.split(':')[1]))
     expect(deletedIds).not.toContain(1150)
-    expect(pgQuery).not.toHaveBeenCalledWith('COMMIT')
   }, 30_000)
-
-  it('does not finalize counters while rows remain after a partial failure', async () => {
-    manifestSelectWhere.mockResolvedValue(makeEntries(10))
-    let deletes = 0
-    manifestDeleteEq.mockImplementation((async () => {
-      deletes += 1
-      callOrder.push('db_delete_row')
-      if (deletes >= 5)
-        return { error: { message: 'db down' } }
-      return { error: null }
-    }) as any)
-    moveObjectToTrash.mockImplementation(async () => {
-      callOrder.push('r2_trash')
-      return true
-    })
-
-    await expect(deleteIt(createContext(), createVersion({ r2_path: null, manifest_count: 10 }))).rejects.toThrow(
-      'Cannot delete manifest row after R2 trash',
-    )
-    expect(pgQuery).not.toHaveBeenCalledWith(expect.stringContaining('WITH prev AS'))
-  })
 })

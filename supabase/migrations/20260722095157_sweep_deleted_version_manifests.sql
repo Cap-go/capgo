@@ -1,4 +1,13 @@
--- Sweep soft-deleted app_versions that still have manifest rows or stale counters.
+-- Sweep soft-deleted app_versions
+
+CREATE INDEX IF NOT EXISTS idx_app_versions_deleted_with_manifest
+  ON public.app_versions (id)
+  WHERE deleted = true AND manifest_count > 0;
+
+CREATE INDEX IF NOT EXISTS idx_app_versions_deleted_at_id
+  ON public.app_versions (deleted_at, id)
+  WHERE deleted = true;
+ that still have manifest rows or stale counters.
 -- Touches a bounded batch so on_version_update re-runs cleanup_manifest.
 -- Also zeros stale manifest_count when no rows remain.
 
@@ -55,14 +64,17 @@ BEGIN
   -- Re-queue deleted versions that still have manifest rows by touching them.
   -- on_version_update trigger enqueues cleanup when deleted_at is unchanged and
   -- manifest_count > 0.
+  -- Start from deleted versions (bounded) and probe manifest via app_version_id index.
   WITH candidates AS (
-    SELECT m.app_version_id AS id
-    FROM public.manifest AS m
-    JOIN public.app_versions AS av
-      ON av.id = m.app_version_id
-     AND av.deleted = true
-    GROUP BY m.app_version_id
-    ORDER BY m.app_version_id
+    SELECT av.id
+    FROM public.app_versions AS av
+    WHERE av.deleted = true
+      AND EXISTS (
+        SELECT 1
+        FROM public.manifest AS m
+        WHERE m.app_version_id = av.id
+      )
+    ORDER BY av.deleted_at NULLS LAST, av.id
     LIMIT p_batch_size
   )
   UPDATE public.app_versions AS av
