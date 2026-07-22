@@ -47,6 +47,7 @@
   "Storage": "Storage",
   "above-plan-trend": "Above Plan Trend",
   "total-above-plan": "Total Above Plan",
+  "total-above-plan-description": "Organizations currently over plan limits (with and without credits)",
   "above-plan-with-credits": "Above Plan With Credits",
   "above-plan-with-credits-description": "Organizations over plan limits with positive, unexpired usage credits",
   "above-plan-without-credits": "Above Plan Without Credits",
