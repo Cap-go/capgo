@@ -33,7 +33,7 @@ SELECT count(*) AS eligible_dual_storage_sample
 FROM (
   SELECT sample.id
   FROM (
-    SELECT av.id, av.manifest, av.manifest_count
+    SELECT av.id, av.manifest
     FROM public.app_versions AS av
     WHERE av.manifest IS NOT NULL
     ORDER BY av.id
