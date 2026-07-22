@@ -55,7 +55,9 @@ BEGIN
         did_work := true;
       END IF;
 
-      EXIT WHEN batches_used >= max_batches_total;
+      IF batches_used >= max_batches_total THEN
+        EXIT; -- leave queue loop; do not start stuck deletes over budget
+      END IF;
 
       EXECUTE pg_catalog.format(
         'DELETE FROM pgmq.q_%I
@@ -560,6 +562,13 @@ SET
   description = 'Delete audit_logs older than 30 days in bounded batches',
   updated_at = pg_catalog.now()
 WHERE name = 'cleanup_old_audit_logs';
+
+
+-- Bound dual-storage candidate discovery for hourly reclaim.
+-- Maintenance-window deploy: brief lock on app_versions is expected.
+CREATE INDEX IF NOT EXISTS app_versions_manifest_present_idx
+  ON public.app_versions USING btree (id)
+  WHERE manifest IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
 -- Allow clearing dual-storage app_versions.manifest after upload (null only).

@@ -66,7 +66,8 @@ VACUUM (VERBOSE) public.app_versions;
 -- maintenance window (exclusive lock):
 -- VACUUM (FULL, VERBOSE) public.app_versions;
 
--- Non-blocking candidate index for ongoing hourly cleanup (outside a tx):
+-- Candidate index for hourly cleanup. Migration creates it non-concurrently;
+-- if deploying via ops only, prefer CONCURRENTLY outside a transaction:
 -- CREATE INDEX CONCURRENTLY IF NOT EXISTS app_versions_manifest_present_idx
 --   ON public.app_versions USING btree (id)
 --   WHERE manifest IS NOT NULL;
