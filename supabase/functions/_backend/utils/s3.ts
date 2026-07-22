@@ -145,6 +145,15 @@ async function moveObjectToTrash(c: Context, fileId: string) {
   if (fileId.startsWith(R2_TRASH_PREFIX))
     return true
 
+  // Never delete tracking before we know the object state.
+  // Exists → copy into lifecycle trash then remove original.
+  // Missing → treat as already gone so callers can drop DB rows safely.
+  const exists = await checkIfExist(c, fileId)
+  if (!exists) {
+    cloudlog({ requestId: c.get('requestId'), message: 'R2 object missing before trash move, skip copy', fileId })
+    return true
+  }
+
   const client = initS3(c)
   const trashPath = getTrashPath(fileId)
   try {
@@ -155,7 +164,7 @@ async function moveObjectToTrash(c: Context, fileId: string) {
   }
   catch (error) {
     if (isMissingObjectError(error)) {
-      cloudlog({ requestId: c.get('requestId'), message: 'R2 object already missing before trash move', fileId, error: serializeStorageError(error) })
+      cloudlog({ requestId: c.get('requestId'), message: 'R2 object disappeared during trash move', fileId, error: serializeStorageError(error) })
       return true
     }
 
