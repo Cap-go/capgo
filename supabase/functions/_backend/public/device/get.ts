@@ -52,9 +52,26 @@ function parseUpdatedAtFilter(updatedAt: string | undefined): string | undefined
   if (!updatedAt)
     return undefined
 
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?Z$/.exec(updatedAt)
+  if (!match) {
+    throw simpleError('invalid_updated_at', 'updated_at must be a valid ISO date', { updated_at: updatedAt })
+  }
+
   const parsed = new Date(updatedAt)
   if (Number.isNaN(parsed.getTime()))
     throw simpleError('invalid_updated_at', 'updated_at must be a valid ISO date', { updated_at: updatedAt })
+
+  const [, year, month, day, hour, minute, second] = match
+  if (
+    parsed.getUTCFullYear() !== Number(year)
+    || parsed.getUTCMonth() + 1 !== Number(month)
+    || parsed.getUTCDate() !== Number(day)
+    || parsed.getUTCHours() !== Number(hour)
+    || parsed.getUTCMinutes() !== Number(minute)
+    || parsed.getUTCSeconds() !== Number(second)
+  ) {
+    throw simpleError('invalid_updated_at', 'updated_at must be a valid ISO date', { updated_at: updatedAt })
+  }
 
   return parsed.toISOString()
 }
@@ -78,8 +95,8 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
   const updatedAtGt = parseUpdatedAtFilter(body.updated_at)
   const order = parseDevicesOrder(body.order)
   const limit = body.limit == null ? fetchLimit : Number(body.limit)
-  if (!Number.isFinite(limit) || limit < 1) {
-    throw simpleError('invalid_limit', 'limit must be a positive number', { limit: body.limit })
+  if (!Number.isFinite(limit) || !Number.isInteger(limit) || limit < 1) {
+    throw simpleError('invalid_limit', 'limit must be a positive integer', { limit: body.limit })
   }
 
   // Auth context is already set by middlewareKey

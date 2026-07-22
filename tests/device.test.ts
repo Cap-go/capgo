@@ -142,6 +142,20 @@ describe('[GET] /device updated_at filter and order', () => {
     expect(data.error).toBe('invalid_updated_at')
   })
 
+  it('rejects non-calendar ISO updated_at values', async () => {
+    const params = new URLSearchParams({
+      app_id: APPNAME_DEVICE,
+      updated_at: '2024-02-31T00:00:00.000Z',
+    })
+    const response = await fetch(`${BASE_URL}/device?${params.toString()}`, {
+      method: 'GET',
+      headers,
+    })
+    const data = await response.json<{ error?: string }>()
+    expect(response.status).toBe(400)
+    expect(data.error).toBe('invalid_updated_at')
+  })
+
   it('rejects invalid order', async () => {
     const params = new URLSearchParams({
       app_id: APPNAME_DEVICE,
