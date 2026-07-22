@@ -32,4 +32,23 @@ describe('buildUpgradeRate12mBackfillRows', () => {
     expect(byDate['2026-07-22']?.upgraded_orgs_12m).toBe(5)
     expect(byDate['2026-07-22']?.next_rate).toBe(25)
   })
+
+  it('clamps leap-day trailing windows to the prior month-end', () => {
+    const rows = [
+      { date_id: '2023-02-28', paying: 10, upgrade_rate_12m: 0, upgraded_orgs: 1 },
+      { date_id: '2023-03-01', paying: 10, upgrade_rate_12m: 0, upgraded_orgs: 1 },
+      { date_id: '2024-02-28', paying: 10, upgrade_rate_12m: 0, upgraded_orgs: 0 },
+      { date_id: '2024-02-29', paying: 10, upgrade_rate_12m: 0, upgraded_orgs: 0 },
+    ]
+
+    const result = buildUpgradeRate12mBackfillRows(
+      [{ date_id: '2024-02-29', paying: 10, upgrade_rate_12m: 0, upgraded_orgs: 0 }],
+      rows,
+    )
+
+    // endExclusive 2024-03-01 => start clamped to 2023-03-01 (not 2023-02-29)
+    // so 2023-02-28 is excluded and only 2023-03-01 counts
+    expect(result[0]?.upgraded_orgs_12m).toBe(1)
+    expect(result[0]?.next_rate).toBe(10)
+  })
 })

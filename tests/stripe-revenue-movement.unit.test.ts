@@ -123,6 +123,8 @@ describe('stripe revenue movement classification', () => {
     )
 
     expect(stripeEventTestUtils.shouldTrackOrganizationUpgrade(false, movement)).toBe(false)
+    // monthly->yearly flag alone is not enough without already-paying MRR
+    expect(stripeEventTestUtils.shouldTrackOrganizationUpgrade(true, movement)).toBe(false)
   })
 
   it.concurrent('records downgrades as contraction MRR', () => {
