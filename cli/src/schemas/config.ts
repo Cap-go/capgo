@@ -1,7 +1,5 @@
-import { type } from 'arktype'
-
 // ============================================================================
-// Capacitor Config Schema
+// Capacitor Config Types
 // ============================================================================
 
 export interface CapacitorConfig {
@@ -12,19 +10,6 @@ export interface CapacitorConfig {
   android?: Record<string, any>
   [key: string]: any
 }
-
-export const capacitorConfigSchema = type({
-  appId: 'string',
-  appName: 'string',
-  webDir: 'string',
-  'plugins?': { '[string]': { '[string]': 'unknown' } },
-  'android?': { '[string]': 'unknown' },
-})
-
-export const extConfigPairsSchema = type({
-  config: capacitorConfigSchema,
-  path: 'string',
-})
 
 export type ExtConfigPairs = {
   config: CapacitorConfig

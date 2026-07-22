@@ -66,7 +66,6 @@ export { compatibilityDetailsSchema, compatibilitySchema, incompatibilityReasonS
 export type { Compatibility, CompatibilityDetails, IncompatibilityReason, NativePackage, ParsedSecurityError } from './common'
 
 // Config
-export { capacitorConfigSchema, extConfigPairsSchema } from './config'
 export type { CapacitorConfig, ExtConfigPairs } from './config'
 
 // Organization

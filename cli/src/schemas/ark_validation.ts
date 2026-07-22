@@ -1,5 +1,4 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
-import { type } from 'arktype'
 
 export type ValidationIssue = StandardSchemaV1.Issue & { readonly code?: string }
 
@@ -18,30 +17,6 @@ export class SchemaError extends Error {
     super(issues.map(issue => issue.message).join('; ') || 'Schema validation failed')
     this.name = 'SchemaError'
     this.issues = issues
-  }
-}
-
-export function makeIssue(message: string, path: readonly PropertyKey[] = [], code = 'custom'): ValidationIssue {
-  return {
-    message,
-    path,
-    code,
-  } as ValidationIssue
-}
-
-export function createSchema<T>(
-  validate: (value: unknown) => { value: T } | { issues: readonly ValidationIssue[] },
-): StandardSchema<T> {
-  return {
-    '~standard': {
-      validate(value) {
-        const result = validate(value)
-        if ('issues' in result) {
-          return { issues: result.issues }
-        }
-        return { value: result.value }
-      },
-    },
   }
 }
 
@@ -82,37 +57,4 @@ export function parseSchema<T>(schema: StandardSchema<T>, value: unknown): T {
   }
 
   return result.data
-}
-
-export async function safeParseSchemaAsync<T>(
-  schema: StandardSchema<T>,
-  value: unknown,
-): Promise<SafeParseSchemaResult<T>> {
-  const result = await Promise.resolve(schema['~standard'].validate(value))
-
-  if (result.issues) {
-    return {
-      success: false,
-      error: new SchemaError(result.issues as readonly ValidationIssue[]),
-    }
-  }
-
-  return {
-    success: true,
-    data: result.value,
-  }
-}
-
-export async function parseSchemaAsync<T>(schema: StandardSchema<T>, value: unknown): Promise<T> {
-  const result = await safeParseSchemaAsync(schema, value)
-
-  if (!result.success) {
-    throw result.error
-  }
-
-  return result.data
-}
-
-export function literalUnion<const T extends readonly string[]>(values: T) {
-  return type(values.map(value => JSON.stringify(value)).join(' | ') as any) as any
 }
