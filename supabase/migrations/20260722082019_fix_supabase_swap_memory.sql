@@ -22,13 +22,17 @@ DECLARE
   deleted_batch integer;
   deleted_archived_total bigint := 0;
   deleted_stuck_total bigint := 0;
+  did_work boolean;
 BEGIN
-  FOR queue_name IN (
-    SELECT q.queue_name FROM pgmq.list_queues() q
-  ) LOOP
+  -- Round-robin: at most one archive batch and one stuck batch per queue per pass,
+  -- so a busy first queue cannot starve later queues within the global budget.
+  LOOP
     EXIT WHEN batches_used >= max_batches_total;
+    did_work := false;
 
-    LOOP
+    FOR queue_name IN (
+      SELECT q.queue_name FROM pgmq.list_queues() q
+    ) LOOP
       EXIT WHEN batches_used >= max_batches_total;
 
       EXECUTE pg_catalog.format(
@@ -45,12 +49,12 @@ BEGIN
       USING cutoff, batch_size;
 
       GET DIAGNOSTICS deleted_batch = ROW_COUNT;
-      EXIT WHEN deleted_batch = 0;
-      batches_used := batches_used + 1;
-      deleted_archived_total := deleted_archived_total + deleted_batch;
-    END LOOP;
+      IF deleted_batch > 0 THEN
+        batches_used := batches_used + 1;
+        deleted_archived_total := deleted_archived_total + deleted_batch;
+        did_work := true;
+      END IF;
 
-    LOOP
       EXIT WHEN batches_used >= max_batches_total;
 
       EXECUTE pg_catalog.format(
@@ -67,10 +71,14 @@ BEGIN
       USING batch_size;
 
       GET DIAGNOSTICS deleted_batch = ROW_COUNT;
-      EXIT WHEN deleted_batch = 0;
-      batches_used := batches_used + 1;
-      deleted_stuck_total := deleted_stuck_total + deleted_batch;
+      IF deleted_batch > 0 THEN
+        batches_used := batches_used + 1;
+        deleted_stuck_total := deleted_stuck_total + deleted_batch;
+        did_work := true;
+      END IF;
     END LOOP;
+
+    EXIT WHEN NOT did_work;
   END LOOP;
 
   RAISE NOTICE
@@ -168,16 +176,17 @@ BEGIN
       FROM public.app_versions AS av
       WHERE av.manifest IS NOT NULL
         AND pg_catalog.cardinality(av.manifest) > 0
-        AND (
-          SELECT count(*)::integer
-          FROM public.manifest AS m
-          WHERE m.app_version_id = av.id
-        ) >= (
-          CASE
-            WHEN COALESCE(av.manifest_count, 0) >= pg_catalog.cardinality(av.manifest)
-              THEN COALESCE(av.manifest_count, 0)
-            ELSE pg_catalog.cardinality(av.manifest)
-          END
+        AND NOT EXISTS (
+          SELECT 1
+          FROM pg_catalog.unnest(av.manifest) AS entry(file_name, s3_path, file_hash)
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM public.manifest AS m
+            WHERE m.app_version_id = av.id
+              AND m.file_name = entry.file_name
+              AND m.s3_path = entry.s3_path
+              AND m.file_hash = entry.file_hash
+          )
         )
       ORDER BY av.id
       LIMIT batch_size
@@ -424,8 +433,11 @@ BEGIN
       old_record_payload := old_record_payload - 'manifest' - 'native_packages';
     END IF;
 
-    -- Dual-storage reclaim only nulls fat columns (+ auto updated_at). Skip queue fan-out.
+    -- Skip queue fan-out only for dual-storage reclaim: non-null manifest -> NULL.
+    -- Do not skip upload-time manifest writes that still need on_version_update migration.
     IF TG_OP = 'UPDATE'
+      AND OLD.manifest IS NOT NULL
+      AND NEW.manifest IS NULL
       AND (record_payload - 'updated_at') IS NOT DISTINCT FROM (old_record_payload - 'updated_at')
     THEN
       RETURN NEW;
@@ -544,10 +556,12 @@ SET
   updated_at = pg_catalog.now();
 
 
--- Bound dual-storage candidate discovery once most arrays are nulled.
-CREATE INDEX IF NOT EXISTS app_versions_manifest_present_idx
-  ON public.app_versions USING btree (id)
-  WHERE manifest IS NOT NULL;
+
+UPDATE public.cron_tasks
+SET
+  description = 'Delete audit_logs older than 30 days in bounded batches',
+  updated_at = pg_catalog.now()
+WHERE name = 'cleanup_old_audit_logs';
 
 -- ---------------------------------------------------------------------------
 -- Allow clearing dual-storage app_versions.manifest after upload (null only).
@@ -586,16 +600,17 @@ BEGIN
         OR (
           NEW.manifest IS NULL
           AND OLD.manifest IS NOT NULL
-          AND (
-            SELECT count(*)::integer
-            FROM public.manifest AS m
-            WHERE m.app_version_id = OLD.id
-          ) < (
-            CASE
-              WHEN COALESCE(OLD.manifest_count, 0) >= COALESCE(pg_catalog.cardinality(OLD.manifest), 0)
-                THEN COALESCE(OLD.manifest_count, 0)
-              ELSE COALESCE(pg_catalog.cardinality(OLD.manifest), 0)
-            END
+          AND EXISTS (
+            SELECT 1
+            FROM pg_catalog.unnest(OLD.manifest) AS entry(file_name, s3_path, file_hash)
+            WHERE NOT EXISTS (
+              SELECT 1
+              FROM public.manifest AS m
+              WHERE m.app_version_id = OLD.id
+                AND m.file_name = entry.file_name
+                AND m.s3_path = entry.s3_path
+                AND m.file_hash = entry.file_hash
+            )
           )
         )
         OR NEW.native_packages IS DISTINCT FROM OLD.native_packages

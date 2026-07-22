@@ -1,9 +1,13 @@
 -- Post-deploy / post-reclaim verification for Capgo-EU swap pressure.
--- Prefer psql. Avoids unbounded whole-table counts where possible.
+-- REQUIRED: psql (uses \gexec). Example:
+--   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/ops/verify_supabase_swap.sql
 
 SELECT pg_size_pretty(pg_database_size(current_database())::bigint) AS db_size;
 
-SELECT name, setting, unit
+SELECT
+  name,
+  setting,
+  unit
 FROM pg_settings
 WHERE name IN ('shared_buffers', 'work_mem', 'max_connections');
 
@@ -24,7 +28,7 @@ WHERE (schemaname, relname) IN (
 )
 ORDER BY pg_total_relation_size(format('%I.%I', schemaname, relname)::regclass) DESC;
 
--- Bound candidate discovery first, then evaluate eligibility inside the sample.
+-- Sample first 1000 non-null manifests; a zero does not prove global completion.
 SELECT count(*) AS eligible_dual_storage_sample
 FROM (
   SELECT sample.id
@@ -36,20 +40,29 @@ FROM (
     LIMIT 1000
   ) AS sample
   WHERE cardinality(sample.manifest) > 0
-    AND (
-      SELECT count(*)::integer
-      FROM public.manifest AS m
-      WHERE m.app_version_id = sample.id
-    ) >= (
-      CASE
-        WHEN COALESCE(sample.manifest_count, 0) >= cardinality(sample.manifest)
-          THEN COALESCE(sample.manifest_count, 0)
-        ELSE cardinality(sample.manifest)
-      END
+    AND NOT EXISTS (
+      SELECT 1
+      FROM unnest(sample.manifest) AS entry(file_name, s3_path, file_hash)
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM public.manifest AS m
+        WHERE m.app_version_id = sample.id
+          AND m.file_name = entry.file_name
+          AND m.s3_path = entry.s3_path
+          AND m.file_hash = entry.file_hash
+      )
     )
 ) AS eligible;
 
-SELECT name, enabled, hour_interval, run_at_hour, run_at_minute, target, updated_at
+SELECT
+  name,
+  enabled,
+  hour_interval,
+  run_at_hour,
+  run_at_minute,
+  target,
+  description,
+  updated_at
 FROM public.cron_tasks
 WHERE name IN (
   'cleanup_queue_messages',
@@ -59,24 +72,38 @@ WHERE name IN (
 )
 ORDER BY name;
 
--- process_all_cron_tasks() swallows per-task errors; cron.job_run_details only
--- reflects the outer job. Prefer Postgres logs / healthchecks for task failures.
+-- process_all_cron_tasks() swallows per-task errors; prefer Postgres logs /
+-- healthchecks for task failures.
 SELECT indexname
 FROM pg_indexes
 WHERE schemaname = 'public'
   AND indexname = 'app_versions_manifest_present_idx';
 
--- Same queue set as cleanup_queue_messages() (psql \gexec; bounded EXISTS).
+-- Same queue set as cleanup_queue_messages() (archives + stuck).
 SELECT format(
   $fmt$SELECT %L AS queue_name,
          EXISTS (
            SELECT 1
-           FROM pgmq.a_%I
+           FROM pgmq.%I
            WHERE archived_at < now() - interval '2 days'
            LIMIT 1
          ) AS has_rows_older_than_2d;$fmt$,
   queue_name,
-  queue_name
+  'a_' || pg_catalog.lower(queue_name)
+)
+FROM pgmq.list_queues()
+\gexec
+
+SELECT format(
+  $fmt$SELECT %L AS queue_name,
+         EXISTS (
+           SELECT 1
+           FROM pgmq.%I
+           WHERE read_ct > 5
+           LIMIT 1
+         ) AS has_stuck_read_ct_gt_5;$fmt$,
+  queue_name,
+  'q_' || pg_catalog.lower(queue_name)
 )
 FROM pgmq.list_queues()
 \gexec

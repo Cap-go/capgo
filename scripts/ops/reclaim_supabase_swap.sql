@@ -1,7 +1,8 @@
 -- Capgo-EU Phase A reclaim (run manually in a maintenance window).
--- Prefer psql (VACUUM cannot run inside a transaction / SQL-editor DO block).
+-- REQUIRED: psql (uses \gexec; VACUUM cannot run inside a transaction).
+-- Prefer ~/.pgpass / PGPASSFILE instead of putting the password on the CLI.
 -- Example:
---   PGPASSWORD=... psql "postgresql://..." -v ON_ERROR_STOP=1 -f scripts/ops/reclaim_supabase_swap.sql
+--   psql "postgresql://postgres@HOST:5432/postgres?sslmode=require" -v ON_ERROR_STOP=1 -f scripts/ops/reclaim_supabase_swap.sql
 -- Safe order: truncate empty bloat -> batched archive deletes -> null dual manifests -> trim audit.
 -- Each statement commits separately. Re-run until cleanup notices report deleted/updated = 0
 -- (functions always emit a notice, including zero totals).
@@ -34,27 +35,29 @@ ORDER BY pg_total_relation_size(format('%I.%I', schemaname, relname)::regclass) 
 TRUNCATE TABLE net._http_response;
 
 -- ---------------------------------------------------------------------------
--- 2) Purge pgmq archives/stuck messages (global batch budget per call).
---    Re-run this SELECT until the notice shows archived_deleted=0 and stuck_deleted=0.
+-- 2) Purge pgmq archives/stuck messages (global round-robin batch budget).
+--    Re-run this SELECT until the notice shows archived_deleted=0 and
+--    stuck_deleted=0.
 -- ---------------------------------------------------------------------------
 SELECT public.cleanup_queue_messages();
 
--- Vacuum every pgmq archive + queue table (psql \gexec; VACUUM cannot run in DO/tx).
-SELECT format('VACUUM (VERBOSE) pgmq.a_%I;', queue_name)
+-- Vacuum every pgmq archive + queue table (quote full physical table name).
+SELECT format('VACUUM (VERBOSE) pgmq.%I;', 'a_' || pg_catalog.lower(queue_name))
 FROM pgmq.list_queues()
 \gexec
-SELECT format('VACUUM (VERBOSE) pgmq.q_%I;', queue_name)
+SELECT format('VACUUM (VERBOSE) pgmq.%I;', 'q_' || pg_catalog.lower(queue_name))
 FROM pgmq.list_queues()
 \gexec
 
 -- Optional hard reclaim (stronger locks):
--- SELECT format('VACUUM (FULL, VERBOSE) pgmq.a_%I;', queue_name) FROM pgmq.list_queues() \gexec
--- SELECT format('VACUUM (FULL, VERBOSE) pgmq.q_%I;', queue_name) FROM pgmq.list_queues() \gexec
+-- SELECT format('VACUUM (FULL, VERBOSE) pgmq.%I;', 'a_' || pg_catalog.lower(queue_name))
+-- FROM pgmq.list_queues()
+-- \gexec
 
 -- ---------------------------------------------------------------------------
 -- 3) Null fully migrated app_versions.manifest arrays
---    Requires every expected legacy entry to exist in public.manifest.
---    Re-run until notice shows updated=0.
+--    Requires every legacy entry to exist in public.manifest by
+--    file_name/s3_path/file_hash. Re-run until notice shows updated=0.
 -- ---------------------------------------------------------------------------
 SELECT public.null_migrated_app_version_manifests();
 
@@ -63,8 +66,14 @@ VACUUM (VERBOSE) public.app_versions;
 -- maintenance window (exclusive lock):
 -- VACUUM (FULL, VERBOSE) public.app_versions;
 
+-- Non-blocking candidate index for ongoing hourly cleanup (outside a tx):
+-- CREATE INDEX CONCURRENTLY IF NOT EXISTS app_versions_manifest_present_idx
+--   ON public.app_versions USING btree (id)
+--   WHERE manifest IS NOT NULL;
+
 -- ---------------------------------------------------------------------------
--- 4) Trim audit_logs older than 30 days (bounded batches). Re-run until deleted=0.
+-- 4) Trim audit_logs older than 30 days (bounded batches).
+--    Re-run until deleted=0.
 -- ---------------------------------------------------------------------------
 SELECT public.cleanup_old_audit_logs();
 
