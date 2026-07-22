@@ -505,15 +505,10 @@ function getRevenueChurnReason(
   return getChurnReason(currentStripeInfo, nextStripeInfo)
 }
 
-function shouldTrackOrganizationUpgrade(isUpgrade: boolean, movement: RevenueMovement) {
-  // Only paying -> bigger (never trial/new-business -> first paid plan).
-  if (movement.currentMrr <= 0)
-    return false
-
-  if (isUpgrade)
-    return true
-
-  return movement.nextMrr > movement.currentMrr
+function shouldTrackOrganizationUpgrade(_isUpgrade: boolean, movement: RevenueMovement) {
+  // Only already-paying orgs that move to higher MRR (larger plan / expansion).
+  // monthly->yearly alone is not enough if MRR does not increase.
+  return movement.currentMrr > 0 && movement.nextMrr > movement.currentMrr
 }
 
 function isStaleStripeEvent(
