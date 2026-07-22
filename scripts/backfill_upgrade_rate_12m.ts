@@ -1,10 +1,10 @@
 /*
- * Backfill public.global_stats.upgrade_rate_12m from Stripe-sourced daily
- * upgrade counts already stored in global_stats.upgraded_orgs.
+ * Backfill public.global_stats.upgrade_rate_12m for paying -> bigger plan moves.
  *
- * Do NOT use stripe_info.upgraded_at for history — that column is new and
- * only tracks recent webhook upgrades. Historical upgraded_orgs were filled
- * from Stripe subscription intervals (admin revenue dashboard backfill).
+ * Numerator: Stripe-sourced daily upgrade counts in global_stats.upgraded_orgs
+ * (monthly->yearly or MRR increase while already paying). Historical rows were
+ * filled from Stripe subscription intervals; do not use stripe_info.upgraded_at
+ * for history (that column is new / sparse).
  *
  * For each snapshot day D:
  *   sum(upgraded_orgs) over date_ids in [D+1-12 calendar months, D]

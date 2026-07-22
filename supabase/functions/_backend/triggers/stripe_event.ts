@@ -506,10 +506,14 @@ function getRevenueChurnReason(
 }
 
 function shouldTrackOrganizationUpgrade(isUpgrade: boolean, movement: RevenueMovement) {
+  // Only paying -> bigger (never trial/new-business -> first paid plan).
+  if (movement.currentMrr <= 0)
+    return false
+
   if (isUpgrade)
     return true
 
-  return movement.currentMrr > 0 && movement.nextMrr > movement.currentMrr
+  return movement.nextMrr > movement.currentMrr
 }
 
 function isStaleStripeEvent(

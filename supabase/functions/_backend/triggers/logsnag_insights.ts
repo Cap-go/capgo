@@ -2795,11 +2795,20 @@ function getTrailing12mStart(nextDayStart: Date): Date {
   ))
 }
 
-async function getUpgradeRate12m(c: Context, nextDayStart: Date): Promise<number> {
+async function getUpgradeRate12m(
+  c: Context,
+  window: DailyWindow,
+  todayUpgradedOrgs: number,
+): Promise<number> {
+  // Paying -> bigger plan only. global_stats.upgraded_orgs counts those daily
+  // events (monthly->yearly or MRR increase while already paying). Rate =
+  // trailing-12m upgrade events / paying orgs on the snapshot day.
+  const nextDayStart = getMetricWindowFromDailyWindow(window).nextDayStart
+  const snapshotEndIso = nextDayStart.toISOString()
+  const trailingStartDateId = getTrailing12mStart(nextDayStart).toISOString().slice(0, 10)
+  const todayDateId = window.prevDayDateId
   const pgClient = getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
-  const snapshotEndIso = nextDayStart.toISOString()
-  const trailing12mStartIso = getTrailing12mStart(nextDayStart).toISOString()
 
   try {
     const result = await drizzleClient.execute(sql`
@@ -2818,15 +2827,18 @@ async function getUpgradeRate12m(c: Context, nextDayStart: Date): Promise<number
             )
         ) AS paying,
         (
-          SELECT COUNT(DISTINCT o.id)::int
-          FROM public.orgs o
-          INNER JOIN public.stripe_info si ON si.customer_id = o.customer_id
-          WHERE si.upgraded_at >= ${trailing12mStartIso}::timestamptz
-            AND si.upgraded_at < ${snapshotEndIso}::timestamptz
-        ) AS upgraded_orgs_12m
+          SELECT COALESCE(SUM(gs.upgraded_orgs), 0)::int
+          FROM public.global_stats gs
+          WHERE gs.date_id >= ${trailingStartDateId}
+            AND gs.date_id < ${todayDateId}
+        ) AS prior_upgraded_orgs_12m
     `)
-    const row = result.rows[0] as { paying?: number | string | null, upgraded_orgs_12m?: number | string | null } | undefined
-    return calculateConversionRate(Number(row?.upgraded_orgs_12m) || 0, Number(row?.paying) || 0)
+    const row = result.rows[0] as {
+      paying?: number | string | null
+      prior_upgraded_orgs_12m?: number | string | null
+    } | undefined
+    const upgradedOrgs12m = (Number(row?.prior_upgraded_orgs_12m) || 0) + (Number(todayUpgradedOrgs) || 0)
+    return calculateConversionRate(upgradedOrgs12m, Number(row?.paying) || 0)
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getUpgradeRate12m error', error })
@@ -2850,7 +2862,6 @@ async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Prom
     new_paying_orgs,
     canceled_orgs,
     upgraded_orgs,
-    upgrade_rate_12m,
     trialExtensionStats,
     pastDueOrgStats,
     subscriptionAccessCounts,
@@ -2910,7 +2921,6 @@ async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Prom
         }
         return new Set((res.data || []).map(row => row.customer_id)).size
       }),
-    getUpgradeRate12m(c, nextDayStart),
     getTrialExtensionStats(c, metricWindow),
     refreshPastDueStats
       ? (async () => {
@@ -2956,6 +2966,8 @@ async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Prom
         return (res.data || []).reduce((sum, row) => sum + (Number(row.credits_used) || 0), 0)
       }),
   ])
+
+  const upgrade_rate_12m = await getUpgradeRate12m(c, window, upgraded_orgs)
 
   const snapshotPatch: GlobalStatsSnapshotPatch = {
     canceled_orgs,
