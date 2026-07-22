@@ -158,8 +158,9 @@ describe('swap memory cleanup functions', () => {
     expect(logs[0]?.new_record?.native_packages).toBeUndefined()
     expect(logs[0]?.new_record?.comment).toBe('after')
     expect(logs[0]?.changed_fields).toContain('comment')
-    expect(logs[0]?.changed_fields ?? []).not.toContain('manifest')
-    expect(logs[0]?.changed_fields ?? []).not.toContain('native_packages')
+    // Fat payloads stay stripped, but field names remain for upload-time history.
+    expect(logs[0]?.changed_fields).toContain('manifest')
+    expect(logs[0]?.changed_fields).toContain('native_packages')
 
     await executeSQL(`DELETE FROM public.audit_logs WHERE record_id = $1 AND table_name = 'app_versions'`, [String(versionId)])
     await executeSQL(`DELETE FROM public.app_versions WHERE id = $1`, [versionId])

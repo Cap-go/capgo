@@ -237,7 +237,6 @@ DECLARE
   v_stats_refresh_fields constant text[] := ARRAY['stats_refresh_requested_at', 'stats_updated_at', 'updated_at'];
   v_background_counter_fields constant text[] := ARRAY['channel_device_count', 'manifest_bundle_count', 'updated_at'];
   v_fat_app_version_fields constant text[] := ARRAY['manifest', 'native_packages'];
-  v_noise_app_version_fields constant text[] := ARRAY['manifest', 'native_packages', 'updated_at'];
 BEGIN
   SELECT auth.uid() INTO v_actor_user_id;
 
@@ -318,6 +317,7 @@ BEGIN
   END IF;
 
   -- Never persist multi-MB array/json columns in audit TOAST.
+  -- Keep fat field names in changed_fields so upload-time edits remain visible.
   IF TG_TABLE_NAME = 'app_versions' THEN
     IF v_old_record IS NOT NULL THEN
       v_old_record := v_old_record - v_fat_app_version_fields;
@@ -325,19 +325,16 @@ BEGIN
     IF v_new_record IS NOT NULL THEN
       v_new_record := v_new_record - v_fat_app_version_fields;
     END IF;
-    IF v_changed_fields IS NOT NULL THEN
-      SELECT pg_catalog.array_agg(field_name)
-      INTO v_changed_fields
-      FROM pg_catalog.unnest(v_changed_fields) AS changed_field(field_name)
-      WHERE changed_field.field_name <> ALL(v_fat_app_version_fields);
-    END IF;
 
-    -- Skip updates that only touched stripped fat columns / auto timestamps.
+    -- Skip audit only for dual-storage reclaim: non-null manifest -> NULL (+ updated_at).
     IF TG_OP = 'UPDATE'
+      AND OLD.manifest IS NOT NULL
+      AND NEW.manifest IS NULL
+      AND NEW.native_packages IS NOT DISTINCT FROM OLD.native_packages
       AND NOT EXISTS (
         SELECT 1
         FROM pg_catalog.unnest(COALESCE(v_changed_fields, ARRAY[]::text[])) AS changed_field(field_name)
-        WHERE changed_field.field_name <> ALL(v_noise_app_version_fields)
+        WHERE changed_field.field_name <> ALL(ARRAY['manifest', 'updated_at']::text[])
       ) THEN
       RETURN NEW;
     END IF;
@@ -434,10 +431,11 @@ BEGIN
     END IF;
 
     -- Skip queue fan-out only for dual-storage reclaim: non-null manifest -> NULL.
-    -- Do not skip upload-time manifest writes that still need on_version_update migration.
+    -- native_packages is stripped from payloads, so compare it explicitly.
     IF TG_OP = 'UPDATE'
       AND OLD.manifest IS NOT NULL
       AND NEW.manifest IS NULL
+      AND NEW.native_packages IS NOT DISTINCT FROM OLD.native_packages
       AND (record_payload - 'updated_at') IS NOT DISTINCT FROM (old_record_payload - 'updated_at')
     THEN
       RETURN NEW;
@@ -580,6 +578,27 @@ DECLARE
   bundle_was_ready boolean;
 BEGIN
   IF TG_OP = 'UPDATE' THEN
+    -- Never drop the only copy of legacy file metadata, ready or not.
+    IF NEW.manifest IS NULL
+      AND OLD.manifest IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+        FROM pg_catalog.unnest(OLD.manifest) AS entry(file_name, s3_path, file_hash)
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM public.manifest AS m
+          WHERE m.app_version_id = OLD.id
+            AND m.file_name = entry.file_name
+            AND m.s3_path = entry.s3_path
+            AND m.file_hash = entry.file_hash
+        )
+      )
+    THEN
+      RAISE EXCEPTION '%',
+        'bundle_manifest_not_migrated: Cannot clear app_versions.manifest '
+        || 'until every entry exists in public.manifest.';
+    END IF;
+
     bundle_was_ready := OLD.storage_provider IS DISTINCT FROM 'r2-direct';
 
     -- Nulling a fully migrated dual-storage manifest array is allowed after upload.
@@ -632,9 +651,9 @@ BEGIN
     END IF;
   END IF;
 
-  -- Manifest/native_packages nulling must not re-run encryption enforcement.
-  -- Legacy rows can predate org encryption requirements; reclaim only clears
-  -- dual-storage columns and must not abort on those orgs.
+  -- Fully migrated dual-storage nulling must not re-run encryption enforcement.
+  -- Incomplete nulling (still missing public.manifest rows) must not bypass checks,
+  -- including for in-progress r2-direct uploads.
   IF TG_OP = 'UPDATE'
     AND NEW.session_key IS NOT DISTINCT FROM OLD.session_key
     AND NEW.key_id IS NOT DISTINCT FROM OLD.key_id
@@ -645,7 +664,25 @@ BEGIN
     AND NEW.external_url IS NOT DISTINCT FROM OLD.external_url
     AND NEW.checksum IS NOT DISTINCT FROM OLD.checksum
     AND NEW.native_packages IS NOT DISTINCT FROM OLD.native_packages
-    AND (NEW.manifest IS NULL OR NEW.manifest IS NOT DISTINCT FROM OLD.manifest)
+    AND (
+      NEW.manifest IS NOT DISTINCT FROM OLD.manifest
+      OR (
+        NEW.manifest IS NULL
+        AND OLD.manifest IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1
+          FROM pg_catalog.unnest(OLD.manifest) AS entry(file_name, s3_path, file_hash)
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM public.manifest AS m
+            WHERE m.app_version_id = OLD.id
+              AND m.file_name = entry.file_name
+              AND m.s3_path = entry.s3_path
+              AND m.file_hash = entry.file_hash
+          )
+        )
+      )
+    )
   THEN
     RETURN NEW;
   END IF;
