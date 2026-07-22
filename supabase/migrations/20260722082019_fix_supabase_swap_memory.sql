@@ -176,9 +176,12 @@ BEGIN
           SELECT count(*)::integer
           FROM public.manifest AS m
           WHERE m.app_version_id = av.id
-        ) >= pg_catalog.GREATEST(
-          COALESCE(av.manifest_count, 0),
-          pg_catalog.cardinality(av.manifest)
+        ) >= (
+          CASE
+            WHEN COALESCE(av.manifest_count, 0) >= pg_catalog.cardinality(av.manifest)
+              THEN COALESCE(av.manifest_count, 0)
+            ELSE pg_catalog.cardinality(av.manifest)
+          END
         )
       ORDER BY av.id
       LIMIT batch_size
@@ -576,9 +579,12 @@ BEGIN
             SELECT count(*)::integer
             FROM public.manifest AS m
             WHERE m.app_version_id = OLD.id
-          ) < pg_catalog.GREATEST(
-            COALESCE(OLD.manifest_count, 0),
-            COALESCE(pg_catalog.cardinality(OLD.manifest), 0)
+          ) < (
+            CASE
+              WHEN COALESCE(OLD.manifest_count, 0) >= COALESCE(pg_catalog.cardinality(OLD.manifest), 0)
+                THEN COALESCE(OLD.manifest_count, 0)
+              ELSE COALESCE(pg_catalog.cardinality(OLD.manifest), 0)
+            END
           )
         )
         OR NEW.native_packages IS DISTINCT FROM OLD.native_packages

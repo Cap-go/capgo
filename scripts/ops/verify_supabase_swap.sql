@@ -35,7 +35,13 @@ FROM (
       SELECT count(*)::integer
       FROM public.manifest AS m
       WHERE m.app_version_id = av.id
-    ) >= GREATEST(COALESCE(av.manifest_count, 0), cardinality(av.manifest))
+    ) >= (
+      CASE
+        WHEN COALESCE(av.manifest_count, 0) >= cardinality(av.manifest)
+          THEN COALESCE(av.manifest_count, 0)
+        ELSE cardinality(av.manifest)
+      END
+    )
   ORDER BY av.id
   LIMIT 1000
 ) AS sample;
