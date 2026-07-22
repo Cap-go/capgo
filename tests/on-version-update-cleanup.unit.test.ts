@@ -23,7 +23,7 @@ const {
   const appVersionsMetaSelect = vi.fn(() => ({ eq: appVersionsMetaSelectEq }))
   const appVersionsMetaUpdateEq = vi.fn()
   const appVersionsMetaUpdate = vi.fn(() => ({ eq: appVersionsMetaUpdateEq }))
-  const manifestDeleteEq = vi.fn(async () => {
+  const manifestDeleteEq = vi.fn(async (..._args: any[]) => {
     callOrder.push('db_delete_row')
     return { error: null }
   })
@@ -50,8 +50,8 @@ const {
     return {}
   })
   const manifestSelectWhere = vi.fn(async (): Promise<any[]> => [])
-  const pgQuery = vi.fn(async () => ({ rows: [], rowCount: 0 }))
-  const moveObjectToTrash = vi.fn(async () => {
+  const pgQuery = vi.fn(async (..._args: any[]) => ({ rows: [] as any[], rowCount: 0 }))
+  const moveObjectToTrash = vi.fn(async (..._args: any[]) => {
     callOrder.push('r2_trash')
     return true
   })
@@ -310,7 +310,6 @@ describe('on_version_update manifest cleanup load', () => {
     const deleteIndexes = callOrder.map((v, i) => v === 'db_delete_row' ? i : -1).filter(i => i >= 0)
     expect(trashIndexes).toHaveLength(5000)
     expect(deleteIndexes).toHaveLength(5000)
-    // Every delete must be preceded by at least as many trash ops (batched concurrency).
     expect(deleteIndexes[0]).toBeGreaterThan(trashIndexes[0])
     expect(deleteIndexes.at(-1)!).toBeGreaterThan(trashIndexes[0])
   }, 30_000)
@@ -329,8 +328,7 @@ describe('on_version_update manifest cleanup load', () => {
       'Cannot move S3 object for deleted manifest file to trash',
     )
 
-    // Failed file must not lose DB tracking.
-    const deletedIds = manifestDeleteEq.mock.calls.map(call => call[1])
+    const deletedIds = manifestDeleteEq.mock.calls.map(call => call[1] as number)
     expect(deletedIds).not.toContain(1150)
     expect(pgQuery).not.toHaveBeenCalledWith('COMMIT')
   }, 30_000)
@@ -338,13 +336,13 @@ describe('on_version_update manifest cleanup load', () => {
   it('does not finalize counters while rows remain after a partial failure', async () => {
     manifestSelectWhere.mockResolvedValue(makeEntries(10))
     let deletes = 0
-    manifestDeleteEq.mockImplementation(async () => {
+    manifestDeleteEq.mockImplementation((async () => {
       deletes += 1
       callOrder.push('db_delete_row')
       if (deletes >= 5)
         return { error: { message: 'db down' } }
       return { error: null }
-    })
+    }) as any)
     moveObjectToTrash.mockImplementation(async () => {
       callOrder.push('r2_trash')
       return true
