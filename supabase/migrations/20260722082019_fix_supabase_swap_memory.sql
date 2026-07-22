@@ -550,8 +550,8 @@ CREATE INDEX IF NOT EXISTS app_versions_manifest_present_idx
   WHERE manifest IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
--- Allow clearing dual-storage fat columns
--- after upload (null only). Unblocks on_version_update + reclaim jobs.
+-- Allow clearing dual-storage app_versions.manifest after upload (null only).
+-- native_packages stays locked: no alternate persisted source of truth.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION "public"."check_encrypted_bundle_on_insert"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -568,8 +568,9 @@ BEGIN
   IF TG_OP = 'UPDATE' THEN
     bundle_was_ready := OLD.storage_provider IS DISTINCT FROM 'r2-direct';
 
-    -- Nulling migrated dual-storage columns is allowed after upload completes.
-    -- Rewriting non-null manifest/native_packages content stays locked.
+    -- Nulling a fully migrated dual-storage manifest array is allowed after upload.
+    -- native_packages remains locked (compatibility metadata has no table copy).
+    -- Rewriting non-null manifest content stays locked.
     IF bundle_was_ready
       AND (
         NEW.name IS DISTINCT FROM OLD.name

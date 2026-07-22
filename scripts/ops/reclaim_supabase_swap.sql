@@ -59,6 +59,9 @@ FROM pgmq.list_queues()
 SELECT public.null_migrated_app_version_manifests();
 
 VACUUM (VERBOSE) public.app_versions;
+-- Routine VACUUM does not shrink TOAST. After nulling is done, compact in the
+-- maintenance window (exclusive lock):
+-- VACUUM (FULL, VERBOSE) public.app_versions;
 
 -- ---------------------------------------------------------------------------
 -- 4) Trim audit_logs older than 30 days (bounded batches). Re-run until deleted=0.
@@ -66,6 +69,8 @@ VACUUM (VERBOSE) public.app_versions;
 SELECT public.cleanup_old_audit_logs();
 
 VACUUM (VERBOSE) public.audit_logs;
+-- After deleted=0, compact TOAST if pg_total_relation_size must fall:
+-- VACUUM (FULL, VERBOSE) public.audit_logs;
 
 -- ---------------------------------------------------------------------------
 -- 5) Final sizes

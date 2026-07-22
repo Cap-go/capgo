@@ -3,7 +3,7 @@
 
 SELECT pg_size_pretty(pg_database_size(current_database())::bigint) AS db_size;
 
-SELECT name, setting
+SELECT name, setting, unit
 FROM pg_settings
 WHERE name IN ('shared_buffers', 'work_mem', 'max_connections');
 
@@ -66,42 +66,20 @@ FROM pg_indexes
 WHERE schemaname = 'public'
   AND indexname = 'app_versions_manifest_present_idx';
 
--- Bounded existence checks per archive queue (no full-table aggregates).
-SELECT queue_name, has_rows_older_than_2d
-FROM (
-  SELECT 'a_on_manifest_create' AS queue_name,
+-- Same queue set as cleanup_queue_messages() (psql \gexec; bounded EXISTS).
+SELECT format(
+  $fmt$SELECT %L AS queue_name,
          EXISTS (
            SELECT 1
-           FROM pgmq.a_on_manifest_create
+           FROM pgmq.a_%I
            WHERE archived_at < now() - interval '2 days'
            LIMIT 1
-         ) AS has_rows_older_than_2d
-  UNION ALL
-  SELECT 'a_on_version_update',
-         EXISTS (
-           SELECT 1
-           FROM pgmq.a_on_version_update
-           WHERE archived_at < now() - interval '2 days'
-           LIMIT 1
-         )
-  UNION ALL
-  SELECT 'a_webhook_dispatcher',
-         EXISTS (
-           SELECT 1
-           FROM pgmq.a_webhook_dispatcher
-           WHERE archived_at < now() - interval '2 days'
-           LIMIT 1
-         )
-  UNION ALL
-  SELECT 'a_on_channel_update',
-         EXISTS (
-           SELECT 1
-           FROM pgmq.a_on_channel_update
-           WHERE archived_at < now() - interval '2 days'
-           LIMIT 1
-         )
-) AS archives
-ORDER BY queue_name;
+         ) AS has_rows_older_than_2d;$fmt$,
+  queue_name,
+  queue_name
+)
+FROM pgmq.list_queues()
+\gexec
 
 SELECT
   'index hit rate' AS name,
