@@ -167,6 +167,7 @@ export type Database = {
           cli_version: string | null
           comment: string | null
           created_at: string | null
+          created_by_apikey_rbac_id: string | null
           deleted: boolean
           deleted_at: string | null
           external_url: string | null
@@ -193,6 +194,7 @@ export type Database = {
           cli_version?: string | null
           comment?: string | null
           created_at?: string | null
+          created_by_apikey_rbac_id?: string | null
           deleted?: boolean
           deleted_at?: string | null
           external_url?: string | null
@@ -219,6 +221,7 @@ export type Database = {
           cli_version?: string | null
           comment?: string | null
           created_at?: string | null
+          created_by_apikey_rbac_id?: string | null
           deleted?: boolean
           deleted_at?: string | null
           external_url?: string | null
@@ -2560,6 +2563,7 @@ export type Database = {
           id: string
           is_direct: boolean
           org_id: string | null
+          parent_binding_id: string | null
           principal_id: string
           principal_type: string
           reason: string | null
@@ -2576,6 +2580,7 @@ export type Database = {
           id?: string
           is_direct?: boolean
           org_id?: string | null
+          parent_binding_id?: string | null
           principal_id: string
           principal_type: string
           reason?: string | null
@@ -2592,6 +2597,7 @@ export type Database = {
           id?: string
           is_direct?: boolean
           org_id?: string | null
+          parent_binding_id?: string | null
           principal_id?: string
           principal_type?: string
           reason?: string | null
@@ -2625,6 +2631,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_bindings_parent_binding_id_fkey"
+            columns: ["parent_binding_id"]
+            isOneToOne: false
+            referencedRelation: "role_bindings"
             referencedColumns: ["id"]
           },
           {
@@ -3658,6 +3671,10 @@ export type Database = {
         Args: { p_group_id: string; p_user_id: string }
         Returns: undefined
       }
+      assert_preview_bundle_owner: {
+        Args: { p_app_id: string; p_owner_org: string; p_version_id: number }
+        Returns: undefined
+      }
       assert_request_principal_rank: {
         Args: {
           p_mutation: string
@@ -3814,6 +3831,14 @@ export type Database = {
           total_non_compliant: number
           wrong_key_count: number
         }[]
+      }
+      current_app_preview_apikey_rbac_id: {
+        Args: { p_app_id: string; p_owner_org: string }
+        Returns: string
+      }
+      current_app_preview_binding_id: {
+        Args: { p_app_id: string; p_owner_org: string }
+        Returns: string
       }
       current_request_role: { Args: never; Returns: string }
       current_user_member_org_ids: { Args: never; Returns: string[] }
@@ -4445,6 +4470,7 @@ export type Database = {
           cli_version: string | null
           comment: string | null
           created_at: string | null
+          created_by_apikey_rbac_id: string | null
           deleted: boolean
           deleted_at: string | null
           external_url: string | null
@@ -4622,6 +4648,10 @@ export type Database = {
       is_user_org_admin: {
         Args: { p_org_id: string; p_user_id: string }
         Returns: boolean
+      }
+      lock_channel_bundle_lifecycle: {
+        Args: { p_rollout_version_id: number; p_version_id: number }
+        Returns: undefined
       }
       lock_rbac_orgs: {
         Args: { p_first_org_id: string; p_second_org_id?: string }
