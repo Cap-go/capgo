@@ -1,12 +1,13 @@
 /**
  * Reclaim ALL soft-deleted app_versions that still have public.manifest rows.
  *
- * For each file:
- *   1) if R2 object exists → move to deleted-after-7-days/
- *   2) if missing → continue
- *   3) only then delete the DB row
+ * Per version (not per row):
+ *   1) one query: unreferenced s3 paths for this version
+ *   2) exist → move to deleted-after-7-days/; missing → ok (R2 pooled)
+ *   3) one DELETE FROM manifest WHERE app_version_id = $1
  *
  * Shared delta files referenced by other versions stay in R2.
+ * Single Postgres connection — R2 is what runs concurrent.
  *
  * Usage:
  *   bun scripts/reclaim_deleted_version_manifests.ts
@@ -16,8 +17,7 @@ import pg from 'pg'
 
 const ENV_FILE = './internal/cloudflare/.env.prod'
 const TRASH_PREFIX = 'deleted-after-7-days/'
-const CONCURRENCY = 50
-const VERSION_PAGE = 100
+const R2_CONCURRENCY = 200
 const DB_URL_ENV_KEYS = [
   'MAIN_SUPABASE_DB_URL',
   'DATABASE_URL',
@@ -52,8 +52,10 @@ function requireDbUrl(env: Record<string, string>) {
 }
 
 async function mapPool<T>(items: T[], concurrency: number, fn: (item: T) => Promise<void>) {
+  if (items.length === 0)
+    return
   let idx = 0
-  const workers = Array.from({ length: Math.min(concurrency, Math.max(items.length, 1)) }, async () => {
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
     while (idx < items.length) {
       const current = items[idx++]
       await fn(current)
@@ -102,8 +104,12 @@ function shouldAllowSelfSignedPgCertificate(env: Record<string, string>, databas
     return true
   if (rejectUnauthorized === '1')
     return false
-  // Local/docker URLs keep default Node TLS verification off only when explicitly local.
   return databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1')
+}
+
+function formatRate(count: number, startedAt: number) {
+  const elapsedSec = Math.max((Date.now() - startedAt) / 1000, 0.001)
+  return `${Math.round(count / elapsedSec)}/s`
 }
 
 async function main() {
@@ -126,22 +132,24 @@ async function main() {
     endpoint: `https://${env.S3_ENDPOINT}`,
     region: env.S3_REGION || 'auto',
     forcePathStyle: true,
+    maxAttempts: 3,
   })
   const bucket = env.S3_BUCKET || 'capgo'
 
   console.log('Listing soft-deleted versions with leftover manifests...')
+  // Prefer indexed deleted+manifest_count path; EXISTS covers stale counters.
   const versionsRes = await db.query<{ id: number, app_id: string, manifest_count: number }>(`
     SELECT av.id, av.app_id, av.manifest_count
     FROM public.app_versions AS av
     WHERE av.deleted = true
+      AND av.app_id NOT LIKE 'com.capdemo%'
       AND (
         av.manifest_count > 0
         OR EXISTS (
           SELECT 1 FROM public.manifest AS m WHERE m.app_version_id = av.id
         )
       )
-      AND av.app_id NOT LIKE 'com.capdemo%'
-    ORDER BY av.id
+    ORDER BY av.deleted_at NULLS LAST, av.id
   `)
   const versions = versionsRes.rows
   console.log(`Found ${versions.length} versions`)
@@ -149,83 +157,68 @@ async function main() {
   let done = 0
   let totalTrashed = 0
   let totalDeleted = 0
+  const startedAt = Date.now()
 
-  for (let i = 0; i < versions.length; i += VERSION_PAGE) {
-    const page = versions.slice(i, i + VERSION_PAGE)
-    for (const version of page) {
-      const entriesRes = await db.query<{
-        id: number
-        file_hash: string
-        file_name: string
-        s3_path: string | null
-      }>(
-        `SELECT id, file_hash, file_name, s3_path
-         FROM public.manifest
-         WHERE app_version_id = $1
-         ORDER BY id`,
+  for (const version of versions) {
+    // One indexed lookup: paths this version alone still references.
+    const trashRes = await db.query<{ s3_path: string }>(
+      `SELECT DISTINCT m.s3_path
+       FROM public.manifest AS m
+       WHERE m.app_version_id = $1
+         AND m.s3_path IS NOT NULL
+         AND NOT EXISTS (
+           SELECT 1
+           FROM public.manifest AS other
+           WHERE other.file_hash = m.file_hash
+             AND other.file_name = m.file_name
+             AND other.app_version_id <> $1
+         )`,
+      [version.id],
+    )
+    const paths = trashRes.rows.map(row => row.s3_path)
+
+    await mapPool(paths, R2_CONCURRENCY, async (path) => {
+      await moveToTrash(s3, bucket, path)
+    })
+
+    // One statement wipes the whole version's rows after R2 is handled.
+    const deletedRes = await db.query(
+      `DELETE FROM public.manifest WHERE app_version_id = $1`,
+      [version.id],
+    )
+    const deletedRows = deletedRes.rowCount ?? 0
+
+    await db.query('BEGIN')
+    try {
+      await db.query(
+        `UPDATE public.app_versions
+         SET manifest_count = 0, manifest = NULL
+         WHERE id = $1`,
         [version.id],
       )
-      const entries = entriesRes.rows
-      let trashed = 0
-      let deletedRows = 0
-
-      await mapPool(entries, CONCURRENCY, async (entry) => {
-        if (entry.s3_path) {
-          const ref = await db.query(
-            `SELECT 1 AS ok
-             FROM public.manifest
-             WHERE file_hash = $1
-               AND file_name = $2
-               AND app_version_id <> $3
-             LIMIT 1`,
-            [entry.file_hash, entry.file_name, version.id],
-          )
-
-          if (ref.rows.length === 0) {
-            await moveToTrash(s3, bucket, entry.s3_path)
-            trashed += 1
-          }
-        }
-
-        await db.query(`DELETE FROM public.manifest WHERE id = $1`, [entry.id])
-        deletedRows += 1
-      })
-
-      const remaining = await db.query(
-        `SELECT COUNT(*)::int AS count FROM public.manifest WHERE app_version_id = $1`,
-        [version.id],
-      )
-      if (Number(remaining.rows[0]?.count ?? 0) > 0)
-        throw new Error(`version ${version.id} still has manifest rows`)
-
-      await db.query('BEGIN')
-      try {
+      if (deletedRows > 0 || (version.manifest_count ?? 0) > 0) {
         await db.query(
-          `UPDATE public.app_versions
-           SET manifest_count = 0, manifest = NULL
-           WHERE id = $1`,
-          [version.id],
+          `UPDATE public.apps
+           SET manifest_bundle_count = GREATEST(manifest_bundle_count - 1, 0),
+               updated_at = now()
+           WHERE app_id = $1`,
+          [version.app_id],
         )
-        if (deletedRows > 0 || (version.manifest_count ?? 0) > 0) {
-          await db.query(
-            `UPDATE public.apps
-             SET manifest_bundle_count = GREATEST(manifest_bundle_count - 1, 0),
-                 updated_at = now()
-             WHERE app_id = $1`,
-            [version.app_id],
-          )
-        }
-        await db.query('COMMIT')
       }
-      catch (error) {
-        await db.query('ROLLBACK')
-        throw error
-      }
+      await db.query('COMMIT')
+    }
+    catch (error) {
+      await db.query('ROLLBACK')
+      throw error
+    }
 
-      done += 1
-      totalTrashed += trashed
-      totalDeleted += deletedRows
-      process.stdout.write(`\rCleaned ${done}/${versions.length} versions (rows=${totalDeleted}, r2=${totalTrashed})`)
+    done += 1
+    totalTrashed += paths.length
+    totalDeleted += deletedRows
+    if (done % 10 === 0 || done === versions.length) {
+      process.stdout.write(
+        `\rCleaned ${done}/${versions.length} versions (rows=${totalDeleted} ${formatRate(totalDeleted, startedAt)}, r2_candidates=${totalTrashed})`,
+      )
     }
   }
 
@@ -234,7 +227,8 @@ async function main() {
   console.log('Done.')
   console.log(`Versions cleaned: ${done}`)
   console.log(`Manifest rows deleted: ${totalDeleted}`)
-  console.log(`R2 objects moved to ${TRASH_PREFIX}: ${totalTrashed}`)
+  console.log(`R2 trash candidates: ${totalTrashed}`)
+  console.log(`Elapsed: ${((Date.now() - startedAt) / 1000).toFixed(1)}s (${formatRate(totalDeleted, startedAt)} rows)`)
 }
 
 await main()
