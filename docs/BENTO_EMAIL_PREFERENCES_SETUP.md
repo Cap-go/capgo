@@ -125,7 +125,7 @@ Tag does NOT contain: bundle_deployed_disabled
 
 #### 10. Device Error Notifications
 
-**Events**: `user:update_fail`
+**Events**: `device:upgrade_blocked`, `device:downgrade_blocked`
 
 **Filter to add**:
 ```text

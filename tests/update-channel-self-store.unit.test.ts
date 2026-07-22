@@ -26,6 +26,10 @@ vi.mock('../supabase/functions/_backend/utils/notifications.ts', () => ({
   sendNotifOrgCached: vi.fn(() => Promise.resolve()),
 }))
 
+vi.mock('../supabase/functions/_backend/utils/org_email_notifications.ts', () => ({
+  sendNotifToOrgMembersCached: vi.fn(() => Promise.resolve()),
+}))
+
 vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
   closeClient: vi.fn(() => Promise.resolve()),
   getAppOwnerPostgres: getAppOwnerPostgresMock,

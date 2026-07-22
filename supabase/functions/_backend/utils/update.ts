@@ -18,6 +18,7 @@ import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { getClientIP } from './rate_limit.ts'
 import { sendNotifOrgCached } from './notifications.ts'
+import { sendNotifToOrgMembersCached } from './org_email_notifications.ts'
 import { closeClient, getAppBlockProviderInfraRequestsPostgres, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres, setReplicationLagHeader } from './pg.ts'
 import { makeDevice } from './plugin_parser.ts'
 import { s3 } from './s3.ts'
@@ -30,6 +31,49 @@ const CHANNEL_SELF_STORE_MIN_V5 = '5.34.0'
 const CHANNEL_SELF_STORE_MIN_V6 = '6.34.0'
 const CHANNEL_SELF_STORE_MIN_V7 = '7.34.0'
 const CHANNEL_SELF_STORE_MIN_V8 = '8.0.0'
+
+type AutoUpdateBlockReason = 'major' | 'minor' | 'patch' | 'metadata' | 'under_native'
+
+function notifyAutoUpdateVersionBlocked(
+  c: Context,
+  kind: 'upgrade' | 'downgrade',
+  reason: AutoUpdateBlockReason,
+  args: {
+    appId: string
+    deviceId: string
+    platform: string
+    orgId: string
+    channelName: string
+    channelId: number
+    version: string
+    versionBuild: string
+    versionName: string
+    drizzleClient: ReturnType<typeof getDrizzleClient>
+  },
+) {
+  const eventName = kind === 'upgrade' ? 'device:upgrade_blocked' : 'device:downgrade_blocked'
+  return backgroundTask(c, sendNotifToOrgMembersCached(
+    c,
+    eventName,
+    'device_error',
+    {
+      app_id: args.appId,
+      app_id_url: args.appId,
+      device_id: args.deviceId,
+      platform: args.platform,
+      channel_name: args.channelName,
+      channel_id: args.channelId,
+      version: args.version,
+      version_build: args.versionBuild,
+      version_name: args.versionName,
+      reason,
+    },
+    args.orgId,
+    args.appId,
+    '0 0 * * 0',
+    args.drizzleClient,
+  ))
+}
 
 type InvalidIpInfo = {
   blocked: boolean
@@ -433,6 +477,18 @@ export async function updateWithPG(
     if (!isInternalVersionName(version.name) && channelData?.channels.disable_auto_update === 'major' && parse(version.name).major > parse(version_build).major) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot upgrade major version', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMajor', versionName: version.name }])
+      await notifyAutoUpdateVersionBlocked(c, 'upgrade', 'major', {
+        appId: app_id,
+        deviceId: device_id,
+        platform,
+        orgId: appOwner.owner_org,
+        channelName: channelData.channels.name,
+        channelId: channelData.channels.id,
+        version: version.name,
+        versionBuild: version_build,
+        versionName: version_name,
+        drizzleClient,
+      })
       return updateError200(c, 'disable_auto_update_to_major', 'Cannot upgrade major version', {
         major: true,
         version: version.name,
@@ -455,6 +511,18 @@ export async function updateWithPG(
     )) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot upgrade minor version', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMinor', versionName: version.name }])
+      await notifyAutoUpdateVersionBlocked(c, 'upgrade', 'minor', {
+        appId: app_id,
+        deviceId: device_id,
+        platform,
+        orgId: appOwner.owner_org,
+        channelName: channelData.channels.name,
+        channelId: channelData.channels.id,
+        version: version.name,
+        versionBuild: version_build,
+        versionName: version_name,
+        drizzleClient,
+      })
       return updateError200(c, 'disable_auto_update_to_minor', 'Cannot upgrade minor version', {
         major: true,
         version: version.name,
@@ -470,6 +538,18 @@ export async function updateWithPG(
     )) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot upgrade patch version', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToPatch', versionName: version.name }])
+      await notifyAutoUpdateVersionBlocked(c, 'upgrade', 'patch', {
+        appId: app_id,
+        deviceId: device_id,
+        platform,
+        orgId: appOwner.owner_org,
+        channelName: channelData.channels.name,
+        channelId: channelData.channels.id,
+        version: version.name,
+        versionBuild: version_build,
+        versionName: version_name,
+        drizzleClient,
+      })
       return updateError200(c, 'disable_auto_update_to_patch', 'Cannot upgrade patch version', {
         major: true,
         version: version.name,
@@ -494,6 +574,18 @@ export async function updateWithPG(
       if (greaterThan(parse(minUpdateVersion), parse(version_build))) {
         cloudlog({ requestId: c.get('requestId'), message: 'Cannot upgrade, metadata > current version', id: device_id, min: minUpdateVersion, old: version_name, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateMetadata', versionName: version.name }])
+        await notifyAutoUpdateVersionBlocked(c, 'upgrade', 'metadata', {
+          appId: app_id,
+          deviceId: device_id,
+          platform,
+          orgId: appOwner.owner_org,
+          channelName: channelData.channels.name,
+          channelId: channelData.channels.id,
+          version: version.name,
+          versionBuild: version_build,
+          versionName: version_name,
+          drizzleClient,
+        })
         return updateError200(c, 'disable_auto_update_to_metadata', 'Cannot upgrade version, min update version > current version', {
           major: true,
           version: version.name,
@@ -506,6 +598,18 @@ export async function updateWithPG(
     if (!isInternalVersionName(version.name) && channelData.channels.disable_auto_update_under_native && lessThan(parse(version.name), parse(version_build))) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot revert under native version', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateUnderNative', versionName: version.name }])
+      await notifyAutoUpdateVersionBlocked(c, 'downgrade', 'under_native', {
+        appId: app_id,
+        deviceId: device_id,
+        platform,
+        orgId: appOwner.owner_org,
+        channelName: channelData.channels.name,
+        channelId: channelData.channels.id,
+        version: version.name,
+        versionBuild: version_build,
+        versionName: version_name,
+        drizzleClient,
+      })
       return updateError200(c, 'disable_auto_update_under_native', 'Cannot revert under native version', {
         version: version.name,
         old: version_name,
