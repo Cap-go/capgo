@@ -59,7 +59,7 @@ describe('swap memory cleanup functions', () => {
     expect(rows[0]?.n).toBe(0)
   })
 
-  it('null_migrated_app_version_manifests clears dual-storage arrays', async () => {
+  it('null_migrated_app_version_manifests clears fully migrated dual-storage arrays', async () => {
     const appId = `com.swap.nullmanifest.${randomUUID().slice(0, 8)}`
     const orgRows = await executeSQL(
       `SELECT id FROM public.orgs ORDER BY created_at LIMIT 1`,
@@ -165,6 +165,61 @@ describe('swap memory cleanup functions', () => {
     await executeSQL(`DELETE FROM public.app_versions WHERE id = $1`, [versionId])
     await executeSQL(`DELETE FROM public.apps WHERE app_id = $1`, [appId])
   })
+
+  it('null_migrated_app_version_manifests skips partially migrated arrays', async () => {
+    const appId = `com.swap.partialmanifest.${randomUUID().slice(0, 8)}`
+    const orgRows = await executeSQL(
+      `SELECT id FROM public.orgs ORDER BY created_at LIMIT 1`,
+    )
+    const orgId = orgRows[0]?.id as string
+
+    await executeSQL(
+      `INSERT INTO public.apps (app_id, name, icon_url, owner_org)
+       VALUES ($1, 'swap-partial-manifest', '', $2::uuid)`,
+      [appId, orgId],
+    )
+
+    const versionRows = await executeSQL(
+      `INSERT INTO public.app_versions (app_id, name, owner_org, storage_provider, manifest, manifest_count)
+       VALUES (
+         $1,
+         $2,
+         $3::uuid,
+         'r2',
+         ARRAY[
+           ROW('index.html', 'apps/test/index.html', 'abc123')::public.manifest_entry,
+           ROW('main.js', 'apps/test/main.js', 'def456')::public.manifest_entry
+         ],
+         2
+       )
+       RETURNING id`,
+      [appId, `1.0.0-${randomUUID().slice(0, 8)}`, orgId],
+    )
+    const versionId = versionRows[0]?.id as number
+
+    // Only one of two files migrated.
+    await executeSQL(
+      `INSERT INTO public.manifest (app_version_id, file_name, s3_path, file_hash)
+       VALUES ($1, 'index.html', 'apps/test/index.html', 'abc123')`,
+      [versionId],
+    )
+
+    await executeSQL(`SELECT public.null_migrated_app_version_manifests()`)
+
+    const after = await executeSQL(
+      `SELECT manifest IS NULL AS is_null, cardinality(manifest) AS n
+       FROM public.app_versions
+       WHERE id = $1`,
+      [versionId],
+    )
+    expect(after[0]?.is_null).toBe(false)
+    expect(after[0]?.n).toBe(2)
+
+    await executeSQL(`DELETE FROM public.manifest WHERE app_version_id = $1`, [versionId])
+    await executeSQL(`DELETE FROM public.app_versions WHERE id = $1`, [versionId])
+    await executeSQL(`DELETE FROM public.apps WHERE app_id = $1`, [appId])
+  })
+
   it('null_migrated_app_version_manifests works when org requires encryption', async () => {
     const appId = `com.swap.encnull.${randomUUID().slice(0, 8)}`
     const orgRows = await executeSQL(

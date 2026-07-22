@@ -1,10 +1,9 @@
 -- Post-deploy / post-reclaim verification for Capgo-EU swap pressure.
+-- Prefer psql. Avoids unbounded whole-table counts where possible.
 
 SELECT pg_size_pretty(pg_database_size(current_database())::bigint) AS db_size;
 
-SELECT
-  name,
-  setting
+SELECT name, setting
 FROM pg_settings
 WHERE name IN ('shared_buffers', 'work_mem', 'max_connections');
 
@@ -25,9 +24,21 @@ WHERE (schemaname, relname) IN (
 )
 ORDER BY pg_total_relation_size(format('%I.%I', schemaname, relname)::regclass) DESC;
 
-SELECT count(*) AS versions_with_array_manifest
-FROM public.app_versions
-WHERE manifest IS NOT NULL AND cardinality(manifest) > 0;
+-- Sample of dual-storage leftovers that are eligible for nulling (bounded).
+SELECT count(*) AS eligible_dual_storage_sample
+FROM (
+  SELECT av.id
+  FROM public.app_versions AS av
+  WHERE av.manifest IS NOT NULL
+    AND cardinality(av.manifest) > 0
+    AND (
+      SELECT count(*)::integer
+      FROM public.manifest AS m
+      WHERE m.app_version_id = av.id
+    ) >= GREATEST(COALESCE(av.manifest_count, 0), cardinality(av.manifest))
+  ORDER BY av.id
+  LIMIT 1000
+) AS sample;
 
 SELECT name, enabled, hour_interval, run_at_hour, run_at_minute, target
 FROM public.cron_tasks
@@ -47,10 +58,42 @@ GROUP BY status, return_message
 ORDER BY n DESC
 LIMIT 20;
 
-SELECT
-  count(*) FILTER (WHERE archived_at < now() - interval '2 days') AS archives_older_than_2d,
-  count(*) AS archives_total
-FROM pgmq.a_on_manifest_create;
+-- Bounded existence checks per archive queue (no full-table aggregates).
+SELECT queue_name, has_rows_older_than_2d
+FROM (
+  SELECT 'a_on_manifest_create' AS queue_name,
+         EXISTS (
+           SELECT 1
+           FROM pgmq.a_on_manifest_create
+           WHERE archived_at < now() - interval '2 days'
+           LIMIT 1
+         ) AS has_rows_older_than_2d
+  UNION ALL
+  SELECT 'a_on_version_update',
+         EXISTS (
+           SELECT 1
+           FROM pgmq.a_on_version_update
+           WHERE archived_at < now() - interval '2 days'
+           LIMIT 1
+         )
+  UNION ALL
+  SELECT 'a_webhook_dispatcher',
+         EXISTS (
+           SELECT 1
+           FROM pgmq.a_webhook_dispatcher
+           WHERE archived_at < now() - interval '2 days'
+           LIMIT 1
+         )
+  UNION ALL
+  SELECT 'a_on_channel_update',
+         EXISTS (
+           SELECT 1
+           FROM pgmq.a_on_channel_update
+           WHERE archived_at < now() - interval '2 days'
+           LIMIT 1
+         )
+) AS archives
+ORDER BY queue_name;
 
 SELECT
   'index hit rate' AS name,

@@ -1,10 +1,9 @@
 -- Capgo-EU Phase A reclaim (run manually in a maintenance window).
+-- Prefer psql (VACUUM cannot run inside a transaction / SQL-editor DO block).
+-- Example:
+--   PGPASSWORD=... psql "postgresql://..." -v ON_ERROR_STOP=1 -f scripts/ops/reclaim_supabase_swap.sql
 -- Safe order: truncate empty bloat -> batched archive deletes -> null dual manifests -> trim audit.
--- Do NOT wrap the whole file in one transaction. VACUUM cannot run inside a transaction block.
--- Prefer Supabase SQL editor / psql as postgres. Re-run sections until counts hit zero.
-
-\timing on
-\set ON_ERROR_STOP on
+-- Each batch commits (separate statements). Re-run until notices show 0 deleted/updated.
 
 -- ---------------------------------------------------------------------------
 -- 0) Baseline sizes
@@ -29,118 +28,40 @@ WHERE (schemaname, relname) IN (
 ORDER BY pg_total_relation_size(format('%I.%I', schemaname, relname)::regclass) DESC;
 
 -- ---------------------------------------------------------------------------
--- 1) Truncate pg_net response bloat (~5GB empty table in prod)
+-- 1) Truncate pg_net response bloat
 -- ---------------------------------------------------------------------------
 TRUNCATE TABLE net._http_response;
 
 -- ---------------------------------------------------------------------------
--- 2) Purge pgmq archives older than 2 days (batched). Repeat until deleted=0.
+-- 2) Purge pgmq archives older than 2 days (one committed batch per statement).
+--    Re-run this section until deleted totals are 0.
 -- ---------------------------------------------------------------------------
-DO $$
-DECLARE
-  queue_name text;
-  cutoff timestamptz := now() - interval '2 days';
-  batch_size integer := 10000;
-  deleted_batch integer;
-  deleted_total bigint;
-BEGIN
-  FOREACH queue_name IN ARRAY ARRAY[
-    'on_version_update',
-    'on_manifest_create',
-    'webhook_dispatcher',
-    'on_channel_update'
-  ]
-  LOOP
-    deleted_total := 0;
-    LOOP
-      EXECUTE format(
-        'WITH doomed AS (
-           SELECT ctid FROM pgmq.a_%I WHERE archived_at < $1 LIMIT $2
-         )
-         DELETE FROM pgmq.a_%I AS archive
-         USING doomed
-         WHERE archive.ctid = doomed.ctid',
-        queue_name, queue_name
-      ) USING cutoff, batch_size;
-      GET DIAGNOSTICS deleted_batch = ROW_COUNT;
-      deleted_total := deleted_total + deleted_batch;
-      EXIT WHEN deleted_batch = 0;
-    END LOOP;
-    RAISE NOTICE 'purged % rows from pgmq.a_%', deleted_total, queue_name;
-  END LOOP;
-END $$;
+SELECT public.cleanup_queue_messages();
 
 VACUUM (VERBOSE) pgmq.a_on_version_update;
 VACUUM (VERBOSE) pgmq.a_on_manifest_create;
 VACUUM (VERBOSE) pgmq.a_webhook_dispatcher;
 VACUUM (VERBOSE) pgmq.a_on_channel_update;
 
--- Optional hard reclaim if VACUUM leaves a lot of empty pages (takes stronger locks):
+-- Optional hard reclaim if VACUUM leaves empty pages (stronger locks):
 -- VACUUM (FULL, VERBOSE) pgmq.a_on_version_update;
 -- VACUUM (FULL, VERBOSE) pgmq.a_on_manifest_create;
 -- VACUUM (FULL, VERBOSE) pgmq.a_webhook_dispatcher;
 -- VACUUM (FULL, VERBOSE) pgmq.a_on_channel_update;
 
 -- ---------------------------------------------------------------------------
--- 3) Null migrated app_versions.manifest arrays (dual storage leftovers)
+-- 3) Null fully migrated app_versions.manifest arrays
+--    Requires every expected legacy entry to exist in public.manifest.
+--    Re-run until notice shows 0.
 -- ---------------------------------------------------------------------------
-DO $$
-DECLARE
-  batch_size integer := 200;
-  updated_batch integer;
-  updated_total bigint := 0;
-BEGIN
-  LOOP
-    WITH doomed AS (
-      SELECT av.id
-      FROM public.app_versions AS av
-      WHERE av.manifest IS NOT NULL
-        AND cardinality(av.manifest) > 0
-        AND EXISTS (
-          SELECT 1 FROM public.manifest AS m WHERE m.app_version_id = av.id
-        )
-      ORDER BY av.id
-      LIMIT batch_size
-    )
-    UPDATE public.app_versions AS av
-    SET manifest = NULL
-    FROM doomed
-    WHERE av.id = doomed.id;
-    GET DIAGNOSTICS updated_batch = ROW_COUNT;
-    updated_total := updated_total + updated_batch;
-    EXIT WHEN updated_batch = 0;
-  END LOOP;
-  RAISE NOTICE 'nulled manifest arrays on % versions', updated_total;
-END $$;
+SELECT public.null_migrated_app_version_manifests();
 
 VACUUM (VERBOSE) public.app_versions;
 
 -- ---------------------------------------------------------------------------
--- 4) Trim audit_logs older than 30 days (batched)
+-- 4) Trim audit_logs older than 30 days (bounded batches). Re-run until 0.
 -- ---------------------------------------------------------------------------
-DO $$
-DECLARE
-  cutoff timestamptz := now() - interval '30 days';
-  batch_size integer := 5000;
-  deleted_batch integer;
-  deleted_total bigint := 0;
-BEGIN
-  LOOP
-    WITH doomed AS (
-      SELECT ctid
-      FROM public.audit_logs
-      WHERE created_at < cutoff
-      LIMIT batch_size
-    )
-    DELETE FROM public.audit_logs AS audit_logs
-    USING doomed
-    WHERE audit_logs.ctid = doomed.ctid;
-    GET DIAGNOSTICS deleted_batch = ROW_COUNT;
-    deleted_total := deleted_total + deleted_batch;
-    EXIT WHEN deleted_batch = 0;
-  END LOOP;
-  RAISE NOTICE 'deleted % audit_logs rows older than 30 days', deleted_total;
-END $$;
+SELECT public.cleanup_old_audit_logs();
 
 VACUUM (VERBOSE) public.audit_logs;
 

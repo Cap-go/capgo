@@ -16,6 +16,8 @@ DECLARE
   queue_name text;
   cutoff timestamptz := pg_catalog.now() - INTERVAL '2 days';
   batch_size integer := 10000;
+  max_batches integer := 20;
+  batch_no integer;
   deleted_batch integer;
   deleted_total bigint;
 BEGIN
@@ -23,9 +25,13 @@ BEGIN
     SELECT q.queue_name FROM pgmq.list_queues() q
   ) LOOP
     deleted_total := 0;
+    batch_no := 0;
 
     LOOP
-      EXECUTE format(
+      batch_no := batch_no + 1;
+      EXIT WHEN batch_no > max_batches;
+
+      EXECUTE pg_catalog.format(
         'DELETE FROM pgmq.a_%I
          WHERE ctid IN (
            SELECT ctid
@@ -48,8 +54,12 @@ BEGIN
     END IF;
 
     deleted_total := 0;
+    batch_no := 0;
     LOOP
-      EXECUTE format(
+      batch_no := batch_no + 1;
+      EXIT WHEN batch_no > max_batches;
+
+      EXECUTE pg_catalog.format(
         'DELETE FROM pgmq.q_%I
          WHERE ctid IN (
            SELECT ctid
@@ -107,10 +117,15 @@ CREATE OR REPLACE FUNCTION "public"."cleanup_old_audit_logs"() RETURNS "void"
 DECLARE
   cutoff timestamptz := pg_catalog.now() - INTERVAL '30 days';
   batch_size integer := 5000;
+  max_batches integer := 40;
+  batch_no integer := 0;
   deleted_batch integer;
   deleted_total bigint := 0;
 BEGIN
   LOOP
+    batch_no := batch_no + 1;
+    EXIT WHEN batch_no > max_batches;
+
     DELETE FROM public.audit_logs
     WHERE ctid IN (
       SELECT ctid
@@ -143,19 +158,27 @@ CREATE OR REPLACE FUNCTION "public"."null_migrated_app_version_manifests"() RETU
     AS $$
 DECLARE
   batch_size integer := 200;
+  max_batches integer := 50;
+  batch_no integer := 0;
   updated_batch integer;
   updated_total bigint := 0;
 BEGIN
   LOOP
+    batch_no := batch_no + 1;
+    EXIT WHEN batch_no > max_batches;
+
     WITH doomed AS (
       SELECT av.id
       FROM public.app_versions AS av
       WHERE av.manifest IS NOT NULL
         AND pg_catalog.cardinality(av.manifest) > 0
-        AND EXISTS (
-          SELECT 1
+        AND (
+          SELECT count(*)::integer
           FROM public.manifest AS m
           WHERE m.app_version_id = av.id
+        ) >= pg_catalog.GREATEST(
+          COALESCE(av.manifest_count, 0),
+          pg_catalog.cardinality(av.manifest)
         )
       ORDER BY av.id
       LIMIT batch_size
@@ -205,6 +228,7 @@ DECLARE
   v_stats_refresh_fields constant text[] := ARRAY['stats_refresh_requested_at', 'stats_updated_at', 'updated_at'];
   v_background_counter_fields constant text[] := ARRAY['channel_device_count', 'manifest_bundle_count', 'updated_at'];
   v_fat_app_version_fields constant text[] := ARRAY['manifest', 'native_packages'];
+  v_noise_app_version_fields constant text[] := ARRAY['manifest', 'native_packages', 'updated_at'];
 BEGIN
   SELECT auth.uid() INTO v_actor_user_id;
 
@@ -299,9 +323,13 @@ BEGIN
       WHERE changed_field.field_name <> ALL(v_fat_app_version_fields);
     END IF;
 
-    -- Skip updates that only touched stripped fat columns (e.g. manifest nulling).
+    -- Skip updates that only touched stripped fat columns / auto timestamps.
     IF TG_OP = 'UPDATE'
-      AND (v_changed_fields IS NULL OR pg_catalog.cardinality(v_changed_fields) = 0) THEN
+      AND NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.unnest(COALESCE(v_changed_fields, ARRAY[]::text[])) AS changed_field(field_name)
+        WHERE changed_field.field_name <> ALL(v_noise_app_version_fields)
+      ) THEN
       RETURN NEW;
     END IF;
   END IF;
@@ -380,12 +408,12 @@ DECLARE
 BEGIN
   function_type := CASE
     WHEN NULLIF(TG_ARGV[1], '') IS NULL THEN 'cloudflare'
-    WHEN lower(TG_ARGV[1]) = 'supabase' THEN 'cloudflare'
+    WHEN pg_catalog.lower(TG_ARGV[1]) = 'supabase' THEN 'cloudflare'
     ELSE TG_ARGV[1]
   END;
 
-  record_payload := to_jsonb(NEW);
-  old_record_payload := to_jsonb(OLD);
+  record_payload := pg_catalog.to_jsonb(NEW);
+  old_record_payload := pg_catalog.to_jsonb(OLD);
 
   -- app_versions fat columns can be multi-MB. Never enqueue them; handlers reload when needed.
   IF TG_TABLE_NAME = 'app_versions' THEN
@@ -397,10 +425,10 @@ BEGIN
     END IF;
   END IF;
 
-  payload := jsonb_build_object(
+  payload := pg_catalog.jsonb_build_object(
     'function_name', TG_ARGV[0],
     'function_type', function_type,
-    'payload', jsonb_build_object(
+    'payload', pg_catalog.jsonb_build_object(
       'old_record', old_record_payload,
       'record', record_payload,
       'type', TG_OP,
@@ -540,7 +568,20 @@ BEGIN
         OR NEW.external_url IS DISTINCT FROM OLD.external_url
         OR NEW.checksum IS DISTINCT FROM OLD.checksum
         OR (NEW.manifest IS DISTINCT FROM OLD.manifest AND NEW.manifest IS NOT NULL)
-        OR (NEW.native_packages IS DISTINCT FROM OLD.native_packages AND NEW.native_packages IS NOT NULL)
+        -- Nulling is allowed only when public.manifest has every expected entry.
+        OR (
+          NEW.manifest IS NULL
+          AND OLD.manifest IS NOT NULL
+          AND (
+            SELECT count(*)::integer
+            FROM public.manifest AS m
+            WHERE m.app_version_id = OLD.id
+          ) < pg_catalog.GREATEST(
+            COALESCE(OLD.manifest_count, 0),
+            COALESCE(pg_catalog.cardinality(OLD.manifest), 0)
+          )
+        )
+        OR NEW.native_packages IS DISTINCT FROM OLD.native_packages
       )
     THEN
       PERFORM public.pg_log('deny: BUNDLE_CONTENT_LOCKED_TRIGGER',
@@ -571,8 +612,8 @@ BEGIN
     AND NEW.r2_path IS NOT DISTINCT FROM OLD.r2_path
     AND NEW.external_url IS NOT DISTINCT FROM OLD.external_url
     AND NEW.checksum IS NOT DISTINCT FROM OLD.checksum
+    AND NEW.native_packages IS NOT DISTINCT FROM OLD.native_packages
     AND (NEW.manifest IS NULL OR NEW.manifest IS NOT DISTINCT FROM OLD.manifest)
-    AND (NEW.native_packages IS NULL OR NEW.native_packages IS NOT DISTINCT FROM OLD.native_packages)
   THEN
     RETURN NEW;
   END IF;
