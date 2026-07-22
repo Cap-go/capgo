@@ -1568,6 +1568,7 @@ export interface AdminGlobalStatsTrend {
   new_paying_orgs: number
   canceled_orgs: number
   upgraded_orgs: number
+  upgrade_rate_12m: number
   trial_extended_orgs: number
   trial_extended_subscribed_orgs: number
   past_due_orgs: number
@@ -1697,6 +1698,7 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(NULLIF(to_jsonb(gs) ->> 'active_past_due_orgs', '')::int, 0)::int AS active_past_due_orgs,
         gs.canceled_orgs::int AS canceled_orgs,
         COALESCE(gs.upgraded_orgs, 0)::int AS upgraded_orgs,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'upgrade_rate_12m', '')::float, 0)::float AS upgrade_rate_12m,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'trial_extended_orgs', '')::int, 0)::int AS trial_extended_orgs,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'trial_extended_subscribed_orgs', '')::int, 0)::int AS trial_extended_subscribed_orgs,
         gs.mrr::float AS mrr,
@@ -1851,6 +1853,7 @@ export async function getAdminGlobalStatsTrend(
       new_paying_orgs: Number(row.new_paying_orgs) || 0,
       canceled_orgs: Number(row.canceled_orgs) || 0,
       upgraded_orgs: Number(row.upgraded_orgs) || 0,
+      upgrade_rate_12m: Number(row.upgrade_rate_12m) || 0,
       trial_extended_orgs: Number(row.trial_extended_orgs) || 0,
       trial_extended_subscribed_orgs: Number(row.trial_extended_subscribed_orgs) || 0,
       mrr: Number(row.mrr) || 0,

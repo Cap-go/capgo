@@ -1,7 +1,7 @@
 {
   "name": "@capgo/cli",
   "type": "module",
-  "version": "8.28.2",
+  "version": "8.29.0",
   "description": "A CLI to upload to capgo servers",
   "author": "Martin martin@capgo.app",
   "license": "Apache 2.0",
@@ -247,7 +247,7 @@
     "@typescript/native-preview": "7.0.0-dev.20260526.1",
     "@vercel/ncc": "^0.38.4",
     "@xterm/headless": "^6.0.0",
-    "adm-zip": "^0.5.17",
+    "adm-zip": "^0.6.0",
     "ci-info": "^4.4.0",
     "commander": "^14.0.3",
     "eslint": "^10.4.0",

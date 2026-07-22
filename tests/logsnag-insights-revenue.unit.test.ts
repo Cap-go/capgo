@@ -51,6 +51,12 @@ describe('logsnag revenue metric helpers', () => {
     )).toBe(1)
   })
 
+
+  it.concurrent('clamps trailing 12-month start for leap-day ends', () => {
+    const start = logsnagInsightsTestUtils.getTrailing12mStart(new Date('2024-02-29T00:00:00.000Z'))
+    expect(start.toISOString()).toBe('2023-02-28T00:00:00.000Z')
+  })
+
   it.concurrent('builds UTC calendar-day bounds', () => {
     const { dayStart, nextDayStart, dayDateId } = logsnagInsightsTestUtils.getCurrentDayWindow(new Date('2026-03-24T18:45:12.000Z'))
 

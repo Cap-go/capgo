@@ -60,6 +60,7 @@ const globalStatsTrendData = ref<Array<{
   new_paying_orgs: number
   canceled_orgs: number
   upgraded_orgs: number
+  upgrade_rate_12m: number
   past_due_orgs: number
   past_due_orgs_average_days: number
   active_canceled_orgs: number
@@ -322,6 +323,22 @@ const planConversionSeries = computed(() => {
         value: item.plan_enterprise_conversion_rate || 0,
       })),
       color: '#f59e0b', // amber
+    },
+  ]
+})
+
+const upgradeRate12mSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: t('upgrade-rate-12m'),
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.upgrade_rate_12m || 0,
+      })),
+      color: '#10b981', // green
     },
   ]
 })
@@ -931,6 +948,29 @@ displayStore.defaultBack = '/dashboard'
               </div>
             </div>
 
+            <!-- 12-Month Upgrade Rate -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-success/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-success"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  {{ t('upgrade-rate-12m') }}
+                </p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-success">
+                  {{ formatNumberValue(latestGlobalStats.upgrade_rate_12m || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }}%
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-success">
+                  0.0%
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ t('upgrade-rate-12m-description') }}
+                </p>
+              </div>
+            </div>
+
             <!-- Past Due Organizations -->
             <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
               <div class="flex items-start justify-between mb-4">
@@ -1108,6 +1148,20 @@ displayStore.defaultBack = '/dashboard'
             >
               <AdminMultiLineChart
                 :series="planConversionSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+                value-suffix="%"
+              />
+            </ChartCard>
+          </div>
+
+          <div class="grid grid-cols-1 gap-6">
+            <ChartCard
+              :title="t('upgrade-rate-12m')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="upgradeRate12mSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="upgradeRate12mSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
                 value-suffix="%"
               />
