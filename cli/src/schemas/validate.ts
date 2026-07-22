@@ -13,14 +13,16 @@ export function validateOptions<T>(schema: StandardSchema<T>, data: unknown, sil
 
   const issues = result.error.issues
   const messages = issues.map((issue) => {
-    // ArkType issue.message often already includes the property path; prefer
-    // `problem` when present to avoid "foo: foo must be ..." duplication.
+    const path = issue.path && issue.path.length > 0 ? issue.path.join('.') : ''
     const problem = (issue as { problem?: string }).problem
-    if (typeof problem === 'string' && problem.length > 0)
-      return problem
-
-    const path = issue.path && issue.path.length > 0 ? issue.path.join('.') : 'value'
-    return `${path}: ${issue.message}`
+    const detail = typeof problem === 'string' && problem.length > 0 ? problem : issue.message
+    // Prefer ArkType `problem` (avoids duplicated "foo: foo must...") but keep an
+    // explicit path prefix for nested multi-field failures.
+    if (path && typeof problem === 'string' && problem.length > 0 && !problem.startsWith(`${path} `) && !problem.startsWith(`${path}:`))
+      return `${path}: ${problem}`
+    if (path && !(typeof problem === 'string' && problem.length > 0))
+      return `${path}: ${detail}`
+    return detail
   })
 
   const errorMessage = `Validation failed:\n${messages.join('\n')}`

@@ -82,3 +82,26 @@ export const parsedSecurityErrorSchema = type({
 })
 
 export type ParsedSecurityError = typeof parsedSecurityErrorSchema.infer
+
+// ============================================================================
+// Localized Store Release Notes
+// ============================================================================
+
+export const localizedReleaseNotesSchema = type({ '[string]': 'string' }).pipe((data, ctx) => {
+  const out = Object.create(null) as Record<string, string>
+  for (const [rawKey, rawValue] of Object.entries(data)) {
+    const key = rawKey.trim()
+    const value = rawValue.trim()
+    if (!key) {
+      return ctx.reject('a non-empty locale key')
+    }
+    if (!value) {
+      return ctx.reject('a non-empty release note')
+    }
+    if (Object.prototype.hasOwnProperty.call(out, key)) {
+      return ctx.reject(`a unique locale key (duplicate after trim: "${key}")`)
+    }
+    out[key] = value
+  }
+  return out
+})

@@ -1,6 +1,6 @@
 import { type } from './arktype'
 import { buildCredentialsSchema } from './build'
-import { rejectConflictingBooleanGroup } from './common'
+import { localizedReleaseNotesSchema, rejectConflictingBooleanGroup } from './common'
 
 export const capacitorConfigOptionSchema = type('string > 0').describe('Capacitor config source to update')
 
@@ -17,22 +17,6 @@ export interface SDKResult<T = void> {
   isSecurityPolicyError?: boolean
   warnings?: string[]
 }
-
-const localizedReleaseNotesSchema = type({ '[string]': 'string' }).pipe((data, ctx) => {
-  const out: Record<string, string> = {}
-  for (const [rawKey, rawValue] of Object.entries(data)) {
-    const key = rawKey.trim()
-    const value = rawValue.trim()
-    if (!key) {
-      return ctx.reject('a non-empty locale key')
-    }
-    if (!value) {
-      return ctx.reject('a non-empty release note')
-    }
-    out[key] = value
-  }
-  return out
-})
 
 // ============================================================================
 // SDK App Schemas

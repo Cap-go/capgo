@@ -10,7 +10,9 @@ configure({
       unit: (ctx) => {
         if (ctx.unit === undefined)
           return ctx.base
-        throw ctx
+        // Re-throw as Error so diagnostics keep a stack / message instead of
+        // stringifying the fallback context as [object Object].
+        throw new TypeError(`Unsupported ArkType unit in JSON Schema export: ${String(ctx.unit)}`)
       },
     },
   },
