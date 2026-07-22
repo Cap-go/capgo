@@ -19609,6 +19609,10 @@ CREATE INDEX "app_versions_cli_version_idx" ON "public"."app_versions" USING "bt
 
 
 
+CREATE INDEX "app_versions_manifest_present_idx" ON "public"."app_versions" USING "btree" ("id") WHERE ("manifest" IS NOT NULL);
+
+
+
 CREATE INDEX "app_versions_meta_app_id_idx" ON "public"."app_versions_meta" USING "btree" ("app_id");
 
 
