@@ -559,6 +559,24 @@ BEGIN
     END IF;
   END IF;
 
+  -- Manifest/native_packages nulling must not re-run encryption enforcement.
+  -- Legacy rows can predate org encryption requirements; reclaim only clears
+  -- dual-storage columns and must not abort on those orgs.
+  IF TG_OP = 'UPDATE'
+    AND NEW.session_key IS NOT DISTINCT FROM OLD.session_key
+    AND NEW.key_id IS NOT DISTINCT FROM OLD.key_id
+    AND NEW.name IS NOT DISTINCT FROM OLD.name
+    AND NEW.app_id IS NOT DISTINCT FROM OLD.app_id
+    AND NEW.storage_provider IS NOT DISTINCT FROM OLD.storage_provider
+    AND NEW.r2_path IS NOT DISTINCT FROM OLD.r2_path
+    AND NEW.external_url IS NOT DISTINCT FROM OLD.external_url
+    AND NEW.checksum IS NOT DISTINCT FROM OLD.checksum
+    AND (NEW.manifest IS NULL OR NEW.manifest IS NOT DISTINCT FROM OLD.manifest)
+    AND (NEW.native_packages IS NULL OR NEW.native_packages IS NOT DISTINCT FROM OLD.native_packages)
+  THEN
+    RETURN NEW;
+  END IF;
+
   -- Derive org_id from NEW.app_id first because
   -- force_valid_owner_org_app_versions runs after this trigger.
   SELECT apps.owner_org INTO org_id

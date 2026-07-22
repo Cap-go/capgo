@@ -165,4 +165,65 @@ describe('swap memory cleanup functions', () => {
     await executeSQL(`DELETE FROM public.app_versions WHERE id = $1`, [versionId])
     await executeSQL(`DELETE FROM public.apps WHERE app_id = $1`, [appId])
   })
+  it('null_migrated_app_version_manifests works when org requires encryption', async () => {
+    const appId = `com.swap.encnull.${randomUUID().slice(0, 8)}`
+    const orgRows = await executeSQL(
+      `SELECT id FROM public.orgs ORDER BY created_at LIMIT 1`,
+    )
+    const orgId = orgRows[0]?.id as string
+
+    await executeSQL(
+      `INSERT INTO public.apps (app_id, name, icon_url, owner_org)
+       VALUES ($1, 'swap-enc-null', '', $2::uuid)`,
+      [appId, orgId],
+    )
+
+    // Create an unencrypted ready bundle while enforcement is off.
+    const versionRows = await executeSQL(
+      `INSERT INTO public.app_versions (app_id, name, owner_org, storage_provider, session_key, manifest, manifest_count)
+       VALUES (
+         $1,
+         $2,
+         $3::uuid,
+         'r2',
+         NULL,
+         ARRAY[ROW('index.html', 'apps/test/index.html', 'abc123')::public.manifest_entry],
+         1
+       )
+       RETURNING id`,
+      [appId, `1.0.0-${randomUUID().slice(0, 8)}`, orgId],
+    )
+    const versionId = versionRows[0]?.id as number
+
+    await executeSQL(
+      `INSERT INTO public.manifest (app_version_id, file_name, s3_path, file_hash)
+       VALUES ($1, 'index.html', 'apps/test/index.html', 'abc123')`,
+      [versionId],
+    )
+
+    try {
+      await executeSQL(
+        `UPDATE public.orgs SET enforce_encrypted_bundles = true WHERE id = $1::uuid`,
+        [orgId],
+      )
+
+      await executeSQL(`SELECT public.null_migrated_app_version_manifests()`)
+
+      const after = await executeSQL(
+        `SELECT manifest IS NULL AS is_null FROM public.app_versions WHERE id = $1`,
+        [versionId],
+      )
+      expect(after[0]?.is_null).toBe(true)
+    }
+    finally {
+      await executeSQL(
+        `UPDATE public.orgs SET enforce_encrypted_bundles = false WHERE id = $1::uuid`,
+        [orgId],
+      )
+      await executeSQL(`DELETE FROM public.manifest WHERE app_version_id = $1`, [versionId])
+      await executeSQL(`DELETE FROM public.app_versions WHERE id = $1`, [versionId])
+      await executeSQL(`DELETE FROM public.apps WHERE app_id = $1`, [appId])
+    }
+  })
+
 })
