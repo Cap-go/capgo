@@ -141,9 +141,63 @@ function shouldUseSizeRangeFallback(size: number, headError: unknown): boolean {
   return !size && !isMissingObjectError(headError)
 }
 
+type ObjectPresence = 'present' | 'absent' | 'unknown'
+
+async function getObjectPresence(c: Context, fileId: string | null): Promise<ObjectPresence> {
+  if (!fileId)
+    return 'absent'
+
+  try {
+    const client = initS3(c)
+    const url = await client.getPresignedUrl('HEAD', fileId)
+    const response = await fetch(url, {
+      method: 'HEAD',
+      signal: AbortSignal.timeout(10_000),
+    })
+    await response.body?.cancel()
+
+    if (response.status === 404)
+      return 'absent'
+    if (response.status === 200)
+      return 'present'
+
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'getObjectPresence unexpected HEAD status',
+      fileId,
+      status: response.status,
+      statusText: response.statusText,
+    })
+    return 'unknown'
+  }
+  catch (error) {
+    if (isMissingObjectError(error))
+      return 'absent'
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'getObjectPresence failed',
+      fileId,
+      error: serializeStorageError(error),
+    })
+    return 'unknown'
+  }
+}
+
 async function moveObjectToTrash(c: Context, fileId: string) {
   if (fileId.startsWith(R2_TRASH_PREFIX))
     return true
+
+  // Only skip copy on a definitive absent object. Unknown HEAD must fail closed
+  // so callers keep DB tracking until trash succeeds.
+  const presence = await getObjectPresence(c, fileId)
+  if (presence === 'absent') {
+    cloudlog({ requestId: c.get('requestId'), message: 'R2 object missing before trash move, skip copy', fileId })
+    return true
+  }
+  if (presence === 'unknown') {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'R2 object presence unknown, refuse trash skip', fileId })
+    return false
+  }
 
   const client = initS3(c)
   const trashPath = getTrashPath(fileId)
@@ -155,7 +209,7 @@ async function moveObjectToTrash(c: Context, fileId: string) {
   }
   catch (error) {
     if (isMissingObjectError(error)) {
-      cloudlog({ requestId: c.get('requestId'), message: 'R2 object already missing before trash move', fileId, error: serializeStorageError(error) })
+      cloudlog({ requestId: c.get('requestId'), message: 'R2 object disappeared during trash move', fileId, error: serializeStorageError(error) })
       return true
     }
 

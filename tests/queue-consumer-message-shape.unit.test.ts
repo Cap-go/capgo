@@ -158,7 +158,9 @@ describe('queue_consumer legacy message compatibility', () => {
     expect(__queueConsumerTestUtils__.getQueueVisibilityTimeout('on_manifest_create')).toBe(900)
     expect(__queueConsumerTestUtils__.getQueueVisibilityTimeout('cron_email')).toBe(120)
     expect(__queueConsumerTestUtils__.getQueueVisibilityTimeout('on_version_update')).toBe(900)
-    expect(__queueConsumerTestUtils__.getQueueHttpTimeoutMs('on_version_update')).toBe(60_000)
+    expect(__queueConsumerTestUtils__.getQueueHttpTimeoutMs('on_version_update')).toBe(300_000)
+    expect(__queueConsumerTestUtils__.getQueueMaxReads('on_version_update')).toBe(30)
+    expect(__queueConsumerTestUtils__.getQueueMaxReads('on_manifest_create')).toBe(5)
     expect(__queueConsumerTestUtils__.getQueueHttpTimeoutMs('cron_email')).toBe(15_000)
     expect(__queueConsumerTestUtils__.shouldRunQueueSyncInBackground('on_manifest_create')).toBe(false)
     expect(__queueConsumerTestUtils__.shouldRunQueueSyncInBackground('cron_email')).toBe(true)
@@ -233,6 +235,31 @@ describe('queue_consumer legacy message compatibility', () => {
       appVersionRow({ deleted_at: null, manifest: [{ file_name: 'index.html' }], manifest_count: 0 }),
       appVersionRow({ deleted_at: null }),
     )).toBe('continue')
+  })
+
+  it.concurrent('uses the version queue retry budget for Discord failure alerts', () => {
+    const versionRetryBudget = __queueConsumerTestUtils__.getQueueMaxReads('on_version_update')
+    const midRetry = {
+      cf_id: 'cf-version-mid',
+      error_code: 'manifest_cleanup_incomplete',
+      function_name: 'on_version_update',
+      function_type: 'supabase',
+      msg_id: 2,
+      payload_size: 10,
+      read_count: MAX_QUEUE_READS,
+      status: 500,
+      status_text: 'Internal Server Error',
+    }
+    const exhausted = {
+      ...midRetry,
+      cf_id: 'cf-version-done',
+      msg_id: 3,
+      read_count: versionRetryBudget,
+    }
+
+    expect(versionRetryBudget).toBe(30)
+    expect(__queueConsumerTestUtils__.getActionableQueueFailures([midRetry], versionRetryBudget)).toEqual([])
+    expect(__queueConsumerTestUtils__.getActionableQueueFailures([exhausted], versionRetryBudget)).toEqual([exhausted])
   })
 
   it.concurrent('alerts Discord after retry budget is exhausted', () => {
