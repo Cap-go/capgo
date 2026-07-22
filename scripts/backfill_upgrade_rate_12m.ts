@@ -1,15 +1,15 @@
 /*
- * Backfill public.global_stats.upgrade_rate_12m.
+ * Backfill public.global_stats.upgrade_rate_12m from Stripe-sourced daily
+ * upgrade counts already stored in global_stats.upgraded_orgs.
  *
- * For each snapshot day, compute:
- *   orgs with stripe_info.upgraded_at in [dayEnd-12 calendar months, dayEnd)
- *   / orgs with created_at < dayEnd
+ * Do NOT use stripe_info.upgraded_at for history — that column is new and
+ * only tracks recent webhook upgrades. Historical upgraded_orgs were filled
+ * from Stripe subscription intervals (admin revenue dashboard backfill).
+ *
+ * For each snapshot day D:
+ *   sum(upgraded_orgs) over date_ids in [D+1-12 calendar months, D]
+ *   / orgs with created_at < D+1
  *   * 100
- *
- * Limitation: stripe_info.upgraded_at stores only the latest upgrade timestamp,
- * so historical rows use that last-known upgrade (same contract as the daily
- * revenue shard). Orgs that upgraded earlier in-window but again later may be
- * undercounted on older snapshots.
  *
  * Dry run, defaulting to the last 30 UTC calendar days:
  *   bun run stripe:backfill-upgrade-rate-12m
@@ -30,9 +30,8 @@ const DEFAULT_PAGE_SIZE = 1000
 const DATE_ID_REGEX = /^\d{4}-\d{2}-\d{2}$/
 
 type SupabaseClient = ReturnType<typeof createSupabaseServiceClient>
-type GlobalStatsRow = Pick<Database['public']['Tables']['global_stats']['Row'], 'date_id' | 'upgrade_rate_12m'>
-type OrgRow = Pick<Database['public']['Tables']['orgs']['Row'], 'created_at' | 'customer_id' | 'id'>
-type StripeInfoRow = Pick<Database['public']['Tables']['stripe_info']['Row'], 'customer_id' | 'upgraded_at'>
+type GlobalStatsRow = Pick<Database['public']['Tables']['global_stats']['Row'], 'date_id' | 'upgrade_rate_12m' | 'upgraded_orgs'>
+type OrgRow = Pick<Database['public']['Tables']['orgs']['Row'], 'created_at' | 'id'>
 
 export interface UpgradeRate12mBackfillRow {
   changed: boolean
@@ -68,12 +67,13 @@ function getNextDateId(dateId: string) {
   return getDateId(date)
 }
 
-function getTrailing12mStartMs(endExclusive: Date) {
+function getTrailing12mStartDateId(dateId: string) {
+  const endExclusive = new Date(`${getNextDateId(dateId)}T00:00:00.000Z`)
   const year = endExclusive.getUTCFullYear() - 1
   const month = endExclusive.getUTCMonth()
   const day = endExclusive.getUTCDate()
   const clampedDay = Math.min(day, new Date(Date.UTC(year, month + 1, 0)).getUTCDate())
-  return Date.UTC(year, month, clampedDay)
+  return getDateId(new Date(Date.UTC(year, month, clampedDay)))
 }
 
 function toMetricNumber(value: number | string | null | undefined) {
@@ -100,63 +100,51 @@ function buildOrgCreatedAtTimes(orgRows: OrgRow[]) {
     .sort((left, right) => left - right)
 }
 
-function buildUpgradeEvents(orgRows: OrgRow[], stripeRows: StripeInfoRow[]) {
-  const orgIdsByCustomerId = new Map<string, string[]>()
-  for (const org of orgRows) {
-    if (!org.customer_id)
-      continue
-    const existing = orgIdsByCustomerId.get(org.customer_id) ?? []
-    existing.push(org.id)
-    orgIdsByCustomerId.set(org.customer_id, existing)
-  }
-
-  const events: Array<{ orgId: string, upgradedAt: number }> = []
-  for (const row of stripeRows) {
-    if (!row.customer_id || !row.upgraded_at)
-      continue
-    const upgradedAt = Date.parse(row.upgraded_at)
-    if (!Number.isFinite(upgradedAt))
-      continue
-    const orgIds = orgIdsByCustomerId.get(row.customer_id)
-    if (!orgIds?.length)
-      continue
-    for (const orgId of orgIds)
-      events.push({ orgId, upgradedAt })
-  }
-
-  return events.sort((left, right) => left.upgradedAt - right.upgradedAt)
-}
-
 export function buildUpgradeRate12mBackfillRows(
   rows: GlobalStatsRow[],
   orgRows: OrgRow[],
-  stripeRows: StripeInfoRow[],
+  allUpgradeRows: GlobalStatsRow[],
 ): UpgradeRate12mBackfillRow[] {
   const orgCreatedAtTimes = buildOrgCreatedAtTimes(orgRows)
-  const upgradeEvents = buildUpgradeEvents(orgRows, stripeRows)
+  const upgradedByDateId = new Map(
+    allUpgradeRows.map(row => [row.date_id, toMetricNumber(row.upgraded_orgs)]),
+  )
+  const sortedUpgradeDateIds = [...upgradedByDateId.keys()].sort((left, right) => left.localeCompare(right))
+  const prefixSums: Array<{ date_id: string, sum: number }> = []
+  let running = 0
+  for (const dateId of sortedUpgradeDateIds) {
+    running += upgradedByDateId.get(dateId) ?? 0
+    prefixSums.push({ date_id: dateId, sum: running })
+  }
+
+  function sumUpgradedInclusive(fromDateId: string, toDateId: string) {
+    if (fromDateId > toDateId)
+      return 0
+    let before = 0
+    let through = 0
+    for (const entry of prefixSums) {
+      if (entry.date_id < fromDateId)
+        before = entry.sum
+      if (entry.date_id <= toDateId)
+        through = entry.sum
+      else
+        break
+    }
+    return through - before
+  }
+
   let orgIndex = 0
 
   return [...rows]
     .sort((left, right) => left.date_id.localeCompare(right.date_id))
     .map((row) => {
-      const endExclusiveDate = new Date(`${getNextDateId(row.date_id)}T00:00:00.000Z`)
-      const endExclusive = endExclusiveDate.getTime()
-      const startInclusive = getTrailing12mStartMs(endExclusiveDate)
-
+      const endExclusive = new Date(`${getNextDateId(row.date_id)}T00:00:00.000Z`).getTime()
       while (orgIndex < orgCreatedAtTimes.length && orgCreatedAtTimes[orgIndex]! < endExclusive)
         orgIndex++
 
-      const upgradedOrgIds = new Set<string>()
-      for (const event of upgradeEvents) {
-        if (event.upgradedAt < startInclusive)
-          continue
-        if (event.upgradedAt >= endExclusive)
-          break
-        upgradedOrgIds.add(event.orgId)
-      }
-
+      const fromDateId = getTrailing12mStartDateId(row.date_id)
+      const upgraded_orgs_12m = sumUpgradedInclusive(fromDateId, row.date_id)
       const orgs = orgIndex
-      const upgraded_orgs_12m = upgradedOrgIds.size
       const current_rate = toMetricNumber(row.upgrade_rate_12m)
       const next_rate = calculateUpgradeRate12m(upgraded_orgs_12m, orgs)
 
@@ -178,7 +166,7 @@ async function fetchGlobalStatsRows(supabase: SupabaseClient, fromDateId: string
   while (true) {
     let query = supabase
       .from('global_stats')
-      .select('date_id, upgrade_rate_12m')
+      .select('date_id, upgrade_rate_12m, upgraded_orgs')
       .order('date_id', { ascending: true })
       .range(offset, offset + DEFAULT_PAGE_SIZE - 1)
 
@@ -202,6 +190,11 @@ async function fetchGlobalStatsRows(supabase: SupabaseClient, fromDateId: string
   return rows
 }
 
+async function fetchAllUpgradeRows(supabase: SupabaseClient) {
+  // Need full history so trailing windows near --from still have prior days.
+  return fetchGlobalStatsRows(supabase, null, null)
+}
+
 async function fetchOrgRows(supabase: SupabaseClient, toDateId: string | null) {
   const rows: OrgRow[] = []
   let lastId: string | null = null
@@ -209,14 +202,14 @@ async function fetchOrgRows(supabase: SupabaseClient, toDateId: string | null) {
   while (true) {
     let query = supabase
       .from('orgs')
-      .select('id, created_at, customer_id')
+      .select('id, created_at')
       .order('id', { ascending: true })
       .limit(DEFAULT_PAGE_SIZE)
 
-    if (toDateId)
-      query = query.lt('created_at', `${getNextDateId(toDateId)}T00:00:00.000Z`)
     if (lastId)
       query = query.gt('id', lastId)
+    if (toDateId)
+      query = query.lt('created_at', `${getNextDateId(toDateId)}T00:00:00.000Z`)
 
     const { data, error } = await query
     if (error)
@@ -226,36 +219,6 @@ async function fetchOrgRows(supabase: SupabaseClient, toDateId: string | null) {
 
     rows.push(...data)
     lastId = data[data.length - 1]!.id
-    if (data.length < DEFAULT_PAGE_SIZE)
-      break
-  }
-
-  return rows
-}
-
-async function fetchStripeInfoRows(supabase: SupabaseClient) {
-  const rows: StripeInfoRow[] = []
-  let lastCustomerId: string | null = null
-
-  while (true) {
-    let query = supabase
-      .from('stripe_info')
-      .select('customer_id, upgraded_at')
-      .not('upgraded_at', 'is', null)
-      .order('customer_id', { ascending: true })
-      .limit(DEFAULT_PAGE_SIZE)
-
-    if (lastCustomerId)
-      query = query.gt('customer_id', lastCustomerId)
-
-    const { data, error } = await query
-    if (error)
-      throw error
-    if (!data?.length)
-      break
-
-    rows.push(...data)
-    lastCustomerId = data[data.length - 1]!.customer_id
     if (data.length < DEFAULT_PAGE_SIZE)
       break
   }
@@ -295,15 +258,17 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   }
   const supabase = createSupabaseServiceClient(env)
 
-  const rows = await fetchGlobalStatsRows(supabase, fromDateId, toDateId)
-  const orgRows = await fetchOrgRows(supabase, toDateId)
-  const stripeRows = await fetchStripeInfoRows(supabase)
-  const backfillRows = buildUpgradeRate12mBackfillRows(rows, orgRows, stripeRows)
+  const [targetRows, allUpgradeRows, orgRows] = await Promise.all([
+    fetchGlobalStatsRows(supabase, fromDateId, toDateId),
+    fetchAllUpgradeRows(supabase),
+    fetchOrgRows(supabase, toDateId),
+  ])
+  const backfillRows = buildUpgradeRate12mBackfillRows(targetRows, orgRows, allUpgradeRows)
   const changedRows = backfillRows.filter(row => row.changed)
 
-  console.log(`Loaded ${rows.length} global_stats rows`)
+  console.log(`Loaded ${targetRows.length} target global_stats rows`)
+  console.log(`Loaded ${allUpgradeRows.length} upgrade-history rows`)
   console.log(`Loaded ${orgRows.length} org rows`)
-  console.log(`Loaded ${stripeRows.length} stripe_info rows with upgraded_at`)
   console.log(`Env file: ${envFile}`)
   if (all)
     console.log('Scope: all global_stats rows')
