@@ -88,6 +88,9 @@ export type ParsedSecurityError = typeof parsedSecurityErrorSchema.infer
 // ============================================================================
 
 export const localizedReleaseNotesSchema = type({ '[string]': 'string' }).pipe((data, ctx) => {
+  if (data === null || typeof data !== 'object' || Array.isArray(data) || Object.getPrototypeOf(data) !== Object.prototype) {
+    return ctx.reject('a plain object of locale keys to release notes')
+  }
   const out = Object.create(null) as Record<string, string>
   for (const [rawKey, rawValue] of Object.entries(data)) {
     const key = rawKey.trim()
