@@ -1007,6 +1007,11 @@ export function buildReadDevicesCFQuery(params: ReadDevicesParams, customIdMode:
     conditions.push(`blob2 = '${escapeSqlString(params.version_name)}'`)
   }
 
+  if (params.updated_at_gt) {
+    const safeUpdatedAtGt = escapeSqlString(formatDateCF(params.updated_at_gt))
+    conditions.push(`timestamp > toDateTime('${safeUpdatedAtGt}')`)
+  }
+
   const devicesOrder = getReadDevicesCFOrder(params)
   const outerConditions = buildReadDevicesCFOuterConditions(params, devicesOrder)
   const includeCountryCode = !!params.deviceIds?.length

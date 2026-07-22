@@ -141,10 +141,13 @@ describe('buildReadDevicesCFQuery', () => {
     }, false)
 
     const groupByIndex = query.indexOf('GROUP BY blob1')
-    const filterIndex = query.indexOf(`WHERE updated_at > toDateTime('2026-04-04 03:05:59')`)
+    const innerFilterIndex = query.indexOf(`timestamp > toDateTime('2026-04-04 03:05:59')`)
+    const outerFilterIndex = query.indexOf(`WHERE updated_at > toDateTime('2026-04-04 03:05:59')`)
 
     expect(groupByIndex).toBeGreaterThan(-1)
-    expect(filterIndex).toBeGreaterThan(groupByIndex)
+    expect(innerFilterIndex).toBeGreaterThan(-1)
+    expect(innerFilterIndex).toBeLessThan(groupByIndex)
+    expect(outerFilterIndex).toBeGreaterThan(groupByIndex)
   })
 
 })

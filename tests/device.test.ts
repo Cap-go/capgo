@@ -71,28 +71,37 @@ describe.concurrent('[GET] /device operations', () => {
 describe('[GET] /device updated_at filter and order', () => {
   it('filters devices by updated_at greater than ISO date', async () => {
     const supabase = getSupabaseClient()
-    const pastDeviceId = '00000000-0000-0000-0000-000000000000'
+    const pastDeviceId = randomUUID().toLowerCase()
     const futureDeviceId = randomUUID().toLowerCase()
     const cutoff = new Date('2026-01-01T00:00:00.000Z')
 
-    const { error: pastError } = await supabase.from('devices').update({
-      updated_at: '2025-06-01T00:00:00.000Z',
-    }).eq('app_id', APPNAME_DEVICE).eq('device_id', pastDeviceId)
-    expect(pastError).toBeNull()
-
-    const { error: futureError } = await supabase.from('devices').upsert({
-      app_id: APPNAME_DEVICE,
-      device_id: futureDeviceId,
-      platform: 'android',
-      plugin_version: '6.0.0',
-      os_version: '14',
-      version_build: '1.0.0',
-      version_name: '1.0.0',
-      is_prod: true,
-      is_emulator: false,
-      updated_at: '2026-06-01T00:00:00.000Z',
-    })
-    expect(futureError).toBeNull()
+    const { error: insertError } = await supabase.from('devices').upsert([
+      {
+        app_id: APPNAME_DEVICE,
+        device_id: pastDeviceId,
+        platform: 'ios',
+        plugin_version: '6.0.0',
+        os_version: '17.0',
+        version_build: '1.0.0',
+        version_name: '1.0.0',
+        is_prod: true,
+        is_emulator: false,
+        updated_at: '2025-06-01T00:00:00.000Z',
+      },
+      {
+        app_id: APPNAME_DEVICE,
+        device_id: futureDeviceId,
+        platform: 'android',
+        plugin_version: '6.0.0',
+        os_version: '14',
+        version_build: '1.0.0',
+        version_name: '1.0.0',
+        is_prod: true,
+        is_emulator: false,
+        updated_at: '2026-06-01T00:00:00.000Z',
+      },
+    ])
+    expect(insertError).toBeNull()
 
     const params = new URLSearchParams({
       app_id: APPNAME_DEVICE,

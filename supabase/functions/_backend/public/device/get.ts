@@ -41,23 +41,29 @@ interface publicDevice {
   channel?: string
 }
 
-export function filterDeviceKeys(devices: DeviceRes[]) {
-  return devices.map((device) => {
-    const { updated_at, device_id, custom_id, is_prod, is_emulator, install_source, version_name, version, app_id, platform, plugin_version, os_version, version_build, key_id, country_code } = device
-    return { updated_at, device_id, custom_id, is_prod, is_emulator, install_source, version_name, version, app_id, platform, plugin_version, os_version, version_build, key_id, country_code }
-  })
+function toPublicUpdatedAt(value: string): string {
+  // Cloudflare Analytics Engine returns UTC as "YYYY-MM-DD HH:mm:ss".
+  const cloudflareUtc = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})$/.exec(value)
+  const normalized = cloudflareUtc ? `${cloudflareUtc[1]}T${cloudflareUtc[2]}.000Z` : value
+  return new Date(normalized).toISOString()
 }
 
 function parseUpdatedAtFilter(updatedAt: string | undefined): string | undefined {
   if (!updatedAt)
     return undefined
 
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?Z$/.exec(updatedAt)
+  // Accept ISO-8601 UTC (Z) and the Cloudflare device timestamp format for sync round-trips.
+  const cloudflareUtc = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(updatedAt)
+  const normalized = cloudflareUtc
+    ? `${cloudflareUtc[1]}-${cloudflareUtc[2]}-${cloudflareUtc[3]}T${cloudflareUtc[4]}:${cloudflareUtc[5]}:${cloudflareUtc[6]}.000Z`
+    : updatedAt
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?Z$/.exec(normalized)
   if (!match) {
     throw simpleError('invalid_updated_at', 'updated_at must be a valid ISO date', { updated_at: updatedAt })
   }
 
-  const parsed = new Date(updatedAt)
+  const parsed = new Date(normalized)
   if (Number.isNaN(parsed.getTime()))
     throw simpleError('invalid_updated_at', 'updated_at must be a valid ISO date', { updated_at: updatedAt })
 
@@ -82,6 +88,29 @@ function parseDevicesOrder(order: string | undefined) {
   if (order !== 'asc' && order !== 'desc')
     throw simpleError('invalid_order', 'order must be asc or desc', { order })
   return [{ key: 'updated_at', sortable: order as 'asc' | 'desc' }]
+}
+
+export function filterDeviceKeys(devices: DeviceRes[]) {
+  return devices.map((device) => {
+    const { updated_at, device_id, custom_id, is_prod, is_emulator, install_source, version_name, version, app_id, platform, plugin_version, os_version, version_build, key_id, country_code } = device
+    return {
+      updated_at: updated_at ? toPublicUpdatedAt(updated_at) : updated_at,
+      device_id,
+      custom_id,
+      is_prod,
+      is_emulator,
+      install_source,
+      version_name,
+      version,
+      app_id,
+      platform,
+      plugin_version,
+      os_version,
+      version_build,
+      key_id,
+      country_code,
+    }
+  })
 }
 
 export async function get(c: Context, body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
