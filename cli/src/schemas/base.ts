@@ -1,13 +1,14 @@
-import { z } from 'zod'
+import { type } from './arktype'
 
 // ============================================================================
 // Base Options Schema
 // ============================================================================
 
-export const optionsBaseSchema = z.object({
-  apikey: z.string(),
-  supaHost: z.string().optional(),
-  supaAnon: z.string().optional(),
+export const optionsBaseSchema = type({
+  '+': 'delete',
+  apikey: 'string',
+  'supaHost?': 'string',
+  'supaAnon?': 'string',
 })
 
-export type OptionsBase = z.infer<typeof optionsBaseSchema>
+export type OptionsBase = typeof optionsBaseSchema.infer

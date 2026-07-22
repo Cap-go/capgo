@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { type } from 'arktype'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { parseSchema, safeParseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
 
 import {
@@ -610,7 +609,8 @@ describe('x-limited-key-id subkeys enforce organization scope on middlewareKey r
     })
 
     expect(response.status).toBe(200)
-    const payload = z.array(z.object({ id: z.string(), name: z.string() })).parse(await response.json())
+    const orgListSchema = type({ id: 'string', name: 'string' }).array()
+    const payload = parseSchema(orgListSchema, await response.json())
     expect(payload.map(org => org.id)).toEqual([scopedOrgId])
   })
 
