@@ -16,11 +16,10 @@ DECLARE
   queue_name text;
   cutoff timestamptz := pg_catalog.now() - INTERVAL '2 days';
   batch_size integer := 10000;
-  -- Hard cap across ALL queues/phases for one cron/reclaim invocation.
+  -- Hard cap of productive batches across ALL queues/phases for one invocation.
   max_batches_total integer := 40;
   batches_used integer := 0;
   deleted_batch integer;
-  deleted_total bigint;
   deleted_archived_total bigint := 0;
   deleted_stuck_total bigint := 0;
 BEGIN
@@ -29,10 +28,8 @@ BEGIN
   ) LOOP
     EXIT WHEN batches_used >= max_batches_total;
 
-    deleted_total := 0;
     LOOP
       EXIT WHEN batches_used >= max_batches_total;
-      batches_used := batches_used + 1;
 
       EXECUTE pg_catalog.format(
         'DELETE FROM pgmq.a_%I
@@ -48,15 +45,13 @@ BEGIN
       USING cutoff, batch_size;
 
       GET DIAGNOSTICS deleted_batch = ROW_COUNT;
-      deleted_total := deleted_total + deleted_batch;
-      deleted_archived_total := deleted_archived_total + deleted_batch;
       EXIT WHEN deleted_batch = 0;
+      batches_used := batches_used + 1;
+      deleted_archived_total := deleted_archived_total + deleted_batch;
     END LOOP;
 
-    deleted_total := 0;
     LOOP
       EXIT WHEN batches_used >= max_batches_total;
-      batches_used := batches_used + 1;
 
       EXECUTE pg_catalog.format(
         'DELETE FROM pgmq.q_%I
@@ -72,9 +67,9 @@ BEGIN
       USING batch_size;
 
       GET DIAGNOSTICS deleted_batch = ROW_COUNT;
-      deleted_total := deleted_total + deleted_batch;
-      deleted_stuck_total := deleted_stuck_total + deleted_batch;
       EXIT WHEN deleted_batch = 0;
+      batches_used := batches_used + 1;
+      deleted_stuck_total := deleted_stuck_total + deleted_batch;
     END LOOP;
   END LOOP;
 
