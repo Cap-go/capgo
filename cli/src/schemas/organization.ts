@@ -1,45 +1,48 @@
-import { z } from 'zod'
+import { type } from 'arktype'
 import { optionsBaseSchema } from './base'
 
 // ============================================================================
 // Organization Command Options Schemas
 // ============================================================================
 
-export const organizationAddOptionsSchema = optionsBaseSchema.extend({
-  name: z.string().optional(),
-  email: z.string().optional(),
+export const organizationAddOptionsSchema = type({
+  '...': optionsBaseSchema,
+  'name?': 'string',
+  'email?': 'string',
 })
 
-export type OrganizationAddOptions = z.infer<typeof organizationAddOptionsSchema>
+export type OrganizationAddOptions = typeof organizationAddOptionsSchema.infer
 
-export const organizationDeleteOptionsSchema = optionsBaseSchema.extend({
-  autoConfirm: z.boolean().optional(),
+export const organizationDeleteOptionsSchema = type({
+  '...': optionsBaseSchema,
+  'autoConfirm?': 'boolean',
 })
 
-export type OrganizationDeleteOptions = z.infer<typeof organizationDeleteOptionsSchema>
+export type OrganizationDeleteOptions = typeof organizationDeleteOptionsSchema.infer
 
-export const passwordPolicyConfigSchema = z.object({
-  enabled: z.boolean(),
-  min_length: z.number(),
-  require_uppercase: z.boolean(),
-  require_number: z.boolean(),
-  require_special: z.boolean(),
+export const passwordPolicyConfigSchema = type({
+  enabled: 'boolean',
+  min_length: 'number',
+  require_uppercase: 'boolean',
+  require_number: 'boolean',
+  require_special: 'boolean',
 })
 
-export type PasswordPolicyConfig = z.infer<typeof passwordPolicyConfigSchema>
+export type PasswordPolicyConfig = typeof passwordPolicyConfigSchema.infer
 
-export const organizationSetOptionsSchema = optionsBaseSchema.extend({
-  name: z.string().optional(),
-  email: z.string().optional(),
-  enforce2fa: z.boolean().optional(),
-  passwordPolicy: z.boolean().optional(),
-  minLength: z.number().optional(),
-  requireUppercase: z.boolean().optional(),
-  requireNumber: z.boolean().optional(),
-  requireSpecial: z.boolean().optional(),
-  requireApikeyExpiration: z.boolean().optional(),
-  maxApikeyExpirationDays: z.number().nullable().optional(),
-  enforceHashedApiKeys: z.boolean().optional(),
+export const organizationSetOptionsSchema = type({
+  '...': optionsBaseSchema,
+  'name?': 'string',
+  'email?': 'string',
+  'enforce2fa?': 'boolean',
+  'passwordPolicy?': 'boolean',
+  'minLength?': 'number',
+  'requireUppercase?': 'boolean',
+  'requireNumber?': 'boolean',
+  'requireSpecial?': 'boolean',
+  'requireApikeyExpiration?': 'boolean',
+  'maxApikeyExpirationDays?': 'number | null',
+  'enforceHashedApiKeys?': 'boolean',
 })
 
-export type OrganizationSetOptions = z.infer<typeof organizationSetOptionsSchema>
+export type OrganizationSetOptions = typeof organizationSetOptionsSchema.infer

@@ -217,7 +217,9 @@
     "qrcode": "^1.5.4",
     "react": "^19.2.6",
     "rrweb-snapshot": "^2.0.1",
-    "string-width": "^8.2.1"
+    "string-width": "^8.2.1",
+    "arktype": "^2.2.0",
+    "@standard-schema/spec": "^1.1.0"
   },
   "optionalDependencies": {
     "@capgo/cli-helper-darwin-arm64": "^1.1.1",
@@ -230,7 +232,7 @@
     "@capacitor/cli": "^8.3.4",
     "@capgo/find-package-manager": "^0.0.18",
     "@clack/prompts": "^1.4.0",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/server": "^2.0.0-beta.5",
     "@sauber/table": "npm:@jsr/sauber__table",
     "@std/semver": "npm:@jsr/std__semver@1.0.8",
     "@supabase/supabase-js": "^2.106.2",
@@ -262,7 +264,6 @@
     "tmp": "^0.2.6",
     "tus-js-client": "^4.3.1",
     "typescript": "^6.0.3",
-    "ws": "^8.21.0",
-    "zod": "^4.4.3"
+    "ws": "^8.21.0"
   }
 }

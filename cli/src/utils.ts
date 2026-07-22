@@ -28,6 +28,7 @@ import { findMonorepoRoot, findNXMonorepoRoot, isMonorepo, isNXMonorepo } from '
 import { getChecksum } from './checksum'
 import { loadConfig, loadConfigForWrite, writeConfig } from './config'
 import { isTruthyEnvValue } from './posthog'
+import { safeParseSchema } from './schemas/ark_validation'
 import { nativePackageSchema } from './schemas/common'
 import { formatApiErrorForCli, parseSecurityPolicyError } from './utils/security_policy_errors'
 
@@ -2084,9 +2085,9 @@ export function convertNativePackages(nativePackages: NativePackage[]): Map<stri
 
   // Validate each package using Zod schema
   for (const data of nativePackages) {
-    const result = nativePackageSchema.safeParse(data)
+    const result = safeParseSchema(nativePackageSchema, data)
     if (!result.success) {
-      const errorMsg = result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join(', ')
+      const errorMsg = result.error.issues.map(i => `${(i.path ?? []).join('.')}: ${i.message}`).join(', ')
       log.error(`Invalid remote native package data: ${errorMsg}`)
       throw new Error(`Invalid remote native package data: ${errorMsg}`)
     }
