@@ -626,10 +626,22 @@ const abovePlanMetricCards = computed(() => {
   const stats = latestGlobalStats.value
   return [
     {
+      key: 'need-upgrade',
+      title: 'Orgs Need Upgrade',
+      description: t('need-upgrade-description'),
+      value: stats ? stats.need_upgrade : 0,
+      emptyDisplay: '0',
+      iconWrapClass: 'bg-error/10',
+      iconClass: 'text-error',
+      valueClass: 'text-error',
+      iconPath: 'M12 9v4m0 4h.01M5.07 19h13.86a2 2 0 001.74-3l-6.93-12a2 2 0 00-3.48 0l-6.93 12a2 2 0 001.74 3z',
+    },
+    {
       key: 'total-above-plan',
       title: t('total-above-plan'),
       description: t('total-above-plan-description'),
       value: totalAbovePlan.value,
+      emptyDisplay: '—',
       iconWrapClass: 'bg-info/10',
       iconClass: 'text-info',
       valueClass: 'text-info',
@@ -640,6 +652,7 @@ const abovePlanMetricCards = computed(() => {
       title: t('above-plan-with-credits'),
       description: t('above-plan-with-credits-description'),
       value: stats?.above_plan_with_credits ?? null,
+      emptyDisplay: '—',
       iconWrapClass: 'bg-warning/10',
       iconClass: 'text-warning',
       valueClass: 'text-warning',
@@ -650,6 +663,7 @@ const abovePlanMetricCards = computed(() => {
       title: t('above-plan-without-credits'),
       description: t('above-plan-without-credits-description'),
       value: stats?.above_plan_without_credits ?? null,
+      emptyDisplay: '—',
       iconWrapClass: 'bg-error/10',
       iconClass: 'text-error',
       valueClass: 'text-error',
@@ -869,29 +883,6 @@ displayStore.defaultBack = '/dashboard'
 
           <!-- Upgrade Metrics Cards -->
           <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-            <!-- Organizations Needing Upgrade -->
-            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
-              <div class="flex items-start justify-between mb-4">
-                <div class="p-3 rounded-lg bg-error/10">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-error"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M5.07 19h13.86a2 2 0 001.74-3l-6.93-12a2 2 0 00-3.48 0l-6.93 12a2 2 0 001.74 3z" /></svg>
-                </div>
-              </div>
-              <div>
-                <p class="text-sm text-slate-600 dark:text-slate-400">
-                  Orgs Need Upgrade
-                </p>
-                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-error">
-                  {{ formatNumberValue(latestGlobalStats.need_upgrade) }}
-                </p>
-                <p v-else class="mt-2 text-3xl font-bold text-error">
-                  0
-                </p>
-                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ t('need-upgrade-description') }}
-                </p>
-              </div>
-            </div>
-
             <div
               v-for="card in abovePlanMetricCards"
               :key="card.key"
@@ -912,7 +903,7 @@ displayStore.defaultBack = '/dashboard'
                   {{ formatNumberValue(card.value) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold" :class="card.valueClass">
-                  —
+                  {{ card.emptyDisplay }}
                 </p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   {{ card.description }}
