@@ -24,29 +24,32 @@ WHERE (schemaname, relname) IN (
 )
 ORDER BY pg_total_relation_size(format('%I.%I', schemaname, relname)::regclass) DESC;
 
--- Sample of dual-storage leftovers that are eligible for nulling (bounded).
+-- Bound candidate discovery first, then evaluate eligibility inside the sample.
 SELECT count(*) AS eligible_dual_storage_sample
 FROM (
-  SELECT av.id
-  FROM public.app_versions AS av
-  WHERE av.manifest IS NOT NULL
-    AND cardinality(av.manifest) > 0
+  SELECT sample.id
+  FROM (
+    SELECT av.id, av.manifest, av.manifest_count
+    FROM public.app_versions AS av
+    WHERE av.manifest IS NOT NULL
+    ORDER BY av.id
+    LIMIT 1000
+  ) AS sample
+  WHERE cardinality(sample.manifest) > 0
     AND (
       SELECT count(*)::integer
       FROM public.manifest AS m
-      WHERE m.app_version_id = av.id
+      WHERE m.app_version_id = sample.id
     ) >= (
       CASE
-        WHEN COALESCE(av.manifest_count, 0) >= cardinality(av.manifest)
-          THEN COALESCE(av.manifest_count, 0)
-        ELSE cardinality(av.manifest)
+        WHEN COALESCE(sample.manifest_count, 0) >= cardinality(sample.manifest)
+          THEN COALESCE(sample.manifest_count, 0)
+        ELSE cardinality(sample.manifest)
       END
     )
-  ORDER BY av.id
-  LIMIT 1000
-) AS sample;
+) AS eligible;
 
-SELECT name, enabled, hour_interval, run_at_hour, run_at_minute, target
+SELECT name, enabled, hour_interval, run_at_hour, run_at_minute, target, updated_at
 FROM public.cron_tasks
 WHERE name IN (
   'cleanup_queue_messages',
@@ -56,13 +59,12 @@ WHERE name IN (
 )
 ORDER BY name;
 
-SELECT status, return_message, count(*) AS n
-FROM cron.job_run_details
-WHERE start_time > now() - interval '24 hours'
-   OR (start_time IS NULL AND status IN ('failed', 'connecting'))
-GROUP BY status, return_message
-ORDER BY n DESC
-LIMIT 20;
+-- process_all_cron_tasks() swallows per-task errors; cron.job_run_details only
+-- reflects the outer job. Prefer Postgres logs / healthchecks for task failures.
+SELECT indexname
+FROM pg_indexes
+WHERE schemaname = 'public'
+  AND indexname = 'app_versions_manifest_present_idx';
 
 -- Bounded existence checks per archive queue (no full-table aggregates).
 SELECT queue_name, has_rows_older_than_2d

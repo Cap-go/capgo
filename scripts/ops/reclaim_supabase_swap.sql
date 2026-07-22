@@ -3,7 +3,8 @@
 -- Example:
 --   PGPASSWORD=... psql "postgresql://..." -v ON_ERROR_STOP=1 -f scripts/ops/reclaim_supabase_swap.sql
 -- Safe order: truncate empty bloat -> batched archive deletes -> null dual manifests -> trim audit.
--- Each batch commits (separate statements). Re-run until notices show 0 deleted/updated.
+-- Each statement commits separately. Re-run until cleanup notices report deleted/updated = 0
+-- (functions always emit a notice, including zero totals).
 
 -- ---------------------------------------------------------------------------
 -- 0) Baseline sizes
@@ -33,33 +34,34 @@ ORDER BY pg_total_relation_size(format('%I.%I', schemaname, relname)::regclass) 
 TRUNCATE TABLE net._http_response;
 
 -- ---------------------------------------------------------------------------
--- 2) Purge pgmq archives older than 2 days (one committed batch per statement).
---    Re-run this section until deleted totals are 0.
+-- 2) Purge pgmq archives/stuck messages (global batch budget per call).
+--    Re-run this SELECT until the notice shows archived_deleted=0 and stuck_deleted=0.
 -- ---------------------------------------------------------------------------
 SELECT public.cleanup_queue_messages();
 
-VACUUM (VERBOSE) pgmq.a_on_version_update;
-VACUUM (VERBOSE) pgmq.a_on_manifest_create;
-VACUUM (VERBOSE) pgmq.a_webhook_dispatcher;
-VACUUM (VERBOSE) pgmq.a_on_channel_update;
+-- Vacuum every pgmq archive + queue table (psql \gexec; VACUUM cannot run in DO/tx).
+SELECT format('VACUUM (VERBOSE) pgmq.a_%I;', queue_name)
+FROM pgmq.list_queues()
+\gexec
+SELECT format('VACUUM (VERBOSE) pgmq.q_%I;', queue_name)
+FROM pgmq.list_queues()
+\gexec
 
--- Optional hard reclaim if VACUUM leaves empty pages (stronger locks):
--- VACUUM (FULL, VERBOSE) pgmq.a_on_version_update;
--- VACUUM (FULL, VERBOSE) pgmq.a_on_manifest_create;
--- VACUUM (FULL, VERBOSE) pgmq.a_webhook_dispatcher;
--- VACUUM (FULL, VERBOSE) pgmq.a_on_channel_update;
+-- Optional hard reclaim (stronger locks):
+-- SELECT format('VACUUM (FULL, VERBOSE) pgmq.a_%I;', queue_name) FROM pgmq.list_queues() \gexec
+-- SELECT format('VACUUM (FULL, VERBOSE) pgmq.q_%I;', queue_name) FROM pgmq.list_queues() \gexec
 
 -- ---------------------------------------------------------------------------
 -- 3) Null fully migrated app_versions.manifest arrays
 --    Requires every expected legacy entry to exist in public.manifest.
---    Re-run until notice shows 0.
+--    Re-run until notice shows updated=0.
 -- ---------------------------------------------------------------------------
 SELECT public.null_migrated_app_version_manifests();
 
 VACUUM (VERBOSE) public.app_versions;
 
 -- ---------------------------------------------------------------------------
--- 4) Trim audit_logs older than 30 days (bounded batches). Re-run until 0.
+-- 4) Trim audit_logs older than 30 days (bounded batches). Re-run until deleted=0.
 -- ---------------------------------------------------------------------------
 SELECT public.cleanup_old_audit_logs();
 

@@ -16,20 +16,23 @@ DECLARE
   queue_name text;
   cutoff timestamptz := pg_catalog.now() - INTERVAL '2 days';
   batch_size integer := 10000;
-  max_batches integer := 20;
-  batch_no integer;
+  -- Hard cap across ALL queues/phases for one cron/reclaim invocation.
+  max_batches_total integer := 40;
+  batches_used integer := 0;
   deleted_batch integer;
   deleted_total bigint;
+  deleted_archived_total bigint := 0;
+  deleted_stuck_total bigint := 0;
 BEGIN
   FOR queue_name IN (
     SELECT q.queue_name FROM pgmq.list_queues() q
   ) LOOP
-    deleted_total := 0;
-    batch_no := 0;
+    EXIT WHEN batches_used >= max_batches_total;
 
+    deleted_total := 0;
     LOOP
-      batch_no := batch_no + 1;
-      EXIT WHEN batch_no > max_batches;
+      EXIT WHEN batches_used >= max_batches_total;
+      batches_used := batches_used + 1;
 
       EXECUTE pg_catalog.format(
         'DELETE FROM pgmq.a_%I
@@ -46,18 +49,14 @@ BEGIN
 
       GET DIAGNOSTICS deleted_batch = ROW_COUNT;
       deleted_total := deleted_total + deleted_batch;
+      deleted_archived_total := deleted_archived_total + deleted_batch;
       EXIT WHEN deleted_batch = 0;
     END LOOP;
 
-    IF deleted_total > 0 THEN
-      RAISE NOTICE 'cleanup_queue_messages: deleted % archived rows from a_%', deleted_total, queue_name;
-    END IF;
-
     deleted_total := 0;
-    batch_no := 0;
     LOOP
-      batch_no := batch_no + 1;
-      EXIT WHEN batch_no > max_batches;
+      EXIT WHEN batches_used >= max_batches_total;
+      batches_used := batches_used + 1;
 
       EXECUTE pg_catalog.format(
         'DELETE FROM pgmq.q_%I
@@ -74,13 +73,17 @@ BEGIN
 
       GET DIAGNOSTICS deleted_batch = ROW_COUNT;
       deleted_total := deleted_total + deleted_batch;
+      deleted_stuck_total := deleted_stuck_total + deleted_batch;
       EXIT WHEN deleted_batch = 0;
     END LOOP;
-
-    IF deleted_total > 0 THEN
-      RAISE NOTICE 'cleanup_queue_messages: deleted % stuck rows from q_%', deleted_total, queue_name;
-    END IF;
   END LOOP;
+
+  RAISE NOTICE
+    'cleanup_queue_messages: archived_deleted=% stuck_deleted=% batches_used=%/%',
+    deleted_archived_total,
+    deleted_stuck_total,
+    batches_used,
+    max_batches_total;
 END;
 $$;
 
@@ -139,9 +142,7 @@ BEGIN
     EXIT WHEN deleted_batch = 0;
   END LOOP;
 
-  IF deleted_total > 0 THEN
-    RAISE NOTICE 'cleanup_old_audit_logs: deleted % rows older than 30 days', deleted_total;
-  END IF;
+  RAISE NOTICE 'cleanup_old_audit_logs: deleted=% max_batches=%', deleted_total, max_batches;
 END;
 $$;
 
@@ -196,9 +197,10 @@ BEGIN
     EXIT WHEN updated_batch = 0;
   END LOOP;
 
-  IF updated_total > 0 THEN
-    RAISE NOTICE 'null_migrated_app_version_manifests: nulled manifest arrays on % versions', updated_total;
-  END IF;
+  RAISE NOTICE
+    'null_migrated_app_version_manifests: updated=% max_batches=%',
+    updated_total,
+    max_batches;
 END;
 $$;
 
@@ -426,6 +428,13 @@ BEGIN
     IF old_record_payload IS NOT NULL THEN
       old_record_payload := old_record_payload - 'manifest' - 'native_packages';
     END IF;
+
+    -- Dual-storage reclaim only nulls fat columns (+ auto updated_at). Skip queue fan-out.
+    IF TG_OP = 'UPDATE'
+      AND (record_payload - 'updated_at') IS NOT DISTINCT FROM (old_record_payload - 'updated_at')
+    THEN
+      RETURN NEW;
+    END IF;
   END IF;
 
   payload := pg_catalog.jsonb_build_object(
@@ -538,6 +547,12 @@ SET
   minute_interval = NULL,
   enabled = true,
   updated_at = pg_catalog.now();
+
+
+-- Bound dual-storage candidate discovery once most arrays are nulled.
+CREATE INDEX IF NOT EXISTS app_versions_manifest_present_idx
+  ON public.app_versions USING btree (id)
+  WHERE manifest IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
 -- Allow clearing dual-storage fat columns
