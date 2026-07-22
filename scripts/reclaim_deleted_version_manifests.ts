@@ -1,0 +1,234 @@
+/**
+ * Reclaim ALL soft-deleted app_versions that still have public.manifest rows.
+ *
+ * Per version (not per row):
+ *   1) one query: unreferenced s3 paths for this version
+ *   2) exist → move to deleted-after-7-days/; missing → ok (R2 pooled)
+ *   3) one DELETE FROM manifest WHERE app_version_id = $1
+ *
+ * Shared delta files referenced by other versions stay in R2.
+ * Single Postgres connection — R2 is what runs concurrent.
+ *
+ * Usage:
+ *   bun scripts/reclaim_deleted_version_manifests.ts
+ */
+import { CopyObjectCommand, DeleteObjectCommand, HeadObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import pg from 'pg'
+
+const ENV_FILE = './internal/cloudflare/.env.prod'
+const TRASH_PREFIX = 'deleted-after-7-days/'
+const R2_CONCURRENCY = 200
+const DB_URL_ENV_KEYS = [
+  'MAIN_SUPABASE_DB_URL',
+  'DATABASE_URL',
+  'POSTGRES_URL',
+  'SUPABASE_DB_URL',
+  'SUPABASE_DB_DIRECT_URL',
+  'DIRECT_URL',
+]
+
+function loadEnv(filePath: string) {
+  return Bun.file(filePath).text().then((text) => {
+    const env: Record<string, string> = {}
+    for (const line of text.split('\n')) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#'))
+        continue
+      const idx = trimmed.indexOf('=')
+      if (idx <= 0)
+        continue
+      env[trimmed.slice(0, idx)] = trimmed.slice(idx + 1)
+    }
+    return env
+  })
+}
+
+function requireDbUrl(env: Record<string, string>) {
+  for (const key of DB_URL_ENV_KEYS) {
+    if (env[key])
+      return env[key]
+  }
+  throw new Error(`Missing DB URL. Set one of: ${DB_URL_ENV_KEYS.join(', ')}`)
+}
+
+async function mapPool<T>(items: T[], concurrency: number, fn: (item: T) => Promise<void>) {
+  if (items.length === 0)
+    return
+  let idx = 0
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (idx < items.length) {
+      const current = items[idx++]
+      await fn(current)
+    }
+  })
+  await Promise.all(workers)
+}
+
+async function objectExists(s3: S3Client, bucket: string, key: string) {
+  try {
+    await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }))
+    return true
+  }
+  catch (error: any) {
+    const status = error?.$metadata?.httpStatusCode ?? error?.statusCode ?? error?.status
+    const code = error?.name ?? error?.Code ?? error?.code
+    if (status === 404 || code === 'NotFound' || code === 'NoSuchKey')
+      return false
+    throw error
+  }
+}
+
+async function moveToTrash(s3: S3Client, bucket: string, key: string) {
+  if (key.startsWith(TRASH_PREFIX))
+    return
+
+  const exists = await objectExists(s3, bucket, key)
+  if (!exists)
+    return
+
+  const encodedKey = key.split('/').map(segment => encodeURIComponent(segment)).join('/')
+  await s3.send(new CopyObjectCommand({
+    Bucket: bucket,
+    CopySource: `${bucket}/${encodedKey}`,
+    Key: `${TRASH_PREFIX}${key}`,
+  }))
+  await s3.send(new DeleteObjectCommand({
+    Bucket: bucket,
+    Key: key,
+  }))
+}
+
+function shouldAllowSelfSignedPgCertificate(env: Record<string, string>, databaseUrl: string) {
+  const rejectUnauthorized = env.PG_SSL_REJECT_UNAUTHORIZED?.trim()
+  if (rejectUnauthorized === '0')
+    return true
+  if (rejectUnauthorized === '1')
+    return false
+  return databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1')
+}
+
+function formatRate(count: number, startedAt: number) {
+  const elapsedSec = Math.max((Date.now() - startedAt) / 1000, 0.001)
+  return `${Math.round(count / elapsedSec)}/s`
+}
+
+async function main() {
+  const env = await loadEnv(ENV_FILE)
+  const databaseUrl = requireDbUrl(env)
+  const usesLocalDatabase = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1')
+  const db = new pg.Client({
+    connectionString: databaseUrl,
+    ssl: usesLocalDatabase
+      ? false
+      : { rejectUnauthorized: !shouldAllowSelfSignedPgCertificate(env, databaseUrl) },
+  })
+  await db.connect()
+
+  const s3 = new S3Client({
+    credentials: {
+      accessKeyId: env.S3_ACCESS_KEY_ID,
+      secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+    },
+    endpoint: `https://${env.S3_ENDPOINT}`,
+    region: env.S3_REGION || 'auto',
+    forcePathStyle: true,
+    maxAttempts: 3,
+  })
+  const bucket = env.S3_BUCKET || 'capgo'
+
+  console.log('Listing soft-deleted versions with leftover manifests...')
+  // Prefer indexed deleted+manifest_count path; EXISTS covers stale counters.
+  const versionsRes = await db.query<{ id: number, app_id: string, manifest_count: number }>(`
+    SELECT av.id, av.app_id, av.manifest_count
+    FROM public.app_versions AS av
+    WHERE av.deleted = true
+      AND av.app_id NOT LIKE 'com.capdemo%'
+      AND (
+        av.manifest_count > 0
+        OR EXISTS (
+          SELECT 1 FROM public.manifest AS m WHERE m.app_version_id = av.id
+        )
+      )
+    ORDER BY av.deleted_at NULLS LAST, av.id
+  `)
+  const versions = versionsRes.rows
+  console.log(`Found ${versions.length} versions`)
+
+  let done = 0
+  let totalTrashed = 0
+  let totalDeleted = 0
+  const startedAt = Date.now()
+
+  for (const version of versions) {
+    // One indexed lookup: paths this version alone still references.
+    const trashRes = await db.query<{ s3_path: string }>(
+      `SELECT DISTINCT m.s3_path
+       FROM public.manifest AS m
+       WHERE m.app_version_id = $1
+         AND m.s3_path IS NOT NULL
+         AND NOT EXISTS (
+           SELECT 1
+           FROM public.manifest AS other
+           WHERE other.file_hash = m.file_hash
+             AND other.file_name = m.file_name
+             AND other.app_version_id <> $1
+         )`,
+      [version.id],
+    )
+    const paths = trashRes.rows.map(row => row.s3_path)
+
+    await mapPool(paths, R2_CONCURRENCY, async (path) => {
+      await moveToTrash(s3, bucket, path)
+    })
+
+    // One statement wipes the whole version's rows after R2 is handled.
+    const deletedRes = await db.query(
+      `DELETE FROM public.manifest WHERE app_version_id = $1`,
+      [version.id],
+    )
+    const deletedRows = deletedRes.rowCount ?? 0
+
+    await db.query('BEGIN')
+    try {
+      await db.query(
+        `UPDATE public.app_versions
+         SET manifest_count = 0, manifest = NULL
+         WHERE id = $1`,
+        [version.id],
+      )
+      if (deletedRows > 0 || (version.manifest_count ?? 0) > 0) {
+        await db.query(
+          `UPDATE public.apps
+           SET manifest_bundle_count = GREATEST(manifest_bundle_count - 1, 0),
+               updated_at = now()
+           WHERE app_id = $1`,
+          [version.app_id],
+        )
+      }
+      await db.query('COMMIT')
+    }
+    catch (error) {
+      await db.query('ROLLBACK')
+      throw error
+    }
+
+    done += 1
+    totalTrashed += paths.length
+    totalDeleted += deletedRows
+    if (done % 10 === 0 || done === versions.length) {
+      process.stdout.write(
+        `\rCleaned ${done}/${versions.length} versions (rows=${totalDeleted} ${formatRate(totalDeleted, startedAt)}, r2_candidates=${totalTrashed})`,
+      )
+    }
+  }
+
+  await db.end()
+  process.stdout.write('\n')
+  console.log('Done.')
+  console.log(`Versions cleaned: ${done}`)
+  console.log(`Manifest rows deleted: ${totalDeleted}`)
+  console.log(`R2 trash candidates: ${totalTrashed}`)
+  console.log(`Elapsed: ${((Date.now() - startedAt) / 1000).toFixed(1)}s (${formatRate(totalDeleted, startedAt)} rows)`)
+}
+
+await main()

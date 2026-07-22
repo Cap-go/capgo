@@ -12,7 +12,6 @@ import type { SupabaseCallInfo } from './supabase-perf'
 // shared sendEvent() path (cli/src/utils.ts) can inject them on every event
 // without a circular import. Re-exported here for existing import sites.
 export { getGlobalAnalyticsProps, getInvocationSource, setInvocationSource } from './global-props'
-export type { GlobalAnalyticsProps, InvocationSource } from './global-props'
 
 export function isTelemetryDisabled(): boolean {
   return isTruthyEnvValue(env.CAPGO_DISABLE_TELEMETRY) || isTruthyEnvValue(env.CAPGO_DISABLE_POSTHOG)

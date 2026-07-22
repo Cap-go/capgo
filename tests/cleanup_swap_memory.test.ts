@@ -282,4 +282,24 @@ describe('swap memory cleanup functions', () => {
     }
   })
 
+
+  it('app_versions_manifest_present_idx exists as valid partial index on id', async () => {
+    const rows = await executeSQL(
+      `SELECT
+         i.indisvalid,
+         pg_get_indexdef(idx.oid) AS indexdef
+       FROM pg_catalog.pg_class AS idx
+       JOIN pg_catalog.pg_namespace AS ns ON ns.oid = idx.relnamespace
+       JOIN pg_catalog.pg_index AS i ON i.indexrelid = idx.oid
+       WHERE ns.nspname = 'public'
+         AND idx.relname = 'app_versions_manifest_present_idx'
+         AND i.indrelid = 'public.app_versions'::regclass`,
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.indisvalid).toBe(true)
+    expect(String(rows[0]?.indexdef)).toContain('(id)')
+    expect(String(rows[0]?.indexdef).toLowerCase()).toContain('manifest is not null')
+  })
+
+
 })
