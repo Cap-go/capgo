@@ -1,64 +1,54 @@
 import { describe, expect, it } from 'vitest'
 import { buildUpgradeRate12mBackfillRows, calculateUpgradeRate12m } from '../scripts/backfill_upgrade_rate_12m.ts'
 
-describe('upgrade_rate_12m backfill helpers', () => {
-  it.concurrent('returns zero when there are no orgs', () => {
-    expect(calculateUpgradeRate12m(3, 0)).toBe(0)
+describe('calculateUpgradeRate12m', () => {
+  it('returns 0 when there are no paying orgs', () => {
+    expect(calculateUpgradeRate12m(5, 0)).toBe(0)
   })
 
-  it.concurrent('rounds to one decimal place', () => {
+  it('rounds to one decimal place', () => {
     expect(calculateUpgradeRate12m(1, 3)).toBe(33.3)
   })
+})
 
-  it.concurrent('counts distinct upgraded orgs in the trailing 12 months', () => {
-    const rows = buildUpgradeRate12mBackfillRows(
-      [
-        { date_id: '2026-07-20', upgrade_rate_12m: 0 },
-        { date_id: '2025-07-20', upgrade_rate_12m: 0 },
-      ],
-      [
-        { id: 'org-1', created_at: '2024-01-01T00:00:00.000Z', customer_id: 'cus_1' },
-        { id: 'org-2', created_at: '2024-06-01T00:00:00.000Z', customer_id: 'cus_2' },
-        { id: 'org-3', created_at: '2026-07-21T00:00:00.000Z', customer_id: 'cus_3' },
-      ],
-      [
-        { customer_id: 'cus_1', upgraded_at: '2026-01-15T12:00:00.000Z' },
-        { customer_id: 'cus_2', upgraded_at: '2024-08-01T00:00:00.000Z' },
-      ],
-    )
+describe('buildUpgradeRate12mBackfillRows', () => {
+  it('uses paying orgs as the denominator', () => {
+    const rows = [
+      { date_id: '2025-07-21', paying: 10, upgrade_rate_12m: 0, upgraded_orgs: 0 },
+      { date_id: '2025-07-22', paying: 10, upgrade_rate_12m: 0, upgraded_orgs: 2 },
+      { date_id: '2026-07-21', paying: 20, upgrade_rate_12m: 0, upgraded_orgs: 1 },
+      { date_id: '2026-07-22', paying: 20, upgrade_rate_12m: 0, upgraded_orgs: 4 },
+    ]
 
-    expect(rows).toEqual([
-      {
-        date_id: '2025-07-20',
-        orgs: 2,
-        upgraded_orgs_12m: 1,
-        current_rate: 0,
-        next_rate: 50,
-        changed: true,
-      },
-      {
-        date_id: '2026-07-20',
-        orgs: 2,
-        upgraded_orgs_12m: 1,
-        current_rate: 0,
-        next_rate: 50,
-        changed: true,
-      },
-    ])
+    const result = buildUpgradeRate12mBackfillRows(rows, rows)
+    const byDate = Object.fromEntries(result.map(row => [row.date_id, row]))
+
+    // Window for 2026-07-21 is [2025-07-22, 2026-07-21] => 2 + 1 = 3 / 20 paying
+    expect(byDate['2026-07-21']?.upgraded_orgs_12m).toBe(3)
+    expect(byDate['2026-07-21']?.paying).toBe(20)
+    expect(byDate['2026-07-21']?.next_rate).toBe(15)
+
+    // Window for 2026-07-22 is [2025-07-23, 2026-07-22] => 1+4 = 5 / 20
+    expect(byDate['2026-07-22']?.upgraded_orgs_12m).toBe(5)
+    expect(byDate['2026-07-22']?.next_rate).toBe(25)
   })
 
-  it.concurrent('keeps Feb 28 when the snapshot end is Feb 29 in a leap year', () => {
-    const rows = buildUpgradeRate12mBackfillRows(
-      [{ date_id: '2024-02-28', upgrade_rate_12m: 0 }],
-      [
-        { id: 'org-1', created_at: '2022-01-01T00:00:00.000Z', customer_id: 'cus_1' },
-      ],
-      [
-        { customer_id: 'cus_1', upgraded_at: '2023-02-28T12:00:00.000Z' },
-      ],
+  it('clamps leap-day trailing windows to the prior month-end', () => {
+    const rows = [
+      { date_id: '2023-02-28', paying: 10, upgrade_rate_12m: 0, upgraded_orgs: 1 },
+      { date_id: '2023-03-01', paying: 10, upgrade_rate_12m: 0, upgraded_orgs: 1 },
+      { date_id: '2024-02-28', paying: 10, upgrade_rate_12m: 0, upgraded_orgs: 0 },
+      { date_id: '2024-02-29', paying: 10, upgrade_rate_12m: 0, upgraded_orgs: 0 },
+    ]
+
+    const result = buildUpgradeRate12mBackfillRows(
+      [{ date_id: '2024-02-29', paying: 10, upgrade_rate_12m: 0, upgraded_orgs: 0 }],
+      rows,
     )
 
-    expect(rows[0]?.upgraded_orgs_12m).toBe(1)
-    expect(rows[0]?.next_rate).toBe(100)
+    // endExclusive 2024-03-01 => start clamped to 2023-03-01 (not 2023-02-29)
+    // so 2023-02-28 is excluded and only 2023-03-01 counts
+    expect(result[0]?.upgraded_orgs_12m).toBe(1)
+    expect(result[0]?.next_rate).toBe(10)
   })
 })
