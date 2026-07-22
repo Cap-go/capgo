@@ -16,6 +16,10 @@ interface GetDevice {
   cursor?: string
   /** Limit for results (default uses fetchLimit) */
   limit?: number
+  /** ISO timestamp - only return devices with updated_at greater than this value */
+  updated_at?: string
+  /** Sort devices by updated_at: asc or desc */
+  order?: string
 }
 
 interface publicDevice {
@@ -44,6 +48,25 @@ export function filterDeviceKeys(devices: DeviceRes[]) {
   })
 }
 
+function parseUpdatedAtFilter(updatedAt: string | undefined): string | undefined {
+  if (!updatedAt)
+    return undefined
+
+  const parsed = new Date(updatedAt)
+  if (Number.isNaN(parsed.getTime()))
+    throw simpleError('invalid_updated_at', 'updated_at must be a valid ISO date', { updated_at: updatedAt })
+
+  return parsed.toISOString()
+}
+
+function parseDevicesOrder(order: string | undefined) {
+  if (!order)
+    return undefined
+  if (order !== 'asc' && order !== 'desc')
+    throw simpleError('invalid_order', 'order must be asc or desc', { order })
+  return [{ key: 'updated_at', sortable: order as 'asc' | 'desc' }]
+}
+
 export async function get(c: Context, body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.app_id) {
     throw simpleError('missing_app_id', 'Missing app_id', { body })
@@ -51,6 +74,14 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
   if (!isValidAppId(body.app_id)) {
     throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
   }
+
+  const updatedAtGt = parseUpdatedAtFilter(body.updated_at)
+  const order = parseDevicesOrder(body.order)
+  const limit = body.limit == null ? fetchLimit : Number(body.limit)
+  if (!Number.isFinite(limit) || limit < 1) {
+    throw simpleError('invalid_limit', 'limit must be a positive number', { limit: body.limit })
+  }
+
   // Auth context is already set by middlewareKey
   if (!(await checkPermission(c, 'app.read_devices', { appId: body.app_id }))) {
     throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id })
@@ -103,7 +134,9 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     const res = await readDevices(c, {
       app_id: body.app_id,
       cursor: body.cursor,
-      limit: body.limit ?? fetchLimit,
+      limit,
+      updated_at_gt: updatedAtGt,
+      order,
     }, body.customIdMode ?? false)
 
     if (!res?.data) {

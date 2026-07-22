@@ -959,8 +959,19 @@ function buildReadDevicesCFCursorCondition(cursor: string | undefined, devicesOr
   return `(updated_at ${comparison} toDateTime('${safeCursorTime}') OR (updated_at = toDateTime('${safeCursorTime}') AND device_id > '${safeCursorDeviceId}'))`
 }
 
+function buildReadDevicesCFUpdatedAtGtCondition(updatedAtGt: string | undefined) {
+  if (!updatedAtGt)
+    return ''
+
+  const safeUpdatedAtGt = escapeSqlString(formatDateCF(updatedAtGt))
+  return `updated_at > toDateTime('${safeUpdatedAtGt}')`
+}
+
 function buildReadDevicesCFOuterConditions(params: ReadDevicesParams, devicesOrder: DevicesOrderCF | null) {
-  const conditions = [buildReadDevicesCFCursorCondition(params.cursor, devicesOrder)]
+  const conditions = [
+    buildReadDevicesCFCursorCondition(params.cursor, devicesOrder),
+    buildReadDevicesCFUpdatedAtGtCondition(params.updated_at_gt),
+  ]
   return conditions.filter(Boolean)
 }
 
