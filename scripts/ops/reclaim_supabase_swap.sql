@@ -1,10 +1,8 @@
 -- Capgo-EU Phase A reclaim (run manually in a maintenance window).
 -- REQUIRED: psql for VACUUM (cannot run inside a transaction / SQL-editor tx).
 -- Prefer ~/.pgpass / PGPASSFILE instead of putting the password on the CLI.
---
--- BEFORE this file, create the candidate index in its OWN non-transactional run:
---   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/ops/reclaim_supabase_swap_index.sql
--- (SQL Editor: run only that single CREATE INDEX CONCURRENTLY statement alone.)
+-- Candidate index app_versions_manifest_present_idx comes from migration
+-- 20260722154010_app_versions_manifest_present_idx (deploy migration first).
 --
 -- Example:
 --   psql "postgresql://postgres@HOST:5432/postgres?sslmode=require" -v ON_ERROR_STOP=1 -f scripts/ops/reclaim_supabase_swap.sql
@@ -15,22 +13,9 @@
 SET lock_timeout = '5s';
 
 -- ---------------------------------------------------------------------------
--- 0) Baseline sizes + require candidate index
+-- 0) Baseline sizes
 -- ---------------------------------------------------------------------------
 SELECT pg_size_pretty(pg_database_size(current_database())::bigint) AS db_size;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_indexes
-    WHERE schemaname = 'public'
-      AND indexname = 'app_versions_manifest_present_idx'
-  ) THEN
-    RAISE EXCEPTION
-      'Missing app_versions_manifest_present_idx. Run scripts/ops/reclaim_supabase_swap_index.sql alone first (CREATE INDEX CONCURRENTLY cannot run inside a transaction / multi-statement SQL Editor script).';
-  END IF;
-END $$;
 
 SELECT
   relname,
@@ -60,7 +45,6 @@ TRUNCATE TABLE net._http_response;
 -- ---------------------------------------------------------------------------
 SELECT public.cleanup_queue_messages();
 
--- Vacuum Capgo-EU evidenced bloated queues only.
 VACUUM (VERBOSE) pgmq.a_on_version_update;
 VACUUM (VERBOSE) pgmq.a_on_manifest_create;
 VACUUM (VERBOSE) pgmq.a_webhook_dispatcher;
