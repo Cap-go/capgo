@@ -47,6 +47,7 @@ For each automation listed below, add a segment filter:
 **Events**: `user:usage_50_percent_of_plan`, `user:usage_70_percent_of_plan`, `user:usage_90_percent_of_plan`, `user:upgrade_to_*`, `user:native_build_concurrency_limit`
 
 **Filter to add**:
+
 ```text
 Tag does NOT contain: usage_limit_disabled
 ```

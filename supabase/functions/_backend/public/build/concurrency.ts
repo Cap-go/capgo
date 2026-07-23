@@ -181,6 +181,7 @@ async function readPlanConcurrencyLimit(client: PgClient, orgId: string): Promis
 }
 
 async function countActiveNativeBuilds(client: PgClient, orgId: string, excludeBuildRequestId?: string): Promise<number> {
+  // Bounded by idx_build_requests_org (owner_org); org-scoped active rows stay small.
   const activeBuildsResult = excludeBuildRequestId
     ? await client.query<{ active_count: string }>(
         `
@@ -217,7 +218,7 @@ export async function assertNativeBuildConcurrencyAvailable(
   let client: PgClient | null = null
 
   try {
-    pgPool = getPgClient(c)
+    pgPool = getPgClient(c, true)
     client = await pgPool.connect() as PgClient
     const { planName, limit } = await readPlanConcurrencyLimit(client, input.orgId)
     const activeBuilds = await countActiveNativeBuilds(client, input.orgId)

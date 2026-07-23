@@ -64,7 +64,7 @@ import { contactSupport } from '../support/contact-support.js'
 import { appendInternalLog, getInternalLogPath, startInternalLog } from '../support/internal-log.js'
 import { uploadSupportLogs } from '../support/support-upload.js'
 import { offerSupportUploadBeforeAi } from '../support/support-upload-prompt.js'
-import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, getRemoteConfig, sendEvent, TUS_UPLOAD_RETRY_DELAYS, wait } from '../utils'
+import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, getRemoteConfig, sendEvent, TUS_UPLOAD_RETRY_DELAYS } from '../utils'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
 import { withCwd } from './cwd'
@@ -253,15 +253,13 @@ async function throwIfBuildPlanLimitError(
   if (!message.includes(upgradeUrl))
     logger.error(`Upgrade here: ${upgradeUrl}`)
 
-  await wait(100)
-  import('open')
-    .then((module) => {
-      module.default(upgradeUrl)
-    })
-    .catch(() => {
-      // Ignore browser-open failures in CI / headless environments.
-    })
-  await wait(500)
+  try {
+    const module = await import('open')
+    await module.default(upgradeUrl)
+  }
+  catch {
+    // Ignore browser-open failures in CI / headless environments.
+  }
   throw new Error(message)
 }
 

@@ -193,11 +193,12 @@ async function reload() {
   }
 }
 
-function isNativeBuildConcurrencyError(errorMessage: string): boolean {
+function isPlanUpgradeError(errorMessage: string): boolean {
   const normalized = errorMessage.toLowerCase()
   return normalized.includes('concurrent native')
     || normalized.includes('native build concurrency')
     || normalized.includes('/settings/organization/plans')
+    || normalized.includes('upgrade plan to continue to build')
 }
 
 function showErrorDetails(errorMessage: string | null) {
@@ -206,7 +207,7 @@ function showErrorDetails(errorMessage: string | null) {
     return
   }
 
-  const showUpgrade = isNativeBuildConcurrencyError(errorMessage)
+  const showUpgrade = isPlanUpgradeError(errorMessage)
   dialogStore.openDialog({
     title: t('build-error-details'),
     size: 'lg',
@@ -394,7 +395,8 @@ watch(showSetupFlow, (newValue) => {
               <IconEye class="w-4 h-4" />
             </button>
             <button
-              v-if="isNativeBuildConcurrencyError(element.last_error)"
+              v-if="isPlanUpgradeError(element.last_error)"
+              type="button"
               class="px-2 py-1 text-xs font-semibold text-white rounded-md d-btn d-btn-xs d-btn-primary shrink-0"
               @click.stop="router.push('/settings/organization/plans')"
             >
