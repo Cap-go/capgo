@@ -82,6 +82,17 @@ describe('deploy scope matching', () => {
     })
   })
 
+  it.concurrent('keeps Deno-only plugin stats bridge off the Cloudflare plugin deploy scope', () => {
+    expect(resolveDeployScopeFromFiles(['supabase/functions/shared/plugin_deno_stats_fallbacks.ts'])).toEqual({
+      api: false,
+      files: false,
+      plugins: false,
+      supabase: true,
+      translation: false,
+    })
+  })
+
+
   it.concurrent('deploys files worker when the shared preview subdomain helper changes', () => {
     expect(resolveDeployScopeFromFiles(['supabase/functions/shared/preview-subdomain.ts'])).toEqual({
       api: false,
