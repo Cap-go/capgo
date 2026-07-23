@@ -1,7 +1,7 @@
 import type { StandardSchema, ValidationIssue } from './ark_validation.ts'
 import type { AppInfos, AppStats } from './types.ts'
 import { canParse } from '@std/semver'
-import { ALLOWED_STATS_ACTIONS } from '../plugins/stats_actions.ts'
+import { ALLOWED_STATS_ACTIONS, ALLOWED_STATS_ACTIONS_SET } from '../plugins/stats_actions.ts'
 import {
   createSchema,
   makeIssue,
@@ -31,7 +31,6 @@ import {
   reverseDomainRegex,
 } from './utils.ts'
 
-const ALLOWED_STATS_ACTIONS_SET = new Set<string>(ALLOWED_STATS_ACTIONS)
 let allowedStatsActionsList: string | undefined
 
 function getAllowedStatsActionsList() {
@@ -278,13 +277,7 @@ function createPluginSchema<T>(
   validateFields: (input: UnknownRecord, issues: ValidationIssue[]) => void,
   fastIs?: (value: unknown) => value is T,
 ): StandardSchema<T> {
-  return createSchema<T>((value) => {
-    // AOT-style boolean predicate (extracted from zod-compiler output): much less
-    // CPU than the handrolled issue builder on valid bodies. On miss, fall through
-    // so existing error messages/behavior stay unchanged.
-    if (fastIs?.(value))
-      return { value }
-
+  const validateHandrolled = (value: unknown) => {
     if (!isRecord(value)) {
       return { issues: [makeIssue('Expected object')] }
     }
@@ -297,6 +290,20 @@ function createPluginSchema<T>(
     }
 
     return { value: value as T }
+  }
+
+  // Specialize the success fast path at schema creation time so schemas without
+  // a predicate don't pay for an optional call on every request.
+  if (!fastIs)
+    return createSchema<T>(validateHandrolled)
+
+  return createSchema<T>((value) => {
+    // AOT-style boolean predicate (zod-compiler / hand-extracted .is): much less
+    // CPU than the handrolled issue builder on valid bodies. On miss, fall through
+    // so existing error messages/behavior stay unchanged.
+    if (fastIs(value))
+      return { value }
+    return validateHandrolled(value)
   })
 }
 

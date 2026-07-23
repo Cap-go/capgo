@@ -5,11 +5,10 @@
  * On miss, the handrolled schema still builds the existing error issues.
  */
 
-import { ALLOWED_STATS_ACTIONS } from '../../plugins/stats_actions.ts'
+import { ALLOWED_STATS_ACTIONS_SET } from '../../plugins/stats_actions.ts'
 
 const reverseDomainRegex = /^[a-z0-9]+(?:\.[\w-]+)+$/i
 const deviceIdRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const ALLOWED_STATS_ACTIONS_SET = new Set<string>(ALLOWED_STATS_ACTIONS)
 const MAX_STATS_METADATA_FIELDS = 30
 const MAX_STATS_METADATA_KEY_LENGTH = 64
 const MAX_STATS_METADATA_VALUE_LENGTH = 2048
