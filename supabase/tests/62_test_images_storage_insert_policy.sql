@@ -15,7 +15,10 @@ SELECT ok(
       AND with_check NOT LIKE '%foldername%apps.name%'
       AND with_check NOT LIKE '%foldername%"apps"."name"%'
       AND with_check LIKE '%rbac_perm_org_create_app%'
-      AND with_check LIKE '%apps.app_id%'
+      AND (
+        with_check LIKE '%apps.app_id%'
+        OR with_check LIKE '%"apps"."app_id"%'
+      )
   ),
   'images insert policy uses storage object path and org.create_app for new app icons'
 );
