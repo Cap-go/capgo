@@ -1,26 +1,28 @@
--- Capgo-EU Phase A reclaim (run manually in a maintenance window).
--- REQUIRED: psql for VACUUM (cannot run inside a transaction / SQL-editor tx).
--- Prefer ~/.pgpass / PGPASSFILE instead of putting the password on the CLI.
+-- Capgo-EU Phase A reclaim — safe for Supabase SQL Editor.
+-- Paste this whole file into SQL Editor and run.
 --
--- Schema source of truth: migration 20260722154010_app_versions_manifest_present_idx.
--- Optional non-blocking prebuild before that migration deploys:
---   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/ops/reclaim_supabase_swap_index.sql
+-- Prerequisites (deploy first, or this script fails the preflight):
+--   - 20260722082019_fix_supabase_swap_memory
+--   - 20260722154010_app_versions_manifest_present_idx
 --
--- Example:
---   psql "postgresql://postgres@HOST:5432/postgres?sslmode=require" -v ON_ERROR_STOP=1 -f scripts/ops/reclaim_supabase_swap.sql
--- Safe order: truncate -> archives -> null manifests -> audit trim.
--- Re-run the FULL script until cleanup notices report deleted/updated = 0
--- (functions always emit a notice, including zero totals).
+-- Re-run until Notices show deleted/updated = 0 (functions always raise a notice).
+-- VACUUM is NOT here: SQL Editor wraps work in a transaction and rejects VACUUM.
+-- Optional later via psql: scripts/ops/reclaim_supabase_swap_vacuum.sql
 
 SET lock_timeout = '5s';
+SET statement_timeout = '180s';
 
 -- ---------------------------------------------------------------------------
--- 0) Baseline sizes + require a valid candidate index
+-- 0) Preflight + baseline sizes
 -- ---------------------------------------------------------------------------
-SELECT pg_size_pretty(pg_database_size(current_database())::bigint) AS db_size;
-
 DO $$
 BEGIN
+  IF to_regprocedure('public.null_migrated_app_version_manifests()') IS NULL
+     OR to_regprocedure('public.cleanup_net_http_response()') IS NULL THEN
+    RAISE EXCEPTION
+      'Missing reclaim functions. Deploy migration 20260722082019_fix_supabase_swap_memory first.';
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1
     FROM pg_catalog.pg_class AS idx
@@ -32,9 +34,12 @@ BEGIN
       AND i.indisvalid
   ) THEN
     RAISE EXCEPTION
-      'Missing or invalid app_versions_manifest_present_idx. Deploy migration 20260722154010 (or run scripts/ops/reclaim_supabase_swap_index.sql alone first if the index is invalid/missing).';
+      'Missing or invalid app_versions_manifest_present_idx. Deploy migration 20260722154010 first.';
   END IF;
-END $$;
+END
+$$;
+
+SELECT pg_size_pretty(pg_database_size(current_database())::bigint) AS db_size;
 
 SELECT
   relname,
@@ -54,44 +59,24 @@ WHERE (schemaname, relname) IN (
 ORDER BY pg_total_relation_size(format('%I.%I', schemaname, relname)::regclass) DESC;
 
 -- ---------------------------------------------------------------------------
--- 1) Truncate pg_net response bloat
+-- 1) Truncate pg_net response bloat (biggest immediate win)
 -- ---------------------------------------------------------------------------
 TRUNCATE TABLE net._http_response;
 
 -- ---------------------------------------------------------------------------
--- 2) Purge pgmq archives/stuck messages.
---    Re-run the FULL script until archived_deleted=0 and stuck_deleted=0.
+-- 2) Purge pgmq archives/stuck messages (batched; re-run until notice = 0)
 -- ---------------------------------------------------------------------------
 SELECT public.cleanup_queue_messages();
 
-VACUUM (VERBOSE) pgmq.a_on_version_update;
-VACUUM (VERBOSE) pgmq.a_on_manifest_create;
-VACUUM (VERBOSE) pgmq.a_webhook_dispatcher;
-VACUUM (VERBOSE) pgmq.a_on_channel_update;
-VACUUM (VERBOSE) pgmq.q_on_version_update;
-VACUUM (VERBOSE) pgmq.q_on_manifest_create;
-VACUUM (VERBOSE) pgmq.q_webhook_dispatcher;
-VACUUM (VERBOSE) pgmq.q_on_channel_update;
-
 -- ---------------------------------------------------------------------------
--- 3) Null fully migrated app_versions.manifest arrays (s3_path + file_hash).
---    Re-run the FULL script until updated=0.
+-- 3) Null fully migrated app_versions.manifest arrays (re-run until notice = 0)
 -- ---------------------------------------------------------------------------
 SELECT public.null_migrated_app_version_manifests();
 
-VACUUM (ANALYZE, VERBOSE) public.app_versions;
--- Optional TOAST compaction after updated=0:
--- VACUUM (FULL, VERBOSE) public.app_versions;
-
 -- ---------------------------------------------------------------------------
--- 4) Trim audit_logs older than 30 days.
---    Re-run the FULL script until deleted=0.
+-- 4) Trim audit_logs older than 30 days (re-run until notice = 0)
 -- ---------------------------------------------------------------------------
 SELECT public.cleanup_old_audit_logs();
-
-VACUUM (ANALYZE, VERBOSE) public.audit_logs;
--- Optional TOAST compaction after deleted=0:
--- VACUUM (FULL, VERBOSE) public.audit_logs;
 
 -- ---------------------------------------------------------------------------
 -- 5) Final sizes
