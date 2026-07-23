@@ -29,10 +29,12 @@ const browserPreviewUnavailableReason = computed<'missing-manifest' | 'encrypted
   const currentVersion = channel.value?.version
   if (!currentVersion)
     return null
-  if (!currentVersion.manifest_count)
-    return 'missing-manifest'
+  // Encryption blocks all Capgo preview paths; check it before missing-manifest so
+  // promotion QR layout does not treat encrypted+no-manifest as QR-eligible.
   if (currentVersion.session_key)
     return 'encrypted'
+  if (!currentVersion.manifest_count)
+    return 'missing-manifest'
   return null
 })
 const browserPreviewAvailable = computed(() => {
