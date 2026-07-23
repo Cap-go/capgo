@@ -293,7 +293,7 @@ app.post('/', async (c) => {
   })
 
   const pgClient = getPgClient(c, !hasCustomId)
-  const drizzleClient = getDrizzleClient(pgClient!)
+  const drizzleClient = getDrizzleClient(pgClient!, { logger: false })
 
   try {
     // For single event, process directly and let errors propagate for proper status codes

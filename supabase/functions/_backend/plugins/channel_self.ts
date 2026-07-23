@@ -633,7 +633,7 @@ async function runChannelSelfWithPgClient(
   await setReplicationLagHeader(c, pgClient)
 
   try {
-    return await run(getDrizzleClient(pgClient as any))
+    return await run(getDrizzleClient(pgClient as any, { logger: false }))
   }
   finally {
     await closeClient(c, pgClient)
