@@ -390,8 +390,9 @@ export function getPgClient(c: Context, readOnly = false) {
   return pool
 }
 
-export function getDrizzleClient(db: ReturnType<typeof getPgClient>) {
-  return drizzle({ client: db, logger: true })
+export function getDrizzleClient(db: ReturnType<typeof getPgClient>, options?: { logger?: boolean }) {
+  // Default off: plugin hot paths create a client per request; SQL logging adds CPU + log volume.
+  return drizzle({ client: db, logger: options?.logger ?? false })
 }
 
 // Helper to extract detailed error information from pg errors

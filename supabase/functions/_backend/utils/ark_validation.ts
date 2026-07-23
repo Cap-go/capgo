@@ -1,5 +1,4 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
-import { type } from 'arktype'
 
 export type ValidationIssue = StandardSchemaV1.Issue & { readonly code?: string }
 
@@ -111,8 +110,4 @@ export async function parseSchemaAsync<T>(schema: StandardSchema<T>, value: unkn
   }
 
   return result.data
-}
-
-export function literalUnion<const T extends readonly string[]>(values: T) {
-  return type(values.map(value => JSON.stringify(value)).join(' | ') as any) as any
 }

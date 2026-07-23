@@ -11,7 +11,6 @@ import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { closeClient, getPgClient } from './pg.ts'
 import { emptyStatsInsights, normalizeStatsInsightsResult } from './statsInsights.ts'
-import { createCustomer } from './stripe.ts'
 import { Constants } from './supabase.types.ts'
 import { getEnv, isStripeConfigured } from './utils.ts'
 
@@ -1084,6 +1083,9 @@ export async function getDefaultPlan(c: Context) {
 }
 
 export async function createStripeCustomer(c: Context, org: Database['public']['Tables']['orgs']['Row']) {
+  // Lazy-load Stripe SDK: plugin worker imports supabase helpers but never creates customers.
+  // A static import here pulled ~214 KiB of Stripe into every plugin isolate.
+  const { createCustomer } = await import('./stripe.ts')
   const customer = await createCustomer(c, org.management_email, org.created_by, org.id, org.name)
   const trial_at = new Date()
   trial_at.setDate(trial_at.getDate() + 15)

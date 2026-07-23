@@ -1,5 +1,5 @@
 import { type } from 'arktype'
-import { literalUnion } from './ark_validation.ts'
+import { literalUnion } from './ark_literal_union.ts'
 import { Constants } from './supabase.types.ts'
 import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, reverseDomainRegex } from './utils.ts'
 

@@ -28,6 +28,13 @@ import {
   reverseDomainRegex,
 } from './utils.ts'
 
+const ALLOWED_STATS_ACTIONS_SET = new Set<string>(ALLOWED_STATS_ACTIONS)
+let allowedStatsActionsList: string | undefined
+
+function getAllowedStatsActionsList() {
+  return allowedStatsActionsList ??= ALLOWED_STATS_ACTIONS.join(', ')
+}
+
 type UnknownRecord = Record<string, unknown>
 type DevicePlatform = 'ios' | 'android' | 'electron'
 
@@ -209,8 +216,8 @@ function validateOptionalAction(input: UnknownRecord, issues: ValidationIssue[])
     issues.push(fieldIssue('action', 'action must be a string'))
     return undefined
   }
-  if (!ALLOWED_STATS_ACTIONS.includes(value as typeof ALLOWED_STATS_ACTIONS[number])) {
-    issues.push(fieldIssue('action', `action must be one of: ${ALLOWED_STATS_ACTIONS.join(', ')}`))
+  if (!ALLOWED_STATS_ACTIONS_SET.has(value)) {
+    issues.push(fieldIssue('action', `action must be one of: ${getAllowedStatsActionsList()}`))
     return undefined
   }
   return value

@@ -97,6 +97,7 @@
     "test:cloudflare:api": "vitest run --exclude=tests/cli* --exclude=tests/updates* --exclude=tests/stats* --exclude=tests/channel_self* --config vitest.config.cloudflare.ts",
     "test:cloudflare:updates": "vitest run tests/updates* --config vitest.config.cloudflare.ts",
     "bench": "vitest bench --config vitest.config.bench.ts --run",
+    "bench:plugin-worker-runtime": "bun scripts/bench_plugin_worker_runtime.ts --compare scripts/bench/plugin_worker_runtime_baseline.json",
     "admin:backfill-paid-product-activity": "bun scripts/backfill_paid_product_activity.ts",
     "admin:backfill-credit-usage-posthog": "bun scripts/backfill_credit_usage_posthog_events.ts",
     "admin:backfill-plugin-version-ladder": "bun scripts/backfill_plugin_version_ladder.ts",

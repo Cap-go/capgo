@@ -4,7 +4,6 @@ import type { DeviceComparable } from './deviceComparison.ts'
 import type { StatsInsightRawAction, StatsInsightRawDaily, StatsInsightRawDevice, StatsInsightRawSummary, StatsInsightRawVersion } from './statsInsights.ts'
 import type { Database } from './supabase.types.ts'
 import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadStatsInsightsParams, ReadStatsParams, StatsInsightsResult, StatsMetadata, VersionUsage, VersionUsageChannel } from './types.ts'
-import dayjs from 'dayjs'
 import { CacheHelper } from './cache.ts'
 import { hasComparableDeviceChanged, toComparableDevice } from './deviceComparison.ts'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
@@ -15,6 +14,20 @@ import { getEnv } from './utils.ts'
 /** Escape a value for safe interpolation into an Analytics Engine SQL string. */
 export function escapeSqlString(value: string): string {
   return value.replace(/'/g, '\'\'').replace(/\\/g, '\\\\')
+}
+
+function pad2(value: number): string {
+  return String(value).padStart(2, '0')
+}
+
+/** Local calendar day, matching prior dayjs().format('YYYY-MM-DD') behavior. */
+function formatLocalYmd(date = new Date()): string {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
+}
+
+/** Local date-time, matching prior dayjs(...).format('YYYY-MM-DD HH:mm:ss') for "now". */
+function formatLocalDateTime(date = new Date()): string {
+  return `${formatLocalYmd(date)} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`
 }
 
 const MAX_ANALYTICS_QUERY_LIMIT = 50_000
@@ -117,7 +130,7 @@ export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: 
     const usageCacheRequest = usageCache.buildRequest(TRACK_DEVICE_USAGE_CACHE_PATH, {
       app_id,
       device_id,
-      day: dayjs().format('YYYY-MM-DD'),
+      day: formatLocalYmd(),
       platform: normalizedPlatform,
       version_build: normalizedVersionBuild,
     })
@@ -342,20 +355,25 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
   }
 }
 
-export function formatDateCF(date: string | Date | undefined) {
-  if (!date)
-    return dayjs(date).format('YYYY-MM-DD HH:mm:ss')
+export function formatDateCF(date: string | Date | undefined | null) {
+  // Preserve prior dayjs edge-case behavior:
+  // - undefined formats as "now" in local time (dayjs(undefined))
+  // - null / '' / unparseable values format as the literal "Invalid Date"
+  if (date === undefined)
+    return formatLocalDateTime()
+  if (date === null || date === '')
+    return 'Invalid Date'
 
   const normalizedDate = date instanceof Date ? date : new Date(date)
   if (Number.isNaN(normalizedDate.getTime()))
-    return dayjs(date).format('YYYY-MM-DD HH:mm:ss')
+    return 'Invalid Date'
 
   const year = normalizedDate.getUTCFullYear()
-  const month = String(normalizedDate.getUTCMonth() + 1).padStart(2, '0')
-  const day = String(normalizedDate.getUTCDate()).padStart(2, '0')
-  const hours = String(normalizedDate.getUTCHours()).padStart(2, '0')
-  const minutes = String(normalizedDate.getUTCMinutes()).padStart(2, '0')
-  const seconds = String(normalizedDate.getUTCSeconds()).padStart(2, '0')
+  const month = pad2(normalizedDate.getUTCMonth() + 1)
+  const day = pad2(normalizedDate.getUTCDate())
+  const hours = pad2(normalizedDate.getUTCHours())
+  const minutes = pad2(normalizedDate.getUTCMinutes())
+  const seconds = pad2(normalizedDate.getUTCSeconds())
 
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }

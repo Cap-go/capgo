@@ -164,12 +164,24 @@ export interface Segments {
   issueSegment: boolean
 }
 
+let limitedAppsCacheKey: string | undefined
+let limitedAppsById: Map<string, LimitedApp> | undefined
+
+function getLimitedAppsById(limits: string): Map<string, LimitedApp> {
+  if (limits === limitedAppsCacheKey && limitedAppsById)
+    return limitedAppsById
+
+  const apps = JSON.parse(limits) as LimitedApp[]
+  limitedAppsCacheKey = limits
+  limitedAppsById = new Map(apps.map(app => [app.id, app]))
+  return limitedAppsById
+}
+
 export function isLimited(c: Context, id: string) {
   const limits = getEnv(c, 'LIMITED_APPS')
   if (!limits)
     return false
-  const apps = JSON.parse(limits) as LimitedApp[]
-  const app = apps.find(a => a.id === id)
+  const app = getLimitedAppsById(limits).get(id)
   if (!app || app.ignore === 0)
     return false
   if (app.ignore === 1)
