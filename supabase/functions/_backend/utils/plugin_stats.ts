@@ -6,15 +6,17 @@ import { createIfNotExistStoreInfo, trackBandwidthUsageCF, trackDevicesCF, track
 import { normalizeDeviceCountryCode } from './deviceComparison.ts'
 import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
-import { logSkippedSupabaseWrite } from './supabase_write_guard.ts'
+import { logSkippedSupabaseWrite, shouldSkipSupabaseStatsFallback } from './supabase_write_guard.ts'
 import { backgroundTask, isInternalVersionName } from './utils.ts'
 
 /**
- * Plugin-worker stats writers.
+ * Plugin stats writers.
  *
- * Intentionally never imports supabase-js. The Cloudflare plugin isolate always
- * sets skipSupabaseStatsFallback; keeping the console SB fallbacks out of this
- * module removes ~220KiB of auth/realtime/storage from plugin module evaluation.
+ * The Cloudflare plugin isolate always sets skipSupabaseStatsFallback and never
+ * needs supabase-js. Supabase fallbacks are loaded through a non-literal
+ * dynamic import so wrangler/esbuild cannot statically pull supabase-js (and
+ * its Stripe edge) into the plugin worker bundle. Local Supabase function tests
+ * still hit the fallback when Analytics Engine bindings are absent.
  */
 
 export type VersionAction = 'get' | 'fail' | 'install' | 'uninstall'
@@ -23,6 +25,15 @@ export interface StatsLogDimensions {
   platform?: string | null
   country_code?: string | null
   plugin_version?: string | null
+}
+
+type SupabaseStatsWriters = typeof import('./supabase.ts')
+
+function loadSupabaseStatsWriters(): Promise<SupabaseStatsWriters> {
+  // Non-literal specifier: intentional. A string-literal import('./supabase.ts')
+  // is still bundled by wrangler/esbuild even inside dead branches.
+  const specifier = `./${'supabase'}.ts`
+  return import(specifier) as Promise<SupabaseStatsWriters>
 }
 
 export function normalizeStatsMetadata(metadata?: StatsMetadata): StatsMetadata | undefined {
@@ -54,11 +65,17 @@ function getStatsLogDimensions(c: Context, device: DeviceWithoutCreatedAt): Stat
 
 export function createStatsMau(c: Context, device_id: string, app_id: string, org_id: string, platform: string, version_build?: string | null): Promise<void> {
   const lowerDeviceId = device_id
-  if (!c.env.DEVICE_USAGE) {
+  if (c.env.DEVICE_USAGE)
+    return Promise.resolve(trackDeviceUsageCF(c, lowerDeviceId, app_id, org_id, platform, version_build)).then(() => undefined)
+
+  if (shouldSkipSupabaseStatsFallback(c)) {
     logSkippedSupabaseWrite(c, 'trackDeviceUsageSB')
     return Promise.resolve()
   }
-  return Promise.resolve(trackDeviceUsageCF(c, lowerDeviceId, app_id, org_id, platform, version_build)).then(() => undefined)
+
+  return loadSupabaseStatsWriters()
+    .then(sb => Promise.resolve(sb.trackDeviceUsageSB(c, lowerDeviceId, app_id, org_id, platform, version_build)))
+    .then(() => undefined)
 }
 
 export async function onPremStats(c: Context, app_id: string, action: string, device: DeviceWithoutCreatedAt, metadata?: StatsMetadata) {
@@ -96,43 +113,59 @@ export function createStatsBandwidth(c: Context, device_id: string, app_id: stri
   cloudlog({ requestId: c.get('requestId'), message: 'createStatsBandwidth', device_id: lowerDeviceId, app_id, file_size })
   if (file_size === 0)
     return
-  if (!c.env.BANDWIDTH_USAGE) {
+  if (c.env.BANDWIDTH_USAGE)
+    return trackBandwidthUsageCF(c, lowerDeviceId, app_id, file_size)
+
+  if (shouldSkipSupabaseStatsFallback(c)) {
     logSkippedSupabaseWrite(c, 'trackBandwidthUsageSB')
     return Promise.resolve()
   }
-  return trackBandwidthUsageCF(c, lowerDeviceId, app_id, file_size)
+
+  return backgroundTask(c, loadSupabaseStatsWriters().then(sb => sb.trackBandwidthUsageSB(c, lowerDeviceId, app_id, file_size)))
 }
 
 export function createStatsVersion(c: Context, version_name: string, app_id: string, action: VersionAction, channel?: VersionUsageChannel | string | null) {
   if (isInternalVersionName(version_name))
     return Promise.resolve()
-  if (!c.env.VERSION_USAGE) {
+  if (c.env.VERSION_USAGE)
+    return trackVersionUsageCF(c, version_name, app_id, action, channel)
+
+  if (shouldSkipSupabaseStatsFallback(c)) {
     logSkippedSupabaseWrite(c, 'trackVersionUsageSB')
     return Promise.resolve()
   }
-  return trackVersionUsageCF(c, version_name, app_id, action, channel)
+
+  return backgroundTask(c, loadSupabaseStatsWriters().then(sb => sb.trackVersionUsageSB(c, version_name, app_id, action, channel)))
 }
 
 export function createStatsLogsExternal(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], versionName?: string, metadata?: StatsMetadata, dimensions?: StatsLogDimensions) {
   const lowerDeviceId = device_id
   const finalVersionName = versionName && versionName !== '' ? versionName : 'unknown'
   const finalMetadata = normalizeStatsMetadata(metadata)
-  if (!c.env.APP_LOG_EXTERNAL) {
+  if (c.env.APP_LOG_EXTERNAL)
+    return trackLogsCFExternal(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata, dimensions)
+
+  if (shouldSkipSupabaseStatsFallback(c)) {
     logSkippedSupabaseWrite(c, 'trackLogsSB(external)')
     return Promise.resolve()
   }
-  return trackLogsCFExternal(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata, dimensions)
+
+  return backgroundTask(c, loadSupabaseStatsWriters().then(sb => sb.trackLogsSB(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata)))
 }
 
 export function createStatsLogs(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], versionName?: string, metadata?: StatsMetadata, dimensions?: StatsLogDimensions) {
   const lowerDeviceId = device_id
   const finalVersionName = versionName && versionName !== '' ? versionName : 'unknown'
   const finalMetadata = normalizeStatsMetadata(metadata)
-  if (!c.env.APP_LOG) {
+  if (c.env.APP_LOG)
+    return trackLogsCF(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata, dimensions)
+
+  if (shouldSkipSupabaseStatsFallback(c)) {
     logSkippedSupabaseWrite(c, 'trackLogsSB')
     return Promise.resolve()
   }
-  return trackLogsCF(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata, dimensions)
+
+  return backgroundTask(c, loadSupabaseStatsWriters().then(sb => sb.trackLogsSB(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata)))
 }
 
 export function createStatsDevices(c: Context, device: DeviceWithoutCreatedAt) {
@@ -143,8 +176,12 @@ export function createStatsDevices(c: Context, device: DeviceWithoutCreatedAt) {
   if (getRuntimeKey() === 'workerd' && c.env.DEVICE_INFO)
     return backgroundTask(c, trackDevicesCF(c, deviceWithCountry))
 
-  logSkippedSupabaseWrite(c, 'trackDevicesSB')
-  return Promise.resolve()
+  if (shouldSkipSupabaseStatsFallback(c)) {
+    logSkippedSupabaseWrite(c, 'trackDevicesSB')
+    return Promise.resolve()
+  }
+
+  return backgroundTask(c, loadSupabaseStatsWriters().then(sb => sb.trackDevicesSB(c, deviceWithCountry)))
 }
 
 export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, statsActions: StatsActions[], isFailedStat = false) {
