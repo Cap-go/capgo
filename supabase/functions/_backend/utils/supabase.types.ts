@@ -3785,9 +3785,16 @@ export type Database = {
       cleanup_expired_demo_apps: { Args: never; Returns: undefined }
       cleanup_frequent_job_details: { Args: never; Returns: undefined }
       cleanup_job_run_details_7days: { Args: never; Returns: undefined }
-      cleanup_old_audit_logs: { Args: never; Returns: undefined }
+      cleanup_net_http_response: { Args: never; Returns: undefined }
+      cleanup_old_audit_logs: {
+        Args: { batch_size?: number; max_batches?: number }
+        Returns: undefined
+      }
       cleanup_old_channel_devices: { Args: never; Returns: undefined }
-      cleanup_queue_messages: { Args: never; Returns: undefined }
+      cleanup_queue_messages: {
+        Args: { batch_size?: number; max_batches_total?: number }
+        Returns: undefined
+      }
       cleanup_tmp_users: { Args: never; Returns: undefined }
       cleanup_webhook_deliveries: { Args: never; Returns: undefined }
       clear_onboarding_app_data:
@@ -4664,6 +4671,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      null_migrated_app_version_manifests: {
+        Args: { batch_size?: number; max_batches?: number }
+        Returns: undefined
+      }
       one_month_ahead: { Args: never; Returns: string }
       org_member_readable_org_ids: { Args: never; Returns: string[] }
       orgs_admin_org_ids: { Args: never; Returns: string[] }
@@ -5094,6 +5105,10 @@ export type Database = {
         Returns: undefined
       }
       strip_html: { Args: { input: string }; Returns: string }
+      sweep_deleted_version_manifests: {
+        Args: { p_batch_size?: number }
+        Returns: number
+      }
       top_up_usage_credits: {
         Args: {
           p_amount: number
