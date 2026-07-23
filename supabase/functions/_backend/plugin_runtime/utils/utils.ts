@@ -192,8 +192,11 @@ export function isLimited(c: Context, id: string) {
     return false
   if (app.ignore === 1)
     return true
-  // check is Math.random() < ignore
-  return Math.random() < app.ignore
+  // Probabilistic allow/deny for LIMITED_APPS (not a crypto secret).
+  // Use CSPRNG so Sonar does not flag Math.random in this path.
+  const buf = new Uint32Array(1)
+  crypto.getRandomValues(buf)
+  return (buf[0]! / 0x1_0000_0000) < app.ignore
 }
 
 export function backgroundTask(c: Context, p: any) {
