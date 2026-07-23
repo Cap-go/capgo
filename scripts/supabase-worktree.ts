@@ -18,8 +18,13 @@ function hasSupabaseCli(): boolean {
  */
 function getLocalSupabaseCli(repoRoot: string): string | null {
   const binName = process.platform === 'win32' ? 'supabase.exe' : 'supabase'
-  const localBin = resolve(repoRoot, 'node_modules', 'supabase', 'bin', binName)
-  return existsSync(localBin) ? localBin : null
+  // Prefer the package shim Bun/npm expose on PATH (.bin), then legacy bin/ layouts.
+  const candidates = [
+    resolve(repoRoot, 'node_modules', '.bin', binName),
+    resolve(repoRoot, 'node_modules', 'supabase', 'bin', binName),
+    resolve(repoRoot, 'node_modules', 'supabase', 'dist', 'supabase.js'),
+  ]
+  return candidates.find(candidate => existsSync(candidate)) ?? null
 }
 
 /**
