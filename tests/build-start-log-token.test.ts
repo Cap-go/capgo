@@ -330,6 +330,7 @@ describe('build start direct log token', () => {
       eq: vi.fn().mockReturnThis(),
       select: vi.fn().mockResolvedValue({ data: [{ id: 'row-1' }], error: null }),
     }
+    const updateMock = vi.fn().mockReturnValue(updateBuilder)
     const adminSelectChain = {
       eq: vi.fn().mockReturnThis(),
       maybeSingle: vi.fn().mockResolvedValue({
@@ -347,7 +348,7 @@ describe('build start direct log token', () => {
       from: vi.fn().mockImplementation((table: string) => {
         expect(table).toBe('build_requests')
         return {
-          update: vi.fn().mockReturnValue(updateBuilder),
+          update: updateMock,
           select: vi.fn().mockReturnValue(adminSelectChain),
         }
       }),
@@ -377,6 +378,10 @@ describe('build start direct log token', () => {
       })
 
       expect(fetchMock).not.toHaveBeenCalled()
+      expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({
+        status: 'failed',
+        last_error: concurrencyMessage,
+      }))
       expect(updateBuilder.select).toHaveBeenCalled()
       expect(mockSendEventToTracking).toHaveBeenCalledWith(
         expect.anything(),

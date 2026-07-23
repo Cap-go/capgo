@@ -160,6 +160,15 @@ describe('native build concurrency limits', () => {
         error: 'native_build_concurrency_limit_exceeded',
       }),
     })
+
+    expect(mockSendEventToTracking).toHaveBeenCalledWith(context, expect.objectContaining({
+      event: 'Native build concurrency limit reached',
+      sentToBento: true,
+      bento: expect.objectContaining({
+        event: 'user:native_build_concurrency_limit',
+        preferenceKey: 'usage_limit',
+      }),
+    }))
   })
 })
 
