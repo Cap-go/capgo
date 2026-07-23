@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../types/supabase.types'
 import { log } from '@clack/prompts'
-import { getPMAndCommand, getRemoteConfig, hasCliPermission, show2FADeniedError } from '../utils'
+import { formatCapgoApiErrorBody, getPMAndCommand, hasCliPermission, resolveCapgoPublicApiHost, show2FADeniedError } from '../utils'
 
 export async function checkAppExists(supabase: SupabaseClient<Database>, appid: string) {
   const { data: app } = await supabase
@@ -97,24 +97,17 @@ export async function findAppInOrganization(
   return data ?? null
 }
 
-function formatAppApiErrorBody(body: unknown): string {
-  if (!body || typeof body !== 'object')
-    return ''
-  const record = body as { error?: string, message?: string, status?: string }
-  return [record.error, record.message, record.status].filter(Boolean).join(' | ')
-}
-
 export async function completePendingOnboardingApp(
   _supabase: SupabaseClient<Database>,
   orgId: string,
   appId: string,
   apikey: string,
+  options?: { supaHost?: string, supaAnon?: string },
 ): Promise<void> {
-  // Prefer Capgo API host with the API key so org.create_app keys can finish a
-  // pending web-onboarding app even without app.update_settings. Avoid
-  // functions.invoke (anon Authorization JWT wins over capgkey in middleware).
-  const config = await getRemoteConfig(true)
-  const response = await fetch(`${config.hostApi}/app/${encodeURIComponent(appId)}`, {
+  // Prefer Capgo API host (or self-hosted /functions/v1) with the API key so
+  // org.create_app keys can finish pending onboarding without app.update_settings.
+  const apiHost = await resolveCapgoPublicApiHost(options)
+  const response = await fetch(`${apiHost}/app/${encodeURIComponent(appId)}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -128,7 +121,7 @@ export async function completePendingOnboardingApp(
 
   const data = await response.json().catch(() => null)
   if (!response.ok) {
-    const details = formatAppApiErrorBody(data) || `HTTP ${response.status}`
+    const details = formatCapgoApiErrorBody(data) || `HTTP ${response.status}`
     throw new Error(`Could not complete onboarding for app ${appId}: ${details}`)
   }
 

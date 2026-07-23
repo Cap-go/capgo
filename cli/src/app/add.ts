@@ -10,12 +10,13 @@ import {
   assertCliPermission,
   createSupabaseClient,
   findSavedKey,
+  formatCapgoApiErrorBody,
   formatError,
   getAppId,
   getConfig,
   getContentType,
   getOrganizationWithPermission,
-  getRemoteConfig,
+  resolveCapgoPublicApiHost,
   resolveUserIdFromApiKey,
   sendEvent,
 } from '../utils'
@@ -80,13 +81,6 @@ export function resolveAppCreateSource(explicit?: AppCreateSource): AppCreateSou
   return getInvocationSource() === 'mcp' ? 'mcp' : 'cli-direct'
 }
 
-function formatAppApiErrorBody(body: unknown): string {
-  if (!body || typeof body !== 'object')
-    return ''
-  const record = body as { error?: string, message?: string, status?: string }
-  return [record.error, record.message, record.status].filter(Boolean).join(' | ')
-}
-
 async function createAppViaApi(
   apikey: string,
   params: {
@@ -95,13 +89,17 @@ async function createAppViaApi(
     name: string
     iconUrl: string
     createdFromOnboarding: boolean
+    supaHost?: string
+    supaAnon?: string
   },
 ) {
-  // Call Capgo API host (Cloudflare) with the API key. Do not use
-  // supabase.functions.invoke: that targets SUPABASE_URL and always sends
-  // Authorization: Bearer <anon>, which middlewareAuth treats as JWT first.
-  const config = await getRemoteConfig(true)
-  const response = await fetch(`${config.hostApi}/app`, {
+  // Prefer Capgo API host (or self-hosted /functions/v1) with the API key.
+  // Avoid supabase.functions.invoke: it always sends Authorization: Bearer <anon>.
+  const apiHost = await resolveCapgoPublicApiHost({
+    supaHost: params.supaHost,
+    supaAnon: params.supaAnon,
+  })
+  const response = await fetch(`${apiHost}/app`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -120,7 +118,7 @@ async function createAppViaApi(
 
   const data = await response.json().catch(() => null)
   if (!response.ok) {
-    const details = formatAppApiErrorBody(data) || `HTTP ${response.status}`
+    const details = formatCapgoApiErrorBody(data) || `HTTP ${response.status}`
     throw new Error(details)
   }
 
@@ -233,6 +231,8 @@ export async function addAppInternal(
       name,
       iconUrl,
       createdFromOnboarding: appCreateSource === 'onboarding',
+      supaHost: options.supaHost,
+      supaAnon: options.supaAnon,
     })
   }
   catch (error) {

@@ -96,28 +96,44 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
 
   let data: Record<string, any> | undefined
   let dbError: { message?: string } | null = null
+  let completedPendingOnboarding = false
 
   try {
     if (!canUpdateSettings && canCompleteOnboarding) {
       // Bypass RLS for the narrow onboarding-completion path after explicit authz.
-      const pgClient = getPgClient(c)
+      // Reuse the advisory-lock session so the update is serialized with the lock.
+      const pgClient = onboardingLock ?? getPgClient(c)
       try {
         const result = await pgClient.query(
           `UPDATE public.apps
            SET need_onboarding = false
            WHERE app_id = $1
+             AND need_onboarding = true
            RETURNING *`,
           [appId],
         )
         data = result.rows[0]
-        if (!data)
-          dbError = { message: 'App not found during onboarding completion' }
+        if (data) {
+          completedPendingOnboarding = true
+        }
+        else {
+          // Already completed under the lock; return current row without re-firing side effects.
+          const current = await pgClient.query(
+            `SELECT * FROM public.apps WHERE app_id = $1`,
+            [appId],
+          )
+          data = current.rows[0]
+          if (!data)
+            dbError = { message: 'App not found during onboarding completion' }
+        }
       }
       catch (error) {
         dbError = { message: (error as Error)?.message }
       }
       finally {
-        await closeClient(c, pgClient)
+        // Only close a client we opened here; unlockOnboardingApp owns the lock session.
+        if (!onboardingLock)
+          await closeClient(c, pgClient)
       }
     }
     else {
@@ -140,6 +156,8 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
         .single()
       data = updateResult.data ?? undefined
       dbError = updateResult.error
+      if (data)
+        completedPendingOnboarding = previousApp.need_onboarding === true && data.need_onboarding === false
     }
   }
   finally {
@@ -162,7 +180,6 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
     const signedIcon = await createSignedImageUrl(c, data.icon_url)
     data.icon_url = signedIcon ?? ''
   }
-  const completedPendingOnboarding = previousApp.need_onboarding === true && data.need_onboarding === false
 
   if (completedPendingOnboarding) {
     const { data: orgData, error: orgError } = await supabaseAdmin(c)
