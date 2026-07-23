@@ -68,9 +68,9 @@ function checkMobile() {
 }
 
 const currentDevice = computed(() => devices[selectedDevice.value])
-const showBrowserPreview = computed(() => props.browserPreview)
-const showNativeStylePreview = computed(() => isNativePlatform || isMobile.value || props.nativeStylePreview)
 const isEncryptedPreview = computed(() => props.browserPreviewUnavailableReason === 'encrypted')
+const showBrowserPreview = computed(() => props.browserPreview && !isEncryptedPreview.value)
+const showNativeStylePreview = computed(() => isNativePlatform || isMobile.value || props.nativeStylePreview)
 const showQrCode = computed(() => !!qrCodeDataUrl.value && !isEncryptedPreview.value && (!isMobile.value || !showBrowserPreview.value))
 const browserPreviewHelp = computed(() => {
   if (props.browserPreviewUnavailableReason === 'missing-manifest') {

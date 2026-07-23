@@ -39,6 +39,7 @@ describe('preview response headers', () => {
     })).resolves.toEqual({
       appId: 'com.example.app',
       checksum: 'abc123',
+      sessionKey: undefined,
       url: 'https://example.com/app.zip',
       version: '1.0.0',
     })

@@ -183,6 +183,8 @@ export async function buildPreviewDownloadPayload(c: Context, appId: string, bun
   return {
     appId,
     checksum: bundle.checksum ?? undefined,
+    // Unencrypted bundles have a null session_key; keep the field for payload shape stability.
+    sessionKey: bundle.session_key ?? undefined,
     url: downloadUrl,
     version: bundle.name || `preview-${bundle.id}`,
   }
