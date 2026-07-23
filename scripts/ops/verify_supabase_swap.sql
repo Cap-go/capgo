@@ -1,6 +1,5 @@
--- Post-deploy / post-reclaim verification for Capgo-EU swap pressure.
--- REQUIRED: psql (uses \gexec). Example:
---   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/ops/verify_supabase_swap.sql
+-- Capgo-EU post-reclaim verification — safe for Supabase SQL Editor.
+-- Paste into SQL Editor and run (no psql meta-commands).
 
 SELECT pg_size_pretty(pg_database_size(current_database())::bigint) AS db_size;
 
@@ -52,6 +51,10 @@ FROM (
     )
 ) AS eligible;
 
+SELECT count(*)::bigint AS non_null_manifest_versions
+FROM public.app_versions
+WHERE manifest IS NOT NULL;
+
 SELECT
   name,
   enabled,
@@ -70,7 +73,15 @@ WHERE name IN (
 )
 ORDER BY name;
 
-SELECT indexname
+SELECT indexname,
+       (
+         SELECT i.indisvalid
+         FROM pg_catalog.pg_class AS idx
+         JOIN pg_catalog.pg_namespace AS ns ON ns.oid = idx.relnamespace
+         JOIN pg_catalog.pg_index AS i ON i.indexrelid = idx.oid
+         WHERE ns.nspname = 'public'
+           AND idx.relname = 'app_versions_manifest_present_idx'
+       ) AS indisvalid
 FROM pg_indexes
 WHERE schemaname = 'public'
   AND indexname = 'app_versions_manifest_present_idx';
@@ -82,33 +93,44 @@ SELECT EXISTS (
   LIMIT 1
 ) AS has_audit_logs_older_than_30d;
 
-SELECT format(
-  $fmt$SELECT %L AS queue_name,
-         EXISTS (
-           SELECT 1
-           FROM pgmq.%I
-           WHERE archived_at < now() - interval '2 days'
-           LIMIT 1
-         ) AS has_rows_older_than_2d;$fmt$,
-  queue_name,
-  'a_' || pg_catalog.lower(queue_name)
-)
-FROM pgmq.list_queues()
-\gexec
+-- Fixed Capgo-EU queue set (no psql \gexec).
+SELECT 'a_on_manifest_create' AS queue_name,
+       EXISTS (
+         SELECT 1 FROM pgmq.a_on_manifest_create
+         WHERE archived_at < now() - interval '2 days' LIMIT 1
+       ) AS has_rows_older_than_2d
+UNION ALL SELECT 'a_on_version_update',
+       EXISTS (
+         SELECT 1 FROM pgmq.a_on_version_update
+         WHERE archived_at < now() - interval '2 days' LIMIT 1
+       )
+UNION ALL SELECT 'a_webhook_dispatcher',
+       EXISTS (
+         SELECT 1 FROM pgmq.a_webhook_dispatcher
+         WHERE archived_at < now() - interval '2 days' LIMIT 1
+       )
+UNION ALL SELECT 'a_on_channel_update',
+       EXISTS (
+         SELECT 1 FROM pgmq.a_on_channel_update
+         WHERE archived_at < now() - interval '2 days' LIMIT 1
+       );
 
-SELECT format(
-  $fmt$SELECT %L AS queue_name,
-         EXISTS (
-           SELECT 1
-           FROM pgmq.%I
-           WHERE read_ct > 5
-           LIMIT 1
-         ) AS has_stuck_read_ct_gt_5;$fmt$,
-  queue_name,
-  'q_' || pg_catalog.lower(queue_name)
-)
-FROM pgmq.list_queues()
-\gexec
+SELECT 'q_on_manifest_create' AS queue_name,
+       EXISTS (
+         SELECT 1 FROM pgmq.q_on_manifest_create WHERE read_ct > 5 LIMIT 1
+       ) AS has_stuck_read_ct_gt_5
+UNION ALL SELECT 'q_on_version_update',
+       EXISTS (
+         SELECT 1 FROM pgmq.q_on_version_update WHERE read_ct > 5 LIMIT 1
+       )
+UNION ALL SELECT 'q_webhook_dispatcher',
+       EXISTS (
+         SELECT 1 FROM pgmq.q_webhook_dispatcher WHERE read_ct > 5 LIMIT 1
+       )
+UNION ALL SELECT 'q_on_channel_update',
+       EXISTS (
+         SELECT 1 FROM pgmq.q_on_channel_update WHERE read_ct > 5 LIMIT 1
+       );
 
 SELECT
   'index hit rate' AS name,
