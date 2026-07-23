@@ -5,6 +5,7 @@ import type { Database } from '../types/supabase.types'
 import type { Organization } from '../utils'
 import { existsSync, readFileSync } from 'node:fs'
 import { intro, log, outro } from '@clack/prompts'
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import { getInvocationSource } from '../analytics/track'
 import { checkAppExists, defaultAppIconPath, getAppIconStoragePath, newIconPath } from '../api/app'
 import { checkAlerts } from '../api/update'
@@ -75,23 +76,71 @@ async function ensureAppDoesNotExist(
 
 export type AppCreateSource = 'cli-direct' | 'onboarding' | 'mcp'
 
-function isMissingAppBuildOnboardingSchemaError(error: { message?: string, details?: string, hint?: string, code?: string | null } | null) {
-  if (!error)
-    return false
-
-  const text = [error.message, error.details, error.hint, error.code]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase()
-
-  return text.includes('created_from_onboarding')
-    || text.includes('onboarding_completed_at')
-}
-
 export function resolveAppCreateSource(explicit?: AppCreateSource): AppCreateSource {
   if (explicit)
     return explicit
   return getInvocationSource() === 'mcp' ? 'mcp' : 'cli-direct'
+}
+
+async function formatAppCreateError(error: unknown): Promise<string> {
+  if (error instanceof FunctionsHttpError) {
+    try {
+      const body = await error.context.json() as { error?: string, message?: string, status?: string }
+      const details = [body.error, body.message, body.status].filter(Boolean).join(' | ')
+      if (details)
+        return details
+    }
+    catch {
+      // Fall through to generic formatter.
+    }
+  }
+
+  const context = (error as { context?: { json?: () => Promise<unknown> } } | null)?.context
+  if (context?.json) {
+    try {
+      return JSON.stringify(await context.json())
+    }
+    catch {
+      // Fall through to generic formatter.
+    }
+  }
+
+  return formatError(error)
+}
+
+async function createAppViaApi(
+  supabase: SupabaseClient<Database>,
+  params: {
+    ownerOrg: string
+    appId: string
+    name: string
+    iconUrl: string
+    createdFromOnboarding: boolean
+  },
+) {
+  const { data, error } = await supabase.functions.invoke('app', {
+    method: 'POST',
+    body: {
+      owner_org: params.ownerOrg,
+      app_id: params.appId,
+      name: params.name,
+      icon: params.iconUrl,
+      need_onboarding: false,
+      created_from_onboarding: params.createdFromOnboarding,
+    },
+  })
+
+  if (error) {
+    const message = await formatAppCreateError(error)
+    throw new Error(message)
+  }
+
+  const createdAppId = (data as { app_id?: string } | null)?.app_id
+  if (!createdAppId) {
+    throw new Error('App create API returned no app_id')
+  }
+
+  return data as { app_id: string, icon_url?: string, name?: string }
 }
 
 export async function addAppInternal(
@@ -165,6 +214,8 @@ export async function addAppInternal(
   const iconPath = getAppIconStoragePath(organizationUid, appId)
   let iconUrl = defaultAppIconPath
 
+  // Icon upload is best-effort. Storage RLS issues must not block app creation;
+  // the web onboarding path already continues without an icon on upload failure.
   if (iconBuff && iconType) {
     const { error } = await supabase.storage
       .from('images')
@@ -175,42 +226,31 @@ export async function addAppInternal(
 
     if (error) {
       if (!silent)
-        log.error(`Could not add app ${formatError(error)}`)
-      throw new Error(`Could not add app ${formatError(error)}`)
+        log.warn(`Could not upload app icon (${formatError(error)}). Continuing with the default icon.`)
     }
-
-    iconUrl = iconPath
+    else {
+      iconUrl = iconPath
+    }
   }
 
   const appCreateSource = resolveAppCreateSource(source)
-  const baseAppInsert = {
-    icon_url: iconUrl,
-    owner_org: organizationUid,
-    user_id: userId,
-    name,
-    app_id: appId,
-  }
-  const insertApp = (withOnboardingMetrics: boolean) => supabase
-    .from('apps')
-    .insert({
-      ...baseAppInsert,
-      ...(withOnboardingMetrics
-        ? {
-            created_from_onboarding: true,
-          }
-        : {}),
-    })
 
-  const insertResult = await insertApp(appCreateSource === 'onboarding')
-  let dbError = insertResult.error
-  if (dbError && appCreateSource === 'onboarding' && isMissingAppBuildOnboardingSchemaError(dbError)) {
-    const fallbackInsertResult = await insertApp(false)
-    dbError = fallbackInsertResult.error
+  try {
+    // Use the same authorized API path as the web console. Direct PostgREST inserts
+    // hit apps/storage RLS and fail for common API-key + pending-onboarding setups.
+    await createAppViaApi(supabase, {
+      ownerOrg: organizationUid,
+      appId,
+      name,
+      iconUrl,
+      createdFromOnboarding: appCreateSource === 'onboarding',
+    })
   }
-  if (dbError) {
+  catch (error) {
+    const message = await formatAppCreateError(error)
     if (!silent)
-      log.error(`Could not add app ${formatError(dbError)}`)
-    throw new Error(`Could not add app ${formatError(dbError)}`)
+      log.error(`Could not add app ${message}`)
+    throw new Error(`Could not add app ${message}`)
   }
 
   await sendEvent(options.apikey!, {

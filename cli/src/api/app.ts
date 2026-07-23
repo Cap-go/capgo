@@ -102,19 +102,20 @@ export async function completePendingOnboardingApp(
   orgId: string,
   appId: string,
 ): Promise<void> {
-  const { data, error } = await supabase
-    .from('apps')
-    .update({ need_onboarding: false })
-    .select('app_id')
-    .eq('owner_org', orgId)
-    .eq('app_id', appId)
-    .eq('need_onboarding', true)
+  // Prefer the authorized API path so keys with org.create_app can finish a
+  // pending web-onboarding app even when they lack app.update_settings.
+  const { data, error } = await supabase.functions.invoke(`app/${appId}`, {
+    method: 'PUT',
+    body: {
+      need_onboarding: false,
+    },
+  })
 
   if (error) {
     throw new Error(`Could not complete onboarding for app ${appId}: ${error.message}`)
   }
 
-  if (!data?.length) {
+  if (!(data as { app_id?: string } | null)?.app_id) {
     throw new Error(`Could not complete onboarding for app ${appId} in org ${orgId}: app was not found or is no longer pending onboarding`)
   }
 }
