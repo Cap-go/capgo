@@ -444,16 +444,18 @@ function compareReports(baseline: BenchReport, current: BenchReport) {
     const after = currentImports.get(specifier)
     if (!before && !after)
       continue
-    const beforeMs = before?.ms ?? 0
-    const afterMs = after?.ms ?? 0
-    const beforeHeap = before?.heapUsedDeltaMB ?? 0
-    const afterHeap = after?.heapUsedDeltaMB ?? 0
-    const beforeRss = before?.rssDeltaMB ?? 0
-    const afterRss = after?.rssDeltaMB ?? 0
     console.log(`  ${specifier}`)
-    console.log(`    cpu  ${beforeMs.toFixed(2)} ms → ${afterMs.toFixed(2)} ms (${pct(beforeMs, afterMs)})`)
-    console.log(`    heap ${beforeHeap.toFixed(2)} MB → ${afterHeap.toFixed(2)} MB (${pct(beforeHeap, afterHeap)})`)
-    console.log(`    rss  ${beforeRss.toFixed(2)} MB → ${afterRss.toFixed(2)} MB (${pct(beforeRss, afterRss)})`)
+    const beforeOk = Boolean(before && !before.error)
+    const afterOk = Boolean(after && !after.error)
+    if (!beforeOk || !afterOk) {
+      const beforeLabel = !before ? 'missing' : (before.error ? `error: ${before.error}` : `${before.ms.toFixed(2)} ms`)
+      const afterLabel = !after ? 'missing' : (after.error ? `error: ${after.error}` : `${after.ms.toFixed(2)} ms`)
+      console.log(`    unavailable for delta (baseline=${beforeLabel}; current=${afterLabel})`)
+      continue
+    }
+    console.log(`    cpu  ${before!.ms.toFixed(2)} ms → ${after!.ms.toFixed(2)} ms (${pct(before!.ms, after!.ms)})`)
+    console.log(`    heap ${before!.heapUsedDeltaMB.toFixed(2)} MB → ${after!.heapUsedDeltaMB.toFixed(2)} MB (${pct(before!.heapUsedDeltaMB, after!.heapUsedDeltaMB)})`)
+    console.log(`    rss  ${before!.rssDeltaMB.toFixed(2)} MB → ${after!.rssDeltaMB.toFixed(2)} MB (${pct(before!.rssDeltaMB, after!.rssDeltaMB)})`)
   }
 
   console.log('\nMicrobench method comparison (lower ns/op is better):')
