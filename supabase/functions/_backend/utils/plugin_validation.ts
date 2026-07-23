@@ -6,7 +6,7 @@ import {
   createSchema,
   makeIssue,
 } from './ark_validation.ts'
-import { updateRequestSchemaZod } from './plugin_schemas/update_request.zod.compiled.ts'
+import { isUpdateRequestBody } from './plugin_schemas/update_request.is.ts'
 import {
   deviceIdRegex,
   INVALID_STRING_APP_ID,
@@ -277,8 +277,9 @@ function createPluginSchema<T>(
   fastIs?: (value: unknown) => value is T,
 ): StandardSchema<T> {
   return createSchema<T>((value) => {
-    // zod-compiler AOT path: measured ~4-5x less CPU than handrolled on valid bodies.
-    // On miss, fall through so existing error messages/behavior stay unchanged.
+    // AOT-style boolean predicate (extracted from zod-compiler output): much less
+    // CPU than the handrolled issue builder on valid bodies. On miss, fall through
+    // so existing error messages/behavior stay unchanged.
     if (fastIs?.(value))
       return { value }
 
@@ -313,7 +314,7 @@ export const updateRequestSchema = createPluginSchema<AppInfos>((input, issues) 
   if (input.install_source !== undefined)
     validateInstallSourceValue(input.install_source, issues)
   validateOptionalStringMaxLength(input, 'key_id', 20, issues)
-}, updateRequestSchemaZod.is as (value: unknown) => value is AppInfos)
+}, isUpdateRequestBody as (value: unknown) => value is AppInfos)
 
 export const statsRequestSchema = createPluginSchema<AppStats>((input, issues) => {
   validateRequiredAppId(input, issues)

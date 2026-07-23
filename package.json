@@ -195,7 +195,7 @@
     "bench:plugin-validation-cpu": "bun scripts/bench_plugin_validation_cpu.ts --save scripts/bench/plugin_validation_cpu_results.json",
     "bench:plugin-worker-cpu": "bun scripts/bench_plugin_worker_cpu.ts --save scripts/bench/plugin_worker_cpu_results.json",
     "bench:plugin-all": "bun run bench:plugin-worker-runtime && bun run bench:plugin-validation-cpu && bun run bench:plugin-worker-cpu",
-    "plugin:schemas:compile": "bunx zod-compiler generate supabase/functions/_backend/utils/plugin_schemas/update_request.zod.ts -o supabase/functions/_backend/utils/plugin_schemas/update_request.zod.compiled.ts --emit bag"
+    "plugin:schemas:compile": "bunx zod-compiler generate supabase/functions/_backend/utils/plugin_schemas/update_request.zod.ts -o scripts/bench/validation/update_request.zod.compiled.ts --emit bag && bunx zod-compiler generate scripts/bench/validation/plugin_schemas.zod.ts -o scripts/bench/validation/plugin_schemas.zod.compiled.ts --emit bag"
   },
   "dependencies": {
     "@bradenmacdonald/s3-lite-client": "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.6",

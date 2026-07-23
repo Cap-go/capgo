@@ -115,8 +115,10 @@ async function main() {
   const zodRuntime = await import(pathToFileURL(resolve(ROOT, 'scripts/bench/validation/plugin_schemas.zod.ts')).href)
   const zodCompiled = await import(pathToFileURL(resolve(ROOT, 'scripts/bench/validation/plugin_schemas.zod.compiled.ts')).href)
 
+  const prodIs = await import(pathToFileURL(resolve(ROOT, 'supabase/functions/_backend/utils/plugin_schemas/update_request.is.ts')).href)
   const validators = {
     handrolled: (input: unknown) => safeParseSchema(handrolled.updateRequestSchema, input).success,
+    production_is_predicate: (input: unknown) => prodIs.isUpdateRequestBody(input),
     arktype: (input: unknown) => ark.updateRequestSchemaArk.allows(input),
     zod_runtime: (input: unknown) => zodRuntime.updateRequestSchemaZod.safeParse(input).success,
     zod_compiler_safeParse: (input: unknown) => zodCompiled.updateRequestSchemaZod.safeParse(input).success,
