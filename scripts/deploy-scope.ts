@@ -73,9 +73,9 @@ export const deployMatchers: Record<DeployTarget, RegExp[]> = {
     ...workerDependencyMatchers,
     ...backendDependencyMatchers,
     // Isolated plugin tree only — do not match shared _backend/utils (API dual-use).
+    // Deno-only shared/plugin_deno_stats_fallbacks.ts is supabase-scoped, not CF plugin.
     /^cloudflare_workers\/plugin\//,
     /^supabase\/functions\/_backend\/plugin_runtime\//,
-    /^supabase\/functions\/shared\/plugin_deno_stats_fallbacks\.ts$/,
     /^supabase\/functions\/(updates|stats|channel_self|updates_debug)\//,
   ],
 }

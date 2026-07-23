@@ -27,8 +27,7 @@ interface NotifCachePayload {
 
 function buildNotifCacheRequest(c: Context, orgId: string, eventName: string, uniqId: string) {
   const helper = new CacheHelper(c)
-  if (!helper.available)
-    return null
+  // Do not check helper.available synchronously — CacheHelper resolves async.
   return {
     helper,
     request: helper.buildRequest(NOTIF_CACHE_PATH, { org_id: orgId, event: eventName, uniq_id: uniqId }),
@@ -37,8 +36,6 @@ function buildNotifCacheRequest(c: Context, orgId: string, eventName: string, un
 
 async function getNotifCacheStatus(c: Context, orgId: string, eventName: string, uniqId: string): Promise<boolean | null> {
   const cacheEntry = buildNotifCacheRequest(c, orgId, eventName, uniqId)
-  if (!cacheEntry)
-    return null
   const payload = await cacheEntry.helper.matchJson<NotifCachePayload>(cacheEntry.request)
   if (!payload)
     return null
@@ -46,12 +43,10 @@ async function getNotifCacheStatus(c: Context, orgId: string, eventName: string,
 }
 
 function setNotifCacheStatus(c: Context, orgId: string, eventName: string, uniqId: string, sendable: boolean, ttlSeconds: number) {
-  return backgroundTask(c, async () => {
+  return backgroundTask(c, (async () => {
     const cacheEntry = buildNotifCacheRequest(c, orgId, eventName, uniqId)
-    if (!cacheEntry)
-      return
     await cacheEntry.helper.putJson(cacheEntry.request, { sendable }, ttlSeconds)
-  })
+  })())
 }
 
 /**

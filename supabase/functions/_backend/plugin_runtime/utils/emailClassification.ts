@@ -25,7 +25,7 @@ export const PERSONAL_EMAIL_DOMAINS = [
   'fastmail.com',
   'tutanota.com',
   'hey.com',
-]
+] as const
 
 export const DISPOSABLE_EMAIL_DOMAINS = [
   '10minutemail.com',
@@ -46,7 +46,7 @@ export const DISPOSABLE_EMAIL_DOMAINS = [
   'tempmail.net',
   'throwawaymail.com',
   'yopmail.com',
-]
+] as const
 
 const personalEmailDomainSet = new Set(PERSONAL_EMAIL_DOMAINS)
 const disposableEmailDomainSet = new Set(DISPOSABLE_EMAIL_DOMAINS)

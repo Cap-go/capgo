@@ -1,17 +1,21 @@
 import { getRuntimeKey } from 'hono/adapter'
 
+function formatLogArgs(message: unknown): unknown[] {
+  if (message instanceof Error)
+    return [serializeError(message)]
+  if (typeof message === 'object' && message !== null) {
+    const entries = Object.entries(message)
+    return entries.flatMap(([key, value]) => [key, value])
+  }
+  return [message]
+}
+
 export function cloudlog(message: any) {
   if (getRuntimeKey() === 'workerd') {
     console.log(message)
+    return
   }
-  else if (typeof message === 'object' && message !== null) {
-    const entries = Object.entries(message)
-    const logArgs = entries.flatMap(([key, value]) => [key, value])
-    console.log(...logArgs)
-  }
-  else {
-    console.log(message)
-  }
+  console.log(...formatLogArgs(message))
 }
 
 export function serializeError(err: unknown) {
@@ -29,13 +33,7 @@ export function serializeError(err: unknown) {
 export function cloudlogErr(message: any) {
   if (getRuntimeKey() === 'workerd') {
     console.error(message)
+    return
   }
-  else if (typeof message === 'object' && message !== null) {
-    const entries = Object.entries(message)
-    const logArgs = entries.flatMap(([key, value]) => [key, value])
-    console.error(...logArgs)
-  }
-  else {
-    console.error(message)
-  }
+  console.error(...formatLogArgs(message))
 }

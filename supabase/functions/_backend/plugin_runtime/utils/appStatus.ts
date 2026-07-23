@@ -11,8 +11,8 @@ export interface AppStatusResult { status: AppStatus | null, allow_device_custom
 
 function buildAppStatusRequest(c: Context, appId: string) {
   const helper = new CacheHelper(c)
-  if (!helper.available)
-    return null
+  // Do not check helper.available synchronously — CacheHelper resolves the
+  // Cache API asynchronously. matchJson/putJson/delete await ensureCache().
   return {
     helper,
     request: helper.buildRequest(APP_STATUS_CACHE_PATH, { app_id: appId }),
@@ -21,8 +21,6 @@ function buildAppStatusRequest(c: Context, appId: string) {
 
 export async function getAppStatus(c: Context, appId: string): Promise<AppStatusResult> {
   const cacheEntry = buildAppStatusRequest(c, appId)
-  if (!cacheEntry)
-    return { status: null, allow_device_custom_id: true, block_provider_infra_requests: false, cacheHit: false }
   const payload = await cacheEntry.helper.matchJson<AppStatusCachePayload>(cacheEntry.request)
   if (!payload)
     return { status: null, allow_device_custom_id: true, block_provider_infra_requests: false, cacheHit: false }
@@ -33,22 +31,18 @@ export async function getAppStatus(c: Context, appId: string): Promise<AppStatus
 }
 
 export function setAppStatus(c: Context, appId: string, status: AppStatus, allowDeviceCustomId: boolean, blockProviderInfraRequests = false) {
-  return backgroundTask(c, async () => {
+  return backgroundTask(c, (async () => {
     const cacheEntry = buildAppStatusRequest(c, appId)
-    if (!cacheEntry)
-      return
     const payload: AppStatusCachePayload = {
       status,
       allow_device_custom_id: allowDeviceCustomId,
       block_provider_infra_requests: blockProviderInfraRequests,
     }
     await cacheEntry.helper.putJson(cacheEntry.request, payload, APP_STATUS_CACHE_TTL_SECONDS)
-  })
+  })())
 }
 
 export async function deleteAppStatus(c: Context, appId: string) {
   const cacheEntry = buildAppStatusRequest(c, appId)
-  if (!cacheEntry)
-    return
   await cacheEntry.helper.delete(cacheEntry.request)
 }

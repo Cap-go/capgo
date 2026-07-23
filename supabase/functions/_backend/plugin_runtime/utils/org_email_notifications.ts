@@ -19,8 +19,7 @@ interface NotifCachePayload {
 
 function buildOrgMembersNotifCacheRequest(c: Context, orgId: string, eventName: string, uniqId: string) {
   const helper = new CacheHelper(c)
-  if (!helper.available)
-    return null
+  // Do not check helper.available synchronously — CacheHelper resolves async.
   return {
     helper,
     request: helper.buildRequest(NOTIF_ORG_MEMBERS_CACHE_PATH, { org_id: orgId, event: eventName, uniq_id: uniqId }),
@@ -29,8 +28,6 @@ function buildOrgMembersNotifCacheRequest(c: Context, orgId: string, eventName: 
 
 async function getOrgMembersNotifCacheStatus(c: Context, orgId: string, eventName: string, uniqId: string): Promise<boolean | null> {
   const cacheEntry = buildOrgMembersNotifCacheRequest(c, orgId, eventName, uniqId)
-  if (!cacheEntry)
-    return null
   const payload = await cacheEntry.helper.matchJson<NotifCachePayload>(cacheEntry.request)
   if (!payload)
     return null
@@ -38,12 +35,10 @@ async function getOrgMembersNotifCacheStatus(c: Context, orgId: string, eventNam
 }
 
 function setOrgMembersNotifCacheStatus(c: Context, orgId: string, eventName: string, uniqId: string, sendable: boolean, ttlSeconds: number) {
-  return backgroundTask(c, async () => {
+  return backgroundTask(c, (async () => {
     const cacheEntry = buildOrgMembersNotifCacheRequest(c, orgId, eventName, uniqId)
-    if (!cacheEntry)
-      return
     await cacheEntry.helper.putJson(cacheEntry.request, { sendable }, ttlSeconds)
-  })
+  })())
 }
 
 /**
@@ -559,9 +554,19 @@ export async function sendNotifToOrgMembers(
     return false
 
   // Get all eligible emails (includes org info)
-  const { recipients } = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, drizzleClient, audience)
+  const { recipients, resolutionFailed } = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, drizzleClient, audience)
   if (!recipients) {
     cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembers: org not found', orgId })
+    return false
+  }
+  if (resolutionFailed) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'sendNotifToOrgMembers: recipient resolution failed',
+      eventName,
+      preferenceKey,
+      orgId,
+    })
     return false
   }
 

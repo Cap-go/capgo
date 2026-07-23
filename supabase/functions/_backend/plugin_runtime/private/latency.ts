@@ -9,10 +9,13 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.get('/', async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: 'Latency check' })
   const pgClient = getPgClient(c, true)
-  const res = await selectOne(pgClient)
-
-  await closeClient(c, pgClient)
-  if (!res)
-    throw simpleError('cannot_get_apps', 'Cannot get apps')
-  return c.json(BRES)
+  try {
+    const res = await selectOne(pgClient)
+    if (!res)
+      throw simpleError('cannot_get_apps', 'Cannot get apps')
+    return c.json(BRES)
+  }
+  finally {
+    await closeClient(c, pgClient)
+  }
 })
