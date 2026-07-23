@@ -108,12 +108,12 @@ async function main() {
   const args = parseArgs(process.argv.slice(2))
   ensureCompiledZod()
 
-  const handrolled = await import(pathToFileURL(resolve(ROOT, 'supabase/functions/_backend/utils/plugin_validation.ts')).href)
+  const handrolled = await import(pathToFileURL(resolve(ROOT, 'supabase/functions/_backend/plugin_runtime/utils/plugin_validation.ts')).href)
   const { safeParseSchema } = await import(pathToFileURL(resolve(ROOT, 'supabase/functions/_backend/utils/schema_validation.ts')).href)
   const zodRuntime = await import(pathToFileURL(resolve(ROOT, 'scripts/bench/validation/plugin_schemas.zod.ts')).href)
   const zodCompiled = await import(pathToFileURL(resolve(ROOT, 'scripts/bench/validation/plugin_schemas.zod.compiled.ts')).href)
 
-  const prodIs = await import(pathToFileURL(resolve(ROOT, 'supabase/functions/_backend/utils/plugin_schemas/update_request.is.ts')).href)
+  const prodIs = await import(pathToFileURL(resolve(ROOT, 'supabase/functions/_backend/plugin_runtime/utils/plugin_schemas/update_request.is.ts')).href)
   const validators = {
     handrolled: (input: unknown) => safeParseSchema(handrolled.updateRequestSchema, input).success,
     production_is_predicate: (input: unknown) => prodIs.isUpdateRequestBody(input),

@@ -79,6 +79,7 @@
     "test:local": "bun run test:all",
     "test:coverage:all": "bun run cli:build && bun run supabase:with-env -- bunx vitest run --coverage.enabled=true tests/*",
     "test:all": "bun run cli:build && bun run supabase:with-env -- bunx vitest run tests/*",
+    "check:plugin-runtime": "bun scripts/check_plugin_runtime_isolation.mjs",
     "test:unit": "vitest run tests/*.unit.test.ts",
     "test:db": "bash scripts/test-db-tinbase.sh",
     "test:backend:integration": "bun run supabase:with-env -- bunx vitest run --exclude=tests/*.unit.test.ts --exclude=tests/cli*",
@@ -196,7 +197,7 @@
     "bench:plugin-worker-cpu": "bun scripts/bench_plugin_worker_cpu.ts --save scripts/bench/plugin_worker_cpu_results.json",
     "bench:plugin-har-inspect": "bun scripts/bench_plugin_har_inspect.ts --save scripts/bench/plugin_har_inspect_results.json --har scripts/bench/plugin_endpoints.har",
     "bench:plugin-all": "bun run bench:plugin-worker-runtime && bun run bench:plugin-validation-cpu && bun run bench:plugin-worker-cpu && bun run bench:plugin-har-inspect",
-    "plugin:schemas:compile": "bunx zod-compiler generate supabase/functions/_backend/utils/plugin_schemas/update_request.zod.ts -o scripts/bench/validation/update_request.zod.compiled.ts --emit bag && bunx zod-compiler generate scripts/bench/validation/plugin_schemas.zod.ts -o scripts/bench/validation/plugin_schemas.zod.compiled.ts --emit bag"
+    "plugin:schemas:compile": "bunx zod-compiler generate supabase/functions/_backend/plugin_runtime/utils/plugin_schemas/update_request.zod.ts -o scripts/bench/validation/update_request.zod.compiled.ts --emit bag && bunx zod-compiler generate scripts/bench/validation/plugin_schemas.zod.ts -o scripts/bench/validation/plugin_schemas.zod.compiled.ts --emit bag"
   },
   "dependencies": {
     "@bradenmacdonald/s3-lite-client": "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.6",

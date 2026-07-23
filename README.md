@@ -126,11 +126,11 @@ The backend is split by responsibility to keep routes clear and access scoped:
 - `supabase/functions/_backend/private/` - **Private API** used internally.
   The console (web UI) uses this heavily for admin/ops workflows. It is not
   publicly accessible. Some UI flows still use the public API where appropriate.
-- `supabase/functions/_backend/plugins/` - **Plugin API** used by the
-  `@capgo/capacitor-updater` plugin running inside apps:
-  - `updates` - device update checks and bundle download flow
-  - `stats` - upload usage stats from devices
-  - `channel_self` - allow a device to opt into a channel (QA/debug)
+- `supabase/functions/_backend/plugin_runtime/` - **Plugin API** (isolated from
+  API/utils) used by the `@capgo/capacitor-updater` plugin running inside apps:
+  - `plugins/updates` - device update checks and bundle download flow
+  - `plugins/stats` - upload usage stats from devices
+  - `plugins/channel_self` - allow a device to opt into a channel (QA/debug)
 - `supabase/functions/_backend/triggers/` - **Triggers & CRON** for automated
   backend jobs (queue consumers, scheduled tasks, DB-triggered flows).
 

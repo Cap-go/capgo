@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { env } from 'node:process'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { ALLOWED_STATS_ACTIONS } from '../supabase/functions/_backend/plugins/stats_actions.ts'
+import { ALLOWED_STATS_ACTIONS } from '../supabase/functions/_backend/plugin_runtime/plugins/stats_actions.ts'
 import { APP_NAME, createAppVersions, getBaseData, getSupabaseClient, getVersionFromAction, headers, ORG_ID, PLUGIN_BASE_URL, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
