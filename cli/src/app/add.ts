@@ -1,11 +1,8 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Buffer } from 'node:buffer'
 import type { AppOptions } from '../schemas/app'
-import type { Database } from '../types/supabase.types'
 import type { Organization } from '../utils'
 import { existsSync, readFileSync } from 'node:fs'
 import { intro, log, outro } from '@clack/prompts'
-import { FunctionsHttpError } from '@supabase/supabase-js'
 import { getInvocationSource } from '../analytics/track'
 import { checkAppExists, defaultAppIconPath, getAppIconStoragePath, newIconPath } from '../api/app'
 import { checkAlerts } from '../api/update'
@@ -18,6 +15,7 @@ import {
   getConfig,
   getContentType,
   getOrganizationWithPermission,
+  getRemoteConfig,
   resolveUserIdFromApiKey,
   sendEvent,
 } from '../utils'
@@ -55,7 +53,7 @@ function ensureOptions(appId: string, options: AppOptions, silent: boolean) {
 }
 
 async function ensureAppDoesNotExist(
-  supabase: SupabaseClient<Database>,
+  supabase: Awaited<ReturnType<typeof createSupabaseClient>>,
   appId: string,
   silent: boolean,
 ) {
@@ -82,34 +80,15 @@ export function resolveAppCreateSource(explicit?: AppCreateSource): AppCreateSou
   return getInvocationSource() === 'mcp' ? 'mcp' : 'cli-direct'
 }
 
-async function formatAppCreateError(error: unknown): Promise<string> {
-  if (error instanceof FunctionsHttpError) {
-    try {
-      const body = await error.context.json() as { error?: string, message?: string, status?: string }
-      const details = [body.error, body.message, body.status].filter(Boolean).join(' | ')
-      if (details)
-        return details
-    }
-    catch {
-      // Fall through to generic formatter.
-    }
-  }
-
-  const context = (error as { context?: { json?: () => Promise<unknown> } } | null)?.context
-  if (context?.json) {
-    try {
-      return JSON.stringify(await context.json())
-    }
-    catch {
-      // Fall through to generic formatter.
-    }
-  }
-
-  return formatError(error)
+function formatAppApiErrorBody(body: unknown): string {
+  if (!body || typeof body !== 'object')
+    return ''
+  const record = body as { error?: string, message?: string, status?: string }
+  return [record.error, record.message, record.status].filter(Boolean).join(' | ')
 }
 
 async function createAppViaApi(
-  supabase: SupabaseClient<Database>,
+  apikey: string,
   params: {
     ownerOrg: string
     appId: string
@@ -118,21 +97,31 @@ async function createAppViaApi(
     createdFromOnboarding: boolean
   },
 ) {
-  const { data, error } = await supabase.functions.invoke('app', {
+  // Call Capgo API host (Cloudflare) with the API key. Do not use
+  // supabase.functions.invoke: that targets SUPABASE_URL and always sends
+  // Authorization: Bearer <anon>, which middlewareAuth treats as JWT first.
+  const config = await getRemoteConfig(true)
+  const response = await fetch(`${config.hostApi}/app`, {
     method: 'POST',
-    body: {
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': apikey,
+      'capgkey': apikey,
+    },
+    body: JSON.stringify({
       owner_org: params.ownerOrg,
       app_id: params.appId,
       name: params.name,
       icon: params.iconUrl,
       need_onboarding: false,
       created_from_onboarding: params.createdFromOnboarding,
-    },
+    }),
   })
 
-  if (error) {
-    const message = await formatAppCreateError(error)
-    throw new Error(message)
+  const data = await response.json().catch(() => null)
+  if (!response.ok) {
+    const details = formatAppApiErrorBody(data) || `HTTP ${response.status}`
+    throw new Error(details)
   }
 
   const createdAppId = (data as { app_id?: string } | null)?.app_id
@@ -238,7 +227,7 @@ export async function addAppInternal(
   try {
     // Use the same authorized API path as the web console. Direct PostgREST inserts
     // hit apps/storage RLS and fail for common API-key + pending-onboarding setups.
-    await createAppViaApi(supabase, {
+    await createAppViaApi(options.apikey!, {
       ownerOrg: organizationUid,
       appId,
       name,
@@ -247,7 +236,7 @@ export async function addAppInternal(
     })
   }
   catch (error) {
-    const message = await formatAppCreateError(error)
+    const message = formatError(error)
     if (!silent)
       log.error(`Could not add app ${message}`)
     throw new Error(`Could not add app ${message}`)

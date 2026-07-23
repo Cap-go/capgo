@@ -1888,7 +1888,7 @@ async function maybeReusePendingOnboardingApp(
   const cleanupSpinner = pSpinner()
   cleanupSpinner.start(`Preparing ${selectedAppId} for real onboarding`)
   try {
-    await completePendingOnboardingApp(supabase, organization.gid, selectedAppId)
+    await completePendingOnboardingApp(supabase, organization.gid, selectedAppId, apikey)
     cleanupSpinner.stop('Pending onboarding app prepared ✅')
   }
   catch (error) {
@@ -2055,11 +2055,12 @@ async function completeExistingAppPendingOnboarding(
   supabase: Awaited<ReturnType<typeof createSupabaseClient>>,
   organization: Organization,
   appId: string,
+  apikey: string,
 ) {
   const s = pSpinner()
   s.start(`Preparing existing app ${appId}`)
   try {
-    await completePendingOnboardingApp(supabase, organization.gid, appId)
+    await completePendingOnboardingApp(supabase, organization.gid, appId, apikey)
     s.stop('Existing app prepared ✅')
   }
   catch (error) {
@@ -2091,7 +2092,7 @@ async function resolveExistingAppConflict(
 
   if (useExistingApp === true) {
     if (existingApp.need_onboarding)
-      await completeExistingAppPendingOnboarding(supabase, organization, appId)
+      await completeExistingAppPendingOnboarding(supabase, organization, appId, apikey)
 
     await saveAppIdToCapacitorConfig(appId)
     return 'use-existing'

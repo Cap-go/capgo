@@ -523,7 +523,25 @@ export function middlewareAuth() {
       return simpleRateLimit({ reason: 'too_many_failed_auth_attempts', ...buildRateLimitInfo(ipRateLimited.resetAt) })
     }
 
-    const { jwt, capgkey } = resolveAuthHeaders(c)
+    let { jwt, capgkey } = resolveAuthHeaders(c)
+    // supabase-js always sends Authorization: Bearer <anon_key>. That JWT has no
+    // user `sub`, so when an API key header is also present, prefer the API key.
+    if (jwt && capgkey) {
+      const claims = await getClaimsFromJWT(c, jwt)
+      if (claims?.sub) {
+        c.set('auth', {
+          userId: claims.sub,
+          authType: 'jwt',
+          jwt,
+          apikey: null,
+          claims,
+        })
+        await next()
+        return
+      }
+      jwt = undefined
+    }
+
     if (jwt) {
       const res = await foundJWT(c, jwt)
       if (res) {

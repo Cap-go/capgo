@@ -1,8 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../types/supabase.types'
 import { log } from '@clack/prompts'
-import { FunctionsHttpError } from '@supabase/supabase-js'
-import { formatError, getPMAndCommand, hasCliPermission, show2FADeniedError } from '../utils'
+import { getPMAndCommand, getRemoteConfig, hasCliPermission, show2FADeniedError } from '../utils'
 
 export async function checkAppExists(supabase: SupabaseClient<Database>, appid: string) {
   const { data: app } = await supabase
@@ -98,38 +97,38 @@ export async function findAppInOrganization(
   return data ?? null
 }
 
-async function formatFunctionsInvokeError(error: unknown): Promise<string> {
-  if (error instanceof FunctionsHttpError) {
-    try {
-      const body = await error.context.json() as { error?: string, message?: string, status?: string }
-      const details = [body.error, body.message, body.status].filter(Boolean).join(' | ')
-      if (details)
-        return details
-    }
-    catch {
-      // Fall through to generic formatter.
-    }
-  }
-
-  return formatError(error)
+function formatAppApiErrorBody(body: unknown): string {
+  if (!body || typeof body !== 'object')
+    return ''
+  const record = body as { error?: string, message?: string, status?: string }
+  return [record.error, record.message, record.status].filter(Boolean).join(' | ')
 }
 
 export async function completePendingOnboardingApp(
-  supabase: SupabaseClient<Database>,
+  _supabase: SupabaseClient<Database>,
   orgId: string,
   appId: string,
+  apikey: string,
 ): Promise<void> {
-  // Prefer the authorized API path so keys with org.create_app can finish a
-  // pending web-onboarding app even when they lack app.update_settings.
-  const { data, error } = await supabase.functions.invoke(`app/${appId}`, {
+  // Prefer Capgo API host with the API key so org.create_app keys can finish a
+  // pending web-onboarding app even without app.update_settings. Avoid
+  // functions.invoke (anon Authorization JWT wins over capgkey in middleware).
+  const config = await getRemoteConfig(true)
+  const response = await fetch(`${config.hostApi}/app/${encodeURIComponent(appId)}`, {
     method: 'PUT',
-    body: {
-      need_onboarding: false,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': apikey,
+      'capgkey': apikey,
     },
+    body: JSON.stringify({
+      need_onboarding: false,
+    }),
   })
 
-  if (error) {
-    const details = await formatFunctionsInvokeError(error)
+  const data = await response.json().catch(() => null)
+  if (!response.ok) {
+    const details = formatAppApiErrorBody(data) || `HTTP ${response.status}`
     throw new Error(`Could not complete onboarding for app ${appId}: ${details}`)
   }
 
