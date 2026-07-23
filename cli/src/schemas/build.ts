@@ -4,7 +4,8 @@ import { optionsBaseSchema } from './base'
 
 const inAppUpdatePrioritySchema = z.union([
   z.number().int().min(0).max(5),
-  z.string().transform((value, ctx) => {
+  // Reject blank strings (Number('') === 0); match arktype string.numeric.parse.
+  z.string().regex(/^[+-]?\d+$/).transform((value, ctx) => {
     const parsed = Number(value)
     if (!Number.isInteger(parsed) || parsed < 0 || parsed > 5) {
       ctx.addIssue({ code: 'custom', message: 'must be an integer between 0 and 5' })

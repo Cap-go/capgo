@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { WebhookDeliveryPayload } from '../../utils/webhook.ts'
 import { z } from 'zod'
-import { safeParseSchema } from '../../utils/schema_validation.ts'
+import { numberLikeSchema, safeParseSchema } from '../../utils/schema_validation.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 import {
@@ -17,7 +17,7 @@ import { checkWebhookPermissionV2 } from './index.ts'
 const getDeliveriesSchema = z.object({
   orgId: z.string(),
   webhookId: z.string(),
-  page: z.union([z.number(), z.coerce.number()]).optional(),
+  page: numberLikeSchema.optional(),
   status: z.string().optional(),
 })
 

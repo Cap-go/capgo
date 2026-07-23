@@ -24,9 +24,11 @@ const queryLimitNumberSchema = z.number().int().min(1).refine(
   { message: `a value <= ${MAX_QUERY_LIMIT}` },
 )
 
-const queryLimitStringSchema = z.coerce.number().int().min(1).refine(
-  value => value <= MAX_QUERY_LIMIT,
-  { message: `a value <= ${MAX_QUERY_LIMIT}` },
+const queryLimitStringSchema = z.string().regex(/^[+-]?\d+$/).transform(Number).pipe(
+  z.number().int().min(1).refine(
+    value => value <= MAX_QUERY_LIMIT,
+    { message: `a value <= ${MAX_QUERY_LIMIT}` },
+  ),
 )
 
 export const queryLimitSchema = z.union([queryLimitNumberSchema, queryLimitStringSchema])

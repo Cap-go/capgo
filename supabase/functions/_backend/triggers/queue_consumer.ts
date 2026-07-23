@@ -4,7 +4,7 @@ import type { Database } from '../utils/supabase.types.ts'
 import { z } from 'zod'
 import { Hono } from 'hono/tiny'
 // --- Worker logic imports ---
-import { safeParseSchema } from '../utils/schema_validation.ts'
+import { integerLikeSchema, safeParseSchema } from '../utils/schema_validation.ts'
 import { sendDiscordAlert } from '../utils/discord.ts'
 import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
@@ -29,7 +29,6 @@ export const MAX_QUEUE_READS = 5
 const VERSION_QUEUE_MAX_READS = 30 // deleted manifests can need many partial trash/delete passes
 const DISCORD_IGNORED_ERROR_CODES = new Set(['version_not_found', 'no_channel'])
 
-const integerLikeSchema = z.union([z.number().int(), z.coerce.number().int()])
 export const messageSchema = z.object({
   msg_id: integerLikeSchema,
   read_ct: integerLikeSchema,

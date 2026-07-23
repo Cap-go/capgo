@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { AuthInfo } from '../../utils/hono.ts'
 import { z } from 'zod'
-import { safeParseSchema } from '../../utils/schema_validation.ts'
+import { numberLikeSchema, safeParseSchema } from '../../utils/schema_validation.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { apikeyHasOrgRightWithPolicy, supabaseWithAuth } from '../../utils/supabase.ts'
@@ -10,8 +10,8 @@ const bodySchema = z.object({
   orgId: z.string(),
   tableName: z.string().optional(),
   operation: z.string().optional(),
-  page: z.union([z.number(), z.coerce.number()]).optional(),
-  limit: z.union([z.number(), z.coerce.number()]).optional(),
+  page: numberLikeSchema.optional(),
+  limit: numberLikeSchema.optional(),
 })
 
 const auditLogSchema = z.object({
