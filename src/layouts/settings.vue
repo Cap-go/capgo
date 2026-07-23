@@ -167,6 +167,17 @@ watchEffect(() => {
   if (!needsPlans && hasPlans)
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/plans')
 
+  // Dedicated builder - visible to users who can read billing
+  const needsDedicatedBuilder = canReadBilling.value
+  const hasDedicatedBuilder = organizationTabs.value.find(tab => tab.key === '/settings/organization/dedicated-builder')
+  if (needsDedicatedBuilder && !hasDedicatedBuilder) {
+    const base = baseOrgTabs.find(t => t.key === '/settings/organization/dedicated-builder')
+    if (base)
+      organizationTabs.value.push({ ...base })
+  }
+  if (!needsDedicatedBuilder && hasDedicatedBuilder)
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/dedicated-builder')
+
   // Audit logs - visible only to super_admins
   const needsAuditLogs = canReadAuditLogs.value
   const hasAuditLogs = organizationTabs.value.find(tab => tab.key === '/settings/organization/audit-logs')
