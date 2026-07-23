@@ -14,6 +14,7 @@
  *   bun run bench:plugin-worker-runtime
  *
  * The committed baseline JSON is captured from main before optimizations.
+ * ci-rerun-marker: keep for workflow dispatch after flaky CI.
  * Note: top-level scripts/*.json is gitignored; keep artifacts under scripts/bench/.
  */
 
@@ -506,3 +507,4 @@ function main() {
 }
 
 main()
+
