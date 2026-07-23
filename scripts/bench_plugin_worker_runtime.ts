@@ -51,6 +51,7 @@ interface MicroBench {
   ms: number
   nsPerOp: number
   opsPerSec: number
+  checksum: number
 }
 
 interface BenchReport {
@@ -66,11 +67,18 @@ const FOCUS_PACKAGE_MATCHERS = [
   'npm:stripe',
   'npm:arktype',
   'npm:arkregex',
+  'npm:@ark/schema',
+  'npm:@ark/util',
   'npm:dayjs',
   'npm:drizzle-orm',
   'npm:cron-schedule',
   'npm:pg',
   'npm:hono',
+  'npm:@supabase/supabase-js',
+  'npm:@supabase/auth-js',
+  'npm:@supabase/postgrest-js',
+  'npm:@supabase/realtime-js',
+  'npm:@supabase/storage-js',
   'npm:@jsr/bradenmacdonald__s3-lite-client',
   'npm:@jsr/std__semver',
   'backend:utils/stripe.ts',
@@ -139,9 +147,18 @@ function classifyPath(path: string): string {
     const jsr = path.match(/node_modules\/@jsr\/([^/]+)/)
     if (jsr)
       return `npm:@jsr/${jsr[1]}`
+
+    // Bun install cache paths look like:
+    //   .../.bun/<cache-entry>/node_modules/<package>/...
+    // Prefer the nested package name so we don't collapse everything into npm:.bun.
+    const bunNested = path.match(/\.bun\/[^/]+\/node_modules\/(@[^/]+\/[^/]+|[^/]+)/)
+    if (bunNested)
+      return `npm:${bunNested[1]}`
+
     const bun = path.match(/\.bun\/((?:@[^/]+\/)?[^/@]+)@/)
     if (bun)
       return `npm:${bun[1]}`
+
     const nm = path.match(/node_modules\/(@[^/]+\/[^/]+|[^/]+)/)
     if (nm)
       return `npm:${nm[1]}`
@@ -269,13 +286,24 @@ try {
   return JSON.parse(line) as ImportCost
 }
 
-function bench(name: string, iterations: number, fn: () => void): MicroBench {
+function bench(name: string, iterations: number, fn: () => unknown): MicroBench {
   // warmup
   for (let i = 0; i < Math.min(1000, iterations); i++)
     fn()
+  let checksum = 0
   const t0 = performance.now()
-  for (let i = 0; i < iterations; i++)
-    fn()
+  for (let i = 0; i < iterations; i++) {
+    const value = fn()
+    // Keep results observable so V8 cannot DCE the benchmark body.
+    if (typeof value === 'boolean')
+      checksum = (checksum + (value ? 1 : 0)) | 0
+    else if (typeof value === 'number')
+      checksum = (checksum + (value | 0)) | 0
+    else if (typeof value === 'string')
+      checksum = (checksum + value.length) | 0
+    else if (value != null)
+      checksum = (checksum + 1) | 0
+  }
   const ms = performance.now() - t0
   return {
     name,
@@ -283,6 +311,7 @@ function bench(name: string, iterations: number, fn: () => void): MicroBench {
     ms,
     nsPerOp: (ms * 1e6) / iterations,
     opsPerSec: iterations / (ms / 1000),
+    checksum,
   }
 }
 
@@ -318,28 +347,20 @@ function runMicroBenches(): MicroBench[] {
   const iterations = 200_000
 
   return [
-    bench('stats_action_array_includes', iterations, () => {
-      void actions.includes(targetAction)
-    }),
-    bench('stats_action_set_has', iterations, () => {
-      void actionSet.has(targetAction)
-    }),
+    bench('stats_action_array_includes', iterations, () => actions.includes(targetAction)),
+    bench('stats_action_set_has', iterations, () => actionSet.has(targetAction)),
     bench('limited_apps_json_parse_every_call', iterations, () => {
       const apps = JSON.parse(limitsJson) as Array<{ id: string, ignore: number }>
-      void apps.find(app => app.id === targetApp)
+      return apps.find(app => app.id === targetApp)?.id ?? ''
     }),
     bench('limited_apps_cached_map_lookup', iterations, () => {
-      void getCached(limitsJson).get(targetApp)
+      return getCached(limitsJson).get(targetApp)?.id ?? ''
     }),
-    bench('allowed_actions_join_every_error', 20_000, () => {
-      void actions.join(', ')
-    }),
+    bench('allowed_actions_join_every_error', 20_000, () => actions.join(', ')),
     (() => {
       let list: string | undefined
       const getList = () => (list ??= actions.join(', '))
-      return bench('allowed_actions_join_cached', 20_000, () => {
-        void getList()
-      })
+      return bench('allowed_actions_join_cached', 20_000, () => getList())
     })(),
   ]
 }
@@ -379,7 +400,7 @@ function printReport(report: BenchReport) {
 
   console.log('\n-- Hot-path microbenches --')
   for (const row of report.microBenches) {
-    console.log(`  ${row.name.padEnd(36)} ${row.ms.toFixed(2).padStart(8)} ms | ${row.nsPerOp.toFixed(1).padStart(8)} ns/op | ${Math.round(row.opsPerSec).toLocaleString()} ops/s`)
+    console.log(`  ${row.name.padEnd(36)} ${row.ms.toFixed(2).padStart(8)} ms | ${row.nsPerOp.toFixed(1).padStart(8)} ns/op | ${Math.round(row.opsPerSec).toLocaleString()} ops/s | checksum ${row.checksum}`)
   }
 }
 
@@ -411,6 +432,30 @@ function compareReports(baseline: BenchReport, current: BenchReport) {
     console.log(`  ${key.padEnd(42)} ${kib(before).padStart(10)} → ${kib(after).padStart(10)} (${pct(before, after)})`)
   }
 
+  console.log('\nImport CPU / RAM (machine-local; compare directionally):')
+  const importKeys = new Set([
+    ...baseline.importCosts.map(row => row.specifier),
+    ...current.importCosts.map(row => row.specifier),
+  ])
+  const baselineImports = new Map(baseline.importCosts.map(row => [row.specifier, row]))
+  const currentImports = new Map(current.importCosts.map(row => [row.specifier, row]))
+  for (const specifier of [...importKeys].sort()) {
+    const before = baselineImports.get(specifier)
+    const after = currentImports.get(specifier)
+    if (!before && !after)
+      continue
+    const beforeMs = before?.ms ?? 0
+    const afterMs = after?.ms ?? 0
+    const beforeHeap = before?.heapUsedDeltaMB ?? 0
+    const afterHeap = after?.heapUsedDeltaMB ?? 0
+    const beforeRss = before?.rssDeltaMB ?? 0
+    const afterRss = after?.rssDeltaMB ?? 0
+    console.log(`  ${specifier}`)
+    console.log(`    cpu  ${beforeMs.toFixed(2)} ms → ${afterMs.toFixed(2)} ms (${pct(beforeMs, afterMs)})`)
+    console.log(`    heap ${beforeHeap.toFixed(2)} MB → ${afterHeap.toFixed(2)} MB (${pct(beforeHeap, afterHeap)})`)
+    console.log(`    rss  ${beforeRss.toFixed(2)} MB → ${afterRss.toFixed(2)} MB (${pct(beforeRss, afterRss)})`)
+  }
+
   console.log('\nMicrobench method comparison (lower ns/op is better):')
   const byName = new Map(current.microBenches.map(row => [row.name, row]))
   const pairs: Array<[string, string]> = [
@@ -424,7 +469,7 @@ function compareReports(baseline: BenchReport, current: BenchReport) {
     if (!oldRow || !newRow)
       continue
     console.log(`  ${oldName} → ${newName}`)
-    console.log(`    ${oldRow.nsPerOp.toFixed(1)} ns/op → ${newRow.nsPerOp.toFixed(1)} ns/op (${pct(oldRow.nsPerOp, newRow.nsPerOp)})`)
+    console.log(`    ${oldRow.nsPerOp.toFixed(1)} ns/op → ${newRow.nsPerOp.toFixed(1)} ns/op (${pct(oldRow.nsPerOp, newRow.nsPerOp)}) | checksum ${oldRow.checksum}/${newRow.checksum}`)
   }
 }
 

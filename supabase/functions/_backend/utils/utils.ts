@@ -172,8 +172,14 @@ function getLimitedAppsById(limits: string): Map<string, LimitedApp> {
     return limitedAppsById
 
   const apps = JSON.parse(limits) as LimitedApp[]
+  // Preserve first-match semantics of the previous apps.find(...) lookup.
+  const byId = new Map<string, LimitedApp>()
+  for (const app of apps) {
+    if (!byId.has(app.id))
+      byId.set(app.id, app)
+  }
   limitedAppsCacheKey = limits
-  limitedAppsById = new Map(apps.map(app => [app.id, app]))
+  limitedAppsById = byId
   return limitedAppsById
 }
 

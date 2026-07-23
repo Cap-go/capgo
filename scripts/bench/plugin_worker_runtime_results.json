@@ -1,21 +1,26 @@
 {
-  "generatedAt": "2026-07-23T07:16:38.772Z",
-  "gitHead": "4f9f2cf582db478e19f6e55a9fe0f8447c377748",
+  "generatedAt": "2026-07-23T07:35:10.530Z",
+  "gitHead": "4280d79633b9699849a06a4ec1ac9eea28f9613f",
   "bundle": {
-    "uploadBytes": 664197,
-    "gzipBytes": 189891,
-    "outputBytes": 664202,
+    "uploadBytes": 664228,
+    "gzipBytes": 189911,
+    "outputBytes": 664228,
     "topPackagesBytesInOutput": {
       "ecosystem:@supabase": 220362,
-      "npm:.bun": 214717,
       "npm:drizzle-orm": 133349,
+      "npm:@supabase/auth-js": 101447,
       "npm:pg": 45372,
+      "npm:@supabase/realtime-js": 32782,
       "npm:hono": 27323,
+      "npm:@supabase/phoenix": 26270,
+      "npm:@supabase/storage-js": 23322,
       "npm:@jsr/bradenmacdonald__s3-lite-client": 22447,
       "backend:utils/pg.ts": 20922,
+      "npm:@supabase/postgrest-js": 16370,
       "backend:utils/update.ts": 16104,
       "npm:pg-protocol": 14010,
       "backend:plugins/channel_self.ts": 11652,
+      "npm:@supabase/supabase-js": 11330,
       "backend:utils/postgres_schema.ts": 9612,
       "npm:cron-schedule": 8019,
       "backend:utils/s3.ts": 7792,
@@ -35,23 +40,23 @@
       "npm:pg-connection-string": 3707,
       "backend:utils/plugin_notification_queue.ts": 3239,
       "backend:utils/updateOracleGuard.ts": 3226,
+      "npm:@supabase/functions-js": 3196,
       "backend:utils/manifest_size.ts": 3015,
       "backend:utils/rollout.ts": 2936,
       "backend:utils/stats.ts": 2797,
       "backend:utils/channelSelfRateLimit.ts": 2784,
-      "npm:pg-cloudflare": 2735,
-      "backend:utils/posthog.ts": 2715,
-      "npm:pgpass": 2706,
-      "backend:utils/utils.ts": 2698,
-      "backend:utils/discord.ts": 2675,
-      "backend:utils/supabase.ts": 2358,
-      "backend:utils/plugin_parser.ts": 2287
+      "npm:pg-cloudflare": 2735
     },
     "focusPackagesBytesInOutput": {
       "npm:drizzle-orm": 133349,
       "npm:cron-schedule": 8019,
       "npm:pg": 45372,
       "npm:hono": 27323,
+      "npm:@supabase/supabase-js": 11330,
+      "npm:@supabase/auth-js": 101447,
+      "npm:@supabase/postgrest-js": 16370,
+      "npm:@supabase/realtime-js": 32782,
+      "npm:@supabase/storage-js": 23322,
       "npm:@jsr/bradenmacdonald__s3-lite-client": 22447,
       "npm:@jsr/std__semver": 3955,
       "backend:utils/ark_validation.ts": 697,
@@ -66,111 +71,117 @@
   "importCosts": [
     {
       "specifier": "arktype",
-      "ms": 164.61856,
-      "heapUsedDeltaMB": 16.82306671142578,
-      "rssDeltaMB": 43.28515625,
-      "heapUsedMB": 20.33983612060547,
-      "rssMB": 88.47265625
+      "ms": 167.217387,
+      "heapUsedDeltaMB": 14.315177917480469,
+      "rssDeltaMB": 44.78515625,
+      "heapUsedMB": 17.831947326660156,
+      "rssMB": 90.03125
     },
     {
       "specifier": "stripe",
-      "ms": 45.052693000000005,
-      "heapUsedDeltaMB": 3.5112075805664062,
-      "rssDeltaMB": 17.6171875,
-      "heapUsedMB": 7.027976989746094,
-      "rssMB": 62.8359375
+      "ms": 43.804316,
+      "heapUsedDeltaMB": 3.5753555297851562,
+      "rssDeltaMB": 17.91796875,
+      "heapUsedMB": 7.092124938964844,
+      "rssMB": 63.11328125
     },
     {
       "specifier": "drizzle-orm",
-      "ms": 50.28196600000001,
+      "ms": 48.267157999999995,
       "heapUsedDeltaMB": 17.60480499267578,
-      "rssDeltaMB": 30.15234375,
+      "rssDeltaMB": 30.171875,
       "heapUsedMB": 21.121612548828125,
-      "rssMB": 75.38671875
+      "rssMB": 75.40234375
     },
     {
       "specifier": "dayjs",
-      "ms": 0.8286960000000008,
+      "ms": 1.0268990000000002,
       "heapUsedDeltaMB": 0.078399658203125,
-      "rssDeltaMB": 0.5,
+      "rssDeltaMB": 0.625,
       "heapUsedMB": 3.5951690673828125,
-      "rssMB": 45.84765625
+      "rssMB": 45.76953125
     },
     {
       "specifier": "@supabase/supabase-js",
-      "ms": 24.065450000000002,
-      "heapUsedDeltaMB": 2.754913330078125,
-      "rssDeltaMB": 11.69140625,
-      "heapUsedMB": 6.27178955078125,
-      "rssMB": 56.96484375
+      "ms": 23.747891000000003,
+      "heapUsedDeltaMB": 2.740570068359375,
+      "rssDeltaMB": 11.22265625,
+      "heapUsedMB": 6.2574462890625,
+      "rssMB": 56.30859375
     },
     {
       "specifier": "pg",
-      "ms": 20.364749000000003,
-      "heapUsedDeltaMB": 1.4881591796875,
-      "rssDeltaMB": 11.35546875,
-      "heapUsedMB": 5.004913330078125,
-      "rssMB": 56.61328125
+      "ms": 20.331899,
+      "heapUsedDeltaMB": 1.4843521118164062,
+      "rssDeltaMB": 11.390625,
+      "heapUsedMB": 5.001106262207031,
+      "rssMB": 56.65625
     },
     {
       "specifier": "cron-schedule",
-      "ms": 5.582895000000001,
+      "ms": 5.6664270000000005,
       "heapUsedDeltaMB": 0.36772918701171875,
       "rssDeltaMB": 1.484375,
       "heapUsedMB": 3.884552001953125,
-      "rssMB": 46.75390625
+      "rssMB": 46.62890625
     },
     {
       "specifier": "hono",
-      "ms": 10.023689000000001,
+      "ms": 10.362763000000001,
       "heapUsedDeltaMB": 0.9991455078125,
-      "rssDeltaMB": 8.40234375,
+      "rssDeltaMB": 8.375,
       "heapUsedMB": 4.515899658203125,
-      "rssMB": 53.515625
+      "rssMB": 53.6328125
     }
   ],
   "microBenches": [
     {
       "name": "stats_action_array_includes",
       "iterations": 200000,
-      "ms": 0.6736860000000888,
-      "nsPerOp": 3.368430000000444,
-      "opsPerSec": 296874211.4278367
+      "ms": 4.791509000000133,
+      "nsPerOp": 23.957545000000668,
+      "opsPerSec": 41740503.878839515,
+      "checksum": 200000
     },
     {
       "name": "stats_action_set_has",
       "iterations": 200000,
-      "ms": 0.8113329999998768,
-      "nsPerOp": 4.056664999999384,
-      "opsPerSec": 246507907.35743567
+      "ms": 1.2329990000000635,
+      "nsPerOp": 6.164995000000318,
+      "opsPerSec": 162206133.17609316,
+      "checksum": 200000
     },
     {
       "name": "limited_apps_json_parse_every_call",
       "iterations": 200000,
-      "ms": 1018.2524010000002,
-      "nsPerOp": 5091.262005000001,
-      "opsPerSec": 196414.95547035785
+      "ms": 1012.0663289999998,
+      "nsPerOp": 5060.331644999998,
+      "opsPerSec": 197615.50628565575,
+      "checksum": 3400000
     },
     {
       "name": "limited_apps_cached_map_lookup",
       "iterations": 200000,
-      "ms": 1.7967549999998482,
-      "nsPerOp": 8.983774999999241,
-      "opsPerSec": 111311781.51724465
+      "ms": 4.2983250000002045,
+      "nsPerOp": 21.491625000001026,
+      "opsPerSec": 46529752.86884786,
+      "checksum": 3400000
     },
     {
       "name": "allowed_actions_join_every_error",
       "iterations": 20000,
-      "ms": 26.445721999999932,
-      "nsPerOp": 1322.2860999999966,
-      "opsPerSec": 756265.9850995957
+      "ms": 25.75385200000028,
+      "nsPerOp": 1287.692600000014,
+      "opsPerSec": 776582.8583623057,
+      "checksum": 21180000
     },
     {
       "name": "allowed_actions_join_cached",
       "iterations": 20000,
-      "ms": 0.2373160000001917,
-      "nsPerOp": 11.865800000009585,
-      "opsPerSec": 84275817.89674461
+      "ms": 0.2719950000000608,
+      "nsPerOp": 13.599750000003041,
+      "opsPerSec": 73530763.4331349,
+      "checksum": 21180000
     }
   ]
 }
