@@ -7,6 +7,23 @@ describe('swap memory cleanup functions', () => {
     await cleanupPostgresClient()
   })
 
+
+  it('cleanup_queue_messages skips queues whose archive tables are missing', async () => {
+    const queueName = `cleanup_missing_${randomUUID().slice(0, 8)}`
+    await executeSQL(
+      `INSERT INTO pgmq.meta (queue_name, is_partitioned, is_unlogged)
+       VALUES ($1, false, false)`,
+      [queueName],
+    )
+
+    try {
+      await expect(executeSQL(`SELECT public.cleanup_queue_messages()`)).resolves.toBeTruthy()
+    }
+    finally {
+      await executeSQL(`DELETE FROM pgmq.meta WHERE queue_name = $1`, [queueName])
+    }
+  })
+
   it('cleanup_queue_messages deletes archived rows older than 2 days in batches', async () => {
     const marker = `swap-cleanup-${randomUUID()}`
     const baseMsgId = BigInt(Date.now()) * 1000n
