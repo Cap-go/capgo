@@ -6,6 +6,7 @@ import {
   createSchema,
   makeIssue,
 } from './ark_validation.ts'
+import { isChannelSelfRequestBody } from './plugin_schemas/channel_self_request.is.ts'
 import { isStatsRequestBody } from './plugin_schemas/stats_request.is.ts'
 import { isUpdateRequestBody } from './plugin_schemas/update_request.is.ts'
 import {
@@ -343,7 +344,7 @@ export const channelSelfRequestSchema = createPluginSchema<AppInfos>((input, iss
   if (input.install_source !== undefined)
     validateInstallSourceValue(input.install_source, issues)
   validateOptionalStringMaxLength(input, 'key_id', 20, issues)
-})
+}, isChannelSelfRequestBody as (value: unknown) => value is AppInfos)
 
 export const channelSelfGetRequestSchema = createPluginSchema<{
   app_id: string
