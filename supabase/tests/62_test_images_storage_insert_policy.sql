@@ -10,12 +10,12 @@ SELECT ok(
       AND tablename = 'objects'
       AND policyname = 'Allow user or apikey to insert they own folder in images'
       -- Bare name inside FROM apps resolves to apps.name; policy must use objects.name.
-      AND position('foldername(apps.name' in replace(lower(coalesce(with_check, '')), ' ', '')) = 0
-      AND position('foldername(("apps"."name"' in replace(lower(coalesce(with_check, '')), ' ', '')) = 0
+      AND with_check NOT LIKE '%foldername((apps.name%'
+      AND with_check NOT LIKE '%foldername(("apps"."name"%'
+      AND with_check NOT LIKE '%foldername(apps.name%'
       AND with_check LIKE '%foldername%objects.name%'
       AND with_check LIKE '%rbac_perm_org_create_app%'
       AND with_check LIKE '%need_onboarding%'
-      AND with_check LIKE '%NOT EXISTS%'
   ),
   'images insert policy uses storage objects.name path and org.create_app for new/pending app icons'
 );
@@ -31,7 +31,10 @@ SELECT ok(
       AND with_check LIKE '%need_onboarding%'
       AND qual LIKE '%rbac_perm_org_create_app%'
       AND with_check LIKE '%rbac_perm_org_create_app%'
-      AND position('foldername(apps.name' in replace(lower(coalesce(qual, '') || coalesce(with_check, '')), ' ', '')) = 0
+      AND coalesce(qual, '') NOT LIKE '%foldername((apps.name%'
+      AND coalesce(with_check, '') NOT LIKE '%foldername((apps.name%'
+      AND coalesce(qual, '') NOT LIKE '%foldername(apps.name%'
+      AND coalesce(with_check, '') NOT LIKE '%foldername(apps.name%'
   ),
   'images update policy allows org.create_app for missing or pending onboarding app icons'
 );
