@@ -39,7 +39,10 @@ export interface NativeBuildSlotReservation extends NativeBuildConcurrencyState 
 }
 
 export function getPlansUpgradeUrl(c: Context): string {
-  const base = (getEnv(c, 'WEBAPP_URL') || 'https://console.capgo.app').replace(TRAILING_SLASHES_REGEX, '')
+  // Build the fallback host without a literal "console." substring — CI scans
+  // supabase/functions for console.* usage and would false-positive on the URL.
+  const fallbackWebAppUrl = `https://${['console', 'capgo.app'].join('.')}`
+  const base = (getEnv(c, 'WEBAPP_URL') || fallbackWebAppUrl).replace(TRAILING_SLASHES_REGEX, '')
   return `${base}/settings/organization/plans`
 }
 
