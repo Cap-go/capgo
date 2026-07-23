@@ -1,12 +1,15 @@
 #!/usr/bin/env bun
 /**
-// CI tip sync marker — keep for reproducible bench entry docs
  * Comparative runtime cost bench for the Capgo plugin Cloudflare Worker.
  *
  * Measures (no guessing):
  * 1) Retained minified bundle bytes per package via `wrangler deploy --dry-run --metafile`
  * 2) Node import CPU ms + heap/RSS deltas for heavy libraries
  * 3) Hot-path microbenches (LIMITED_APPS parse, stats action membership)
+ *
+ * For isolate/request CPU ms and validation library CPU comparisons, also run:
+ *   bun run bench:plugin-worker-cpu
+ *   bun run bench:plugin-validation-cpu
  *
  * Usage:
  *   bun scripts/bench_plugin_worker_runtime.ts

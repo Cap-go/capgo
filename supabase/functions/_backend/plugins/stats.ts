@@ -6,14 +6,14 @@ import { greaterOrEqual, parse, tryParse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { BRES, simpleError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
-import { cloudlog } from '../utils/logging.ts'
 import { invalidIpInfo } from '../utils/invalids_ip.ts'
+import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrgCached } from '../utils/notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getEffectiveDeviceChannelNamePostgres, getPgClient } from '../utils/pg.ts'
 import { makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
-import { getClientIP } from '../utils/rate_limit.ts'
+import { createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/plugin_stats.ts'
 import { statsRequestSchema } from '../utils/plugin_validation.ts'
-import { createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/stats.ts'
+import { getClientIP } from '../utils/rate_limit.ts'
 import { backgroundTask, INVALID_STRING_APP_ID, isLimited, MISSING_STRING_APP_ID, reverseDomainRegex } from '../utils/utils.ts'
 
 const PLAN_ERROR = 'Cannot send stats, upgrade plan to continue to update'
@@ -42,7 +42,6 @@ async function blockProviderInfrastructure(c: Context, shouldBlockProviderInfras
   })
   return c.json({ error: 'provider_infrastructure_request_blocked', message: 'Provider infrastructure requests are blocked' }, 429)
 }
-
 
 export interface BatchStatsResult {
   status: 'ok' | 'error'

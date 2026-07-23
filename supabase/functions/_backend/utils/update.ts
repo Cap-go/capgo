@@ -16,14 +16,14 @@ import { getAppStatus, setAppStatus } from './appStatus.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
-import { getClientIP } from './rate_limit.ts'
 import { sendNotifOrgCached } from './notifications.ts'
 import { sendNotifToOrgMembersCached } from './org_email_notifications.ts'
 import { closeClient, getAppBlockProviderInfraRequestsPostgres, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres, setReplicationLagHeader } from './pg.ts'
-import { shouldQueuePluginNotifications } from './supabase_write_guard.ts'
 import { makeDevice } from './plugin_parser.ts'
+import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './plugin_stats.ts'
+import { getClientIP } from './rate_limit.ts'
 import { s3 } from './s3.ts'
-import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './stats.ts'
+import { shouldQueuePluginNotifications } from './supabase_write_guard.ts'
 import { isUpdateEnumerationLimited, recordUpdateEnumerationMiss, updateEnumerationLimitedResponse } from './updateOracleGuard.ts'
 import { backgroundTask, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, fixSemver, isDeprecatedPluginVersion, isInternalVersionName } from './utils.ts'
 
@@ -103,7 +103,7 @@ function notifyAutoUpdateVersionBlocked(
   })())
 }
 
-type InvalidIpInfo = {
+interface InvalidIpInfo {
   blocked: boolean
   provider: 'google' | 'apple' | null
 }
@@ -156,7 +156,6 @@ function updateError200(c: Context, errorCode: string, message: string, moreInfo
   })
 }
 
-
 async function getProviderInfrastructureInfo(c: Context) {
   const requestIp = getClientIP(c)
   if (requestIp === 'unknown')
@@ -204,7 +203,7 @@ async function providerInfrastructureColdCacheBlockResponse(c: Context, appId: s
   return providerInfrastructureBlockedResponse(c, providerInfo.requestIp, providerInfo.providerInfo)
 }
 
-type ResponseFeatureSupport = {
+interface ResponseFeatureSupport {
   manifest: boolean
   metadata: boolean
 }

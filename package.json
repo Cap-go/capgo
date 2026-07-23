@@ -97,7 +97,7 @@
     "test:cloudflare:api": "vitest run --exclude=tests/cli* --exclude=tests/updates* --exclude=tests/stats* --exclude=tests/channel_self* --config vitest.config.cloudflare.ts",
     "test:cloudflare:updates": "vitest run tests/updates* --config vitest.config.cloudflare.ts",
     "bench": "vitest bench --config vitest.config.bench.ts --run",
-    "bench:plugin-worker-runtime": "bun scripts/bench_plugin_worker_runtime.ts --compare scripts/bench/plugin_worker_runtime_baseline.json",
+    "bench:plugin-worker-runtime": "bun scripts/bench_plugin_worker_runtime.ts --compare scripts/bench/plugin_worker_runtime_baseline.json --save scripts/bench/plugin_worker_runtime_results.json",
     "admin:backfill-paid-product-activity": "bun scripts/backfill_paid_product_activity.ts",
     "admin:backfill-credit-usage-posthog": "bun scripts/backfill_credit_usage_posthog_events.ts",
     "admin:backfill-plugin-version-ladder": "bun scripts/backfill_plugin_version_ladder.ts",
@@ -191,7 +191,11 @@
     "size": "bunx vite-bundle-visualizer",
     "test:analytics-sql": "vitest run tests/analytics-engine-sql.unit.test.ts",
     "test:analytics-sql:live": "bun --env-file=internal/cloudflare/.env.prod scripts/validate-analytics-engine-sql.ts",
-    "changelog:ai": "node scripts/generate-ai-changelog.mjs"
+    "changelog:ai": "node scripts/generate-ai-changelog.mjs",
+    "bench:plugin-validation-cpu": "bun scripts/bench_plugin_validation_cpu.ts --save scripts/bench/plugin_validation_cpu_results.json",
+    "bench:plugin-worker-cpu": "bun scripts/bench_plugin_worker_cpu.ts --save scripts/bench/plugin_worker_cpu_results.json",
+    "bench:plugin-all": "bun run bench:plugin-worker-runtime && bun run bench:plugin-validation-cpu && bun run bench:plugin-worker-cpu",
+    "plugin:schemas:compile": "bunx zod-compiler generate supabase/functions/_backend/utils/plugin_schemas/update_request.zod.ts -o supabase/functions/_backend/utils/plugin_schemas/update_request.zod.compiled.ts --emit bag"
   },
   "dependencies": {
     "@bradenmacdonald/s3-lite-client": "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.6",
@@ -371,6 +375,7 @@
     "eslint-plugin-oxlint": "^1.75.0",
     "jose": "^6.2.4",
     "knip": "^6.29.0",
+    "miniflare": "^4.20260721.0",
     "oxlint": "^1.75.0",
     "pixelmatch": "^7.2.0",
     "pngjs": "^7.0.0",
@@ -393,7 +398,9 @@
     "vite-plugin-webfont-dl": "^3.12.0",
     "vitest": "^4.1.10",
     "vue-tsc": "3.3.7",
-    "wrangler": "^4.113.0"
+    "wrangler": "^4.113.0",
+    "zod": "^4.4.3",
+    "zod-compiler": "^1.15.0"
   },
   "gitmoji": {
     "autoAdd": false,
