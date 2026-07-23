@@ -1606,6 +1606,7 @@ DECLARE
   v_actor_apikey_name text;
   v_stats_refresh_fields constant text[] := ARRAY['stats_refresh_requested_at', 'stats_updated_at', 'updated_at'];
   v_background_counter_fields constant text[] := ARRAY['channel_device_count', 'manifest_bundle_count', 'updated_at'];
+  v_fat_app_version_fields constant text[] := ARRAY['manifest', 'native_packages'];
 BEGIN
   SELECT auth.uid() INTO v_actor_user_id;
 
@@ -1680,6 +1681,30 @@ BEGIN
         SELECT 1
         FROM pg_catalog.unnest(v_changed_fields) AS changed_field(field_name)
         WHERE changed_field.field_name <> ALL(v_background_counter_fields)
+      ) THEN
+      RETURN NEW;
+    END IF;
+  END IF;
+
+  -- Never persist multi-MB array/json columns in audit TOAST.
+  -- Keep fat field names in changed_fields so upload-time edits remain visible.
+  IF TG_TABLE_NAME = 'app_versions' THEN
+    IF v_old_record IS NOT NULL THEN
+      v_old_record := v_old_record - v_fat_app_version_fields;
+    END IF;
+    IF v_new_record IS NOT NULL THEN
+      v_new_record := v_new_record - v_fat_app_version_fields;
+    END IF;
+
+    -- Skip audit only for dual-storage reclaim: non-null manifest -> NULL (+ updated_at).
+    IF TG_OP = 'UPDATE'
+      AND OLD.manifest IS NOT NULL
+      AND NEW.manifest IS NULL
+      AND NEW.native_packages IS NOT DISTINCT FROM OLD.native_packages
+      AND NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.unnest(COALESCE(v_changed_fields, ARRAY[]::text[])) AS changed_field(field_name)
+        WHERE changed_field.field_name <> ALL(ARRAY['manifest', 'updated_at']::text[])
       ) THEN
       RETURN NEW;
     END IF;
@@ -2467,8 +2492,32 @@ DECLARE
   bundle_was_ready boolean;
 BEGIN
   IF TG_OP = 'UPDATE' THEN
+    -- Never drop the only copy of legacy file metadata, ready or not.
+    IF NEW.manifest IS NULL
+      AND OLD.manifest IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+        FROM pg_catalog.unnest(OLD.manifest) AS entry(file_name, s3_path, file_hash)
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM public.manifest AS m
+          WHERE m.app_version_id = OLD.id
+            -- Match stable identity; file_name may have been normalized at migrate time.
+            AND m.s3_path = entry.s3_path
+            AND m.file_hash = entry.file_hash
+        )
+      )
+    THEN
+      RAISE EXCEPTION '%',
+        'bundle_manifest_not_migrated: Cannot clear app_versions.manifest '
+        || 'until every entry exists in public.manifest.';
+    END IF;
+
     bundle_was_ready := OLD.storage_provider IS DISTINCT FROM 'r2-direct';
 
+    -- Nulling a fully migrated dual-storage manifest array is allowed after upload.
+    -- native_packages remains locked (compatibility metadata has no table copy).
+    -- Rewriting non-null manifest content stays locked.
     IF bundle_was_ready
       AND (
         NEW.name IS DISTINCT FROM OLD.name
@@ -2479,12 +2528,29 @@ BEGIN
         OR NEW.r2_path IS DISTINCT FROM OLD.r2_path
         OR NEW.external_url IS DISTINCT FROM OLD.external_url
         OR NEW.checksum IS DISTINCT FROM OLD.checksum
-        OR NEW.manifest IS DISTINCT FROM OLD.manifest
+        OR (NEW.manifest IS DISTINCT FROM OLD.manifest AND NEW.manifest IS NOT NULL)
+        -- Nulling is allowed only when public.manifest has every expected entry.
+        OR (
+          NEW.manifest IS NULL
+          AND OLD.manifest IS NOT NULL
+          AND EXISTS (
+            SELECT 1
+            FROM pg_catalog.unnest(OLD.manifest) AS entry(file_name, s3_path, file_hash)
+            WHERE NOT EXISTS (
+              SELECT 1
+              FROM public.manifest AS m
+              WHERE m.app_version_id = OLD.id
+                -- Match stable identity; file_name may have been normalized at migrate time.
+                AND m.s3_path = entry.s3_path
+                AND m.file_hash = entry.file_hash
+            )
+          )
+        )
         OR NEW.native_packages IS DISTINCT FROM OLD.native_packages
       )
     THEN
       PERFORM public.pg_log('deny: BUNDLE_CONTENT_LOCKED_TRIGGER',
-        jsonb_build_object(
+        pg_catalog.jsonb_build_object(
           'org_id', OLD.owner_org,
           'app_id', OLD.app_id,
           'version_name', OLD.name,
@@ -2497,6 +2563,42 @@ BEGIN
         'bundle_already_ready: Bundle content cannot be changed '
         || 'after upload is complete. Upload a new bundle instead.';
     END IF;
+  END IF;
+
+  -- Fully migrated dual-storage nulling must not re-run encryption enforcement.
+  -- Incomplete nulling (still missing public.manifest rows) must not bypass checks,
+  -- including for in-progress r2-direct uploads.
+  IF TG_OP = 'UPDATE'
+    AND NEW.session_key IS NOT DISTINCT FROM OLD.session_key
+    AND NEW.key_id IS NOT DISTINCT FROM OLD.key_id
+    AND NEW.name IS NOT DISTINCT FROM OLD.name
+    AND NEW.app_id IS NOT DISTINCT FROM OLD.app_id
+    AND NEW.storage_provider IS NOT DISTINCT FROM OLD.storage_provider
+    AND NEW.r2_path IS NOT DISTINCT FROM OLD.r2_path
+    AND NEW.external_url IS NOT DISTINCT FROM OLD.external_url
+    AND NEW.checksum IS NOT DISTINCT FROM OLD.checksum
+    AND NEW.native_packages IS NOT DISTINCT FROM OLD.native_packages
+    AND (
+      NEW.manifest IS NOT DISTINCT FROM OLD.manifest
+      OR (
+        NEW.manifest IS NULL
+        AND OLD.manifest IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1
+          FROM pg_catalog.unnest(OLD.manifest) AS entry(file_name, s3_path, file_hash)
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM public.manifest AS m
+            WHERE m.app_version_id = OLD.id
+              -- Match stable identity; file_name may have been normalized at migrate time.
+              AND m.s3_path = entry.s3_path
+              AND m.file_hash = entry.file_hash
+          )
+        )
+      )
+    )
+  THEN
+    RETURN NEW;
   END IF;
 
   -- Derive org_id from NEW.app_id first because
@@ -2524,11 +2626,11 @@ BEGIN
   END IF;
 
   bundle_is_encrypted := public.is_bundle_encrypted(NEW.session_key);
-  bundle_key_id := NULLIF(btrim(NEW.key_id), '')::varchar(20);
+  bundle_key_id := NULLIF(pg_catalog.btrim(NEW.key_id), '')::varchar(20);
 
   IF NOT bundle_is_encrypted THEN
     PERFORM public.pg_log('deny: ORG_REQUIRES_ENCRYPTED_BUNDLES_TRIGGER',
-      jsonb_build_object(
+      pg_catalog.jsonb_build_object(
         'org_id', org_id,
         'app_id', NEW.app_id,
         'version_name', NEW.name,
@@ -2543,7 +2645,7 @@ BEGIN
   IF org_required_key IS NOT NULL AND org_required_key <> '' THEN
     IF bundle_key_id IS NULL THEN
       PERFORM public.pg_log('deny: ORG_REQUIRES_SPECIFIC_ENCRYPTION_KEY_TRIGGER',
-        jsonb_build_object(
+        pg_catalog.jsonb_build_object(
           'org_id', org_id,
           'app_id', NEW.app_id,
           'version_name', NEW.name,
@@ -2560,11 +2662,11 @@ BEGIN
 
     -- key_id is 20 chars and required_encryption_key may be 20 or 21 chars.
     IF NOT (
-      bundle_key_id = LEFT(org_required_key, 20)
-      OR LEFT(bundle_key_id, LENGTH(org_required_key)) = org_required_key
+      bundle_key_id = pg_catalog.left(org_required_key, 20)
+      OR pg_catalog.left(bundle_key_id, pg_catalog.length(org_required_key)) = org_required_key
     ) THEN
       PERFORM public.pg_log('deny: ORG_REQUIRES_SPECIFIC_ENCRYPTION_KEY_TRIGGER',
-        jsonb_build_object(
+        pg_catalog.jsonb_build_object(
           'org_id', org_id,
           'app_id', NEW.app_id,
           'version_name', NEW.name,
@@ -3519,18 +3621,62 @@ $$;
 ALTER FUNCTION "public"."cleanup_job_run_details_7days"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."cleanup_old_audit_logs"() RETURNS "void"
+CREATE OR REPLACE FUNCTION "public"."cleanup_net_http_response"() RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
 BEGIN
-  DELETE FROM "public"."audit_logs"
-  WHERE created_at < pg_catalog.now() - INTERVAL '90 days';
+  -- Responses are only used for short-lived async HTTP debugging.
+  -- Truncate reclaims disk; row deletes do not.
+  TRUNCATE TABLE net._http_response;
+  RAISE NOTICE 'cleanup_net_http_response: truncated net._http_response';
 END;
 $$;
 
 
-ALTER FUNCTION "public"."cleanup_old_audit_logs"() OWNER TO "postgres";
+ALTER FUNCTION "public"."cleanup_net_http_response"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."cleanup_old_audit_logs"("max_batches" integer DEFAULT 40, "batch_size" integer DEFAULT 5000) RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  cutoff timestamptz := pg_catalog.now() - INTERVAL '30 days';
+  batch_no integer := 0;
+  deleted_batch integer;
+  deleted_total bigint := 0;
+  v_max_batches integer := GREATEST(1, COALESCE(max_batches, 40));
+  v_batch_size integer := GREATEST(1, COALESCE(batch_size, 5000));
+BEGIN
+  LOOP
+    batch_no := batch_no + 1;
+    EXIT WHEN batch_no > v_max_batches;
+
+    DELETE FROM public.audit_logs
+    WHERE ctid IN (
+      SELECT ctid
+      FROM public.audit_logs
+      WHERE created_at < cutoff
+      LIMIT v_batch_size
+    );
+
+    GET DIAGNOSTICS deleted_batch = ROW_COUNT;
+    deleted_total := deleted_total + deleted_batch;
+    EXIT WHEN deleted_batch = 0;
+  END LOOP;
+
+  RAISE NOTICE
+    'cleanup_old_audit_logs: deleted=% batches=%/% batch_size=%',
+    deleted_total,
+    batch_no,
+    v_max_batches,
+    v_batch_size;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."cleanup_old_audit_logs"("max_batches" integer, "batch_size" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."cleanup_old_channel_devices"() RETURNS "void"
@@ -3612,29 +3758,99 @@ $$;
 ALTER FUNCTION "public"."cleanup_onboarding_app_data_on_complete"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."cleanup_queue_messages"() RETURNS "void"
+CREATE OR REPLACE FUNCTION "public"."cleanup_queue_messages"("max_batches_total" integer DEFAULT 40, "batch_size" integer DEFAULT 10000) RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $_$
 DECLARE
-    queue_name text;
+  queue_name text;
+  cutoff timestamptz := pg_catalog.now() - INTERVAL '2 days';
+  batches_used integer := 0;
+  deleted_batch integer;
+  deleted_archived_total bigint := 0;
+  deleted_stuck_total bigint := 0;
+  did_work boolean;
+  archive_rel regclass;
+  queue_rel regclass;
+  v_max_batches integer := GREATEST(1, COALESCE(max_batches_total, 40));
+  v_batch_size integer := GREATEST(1, COALESCE(batch_size, 10000));
 BEGIN
-    -- Clean up messages older than 7 days from all queues
+  LOOP
+    EXIT WHEN batches_used >= v_max_batches;
+    did_work := false;
+
     FOR queue_name IN (
-        SELECT q.queue_name FROM pgmq.list_queues() q
+      SELECT q.queue_name FROM pgmq.list_queues() q
     ) LOOP
-        -- Delete archived messages older than 7 days
-        EXECUTE format('DELETE FROM pgmq.a_%I WHERE archived_at < $1', queue_name)
-        USING (NOW() - INTERVAL '7 days')::timestamptz;
-        
-        -- Delete failed messages that have been retried more than 5 times
-        EXECUTE format('DELETE FROM pgmq.q_%I WHERE read_ct > 5', queue_name);
+      EXIT WHEN batches_used >= v_max_batches;
+
+      archive_rel := to_regclass(pg_catalog.format('pgmq.a_%I', queue_name));
+      queue_rel := to_regclass(pg_catalog.format('pgmq.q_%I', queue_name));
+
+      IF archive_rel IS NOT NULL THEN
+        EXECUTE pg_catalog.format(
+          'DELETE FROM pgmq.a_%I
+           WHERE ctid IN (
+             SELECT ctid
+             FROM pgmq.a_%I
+             WHERE archived_at < $1
+             LIMIT $2
+           )',
+          queue_name,
+          queue_name
+        )
+        USING cutoff, v_batch_size;
+
+        GET DIAGNOSTICS deleted_batch = ROW_COUNT;
+        IF deleted_batch > 0 THEN
+          batches_used := batches_used + 1;
+          deleted_archived_total := deleted_archived_total + deleted_batch;
+          did_work := true;
+        END IF;
+      END IF;
+
+      IF batches_used >= v_max_batches THEN
+        EXIT;
+      END IF;
+
+      IF queue_rel IS NOT NULL THEN
+        EXECUTE pg_catalog.format(
+          'DELETE FROM pgmq.q_%I
+           WHERE ctid IN (
+             SELECT ctid
+             FROM pgmq.q_%I
+             WHERE read_ct > 5
+             LIMIT $1
+           )',
+          queue_name,
+          queue_name
+        )
+        USING v_batch_size;
+
+        GET DIAGNOSTICS deleted_batch = ROW_COUNT;
+        IF deleted_batch > 0 THEN
+          batches_used := batches_used + 1;
+          deleted_stuck_total := deleted_stuck_total + deleted_batch;
+          did_work := true;
+        END IF;
+      END IF;
     END LOOP;
+
+    EXIT WHEN NOT did_work;
+  END LOOP;
+
+  RAISE NOTICE
+    'cleanup_queue_messages: archived_deleted=% stuck_deleted=% batches_used=%/% batch_size=%',
+    deleted_archived_total,
+    deleted_stuck_total,
+    batches_used,
+    v_max_batches,
+    v_batch_size;
 END;
 $_$;
 
 
-ALTER FUNCTION "public"."cleanup_queue_messages"() OWNER TO "postgres";
+ALTER FUNCTION "public"."cleanup_queue_messages"("max_batches_total" integer, "batch_size" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."cleanup_tmp_users"() RETURNS "void"
@@ -10207,6 +10423,62 @@ $_$;
 ALTER FUNCTION "public"."noupdate"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."null_migrated_app_version_manifests"("max_batches" integer DEFAULT 50, "batch_size" integer DEFAULT 200) RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  batch_no integer := 0;
+  updated_batch integer;
+  updated_total bigint := 0;
+  v_max_batches integer := GREATEST(1, COALESCE(max_batches, 50));
+  v_batch_size integer := GREATEST(1, COALESCE(batch_size, 200));
+BEGIN
+  LOOP
+    batch_no := batch_no + 1;
+    EXIT WHEN batch_no > v_max_batches;
+
+    WITH doomed AS (
+      SELECT av.id
+      FROM public.app_versions AS av
+      WHERE av.manifest IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1
+          FROM pg_catalog.unnest(av.manifest) AS entry(file_name, s3_path, file_hash)
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM public.manifest AS m
+            WHERE m.app_version_id = av.id
+              AND m.s3_path = entry.s3_path
+              AND m.file_hash = entry.file_hash
+          )
+        )
+      ORDER BY av.id
+      LIMIT v_batch_size
+    )
+    UPDATE public.app_versions AS av
+    SET manifest = NULL
+    FROM doomed
+    WHERE av.id = doomed.id;
+
+    GET DIAGNOSTICS updated_batch = ROW_COUNT;
+    updated_total := updated_total + updated_batch;
+    EXIT WHEN updated_batch = 0;
+  END LOOP;
+
+  RAISE NOTICE
+    'null_migrated_app_version_manifests: updated=% batches=%/% batch_size=%',
+    updated_total,
+    batch_no,
+    v_max_batches,
+    v_batch_size;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."null_migrated_app_version_manifests"("max_batches" integer, "batch_size" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."one_month_ahead"() RETURNS timestamp without time zone
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -15526,6 +15798,94 @@ $$;
 ALTER FUNCTION "public"."strip_html"("input" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."sweep_deleted_version_manifests"("p_batch_size" integer DEFAULT 100) RETURNS bigint
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  stale_fixed bigint := 0;
+  requeued bigint := 0;
+BEGIN
+  IF p_batch_size IS NULL OR p_batch_size < 1 THEN
+    p_batch_size := 100;
+  END IF;
+
+  -- Fix stale counters: deleted versions with manifest_count > 0 but no rows.
+  WITH stale AS (
+    SELECT av.id, av.app_id
+    FROM public.app_versions AS av
+    WHERE av.deleted = true
+      AND av.manifest_count > 0
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.manifest AS m
+        WHERE m.app_version_id = av.id
+      )
+    ORDER BY av.deleted_at NULLS LAST, av.id
+    LIMIT p_batch_size
+  ),
+  cleared AS (
+    UPDATE public.app_versions AS av
+    SET manifest_count = 0,
+        manifest = NULL,
+        updated_at = now()
+    FROM stale
+    WHERE av.id = stale.id
+    RETURNING stale.app_id
+  ),
+  app_counts AS (
+    SELECT app_id, COUNT(*)::int AS cleared_count
+    FROM cleared
+    GROUP BY app_id
+  )
+  UPDATE public.apps AS a
+  SET manifest_bundle_count = GREATEST(a.manifest_bundle_count - app_counts.cleared_count, 0),
+      updated_at = now()
+  FROM app_counts
+  WHERE a.app_id = app_counts.app_id;
+
+  GET DIAGNOSTICS stale_fixed = ROW_COUNT;
+
+  -- Re-queue deleted versions that still have manifest rows by touching them.
+  -- on_version_update trigger enqueues cleanup when deleted_at is unchanged and
+  -- manifest_count > 0.
+  -- Start from deleted versions (bounded) and probe manifest via app_version_id index.
+  WITH candidates AS (
+    SELECT av.id
+    FROM public.app_versions AS av
+    WHERE av.deleted = true
+      AND EXISTS (
+        SELECT 1
+        FROM public.manifest AS m
+        WHERE m.app_version_id = av.id
+      )
+    ORDER BY av.deleted_at NULLS LAST, av.id
+    LIMIT p_batch_size
+  )
+  UPDATE public.app_versions AS av
+  SET manifest_count = GREATEST(av.manifest_count, 1),
+      updated_at = now()
+  FROM candidates
+  WHERE av.id = candidates.id;
+
+  GET DIAGNOSTICS requeued = ROW_COUNT;
+
+  IF stale_fixed > 0 OR requeued > 0 THEN
+    RAISE NOTICE 'sweep_deleted_version_manifests: stale_counters=% requeued=%', stale_fixed, requeued;
+  END IF;
+
+  RETURN requeued;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."sweep_deleted_version_manifests"("p_batch_size" integer) OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."sweep_deleted_version_manifests"("p_batch_size" integer) IS 'Bounded sweeper for soft-deleted versions with leftover manifest rows or stale manifest_count. Re-touches rows so on_version_update runs cleanup_manifest (DB delete + R2 trash).';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."sync_org_has_usage_credits_from_grants"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -15948,27 +16308,38 @@ DECLARE
 BEGIN
   function_type := CASE
     WHEN NULLIF(TG_ARGV[1], '') IS NULL THEN 'cloudflare'
-    WHEN lower(TG_ARGV[1]) = 'supabase' THEN 'cloudflare'
+    WHEN pg_catalog.lower(TG_ARGV[1]) = 'supabase' THEN 'cloudflare'
     ELSE TG_ARGV[1]
   END;
 
-  record_payload := to_jsonb(NEW);
-  old_record_payload := to_jsonb(OLD);
+  record_payload := pg_catalog.to_jsonb(NEW);
+  old_record_payload := pg_catalog.to_jsonb(OLD);
 
-  -- app_versions.manifest can be multi-MB. Never enqueue it; handlers reload when needed.
+  -- app_versions fat columns can be multi-MB. Never enqueue them; handlers reload when needed.
   IF TG_TABLE_NAME = 'app_versions' THEN
     IF record_payload IS NOT NULL THEN
-      record_payload := record_payload - 'manifest';
+      record_payload := record_payload - 'manifest' - 'native_packages';
     END IF;
     IF old_record_payload IS NOT NULL THEN
-      old_record_payload := old_record_payload - 'manifest';
+      old_record_payload := old_record_payload - 'manifest' - 'native_packages';
+    END IF;
+
+    -- Skip queue fan-out only for dual-storage reclaim: non-null manifest -> NULL.
+    -- native_packages is stripped from payloads, so compare it explicitly.
+    IF TG_OP = 'UPDATE'
+      AND OLD.manifest IS NOT NULL
+      AND NEW.manifest IS NULL
+      AND NEW.native_packages IS NOT DISTINCT FROM OLD.native_packages
+      AND (record_payload - 'updated_at') IS NOT DISTINCT FROM (old_record_payload - 'updated_at')
+    THEN
+      RETURN NEW;
     END IF;
   END IF;
 
-  payload := jsonb_build_object(
+  payload := pg_catalog.jsonb_build_object(
     'function_name', TG_ARGV[0],
     'function_type', function_type,
-    'payload', jsonb_build_object(
+    'payload', pg_catalog.jsonb_build_object(
       'old_record', old_record_payload,
       'record', record_payload,
       'type', TG_OP,
@@ -19769,6 +20140,14 @@ CREATE INDEX "idx_app_versions_deleted_at" ON "public"."app_versions" USING "btr
 
 
 
+CREATE INDEX "idx_app_versions_deleted_at_id" ON "public"."app_versions" USING "btree" ("deleted_at", "id") WHERE ("deleted" = true);
+
+
+
+CREATE INDEX "idx_app_versions_deleted_with_manifest" ON "public"."app_versions" USING "btree" ("id") WHERE (("deleted" = true) AND ("manifest_count" > 0));
+
+
+
 CREATE INDEX "idx_app_versions_id" ON "public"."app_versions" USING "btree" ("id");
 
 
@@ -22690,8 +23069,13 @@ REVOKE ALL ON FUNCTION "public"."cleanup_job_run_details_7days"() FROM PUBLIC;
 
 
 
-REVOKE ALL ON FUNCTION "public"."cleanup_old_audit_logs"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."cleanup_old_audit_logs"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."cleanup_net_http_response"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."cleanup_net_http_response"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."cleanup_old_audit_logs"("max_batches" integer, "batch_size" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."cleanup_old_audit_logs"("max_batches" integer, "batch_size" integer) TO "service_role";
 
 
 
@@ -22707,7 +23091,8 @@ GRANT ALL ON FUNCTION "public"."cleanup_onboarding_app_data_on_complete"() TO "s
 
 
 
-REVOKE ALL ON FUNCTION "public"."cleanup_queue_messages"() FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."cleanup_queue_messages"("max_batches_total" integer, "batch_size" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."cleanup_queue_messages"("max_batches_total" integer, "batch_size" integer) TO "service_role";
 
 
 
@@ -23651,6 +24036,11 @@ GRANT ALL ON FUNCTION "public"."noupdate"() TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "public"."null_migrated_app_version_manifests"("max_batches" integer, "batch_size" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."null_migrated_app_version_manifests"("max_batches" integer, "batch_size" integer) TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."one_month_ahead"() TO "anon";
 GRANT ALL ON FUNCTION "public"."one_month_ahead"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."one_month_ahead"() TO "service_role";
@@ -24569,6 +24959,11 @@ GRANT ALL ON FUNCTION "public"."set_webhook_created_by"() TO "service_role";
 GRANT ALL ON FUNCTION "public"."strip_html"("input" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."strip_html"("input" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."strip_html"("input" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."sweep_deleted_version_manifests"("p_batch_size" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."sweep_deleted_version_manifests"("p_batch_size" integer) TO "service_role";
 
 
 
