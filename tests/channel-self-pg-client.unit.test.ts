@@ -54,7 +54,7 @@ vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
   upsertChannelDevicePg: upsertChannelDevicePgMock,
 }))
 
-vi.mock('../supabase/functions/_backend/utils/stats.ts', () => ({
+vi.mock('../supabase/functions/_backend/utils/plugin_stats.ts', () => ({
   sendStatsAndDevice: vi.fn(() => Promise.resolve()),
 }))
 

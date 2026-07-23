@@ -17,7 +17,7 @@ import {
   createStatsMau as createStatsMauCF,
   createStatsVersion as createStatsVersionCF,
   normalizeStatsMetadata,
-  writeOnPremStats,
+  onPremStats,
 } from './plugin_stats.ts'
 import { normalizeStatsInsightDate, normalizeStatsInsightNumber, sortStatsInsightTotals } from './statsInsights.ts'
 import { countDevicesSB, countInstallSourcesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readDeviceVersionCountsSB, readNativeVersionUsageSB, readStatsInsightsSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
@@ -26,12 +26,7 @@ import { DEFAULT_LIMIT } from './types.ts'
 import { backgroundTask, getEnv, isInternalVersionName } from './utils.ts'
 
 export type { StatsLogDimensions, VersionAction }
-export { normalizeStatsMetadata }
-
-/** Fallback-aware on-prem stats for Deno/local; CF plugin isolate uses plugin_stats.onPremStats via alias. */
-export async function onPremStats(c: Context, app_id: string, action: string, device: DeviceWithoutCreatedAt, metadata?: StatsMetadata) {
-  return writeOnPremStats(c, app_id, action, device, metadata, createStatsLogsExternal)
-}
+export { normalizeStatsMetadata, onPremStats }
 
 export function createStatsMau(c: Context, device_id: string, app_id: string, org_id: string, platform: string, version_build?: string | null): Promise<void> {
   if (c.env.DEVICE_USAGE)

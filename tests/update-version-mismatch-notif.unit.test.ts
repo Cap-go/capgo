@@ -44,7 +44,7 @@ vi.mock('../supabase/functions/_backend/utils/s3.ts', () => ({
   s3: vi.fn(),
 }))
 
-vi.mock('../supabase/functions/_backend/utils/stats.ts', () => ({
+vi.mock('../supabase/functions/_backend/utils/plugin_stats.ts', () => ({
   createStatsBandwidth: vi.fn(() => Promise.resolve()),
   createStatsMau: vi.fn(() => Promise.resolve()),
   createStatsVersion: vi.fn(() => Promise.resolve()),

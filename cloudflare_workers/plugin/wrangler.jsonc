@@ -6,13 +6,6 @@
     "enabled": true
   },
   "main": "./index.ts",
-  // Plugin hot path never needs Supabase stats fallbacks / supabase-js.
-  // Deno function tests keep importing utils/stats.ts with SB writers; this
-  // isolate remaps those write imports to the CF-only plugin_stats module.
-  "alias": {
-    "../utils/stats.ts": "../../supabase/functions/_backend/utils/plugin_stats.ts",
-    "./stats.ts": "../../supabase/functions/_backend/utils/plugin_stats.ts"
-  },
   "compatibility_flags": [
     "nodejs_compat",
     // "enable_workers_observability_tracing",
