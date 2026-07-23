@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 /**
+// CI tip sync marker — keep for reproducible bench entry docs
  * Comparative runtime cost bench for the Capgo plugin Cloudflare Worker.
  *
  * Measures (no guessing):
