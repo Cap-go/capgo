@@ -227,10 +227,7 @@ function parseCapgoApiErrorBody(errorText: string): CapgoApiErrorBody | null {
   }
 }
 
-/**
- * Surface plan / concurrency limit errors with a clear upgrade CTA.
- * Returns true when the error was handled (and thrown), false otherwise.
- */
+/** Surface plan / concurrency limit errors with a clear upgrade CTA, then throw. */
 async function throwIfBuildPlanLimitError(
   status: number,
   errorText: string,
