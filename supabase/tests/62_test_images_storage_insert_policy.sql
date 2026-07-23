@@ -31,6 +31,8 @@ SELECT ok(
       AND with_check LIKE '%need_onboarding%'
       AND qual LIKE '%rbac_perm_org_create_app%'
       AND with_check LIKE '%rbac_perm_org_create_app%'
+      AND qual LIKE '%foldername%objects.name%'
+      AND with_check LIKE '%foldername%objects.name%'
       AND coalesce(qual, '') NOT LIKE '%foldername((apps.name%'
       AND coalesce(with_check, '') NOT LIKE '%foldername((apps.name%'
       AND coalesce(qual, '') NOT LIKE '%foldername(apps.name%'

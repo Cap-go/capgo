@@ -730,6 +730,17 @@ export function formatCapgoApiErrorBody(body: unknown): string {
 }
 
 /** Resolve Capgo public API base URL for CLI mutations (app create/update, etc.). */
+export function resolveConfiguredCapgoPublicApiHost(config: {
+  hostApi: string
+  supaHost?: string
+  supaKey?: string
+}): string {
+  if (config.supaHost && config.supaKey && config.hostApi === defaultApiHost)
+    return `${normalizeSupabaseHost(config.supaHost)}/functions/v1`
+
+  return config.hostApi
+}
+
 export async function resolveCapgoPublicApiHost(
   options?: { supaHost?: string, supaAnon?: string },
   silent = true,
@@ -738,8 +749,8 @@ export async function resolveCapgoPublicApiHost(
     return `${normalizeSupabaseHost(options.supaHost)}/functions/v1`
 
   const localConfig = await getLocalConfig(silent)
-  if (localConfig.supaHost && localConfig.supaKey && localConfig.hostApi === defaultApiHost)
-    return `${normalizeSupabaseHost(localConfig.supaHost)}/functions/v1`
+  if (localConfig.supaHost && localConfig.supaKey)
+    return resolveConfiguredCapgoPublicApiHost(localConfig)
 
   const config = await getRemoteConfig(silent)
   return config.hostApi
