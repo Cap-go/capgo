@@ -169,7 +169,7 @@ watchEffect(() => {
 
   // Dedicated builder - visible to users who can read billing
   const needsDedicatedBuilder = canReadBilling.value
-  const hasDedicatedBuilder = organizationTabs.value.find(tab => tab.key === '/settings/organization/dedicated-builder')
+  const hasDedicatedBuilder = organizationTabs.value.some(tab => tab.key === '/settings/organization/dedicated-builder')
   if (needsDedicatedBuilder && !hasDedicatedBuilder) {
     const base = baseOrgTabs.find(t => t.key === '/settings/organization/dedicated-builder')
     if (base)
