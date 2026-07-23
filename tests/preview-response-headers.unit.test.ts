@@ -39,9 +39,22 @@ describe('preview response headers', () => {
     })).resolves.toEqual({
       appId: 'com.example.app',
       checksum: 'abc123',
-      sessionKey: undefined,
       url: 'https://example.com/app.zip',
       version: '1.0.0',
+    })
+  })
+
+  it.concurrent('rejects encrypted bundles instead of returning a zip download payload', async () => {
+    await expect(buildPreviewDownloadPayload({} as never, 'com.example.app', {
+      checksum: 'a'.repeat(512),
+      external_url: 'https://example.com/app.zip',
+      id: 42,
+      manifest_count: 3,
+      name: '1.0.0',
+      r2_path: null,
+      session_key: 'iv:encrypted-session-key',
+    })).rejects.toMatchObject({
+      message: 'Encrypted bundles cannot be previewed. Upload an unencrypted bundle to use Capgo preview.',
     })
   })
 })
