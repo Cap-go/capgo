@@ -78,7 +78,7 @@ describe('org dashboard bandwidth pagination', () => {
 
     await getSupabaseClient().from('daily_bandwidth').upsert({
       app_id: busyAppId,
-      date: endDate,
+      date: bandwidthDate,
       bandwidth: expectedBandwidth,
     }, {
       onConflict: 'app_id,date',
