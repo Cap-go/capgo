@@ -25,9 +25,14 @@ function rangeDates() {
   end.setUTCHours(0, 0, 0, 0)
   const start = new Date(end)
   start.setUTCDate(start.getUTCDate() - (DAYS - 1))
+  // getDaysBetweenDates(from, to) is exclusive of `to`, so put bandwidth on a
+  // day that is inside the generated graph day indexes (not the end date).
+  const bandwidthDate = new Date(start)
+  bandwidthDate.setUTCDate(bandwidthDate.getUTCDate() + 10)
   return {
     startDate: start.toISOString().slice(0, 10),
     endDate: end.toISOString().slice(0, 10),
+    bandwidthDate: bandwidthDate.toISOString().slice(0, 10),
   }
 }
 
@@ -51,7 +56,7 @@ async function seedQuietApps(count: number) {
 }
 
 describe('org dashboard bandwidth pagination', () => {
-  const { startDate, endDate } = rangeDates()
+  const { startDate, endDate, bandwidthDate } = rangeDates()
 
   beforeAll(async () => {
     // created_by bootstraps org_users + org_super_admin role_bindings
@@ -120,7 +125,7 @@ describe('org dashboard bandwidth pagination', () => {
     })
 
     expect(appError).toBeNull()
-    const busyRow = (appOnly as any[])?.find(row => row.app_id === busyAppId && row.date === endDate)
+    const busyRow = (appOnly as any[])?.find(row => row.app_id === busyAppId && row.date === bandwidthDate)
     expect(busyRow?.bandwidth).toBe(expectedBandwidth)
   }, 60_000)
 
