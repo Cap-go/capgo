@@ -48,8 +48,8 @@ export const DISPOSABLE_EMAIL_DOMAINS = [
   'yopmail.com',
 ] as const
 
-const personalEmailDomainSet = new Set(PERSONAL_EMAIL_DOMAINS)
-const disposableEmailDomainSet = new Set(DISPOSABLE_EMAIL_DOMAINS)
+const personalEmailDomainSet: ReadonlySet<string> = new Set(PERSONAL_EMAIL_DOMAINS)
+const disposableEmailDomainSet: ReadonlySet<string> = new Set(DISPOSABLE_EMAIL_DOMAINS)
 
 export function extractEmailDomain(email: string | null | undefined): string | null {
   if (!email)
