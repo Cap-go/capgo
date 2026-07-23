@@ -6,6 +6,7 @@ import {
   createSchema,
   makeIssue,
 } from './ark_validation.ts'
+import { isStatsRequestBody } from './plugin_schemas/stats_request.is.ts'
 import { isUpdateRequestBody } from './plugin_schemas/update_request.is.ts'
 import {
   deviceIdRegex,
@@ -327,7 +328,7 @@ export const statsRequestSchema = createPluginSchema<AppStats>((input, issues) =
   validateOptionalAction(input, issues)
   validateOptionalStatsMetadata(input, issues)
   validateOptionalString(input, 'version_build', issues)
-})
+}, isStatsRequestBody as (value: unknown) => value is AppStats)
 
 export const channelSelfRequestSchema = createPluginSchema<AppInfos>((input, issues) => {
   validateRequiredAppId(input, issues)
