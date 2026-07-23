@@ -8,6 +8,44 @@ describe('swap memory cleanup functions', () => {
   })
 
 
+
+  it('cleanup_queue_messages respects a tiny max batch budget', async () => {
+    const marker = `swap-budget-${randomUUID()}`
+    const baseMsgId = BigInt(Date.now()) * 1000n
+    const rows = Array.from({ length: 5 }, (_, i) => ({
+      id: (baseMsgId + BigInt(i + 1)).toString(),
+      payload: JSON.stringify({ marker, i }),
+    }))
+
+    for (const row of rows) {
+      await executeSQL(
+        `INSERT INTO pgmq.a_on_version_update (msg_id, read_ct, enqueued_at, archived_at, vt, message)
+         VALUES ($1, 0, now() - interval '10 days', now() - interval '10 days', now(), $2::jsonb)`,
+        [row.id, row.payload],
+      )
+    }
+
+    await executeSQL(`SELECT public.cleanup_queue_messages(1, 2)`)
+
+    const left = await executeSQL(
+      `SELECT count(*)::int AS n
+       FROM pgmq.a_on_version_update
+       WHERE message->>'marker' = $1`,
+      [marker],
+    )
+    expect(left[0]?.n).toBeGreaterThan(0)
+    expect(left[0]?.n).toBeLessThan(5)
+
+    await executeSQL(`SELECT public.cleanup_queue_messages(20, 100)`)
+    const after = await executeSQL(
+      `SELECT count(*)::int AS n
+       FROM pgmq.a_on_version_update
+       WHERE message->>'marker' = $1`,
+      [marker],
+    )
+    expect(after[0]?.n).toBe(0)
+  })
+
   it('cleanup_queue_messages skips queues whose archive tables are missing', async () => {
     const queueName = `cleanup_missing_${randomUUID().slice(0, 8)}`
     await executeSQL(
