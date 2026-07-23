@@ -1,7 +1,7 @@
 -- Fix images bucket INSERT policy left behind during RBAC consolidation.
--- The previous policy compared apps.owner_org/app_id against foldername(apps.name)
--- (display name) instead of the storage object path, which made existence checks
--- unreliable for app-icon uploads during CLI app create.
+-- Bare `name` inside EXISTS (SELECT ... FROM public.apps ...) resolves to
+-- apps.name (display name), not storage.objects.name (object path). Always
+-- qualify as objects.name in those subqueries.
 --
 -- Also allow org.create_app on icon UPDATE when the target app is missing or still
 -- pending onboarding, so upsert:true during app add/init does not fail RLS for
@@ -16,21 +16,21 @@ WITH CHECK (
   bucket_id = 'images'
   AND (
     (
-      (storage.foldername(name))[1] = 'org'
-      AND (storage.foldername(name))[3] IS NOT NULL
-      AND (storage.foldername(name))[3] <> 'logo'
+      (storage.foldername(objects.name))[1] = 'org'
+      AND (storage.foldername(objects.name))[3] IS NOT NULL
+      AND (storage.foldername(objects.name))[3] <> 'logo'
       AND (
         (
           EXISTS (
             SELECT 1
             FROM public.apps
-            WHERE apps.owner_org = ((storage.foldername(name))[2])::uuid
-              AND apps.app_id = ((storage.foldername(name))[3])::character varying
+            WHERE apps.owner_org = ((storage.foldername(objects.name))[2])::uuid
+              AND apps.app_id = ((storage.foldername(objects.name))[3])::character varying
           )
           AND public.rbac_check_permission_request(
             public.rbac_perm_app_update_settings(),
-            ((storage.foldername(name))[2])::uuid,
-            ((storage.foldername(name))[3])::character varying,
+            ((storage.foldername(objects.name))[2])::uuid,
+            ((storage.foldername(objects.name))[3])::character varying,
             NULL::bigint
           )
         )
@@ -38,12 +38,12 @@ WITH CHECK (
           NOT EXISTS (
             SELECT 1
             FROM public.apps
-            WHERE apps.owner_org = ((storage.foldername(name))[2])::uuid
-              AND apps.app_id = ((storage.foldername(name))[3])::character varying
+            WHERE apps.owner_org = ((storage.foldername(objects.name))[2])::uuid
+              AND apps.app_id = ((storage.foldername(objects.name))[3])::character varying
           )
           AND public.rbac_check_permission_request(
             public.rbac_perm_org_create_app(),
-            ((storage.foldername(name))[2])::uuid,
+            ((storage.foldername(objects.name))[2])::uuid,
             NULL::character varying,
             NULL::bigint
           )
@@ -51,17 +51,17 @@ WITH CHECK (
       )
     )
     OR (
-      (storage.foldername(name))[1] = 'org'
-      AND (storage.foldername(name))[3] = 'logo'
+      (storage.foldername(objects.name))[1] = 'org'
+      AND (storage.foldername(objects.name))[3] = 'logo'
       AND public.rbac_check_permission_request(
         public.rbac_perm_org_update_settings(),
-        ((storage.foldername(name))[2])::uuid,
+        ((storage.foldername(objects.name))[2])::uuid,
         NULL::character varying,
         NULL::bigint
       )
     )
     OR (
-      (SELECT auth.uid())::text = (storage.foldername(name))[1]
+      (SELECT auth.uid())::text = (storage.foldername(objects.name))[1]
     )
   )
 );
@@ -75,20 +75,20 @@ USING (
   bucket_id = 'images'
   AND (
     (
-      (storage.foldername(name))[1] = 'org'
-      AND (storage.foldername(name))[3] IS NOT NULL
-      AND (storage.foldername(name))[3] <> 'logo'
+      (storage.foldername(objects.name))[1] = 'org'
+      AND (storage.foldername(objects.name))[3] IS NOT NULL
+      AND (storage.foldername(objects.name))[3] <> 'logo'
       AND (
         public.rbac_check_permission_request(
           public.rbac_perm_app_update_settings(),
-          ((storage.foldername(name))[2])::uuid,
-          ((storage.foldername(name))[3])::character varying,
+          ((storage.foldername(objects.name))[2])::uuid,
+          ((storage.foldername(objects.name))[3])::character varying,
           NULL::bigint
         )
         OR (
           public.rbac_check_permission_request(
             public.rbac_perm_org_create_app(),
-            ((storage.foldername(name))[2])::uuid,
+            ((storage.foldername(objects.name))[2])::uuid,
             NULL::character varying,
             NULL::bigint
           )
@@ -96,14 +96,14 @@ USING (
             NOT EXISTS (
               SELECT 1
               FROM public.apps
-              WHERE apps.owner_org = ((storage.foldername(name))[2])::uuid
-                AND apps.app_id = ((storage.foldername(name))[3])::character varying
+              WHERE apps.owner_org = ((storage.foldername(objects.name))[2])::uuid
+                AND apps.app_id = ((storage.foldername(objects.name))[3])::character varying
             )
             OR EXISTS (
               SELECT 1
               FROM public.apps
-              WHERE apps.owner_org = ((storage.foldername(name))[2])::uuid
-                AND apps.app_id = ((storage.foldername(name))[3])::character varying
+              WHERE apps.owner_org = ((storage.foldername(objects.name))[2])::uuid
+                AND apps.app_id = ((storage.foldername(objects.name))[3])::character varying
                 AND apps.need_onboarding IS TRUE
             )
           )
@@ -111,17 +111,17 @@ USING (
       )
     )
     OR (
-      (storage.foldername(name))[1] = 'org'
-      AND (storage.foldername(name))[3] = 'logo'
+      (storage.foldername(objects.name))[1] = 'org'
+      AND (storage.foldername(objects.name))[3] = 'logo'
       AND public.rbac_check_permission_request(
         public.rbac_perm_org_update_settings(),
-        ((storage.foldername(name))[2])::uuid,
+        ((storage.foldername(objects.name))[2])::uuid,
         NULL::character varying,
         NULL::bigint
       )
     )
     OR (
-      (SELECT auth.uid())::text = (storage.foldername(name))[1]
+      (SELECT auth.uid())::text = (storage.foldername(objects.name))[1]
     )
   )
 )
@@ -129,20 +129,20 @@ WITH CHECK (
   bucket_id = 'images'
   AND (
     (
-      (storage.foldername(name))[1] = 'org'
-      AND (storage.foldername(name))[3] IS NOT NULL
-      AND (storage.foldername(name))[3] <> 'logo'
+      (storage.foldername(objects.name))[1] = 'org'
+      AND (storage.foldername(objects.name))[3] IS NOT NULL
+      AND (storage.foldername(objects.name))[3] <> 'logo'
       AND (
         public.rbac_check_permission_request(
           public.rbac_perm_app_update_settings(),
-          ((storage.foldername(name))[2])::uuid,
-          ((storage.foldername(name))[3])::character varying,
+          ((storage.foldername(objects.name))[2])::uuid,
+          ((storage.foldername(objects.name))[3])::character varying,
           NULL::bigint
         )
         OR (
           public.rbac_check_permission_request(
             public.rbac_perm_org_create_app(),
-            ((storage.foldername(name))[2])::uuid,
+            ((storage.foldername(objects.name))[2])::uuid,
             NULL::character varying,
             NULL::bigint
           )
@@ -150,14 +150,14 @@ WITH CHECK (
             NOT EXISTS (
               SELECT 1
               FROM public.apps
-              WHERE apps.owner_org = ((storage.foldername(name))[2])::uuid
-                AND apps.app_id = ((storage.foldername(name))[3])::character varying
+              WHERE apps.owner_org = ((storage.foldername(objects.name))[2])::uuid
+                AND apps.app_id = ((storage.foldername(objects.name))[3])::character varying
             )
             OR EXISTS (
               SELECT 1
               FROM public.apps
-              WHERE apps.owner_org = ((storage.foldername(name))[2])::uuid
-                AND apps.app_id = ((storage.foldername(name))[3])::character varying
+              WHERE apps.owner_org = ((storage.foldername(objects.name))[2])::uuid
+                AND apps.app_id = ((storage.foldername(objects.name))[3])::character varying
                 AND apps.need_onboarding IS TRUE
             )
           )
@@ -165,17 +165,17 @@ WITH CHECK (
       )
     )
     OR (
-      (storage.foldername(name))[1] = 'org'
-      AND (storage.foldername(name))[3] = 'logo'
+      (storage.foldername(objects.name))[1] = 'org'
+      AND (storage.foldername(objects.name))[3] = 'logo'
       AND public.rbac_check_permission_request(
         public.rbac_perm_org_update_settings(),
-        ((storage.foldername(name))[2])::uuid,
+        ((storage.foldername(objects.name))[2])::uuid,
         NULL::character varying,
         NULL::bigint
       )
     )
     OR (
-      (SELECT auth.uid())::text = (storage.foldername(name))[1]
+      (SELECT auth.uid())::text = (storage.foldername(objects.name))[1]
     )
   )
 );
