@@ -62,7 +62,28 @@ export function createStatsMau(c: Context, device_id: string, app_id: string, or
   return Promise.resolve(trackDeviceUsageCF(c, lowerDeviceId, app_id, org_id, platform, version_build)).then(() => undefined)
 }
 
-export async function onPremStats(c: Context, app_id: string, action: string, device: DeviceWithoutCreatedAt, metadata?: StatsMetadata) {
+type OnPremExternalLogWriter = (
+  c: Context,
+  app_id: string,
+  device_id: string,
+  action: Database['public']['Enums']['stats_action'],
+  versionName?: string,
+  metadata?: StatsMetadata,
+  dimensions?: StatsLogDimensions,
+) => Promise<unknown> | unknown
+
+/**
+ * Shared on-prem bookkeeping. Callers pass the log writer so Deno/SB can keep
+ * `trackLogsSB` fallbacks while the CF plugin isolate stays supabase-free.
+ */
+export async function writeOnPremStats(
+  c: Context,
+  app_id: string,
+  action: string,
+  device: DeviceWithoutCreatedAt,
+  metadata: StatsMetadata | undefined,
+  writeExternalLogs: OnPremExternalLogWriter,
+) {
   if (!app_id) {
     cloudlog({ requestId: c.get('requestId'), message: 'App ID is missing in onPremStats', country: c.req.raw?.cf?.country })
     return simpleError200(c, 'app_not_found', 'App not found')
@@ -79,7 +100,7 @@ export async function onPremStats(c: Context, app_id: string, action: string, de
       await updateStoreApp(c, app_id, 1)
   })
 
-  await createStatsLogsExternal(
+  await writeExternalLogs(
     c,
     device.app_id,
     device.device_id,
@@ -90,6 +111,10 @@ export async function onPremStats(c: Context, app_id: string, action: string, de
   )
   cloudlog({ requestId: c.get('requestId'), message: 'App is external (onPremise), returning 429', app_id: device.app_id, country: c.req.raw.cf?.country, user_agent: c.req.raw.headers.get('user-agent') })
   return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+}
+
+export async function onPremStats(c: Context, app_id: string, action: string, device: DeviceWithoutCreatedAt, metadata?: StatsMetadata) {
+  return writeOnPremStats(c, app_id, action, device, metadata, createStatsLogsExternal)
 }
 
 export function createStatsBandwidth(c: Context, device_id: string, app_id: string, file_size: number) {

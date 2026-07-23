@@ -235,8 +235,13 @@ function buildPluginBundle(outDir: string): BundleReport {
       focusPackagesBytesInOutput[key] = packagesBytesInOutput[key]
   }
 
+  // Exclude synthetic ecosystem:* aggregates — they double-count real packages
+  // and hide the true largest inputs. Ecosystem totals stay in focusPackagesBytesInOutput.
   const topPackagesBytesInOutput = Object.fromEntries(
-    Object.entries(packagesBytesInOutput).sort((a, b) => b[1] - a[1]).slice(0, 40),
+    Object.entries(packagesBytesInOutput)
+      .filter(([key]) => !key.startsWith('ecosystem:'))
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 40),
   )
 
   return {
