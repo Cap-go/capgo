@@ -64,6 +64,28 @@ for (const spec of collectImports(pluginEntry)) {
   }
 }
 
+const denoEntries = [
+  'supabase/functions/updates/index.ts',
+  'supabase/functions/stats/index.ts',
+  'supabase/functions/channel_self/index.ts',
+  'supabase/functions/updates_debug/index.ts',
+]
+
+for (const rel of denoEntries) {
+  const file = resolve(root, rel)
+  for (const spec of collectImports(file)) {
+    const resolved = resolveImport(file, spec)
+    if (!resolved)
+      continue
+    // Request-path code must come from plugin_runtime. The only allowed
+    // sibling _backend import is none — Deno supabase-js bridge lives in
+    // shared/plugin_deno_stats_fallbacks.ts.
+    if (resolved.startsWith(`${backendRoot}/`) && !resolved.startsWith(`${runtimeRoot}/`)) {
+      errors.push(`${rel} imports ${relative(root, resolved)} (use plugin_runtime or shared Deno bridge)`)
+    }
+  }
+}
+
 if (errors.length) {
   console.error('plugin_runtime isolation check failed:\n')
   for (const err of errors)
