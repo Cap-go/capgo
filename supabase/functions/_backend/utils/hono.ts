@@ -272,6 +272,14 @@ export function createHono(functionName: string, _version: string) {
   else {
     appGlobal = new Hono<MiddlewareKeyVariables>()
   }
+
+  // Plugin hot paths (/updates|/stats|/channel_self and the CF plugin worker).
+  // HAR/CPU inspect showed middleware + logging dominating non-DB request cost.
+  const pluginHotPath = functionName === 'plugin'
+    || functionName === 'updates'
+    || functionName === 'stats'
+    || functionName === 'channel_self'
+
   appGlobal.use('*', (c, next): Promise<any> => {
     // ADD HEADER TO IDENTIFY WORKER SOURCE
     const name = `${getEnv(c, 'ENV_NAME') || functionName}-${CapgoVersion}`
@@ -282,27 +290,25 @@ export function createHono(functionName: string, _version: string) {
     return next()
   })
 
-  appGlobal.use('*', logger())
-  // Use platform-specific request IDs, fallback to generated UUID
+  // Skip hono's access logger on plugin hot paths — it serializes every request
+  // on millions of device calls/day.
+  if (!pluginHotPath)
+    appGlobal.use('*', logger())
+  // Use platform-specific request IDs, fallback to generated UUID.
+  // Do not cloudlog inside the generator: it runs on every request (incl. cf-ray).
   appGlobal.use('*', requestId({
     generator: (c) => {
       // Cloudflare provides the Ray ID in the cf-ray header
       // Check this first as it's our primary deployment target
       const cfRay = c.req.header('cf-ray')
-      if (cfRay) {
-        cloudlog({ message: 'requestId source: cf-ray', cfRay })
+      if (cfRay)
         return cfRay
-      }
       // Supabase Edge Functions provide SB_EXECUTION_ID
       const sbExecutionId = getEnv(c, 'SB_EXECUTION_ID')
-      if (sbExecutionId) {
-        cloudlog({ message: 'requestId source: SB_EXECUTION_ID', sbExecutionId })
+      if (sbExecutionId)
         return sbExecutionId
-      }
       // Fallback to crypto.randomUUID() if not on any known platform
-      const uuid = crypto.randomUUID()
-      cloudlog({ message: 'requestId source: crypto.randomUUID()', uuid })
-      return uuid
+      return crypto.randomUUID()
     },
   }))
 

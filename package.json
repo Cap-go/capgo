@@ -194,7 +194,8 @@
     "changelog:ai": "node scripts/generate-ai-changelog.mjs",
     "bench:plugin-validation-cpu": "bun scripts/bench_plugin_validation_cpu.ts --save scripts/bench/plugin_validation_cpu_results.json",
     "bench:plugin-worker-cpu": "bun scripts/bench_plugin_worker_cpu.ts --save scripts/bench/plugin_worker_cpu_results.json",
-    "bench:plugin-all": "bun run bench:plugin-worker-runtime && bun run bench:plugin-validation-cpu && bun run bench:plugin-worker-cpu",
+    "bench:plugin-har-inspect": "bun scripts/bench_plugin_har_inspect.ts --save scripts/bench/plugin_har_inspect_results.json --har scripts/bench/plugin_endpoints.har",
+    "bench:plugin-all": "bun run bench:plugin-worker-runtime && bun run bench:plugin-validation-cpu && bun run bench:plugin-worker-cpu && bun run bench:plugin-har-inspect",
     "plugin:schemas:compile": "bunx zod-compiler generate supabase/functions/_backend/utils/plugin_schemas/update_request.zod.ts -o scripts/bench/validation/update_request.zod.compiled.ts --emit bag && bunx zod-compiler generate scripts/bench/validation/plugin_schemas.zod.ts -o scripts/bench/validation/plugin_schemas.zod.compiled.ts --emit bag"
   },
   "dependencies": {

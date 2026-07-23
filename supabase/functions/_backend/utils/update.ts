@@ -273,7 +273,6 @@ export async function updateWithPG(
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   appStatus?: Awaited<ReturnType<typeof getAppStatus>>,
 ) {
-  cloudlog({ requestId: c.get('requestId'), message: 'body', body, date: new Date().toISOString() })
   const {
     version_name,
     version_build,
@@ -283,6 +282,8 @@ export async function updateWithPG(
     plugin_version = '2.3.3',
     defaultChannel,
   } = body
+  // Request body is already logged with curated fields in plugins/updates.ts.
+  // Avoid a second per-request cloudlog on this hot path (HAR CPU inspect).
   const cachedAppStatus = appStatus ?? await getAppStatus(c, app_id)
   const cachedStatus = cachedAppStatus.status
   if (cachedStatus === 'onprem') {

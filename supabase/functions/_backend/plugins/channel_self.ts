@@ -283,8 +283,8 @@ async function prepareChannelSelfDeviceRequest(
   return { appOwner: ownerRes.appOwner, device }
 }
 async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink, cachedAppStatus: AppStatusResult): Promise<Response> {
-  cloudlog({ requestId: c.get('requestId'), message: 'post channel self body', body })
   const { app_id, device_id, channel } = body
+  cloudlog({ requestId: c.get('requestId'), message: 'post channel self body', app_id, device_id, channel })
 
   const requestContext = await prepareChannelSelfDeviceRequest(c, drizzleClient, body, 'POST', cachedAppStatus)
   if ('response' in requestContext) {
@@ -418,8 +418,8 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
 }
 
 async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink, cachedAppStatus: AppStatusResult): Promise<Response> {
-  cloudlog({ requestId: c.get('requestId'), message: 'put channel self body', body })
   const { app_id, defaultChannel, device_id } = body
+  cloudlog({ requestId: c.get('requestId'), message: 'put channel self body', app_id, device_id, channel: body.channel, defaultChannel })
 
   const requestContext = await prepareChannelSelfDeviceRequest(c, drizzleClient, body, 'PUT', cachedAppStatus)
   if ('response' in requestContext) {
@@ -491,13 +491,12 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
 }
 
 async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink, cachedAppStatus: AppStatusResult): Promise<Response> {
-  cloudlog({ requestId: c.get('requestId'), message: 'delete channel self body', body })
   const {
     app_id,
     device_id,
     version_build,
   } = body
-  cloudlog({ requestId: c.get('requestId'), message: 'delete override', version_build })
+  cloudlog({ requestId: c.get('requestId'), message: 'delete channel self body', app_id, device_id, version_build })
 
   const requestContext = await prepareChannelSelfDeviceRequest(c, drizzleClient, body, 'DELETE', cachedAppStatus)
   if ('response' in requestContext) {
@@ -605,7 +604,16 @@ async function parseChannelSelfPluginRequest(
   schema: StandardSchema<DeviceLink>,
   requireDevice = true,
 ): Promise<{ response: Response } | { body: DeviceLink, bodyParsed: DeviceLink }> {
-  cloudlog({ requestId: c.get('requestId'), message: logMessage, body })
+  // Curated fields only — full body serialization was a top CPU cost on HAR inspect.
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: logMessage,
+    app_id: body.app_id,
+    device_id: body.device_id,
+    channel: body.channel,
+    version_name: body.version_name,
+    plugin_version: body.plugin_version,
+  })
 
   if (isLimited(c, body.app_id)) {
     // Pass curated metadata only — see simpleRateLimit contract in hono.ts.
