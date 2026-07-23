@@ -1,7 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../types/supabase.types'
 import { log } from '@clack/prompts'
-import { getPMAndCommand, hasCliPermission, show2FADeniedError } from '../utils'
+import { FunctionsHttpError } from '@supabase/supabase-js'
+import { formatError, getPMAndCommand, hasCliPermission, show2FADeniedError } from '../utils'
 
 export async function checkAppExists(supabase: SupabaseClient<Database>, appid: string) {
   const { data: app } = await supabase
@@ -97,6 +98,22 @@ export async function findAppInOrganization(
   return data ?? null
 }
 
+async function formatFunctionsInvokeError(error: unknown): Promise<string> {
+  if (error instanceof FunctionsHttpError) {
+    try {
+      const body = await error.context.json() as { error?: string, message?: string, status?: string }
+      const details = [body.error, body.message, body.status].filter(Boolean).join(' | ')
+      if (details)
+        return details
+    }
+    catch {
+      // Fall through to generic formatter.
+    }
+  }
+
+  return formatError(error)
+}
+
 export async function completePendingOnboardingApp(
   supabase: SupabaseClient<Database>,
   orgId: string,
@@ -112,7 +129,8 @@ export async function completePendingOnboardingApp(
   })
 
   if (error) {
-    throw new Error(`Could not complete onboarding for app ${appId}: ${error.message}`)
+    const details = await formatFunctionsInvokeError(error)
+    throw new Error(`Could not complete onboarding for app ${appId}: ${details}`)
   }
 
   if (!(data as { app_id?: string } | null)?.app_id) {
