@@ -4,9 +4,8 @@
  *
  * Contenders (same logical update payload shape):
  * 1) handrolled Standard Schema (current plugin production path)
- * 2) arktype
- * 3) zod runtime
- * 4) zod-compiler AOT (`--emit bag`)
+ * 2) zod runtime
+ * 3) zod-compiler AOT (`--emit bag`)
  *
  * Measures process.cpuUsage() user+system ms (exact CPU, not wall guess).
  *
@@ -110,8 +109,7 @@ async function main() {
   ensureCompiledZod()
 
   const handrolled = await import(pathToFileURL(resolve(ROOT, 'supabase/functions/_backend/utils/plugin_validation.ts')).href)
-  const { safeParseSchema } = await import(pathToFileURL(resolve(ROOT, 'supabase/functions/_backend/utils/ark_validation.ts')).href)
-  const ark = await import(pathToFileURL(resolve(ROOT, 'scripts/bench/validation/plugin_schemas.arktype.ts')).href)
+  const { safeParseSchema } = await import(pathToFileURL(resolve(ROOT, 'supabase/functions/_backend/utils/schema_validation.ts')).href)
   const zodRuntime = await import(pathToFileURL(resolve(ROOT, 'scripts/bench/validation/plugin_schemas.zod.ts')).href)
   const zodCompiled = await import(pathToFileURL(resolve(ROOT, 'scripts/bench/validation/plugin_schemas.zod.compiled.ts')).href)
 
@@ -119,7 +117,6 @@ async function main() {
   const validators = {
     handrolled: (input: unknown) => safeParseSchema(handrolled.updateRequestSchema, input).success,
     production_is_predicate: (input: unknown) => prodIs.isUpdateRequestBody(input),
-    arktype: (input: unknown) => ark.updateRequestSchemaArk.allows(input),
     zod_runtime: (input: unknown) => zodRuntime.updateRequestSchemaZod.safeParse(input).success,
     zod_compiler_safeParse: (input: unknown) => zodCompiled.updateRequestSchemaZod.safeParse(input).success,
     zod_compiler_is: (input: unknown) => zodCompiled.updateRequestSchemaZod.is(input),
@@ -152,10 +149,8 @@ async function main() {
 
   const byName = Object.fromEntries(rows.map(row => [row.name, row]))
   const comparisons = [
-    ['arktype_valid', 'handrolled_valid'],
     ['zod_runtime_valid', 'handrolled_valid'],
     ['zod_compiler_is_valid', 'handrolled_valid'],
-    ['zod_compiler_is_valid', 'arktype_valid'],
     ['zod_compiler_is_valid', 'zod_runtime_valid'],
   ]
   console.log('\n=== Comparative deltas (A → B, negative means B faster) ===')

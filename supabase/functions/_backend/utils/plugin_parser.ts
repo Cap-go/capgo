@@ -1,10 +1,10 @@
 import type { Context } from 'hono'
-import type { StandardSchema } from './ark_validation.ts'
+import type { StandardSchema } from './schema_validation.ts'
 import type { Database } from './supabase.types.ts'
 import type { AppInfos, AppStats, DeviceWithoutCreatedAt } from './types.ts'
 import { format, tryParse } from '@std/semver'
 import { fixSemver } from '../utils/utils.ts'
-import { safeParseSchema } from './ark_validation.ts'
+import { safeParseSchema } from './schema_validation.ts'
 import { simpleError } from './hono.ts'
 
 export interface DeviceLink extends AppInfos {

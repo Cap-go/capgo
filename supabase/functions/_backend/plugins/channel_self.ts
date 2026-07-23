@@ -1,6 +1,6 @@
 // channel self old function
 import type { Context } from 'hono'
-import type { StandardSchema } from '../utils/ark_validation.ts'
+import type { StandardSchema } from '../utils/schema_validation.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { DeviceLink } from '../utils/plugin_parser.ts'
 import type { Database } from '../utils/supabase.types.ts'

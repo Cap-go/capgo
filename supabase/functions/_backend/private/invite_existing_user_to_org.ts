@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../utils/hono.ts'
-import { type } from 'arktype'
-import { safeParseSchema } from '../utils/ark_validation.ts'
+import { z } from 'zod'
+import { safeParseSchema } from '../utils/schema_validation.ts'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { CacheHelper } from '../utils/cache.ts'
 import { BRES, createHono, parseBody, quickError, useCors } from '../utils/hono.ts'
@@ -13,9 +13,9 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 import { version } from '../utils/version.ts'
 
-const inviteExistingUserSchema = type({
-  email: 'string.email',
-  org_id: 'string > 0',
+const inviteExistingUserSchema = z.object({
+  email: z.email(),
+  org_id: z.string().min(1),
 })
 const INVITE_RESEND_COOLDOWN_MINUTES = 5
 // CacheHelper is the durable cross-instance cooldown layer. Keep this in-memory

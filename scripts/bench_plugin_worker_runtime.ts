@@ -69,10 +69,7 @@ interface BenchReport {
 const ROOT = resolve(import.meta.dirname, '..')
 const FOCUS_PACKAGE_MATCHERS = [
   'npm:stripe',
-  'npm:arktype',
-  'npm:arkregex',
-  'npm:@ark/schema',
-  'npm:@ark/util',
+  'npm:zod',
   'npm:dayjs',
   'npm:drizzle-orm',
   'npm:cron-schedule',
@@ -86,15 +83,14 @@ const FOCUS_PACKAGE_MATCHERS = [
   'npm:@jsr/bradenmacdonald__s3-lite-client',
   'npm:@jsr/std__semver',
   'backend:utils/stripe.ts',
-  'backend:utils/ark_validation.ts',
-  'backend:utils/ark_literal_union.ts',
+  'backend:utils/schema_validation.ts',
   'backend:utils/cloudflare.ts',
   'backend:utils/supabase.ts',
   'backend:utils/pg.ts',
 ]
 
 const HEAVY_IMPORTS = [
-  'arktype',
+  'zod',
   'stripe',
   'drizzle-orm',
   'dayjs',
@@ -207,28 +203,28 @@ function buildPluginBundle(outDir: string): BundleReport {
     packagesBytesInOutput[key] = (packagesBytesInOutput[key] || 0) + (info.bytesInOutput || 0)
   }
 
-  // Also aggregate supabase / ark ecosystems for clearer reporting
+  // Also aggregate supabase / zod ecosystems for clearer reporting
   let supabaseEcosystem = 0
-  let arkEcosystem = 0
+  let zodEcosystem = 0
   let stripeEcosystem = 0
   for (const [path, info] of Object.entries(jsOutput.inputs || {})) {
     const bytes = info.bytesInOutput || 0
     if (path.includes('@supabase') || path.includes('supabase-js') || path.includes('iceberg-js'))
       supabaseEcosystem += bytes
-    if (path.includes('arktype') || path.includes('@ark/') || path.includes('arkregex'))
-      arkEcosystem += bytes
+    if (path.includes('/zod') || path.includes('zod@'))
+      zodEcosystem += bytes
     if (path.includes('/stripe') || path.includes('stripe@') || path.endsWith('utils/stripe.ts'))
       stripeEcosystem += bytes
   }
   packagesBytesInOutput['ecosystem:@supabase'] = supabaseEcosystem
-  packagesBytesInOutput['ecosystem:arktype'] = arkEcosystem
+  packagesBytesInOutput['ecosystem:zod'] = zodEcosystem
   packagesBytesInOutput['ecosystem:stripe'] = stripeEcosystem
 
   const focusPackagesBytesInOutput: PackageBytes = {}
   for (const key of [
     ...FOCUS_PACKAGE_MATCHERS,
     'ecosystem:@supabase',
-    'ecosystem:arktype',
+    'ecosystem:zod',
     'ecosystem:stripe',
   ]) {
     if (packagesBytesInOutput[key] != null)

@@ -118,7 +118,6 @@
         "@supabase/supabase-js": "2.110.8",
         "@vuepic/vue-datepicker": "^14.0.0",
         "@vueuse/core": "^14.3.0",
-        "arktype": "^2.2.3",
         "better-qr": "^0.1.2",
         "chart.js": "^4.5.1",
         "chartjs-chart-funnel": "^4.2.5",
@@ -222,7 +221,6 @@
         "@standard-schema/spec": "^1.1.0",
         "@xterm/addon-serialize": "^0.14.0",
         "@xterm/headless": "^6.0.0",
-        "arktype": "^2.2.0",
         "happy-dom": "^20.11.0",
         "ink": "^7.1.1",
         "ink-spinner": "^5.0.0",
@@ -232,6 +230,7 @@
         "react": "^19.2.8",
         "rrweb-snapshot": "^2.1.1",
         "string-width": "^8.2.2",
+        "zod": "^4.4.3",
       },
       "devDependencies": {
         "@antfu/eslint-config": "^9.2.0",
@@ -273,6 +272,7 @@
         "tus-js-client": "^4.3.1",
         "typescript": "6.0.3",
         "ws": "^8.21.1",
+        "zod-compiler": "^1.15.0",
       },
       "optionalDependencies": {
         "@capgo/cli-helper-darwin-arm64": "^1.1.1",

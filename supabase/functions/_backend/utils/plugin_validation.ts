@@ -1,11 +1,11 @@
-import type { StandardSchema, ValidationIssue } from './ark_validation.ts'
+import type { StandardSchema, ValidationIssue } from './schema_validation.ts'
 import type { AppInfos, AppStats } from './types.ts'
 import { canParse } from '@std/semver'
 import { ALLOWED_STATS_ACTIONS, ALLOWED_STATS_ACTIONS_SET } from '../plugins/stats_actions.ts'
 import {
   createSchema,
   makeIssue,
-} from './ark_validation.ts'
+} from './schema_validation.ts'
 import { isChannelSelfRequestBody } from './plugin_schemas/channel_self_request.is.ts'
 import { isStatsRequestBody } from './plugin_schemas/stats_request.is.ts'
 import { isUpdateRequestBody } from './plugin_schemas/update_request.is.ts'

@@ -218,7 +218,7 @@
     "react": "^19.2.8",
     "rrweb-snapshot": "^2.1.1",
     "string-width": "^8.2.2",
-    "arktype": "^2.2.0",
+    "zod": "^4.4.3",
     "@standard-schema/spec": "^1.1.0"
   },
   "optionalDependencies": {
@@ -265,6 +265,7 @@
     "tmp": "^0.2.7",
     "tus-js-client": "^4.3.1",
     "typescript": "6.0.3",
-    "ws": "^8.21.1"
+    "ws": "^8.21.1",
+    "zod-compiler": "^1.15.0"
   }
 }

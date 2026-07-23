@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import type { StandardSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
+import type { StandardSchema } from '../supabase/functions/_backend/utils/schema_validation.ts'
 import type { DeviceLink } from '../supabase/functions/_backend/utils/plugin_parser.ts'
 import type { Database } from '../supabase/functions/_backend/utils/supabase.types.ts'
 import type { AppInfos, AppStats } from '../supabase/functions/_backend/utils/types.ts'
