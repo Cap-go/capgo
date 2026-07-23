@@ -309,10 +309,10 @@ async function fetchAppMetricsRows(
               end_date: params.endDate,
             })
 
-        return await query
+        return await (query as any)
           .order('app_id', { ascending: true })
           .order('date', { ascending: true })
-          .range(pageStart, pageStart + APP_METRICS_PAGE_SIZE - 1) as Promise<QueryResult<AppMetricRow[]>>
+          .range(pageStart, pageStart + APP_METRICS_PAGE_SIZE - 1) as QueryResult<AppMetricRow[]>
       },
     )
 
