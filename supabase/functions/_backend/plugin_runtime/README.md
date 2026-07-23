@@ -14,9 +14,13 @@ cannot pull API-only dependencies back into the isolate.
 Enforce with:
 
 ```bash
-bun scripts/check_plugin_runtime_isolation.mjs
+bun run check:plugin-runtime
 ```
 
 Deno-only supabase-js stats fallbacks are registered from
 `supabase/functions/shared/plugin_deno_stats_fallbacks.ts` (never from the CF
 plugin entry).
+
+When editing plugin hot paths, change files under this tree only. Do not
+"temporarily" import helpers from `_backend/utils` — copy or reimplement inside
+`plugin_runtime` instead.
