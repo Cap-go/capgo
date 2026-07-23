@@ -272,7 +272,6 @@
         "tus-js-client": "^4.3.1",
         "typescript": "6.0.3",
         "ws": "^8.21.1",
-        "zod-compiler": "^1.15.0",
       },
       "optionalDependencies": {
         "@capgo/cli-helper-darwin-arm64": "^1.1.1",

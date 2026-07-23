@@ -1,7 +1,5 @@
 import { copyFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { env, exit } from 'node:process'
-import zodCompiler from 'zod-compiler/bun'
-
 // Precompiled helper packages (keychain + ASC key helper .apps) resolve from
 // node_modules at runtime (binary-only optional deps) — never bundle them.
 const HELPER_PACKAGES = [
@@ -12,7 +10,6 @@ const HELPER_PACKAGES = [
 const EXTERNAL_PACKAGES = [
   ...HELPER_PACKAGES,
   'node-pty',
-  'zod',
 ]
 
 // Shared plugin definitions - Bun's plugin API is compatible with esbuild's
@@ -335,7 +332,6 @@ const buildCLI = Bun.build({
     '__CAPGO_ALLOW_HELPER_ENV_OVERRIDE__': env.NODE_ENV === 'development' ? 'true' : 'false',
   },
   plugins: [
-    zodCompiler({ include: ['src/schemas'], codegenMode: 'inline', output: 'compact' }),
     fixCapacitorCliDirname,
     stubSemver,
     ignorePunycode,
@@ -373,7 +369,6 @@ const buildSDK = Bun.build({
     '__CAPGO_ALLOW_HELPER_ENV_OVERRIDE__': env.NODE_ENV === 'development' ? 'true' : 'false',
   },
   plugins: [
-    zodCompiler({ include: ['src/schemas'], codegenMode: 'inline', output: 'compact' }),
     fixCapacitorCliDirname,
     ignorePunycode,
     noopSupabaseNodeFetch,
