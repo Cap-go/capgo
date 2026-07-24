@@ -48,8 +48,8 @@ when working with code in this repository.
 
 Note: Cloudflare Workers and Playwright e2e suites were removed from CI
 because local edge/workerd overload caused intermittent 503/429 and login
-false-reds. Run them locally with `bun test:cloudflare:*` / `bun test:front`
-only when you need that coverage.
+false-reds. Run them locally with `bun test:cloudflare:all` /
+`bun test:front` only when you need that coverage.
 
 See [CLOUDFLARE_TESTING.md](CLOUDFLARE_TESTING.md) for detailed information on
 testing against Cloudflare Workers.

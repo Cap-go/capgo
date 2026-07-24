@@ -434,7 +434,7 @@ jobs:
 
   # Cloudflare Workers + Playwright CI jobs removed: local edge/workerd overload
   # caused intermittent 503/429 and login false-reds. Run locally via
-  # `bun test:cloudflare:*` / `bun test:front` when needed.
+  # `bun test:cloudflare:all` / `bun test:front` when needed.
 
   cli_node_compatibility:
     needs: changes
