@@ -71,6 +71,9 @@ async function submit(form: { first_name: string, last_name: string, password: s
 
     if (profileError)
       console.error('Failed to seed user profile after signup', profileError)
+
+    // Affonso affiliate signup tracking (pixel loaded in index.html)
+    window.Affonso?.signup(form.email)
   }
 
   router.push('/dashboard')

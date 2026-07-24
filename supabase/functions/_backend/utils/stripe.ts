@@ -531,7 +531,14 @@ function getDatafastAttributionMetadata(attribution?: DatafastAttribution): Reco
   }
 }
 
-export async function createCheckout(c: Context, customerId: string, recurrence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string, attributionId?: string, datafastAttribution?: DatafastAttribution) {
+function getAffonsoReferralMetadata(affonsoReferral?: string | null): Record<string, string> {
+  // Affonso expects the referral cookie value in Stripe Checkout session metadata.
+  return {
+    affonso_referral: affonsoReferral ?? '',
+  }
+}
+
+export async function createCheckout(c: Context, customerId: string, recurrence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string, attributionId?: string, datafastAttribution?: DatafastAttribution, affonsoReferral?: string | null) {
   if (!isStripeConfigured(c))
     return { url: '' }
   const prices = await getPriceIds(c, planId, recurrence)
@@ -541,6 +548,7 @@ export async function createCheckout(c: Context, customerId: string, recurrence:
   const metadata = {
     ...(attributionId ? { attribution_id: attributionId } : {}),
     ...getDatafastAttributionMetadata(datafastAttribution),
+    ...getAffonsoReferralMetadata(affonsoReferral),
   }
   const allowedSuccessUrl = getAllowedRedirectUrl(c, successUrl, 'success_url')
   const allowedCancelUrl = getAllowedRedirectUrl(c, cancelUrl, 'cancel_url')
@@ -603,6 +611,7 @@ export async function createOneTimeCheckout(
   cancelUrl: string,
   clientReferenceId?: string,
   datafastAttribution?: DatafastAttribution,
+  affonsoReferral?: string | null,
 ) {
   if (!isStripeConfigured(c))
     return { url: '' }
@@ -649,6 +658,7 @@ export async function createOneTimeCheckout(
       orgId: clientReferenceId ?? '',
       intendedQuantity: String(quantity),
       ...getDatafastAttributionMetadata(datafastAttribution),
+      ...getAffonsoReferralMetadata(affonsoReferral),
     },
   })
   return { url: session.url }

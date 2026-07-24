@@ -98,6 +98,10 @@ export async function getDatafastAttribution() {
   }
 }
 
+export async function getAffonsoReferral() {
+  return (await getCookieValue('affonso_referral')) || ''
+}
+
 export async function openCheckout(priceId: string, successUrl: string, cancelUrl: string, isYear: boolean, orgId: string) {
   //   console.log('openCheckout')
   const supabase = useSupabase()
@@ -105,6 +109,7 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
   if (!session)
     return false
   const datafastAttribution = await getDatafastAttribution()
+  const affonsoReferral = await getAffonsoReferral()
   try {
     const resp = await supabase.functions.invoke('private/stripe_checkout', {
       body: JSON.stringify({
@@ -116,6 +121,7 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
         attributionId: datafastAttribution.visitorId,
         datafastVisitorId: datafastAttribution.visitorId,
         datafastSessionId: datafastAttribution.sessionId,
+        affonsoReferral,
       }),
     })
     if (!resp.error && resp.data?.url)
@@ -134,6 +140,7 @@ export async function startCreditTopUp(orgId: string, quantity = 100) {
     return
   const supabase = useSupabase()
   const datafastAttribution = await getDatafastAttribution()
+  const affonsoReferral = await getAffonsoReferral()
   try {
     const { data, error } = await supabase.functions.invoke('private/credits/start-top-up', {
       body: JSON.stringify({
@@ -141,6 +148,7 @@ export async function startCreditTopUp(orgId: string, quantity = 100) {
         quantity,
         datafastVisitorId: datafastAttribution.visitorId,
         datafastSessionId: datafastAttribution.sessionId,
+        affonsoReferral,
       }),
     })
     if (error || !data?.url) {

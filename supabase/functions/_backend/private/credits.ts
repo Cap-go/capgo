@@ -67,6 +67,7 @@ interface StartTopUpRequest {
   quantity?: number
   datafastVisitorId?: string
   datafastSessionId?: string
+  affonsoReferral?: string
 }
 
 interface CompleteTopUpRequest {
@@ -572,6 +573,7 @@ app.post('/start-top-up', middlewareAuth, async (c) => {
       visitorId: body.datafastVisitorId,
       sessionId: body.datafastSessionId,
     },
+    body.affonsoReferral,
   )
 
   return c.json({ url: checkout.url })
