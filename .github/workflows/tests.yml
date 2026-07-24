@@ -821,10 +821,6 @@ jobs:
   cli_node_compatibility:
     needs: changes
     if: needs.changes.outputs.run_cli == 'true'
-
-  cli_node_compatibility:
-    needs: changes
-    if: needs.changes.outputs.run_cli == 'true'
     name: CLI on Node.js ${{ matrix.node-version }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
