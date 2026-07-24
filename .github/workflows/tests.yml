@@ -425,7 +425,7 @@ jobs:
           bun scripts/supabase-worktree.ts stop --no-backup || true
 
 
-  # SQL/schema checks isolated so backend vitest shards stay under 5 minutes.
+  # SQL/schema checks split so each 5-minute job has headroom after cold Supabase start.
   test_backend_sql:
     needs: changes
     if: needs.changes.outputs.run_capgo == 'true'
@@ -506,6 +506,64 @@ jobs:
         run: bun scripts/supabase-worktree.ts test db
       - name: Lint SQL
         run: bun scripts/supabase-worktree.ts db lint -s public --fail-on warning
+      - name: Stop this job's Supabase stack
+        if: always()
+        run: bun scripts/supabase-worktree.ts stop --no-backup || true
+
+  test_backend_sql_catalog:
+    needs: changes
+    if: needs.changes.outputs.run_capgo == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    name: Run backend SQL catalog checks
+    permissions:
+      contents: read
+    concurrency:
+      group: capgo-local-services-backend-sql-catalog-${{ github.repository }}
+      cancel-in-progress: false
+    env:
+      SUPABASE_WORKTREE_INSTANCE: backend-sql-catalog-${{ github.run_id }}-${{ github.run_attempt }}
+      SUPABASE_WORKTREE_PORT_OFFSET: 2700
+    steps:
+      - name: Cache Deno dependencies
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.DENO_DIR }}
+          key: my_cache_key
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+      - name: Setup bun
+        run: bash scripts/setup-bun.sh
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: 2.84.2
+      - name: Link Supabase templates
+        run: ln -sfn supabase/templates templates
+      - name: Stop this job's Supabase stack
+        run: bun scripts/supabase-worktree.ts stop --no-backup || true
+      - name: Run Supabase Start (deps install in background)
+        run: |
+          (
+            set -e
+            bun install
+          ) > "${RUNNER_TEMP}/deps-install.log" 2>&1 &
+          deps_install_pid=$!
+          bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
+          if ! wait "${deps_install_pid}"; then
+            echo "::error::Dependency install failed"
+            cat "${RUNNER_TEMP}/deps-install.log"
+            exit 1
+          fi
+      - name: Export isolated Supabase endpoints
+        run: |
+          bun scripts/supabase-worktree.ts with-env bun -e 'const apiUrl = new URL(process.env.SUPABASE_URL ?? ""); const dbUrl = process.env.SUPABASE_DB_URL ?? ""; if (!apiUrl.host || !dbUrl) throw new Error("Isolated Supabase status is missing API_URL or DB_URL."); console.log(`SUPABASE_FUNCTIONS_HEALTH_URL=http-get://${apiUrl.host}/functions/v1/ok`); console.log(`MAIN_SUPABASE_DB_URL=${dbUrl}`)' >> "$GITHUB_ENV"
       - name: Quiesce test scheduler
         run: bun scripts/supabase-worktree.ts with-env bun scripts/quiesce-test-scheduler.ts
       - id: bootstrap_edge_server
@@ -514,7 +572,7 @@ jobs:
           CAPGO_PREVENT_BACKGROUND_FUNCTIONS: 'true'
           BACKGROUND_SERVICE_NAME: Bootstrap Edge server
           BACKGROUND_RUN_COMMAND: exec bun scripts/supabase-worktree.ts functions serve
-          BACKGROUND_LOG_PATH: ${{ runner.temp }}/bootstrap-edge-server-sql.log
+          BACKGROUND_LOG_PATH: ${{ runner.temp }}/bootstrap-edge-server-sql-catalog.log
           BACKGROUND_WAIT_TIMEOUT_MS: 60000
         run: |
           export BACKGROUND_WAIT_ON="${SUPABASE_FUNCTIONS_HEALTH_URL:?Missing isolated Supabase health URL}"

@@ -552,14 +552,15 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /stats', () => {
     await resetAppDataStats(appId)
   })
 
-  // Concurrent action matrix: each case gets an isolated app so parallel creates
-  // cannot race shared APP_NAME_STATS into intermittent PGRST116 misses.
-  const testDescribe = USE_CLOUDFLARE ? describe : describe.concurrent
-  const testIt = USE_CLOUDFLARE ? it : it.concurrent
+  // Concurrent action matrix only: each case gets an isolated app so parallel
+  // creates cannot race shared APP_NAME_STATS into intermittent PGRST116 misses.
+  // Do not reuse actionIt for tests that still mutate APP_NAME_STATS.
+  const actionDescribe = USE_CLOUDFLARE ? describe : describe.concurrent
+  const actionIt = USE_CLOUDFLARE ? it : it.concurrent
 
-  testDescribe('test all possible stats actions', () => {
+  actionDescribe('test all possible stats actions', () => {
     for (const [actionIndex, action] of ALLOWED_STATS_ACTIONS.entries()) {
-      testIt(`should handle ${action} action`, async () => {
+      actionIt(`should handle ${action} action`, async () => {
         // Keep app_id <= varchar(50): action names are too long to embed.
         const appId = `${APP_NAME}.sa.${actionIndex}.${randomUUID().slice(0, 8)}`
         await resetAndSeedAppData(appId)
@@ -625,7 +626,7 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /stats', () => {
     }
   })
 
-  testIt('filters legacy download_fail before saved stats and logs', async () => {
+  it('filters legacy download_fail before saved stats and logs', async () => {
     const cases = [
       { pluginVersion: '7.16.9', shouldRecord: false, createVersion: true },
       { pluginVersion: '7.16.9', shouldRecord: false, createVersion: false },

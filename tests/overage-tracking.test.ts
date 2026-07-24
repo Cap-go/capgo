@@ -31,10 +31,14 @@ async function countOverageEvents(metric: CreditMetric, billingStart: Date, bill
 describe('overage Tracking - Duplicate Prevention', () => {
   beforeAll(async () => {
     // Clean up any existing overage/credit rows for our dedicated test org (PostgREST only).
-    await supabase.from('usage_overage_events').delete().eq('org_id', ORG_ID_OVERAGE)
-    await supabase.from('usage_credit_transactions').delete().eq('org_id', ORG_ID_OVERAGE)
-    await supabase.from('usage_credit_consumptions').delete().eq('org_id', ORG_ID_OVERAGE)
-    await supabase.from('usage_credit_grants').delete().eq('org_id', ORG_ID_OVERAGE)
+    const { error: overageCleanupError } = await supabase.from('usage_overage_events').delete().eq('org_id', ORG_ID_OVERAGE)
+    expect(overageCleanupError).toBeNull()
+    const { error: transactionCleanupError } = await supabase.from('usage_credit_transactions').delete().eq('org_id', ORG_ID_OVERAGE)
+    expect(transactionCleanupError).toBeNull()
+    const { error: consumptionCleanupError } = await supabase.from('usage_credit_consumptions').delete().eq('org_id', ORG_ID_OVERAGE)
+    expect(consumptionCleanupError).toBeNull()
+    const { error: grantCleanupError } = await supabase.from('usage_credit_grants').delete().eq('org_id', ORG_ID_OVERAGE)
+    expect(grantCleanupError).toBeNull()
   })
 
   it('should not create duplicate overage records when called multiple times with same values', async () => {
