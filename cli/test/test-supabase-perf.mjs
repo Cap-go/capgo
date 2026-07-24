@@ -117,18 +117,22 @@ try {
   const realNow = Date.now
   let now = realNow()
   Date.now = () => now
-  globalThis.fetch = async (url, init) => {
-    reqs.push({ url: String(url), init })
-    now += SLOW_THRESHOLD_MS + 1
-    return new Response('{}', { status: 200 })
+  try {
+    globalThis.fetch = async (url, init) => {
+      reqs.push({ url: String(url), init })
+      now += SLOW_THRESHOLD_MS + 1
+      return new Response('{}', { status: 200 })
+    }
+    await withSupabaseSource('apps.list', () => tf3('https://db.co/rest/v1/apps?select=*', { method: 'GET' }))
+    await flushAnalytics()
+    ev = JSON.parse(findPerfEvent(reqs).init.body)
+    assert.equal(ev.tags.ok, true)
+    assert.equal(ev.tags.slow, true)
+    assert.equal(ev.tags.operation, 'GET apps')
   }
-  await withSupabaseSource('apps.list', () => tf3('https://db.co/rest/v1/apps?select=*', { method: 'GET' }))
-  await flushAnalytics()
-  Date.now = realNow
-  ev = JSON.parse(findPerfEvent(reqs).init.body)
-  assert.equal(ev.tags.ok, true)
-  assert.equal(ev.tags.slow, true)
-  assert.equal(ev.tags.operation, 'GET apps')
+  finally {
+    Date.now = realNow
+  }
 
   process.env.CAPGO_TOKEN = originalToken
   if (originalDisable !== undefined) process.env.CAPGO_DISABLE_TELEMETRY = originalDisable
