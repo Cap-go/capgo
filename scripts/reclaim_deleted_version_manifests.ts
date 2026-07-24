@@ -27,20 +27,23 @@ const DB_URL_ENV_KEYS = [
   'DIRECT_URL',
 ]
 
-function loadEnv(filePath: string) {
-  return Bun.file(filePath).text().then((text) => {
-    const env: Record<string, string> = {}
-    for (const line of text.split('\n')) {
-      const trimmed = line.trim()
-      if (!trimmed || trimmed.startsWith('#'))
-        continue
-      const idx = trimmed.indexOf('=')
-      if (idx <= 0)
-        continue
-      env[trimmed.slice(0, idx)] = trimmed.slice(idx + 1)
-    }
-    return env
-  })
+async function loadEnv(filePath: string) {
+  const env: Record<string, string> = {}
+  const text = await Bun.file(filePath).text()
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#'))
+      continue
+    const idx = trimmed.indexOf('=')
+    if (idx <= 0)
+      continue
+    env[trimmed.slice(0, idx)] = trimmed.slice(idx + 1)
+  }
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value != null && value !== '')
+      env[key] = value
+  }
+  return env
 }
 
 function requireDbUrl(env: Record<string, string>) {
@@ -98,13 +101,20 @@ async function moveToTrash(s3: S3Client, bucket: string, key: string) {
   }))
 }
 
-function shouldAllowSelfSignedPgCertificate(env: Record<string, string>, databaseUrl: string) {
-  const rejectUnauthorized = env.PG_SSL_REJECT_UNAUTHORIZED?.trim()
-  if (rejectUnauthorized === '0')
-    return true
-  if (rejectUnauthorized === '1')
-    return false
-  return databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1')
+function createPgClient(databaseUrl: string) {
+  const parsed = new URL(databaseUrl)
+  const host = parsed.hostname
+  const usesLocalDatabase = host === 'localhost' || host === '127.0.0.1' || host === '::1'
+
+  // pg parses connectionString AFTER our ssl option and Object.assign-overwrites it.
+  // sslmode=require is treated as verify-full → SELF_SIGNED_CERT_IN_CHAIN on Supabase.
+  parsed.searchParams.delete('sslmode')
+  parsed.searchParams.delete('sslrootcert')
+
+  return new pg.Client({
+    connectionString: parsed.toString(),
+    ssl: usesLocalDatabase ? false : { rejectUnauthorized: false },
+  })
 }
 
 function formatRate(count: number, startedAt: number) {
@@ -115,13 +125,7 @@ function formatRate(count: number, startedAt: number) {
 async function main() {
   const env = await loadEnv(ENV_FILE)
   const databaseUrl = requireDbUrl(env)
-  const usesLocalDatabase = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1')
-  const db = new pg.Client({
-    connectionString: databaseUrl,
-    ssl: usesLocalDatabase
-      ? false
-      : { rejectUnauthorized: !shouldAllowSelfSignedPgCertificate(env, databaseUrl) },
-  })
+  const db = createPgClient(databaseUrl)
   await db.connect()
 
   const s3 = new S3Client({
@@ -137,7 +141,6 @@ async function main() {
   const bucket = env.S3_BUCKET || 'capgo'
 
   console.log('Listing soft-deleted versions with leftover manifests...')
-  // Prefer indexed deleted+manifest_count path; EXISTS covers stale counters.
   const versionsRes = await db.query<{ id: number, app_id: string, manifest_count: number }>(`
     SELECT av.id, av.app_id, av.manifest_count
     FROM public.app_versions AS av
@@ -160,7 +163,6 @@ async function main() {
   const startedAt = Date.now()
 
   for (const version of versions) {
-    // One indexed lookup: paths this version alone still references.
     const trashRes = await db.query<{ s3_path: string }>(
       `SELECT DISTINCT m.s3_path
        FROM public.manifest AS m
@@ -181,7 +183,6 @@ async function main() {
       await moveToTrash(s3, bucket, path)
     })
 
-    // One statement wipes the whole version's rows after R2 is handled.
     const deletedRes = await db.query(
       `DELETE FROM public.manifest WHERE app_version_id = $1`,
       [version.id],
