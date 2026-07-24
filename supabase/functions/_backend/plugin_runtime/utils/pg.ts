@@ -357,12 +357,20 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
   return fixSupabaseHost(getEnv(c, 'SUPABASE_DB_URL'))
 }
 
-// workerd cannot Pool.end(); creating a new Pool per request left dead pools on
-// the isolate heap (sawtooth memory). Reuse one Pool per connection config.
+// workerd cannot reliably Pool.end(); creating a new Pool per request left dead
+// pools on the isolate heap (sawtooth memory). Reuse one Pool per connection
+// config in production. Local CF test runs set CAPGO_PREVENT_BACKGROUND_FUNCTIONS
+// and hammer one isolate in parallel — reuse there starves max:4 and hits the
+// 10s connectionTimeout (mass 429/500). Keep per-request pools in that mode.
 const workerdPgPools = new Map<string, Pool>()
+const workerdSharedPools = new WeakSet<Pool>()
 
 function getWorkerdPgPoolKey(connectionString: string, readOnlyOptions: string | undefined) {
   return `${connectionString}\0${readOnlyOptions ?? ''}`
+}
+
+function shouldReuseWorkerdPgPool(c: Context) {
+  return getRuntimeKey() === 'workerd' && getEnv(c, 'CAPGO_PREVENT_BACKGROUND_FUNCTIONS') !== 'true'
 }
 
 export function getPgClient(c: Context, readOnly = false) {
@@ -385,7 +393,7 @@ export function getPgClient(c: Context, readOnly = false) {
     options: readOnlyOptions,
   }
 
-  if (getRuntimeKey() === 'workerd') {
+  if (shouldReuseWorkerdPgPool(c)) {
     const poolKey = getWorkerdPgPoolKey(dbUrl, readOnlyOptions)
     const existing = workerdPgPools.get(poolKey)
     if (existing)
@@ -395,6 +403,7 @@ export function getPgClient(c: Context, readOnly = false) {
     pool.on('error', (err: Error) => {
       cloudlogErr({ message: 'PG Pool Error', error: err, dbName, appName })
     })
+    workerdSharedPools.add(pool)
     workerdPgPools.set(poolKey, pool)
     return pool
   }
@@ -471,10 +480,11 @@ export function logPgError(c: Context, functionName: string, error: unknown) {
 }
 
 export function closeClient(c: Context, db: ReturnType<typeof getPgClient>) {
-  // workerd pools are isolate-scoped and reused; never end them per request.
-  if (getRuntimeKey() !== 'workerd')
-    return backgroundTask(c, db.end())
-  return undefined
+  // Shared production workerd pools must not be ended per request.
+  if (getRuntimeKey() === 'workerd' && workerdSharedPools.has(db))
+    return undefined
+  // Non-shared workerd pools (local CF test mode) and Deno: end when possible.
+  return backgroundTask(c, Promise.resolve(db.end()).catch(() => undefined))
 }
 
 export function getAlias() {

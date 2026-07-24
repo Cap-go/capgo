@@ -105,6 +105,41 @@ describe('plugin_runtime workerd pg pool reuse', () => {
     expect(first.end).toBeUndefined()
   })
 
+  it('does not reuse workerd pools in local CF test mode', async () => {
+    const endMock = vi.fn(async () => undefined)
+    PoolMock.mockImplementation(function PoolMock(this: { on: typeof poolOnMock, end: typeof endMock }) {
+      this.on = poolOnMock
+      this.end = endMock
+      return this
+    })
+    const utils = await import('../supabase/functions/_backend/plugin_runtime/utils/utils.ts')
+    vi.mocked(utils.getEnv).mockImplementation((_c, key: string) => {
+      if (key === 'CAPGO_PREVENT_BACKGROUND_FUNCTIONS')
+        return 'true'
+      if (key === 'ENV_NAME')
+        return 'capgo_plugin-eu-prod-test'
+      if (key === 'SB_REGION')
+        return 'eu-west-3'
+      if (key === 'SUPABASE_DB_URL')
+        return 'postgres://supabase-direct'
+      if (key === 'MAIN_SUPABASE_DB_URL')
+        return 'postgres://main-pooler'
+      return ''
+    })
+
+    const { getPgClient, closeClient } = await import('../supabase/functions/_backend/plugin_runtime/utils/pg.ts')
+    const c = createContext()
+
+    const first = getPgClient(c, true)
+    const second = getPgClient(c, true)
+
+    expect(first).not.toBe(second)
+    expect(PoolMock).toHaveBeenCalledTimes(2)
+
+    await closeClient(c, first)
+    expect(endMock).toHaveBeenCalledTimes(1)
+  })
+
   it('still creates a fresh Pool outside workerd and ends it on close', async () => {
     getRuntimeKeyMock.mockReturnValue('node')
     const endMock = vi.fn(async () => undefined)
