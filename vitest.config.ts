@@ -21,8 +21,8 @@ export default defineConfig(({ mode }) => ({
     retry: 0,
     // Keep load low: parallel file workers overload local Supabase edge into
     // intermittent 502/503 mid-suite (false-red organization/channel shards).
-    maxConcurrency: 2,
-    maxWorkers: 2,
+    maxConcurrency: 1,
+    maxWorkers: 1,
     // Vitest 4: pool options are now top-level
     isolate: true,
     fileParallelism: true,
