@@ -14,7 +14,9 @@ async function callRpc<T>(
   return await fn()
 }
 
-async function countOverageEvents(metric: string, billingStart: Date, billingEnd: Date) {
+type CreditMetric = Database['public']['Enums']['credit_metric_type']
+
+async function countOverageEvents(metric: CreditMetric, billingStart: Date, billingEnd: Date) {
   const { count, error } = await supabase
     .from('usage_overage_events')
     .select('*', { count: 'exact', head: true })

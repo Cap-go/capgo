@@ -774,6 +774,9 @@ jobs:
           SKIP_STRIPE_EMULATOR_START: 'true'
           SKIP_BACKEND_START: 'true'
           SKIP_FRONTEND_START: 'true'
+          # Host-side specs must hit localhost; backend uses host.docker.internal.
+          STRIPE_EMULATOR_PORT: ${{ steps.start_playwright_services.outputs.stripe_port }}
+          STRIPE_API_BASE_URL: http://localhost:${{ steps.start_playwright_services.outputs.stripe_port }}
         run: bunx playwright test --shard=${{ matrix.shard }}
       - name: Show Playwright service logs after failure
         if: failure()

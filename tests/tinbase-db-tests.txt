@@ -13,10 +13,8 @@ tests/files-r2-error.test.ts
 tests/frontend-channel-rbac-scope.test.ts
 tests/overage-tracking.test.ts
 tests/pg-header-safety.test.ts
-tests/plan-check-appid-passthrough.test.ts
 tests/plugin-parser.test.ts
 tests/plugin-validation.test.ts
-tests/rbac-apikey-request-identity-rpc.test.ts
 tests/release-scope.test.ts
 tests/rollout.test.ts
 tests/stats-export-cors.test.ts

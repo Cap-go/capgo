@@ -558,9 +558,10 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /stats', () => {
   const testIt = USE_CLOUDFLARE ? it : it.concurrent
 
   testDescribe('test all possible stats actions', () => {
-    for (const action of ALLOWED_STATS_ACTIONS) {
+    for (const [actionIndex, action] of ALLOWED_STATS_ACTIONS.entries()) {
       testIt(`should handle ${action} action`, async () => {
-        const appId = `${APP_NAME}.stats.action.${action}.${randomUUID().slice(0, 8)}`
+        // Keep app_id <= varchar(50): action names are too long to embed.
+        const appId = `${APP_NAME}.sa.${actionIndex}.${randomUUID().slice(0, 8)}`
         await resetAndSeedAppData(appId)
         await resetAndSeedAppDataStats(appId)
         try {
