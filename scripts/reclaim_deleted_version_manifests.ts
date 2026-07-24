@@ -11,6 +11,10 @@
  *
  * Usage:
  *   bun scripts/reclaim_deleted_version_manifests.ts
+ *
+ * If logs say "Cleaned N/M versions" you are on the OLD script — stop.
+ * Fast script prints "1/3 Listing doomed versions...".
+ * RequestTimeTooSkewed => sync clock: sudo sntp -sS time.apple.com
  */
 import { CopyObjectCommand, DeleteObjectCommand, HeadObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import pg from 'pg'
@@ -217,7 +221,7 @@ async function main() {
     endpoint: `https://${env.S3_ENDPOINT}`,
     region: env.S3_REGION || 'auto',
     forcePathStyle: true,
-    maxAttempts: 3,
+    maxAttempts: 5,
   })
   const bucket = env.S3_BUCKET || 'capgo'
 
