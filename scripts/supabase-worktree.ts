@@ -292,12 +292,15 @@ function runSupabase(args: string[], repoRoot: string, options: { captureOutput?
     encoding: options.captureOutput ? 'utf8' : undefined,
     env: process.env,
   })
-  const output = options.captureOutput
-    ? `${res.stdout ?? ''}${res.stderr ?? ''}`
-    : ''
-  if (options.captureOutput && output)
-    process.stderr.write(output)
-  return { status: res.status ?? 1, output }
+  const stdout = options.captureOutput ? (res.stdout ?? '') : ''
+  const stderr = options.captureOutput ? (res.stderr ?? '') : ''
+  if (options.captureOutput) {
+    if (stdout)
+      process.stdout.write(stdout)
+    if (stderr)
+      process.stderr.write(stderr)
+  }
+  return { status: res.status ?? 1, output: `${stdout}${stderr}` }
 }
 
 function isTransientDockerPortBindFailure(output: string): boolean {
