@@ -357,22 +357,6 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
   return fixSupabaseHost(getEnv(c, 'SUPABASE_DB_URL'))
 }
 
-// workerd cannot reliably Pool.end(); creating a new Pool per request left dead
-// pools on the isolate heap (sawtooth memory). Reuse one Pool per connection
-// config in production. Local CF test runs set CAPGO_PREVENT_BACKGROUND_FUNCTIONS
-// and hammer one isolate in parallel — reuse there starves max:4 and hits the
-// 10s connectionTimeout (mass 429/500). Keep per-request pools in that mode.
-const workerdPgPools = new Map<string, Pool>()
-const workerdSharedPools = new WeakSet<Pool>()
-
-function getWorkerdPgPoolKey(connectionString: string, applicationName: string, readOnlyOptions: string | undefined) {
-  return `${connectionString}\0${applicationName}\0${readOnlyOptions ?? ''}`
-}
-
-function shouldReuseWorkerdPgPool(c: Context) {
-  return getRuntimeKey() === 'workerd' && getEnv(c, 'CAPGO_PREVENT_BACKGROUND_FUNCTIONS') !== 'true'
-}
-
 export function getPgClient(c: Context, readOnly = false) {
   const dbUrl = getDatabaseURL(c, readOnly)
   const requestId = c.get('requestId')
@@ -382,40 +366,25 @@ export function getPgClient(c: Context, readOnly = false) {
 
   const isPooler = dbName.startsWith('sb_pooler')
   const readOnlyOptions = readOnly && !isPooler ? '-c default_transaction_read_only=on' : undefined
-  // Stable name for shared pools so request header noise cannot fragment the cache.
-  const applicationName = shouldReuseWorkerdPgPool(c) ? `plugin-${dbName}` : `${appName}-${dbName}`
+  const isWorkerd = getRuntimeKey() === 'workerd'
+  // Cloudflare Hyperdrive contract (get-started): create a new client per request;
+  // Hyperdrive owns the real DB pool, so per-request clients are fast and do not
+  // share socket/session state across requests. We use Pool(max:1) to keep
+  // getPgClient sync (drizzle + existing call sites) while matching that lifecycle.
+  // Never cache/reuse a Pool on the isolate — that was a guess we cannot afford at
+  // plugin scale, and the previous "new Pool + never end" pattern leaked memory.
   const options = {
     connectionString: dbUrl,
-    max: 4,
-    application_name: applicationName,
-    idleTimeoutMillis: 20000, // Increase from 2 to 20 seconds
-    connectionTimeoutMillis: 10000, // Add explicit connect timeout
-    maxLifetimeMillis: 30 * 60 * 1000, // 30 minutes
+    max: isWorkerd ? 1 : 4,
+    application_name: `${appName}-${dbName}`,
+    idleTimeoutMillis: 20000,
+    connectionTimeoutMillis: 10000,
+    maxLifetimeMillis: 30 * 60 * 1000,
     // PgBouncer/Supabase pooler doesn't support the 'options' startup parameter
     options: readOnlyOptions,
   }
 
-  if (shouldReuseWorkerdPgPool(c)) {
-    const poolKey = getWorkerdPgPoolKey(dbUrl, applicationName, readOnlyOptions)
-    const existing = workerdPgPools.get(poolKey)
-    if (existing)
-      return existing
-
-    const pool = new Pool(options)
-    pool.on('error', (err: Error) => {
-      cloudlogErr({ message: 'PG Pool Error', error: err, dbName, applicationName })
-    })
-    workerdSharedPools.add(pool)
-    workerdPgPools.set(poolKey, pool)
-    return pool
-  }
-
   const pool = new Pool(options)
-
-  // Hook to log when connections are removed from the pool
-  pool.on('remove', () => {
-    cloudlog({ requestId, message: 'PG Connection Removed from Pool' })
-  })
 
   pool.on('error', (err: Error) => {
     cloudlogErr({ requestId, message: 'PG Pool Error', error: err })
@@ -482,11 +451,15 @@ export function logPgError(c: Context, functionName: string, error: unknown) {
 }
 
 export function closeClient(c: Context, db: ReturnType<typeof getPgClient>) {
-  // Shared production workerd pools must not be ended per request.
-  if (getRuntimeKey() === 'workerd' && workerdSharedPools.has(db))
-    return undefined
-  // Non-shared workerd pools (local CF test mode) and Deno: end when possible.
-  return backgroundTask(c, Promise.resolve(db.end()).catch(() => undefined))
+  // Always end the per-request client. On workerd this runs via waitUntil so the
+  // response is not blocked; failing to end was the isolate memory sawtooth.
+  return backgroundTask(c, Promise.resolve(db.end()).catch((error: unknown) => {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'PG client end failed',
+      error,
+    })
+  }))
 }
 
 export function getAlias() {

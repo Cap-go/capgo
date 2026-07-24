@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { getRuntimeKeyMock, PoolMock, poolOnMock } = vi.hoisted(() => {
   const poolOnMock = vi.fn()
-  const PoolMock = vi.fn(function PoolMock(this: { on: typeof poolOnMock }) {
+  const PoolMock = vi.fn(function PoolMock(this: { on: typeof poolOnMock, end: ReturnType<typeof vi.fn> }) {
     this.on = poolOnMock
+    this.end = vi.fn(async () => undefined)
     return this
   })
   return {
@@ -83,7 +84,7 @@ function createContext(env: Record<string, any> = {}) {
   } as any
 }
 
-describe('plugin_runtime workerd pg pool reuse', () => {
+describe('plugin_runtime workerd pg per-request lifecycle', () => {
   beforeEach(() => {
     vi.resetModules()
     PoolMock.mockClear()
@@ -91,71 +92,7 @@ describe('plugin_runtime workerd pg pool reuse', () => {
     getRuntimeKeyMock.mockReturnValue('workerd')
   })
 
-  it('reuses one Pool per connection config on workerd and never ends it', async () => {
-    const { getPgClient, closeClient } = await import('../supabase/functions/_backend/plugin_runtime/utils/pg.ts')
-    const c = createContext()
-
-    const first = getPgClient(c, true)
-    const second = getPgClient(c, true)
-
-    expect(first).toBe(second)
-    expect(PoolMock).toHaveBeenCalledTimes(1)
-
-    await closeClient(c, first)
-    expect(first.end).toBeUndefined()
-  })
-
-  it('keeps distinct Pools for distinct connection strings', async () => {
-    const { getPgClient } = await import('../supabase/functions/_backend/plugin_runtime/utils/pg.ts')
-    const eu = createContext({
-      HYPERDRIVE_CAPGO_READ_EU: { connectionString: 'postgres://hyperdrive-eu' },
-    })
-    const na = createContext({
-      HYPERDRIVE_CAPGO_READ_EU: undefined,
-      HYPERDRIVE_CAPGO_READ_NA: { connectionString: 'postgres://hyperdrive-na' },
-    })
-    const utils = await import('../supabase/functions/_backend/plugin_runtime/utils/utils.ts')
-    vi.mocked(utils.getEnv).mockImplementation((_c, key: string) => {
-      if (key === 'ENV_NAME')
-        return _c === na ? 'capgo_plugin-na-prod-test' : 'capgo_plugin-eu-prod-test'
-      if (key === 'SB_REGION')
-        return _c === na ? 'us-east-1' : 'eu-west-3'
-      if (key === 'SUPABASE_DB_URL')
-        return 'postgres://supabase-direct'
-      if (key === 'MAIN_SUPABASE_DB_URL')
-        return 'postgres://main-pooler'
-      return ''
-    })
-
-    const euPool = getPgClient(eu, true)
-    const naPool = getPgClient(na, true)
-
-    expect(euPool).not.toBe(naPool)
-    expect(PoolMock).toHaveBeenCalledTimes(2)
-  })
-
-  it('does not reuse workerd pools in local CF test mode', async () => {
-    const endMock = vi.fn(async () => undefined)
-    PoolMock.mockImplementation(function PoolMock(this: { on: typeof poolOnMock, end: typeof endMock }) {
-      this.on = poolOnMock
-      this.end = endMock
-      return this
-    })
-    const utils = await import('../supabase/functions/_backend/plugin_runtime/utils/utils.ts')
-    vi.mocked(utils.getEnv).mockImplementation((_c, key: string) => {
-      if (key === 'CAPGO_PREVENT_BACKGROUND_FUNCTIONS')
-        return 'true'
-      if (key === 'ENV_NAME')
-        return 'capgo_plugin-eu-prod-test'
-      if (key === 'SB_REGION')
-        return 'eu-west-3'
-      if (key === 'SUPABASE_DB_URL')
-        return 'postgres://supabase-direct'
-      if (key === 'MAIN_SUPABASE_DB_URL')
-        return 'postgres://main-pooler'
-      return ''
-    })
-
+  it('creates a fresh max:1 Pool per request on workerd and ends it on close', async () => {
     const { getPgClient, closeClient } = await import('../supabase/functions/_backend/plugin_runtime/utils/pg.ts')
     const c = createContext()
 
@@ -164,20 +101,14 @@ describe('plugin_runtime workerd pg pool reuse', () => {
 
     expect(first).not.toBe(second)
     expect(PoolMock).toHaveBeenCalledTimes(2)
+    expect(PoolMock.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ max: 1 }))
 
     await closeClient(c, first)
-    expect(endMock).toHaveBeenCalledTimes(1)
+    expect(first.end).toHaveBeenCalledTimes(1)
   })
 
   it('still creates a fresh Pool outside workerd and ends it on close', async () => {
     getRuntimeKeyMock.mockReturnValue('node')
-    const endMock = vi.fn(async () => undefined)
-    PoolMock.mockImplementation(function PoolMock(this: { on: typeof poolOnMock, end: typeof endMock }) {
-      this.on = poolOnMock
-      this.end = endMock
-      return this
-    })
-
     const { getPgClient, closeClient } = await import('../supabase/functions/_backend/plugin_runtime/utils/pg.ts')
     const c = createContext()
 
@@ -186,8 +117,29 @@ describe('plugin_runtime workerd pg pool reuse', () => {
 
     expect(first).not.toBe(second)
     expect(PoolMock).toHaveBeenCalledTimes(2)
+    expect(PoolMock.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ max: 4 }))
 
     await closeClient(c, first)
-    expect(endMock).toHaveBeenCalledTimes(1)
+    expect(first.end).toHaveBeenCalledTimes(1)
+  })
+
+  it('logs when end fails instead of throwing into the request path', async () => {
+    const { cloudlogErr } = await import('../supabase/functions/_backend/plugin_runtime/utils/logging.ts')
+    PoolMock.mockImplementation(function PoolMock(this: { on: typeof poolOnMock, end: ReturnType<typeof vi.fn> }) {
+      this.on = poolOnMock
+      this.end = vi.fn(async () => {
+        throw new Error('end unsupported')
+      })
+      return this
+    })
+
+    const { getPgClient, closeClient } = await import('../supabase/functions/_backend/plugin_runtime/utils/pg.ts')
+    const c = createContext()
+    const client = getPgClient(c, true)
+
+    await expect(closeClient(c, client)).resolves.toBeUndefined()
+    expect(cloudlogErr).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'PG client end failed',
+    }))
   })
 })
