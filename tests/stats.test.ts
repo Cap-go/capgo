@@ -552,67 +552,73 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /stats', () => {
     await resetAppDataStats(appId)
   })
 
-  // Sequential: concurrent action matrix raced on shared APP_NAME_STATS and
-  // produced intermittent PGRST116 (missing stats row) under edge load.
-  const testDescribe = describe
-  const testIt = it
+  // Concurrent action matrix: each case gets an isolated app so parallel creates
+  // cannot race shared APP_NAME_STATS into intermittent PGRST116 misses.
+  const testDescribe = USE_CLOUDFLARE ? describe : describe.concurrent
+  const testIt = USE_CLOUDFLARE ? it : it.concurrent
 
   testDescribe('test all possible stats actions', () => {
     for (const action of ALLOWED_STATS_ACTIONS) {
       testIt(`should handle ${action} action`, async () => {
-        const uuid = randomUUID().toLowerCase()
-        const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
-        baseData.device_id = uuid
-        baseData.action = action
-        if (action === 'download_fail')
-          baseData.plugin_version = '7.17.0'
-        baseData.version_build = getVersionFromAction(action)
+        const appId = `${APP_NAME}.stats.action.${action}.${randomUUID().slice(0, 8)}`
+        await resetAndSeedAppData(appId)
+        await resetAndSeedAppDataStats(appId)
+        try {
+          const uuid = randomUUID().toLowerCase()
+          const baseData = getBaseData(appId) as StatsPayload
+          baseData.device_id = uuid
+          baseData.action = action
+          if (action === 'download_fail')
+            baseData.plugin_version = '7.17.0'
+          baseData.version_build = getVersionFromAction(action)
 
-        const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
-        baseData.version_name = version.name
-        baseData.version_code = '2'
-        baseData.version_os = '16.1'
-        baseData.custom_id = 'test2'
+          const version = await createAppVersions(baseData.version_build, appId)
+          baseData.version_name = version.name
+          baseData.version_code = '2'
+          baseData.version_os = '16.1'
+          baseData.custom_id = 'test2'
 
-        const response = await postStats(baseData)
-        const responseData = await response.json<StatsRes>()
-        expect(response.status).toBe(200)
-        expect(responseData.status).toBe('ok')
+          const response = await postStats(baseData)
+          const responseData = await response.json<StatsRes>()
+          expect(response.status).toBe(200)
+          expect(responseData.status).toBe('ok')
 
-        // Verify stats entry
-        const { error: statsError, data: statsData } = await getSupabaseClient()
-          .from('stats')
-          .select()
-          .eq('device_id', uuid)
-          .eq('app_id', APP_NAME_STATS)
-          .eq('action', action)
-          .single()
-
-        expect(statsError).toBeNull()
-        expect(statsData).toBeTruthy()
-        expect(statsData?.action).toBe(action)
-        expect(statsData?.device_id).toBe(uuid)
-
-        // Verify device state - fail actions should NOT create/update device records
-        // because the version_name in fail requests is the failed version, not the actual running version
-        if (!action.endsWith('_fail')) {
-          const { error: deviceError, data: deviceData } = await getSupabaseClient()
-            .from('devices')
+          // Verify stats entry
+          const { error: statsError, data: statsData } = await getSupabaseClient()
+            .from('stats')
             .select()
             .eq('device_id', uuid)
-            .eq('app_id', APP_NAME_STATS)
+            .eq('app_id', appId)
+            .eq('action', action)
             .single()
 
-          expect(deviceError).toBeNull()
-          expect(deviceData).toBeTruthy()
-          expect(deviceData?.version_build).toBe(baseData.version_build)
-          expect(deviceData?.version_name).toBe(version.name)
-          expect(deviceData?.os_version).toBe('16.1')
-          expect(deviceData?.plugin_version).toBe('7.0.0')
-          expect(deviceData?.custom_id).toBe('test2')
+          expect(statsError).toBeNull()
+          expect(statsData).toBeTruthy()
+          expect(statsData?.action).toBe(action)
+          expect(statsData?.device_id).toBe(uuid)
 
-          // Clean up
-          await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
+          // Verify device state - fail actions should NOT create/update device records
+          // because the version_name in fail requests is the failed version, not the actual running version
+          if (!action.endsWith('_fail')) {
+            const { error: deviceError, data: deviceData } = await getSupabaseClient()
+              .from('devices')
+              .select()
+              .eq('device_id', uuid)
+              .eq('app_id', appId)
+              .single()
+
+            expect(deviceError).toBeNull()
+            expect(deviceData).toBeTruthy()
+            expect(deviceData?.version_build).toBe(baseData.version_build)
+            expect(deviceData?.version_name).toBe(version.name)
+            expect(deviceData?.os_version).toBe('16.1')
+            expect(deviceData?.plugin_version).toBe('7.0.0')
+            expect(deviceData?.custom_id).toBe('test2')
+          }
+        }
+        finally {
+          await resetAppData(appId)
+          await resetAppDataStats(appId)
         }
       })
     }

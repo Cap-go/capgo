@@ -46,10 +46,10 @@ when working with code in this repository.
 - `./scripts/start-cloudflare-workers.sh` - Start local Cloudflare Workers for
   testing
 
-Note: Cloudflare Workers and Playwright e2e suites were removed from CI
-because local edge/workerd overload caused intermittent 503/429 and login
-false-reds. Run them locally with `bun test:cloudflare:all` /
-`bun test:front` only when you need that coverage.
+Note: Prefer Tinbase (`bun test:db` / `tests/tinbase-db-tests.txt`) for
+PostgREST/auth-only coverage so Docker/Cloudflare shards stay small and can
+run at high concurrency. CI caps every test job at 5 minutes and shards
+backend/Cloudflare/Playwright aggressively instead of lowering concurrency.
 
 See [CLOUDFLARE_TESTING.md](CLOUDFLARE_TESTING.md) for detailed information on
 testing against Cloudflare Workers.
@@ -775,10 +775,9 @@ Also applies to dialog/Teleport content, admin filters, and hidden utility input
 
 ## Frontend Testing
 
-- Playwright e2e specs were removed from CI due to flaky Supabase edge login
-  (503 / password step never appears). Prefer visual-diff and backend/API
-  coverage for UI changes; do not re-add login-dependent Playwright CI without
-  fixing edge readiness first.
+- Cover customer-facing flows with the Playwright suite under `playwright/e2e`
+  and run them locally with `bun run test:front` before shipping UI changes.
+  CI runs Playwright sharded with a 5-minute job budget.
 
 ### Visual diff for UI changes
 
