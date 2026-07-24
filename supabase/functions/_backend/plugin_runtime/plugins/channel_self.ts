@@ -645,7 +645,8 @@ async function runChannelSelfWithPgClient(
   }
   finally {
     await closeClient(c, pgClient)
-    await record()
+    // Do not block the response on rate-limit Cache writes (P999 wall time).
+    await backgroundTask(c, record())
   }
 }
 
