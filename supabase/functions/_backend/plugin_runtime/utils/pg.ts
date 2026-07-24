@@ -365,8 +365,8 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
 const workerdPgPools = new Map<string, Pool>()
 const workerdSharedPools = new WeakSet<Pool>()
 
-function getWorkerdPgPoolKey(connectionString: string, readOnlyOptions: string | undefined) {
-  return `${connectionString}\0${readOnlyOptions ?? ''}`
+function getWorkerdPgPoolKey(connectionString: string, applicationName: string, readOnlyOptions: string | undefined) {
+  return `${connectionString}\0${applicationName}\0${readOnlyOptions ?? ''}`
 }
 
 function shouldReuseWorkerdPgPool(c: Context) {
@@ -382,10 +382,12 @@ export function getPgClient(c: Context, readOnly = false) {
 
   const isPooler = dbName.startsWith('sb_pooler')
   const readOnlyOptions = readOnly && !isPooler ? '-c default_transaction_read_only=on' : undefined
+  // Stable name for shared pools so request header noise cannot fragment the cache.
+  const applicationName = shouldReuseWorkerdPgPool(c) ? `plugin-${dbName}` : `${appName}-${dbName}`
   const options = {
     connectionString: dbUrl,
     max: 4,
-    application_name: `${appName}-${dbName}`,
+    application_name: applicationName,
     idleTimeoutMillis: 20000, // Increase from 2 to 20 seconds
     connectionTimeoutMillis: 10000, // Add explicit connect timeout
     maxLifetimeMillis: 30 * 60 * 1000, // 30 minutes
@@ -394,14 +396,14 @@ export function getPgClient(c: Context, readOnly = false) {
   }
 
   if (shouldReuseWorkerdPgPool(c)) {
-    const poolKey = getWorkerdPgPoolKey(dbUrl, readOnlyOptions)
+    const poolKey = getWorkerdPgPoolKey(dbUrl, applicationName, readOnlyOptions)
     const existing = workerdPgPools.get(poolKey)
     if (existing)
       return existing
 
     const pool = new Pool(options)
     pool.on('error', (err: Error) => {
-      cloudlogErr({ message: 'PG Pool Error', error: err, dbName, appName })
+      cloudlogErr({ message: 'PG Pool Error', error: err, dbName, applicationName })
     })
     workerdSharedPools.add(pool)
     workerdPgPools.set(poolKey, pool)
@@ -1011,9 +1013,8 @@ export function requestInfosPostgres(options: RequestInfosPostgresOptions) {
     channelSelfOverrideChannelId,
   } = options
   const shouldQueryChannelOverride = channelDeviceCount === undefined || channelDeviceCount === null ? true : channelDeviceCount > 0
-  const shouldFetchManifest = includeManifest === false
-    ? false
-    : (manifestBundleCount === undefined || manifestBundleCount === null ? true : manifestBundleCount > 0)
+  const shouldFetchManifest = includeManifest !== false
+    && (manifestBundleCount == null || manifestBundleCount > 0)
   const isPausedRolloutVersion = Array.isArray(rolloutPausedVersionNames) && rolloutPausedVersionNames.includes(currentVersionName)
   const shouldUseRolloutPath = (rolloutChannelCount ?? 0) > 0 || isPausedRolloutVersion
 

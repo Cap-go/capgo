@@ -696,6 +696,11 @@ export async function updateWithPG(
       manifestEntries = await requestManifestEntriesPostgres(c, version.id, drizzleClient)
       manifestFetchMs = Math.round(performance.now() - startManifestFetch)
     }
+    if (!version.r2_path && !isInternalVersionName(version.name) && (!manifestEntries || manifestEntries.length === 0)) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Cannot get bundle', id: app_id, version, manifestEntriesLength: 0, channelData: channelData ? channelData.channels.name : 'no channel data', defaultChannel })
+      await sendStatsAndDevice(c, device, [{ action: 'missingBundle', versionName: version.name }])
+      return updateError200(c, 'no_bundle', 'Cannot get bundle')
+    }
     manifest = getManifestUrl(c, version.id, manifestEntries, device_id)
   }
   const endBundleUrl = performance.now()

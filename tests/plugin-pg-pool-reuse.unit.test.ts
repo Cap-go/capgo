@@ -105,6 +105,35 @@ describe('plugin_runtime workerd pg pool reuse', () => {
     expect(first.end).toBeUndefined()
   })
 
+  it('keeps distinct Pools for distinct connection strings', async () => {
+    const { getPgClient } = await import('../supabase/functions/_backend/plugin_runtime/utils/pg.ts')
+    const eu = createContext({
+      HYPERDRIVE_CAPGO_READ_EU: { connectionString: 'postgres://hyperdrive-eu' },
+    })
+    const na = createContext({
+      HYPERDRIVE_CAPGO_READ_EU: undefined,
+      HYPERDRIVE_CAPGO_READ_NA: { connectionString: 'postgres://hyperdrive-na' },
+    })
+    const utils = await import('../supabase/functions/_backend/plugin_runtime/utils/utils.ts')
+    vi.mocked(utils.getEnv).mockImplementation((_c, key: string) => {
+      if (key === 'ENV_NAME')
+        return _c === na ? 'capgo_plugin-na-prod-test' : 'capgo_plugin-eu-prod-test'
+      if (key === 'SB_REGION')
+        return _c === na ? 'us-east-1' : 'eu-west-3'
+      if (key === 'SUPABASE_DB_URL')
+        return 'postgres://supabase-direct'
+      if (key === 'MAIN_SUPABASE_DB_URL')
+        return 'postgres://main-pooler'
+      return ''
+    })
+
+    const euPool = getPgClient(eu, true)
+    const naPool = getPgClient(na, true)
+
+    expect(euPool).not.toBe(naPool)
+    expect(PoolMock).toHaveBeenCalledTimes(2)
+  })
+
   it('does not reuse workerd pools in local CF test mode', async () => {
     const endMock = vi.fn(async () => undefined)
     PoolMock.mockImplementation(function PoolMock(this: { on: typeof poolOnMock, end: typeof endMock }) {
