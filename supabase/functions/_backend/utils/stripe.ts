@@ -532,7 +532,7 @@ function getDatafastAttributionMetadata(attribution?: DatafastAttribution): Reco
 }
 
 function getAffonsoReferralMetadata(affonsoReferral?: string | null): Record<string, string> {
-  // Affonso expects the referral cookie value in Stripe Checkout session metadata.
+  // Affonso expects the referral cookie value on Stripe Checkout session metadata.
   return {
     affonso_referral: affonsoReferral ?? '',
   }
