@@ -295,6 +295,29 @@ function runSupabase(args: string[], repoRoot: string): number {
 }
 
 /**
+ * `supabase start` can fail on GitHub runners with a transient Docker port bind
+ * (`address already in use`) after a partial start/stop. Retry a few times with a
+ * clean stop so CI concurrency does not depend on one-shot Docker networking.
+ */
+function runSupabaseStartWithRetry(args: string[], repoRoot: string): number {
+  const maxAttempts = 3
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const status = runSupabase(args, repoRoot)
+    if (status === 0)
+      return 0
+    if (attempt === maxAttempts)
+      return status
+    console.error(`Supabase start failed (attempt ${attempt}/${maxAttempts}); stopping and retrying...`)
+    runSupabase(['stop', '--no-backup'], repoRoot)
+    if (typeof Bun !== 'undefined' && typeof Bun.sleepSync === 'function')
+      Bun.sleepSync(2000)
+    else
+      spawnSync('sleep', ['2'])
+  }
+  return 1
+}
+
+/**
  * Run an arbitrary command with Supabase env (URL/keys) injected for the current worktree.
  *
  * This is used by the test scripts so parallel worktrees do not accidentally target the same
@@ -369,6 +392,9 @@ function main(): number {
       }
       return runWithEnv(cmdArgs, repoRoot)
     }
+
+    if (args[0] === 'start')
+      return runSupabaseStartWithRetry(args, repoRoot)
 
     return runSupabase(args, repoRoot)
   }
