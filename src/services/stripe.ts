@@ -99,7 +99,14 @@ export async function getDatafastAttribution() {
 }
 
 export async function getAffonsoReferral() {
-  return (await getCookieValue('affonso_referral')) || ''
+  try {
+    const referral = await getCookieValue('affonso_referral')
+    // Stripe metadata values are capped at 500 characters.
+    return referral && referral.length <= 500 ? referral : ''
+  }
+  catch {
+    return ''
+  }
 }
 
 export async function openCheckout(priceId: string, successUrl: string, cancelUrl: string, isYear: boolean, orgId: string) {

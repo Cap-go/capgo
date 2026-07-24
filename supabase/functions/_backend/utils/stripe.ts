@@ -533,9 +533,10 @@ function getDatafastAttributionMetadata(attribution?: DatafastAttribution): Reco
 
 function getAffonsoReferralMetadata(affonsoReferral?: string | null): Record<string, string> {
   // Affonso expects the referral cookie value on Stripe Checkout session metadata.
-  return {
-    affonso_referral: affonsoReferral ?? '',
-  }
+  // Stripe metadata values are capped at 500 characters; omit invalid/empty values.
+  if (typeof affonsoReferral !== 'string' || !affonsoReferral || affonsoReferral.length > 500)
+    return {}
+  return { affonso_referral: affonsoReferral }
 }
 
 export async function createCheckout(c: Context, customerId: string, recurrence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string, attributionId?: string, datafastAttribution?: DatafastAttribution, affonsoReferral?: string | null) {
