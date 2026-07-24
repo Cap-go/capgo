@@ -127,14 +127,7 @@ describe('handleOrgNotificationsAndEvents onboarding reminder', () => {
       orgId,
       expect.anything(),
     )
-    expect(sendEventToTrackingMock).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        channel: 'usage',
-        event: 'User need onboarding',
-        user_id: orgId,
-      }),
-    )
+    expect(trackingCalls(orgId)).toHaveLength(0)
   })
 
   it.concurrent('does not send plan usage alerts from stale total percent alone', async () => {
