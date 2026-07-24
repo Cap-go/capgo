@@ -30,6 +30,20 @@ const safeIndexStatement: ReadReplicaSchemaSyncStatement = {
   sql: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "read_replica_import_unit_index" ON public."apps" ("app_id")',
 }
 
+const spacedIndexStatement: ReadReplicaSchemaSyncStatement = {
+  kind: 'index',
+  table: 'orgs',
+  name: 'unique customer_id on orgs',
+  sql: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "unique customer_id on orgs" ON public."orgs" USING btree (customer_id)',
+}
+
+const spacedConstraintStatement: ReadReplicaSchemaSyncStatement = {
+  kind: 'constraint',
+  table: 'orgs',
+  name: 'unique customer_id on orgs',
+  sql: 'ALTER TABLE public."orgs" ADD CONSTRAINT "unique customer_id on orgs" UNIQUE USING INDEX "unique customer_id on orgs"',
+}
+
 function plan(
   statements: ReadReplicaSchemaSyncStatement[],
 ): ReadReplicaSchemaSyncPlan {
@@ -53,19 +67,35 @@ describe('read-replica Cloud SQL server-side import', () => {
     assertGoogleReadReplicaSchemaPlan(plan([safeIndexStatement]))
 
     expect(renderReadReplicaIndexImport([safeIndexStatement])).toBe(
-      `${safeIndexStatement.sql};`,
+      'CREATE INDEX IF NOT EXISTS "read_replica_import_unit_index" ON public."apps" ("app_id");',
     )
     expect(() => {
       renderReadReplicaImportTransaction([safeIndexStatement])
     }).toThrow('cannot atomically apply')
   })
 
-  it.concurrent('partitions index DDL away from atomic import statements', () => {
+  it.concurrent('imports quoted index names that contain spaces', () => {
+    assertGoogleReadReplicaSchemaPlan(plan([spacedIndexStatement, spacedConstraintStatement]))
+
+    expect(renderReadReplicaIndexImport([spacedIndexStatement])).toBe(
+      'CREATE UNIQUE INDEX IF NOT EXISTS "unique customer_id on orgs" ON public."orgs" USING btree (customer_id);',
+    )
+    expect(renderReadReplicaImportTransaction([spacedConstraintStatement])).toContain(
+      spacedConstraintStatement.sql,
+    )
+  })
+
+  it.concurrent('partitions index DDL between column and constraint imports', () => {
     expect(
-      partitionReadReplicaImportStatements([safeColumnStatement, safeIndexStatement]),
+      partitionReadReplicaImportStatements([
+        safeColumnStatement,
+        safeIndexStatement,
+        spacedConstraintStatement,
+      ]),
     ).toEqual({
-      atomicStatements: [safeColumnStatement],
+      preIndexAtomicStatements: [safeColumnStatement],
       indexStatements: [safeIndexStatement],
+      postIndexAtomicStatements: [spacedConstraintStatement],
     })
   })
 
@@ -96,7 +126,10 @@ describe('read-replica Cloud SQL server-side import', () => {
     expect(source).toMatch(/--user=(?:postgres|\$\{POSTGRES_IMPORT_USER\})/)
     expect(source).toContain('BEGIN;')
     expect(source).toContain('COMMIT;')
-    expect(source).toContain('renderReadReplicaIndexImport')
+    expect(source).toContain('renderReadReplicaIndexImport(indexStatements)')
+    expect(source).toContain('preIndexAtomicStatements')
+    expect(source).toContain('postIndexAtomicStatements')
+    expect(source).toContain('renderCloudSqlIndexStatement')
     expect(source).not.toContain('capgo_read_replica_schema_owner')
     expect(source).not.toContain('bootstrap-read-replica-schema-owner')
     expect(source).not.toContain('CREATE ROLE')

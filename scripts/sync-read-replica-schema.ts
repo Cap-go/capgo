@@ -174,11 +174,21 @@ function googleDataApiClient(
       assertGoogleReadReplicaSchemaPlan(plan)
     },
     async applyReadReplicaSchemaPlan(plan) {
-      const { atomicStatements, indexStatements } = partitionReadReplicaImportStatements(
-        plan.statements,
-      )
-      // Indexes use CREATE/DROP/REINDEX CONCURRENTLY and cannot live inside the
-      // atomic BEGIN/COMMIT import. Apply them first so UNIQUE/PK attach can use them.
+      const {
+        preIndexAtomicStatements,
+        indexStatements,
+        postIndexAtomicStatements,
+      } = partitionReadReplicaImportStatements(plan.statements)
+      // Columns/types/sequences first, then indexes, then USING INDEX attaches.
+      // Index DDL is imported outside BEGIN/COMMIT and without CONCURRENTLY
+      // because Cloud SQL managed SQL import is transactional.
+      if (preIndexAtomicStatements.length) {
+        await importReadReplicaSchemaTransaction(
+          config,
+          renderReadReplicaImportTransaction(preIndexAtomicStatements),
+          deadline,
+        )
+      }
       if (indexStatements.length) {
         await importReadReplicaSchemaTransaction(
           config,
@@ -186,10 +196,10 @@ function googleDataApiClient(
           deadline,
         )
       }
-      if (atomicStatements.length) {
+      if (postIndexAtomicStatements.length) {
         await importReadReplicaSchemaTransaction(
           config,
-          renderReadReplicaImportTransaction(atomicStatements),
+          renderReadReplicaImportTransaction(postIndexAtomicStatements),
           deadline,
         )
       }
@@ -281,12 +291,13 @@ function assertColumnStatement(statement: ReadReplicaSchemaSyncStatement): void 
 
 function assertConstraintStatement(statement: ReadReplicaSchemaSyncStatement): void {
   const expected = `ALTER TABLE public.${quoteSqlIdentifier(statement.table)} ADD CONSTRAINT ${quoteSqlIdentifier(statement.name)} `
+  const primaryKey = `PRIMARY KEY USING INDEX ${quoteSqlIdentifier(statement.name)}`
+  const unique = `UNIQUE USING INDEX ${quoteSqlIdentifier(statement.name)}`
+  const tail = statement.sql.slice(expected.length)
   if (
-    !isSafeIdentifier(statement.name)
+    !isSafeQuotedIdentifier(statement.name)
     || !statement.sql.startsWith(expected)
-    || !/^(?:PRIMARY KEY|UNIQUE) USING INDEX "[A-Za-z_]\w*"$/u.test(
-      statement.sql.slice(expected.length),
-    )
+    || (tail !== primaryKey && tail !== unique)
   ) {
     throw new Error(
       `Cloud SQL server-side import cannot atomically apply ${statement.kind} ${statement.table}.${statement.name} before primary migrations.`,
@@ -355,22 +366,30 @@ function isIndexImportStatement(
 export function partitionReadReplicaImportStatements(
   statements: readonly ReadReplicaSchemaSyncStatement[],
 ): {
-  atomicStatements: ReadReplicaSchemaSyncStatement[]
+  preIndexAtomicStatements: ReadReplicaSchemaSyncStatement[]
   indexStatements: ReadReplicaSchemaSyncStatement[]
+  postIndexAtomicStatements: ReadReplicaSchemaSyncStatement[]
 } {
-  const atomicStatements: ReadReplicaSchemaSyncStatement[] = []
+  const preIndexAtomicStatements: ReadReplicaSchemaSyncStatement[] = []
   const indexStatements: ReadReplicaSchemaSyncStatement[] = []
+  const postIndexAtomicStatements: ReadReplicaSchemaSyncStatement[] = []
   for (const statement of statements) {
     if (isIndexImportStatement(statement))
       indexStatements.push(statement)
+    else if (statement.kind === 'constraint')
+      postIndexAtomicStatements.push(statement)
     else
-      atomicStatements.push(statement)
+      preIndexAtomicStatements.push(statement)
   }
-  return { atomicStatements, indexStatements }
+  return {
+    preIndexAtomicStatements,
+    indexStatements,
+    postIndexAtomicStatements,
+  }
 }
 
 function assertIndexStatement(statement: ReadReplicaSchemaSyncStatement): void {
-  if (!isSafeIdentifier(statement.name)) {
+  if (!isSafeQuotedIdentifier(statement.name)) {
     throw new Error(
       `Cloud SQL server-side import cannot apply ${statement.kind} ${statement.table}.${statement.name} before primary migrations.`,
     )
@@ -415,6 +434,10 @@ function assertIndexStatement(statement: ReadReplicaSchemaSyncStatement): void {
 
 function isSafeIdentifier(value: string): boolean {
   return /^[A-Za-z_]\w*$/u.test(value)
+}
+
+function isSafeQuotedIdentifier(value: string): boolean {
+  return value.length > 0 && !value.includes('\0')
 }
 
 function isSafeSchemaFragment(value: string): boolean {
@@ -491,8 +514,17 @@ export function renderReadReplicaIndexImport(
     assertGoogleReadReplicaSchemaStatement(statement)
   }
 
-  // No BEGIN/COMMIT: CONCURRENTLY index DDL cannot run inside a transaction.
-  return `${statements.map(statement => statement.sql).join(';\n')};`
+  // Cloud SQL managed SQL import is transactional, so strip CONCURRENTLY.
+  // Keep planner statements validated as CONCURRENTLY above.
+  return `${statements.map(statement => renderCloudSqlIndexStatement(statement.sql)).join(';\n')};`
+}
+
+function renderCloudSqlIndexStatement(sql: string): string {
+  return sql
+    .replaceAll('CREATE UNIQUE INDEX CONCURRENTLY ', 'CREATE UNIQUE INDEX ')
+    .replaceAll('CREATE INDEX CONCURRENTLY ', 'CREATE INDEX ')
+    .replaceAll('DROP INDEX CONCURRENTLY ', 'DROP INDEX ')
+    .replaceAll('REINDEX INDEX CONCURRENTLY ', 'REINDEX INDEX ')
 }
 
 async function importReadReplicaSchemaTransaction(
@@ -781,10 +813,10 @@ function quoteSqlText(value: string): string {
 }
 
 function quoteSqlIdentifier(value: string): string {
-  if (!isSafeIdentifier(value))
+  if (!isSafeQuotedIdentifier(value))
     throw new Error('Read-replica schema identifier must be valid')
 
-  return `"${value}"`
+  return `"${value.replaceAll('"', '""')}"`
 }
 
 function remainingBudgetMs(deadline: number, operation: string): number {
