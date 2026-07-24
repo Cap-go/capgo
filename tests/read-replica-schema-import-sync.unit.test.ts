@@ -6,7 +6,9 @@ import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import {
   assertGoogleReadReplicaSchemaPlan,
+  partitionReadReplicaImportStatements,
   renderReadReplicaImportTransaction,
+  renderReadReplicaIndexImport,
 } from '../scripts/sync-read-replica-schema.ts'
 
 const syncScriptUrl = new URL(
@@ -19,6 +21,13 @@ const safeColumnStatement: ReadReplicaSchemaSyncStatement = {
   table: 'apps',
   name: 'read_replica_import_unit',
   sql: 'ALTER TABLE public."apps" ADD COLUMN IF NOT EXISTS "read_replica_import_unit" boolean',
+}
+
+const safeIndexStatement: ReadReplicaSchemaSyncStatement = {
+  kind: 'index',
+  table: 'apps',
+  name: 'read_replica_import_unit_index',
+  sql: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "read_replica_import_unit_index" ON public."apps" ("app_id")',
 }
 
 function plan(
@@ -40,14 +49,28 @@ describe('read-replica Cloud SQL server-side import', () => {
     )
   })
 
+  it.concurrent('imports reviewed index DDL outside the atomic transaction', () => {
+    assertGoogleReadReplicaSchemaPlan(plan([safeIndexStatement]))
+
+    expect(renderReadReplicaIndexImport([safeIndexStatement])).toBe(
+      `${safeIndexStatement.sql};`,
+    )
+    expect(() => {
+      renderReadReplicaImportTransaction([safeIndexStatement])
+    }).toThrow('cannot atomically apply')
+  })
+
+  it.concurrent('partitions index DDL away from atomic import statements', () => {
+    expect(
+      partitionReadReplicaImportStatements([safeColumnStatement, safeIndexStatement]),
+    ).toEqual({
+      atomicStatements: [safeColumnStatement],
+      indexStatements: [safeIndexStatement],
+    })
+  })
+
   it.concurrent('rejects unsupported plans before they can become import input', () => {
     const unsupportedStatements: ReadReplicaSchemaSyncStatement[] = [
-      {
-        kind: 'index',
-        table: 'apps',
-        name: 'read_replica_import_unit_index',
-        sql: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "read_replica_import_unit_index" ON public."apps" ("app_id")',
-      },
       {
         kind: 'function',
         table: 'public',
@@ -73,6 +96,7 @@ describe('read-replica Cloud SQL server-side import', () => {
     expect(source).toMatch(/--user=(?:postgres|\$\{POSTGRES_IMPORT_USER\})/)
     expect(source).toContain('BEGIN;')
     expect(source).toContain('COMMIT;')
+    expect(source).toContain('renderReadReplicaIndexImport')
     expect(source).not.toContain('capgo_read_replica_schema_owner')
     expect(source).not.toContain('bootstrap-read-replica-schema-owner')
     expect(source).not.toContain('CREATE ROLE')

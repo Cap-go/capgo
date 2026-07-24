@@ -174,11 +174,25 @@ function googleDataApiClient(
       assertGoogleReadReplicaSchemaPlan(plan)
     },
     async applyReadReplicaSchemaPlan(plan) {
-      await importReadReplicaSchemaTransaction(
-        config,
-        renderReadReplicaImportTransaction(plan.statements),
-        deadline,
+      const { atomicStatements, indexStatements } = partitionReadReplicaImportStatements(
+        plan.statements,
       )
+      // Indexes use CREATE/DROP/REINDEX CONCURRENTLY and cannot live inside the
+      // atomic BEGIN/COMMIT import. Apply them first so UNIQUE/PK attach can use them.
+      if (indexStatements.length) {
+        await importReadReplicaSchemaTransaction(
+          config,
+          renderReadReplicaIndexImport(indexStatements),
+          deadline,
+        )
+      }
+      if (atomicStatements.length) {
+        await importReadReplicaSchemaTransaction(
+          config,
+          renderReadReplicaImportTransaction(atomicStatements),
+          deadline,
+        )
+      }
     },
     async query(queryText: string, values?: unknown[]) {
       // The Data API has no session affinity and rejects requests over 0.5 MB or
@@ -238,6 +252,12 @@ function assertGoogleReadReplicaSchemaStatement(
       return
     case 'sequence':
       assertSequenceStatement(statement)
+      return
+    case 'index':
+    case 'invalid_index':
+    case 'drop_index':
+      assertSelectedReplicaTable(statement)
+      assertIndexStatement(statement)
       return
     default:
       throw new Error(
@@ -322,6 +342,77 @@ function assertSelectedReplicaTable(statement: ReadReplicaSchemaSyncStatement): 
   }
 }
 
+function isIndexImportStatement(
+  statement: ReadReplicaSchemaSyncStatement,
+): boolean {
+  return (
+    statement.kind === 'index'
+    || statement.kind === 'invalid_index'
+    || statement.kind === 'drop_index'
+  )
+}
+
+export function partitionReadReplicaImportStatements(
+  statements: readonly ReadReplicaSchemaSyncStatement[],
+): {
+  atomicStatements: ReadReplicaSchemaSyncStatement[]
+  indexStatements: ReadReplicaSchemaSyncStatement[]
+} {
+  const atomicStatements: ReadReplicaSchemaSyncStatement[] = []
+  const indexStatements: ReadReplicaSchemaSyncStatement[] = []
+  for (const statement of statements) {
+    if (isIndexImportStatement(statement))
+      indexStatements.push(statement)
+    else
+      atomicStatements.push(statement)
+  }
+  return { atomicStatements, indexStatements }
+}
+
+function assertIndexStatement(statement: ReadReplicaSchemaSyncStatement): void {
+  if (!isSafeIdentifier(statement.name)) {
+    throw new Error(
+      `Cloud SQL server-side import cannot apply ${statement.kind} ${statement.table}.${statement.name} before primary migrations.`,
+    )
+  }
+
+  const quotedName = quoteSqlIdentifier(statement.name)
+  const quotedTable = quoteSqlIdentifier(statement.table)
+  const createPrefix = `CREATE INDEX CONCURRENTLY IF NOT EXISTS ${quotedName} ON public.${quotedTable} `
+  const createUniquePrefix = `CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS ${quotedName} ON public.${quotedTable} `
+  const dropSql = `DROP INDEX CONCURRENTLY IF EXISTS public.${quotedName}`
+  const reindexSql = `REINDEX INDEX CONCURRENTLY public.${quotedName}`
+
+  if (statement.kind === 'drop_index') {
+    if (statement.sql !== dropSql) {
+      throw new Error(
+        `Cloud SQL server-side import cannot apply ${statement.kind} ${statement.table}.${statement.name} before primary migrations.`,
+      )
+    }
+    return
+  }
+
+  if (statement.kind === 'invalid_index') {
+    if (statement.sql !== reindexSql) {
+      throw new Error(
+        `Cloud SQL server-side import cannot apply ${statement.kind} ${statement.table}.${statement.name} before primary migrations.`,
+      )
+    }
+    return
+  }
+
+  const createTail = statement.sql.startsWith(createPrefix)
+    ? statement.sql.slice(createPrefix.length)
+    : statement.sql.startsWith(createUniquePrefix)
+      ? statement.sql.slice(createUniquePrefix.length)
+      : undefined
+  if (!createTail || !isSafeSchemaFragment(createTail)) {
+    throw new Error(
+      `Cloud SQL server-side import cannot apply ${statement.kind} ${statement.table}.${statement.name} before primary migrations.`,
+    )
+  }
+}
+
 function isSafeIdentifier(value: string): boolean {
   return /^[A-Za-z_]\w*$/u.test(value)
 }
@@ -370,10 +461,38 @@ export function renderReadReplicaImportTransaction(
     )
   }
 
-  for (const statement of statements)
+  for (const statement of statements) {
+    if (isIndexImportStatement(statement)) {
+      throw new Error(
+        `Cloud SQL server-side import cannot atomically apply ${statement.kind} ${statement.table}.${statement.name} before primary migrations.`,
+      )
+    }
     assertGoogleReadReplicaSchemaStatement(statement)
+  }
 
   return `BEGIN;\n${statements.map(statement => statement.sql).join(';\n')};\nCOMMIT;`
+}
+
+export function renderReadReplicaIndexImport(
+  statements: readonly ReadReplicaSchemaSyncStatement[],
+): string {
+  if (!statements.length) {
+    throw new Error(
+      'Read-replica server-side index import requires at least one reviewed statement',
+    )
+  }
+
+  for (const statement of statements) {
+    if (!isIndexImportStatement(statement)) {
+      throw new Error(
+        `Cloud SQL server-side index import rejected non-index ${statement.kind} ${statement.table}.${statement.name}.`,
+      )
+    }
+    assertGoogleReadReplicaSchemaStatement(statement)
+  }
+
+  // No BEGIN/COMMIT: CONCURRENTLY index DDL cannot run inside a transaction.
+  return `${statements.map(statement => statement.sql).join(';\n')};`
 }
 
 async function importReadReplicaSchemaTransaction(
