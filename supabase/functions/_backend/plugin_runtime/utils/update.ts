@@ -460,8 +460,10 @@ export async function updateWithPG(
   let manifestEntries = (channelOverride?.manifestEntries ?? channelData?.manifestEntries ?? []) as Partial<Database['public']['Tables']['manifest']['Row']>[]
   // device.version = versionData ? versionData.id : version.id
 
-  const hasDeferredManifest = fetchManifestEntries && (version.manifest_count ?? 0) > 0
-  if (!version.external_url && !version.r2_path && !isInternalVersionName(version.name) && !hasDeferredManifest && (!manifestEntries || manifestEntries.length === 0)) {
+  // App-level manifest_bundle_count gates whether we may load files later.
+  // Do not require version.manifest_count here — seed/legacy rows can lag that column
+  // while still having manifest table entries (and the old json_agg path found them).
+  if (!version.external_url && !version.r2_path && !isInternalVersionName(version.name) && !fetchManifestEntries && (!manifestEntries || manifestEntries.length === 0)) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot get bundle', id: app_id, version, manifestEntriesLength: manifestEntries ? manifestEntries.length : 0, channelData: channelData ? channelData.channels.name : 'no channel data', defaultChannel })
     await sendStatsAndDevice(c, device, [{ action: 'missingBundle', versionName: version.name }])
     return updateError200(c, 'no_bundle', 'Cannot get bundle')
@@ -689,7 +691,7 @@ export async function updateWithPG(
         }
       }
     }
-    if (hasDeferredManifest && (!manifestEntries || manifestEntries.length === 0)) {
+    if (fetchManifestEntries && (!manifestEntries || manifestEntries.length === 0)) {
       const startManifestFetch = performance.now()
       manifestEntries = await requestManifestEntriesPostgres(c, version.id, drizzleClient)
       manifestFetchMs = Math.round(performance.now() - startManifestFetch)
