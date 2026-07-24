@@ -46,7 +46,10 @@ when working with code in this repository.
 - `./scripts/start-cloudflare-workers.sh` - Start local Cloudflare Workers for
   testing
 
-Note: Cloudflare test suite is currently unstable and may not pass reliably.
+Note: Cloudflare Workers and Playwright e2e suites are disabled in CI
+(`test_cloudflare` / `test_playwright`) because local edge/workerd overload
+caused intermittent 503/429 and login false-reds. Run them locally with
+`bun test:cloudflare:*` / `bun test:front` only when you need that coverage.
 
 See [CLOUDFLARE_TESTING.md](CLOUDFLARE_TESTING.md) for detailed information on
 testing against Cloudflare Workers.

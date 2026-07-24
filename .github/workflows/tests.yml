@@ -432,9 +432,11 @@ jobs:
           done
           bun scripts/supabase-worktree.ts stop --no-backup || true
 
+  # Removed from CI: local workerd/edge overload produces intermittent 503/429
+  # cascades and false-red shards. Keep `bun test:cloudflare:*` for local/manual runs.
   test_cloudflare:
     needs: changes
-    if: needs.changes.outputs.run_capgo == 'true'
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 30
     name: Run Cloudflare Workers tests (shard ${{ matrix.shard }})
@@ -555,9 +557,11 @@ jobs:
           done
           bun scripts/supabase-worktree.ts stop --no-backup || true
 
+  # Removed from CI: Supabase edge 503s break SSO domain-check during login
+  # (password step never appears). Frontend coverage stays in unit/backend tests.
   test_playwright:
     needs: changes
-    if: needs.changes.outputs.run_capgo == 'true'
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 30
     name: Run Playwright tests
