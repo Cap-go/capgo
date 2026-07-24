@@ -357,6 +357,14 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
   return fixSupabaseHost(getEnv(c, 'SUPABASE_DB_URL'))
 }
 
+// workerd cannot Pool.end(); creating a new Pool per request left dead pools on
+// the isolate heap (sawtooth memory). Reuse one Pool per connection config.
+const workerdPgPools = new Map<string, Pool>()
+
+function getWorkerdPgPoolKey(connectionString: string, readOnlyOptions: string | undefined) {
+  return `${connectionString}\0${readOnlyOptions ?? ''}`
+}
+
 export function getPgClient(c: Context, readOnly = false) {
   const dbUrl = getDatabaseURL(c, readOnly)
   const requestId = c.get('requestId')
@@ -365,6 +373,7 @@ export function getPgClient(c: Context, readOnly = false) {
   cloudlog({ requestId, message: 'SUPABASE_DB_URL selected', dbName, appName, readOnly })
 
   const isPooler = dbName.startsWith('sb_pooler')
+  const readOnlyOptions = readOnly && !isPooler ? '-c default_transaction_read_only=on' : undefined
   const options = {
     connectionString: dbUrl,
     max: 4,
@@ -373,7 +382,21 @@ export function getPgClient(c: Context, readOnly = false) {
     connectionTimeoutMillis: 10000, // Add explicit connect timeout
     maxLifetimeMillis: 30 * 60 * 1000, // 30 minutes
     // PgBouncer/Supabase pooler doesn't support the 'options' startup parameter
-    options: readOnly && !isPooler ? '-c default_transaction_read_only=on' : undefined,
+    options: readOnlyOptions,
+  }
+
+  if (getRuntimeKey() === 'workerd') {
+    const poolKey = getWorkerdPgPoolKey(dbUrl, readOnlyOptions)
+    const existing = workerdPgPools.get(poolKey)
+    if (existing)
+      return existing
+
+    const pool = new Pool(options)
+    pool.on('error', (err: Error) => {
+      cloudlogErr({ message: 'PG Pool Error', error: err, dbName, appName })
+    })
+    workerdPgPools.set(poolKey, pool)
+    return pool
   }
 
   const pool = new Pool(options)
@@ -448,7 +471,7 @@ export function logPgError(c: Context, functionName: string, error: unknown) {
 }
 
 export function closeClient(c: Context, db: ReturnType<typeof getPgClient>) {
-  // cloudlog(c.get('requestId'), 'Closing client', client)
+  // workerd pools are isolate-scoped and reused; never end them per request.
   if (getRuntimeKey() !== 'workerd')
     return backgroundTask(c, db.end())
   return undefined
@@ -948,6 +971,11 @@ interface RequestInfosPostgresOptions {
   drizzleClient: ReturnType<typeof getDrizzleClient>
   channelDeviceCount?: number | null
   manifestBundleCount?: number | null
+  /**
+   * When false, skip manifest json_agg / follow-up fetch in channel queries.
+   * Used by /updates to avoid loading thousands of files before the up-to-date short-circuit.
+   */
+  includeManifest?: boolean
   rolloutChannelCount?: number | null
   rolloutPausedVersionNames?: string[] | null
   currentVersionName: string
@@ -965,6 +993,7 @@ export function requestInfosPostgres(options: RequestInfosPostgresOptions) {
     drizzleClient,
     channelDeviceCount,
     manifestBundleCount,
+    includeManifest,
     rolloutChannelCount,
     rolloutPausedVersionNames,
     currentVersionName,
@@ -972,7 +1001,9 @@ export function requestInfosPostgres(options: RequestInfosPostgresOptions) {
     channelSelfOverrideChannelId,
   } = options
   const shouldQueryChannelOverride = channelDeviceCount === undefined || channelDeviceCount === null ? true : channelDeviceCount > 0
-  const shouldFetchManifest = manifestBundleCount === undefined || manifestBundleCount === null ? true : manifestBundleCount > 0
+  const shouldFetchManifest = includeManifest === false
+    ? false
+    : (manifestBundleCount === undefined || manifestBundleCount === null ? true : manifestBundleCount > 0)
   const isPausedRolloutVersion = Array.isArray(rolloutPausedVersionNames) && rolloutPausedVersionNames.includes(currentVersionName)
   const shouldUseRolloutPath = (rolloutChannelCount ?? 0) > 0 || isPausedRolloutVersion
 
