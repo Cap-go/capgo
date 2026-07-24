@@ -9,16 +9,12 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
-        # secret is base64 in this repo - handle manually instead
       - uses: google-github-actions/setup-gcloud@v2
       - name: Activate SA and inspect Cloud SQL
         env:
           GOOGLE_SERVICE_ACCOUNT_BASE64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           credentials_file="$(mktemp)"
           trap 'rm -f "$credentials_file"' EXIT
           printf '%s' "$GOOGLE_SERVICE_ACCOUNT_BASE64" | base64 --decode > "$credentials_file"
@@ -26,44 +22,50 @@ jobs:
           gcloud config set project capgo-394818
 
           echo "==== instance ===="
-          gcloud sql instances describe eu-2 --format='yaml(name,state,settings.activationPolicy,settings.ipConfiguration,currentDiskSize,settings.dataDiskSizeGb)'
+          gcloud sql instances describe eu-2 --format='yaml(name,state,settings.activationPolicy,currentDiskSize,settings.dataDiskSizeGb)' || true
 
-          echo "==== operations last 20 ===="
-          gcloud sql operations list --instance=eu-2 --limit=20 --format='table(name,operationType,status,user,insertTime,endTime,error.errors[].message)'
+          echo "==== operations last 30 ===="
+          gcloud sql operations list --instance=eu-2 --limit=30 --format='table(name,operationType,status,user,insertTime,endTime,error.errors[].message)' || true
 
-          echo "==== postgres.log ERROR/FATAL/replication last 6h ===="
+          echo "==== logging (may be denied) ===="
           gcloud logging read \
-            'resource.type="cloudsql_database" AND resource.labels.database_id="capgo-394818:eu-2" AND (textPayload=~"(?i)(error|fatal|panic|replication|subscription|conflict|could not|canceling|lock|timeout|access exclusive)" OR jsonPayload.message=~"(?i)(error|fatal|panic|replication|subscription|conflict|could not|canceling|lock|timeout|access exclusive)")' \
-            --limit=80 \
-            --freshness=6h \
-            --format='value(timestamp,textPayload,jsonPayload.message)'
+            'resource.type="cloudsql_database" AND resource.labels.database_id="capgo-394818:eu-2"' \
+            --limit=50 \
+            --freshness=12h \
+            --format='value(timestamp,textPayload,jsonPayload.message)' || true
 
           echo "==== pg_stat_subscription ===="
           gcloud sql instances execute-sql eu-2 \
             --database=postgres \
             --sql="SELECT subname, pid, received_lsn, latest_end_lsn, last_msg_send_time, last_msg_receipt_time, now()-last_msg_receipt_time AS no_message_for FROM pg_stat_subscription;" \
-            --format=json
+            --format=json || true
 
           echo "==== pg_subscription ===="
           gcloud sql instances execute-sql eu-2 \
             --database=postgres \
-            --sql="SELECT subname, subenabled, subslotname, subconninfo IS NOT NULL AS has_conninfo, subpublications FROM pg_subscription;" \
-            --format=json
+            --sql="SELECT subname, subenabled, subslotname, subpublications FROM pg_subscription;" \
+            --format=json || true
 
           echo "==== subscription rel states ===="
           gcloud sql instances execute-sql eu-2 \
             --database=postgres \
             --sql="SELECT sr.srrelid::regclass AS table_name, sr.srsubstate, sr.srsublsn FROM pg_subscription_rel sr JOIN pg_subscription s ON s.oid=sr.srsubid ORDER BY 1;" \
-            --format=json
+            --format=json || true
 
-          echo "==== locks / activity ===="
+          echo "==== worker/apply activity ===="
           gcloud sql instances execute-sql eu-2 \
             --database=postgres \
-            --sql="SELECT pid, usename, state, wait_event_type, wait_event, left(query,160) AS query FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() ORDER BY state, pid LIMIT 40;" \
-            --format=json
+            --sql="SELECT pid, usename, application_name, state, wait_event_type, wait_event, left(query,200) AS query FROM pg_stat_activity WHERE pid<>pg_backend_pid() ORDER BY backend_start NULLS LAST LIMIT 50;" \
+            --format=json || true
 
-          echo "==== trigger enabled? ===="
+          echo "==== blocking locks ===="
+          gcloud sql instances execute-sql eu-2 \
+            --database=postgres \
+            --sql="SELECT blocked.pid AS blocked_pid, left(blocked.query,120) AS blocked_query, blocking.pid AS blocking_pid, left(blocking.query,120) AS blocking_query FROM pg_stat_activity blocked JOIN pg_locks bl ON bl.pid=blocked.pid AND NOT bl.granted JOIN pg_locks kl ON kl.locktype=bl.locktype AND kl.database IS NOT DISTINCT FROM bl.database AND kl.relation IS NOT DISTINCT FROM bl.relation AND kl.page IS NOT DISTINCT FROM bl.page AND kl.tuple IS NOT DISTINCT FROM bl.tuple AND kl.virtualxid IS NOT DISTINCT FROM bl.virtualxid AND kl.transactionid IS NOT DISTINCT FROM bl.transactionid AND kl.classid IS NOT DISTINCT FROM bl.classid AND kl.objid IS NOT DISTINCT FROM bl.objid AND kl.objsubid IS NOT DISTINCT FROM bl.objsubid AND kl.pid<>bl.pid AND kl.granted JOIN pg_stat_activity blocking ON blocking.pid=kl.pid LIMIT 30;" \
+            --format=json || true
+
+          echo "==== app_versions triggers ===="
           gcloud sql instances execute-sql eu-2 \
             --database=postgres \
             --sql="SELECT tgname, tgenabled FROM pg_trigger WHERE tgrelid='public.app_versions'::regclass AND NOT tgisinternal;" \
-            --format=json
+            --format=json || true
