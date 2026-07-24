@@ -550,21 +550,14 @@ export async function handleOrgNotificationsAndEvents(c: Context, org: any, orgI
   }
   else if (!is_onboarded && is_onboarding_needed) {
     const onboardingIntent = parseOrgOnboardingIntent(org.onboarding)
-    const sent = await sendNotifToOrgMembersOnce(c, 'user:need_onboarding', 'onboarding', buildOnboardingIntentBentoEventData(c, onboardingIntent, {
+    // Email reminder stays once-per-org via sendNotifToOrgMembersOnce.
+    // Do not mirror to PostHog: Once returns true for already-claimed orgs, so a
+    // daily cron re-emitted ~5k identified "User need onboarding" events/day.
+    await sendNotifToOrgMembersOnce(c, 'user:need_onboarding', 'onboarding', buildOnboardingIntentBentoEventData(c, onboardingIntent, {
       id: orgId,
       name: org.name ?? '',
       website: org.website ?? null,
     }), orgId, orgId, drizzleClient)
-    if (sent) {
-      await sendEventToTracking(c, {
-        channel: 'usage',
-        event: 'User need onboarding',
-        icon: '🥲',
-        user_id: orgId,
-        groups: { organization: orgId },
-        notify: false,
-      }).catch()
-    }
   }
   else if (is_good_plan && is_onboarded) {
     await userIsAtPlanUsage(c, orgId, org.customer_id, percentUsage, drizzleClient)
