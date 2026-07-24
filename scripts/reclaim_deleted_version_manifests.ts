@@ -1,15 +1,13 @@
 /**
  * Reclaim ALL soft-deleted app_versions that still have public.manifest rows.
  *
- * Per version:
- *   1) R2: trash s3 paths only referenced by this version
- *   2) DB txn: clear JSON/count FIRST, then DELETE public.manifest rows
- *
- * check_encrypted_bundle_on_insert forbids nulling JSON when any OLD.manifest
- * entry is missing from public.manifest. So DELETE-then-NULL is always wrong
- * if that trigger can fire. We also must not ALTER TABLE DISABLE TRIGGER here:
- * that takes ACCESS EXCLUSIVE on app_versions once per version and stalls
- * producers / logical replication. Use session_replication_role=replica instead.
+ * Parallel bulk (target: minutes, not hours):
+ *   1) list doomed version ids
+ *   2) collect R2 paths not used by any live version
+ *   3) IN PARALLEL:
+ *        - trash those R2 paths (high concurrency)
+ *        - wipe DB in version batches across a connection pool
+ *          (SET LOCAL session_replication_role=replica — no table lock)
  *
  * Usage:
  *   bun scripts/reclaim_deleted_version_manifests.ts
@@ -19,7 +17,9 @@ import pg from 'pg'
 
 const ENV_FILE = './internal/cloudflare/.env.prod'
 const TRASH_PREFIX = 'deleted-after-7-days/'
-const R2_CONCURRENCY = 200
+const R2_CONCURRENCY = 500
+const DB_POOL_SIZE = 16
+const VERSION_BATCH = 250
 const DB_URL_ENV_KEYS = [
   'MAIN_SUPABASE_DB_URL',
   'DATABASE_URL',
@@ -56,6 +56,26 @@ function requireDbUrl(env: Record<string, string>) {
   throw new Error(`Missing DB URL. Set one of: ${DB_URL_ENV_KEYS.join(', ')}`)
 }
 
+function sslForUrl(databaseUrl: string) {
+  const host = new URL(databaseUrl).hostname
+  const local = host === 'localhost' || host === '127.0.0.1' || host === '::1'
+  return local ? false as const : { rejectUnauthorized: false }
+}
+
+function cleanDbUrl(databaseUrl: string) {
+  const parsed = new URL(databaseUrl)
+  parsed.searchParams.delete('sslmode')
+  parsed.searchParams.delete('sslrootcert')
+  return parsed.toString()
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < items.length; i += size)
+    out.push(items.slice(i, i + size))
+  return out
+}
+
 async function mapPool<T>(items: T[], concurrency: number, fn: (item: T) => Promise<void>) {
   if (items.length === 0)
     return
@@ -86,35 +106,16 @@ async function objectExists(s3: S3Client, bucket: string, key: string) {
 async function moveToTrash(s3: S3Client, bucket: string, key: string) {
   if (key.startsWith(TRASH_PREFIX))
     return
-
   const exists = await objectExists(s3, bucket, key)
   if (!exists)
     return
-
   const encodedKey = key.split('/').map(segment => encodeURIComponent(segment)).join('/')
   await s3.send(new CopyObjectCommand({
     Bucket: bucket,
     CopySource: `${bucket}/${encodedKey}`,
     Key: `${TRASH_PREFIX}${key}`,
   }))
-  await s3.send(new DeleteObjectCommand({
-    Bucket: bucket,
-    Key: key,
-  }))
-}
-
-function createPgClient(databaseUrl: string) {
-  const parsed = new URL(databaseUrl)
-  const host = parsed.hostname
-  const usesLocalDatabase = host === 'localhost' || host === '127.0.0.1' || host === '::1'
-
-  parsed.searchParams.delete('sslmode')
-  parsed.searchParams.delete('sslrootcert')
-
-  return new pg.Client({
-    connectionString: parsed.toString(),
-    ssl: usesLocalDatabase ? false : { rejectUnauthorized: false },
-  })
+  await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
 }
 
 function formatRate(count: number, startedAt: number) {
@@ -122,16 +123,91 @@ function formatRate(count: number, startedAt: number) {
   return `${Math.round(count / elapsedSec)}/s`
 }
 
+async function wipeVersionBatch(pool: pg.Pool, ids: string[]) {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query(`SET LOCAL statement_timeout = '0'`)
+    await client.query(`SET LOCAL synchronous_commit = off`)
+    // Skip user triggers without ACCESS EXCLUSIVE table locks.
+    await client.query(`SET LOCAL session_replication_role = 'replica'`)
+
+    const deletedRes = await client.query(
+      `DELETE FROM public.manifest WHERE app_version_id = ANY($1::bigint[])`,
+      [ids],
+    )
+
+    await client.query(
+      `WITH prev AS (
+         SELECT av.id, av.app_id,
+           CASE WHEN av.manifest_count > 0 OR av.manifest IS NOT NULL THEN 1 ELSE 0 END AS counted
+         FROM public.app_versions AS av
+         WHERE av.id = ANY($1::bigint[])
+       ),
+       cleared AS (
+         UPDATE public.app_versions AS av
+         SET manifest_count = 0,
+             manifest = NULL
+         FROM prev
+         WHERE av.id = prev.id
+         RETURNING prev.app_id, prev.counted
+       ),
+       per_app AS (
+         SELECT app_id, SUM(counted)::int AS cleared_count
+         FROM cleared
+         GROUP BY app_id
+         HAVING SUM(counted) > 0
+       )
+       UPDATE public.apps AS a
+       SET manifest_bundle_count = GREATEST(a.manifest_bundle_count - per_app.cleared_count, 0),
+           updated_at = now()
+       FROM per_app
+       WHERE a.app_id = per_app.app_id`,
+      [ids],
+    )
+
+    await client.query('COMMIT')
+    return deletedRes.rowCount ?? 0
+  }
+  catch (error) {
+    try {
+      await client.query('ROLLBACK')
+    }
+    catch {
+      // ignore
+    }
+    throw error
+  }
+  finally {
+    client.release()
+  }
+}
+
 async function main() {
   const env = await loadEnv(ENV_FILE)
-  const databaseUrl = requireDbUrl(env)
-  const db = createPgClient(databaseUrl)
-  await db.connect()
-  await db.query(`SET statement_timeout = '0'`)
-  // Old runs used ALTER TABLE DISABLE TRIGGER and could leave it off after a crash.
-  await db.query(
-    `ALTER TABLE public.app_versions ENABLE TRIGGER enforce_encrypted_bundle_trigger`,
-  )
+  const databaseUrl = cleanDbUrl(requireDbUrl(env))
+  const ssl = sslForUrl(databaseUrl)
+
+  const pool = new pg.Pool({
+    connectionString: databaseUrl,
+    ssl,
+    max: DB_POOL_SIZE,
+    allowExitOnIdle: true,
+  })
+  pool.on('error', (error) => {
+    console.error('pool error', error)
+  })
+
+  // Ensure previous crashed runs did not leave the lock trigger disabled.
+  {
+    const client = await pool.connect()
+    try {
+      await client.query(`ALTER TABLE public.app_versions ENABLE TRIGGER enforce_encrypted_bundle_trigger`)
+    }
+    finally {
+      client.release()
+    }
+  }
 
   const s3 = new S3Client({
     credentials: {
@@ -146,115 +222,91 @@ async function main() {
   const bucket = env.S3_BUCKET || 'capgo'
 
   const onSignal = () => {
-    db.end().finally(() => process.exit(1))
+    pool.end().finally(() => process.exit(1))
   }
   process.once('SIGINT', onSignal)
   process.once('SIGTERM', onSignal)
 
-  console.log('Listing soft-deleted versions with leftover manifests...')
-  const versionsRes = await db.query<{ id: number, app_id: string, manifest_count: number }>(`
-    SELECT av.id, av.app_id, av.manifest_count
+  const startedAt = Date.now()
+
+  console.log('1/3 Listing doomed versions...')
+  const versionsRes = await pool.query<{ id: string }>(`
+    SELECT av.id::text AS id
     FROM public.app_versions AS av
     WHERE av.deleted = true
       AND av.app_id NOT LIKE 'com.capdemo%'
       AND (
         av.manifest_count > 0
-        OR EXISTS (
-          SELECT 1 FROM public.manifest AS m WHERE m.app_version_id = av.id
-        )
+        OR EXISTS (SELECT 1 FROM public.manifest AS m WHERE m.app_version_id = av.id)
       )
-    ORDER BY av.deleted_at NULLS LAST, av.id
+    ORDER BY av.id
   `)
-  const versions = versionsRes.rows
-  console.log(`Found ${versions.length} versions`)
+  const versionIds = versionsRes.rows.map(r => r.id)
+  console.log(`   versions=${versionIds.length}`)
+  if (versionIds.length === 0) {
+    await pool.end()
+    console.log('Nothing to do.')
+    return
+  }
 
-  let done = 0
-  let totalTrashed = 0
-  let totalDeleted = 0
-  const startedAt = Date.now()
-
-  try {
-    for (const version of versions) {
-      const trashRes = await db.query<{ s3_path: string }>(
-        `SELECT DISTINCT m.s3_path
-         FROM public.manifest AS m
-         WHERE m.app_version_id = $1
-           AND m.s3_path IS NOT NULL
-           AND NOT EXISTS (
-             SELECT 1
-             FROM public.manifest AS other
-             WHERE other.file_hash = m.file_hash
-               AND other.file_name = m.file_name
-               AND other.app_version_id <> $1
-           )`,
-        [version.id],
+  console.log('2/3 Collecting R2 paths not used by live versions...')
+  const pathStarted = Date.now()
+  const pathRes = await pool.query<{ s3_path: string }>(`
+    SELECT DISTINCT m.s3_path
+    FROM public.manifest AS m
+    WHERE m.app_version_id = ANY($1::bigint[])
+      AND m.s3_path IS NOT NULL
+      AND m.s3_path <> ''
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.manifest AS live_m
+        JOIN public.app_versions AS live_av
+          ON live_av.id = live_m.app_version_id
+         AND live_av.deleted = false
+        WHERE live_m.s3_path = m.s3_path
       )
-      const paths = trashRes.rows.map(row => row.s3_path)
+  `, [versionIds])
+  const paths = pathRes.rows.map(r => r.s3_path)
+  console.log(`   r2_paths=${paths.length} (${((Date.now() - pathStarted) / 1000).toFixed(1)}s)`)
 
-      await mapPool(paths, R2_CONCURRENCY, async (path) => {
-        await moveToTrash(s3, bucket, path)
-      })
+  console.log(`3/3 Parallel wipe: DB pool=${DB_POOL_SIZE} batch=${VERSION_BATCH} | R2 concurrency=${R2_CONCURRENCY}`)
+  const batches = chunk(versionIds, VERSION_BATCH)
+  let totalDeleted = 0
+  let dbBatchesDone = 0
+  let r2Done = 0
+  const workStarted = Date.now()
 
-      await db.query('BEGIN')
-      try {
-        // Session-local: skips user triggers without ACCESS EXCLUSIVE on the table.
-        await db.query(`SET LOCAL session_replication_role = 'replica'`)
+  const dbWork = mapPool(batches, DB_POOL_SIZE, async (ids) => {
+    const deleted = await wipeVersionBatch(pool, ids)
+    totalDeleted += deleted
+    dbBatchesDone += 1
+    process.stdout.write(
+      `\r   DB ${Math.min(dbBatchesDone * VERSION_BATCH, versionIds.length)}/${versionIds.length} versions | rows=${totalDeleted} ${formatRate(totalDeleted, workStarted)} | R2 ${r2Done}/${paths.length}`,
+    )
+  })
 
-        // Null JSON first. DELETE-then-NULL trips bundle_manifest_not_migrated
-        // if the encryption trigger can still fire.
-        await db.query(
-          `UPDATE public.app_versions
-           SET manifest_count = 0,
-               manifest = NULL
-           WHERE id = $1`,
-          [version.id],
-        )
-
-        const deletedRes = await db.query(
-          `DELETE FROM public.manifest WHERE app_version_id = $1`,
-          [version.id],
-        )
-        const deletedRows = deletedRes.rowCount ?? 0
-
-        if (deletedRows > 0 || (version.manifest_count ?? 0) > 0) {
-          await db.query(
-            `UPDATE public.apps
-             SET manifest_bundle_count = GREATEST(manifest_bundle_count - 1, 0),
-                 updated_at = now()
-             WHERE app_id = $1`,
-            [version.app_id],
-          )
-        }
-
-        await db.query('COMMIT')
-        totalDeleted += deletedRows
-      }
-      catch (error) {
-        await db.query('ROLLBACK')
-        throw error
-      }
-
-      done += 1
-      totalTrashed += paths.length
-      if (done % 10 === 0 || done === versions.length) {
-        process.stdout.write(
-          `\rCleaned ${done}/${versions.length} versions (rows=${totalDeleted} ${formatRate(totalDeleted, startedAt)}, r2_candidates=${totalTrashed})`,
-        )
-      }
+  const r2Work = mapPool(paths, R2_CONCURRENCY, async (path) => {
+    await moveToTrash(s3, bucket, path)
+    r2Done += 1
+    if (r2Done % 500 === 0 || r2Done === paths.length) {
+      process.stdout.write(
+        `\r   DB ${Math.min(dbBatchesDone * VERSION_BATCH, versionIds.length)}/${versionIds.length} versions | rows=${totalDeleted} ${formatRate(totalDeleted, workStarted)} | R2 ${r2Done}/${paths.length}`,
+      )
     }
-  }
-  finally {
-    process.off('SIGINT', onSignal)
-    process.off('SIGTERM', onSignal)
-    await db.end()
-  }
+  })
 
+  await Promise.all([dbWork, r2Work])
   process.stdout.write('\n')
+
+  process.off('SIGINT', onSignal)
+  process.off('SIGTERM', onSignal)
+  await pool.end()
+
   console.log('Done.')
-  console.log(`Versions cleaned: ${done}`)
+  console.log(`Versions: ${versionIds.length}`)
   console.log(`Manifest rows deleted: ${totalDeleted}`)
-  console.log(`R2 trash candidates: ${totalTrashed}`)
-  console.log(`Elapsed: ${((Date.now() - startedAt) / 1000).toFixed(1)}s (${formatRate(totalDeleted, startedAt)} rows)`)
+  console.log(`R2 candidates: ${paths.length}`)
+  console.log(`Elapsed: ${((Date.now() - startedAt) / 1000).toFixed(1)}s`)
 }
 
 await main()
