@@ -74,6 +74,19 @@ describe('read-replica Cloud SQL server-side import', () => {
     }).toThrow('cannot atomically apply')
   })
 
+  it.concurrent('strips only the leading CONCURRENTLY keyword from index DDL', () => {
+    const tricky: ReadReplicaSchemaSyncStatement = {
+      kind: 'index',
+      table: 'apps',
+      name: 'create index concurrently trap',
+      sql: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "create index concurrently trap" ON public."apps" ("app_id")',
+    }
+    assertGoogleReadReplicaSchemaPlan(plan([tricky]))
+    expect(renderReadReplicaIndexImport([tricky])).toBe(
+      'CREATE INDEX IF NOT EXISTS "create index concurrently trap" ON public."apps" ("app_id");',
+    )
+  })
+
   it.concurrent('imports quoted index names that contain spaces', () => {
     assertGoogleReadReplicaSchemaPlan(plan([spacedIndexStatement, spacedConstraintStatement]))
 

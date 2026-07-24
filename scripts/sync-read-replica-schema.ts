@@ -521,10 +521,10 @@ export function renderReadReplicaIndexImport(
 
 function renderCloudSqlIndexStatement(sql: string): string {
   return sql
-    .replaceAll('CREATE UNIQUE INDEX CONCURRENTLY ', 'CREATE UNIQUE INDEX ')
-    .replaceAll('CREATE INDEX CONCURRENTLY ', 'CREATE INDEX ')
-    .replaceAll('DROP INDEX CONCURRENTLY ', 'DROP INDEX ')
-    .replaceAll('REINDEX INDEX CONCURRENTLY ', 'REINDEX INDEX ')
+    .replace(/^CREATE UNIQUE INDEX CONCURRENTLY /u, 'CREATE UNIQUE INDEX ')
+    .replace(/^CREATE INDEX CONCURRENTLY /u, 'CREATE INDEX ')
+    .replace(/^DROP INDEX CONCURRENTLY /u, 'DROP INDEX ')
+    .replace(/^REINDEX INDEX CONCURRENTLY /u, 'REINDEX INDEX ')
 }
 
 async function importReadReplicaSchemaTransaction(

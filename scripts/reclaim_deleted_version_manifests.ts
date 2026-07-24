@@ -7,8 +7,9 @@
  *
  * Nulling app_versions.manifest normally runs check_encrypted_bundle_on_insert,
  * which unnests the full JSON against public.manifest and statement-timeouts on
- * large bundles. This ops script temporarily disables that one trigger, then
- * always re-enables it (finally + SIGINT/SIGTERM).
+ * large bundles. Disable that trigger only inside each short per-version
+ * transaction (disable + update + enable) so concurrent writers never see a
+ * globally disabled trigger.
  *
  * Usage:
  *   bun scripts/reclaim_deleted_version_manifests.ts
@@ -141,25 +142,10 @@ async function main() {
   })
   const bucket = env.S3_BUCKET || 'capgo'
 
-  let triggerDisabled = false
-  const enableTrigger = async () => {
-    if (!triggerDisabled)
-      return
-    await db.query(
-      `ALTER TABLE public.app_versions ENABLE TRIGGER ${LOCK_TRIGGER}`,
-    )
-    triggerDisabled = false
-    console.log(`Re-enabled ${LOCK_TRIGGER}`)
-  }
-
   const onSignal = () => {
-    enableTrigger()
-      .catch((error) => {
-        console.error(`Failed to re-enable ${LOCK_TRIGGER}`, error)
-      })
-      .finally(() => {
-        db.end().finally(() => process.exit(1))
-      })
+    // Closing the connection aborts any in-flight transaction and rolls back a
+    // temporary trigger disable that lived only inside that transaction.
+    db.end().finally(() => process.exit(1))
   }
   process.once('SIGINT', onSignal)
   process.once('SIGTERM', onSignal)
@@ -180,12 +166,6 @@ async function main() {
   `)
   const versions = versionsRes.rows
   console.log(`Found ${versions.length} versions`)
-
-  console.log(`Disabling ${LOCK_TRIGGER} for bulk JSON clear...`)
-  await db.query(
-    `ALTER TABLE public.app_versions DISABLE TRIGGER ${LOCK_TRIGGER}`,
-  )
-  triggerDisabled = true
 
   let done = 0
   let totalTrashed = 0
@@ -216,6 +196,11 @@ async function main() {
 
       await db.query('BEGIN')
       try {
+        // ALTER TABLE takes ACCESS EXCLUSIVE; disable only for this short txn.
+        await db.query(
+          `ALTER TABLE public.app_versions DISABLE TRIGGER ${LOCK_TRIGGER}`,
+        )
+
         const deletedRes = await db.query(
           `DELETE FROM public.manifest WHERE app_version_id = $1`,
           [version.id],
@@ -240,6 +225,9 @@ async function main() {
           )
         }
 
+        await db.query(
+          `ALTER TABLE public.app_versions ENABLE TRIGGER ${LOCK_TRIGGER}`,
+        )
         await db.query('COMMIT')
         totalDeleted += deletedRows
       }
@@ -260,7 +248,6 @@ async function main() {
   finally {
     process.off('SIGINT', onSignal)
     process.off('SIGTERM', onSignal)
-    await enableTrigger()
     await db.end()
   }
 
