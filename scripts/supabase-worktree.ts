@@ -277,7 +277,7 @@ function parseInlineEnvAssignments(args: string[]): { env: Record<string, string
 /**
  * Run a Supabase CLI command against the current worktree's generated `--workdir`.
  */
-function runSupabase(args: string[], repoRoot: string): number {
+function runSupabase(args: string[], repoRoot: string, options: { captureOutput?: boolean } = {}): { status: number, output: string } {
   const { workdir, cfg } = ensureWorktreeSupabaseDir(repoRoot)
   const supa = getSupabaseCmd(repoRoot)
   const commandArgs = [...args]
@@ -288,31 +288,40 @@ function runSupabase(args: string[], repoRoot: string): number {
     commandArgs.push('--env-file', ensureFunctionsEnvFile(repoRoot, workdir, cfg))
 
   const res = spawnSync(supa.cmd, [...supa.argsPrefix, ...commandArgs, '--workdir', workdir], {
-    stdio: 'inherit',
+    stdio: options.captureOutput ? 'pipe' : 'inherit',
+    encoding: options.captureOutput ? 'utf8' : undefined,
     env: process.env,
   })
-  return res.status ?? 1
+  const output = options.captureOutput
+    ? `${res.stdout ?? ''}${res.stderr ?? ''}`
+    : ''
+  if (options.captureOutput && output)
+    process.stderr.write(output)
+  return { status: res.status ?? 1, output }
+}
+
+function isTransientDockerPortBindFailure(output: string): boolean {
+  return /address already in use/i.test(output)
+    || /failed to bind host port/i.test(output)
 }
 
 /**
  * `supabase start` can fail on GitHub runners with a transient Docker port bind
- * (`address already in use`) after a partial start/stop. Retry a few times with a
- * clean stop so CI concurrency does not depend on one-shot Docker networking.
+ * (`address already in use`) after a partial start/stop. Retry only that class of
+ * failure so permanent start errors fail fast.
  */
 function runSupabaseStartWithRetry(args: string[], repoRoot: string): number {
   const maxAttempts = 3
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const status = runSupabase(args, repoRoot)
+    const { status, output } = runSupabase(args, repoRoot, { captureOutput: true })
     if (status === 0)
       return 0
-    if (attempt === maxAttempts)
+    const canRetry = attempt < maxAttempts && isTransientDockerPortBindFailure(output)
+    if (!canRetry)
       return status
-    console.error(`Supabase start failed (attempt ${attempt}/${maxAttempts}); stopping and retrying...`)
+    console.error(`Supabase start hit a transient Docker port bind (attempt ${attempt}/${maxAttempts}); stopping and retrying...`)
     runSupabase(['stop', '--no-backup'], repoRoot)
-    if (typeof Bun !== 'undefined' && typeof Bun.sleepSync === 'function')
-      Bun.sleepSync(2000)
-    else
-      spawnSync('sleep', ['2'])
+    spawnSync(process.platform === 'win32' ? 'timeout' : 'sleep', process.platform === 'win32' ? ['/T', '2', '/NOBREAK'] : ['2'])
   }
   return 1
 }
@@ -396,7 +405,7 @@ function main(): number {
     if (args[0] === 'start')
       return runSupabaseStartWithRetry(args, repoRoot)
 
-    return runSupabase(args, repoRoot)
+    return runSupabase(args, repoRoot).status
   }
   catch (error) {
     console.error(error instanceof Error ? error.message : String(error))
