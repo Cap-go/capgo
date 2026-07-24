@@ -19,7 +19,10 @@ export default defineConfig(({ mode }) => ({
     testTimeout: 30_000, // Increased from 20s to handle slow edge function responses
     hookTimeout: 15_000, // Setup/teardown should complete promptly with isolated fixtures
     retry: 0,
-    maxConcurrency: 5, // Reduced to prevent connection exhaustion
+    // Keep load low: parallel file workers overload local Supabase edge into
+    // intermittent 502/503 mid-suite (false-red organization/channel shards).
+    maxConcurrency: 2,
+    maxWorkers: 2,
     // Vitest 4: pool options are now top-level
     isolate: true,
     fileParallelism: true,
