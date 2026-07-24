@@ -83,7 +83,7 @@ function notifyAutoUpdateVersionBlocked(
 
     // Non-queued fallback (local/Supabase): own a short-lived client so the request
     // pool can close without cancelling the Bento send.
-    const pgClient = getPgClient(c)
+    const pgClient = await getPgClient(c)
     const drizzleClient = getDrizzleClient(pgClient, { logger: false })
     try {
       await sendNotifToOrgMembersCached(
@@ -753,7 +753,7 @@ export async function update(c: Context, body: AppInfos) {
     if (providerBlockedResponse)
       return providerBlockedResponse
   }
-  const pgClient = getPgClient(c, true)
+  const pgClient = await getPgClient(c, true)
   try {
     const startLag = performance.now()
     await setReplicationLagHeader(c, pgClient)

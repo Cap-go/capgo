@@ -127,8 +127,7 @@ interface EligibleOrgMemberEmailsResult {
   resolutionFailed: boolean
 }
 
-
-type OrgRoleBindingRow = {
+interface OrgRoleBindingRow {
   principal_id: string | null
   expires_at: Date | null
 }
@@ -480,7 +479,7 @@ export async function sendEmailToOrgMembers(
   if (!isBentoConfigured(c))
     return 0
 
-  const client = drizzleClient ?? getDrizzleClient(getPgClient(c, true))
+  const client = drizzleClient ?? getDrizzleClient(await getPgClient(c, true))
   const { recipients } = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, client)
   if (!recipients) {
     cloudlog({ requestId: c.get('requestId'), message: 'sendEmailToOrgMembers: org not found', orgId })
@@ -633,7 +632,7 @@ export async function sendNotifToOrgMembersOnce(
   if (!isBentoConfigured(c))
     return false
 
-  const pgClient = getPgClient(c)
+  const pgClient = await getPgClient(c)
   const writeClient = getDrizzleClient(pgClient)
 
   try {
@@ -823,7 +822,6 @@ export async function sendNotifToOrgMembersCached(
   // No need to cache "sent=true" as next check should query DB anyway
   return result === true
 }
-
 
 /**
  * Resolve org admin/super_admin member emails for Bento profile tagging.

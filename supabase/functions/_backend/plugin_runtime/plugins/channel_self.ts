@@ -1,8 +1,9 @@
 // channel self old function
 import type { Context } from 'hono'
-import type { StandardSchema } from '../utils/schema_validation.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { PluginPgClient } from '../utils/pg.ts'
 import type { DeviceLink } from '../utils/plugin_parser.ts'
+import type { StandardSchema } from '../utils/schema_validation.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { parse } from '@std/semver'
 import { Hono } from 'hono/tiny'
@@ -634,7 +635,7 @@ async function parseChannelSelfPluginRequest(
 
 async function runChannelSelfWithPgClient(
   c: Context,
-  pgClient: ReturnType<typeof getPgClient>,
+  pgClient: PluginPgClient,
   run: (drizzleClient: ReturnType<typeof getDrizzleClient>) => Promise<Response>,
   record: () => Promise<void>,
 ) {
@@ -673,7 +674,7 @@ async function runChannelSelfDeviceOperation(
     return simpleError200(c, 'channel_self_server_storage_unavailable', 'Server channel_self storage unavailable')
   }
 
-  const pgClient = getPgClient(c, canUseReadReplica)
+  const pgClient = await getPgClient(c, canUseReadReplica)
 
   return await runChannelSelfWithPgClient(
     c,
@@ -785,7 +786,7 @@ app.get('/', async (c) => {
     }
   }
 
-  const pgClient = getPgClient(c, true)
+  const pgClient = await getPgClient(c, true)
 
   return await runChannelSelfWithPgClient(
     c,
