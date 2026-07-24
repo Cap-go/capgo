@@ -430,7 +430,7 @@ export async function getPgClient(c: Context, readOnly = false): Promise<PluginP
     application_name: `${appName}-${dbName}`,
     idleTimeoutMillis: 20000,
     connectionTimeoutMillis: 10000,
-    maxLifetimeMillis: 30 * 60 * 1000,
+    maxLifetimeSeconds: 30 * 60,
     // PgBouncer/Supabase pooler doesn't support the 'options' startup parameter
     options: readOnlyOptions,
   })
