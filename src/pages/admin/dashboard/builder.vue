@@ -8,6 +8,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import AdminBarChart from '~/components/admin/AdminBarChart.vue'
+import AdminBuilderRuntimeStatus from '~/components/admin/AdminBuilderRuntimeStatus.vue'
 import AdminFilterBar from '~/components/admin/AdminFilterBar.vue'
 import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
 import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
@@ -384,6 +385,10 @@ displayStore.defaultBack = '/dashboard'
     <div class="h-full pb-4 overflow-hidden">
       <div class="w-full h-full px-4 pt-2 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
         <AdminFilterBar />
+
+        <div class="mb-6">
+          <AdminBuilderRuntimeStatus />
+        </div>
 
         <PageLoader v-if="isLoading" />
 
