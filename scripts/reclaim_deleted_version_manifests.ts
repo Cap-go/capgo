@@ -1,15 +1,15 @@
 /**
  * Reclaim ALL soft-deleted app_versions that still have public.manifest rows.
  *
- * Per version (not per row):
- *   1) exist → move to deleted-after-7-days/; missing → ok (R2 pooled)
- *   2) DELETE public.manifest rows + clear JSON/count
+ * Per version:
+ *   1) R2: trash s3 paths only referenced by this version
+ *   2) DB txn: clear JSON/count FIRST, then DELETE public.manifest rows
  *
- * Nulling app_versions.manifest normally runs check_encrypted_bundle_on_insert,
- * which unnests the full JSON against public.manifest and statement-timeouts on
- * large bundles. Disable that trigger only inside each short per-version
- * transaction (disable + update + enable) so concurrent writers never see a
- * globally disabled trigger.
+ * check_encrypted_bundle_on_insert forbids nulling JSON when any OLD.manifest
+ * entry is missing from public.manifest. So DELETE-then-NULL is always wrong
+ * if that trigger can fire. We also must not ALTER TABLE DISABLE TRIGGER here:
+ * that takes ACCESS EXCLUSIVE on app_versions once per version and stalls
+ * producers / logical replication. Use session_replication_role=replica instead.
  *
  * Usage:
  *   bun scripts/reclaim_deleted_version_manifests.ts
@@ -20,7 +20,6 @@ import pg from 'pg'
 const ENV_FILE = './internal/cloudflare/.env.prod'
 const TRASH_PREFIX = 'deleted-after-7-days/'
 const R2_CONCURRENCY = 200
-const LOCK_TRIGGER = 'enforce_encrypted_bundle_trigger'
 const DB_URL_ENV_KEYS = [
   'MAIN_SUPABASE_DB_URL',
   'DATABASE_URL',
@@ -129,6 +128,10 @@ async function main() {
   const db = createPgClient(databaseUrl)
   await db.connect()
   await db.query(`SET statement_timeout = '0'`)
+  // Old runs used ALTER TABLE DISABLE TRIGGER and could leave it off after a crash.
+  await db.query(
+    `ALTER TABLE public.app_versions ENABLE TRIGGER enforce_encrypted_bundle_trigger`,
+  )
 
   const s3 = new S3Client({
     credentials: {
@@ -143,8 +146,6 @@ async function main() {
   const bucket = env.S3_BUCKET || 'capgo'
 
   const onSignal = () => {
-    // Closing the connection aborts any in-flight transaction and rolls back a
-    // temporary trigger disable that lived only inside that transaction.
     db.end().finally(() => process.exit(1))
   }
   process.once('SIGINT', onSignal)
@@ -196,17 +197,11 @@ async function main() {
 
       await db.query('BEGIN')
       try {
-        // ALTER TABLE takes ACCESS EXCLUSIVE; disable only for this short txn.
-        await db.query(
-          `ALTER TABLE public.app_versions DISABLE TRIGGER ${LOCK_TRIGGER}`,
-        )
+        // Session-local: skips user triggers without ACCESS EXCLUSIVE on the table.
+        await db.query(`SET LOCAL session_replication_role = 'replica'`)
 
-        const deletedRes = await db.query(
-          `DELETE FROM public.manifest WHERE app_version_id = $1`,
-          [version.id],
-        )
-        const deletedRows = deletedRes.rowCount ?? 0
-
+        // Null JSON first. DELETE-then-NULL trips bundle_manifest_not_migrated
+        // if the encryption trigger can still fire.
         await db.query(
           `UPDATE public.app_versions
            SET manifest_count = 0,
@@ -214,6 +209,12 @@ async function main() {
            WHERE id = $1`,
           [version.id],
         )
+
+        const deletedRes = await db.query(
+          `DELETE FROM public.manifest WHERE app_version_id = $1`,
+          [version.id],
+        )
+        const deletedRows = deletedRes.rowCount ?? 0
 
         if (deletedRows > 0 || (version.manifest_count ?? 0) > 0) {
           await db.query(
@@ -225,9 +226,6 @@ async function main() {
           )
         }
 
-        await db.query(
-          `ALTER TABLE public.app_versions ENABLE TRIGGER ${LOCK_TRIGGER}`,
-        )
         await db.query('COMMIT')
         totalDeleted += deletedRows
       }
