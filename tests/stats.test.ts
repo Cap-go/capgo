@@ -552,9 +552,10 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /stats', () => {
     await resetAppDataStats(appId)
   })
 
-  // Test each stats action - concurrent for Supabase, sequential for Cloudflare
-  const testDescribe = USE_CLOUDFLARE ? describe : describe.concurrent
-  const testIt = USE_CLOUDFLARE ? it : it.concurrent
+  // Sequential: concurrent action matrix raced on shared APP_NAME_STATS and
+  // produced intermittent PGRST116 (missing stats row) under edge load.
+  const testDescribe = describe
+  const testIt = it
 
   testDescribe('test all possible stats actions', () => {
     for (const action of ALLOWED_STATS_ACTIONS) {
