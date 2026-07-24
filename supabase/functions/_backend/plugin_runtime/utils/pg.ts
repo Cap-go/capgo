@@ -386,11 +386,12 @@ function isHyperdriveConnectionString(c: Context, dbUrl: string): boolean {
 /**
  * Create a DB client for this request.
  *
- * Hyperdrive (Cloudflare docs — solid contract at plugin scale):
- * - New `pg.Client` every request. Do not cache Client/Pool on the isolate.
- * - `await client.connect()` once, then query.
- * - Do **not** call `client.end()`: Hyperdrive cleans up the Worker↔Hyperdrive hop
- *   when the request ends and keeps the origin Postgres pool.
+ * Hyperdrive connection lifecycle (explicit Cloudflare contract):
+ * @see https://developers.cloudflare.com/hyperdrive/concepts/connection-lifecycle/
+ * - New `pg.Client` inside each request. Never create/cache Client/Pool in global scope.
+ * - `await client.connect()`, then query.
+ * - Do **not** call `client.end()` / `pool.end()`: "Workers-to-Hyperdrive connections
+ *   are automatically cleaned up when the request ends"; origin pool stays open.
  *
  * Non-Hyperdrive (local/direct/pooler): `Pool` + explicit `closeClient`/`end()`.
  */
@@ -500,7 +501,8 @@ export function logPgError(c: Context, functionName: string, error: unknown) {
 }
 
 export function closeClient(c: Context, db: PluginPgClient) {
-  // Hyperdrive Client: Cloudflare docs — do not end(); GC + Hyperdrive own cleanup.
+  // Hyperdrive: do not end() — connection-lifecycle docs say GC cleans the edge hop.
+  // https://developers.cloudflare.com/hyperdrive/concepts/connection-lifecycle/
   if (skipEndClients.has(db))
     return
 
