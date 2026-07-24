@@ -152,6 +152,7 @@ describe('handleOrgNotificationsAndEvents onboarding reminder', () => {
         onboarding: null,
       },
       orgId,
+      false,
       {
         total_percent: 0,
         mau_percent: 0,
