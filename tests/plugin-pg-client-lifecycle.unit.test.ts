@@ -109,7 +109,8 @@ describe('plugin_runtime Hyperdrive pg Client lifecycle', () => {
     ClientMock.mockClear()
     poolOnMock.mockClear()
     clientOnMock.mockClear()
-    clientConnectMock.mockClear()
+    clientConnectMock.mockReset()
+    clientConnectMock.mockImplementation(async () => undefined)
     getRuntimeKeyMock.mockReturnValue('workerd')
   })
 
@@ -130,6 +131,32 @@ describe('plugin_runtime Hyperdrive pg Client lifecycle', () => {
 
     await closeClient(c, first)
     expect(first.end).not.toHaveBeenCalled()
+  })
+
+  it('does not return the Hyperdrive Client until connect() resolves', async () => {
+    let releaseConnect!: () => void
+    clientConnectMock.mockImplementation(() => new Promise<undefined>((resolve) => {
+      releaseConnect = () => resolve(undefined)
+    }))
+
+    const { getPgClient } = await import('../supabase/functions/_backend/plugin_runtime/utils/pg.ts')
+    const c = createContext()
+
+    let settled: 'pending' | 'done' = 'pending'
+    const pending = getPgClient(c, true).then((client) => {
+      settled = 'done'
+      return client
+    })
+
+    // Yield so connect() is reached, but do not release it yet.
+    await Promise.resolve()
+    expect(clientConnectMock).toHaveBeenCalledTimes(1)
+    expect(settled).toBe('pending')
+
+    releaseConnect()
+    const client = await pending
+    expect(settled).toBe('done')
+    expect(client).toBeTruthy()
   })
 
   it('isolates Clients across different Hyperdrive connection strings', async () => {
