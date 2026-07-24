@@ -58,6 +58,7 @@ const GOOGLE_DATA_API_RESPONSE_LIMIT_BYTES = 10_000_000
 const IMPORT_CLEANUP_MAX_SECONDS = 60
 const POSTGRES_IMPORT_USER = 'postgres'
 const GCS_IMPORT_BUCKET = 'capgo-read-replica-schema-import-394818'
+// Included in Capgo release scope so replica schema sync fixes cut deploy tags.
 const GOOGLE_READ_REPLICA: GoogleDataApiConfig = {
   project: 'capgo-394818',
   instance: 'eu-2',
