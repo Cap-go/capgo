@@ -813,6 +813,57 @@ async function persistStripeInfoAndRevenueMovement(
   }
 }
 
+export function hasStripePaidAccess(
+  stripeInfo: Pick<StripeInfoRow, 'paid_at' | 'status'> | null | undefined,
+) {
+  return stripeInfo?.status === 'succeeded' && Boolean(stripeInfo?.paid_at)
+}
+
+export function mergeStripeWebhookExtractIntoStripeInfoState(
+  currentStripeInfo: Pick<StripeInfoRow, 'paid_at' | 'status' | 'canceled_at'>,
+  extracted: StripeData['data'],
+  eventOccurredAtIso: string,
+) {
+  const persistedStatus = extracted.subscription_id
+    ? resolveSubscriptionPersistedStatus(extracted.status, currentStripeInfo)
+    : extracted.status
+
+  const next: Pick<StripeInfoRow, 'paid_at' | 'status' | 'canceled_at'> = {
+    status: currentStripeInfo.status,
+    paid_at: currentStripeInfo.paid_at,
+    canceled_at: currentStripeInfo.canceled_at,
+  }
+
+  if (persistedStatus === 'failed') {
+    next.status = 'failed'
+    return next
+  }
+
+  if (persistedStatus === 'canceled') {
+    next.status = 'canceled'
+    if (extracted.canceled_at)
+      next.canceled_at = extracted.canceled_at
+    return next
+  }
+
+  const paidAt = getPaidAtUpdate(currentStripeInfo, persistedStatus, eventOccurredAtIso)
+  if (paidAt) {
+    next.status = 'succeeded'
+    next.paid_at = paidAt
+    return next
+  }
+
+  if (persistedStatus === 'succeeded') {
+    next.status = 'succeeded'
+    return next
+  }
+
+  if (persistedStatus && persistedStatus !== 'updated')
+    next.status = persistedStatus as StripeInfoRow['status']
+
+  return next
+}
+
 async function writePaidAtAtomically(c: Context, customerId: string, eventOccurredAtIso: string) {
   const pgClient = await getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
@@ -1080,7 +1131,7 @@ async function customerSourceExpiring(c: Context, org: Org) {
   return c.json(BRES)
 }
 
-async function invoiceCreatedOrUpdated(c: Context, stripeEvent: Stripe.InvoiceCreatedEvent | Stripe.InvoiceUpdatedEvent) {
+async function invoiceCreatedOrUpdated(c: Context, stripeEvent: Stripe.InvoiceCreatedEvent | Stripe.InvoiceUpdatedEvent | Stripe.InvoiceFinalizedEvent) {
   const eventInvoice = stripeEvent.data.object
 
   if (!shouldStampTransferInvoiceFooter(eventInvoice)) {
@@ -1632,6 +1683,35 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
     return c.json(BRES)
   }
 
+  if (stripeEvent.type === 'setup_intent.succeeded' || stripeEvent.type === 'payment_method.attached') {
+    return c.json(BRES)
+  }
+
+  if (stripeEvent.type === 'invoice.marked_uncollectible') {
+    const eventOccurredAtIso = new Date(stripeEvent.created * 1000).toISOString()
+    if (isStaleStripeEvent(customer, eventOccurredAtIso)) {
+      return c.json(BRES)
+    }
+    if (customer.subscription_id && stripeData.data.subscription_id === customer.subscription_id) {
+      const updateData = toStripeInfoUpdate(stripeData.data)
+      const revenuePlans = await getRevenuePlans(c)
+      const revenueMovement = classifyRevenueMovement(customer, updateData, revenuePlans)
+      const didPersist = await persistStripeInfoAndRevenueMovement(
+        c,
+        stripeData.data.customer_id,
+        stripeEvent.id,
+        updateData,
+        eventOccurredAtIso,
+        revenueMovement,
+      )
+      if (didPersist === 'missing')
+        return quickError(404, 'canceled_customer_id_not_found', `canceled: customer_id not found`, { stripeData })
+      if (didPersist === 'applied')
+        await didCancel(c, org, stripeData.data.customer_id)
+    }
+    return c.json(BRES)
+  }
+
   if (stripeEvent.type === 'payment_intent.payment_failed' || stripeEvent.type === 'invoice.payment_failed') {
     if (await orgHasActiveUsageCredits(c, org.id)) {
       cloudlog({ requestId: c.get('requestId'), message: 'Skipping failed payment email because org has active usage credits', orgId: org.id })
@@ -1652,7 +1732,7 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
   else if (stripeEvent.type === 'invoice.upcoming') {
     return invoiceUpcoming(c, org, stripeEvent, stripeData)
   }
-  else if (stripeEvent.type === 'invoice.created' || stripeEvent.type === 'invoice.updated') {
+  else if (stripeEvent.type === 'invoice.created' || stripeEvent.type === 'invoice.updated' || stripeEvent.type === 'invoice.finalized') {
     return invoiceCreatedOrUpdated(c, stripeEvent)
   }
   else if (stripeEvent.type === 'invoice.payment_action_required') {
@@ -1768,6 +1848,8 @@ export const stripeEventTestUtils = {
   getMovementPlanBreakdown,
   getPaidAtUpdate,
   resolveSubscriptionPersistedStatus,
+  mergeStripeWebhookExtractIntoStripeInfoState,
+  hasStripePaidAccess,
   getPlanChangeTrackingEventName,
   getChurnReason,
   getSubscriptionMrr,
