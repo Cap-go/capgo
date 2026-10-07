@@ -235,11 +235,7 @@
     },
     "cli": {
       "name": "@capgo/cli",
-<<<<<<< HEAD
       "version": "8.83.0",
-=======
-      "version": "8.75.1",
->>>>>>> a161dd8dd (feat(mobile): register the Capgo app with Capgo native notifications)
       "bin": {
         "capgo": "dist/index.js",
       },
