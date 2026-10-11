@@ -556,6 +556,33 @@ function readOnlyPgRetryBackoffMs(): number {
   return 25 + (jitter[0] % 26)
 }
 
+async function closeReadOnlyPgSession(
+  c: Context,
+  context: string,
+  session: ReadOnlyPgSession,
+  succeeded: boolean,
+  preserveError?: unknown,
+): Promise<void> {
+  if (succeeded && session.keepOpenAfterSuccess)
+    return
+  try {
+    await session.cleanup()
+  }
+  catch (cleanupError) {
+    if (preserveError !== undefined) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'read_only_pg_cleanup_failed',
+        context,
+        error: serializePostgresError(cleanupError),
+        databaseSource: c.get('databaseSource') ?? c.res.headers.get('X-Database-Source') ?? null,
+      })
+      return
+    }
+    throw cleanupError
+  }
+}
+
 export async function withReadOnlyPgTransientRetry<T>(
   c: Context,
   context: string,
@@ -564,15 +591,17 @@ export async function withReadOnlyPgTransientRetry<T>(
 ): Promise<T> {
   for (let attempt = 0; attempt < 2; attempt++) {
     let session: ReadOnlyPgSession | undefined
-    let succeeded = false
     try {
       session = await createSession()
       const result = await run(session)
-      succeeded = true
+      await closeReadOnlyPgSession(c, context, session, true)
       return result
     }
     catch (error) {
-      if (attempt === 0 && isReadOnlyPgConnectionRetryError(error)) {
+      const willRetry = attempt === 0 && isReadOnlyPgConnectionRetryError(error)
+      if (session)
+        await closeReadOnlyPgSession(c, context, session, false, error)
+      if (willRetry) {
         cloudlog({
           requestId: c.get('requestId'),
           message: 'read_only_pg_transient_retry',
@@ -583,10 +612,6 @@ export async function withReadOnlyPgTransientRetry<T>(
         continue
       }
       throw error
-    }
-    finally {
-      if (session && (!succeeded || !session.keepOpenAfterSuccess))
-        await session.cleanup()
     }
   }
 

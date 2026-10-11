@@ -169,6 +169,57 @@ describe('withReadOnlyPgTransientRetry', () => {
     expect(cloudlogMock).not.toHaveBeenCalled()
   })
 
+  it('still retries when cleanup fails after a connection error on the first attempt', async () => {
+    const { withReadOnlyPgTransientRetry } = await import('../supabase/functions/_backend/plugin_runtime/utils/pg.ts')
+    const c = createContext()
+    let sessions = 0
+    let runCalls = 0
+    const connectionError = Object.assign(new Error('Failed query: SELECT 1'), {
+      name: 'DrizzleQueryError',
+      cause: new Error('Client has encountered a connection error and is not queryable'),
+    })
+
+    const result = await withReadOnlyPgTransientRetry(c, 'test', async () => {
+      sessions++
+      return {
+        pgClient: {} as PluginPgClient,
+        drizzle: {} as any,
+        cleanup: vi.fn(async () => {
+          if (sessions === 1)
+            throw new Error('cleanup failed')
+        }),
+      }
+    }, async () => {
+      runCalls++
+      if (runCalls === 1)
+        throw connectionError
+      return 'ok'
+    })
+
+    expect(result).toBe('ok')
+    expect(sessions).toBe(2)
+    expect(runCalls).toBe(2)
+  })
+
+  it('rethrows the query error when cleanup fails on the final attempt', async () => {
+    const { withReadOnlyPgTransientRetry } = await import('../supabase/functions/_backend/plugin_runtime/utils/pg.ts')
+    const c = createContext()
+    const connectionError = Object.assign(new Error('Failed query: SELECT 1'), {
+      name: 'DrizzleQueryError',
+      cause: new Error('Client has encountered a connection error and is not queryable'),
+    })
+
+    await expect(withReadOnlyPgTransientRetry(c, 'test', async () => ({
+      pgClient: {} as PluginPgClient,
+      drizzle: {} as any,
+      cleanup: vi.fn(async () => {
+        throw new Error('cleanup failed')
+      }),
+    }), async () => {
+      throw connectionError
+    })).rejects.toBe(connectionError)
+  })
+
   it('does not retry non-transient drizzle failures', async () => {
     const { withReadOnlyPgTransientRetry } = await import('../supabase/functions/_backend/plugin_runtime/utils/pg.ts')
     const c = createContext()

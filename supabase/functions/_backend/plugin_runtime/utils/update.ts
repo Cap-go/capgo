@@ -68,7 +68,8 @@ export async function recordUpdatesMauOnce(
   return tracked
 }
 
-const updatesVersionGetStatsRecordedByRequest = new WeakMap<object, boolean>()
+const updatesVersionGetStatsVersionRecordedByRequest = new WeakMap<object, boolean>()
+const updatesVersionGetStatsDeviceRecordedByRequest = new WeakMap<object, boolean>()
 
 /** Dedupe version `get` stats when a connection retry replays updateWithPG. */
 export async function recordUpdatesVersionGetStatsOnce(
@@ -79,14 +80,23 @@ export async function recordUpdatesVersionGetStatsOnce(
   channel: VersionUsageChannel,
 ) {
   const requestKey = c.req.raw
-  if (updatesVersionGetStatsRecordedByRequest.get(requestKey))
+  const versionRecorded = updatesVersionGetStatsVersionRecordedByRequest.get(requestKey)
+  const deviceRecorded = updatesVersionGetStatsDeviceRecordedByRequest.get(requestKey)
+  if (versionRecorded && deviceRecorded)
     return
 
-  await Promise.all([
-    createStatsVersion(c, versionName, appId, 'get', channel),
-    sendStatsAndDevice(c, device, [{ action: 'get', versionName }]),
-  ])
-  updatesVersionGetStatsRecordedByRequest.set(requestKey, true)
+  const tasks: Promise<void>[] = []
+  if (!versionRecorded) {
+    tasks.push(createStatsVersion(c, versionName, appId, 'get', channel).then(() => {
+      updatesVersionGetStatsVersionRecordedByRequest.set(requestKey, true)
+    }))
+  }
+  if (!deviceRecorded) {
+    tasks.push(sendStatsAndDevice(c, device, [{ action: 'get', versionName }]).then(() => {
+      updatesVersionGetStatsDeviceRecordedByRequest.set(requestKey, true)
+    }))
+  }
+  await Promise.all(tasks)
 }
 
 const PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth']
