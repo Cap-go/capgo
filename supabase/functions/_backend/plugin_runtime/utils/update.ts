@@ -3,7 +3,7 @@ import type { Context } from 'hono'
 import type { ManifestEntry } from './downloadUrl.ts'
 import type { MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
-import type { AppInfos } from './types.ts'
+import type { AppInfos, VersionUsageChannel } from './types.ts'
 import {
   greaterOrEqual,
   greaterThan,
@@ -63,6 +63,27 @@ export async function recordUpdatesMauOnce(
 
   updatesMauInFlightByRequest.set(requestKey, tracked)
   return tracked
+}
+
+const updatesVersionGetStatsRecordedByRequest = new WeakMap<object, boolean>()
+
+/** Dedupe version `get` stats when a connection retry replays updateWithPG. */
+export async function recordUpdatesVersionGetStatsOnce(
+  c: Context,
+  device: ReturnType<typeof makeDevice>,
+  versionName: string,
+  appId: string,
+  channel: VersionUsageChannel,
+) {
+  const requestKey = c.req.raw
+  if (updatesVersionGetStatsRecordedByRequest.get(requestKey))
+    return
+
+  await Promise.all([
+    createStatsVersion(c, versionName, appId, 'get', channel),
+    sendStatsAndDevice(c, device, [{ action: 'get', versionName }]),
+  ])
+  updatesVersionGetStatsRecordedByRequest.set(requestKey, true)
 }
 
 const PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth']
@@ -990,10 +1011,10 @@ export async function updateWithPG(
   // bundle is not installed yet; /stats `set` records it once the device switches.
   // Attribute the offer to the channel that served it so channel stats and
   // release views can scope `get` counts (install/fail already carry it).
-  await Promise.all([
-    createStatsVersion(c, version.name, app_id, 'get', { id: channelData.channels.id, name: channelData.channels.name }),
-    sendStatsAndDevice(c, device, [{ action: 'get', versionName: version.name }]),
-  ])
+  await recordUpdatesVersionGetStatsOnce(c, device, version.name, app_id, {
+    id: channelData.channels.id,
+    name: channelData.channels.name,
+  })
   if (requestInfosMs >= 50 || manifestFetchMs >= 50 || bundleUrlMs >= 50) {
     cloudlog({
       requestId: c.get('requestId'),
