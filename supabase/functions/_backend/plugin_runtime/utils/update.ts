@@ -595,7 +595,7 @@ export async function updateWithPG(
     channelData.channels.update_package,
     isOnBuiltinVersion(version_name, version_build),
   )
-  const pluginSupportsManifest = getResponseFeatureSupport(plugin_version).manifest
+  const pluginSupportsManifest = updateResponseSupportsManifest(plugin_version)
   // External URLs and old plugins cannot consume delta manifests — keep a zip.
   const serveZip = updatePackage !== 'delta' || !pluginSupportsManifest || Boolean(version.external_url)
   const serveDelta = updatePackage !== 'zip' && pluginSupportsManifest && !version.external_url
