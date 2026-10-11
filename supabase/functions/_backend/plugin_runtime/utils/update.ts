@@ -32,7 +32,7 @@ import { isUpdateEnumerationLimited, recordUpdateEnumerationMiss, updateEnumerat
 import { canServeUpToDateFromCache, getUpdateReadCache, setUpdateReadCache } from './updateReadCache.ts'
 import { getCachedDefaultChannel, shouldUseUpdatesEdgeCache } from './updatesEdgeCache.ts'
 import { getUpdateResponseKind, resToVersion } from './update_response.ts'
-import { backgroundTask, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, fixSemver, isDeprecatedPluginVersion, isInternalVersionName, isVersionDeleted } from './utils.ts'
+import { backgroundTask, BROTLI_MIN_UPDATER_VERSION_V7, fixSemver, isDeprecatedPluginVersion, isInternalVersionName, isVersionDeleted } from './utils.ts'
 
 export { getUpdateResponseKind, resToVersion, type UpdateResponseKind } from './update_response.ts'
 
