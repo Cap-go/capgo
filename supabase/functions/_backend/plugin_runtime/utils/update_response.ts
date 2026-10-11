@@ -64,6 +64,10 @@ function getResponseFeatureSupport(plugin_version: string): ResponseFeatureSuppo
   return support
 }
 
+export function updateResponseSupportsManifest(plugin_version: string) {
+  return getResponseFeatureSupport(plugin_version).manifest
+}
+
 export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[], expose_metadata: boolean = false) {
   const support = getResponseFeatureSupport(plugin_version)
   const res: {

@@ -31,7 +31,7 @@ import { shouldQueuePluginNotifications } from './supabase_write_guard.ts'
 import { isUpdateEnumerationLimited, recordUpdateEnumerationMiss, updateEnumerationLimitedResponse } from './updateOracleGuard.ts'
 import { canServeUpToDateFromCache, getUpdateReadCache, setUpdateReadCache } from './updateReadCache.ts'
 import { getCachedDefaultChannel, shouldUseUpdatesEdgeCache } from './updatesEdgeCache.ts'
-import { getUpdateResponseKind, resToVersion } from './update_response.ts'
+import { getUpdateResponseKind, resToVersion, updateResponseSupportsManifest } from './update_response.ts'
 import { backgroundTask, BROTLI_MIN_UPDATER_VERSION_V7, fixSemver, isDeprecatedPluginVersion, isInternalVersionName, isVersionDeleted } from './utils.ts'
 
 export { getUpdateResponseKind, resToVersion, type UpdateResponseKind } from './update_response.ts'
