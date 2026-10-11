@@ -66,9 +66,11 @@ export function decryptSource(source: Buffer, ivSessionKey: string, key: string)
   return decryptedData
 }
 
+/**
+ * Encrypt a checksum with V2 RSA (legacy: treats the digest argument as base64 bytes, not hex).
+ * Prefer encryptChecksumV3 for current plugin versions.
+ */
 export function encryptChecksum(checksum: string, key: string): string {
-  // Note: This function incorrectly treats hex checksum as base64, but is kept for backwards compatibility
-  // with older plugin versions. Use encryptChecksumV3 for new plugin versions.
   const checksumEncrypted = privateEncrypt(
     {
       key,
@@ -80,8 +82,8 @@ export function encryptChecksum(checksum: string, key: string): string {
   return checksumEncrypted
 }
 
+/** Encrypt a SHA-256 hex digest with V3 RSA; ciphertext is hex-encoded. */
 export function encryptChecksumV3(checksum: string, key: string): string {
-  // V3: Correctly treats checksum as hex string and outputs hex
   const checksumEncrypted = privateEncrypt(
     {
       key,
@@ -93,6 +95,7 @@ export function encryptChecksumV3(checksum: string, key: string): string {
   return checksumEncrypted
 }
 
+/** Decrypt a V2 bundle checksum ciphertext (canonical base64) to its plaintext digest string. */
 export function decryptChecksum(checksum: string, key: string): string {
   const ciphertext = decodeCanonicalBase64(checksum)
   if (!ciphertext)
@@ -109,6 +112,7 @@ export function decryptChecksum(checksum: string, key: string): string {
   return checksumDecrypted
 }
 
+/** Decrypt a V3 bundle checksum ciphertext (hex) to its plaintext digest string. */
 export function decryptChecksumV3(checksum: string, key: string): string {
   // V3: Correctly treats checksum as hex string and outputs hex
   const checksumDecrypted = publicDecrypt(
@@ -126,6 +130,7 @@ const SHA256_HEX_LENGTH = 64
 // Standard base64 alphabet with optional padding. base64url (-_) is intentionally not accepted.
 const CANONICAL_BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/
 
+/** Decode standard base64 ciphertext when it round-trips canonically; reject base64url and malformed input. */
 function decodeCanonicalBase64(value: string): Buffer | null {
   if (!CANONICAL_BASE64_PATTERN.test(value))
     return null
@@ -172,7 +177,8 @@ export function decryptChecksumPlaintexts(encryptedChecksum: string, key: string
   const plaintexts: string[] = []
   const seen = new Set<string>()
 
-  const add = (value: string) => {
+  /** Record a unique decrypted checksum plaintext candidate. */
+  function add(value: string) {
     if (!seen.has(value)) {
       seen.add(value)
       plaintexts.push(value)
@@ -196,6 +202,7 @@ export function decryptChecksumPlaintexts(encryptedChecksum: string, key: string
   return plaintexts
 }
 
+/** Try V2 and V3 RSA checksum decryption and compare each plaintext digest to the zip SHA-256 hex. */
 export function verifyDecryptedBundleChecksum(
   computedSha256Hex: string,
   encryptedChecksum: string,
@@ -208,6 +215,7 @@ export function verifyDecryptedBundleChecksum(
   return { matches, decryptedPlaintexts }
 }
 
+/** Format decrypted checksum plaintext for CLI mismatch errors (hex as-is, base64 with derived hex). */
 export function formatDecryptedChecksumForError(decryptedPlaintext: string): string {
   if (new RegExp(`^[0-9a-fA-F]{${SHA256_HEX_LENGTH}}$`).test(decryptedPlaintext))
     return decryptedPlaintext.toLowerCase()

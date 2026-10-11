@@ -19,6 +19,7 @@ const HEX_CHECKSUM_MIN_VERSION_V5 = '5.30.0'
 const HEX_CHECKSUM_MIN_VERSION_V6 = '6.30.0'
 const HEX_CHECKSUM_MIN_VERSION_V7 = '7.30.0'
 
+/** Resolve the RSA public key from CLI options, local key file, or capacitor config. */
 function resolvePublicKey(options: BundleDecryptOptions, extConfig: Awaited<ReturnType<typeof getConfig>>) {
   const fallbackKeyPath = options.key || baseKeyPubV2
   let publicKey = extConfig.config.plugins?.CapacitorUpdater?.publicKey
@@ -33,6 +34,7 @@ function resolvePublicKey(options: BundleDecryptOptions, extConfig: Awaited<Retu
   return { publicKey, fallbackKeyPath }
 }
 
+/** Map OpenSSL RSA decrypt failures on ivSessionKey to a user-facing CLI error. */
 function toIvSessionKeyDecryptError(error: unknown): CliUserError | null {
   if (!(error instanceof Error))
     return null
@@ -42,6 +44,7 @@ function toIvSessionKeyDecryptError(error: unknown): CliUserError | null {
   return null
 }
 
+/** Decrypt a Capgo bundle zip and verify its RSA-encrypted checksum against the payload SHA-256. */
 export async function decryptZipInternal(
   zipPath: string,
   ivsessionKey: string,
@@ -167,6 +170,7 @@ export async function decryptZipInternal(
   }
 }
 
+/** CLI entry point for bundle zip decryption with interactive logging. */
 export async function decryptZip(zipPath: string, ivsessionKey: string, options: BundleDecryptOptions) {
   await decryptZipInternal(zipPath, ivsessionKey, options, false)
 }

@@ -51,6 +51,7 @@ describe('sha256DigestMatchesComputed', () => {
 })
 
 describe('bundle decrypt --checksum', () => {
+  /** Build a minimal encrypted bundle zip and checksum for decrypt regression tests. */
   async function prepareEncryptedBundle(encryptChecksumFn: (hex: string, privateKey: string) => string) {
     const { publicKey, privateKey } = createRSA()
     const zipContent = Buffer.from('capgo decrypt checksum regression payload')
@@ -122,6 +123,7 @@ describe('bundle decrypt --checksum', () => {
   })
 
   it('verifies V2 checksum plaintext encoding when ciphertext was produced with V2', async () => {
+    // V2 encryptChecksum expects a base64-encoded SHA-256 digest, not the hex string.
     const fixture = await prepareEncryptedBundle((checksum, privateKey) =>
       encryptChecksum(Buffer.from(checksum, 'hex').toString('base64'), privateKey),
     )
