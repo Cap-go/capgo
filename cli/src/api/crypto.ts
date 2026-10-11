@@ -8,6 +8,7 @@ import {
   privateEncrypt,
   publicDecrypt,
   randomBytes,
+  timingSafeEqual,
 } from 'node:crypto'
 
 const algorithm = 'aes-128-cbc'
@@ -115,6 +116,96 @@ export function decryptChecksumV3(checksum: string, key: string): string {
   ).toString(formatHex)
 
   return checksumDecrypted
+}
+
+const SHA256_HEX_LENGTH = 64
+
+/**
+ * Compare a computed SHA-256 hex digest with decrypted checksum plaintext from RSA.
+ * V2 plugins expose the digest as base64; V3 uses hex. Both encode the same 32 bytes.
+ */
+export function sha256DigestMatchesComputed(computedSha256Hex: string, decryptedPlaintext: string): boolean {
+  const expected = Buffer.from(computedSha256Hex, formatHex)
+  if (expected.length !== 32)
+    return false
+
+  const trimmed = decryptedPlaintext.trim()
+  if (new RegExp(`^[0-9a-fA-F]{${SHA256_HEX_LENGTH}}$`).test(trimmed)) {
+    const fromHex = Buffer.from(trimmed, formatHex)
+    if (fromHex.length === 32 && timingSafeEqual(fromHex, expected))
+      return true
+  }
+
+  try {
+    const fromB64 = Buffer.from(trimmed, formatB64)
+    if (fromB64.length === 32 && timingSafeEqual(fromB64, expected))
+      return true
+  }
+  catch {
+    // Invalid base64
+  }
+
+  return false
+}
+
+/**
+ * Decrypt a bundle checksum with V3 and V2 RSA encodings. Returns unique plaintext candidates.
+ */
+export function decryptChecksumPlaintexts(encryptedChecksum: string, key: string): string[] {
+  const plaintexts: string[] = []
+  const seen = new Set<string>()
+
+  const add = (value: string) => {
+    if (!seen.has(value)) {
+      seen.add(value)
+      plaintexts.push(value)
+    }
+  }
+
+  try {
+    add(decryptChecksumV3(encryptedChecksum, key))
+  }
+  catch {
+    // Not V3 hex ciphertext or wrong key
+  }
+
+  try {
+    add(decryptChecksum(encryptedChecksum, key))
+  }
+  catch {
+    // Not V2 base64 ciphertext or wrong key
+  }
+
+  return plaintexts
+}
+
+export function verifyDecryptedBundleChecksum(
+  computedSha256Hex: string,
+  encryptedChecksum: string,
+  publicKey: string,
+): { matches: boolean, decryptedPlaintexts: string[] } {
+  const decryptedPlaintexts = decryptChecksumPlaintexts(encryptedChecksum, publicKey)
+  const matches = decryptedPlaintexts.some(plaintext =>
+    sha256DigestMatchesComputed(computedSha256Hex, plaintext),
+  )
+  return { matches, decryptedPlaintexts }
+}
+
+export function formatDecryptedChecksumForError(decryptedPlaintext: string): string {
+  const trimmed = decryptedPlaintext.trim()
+  if (new RegExp(`^[0-9a-fA-F]{${SHA256_HEX_LENGTH}}$`).test(trimmed))
+    return trimmed.toLowerCase()
+
+  try {
+    const fromB64 = Buffer.from(trimmed, formatB64)
+    if (fromB64.length === 32)
+      return `${trimmed} (sha256 hex: ${fromB64.toString(formatHex)})`
+  }
+  catch {
+    // fall through
+  }
+
+  return trimmed
 }
 
 interface RSAKeys {

@@ -5,7 +5,7 @@ import { cwd } from 'node:process'
 import { intro, log, outro } from '@clack/prompts'
 import { parse } from '@std/semver'
 import { trackEvent } from '../analytics/track'
-import { decryptChecksum, decryptChecksumV3, decryptSource } from '../api/crypto'
+import { decryptSource, formatDecryptedChecksumForError, verifyDecryptedBundleChecksum } from '../api/crypto'
 import { checkAlerts } from '../api/update'
 import { getChecksum } from '../checksum'
 import { CliUserError } from '../shared/cli-user-error'
@@ -120,13 +120,18 @@ export async function decryptZipInternal(
       if (!silent)
         log.info(`Decrypting checksum with ${supportsV3Checksum ? 'V3' : 'V2'} (based on updater version ${updaterVersion || 'unknown'})`)
 
-      const decryptedChecksum = supportsV3Checksum
-        ? decryptChecksumV3(options.checksum, options.keyData ?? publicKey)
-        : decryptChecksum(options.checksum, options.keyData ?? publicKey)
-      checksumMatches = checksum === decryptedChecksum
+      const { matches, decryptedPlaintexts } = verifyDecryptedBundleChecksum(
+        checksum,
+        options.checksum,
+        options.keyData ?? publicKey,
+      )
+      checksumMatches = matches
 
       if (!checksumMatches) {
-        const message = `Checksum does not match ${checksum} !== ${decryptedChecksum}`
+        const decryptedSummary = decryptedPlaintexts.length > 0
+          ? decryptedPlaintexts.map(formatDecryptedChecksumForError).join(', ')
+          : '(unable to decrypt checksum with the configured public key)'
+        const message = `Checksum does not match ${checksum} !== ${decryptedSummary}`
         if (!silent)
           log.error(message)
         throw new Error(message)
