@@ -8,9 +8,11 @@
  * matrix below is the tested source of truth.
  */
 import assert from 'node:assert/strict'
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import { shouldBlockIncompatibleUpload } from '../src/bundle/builder-cta.ts'
 import { checkValidOptions } from '../src/bundle/upload.ts'
-import { rejectOrAcceptIncompatibleChannelBundle } from '../src/channel/set.ts'
+import { rejectOrAcceptIncompatibleChannelBundle, throwChannelWriteError } from '../src/channel/set.ts'
+import { shouldCapturePosthogException } from '../src/posthog.ts'
 import { requestBuildOptionsSchema, updateChannelOptionsSchema, uploadOptionsSchema } from '../src/schemas/sdk.ts'
 
 let failures = 0
@@ -290,7 +292,12 @@ test('channel set throws when incompatible and not accepted', () => {
       heading: 'nope',
       errorMessage: 'Bundle is not compatible with production channel',
     }),
-    /Bundle is not compatible with production channel/,
+    (error) => {
+      assert.match(error.message, /Bundle is not compatible with production channel/)
+      // An expected rejection, not a crash: error tracking must skip it.
+      assert.equal(shouldCapturePosthogException(error), false)
+      return true
+    },
   )
 })
 
@@ -313,6 +320,60 @@ test('channel set continues when compatible', () => {
     heading: 'nope',
     errorMessage: 'nope',
   }))
+})
+
+async function testAsync(name, fn) {
+  try {
+    await fn()
+    console.log(`✅ ${name}`)
+  }
+  catch (error) {
+    failures += 1
+    console.error(`❌ ${name}`)
+    console.error(error)
+  }
+}
+
+async function channelWriteError(error) {
+  try {
+    await throwChannelWriteError(error, true)
+  }
+  catch (thrown) {
+    return thrown
+  }
+  throw new Error('throwChannelWriteError did not throw')
+}
+
+function httpError(status, body) {
+  return new FunctionsHttpError(new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  }))
+}
+
+console.log('\n🧪 Testing throwChannelWriteError...\n')
+
+await testAsync('a channel write denial is not captured', async () => {
+  const error = await channelWriteError(httpError(400, { error: 'cannot_access_app', message: 'You can\'t access this app' }))
+  assert.equal(error.message, 'API key is not allowed to set this channel')
+  assert.equal(shouldCapturePosthogException(error), false)
+})
+
+await testAsync('a forbidden channel write is not captured', async () => {
+  const error = await channelWriteError(httpError(403, { error: 'forbidden' }))
+  assert.equal(shouldCapturePosthogException(error), false)
+})
+
+await testAsync('a network failure on a channel write is captured', async () => {
+  const cause = new TypeError('fetch failed')
+  const error = await channelWriteError(cause)
+  assert.equal(error.cause, cause)
+  assert.equal(shouldCapturePosthogException(error), true)
+})
+
+await testAsync('a server error on a channel write is captured', async () => {
+  const error = await channelWriteError(httpError(500, { error: 'internal_error' }))
+  assert.equal(shouldCapturePosthogException(error), true)
 })
 
 if (failures > 0) {
