@@ -31,7 +31,10 @@ import { shouldQueuePluginNotifications } from './supabase_write_guard.ts'
 import { isUpdateEnumerationLimited, recordUpdateEnumerationMiss, updateEnumerationLimitedResponse } from './updateOracleGuard.ts'
 import { canServeUpToDateFromCache, getUpdateReadCache, setUpdateReadCache } from './updateReadCache.ts'
 import { getCachedDefaultChannel, shouldUseUpdatesEdgeCache } from './updatesEdgeCache.ts'
+import { getUpdateResponseKind, resToVersion } from './update_response.ts'
 import { backgroundTask, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, fixSemver, isDeprecatedPluginVersion, isInternalVersionName, isVersionDeleted } from './utils.ts'
+
+export { getUpdateResponseKind, resToVersion, type UpdateResponseKind } from './update_response.ts'
 
 const updatesMauRecordedByRequest = new WeakMap<object, boolean>()
 const updatesMauInFlightByRequest = new WeakMap<object, Promise<void>>()
@@ -177,40 +180,6 @@ function getInvalidIpInfo(): Promise<(ip: string, context?: Context) => Promise<
   return loadInvalidIpInfo
 }
 
-export type UpdateResponseKind = 'up_to_date' | 'blocked' | 'failed'
-
-const UPDATE_UP_TO_DATE_CODES = new Set([
-  'no_new_version_available',
-  'already_on_builtin',
-  'channel_paused',
-])
-
-const UPDATE_BLOCKED_CODES = new Set([
-  'cannot_update_via_private_channel',
-  'disabled_platform_ios',
-  'disabled_platform_android',
-  'disabled_platform_electron',
-  'disable_auto_update_to_major',
-  'disable_auto_update_to_minor',
-  'disable_auto_update_to_patch',
-  'disable_auto_update_to_metadata',
-  'disable_auto_update_under_native',
-  'disable_prod_build',
-  'disable_dev_build',
-  'disable_device',
-  'disable_emulator',
-  'key_id_mismatch',
-  'provider_infrastructure_request_blocked',
-])
-
-export function getUpdateResponseKind(errorCode: string): UpdateResponseKind {
-  if (UPDATE_UP_TO_DATE_CODES.has(errorCode))
-    return 'up_to_date'
-  if (UPDATE_BLOCKED_CODES.has(errorCode))
-    return 'blocked'
-  return 'failed'
-}
-
 function updateError200(c: Context, errorCode: string, message: string, moreInfo: Record<string, unknown> = {}) {
   return simpleError200(c, errorCode, message, {
     ...moreInfo,
@@ -265,33 +234,6 @@ async function providerInfrastructureColdCacheBlockResponse(c: Context, appId: s
   return providerInfrastructureBlockedResponse(c, providerInfo.requestIp, providerInfo.providerInfo)
 }
 
-interface ResponseFeatureSupport {
-  manifest: boolean
-  metadata: boolean
-}
-
-const RESPONSE_FEATURE_SUPPORT_CACHE_MAX = 256
-const responseFeatureSupportCache = new Map<string, ResponseFeatureSupport>()
-
-function getResponseFeatureSupport(plugin_version: string): ResponseFeatureSupport {
-  const cached = responseFeatureSupportCache.get(plugin_version)
-  if (cached)
-    return cached
-
-  const pluginVersion = parse(plugin_version)
-  const support = {
-    manifest: !isDeprecatedPluginVersion(pluginVersion, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7),
-    metadata: !isDeprecatedPluginVersion(pluginVersion, '5.35.0', '6.35.0', '7.35.0', '8.35.0'),
-  }
-  if (responseFeatureSupportCache.size >= RESPONSE_FEATURE_SUPPORT_CACHE_MAX) {
-    const oldest = responseFeatureSupportCache.keys().next().value
-    if (oldest !== undefined)
-      responseFeatureSupportCache.delete(oldest)
-  }
-  responseFeatureSupportCache.set(plugin_version, support)
-  return support
-}
-
 export const CHANNEL_UPDATE_PACKAGE_VALUES = ['all', 'zip', 'delta', 'zip_from_builtin', 'delta_from_builtin'] as const
 export type ChannelUpdatePackage = typeof CHANNEL_UPDATE_PACKAGE_VALUES[number]
 export type ResolvedChannelUpdatePackage = 'all' | 'zip' | 'delta'
@@ -311,36 +253,6 @@ export function resolveChannelUpdatePackage(
   if (isOnBuiltin && mode === 'delta_from_builtin')
     return 'delta'
   return 'all'
-}
-
-export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[], expose_metadata: boolean = false) {
-  const support = getResponseFeatureSupport(plugin_version)
-  const res: {
-    version: string
-    url: string
-    session_key: string
-    checksum: string | null
-    manifest?: ManifestEntry[]
-    link?: string | null
-    comment?: string | null
-  } = {
-    version: version.name,
-    url: signedURL,
-    // session_key and checksum are always included since v4 is no longer supported
-    session_key: version.session_key ?? '',
-    checksum: version.checksum,
-  }
-  // manifest is supported in v5.10.0+, v6.25.0+, v7.0.35+, v8+
-  if (manifest.length > 0 && support.manifest)
-    res.manifest = manifest
-  // Include link and comment for plugin v5.35.0+, v6.35.0+, v7.35.0+, v8.35.0+ (only if expose_metadata is enabled and they have values)
-  if (expose_metadata && support.metadata) {
-    if (version.link)
-      res.link = version.link
-    if (version.comment)
-      res.comment = version.comment
-  }
-  return res
 }
 
 function hasChannelSelfStoreBinding(c: Context) {
