@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test'
+import { Buffer } from 'node:buffer'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -136,6 +137,23 @@ describe('bundle decrypt --checksum', () => {
         { key: fixture.keyPath, checksum: wrongEncrypted },
         true,
       )).rejects.toThrow(/Checksum does not match/)
+    }
+    finally {
+      rmSync(fixture.tempDir, { recursive: true, force: true })
+    }
+  })
+
+  it('verifies checksum when the encrypted checksum ciphertext is base64 instead of hex', async () => {
+    const fixture = await prepareEncryptedBundle(encryptChecksumV3)
+    const base64Ciphertext = Buffer.from(fixture.encryptedChecksum, 'hex').toString('base64')
+    try {
+      const result = await decryptZipInternal(
+        fixture.zipPath,
+        fixture.ivSessionKey,
+        { key: fixture.keyPath, checksum: base64Ciphertext },
+        true,
+      )
+      expect(result.checksumMatches).toBe(true)
     }
     finally {
       rmSync(fixture.tempDir, { recursive: true, force: true })

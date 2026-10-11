@@ -117,8 +117,14 @@ export async function decryptZipInternal(
         supportsV3Checksum = !isDeprecatedPluginVersion(coerced, HEX_CHECKSUM_MIN_VERSION_V5, HEX_CHECKSUM_MIN_VERSION_V6, HEX_CHECKSUM_MIN_VERSION_V7)
       }
 
-      if (!silent)
-        log.info(`Decrypting checksum with ${supportsV3Checksum ? 'V3' : 'V2'} (based on updater version ${updaterVersion || 'unknown'})`)
+      if (!silent) {
+        const versionHint = supportsV3Checksum
+          ? 'updater supports V3 checksum format'
+          : updaterVersion
+            ? 'updater may use legacy V2 checksum format'
+            : 'updater version unknown'
+        log.info(`Verifying encrypted checksum (trying V2 and V3 RSA encodings; ${versionHint})`)
+      }
 
       const { matches, decryptedPlaintexts } = verifyDecryptedBundleChecksum(
         checksum,
