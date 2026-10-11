@@ -109,9 +109,10 @@ export async function throwChannelWriteError(error: Error, silent: boolean): Pro
   }
   if (!silent)
     log.error('Cannot set channel because this API key does not have the required RBAC permission.')
+  const message = 'API key is not allowed to set this channel'
   if (await isChannelWriteDenied(error))
-    throw new CliUserError('API key is not allowed to set this channel')
-  throw new Error('API key is not allowed to set this channel', { cause: error })
+    throw new CliUserError(message)
+  throw new Error(message, { cause: error })
 }
 
 export async function setChannelInternal(channel: string, appId: string, options: OptionsSetChannel, silent = false, showFrame = true) {
