@@ -10,7 +10,7 @@ import {
 } from '../supabase/functions/_backend/utils/pg_errors.ts'
 
 describe('pg_errors', () => {
-  it('detects hyperdrive client-not-queryable failures as transient database errors', () => {
+  it('treats hyperdrive not-queryable drizzle failures as read-only retry only (not shared transient)', () => {
     const error = Object.assign(new Error('Failed query: select "file_name" from "manifest" where "manifest"."app_version_id" = $1'), {
       name: 'DrizzleQueryError',
       cause: new Error('Client has encountered a connection error and is not queryable'),

@@ -545,8 +545,10 @@ export interface ReadOnlyPgSession {
 
 /**
  * Run read-only plugin work once, retrying on a fresh Hyperdrive client when the
- * first attempt hits a transient connection failure. A dead pg.Client poisons
- * every later query in the same request unless we reconnect.
+ * first attempt hits a connection-class error matched by isReadOnlyPgConnectionRetryError.
+ * Shared isTransientDatabaseError is unchanged (not-queryable still maps to 500 after
+ * retry exhaustion). A dead pg.Client poisons every later query in the same request
+ * unless we reconnect.
  */
 function readOnlyPgRetryBackoffMs(): number {
   const jitter = new Uint8Array(1)

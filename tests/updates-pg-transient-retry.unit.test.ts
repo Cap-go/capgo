@@ -19,6 +19,8 @@ function createContext() {
 }
 
 describe('withReadOnlyPgTransientRetry', () => {
+  // Not-queryable Hyperdrive errors are not shared-transient; exhausted retries still
+  // surface as drizzle_error (500 + PostHog) via on_error, same as main.
   beforeEach(() => {
     cloudlogMock.mockReset()
   })
