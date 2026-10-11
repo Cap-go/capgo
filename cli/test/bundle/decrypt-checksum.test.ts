@@ -122,7 +122,9 @@ describe('bundle decrypt --checksum', () => {
   })
 
   it('verifies V2 checksum plaintext encoding when ciphertext was produced with V2', async () => {
-    const fixture = await prepareEncryptedBundle(encryptChecksum)
+    const fixture = await prepareEncryptedBundle((checksum, privateKey) =>
+      encryptChecksum(Buffer.from(checksum, 'hex').toString('base64'), privateKey),
+    )
     try {
       const { matches } = verifyDecryptedBundleChecksum(
         fixture.checksumHex,
