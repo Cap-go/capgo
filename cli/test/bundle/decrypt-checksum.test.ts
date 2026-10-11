@@ -30,6 +30,24 @@ describe('sha256DigestMatchesComputed', () => {
     expect(sha256DigestMatchesComputed(computedHex, otherHex)).toBe(false)
     expect(sha256DigestMatchesComputed(computedHex, Buffer.alloc(32, 0).toString('base64'))).toBe(false)
   })
+
+  it('rejects empty, short, and malformed hex plaintext', () => {
+    expect(sha256DigestMatchesComputed(computedHex, '')).toBe(false)
+    expect(sha256DigestMatchesComputed(computedHex, computedHex.slice(0, 32))).toBe(false)
+    expect(sha256DigestMatchesComputed(computedHex, `${computedHex}zz`)).toBe(false)
+    expect(sha256DigestMatchesComputed(computedHex, 'not-a-hex-digest')).toBe(false)
+  })
+
+  it('rejects non-canonical base64 plaintext (base64url, unpadded, whitespace, junk)', () => {
+    const unpadded = v2Base64.replace(/=+$/, '')
+    const base64url = unpadded.replace(/\+/g, '-').replace(/\//g, '_')
+    expect(sha256DigestMatchesComputed(computedHex, unpadded)).toBe(false)
+    expect(sha256DigestMatchesComputed(computedHex, base64url)).toBe(false)
+    expect(sha256DigestMatchesComputed(computedHex, ` ${v2Base64}`)).toBe(false)
+    expect(sha256DigestMatchesComputed(computedHex, `${v2Base64}\n`)).toBe(false)
+    expect(sha256DigestMatchesComputed(computedHex, `\0${v2Base64}`)).toBe(false)
+    expect(sha256DigestMatchesComputed(computedHex, `${v2Base64}extra`)).toBe(false)
+  })
 })
 
 describe('bundle decrypt --checksum', () => {

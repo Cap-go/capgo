@@ -94,12 +94,16 @@ export function encryptChecksumV3(checksum: string, key: string): string {
 }
 
 export function decryptChecksum(checksum: string, key: string): string {
+  const ciphertext = decodeCanonicalBase64(checksum)
+  if (!ciphertext)
+    throw new Error('Encrypted checksum is not canonical base64')
+
   const checksumDecrypted = publicDecrypt(
     {
       key,
       padding,
     },
-    Buffer.from(checksum, formatB64),
+    ciphertext,
   ).toString(formatB64)
 
   return checksumDecrypted
@@ -119,6 +123,25 @@ export function decryptChecksumV3(checksum: string, key: string): string {
 }
 
 const SHA256_HEX_LENGTH = 64
+// Standard base64 alphabet with optional padding. base64url (-_) is intentionally not accepted.
+const CANONICAL_BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/
+
+function decodeCanonicalBase64(value: string): Buffer | null {
+  if (!CANONICAL_BASE64_PATTERN.test(value))
+    return null
+
+  try {
+    const decoded = Buffer.from(value, formatB64)
+    if (decoded.length === 0)
+      return null
+    if (decoded.toString(formatB64) !== value)
+      return null
+    return decoded
+  }
+  catch {
+    return null
+  }
+}
 
 /**
  * Compare a computed SHA-256 hex digest with decrypted checksum plaintext from RSA.
@@ -129,21 +152,15 @@ export function sha256DigestMatchesComputed(computedSha256Hex: string, decrypted
   if (expected.length !== 32)
     return false
 
-  const trimmed = decryptedPlaintext.trim()
-  if (new RegExp(`^[0-9a-fA-F]{${SHA256_HEX_LENGTH}}$`).test(trimmed)) {
-    const fromHex = Buffer.from(trimmed, formatHex)
+  if (new RegExp(`^[0-9a-fA-F]{${SHA256_HEX_LENGTH}}$`).test(decryptedPlaintext)) {
+    const fromHex = Buffer.from(decryptedPlaintext, formatHex)
     if (fromHex.length === 32 && timingSafeEqual(fromHex, expected))
       return true
   }
 
-  try {
-    const fromB64 = Buffer.from(trimmed, formatB64)
-    if (fromB64.length === 32 && timingSafeEqual(fromB64, expected))
-      return true
-  }
-  catch {
-    // Invalid base64
-  }
+  const fromB64 = decodeCanonicalBase64(decryptedPlaintext)
+  if (fromB64 && fromB64.length === 32 && timingSafeEqual(fromB64, expected))
+    return true
 
   return false
 }
@@ -192,20 +209,14 @@ export function verifyDecryptedBundleChecksum(
 }
 
 export function formatDecryptedChecksumForError(decryptedPlaintext: string): string {
-  const trimmed = decryptedPlaintext.trim()
-  if (new RegExp(`^[0-9a-fA-F]{${SHA256_HEX_LENGTH}}$`).test(trimmed))
-    return trimmed.toLowerCase()
+  if (new RegExp(`^[0-9a-fA-F]{${SHA256_HEX_LENGTH}}$`).test(decryptedPlaintext))
+    return decryptedPlaintext.toLowerCase()
 
-  try {
-    const fromB64 = Buffer.from(trimmed, formatB64)
-    if (fromB64.length === 32)
-      return `${trimmed} (sha256 hex: ${fromB64.toString(formatHex)})`
-  }
-  catch {
-    // fall through
-  }
+  const fromB64 = decodeCanonicalBase64(decryptedPlaintext)
+  if (fromB64 && fromB64.length === 32)
+    return `${decryptedPlaintext} (sha256 hex: ${fromB64.toString(formatHex)})`
 
-  return trimmed
+  return decryptedPlaintext
 }
 
 interface RSAKeys {
