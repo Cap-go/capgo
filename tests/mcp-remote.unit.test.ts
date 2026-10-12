@@ -144,6 +144,55 @@ describe('hosted MCP protocol', () => {
     expect(calls).toEqual([{ method: 'POST', path: '/channel', body: { app_id: 'com.example.app', channel: 'production', version: '1.2.3' } }])
   })
 
+  it.concurrent('forwards signed bundle metadata when registering an external bundle', async () => {
+    const { ctx, calls } = fakeContext()
+    const signature = '0123456789abcdef'.repeat(32)
+    const manifestSignature = 'fedcba9876543210'.repeat(32)
+    await handleJsonRpcMessage({
+      jsonrpc: '2.0',
+      id: 9,
+      method: 'tools/call',
+      params: {
+        name: 'capgo_create_bundle_from_url',
+        arguments: {
+          appId: 'com.example.app',
+          version: '1.2.3',
+          external_url: 'https://cdn.example.com/bundle.zip',
+          checksum: 'abc123',
+          signature,
+          manifest_signature: manifestSignature,
+        },
+      },
+    }, ctx)
+    expect(calls).toEqual([{
+      method: 'POST',
+      path: '/bundle',
+      body: {
+        app_id: 'com.example.app',
+        version: '1.2.3',
+        external_url: 'https://cdn.example.com/bundle.zip',
+        checksum: 'abc123',
+        signature,
+        manifest_signature: manifestSignature,
+      },
+    }])
+  })
+
+  it.concurrent('rejects malformed bundle signatures before calling the API', async () => {
+    const { ctx, calls } = fakeContext()
+    const response = await handleJsonRpcMessage({
+      jsonrpc: '2.0',
+      id: 10,
+      method: 'tools/call',
+      params: {
+        name: 'capgo_create_bundle_from_url',
+        arguments: { appId: 'com.example.app', version: '1.2.3', external_url: 'https://cdn.example.com/bundle.zip', checksum: 'abc123', signature: 'nothex' },
+      },
+    }, ctx)
+    expect(calls).toEqual([])
+    expect((response as any).result.isError).toBe(true)
+  })
+
   it.concurrent('reports invalid arguments as a tool error so the model can retry', async () => {
     const { ctx, calls } = fakeContext()
     const response = await handleJsonRpcMessage({
