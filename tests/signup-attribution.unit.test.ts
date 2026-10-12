@@ -45,6 +45,17 @@ describe('signup attribution parsing', () => {
     expect(parsed.signup_plugin).toBe('updater')
   })
 
+  it('truncates oversized attribution strings', () => {
+    const longRef = `plugin_${'a'.repeat(300)}`
+    const parsed = parseSignupAttributionRecord({
+      ref: longRef,
+      first_touch_path: `/${'b'.repeat(600)}`,
+    })
+
+    expect(parsed.signup_ref?.length).toBe(256)
+    expect(parsed.first_touch_path?.length).toBe(512)
+  })
+
   it('ignores invalid first_touch_type values', () => {
     const parsed = parseSignupAttributionRecord({
       first_touch_type: 'newsletter',

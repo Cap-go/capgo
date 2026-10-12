@@ -48,21 +48,32 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c)
     ? org.signup_plugin.trim()
     : null
   if (!signupPlugin) {
-    const creatorAttribution = await resolveSignupAttributionForUser(c, org.created_by)
-    signupPlugin = creatorAttribution.signup_plugin ?? null
-    if (signupPlugin) {
-      const { error: signupPluginUpdateError } = await supabaseAdmin(c)
-        .from('orgs')
-        .update({ signup_plugin: signupPlugin })
-        .eq('id', org.id)
-      if (signupPluginUpdateError) {
-        cloudlog({
-          requestId: c.get('requestId'),
-          message: 'org signup_plugin persist failed',
-          orgId: org.id,
-          error: signupPluginUpdateError.message,
-        })
+    try {
+      const creatorAttribution = await resolveSignupAttributionForUser(c, org.created_by)
+      signupPlugin = creatorAttribution.signup_plugin ?? null
+      if (signupPlugin) {
+        const { error: signupPluginUpdateError } = await supabaseAdmin(c)
+          .from('orgs')
+          .update({ signup_plugin: signupPlugin })
+          .eq('id', org.id)
+        if (signupPluginUpdateError) {
+          cloudlog({
+            requestId: c.get('requestId'),
+            message: 'org signup_plugin persist failed',
+            orgId: org.id,
+            error: signupPluginUpdateError.message,
+          })
+        }
       }
+    }
+    catch (error) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'creator signup attribution lookup failed',
+        orgId: org.id,
+        userId: org.created_by,
+        error,
+      })
     }
   }
 
@@ -115,9 +126,20 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c)
   }))
 
   const orgForAttribution = signupPlugin ? { ...org, signup_plugin: signupPlugin } : org
-  const orgCreatedAttributionTags = signupAttributionEventTags(
-    await resolveSignupAttributionForOrg(c, orgForAttribution),
-  )
+  let orgCreatedAttributionTags: ReturnType<typeof signupAttributionEventTags> = {}
+  try {
+    orgCreatedAttributionTags = signupAttributionEventTags(
+      await resolveSignupAttributionForOrg(c, orgForAttribution),
+    )
+  }
+  catch (error) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'org created attribution tags lookup failed',
+      orgId: org.id,
+      error,
+    })
+  }
 
   await sendEventToTracking(c, {
     bento: {

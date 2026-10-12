@@ -27,13 +27,13 @@ export async function resolveSignupAttributionForOrg(
   org: { created_by: string, signup_plugin?: string | null },
 ): Promise<ResolvedSignupAttribution> {
   const attribution = await resolveSignupAttributionForUser(c, org.created_by)
-  const signup_plugin = typeof org.signup_plugin === 'string' && org.signup_plugin.trim().length > 0
+  const orgSignupPlugin = typeof org.signup_plugin === 'string' && org.signup_plugin.trim().length > 0
     ? org.signup_plugin.trim()
-    : attribution.signup_plugin
+    : undefined
 
   return mergeSignupAttribution(
+    orgSignupPlugin ? { signup_plugin: orgSignupPlugin } : null,
     attribution,
-    signup_plugin ? { signup_plugin } : null,
   )
 }
 

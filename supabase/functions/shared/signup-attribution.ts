@@ -46,6 +46,9 @@ type AttributionRecord = Record<string, unknown>
 
 const FIRST_TOUCH_TYPE_SET = new Set<string>(FIRST_TOUCH_TYPES)
 
+const ATTRIBUTION_STRING_MAX = 256
+const FIRST_TOUCH_PATH_MAX = 512
+
 function readNonEmptyString(value: unknown): string | undefined {
   if (typeof value !== 'string')
     return undefined
@@ -53,8 +56,15 @@ function readNonEmptyString(value: unknown): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined
 }
 
+function readAttributionString(value: unknown, maxLen = ATTRIBUTION_STRING_MAX): string | undefined {
+  const normalized = readNonEmptyString(value)
+  if (!normalized)
+    return undefined
+  return normalized.length > maxLen ? normalized.slice(0, maxLen) : normalized
+}
+
 export function signupPluginFromRef(ref: string | undefined): string | undefined {
-  const normalized = readNonEmptyString(ref)
+  const normalized = readAttributionString(ref)
   if (!normalized)
     return undefined
   const prefix = 'plugin_'
@@ -65,17 +75,17 @@ export function signupPluginFromRef(ref: string | undefined): string | undefined
 }
 
 function readSignupRef(record: AttributionRecord): string | undefined {
-  return readNonEmptyString(record.signup_ref)
-    ?? readNonEmptyString(record.ref)
-    ?? readNonEmptyString(record.attribution_ref)
+  return readAttributionString(record.signup_ref)
+    ?? readAttributionString(record.ref)
+    ?? readAttributionString(record.attribution_ref)
 }
 
 function readSignupSource(record: AttributionRecord, signupRef: string | undefined): string | undefined {
-  return readNonEmptyString(record.signup_source) ?? signupRef
+  return readAttributionString(record.signup_source) ?? signupRef
 }
 
 function readSignupPlugin(record: AttributionRecord, signupRef: string | undefined): string | undefined {
-  return readNonEmptyString(record.signup_plugin)
+  return readAttributionString(record.signup_plugin)
     ?? signupPluginFromRef(signupRef)
 }
 
@@ -87,16 +97,13 @@ function readFirstTouchType(record: AttributionRecord): FirstTouchType | undefin
 }
 
 function readFirstTouchPath(record: AttributionRecord): string | undefined {
-  const path = readNonEmptyString(record.first_touch_path)
-  if (!path)
-    return undefined
-  return path.length > 512 ? path.slice(0, 512) : path
+  return readAttributionString(record.first_touch_path, FIRST_TOUCH_PATH_MAX)
 }
 
 function readUtm(record: AttributionRecord, key: SignupUtmKey): string | undefined {
   const firstKey = `first_${key}` as FirstSignupUtmKey
-  return readNonEmptyString(record[firstKey])
-    ?? readNonEmptyString(record[key])
+  return readAttributionString(record[firstKey])
+    ?? readAttributionString(record[key])
 }
 
 export function parseSignupAttributionRecord(record: AttributionRecord | null | undefined): ResolvedSignupAttribution {

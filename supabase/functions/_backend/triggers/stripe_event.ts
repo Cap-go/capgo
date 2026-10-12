@@ -1246,7 +1246,18 @@ async function createdOrUpdated(
     if (status === 'past_due')
       return
 
-    const signupAttributionTags = await signupAttributionTagsForOrg(c, org)
+    let signupAttributionTags: Awaited<ReturnType<typeof signupAttributionTagsForOrg>> = {}
+    try {
+      signupAttributionTags = await signupAttributionTagsForOrg(c, org)
+    }
+    catch (error) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'signup attribution tags lookup failed',
+        orgId: org.id,
+        error,
+      })
+    }
 
     let previousPlan: PlanRow | null = null
     if (trackingState.shouldSendPlanChange && stripeData.previousProductId) {

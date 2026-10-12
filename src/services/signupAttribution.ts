@@ -10,8 +10,6 @@ import {
   signupAttributionToPostHogSetOnce,
 } from '../../supabase/functions/shared/signup-attribution.ts'
 
-const APPLIED_STORAGE_KEY = 'capgo_signup_attribution_applied'
-
 function readCookieValue(name: string): string | null {
   if (typeof document === 'undefined')
     return null
@@ -65,11 +63,6 @@ export function applySignupAttributionToPostHog(user: User | null | undefined, _
     return
 
   try {
-    const appliedKey = `${APPLIED_STORAGE_KEY}:${user.id}`
-    const fingerprint = JSON.stringify(setOnce)
-    if (localStorage.getItem(appliedKey) === fingerprint)
-      return
-
     // @ts-expect-error posthog is injected by the loader snippet
     const posthog = globalThis.posthog
     if (!posthog?.setPersonProperties)
@@ -77,7 +70,6 @@ export function applySignupAttributionToPostHog(user: User | null | undefined, _
 
     posthog.identify(user.id)
     posthog.setPersonProperties({}, setOnce)
-    localStorage.setItem(appliedKey, fingerprint)
   }
   catch (error) {
     console.warn('Cannot apply signup attribution to PostHog', error)
