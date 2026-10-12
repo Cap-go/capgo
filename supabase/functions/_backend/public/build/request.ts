@@ -562,8 +562,8 @@ export async function requestBuild(
     appId: app_id,
     platform,
     uploadPath: upload_path,
-    // The builder routes on it (e.g. only SPM projects can try the newer build machines).
-    buildOptions: ios_dependency_manager ? { ...build_options, CAPGO_IOS_DEPENDENCY_MANAGER: ios_dependency_manager } : build_options,
+    // The builder schedules some builds by dependency manager.
+    buildOptions: ios_dependency_manager ? { ...build_options, iosDependencyManager: ios_dependency_manager } : build_options,
     buildCredentials: build_credentials,
     cacheEnabled: cache_enabled,
     cacheKey: cache_key,
