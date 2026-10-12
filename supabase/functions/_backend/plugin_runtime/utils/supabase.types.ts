@@ -683,6 +683,7 @@ export type Database = {
           upload_path: string
           upload_session_key: string
           upload_url: string
+          xcode_version: string | null
         }
         Insert: {
           ai_analyzed?: boolean
@@ -704,6 +705,7 @@ export type Database = {
           upload_path: string
           upload_session_key: string
           upload_url: string
+          xcode_version?: string | null
         }
         Update: {
           ai_analyzed?: boolean
@@ -725,6 +727,7 @@ export type Database = {
           upload_path?: string
           upload_session_key?: string
           upload_url?: string
+          xcode_version?: string | null
         }
         Relationships: [
           {
@@ -1637,6 +1640,7 @@ export type Database = {
           build_count_day_android: number
           build_count_day_ios: number
           build_requests_day_ios_cocoapods: number
+          build_requests_day_ios_sdk: Json
           build_requests_day_ios_spm: number
           build_requests_day_ios_unknown: number
           build_total_seconds_day_android: number
@@ -1664,8 +1668,6 @@ export type Database = {
           credits_consumed: number
           date_id: string
           demo_apps_created: number
-          devices_ios_26: number
-          devices_ios_27: number
           devices_last_month: number | null
           devices_last_month_android: number | null
           devices_last_month_ios: number | null
@@ -1747,6 +1749,7 @@ export type Database = {
           build_count_day_android?: number
           build_count_day_ios?: number
           build_requests_day_ios_cocoapods?: number
+          build_requests_day_ios_sdk?: Json
           build_requests_day_ios_spm?: number
           build_requests_day_ios_unknown?: number
           build_total_seconds_day_android?: number
@@ -1774,8 +1777,6 @@ export type Database = {
           credits_consumed?: number
           date_id: string
           demo_apps_created?: number
-          devices_ios_26?: number
-          devices_ios_27?: number
           devices_last_month?: number | null
           devices_last_month_android?: number | null
           devices_last_month_ios?: number | null
@@ -1857,6 +1858,7 @@ export type Database = {
           build_count_day_android?: number
           build_count_day_ios?: number
           build_requests_day_ios_cocoapods?: number
+          build_requests_day_ios_sdk?: Json
           build_requests_day_ios_spm?: number
           build_requests_day_ios_unknown?: number
           build_total_seconds_day_android?: number
@@ -1884,8 +1886,6 @@ export type Database = {
           credits_consumed?: number
           date_id?: string
           demo_apps_created?: number
-          devices_ios_26?: number
-          devices_ios_27?: number
           devices_last_month?: number | null
           devices_last_month_android?: number | null
           devices_last_month_ios?: number | null

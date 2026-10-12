@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { classifyBuildTransition, mapBuildFailureCategory } from '../supabase/functions/_backend/utils/build_tracking.ts'
+import { getBuilderXcodeVersion } from '../supabase/functions/_backend/utils/builder_machine.ts'
 
 describe('classifyBuildTransition', () => {
   it.concurrent('returns "started" when pending becomes running', () => {
@@ -63,5 +64,19 @@ describe('mapBuildFailureCategory', () => {
   it.concurrent('returns unknown when timeoutApplied is false and error is empty', () => {
     expect(mapBuildFailureCategory({ timeoutApplied: false, errorMessage: null })).toBe('unknown')
     expect(mapBuildFailureCategory({ timeoutApplied: false, errorMessage: '' })).toBe('unknown')
+  })
+})
+
+describe('getBuilderXcodeVersion', () => {
+  it.concurrent('reads the Xcode version reported by the builder', () => {
+    expect(getBuilderXcodeVersion({ backend: 'mac', xcode_version: '26.1', macos_version: '15.6' })).toBe('26.1')
+    expect(getBuilderXcodeVersion({ backend: 'linux', xcode_version: '27' })).toBe('27')
+  })
+
+  it.concurrent('ignores missing or malformed versions', () => {
+    expect(getBuilderXcodeVersion(null)).toBeNull()
+    expect(getBuilderXcodeVersion({})).toBeNull()
+    expect(getBuilderXcodeVersion({ xcode_version: 26 })).toBeNull()
+    expect(getBuilderXcodeVersion({ xcode_version: 'Xcode 26.1' })).toBeNull()
   })
 })
