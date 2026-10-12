@@ -60,6 +60,20 @@ describe('device_data_collection via PUT /app (CLI app set)', () => {
     })
   })
 
+  it('rejects non-boolean values and unknown keys', async () => {
+    for (const patch of [{ country: 'false' }, { unknown_flag: false }, null, ['country']]) {
+      const response = await fetch(`${getEndpointUrl('/app')}/${APP_NAME_CLI}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ device_data_collection: patch }),
+      })
+
+      expect(response.status).toBe(400)
+      const data = await response.json() as { error?: string }
+      expect(data.error).toBe('invalid_device_data_collection')
+    }
+  })
+
   it('lets GET read the stored collection flags', async () => {
     const response = await fetch(`${getEndpointUrl('/app')}/${APP_NAME_CLI}`, {
       method: 'GET',

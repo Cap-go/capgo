@@ -453,6 +453,7 @@ watch([packageId, days, versionGroup], async () => {
             variant="chart"
             :use-billing-period="false"
             :accumulated="false"
+            :device-data-collection="collection"
             @native-usage="nativeUsage = $event"
           />
           <div v-if="hasData" class="flex flex-col h-[320px] p-4 bg-white border rounded-xl shadow-sm dark:bg-slate-800/60 border-slate-200 dark:border-white/10">
