@@ -21,6 +21,19 @@ export interface RequestBuildBody {
   cache_enabled?: boolean
   /** Custom cache namespace for compilation cache restore/save (e.g. rc, prod). */
   cache_key?: string
+  /** iOS dependency manager detected by the CLI. Stored for build analytics only. */
+  ios_dependency_manager?: IosDependencyManager
+}
+
+type IosDependencyManager = 'cocoapods' | 'spm'
+
+const IOS_DEPENDENCY_MANAGERS: readonly IosDependencyManager[] = ['cocoapods', 'spm']
+
+/** Unknown or non-iOS values are dropped instead of rejected: this field is analytics-only. */
+function normalizeIosDependencyManager(platform: string, value: unknown): IosDependencyManager | null {
+  if (platform !== 'ios' || typeof value !== 'string')
+    return null
+  return IOS_DEPENDENCY_MANAGERS.find(manager => manager === value) ?? null
 }
 
 export interface RequestBuildResponse {
@@ -48,6 +61,7 @@ interface ValidBuildRequestBody {
   build_credentials: Record<string, string>
   cache_enabled?: boolean
   cache_key?: string
+  ios_dependency_manager: IosDependencyManager | null
 }
 
 function throwBuilderUnavailable(message: string, moreInfo: Record<string, unknown> = {}, cause?: unknown): never {
@@ -98,7 +112,7 @@ export function buildBuilderPayload(input: {
 }
 
 /** Exported for unit tests — follows bundleUsageTestUtils pattern. */
-export const builderPayloadTestUtils = { buildBuilderPayload, parseMachineVersionUnavailable }
+export const builderPayloadTestUtils = { buildBuilderPayload, normalizeIosDependencyManager, parseMachineVersionUnavailable }
 
 function hasLegacyCredentials(body: RequestBuildBody): boolean {
   const credentials = Reflect.get(body, 'credentials')
@@ -115,6 +129,7 @@ function validateBuildRequestBody(c: Context, body: RequestBuildBody, userId: st
     build_credentials = {},
     cache_enabled,
     cache_key,
+    ios_dependency_manager,
   } = body
 
   cloudlog({
@@ -186,6 +201,7 @@ function validateBuildRequestBody(c: Context, body: RequestBuildBody, userId: st
     build_credentials,
     cache_enabled,
     cache_key: cache_key?.trim(),
+    ios_dependency_manager: normalizeIosDependencyManager(platform, ios_dependency_manager),
   }
 }
 
@@ -410,6 +426,7 @@ async function persistBuildRequest(c: Context, input: {
   platform: 'ios' | 'android'
   build_mode: 'release' | 'debug'
   build_config: Json
+  ios_dependency_manager: IosDependencyManager | null
   builder_job_id: string
   upload_session_key: string
   upload_path: string
@@ -423,6 +440,7 @@ async function persistBuildRequest(c: Context, input: {
     platform,
     build_mode,
     build_config,
+    ios_dependency_manager,
     builder_job_id,
     upload_session_key,
     upload_path,
@@ -440,6 +458,7 @@ async function persistBuildRequest(c: Context, input: {
       platform,
       build_mode,
       build_config,
+      ios_dependency_manager,
       status: 'pending',
       builder_job_id,
       upload_session_key,
@@ -505,6 +524,7 @@ export async function requestBuild(
     build_credentials,
     cache_enabled,
     cache_key,
+    ios_dependency_manager,
   } = validateBuildRequestBody(c, body, apikey.user_id)
 
   await ensureBuildPermission(c, app_id, apikey.user_id)
@@ -565,6 +585,7 @@ export async function requestBuild(
     platform,
     build_mode,
     build_config,
+    ios_dependency_manager,
     builder_job_id: builderJob.jobId,
     upload_session_key,
     upload_path,

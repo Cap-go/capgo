@@ -703,6 +703,7 @@ export type Database = {
           completed_at: string | null
           created_at: string
           id: string
+          ios_dependency_manager: string | null
           last_error: string | null
           owner_org: string
           platform: string
@@ -725,6 +726,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           id?: string
+          ios_dependency_manager?: string | null
           last_error?: string | null
           owner_org: string
           platform: string
@@ -747,6 +749,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           id?: string
+          ios_dependency_manager?: string | null
           last_error?: string | null
           owner_org?: string
           platform?: string
@@ -1723,6 +1726,9 @@ export type Database = {
           build_avg_seconds_day_ios: number
           build_count_day_android: number
           build_count_day_ios: number
+          build_requests_day_ios_cocoapods: number
+          build_requests_day_ios_spm: number
+          build_requests_day_ios_unknown: number
           build_total_seconds_day_android: number
           build_total_seconds_day_ios: number
           builder_active_paying_clients_60d: number
@@ -1748,6 +1754,8 @@ export type Database = {
           credits_consumed: number
           date_id: string
           demo_apps_created: number
+          devices_ios_26: number
+          devices_ios_27: number
           devices_last_month: number | null
           devices_last_month_android: number | null
           devices_last_month_ios: number | null
@@ -1838,6 +1846,9 @@ export type Database = {
           build_avg_seconds_day_ios?: number
           build_count_day_android?: number
           build_count_day_ios?: number
+          build_requests_day_ios_cocoapods?: number
+          build_requests_day_ios_spm?: number
+          build_requests_day_ios_unknown?: number
           build_total_seconds_day_android?: number
           build_total_seconds_day_ios?: number
           builder_active_paying_clients_60d?: number
@@ -1863,6 +1874,8 @@ export type Database = {
           credits_consumed?: number
           date_id: string
           demo_apps_created?: number
+          devices_ios_26?: number
+          devices_ios_27?: number
           devices_last_month?: number | null
           devices_last_month_android?: number | null
           devices_last_month_ios?: number | null
@@ -1953,6 +1966,9 @@ export type Database = {
           build_avg_seconds_day_ios?: number
           build_count_day_android?: number
           build_count_day_ios?: number
+          build_requests_day_ios_cocoapods?: number
+          build_requests_day_ios_spm?: number
+          build_requests_day_ios_unknown?: number
           build_total_seconds_day_android?: number
           build_total_seconds_day_ios?: number
           builder_active_paying_clients_60d?: number
@@ -1978,6 +1994,8 @@ export type Database = {
           credits_consumed?: number
           date_id?: string
           demo_apps_created?: number
+          devices_ios_26?: number
+          devices_ios_27?: number
           devices_last_month?: number | null
           devices_last_month_android?: number | null
           devices_last_month_ios?: number | null
