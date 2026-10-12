@@ -190,12 +190,30 @@ describe('[POST] /private/invite_new_user_to_org rank guards', () => {
 
       const { data: invitation, error } = await fixture.supabase
         .from('tmp_users')
-        .select('rbac_role_name, email')
+        .select('id, rbac_role_name, email')
         .eq('org_id', fixture.orgId)
         .eq('email', invitedEmail)
         .single()
       expect(error).toBeNull()
       expect(invitation?.rbac_role_name).toBe('org_super_admin')
+      const [request] = await executeSQL<{ id: string, sent_at: string | null }>(`
+        SELECT id, sent_at FROM public.org_invitation_email_requests WHERE tmp_user_id = $1
+      `, [invitation!.id])
+      expect(request?.id).toBeTruthy()
+      expect(request?.sent_at).toBeNull()
+      const [job] = await executeSQL<{ message: unknown }>(`
+        SELECT message FROM pgmq.q_send_email WHERE message->'payload'->>'org_invitation_id' = $1
+      `, [request!.id])
+      expect(job?.message).toEqual({
+        function_name: 'send_email', function_type: 'cloudflare', payload: { org_invitation_id: request!.id },
+      })
+      const repeated = await postInviteNewUserToOrg(authHeaders, {
+        email: invitedEmail,
+        org_id: fixture.orgId,
+        invite_type: 'org_super_admin',
+      })
+      expect(repeated.status).toBe(400)
+      expect(await repeated.json()).toMatchObject({ error: 'user_already_invited' })
     }
     finally {
       await fixture.cleanup()

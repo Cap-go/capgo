@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { getAuthHeaders, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, USER_EMAIL_NONMEMBER, USER_ID, USER_ID_2, USER_ID_NONMEMBER, USER_PASSWORD, USER_PASSWORD_NONMEMBER } from './test-utils.ts'
+import { executeSQL, getAuthHeaders, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, USER_EMAIL_NONMEMBER, USER_ID, USER_ID_2, USER_ID_NONMEMBER, USER_PASSWORD, USER_PASSWORD_NONMEMBER } from './test-utils.ts'
 
 let authHeaders: Record<string, string>
 let nonMemberAuthHeaders: Record<string, string>
@@ -71,6 +71,14 @@ async function createInviteTestFixture(options?: {
   if (orgUsersError)
     throw orgUsersError
 
+  // A pending membership now queues the initial email atomically. These
+  // endpoint tests exercise a later explicit resend after the cooldown.
+  await executeSQL(`
+    UPDATE public.org_invitation_email_requests
+    SET requested_at = CURRENT_TIMESTAMP - INTERVAL '6 minutes'
+    WHERE org_user_id IN (SELECT id FROM public.org_users WHERE org_id = $1)
+  `, [orgId])
+
   return {
     id,
     orgId,
@@ -89,6 +97,35 @@ beforeAll(async () => {
 })
 
 describe('[POST] /private/invite_existing_user_to_org', () => {
+  it.concurrent('queues one explicit resend and rejects repeated requests during the cooldown', async () => {
+    const fixture = await createInviteTestFixture()
+    try {
+      const before = await executeSQL<{ id: string }>(`
+        SELECT r.id FROM public.org_invitation_email_requests r
+        JOIN public.org_users ou ON ou.id = r.org_user_id WHERE ou.org_id = $1
+      `, [fixture.orgId])
+      const body = { email: USER_EMAIL_NONMEMBER, org_id: fixture.orgId }
+      expect((await postInviteExistingUserToOrg(authHeaders, body)).status).toBe(200)
+      const after = await executeSQL<{ id: string }>(`
+        SELECT r.id FROM public.org_invitation_email_requests r
+        JOIN public.org_users ou ON ou.id = r.org_user_id WHERE ou.org_id = $1
+      `, [fixture.orgId])
+      expect(after[0]?.id).not.toBe(before[0]?.id)
+      const response = await postInviteExistingUserToOrg(authHeaders, body)
+      expect(response.status).toBe(409)
+      expect(await response.json()).toMatchObject({
+        error: 'user_already_invited', moreInfo: { reason: 'invite_recently_sent', cooldown_minutes: 5 },
+      })
+      const jobs = await executeSQL<{ count: string }>(`
+        SELECT count(*) FROM pgmq.q_send_email WHERE message->'payload'->>'org_invitation_id' = $1
+      `, [after[0]!.id])
+      expect(Number(jobs[0]?.count)).toBe(1)
+    }
+    finally {
+      await fixture.cleanup()
+    }
+  })
+
   it.concurrent('returns ok for an existing user with a pending org invitation', async () => {
     const fixture = await createInviteTestFixture()
     try {
