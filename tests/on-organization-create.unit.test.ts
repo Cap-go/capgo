@@ -52,6 +52,11 @@ vi.mock('../supabase/functions/_backend/utils/posthog.ts', () => ({
   groupIdentifyPosthog: vi.fn(async () => undefined),
 }))
 
+vi.mock('../supabase/functions/_backend/utils/signup_attribution.ts', () => ({
+  resolveSignupAttributionForUser: vi.fn(async () => ({})),
+  resolveSignupAttributionForOrg: vi.fn(async () => ({})),
+}))
+
 vi.mock('../supabase/functions/_backend/utils/hono.ts', async () => {
   const actual = await vi.importActual('../supabase/functions/_backend/utils/hono.ts')
   return {
@@ -83,6 +88,9 @@ function mockOrgReload(customerId: string | null) {
             eq: () => ({
               single: async () => ({ data: createOrg(customerId), error: null }),
             }),
+          }),
+          update: () => ({
+            eq: async () => ({ error: null }),
           }),
         }
       }
