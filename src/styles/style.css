@@ -407,8 +407,11 @@ html {
    (one per child: range label, page buttons) instead of a full-width strip,
    matching the Liquid Glass tabbar. They become static from md up. */
 @media (max-width: 767px) {
+  /* --cap-native-navigation-bottom is 0px when iOS hosts the WebView inside
+     the system Liquid Glass tab controller, while the WebView still runs under
+     the bar; its safe-area inset then includes the bar, so take the larger. */
   .native-chrome-content .native-bottom-offset {
-    bottom: calc(var(--cap-native-navigation-bottom, var(--safe-area-bottom)) + 0.5rem);
+    bottom: calc(max(var(--cap-native-navigation-bottom, 0px), var(--safe-area-bottom)) + 0.5rem);
     padding: 0 1rem;
     gap: 0.5rem;
     border: 0;

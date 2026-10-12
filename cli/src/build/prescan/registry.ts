@@ -60,6 +60,7 @@ import {
   plistOrientationsMultitasking,
   plistOrientationsPresent,
   plistRequiredDeviceArm64,
+  plistSceneLifecycleXcode27,
   plistVersionBuildFormat,
   plistVersionShortFormat,
 } from './checks/ios-plist-checks'
@@ -98,7 +99,7 @@ const IOS_EXPANSION_CHECKS: PrescanCheck[] = [
   plistBundleIdFormat, plistVersionShortFormat, plistVersionBuildFormat,
   plistEncryptionCompliance, plistAtsArbitraryLoads, plistLaunchStoryboard,
   plistOrientationsMultitasking, plistOrientationsPresent, plistDisplayName,
-  plistBackgroundModesSanity, plistRequiredDeviceArm64,
+  plistBackgroundModesSanity, plistRequiredDeviceArm64, plistSceneLifecycleXcode27,
   // ios xcode (project / build settings)
   deploymentTargetCapacitor, signingTeam, bundleIdMismatchAcrossConfigs,
   enableBitcodeLeftover, swiftVersionSanity, noAppTarget,

@@ -916,6 +916,34 @@ export function requestInfosChannelPostgres(
   return channel
 }
 
+/**
+ * Read replicas cancel queries that block WAL replay ("canceling statement due
+ * to conflict with recovery", SQLSTATE 40001). The statement only lost a race
+ * with replay, so running it again on the same connection normally succeeds.
+ */
+export function isRecoveryConflictError(error: unknown): boolean {
+  let current: unknown = error
+  for (let depth = 0; current && typeof current === 'object' && depth < 5; depth++) {
+    const { message } = current as { message?: unknown }
+    if (typeof message === 'string' && message.includes('canceling statement due to conflict with recovery'))
+      return true
+    current = (current as { cause?: unknown }).cause
+  }
+  return false
+}
+
+export async function retryOnRecoveryConflict<T>(c: Context, queryName: string, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run()
+  }
+  catch (error) {
+    if (!isRecoveryConflictError(error))
+      throw error
+    cloudlog({ requestId: c.get('requestId'), message: 'replica_recovery_conflict_retry', queryName })
+    return await run()
+  }
+}
+
 const MANIFEST_ROWS_CACHE_PATH = '/.manifest-rows-v1'
 // manifest_persist inserts a version's rows once, in the same transaction that
 // sets manifest_count, and never rewrites them. A non-empty row set is final and
@@ -937,7 +965,7 @@ export async function requestManifestEntriesPostgres(
   if (cached)
     return cached
 
-  const rows = await drizzleClient
+  const rows = await retryOnRecoveryConflict(c, 'manifest_entries', () => drizzleClient
     .select({
       file_name: schema.manifest.file_name,
       file_hash: schema.manifest.file_hash,
@@ -945,6 +973,7 @@ export async function requestManifestEntriesPostgres(
     })
     .from(schema.manifest)
     .where(eq(schema.manifest.app_version_id, versionId))
+    .execute())
 
   // Cache API size limits may reject huge manifests; the put fails open.
   // With the /updates edge cache on, the rows also carry the app's purge tag.

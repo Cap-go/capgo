@@ -1700,6 +1700,8 @@ export type Database = {
           plugin_major_breakdown: Json
           plugin_version_breakdown: Json
           plugin_version_ladder: Json
+          refunds_amount: number
+          refunds_count: number
           registers_today: number
           revenue_enterprise: number
           revenue_maker: number
@@ -1803,6 +1805,8 @@ export type Database = {
           plugin_major_breakdown?: Json
           plugin_version_breakdown?: Json
           plugin_version_ladder?: Json
+          refunds_amount?: number
+          refunds_count?: number
           registers_today?: number
           revenue_enterprise?: number
           revenue_maker?: number
@@ -1906,6 +1910,8 @@ export type Database = {
           plugin_major_breakdown?: Json
           plugin_version_breakdown?: Json
           plugin_version_ladder?: Json
+          refunds_amount?: number
+          refunds_count?: number
           registers_today?: number
           revenue_enterprise?: number
           revenue_maker?: number
@@ -3061,6 +3067,45 @@ export type Database = {
           },
         ]
       }
+      stripe_refunds: {
+        Row: {
+          amount: number
+          charge_id: string
+          created_at: string
+          currency: string
+          customer_id: string | null
+          id: string
+          reason: string | null
+          refunded_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          charge_id: string
+          created_at?: string
+          currency: string
+          customer_id?: string | null
+          id: string
+          reason?: string | null
+          refunded_at: string
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          charge_id?: string
+          created_at?: string
+          currency?: string
+          customer_id?: string | null
+          id?: string
+          reason?: string | null
+          refunded_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tmp_users: {
         Row: {
           cancelled_at: string | null
@@ -3070,6 +3115,7 @@ export type Database = {
           future_uuid: string
           id: number
           invite_magic_string: string
+          invited_by_user_id: string | null
           last_name: string
           org_id: string
           rbac_role_name: string
@@ -3083,6 +3129,7 @@ export type Database = {
           future_uuid?: string
           id?: number
           invite_magic_string?: string
+          invited_by_user_id?: string | null
           last_name: string
           org_id: string
           rbac_role_name?: string
@@ -3096,6 +3143,7 @@ export type Database = {
           future_uuid?: string
           id?: number
           invite_magic_string?: string
+          invited_by_user_id?: string | null
           last_name?: string
           org_id?: string
           rbac_role_name?: string
@@ -5451,6 +5499,7 @@ export type Database = {
         | "app_launch_timeout"
         | "app_nav"
         | "channelPaused"
+        | "update_check_error"
         | "webview_dom_content_loaded"
         | "webview_page_loaded"
       stripe_status:
@@ -5734,6 +5783,7 @@ export const Constants = {
         "app_launch_timeout",
         "app_nav",
         "channelPaused",
+        "update_check_error",
         "webview_dom_content_loaded",
         "webview_page_loaded",
       ],
