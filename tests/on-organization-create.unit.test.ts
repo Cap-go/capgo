@@ -154,9 +154,10 @@ describe('on_organization_create stripe bootstrap', () => {
     expect(response.status).toBe(200)
     expect(orgSignupPluginUpdateMock).toHaveBeenCalledWith({ signup_plugin: 'capacitor-updater' })
     expect(sendEventToTrackingMock).toHaveBeenCalled()
-    const trackingPayload = sendEventToTrackingMock.mock.calls.find(
-      call => call[1]?.event === 'Org Created',
-    )?.[1]
+    const trackingCalls = sendEventToTrackingMock.mock.calls as unknown as Array<
+      [_context: unknown, payload: { event?: string, user_id?: string, tags?: Record<string, unknown> }]
+    >
+    const trackingPayload = trackingCalls.find(call => call[1]?.event === 'Org Created')?.[1]
     expect(trackingPayload).toMatchObject({
       user_id: 'user-1',
       tags: {
