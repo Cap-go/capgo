@@ -143,13 +143,15 @@ const creativeAssets: CreativeAsset[] = [
 const featureGraphic: CreativeAsset = { fileName: 'featureGraphic.png', cssWidth: 1024, cssHeight: 500, scale: 1, layout: 'feature' }
 
 // Demo data comes from scripts/marketing-screenshots (seed.sql + mocked analytics), so every screen shows a live-looking app
-const screens: { slug: string, path: string, title: string, subtitle: string, prepare?: (page: Page) => Promise<void> }[] = [
+// playOnly screens show other platforms (Android device rows, platform tags), which App Review rejects (guideline 2.3.10)
+const screens: { slug: string, path: string, title: string, subtitle: string, playOnly?: boolean, prepare?: (page: Page) => Promise<void> }[] = [
   { slug: 'live-release', path: '/app/com.demo.app?days=7', title: 'Watch each release go live', subtitle: 'Adoption, installs, and failures in real time' },
   {
     slug: 'rollout',
     path: '/app/com.demo.app/channel/1',
     title: 'Roll out safely',
     subtitle: 'Start small and pause automatically on errors',
+    playOnly: true,
     prepare: async (page) => {
       await page.getByText(/of devices receive/).first().evaluate((el: Element) => el.closest('div')?.parentElement?.scrollIntoView({ block: 'center' })).catch(() => {})
       await page.waitForTimeout(600)
@@ -157,7 +159,7 @@ const screens: { slug: string, path: string, title: string, subtitle: string, pr
   },
   { slug: 'update-health', path: '/app/com.demo.app/observe/errors?days=7', title: 'Catch failed updates fast', subtitle: 'See which devices failed and why' },
   { slug: 'channels', path: '/app/com.demo.app/channels', title: 'Ship to beta, then production', subtitle: 'Channels for every audience' },
-  { slug: 'devices', path: '/app/com.demo.app/devices', title: 'Know what each device runs', subtitle: 'Find any user\'s version in seconds' },
+  { slug: 'devices', path: '/app/com.demo.app/devices', title: 'Know what each device runs', subtitle: 'Find any user\'s version in seconds', playOnly: true },
   { slug: 'preview-qr', path: '/app/com.demo.app/channel/1/preview?appStoreQr=1', title: 'Preview any build with a scan', subtitle: 'Share bundles with your team by QR' },
   { slug: 'builds', path: '/app/com.demo.app/builds', title: 'Native builds in the cloud', subtitle: 'Signed, uploaded, and tracked for you' },
 ]
@@ -654,13 +656,16 @@ async function captureScreenshots() {
       if (device.slug === 'iphone-6-9')
         creativeRawPaths = rawPaths
 
+      let appleIndex = 0
       for (const [index, screen] of screens.entries()) {
-        const baseName = `${String(index + 1).padStart(2, '0')}-${screen.slug}.png`
-        const fileName = `${device.filePrefix}-${baseName}`
-        const outputPath = resolve(device.outputDir ?? outputRoot, fileName)
+        if (screen.playOnly && device.androidDirs.length === 0)
+          continue
+        const androidName = `${String(index + 1).padStart(2, '0')}-${screen.slug}.png`
+        const fileName = screen.playOnly ? androidName : `${device.filePrefix}-${String(++appleIndex).padStart(2, '0')}-${screen.slug}.png`
+        const outputPath = screen.playOnly ? resolve(composeRoot, device.slug, androidName) : resolve(device.outputDir ?? outputRoot, fileName)
         await renderHtml(browser, framedScreenHtml(device, screen, rawPaths[index]), `${device.slug}-${screen.slug}`, device.cssWidth, device.cssHeight, device.scale, outputPath)
         for (const dir of device.androidDirs)
-          copyFileSync(outputPath, resolve(androidOutputRoot, dir, baseName))
+          copyFileSync(outputPath, resolve(androidOutputRoot, dir, androidName))
         console.log(`${device.slug}: ${fileName}`)
       }
     }
