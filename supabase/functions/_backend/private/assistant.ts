@@ -1,0 +1,363 @@
+import type { Context } from 'hono'
+import type { McpDispatch } from '../mcp/index.ts'
+import type { McpTool, McpToolContext } from '../mcp/tools.ts'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { Database } from '../utils/supabase.types.ts'
+import { z } from 'zod'
+import { createCaller } from '../mcp/index.ts'
+import { listTools, SERVER_INSTRUCTIONS } from '../mcp/protocol.ts'
+import { MCP_TOOLS_BY_NAME } from '../mcp/tools.ts'
+import { honoFactory, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { middlewareKey } from '../utils/hono_middleware.ts'
+import { cloudlog } from '../utils/logging.ts'
+import { safeParseSchema } from '../utils/schema_validation.ts'
+import { getEnv } from '../utils/utils.ts'
+
+/**
+ * In-console Capgo assistant.
+ *
+ * The web console sends the conversation plus the page the user is on. The model (OpenAI chat
+ * completions) can call every hosted MCP tool, replayed through the public API with the user's
+ * assistant API key, so RBAC, org policies and rate limits are exactly the MCP ones. Two UI tools
+ * let the model answer with cards: a link card to jump to a console page and a question card the
+ * user answers with one click. Destructive or outward-facing MCP tools are never run directly:
+ * they come back as a confirm card and only run once the user clicks it.
+ */
+
+type ApikeyRow = Database['public']['Tables']['apikeys']['Row']
+
+const DEFAULT_MODEL = 'gpt-5-mini'
+const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1'
+const MAX_ROUNDS = 8
+const MAX_TOOL_RESULT_CHARS = 20_000
+const MAX_HISTORY = 40
+const MAX_MESSAGE_CHARS = 8_000
+
+export type AssistantCard
+  = | { type: 'link', title: string, description?: string, path: string }
+    | { type: 'question', question: string, options: string[], allowFreeText: boolean }
+    | { type: 'confirm', title: string, description: string, tool: string, arguments: Record<string, unknown> }
+
+export interface AssistantAction {
+  tool: string
+  title: string
+  ok: boolean
+}
+
+export interface AssistantResponse {
+  reply: string
+  cards: AssistantCard[]
+  actions: AssistantAction[]
+}
+
+const messageSchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string().max(MAX_MESSAGE_CHARS),
+})
+
+const bodySchema = z.object({
+  messages: z.array(messageSchema).min(1).max(MAX_HISTORY),
+  context: z.object({
+    path: z.string().max(500).optional(),
+    orgId: z.string().max(100).optional(),
+    orgName: z.string().max(200).optional(),
+    appId: z.string().max(300).optional(),
+  }).optional(),
+  confirm: z.object({
+    tool: z.string().min(1).max(100),
+    arguments: z.record(z.string(), z.unknown()),
+  }).optional(),
+})
+
+type AssistantBody = z.infer<typeof bodySchema>
+
+// Console routes the model may link to. Ids in braces must come from MCP tool results.
+const CONSOLE_ROUTES = `
+/dashboard - organization overview (usage, apps, charts)
+/apps - list of apps in the current organization
+/app/new - add a new app
+/app/{appId} - app overview dashboard
+/app/{appId}/getting-started - app onboarding steps
+/app/{appId}/bundles - bundle list; /app/{appId}/bundles/new - upload a bundle
+/app/{appId}/bundle/{bundleId} - one bundle (bundleId is the numeric id, not the version name); suffixes /history, /manifest, /dependencies, /preview
+/app/{appId}/channels - channel list
+/app/{appId}/channel/{channelId} - one channel (numeric id); suffixes /devices, /history, /statistics, /preview
+/app/{appId}/devices - device list; /app/{appId}/device/{deviceId} - one device; suffixes /logs, /deployments
+/app/{appId}/builds - native builds
+/app/{appId}/notifications - push notifications
+/app/{appId}/observe/errors, /observe/logs, /observe/native, /observe/compatibility - Observe health data
+/app/{appId}/settings - app settings; /settings/access - app access; /settings/usage - app usage
+/settings/account - profile; /settings/account/change-password; /settings/account/notifications
+/settings/organization - organization settings; suffixes /members, /groups, /security, /api-keys, /webhooks, /audit-logs, /usage, /plans, /credits, /notifications
+`.trim()
+
+const UI_TOOLS = [
+  {
+    type: 'function',
+    function: {
+      name: 'show_link',
+      description: 'Show the user a clickable card that opens a page of the Capgo console. Use it whenever you mention where something lives, after finding a resource, or after an action so the user can check the result.',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Short card title, e.g. "Production channel"' },
+          description: { type: 'string', description: 'One short line about what the page shows' },
+          path: { type: 'string', description: 'Console path starting with /, built from the route list and real ids' },
+        },
+        required: ['title', 'path'],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'ask_user',
+      description: 'Ask the user a question with clickable answers. Use it instead of a plain-text question whenever a choice is needed (which app, which channel, which bundle, yes/no). Fill options from real data you fetched. Stop and wait for the answer after calling it.',
+      parameters: {
+        type: 'object',
+        properties: {
+          question: { type: 'string' },
+          options: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 8, description: 'Answers shown as buttons' },
+          allow_free_text: { type: 'boolean', description: 'Also let the user type another answer' },
+        },
+        required: ['question', 'options'],
+        additionalProperties: false,
+      },
+    },
+  },
+] as const
+
+interface OpenAiToolCall {
+  id: string
+  type: 'function'
+  function: { name: string, arguments: string }
+}
+
+type OpenAiMessage
+  = | { role: 'system' | 'user', content: string }
+    | { role: 'assistant', content: string | null, tool_calls?: OpenAiToolCall[] }
+    | { role: 'tool', tool_call_id: string, content: string }
+
+let mcpOpenAiTools: unknown[] | null = null
+
+function openAiTools(): unknown[] {
+  if (!mcpOpenAiTools) {
+    mcpOpenAiTools = (listTools() as Array<{ name: string, description: string, inputSchema: Record<string, unknown> }>).map(tool => ({
+      type: 'function',
+      function: { name: tool.name, description: tool.description, parameters: tool.inputSchema },
+    }))
+  }
+  return [...UI_TOOLS, ...mcpOpenAiTools]
+}
+
+/** Deletes, overwrites, cancellations and push sends wait for an explicit click in the UI. */
+export function needsConfirmation(tool: McpTool): boolean {
+  return tool.annotations.destructiveHint === true || tool.annotations.openWorldHint === true
+}
+
+/** Only same-origin console paths: no scheme, no protocol-relative or backslash tricks. */
+export function sanitizeConsolePath(path: unknown): string | null {
+  if (typeof path !== 'string')
+    return null
+  const trimmed = path.trim()
+  if (!trimmed.startsWith('/') || trimmed.startsWith('//') || trimmed.includes('\\') || /\s/.test(trimmed) || trimmed.length > 500)
+    return null
+  return trimmed
+}
+
+function clip(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max)}\n… (truncated)` : text
+}
+
+function parseArguments(raw: string): Record<string, unknown> {
+  try {
+    const value = JSON.parse(raw || '{}')
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+  }
+  catch {
+    return {}
+  }
+}
+
+function systemPrompt(body: AssistantBody): string {
+  const ctx = body.context ?? {}
+  const where = [
+    ctx.path ? `Current page: ${ctx.path}` : null,
+    ctx.orgId ? `Current organization: ${ctx.orgName ?? ''} (${ctx.orgId})` : null,
+    ctx.appId ? `Current app: ${ctx.appId}` : null,
+  ].filter(Boolean).join('\n')
+  return [
+    'You are the Capgo assistant inside the Capgo web console. You help users find things and act on their Capgo account.',
+    SERVER_INSTRUCTIONS,
+    'Rules:',
+    '- Use the capgo_* tools to look up real data before answering. Never invent ids, versions or numbers.',
+    '- "This app", "here" and similar refer to the current page context below.',
+    '- When the user asks where something is, or after you find or change a resource, call show_link with the matching console page.',
+    '- When you need the user to pick something, call ask_user with options from real data instead of asking in plain text.',
+    '- Delete, overwrite, cancel and push-notification tools are not run immediately: the user gets a confirm card. Tell them to confirm it.',
+    '- Uploading bundle files and starting native builds need the Capgo CLI: give the command (bunx @capgo/cli@latest ...).',
+    '- Reply in the user\'s language, short and plain (a few sentences, simple markdown lists at most).',
+    '',
+    `Console routes:\n${CONSOLE_ROUTES}`,
+    where ? `\n${where}` : '',
+  ].join('\n')
+}
+
+async function callOpenAi(c: Context, messages: OpenAiMessage[]): Promise<{ content: string | null, tool_calls?: OpenAiToolCall[] }> {
+  const apiKey = getEnv(c, 'OPENAI_API_KEY')
+  const model = getEnv(c, 'ASSISTANT_OPENAI_MODEL') || DEFAULT_MODEL
+  // Any OpenAI-compatible chat completions endpoint works (Azure OpenAI, a gateway, a local stub).
+  const baseUrl = (getEnv(c, 'ASSISTANT_OPENAI_BASE_URL') || DEFAULT_OPENAI_BASE_URL).replace(/\/$/, '')
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: { 'authorization': `Bearer ${apiKey}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ model, messages, tools: openAiTools(), tool_choice: 'auto' }),
+  })
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '')
+    cloudlog({ requestId: c.get('requestId'), message: 'assistant_openai_error', status: response.status, detail: detail.slice(0, 500) })
+    throw quickError(502, 'assistant_upstream_error', 'The assistant is unavailable right now, try again in a moment')
+  }
+  const data = await response.json() as { choices?: Array<{ message?: { content: string | null, tool_calls?: OpenAiToolCall[] } }> }
+  const message = data.choices?.[0]?.message
+  if (!message)
+    throw quickError(502, 'assistant_upstream_error', 'The assistant returned an empty answer')
+  return message
+}
+
+async function runMcpTool(tool: McpTool, args: Record<string, unknown>, ctx: McpToolContext): Promise<{ ok: boolean, text: string }> {
+  const parsed = tool.inputSchema.safeParse(args)
+  if (!parsed.success)
+    return { ok: false, text: `Invalid arguments for ${tool.name}: ${z.prettifyError(parsed.error)}` }
+  try {
+    const result = await tool.run(parsed.data as Record<string, unknown>, ctx)
+    return { ok: !result.isError, text: result.content.map(part => part.text).join('\n') }
+  }
+  catch (error) {
+    return { ok: false, text: `Tool failed: ${error instanceof Error ? error.message : String(error)}` }
+  }
+}
+
+export async function runAssistant(c: Context, body: AssistantBody, ctx: McpToolContext): Promise<AssistantResponse> {
+  const cards: AssistantCard[] = []
+  const actions: AssistantAction[] = []
+  const messages: OpenAiMessage[] = [
+    { role: 'system', content: systemPrompt(body) },
+    ...body.messages.map(message => ({ role: message.role, content: message.content }) as OpenAiMessage),
+  ]
+
+  if (body.confirm) {
+    const tool = MCP_TOOLS_BY_NAME.get(body.confirm.tool)
+    if (!tool || !needsConfirmation(tool))
+      throw simpleError('invalid_confirm', 'Unknown action to confirm')
+    const result = await runMcpTool(tool, body.confirm.arguments, ctx)
+    actions.push({ tool: tool.name, title: tool.title, ok: result.ok })
+    messages.push({
+      role: 'user',
+      content: `I confirmed the action ${tool.name} with ${JSON.stringify(body.confirm.arguments)}. Result (${result.ok ? 'success' : 'error'}):\n${clip(result.text, MAX_TOOL_RESULT_CHARS)}\nSummarize the outcome and link the affected page.`,
+    })
+  }
+
+  for (let round = 0; round < MAX_ROUNDS; round++) {
+    const message = await callOpenAi(c, messages)
+    const toolCalls = message.tool_calls ?? []
+    if (!toolCalls.length)
+      return { reply: message.content ?? '', cards, actions }
+
+    messages.push({ role: 'assistant', content: message.content, tool_calls: toolCalls })
+    let waitForUser = false
+    for (const call of toolCalls) {
+      const name = call.function.name
+      const args = parseArguments(call.function.arguments)
+      let output: string
+
+      if (name === 'show_link') {
+        const path = sanitizeConsolePath(args.path)
+        if (path) {
+          cards.push({ type: 'link', title: String(args.title ?? path).slice(0, 120), description: typeof args.description === 'string' ? args.description.slice(0, 300) : undefined, path })
+          output = 'Card shown to the user.'
+        }
+        else {
+          output = 'Invalid path: use a console path starting with a single /.'
+        }
+      }
+      else if (name === 'ask_user') {
+        const options = Array.isArray(args.options) ? args.options.filter((option): option is string => typeof option === 'string' && option.trim() !== '').slice(0, 8).map(option => option.slice(0, 120)) : []
+        cards.push({ type: 'question', question: String(args.question ?? '').slice(0, 500), options, allowFreeText: args.allow_free_text === true })
+        waitForUser = true
+        output = 'Question shown. Stop here and wait for the user to answer.'
+      }
+      else {
+        const tool = MCP_TOOLS_BY_NAME.get(name)
+        if (!tool) {
+          output = `Unknown tool: ${name}`
+        }
+        else if (needsConfirmation(tool)) {
+          const parsed = tool.inputSchema.safeParse(args)
+          if (parsed.success) {
+            cards.push({ type: 'confirm', title: tool.title, description: tool.description.split('. ')[0], tool: tool.name, arguments: parsed.data as Record<string, unknown> })
+            waitForUser = true
+            output = 'Not run yet: the user must click the confirm card. Tell them briefly what will happen.'
+          }
+          else {
+            output = `Invalid arguments for ${name}: ${z.prettifyError(parsed.error)}`
+          }
+        }
+        else {
+          const result = await runMcpTool(tool, args, ctx)
+          actions.push({ tool: tool.name, title: tool.title, ok: result.ok })
+          output = clip(result.text, MAX_TOOL_RESULT_CHARS)
+        }
+      }
+      messages.push({ role: 'tool', tool_call_id: call.id, content: output })
+    }
+
+    if (waitForUser) {
+      // Let the model add one short sentence, without more tool calls, then hand back to the user.
+      messages.push({ role: 'system', content: 'Write one short sentence for the user now. Do not call tools.' })
+      const final = await callOpenAi(c, messages).catch(() => ({ content: '' }))
+      return { reply: final.content ?? '', cards, actions }
+    }
+  }
+  return { reply: 'I stopped after too many steps. Try a narrower question.', cards, actions }
+}
+
+/**
+ * Supabase Edge Functions have no in-process router for the public API, so tool calls go through
+ * the functions gateway. The Cloudflare API worker passes its own app.fetch instead.
+ */
+function supabaseDispatch(c: Context): McpDispatch {
+  return (request) => {
+    const url = new URL(request.url)
+    const base = getEnv(c, 'SUPABASE_URL').replace(/\/$/, '')
+    return fetch(new Request(`${base}/functions/v1${url.pathname}${url.search}`, request))
+  }
+}
+
+export function createAssistantApp(dispatch?: McpDispatch) {
+  const app = honoFactory.createApp()
+  app.use('*', useCors)
+
+  app.post('/', middlewareKey(), async (c) => {
+    if (!getEnv(c, 'OPENAI_API_KEY'))
+      throw quickError(503, 'assistant_not_configured', 'The assistant is not configured on this server')
+
+    const parsed = safeParseSchema(bodySchema, await parseBody<unknown>(c))
+    if (!parsed.success)
+      throw simpleError('invalid_body', 'Invalid assistant request')
+
+    const apikey = c.get('apikey') as ApikeyRow
+    const token = (c.req.header('capgkey') ?? c.req.header('authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
+    const ctx: McpToolContext = {
+      call: createCaller(c as Context<MiddlewareKeyVariables>, dispatch ?? supabaseDispatch(c), token),
+      caller: { userId: apikey.user_id, apikeyId: Number(apikey.id), apikeyName: apikey.name, apikeyExpiresAt: apikey.expires_at },
+    }
+    cloudlog({ requestId: c.get('requestId'), message: 'assistant_request', apikeyId: apikey.id, turns: parsed.data.messages.length, confirm: parsed.data.confirm?.tool })
+    return c.json(await runAssistant(c, parsed.data, ctx))
+  })
+
+  return app
+}
+
+export const app = createAssistantApp()
