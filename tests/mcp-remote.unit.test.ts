@@ -7,6 +7,7 @@ import {
   buildRedirectUrl,
   decryptWithCode,
   encryptWithCode,
+  getPinnedClientMetadata,
   isAllowedRedirectUri,
   isClientIdMetadataUrl,
   randomToken,
@@ -222,6 +223,9 @@ describe('hosted MCP OAuth helpers', () => {
     expect(sanitizeClientName('', 'fallback')).toBe('fallback')
     expect(isClientIdMetadataUrl('https://app.example/oauth/client.json')).toBe(true)
     expect(isClientIdMetadataUrl('mcp_abc')).toBe(false)
+    expect(getPinnedClientMetadata('https://chatgpt.com/oauth/client.json')?.redirect_uris)
+      .toEqual(['https://chatgpt.com/connector_platform_oauth_redirect'])
+    expect(getPinnedClientMetadata('https://app.example/oauth/client.json')).toBeNull()
     expect(base64UrlEncode(new Uint8Array([251, 255]))).toBe('-_8')
   })
 })
