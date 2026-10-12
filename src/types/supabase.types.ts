@@ -2879,6 +2879,7 @@ export type Database = {
           required_encryption_key: string | null
           stats_refresh_requested_at: string | null
           stats_updated_at: string | null
+          signup_plugin: string | null
           support_channel_set_at: string | null
           support_channel_type: string | null
           support_channel_url: string | null
@@ -2910,6 +2911,7 @@ export type Database = {
           required_encryption_key?: string | null
           stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
+          signup_plugin?: string | null
           support_channel_set_at?: string | null
           support_channel_type?: string | null
           support_channel_url?: string | null
@@ -2941,6 +2943,7 @@ export type Database = {
           required_encryption_key?: string | null
           stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
+          signup_plugin?: string | null
           support_channel_set_at?: string | null
           support_channel_type?: string | null
           support_channel_url?: string | null

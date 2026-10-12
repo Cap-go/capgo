@@ -1,12 +1,14 @@
-import type { QueueApi, QueueEnvironment, QueueInfo } from './lib/posthog-queues.ts'
+import type { QueueApi, QueueInfo } from './lib/posthog-queues.ts'
 import process from 'node:process'
-import { createQueueApi, findQueue, queueEnvironment } from './lib/posthog-queues.ts'
+import { createQueueApi, findQueue } from './lib/posthog-queues.ts'
 
 export const INVENTORY_RETENTION_SECONDS = 4 * 24 * 60 * 60
 
-export async function ensureR2InventoryQueues(api: QueueApi, environment: QueueEnvironment) {
+export async function ensureR2InventoryQueues(api: QueueApi, environment: string) {
+  if (environment !== 'prod')
+    throw new Error('R2 inventory is production-only; expected prod')
   for (const suffix of ['', '-dlq', '-repair', '-repair-dlq']) {
-    const name = `capgo-r2-inventory-${environment}${suffix}`
+    const name = `capgo-r2-inventory-prod${suffix}`
     let queue = await findQueue(api, name)
     if (!queue) {
       try {
@@ -37,10 +39,9 @@ export async function ensureR2InventoryQueues(api: QueueApi, environment: QueueE
 
 if (import.meta.main) {
   try {
-    if (process.argv.length !== 3)
-      throw new Error('Usage: bun scripts/ensure-r2-inventory-queues.ts <alpha|preprod|prod>')
-    const environment = queueEnvironment(process.argv[2])
-    await ensureR2InventoryQueues(createQueueApi(), environment)
+    if (process.argv.length !== 3 || process.argv[2] !== 'prod')
+      throw new Error('Usage: bun scripts/ensure-r2-inventory-queues.ts prod (R2 inventory is production-only)')
+    await ensureR2InventoryQueues(createQueueApi(), process.argv[2])
   }
   catch (error) {
     console.error(error instanceof Error ? error.message : 'Inventory queue provisioning failed')

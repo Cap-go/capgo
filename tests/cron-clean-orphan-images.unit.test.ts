@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getStaleOrgLogoPaths } from '../supabase/functions/_backend/triggers/cron_clean_orphan_images.ts'
+import { getStaleOrgLogoPaths, runWithDeadline } from '../supabase/functions/_backend/triggers/cron_clean_orphan_images.ts'
 
 describe('getStaleOrgLogoPaths', () => {
   it.concurrent('preserves the linked org logo file and removes only stale files', () => {
@@ -77,5 +77,36 @@ describe('getStaleOrgLogoPaths', () => {
       'org/org-789/logo/first.png',
       'org/org-789/logo/second.png',
     ])
+  })
+})
+
+describe('runWithDeadline', () => {
+  it.concurrent('processes every item before the deadline with bounded concurrency', async () => {
+    let active = 0
+    let maxActive = 0
+    const seen: number[] = []
+    const started = await runWithDeadline([1, 2, 3, 4, 5], async (item) => {
+      active++
+      maxActive = Math.max(maxActive, active)
+      await new Promise(resolve => setTimeout(resolve, 1))
+      seen.push(item)
+      active--
+    }, { concurrency: 2, deadline: Date.now() + 60_000 })
+
+    expect(started).toBe(5)
+    expect(seen.sort()).toEqual([1, 2, 3, 4, 5])
+    expect(maxActive).toBe(2)
+  })
+
+  it.concurrent('stops starting items once the deadline passes', async () => {
+    let clock = 0
+    const seen: number[] = []
+    const started = await runWithDeadline([1, 2, 3, 4], async (item) => {
+      seen.push(item)
+      clock += 10
+    }, { concurrency: 1, deadline: 15, now: () => clock })
+
+    expect(started).toBe(2)
+    expect(seen).toEqual([1, 2])
   })
 })
