@@ -102,10 +102,10 @@ async function getAvailableCredits(c: Context, orgId: string): Promise<number> {
 }
 
 export async function customerHasSavedPaymentMethod(c: Context, customerId: string): Promise<boolean> {
-  const billingAccount = await getBillingAccountForCustomer(c, customerId)
-  if (!isStripeConfiguredForAccount(c, billingAccount))
-    return false
   try {
+    const billingAccount = await getBillingAccountForCustomer(c, customerId)
+    if (!isStripeConfiguredForAccount(c, billingAccount))
+      return false
     return Boolean(await getDefaultPaymentMethodId(c, customerId))
   }
   catch (error) {
@@ -363,13 +363,13 @@ export async function maybeAutoTopUpCredits(c: Context, orgId: string): Promise<
   if (orgError || !org?.customer_id)
     return
 
-  const billingAccount = await getBillingAccountForCustomer(c, org.customer_id)
-  if (!isStripeConfiguredForAccount(c, billingAccount))
-    return
-
-  // DB-only lookup here; the Stripe price lookup waits until the claim succeeds.
+  // DB-only lookups here; the Stripe price lookup waits until the claim succeeds.
+  let billingAccount: BillingAccount
   let productId: string
   try {
+    billingAccount = await getBillingAccountForCustomer(c, org.customer_id)
+    if (!isStripeConfiguredForAccount(c, billingAccount))
+      return
     productId = await getCreditProductIdForCustomer(c, org.customer_id, billingAccount)
   }
   catch (error) {
