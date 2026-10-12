@@ -116,8 +116,11 @@ app.post('/', middlewareAuth(), async (c) => {
     userId,
   })
 
+  // PostHog delivery failures are already logged by capturePosthogReplaySnapshot.
+  // CLI replay is best-effort telemetry: report the failure to the caller
+  // without paging on an upstream outage or timeout.
   if (!sent)
-    throw quickError(502, 'posthog_replay_failed', 'Failed to send replay')
+    throw quickError(502, 'posthog_replay_failed', 'Failed to send replay', {}, undefined, { alert: false })
 
   return c.json(BRES)
 })
