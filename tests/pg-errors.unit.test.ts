@@ -44,6 +44,17 @@ describe('pg_errors', () => {
     expect(isTransientPgError(error)).toBe(true)
   })
 
+  it('treats replica recovery conflicts as transient', () => {
+    const error = Object.assign(new Error('Failed query: select "file_name" from "manifest"'), {
+      name: 'DrizzleQueryError',
+      cause: Object.assign(new Error('canceling statement due to conflict with recovery'), {
+        code: '40001',
+      }),
+    })
+
+    expect(isTransientPgError(error)).toBe(true)
+  })
+
   it('does not treat invalid UUID casts as transient', () => {
     const error = Object.assign(new Error('Failed query: SELECT 1'), {
       name: 'DrizzleQueryError',
