@@ -91,7 +91,7 @@ async function submit(form: { password: string, email: string }) {
           autocomplete="new-password"
           :label="t('password')"
           data-test="password"
-          validation="required|length:6|contains_alpha|contains_uppercase|contains_lowercase|contains_symbol"
+          validation="required|length:6|contains_alpha|contains_uppercase|contains_lowercase|contains_numeric|contains_symbol"
           validation-visibility="dirty"
         />
         <FormKit

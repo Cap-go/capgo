@@ -529,4 +529,19 @@ test.describe('Registration', () => {
     await page.click('[data-test="submit"]')
     await expect(page.locator('.formkit-messages [data-message-type="validation"]')).toContainText('Password confirmation does not match')
   })
+
+  test('should require a number before submitting to the registration API', async ({ page }) => {
+    let requests = 0
+    page.on('request', (request) => {
+      if (request.url().endsWith('/auth/register') && request.method() === 'POST')
+        requests++
+    })
+    await page.fill('[data-test="email"]', 'password-policy@example.com')
+    await page.fill('[data-test="password"]', 'Password!')
+    await page.fill('[data-test="confirm-password"]', 'Password!')
+    await page.click('[data-test="submit"]')
+    await expect(page.locator('.formkit-messages [data-message-type="validation"]')).toContainText(/number/i)
+    expect(requests).toBe(0)
+    await expect(page).toHaveURL(/\/register\/?$/)
+  })
 })
