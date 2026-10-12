@@ -1925,6 +1925,8 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     const iosDependencyManager = platform === 'ios'
       ? detectIosDependencyManager(projectDir, nativeProjectDir)
       : undefined
+    if (iosDependencyManager === 'cocoapods')
+      log.warn('⚠️  This iOS project uses CocoaPods. Capgo Cloud Build stops building CocoaPods projects in December 2026: migrate to Swift Package Manager (https://capacitorjs.com/docs/ios/spm).')
     const requestPayload = {
       app_id: appId,
       platform,
