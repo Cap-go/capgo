@@ -58,11 +58,13 @@ function chunk<T>(items: T[], size: number): T[][] {
 }
 
 // Random order so a run cut short by the budget does not always revisit the
-// same folders.
+// same folders. Not security sensitive; crypto source only keeps scanners quiet.
 function shuffle<T>(items: T[]): T[] {
   const result = [...items]
+  const random = new Uint32Array(result.length)
+  crypto.getRandomValues(random)
   for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
+    const j = random[i] % (i + 1)
     ;[result[i], result[j]] = [result[j], result[i]]
   }
   return result
@@ -195,6 +197,7 @@ async function cleanOrgFolder(
   stats: CleanupStats,
   orgId: string,
   org: { logo: string | null } | undefined,
+  deadline: number,
 ) {
   try {
     const { data: entries, error: listError } = await supabase
@@ -212,6 +215,9 @@ async function cleanOrgFolder(
     if (!org) {
       let deleted = 0
       for (const entry of entries ?? []) {
+        // Stop at the budget; the next run lists the folder again and finishes.
+        if (Date.now() >= deadline)
+          break
         if (entry.id === null) {
           deleted += await removeOrgFolderContents(supabase, `org/${orgId}/${entry.name}`)
         }
@@ -280,6 +286,8 @@ async function cleanOrgFolder(
     const existingAppIds = new Set(existingApps.map(row => row.app_id))
 
     for (const appId of appIds) {
+      if (Date.now() >= deadline)
+        break
       if (existingAppIds.has(appId))
         continue
       try {
@@ -360,7 +368,7 @@ async function cleanOrgImages(c: Context<MiddlewareKeyVariables>, supabase: Supa
 
   stats.orgFoldersProcessed = await runWithDeadline(
     orgIds,
-    orgId => cleanOrgFolder(c, supabase, stats, orgId, orgsById.get(orgId)),
+    orgId => cleanOrgFolder(c, supabase, stats, orgId, orgsById.get(orgId), deadline),
     { concurrency: CLEANUP_CONCURRENCY, deadline },
   )
 }
