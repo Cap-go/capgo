@@ -1,7 +1,7 @@
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { User } from '@supabase/supabase-js'
-import { z } from 'zod'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
+import { z } from 'zod'
 import { parseBody, simpleErrorWithStatus, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
 import { getPasswordPolicyValidationErrors } from '../utils/password_policy.ts'
@@ -19,8 +19,10 @@ const DEFAULT_PASSWORD_POLICY = {
 const registerSchema = z.object({
   email: z.string().trim().pipe(z.email().max(320)),
   password: z.string(),
-  first_name: z.string().trim().min(1),
-  last_name: z.string().trim().min(1),
+  first_name: z.string().trim().min(1).optional(),
+  last_name: z.string().trim().min(1).optional(),
+  ref: z.string().trim().min(1).optional(),
+  opt_for_newsletters: z.boolean().default(false),
   captcha_token: z.string().min(1).optional(),
   registration_device_type: z.string().trim().min(1).optional(),
   registration_os: z.string().trim().min(1).optional(),
@@ -144,10 +146,13 @@ app.post('/', async (c) => {
     return simpleErrorWithStatus(c, 403, 'account_deleted', ACCOUNT_DELETED_MESSAGE)
   }
 
-  const userMetadata: Record<string, string> = {
-    first_name: body.first_name,
-    last_name: body.last_name,
-  }
+  const userMetadata: Record<string, string> = {}
+  if (body.first_name)
+    userMetadata.first_name = body.first_name
+  if (body.last_name)
+    userMetadata.last_name = body.last_name
+  if (body.ref)
+    userMetadata.ref = body.ref
   if (body.registration_device_type)
     userMetadata.registration_device_type = body.registration_device_type
   if (body.registration_os)
@@ -219,10 +224,10 @@ app.post('/', async (c) => {
   const { error: profileError } = await admin.from('users').upsert({
     id: userId,
     email: normalizedEmail,
-    first_name: body.first_name,
-    last_name: body.last_name,
+    first_name: body.first_name ?? '',
+    last_name: body.last_name ?? '',
     enable_notifications: true,
-    opt_for_newsletters: false,
+    opt_for_newsletters: body.opt_for_newsletters,
   }, { onConflict: 'id' })
 
   if (profileError) {

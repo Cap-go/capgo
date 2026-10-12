@@ -88,9 +88,39 @@ const validBody = {
   captcha_token: 'captcha-token',
 }
 
-describe('POST /auth/register unit', () => {
+describe('pOST /auth/register unit', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  it('creates a nameless profile for onboarding and preserves signup attribution', async () => {
+    const response = await postRegister({
+      ...validBody,
+      first_name: undefined,
+      last_name: undefined,
+      ref: 'readme-example',
+      opt_for_newsletters: true,
+    })
+    expect(response.status).toBe(200)
+    expect(signUpMock).toHaveBeenCalledWith({
+      email: validBody.email,
+      password: validBody.password,
+      options: { captchaToken: validBody.captcha_token, data: { ref: 'readme-example' } },
+    })
+    expect(usersUpsertMock).toHaveBeenCalledWith({
+      id: '11111111-1111-1111-1111-111111111111',
+      email: validBody.email,
+      first_name: '',
+      last_name: '',
+      enable_notifications: true,
+      opt_for_newsletters: true,
+    }, { onConflict: 'id' })
+  })
+
+  it('rejects blank names when supplied while accepting omitted names', async () => {
+    const response = await postRegister({ ...validBody, first_name: '   ' })
+    expect(response.status).toBe(400)
+    expect(signUpMock).not.toHaveBeenCalled()
   })
 
   it('requires captcha when CAPTCHA_SECRET_KEY is configured', async () => {

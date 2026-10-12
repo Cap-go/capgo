@@ -148,7 +148,12 @@ test.describe('Registration', () => {
     await page.fill('[data-test="email"]', email)
     await page.fill('[data-test="password"]', 'Password123!')
     await page.fill('[data-test="confirm-password"]', 'Password123!')
+    await page.route('**/auth/v1/signup', route => route.abort())
+    const registrationRequest = page.waitForRequest(request => request.url().endsWith('/auth/register') && request.method() === 'POST')
     await page.click('[data-test="submit"]')
+    const registrationPayload = (await registrationRequest).postDataJSON()
+    expect(registrationPayload).not.toHaveProperty('first_name')
+    expect(registrationPayload).not.toHaveProperty('last_name')
 
     await page.waitForURL(/\/onboarding\/app/)
     await continuePastWelcome(page)
