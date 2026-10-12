@@ -1,5 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import {
+  buildOnboardingIntentBentoEventData,
+  buildOnboardingIntentBentoTags,
+  parseOrgOnboardingDevelopmentEnvironment,
+  parseOrgOnboardingIntent,
+  syncOrgOnboardingIntentBentoTags,
+  syncOrgOnboardingIntentForOrg,
+} from '../supabase/functions/_backend/utils/org_onboarding_intent.ts'
+
 const syncBentoSubscriberTagsMock = vi.hoisted(() => vi.fn(async () => true))
 const getOrgAdminMemberEmailsForTagsMock = vi.hoisted(() => vi.fn(async () => ({ emails: ['admin@capgo.app'], resolutionFailed: false })))
 
@@ -23,21 +32,14 @@ vi.mock('../supabase/functions/_backend/utils/utils.ts', () => ({
   },
 }))
 
-vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
+vi.mock('../supabase/functions/_backend/utils/pg.ts', async () => ({
+  ...(await import('./helpers/pg-checkout-release-mocks.ts')),
   getPgClient: vi.fn(() => ({
     end: vi.fn(async () => undefined),
   })),
   getDrizzleClient: vi.fn(() => ({})),
+  closeClient: vi.fn(async () => undefined),
 }))
-
-import {
-  buildOnboardingIntentBentoEventData,
-  buildOnboardingIntentBentoTags,
-  parseOrgOnboardingDevelopmentEnvironment,
-  parseOrgOnboardingIntent,
-  syncOrgOnboardingIntentBentoTags,
-  syncOrgOnboardingIntentForOrg,
-} from '../supabase/functions/_backend/utils/org_onboarding_intent.ts'
 
 function createContext() {
   return {
@@ -199,5 +201,4 @@ describe('syncOrgOnboardingIntentForOrg', () => {
       ]),
     )
   })
-
 })

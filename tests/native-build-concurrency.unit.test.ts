@@ -14,7 +14,8 @@ const { mockCloseClient, mockGetPgClient, mockLogPgError, mockGetEnv, mockSendEv
   mockSendEventToTracking: vi.fn(),
 }))
 
-vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
+vi.mock('../supabase/functions/_backend/utils/pg.ts', async () => ({
+  ...(await import('./helpers/pg-checkout-release-mocks.ts')),
   closeClient: mockCloseClient,
   getPgClient: mockGetPgClient,
   logPgError: mockLogPgError,

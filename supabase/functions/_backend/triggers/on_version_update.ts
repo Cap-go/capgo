@@ -487,7 +487,7 @@ async function trashLastReferenceEntries(c: Context, database: ManifestCleanupDa
  * already-trashed paths are idempotent.
  */
 async function deleteManifest(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
-  const readPgClient = getPgClient(c, true)
+  const readPgClient = await getPgClient(c, true)
   const drizzleClient = getDrizzleClient(readPgClient)
 
   let manifestIds: number[] = []
@@ -507,7 +507,7 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
   if (startedWithRows) {
     // One bounded pool for the whole pass: a pool per file meant thousands of
     // Hyperdrive connections (and log lines) for a large bundle.
-    const cleanupPool = getPgClient(c, false)
+    const cleanupPool = await getPgClient(c, false)
     try {
       const cleanupDatabase = getDrizzleClient(cleanupPool)
       await retryPendingTrashRestores(c, cleanupDatabase, record.id)
@@ -523,7 +523,7 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
     }
   }
 
-  const writePgClient = getPgClient(c, false)
+  const writePgClient = await getPgClient(c, false)
   try {
     await getDrizzleClient(writePgClient).transaction(async (tx) => {
       const remaining = await tx.execute<{ count: number }>(sql`

@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.15"
   }
   graphql_public: {
     Tables: {
@@ -703,6 +703,7 @@ export type Database = {
           completed_at: string | null
           created_at: string
           id: string
+          ios_dependency_manager: string | null
           last_error: string | null
           owner_org: string
           platform: string
@@ -725,6 +726,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           id?: string
+          ios_dependency_manager?: string | null
           last_error?: string | null
           owner_org: string
           platform: string
@@ -747,6 +749,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           id?: string
+          ios_dependency_manager?: string | null
           last_error?: string | null
           owner_org?: string
           platform?: string
@@ -1723,6 +1726,9 @@ export type Database = {
           build_avg_seconds_day_ios: number
           build_count_day_android: number
           build_count_day_ios: number
+          build_requests_day_ios_cocoapods: number
+          build_requests_day_ios_spm: number
+          build_requests_day_ios_unknown: number
           build_total_seconds_day_android: number
           build_total_seconds_day_ios: number
           builder_active_paying_clients_60d: number
@@ -1748,6 +1754,8 @@ export type Database = {
           credits_consumed: number
           date_id: string
           demo_apps_created: number
+          devices_ios_26: number
+          devices_ios_27: number
           devices_last_month: number | null
           devices_last_month_android: number | null
           devices_last_month_ios: number | null
@@ -1838,6 +1846,9 @@ export type Database = {
           build_avg_seconds_day_ios?: number
           build_count_day_android?: number
           build_count_day_ios?: number
+          build_requests_day_ios_cocoapods?: number
+          build_requests_day_ios_spm?: number
+          build_requests_day_ios_unknown?: number
           build_total_seconds_day_android?: number
           build_total_seconds_day_ios?: number
           builder_active_paying_clients_60d?: number
@@ -1863,6 +1874,8 @@ export type Database = {
           credits_consumed?: number
           date_id: string
           demo_apps_created?: number
+          devices_ios_26?: number
+          devices_ios_27?: number
           devices_last_month?: number | null
           devices_last_month_android?: number | null
           devices_last_month_ios?: number | null
@@ -1953,6 +1966,9 @@ export type Database = {
           build_avg_seconds_day_ios?: number
           build_count_day_android?: number
           build_count_day_ios?: number
+          build_requests_day_ios_cocoapods?: number
+          build_requests_day_ios_spm?: number
+          build_requests_day_ios_unknown?: number
           build_total_seconds_day_android?: number
           build_total_seconds_day_ios?: number
           builder_active_paying_clients_60d?: number
@@ -1978,6 +1994,8 @@ export type Database = {
           credits_consumed?: number
           date_id?: string
           demo_apps_created?: number
+          devices_ios_26?: number
+          devices_ios_27?: number
           devices_last_month?: number | null
           devices_last_month_android?: number | null
           devices_last_month_ios?: number | null
@@ -2877,9 +2895,9 @@ export type Database = {
           password_policy_config: Json | null
           require_apikey_expiration: boolean
           required_encryption_key: string | null
+          signup_plugin: string | null
           stats_refresh_requested_at: string | null
           stats_updated_at: string | null
-          signup_plugin: string | null
           support_channel_set_at: string | null
           support_channel_type: string | null
           support_channel_url: string | null
@@ -2909,9 +2927,9 @@ export type Database = {
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
+          signup_plugin?: string | null
           stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
-          signup_plugin?: string | null
           support_channel_set_at?: string | null
           support_channel_type?: string | null
           support_channel_url?: string | null
@@ -2941,9 +2959,9 @@ export type Database = {
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
+          signup_plugin?: string | null
           stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
-          signup_plugin?: string | null
           support_channel_set_at?: string | null
           support_channel_type?: string | null
           support_channel_url?: string | null

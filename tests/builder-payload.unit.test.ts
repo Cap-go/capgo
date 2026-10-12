@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { builderPayloadTestUtils } from '../supabase/functions/_backend/public/build/request.ts'
 
-const { buildBuilderPayload, parseMachineVersionUnavailable } = builderPayloadTestUtils
+const { buildBuilderPayload, normalizeIosDependencyManager, parseMachineVersionUnavailable } = builderPayloadTestUtils
 
 const baseInput = {
   orgId: 'org-123',
@@ -207,5 +207,19 @@ describe('builder machine version rejection', () => {
       buildOptions: { platform: 'ios', iosXcodeVersion: '26', iosMacosVersion: '26.1' },
     })
     expect(payload.buildOptions).toMatchObject({ iosXcodeVersion: '26', iosMacosVersion: '26.1' })
+  })
+})
+
+describe('ios dependency manager normalization', () => {
+  it.concurrent('keeps cocoapods and spm for iOS builds', () => {
+    expect(normalizeIosDependencyManager('ios', 'cocoapods')).toBe('cocoapods')
+    expect(normalizeIosDependencyManager('ios', 'spm')).toBe('spm')
+  })
+
+  it.concurrent('drops unknown values and non-iOS platforms', () => {
+    expect(normalizeIosDependencyManager('ios', 'carthage')).toBeNull()
+    expect(normalizeIosDependencyManager('ios', undefined)).toBeNull()
+    expect(normalizeIosDependencyManager('ios', 1)).toBeNull()
+    expect(normalizeIosDependencyManager('android', 'spm')).toBeNull()
   })
 })

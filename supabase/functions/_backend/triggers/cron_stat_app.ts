@@ -280,7 +280,7 @@ async function runSupabaseResultWithRetry<T>(
 }
 
 async function readVersionMetaStorageRows(c: Parameters<typeof supabaseAdmin>[0], appId: string, calculationEnd: string) {
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
   try {
     const { rows } = await pgClient.query<VersionMetaStorageRow>(
       `

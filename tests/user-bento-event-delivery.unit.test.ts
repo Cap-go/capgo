@@ -29,7 +29,8 @@ vi.mock('../supabase/functions/_backend/utils/logging.ts', () => ({
   serializeError: mocks.serializeError,
 }))
 
-vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
+vi.mock('../supabase/functions/_backend/utils/pg.ts', async () => ({
+  ...(await import('./helpers/pg-checkout-release-mocks.ts')),
   closeClient: mocks.closeClient,
   getPgClient: mocks.getPgClient,
 }))
@@ -256,8 +257,13 @@ describe('user Bento event delivery', () => {
     mocks.getPgClient.mockReturnValue(sharedPool)
 
     const tags = {
-      app_id: 'com.test.app', app_name: 'Test App', flow: 'pre_org', secret: 'must-not-leak',
-      step: 'app_name', step_index: 2, total_steps: 7,
+      app_id: 'com.test.app',
+      app_name: 'Test App',
+      flow: 'pre_org',
+      secret: 'must-not-leak',
+      step: 'app_name',
+      step_index: 2,
+      total_steps: 7,
     }
     await recordUserBentoEvent(createContext(), {
       sourceEvent: 'onboarding_step_completed',
@@ -283,8 +289,10 @@ describe('user Bento event delivery', () => {
       preorg_app_name_followup_at: '2026-08-22T10:15:01.000Z',
     }, expect.any(AbortSignal))
     expect(mocks.trackBentoEvents).toHaveBeenCalledWith(
-      expect.anything(), 'bento.user@example.com',
-      [{ event: 'cli:login_successful', data: expect.anything() }], expect.any(AbortSignal),
+      expect.anything(),
+      'bento.user@example.com',
+      [{ event: 'cli:login_successful', data: expect.anything() }],
+      expect.any(AbortSignal),
     )
     expect(mocks.trackBentoEvents).toHaveBeenCalledTimes(1)
     expect(vi.getTimerCount()).toBe(0)

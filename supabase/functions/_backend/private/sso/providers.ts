@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
-import type { PoolClient } from 'pg'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
+import type { PgQueryClient } from '../../utils/pg.ts'
 import type { SsoRoleMapping } from './role-mapping.ts'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
@@ -143,7 +143,7 @@ async function isOrgSuperAdmin(c: Context<MiddlewareKeyVariables>, orgId: string
   // Legacy API keys have no RBAC principal, hence no role in the org.
   if (auth.authType === 'apikey' && !auth.apikey?.rbac_id)
     return false
-  const pgPool = getPgClient(c)
+  const pgPool = await getPgClient(c)
   try {
     const drizzle = getDrizzleClient(pgPool)
     const callerRank = auth.authType === 'apikey'
@@ -164,7 +164,7 @@ async function isOrgSuperAdmin(c: Context<MiddlewareKeyVariables>, orgId: string
 // on login, so the access SSO granted on them is revoked when the mapping is
 // saved: app bindings created by SSO and group memberships SSO added (added_by
 // is the user itself), for users of the provider's domain only.
-async function revokeUnmappedSsoAccess(client: PoolClient, orgId: string, domain: string, appIds: string[], groupIds: string[]) {
+async function revokeUnmappedSsoAccess(client: PgQueryClient, orgId: string, domain: string, appIds: string[], groupIds: string[]) {
   if (appIds.length > 0) {
     await client.query(
       `
@@ -209,7 +209,7 @@ function buildAuthAttributeMapping(attributeMapping: Record<string, string>, rol
   }
 }
 
-async function loadLinkedRoleMappings(client: PoolClient | ReturnType<typeof getPgClient>, providerId: string, excludedOrgId: string | null = null): Promise<(SsoRoleMapping | null)[]> {
+async function loadLinkedRoleMappings(client: PgQueryClient | Awaited<ReturnType<typeof getPgClient>>, providerId: string, excludedOrgId: string | null = null): Promise<(SsoRoleMapping | null)[]> {
   const { rows } = await client.query<{ role_mapping: unknown }>(
     'select role_mapping from public.sso_provider_org_links where sso_provider_id = $1 and role_mapping is not null and org_id is distinct from $2',
     [providerId, excludedOrgId],
@@ -259,7 +259,7 @@ async function applyProviderUpdate(
   const values = columns.map(column => JSONB_PROVIDER_COLUMNS.has(column) && updates[column] !== null ? JSON.stringify(updates[column]) : updates[column])
   const setClause = columns.map((column, index) => `"${column}" = $${index + 2}`).join(', ')
 
-  const pgPool = getPgClient(c)
+  const pgPool = await getPgClient(c)
   let restoreAuth: (() => Promise<void>) | null = null
   let lockedUpdatedAt: string | null = null
   try {
@@ -314,7 +314,7 @@ async function applyProviderUpdate(
 // outcome cannot be established, Auth is left alone and the case is logged.
 async function restoreAuthIfRolledBack(
   c: Context<MiddlewareKeyVariables>,
-  pgPool: ReturnType<typeof getPgClient>,
+  pgPool: Awaited<ReturnType<typeof getPgClient>>,
   id: string,
   lockedUpdatedAt: string | null,
   restoreAuth: () => Promise<void>,
@@ -337,7 +337,7 @@ async function restoreAuthIfRolledBack(
   }
 }
 
-async function setDomainSsoOnly(client: PoolClient, domain: string, isSsoOnly: boolean) {
+async function setDomainSsoOnly(client: PgQueryClient, domain: string, isSsoOnly: boolean) {
   await client.query(
     `
       update auth.users
@@ -349,8 +349,8 @@ async function setDomainSsoOnly(client: PoolClient, domain: string, isSsoOnly: b
   )
 }
 
-async function withPgPool<T>(c: Context<MiddlewareKeyVariables>, run: (pool: ReturnType<typeof getPgClient>) => Promise<T>): Promise<T> {
-  const pgPool = getPgClient(c)
+async function withPgPool<T>(c: Context<MiddlewareKeyVariables>, run: (pool: Awaited<ReturnType<typeof getPgClient>>) => Promise<T>): Promise<T> {
+  const pgPool = await getPgClient(c)
   try {
     return await run(pgPool)
   }
@@ -705,7 +705,7 @@ app.delete('/:id', async (c) => {
   // policy requires a different permission than the one checked above, which
   // silently left orphaned rows behind.
   const wasSsoEnforced = provider.status === 'active' && provider.enforce_sso === true
-  const pgPool = getPgClient(c)
+  const pgPool = await getPgClient(c)
   try {
     await withPgTransaction(pgPool, async (client) => {
       await client.query('delete from public.sso_providers where id = $1', [id])
@@ -820,7 +820,7 @@ app.put('/:id/links/:orgId', async (c) => {
   if (roleMapping)
     await requireMappingTargetsInOrg(c, orgId, roleMapping)
 
-  const pgPool = getPgClient(c)
+  const pgPool = await getPgClient(c)
   try {
     const link = await withPgTransaction(pgPool, async (client) => {
       // Up to two Management API calls (8s each) run while the row is locked.
