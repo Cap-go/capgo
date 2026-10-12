@@ -82,7 +82,7 @@ async function readSseSnapshot(response: Response): Promise<string> {
   return dataLines.length > 0 ? dataLines.join('\n') : text
 }
 
-export function createCaller(c: Context<MiddlewareKeyVariables>, dispatch: McpDispatch, token: string) {
+function createCaller(c: Context<MiddlewareKeyVariables>, dispatch: McpDispatch, token: string) {
   const origin = new URL(c.req.url).origin
   return async (request: McpApiRequest): Promise<McpApiResponse> => {
     const url = new URL(request.path, origin)

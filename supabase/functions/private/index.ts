@@ -1,13 +1,12 @@
 import { app as accept_invitation } from '../_backend/private/accept_invitation.ts'
-import { app as assistant } from '../_backend/private/assistant.ts'
 import { app as bundle_install_stats } from '../_backend/private/bundle_install_stats.ts'
 import { app as channel_device } from '../_backend/private/channel_device.ts'
 import { app as channel_stats } from '../_backend/private/channel_stats.ts'
 import { app as config } from '../_backend/private/config.ts'
 import { app as configBuilder } from '../_backend/private/config_builder.ts'
+import { app as customDomains } from '../_backend/private/custom_domains.ts'
 import { app as create_device } from '../_backend/private/create_device.ts'
 import { app as credits } from '../_backend/private/credits.ts'
-import { app as customDomains } from '../_backend/private/custom_domains.ts'
 import { app as deleted_failed_version } from '../_backend/private/delete_failed_version.ts'
 import { app as devices_priv } from '../_backend/private/devices.ts'
 import { app as download_link } from '../_backend/private/download_link.ts'
@@ -83,7 +82,6 @@ appGlobal.route('/organization_invitation', organization_invitation)
 appGlobal.route('/download_link', download_link)
 appGlobal.route('/log_as', log_as)
 appGlobal.route('/mcp_oauth', mcp_oauth)
-appGlobal.route('/assistant', assistant)
 appGlobal.route('/stats', stats_priv)
 appGlobal.route('/stripe_checkout', stripe_checkout)
 appGlobal.route('/stripe_portal', stripe_portal)

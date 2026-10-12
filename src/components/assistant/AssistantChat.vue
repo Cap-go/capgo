@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import type { AssistantAction, AssistantCard, AssistantStatus, AssistantTurn, ChatGptAuthorization } from '~/services/assistant'
+import type { AssistantAction, AssistantCard, AssistantTurn } from '~/services/assistant'
+import type { ChatGptCredentials } from '~/services/chatgptAuth'
 import type { ChatGptCallback } from '~/utils/chatgptCallback'
 import { Capacitor } from '@capacitor/core'
 import { onKeyStroke, useLocalStorage } from '@vueuse/core'
-import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconArrowRight from '~icons/heroicons/arrow-right'
@@ -17,7 +18,9 @@ import IconSparkles from '~icons/heroicons/sparkles'
 import IconTrash from '~icons/heroicons/trash'
 import IconClose from '~icons/heroicons/x-mark'
 import chatGptLogoWhite from '~/assets/assistant/chatgpt-logo-white.svg'
-import { askAssistant, ASSISTANT_OPEN_AFTER_CONNECT_KEY, AssistantChatGptError, AssistantKeyError, CHATGPT_MANAGE_USAGE_URL, completeChatGptConnect, createAssistantKey, disconnectChatGpt, getAssistantStatus, saveAssistantKey, startChatGptConnect } from '~/services/assistant'
+import { AssistantKeyError, createAssistantKey, loadAssistantKey, saveAssistantKey } from '~/services/assistant'
+import { AssistantUpstreamError, runAssistant } from '~/services/assistantAgent'
+import { beginChatGptSignIn, CHATGPT_MANAGE_USAGE_URL, CHATGPT_REDIRECT_URI, ChatGptAuthError, completeChatGptSignIn, getChatGptAccessToken, loadChatGptCredentials, signOutChatGpt } from '~/services/chatgptAuth'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
@@ -49,9 +52,7 @@ const loading = ref(false)
 const connecting = ref(false)
 const connectError = ref('')
 const entries = ref<ChatEntry[]>([])
-const status = ref<AssistantStatus | null>(null)
-const chatgpt = computed(() => status.value?.chatgpt ?? null)
-/** Web + dynamic client: the sign-in window lands on a loopback address the user pastes back here. */
+/** Web: the sign-in window lands on a loopback address the user pastes back here. */
 const pasteStep = ref<{ redirectUri: string } | null>(null)
 const pasteValue = ref('')
 let signInWindow: Window | null = null
@@ -62,10 +63,17 @@ const inputEl = useTemplateRef<HTMLTextAreaElement>('inputEl')
 let nextId = 1
 
 const userId = computed(() => main.user?.id ?? main.auth?.id ?? '')
+// Everything the assistant needs stays on this device: the Capgo API key and the ChatGPT tokens.
+const apikey = ref('')
+const credentials = ref<ChatGptCredentials | null>(null)
+const chatgpt = computed(() => ({ connected: !!credentials.value, email: credentials.value?.email ?? '' }))
+const needsConnect = computed(() => !apikey.value || !credentials.value)
 
-/** ChatGPT is the model provider when the server has Sign in with ChatGPT enabled. */
-const needsChatGpt = computed(() => !!chatgpt.value?.configured && !chatgpt.value.connected)
-const needsConnect = computed(() => !status.value?.hasKey || needsChatGpt.value)
+function reloadLocalState() {
+  apikey.value = userId.value ? loadAssistantKey(userId.value) : ''
+  credentials.value = userId.value ? loadChatGptCredentials(userId.value) : null
+}
+watch(userId, reloadLocalState, { immediate: true })
 
 const suggestions = computed(() => [
   t('assistant-suggestion-where'),
@@ -87,10 +95,6 @@ const pageContext = computed(() => {
 async function scrollToBottom() {
   await nextTick()
   scroller.value?.scrollTo({ top: scroller.value.scrollHeight, behavior: 'smooth' })
-}
-
-async function refreshStatus() {
-  status.value = await getAssistantStatus()
 }
 
 function toggle() {
@@ -115,7 +119,7 @@ onKeyStroke('Escape', () => {
  * sign-in runs in an in-app web view where 127.0.0.1 is blocked and the code is read from the
  * intercepted redirect URL.
  */
-async function signInNative(authorization: ChatGptAuthorization): Promise<ChatGptCallback> {
+async function signInNative(url: string): Promise<ChatGptCallback> {
   const { InAppBrowser } = await import('@capgo/capacitor-inappbrowser')
   return new Promise<ChatGptCallback>((resolve, reject) => {
     let settled = false
@@ -130,31 +134,36 @@ async function signInNative(authorization: ChatGptAuthorization): Promise<ChatGp
         resolve(callback)
       }
       else {
-        reject(new Error('chatgpt_sign_in_cancelled'))
+        reject(new ChatGptAuthError('access_denied'))
       }
     }
     handles.push(InAppBrowser.addListener('urlChangeEvent', (event) => {
-      const callback = parseChatGptCallback(event.url, authorization.redirectUri)
+      const callback = parseChatGptCallback(event.url, CHATGPT_REDIRECT_URI)
       if (callback)
         finish(callback)
     }))
     handles.push(InAppBrowser.addListener('closeEvent', () => finish(null)))
-    InAppBrowser.openWebView({ url: authorization.url, title: t('assistant-chatgpt-continue'), blockedHosts: ['127.0.0.1'] }).catch(reject)
+    InAppBrowser.openWebView({ url, title: t('assistant-chatgpt-continue'), blockedHosts: ['127.0.0.1'] }).catch(reject)
   })
 }
 
+function signInErrorMessage(error: unknown): string {
+  if (error instanceof AssistantKeyError)
+    return t('assistant-connect-no-org')
+  if (error instanceof ChatGptAuthError && error.message === 'access_denied')
+    return t('assistant-chatgpt-denied')
+  if (error instanceof ChatGptAuthError && error.message === 'chatgpt_plan_usage_not_granted')
+    return t('assistant-chatgpt-not-eligible')
+  return t('assistant-connect-failed')
+}
+
 async function finishSignIn(callback: ChatGptCallback) {
-  if (callback.error || !callback.code || !callback.state) {
-    connectError.value = callback.error === 'access_denied' ? t('assistant-chatgpt-denied') : t('assistant-connect-failed')
-    return
-  }
-  await completeChatGptConnect({ code: callback.code, state: callback.state, clientId: callback.clientId })
+  credentials.value = await completeChatGptSignIn(userId.value, callback)
   pasteStep.value = null
   pasteValue.value = ''
   signInWindow?.close()
   signInWindow = null
-  await refreshStatus()
-  showWelcome.value = !welcomeSeen.value && !!chatgpt.value?.connected
+  showWelcome.value = !welcomeSeen.value
 }
 
 async function connect() {
@@ -162,39 +171,35 @@ async function connect() {
     return
   connecting.value = true
   connectError.value = ''
-  // Popups must open inside the click; the address is set once the server built it.
-  const webDynamic = !!chatgpt.value?.configured && chatgpt.value.mode === 'dynamic' && needsChatGpt.value && !Capacitor.isNativePlatform()
-  signInWindow = webDynamic ? window.open('', 'capgo-chatgpt-sign-in', 'popup,width=520,height=760') : null
+  // Popups must open inside the click; the address is set once it is built.
+  const web = !Capacitor.isNativePlatform()
+  signInWindow = web && !credentials.value ? window.open('', 'capgo-chatgpt-sign-in', 'popup,width=520,height=760') : null
   try {
-    // The Capgo API key lets the assistant run MCP tools; the server keeps it, never the browser.
-    if (!status.value?.hasKey) {
+    // The Capgo API key lets the assistant run MCP tools on the user's orgs.
+    if (!apikey.value) {
       await organizationStore.awaitInitialLoad()
-      await saveAssistantKey(await createAssistantKey(supabase, userId.value, organizationStore.organizations))
+      apikey.value = await createAssistantKey(supabase, userId.value, organizationStore.organizations)
+      saveAssistantKey(userId.value, apikey.value)
     }
-    if (needsChatGpt.value) {
-      const authorization = await startChatGptConnect(route.fullPath)
-      if (authorization.mode === 'partner') {
-        window.location.assign(authorization.url)
-        return
-      }
-      if (Capacitor.isNativePlatform()) {
-        await finishSignIn(await signInNative(authorization))
+    if (!credentials.value) {
+      const url = await beginChatGptSignIn(userId.value)
+      if (!web) {
+        await finishSignIn(await signInNative(url))
       }
       else {
         if (signInWindow)
-          signInWindow.location.href = authorization.url
+          signInWindow.location.href = url
         else
-          window.open(authorization.url, '_blank', 'noopener')
-        pasteStep.value = { redirectUri: authorization.redirectUri }
+          window.open(url, '_blank', 'noopener')
+        pasteStep.value = { redirectUri: CHATGPT_REDIRECT_URI }
       }
     }
-    await refreshStatus()
   }
   catch (error) {
     console.error('Cannot connect the assistant', error)
     signInWindow?.close()
     signInWindow = null
-    connectError.value = error instanceof AssistantKeyError ? t('assistant-connect-no-org') : t('assistant-connect-failed')
+    connectError.value = signInErrorMessage(error)
   }
   finally {
     connecting.value = false
@@ -202,9 +207,7 @@ async function connect() {
 }
 
 async function submitPaste() {
-  if (!pasteStep.value)
-    return
-  const callback = parseChatGptCallback(pasteValue.value, pasteStep.value.redirectUri)
+  const callback = parseChatGptCallback(pasteValue.value, CHATGPT_REDIRECT_URI)
   if (!callback) {
     connectError.value = t('assistant-chatgpt-paste-invalid')
     return
@@ -216,7 +219,7 @@ async function submitPaste() {
   }
   catch (error) {
     console.error('Cannot complete ChatGPT sign-in', error)
-    connectError.value = t('assistant-connect-failed')
+    connectError.value = signInErrorMessage(error)
   }
   finally {
     connecting.value = false
@@ -235,32 +238,36 @@ async function run(confirm?: { tool: string, arguments: Record<string, unknown> 
   loading.value = true
   await scrollToBottom()
   try {
+    const accessToken = await getChatGptAccessToken(userId.value)
+    if (!accessToken) {
+      reloadLocalState()
+      return
+    }
     const history = entries.value.filter(entry => !entry.error).map(({ role, content }) => ({ role, content }))
-    const response = await askAssistant(history, pageContext.value, confirm)
+    const response = await runAssistant({ accessToken, apikey: apikey.value, messages: history, context: pageContext.value, confirm })
     entries.value.push({ id: nextId++, role: 'assistant', content: response.reply, cards: response.cards, actions: response.actions })
   }
   catch (error) {
-    if (error instanceof AssistantKeyError) {
-      // The stored key was revoked or expired: show Connect again to mint a new one.
-      await refreshStatus()
+    if (error instanceof ChatGptAuthError || (error instanceof AssistantUpstreamError && error.code === 'chatgpt_reconnect_required')) {
+      // Expired, revoked in ChatGPT settings, or plan usage removed: show "Continue with ChatGPT" again.
+      signOutChatGpt(userId.value)
+      reloadLocalState()
+      connectError.value = t('assistant-chatgpt-reconnect')
       return
     }
-    if (error instanceof AssistantChatGptError) {
-      if (error.code === 'chatgpt_usage_limit') {
-        entries.value.push({ id: nextId++, role: 'assistant', content: '', cards: [], actions: [], usageLimit: true })
-        return
-      }
-      if (error.code !== 'chatgpt_not_eligible') {
-        // Not connected, revoked in ChatGPT settings, or plan usage not granted: show "Continue with ChatGPT" again.
-        connectError.value = t('assistant-chatgpt-reconnect')
-        await refreshStatus()
-        return
-      }
-      entries.value.push({ id: nextId++, role: 'assistant', content: t('assistant-chatgpt-not-eligible'), cards: [], actions: [], error: true })
+    if (error instanceof AssistantUpstreamError && error.code === 'assistant_key_invalid') {
+      // The Capgo key was revoked or expired: Connect mints a new one.
+      saveAssistantKey(userId.value, '')
+      reloadLocalState()
+      return
+    }
+    if (error instanceof AssistantUpstreamError && error.code === 'chatgpt_usage_limit') {
+      entries.value.push({ id: nextId++, role: 'assistant', content: '', cards: [], actions: [], usageLimit: true })
       return
     }
     console.error('Assistant request failed', error)
-    entries.value.push({ id: nextId++, role: 'assistant', content: t('assistant-error'), cards: [], actions: [], error: true })
+    const content = error instanceof AssistantUpstreamError && error.code === 'chatgpt_not_eligible' ? t('assistant-chatgpt-not-eligible') : t('assistant-error')
+    entries.value.push({ id: nextId++, role: 'assistant', content, cards: [], actions: [], error: true })
   }
   finally {
     loading.value = false
@@ -312,9 +319,9 @@ function clear() {
   entries.value = []
 }
 
-async function disconnect() {
-  await disconnectChatGpt()
-  await refreshStatus()
+function disconnect() {
+  signOutChatGpt(userId.value)
+  reloadLocalState()
 }
 
 function dismissWelcome() {
@@ -325,24 +332,9 @@ function dismissWelcome() {
 watch(open, (value) => {
   if (!value)
     return
+  reloadLocalState()
   scrollToBottom()
-  if (!chatgpt.value)
-    refreshStatus()
 })
-
-// Back from the ChatGPT consent screen: reopen the chat and explain plan usage once. The chat may
-// stay mounted across the callback page, so check on every navigation, not only on mount.
-async function resumeAfterConnect() {
-  if (!sessionStorage.getItem(ASSISTANT_OPEN_AFTER_CONNECT_KEY))
-    return
-  sessionStorage.removeItem(ASSISTANT_OPEN_AFTER_CONNECT_KEY)
-  await refreshStatus()
-  open.value = true
-  showWelcome.value = !welcomeSeen.value && !!chatgpt.value?.connected
-}
-
-watch(() => route.fullPath, resumeAfterConnect)
-onMounted(resumeAfterConnect)
 </script>
 
 <template>
@@ -367,7 +359,7 @@ onMounted(resumeAfterConnect)
           </p>
         </div>
         <button
-          v-if="chatgpt?.connected"
+          v-if="chatgpt.connected"
           type="button"
           class="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-200"
           :aria-label="t('assistant-chatgpt-disconnect')"
@@ -404,10 +396,10 @@ onMounted(resumeAfterConnect)
         </div>
         <div>
           <h3 class="text-base font-semibold text-slate-900 dark:text-white">
-            {{ chatgpt?.configured ? t('assistant-chatgpt-connect-title') : t('assistant-connect-title') }}
+            {{ t('assistant-chatgpt-connect-title') }}
           </h3>
           <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            {{ chatgpt?.configured ? t('assistant-chatgpt-connect-description') : t('assistant-connect-description') }}
+            {{ t('assistant-chatgpt-connect-description') }}
           </p>
         </div>
         <p v-if="connectError" class="text-sm text-red-600 dark:text-red-400">
@@ -439,7 +431,7 @@ onMounted(resumeAfterConnect)
           </div>
         </form>
         <button
-          v-else-if="chatgpt?.configured"
+          v-else
           type="button"
           class="flex h-11 items-center justify-center gap-2 rounded-full bg-black px-5 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:opacity-60"
           :disabled="connecting"
@@ -450,18 +442,7 @@ onMounted(resumeAfterConnect)
           <img v-else :src="chatGptLogoWhite" alt="" class="h-5 w-5">
           {{ t('assistant-chatgpt-continue') }}
         </button>
-        <button
-          v-else
-          type="button"
-          class="d-btn d-btn-primary"
-          :disabled="connecting || !chatgpt"
-          data-test="assistant-connect-button"
-          @click="connect"
-        >
-          <span v-if="connecting" class="d-loading d-loading-spinner d-loading-sm" />
-          {{ t('assistant-connect-button') }}
-        </button>
-        <p v-if="chatgpt?.configured && !pasteStep" class="text-xs text-slate-500 dark:text-slate-400">
+        <p v-if="!pasteStep" class="text-xs text-slate-500 dark:text-slate-400">
           {{ t('assistant-chatgpt-connect-note') }}
         </p>
       </div>
@@ -630,7 +611,7 @@ onMounted(resumeAfterConnect)
         </div>
 
         <form class="border-t border-slate-200 p-3 dark:border-slate-700" @submit.prevent="send()">
-          <p v-if="chatgpt?.connected" class="mb-2 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400" data-test="assistant-chatgpt-indicator">
+          <p v-if="chatgpt.connected" class="mb-2 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400" data-test="assistant-chatgpt-indicator">
             <img :src="chatGptLogoWhite" alt="" class="h-3.5 w-3.5 rounded-sm bg-black p-0.5">
             {{ t('assistant-chatgpt-using-plan') }}
             <span v-if="chatgpt.email" class="truncate">· {{ chatgpt.email }}</span>

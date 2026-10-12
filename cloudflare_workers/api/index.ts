@@ -4,7 +4,6 @@ import type { Bindings } from '../../supabase/functions/_backend/utils/cloudflar
 import { app as register } from '../../supabase/functions/_backend/auth/register.ts'
 import { createMcpApp } from '../../supabase/functions/_backend/mcp/index.ts'
 import { app as accept_invitation } from '../../supabase/functions/_backend/private/accept_invitation.ts'
-import { createAssistantApp } from '../../supabase/functions/_backend/private/assistant.ts'
 import { app as bundle_install_stats } from '../../supabase/functions/_backend/private/bundle_install_stats.ts'
 import { app as channel_device } from '../../supabase/functions/_backend/private/channel_device.ts'
 import { app as channel_stats } from '../../supabase/functions/_backend/private/channel_stats.ts'
@@ -166,8 +165,6 @@ appPrivate.route('/devices', devices_priv)
 appPrivate.route('/channel_device', channel_device)
 appPrivate.route('/log_as', log_as)
 appPrivate.route('/mcp_oauth', mcp_oauth)
-// In-console assistant: same MCP tools, replayed in-process through the public API app.
-appPrivate.route('/assistant', createAssistantApp((request, c) => app.fetch(request, c.env, getExecutionContext(c))))
 appPrivate.route('/invite_new_user_to_org', invite_new_user_to_org)
 appPrivate.route('/invite_existing_user_to_org', invite_existing_user_to_org)
 appPrivate.route('/set_org_email', set_org_email)
