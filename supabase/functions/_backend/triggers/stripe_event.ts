@@ -22,6 +22,7 @@ import { ensureCustomerMetadata, getCreditCheckoutDetails, getLatestOpenSubscrip
 import { buildTransferInvoiceFooter, getTransferInvoiceFooterUpdate, isTransferInvoice, normalizeBillingEmail, shouldStampTransferInvoiceFooter, TRANSFER_INVOICE_FOOTER, TRANSFER_INVOICE_FOOTER_MAX_LENGTH } from '../utils/stripe_event.ts'
 import { recordChargeRefunds } from '../utils/stripe_refunds.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
+import { signupAttributionTagsForOrg } from '../utils/signup_attribution.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { backgroundTask, isStripeConfigured } from '../utils/utils.ts'
 
@@ -33,6 +34,7 @@ interface Org {
   management_email: string
   created_by: string
   customer_id?: string | null
+  signup_plugin?: string | null
 }
 
 type StripeInfoRow = Database['public']['Tables']['stripe_info']['Row']
@@ -1244,6 +1246,8 @@ async function createdOrUpdated(
     if (status === 'past_due')
       return
 
+    const signupAttributionTags = await signupAttributionTagsForOrg(c, org)
+
     let previousPlan: PlanRow | null = null
     if (trackingState.shouldSendPlanChange && stripeData.previousProductId) {
       const previousProduct = await supabaseAdmin(c)
@@ -1268,7 +1272,10 @@ async function createdOrUpdated(
         sentToBento: true,
         user_id: org.id,
         groups: { organization: org.id },
-        tags: planChangeMetadata,
+        tags: {
+          ...planChangeMetadata,
+          ...(planChangeEventName === 'User Upgraded' ? signupAttributionTags : {}),
+        },
       })
     }
 
@@ -1296,7 +1303,10 @@ async function createdOrUpdated(
       sentToBento: true,
       user_id: org.id,
       groups: { organization: org.id },
-      tags: subscriptionMetadata,
+      tags: {
+        ...subscriptionMetadata,
+        ...(isNewSubscription ? {} : signupAttributionTags),
+      },
     })
 
     await backgroundTask(c, groupIdentifyPosthog(c, {
@@ -1382,7 +1392,7 @@ async function didCancel(c: Context, org: Org, customerId: string) {
 async function getOrgForCustomerId(c: Context, customerId: string): Promise<Org | null> {
   const { error: dbError, data: org } = await supabaseAdmin(c)
     .from('orgs')
-    .select('id, management_email, created_by, name, customer_id')
+    .select('id, management_email, created_by, name, customer_id, signup_plugin')
     .eq('customer_id', customerId)
     .maybeSingle()
 
