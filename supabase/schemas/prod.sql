@@ -48,6 +48,12 @@ CREATE SCHEMA IF NOT EXISTS "rbac_internal";
 ALTER SCHEMA "rbac_internal" OWNER TO "postgres";
 
 
+CREATE SCHEMA IF NOT EXISTS "seed_helpers";
+
+
+ALTER SCHEMA "seed_helpers" OWNER TO "postgres";
+
+
 CREATE EXTENSION IF NOT EXISTS "http" WITH SCHEMA "extensions";
 
 
@@ -353,7 +359,8 @@ CREATE TYPE "public"."stats_action" AS ENUM (
     'webview_dom_content_loaded',
     'webview_page_loaded',
     'app_nav',
-    'channelPaused'
+    'channelPaused',
+    'update_check_error'
 );
 
 
@@ -4483,8 +4490,8 @@ CREATE OR REPLACE FUNCTION "public"."claim_updates_cache_purge"("p_limit" intege
 DECLARE
   v_now timestamptz := pg_catalog.clock_timestamp();
   v_last timestamptz;
-  v_min_interval constant interval := '1 second';
-  v_lease interval := '2 minutes';
+  v_min_interval constant interval := INTERVAL '1 second';
+  v_lease interval := INTERVAL '2 minutes';
   v_token uuid := gen_random_uuid();
   v_apps jsonb;
 BEGIN
@@ -4500,7 +4507,6 @@ BEGIN
     );
   END IF;
 
-  -- One (app, scope) pair = one Cloudflare tag.
   WITH picked AS (
     SELECT p.app_id, p.scope
     FROM public.updates_cache_purge_pending p
@@ -19249,6 +19255,22 @@ $$;
 ALTER FUNCTION "public"."rescind_invitation"("email" "text", "org_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."reset_and_seed_demo_customer_data"() RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.orgs WHERE id = 'acde0000-0000-4000-8000-0000000000a1'::uuid) THEN
+    PERFORM public.seed_demo_customer_account();
+  END IF;
+  PERFORM seed_helpers.seed_demo_customer_telemetry();
+END;
+$$;
+
+
+ALTER FUNCTION "public"."reset_and_seed_demo_customer_data"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."reset_onboarding_demo_app_data"("p_app_uuid" "uuid") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -23338,7 +23360,9 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
     "apps_with_preview" bigint DEFAULT 0 NOT NULL,
     "plan_credits" integer DEFAULT 0 NOT NULL,
     "users_with_2fa" bigint DEFAULT 0 NOT NULL,
-    "apps_with_store_url" bigint DEFAULT 0 NOT NULL
+    "apps_with_store_url" bigint DEFAULT 0 NOT NULL,
+    "refunds_count" bigint DEFAULT 0 NOT NULL,
+    "refunds_amount" double precision DEFAULT 0 NOT NULL
 );
 
 
@@ -23666,6 +23690,14 @@ COMMENT ON COLUMN "public"."global_stats"."users_with_2fa" IS 'Snapshot of users
 
 
 COMMENT ON COLUMN "public"."global_stats"."apps_with_store_url" IS 'Number of apps with at least one App Store or Google Play link at snapshot day end.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."refunds_count" IS 'Number of Stripe refunds created on the snapshot UTC day (failed and canceled refunds excluded).';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."refunds_amount" IS 'Total USD amount refunded on the snapshot UTC day, in dollars (failed and canceled refunds excluded).';
 
 
 
@@ -24574,6 +24606,39 @@ ALTER SEQUENCE "public"."stripe_info_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."stripe_info_id_seq" OWNED BY "public"."stripe_info"."id";
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."stripe_refunds" (
+    "id" character varying NOT NULL,
+    "charge_id" character varying NOT NULL,
+    "customer_id" character varying,
+    "amount" bigint NOT NULL,
+    "currency" character varying NOT NULL,
+    "status" character varying NOT NULL,
+    "reason" character varying,
+    "refunded_at" timestamp with time zone NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."stripe_refunds" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."stripe_refunds" IS 'Stripe refunds synced from the charge.refunded webhook, used for daily refund stats.';
+
+
+
+COMMENT ON COLUMN "public"."stripe_refunds"."id" IS 'Stripe refund id (re_...).';
+
+
+
+COMMENT ON COLUMN "public"."stripe_refunds"."amount" IS 'Refunded amount in the smallest currency unit (cents for USD).';
+
+
+
+COMMENT ON COLUMN "public"."stripe_refunds"."refunded_at" IS 'Stripe refund creation time.';
 
 
 
@@ -25662,6 +25727,11 @@ ALTER TABLE ONLY "public"."stripe_info"
 
 
 
+ALTER TABLE ONLY "public"."stripe_refunds"
+    ADD CONSTRAINT "stripe_refunds_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."tmp_users"
     ADD CONSTRAINT "tmp_users_pkey" PRIMARY KEY ("id");
 
@@ -26475,6 +26545,14 @@ CREATE INDEX "si_customer_status_trial_idx" ON "public"."stripe_info" USING "btr
 
 
 CREATE INDEX "stripe_info_paid_at_idx" ON "public"."stripe_info" USING "btree" ("paid_at") WHERE ("paid_at" IS NOT NULL);
+
+
+
+CREATE INDEX "stripe_refunds_charge_id_idx" ON "public"."stripe_refunds" USING "btree" ("charge_id");
+
+
+
+CREATE INDEX "stripe_refunds_refunded_at_idx" ON "public"."stripe_refunds" USING "btree" ("refunded_at");
 
 
 
@@ -27825,6 +27903,10 @@ CREATE POLICY "Deny all access" ON "public"."processed_stripe_events" USING (fal
 
 
 
+CREATE POLICY "Deny all access" ON "public"."stripe_refunds" USING (false) WITH CHECK (false);
+
+
+
 CREATE POLICY "Deny all access" ON "public"."to_delete_accounts" USING (false) WITH CHECK (false);
 
 
@@ -28663,6 +28745,9 @@ ALTER TABLE "public"."storage_usage" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."stripe_info" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."stripe_refunds" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."tmp_users" ENABLE ROW LEVEL SECURITY;
 
 
@@ -28717,6 +28802,12 @@ CREATE PUBLICATION "capgo_google_eu_2_pub" WITH (publish = 'insert, update, dele
 ALTER PUBLICATION "capgo_google_eu_2_pub" OWNER TO "postgres";
 
 
+CREATE PUBLICATION "capgo_planetscale_r2_pub" WITH (publish = 'insert, update, delete, truncate');
+
+
+ALTER PUBLICATION "capgo_planetscale_r2_pub" OWNER TO "postgres";
+
+
 
 
 ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
@@ -28743,6 +28834,10 @@ ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."channels";
 
 
 ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."manifest";
+
+
+
+ALTER PUBLICATION "capgo_planetscale_r2_pub" ADD TABLE ONLY "public"."manifest";
 
 
 
@@ -31576,6 +31671,11 @@ GRANT ALL ON FUNCTION "public"."rescind_invitation"("email" "text", "org_id" "uu
 
 
 
+REVOKE ALL ON FUNCTION "public"."reset_and_seed_demo_customer_data"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."reset_and_seed_demo_customer_data"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."reset_onboarding_demo_app_data"("p_app_uuid" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."reset_onboarding_demo_app_data"("p_app_uuid" "uuid") TO "service_role";
 
@@ -32387,6 +32487,10 @@ GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public".
 GRANT ALL ON SEQUENCE "public"."stripe_info_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."stripe_info_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."stripe_info_id_seq" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."stripe_refunds" TO "service_role";
 
 
 

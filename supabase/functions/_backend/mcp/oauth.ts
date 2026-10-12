@@ -8,6 +8,7 @@ import { getEnv } from '../utils/utils.ts'
 import {
   buildRedirectUrl,
   decryptWithCode,
+  getPinnedClientMetadata,
   isAllowedRedirectUri,
   isClientIdMetadataUrl,
   isValidCodeChallenge,
@@ -173,14 +174,27 @@ async function readBoundedText(response: Response, maxBytes: number): Promise<st
 
 /** Resolve a Client ID Metadata Document (the MCP 2025-11-25 preferred client identification). */
 async function fetchClientMetadataDocument(c: McpContext, clientId: string): Promise<McpOAuthClient | null> {
+  const live = await fetchLiveClientMetadataDocument(c, clientId)
+  if (live)
+    return live
+  const pinned = getPinnedClientMetadata(clientId)
+  if (!pinned)
+    return null
+  cloudlog({ requestId: c.get('requestId'), message: 'mcp_oauth_client_metadata_pinned_fallback', clientId })
+  return { client_id: clientId, ...pinned }
+}
+
+async function fetchLiveClientMetadataDocument(c: McpContext, clientId: string): Promise<McpOAuthClient | null> {
   try {
     const response = await fetch(clientId, {
-      headers: { accept: 'application/json' },
+      headers: { 'accept': 'application/json', 'user-agent': 'Capgo-MCP-OAuth/1.0 (+https://capgo.app/docs/ai/mcp/)' },
       redirect: 'error',
       signal: AbortSignal.timeout(5000),
     })
-    if (!response.ok)
+    if (!response.ok) {
+      cloudlog({ requestId: c.get('requestId'), message: 'mcp_oauth_client_metadata_fetch_status', clientId, status: response.status })
       return null
+    }
     const text = await readBoundedText(response, METADATA_DOCUMENT_MAX_BYTES)
     if (text === null)
       return null
