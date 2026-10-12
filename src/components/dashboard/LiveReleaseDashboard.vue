@@ -250,7 +250,16 @@ const healthTiles = computed(() => {
         :device-data-collection="deviceDataCollection"
       />
       <BundleInstallStatsPanel :app-id="appId" :channel-id="channelId" :days="days" :force-demo="forceDemo" hide-period-selector dense />
-      <DeliveryLatencyPanel :key="appId" scope="app" :app-id="appId" :days="days" :force-demo="forceDemo" hide-period-selector dense />
+      <DeliveryLatencyPanel
+        :key="appId"
+        scope="app"
+        :app-id="appId"
+        :days="days"
+        :force-demo="forceDemo"
+        :plugin-versions-collected="deviceDataCollection.plugin_version && deviceDataCollection.is_prod"
+        hide-period-selector
+        dense
+      />
     </div>
   </div>
 </template>

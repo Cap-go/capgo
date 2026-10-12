@@ -12,6 +12,7 @@ import IconExternalLink from '~icons/lucide/external-link'
 import IconLayers from '~icons/lucide/layers'
 import IconRocket from '~icons/lucide/rocket'
 import IconSmartphone from '~icons/lucide/smartphone'
+import DeviceDataCollectionGate from '~/components/dashboard/DeviceDataCollectionGate.vue'
 import InfoPopover from '~/components/InfoPopover.vue'
 import { useDeviceDataCollection } from '~/composables/useDeviceDataCollection'
 import { useNativeObserveStats } from '~/composables/useNativeObserveStats'
@@ -139,18 +140,17 @@ watch(packageId, async () => {
         </InfoPopover>
       </div>
 
-      <div
-        v-if="!collection.plugin_version"
-        class="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600 dark:border-slate-700 dark:bg-gray-800 dark:text-slate-300"
-        data-test="observe-plugin-collection-disabled"
-      >
-        {{ t('device-data-collection-chart-disabled') }}
-      </div>
-      <div v-else-if="statsLoading" class="flex items-center justify-center h-80">
+      <div v-if="statsLoading" class="flex items-center justify-center h-80">
         <Spinner size="w-12 h-12" />
       </div>
 
-      <template v-else>
+      <DeviceDataCollectionGate
+        v-else
+        :app-id="packageId"
+        :collection="collection"
+        :requires="['plugin_version', 'is_prod']"
+        data-test="observe-plugin-collection-gate"
+      >
         <section
           v-if="recommendation && (recommendation.unsupported || recommendation.recommendedVersion)"
           data-test="observe-plugin-upgrade"
@@ -397,7 +397,7 @@ watch(packageId, async () => {
             </div>
           </div>
         </section>
-      </template>
+      </DeviceDataCollectionGate>
     </div>
   </section>
 </template>
