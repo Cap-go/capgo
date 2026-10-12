@@ -54,7 +54,7 @@ const mobileTitle = computed(() => {
           <div class="hidden lg:block">
             <button
               type="button"
-              class="d-btn d-btn-ghost d-btn-square d-btn-sm dark:text-white focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none text-slate-500 dark:hover:text-slate-50 hover:text-slate-600"
+              class="d-btn d-btn-ghost d-btn-square d-btn-sm dark:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 text-slate-500 dark:hover:text-slate-50 hover:text-slate-600"
               data-test="sidebar-collapse-toggle"
               aria-controls="sidebar"
               :aria-expanded="!props.sidebarCollapsed"
@@ -68,7 +68,7 @@ const mobileTitle = computed(() => {
           <!-- Hamburger button -->
           <button
             type="button"
-            class="p-1 rounded-md lg:hidden dark:text-white focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none text-slate-500 dark:hover:text-slate-50 hover:text-slate-600"
+            class="p-1 rounded-md lg:hidden dark:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 text-slate-500 dark:hover:text-slate-50 hover:text-slate-600"
             data-test="sidebar-mobile-toggle"
             aria-controls="sidebar"
             :aria-expanded="props.sidebarOpen"
@@ -84,7 +84,7 @@ const mobileTitle = computed(() => {
             <div class="flex items-center space-x-2 font-bold truncate md:text-2xl dark:text-white text-md text-dark">
               <nav class="text-sm font-normal text-slate-600 dark:text-slate-400" aria-label="Breadcrumb">
                 <ol class="inline-flex items-center space-x-1">
-                  <li v-for="(breadcrumb, i) in displayStore.pathTitle" :key="i" class="flex items-center">
+                  <li v-for="(breadcrumb, i) in displayStore.pathTitle" :key="i" class="flex items-center h-16">
                     <span v-if="i > 0" class="mx-1" aria-hidden="true"> / </span>
                     <!-- Last crumb points at the current route, so render it as plain text rather than a dead link -->
                     <span
@@ -97,7 +97,7 @@ const mobileTitle = computed(() => {
                     <router-link
                       v-else
                       :to="breadcrumb.path"
-                      class="flex items-center h-16 px-2 rounded-sm underline underline-offset-2 decoration-slate-400/60 hover:decoration-slate-600 hover:text-slate-800 dark:decoration-slate-500 dark:hover:decoration-slate-300 dark:hover:text-white focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none"
+                      class="flex items-center px-2 py-1 rounded-md underline underline-offset-2 decoration-slate-400/60 hover:bg-slate-200/70 hover:decoration-slate-600 hover:text-slate-800 active:bg-slate-200 dark:decoration-slate-500 dark:hover:bg-slate-800 dark:hover:decoration-slate-300 dark:hover:text-white dark:active:bg-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                     >
                       {{ breadcrumb.translate === false ? breadcrumb.name : t(breadcrumb.name) }}
                     </router-link>
