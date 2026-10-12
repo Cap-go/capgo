@@ -25,7 +25,7 @@ describe('resolveSignupAttributionForOrg', () => {
   it('keeps org signup_plugin when creator lookup rejects', async () => {
     getUserByIdMock.mockRejectedValue(new Error('auth unavailable'))
     const { resolveSignupAttributionForOrg } = await import('../supabase/functions/_backend/utils/signup_attribution.ts')
-    const context = { get: () => undefined } as import('hono').Context
+    const context = { get: () => undefined } as unknown as import('hono').Context
 
     const attribution = await resolveSignupAttributionForOrg(context, {
       created_by: 'user-1',
@@ -48,7 +48,7 @@ describe('resolveSignupAttributionForOrg', () => {
       error: null,
     })
     const { resolveSignupAttributionForOrg } = await import('../supabase/functions/_backend/utils/signup_attribution.ts')
-    const context = { get: () => undefined } as import('hono').Context
+    const context = { get: () => undefined } as unknown as import('hono').Context
 
     const attribution = await resolveSignupAttributionForOrg(context, {
       created_by: 'user-1',
