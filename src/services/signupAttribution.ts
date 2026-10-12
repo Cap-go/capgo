@@ -5,7 +5,6 @@ import {
   mergeSignupAttribution,
   parseCapgoAttributionCookieValue,
   parseSignupAttributionRecord,
-  parseSignupAttributionSearchParams,
   signupAttributionEventTags,
   signupAttributionToPostHogSetOnce,
 } from '../../supabase/functions/shared/signup-attribution.ts'
@@ -30,23 +29,17 @@ function readCapgoAttributionCookie(): ResolvedSignupAttribution {
   return parseCapgoAttributionCookieValue(raw)
 }
 
-function readUrlSignupAttribution(): ResolvedSignupAttribution {
-  if (typeof window === 'undefined')
-    return {}
-  return parseSignupAttributionSearchParams(new URLSearchParams(window.location.search))
-}
-
 function readUserMetadataSignupAttribution(user: User | null | undefined): ResolvedSignupAttribution {
   if (!user?.user_metadata)
     return {}
   return parseSignupAttributionRecord(user.user_metadata as Record<string, unknown>)
 }
 
+/** Signup attribution for authenticated console sessions (metadata + first-touch cookie only). */
 export function resolveSignupAttribution(user?: User | null): ResolvedSignupAttribution {
   const metadata = readUserMetadataSignupAttribution(user ?? null)
   const cookie = readCapgoAttributionCookie()
-  const url = readUrlSignupAttribution()
-  return mergeSignupAttribution(metadata, cookie, url)
+  return mergeSignupAttribution(metadata, cookie)
 }
 
 export function getSignupAttributionEventTags(user?: User | null) {

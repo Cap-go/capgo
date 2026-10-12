@@ -1246,17 +1246,21 @@ async function createdOrUpdated(
     if (status === 'past_due')
       return
 
-    let signupAttributionTags: Awaited<ReturnType<typeof signupAttributionTagsForOrg>> = {}
-    try {
-      signupAttributionTags = await signupAttributionTagsForOrg(c, org)
-    }
-    catch (error) {
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: 'signup attribution tags lookup failed',
-        orgId: org.id,
-        error,
-      })
+    const isNewSubscription = status === 'created'
+    let signupAttributionTagsTask: Promise<Awaited<ReturnType<typeof signupAttributionTagsForOrg>>> | null = null
+    const loadSignupAttributionTags = () => {
+      if (!signupAttributionTagsTask) {
+        signupAttributionTagsTask = signupAttributionTagsForOrg(c, org).catch((error) => {
+          cloudlog({
+            requestId: c.get('requestId'),
+            message: 'signup attribution tags lookup failed',
+            orgId: org.id,
+            error,
+          })
+          return {}
+        })
+      }
+      return signupAttributionTagsTask
     }
 
     let previousPlan: PlanRow | null = null
@@ -1285,7 +1289,7 @@ async function createdOrUpdated(
         groups: { organization: org.id },
         tags: {
           ...planChangeMetadata,
-          ...(planChangeEventName === 'User Upgraded' ? signupAttributionTags : {}),
+          ...(planChangeEventName === 'User Upgraded' ? await loadSignupAttributionTags() : {}),
         },
       })
     }
@@ -1299,7 +1303,6 @@ async function createdOrUpdated(
     const eventName = `user:subscribe_${statusName}:${isMonthly ? 'monthly' : 'yearly'}`
     const subscriptionMetadata = buildSubscriptionEventMetadata(stripeData, plan, previousPlan)
     await syncBillingBentoTags(c, org, stripeData.data.customer_id, segment)
-    const isNewSubscription = status === 'created'
     await sendEventToTracking(c, {
       bento: {
         cron: '* * * * *',
@@ -1316,7 +1319,7 @@ async function createdOrUpdated(
       groups: { organization: org.id },
       tags: {
         ...subscriptionMetadata,
-        ...(isNewSubscription ? {} : signupAttributionTags),
+        ...(isNewSubscription ? {} : await loadSignupAttributionTags()),
       },
     })
 

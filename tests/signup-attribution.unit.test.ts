@@ -45,6 +45,15 @@ describe('signup attribution parsing', () => {
     expect(parsed.signup_plugin).toBe('updater')
   })
 
+  it('drops sensitive first_touch_path values', () => {
+    expect(parseSignupAttributionRecord({
+      first_touch_path: '/reset?token=secret',
+    }).first_touch_path).toBeUndefined()
+    expect(parseSignupAttributionRecord({
+      first_touch_path: '/docs/getting-started/',
+    }).first_touch_path).toBe('/docs/getting-started/')
+  })
+
   it('truncates oversized attribution strings', () => {
     const longRef = `plugin_${'a'.repeat(300)}`
     const parsed = parseSignupAttributionRecord({

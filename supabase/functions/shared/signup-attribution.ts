@@ -49,6 +49,9 @@ const FIRST_TOUCH_TYPE_SET = new Set<string>(FIRST_TOUCH_TYPES)
 const ATTRIBUTION_STRING_MAX = 256
 const FIRST_TOUCH_PATH_MAX = 512
 
+const SENSITIVE_ATTRIBUTION_PATTERN = /[@?#]|(?:^|[^\w-])(?:token|password|secret|api[_-]?key|authorization)(?:[^\w-]|$)/i
+const SENSITIVE_PATH_SEGMENT = /(?:^|\/)(?:reset|recover|confirm|callback|invite|oauth|magic-link)(?:\/|$)/i
+
 function readNonEmptyString(value: unknown): string | undefined {
   if (typeof value !== 'string')
     return undefined
@@ -56,9 +59,15 @@ function readNonEmptyString(value: unknown): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined
 }
 
+function isSafeAttributionValue(value: string): boolean {
+  if (SENSITIVE_ATTRIBUTION_PATTERN.test(value))
+    return false
+  return true
+}
+
 function readAttributionString(value: unknown, maxLen = ATTRIBUTION_STRING_MAX): string | undefined {
   const normalized = readNonEmptyString(value)
-  if (!normalized)
+  if (!normalized || !isSafeAttributionValue(normalized))
     return undefined
   return normalized.length > maxLen ? normalized.slice(0, maxLen) : normalized
 }
@@ -97,7 +106,21 @@ function readFirstTouchType(record: AttributionRecord): FirstTouchType | undefin
 }
 
 function readFirstTouchPath(record: AttributionRecord): string | undefined {
-  return readAttributionString(record.first_touch_path, FIRST_TOUCH_PATH_MAX)
+  const raw = readAttributionString(record.first_touch_path, FIRST_TOUCH_PATH_MAX)
+  if (!raw)
+    return undefined
+
+  const withoutQuery = raw.split(/[?#]/, 1)[0]?.trim()
+  if (!withoutQuery || !withoutQuery.startsWith('/'))
+    return undefined
+  if (SENSITIVE_PATH_SEGMENT.test(withoutQuery))
+    return undefined
+  if (!isSafeAttributionValue(withoutQuery))
+    return undefined
+
+  return withoutQuery.length > FIRST_TOUCH_PATH_MAX
+    ? withoutQuery.slice(0, FIRST_TOUCH_PATH_MAX)
+    : withoutQuery
 }
 
 function readUtm(record: AttributionRecord, key: SignupUtmKey): string | undefined {

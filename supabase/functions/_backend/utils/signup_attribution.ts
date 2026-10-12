@@ -16,10 +16,15 @@ export async function resolveSignupAttributionForUser(
   c: Context,
   userId: string,
 ): Promise<ResolvedSignupAttribution> {
-  const { data, error } = await supabaseAdmin(c).auth.admin.getUserById(userId)
-  if (error || !data.user)
+  try {
+    const { data, error } = await supabaseAdmin(c).auth.admin.getUserById(userId)
+    if (error || !data.user)
+      return {}
+    return parseSignupAttributionRecord(data.user.user_metadata as Record<string, unknown>)
+  }
+  catch {
     return {}
-  return parseSignupAttributionRecord(data.user.user_metadata as Record<string, unknown>)
+  }
 }
 
 export async function resolveSignupAttributionForOrg(
