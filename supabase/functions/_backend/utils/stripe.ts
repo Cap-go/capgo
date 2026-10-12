@@ -9,6 +9,7 @@ import {
   getBillingAccountForCustomer,
   getPlanPriceId,
   getStripeSecretKey,
+  isAutomaticTaxEnabled,
   isStripeConfiguredForAccount,
   planProductIdOrFilter,
   resolveCheckoutPlanProductId,
@@ -847,7 +848,7 @@ export async function createCheckout(c: Context, customerId: string, recurrence:
     customer: customerId,
     success_url: `${allowedSuccessUrl}?success=true`,
     cancel_url: allowedCancelUrl,
-    automatic_tax: { enabled: true },
+    automatic_tax: { enabled: isAutomaticTaxEnabled(billingAccount) },
     client_reference_id: clientReferenceId,
     metadata: Object.keys(metadata).length ? metadata : undefined,
     customer_update: {
@@ -915,7 +916,7 @@ export async function createOneTimeCheckout(
     customer: customerId,
     success_url: successUrlWithFlag,
     cancel_url: allowedCancelUrl,
-    automatic_tax: { enabled: true },
+    automatic_tax: { enabled: isAutomaticTaxEnabled(billingAccount) },
     client_reference_id: clientReferenceId,
     customer_update: {
       address: 'auto',

@@ -193,3 +193,8 @@ export async function resolveCheckoutPlanProductId(
   }
   return getPlanProductId(plan, billingAccount)
 }
+
+// The US entity has no sales tax registrations yet; collect tax only on the EE account.
+export function isAutomaticTaxEnabled(billingAccount: BillingAccount): boolean {
+  return billingAccount !== 'us'
+}

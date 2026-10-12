@@ -10,6 +10,7 @@ import {
   getStripeWebhookSecretEnvName,
   getSuggestedBillingAccount,
   IncompleteUsPlanConfigError,
+  isAutomaticTaxEnabled,
   normalizeBillingAccount,
   planProductIdOrFilter,
   resolveCheckoutPlanProductId,
@@ -227,5 +228,12 @@ describe('new org billing account from location', () => {
 
   it('falls back to ee when us is requested but not configured', () => {
     expect(resolveNewOrgBillingAccount(createGeoContext('US'), 'us')).toBe('ee')
+  })
+})
+
+describe('isAutomaticTaxEnabled', () => {
+  it('collects tax only on the ee account', () => {
+    expect(isAutomaticTaxEnabled('ee')).toBe(true)
+    expect(isAutomaticTaxEnabled('us')).toBe(false)
   })
 })
