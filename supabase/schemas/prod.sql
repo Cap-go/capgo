@@ -48,6 +48,12 @@ CREATE SCHEMA IF NOT EXISTS "rbac_internal";
 ALTER SCHEMA "rbac_internal" OWNER TO "postgres";
 
 
+CREATE SCHEMA IF NOT EXISTS "seed_helpers";
+
+
+ALTER SCHEMA "seed_helpers" OWNER TO "postgres";
+
+
 CREATE EXTENSION IF NOT EXISTS "http" WITH SCHEMA "extensions";
 
 
@@ -353,7 +359,8 @@ CREATE TYPE "public"."stats_action" AS ENUM (
     'webview_dom_content_loaded',
     'webview_page_loaded',
     'app_nav',
-    'channelPaused'
+    'channelPaused',
+    'update_check_error'
 );
 
 
@@ -443,9 +450,9 @@ DECLARE
   invite_org_id uuid;
   role_name text;
   role_id uuid;
+  v_inviter_id uuid;
+  v_finalize_rows integer;
 BEGIN
-  -- Serialize with update_org/tmp_invite_role_rbac: read pending role only after
-  -- the shared org lock so acceptance cannot observe a stale invite role.
   PERFORM public.lock_rbac_orgs(accept_invitation_to_org.org_id);
 
   SELECT public.org_users.*
@@ -465,9 +472,20 @@ BEGIN
     invite_user_id := invite.user_id;
     invite_org_id := invite.org_id;
     role_name := invite.rbac_role_name;
+
+    SELECT rb.granted_by
+    INTO v_inviter_id
+    FROM public.role_bindings rb
+    WHERE rb.principal_type = public.rbac_principal_user()
+      AND rb.principal_id = invite_user_id
+      AND rb.org_id = invite_org_id
+      AND rb.scope_type = public.rbac_scope_org()
+      AND rb.reason IN ('Pending invitation', 'Invited via invite_user_to_org_rbac')
+    ORDER BY rb.granted_at DESC NULLS LAST
+    LIMIT 1;
   ELSE
-    SELECT rb.principal_id, rb.org_id, r.name
-    INTO invite_user_id, invite_org_id, role_name
+    SELECT rb.principal_id, rb.org_id, r.name, rb.granted_by
+    INTO invite_user_id, invite_org_id, role_name, v_inviter_id
     FROM public.role_bindings rb
     JOIN public.roles r
       ON r.id = rb.role_id
@@ -489,7 +507,8 @@ BEGIN
     RETURN 'ROLE_NOT_FOUND';
   END IF;
 
-  SELECT public.roles.id INTO role_id
+  SELECT public.roles.id
+  INTO role_id
   FROM public.roles
   WHERE public.roles.name = role_name
     AND public.roles.scope_type = public.rbac_scope_org()
@@ -499,6 +518,17 @@ BEGIN
   IF role_id IS NULL THEN
     RETURN 'ROLE_NOT_FOUND';
   END IF;
+
+  IF v_inviter_id IS NULL THEN
+    RETURN 'INVITER_NOT_FOUND';
+  END IF;
+
+  PERFORM public.assert_principal_can_grant_org_role(
+    invite_org_id,
+    v_inviter_id,
+    role_name,
+    'accept_invitation_to_org'
+  );
 
   -- Keep is_invite true until after the accepted binding is inserted so the
   -- privilege guards can verify this is a real invite acceptance.
@@ -533,8 +563,8 @@ BEGIN
     invite_org_id,
     NULL,
     NULL,
-    auth.uid(),
-    pg_catalog.now(),
+    v_inviter_id,
+    now(),
     'Accepted invitation',
     true
   ) ON CONFLICT DO NOTHING;
@@ -542,10 +572,15 @@ BEGIN
   UPDATE public.org_users
   SET is_invite = false,
       rbac_role_name = role_name,
-      updated_at = pg_catalog.now()
+      updated_at = CURRENT_TIMESTAMP
   WHERE public.org_users.user_id = invite_user_id
     AND public.org_users.org_id = invite_org_id
     AND public.org_users.is_invite IS TRUE;
+
+  GET DIAGNOSTICS v_finalize_rows = ROW_COUNT;
+  IF v_finalize_rows = 0 THEN
+    RAISE EXCEPTION 'MEMBERSHIP_NOT_FINALIZED';
+  END IF;
 
   RETURN 'OK';
 END;
@@ -556,6 +591,177 @@ ALTER FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") OWNER TO "po
 
 
 COMMENT ON FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") IS 'Accepts a pending org invite and creates the active RBAC binding. Kept for old clients. Acquires lock_rbac_orgs before reading the pending invite role.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."accept_tmp_user_invitation"("p_invite_magic_string" "text", "p_user_id" "uuid") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    SET "row_security" TO 'off'
+    AS $$
+DECLARE
+  v_org_id uuid;
+  v_invite public.tmp_users%ROWTYPE;
+  v_role_id uuid;
+  v_rbac_role_name text;
+  v_inviter_id uuid;
+  v_finalize_rows integer;
+BEGIN
+  SELECT tmp_users.org_id
+  INTO v_org_id
+  FROM public.tmp_users
+  WHERE tmp_users.invite_magic_string = p_invite_magic_string
+    AND tmp_users.cancelled_at IS NULL
+  LIMIT 1;
+
+  IF v_org_id IS NULL THEN
+    RETURN 'NO_INVITE';
+  END IF;
+
+  PERFORM public.lock_rbac_orgs(v_org_id);
+
+  SELECT tmp_users.*
+  INTO v_invite
+  FROM public.tmp_users
+  WHERE tmp_users.invite_magic_string = p_invite_magic_string
+    AND tmp_users.cancelled_at IS NULL
+  LIMIT 1
+  FOR UPDATE;
+
+  IF v_invite.id IS NULL THEN
+    RETURN 'NO_INVITE';
+  END IF;
+
+  v_rbac_role_name := pg_catalog.btrim(v_invite.rbac_role_name);
+  IF v_rbac_role_name IS NULL OR v_rbac_role_name = '' THEN
+    RETURN 'ROLE_NOT_FOUND';
+  END IF;
+
+  v_inviter_id := v_invite.invited_by_user_id;
+  IF v_inviter_id IS NULL THEN
+    RETURN 'INVITER_NOT_FOUND';
+  END IF;
+
+  PERFORM public.assert_principal_can_grant_org_role(
+    v_invite.org_id,
+    v_inviter_id,
+    v_rbac_role_name,
+    'accept_tmp_user_invitation'
+  );
+
+  SELECT roles.id
+  INTO v_role_id
+  FROM public.roles
+  WHERE roles.name = v_rbac_role_name
+    AND roles.scope_type = public.rbac_scope_org()
+    AND roles.is_assignable = true
+  LIMIT 1;
+
+  IF v_role_id IS NULL THEN
+    RETURN 'ROLE_NOT_FOUND';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.org_users
+    WHERE org_users.user_id = p_user_id
+      AND org_users.org_id = v_invite.org_id
+      AND org_users.app_id IS NULL
+      AND org_users.channel_id IS NULL
+      AND org_users.is_invite IS FALSE
+  ) THEN
+    RETURN 'ALREADY_MEMBER';
+  END IF;
+
+  -- Keep is_invite true until after the accepted binding is inserted.
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.org_users
+    WHERE org_users.user_id = p_user_id
+      AND org_users.org_id = v_invite.org_id
+      AND org_users.app_id IS NULL
+      AND org_users.channel_id IS NULL
+  ) THEN
+    INSERT INTO public.org_users (user_id, org_id, rbac_role_name, is_invite)
+    VALUES (p_user_id, v_invite.org_id, v_rbac_role_name, true);
+  ELSE
+    UPDATE public.org_users
+    SET rbac_role_name = v_rbac_role_name,
+        updated_at = now()
+    WHERE org_users.user_id = p_user_id
+      AND org_users.org_id = v_invite.org_id
+      AND org_users.app_id IS NULL
+      AND org_users.channel_id IS NULL
+      AND org_users.is_invite IS TRUE;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.org_users
+    WHERE org_users.user_id = p_user_id
+      AND org_users.org_id = v_invite.org_id
+      AND org_users.app_id IS NULL
+      AND org_users.channel_id IS NULL
+      AND org_users.is_invite IS TRUE
+  ) THEN
+    RETURN 'MEMBERSHIP_NOT_FINALIZED';
+  END IF;
+
+  DELETE FROM public.role_bindings
+  WHERE role_bindings.principal_type = public.rbac_principal_user()
+    AND role_bindings.principal_id = p_user_id
+    AND role_bindings.scope_type = public.rbac_scope_org()
+    AND role_bindings.org_id = v_invite.org_id;
+
+  INSERT INTO public.role_bindings (
+    principal_type,
+    principal_id,
+    role_id,
+    scope_type,
+    org_id,
+    granted_by,
+    granted_at,
+    reason,
+    is_direct
+  ) VALUES (
+    public.rbac_principal_user(),
+    p_user_id,
+    v_role_id,
+    public.rbac_scope_org(),
+    v_invite.org_id,
+    v_inviter_id,
+    now(),
+    'Accepted invitation',
+    true
+  );
+
+  UPDATE public.org_users
+  SET is_invite = false,
+      rbac_role_name = v_rbac_role_name,
+      updated_at = now()
+  WHERE org_users.user_id = p_user_id
+    AND org_users.org_id = v_invite.org_id
+    AND org_users.app_id IS NULL
+    AND org_users.channel_id IS NULL
+    AND org_users.is_invite IS TRUE;
+
+  GET DIAGNOSTICS v_finalize_rows = ROW_COUNT;
+  IF v_finalize_rows = 0 THEN
+    RAISE EXCEPTION 'MEMBERSHIP_NOT_FINALIZED';
+  END IF;
+
+  DELETE FROM public.tmp_users
+  WHERE tmp_users.id = v_invite.id;
+
+  RETURN 'OK';
+END;
+$$;
+
+
+ALTER FUNCTION "public"."accept_tmp_user_invitation"("p_invite_magic_string" "text", "p_user_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."accept_tmp_user_invitation"("p_invite_magic_string" "text", "p_user_id" "uuid") IS 'Atomically validates inviter rank and finalizes a tmp_users invitation (org membership + role binding + invite delete).';
 
 
 
@@ -1742,6 +1948,77 @@ $$;
 
 
 ALTER FUNCTION "public"."assert_preview_bundle_owner"("p_owner_org" "uuid", "p_app_id" character varying, "p_version_id" bigint) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."assert_principal_can_grant_org_role"("p_org_id" "uuid", "p_principal_id" "uuid", "p_role_name" "text", "p_mutation" "text") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_target_priority integer;
+  v_caller_priority integer;
+BEGIN
+  IF p_org_id IS NULL OR p_principal_id IS NULL OR p_role_name IS NULL THEN
+    PERFORM public.pg_log(
+      'deny: RBAC_INVITE_GRANT_UNKNOWN_TARGET',
+      pg_catalog.jsonb_build_object(
+        'org_id', p_org_id,
+        'principal_id', p_principal_id,
+        'mutation', p_mutation
+      )
+    );
+    RAISE EXCEPTION 'Admins cannot elevate privileges!';
+  END IF;
+
+  SELECT roles.priority_rank
+  INTO v_target_priority
+  FROM public.roles
+  WHERE roles.name = p_role_name
+    AND roles.scope_type = public.rbac_scope_org()
+    AND roles.is_assignable IS TRUE
+  LIMIT 1;
+
+  IF v_target_priority IS NULL THEN
+    PERFORM public.pg_log(
+      'deny: RBAC_INVITE_GRANT_UNKNOWN_ROLE',
+      pg_catalog.jsonb_build_object(
+        'org_id', p_org_id,
+        'principal_id', p_principal_id,
+        'role_name', p_role_name,
+        'mutation', p_mutation
+      )
+    );
+    RAISE EXCEPTION 'Admins cannot elevate privileges!';
+  END IF;
+
+  v_caller_priority := public.principal_max_role_priority(
+    p_org_id,
+    public.rbac_principal_user(),
+    p_principal_id
+  );
+
+  IF v_caller_priority IS NULL OR v_caller_priority < v_target_priority THEN
+    PERFORM public.pg_log(
+      'deny: RBAC_INVITE_GRANT_PRIORITY_ESCALATION',
+      pg_catalog.jsonb_build_object(
+        'org_id', p_org_id,
+        'principal_id', p_principal_id,
+        'mutation', p_mutation,
+        'caller_max_priority', v_caller_priority,
+        'target_role_priority', v_target_priority
+      )
+    );
+    RAISE EXCEPTION 'Admins cannot elevate privileges!';
+  END IF;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."assert_principal_can_grant_org_role"("p_org_id" "uuid", "p_principal_id" "uuid", "p_role_name" "text", "p_mutation" "text") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."assert_principal_can_grant_org_role"("p_org_id" "uuid", "p_principal_id" "uuid", "p_role_name" "text", "p_mutation" "text") IS 'Ensures a principal can grant an org-scoped role at or below their max rank. Used for invite acceptance validation.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."assert_request_principal_rank"("p_org_id" "uuid", "p_target_priority" integer, "p_mutation" "text") RETURNS "void"
@@ -3512,16 +3789,28 @@ CREATE OR REPLACE FUNCTION "public"."check_org_members_2fa_enabled"("org_id" "uu
     SET "search_path" TO ''
     AS $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM public.orgs WHERE public.orgs.id = check_org_members_2fa_enabled.org_id) THEN
-    RAISE EXCEPTION 'Organization does not exist';
-  END IF;
-
-  IF NOT public.is_internal_request_role(public.current_request_role())
-    AND NOT public.rbac_check_permission_request(
-      public.rbac_perm_org_update_settings(),
-      check_org_members_2fa_enabled.org_id,
-      NULL::character varying,
-      NULL::bigint
+  -- Internal callers keep a distinguishable missing-org signal; non-internal
+  -- callers still collapse missing-org into NO_RIGHTS (anon oracle closed).
+  IF public.is_internal_request_role(public.current_request_role()) THEN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM public.orgs
+      WHERE public.orgs.id = check_org_members_2fa_enabled.org_id
+    ) THEN
+      RAISE EXCEPTION 'ORG_NOT_FOUND';
+    END IF;
+  ELSIF (
+      NOT EXISTS (
+        SELECT 1
+        FROM public.orgs
+        WHERE public.orgs.id = check_org_members_2fa_enabled.org_id
+      )
+      OR NOT public.rbac_check_permission_request(
+        public.rbac_perm_org_update_settings(),
+        check_org_members_2fa_enabled.org_id,
+        NULL::character varying,
+        NULL::bigint
+      )
     )
   THEN
     RAISE EXCEPTION 'NO_RIGHTS';
@@ -3551,37 +3840,46 @@ CREATE OR REPLACE FUNCTION "public"."check_org_members_password_policy"("org_id"
     SET "search_path" TO ''
     AS $$
 BEGIN
-  IF NOT public.is_internal_request_role(public.current_request_role())
-    AND NOT public.rbac_check_permission_request(
-      public.rbac_perm_org_update_settings(),
-      check_org_members_password_policy.org_id,
-      NULL::character varying,
-      NULL::bigint
+  -- Internal callers keep a distinguishable missing-org signal; non-internal
+  -- callers still collapse missing-org into NO_RIGHTS (anon oracle closed).
+  IF public.is_internal_request_role(public.current_request_role()) THEN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM public.orgs
+      WHERE public.orgs.id = check_org_members_password_policy.org_id
+    ) THEN
+      RAISE EXCEPTION 'ORG_NOT_FOUND';
+    END IF;
+  ELSIF (
+      NOT EXISTS (
+        SELECT 1
+        FROM public.orgs
+        WHERE public.orgs.id = check_org_members_password_policy.org_id
+      )
+      OR NOT public.rbac_check_permission_request(
+        public.rbac_perm_org_update_settings(),
+        check_org_members_password_policy.org_id,
+        NULL::character varying,
+        NULL::bigint
+      )
     )
   THEN
     RAISE EXCEPTION 'NO_RIGHTS';
   END IF;
 
-  IF NOT EXISTS (
-    SELECT 1
-    FROM public.orgs
-    WHERE public.orgs.id = check_org_members_password_policy.org_id
-  ) THEN
-    RAISE EXCEPTION 'Organization does not exist';
-  END IF;
-
   RETURN QUERY
   SELECT DISTINCT
     rb.principal_id AS user_id,
-    au.email::text,
-    u.first_name::text,
-    u.last_name::text,
-    public.user_meets_password_policy(rb.principal_id, check_org_members_password_policy.org_id) AS password_policy_compliant
+    NULL::text AS email,
+    NULL::text AS first_name,
+    NULL::text AS last_name,
+    public.user_meets_password_policy(
+      rb.principal_id,
+      check_org_members_password_policy.org_id
+    ) AS password_policy_compliant
   FROM public.role_bindings rb
   JOIN public.roles r ON r.id = rb.role_id
     AND r.scope_type = rb.scope_type
-  JOIN auth.users au ON au.id = rb.principal_id
-  LEFT JOIN public.users u ON u.id = rb.principal_id
   WHERE rb.principal_type = public.rbac_principal_user()
     AND rb.scope_type = public.rbac_scope_org()
     AND rb.org_id = check_org_members_password_policy.org_id
@@ -4192,8 +4490,8 @@ CREATE OR REPLACE FUNCTION "public"."claim_updates_cache_purge"("p_limit" intege
 DECLARE
   v_now timestamptz := pg_catalog.clock_timestamp();
   v_last timestamptz;
-  v_min_interval constant interval := '1 second';
-  v_lease interval := '2 minutes';
+  v_min_interval constant interval := INTERVAL '1 second';
+  v_lease interval := INTERVAL '2 minutes';
   v_token uuid := gen_random_uuid();
   v_apps jsonb;
 BEGIN
@@ -4209,7 +4507,6 @@ BEGIN
     );
   END IF;
 
-  -- One (app, scope) pair = one Cloudflare tag.
   WITH picked AS (
     SELECT p.app_id, p.scope
     FROM public.updates_cache_purge_pending p
@@ -18958,6 +19255,22 @@ $$;
 ALTER FUNCTION "public"."rescind_invitation"("email" "text", "org_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."reset_and_seed_demo_customer_data"() RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.orgs WHERE id = 'acde0000-0000-4000-8000-0000000000a1'::uuid) THEN
+    PERFORM public.seed_demo_customer_account();
+  END IF;
+  PERFORM seed_helpers.seed_demo_customer_telemetry();
+END;
+$$;
+
+
+ALTER FUNCTION "public"."reset_and_seed_demo_customer_data"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."reset_onboarding_demo_app_data"("p_app_uuid" "uuid") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -20753,22 +21066,76 @@ CREATE OR REPLACE FUNCTION "public"."update_org_invite_role_rbac"("p_org_id" "uu
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
+DECLARE
+  role_id uuid;
+  role_priority integer;
 BEGIN
-  PERFORM rbac_internal.assert_assignable_org_invite_role_exists(p_new_role_name);
-  PERFORM rbac_internal.assert_invite_role_update_permission(p_org_id, p_new_role_name);
   PERFORM public.lock_rbac_orgs(p_org_id);
-  PERFORM rbac_internal.assert_invite_role_update_permission(p_org_id, p_new_role_name);
+
+  SELECT r.id, r.priority_rank
+  INTO role_id, role_priority
+  FROM public.roles r
+  WHERE r.name = p_new_role_name
+    AND r.scope_type = public.rbac_scope_org()
+    AND r.is_assignable = true
+  LIMIT 1;
+
+  IF role_id IS NULL THEN
+    RAISE EXCEPTION 'ROLE_NOT_FOUND';
+  END IF;
+
+  IF p_new_role_name = public.rbac_role_org_super_admin() THEN
+    IF NOT public.rbac_check_permission_request(
+      public.rbac_perm_org_update_user_roles(),
+      p_org_id,
+      NULL::character varying,
+      NULL::bigint
+    ) THEN
+      RAISE EXCEPTION 'NO_PERMISSION_TO_UPDATE_ROLES';
+    END IF;
+  ELSE
+    IF NOT public.rbac_check_permission_request(
+      public.rbac_perm_org_invite_user(),
+      p_org_id,
+      NULL::character varying,
+      NULL::bigint
+    ) THEN
+      RAISE EXCEPTION 'NO_PERMISSION_TO_UPDATE_ROLES';
+    END IF;
+  END IF;
+
+  PERFORM public.assert_request_principal_rank(
+    p_org_id,
+    role_priority,
+    'org_invite_role_update'
+  );
 
   UPDATE public.org_users
   SET rbac_role_name = p_new_role_name,
-      updated_at = pg_catalog.now()
-  WHERE public.org_users.org_id = p_org_id
-    AND public.org_users.user_id = p_user_id
-    AND public.org_users.is_invite IS TRUE;
+      updated_at = now()
+  WHERE org_id = p_org_id
+    AND user_id = p_user_id
+    AND is_invite IS TRUE;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'NO_INVITATION';
   END IF;
+
+  UPDATE public.role_bindings rb
+  SET granted_by = COALESCE(public.request_actor_user_id(), rb.granted_by),
+      role_id = (
+        SELECT r.id
+        FROM public.roles r
+        WHERE r.name = p_new_role_name
+          AND r.scope_type = public.rbac_scope_org()
+          AND r.is_assignable = true
+        LIMIT 1
+      )
+  WHERE rb.principal_type = public.rbac_principal_user()
+    AND rb.principal_id = p_user_id
+    AND rb.org_id = p_org_id
+    AND rb.scope_type = public.rbac_scope_org()
+    AND rb.reason IN ('Pending invitation', 'Invited via invite_user_to_org_rbac');
 
   RETURN 'OK';
 END;
@@ -20916,18 +21283,57 @@ CREATE OR REPLACE FUNCTION "public"."update_tmp_invite_role_rbac"("p_org_id" "uu
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
+DECLARE
+  role_id uuid;
+  role_priority integer;
 BEGIN
-  PERFORM rbac_internal.assert_assignable_org_invite_role_exists(p_new_role_name);
-  PERFORM rbac_internal.assert_invite_role_update_permission(p_org_id, p_new_role_name);
   PERFORM public.lock_rbac_orgs(p_org_id);
-  PERFORM rbac_internal.assert_invite_role_update_permission(p_org_id, p_new_role_name);
+
+  SELECT r.id, r.priority_rank
+  INTO role_id, role_priority
+  FROM public.roles r
+  WHERE r.name = p_new_role_name
+    AND r.scope_type = public.rbac_scope_org()
+    AND r.is_assignable = true
+  LIMIT 1;
+
+  IF role_id IS NULL THEN
+    RAISE EXCEPTION 'ROLE_NOT_FOUND';
+  END IF;
+
+  IF p_new_role_name = public.rbac_role_org_super_admin() THEN
+    IF NOT public.rbac_check_permission_request(
+      public.rbac_perm_org_update_user_roles(),
+      p_org_id,
+      NULL::character varying,
+      NULL::bigint
+    ) THEN
+      RAISE EXCEPTION 'NO_PERMISSION_TO_UPDATE_ROLES';
+    END IF;
+  ELSE
+    IF NOT public.rbac_check_permission_request(
+      public.rbac_perm_org_invite_user(),
+      p_org_id,
+      NULL::character varying,
+      NULL::bigint
+    ) THEN
+      RAISE EXCEPTION 'NO_PERMISSION_TO_UPDATE_ROLES';
+    END IF;
+  END IF;
+
+  PERFORM public.assert_request_principal_rank(
+    p_org_id,
+    role_priority,
+    'tmp_invite_role_update'
+  );
 
   UPDATE public.tmp_users
   SET rbac_role_name = p_new_role_name,
-      updated_at = pg_catalog.now()
-  WHERE public.tmp_users.org_id = p_org_id
-    AND public.tmp_users.email = p_email
-    AND public.tmp_users.cancelled_at IS NULL;
+      invited_by_user_id = COALESCE(public.request_actor_user_id(), invited_by_user_id),
+      updated_at = now()
+  WHERE org_id = p_org_id
+    AND email = p_email
+    AND cancelled_at IS NULL;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'NO_INVITATION';
@@ -22954,7 +23360,9 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
     "apps_with_preview" bigint DEFAULT 0 NOT NULL,
     "plan_credits" integer DEFAULT 0 NOT NULL,
     "users_with_2fa" bigint DEFAULT 0 NOT NULL,
-    "apps_with_store_url" bigint DEFAULT 0 NOT NULL
+    "apps_with_store_url" bigint DEFAULT 0 NOT NULL,
+    "refunds_count" bigint DEFAULT 0 NOT NULL,
+    "refunds_amount" double precision DEFAULT 0 NOT NULL
 );
 
 
@@ -23282,6 +23690,14 @@ COMMENT ON COLUMN "public"."global_stats"."users_with_2fa" IS 'Snapshot of users
 
 
 COMMENT ON COLUMN "public"."global_stats"."apps_with_store_url" IS 'Number of apps with at least one App Store or Google Play link at snapshot day end.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."refunds_count" IS 'Number of Stripe refunds created on the snapshot UTC day (failed and canceled refunds excluded).';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."refunds_amount" IS 'Total USD amount refunded on the snapshot UTC day, in dollars (failed and canceled refunds excluded).';
 
 
 
@@ -24193,6 +24609,39 @@ ALTER SEQUENCE "public"."stripe_info_id_seq" OWNED BY "public"."stripe_info"."id
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."stripe_refunds" (
+    "id" character varying NOT NULL,
+    "charge_id" character varying NOT NULL,
+    "customer_id" character varying,
+    "amount" bigint NOT NULL,
+    "currency" character varying NOT NULL,
+    "status" character varying NOT NULL,
+    "reason" character varying,
+    "refunded_at" timestamp with time zone NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."stripe_refunds" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."stripe_refunds" IS 'Stripe refunds synced from the charge.refunded webhook, used for daily refund stats.';
+
+
+
+COMMENT ON COLUMN "public"."stripe_refunds"."id" IS 'Stripe refund id (re_...).';
+
+
+
+COMMENT ON COLUMN "public"."stripe_refunds"."amount" IS 'Refunded amount in the smallest currency unit (cents for USD).';
+
+
+
+COMMENT ON COLUMN "public"."stripe_refunds"."refunded_at" IS 'Stripe refund creation time.';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."tmp_users" (
     "id" integer NOT NULL,
     "email" "text" NOT NULL,
@@ -24204,11 +24653,16 @@ CREATE TABLE IF NOT EXISTS "public"."tmp_users" (
     "cancelled_at" timestamp with time zone,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "rbac_role_name" "text" DEFAULT 'org_member'::"text" NOT NULL
+    "rbac_role_name" "text" DEFAULT 'org_member'::"text" NOT NULL,
+    "invited_by_user_id" "uuid"
 );
 
 
 ALTER TABLE "public"."tmp_users" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."tmp_users"."invited_by_user_id" IS 'User who created or last legitimately updated the invitation role. Legacy pending rows without durable grantor evidence stay NULL; accept_tmp_user_invitation returns INVITER_NOT_FOUND until the invite is reissued or updated via update_tmp_invite_role_rbac.';
+
 
 
 CREATE SEQUENCE IF NOT EXISTS "public"."tmp_users_id_seq"
@@ -25273,6 +25727,11 @@ ALTER TABLE ONLY "public"."stripe_info"
 
 
 
+ALTER TABLE ONLY "public"."stripe_refunds"
+    ADD CONSTRAINT "stripe_refunds_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."tmp_users"
     ADD CONSTRAINT "tmp_users_pkey" PRIMARY KEY ("id");
 
@@ -26086,6 +26545,14 @@ CREATE INDEX "si_customer_status_trial_idx" ON "public"."stripe_info" USING "btr
 
 
 CREATE INDEX "stripe_info_paid_at_idx" ON "public"."stripe_info" USING "btree" ("paid_at") WHERE ("paid_at" IS NOT NULL);
+
+
+
+CREATE INDEX "stripe_refunds_charge_id_idx" ON "public"."stripe_refunds" USING "btree" ("charge_id");
+
+
+
+CREATE INDEX "stripe_refunds_refunded_at_idx" ON "public"."stripe_refunds" USING "btree" ("refunded_at");
 
 
 
@@ -27436,6 +27903,10 @@ CREATE POLICY "Deny all access" ON "public"."processed_stripe_events" USING (fal
 
 
 
+CREATE POLICY "Deny all access" ON "public"."stripe_refunds" USING (false) WITH CHECK (false);
+
+
+
 CREATE POLICY "Deny all access" ON "public"."to_delete_accounts" USING (false) WITH CHECK (false);
 
 
@@ -28274,6 +28745,9 @@ ALTER TABLE "public"."storage_usage" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."stripe_info" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."stripe_refunds" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."tmp_users" ENABLE ROW LEVEL SECURITY;
 
 
@@ -28328,6 +28802,12 @@ CREATE PUBLICATION "capgo_google_eu_2_pub" WITH (publish = 'insert, update, dele
 ALTER PUBLICATION "capgo_google_eu_2_pub" OWNER TO "postgres";
 
 
+CREATE PUBLICATION "capgo_planetscale_r2_pub" WITH (publish = 'insert, update, delete, truncate');
+
+
+ALTER PUBLICATION "capgo_planetscale_r2_pub" OWNER TO "postgres";
+
+
 
 
 ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
@@ -28354,6 +28834,10 @@ ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."channels";
 
 
 ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."manifest";
+
+
+
+ALTER PUBLICATION "capgo_planetscale_r2_pub" ADD TABLE ONLY "public"."manifest";
 
 
 
@@ -28718,6 +29202,11 @@ GRANT ALL ON FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") TO "s
 
 
 
+REVOKE ALL ON FUNCTION "public"."accept_tmp_user_invitation"("p_invite_magic_string" "text", "p_user_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."accept_tmp_user_invitation"("p_invite_magic_string" "text", "p_user_id" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."ack_updates_cache_purge"("p_lease_token" "uuid", "p_success" boolean, "p_retry_after_seconds" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."ack_updates_cache_purge"("p_lease_token" "uuid", "p_success" boolean, "p_retry_after_seconds" integer) TO "service_role";
 
@@ -28809,6 +29298,11 @@ GRANT ALL ON FUNCTION "public"."assert_group_member_is_org_member"("p_group_id" 
 
 REVOKE ALL ON FUNCTION "public"."assert_preview_bundle_owner"("p_owner_org" "uuid", "p_app_id" character varying, "p_version_id" bigint) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."assert_preview_bundle_owner"("p_owner_org" "uuid", "p_app_id" character varying, "p_version_id" bigint) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."assert_principal_can_grant_org_role"("p_org_id" "uuid", "p_principal_id" "uuid", "p_role_name" "text", "p_mutation" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."assert_principal_can_grant_org_role"("p_org_id" "uuid", "p_principal_id" "uuid", "p_role_name" "text", "p_mutation" "text") TO "service_role";
 
 
 
@@ -29577,7 +30071,6 @@ GRANT ALL ON FUNCTION "public"."get_org_members"("user_id" "uuid", "guild_id" "u
 
 
 REVOKE ALL ON FUNCTION "public"."get_org_members_rbac"("p_org_id" "uuid") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."get_org_members_rbac"("p_org_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_org_members_rbac"("p_org_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_org_members_rbac"("p_org_id" "uuid") TO "service_role";
 
@@ -30010,7 +30503,6 @@ GRANT ALL ON FUNCTION "public"."is_mau_exceeded_by_org"("org_id" "uuid") TO "ser
 
 REVOKE ALL ON FUNCTION "public"."is_member_of_org"("user_id" "uuid", "org_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."is_member_of_org"("user_id" "uuid", "org_id" "uuid") TO "service_role";
-GRANT ALL ON FUNCTION "public"."is_member_of_org"("user_id" "uuid", "org_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."is_member_of_org"("user_id" "uuid", "org_id" "uuid") TO "authenticated";
 
 
@@ -31179,6 +31671,11 @@ GRANT ALL ON FUNCTION "public"."rescind_invitation"("email" "text", "org_id" "uu
 
 
 
+REVOKE ALL ON FUNCTION "public"."reset_and_seed_demo_customer_data"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."reset_and_seed_demo_customer_data"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."reset_onboarding_demo_app_data"("p_app_uuid" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."reset_onboarding_demo_app_data"("p_app_uuid" "uuid") TO "service_role";
 
@@ -31341,7 +31838,6 @@ GRANT ALL ON FUNCTION "public"."update_apps_build_timeout_updated_at"() TO "serv
 
 
 REVOKE ALL ON FUNCTION "public"."update_org_invite_role_rbac"("p_org_id" "uuid", "p_user_id" "uuid", "p_new_role_name" "text") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."update_org_invite_role_rbac"("p_org_id" "uuid", "p_user_id" "uuid", "p_new_role_name" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."update_org_invite_role_rbac"("p_org_id" "uuid", "p_user_id" "uuid", "p_new_role_name" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_org_invite_role_rbac"("p_org_id" "uuid", "p_user_id" "uuid", "p_new_role_name" "text") TO "service_role";
 
@@ -31360,7 +31856,6 @@ GRANT ALL ON FUNCTION "public"."update_sso_providers_updated_at"() TO "authentic
 
 
 REVOKE ALL ON FUNCTION "public"."update_tmp_invite_role_rbac"("p_org_id" "uuid", "p_email" "text", "p_new_role_name" "text") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."update_tmp_invite_role_rbac"("p_org_id" "uuid", "p_email" "text", "p_new_role_name" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."update_tmp_invite_role_rbac"("p_org_id" "uuid", "p_email" "text", "p_new_role_name" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_tmp_invite_role_rbac"("p_org_id" "uuid", "p_email" "text", "p_new_role_name" "text") TO "service_role";
 
@@ -31992,6 +32487,10 @@ GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public".
 GRANT ALL ON SEQUENCE "public"."stripe_info_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."stripe_info_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."stripe_info_id_seq" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."stripe_refunds" TO "service_role";
 
 
 

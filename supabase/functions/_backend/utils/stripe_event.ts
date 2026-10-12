@@ -193,7 +193,7 @@ function invoiceCreatedOrUpdated(event: Stripe.InvoiceCreatedEvent | Stripe.Invo
   return data
 }
 
-function getStripeCustomerId(
+export function getStripeCustomerId(
   customer: Stripe.Charge['customer'] | Stripe.Checkout.Session['customer'] | Stripe.Invoice['customer'],
 ): string {
   if (!customer)
@@ -245,11 +245,21 @@ export function extractDataEvent(c: Context, event: Stripe.Event): StripeData {
     data.status = 'succeeded'
     data.customer_id = getStripeCustomerId(charge.customer)
   }
+  else if (event.type === 'charge.refunded') {
+    const charge = event.data.object
+    data.status = 'updated'
+    data.customer_id = getStripeCustomerId(charge.customer)
+  }
   else if (event.type === 'invoice.upcoming') {
     data = invoiceUpcoming(event, data)
   }
   else if (event.type === 'invoice.created' || event.type === 'invoice.updated') {
     data = invoiceCreatedOrUpdated(event, data)
+  }
+  else if (event.type === 'invoice.payment_action_required') {
+    // 3DS / e-mandate confirmation needed: notify only, never touch stripe_info.
+    data.status = 'updated'
+    data.customer_id = getStripeCustomerId(event.data.object.customer)
   }
   else if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
     const session = event.data.object as Stripe.Checkout.Session

@@ -1797,6 +1797,8 @@ export type Database = {
           plugin_major_breakdown: Json
           plugin_version_breakdown: Json
           plugin_version_ladder: Json
+          refunds_amount: number
+          refunds_count: number
           registers_today: number
           revenue_enterprise: number
           revenue_maker: number
@@ -1910,6 +1912,8 @@ export type Database = {
           plugin_major_breakdown?: Json
           plugin_version_breakdown?: Json
           plugin_version_ladder?: Json
+          refunds_amount?: number
+          refunds_count?: number
           registers_today?: number
           revenue_enterprise?: number
           revenue_maker?: number
@@ -2023,6 +2027,8 @@ export type Database = {
           plugin_major_breakdown?: Json
           plugin_version_breakdown?: Json
           plugin_version_ladder?: Json
+          refunds_amount?: number
+          refunds_count?: number
           registers_today?: number
           revenue_enterprise?: number
           revenue_maker?: number
@@ -3581,6 +3587,45 @@ export type Database = {
         }
         Relationships: []
       }
+      stripe_refunds: {
+        Row: {
+          amount: number
+          charge_id: string
+          created_at: string
+          currency: string
+          customer_id: string | null
+          id: string
+          reason: string | null
+          refunded_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          charge_id: string
+          created_at?: string
+          currency: string
+          customer_id?: string | null
+          id: string
+          reason?: string | null
+          refunded_at: string
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          charge_id?: string
+          created_at?: string
+          currency?: string
+          customer_id?: string | null
+          id?: string
+          reason?: string | null
+          refunded_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tmp_users: {
         Row: {
           cancelled_at: string | null
@@ -3590,6 +3635,7 @@ export type Database = {
           future_uuid: string
           id: number
           invite_magic_string: string
+          invited_by_user_id: string | null
           last_name: string
           org_id: string
           rbac_role_name: string
@@ -3603,6 +3649,7 @@ export type Database = {
           future_uuid?: string
           id?: number
           invite_magic_string?: string
+          invited_by_user_id?: string | null
           last_name: string
           org_id: string
           rbac_role_name?: string
@@ -3616,6 +3663,7 @@ export type Database = {
           future_uuid?: string
           id?: number
           invite_magic_string?: string
+          invited_by_user_id?: string | null
           last_name?: string
           org_id?: string
           rbac_role_name?: string
@@ -4320,6 +4368,10 @@ export type Database = {
     }
     Functions: {
       accept_invitation_to_org: { Args: { org_id: string }; Returns: string }
+      accept_tmp_user_invitation: {
+        Args: { p_invite_magic_string: string; p_user_id: string }
+        Returns: string
+      }
       ack_updates_cache_purge: {
         Args: {
           p_lease_token: string
@@ -4391,6 +4443,15 @@ export type Database = {
       }
       assert_preview_bundle_owner: {
         Args: { p_app_id: string; p_owner_org: string; p_version_id: number }
+        Returns: undefined
+      }
+      assert_principal_can_grant_org_role: {
+        Args: {
+          p_mutation: string
+          p_org_id: string
+          p_principal_id: string
+          p_role_name: string
+        }
         Returns: undefined
       }
       assert_request_principal_rank: {
@@ -6009,6 +6070,7 @@ export type Database = {
         Args: { email: string; org_id: string }
         Returns: string
       }
+      reset_and_seed_demo_customer_data: { Args: never; Returns: undefined }
       reset_onboarding_demo_app_data: {
         Args: { p_app_uuid: string }
         Returns: undefined
@@ -6277,6 +6339,7 @@ export type Database = {
         | "webview_page_loaded"
         | "app_nav"
         | "channelPaused"
+        | "update_check_error"
       stripe_status:
         | "created"
         | "succeeded"
@@ -6565,6 +6628,7 @@ export const Constants = {
         "webview_page_loaded",
         "app_nav",
         "channelPaused",
+        "update_check_error",
       ],
       stripe_status: [
         "created",

@@ -48,6 +48,7 @@ function createGeoContext(country?: string, header?: string) {
 afterEach(() => {
   mockedEnv.STRIPE_NEW_CUSTOMERS_ACCOUNT = 'ee'
   delete mockedEnv.STRIPE_SECRET_KEY_US
+  delete mockedEnv.STRIPE_WEBHOOK_SECRET_US
 })
 
 const SOLO_PLAN = {
@@ -209,12 +210,16 @@ describe('new org billing account from location', () => {
   it('suggests us for US visitors only when the US account is configured', () => {
     expect(getSuggestedBillingAccount(createGeoContext('US'))).toBe('ee')
     mockedEnv.STRIPE_SECRET_KEY_US = 'sk_test_us'
+    // Key without webhook secret: US webhooks would not sync, stay on ee.
+    expect(getSuggestedBillingAccount(createGeoContext('US'))).toBe('ee')
+    mockedEnv.STRIPE_WEBHOOK_SECRET_US = 'whsec_test_us'
     expect(getSuggestedBillingAccount(createGeoContext('US'))).toBe('us')
     expect(getSuggestedBillingAccount(createGeoContext('FR'))).toBe('ee')
   })
 
   it('lets the user choice override the suggestion', () => {
     mockedEnv.STRIPE_SECRET_KEY_US = 'sk_test_us'
+    mockedEnv.STRIPE_WEBHOOK_SECRET_US = 'whsec_test_us'
     expect(resolveNewOrgBillingAccount(createGeoContext('US'), 'ee')).toBe('ee')
     expect(resolveNewOrgBillingAccount(createGeoContext('FR'), 'us')).toBe('us')
     expect(resolveNewOrgBillingAccount(createGeoContext('US'))).toBe('us')

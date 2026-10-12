@@ -5,8 +5,8 @@ import type { BillingAccount } from './stripe_billing.ts'
 import { createFactory } from 'hono/factory'
 import { simpleError } from './hono.ts'
 import { cloudlog } from './logging.ts'
-import { extractDataEvent, parseStripeEvent } from './stripe_event.ts'
 import { getStripeWebhookSecret } from './stripe_billing.ts'
+import { extractDataEvent, parseStripeEvent } from './stripe_event.ts'
 
 export interface MiddlewareKeyVariablesStripe {
   Bindings: Bindings
@@ -35,7 +35,8 @@ export function middlewareStripeWebhook(billingAccount: BillingAccount = 'ee') {
     const stripeEvent = await parseStripeEvent(c, body, signature, billingAccount)
     const stripeDataEvent = extractDataEvent(c, stripeEvent)
     const stripeData = stripeDataEvent.data
-    if (stripeData.customer_id === '') {
+    // Refunds are recorded for stats even when the charge has no Stripe customer.
+    if (stripeData.customer_id === '' && stripeEvent.type !== 'charge.refunded') {
       cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no customer found', billingAccount })
       throw simpleError('webhook_error_no_customer', 'Webhook Error: no customer found')
     }

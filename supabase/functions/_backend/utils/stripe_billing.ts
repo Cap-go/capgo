@@ -39,7 +39,7 @@ export function getRequestCountry(c: Context): string | null {
 }
 
 export function getSuggestedBillingAccount(c: Context): BillingAccount {
-  if (getRequestCountry(c) === 'US' && isStripeConfiguredForAccount(c, 'us'))
+  if (getRequestCountry(c) === 'US' && isStripeAccountReadyForNewCustomers(c, 'us'))
     return 'us'
   return getNewCustomersBillingAccount(c)
 }
@@ -47,7 +47,7 @@ export function getSuggestedBillingAccount(c: Context): BillingAccount {
 // New orgs: an explicit user choice wins, otherwise fall back to the geo suggestion.
 export function resolveNewOrgBillingAccount(c: Context, requested?: BillingAccount | null): BillingAccount {
   if (requested === 'us')
-    return isStripeConfiguredForAccount(c, 'us') ? 'us' : getNewCustomersBillingAccount(c)
+    return isStripeAccountReadyForNewCustomers(c, 'us') ? 'us' : getNewCustomersBillingAccount(c)
   if (requested === 'ee')
     return 'ee'
   return getSuggestedBillingAccount(c)
@@ -74,6 +74,11 @@ export function isStripeConfiguredForAccount(c: Context, account: BillingAccount
   if (!secretKey)
     return false
   return secretKey.startsWith('sk_') || secretKey.startsWith('rk_')
+}
+
+// Fail closed: no new customers on an account whose webhook is not wired, or their subscriptions never sync.
+export function isStripeAccountReadyForNewCustomers(c: Context, account: BillingAccount): boolean {
+  return isStripeConfiguredForAccount(c, account) && getStripeWebhookSecret(c, account).trim().startsWith('whsec_')
 }
 
 export class IncompleteUsPlanConfigError extends Error {
