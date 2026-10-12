@@ -22510,6 +22510,9 @@ CREATE TABLE IF NOT EXISTS "public"."build_requests" (
     "ai_analyzed" boolean DEFAULT false NOT NULL,
     "started_at" timestamp with time zone,
     "completed_at" timestamp with time zone,
+    "ios_dependency_manager" "text",
+    "xcode_version" "text",
+    CONSTRAINT "build_requests_ios_dependency_manager_check" CHECK ((("ios_dependency_manager" IS NULL) OR ("ios_dependency_manager" = ANY (ARRAY['cocoapods'::"text", 'spm'::"text"])))),
     CONSTRAINT "build_requests_platform_check" CHECK ((("platform")::"text" = ANY (ARRAY[('ios'::character varying)::"text", ('android'::character varying)::"text"]))),
     CONSTRAINT "build_requests_run_interval_check" CHECK ((("started_at" IS NULL) OR ("completed_at" IS NULL) OR ("completed_at" >= "started_at")))
 );
@@ -22531,6 +22534,14 @@ COMMENT ON COLUMN "public"."build_requests"."started_at" IS 'Builder-reported jo
 
 
 COMMENT ON COLUMN "public"."build_requests"."completed_at" IS 'Builder-reported job completion (UTC). Used for capacity reconstruction.';
+
+
+
+COMMENT ON COLUMN "public"."build_requests"."ios_dependency_manager" IS 'iOS dependency manager detected by the CLI (cocoapods or spm). NULL for Android builds or CLIs that do not report it.';
+
+
+
+COMMENT ON COLUMN "public"."build_requests"."xcode_version" IS 'Xcode version of the builder runner that ran the build (its major is the iOS SDK). NULL until a runner claims the build or when the builder does not report it.';
 
 
 
@@ -23362,7 +23373,11 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
     "users_with_2fa" bigint DEFAULT 0 NOT NULL,
     "apps_with_store_url" bigint DEFAULT 0 NOT NULL,
     "refunds_count" bigint DEFAULT 0 NOT NULL,
-    "refunds_amount" double precision DEFAULT 0 NOT NULL
+    "refunds_amount" double precision DEFAULT 0 NOT NULL,
+    "build_requests_day_ios_cocoapods" integer DEFAULT 0 NOT NULL,
+    "build_requests_day_ios_spm" integer DEFAULT 0 NOT NULL,
+    "build_requests_day_ios_unknown" integer DEFAULT 0 NOT NULL,
+    "build_requests_day_ios_sdk" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL
 );
 
 
@@ -23698,6 +23713,22 @@ COMMENT ON COLUMN "public"."global_stats"."refunds_count" IS 'Number of Stripe r
 
 
 COMMENT ON COLUMN "public"."global_stats"."refunds_amount" IS 'Total USD amount refunded on the snapshot UTC day, in dollars (failed and canceled refunds excluded).';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."build_requests_day_ios_cocoapods" IS 'iOS native build requests on the snapshot UTC day whose project uses CocoaPods.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."build_requests_day_ios_spm" IS 'iOS native build requests on the snapshot UTC day whose project uses Swift Package Manager.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."build_requests_day_ios_unknown" IS 'iOS native build requests on the snapshot UTC day without a reported dependency manager (older CLI).';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."build_requests_day_ios_sdk" IS 'iOS native build requests on the snapshot UTC day by iOS SDK (Xcode major), e.g. {"26": 120, "27": 4, "unknown": 3}. unknown = never claimed by a runner or not reported.';
 
 
 
@@ -24434,6 +24465,25 @@ ALTER TABLE "public"."roles" OWNER TO "postgres";
 
 
 COMMENT ON TABLE "public"."roles" IS 'Canonical RBAC roles. Scope_type indicates the native scope the role is defined for.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."sso_provider_org_links" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "sso_provider_id" "uuid" NOT NULL,
+    "org_id" "uuid" NOT NULL,
+    "role_mapping" "jsonb",
+    "linked_by" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "sso_provider_org_links_role_mapping_object_check" CHECK ((("role_mapping" IS NULL) OR ("jsonb_typeof"("role_mapping") = 'object'::"text")))
+);
+
+
+ALTER TABLE "public"."sso_provider_org_links" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."sso_provider_org_links" IS 'Orgs sharing an SSO provider owned by another org (same company, same IdP). Each link carries the role mapping applied to that org on every SSO login. Written only by /private/sso/providers/:id/links.';
 
 
 
@@ -25707,6 +25757,16 @@ ALTER TABLE ONLY "public"."roles"
 
 
 
+ALTER TABLE ONLY "public"."sso_provider_org_links"
+    ADD CONSTRAINT "sso_provider_org_links_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."sso_provider_org_links"
+    ADD CONSTRAINT "sso_provider_org_links_provider_org_key" UNIQUE ("sso_provider_id", "org_id");
+
+
+
 ALTER TABLE ONLY "public"."sso_providers"
     ADD CONSTRAINT "sso_providers_domain_key" UNIQUE ("domain");
 
@@ -26149,6 +26209,10 @@ CREATE INDEX "idx_build_requests_app_created_at" ON "public"."build_requests" US
 
 
 
+CREATE INDEX "idx_build_requests_created_at_platform" ON "public"."build_requests" USING "btree" ("created_at", "platform");
+
+
+
 CREATE INDEX "idx_build_requests_job" ON "public"."build_requests" USING "btree" ("builder_job_id");
 
 
@@ -26546,6 +26610,10 @@ CREATE UNIQUE INDEX "si_customer_cover_uidx" ON "public"."stripe_info" USING "bt
 
 
 CREATE INDEX "si_customer_status_trial_idx" ON "public"."stripe_info" USING "btree" ("customer_id", "status", "trial_at") INCLUDE ("mau_exceeded", "storage_exceeded", "bandwidth_exceeded");
+
+
+
+CREATE INDEX "sso_provider_org_links_org_id_idx" ON "public"."sso_provider_org_links" USING "btree" ("org_id");
 
 
 
@@ -27524,6 +27592,21 @@ ALTER TABLE ONLY "public"."role_permissions"
 
 
 
+ALTER TABLE ONLY "public"."sso_provider_org_links"
+    ADD CONSTRAINT "sso_provider_org_links_linked_by_fkey" FOREIGN KEY ("linked_by") REFERENCES "auth"."users"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."sso_provider_org_links"
+    ADD CONSTRAINT "sso_provider_org_links_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."sso_provider_org_links"
+    ADD CONSTRAINT "sso_provider_org_links_sso_provider_id_fkey" FOREIGN KEY ("sso_provider_id") REFERENCES "public"."sso_providers"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."sso_providers"
     ADD CONSTRAINT "sso_providers_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
 
@@ -27905,6 +27988,10 @@ CREATE POLICY "Deny all access" ON "public"."daily_revenue_metrics" USING (false
 
 
 CREATE POLICY "Deny all access" ON "public"."processed_stripe_events" USING (false) WITH CHECK (false);
+
+
+
+CREATE POLICY "Deny all access" ON "public"."sso_provider_org_links" TO "anon", "authenticated" USING (false) WITH CHECK (false);
 
 
 
@@ -28736,6 +28823,9 @@ COMMENT ON POLICY "roles_select" ON "public"."roles" IS 'All authenticated users
 
 CREATE POLICY "roles_update" ON "public"."roles" FOR UPDATE TO "authenticated" USING (false);
 
+
+
+ALTER TABLE "public"."sso_provider_org_links" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."sso_providers" ENABLE ROW LEVEL SECURITY;
@@ -32450,6 +32540,10 @@ GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public".
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."roles" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."roles" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."roles" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."sso_provider_org_links" TO "service_role";
 
 
 
