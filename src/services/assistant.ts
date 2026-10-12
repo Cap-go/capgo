@@ -51,30 +51,52 @@ const CHATGPT_ERROR_CODES = new Set(['chatgpt_not_connected', 'chatgpt_reconnect
 /** Where users review their ChatGPT plan usage and per-app limits. */
 export const CHATGPT_MANAGE_USAGE_URL = 'https://chatgpt.com/#settings'
 
+export type ChatGptMode = 'dynamic' | 'partner'
+
 export interface ChatGptStatus {
   configured: boolean
+  /** dynamic: loopback redirect read in-app (native) or pasted (web); partner: https redirect to the console. */
+  mode: ChatGptMode
   connected: boolean
   email: string | null
   planUsage: boolean
 }
 
-export async function getChatGptStatus(): Promise<ChatGptStatus> {
-  const { data, error } = await invokeCapgoApi<ChatGptStatus>('private/assistant/chatgpt', { method: 'GET' })
-  if (error || !data)
-    return { configured: false, connected: false, email: null, planUsage: false }
+export interface AssistantStatus {
+  chatgpt: ChatGptStatus
+  /** Whether the server holds a usable "MCP · Capgo Assistant" key for this user. */
+  hasKey: boolean
+}
+
+const EMPTY_STATUS: AssistantStatus = { chatgpt: { configured: false, mode: 'dynamic', connected: false, email: null, planUsage: false }, hasKey: false }
+
+export async function getAssistantStatus(): Promise<AssistantStatus> {
+  const { data, error } = await invokeCapgoApi<AssistantStatus>('private/assistant/status', { method: 'GET' })
+  return error || !data ? EMPTY_STATUS : data
+}
+
+/** Hand the freshly minted key to the server, which keeps it encrypted. The browser never stores it. */
+export async function saveAssistantKey(apikey: string): Promise<void> {
+  const { error } = await invokeCapgoApi('private/assistant/key', { method: 'POST', body: { apikey } })
+  if (error)
+    throw new Error(await getCapgoApiErrorCode(error) ?? 'assistant_key_failed')
+}
+
+export interface ChatGptAuthorization {
+  url: string
+  mode: ChatGptMode
+  redirectUri: string
+}
+
+export async function startChatGptConnect(returnTo: string): Promise<ChatGptAuthorization> {
+  const { data, error } = await invokeCapgoApi<ChatGptAuthorization>('private/assistant/chatgpt/authorize', { method: 'POST', body: { returnTo } })
+  if (error || !data?.url)
+    throw new Error(await getCapgoApiErrorCode(error) ?? 'chatgpt_authorize_failed')
   return data
 }
 
-/** Returns the OpenAI authorize URL; the browser leaves the console and comes back on /assistant/chatgpt-callback. */
-export async function startChatGptConnect(returnTo: string): Promise<string> {
-  const { data, error } = await invokeCapgoApi<{ url: string }>('private/assistant/chatgpt/authorize', { method: 'POST', body: { returnTo } })
-  if (error || !data?.url)
-    throw new Error(await getCapgoApiErrorCode(error) ?? 'chatgpt_authorize_failed')
-  return data.url
-}
-
-export async function completeChatGptConnect(code: string, state: string): Promise<{ returnTo: string, email: string | null, planUsage: boolean }> {
-  const { data, error } = await invokeCapgoApi<{ returnTo: string, email: string | null, planUsage: boolean }>('private/assistant/chatgpt/callback', { method: 'POST', body: { code, state } })
+export async function completeChatGptConnect(callback: { code: string, state: string, clientId?: string }): Promise<{ returnTo: string, email: string | null, planUsage: boolean }> {
+  const { data, error } = await invokeCapgoApi<{ returnTo: string, email: string | null, planUsage: boolean }>('private/assistant/chatgpt/callback', { method: 'POST', body: callback })
   if (error || !data)
     throw new Error(await getCapgoApiErrorCode(error) ?? 'chatgpt_callback_failed')
   return data
@@ -82,10 +104,6 @@ export async function completeChatGptConnect(code: string, state: string): Promi
 
 export async function disconnectChatGpt(): Promise<void> {
   await invokeCapgoApi('private/assistant/chatgpt', { method: 'DELETE' })
-}
-
-export function assistantKeyStorageKey(userId: string): string {
-  return `capgo-assistant-key:${userId}`
 }
 
 /** Plain-text transcript sent to the model: card answers are already user turns, so cards are dropped. */
@@ -111,20 +129,18 @@ export async function createAssistantKey(
 }
 
 export async function askAssistant(
-  apikey: string,
   messages: AssistantTurn[],
   context: AssistantContext,
   confirm?: { tool: string, arguments: Record<string, unknown> },
 ): Promise<AssistantResponse> {
   const { data, error } = await invokeCapgoApi<AssistantResponse>('private/assistant', {
     method: 'POST',
-    headers: { capgkey: apikey },
     body: { messages: toAssistantHistory(messages), context, ...(confirm ? { confirm } : {}) },
     retries: 0,
   })
   if (error || !data) {
     const code = await getCapgoApiErrorCode(error)
-    if (code === 'invalid_apikey' || code === 'no_key_provided')
+    if (code === 'assistant_key_missing')
       throw new AssistantKeyError(code)
     if (code && CHATGPT_ERROR_CODES.has(code))
       throw new AssistantChatGptError(code as AssistantChatGptError['code'])

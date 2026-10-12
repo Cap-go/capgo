@@ -3,17 +3,21 @@ import type { McpApiRequest, McpToolContext } from '../supabase/functions/_backe
 import type { ModelAccess } from '../supabase/functions/_backend/private/assistant.ts'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tokenizeAssistantText } from '../src/utils/assistantText.ts'
+import { parseChatGptCallback } from '../src/utils/chatgptCallback.ts'
 import { base64UrlEncode } from '../supabase/functions/_backend/mcp/oauth_utils.ts'
 import { MCP_TOOLS_BY_NAME } from '../supabase/functions/_backend/mcp/tools.ts'
-import { needsConfirmation, readResponseStream, responsesTools, runAssistant, sanitizeConsolePath } from '../supabase/functions/_backend/private/assistant.ts'
+import { needsConfirmation, readResponseStream, resolveModel, responsesTools, runAssistant, sanitizeConsolePath } from '../supabase/functions/_backend/private/assistant.ts'
 import {
   buildAuthorizeUrl,
+  CHATGPT_DYNAMIC_CLIENT_ID,
+  CHATGPT_LOOPBACK_REDIRECT_URI,
   CHATGPT_SCOPES,
   chatGptEndpoints,
   decryptSecret,
   encryptSecret,
   hasPlanUsage,
   pkceChallenge,
+  resolveIssuedClientId,
   safeReturnTo,
   verifyIdToken,
 } from '../supabase/functions/_backend/utils/chatgpt_oauth.ts'
@@ -49,7 +53,7 @@ function completed(output: ModelOutput) {
   if (output.text)
     items.push({ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: output.text }] })
   for (const [name, args] of output.calls ?? [])
-    items.push({ type: 'function_call', call_id: `call_${++callCounter}`, name, namespace: name.startsWith('capgo_') ? 'capgo' : 'console', arguments: JSON.stringify(args) })
+    items.push({ type: 'function_call', call_id: `call_${++callCounter}`, name, namespace: name.startsWith('capgo_') ? 'capgo' : 'capgo_ui', arguments: JSON.stringify(args) })
   return sse([{ type: 'response.created' }, ...(output.text ? [{ type: 'response.output_text.delta', delta: output.text }] : []), { type: 'response.completed', response: { output: items } }])
 }
 
@@ -57,6 +61,8 @@ function completed(output: ModelOutput) {
 function mockResponses(outputs: Array<ModelOutput | string>) {
   const requests: Array<{ url: string, auth: string | null, body: { input: Array<Record<string, unknown>>, store: boolean, stream: boolean, tools?: unknown[], instructions: string } }> = []
   vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
+    if (url.endsWith('/models'))
+      return Response.json({ models: [{ slug: 'gpt-hidden', visibility: 'hide' }, { slug: 'gpt-plan-default', visibility: 'list' }] })
     requests.push({ url, auth: new Headers(init.headers).get('authorization'), body: JSON.parse(String(init.body)) })
     const next = outputs.shift() ?? { text: 'done' }
     return new Response(typeof next === 'string' ? next : completed(next), { status: 200, headers: { 'content-type': 'text/event-stream' } })
@@ -82,7 +88,7 @@ describe('assistant helpers', () => {
 
   it.concurrent('groups tools in namespaces as ChatGPT plan usage requires', () => {
     const tools = responsesTools() as Array<{ type: string, name: string, tools: Array<{ type: string, name: string }> }>
-    expect(tools.map(tool => [tool.type, tool.name])).toEqual([['namespace', 'console'], ['namespace', 'capgo']])
+    expect(tools.map(tool => [tool.type, tool.name])).toEqual([['namespace', 'capgo_ui'], ['namespace', 'capgo']])
     expect(tools[0].tools.map(tool => tool.name)).toEqual(['show_link', 'ask_user'])
     expect(tools[1].tools.every(tool => tool.type === 'function' && tool.name.startsWith('capgo_'))).toBe(true)
   })
@@ -94,6 +100,12 @@ describe('assistant helpers', () => {
     ])
   })
 
+  it.concurrent('falls back to streamed items when response.completed has an empty output', async () => {
+    const item = { type: 'function_call', call_id: 'c1', name: 'show_link', namespace: 'capgo_ui', arguments: '{"title":"A","path":"/apps"}' }
+    const turn = await readResponseStream(new Response(sse([{ type: 'response.output_item.done', item }, { type: 'response.completed', response: { output: [] } }])).body!)
+    expect(turn.calls).toEqual([{ type: 'function_call', call_id: 'c1', name: 'show_link', namespace: 'capgo_ui', arguments: '{"title":"A","path":"/apps"}' }])
+  })
+
   it.concurrent('reports a failed or interrupted stream', async () => {
     const failed = await readResponseStream(new Response(sse([{ type: 'response.failed', response: { error: { code: 'subscription_sharing_usage_limit_exceeded' } } }])).body!)
     expect(failed.failedCode).toBe('subscription_sharing_usage_limit_exceeded')
@@ -103,6 +115,44 @@ describe('assistant helpers', () => {
 })
 
 describe('sign in with ChatGPT helpers', () => {
+  it.concurrent('registers a dynamic agent client like the Capgo browser app', async () => {
+    const url = new URL(buildAuthorizeUrl({
+      endpoints: chatGptEndpoints(),
+      clientId: CHATGPT_DYNAMIC_CLIENT_ID,
+      redirectUri: CHATGPT_LOOPBACK_REDIRECT_URI,
+      state: 's',
+      nonce: 'n',
+      codeChallenge: 'c',
+      hostId: 'urn:uuid:00000000-0000-4000-8000-000000000000',
+      agentNameHint: 'Capgo',
+    }))
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({
+      client_id: 'dynamic_agent_client',
+      redirect_uri: 'http://127.0.0.1:1455/auth/callback',
+      ext_agent_host_id: 'urn:uuid:00000000-0000-4000-8000-000000000000',
+      agent_name_hint: 'Capgo',
+    })
+    expect(chatGptEndpoints().jwks).toBe('https://auth.openai.com/api/accounts/oauth/jwks')
+  })
+
+  it.concurrent('requires an issued client on registration and refuses a client switch', () => {
+    expect(resolveIssuedClientId(CHATGPT_DYNAMIC_CLIENT_ID, 'oaiapp_new')).toBe('oaiapp_new')
+    expect(resolveIssuedClientId(CHATGPT_DYNAMIC_CLIENT_ID, undefined)).toBeNull()
+    expect(resolveIssuedClientId(CHATGPT_DYNAMIC_CLIENT_ID, CHATGPT_DYNAMIC_CLIENT_ID)).toBeNull()
+    expect(resolveIssuedClientId('oaiapp_saved', undefined)).toBe('oaiapp_saved')
+    expect(resolveIssuedClientId('oaiapp_saved', 'oaiapp_saved')).toBe('oaiapp_saved')
+    expect(resolveIssuedClientId('oaiapp_saved', 'oaiapp_other')).toBeNull()
+  })
+
+  it.concurrent('parses only the loopback callback address', () => {
+    expect(parseChatGptCallback('http://127.0.0.1:1455/auth/callback?code=abc&state=xyz&client_id=oaiapp_1&scope=openid', CHATGPT_LOOPBACK_REDIRECT_URI))
+      .toEqual({ code: 'abc', state: 'xyz', clientId: 'oaiapp_1', error: undefined })
+    expect(parseChatGptCallback(' http://127.0.0.1:1455/auth/callback?error=access_denied&state=xyz ', CHATGPT_LOOPBACK_REDIRECT_URI))
+      .toMatchObject({ error: 'access_denied' })
+    expect(parseChatGptCallback('https://evil.example/auth/callback?code=abc', CHATGPT_LOOPBACK_REDIRECT_URI)).toBeNull()
+    expect(parseChatGptCallback('not a url', CHATGPT_LOOPBACK_REDIRECT_URI)).toBeNull()
+  })
+
   it.concurrent('builds the authorize URL with PKCE, plan usage scope and resource', async () => {
     const url = new URL(buildAuthorizeUrl({
       endpoints: chatGptEndpoints(),
@@ -184,6 +234,7 @@ describe('assistant loop on the Responses API', () => {
     expect(result.cards).toEqual([{ type: 'link', title: 'Channels', description: undefined, path: '/app/com.example.app/channels' }])
     expect(result.actions).toEqual([{ tool: 'capgo_list_apps', title: 'List apps', ok: true }])
     expect(requests[0].url).toBe('https://api.openai.com/v1/responses')
+    expect(requests[0].body).toMatchObject({ model: 'gpt-plan-default' })
     expect(requests[0].auth).toBe('Bearer chatgpt-access-token')
     expect(requests.every(request => request.body.store === false && request.body.stream === true)).toBe(true)
     // History is resent each round: the function call and its output follow the user message.
@@ -202,7 +253,7 @@ describe('assistant loop on the Responses API', () => {
     expect(result.cards).toEqual([{ type: 'question', question: 'Which app?', options: ['com.a', 'com.b'], allowFreeText: false }])
     expect(result.reply).toBe('Pick an app.')
     expect(requests).toHaveLength(2)
-    expect(requests[1].body.tools).toBeUndefined()
+    expect(requests[1].body).toMatchObject({ tool_choice: 'none' })
   })
 
   it('never runs a destructive tool without confirmation', async () => {
@@ -229,6 +280,24 @@ describe('assistant loop on the Responses API', () => {
     expect(calls[0].method).toBe('DELETE')
     expect(result.actions).toEqual([{ tool: 'capgo_delete_channel', title: 'Delete channel', ok: true }])
     expect(String(requests[0].body.input.at(-1)?.content)).toContain('I confirmed the action capgo_delete_channel')
+  })
+
+  it('still reports a confirmed action when the summary call fails', async () => {
+    mockResponses([sse([{ type: 'response.failed', response: { error: { code: 'server_error' } } }])])
+    const { ctx, calls } = fakeToolContext({ status: 'ok' })
+    const result = await runAssistant(fakeHonoContext, {
+      messages: [{ role: 'user', content: 'Delete beta' }],
+      confirm: { tool: 'capgo_delete_channel', arguments: { appId: 'com.example.app', channel: 'beta' } },
+    }, ctx, chatgptAccess)
+
+    expect(calls).toHaveLength(1)
+    expect(result.actions).toEqual([{ tool: 'capgo_delete_channel', title: 'Delete channel', ok: true }])
+    expect(result.reply).toContain('completed')
+  })
+
+  it('picks a model listed for the ChatGPT plan', async () => {
+    mockResponses([])
+    expect(await resolveModel(fakeHonoContext, { token: 'plan-token-for-model-test', source: 'chatgpt' })).toBe('gpt-plan-default')
   })
 
   it('refuses to confirm a tool that does not need confirmation', async () => {

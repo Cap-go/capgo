@@ -6,6 +6,14 @@ import { base64UrlDecode, base64UrlEncode, randomToken } from '../mcp/oauth_util
  */
 
 export const CHATGPT_DEFAULT_ISSUER = 'https://auth.openai.com'
+/**
+ * Dynamic agent registration: the first sign-in uses this client_id and OpenAI issues a per-user
+ * oaiapp_ client in the callback. Same flow as the Capgo browser app, no partner approval needed.
+ */
+export const CHATGPT_DYNAMIC_CLIENT_ID = 'dynamic_agent_client'
+export const CHATGPT_AGENT_NAME = 'Capgo'
+/** Dynamic registration only accepts an http loopback redirect. The console reads the code from it. */
+export const CHATGPT_LOOPBACK_REDIRECT_URI = 'http://127.0.0.1:1455/auth/callback'
 export const CHATGPT_RESOURCE = 'https://api.openai.com/v1'
 /** Identity + refresh token + Responses API access billed to the user's ChatGPT plan. */
 export const CHATGPT_SCOPES = 'openid profile email offline_access resource.invoke chatgpt.tokens.use.direct'
@@ -40,7 +48,7 @@ export function chatGptEndpoints(issuer = CHATGPT_DEFAULT_ISSUER): ChatGptEndpoi
     issuer: base,
     authorize: `${base}/api/accounts/authorize`,
     token: `${base}/api/accounts/oauth/token`,
-    jwks: `${base}/.well-known/jwks.json`,
+    jwks: `${base}/api/accounts/oauth/jwks`,
   }
 }
 
@@ -56,6 +64,8 @@ export interface AuthorizeParams {
   nonce: string
   codeChallenge: string
   hostId?: string
+  /** Sent on first dynamic registration only. */
+  agentNameHint?: string
   loginHint?: string
 }
 
@@ -72,9 +82,30 @@ export function buildAuthorizeUrl(params: AuthorizeParams): string {
   url.searchParams.set('code_challenge', params.codeChallenge)
   if (params.hostId)
     url.searchParams.set('ext_agent_host_id', params.hostId)
+  if (params.agentNameHint)
+    url.searchParams.set('agent_name_hint', params.agentNameHint)
   if (params.loginHint)
     url.searchParams.set('login_hint', params.loginHint)
   return url.toString()
+}
+
+export function newHostId(): string {
+  return `urn:uuid:${crypto.randomUUID()}`
+}
+
+/**
+ * Validate the client_id returned by the callback. A registration must return a newly issued client;
+ * a re-authorization may omit it but must never switch to another client.
+ */
+export function resolveIssuedClientId(pendingClientId: string, callbackClientId: string | undefined): string | null {
+  if (pendingClientId === CHATGPT_DYNAMIC_CLIENT_ID) {
+    if (!callbackClientId || callbackClientId === CHATGPT_DYNAMIC_CLIENT_ID)
+      return null
+    return callbackClientId
+  }
+  if (callbackClientId && callbackClientId !== pendingClientId)
+    return null
+  return pendingClientId
 }
 
 export function newOAuthTransaction() {

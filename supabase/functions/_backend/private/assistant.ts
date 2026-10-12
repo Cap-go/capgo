@@ -2,17 +2,18 @@ import type { Context } from 'hono'
 import type { McpDispatch } from '../mcp/index.ts'
 import type { McpTool, McpToolContext } from '../mcp/tools.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import type { Database } from '../utils/supabase.types.ts'
+import type { ConnectionRow } from './assistant_chatgpt.ts'
 import { z } from 'zod'
 import { createCaller } from '../mcp/index.ts'
+import { sha256Hex } from '../mcp/oauth_utils.ts'
 import { listTools, SERVER_INSTRUCTIONS } from '../mcp/protocol.ts'
 import { MCP_TOOLS_BY_NAME } from '../mcp/tools.ts'
 import { honoFactory, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
-import { middlewareKey } from '../utils/hono_middleware.ts'
+import { middlewareAuth } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { safeParseSchema } from '../utils/schema_validation.ts'
 import { getEnv } from '../utils/utils.ts'
-import { ChatGptError, getChatGptAccessToken, isChatGptConfigured, registerChatGptRoutes } from './assistant_chatgpt.ts'
+import { ChatGptError, getAssistantApiKey, getChatGptAccessToken, isChatGptConfigured, registerChatGptRoutes, requireUserSession } from './assistant_chatgpt.ts'
 
 /**
  * In-console Capgo assistant.
@@ -27,9 +28,10 @@ import { ChatGptError, getChatGptAccessToken, isChatGptConfigured, registerChatG
  * come back as a confirm card and only run once the user clicks it.
  */
 
-type ApikeyRow = Database['public']['Tables']['apikeys']['Row']
-
-const DEFAULT_MODEL = 'gpt-5-mini'
+/** Preferred model; ChatGPT plans list their own catalog, so the first listed model is the fallback. */
+const DEFAULT_MODEL = 'gpt-6.1-sol'
+const MODEL_FETCH_TIMEOUT_MS = 10_000
+const MODEL_CALL_TIMEOUT_MS = 90_000
 const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1'
 const MAX_ROUNDS = 8
 const MAX_TOOL_RESULT_CHARS = 20_000
@@ -98,7 +100,7 @@ const UI_FUNCTIONS = [
   {
     type: 'function',
     name: 'show_link',
-    description: 'Show the user a clickable card that opens a page of the Capgo console. Use it whenever you mention where something lives, after finding a resource, or after an action so the user can check the result.',
+    description: 'Show the user a clickable card that opens a page of the Capgo web app. Use it whenever you mention where something lives, after finding a resource, or after an action so the user can check the result.',
     strict: false,
     parameters: {
       type: 'object',
@@ -179,7 +181,7 @@ export function responsesTools(): unknown[] {
       parameters: tool.inputSchema,
     }))
     toolsCache = [
-      { type: 'namespace', name: 'console', description: 'Show cards in the Capgo console chat.', tools: UI_FUNCTIONS },
+      { type: 'namespace', name: 'capgo_ui', description: 'Show cards in the Capgo chat panel.', tools: UI_FUNCTIONS },
       { type: 'namespace', name: 'capgo', description: 'Capgo Cloud MCP tools acting on the user account.', tools: mcpFunctions },
     ]
   }
@@ -223,7 +225,7 @@ function systemPrompt(body: AssistantBody): string {
     ctx.appId ? `Current app: ${ctx.appId}` : null,
   ].filter(Boolean).join('\n')
   return [
-    'You are the Capgo assistant inside the Capgo web console. You help users find things and act on their Capgo account.',
+    'You are the Capgo assistant inside the Capgo web app (the console). You help users find things and act on their Capgo account.',
     SERVER_INSTRUCTIONS,
     'Rules:',
     '- Use the capgo_* tools to look up real data before answering. Never invent ids, versions or numbers.',
@@ -250,12 +252,19 @@ function upstreamError(code: string | undefined, status: number): never {
   throw quickError(502, 'assistant_upstream_error', 'The assistant is unavailable right now, try again in a moment')
 }
 
-/** Read a Responses API event stream until response.completed and collect text and function calls. */
+/**
+ * Read a Responses API event stream until response.completed and collect text and function calls.
+ * With store: false the completed event can carry an empty output, so items announced by
+ * response.output_item.done are kept as the fallback.
+ */
 export async function readResponseStream(body: ReadableStream<Uint8Array>): Promise<ModelTurn & { failedCode?: string }> {
   const reader = body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
-  let output: OutputItem[] | null = null
+  let completed = false
+  let output: OutputItem[] = []
+  const streamedItems: OutputItem[] = []
+  let streamedText = ''
   let failedCode: string | undefined
   for (;;) {
     const { value, done } = await reader.read()
@@ -269,46 +278,94 @@ export async function readResponseStream(body: ReadableStream<Uint8Array>): Prom
       const data = block.split('\n').filter(line => line.startsWith('data:')).map(line => line.slice(5).trim()).join('\n')
       if (!data || data === '[DONE]')
         continue
-      let event: { type?: string, response?: { output?: OutputItem[], error?: { code?: string } }, error?: { code?: string }, code?: string }
+      let event: { type?: string, delta?: string, item?: OutputItem, response?: { output?: OutputItem[], error?: { code?: string } }, error?: { code?: string }, code?: string }
       try {
         event = JSON.parse(data)
       }
       catch {
         continue
       }
-      if (event.type === 'response.completed')
+      if (event.type === 'response.output_text.delta') {
+        streamedText += event.delta ?? ''
+      }
+      else if (event.type === 'response.output_item.done' && event.item) {
+        streamedItems.push(event.item)
+      }
+      else if (event.type === 'response.completed') {
+        completed = true
         output = event.response?.output ?? []
-      else if (event.type === 'response.failed' || event.type === 'response.incomplete')
+      }
+      else if (event.type === 'response.failed' || event.type === 'response.incomplete') {
         failedCode = event.response?.error?.code ?? event.type
-      else if (event.type === 'error')
+      }
+      else if (event.type === 'error') {
         failedCode = event.error?.code ?? event.code ?? 'error'
+      }
     }
     if (done)
       break
   }
-  if (!output)
+  if (!completed)
     return { text: '', calls: [], failedCode: failedCode ?? 'stream_interrupted' }
-  const text = output.filter(item => item.type === 'message').flatMap(item => item.content ?? []).filter(part => part.type === 'output_text').map(part => part.text ?? '').join('')
-  const calls = output.filter(item => item.type === 'function_call' && item.call_id && item.name).map(item => ({
+  const items = output.length ? output : streamedItems
+  const itemText = items.filter(item => item.type === 'message').flatMap(item => item.content ?? []).filter(part => part.type === 'output_text').map(part => part.text ?? '').join('')
+  const calls = items.filter(item => item.type === 'function_call' && item.call_id && item.name).map(item => ({
     type: 'function_call' as const,
     call_id: item.call_id!,
     name: item.name!,
     arguments: item.arguments ?? '{}',
     ...(item.namespace ? { namespace: item.namespace } : {}),
   }))
-  return { text, calls }
+  return { text: itemText || streamedText, calls }
+}
+
+function openAiBaseUrl(c: Context): string {
+  // Any OpenAI-compatible Responses endpoint works (gateway, local stub). ChatGPT plan usage needs api.openai.com.
+  return (getEnv(c, 'ASSISTANT_OPENAI_BASE_URL') || DEFAULT_OPENAI_BASE_URL).replace(/\/$/, '')
+}
+
+const modelCache = new Map<string, { slug: string, at: number }>()
+
+/** Pick a model from the account's catalog: ChatGPT plans list different models than API keys. */
+export async function resolveModel(c: Context, access: ModelAccess): Promise<string> {
+  const preferred = getEnv(c, 'ASSISTANT_OPENAI_MODEL') || DEFAULT_MODEL
+  const cacheKey = await sha256Hex(access.token)
+  const cached = modelCache.get(cacheKey)
+  if (cached && Date.now() - cached.at < 3_600_000)
+    return cached.slug
+  let slug = preferred
+  try {
+    const response = await fetch(`${openAiBaseUrl(c)}/models`, { headers: { authorization: `Bearer ${access.token}` }, signal: AbortSignal.timeout(MODEL_FETCH_TIMEOUT_MS) })
+    if (response.ok) {
+      // ChatGPT plan catalog: { models: [{ slug, visibility }] }; API key catalog: { data: [{ id }] }.
+      const body = await response.json() as { models?: Array<{ slug?: string, visibility?: string }>, data?: Array<{ id?: string }> }
+      const listed = (body.models ?? []).filter(model => model.slug && model.visibility === 'list').map(model => model.slug!)
+      const ids = listed.length ? listed : (body.data ?? []).map(model => model.id).filter((id): id is string => !!id)
+      slug = ids.includes(preferred) ? preferred : (listed[0] ?? preferred)
+    }
+  }
+  catch {}
+  modelCache.set(cacheKey, { slug, at: Date.now() })
+  return slug
 }
 
 async function callModel(c: Context, access: ModelAccess, instructions: string, input: InputItem[], allowTools = true): Promise<ModelTurn> {
-  const model = getEnv(c, 'ASSISTANT_OPENAI_MODEL') || DEFAULT_MODEL
-  // Any OpenAI-compatible Responses endpoint works (gateway, local stub). ChatGPT plan usage needs api.openai.com.
-  const baseUrl = (getEnv(c, 'ASSISTANT_OPENAI_BASE_URL') || DEFAULT_OPENAI_BASE_URL).replace(/\/$/, '')
-  const response = await fetch(`${baseUrl}/responses`, {
-    method: 'POST',
-    headers: { 'authorization': `Bearer ${access.token}`, 'content-type': 'application/json', 'accept': 'text/event-stream' },
-    // ChatGPT plan usage requires store: false and stream: true on every request.
-    body: JSON.stringify({ model, instructions, input, store: false, stream: true, ...(allowTools ? { tools: responsesTools() } : {}) }),
-  })
+  const model = await resolveModel(c, access)
+  let response: Response
+  try {
+    response = await fetch(`${openAiBaseUrl(c)}/responses`, {
+      method: 'POST',
+      headers: { 'authorization': `Bearer ${access.token}`, 'content-type': 'application/json', 'accept': 'text/event-stream' },
+      // ChatGPT plan usage requires store: false and stream: true on every request. Tools stay
+      // declared on the last turn (history references them); tool_choice none forces plain text.
+      body: JSON.stringify({ model, instructions, input, store: false, stream: true, tools: responsesTools(), ...(allowTools ? {} : { tool_choice: 'none' }) }),
+      signal: AbortSignal.timeout(MODEL_CALL_TIMEOUT_MS),
+    })
+  }
+  catch (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'assistant_openai_network_error', source: access.source, error: error instanceof Error ? error.message : String(error) })
+    upstreamError(undefined, 0)
+  }
   if (!response.ok || !response.body) {
     const detail = await response.text().catch(() => '')
     cloudlog({ requestId: c.get('requestId'), message: 'assistant_openai_error', status: response.status, source: access.source, detail: detail.slice(0, 500), openaiRequestId: response.headers.get('x-request-id') })
@@ -319,7 +376,15 @@ async function callModel(c: Context, access: ModelAccess, instructions: string, 
     catch {}
     upstreamError(code, response.status)
   }
-  const turn = await readResponseStream(response.body)
+  let turn: Awaited<ReturnType<typeof readResponseStream>>
+  try {
+    turn = await readResponseStream(response.body)
+  }
+  catch (error) {
+    // A timeout while streaming aborts the body read.
+    cloudlog({ requestId: c.get('requestId'), message: 'assistant_openai_stream_error', source: access.source, error: error instanceof Error ? error.message : String(error) })
+    upstreamError(undefined, 0)
+  }
   if (turn.failedCode) {
     cloudlog({ requestId: c.get('requestId'), message: 'assistant_openai_stream_failed', code: turn.failedCode, source: access.source })
     upstreamError(turn.failedCode, 200)
@@ -358,8 +423,19 @@ export async function runAssistant(c: Context, body: AssistantBody, ctx: McpTool
     })
   }
 
+  // A confirmed action already ran: if the summary call fails, still report it instead of an error.
+  let confirmedActionNeedsFallback = !!body.confirm && actions.at(-1)?.ok === true
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    const turn = await callModel(c, access, instructions, input)
+    let turn: ModelTurn
+    try {
+      turn = await callModel(c, access, instructions, input)
+    }
+    catch (error) {
+      if (confirmedActionNeedsFallback)
+        return { reply: 'Done. The action completed, but I could not write a summary.', cards, actions }
+      throw error
+    }
+    confirmedActionNeedsFallback = false
     if (!turn.calls.length)
       return { reply: turn.text, cards, actions }
 
@@ -424,9 +500,9 @@ export async function runAssistant(c: Context, body: AssistantBody, ctx: McpTool
 }
 
 /** The user's ChatGPT plan first; a server key only when one is configured as fallback. */
-async function resolveModelAccess(c: Context, userId: string): Promise<ModelAccess> {
+async function resolveModelAccess(c: Context, userId: string, connection: ConnectionRow): Promise<ModelAccess> {
   try {
-    const token = await getChatGptAccessToken(c, userId)
+    const token = await getChatGptAccessToken(c, userId, connection)
     if (token)
       return { token, source: 'chatgpt' }
   }
@@ -458,16 +534,20 @@ export function createAssistantApp(dispatch?: McpDispatch) {
   app.use('*', useCors)
   registerChatGptRoutes(app)
 
-  app.post('/', middlewareKey(), async (c) => {
+  app.post('/', middlewareAuth(), async (c) => {
+    const auth = requireUserSession(c)
     const parsed = safeParseSchema(bodySchema, await parseBody<unknown>(c))
     if (!parsed.success)
       throw simpleError('invalid_body', 'Invalid assistant request')
 
-    const apikey = c.get('apikey') as ApikeyRow
-    const access = await resolveModelAccess(c, apikey.user_id)
-    const token = (c.req.header('capgkey') ?? c.req.header('authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
+    // MCP tools run with the user's stored assistant API key, never sent by the browser.
+    const stored = await getAssistantApiKey(c, auth.userId)
+    if (!stored)
+      throw quickError(409, 'assistant_key_missing', 'Connect the assistant first')
+    const { key, row: apikey, connection } = stored
+    const access = await resolveModelAccess(c, auth.userId, connection)
     const ctx: McpToolContext = {
-      call: createCaller(c as Context<MiddlewareKeyVariables>, dispatch ?? supabaseDispatch(c), token),
+      call: createCaller(c as Context<MiddlewareKeyVariables>, dispatch ?? supabaseDispatch(c), key),
       caller: { userId: apikey.user_id, apikeyId: Number(apikey.id), apikeyName: apikey.name, apikeyExpiresAt: apikey.expires_at },
     }
     cloudlog({ requestId: c.get('requestId'), message: 'assistant_request', apikeyId: apikey.id, source: access.source, turns: parsed.data.messages.length, confirm: parsed.data.confirm?.tool })

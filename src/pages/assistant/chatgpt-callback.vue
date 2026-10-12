@@ -26,7 +26,7 @@ onMounted(async () => {
     return
   }
   try {
-    const result = await completeChatGptConnect(code, state)
+    const result = await completeChatGptConnect({ code, state, clientId: queryValue('client_id') || undefined })
     sessionStorage.setItem(ASSISTANT_OPEN_AFTER_CONNECT_KEY, '1')
     router.replace(result.returnTo)
   }

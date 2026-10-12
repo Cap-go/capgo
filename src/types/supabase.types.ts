@@ -538,12 +538,16 @@ export type Database = {
         Row: {
           access_expires_at: string | null
           access_token_enc: string | null
+          apikey_enc: string | null
           client_id: string | null
           connected_at: string | null
           created_at: string
           email: string | null
+          host_id: string | null
+          pending_client_id: string | null
           pending_expires_at: string | null
           pending_nonce: string | null
+          pending_redirect_uri: string | null
           pending_return_to: string | null
           pending_state_hash: string | null
           pending_verifier_enc: string | null
@@ -557,12 +561,16 @@ export type Database = {
         Insert: {
           access_expires_at?: string | null
           access_token_enc?: string | null
+          apikey_enc?: string | null
           client_id?: string | null
           connected_at?: string | null
           created_at?: string
           email?: string | null
+          host_id?: string | null
+          pending_client_id?: string | null
           pending_expires_at?: string | null
           pending_nonce?: string | null
+          pending_redirect_uri?: string | null
           pending_return_to?: string | null
           pending_state_hash?: string | null
           pending_verifier_enc?: string | null
@@ -576,12 +584,16 @@ export type Database = {
         Update: {
           access_expires_at?: string | null
           access_token_enc?: string | null
+          apikey_enc?: string | null
           client_id?: string | null
           connected_at?: string | null
           created_at?: string
           email?: string | null
+          host_id?: string | null
+          pending_client_id?: string | null
           pending_expires_at?: string | null
           pending_nonce?: string | null
+          pending_redirect_uri?: string | null
           pending_return_to?: string | null
           pending_state_hash?: string | null
           pending_verifier_enc?: string | null
