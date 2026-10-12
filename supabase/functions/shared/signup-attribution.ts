@@ -106,7 +106,7 @@ function readFirstTouchType(record: AttributionRecord): FirstTouchType | undefin
 }
 
 function readFirstTouchPath(record: AttributionRecord): string | undefined {
-  const raw = readAttributionString(record.first_touch_path, FIRST_TOUCH_PATH_MAX)
+  const raw = readNonEmptyString(record.first_touch_path)
   if (!raw)
     return undefined
 

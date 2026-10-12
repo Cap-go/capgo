@@ -35,6 +35,19 @@ describe('resolveSignupAttributionForOrg', () => {
     expect(attribution).toEqual({ signup_plugin: 'capacitor-updater' })
   })
 
+  it('drops unsafe org signup_plugin values', async () => {
+    getUserByIdMock.mockResolvedValue({ data: { user: { user_metadata: {} } }, error: null })
+    const { resolveSignupAttributionForOrg } = await import('../supabase/functions/_backend/utils/signup_attribution.ts')
+    const context = { get: () => undefined } as unknown as import('hono').Context
+
+    const attribution = await resolveSignupAttributionForOrg(context, {
+      created_by: 'user-1',
+      signup_plugin: 'user@example.com',
+    })
+
+    expect(attribution).toEqual({})
+  })
+
   it('prefers org signup_plugin over creator metadata plugin', async () => {
     getUserByIdMock.mockResolvedValue({
       data: {

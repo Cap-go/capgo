@@ -10,7 +10,7 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 import { createStripeCustomer, finalizePendingStripeCustomer, isPendingStripeCustomerId } from '../utils/stripe_org.ts'
 import { buildOnboardingIntentBentoEventData, parseOrgOnboardingIntent, syncOrgOnboardingIntentForOrg } from '../utils/org_onboarding_intent.ts'
 import { resolveSignupAttributionForOrg, resolveSignupAttributionForUser } from '../utils/signup_attribution.ts'
-import { signupAttributionEventTags } from '../../shared/signup-attribution.ts'
+import { parseSignupAttributionRecord, signupAttributionEventTags } from '../../shared/signup-attribution.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
@@ -44,9 +44,9 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c)
 
   const org = orgRow ?? queuedRecord
 
-  let signupPlugin = typeof org.signup_plugin === 'string' && org.signup_plugin.trim().length > 0
-    ? org.signup_plugin.trim()
-    : null
+  let signupPlugin = parseSignupAttributionRecord({
+    signup_plugin: org.signup_plugin,
+  }).signup_plugin ?? null
   if (!signupPlugin) {
     try {
       const creatorAttribution = await resolveSignupAttributionForUser(c, org.created_by)

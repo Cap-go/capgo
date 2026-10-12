@@ -53,6 +53,15 @@ describe('signup attribution parsing', () => {
     expect(parseSignupAttributionRecord({
       first_touch_path: '/docs/getting-started/',
     }).first_touch_path).toBe('/docs/getting-started/')
+    expect(parseSignupAttributionRecord({
+      first_touch_path: '/docs/intro?utm_source=docs',
+    }).first_touch_path).toBe('/docs/intro')
+  })
+
+  it('rejects unsafe signup_plugin values on org rows', () => {
+    expect(parseSignupAttributionRecord({
+      signup_plugin: 'user@example.com',
+    }).signup_plugin).toBeUndefined()
   })
 
   it('truncates oversized attribution strings', () => {

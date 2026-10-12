@@ -38,9 +38,9 @@ export async function resolveSignupAttributionForOrg(
   c: Context,
   org: { created_by: string, signup_plugin?: string | null },
 ): Promise<ResolvedSignupAttribution> {
-  const orgSignupPlugin = typeof org.signup_plugin === 'string' && org.signup_plugin.trim().length > 0
-    ? org.signup_plugin.trim()
-    : undefined
+  const orgSignupPlugin = parseSignupAttributionRecord({
+    signup_plugin: org.signup_plugin,
+  }).signup_plugin
   const orgOverlay = orgSignupPlugin ? { signup_plugin: orgSignupPlugin } : null
 
   let attribution: ResolvedSignupAttribution = {}
