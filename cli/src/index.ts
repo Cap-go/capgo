@@ -729,6 +729,7 @@ NEVER commit the private key - store it securely!
 Example: npx @capgo/cli@latest key create`)
   .action(createKey)
   .option('-f, --force', `Force generate a new one`)
+  .option('--skip-capgo-app-id-prompt', `Skip the optional prompt to create a Capgo app with a random app ID after key creation`)
   .option('--capacitor-config <path>', optionDescriptions.capacitorConfig)
 
 key
