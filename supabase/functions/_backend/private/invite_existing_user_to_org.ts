@@ -1,7 +1,6 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { z } from 'zod'
-import { safeParseSchema } from '../utils/schema_validation.ts'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { CacheHelper } from '../utils/cache.ts'
 import { BRES, createHono, parseBody, quickError, useCors } from '../utils/hono.ts'
@@ -9,6 +8,7 @@ import { middlewareAuth } from '../utils/hono_jwt.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { closeClient, getPgClient } from '../utils/pg.ts'
 import { canCallerAssignOrgRole, checkPermission } from '../utils/rbac.ts'
+import { safeParseSchema } from '../utils/schema_validation.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 import { version } from '../utils/version.ts'
@@ -57,7 +57,7 @@ export function getInviteResendRequiredPermission(
 }
 
 async function lockInviteNotification(c: AppContext, orgId: string, userId: string) {
-  const pgClient = getPgClient(c)
+  const pgClient = await getPgClient(c)
   const inviteNotificationLockKey = getInviteNotificationLockKey(orgId, userId)
 
   try {
@@ -79,7 +79,7 @@ async function lockInviteNotification(c: AppContext, orgId: string, userId: stri
 
 async function unlockInviteNotification(
   c: AppContext,
-  pgClient: ReturnType<typeof getPgClient>,
+  pgClient: Awaited<ReturnType<typeof getPgClient>>,
   orgId: string,
   userId: string,
 ) {

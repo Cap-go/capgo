@@ -3,7 +3,7 @@ import type { EmailPreferenceKey, NotificationAudience } from './org_email_notif
 import type { PostHogGroups } from './posthog.ts'
 import { cloudlogErr, serializeError } from './logging.ts'
 import { sendNotifToOrgMembers, sendNotifToOrgMembersOnce } from './org_email_notifications.ts'
-import { getDrizzleClient, getPgClient } from './pg.ts'
+import { closeClient, getDrizzleClient, getPgClient } from './pg.ts'
 import { trackPosthogEvent } from './posthog.ts'
 import { backgroundTask } from './utils.ts'
 
@@ -166,7 +166,7 @@ async function executeBentoTracking(c: Context, payload: SendEventToTrackingPayl
   }
 
   await runTrackedCall(c, 'bento', async () => {
-    const pgClient = getPgClient(c, true)
+    const pgClient = await getPgClient(c, true)
     try {
       if (bento.once) {
         // Permanent per-(event, org, uniqId) claim: per-entity alerts (e.g. an
@@ -198,7 +198,7 @@ async function executeBentoTracking(c: Context, payload: SendEventToTrackingPayl
       )
     }
     finally {
-      await pgClient.end()
+      await closeClient(c, pgClient)
     }
   }, strict)
 }

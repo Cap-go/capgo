@@ -26,9 +26,9 @@ export async function processAppFameBatch(c: Context<MiddlewareKeyVariables>): P
     throw quickError(503, 'ai_unavailable', 'Workers AI binding is not configured')
   }
 
-  let pgClient: ReturnType<typeof getPgClient> | undefined
+  let pgClient: Awaited<ReturnType<typeof getPgClient>> | undefined
   try {
-    pgClient = getPgClient(c)
+    pgClient = await getPgClient(c)
     const drizzleClient = getDrizzleClient(pgClient)
     const candidateResult = await drizzleClient.execute(sql`
       SELECT

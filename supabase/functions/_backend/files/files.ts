@@ -706,9 +706,9 @@ export function calculateBytesTransferred(objLen: number, r2Range: R2Range | und
   return isPositiveFiniteNumber(bytesTransferred) ? bytesTransferred : objLen
 }
 
-type ParsedAttachmentByteRange =
-  | { kind: 'partial', start: number, end: number, bytesTransferred: number }
-  | { kind: 'invalid' }
+type ParsedAttachmentByteRange
+  = | { kind: 'partial', start: number, end: number, bytesTransferred: number }
+    | { kind: 'invalid' }
 
 export function parseAttachmentByteRange(rangeHeader: string, fileSize: number): ParsedAttachmentByteRange {
   if (!isPositiveFiniteNumber(fileSize)) {
@@ -1172,7 +1172,7 @@ async function checkWriteAppAccess(c: Context, next: Next) {
   })
 
   // Use Postgres instead of Supabase SDK
-  const pgClient = getPgClient(c, false) // authz + plan gating must read primary
+  const pgClient = await getPgClient(c, false) // authz + plan gating must read primary
   const drizzleClient = getDrizzleClient(pgClient)
 
   try {

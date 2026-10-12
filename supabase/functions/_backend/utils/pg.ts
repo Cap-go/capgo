@@ -3,20 +3,46 @@ import type { Context } from 'hono'
 import type { PoolClient } from 'pg'
 import { and, eq, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
-import { CapgoDrizzleQueryLogger } from './drizzle_query_logger.ts'
 import { alias } from 'drizzle-orm/pg-core'
+import { getRuntimeKey } from 'hono/adapter'
 // @ts-types="npm:@types/pg"
-import { Pool } from 'pg'
+import { Client, Pool } from 'pg'
 import { serializePostgresError } from '../plugin_runtime/utils/postgres_error.ts'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { CacheHelper } from './cache.ts'
 import { getChannelSelfOverride, isChannelSelfStoreEnabled } from './channelSelfStore.ts'
+import { CapgoDrizzleQueryLogger } from './drizzle_query_logger.ts'
 import { getClientDbRegionSB } from './geolocation.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import * as schema from './postgres_schema.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
 import { resolveRolloutDecision } from './rollout.ts'
 import { shouldRequireReadReplica, shouldSkipDirectHyperdriveFallback } from './supabase_write_guard.ts'
+
+/**
+ * PG client handle. On Hyperdrive (workerd) this is a per-request `Client`;
+ * elsewhere it is a short-lived `Pool`.
+ */
+export type PgClient = Client | Pool
+
+/** Checked-out query handle: Pool connection or a connected Hyperdrive Client. */
+export type PgQueryClient = PoolClient | Client
+
+/** Hyperdrive owns Worker↔origin cleanup; do not call `.end()` on these clients. */
+const skipEndClients = new WeakSet<object>()
+
+export async function checkoutPgClient(pg: PgClient): Promise<PgQueryClient> {
+  if (skipEndClients.has(pg))
+    return pg as Client
+  return (pg as Pool).connect()
+}
+
+export function releasePgClient(pg: PgClient | null | undefined, client: object | null | undefined, error?: boolean | Error): void {
+  if (!pg || !client || skipEndClients.has(pg))
+    return
+  if ('release' in client && typeof client.release === 'function')
+    client.release(error)
+}
 
 const REPLICATION_LAG_THRESHOLD_SECONDS = 180
 const REPLICATION_LAG_CACHE_TTL_SECONDS = 60
@@ -119,7 +145,7 @@ export function buildPlanValidationExpression(
   ) OR (${customerIdSubquery} IS NULL)`
 }
 
-export function selectOne(pgClient: ReturnType<typeof getPgClient>) {
+export function selectOne(pgClient: PgClient) {
   // Use pg Pool directly to avoid Drizzle's prepared statement handling
   // which doesn't work with Supabase pooler in transaction mode
   return pgClient.query('SELECT 1')
@@ -366,7 +392,33 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
   return fixSupabaseHost(getEnv(c, 'SUPABASE_DB_URL'))
 }
 
-export function getPgClient(c: Context, readOnly = false) {
+/** True when dbUrl is one of this Worker's Hyperdrive binding connection strings. */
+function isHyperdriveConnectionString(c: Context, dbUrl: string): boolean {
+  const env = c.env as Record<string, { connectionString?: string } | undefined> | undefined
+  if (!env)
+    return false
+  for (const [key, value] of Object.entries(env)) {
+    if (!key.startsWith('HYPERDRIVE_') || !value?.connectionString)
+      continue
+    if (value.connectionString === dbUrl)
+      return true
+  }
+  return false
+}
+
+/**
+ * Create a DB client for this request.
+ *
+ * Hyperdrive connection lifecycle (explicit Cloudflare contract):
+ * @see https://developers.cloudflare.com/hyperdrive/concepts/connection-lifecycle/
+ * - New `pg.Client` inside each request. Never create/cache Client/Pool in global scope.
+ * - `await client.connect()`, then query.
+ * - Do **not** call `client.end()` / `pool.end()`: Workers-to-Hyperdrive connections
+ *   are automatically cleaned up when the request ends.
+ *
+ * Non-Hyperdrive (local/direct/pooler): `Pool` + explicit `closeClient`/`end()`.
+ */
+export async function getPgClient(c: Context, readOnly = false): Promise<PgClient> {
   const dbUrl = getDatabaseURL(c, readOnly)
   const requestId = c.get('requestId')
   const appName = c.res.headers.get('X-Worker-Source') ?? 'unknown source'
@@ -374,18 +426,35 @@ export function getPgClient(c: Context, readOnly = false) {
   cloudlog({ requestId, message: 'SUPABASE_DB_URL selected', dbName, appName, readOnly })
 
   const isPooler = dbName.startsWith('sb_pooler')
-  const options = {
-    connectionString: dbUrl,
-    max: 4,
-    application_name: `${appName}-${dbName}`,
-    idleTimeoutMillis: 20000, // Increase from 2 to 20 seconds
-    connectionTimeoutMillis: 10000, // Add explicit connect timeout
-    maxLifetimeMillis: 30 * 60 * 1000, // 30 minutes
-    // PgBouncer/Supabase pooler doesn't support the 'options' startup parameter
-    options: readOnly && !isPooler ? '-c default_transaction_read_only=on' : undefined,
+  // PgBouncer/Supabase pooler doesn't support the 'options' startup parameter
+  const readOnlyOptions = readOnly && !isPooler ? '-c default_transaction_read_only=on' : undefined
+  const isWorkerd = getRuntimeKey() === 'workerd'
+  // Match on the actual connection string so the Hyperdrive Client contract cannot
+  // silently become Pool+end() if c.set is missed.
+  if (isWorkerd && isHyperdriveConnectionString(c, dbUrl)) {
+    const client = new Client({
+      connectionString: dbUrl,
+      application_name: `${appName}-${dbName}`,
+      connectionTimeoutMillis: 10000,
+      options: readOnlyOptions,
+    })
+    client.on('error', (err: Error) => {
+      cloudlogErr({ requestId, message: 'PG Client Error', databaseSource: dbName, error: serializePostgresError(err) })
+    })
+    await client.connect()
+    skipEndClients.add(client)
+    return client
   }
 
-  const pool = new Pool(options)
+  const pool = new Pool({
+    connectionString: dbUrl,
+    max: isWorkerd ? 1 : 4,
+    application_name: `${appName}-${dbName}`,
+    idleTimeoutMillis: 20000,
+    connectionTimeoutMillis: 10000,
+    maxLifetimeSeconds: 30 * 60,
+    options: readOnlyOptions,
+  })
 
   // Hook to log when connections are removed from the pool
   pool.on('remove', () => {
@@ -402,8 +471,8 @@ export function getPgClient(c: Context, readOnly = false) {
 // Transactions must run on one checked-out connection: BEGIN/COMMIT issued on
 // the Pool itself can land on different connections and leave one idle in
 // transaction, holding row locks until the server kills it.
-export async function withPgTransaction<T>(pgPool: ReturnType<typeof getPgClient>, run: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await pgPool.connect()
+export async function withPgTransaction<T>(pgPool: PgClient, run: (client: PgQueryClient) => Promise<T>): Promise<T> {
+  const client = await checkoutPgClient(pgPool)
   try {
     await client.query('BEGIN')
     try {
@@ -419,13 +488,13 @@ export async function withPgTransaction<T>(pgPool: ReturnType<typeof getPgClient
     }
   }
   finally {
-    client.release()
+    releasePgClient(pgPool, client)
   }
 }
 
 const capgoDrizzleQueryLogger = new CapgoDrizzleQueryLogger()
 
-export function getDrizzleClient(db: ReturnType<typeof getPgClient> | PoolClient, options?: { logger?: boolean }) {
+export function getDrizzleClient(db: PgClient | PgQueryClient, options?: { logger?: boolean }) {
   // Keep SQL logging on by default for API/trigger diagnostics.
   // Plugin hot paths pass `{ logger: false }` to avoid per-request log CPU/volume.
   const enableLogger = options?.logger ?? true
@@ -442,11 +511,14 @@ export function logPgError(c: Context, functionName: string, error: unknown) {
   })
 }
 
-export function closeClient(c: Context, db: ReturnType<typeof getPgClient>) {
-  // Always end the request-scoped pool. On workerd a Pool that is never ended
-  // leaks its Hyperdrive sockets until the pool slots are exhausted (the workerd
-  // sawtooth). backgroundTask defers end() to waitUntil, so it never adds
-  // request latency.
+export function closeClient(c: Context, db: PgClient) {
+  // Hyperdrive: do not end() — connection-lifecycle docs say GC cleans the edge hop.
+  // https://developers.cloudflare.com/hyperdrive/concepts/connection-lifecycle/
+  if (skipEndClients.has(db))
+    return
+
+  // Non-Hyperdrive Pool: must end() or we leak sockets (the old workerd sawtooth).
+  // backgroundTask defers end() to waitUntil, so it never adds request latency.
   return backgroundTask(c, Promise.resolve(db.end()).catch((error: unknown) => {
     cloudlogErr({
       requestId: c.get('requestId'),

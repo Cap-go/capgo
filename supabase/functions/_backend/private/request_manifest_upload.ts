@@ -50,7 +50,7 @@ app.post('/', middlewareKey({ usePostgres: true, readOnly: false, rateLimitScope
   if (!auth?.userId)
     return quickError(401, 'not_authorized', 'Not authorized')
 
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
   try {
     const drizzleClient = getDrizzleClient(pgClient)
     const [version] = await drizzleClient

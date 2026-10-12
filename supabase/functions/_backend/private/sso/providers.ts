@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
-import type { PoolClient } from 'pg'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
+import type { PgQueryClient } from '../../utils/pg.ts'
 import type { SsoRoleMapping } from './role-mapping.ts'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
@@ -129,7 +129,7 @@ async function requireSuperAdminForRoleMapping(c: Context<MiddlewareKeyVariables
   // Legacy API keys have no RBAC principal, hence no role in the org.
   if (auth.authType === 'apikey' && !auth.apikey?.rbac_id)
     quickError(403, 'role_mapping_requires_super_admin', 'Only organization super admins can change the SSO role mapping')
-  const pgPool = getPgClient(c)
+  const pgPool = await getPgClient(c)
   try {
     const drizzle = getDrizzleClient(pgPool)
     const callerRank = auth.authType === 'apikey'
@@ -151,7 +151,7 @@ async function requireSuperAdminForRoleMapping(c: Context<MiddlewareKeyVariables
 // on login, so the access SSO granted on them is revoked when the mapping is
 // saved: app bindings created by SSO and group memberships SSO added (added_by
 // is the user itself), for users of the provider's domain only.
-async function revokeUnmappedSsoAccess(client: PoolClient, orgId: string, domain: string, appIds: string[], groupIds: string[]) {
+async function revokeUnmappedSsoAccess(client: PgQueryClient, orgId: string, domain: string, appIds: string[], groupIds: string[]) {
   if (appIds.length > 0) {
     await client.query(
       `
@@ -227,7 +227,7 @@ async function applyProviderUpdate(
   const values = columns.map(column => JSONB_PROVIDER_COLUMNS.has(column) && updates[column] !== null ? JSON.stringify(updates[column]) : updates[column])
   const setClause = columns.map((column, index) => `"${column}" = $${index + 2}`).join(', ')
 
-  const pgPool = getPgClient(c)
+  const pgPool = await getPgClient(c)
   let restoreAuth: (() => Promise<void>) | null = null
   let lockedUpdatedAt: string | null = null
   try {
@@ -282,7 +282,7 @@ async function applyProviderUpdate(
 // outcome cannot be established, Auth is left alone and the case is logged.
 async function restoreAuthIfRolledBack(
   c: Context<MiddlewareKeyVariables>,
-  pgPool: ReturnType<typeof getPgClient>,
+  pgPool: Awaited<ReturnType<typeof getPgClient>>,
   id: string,
   lockedUpdatedAt: string | null,
   restoreAuth: () => Promise<void>,
@@ -305,7 +305,7 @@ async function restoreAuthIfRolledBack(
   }
 }
 
-async function setDomainSsoOnly(client: PoolClient, domain: string, isSsoOnly: boolean) {
+async function setDomainSsoOnly(client: PgQueryClient, domain: string, isSsoOnly: boolean) {
   await client.query(
     `
       update auth.users
@@ -637,7 +637,7 @@ app.delete('/:id', async (c) => {
   // policy requires a different permission than the one checked above, which
   // silently left orphaned rows behind.
   const wasSsoEnforced = provider.status === 'active' && provider.enforce_sso === true
-  const pgPool = getPgClient(c)
+  const pgPool = await getPgClient(c)
   try {
     await withPgTransaction(pgPool, async (client) => {
       await client.query('delete from public.sso_providers where id = $1', [id])

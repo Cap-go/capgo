@@ -53,9 +53,9 @@ async function loadApiKeyBindingOrgIdsForRbacIds(
     return orgIdsByRbacId
   }
 
-  let pgClient: ReturnType<typeof getPgClient> | undefined
+  let pgClient: Awaited<ReturnType<typeof getPgClient>> | undefined
   try {
-    pgClient = getPgClient(c)
+    pgClient = await getPgClient(c)
     const { rows } = await pgClient.query<{ principal_id: string, org_id: string }>(
       `
       SELECT DISTINCT principal_id::text, org_id::text
@@ -204,9 +204,9 @@ async function loadApiKeyOrgRoleBindings(
   c: Context<MiddlewareKeyVariables>,
   apikeyRbacId: string,
 ): Promise<Array<{ role_name: string, org_id: string }>> {
-  let pgClient: ReturnType<typeof getPgClient> | undefined
+  let pgClient: Awaited<ReturnType<typeof getPgClient>> | undefined
   try {
-    pgClient = getPgClient(c)
+    pgClient = await getPgClient(c)
     const { rows } = await pgClient.query<{ role_name: string, org_id: string }>(
       `
       SELECT DISTINCT r.name AS role_name, rb.org_id::text AS org_id

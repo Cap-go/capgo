@@ -44,7 +44,8 @@ vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
   supabaseAdmin: (...args: unknown[]) => supabaseAdminMock(...args),
 }))
 
-vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
+vi.mock('../supabase/functions/_backend/utils/pg.ts', async () => ({
+  ...(await import('./helpers/pg-checkout-release-mocks.ts')),
   getPgClient: (...args: unknown[]) => getPgClientMock(...args),
   closeClient: (...args: unknown[]) => closeClientMock(...args),
 }))
