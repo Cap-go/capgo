@@ -1,4 +1,4 @@
-# Console to manage and distribute your live update
+# Capgo: build Capacitor apps with AI, ship updates instantly
 
 <p align='center'>
   <img src='https://capgo.app/readme-banner.svg?repo=Cap-go/capgo' alt='Capgo - Instant updates for capacitor'/>
@@ -30,6 +30,40 @@
   <h2><a href="https://capgo.app/consulting/?ref=plugin"> Missing a feature? We’ll build the plugin for you 💪</a></h2>
 </div>
 <br>
+
+Capgo is the AI-ready platform to build, ship, and maintain Capacitor apps:
+Capacitor skills and MCP servers for AI coding agents (Claude Code, Codex,
+Cursor, Copilot, Gemini CLI), maintained Capacitor plugins, cloud native
+iOS/Android builds with App Store and Google Play publishing, live updates with
+channels and rollback, and release monitoring.
+
+This repository is the open-source core of [Capgo](https://capgo.app/): the web
+console, the backend API (Cloudflare Workers + Supabase, including the hosted
+MCP endpoint), and the `@capgo/cli` workspace (including the local MCP server).
+
+- [Capacitor skills for AI agents](https://capgo.app/skills/)
+- [AI agent setup](https://capgo.app/agents/)
+- [Capgo MCP docs](https://capgo.app/docs/ai/mcp/)
+- [Cloud native builds](https://capgo.app/native-build/)
+- [Capacitor plugins](https://capgo.app/plugins/)
+- [AI tools for Capacitor](https://capgo.app/best/ai-tools-for-capacitor/)
+
+## Use with AI coding agents
+
+Install the Capgo Capacitor skills in your agent (Claude Code, Codex, Cursor,
+Copilot, Gemini CLI):
+
+```bash
+npx skills add Cap-go/capgo-skills
+```
+
+Connect the Capgo MCP server so the agent can manage apps, channels, bundles,
+native builds, and stats:
+
+- Hosted MCP: `https://api.capgo.app/mcp` ([docs](https://capgo.app/docs/ai/mcp/))
+- Local MCP (served by the CLI in this repo): `npx @capgo/cli@latest mcp`
+
+Per-agent setup instructions are at [capgo.app/agents](https://capgo.app/agents/).
 
 ## Features
 
