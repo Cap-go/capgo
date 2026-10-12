@@ -1,5 +1,5 @@
 import type { User } from '@supabase/supabase-js'
-import type { ResolvedSignupAttribution } from '../../shared/signup-attribution.ts'
+import type { ResolvedSignupAttribution } from '../../supabase/functions/shared/signup-attribution.ts'
 import {
   CAPGO_ATTRIBUTION_COOKIE_NAME,
   mergeSignupAttribution,
@@ -8,7 +8,7 @@ import {
   parseSignupAttributionSearchParams,
   signupAttributionEventTags,
   signupAttributionToPostHogSetOnce,
-} from '../../shared/signup-attribution.ts'
+} from '../../supabase/functions/shared/signup-attribution.ts'
 
 const APPLIED_STORAGE_KEY = 'capgo_signup_attribution_applied'
 

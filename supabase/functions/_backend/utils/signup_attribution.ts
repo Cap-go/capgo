@@ -5,7 +5,7 @@ import {
   signupAttributionEventTags,
   type ResolvedSignupAttribution,
   type SignupAttributionEventTags,
-} from '../../../../shared/signup-attribution.ts'
+} from '../../shared/signup-attribution.ts'
 import { supabaseAdmin } from './supabase.ts'
 
 export function signupPluginTagsFromAttribution(attribution: ResolvedSignupAttribution): SignupAttributionEventTags {

@@ -6,7 +6,7 @@ import {
   signupAttributionEventTags,
   signupAttributionToPostHogSetOnce,
   signupPluginFromRef,
-} from '../shared/signup-attribution.ts'
+} from '../supabase/functions/shared/signup-attribution.ts'
 
 describe('signup attribution parsing', () => {
   it('derives signup_plugin from plugin ref', () => {
