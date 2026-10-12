@@ -1,16 +1,13 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readFileSync as readSource, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { readFileSync as readSource } from 'node:fs'
-import { dirname } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setConfigWriteTarget } from '../src/config/index.ts'
 import {
   CAPGO_APP_ID_OPT_IN_MESSAGE,
   generateRandomCapgoAppId,
   offerCapgoAppIdPrompt,
-  persistCapgoAppIdToCapacitorConfig,
 } from '../src/key/capgoAppIdPrompt.ts'
 
 const cliRoot = dirname(dirname(fileURLToPath(import.meta.url)))
@@ -28,16 +25,16 @@ async function test(name, fn) {
   }
 }
 
-function makeConfigFixture(initialAppId = 'com.example.before') {
+function makeConfigFixture(updaterAppId) {
   const root = mkdtempSync(join(tmpdir(), 'capgo-app-id-prompt-'))
   const configPath = join(root, 'capacitor.config.json')
   writeFileSync(configPath, JSON.stringify({
-    appId: initialAppId,
+    appId: 'com.example.native',
     appName: 'Test',
     webDir: 'www',
     plugins: {
       CapacitorUpdater: {
-        appId: initialAppId,
+        ...(updaterAppId ? { appId: updaterAppId } : {}),
         publicKey: '-----BEGIN RSA PUBLIC KEY-----\nTEST\n-----END RSA PUBLIC KEY-----',
       },
     },
@@ -51,133 +48,120 @@ function readConfig(configPath) {
   return JSON.parse(readFileSync(configPath, 'utf8'))
 }
 
+const quiet = { logSuccess: () => {}, logWarn: () => {} }
+
+async function withFixture(fn, initialAppId) {
+  const { root, configPath } = makeConfigFixture(initialAppId)
+  try {
+    await fn(configPath)
+  }
+  finally {
+    setConfigWriteTarget(undefined)
+    rmSync(root, { recursive: true, force: true })
+  }
+}
+
 await test('generateRandomCapgoAppId uses com.capgo prefix and valid shape', () => {
   const id = generateRandomCapgoAppId()
   assert.match(id, /^com\.capgo\.[a-f0-9]{16}$/)
 })
 
-await test('non-interactive skips without writing config', async () => {
-  const { root, configPath } = makeConfigFixture()
-  try {
-    const outcome = await offerCapgoAppIdPrompt({ interactive: false })
-    assert.equal(outcome, 'skipped')
-    assert.equal(readConfig(configPath).appId, 'com.example.before')
-  }
-  finally {
-    setConfigWriteTarget(undefined)
-    rmSync(root, { recursive: true, force: true })
-  }
-})
+await test('non-interactive skips without writing config', () => withFixture(async (configPath) => {
+  const outcome = await offerCapgoAppIdPrompt({ interactive: false })
+  assert.equal(outcome, 'skipped')
+  assert.equal(readConfig(configPath).plugins.CapacitorUpdater.appId, undefined)
+}))
 
-await test('skip flag skips without writing config', async () => {
-  const { root, configPath } = makeConfigFixture()
-  try {
-    const outcome = await offerCapgoAppIdPrompt({ skip: true, interactive: true })
-    assert.equal(outcome, 'skipped')
-    assert.equal(readConfig(configPath).appId, 'com.example.before')
-  }
-  finally {
-    setConfigWriteTarget(undefined)
-    rmSync(root, { recursive: true, force: true })
-  }
-})
+await test('skip flag skips without writing config', () => withFixture(async (configPath) => {
+  const outcome = await offerCapgoAppIdPrompt({ skip: true, interactive: true })
+  assert.equal(outcome, 'skipped')
+  assert.equal(readConfig(configPath).plugins.CapacitorUpdater.appId, undefined)
+}))
 
-await test('declining opt-in keeps existing app ID', async () => {
-  const { root, configPath } = makeConfigFixture()
-  try {
-    const outcome = await offerCapgoAppIdPrompt({
-      interactive: true,
-      deps: {
-        confirm: async () => false,
-      },
-    })
-    assert.equal(outcome, 'declined')
-    assert.equal(readConfig(configPath).appId, 'com.example.before')
-    assert.equal(readConfig(configPath).plugins.CapacitorUpdater.appId, 'com.example.before')
-  }
-  finally {
-    setConfigWriteTarget(undefined)
-    rmSync(root, { recursive: true, force: true })
-  }
-})
+await test('existing CapacitorUpdater.appId skips without prompting', () => withFixture(async (configPath) => {
+  const outcome = await offerCapgoAppIdPrompt({
+    interactive: true,
+    deps: {
+      findApiKey: () => 'key',
+      confirm: async () => { throw new Error('should not prompt') },
+    },
+  })
+  assert.equal(outcome, 'skipped')
+  assert.equal(readConfig(configPath).plugins.CapacitorUpdater.appId, 'com.example.updater')
+}, 'com.example.updater'))
 
-await test('random path writes top-level and CapacitorUpdater appId', async () => {
-  const { root, configPath } = makeConfigFixture()
+await test('missing API key skips without prompting', () => withFixture(async (configPath) => {
+  const outcome = await offerCapgoAppIdPrompt({
+    interactive: true,
+    deps: {
+      findApiKey: () => undefined,
+      confirm: async () => { throw new Error('should not prompt') },
+    },
+  })
+  assert.equal(outcome, 'skipped')
+  assert.equal(readConfig(configPath).plugins.CapacitorUpdater.appId, undefined)
+}))
+
+await test('declining keeps config untouched and creates nothing', () => withFixture(async (configPath) => {
+  let created = false
+  const outcome = await offerCapgoAppIdPrompt({
+    interactive: true,
+    deps: {
+      findApiKey: () => 'key',
+      confirm: async () => false,
+      createApp: async () => { created = true },
+    },
+  })
+  assert.equal(outcome, 'declined')
+  assert.equal(created, false)
+  assert.equal(readConfig(configPath).plugins.CapacitorUpdater.appId, undefined)
+}))
+
+await test('accepting creates random app in backend then writes CapacitorUpdater.appId only', () => withFixture(async (configPath) => {
   const generated = 'com.capgo.deadbeefcafebabe'
-  try {
-    const outcome = await offerCapgoAppIdPrompt({
-      interactive: true,
-      deps: {
-        confirm: async () => true,
-        select: async () => 'random',
-        generateRandomAppId: () => generated,
-        logSuccess: () => {},
-        logWarn: () => {},
-      },
-    })
-    assert.equal(outcome, 'saved-random')
-    const config = readConfig(configPath)
-    assert.equal(config.appId, generated)
-    assert.equal(config.plugins.CapacitorUpdater.appId, generated)
-  }
-  finally {
-    setConfigWriteTarget(undefined)
-    rmSync(root, { recursive: true, force: true })
-  }
-})
+  const calls = []
+  const outcome = await offerCapgoAppIdPrompt({
+    interactive: true,
+    deps: {
+      ...quiet,
+      findApiKey: () => 'key',
+      confirm: async () => true,
+      generateRandomAppId: () => generated,
+      createApp: async (appId, apikey) => { calls.push([appId, apikey]) },
+    },
+  })
+  assert.equal(outcome, 'saved')
+  assert.deepEqual(calls, [[generated, 'key']])
+  const config = readConfig(configPath)
+  assert.equal(config.appId, 'com.example.native')
+  assert.equal(config.plugins.CapacitorUpdater.appId, generated)
+}))
 
-await test('custom path writes typed app ID to both config fields', async () => {
-  const { root, configPath } = makeConfigFixture()
-  const custom = 'com.customer.encrypted'
-  try {
-    const outcome = await offerCapgoAppIdPrompt({
-      interactive: true,
-      deps: {
-        confirm: async () => true,
-        select: async () => 'custom',
-        text: async () => custom,
-        logSuccess: () => {},
-        logWarn: () => {},
-      },
-    })
-    assert.equal(outcome, 'saved-custom')
-    const config = readConfig(configPath)
-    assert.equal(config.appId, custom)
-    assert.equal(config.plugins.CapacitorUpdater.appId, custom)
-  }
-  finally {
-    setConfigWriteTarget(undefined)
-    rmSync(root, { recursive: true, force: true })
-  }
-})
+await test('backend create failure does not write config', () => withFixture(async (configPath) => {
+  const outcome = await offerCapgoAppIdPrompt({
+    interactive: true,
+    deps: {
+      ...quiet,
+      findApiKey: () => 'key',
+      confirm: async () => true,
+      createApp: async () => { throw new Error('boom') },
+    },
+  })
+  assert.equal(outcome, 'failed')
+  assert.equal(readConfig(configPath).plugins.CapacitorUpdater.appId, undefined)
+}))
 
-await test('persistCapgoAppIdToCapacitorConfig updates both fields', async () => {
-  const { root, configPath } = makeConfigFixture()
-  try {
-    const saved = await persistCapgoAppIdToCapacitorConfig('com.example.saved')
-    assert.equal(saved, true)
-    const config = readConfig(configPath)
-    assert.equal(config.appId, 'com.example.saved')
-    assert.equal(config.plugins.CapacitorUpdater.appId, 'com.example.saved')
-  }
-  finally {
-    setConfigWriteTarget(undefined)
-    rmSync(root, { recursive: true, force: true })
-  }
-})
-
-await test('key create wires offerCapgoAppIdPrompt and skip flag in CLI', () => {
+await test('key create wires prompt and skip flag; init does not', () => {
   const keySource = readSource(join(cliRoot, 'src/key.ts'), 'utf8')
   const indexSource = readSource(join(cliRoot, 'src/index.ts'), 'utf8')
   const initSource = readSource(join(cliRoot, 'src/init/command.ts'), 'utf8')
   assert.ok(keySource.includes('offerCapgoAppIdPrompt'))
   assert.ok(keySource.includes('skipCapgoAppIdPrompt'))
   assert.ok(indexSource.includes('--skip-capgo-app-id-prompt'))
-  assert.ok(initSource.includes('offerCapgoAppIdPrompt'))
-  assert.ok(initSource.includes("finalSummary.phase === 'enabled'") || initSource.includes('finalSummary.phase === \'enabled\''))
+  assert.ok(!initSource.includes('offerCapgoAppIdPrompt'))
 })
 
-await test('opt-in message is stable', () => {
+await test('opt-in message mentions CapacitorUpdater.appId', () => {
   assert.ok(CAPGO_APP_ID_OPT_IN_MESSAGE.includes('CapacitorUpdater.appId'))
 })
 

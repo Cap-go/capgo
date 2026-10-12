@@ -27,7 +27,6 @@ import { uploadBundleInternal } from '../bundle/upload'
 import { addChannelInternal } from '../channel/add'
 import { getConfigWriteTarget, resolveCapacitorConfigTargetPath, setConfigWriteTarget, writeConfigUpdater } from '../config'
 import { getRepoStarStatus, isRepoStarredInSession, starAllRepositories, starRepository } from '../github'
-import { offerCapgoAppIdPrompt } from '../key/capgoAppIdPrompt'
 import { createKeyInternal } from '../key'
 import type { LoginMethod } from '../login'
 import { doLoginExists, LOGIN_METHOD_OPTIONS, loginInternal } from '../login'
@@ -3497,10 +3496,6 @@ async function addEncryptionStep(orgId: string, apikey: string, appId: string) {
   }
   // If the user answered "not needed" to Q1, we keep the default
   // `skippedSummary`.
-
-  if (finalSummary.phase === 'enabled' || finalSummary.phase === 'pending-sync') {
-    await offerCapgoAppIdPrompt({ interactive: canPromptInteractively() })
-  }
 
   globalEncryptionSummary = finalSummary
   setInitEncryptionSummary(finalSummary)
