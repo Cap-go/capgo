@@ -2083,6 +2083,51 @@ export async function readLastMonthDevicesByPlatformCF(c: Context, referenceDate
   return { total: 0, ios: 0, android: 0 }
 }
 
+export type IosMajorDeviceCounts = Record<number, number>
+
+/**
+ * Count distinct iOS devices seen in the last month grouped by the major OS version
+ * of their latest DEVICE_INFO row (blob4 = os_version, double1 = platform, 1 = ios).
+ */
+export async function readLastMonthIosMajorDevicesCF(c: Context, referenceDate?: Date): Promise<IosMajorDeviceCounts> {
+  if (!c.env.DEVICE_INFO)
+    return {}
+
+  const { startExpression, endExpression } = getLastMonthAnalyticsWindow(referenceDate)
+  const query = `SELECT
+    toUInt32OrZero(splitByChar('.', os_version)[1]) AS major,
+    count() AS devices
+  FROM (
+    SELECT
+      argMax(blob4, timestamp) AS os_version,
+      argMax(double1, timestamp) AS platform
+    FROM device_info
+    WHERE timestamp >= ${startExpression}
+      AND timestamp < ${endExpression}
+    GROUP BY index1, blob1
+  )
+  WHERE platform = 1
+    AND os_version != ''
+  GROUP BY major`
+
+  cloudlog({ requestId: c.get('requestId'), message: 'readLastMonthIosMajorDevicesCF query', query })
+  try {
+    const rows = await runQueryToCFA<{ major: number | string, devices: number | string }>(c, query)
+    const counts: IosMajorDeviceCounts = {}
+    for (const row of rows) {
+      const major = Number(row.major)
+      if (major > 0)
+        counts[major] = (counts[major] ?? 0) + (Number(row.devices) || 0)
+    }
+    return counts
+  }
+  catch (e) {
+    // Rethrow so the global stats shard retries instead of snapshotting zeros.
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading last month iOS major devices', error: serializeError(e) })
+    throw e
+  }
+}
+
 export async function getAppsToProcessCF(c: Context, flag: 'to_get_framework' | 'to_get_info' | 'to_get_similar', limit: number) {
   if (!c.env.DB_STOREAPPS)
     return Promise.resolve([] as StoreApp[])

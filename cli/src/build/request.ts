@@ -950,6 +950,20 @@ async function extractNativeDependencies(
 }
 
 /**
+ * Detect the iOS dependency manager the same way the Capacitor CLI does:
+ * a Podfile in the native App folder means CocoaPods, otherwise a CapApp-SPM
+ * package means Swift Package Manager. Reported to Capgo for build analytics.
+ */
+export function detectIosDependencyManager(projectDir: string, platformDir: string): 'cocoapods' | 'spm' | undefined {
+  const appDir = join(projectDir, platformDir, 'App')
+  if (existsSync(join(appDir, 'Podfile')))
+    return 'cocoapods'
+  if (existsSync(join(appDir, 'CapApp-SPM', 'Package.swift')))
+    return 'spm'
+  return undefined
+}
+
+/**
  * Check if a file path should be included in the zip
  */
 export function shouldIncludeFile(filePath: string, platform: 'ios' | 'android', nativeDeps: NativeDependencies, platformDir: string): boolean {
@@ -1908,12 +1922,16 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       pack.version,
     )
 
+    const iosDependencyManager = platform === 'ios'
+      ? detectIosDependencyManager(projectDir, nativeProjectDir)
+      : undefined
     const requestPayload = {
       app_id: appId,
       platform,
       build_mode: options.buildMode || 'release',
       build_options: buildOptionsPayload,
       build_credentials: buildCredentialsPayload,
+      ...(iosDependencyManager ? { ios_dependency_manager: iosDependencyManager } : {}),
       ...buildJobCachePayload({ cache: options.cache, cacheKey: options.cacheKey }),
     }
 

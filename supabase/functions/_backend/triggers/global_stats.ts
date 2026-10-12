@@ -5,7 +5,7 @@ import type { Database, Json } from '../utils/supabase.types.ts'
 import { sql } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 
-import { getDeviceDaySuccessRateCF, getLastMonthAnalyticsWindowStart, getPluginBreakdownCF, readActiveAppsCF, readLastMonthDevicesByPlatformCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
+import { getDeviceDaySuccessRateCF, getLastMonthAnalyticsWindowStart, getPluginBreakdownCF, readActiveAppsCF, readLastMonthDevicesByPlatformCF, readLastMonthDevicesCF, readLastMonthIosMajorDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
 import { GLOBAL_STATS_SHARDS, REQUIRED_GLOBAL_STATS_SHARDS, USAGE_GLOBAL_STATS_SHARDS } from '../utils/global_stats.ts'
 import { BRES, middlewareAPISecret, quickError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
@@ -1481,6 +1481,44 @@ async function aggregateDailyBuildStats(
   }
 
   return { totalSeconds: totalSecondsByPlatform, avgSeconds: avgSecondsByPlatform, counts: countsByPlatform }
+}
+
+interface IosDependencyManagerBuildCounts {
+  cocoapods: number
+  spm: number
+  unknown: number
+}
+
+async function countDailyIosBuildRequestsByDependencyManager(c: Context, start: Date, end: Date): Promise<IosDependencyManagerBuildCounts> {
+  // Read from primary so the daily rollup is not permanently undercounted by replica lag.
+  const pgClient = await getPgClient(c, false)
+  const drizzleClient = getDrizzleClient(pgClient)
+  const counts: IosDependencyManagerBuildCounts = { cocoapods: 0, spm: 0, unknown: 0 }
+
+  try {
+    const result = await drizzleClient.execute<{ ios_dependency_manager: string | null, total_builds: number | string }>(sql`
+      SELECT ios_dependency_manager, COUNT(*)::int AS total_builds
+      FROM public.build_requests
+      WHERE created_at >= ${start}
+        AND created_at < ${end}
+        AND platform = 'ios'
+      GROUP BY ios_dependency_manager
+    `)
+    for (const row of result.rows ?? []) {
+      const total = Number(row.total_builds) || 0
+      if (row.ios_dependency_manager === 'cocoapods')
+        counts.cocoapods += total
+      else if (row.ios_dependency_manager === 'spm')
+        counts.spm += total
+      else
+        counts.unknown += total
+    }
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
+
+  return counts
 }
 
 function getCompletedAppBuildOnboardingWindow(window: DailyWindow): DailyWindow {
@@ -2994,11 +3032,16 @@ async function runUsageDevicesGlobalStatsShard(c: Context, window: DailyWindow):
 }
 
 async function runUsageDevicePlatformsGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
-  const devicesByPlatform = await readLastMonthDevicesByPlatformCF(c, window.prevDayEnd)
+  const [devicesByPlatform, iosMajorDevices] = await Promise.all([
+    readLastMonthDevicesByPlatformCF(c, window.prevDayEnd),
+    readLastMonthIosMajorDevicesCF(c, window.prevDayEnd),
+  ])
   await updateUsageGlobalStatsSnapshot(c, window, 'Updated global stats usage device platforms shard', {
     devices_last_month_android: devicesByPlatform.android,
     devices_last_month_ios: devicesByPlatform.ios,
-  }, { devicesByPlatform })
+    devices_ios_26: iosMajorDevices[26] ?? 0,
+    devices_ios_27: iosMajorDevices[27] ?? 0,
+  }, { devicesByPlatform, iosMajorDevices })
 }
 
 async function runUsageRegistrationsGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
@@ -3305,9 +3348,15 @@ async function runPluginsGlobalStatsShard(c: Context, window: DailyWindow): Prom
 }
 
 async function runBuildsGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
-  const build_stats = await getBuildStats(c, window)
+  const [build_stats, iosDependencyManagerBuilds] = await Promise.all([
+    getBuildStats(c, window),
+    countDailyIosBuildRequestsByDependencyManager(c, window.prevDayStart, window.prevDayEnd),
+  ])
 
   await updateGlobalStatsSnapshot(c, window.prevDayDateId, {
+    build_requests_day_ios_cocoapods: iosDependencyManagerBuilds.cocoapods,
+    build_requests_day_ios_spm: iosDependencyManagerBuilds.spm,
+    build_requests_day_ios_unknown: iosDependencyManagerBuilds.unknown,
     builds_android: build_stats.android,
     builds_ios: build_stats.ios,
     builds_last_month: build_stats.last_month,
