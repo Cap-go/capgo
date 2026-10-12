@@ -146,6 +146,47 @@ describe('[POST] /private/invite_new_user_to_org validation', () => {
   })
 })
 
+describe('[POST] /private/invite_new_user_to_org durable cooldown', () => {
+  it.concurrent('preserves the cooldown response when the database blocks token rotation', async () => {
+    const fixture = await createInviteNewUserFixture()
+    const invitedEmail = `database-cooldown-${fixture.id}@capgo.app`
+    const previousInviteAt = new Date(Date.now() - 6 * 60 * 1000).toISOString()
+    try {
+      const { data: invitation, error } = await fixture.supabase.from('tmp_users').insert({
+        email: invitedEmail,
+        org_id: fixture.orgId,
+        first_name: 'Invite',
+        last_name: 'Target',
+        rbac_role_name: 'org_member',
+        invited_by_user_id: USER_ID,
+        created_at: previousInviteAt,
+        updated_at: previousInviteAt,
+      }).select('id, invite_magic_string').single()
+      expect(error).toBeNull()
+
+      // The API timestamp allows a resend, while the durable request is still recent.
+      const response = await postInviteNewUserToOrg(authHeaders, {
+        email: invitedEmail,
+        org_id: fixture.orgId,
+        invite_type: 'org_member',
+      })
+      expect(response.status).toBe(400)
+      expect(await response.json()).toMatchObject({
+        error: 'user_already_invited',
+        moreInfo: { reason: 'invite_recently_sent', cooldown_minutes: 5 },
+      })
+      const { data: current } = await fixture.supabase.from('tmp_users')
+        .select('invite_magic_string')
+        .eq('id', invitation!.id)
+        .single()
+      expect(current?.invite_magic_string).toBe(invitation!.invite_magic_string)
+    }
+    finally {
+      await fixture.cleanup()
+    }
+  })
+})
+
 describe('[POST] /private/invite_new_user_to_org rank guards', () => {
   it.concurrent('returns forbidden when an org_admin invites org_super_admin', async () => {
     const fixture = await createInviteNewUserFixture({
@@ -205,7 +246,9 @@ describe('[POST] /private/invite_new_user_to_org rank guards', () => {
         SELECT message FROM pgmq.q_send_email WHERE message->'payload'->>'org_invitation_id' = $1
       `, [request!.id])
       expect(job?.message).toEqual({
-        function_name: 'send_email', function_type: 'cloudflare', payload: { org_invitation_id: request!.id },
+        function_name: 'send_email',
+        function_type: 'cloudflare',
+        payload: { org_invitation_id: request!.id },
       })
       const repeated = await postInviteNewUserToOrg(authHeaders, {
         email: invitedEmail,

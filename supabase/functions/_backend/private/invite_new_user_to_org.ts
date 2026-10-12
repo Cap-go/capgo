@@ -197,7 +197,7 @@ app.post('/', middlewareAuth, async (c) => {
       .single()
 
     if (updateInvitationError) {
-      if (updateInvitationError.message.includes('INVITE_EMAIL_COOLDOWN')) {
+      if (updateInvitationError.code === 'P0001' && updateInvitationError.message.includes('INVITE_EMAIL_COOLDOWN')) {
         throw simpleError('user_already_invited', 'User already invited recently. Please wait before resending.', {
           reason: 'invite_recently_sent',
           cooldown_minutes: INVITE_RESEND_COOLDOWN_MINUTES,
