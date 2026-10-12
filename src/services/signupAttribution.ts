@@ -2,9 +2,9 @@ import type { User } from '@supabase/supabase-js'
 import type { ResolvedSignupAttribution } from '../../supabase/functions/shared/signup-attribution.ts'
 import {
   CAPGO_ATTRIBUTION_COOKIE_NAME,
-  mergeSignupAttribution,
   parseCapgoAttributionCookieValue,
   parseSignupAttributionRecord,
+  resolveConsoleSignupAttribution,
   signupAttributionEventTags,
   signupAttributionToPostHogSetOnce,
 } from '../../supabase/functions/shared/signup-attribution.ts'
@@ -35,11 +35,11 @@ function readUserMetadataSignupAttribution(user: User | null | undefined): Resol
   return parseSignupAttributionRecord(user.user_metadata as Record<string, unknown>)
 }
 
-/** Signup attribution for authenticated console sessions (metadata + first-touch cookie only). */
+/** Signup attribution for authenticated console sessions (metadata; cookie only during signup window). */
 export function resolveSignupAttribution(user?: User | null): ResolvedSignupAttribution {
   const metadata = readUserMetadataSignupAttribution(user ?? null)
   const cookie = readCapgoAttributionCookie()
-  return mergeSignupAttribution(metadata, cookie)
+  return resolveConsoleSignupAttribution(metadata, cookie, user?.created_at)
 }
 
 export function getSignupAttributionEventTags(user?: User | null) {

@@ -3,6 +3,7 @@ import {
   mergeSignupAttribution,
   parseCapgoAttributionCookieValue,
   parseSignupAttributionRecord,
+  resolveConsoleSignupAttribution,
   signupAttributionEventTags,
   signupAttributionToPostHogSetOnce,
   signupPluginFromRef,
@@ -106,6 +107,35 @@ describe('signup attribution parsing', () => {
       first_touch_path: '/plugins/capacitor-updater/',
       first_utm_source: 'website',
     })
+  })
+
+  it('ignores cookie attribution for established users without metadata', () => {
+    const now = Date.parse('2026-10-12T12:00:00.000Z')
+    const createdAt = '2024-01-01T00:00:00.000Z'
+    const cookie = parseSignupAttributionRecord({ ref: 'plugin_updater' })
+
+    expect(resolveConsoleSignupAttribution({}, cookie, createdAt, now)).toEqual({})
+  })
+
+  it('merges cookie attribution only during the signup window when metadata is empty', () => {
+    const now = Date.parse('2026-10-12T12:00:00.000Z')
+    const createdAt = '2026-10-12T11:00:00.000Z'
+    const cookie = parseSignupAttributionRecord({ ref: 'plugin_updater' })
+
+    expect(resolveConsoleSignupAttribution({}, cookie, createdAt, now)).toEqual({
+      signup_ref: 'plugin_updater',
+      signup_plugin: 'updater',
+      signup_source: 'plugin_updater',
+    })
+  })
+
+  it('keeps stored metadata over a newer cookie', () => {
+    const now = Date.parse('2026-10-12T12:00:00.000Z')
+    const createdAt = '2026-10-12T11:00:00.000Z'
+    const metadata = parseSignupAttributionRecord({ signup_plugin: 'from_metadata' })
+    const cookie = parseSignupAttributionRecord({ ref: 'plugin_other' })
+
+    expect(resolveConsoleSignupAttribution(metadata, cookie, createdAt, now).signup_plugin).toBe('from_metadata')
   })
 
   it('builds PostHog set_once and event tag payloads without PII fields', () => {

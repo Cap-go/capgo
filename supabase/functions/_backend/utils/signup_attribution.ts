@@ -6,6 +6,7 @@ import {
   type ResolvedSignupAttribution,
   type SignupAttributionEventTags,
 } from '../../shared/signup-attribution.ts'
+import { cloudlog } from './logging.ts'
 import { supabaseAdmin } from './supabase.ts'
 
 export function signupPluginTagsFromAttribution(attribution: ResolvedSignupAttribution): SignupAttributionEventTags {
@@ -22,7 +23,13 @@ export async function resolveSignupAttributionForUser(
       return {}
     return parseSignupAttributionRecord(data.user.user_metadata as Record<string, unknown>)
   }
-  catch {
+  catch (error) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'signup attribution user lookup failed',
+      userId,
+      error,
+    })
     return {}
   }
 }
@@ -31,15 +38,26 @@ export async function resolveSignupAttributionForOrg(
   c: Context,
   org: { created_by: string, signup_plugin?: string | null },
 ): Promise<ResolvedSignupAttribution> {
-  const attribution = await resolveSignupAttributionForUser(c, org.created_by)
   const orgSignupPlugin = typeof org.signup_plugin === 'string' && org.signup_plugin.trim().length > 0
     ? org.signup_plugin.trim()
     : undefined
+  const orgOverlay = orgSignupPlugin ? { signup_plugin: orgSignupPlugin } : null
 
-  return mergeSignupAttribution(
-    orgSignupPlugin ? { signup_plugin: orgSignupPlugin } : null,
-    attribution,
-  )
+  let attribution: ResolvedSignupAttribution = {}
+  try {
+    attribution = await resolveSignupAttributionForUser(c, org.created_by)
+  }
+  catch (error) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'resolveSignupAttributionForOrg creator lookup failed',
+      orgId: (org as { id?: string }).id,
+      userId: org.created_by,
+      error,
+    })
+  }
+
+  return mergeSignupAttribution(orgOverlay, attribution)
 }
 
 export async function signupAttributionTagsForOrg(

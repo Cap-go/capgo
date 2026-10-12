@@ -160,6 +160,58 @@ export function parseSignupAttributionRecord(record: AttributionRecord | null | 
   return resolved
 }
 
+export const SIGNUP_ATTRIBUTION_COOKIE_WINDOW_MS = 48 * 60 * 60 * 1000
+
+export function hasSignupAttributionFields(attribution: ResolvedSignupAttribution): boolean {
+  if (
+    attribution.signup_ref
+    || attribution.signup_plugin
+    || attribution.signup_source
+    || attribution.first_touch_type
+    || attribution.first_touch_path
+  ) {
+    return true
+  }
+
+  for (const key of SIGNUP_UTM_KEYS) {
+    const firstKey = `first_${key}` as FirstSignupUtmKey
+    if (attribution[firstKey])
+      return true
+  }
+
+  return false
+}
+
+export function isWithinSignupAttributionWindow(
+  createdAtIso: string | undefined,
+  nowMs = Date.now(),
+): boolean {
+  if (!createdAtIso)
+    return false
+
+  const createdMs = Date.parse(createdAtIso)
+  if (Number.isNaN(createdMs))
+    return false
+
+  return nowMs - createdMs <= SIGNUP_ATTRIBUTION_COOKIE_WINDOW_MS
+}
+
+/** Console signup attribution: metadata wins; cookie fills gaps only during the signup window. */
+export function resolveConsoleSignupAttribution(
+  metadata: ResolvedSignupAttribution,
+  cookie: ResolvedSignupAttribution,
+  userCreatedAt?: string,
+  nowMs = Date.now(),
+): ResolvedSignupAttribution {
+  if (hasSignupAttributionFields(metadata))
+    return metadata
+
+  if (!isWithinSignupAttributionWindow(userCreatedAt, nowMs))
+    return metadata
+
+  return mergeSignupAttribution(metadata, cookie)
+}
+
 export function mergeSignupAttribution(
   ...sources: Array<ResolvedSignupAttribution | null | undefined>
 ): ResolvedSignupAttribution {
