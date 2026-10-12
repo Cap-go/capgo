@@ -19,7 +19,6 @@ import {
   readDeviceVersionCountsCF,
   readLastMonthDevicesByPlatformCF,
   readLastMonthDevicesCF,
-  readLastMonthIosMajorDevicesCF,
   readLastMonthUpdatesCF,
   readNativeVersionUsageCF,
   readStatsCF,
@@ -363,7 +362,6 @@ export async function collectAnalyticsEngineSqlFixtures(): Promise<AnalyticsEngi
     await captureCall('readLastMonthUpdatesCF', () => readLastMonthUpdatesCF(context, SAMPLE_REFERENCE_DATE))
     await captureCall('readLastMonthDevicesCF', () => readLastMonthDevicesCF(context, SAMPLE_REFERENCE_DATE))
     await captureCall('readLastMonthDevicesByPlatformCF', () => readLastMonthDevicesByPlatformCF(context, SAMPLE_REFERENCE_DATE))
-    await captureCall('readLastMonthIosMajorDevicesCF', () => readLastMonthIosMajorDevicesCF(context, SAMPLE_REFERENCE_DATE))
     await captureCall('getUpdateStatsCF', () => getUpdateStatsCF(context))
     await captureCall('getPluginBreakdownCF', () => getPluginBreakdownCF(context, SAMPLE_REFERENCE_DATE))
     await captureCall('getPublicLiveUpdateMetricsCF', () => getPublicLiveUpdateMetricsCF(context, SAMPLE_REFERENCE_DATE))
