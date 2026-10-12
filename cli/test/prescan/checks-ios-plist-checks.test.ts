@@ -17,6 +17,7 @@ import {
   plistOrientationsMultitasking,
   plistOrientationsPresent,
   plistRequiredDeviceArm64,
+  plistSceneLifecycleXcode27,
   plistVersionBuildFormat,
   plistVersionShortFormat,
 } from '../../src/build/prescan/checks/ios-plist-checks'
@@ -407,5 +408,25 @@ describe('partial / non-Capacitor project — all checks early-return []', () =>
     const ctx = makeCtx({ projectDir: dir, platform: 'ios' })
     for (const check of ALL_CHECKS)
       expect(await runGated(check, ctx)).toEqual([])
+  })
+})
+
+describe('ios/plist-scene-lifecycle-xcode27', () => {
+  const xcode = (version: string) => ({ partial: { credentials: { CAPGO_IOS_XCODE_VERSION: version } } })
+  const SCENE = `<key>UIApplicationSceneManifest</key><dict><key>UIApplicationSupportsMultipleScenes</key><false/></dict>`
+
+  it('does not apply unless the build asks for Xcode 27 or later', () => {
+    expect(plistSceneLifecycleXcode27.appliesTo!(ctxFor(HEALTHY_BODY))).toBe(false)
+    expect(plistSceneLifecycleXcode27.appliesTo!(ctxFor(HEALTHY_BODY, xcode('26.6')))).toBe(false)
+    expect(plistSceneLifecycleXcode27.appliesTo!(ctxFor(HEALTHY_BODY, xcode('27')))).toBe(true)
+    expect(plistSceneLifecycleXcode27.appliesTo!(ctxFor(HEALTHY_BODY, xcode('Xcode 27.1')))).toBe(true)
+  })
+  it('errors on Xcode 27 without a scene manifest', async () => {
+    const f = await plistSceneLifecycleXcode27.run(ctxFor(HEALTHY_BODY, xcode('27')))
+    expect(f.length).toBe(1)
+    expect(f[0].severity).toBe('error')
+  })
+  it('passes with a scene manifest', async () => {
+    expect(await plistSceneLifecycleXcode27.run(ctxFor(`${HEALTHY_BODY}${SCENE}`, xcode('27')))).toEqual([])
   })
 })
