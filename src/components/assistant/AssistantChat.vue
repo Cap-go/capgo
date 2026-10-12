@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { AssistantAction, AssistantCard, AssistantTurn } from '~/services/assistant'
+import type { AssistantAction, AssistantCard, AssistantTurn, ChatGptStatus } from '~/services/assistant'
 import { onKeyStroke, useLocalStorage } from '@vueuse/core'
-import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconArrowRight from '~icons/heroicons/arrow-right'
@@ -9,11 +9,13 @@ import IconArrowUp from '~icons/heroicons/arrow-up'
 import IconChatBubble from '~icons/heroicons/chat-bubble-left-right'
 import IconCheckCircle from '~icons/heroicons/check-circle'
 import IconExclamationTriangle from '~icons/heroicons/exclamation-triangle'
+import IconLinkSlash from '~icons/heroicons/link-slash'
 import IconQuestion from '~icons/heroicons/question-mark-circle'
 import IconSparkles from '~icons/heroicons/sparkles'
 import IconTrash from '~icons/heroicons/trash'
 import IconClose from '~icons/heroicons/x-mark'
-import { askAssistant, AssistantKeyError, assistantKeyStorageKey, createAssistantKey } from '~/services/assistant'
+import chatGptLogoWhite from '~/assets/assistant/chatgpt-logo-white.svg'
+import { askAssistant, ASSISTANT_OPEN_AFTER_CONNECT_KEY, AssistantChatGptError, AssistantKeyError, assistantKeyStorageKey, CHATGPT_MANAGE_USAGE_URL, createAssistantKey, disconnectChatGpt, getChatGptStatus, startChatGptConnect } from '~/services/assistant'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
@@ -24,6 +26,8 @@ interface ChatEntry extends AssistantTurn {
   cards: AssistantCard[]
   actions: AssistantAction[]
   error?: boolean
+  /** ChatGPT plan limit reached: shown as the "Usage limit reached" card from OpenAI's guidelines. */
+  usageLimit?: boolean
   /** Question / confirm cards stay clickable until the user answers once. */
   answered?: boolean
 }
@@ -41,6 +45,9 @@ const loading = ref(false)
 const connecting = ref(false)
 const connectError = ref('')
 const entries = ref<ChatEntry[]>([])
+const chatgpt = ref<ChatGptStatus | null>(null)
+const showWelcome = ref(false)
+const welcomeSeen = useLocalStorage('capgo-assistant-chatgpt-welcome-seen', false)
 const scroller = useTemplateRef<HTMLElement>('scroller')
 const inputEl = useTemplateRef<HTMLTextAreaElement>('inputEl')
 let nextId = 1
@@ -48,6 +55,10 @@ let nextId = 1
 const userId = computed(() => main.user?.id ?? main.auth?.id ?? '')
 const storedKey = useLocalStorage<Record<string, string>>('capgo-assistant-keys', {})
 const apikey = computed(() => (userId.value ? storedKey.value[assistantKeyStorageKey(userId.value)] ?? '' : ''))
+
+/** ChatGPT is the model provider when the server has a Sign in with ChatGPT client configured. */
+const needsChatGpt = computed(() => !!chatgpt.value?.configured && !chatgpt.value.connected)
+const needsConnect = computed(() => !apikey.value || needsChatGpt.value)
 
 const suggestions = computed(() => [
   t('assistant-suggestion-where'),
@@ -81,6 +92,10 @@ async function scrollToBottom() {
   scroller.value?.scrollTo({ top: scroller.value.scrollHeight, behavior: 'smooth' })
 }
 
+async function refreshChatGpt() {
+  chatgpt.value = await getChatGptStatus()
+}
+
 function toggle() {
   open.value = !open.value
   if (open.value)
@@ -104,8 +119,13 @@ async function connect() {
   connecting.value = true
   connectError.value = ''
   try {
-    await organizationStore.awaitInitialLoad()
-    setKey(await createAssistantKey(supabase, userId.value, organizationStore.organizations))
+    // The Capgo API key lets the assistant run MCP tools; ChatGPT pays for the model.
+    if (!apikey.value) {
+      await organizationStore.awaitInitialLoad()
+      setKey(await createAssistantKey(supabase, userId.value, organizationStore.organizations))
+    }
+    if (chatgpt.value?.configured && !chatgpt.value.connected)
+      window.location.assign(await startChatGptConnect(route.fullPath))
   }
   catch (error) {
     console.error('Cannot connect the assistant', error)
@@ -127,6 +147,20 @@ async function run(confirm?: { tool: string, arguments: Record<string, unknown> 
   catch (error) {
     if (error instanceof AssistantKeyError) {
       setKey('')
+      return
+    }
+    if (error instanceof AssistantChatGptError) {
+      if (error.code === 'chatgpt_usage_limit') {
+        entries.value.push({ id: nextId++, role: 'assistant', content: '', cards: [], actions: [], usageLimit: true })
+        return
+      }
+      if (error.code !== 'chatgpt_not_eligible') {
+        // Not connected, revoked in ChatGPT settings, or plan usage not granted: show "Continue with ChatGPT" again.
+        connectError.value = t('assistant-chatgpt-reconnect')
+        await refreshChatGpt()
+        return
+      }
+      entries.value.push({ id: nextId++, role: 'assistant', content: t('assistant-chatgpt-not-eligible'), cards: [], actions: [], error: true })
       return
     }
     console.error('Assistant request failed', error)
@@ -182,10 +216,37 @@ function clear() {
   entries.value = []
 }
 
+async function disconnect() {
+  await disconnectChatGpt()
+  await refreshChatGpt()
+}
+
+function dismissWelcome() {
+  showWelcome.value = false
+  welcomeSeen.value = true
+}
+
 watch(open, (value) => {
-  if (value)
-    scrollToBottom()
+  if (!value)
+    return
+  scrollToBottom()
+  if (!chatgpt.value)
+    refreshChatGpt()
 })
+
+// Back from the ChatGPT consent screen: reopen the chat and explain plan usage once. The chat may
+// stay mounted across the callback page, so check on every navigation, not only on mount.
+async function resumeAfterConnect() {
+  if (!sessionStorage.getItem(ASSISTANT_OPEN_AFTER_CONNECT_KEY))
+    return
+  sessionStorage.removeItem(ASSISTANT_OPEN_AFTER_CONNECT_KEY)
+  await refreshChatGpt()
+  open.value = true
+  showWelcome.value = !welcomeSeen.value && !!chatgpt.value?.connected
+}
+
+watch(() => route.fullPath, resumeAfterConnect)
+onMounted(resumeAfterConnect)
 </script>
 
 <template>
@@ -210,6 +271,17 @@ watch(open, (value) => {
           </p>
         </div>
         <button
+          v-if="chatgpt?.connected"
+          type="button"
+          class="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+          :aria-label="t('assistant-chatgpt-disconnect')"
+          :title="t('assistant-chatgpt-disconnect')"
+          data-test="assistant-chatgpt-disconnect"
+          @click="disconnect"
+        >
+          <IconLinkSlash class="h-4 w-4" />
+        </button>
+        <button
           v-if="entries.length"
           type="button"
           class="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-200"
@@ -229,31 +301,65 @@ watch(open, (value) => {
         </button>
       </header>
 
-      <!-- Connect: the assistant needs its own revocable API key -->
-      <div v-if="!apikey" class="flex flex-1 flex-col justify-center gap-4 p-6" data-test="assistant-connect">
+      <!-- Connect: ChatGPT pays for the model, a revocable Capgo API key runs the MCP tools -->
+      <div v-if="needsConnect" class="flex flex-1 flex-col justify-center gap-4 p-6" data-test="assistant-connect">
         <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-azure-500/10 text-azure-500">
           <IconChatBubble class="h-6 w-6" />
         </div>
         <div>
           <h3 class="text-base font-semibold text-slate-900 dark:text-white">
-            {{ t('assistant-connect-title') }}
+            {{ chatgpt?.configured ? t('assistant-chatgpt-connect-title') : t('assistant-connect-title') }}
           </h3>
           <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            {{ t('assistant-connect-description') }}
+            {{ chatgpt?.configured ? t('assistant-chatgpt-connect-description') : t('assistant-connect-description') }}
           </p>
         </div>
         <p v-if="connectError" class="text-sm text-red-600 dark:text-red-400">
           {{ connectError }}
         </p>
         <button
+          v-if="chatgpt?.configured"
+          type="button"
+          class="flex h-11 items-center justify-center gap-2 rounded-full bg-black px-5 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:opacity-60"
+          :disabled="connecting"
+          data-test="assistant-chatgpt-button"
+          @click="connect"
+        >
+          <span v-if="connecting" class="d-loading d-loading-spinner d-loading-sm" />
+          <img v-else :src="chatGptLogoWhite" alt="" class="h-5 w-5">
+          {{ t('assistant-chatgpt-continue') }}
+        </button>
+        <button
+          v-else
           type="button"
           class="d-btn d-btn-primary"
-          :disabled="connecting"
+          :disabled="connecting || !chatgpt"
           data-test="assistant-connect-button"
           @click="connect"
         >
           <span v-if="connecting" class="d-loading d-loading-spinner d-loading-sm" />
           {{ t('assistant-connect-button') }}
+        </button>
+        <p v-if="chatgpt?.configured" class="text-xs text-slate-500 dark:text-slate-400">
+          {{ t('assistant-chatgpt-connect-note') }}
+        </p>
+      </div>
+
+      <!-- First sign-in with plan usage (OpenAI UI guidelines) -->
+      <div v-else-if="showWelcome" class="flex flex-1 flex-col justify-center gap-4 p-6" data-test="assistant-chatgpt-welcome">
+        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-black">
+          <img :src="chatGptLogoWhite" alt="" class="h-6 w-6">
+        </div>
+        <div>
+          <h3 class="text-base font-semibold text-slate-900 dark:text-white">
+            {{ t('assistant-chatgpt-welcome-title') }}
+          </h3>
+          <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            {{ t('assistant-chatgpt-welcome-description') }}
+          </p>
+        </div>
+        <button type="button" class="d-btn d-btn-primary" @click="dismissWelcome">
+          {{ t('assistant-chatgpt-welcome-ok') }}
         </button>
       </div>
 
@@ -289,6 +395,21 @@ watch(open, (value) => {
                 <IconExclamationTriangle v-else class="h-3 w-3" />
                 {{ action.title }}
               </span>
+            </div>
+            <div
+              v-if="entry.usageLimit"
+              class="w-[90%] rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-600 dark:bg-slate-800"
+              data-test="assistant-usage-limit"
+            >
+              <p class="text-sm font-semibold text-slate-900 dark:text-white">
+                {{ t('assistant-chatgpt-limit-title') }}
+              </p>
+              <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                {{ t('assistant-chatgpt-limit-description') }}
+              </p>
+              <a :href="CHATGPT_MANAGE_USAGE_URL" target="_blank" rel="noopener" class="d-btn d-btn-sm d-btn-primary mt-2">
+                {{ t('assistant-chatgpt-manage-usage') }}
+              </a>
             </div>
             <div
               v-if="entry.content"
@@ -400,6 +521,14 @@ watch(open, (value) => {
         </div>
 
         <form class="border-t border-slate-200 p-3 dark:border-slate-700" @submit.prevent="send()">
+          <p v-if="chatgpt?.connected" class="mb-2 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400" data-test="assistant-chatgpt-indicator">
+            <img :src="chatGptLogoWhite" alt="" class="h-3.5 w-3.5 rounded-sm bg-black p-0.5">
+            {{ t('assistant-chatgpt-using-plan') }}
+            <span v-if="chatgpt.email" class="truncate">· {{ chatgpt.email }}</span>
+            <a :href="CHATGPT_MANAGE_USAGE_URL" target="_blank" rel="noopener" class="ml-auto shrink-0 text-azure-500 hover:underline">
+              {{ t('assistant-chatgpt-manage-usage') }}
+            </a>
+          </p>
           <div class="flex items-end gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 focus-within:border-azure-500 dark:border-slate-600 dark:bg-slate-900">
             <textarea
               ref="inputEl"

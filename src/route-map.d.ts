@@ -262,6 +262,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/assistant/chatgpt-callback': RouteRecordInfo<
+      '/assistant/chatgpt-callback',
+      '/assistant/chatgpt-callback',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/confirm-signup': RouteRecordInfo<
       '/confirm-signup',
       '/confirm-signup',
@@ -841,6 +848,14 @@ declare module 'vue-router/auto-routes' {
     'src/pages/apps.vue': {
       routes:
         | '/apps'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/assistant/chatgpt-callback.vue': {
+      routes:
+        | '/assistant/chatgpt-callback'
       views:
         | never
       pathParamNames:
