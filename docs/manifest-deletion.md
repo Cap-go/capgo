@@ -27,7 +27,7 @@ removing references, the handler restores at most 100 recorded paths per pass,
 in waves of ten, committing successful restores and retaining failures. Failed
 paths receive `last_attempted_at` and rotate behind unattempted paths using the
 version/retry index, so persistent failures cannot starve later recovery. Recovery
-runs even for versions with zero manifest rows/count. The sweeper also revisits
+runs even for versions with zero manifest rows/count. The sweeper rotates versions by their last requeue time and also revisits
 pending-only versions and leaves counter finalization to the handler. Normal
 cleanup never creates a pending restore. Keep the table and recovery helper
 through cutover: old workers can still record recovery entries. Removal requires
@@ -40,8 +40,8 @@ Channel unlinking, bundle cache purge, metadata/storage-statistics updates and
 canonical version-owned ZIP trash/retry remain part of version deletion.
 
 The sweeper remains a service-role-only cron RPC, called once per sweep. Its
-candidate search starts from deleted versions ordered by `deleted_at, id`
-(`idx_app_versions_deleted_at_id`); each manifest/pending probe uses the
+candidate search starts from deleted versions ordered by `updated_at, id`
+(`idx_app_versions_deleted_manifest_retry`); each manifest/pending probe uses the
 `app_version_id` index or `(app_version_id, s3_path)` primary key. It updates at
 most the requested batch. No new RLS function, public RPC, cron, or extension is
 introduced. Cleanup queries target one version; they do not scan all manifests.

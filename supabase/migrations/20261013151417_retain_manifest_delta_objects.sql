@@ -5,6 +5,8 @@
 ALTER TABLE public.manifest_trash_restore_pending ADD COLUMN last_attempted_at timestamptz;
 CREATE INDEX manifest_trash_restore_pending_retry_idx
   ON public.manifest_trash_restore_pending (app_version_id, last_attempted_at ASC NULLS FIRST, s3_path);
+CREATE INDEX idx_app_versions_deleted_manifest_retry
+  ON public.app_versions (updated_at ASC NULLS FIRST, id) WHERE deleted = true;
 
 CREATE OR REPLACE FUNCTION public.sweep_deleted_version_manifests(p_batch_size integer DEFAULT 100)
 RETURNS bigint
@@ -30,7 +32,7 @@ BEGIN
         OR EXISTS (SELECT 1 FROM public.manifest AS m WHERE m.app_version_id = av.id)
         OR EXISTS (SELECT 1 FROM public.manifest_trash_restore_pending AS p WHERE p.app_version_id = av.id)
       )
-    ORDER BY av.deleted_at NULLS LAST, av.id
+    ORDER BY av.updated_at ASC NULLS FIRST, av.id
     LIMIT p_batch_size
   )
   UPDATE public.app_versions AS av

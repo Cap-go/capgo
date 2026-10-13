@@ -157,6 +157,23 @@ describe('manifest deletion Postgres effects', () => {
     expect(await state(2)).toMatchObject({ pending: 0, manifest_bundle_count: '0' })
   })
 
+  it('rotates bounded sweeps past permanently failing versions without changing counters', async () => {
+    await seedVersion(1, 0)
+    await seedVersion(2, 1)
+    await seedVersion(3, 1)
+    await pool.query('INSERT INTO public.manifest_trash_restore_pending (app_version_id, s3_path) VALUES (1, \'delta/failed\')')
+    await pool.query('UPDATE public.app_versions SET updated_at = \'2020-01-01\'::timestamptz + id * interval \'1 second\'')
+    const touched: number[] = []
+    for (let i = 0; i < 3; i++) {
+      await pool.query('SELECT public.sweep_deleted_version_manifests(1)')
+      touched.push(Number((await pool.query('SELECT id FROM public.app_versions ORDER BY updated_at DESC LIMIT 1')).rows[0].id))
+    }
+    expect(touched).toEqual([1, 2, 3])
+    expect(await state(1)).toMatchObject({ pending: 1, manifest_bundle_count: '2' })
+    expect(await state(2)).toMatchObject({ rows: 1, manifest_count: '1' })
+    expect(await state(3)).toMatchObject({ rows: 1, manifest_count: '1' })
+  })
+
   it('rotates a full failed recovery batch so later live objects are recovered on the next pass', async () => {
     await seedVersion(1, 1)
     await pool.query('INSERT INTO public.manifest_trash_restore_pending (app_version_id, s3_path) SELECT 1, \'delta/a-\' || lpad(i::text, 3, \'0\') FROM generate_series(1,100) i')
