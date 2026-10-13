@@ -1,5 +1,6 @@
 import type { Bindings } from './cloudflare.ts'
 import { Client } from 'pg'
+import { cloudlog } from './logging.ts'
 import { inventoryTransaction } from './r2_inventory.ts'
 
 export const EXPIRY_ROW_BUDGET = 10_000
@@ -35,7 +36,7 @@ export async function runScheduledManifestPlaceholderExpiry(env: Bindings): Prom
     return
   const startedAt = Date.now()
   if (!await inventoryIngestionHealthy(env)) {
-    console.log(JSON.stringify({ event: 'r2_manifest_expiry_skipped', reason: 'ingestion_health_unknown_or_unhealthy' }))
+    cloudlog({ event: 'r2_manifest_expiry_skipped', reason: 'ingestion_health_unknown_or_unhealthy' })
     return
   }
   const healthAt = Date.now()
@@ -59,7 +60,7 @@ export async function runScheduledManifestPlaceholderExpiry(env: Bindings): Prom
       if (count < EXPIRY_BATCH_SIZE)
         break
     }
-    console.log(JSON.stringify({ event: 'r2_manifest_expiry', removed, elapsed_ms: Date.now() - startedAt }))
+    cloudlog({ event: 'r2_manifest_expiry', removed, elapsed_ms: Date.now() - startedAt })
   }
   finally {
     await db.end()
