@@ -8,6 +8,8 @@ import { sendEventToTracking } from './tracking.ts'
 export const COCOAPODS_DEPRECATION_EVENT = 'org:ios_cocoapods_deprecation'
 /** The CocoaPods trunk becomes read-only on this date: no new or updated pods after it. */
 export const COCOAPODS_TRUNK_READ_ONLY = '2026-12-02'
+/** iOS 27 SDK builds (Swift Package Manager only) become the default on this date. */
+export const IOS_27_SDK_DEFAULT = '2027-01-01'
 const MIGRATION_GUIDE_URL = 'https://capacitorjs.com/docs/ios/spm'
 /** At most one reminder per app and per week while the app keeps building with CocoaPods. */
 const REMINDER_CRON = '0 0 * * 1'
@@ -29,6 +31,7 @@ export async function notifyCocoaPodsDeprecation(c: Context, input: {
       app_id: input.appId,
       ios_dependency_manager: input.iosDependencyManager,
       trunk_read_only: COCOAPODS_TRUNK_READ_ONLY,
+      ios_27_sdk_default: IOS_27_SDK_DEFAULT,
       migration_guide_url: MIGRATION_GUIDE_URL,
     }, input.orgId, input.appId, REMINDER_CRON, getDrizzleClient(pgClient))
     if (sent === true) {
