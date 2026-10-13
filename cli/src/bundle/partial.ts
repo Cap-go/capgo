@@ -42,9 +42,18 @@ function getExistenceCheckRetryDelayMs(response: Response, retryDelays: readonly
   const retryAfter = response.headers.get('Retry-After')?.trim()
   if (!retryAfter)
     return scheduledDelay
-  const retryAfterSeconds = Number.parseInt(retryAfter, 10)
-  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0)
-    return retryAfterSeconds * 1000
+  if (/^\d+$/.test(retryAfter)) {
+    const retryAfterSeconds = Number(retryAfter)
+    const retryAfterMs = retryAfterSeconds * 1000
+    if (Number.isSafeInteger(retryAfterSeconds) && Number.isFinite(retryAfterMs))
+      return retryAfterMs
+  }
+  const retryAt = Date.parse(retryAfter)
+  if (Number.isFinite(retryAt)) {
+    const waitMs = retryAt - Date.now()
+    if (waitMs >= 0)
+      return waitMs
+  }
   return scheduledDelay
 }
 
@@ -71,6 +80,7 @@ export async function fileExistsAtUploadTarget(existenceCheckUrlPrefix: string, 
           ? getExistenceCheckRetryDelayMs(response, retryDelays, attempt)
           : undefined
         if (retryDelay !== undefined) {
+          await response.body?.cancel()
           if (retryDelay > 0)
             await new Promise(resolve => setTimeout(resolve, retryDelay))
           continue

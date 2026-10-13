@@ -13,6 +13,13 @@ assert.equal(categorizeCliError({ status: 404 }), 'not_found')
 assert.equal(categorizeCliError({ status: 413 }), 'payload_too_large')
 assert.equal(categorizeCliError({ status: 500 }), 'server_error')
 assert.equal(categorizeCliError(new CliUserError('Cannot check whether manifest file exists (HTTP 503)', { status: 503 })), 'server_error')
+assert.equal(categorizeCliError(new CliUserError('Cannot check whether manifest file exists (HTTP 429)', { status: 429 })), 'rate_limited')
+assert.equal(
+  categorizeCliError(new Error('Cannot check whether delta file exists', {
+    cause: new CliUserError('Cannot check whether manifest file exists (HTTP 503)', { status: 503 }),
+  })),
+  'server_error',
+)
 
 assert.equal(categorizeCliError(new Error('fetch failed: ECONNREFUSED')), 'network_error')
 assert.equal(categorizeCliError(new Error('TypeError: fetch failed')), 'network_error')

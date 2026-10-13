@@ -11,9 +11,7 @@ export type CliErrorCategory
     | 'commander'
     | 'unknown'
 
-function getStatus(error: unknown): number | undefined {
-  if (!error || typeof error !== 'object')
-    return undefined
+function getStatusFromObject(error: object): number | undefined {
   const candidate = error as { status?: unknown, context?: { status?: unknown } }
   if (typeof candidate.status === 'number')
     return candidate.status
@@ -21,6 +19,18 @@ function getStatus(error: unknown): number | undefined {
     ? (candidate.context as { status?: unknown }).status
     : undefined
   return typeof contextStatus === 'number' ? contextStatus : undefined
+}
+
+function getStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== 'object')
+    return undefined
+  const directStatus = getStatusFromObject(error)
+  if (directStatus !== undefined)
+    return directStatus
+  const cause = (error as { cause?: unknown }).cause
+  if (cause && typeof cause === 'object')
+    return getStatusFromObject(cause)
+  return undefined
 }
 
 function collectErrorMessages(error: unknown): string {
@@ -84,6 +94,8 @@ export function categorizeCliError(error: unknown): CliErrorCategory {
       return 'not_found'
     if (status === 413)
       return 'payload_too_large'
+    if (status === 429)
+      return 'rate_limited'
     if (status >= 500)
       return 'server_error'
   }
