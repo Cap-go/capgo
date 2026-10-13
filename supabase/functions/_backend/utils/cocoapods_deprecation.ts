@@ -22,8 +22,9 @@ export async function notifyCocoaPodsDeprecation(c: Context, input: {
   appId: string
   iosDependencyManager: 'cocoapods'
 }) {
-  const pgClient = await getPgClient(c, true)
+  let pgClient: Awaited<ReturnType<typeof getPgClient>> | undefined
   try {
+    pgClient = await getPgClient(c, true)
     const sent = await sendNotifToOrgMembers(c, COCOAPODS_DEPRECATION_EVENT, 'builder_onboarding', {
       app_id: input.appId,
       ios_dependency_manager: input.iosDependencyManager,
@@ -45,6 +46,7 @@ export async function notifyCocoaPodsDeprecation(c: Context, input: {
     cloudlogErr({ requestId: c.get('requestId'), message: 'CocoaPods deprecation email failed', org_id: input.orgId, app_id: input.appId, error: serializeError(error) })
   }
   finally {
-    await closeClient(c, pgClient)
+    if (pgClient)
+      await closeClient(c, pgClient)
   }
 }
