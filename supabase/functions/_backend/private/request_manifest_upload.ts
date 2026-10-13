@@ -7,7 +7,7 @@ import { Hono } from 'hono/tiny'
 import { quickError } from '../utils/hono.ts'
 import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { reserveManifestPaths, usesManifestInventory, withManifestInventory } from '../utils/manifest_inventory.ts'
+import { ManifestInventoryConflict, reserveManifestPaths, usesManifestInventory, withManifestInventory } from '../utils/manifest_inventory.ts'
 import { getManifestReceiptBucket } from '../utils/manifest_size_receipt.ts'
 import { createManifestUploadResponse, ManifestUploadRequestError, parseManifestUploadRequestBody, resolveManifestUploadPublicBaseUrl, validateManifestUploadRequest } from '../utils/manifest_upload.ts'
 import { closeClient, getAppByIdPg, getDrizzleClient, getPgClient, logPgError } from '../utils/pg.ts'
@@ -108,6 +108,8 @@ app.post('/', middlewareKey({ usePostgres: true, readOnly: false, rateLimitScope
       })
     }
     catch (error) {
+      if (error instanceof ManifestInventoryConflict)
+        return quickError(409, 'error_manifest_inventory_conflict', error.message, { entries: error.paths })
       if (error instanceof ManifestUploadRequestError)
         return manifestUploadError(error)
       throw error

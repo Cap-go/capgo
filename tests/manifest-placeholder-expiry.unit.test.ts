@@ -57,6 +57,13 @@ describe('production scheduled placeholder expiry', () => {
     expect(mocks.end).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps string database counts numeric within the fixed row budget', async () => {
+    mocks.query.mockResolvedValue({ rows: [{ removed: '1000' }] })
+    await runScheduledManifestPlaceholderExpiry(env())
+    expect(mocks.query).toHaveBeenCalledTimes(30)
+    expect(mocks.end).toHaveBeenCalledTimes(1)
+  })
+
   it('stops when a bounded batch is drained', async () => {
     mocks.query.mockResolvedValue({ rows: [{ removed: 1 }] })
     await runScheduledManifestPlaceholderExpiry(env())

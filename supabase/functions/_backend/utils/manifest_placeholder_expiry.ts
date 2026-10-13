@@ -53,8 +53,8 @@ export async function runScheduledManifestPlaceholderExpiry(env: Bindings): Prom
         // already-running client statement's deadline.
         await db.query('SET LOCAL statement_timeout = \'5s\'')
         await db.query('SET LOCAL lock_timeout = \'1s\'')
-        const result = await db.query<{ removed: number }>('SELECT public.expire_r2_manifest_placeholders($1,$2) AS removed', ['capgo', Math.min(EXPIRY_BATCH_SIZE, EXPIRY_ROW_BUDGET - removed)])
-        return result.rows[0].removed
+        const result = await db.query<{ removed: number | string }>('SELECT public.expire_r2_manifest_placeholders($1,$2) AS removed', ['capgo', Math.min(EXPIRY_BATCH_SIZE, EXPIRY_ROW_BUDGET - removed)])
+        return Number(result.rows[0].removed)
       })
       removed += count
       if (count < EXPIRY_BATCH_SIZE)

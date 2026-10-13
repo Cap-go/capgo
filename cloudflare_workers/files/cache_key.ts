@@ -21,6 +21,8 @@ function normalizeSearch(url: URL, ignoredParams: readonly string[] = []): strin
 
 function isCacheableAttachmentRead(request: Request): boolean {
   const url = new URL(request.url)
+  // CLI existence checks must reach the exact-key receipt handler, including
+  // its original-evidence inner cache, rather than the outer device cache.
   if (request.method !== 'GET' || request.headers.has('range')
     || url.searchParams.has('nocache') || request.headers.get('x-cli-version')?.trim()) {
     return false

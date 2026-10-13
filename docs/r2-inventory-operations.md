@@ -48,9 +48,10 @@ The column is nullable `timestamptz`, with no default or existing-row backfill.
 The four lifecycle states stay unchanged. The partial index contains only
 `to_be_uploaded` rows with a non-null lease and supports bucket-scoped queries
 ordered by `(manifest_lease_expires_at, r2_key)` with an expiry cutoff and limit.
-Reservations and cleanup do not use this field yet. Future reservations will
-extend it using `GREATEST(COALESCE(existing_expiry, database_now), database_now +
-interval '30 minutes')`.
+Manifest reservations and registration extend it using
+`GREATEST(COALESCE(existing_expiry, database_now), database_now + interval '30 minutes')`;
+see "Manifest reservations and receipt registration" and "Placeholder expiry
+deployment and limits" below.
 
 For a later authorized PlanetScale deployment, use an existing administrator
 connection to the production destination above, not the restricted Hyperdrive
