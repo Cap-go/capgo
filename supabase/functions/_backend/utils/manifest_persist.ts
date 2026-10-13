@@ -94,6 +94,13 @@ export async function persistVersionManifestEntries(
     alreadyPresent = await getDrizzleClient(pgPool).transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_catalog.set_config('capgo.manifest_queue_managed', 'on', true)`)
       await tx.execute(sql`SELECT pg_catalog.pg_advisory_xact_lock(${record.id})`)
+      const version = await tx.execute<{ deleted: boolean, deleted_at: string | null }>(sql`
+        SELECT deleted, deleted_at FROM public.app_versions WHERE id = ${record.id} FOR UPDATE
+      `)
+      // An upload may have passed its route check before deletion started.
+      // Serialize with cleanup and recheck before inserting any references.
+      if (!version.rows[0] || version.rows[0].deleted || version.rows[0].deleted_at)
+        throw new Error('Deleted versions cannot receive manifest entries')
       const existing = await tx.execute<{ id: number }>(sql`SELECT id FROM public.manifest WHERE app_version_id = ${record.id} LIMIT 1`)
       const alreadyPresent = existing.rows.length > 0
 

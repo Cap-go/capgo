@@ -24,7 +24,7 @@ const DEFAULT_QUEUE_VISIBILITY_TIMEOUT_SECONDS = 120
 const VERSION_QUEUE_VISIBILITY_TIMEOUT_SECONDS = 900
 const MANIFEST_QUEUE_VISIBILITY_TIMEOUT_SECONDS = 900
 const QUEUE_HTTP_TIMEOUT_MS = 15_000
-const VERSION_QUEUE_HTTP_TIMEOUT_MS = 300_000 // large deleted manifests: trash then DB delete
+const VERSION_QUEUE_HTTP_TIMEOUT_MS = 300_000 // version cleanup, legacy recovery and canonical ZIP trash
 // HARD RULE: no pgmq queue may retry more than 5 times. Do not raise this, and
 // do not add per-queue exceptions. Leftover work must be re-enqueued by a
 // sweeper/cron (e.g. sweep_deleted_version_manifests), never by burning reads.

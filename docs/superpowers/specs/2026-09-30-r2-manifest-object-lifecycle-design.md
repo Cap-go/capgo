@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-30
 
-**Status:** Idea and migration proposal; no implementation is included
+**Status:** Historical idea and migration proposal. Current deleted-version behavior is documented in [manifest deletion](../../manifest-deletion.md); physical delta trash has been removed while legacy recovery remains.
 
 **Scope:** Delta-manifest database rows, shared R2 objects, CLI upload compatibility, garbage collection, Cloudflare Queues, and replication/operational cost
 
@@ -11,7 +11,7 @@
 ## 1. Summary
 
 Capgo delta bundles store one database manifest row per logical file while the
-underlying R2 object may be shared by several versions. The current cleanup path
+underlying R2 object may be shared by several versions. At the proposal date, the cleanup path
 checks whether another manifest row references a file, moves an apparently
 unreferenced R2 object to trash, and then deletes the manifest row. It performs
 this work under a per-file advisory lock and holds the database transaction open
@@ -74,9 +74,9 @@ Encrypted partial uploads are different: their paths contain session-specific
 material and the CLI deliberately does not reuse existing objects. The principal
 race described here concerns deterministic, reusable delta paths.
 
-### 2.2 Current deletion behavior
+### 2.2 Deletion behavior at the proposal date
 
-The deleted-version handler currently processes manifest entries in small
+The previous deleted-version handler processed manifest entries in small
 groups. For each entry it:
 
 1. starts a database transaction;

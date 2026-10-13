@@ -1,8 +1,8 @@
 import { HTTPException } from 'hono/http-exception'
 import { describe, expect, it } from 'vitest'
-import { __queueConsumerTestUtils__, MAX_QUEUE_READS, messagesArraySchema } from '../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { onManifestCreateTestUtils } from '../supabase/functions/_backend/triggers/on_manifest_create.ts'
 import { onVersionUpdateTestUtils } from '../supabase/functions/_backend/triggers/on_version_update.ts'
+import { __queueConsumerTestUtils__, MAX_QUEUE_READS, messagesArraySchema } from '../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { s3TestUtils } from '../supabase/functions/_backend/utils/s3.ts'
 import { parseSchema } from '../supabase/functions/_backend/utils/schema_validation.ts'
 
@@ -217,7 +217,7 @@ describe('queue_consumer legacy message compatibility', () => {
     expect(__queueConsumerTestUtils__.prepareQueueHttpBody('cron_email', body)).toEqual(body)
   })
 
-  it.concurrent('does not reprocess manifests for already deleted versions', () => {
+  it.concurrent('checks legacy recovery even for already deleted zero-count versions', () => {
     const deletedAt = '2026-07-07T00:40:00.096Z'
     const appVersionRow = (value: Record<string, unknown>) => value as Parameters<typeof onVersionUpdateTestUtils.getDeletedVersionAction>[0]
 
@@ -228,7 +228,7 @@ describe('queue_consumer legacy message compatibility', () => {
     expect(onVersionUpdateTestUtils.getDeletedVersionAction(
       appVersionRow({ deleted_at: deletedAt, manifest: null, manifest_count: 0 }),
       appVersionRow({ deleted_at: deletedAt }),
-    )).toBe('skip')
+    )).toBe('cleanup_manifest')
     expect(onVersionUpdateTestUtils.getDeletedVersionAction(
       appVersionRow({ deleted_at: deletedAt, manifest: null, manifest_count: 0 }),
       appVersionRow({ deleted_at: null }),
