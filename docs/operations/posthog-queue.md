@@ -32,7 +32,7 @@ group, and signup-attribution properties remain; event-only properties add
 `org_id` and `capture_source: database_trigger`.
 
 `organization_membership_invitation_accepted` is produced only by
-`on_user_org_access` for INSERTs of direct user/org bindings whose reason is
+`on_user_org_access` for `INSERT` records of direct user/org bindings whose reason is
 `Accepted invitation`. Both dashboard and magic-link acceptance transactions
 already enqueue these bindings. Its distinct ID is `principal_id` (the Supabase
 user UUID), timestamp is `granted_at`, organization group and `org_id` use the
