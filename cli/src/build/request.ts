@@ -1925,6 +1925,8 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     const iosDependencyManager = platform === 'ios'
       ? detectIosDependencyManager(projectDir, nativeProjectDir)
       : undefined
+    if (iosDependencyManager === 'cocoapods')
+      log.warn('⚠️  This iOS project uses CocoaPods. The CocoaPods trunk becomes read-only on December 2, 2026: your pods will stop getting updates and security fixes. Capgo iOS 27 SDK builds are Swift Package Manager only and become the default on January 1, 2027. Moving to Swift Package Manager takes a few minutes: https://capacitorjs.com/docs/ios/spm')
     const requestPayload = {
       app_id: appId,
       platform,

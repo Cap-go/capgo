@@ -1,11 +1,12 @@
 import type { Context } from 'hono'
 import type { Database, Json } from '../../utils/supabase.types.ts'
+import { notifyCocoaPodsDeprecation } from '../../utils/cocoapods_deprecation.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 import { sendEventToTracking } from '../../utils/tracking.ts'
-import { getEnv } from '../../utils/utils.ts'
+import { backgroundTask, getEnv } from '../../utils/utils.ts'
 import { assertNativeBuildConcurrencyAvailable, getPlansUpgradeUrl } from './concurrency.ts'
 
 export interface RequestBuildBody {
@@ -561,7 +562,8 @@ export async function requestBuild(
     appId: app_id,
     platform,
     uploadPath: upload_path,
-    buildOptions: build_options,
+    // The builder schedules some builds by dependency manager.
+    buildOptions: ios_dependency_manager ? { ...build_options, iosDependencyManager: ios_dependency_manager } : build_options,
     buildCredentials: build_credentials,
     cacheEnabled: cache_enabled,
     cacheKey: cache_key,
@@ -601,6 +603,9 @@ export async function requestBuild(
     app_id,
     platform,
   })
+
+  if (ios_dependency_manager === 'cocoapods')
+    await backgroundTask(c, notifyCocoaPodsDeprecation(c, { orgId: org_id, appId: app_id, iosDependencyManager: ios_dependency_manager }))
 
   await recordBuildRequestedTelemetry(c, {
     app_id,
