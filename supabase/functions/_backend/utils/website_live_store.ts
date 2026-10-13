@@ -4,7 +4,6 @@ import { sql } from 'drizzle-orm'
 import { quickError, simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from './pg.ts'
-import { s3 } from './s3.ts'
 import {
   AscCertificateLimitError,
   buildIosProvisioningMap,
@@ -17,6 +16,7 @@ import {
   validatePlayServiceAccountJson,
   verifyAscKey,
 } from './store_signing.ts'
+import { supabaseAdmin } from './supabase.ts'
 import { getEnv } from './utils.ts'
 import { generateWebsiteLiveIconSet } from './website_live_icons.ts'
 
@@ -569,15 +569,18 @@ export async function exportAndroidKeystore(c: Context, appId: string) {
 // Icons
 // ---------------------------------------------------------------------------
 
+// Icons live in the Supabase images bucket next to the app icon (org/<org>/<app>/),
+// so cron_clean_orphan_images removes them when the app is deleted.
+const ICON_BUCKET = 'images'
+
 function iconPrefix(app: WebsiteLiveApp): string {
-  return `orgs/${app.owner_org}/apps/${app.app_id}/website_live/icons/${crypto.randomUUID()}`
+  return `org/${app.owner_org}/${app.app_id}/website_live/${crypto.randomUUID()}`
 }
 
 async function putStorageObject(c: Context, key: string, bytes: Uint8Array, contentType: string) {
-  const url = await s3.getUploadUrl(c, key, 600)
-  const response = await fetch(url, { method: 'PUT', headers: { 'Content-Type': contentType }, body: new Uint8Array(bytes) })
-  if (!response.ok) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Website Live icon upload failed', key, status: response.status, body: (await response.text()).slice(0, 500) })
+  const { error } = await supabaseAdmin(c).storage.from(ICON_BUCKET).upload(key, new Uint8Array(bytes), { contentType, upsert: true })
+  if (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Website Live icon upload failed', key, error })
     throw simpleError('icon_upload_failed', 'Could not store the generated icon')
   }
 }
@@ -592,11 +595,12 @@ export async function storeIconSet(c: Context, app: WebsiteLiveApp, source: Uint
 }
 
 export async function loadIconSet(c: Context, prefix: string, backgroundColor: string): Promise<WebsiteLiveIconSet> {
+  const storage = supabaseAdmin(c).storage.from(ICON_BUCKET)
   const entries = await Promise.all(Object.entries(ICON_FILES).map(async ([field, file]) => {
-    const response = await s3.getObject(c, `${prefix}/${file}`)
-    if (!response)
+    const { data, error } = await storage.download(`${prefix}/${file}`)
+    if (error || !data)
       throw simpleError('icon_missing', 'The app icon is missing. Upload it again.')
-    return [field, new Uint8Array(await response.arrayBuffer())] as const
+    return [field, new Uint8Array(await data.arrayBuffer())] as const
   }))
   return { ...Object.fromEntries(entries), backgroundColor } as WebsiteLiveIconSet
 }
@@ -604,13 +608,12 @@ export async function loadIconSet(c: Context, prefix: string, backgroundColor: s
 export async function getIconPreviewUrl(c: Context, prefix: string | null): Promise<string | null> {
   if (!prefix)
     return null
-  try {
-    return await s3.getSignedUrl(c, `${prefix}/${ICON_FILES.preview256}`, 3600)
-  }
-  catch (error) {
+  const { data, error } = await supabaseAdmin(c).storage.from(ICON_BUCKET).createSignedUrl(`${prefix}/${ICON_FILES.preview256}`, 3600)
+  if (error || !data) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot sign Website Live icon preview', error })
     return null
   }
+  return data.signedUrl
 }
 
 async function readLimited(response: Response, maxBytes: number): Promise<Uint8Array> {

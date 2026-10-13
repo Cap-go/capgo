@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS public.website_live_store_configs (
 );
 
 COMMENT ON TABLE public.website_live_store_configs IS 'Store listing settings Capgo uses to build Website Live apps from the hosted template. One row per app.';
-COMMENT ON COLUMN public.website_live_store_configs.icon_storage_prefix IS 'Storage prefix holding the generated icon set (ios-1024.png, android-*.png, play-512.png, preview-256.png).';
+COMMENT ON COLUMN public.website_live_store_configs.icon_storage_prefix IS 'Path prefix in the images storage bucket holding the generated icon set (ios-1024.png, android-*.png, play-512.png, preview-256.png).';
 
 CREATE TABLE IF NOT EXISTS public.website_live_store_credentials (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
