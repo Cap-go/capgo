@@ -36,6 +36,51 @@ The standalone database needs `r2_objects`, its lifecycle trigger and enum, and 
 
 The Hyperdrive origin uses the `r2_inventory_consumer` role. It can select, insert and update the two inventory tables and use the object-state enum. It has no inherited database-wide or administrative roles, no access to `manifest`, and no delete or schema-creation permission. Runtime credentials are stored in Hyperdrive, never in repository files. These explicit grants were verified on the target, and Cloudflare accepted the restricted origin connection.
 
+### Manifest reservation lease schema preparation
+
+`supabase/migrations/20261013093816_r2_objects_manifest_lease.sql` records the
+additive lease schema in the repository's migration history. Applying Supabase
+migrations does **not** update the authoritative standalone PlanetScale inventory.
+The lease preparation requires a separate reviewed schema deployment to that
+inventory database; merging this PR alone does not complete that deployment.
+
+The column is nullable `timestamptz`, with no default or existing-row backfill.
+The four lifecycle states stay unchanged. The partial index contains only
+`to_be_uploaded` rows with a non-null lease and supports bucket-scoped queries
+ordered by `(manifest_lease_expires_at, r2_key)` with an expiry cutoff and limit.
+Reservations and cleanup do not use this field yet. Future reservations will
+extend it using `GREATEST(COALESCE(existing_expiry, database_now), database_now +
+interval '30 minutes')`.
+
+For a later authorized PlanetScale deployment, use an existing administrator
+connection to the production destination above, not the restricted Hyperdrive
+runtime role. Apply the migration's exact `ALTER TABLE` and `COMMENT ON COLUMN`
+statements in a short transaction with `SET LOCAL lock_timeout = '5s'`. If the
+lock times out, roll back and retry later; do not wait indefinitely behind active
+inventory work. Commit those statements before building the index.
+
+Then apply the migration's same index definition with `CONCURRENTLY`, outside a
+transaction, so notifications, repairs and backfill writes can continue:
+
+```sql
+CREATE INDEX CONCURRENTLY r2_objects_expired_manifest_leases_idx
+ON public.r2_objects (bucket_name, manifest_lease_expires_at, r2_key)
+WHERE r2_state = 'to_be_uploaded'::public.r2_object_state
+AND manifest_lease_expires_at IS NOT NULL;
+```
+
+The regular index statement in the migration is for transactional Supabase
+migration execution. Do not run that regular build on the large live inventory.
+Even the initially empty partial index requires table scans during construction;
+schedule the concurrent build with capacity available, deferring it if necessary
+while the historical backfill runs without modifying that backfill. Afterward,
+verify the column's type, nullability and absent default, the column comment, and
+the index definition plus `pg_index.indisvalid` / `indisready`. A failed concurrent
+build can leave an invalid index: inspect and remove only that invalid index with
+`DROP INDEX CONCURRENTLY public.r2_objects_expired_manifest_leases_idx` before
+retrying. Do not use `IF NOT EXISTS` to accept an invalid or mismatched index.
+This deployment needs no credential, binding, consumer or R2 object changes.
+
 ### Starting without the old inventory history
 
 This change starts a new inventory; it does not import existing Supabase inventory rows or historical R2 objects. The first insertion of a bucket's admission checkpoint records the database statement-start time as its initial event floor. That floor is preserved on subsequent `ON CONFLICT DO NOTHING` insertions. The existing guard prevents moving it backwards or deleting it.
